@@ -1,7 +1,7 @@
 # Alcance del Proyecto — Sistema de Gestión Empresarial
 
 **Documento técnico para selección y configuración de servidor**
-**Versión:** 1.5 | **Fecha:** 2026-06-02
+**Versión:** 1.6 | **Fecha:** 2026-06-02
 
 ---
 
@@ -17,7 +17,7 @@
    - 4.1 Base de Conocimientos
    - 4.2 Comunicaciones Internas
 5. [Módulos de Recursos](#5-módulos-de-recursos)
-   - 5.1 Inventario _(En desarrollo)_
+   - 5.1 Inventario
 6. [Módulos de Plataforma](#6-módulos-de-plataforma)
    - 6.1 Usuarios y Áreas
    - 6.2 Notificaciones
@@ -42,28 +42,28 @@ El sistema está organizado en **4 grupos funcionales** y **10 módulos** que se
 
 ## 2. Visión General del Sistema
 
-El siguiente diagrama muestra los 10 módulos del sistema organizados por grupo funcional. Esta estructura es la que guía el resto del documento.
+El siguiente diagrama muestra los 10 módulos del sistema organizados por grupo funcional, con sus números de sección correspondientes. Esta estructura es la que guía el resto del documento.
 
 ```mermaid
 mindmap
   root((Sistema de<br/>Gestión))
-    Operaciones
-      🎫 Tickets de Soporte
-      🚶 Rondas y Patrullas
-      📋 Formularios
-    Conocimiento
-      📚 Base de Conocimientos
-      📰 Comunicaciones
-    Recursos
-      📦 Inventario
-    Plataforma
-      👥 Usuarios y Áreas
-      🔔 Notificaciones
-      🏠 Página Pública
-      ⚙️ Configuración
+    §3 Operaciones
+      3.1 🎫 Tickets de Soporte
+      3.2 🚶 Rondas y Patrullas
+      3.3 📋 Formularios
+    §4 Conocimiento
+      4.1 📚 Base de Conocimientos
+      4.2 📰 Comunicaciones
+    §5 Recursos
+      5.1 📦 Inventario
+    §6 Plataforma
+      6.1 👥 Usuarios y Áreas
+      6.2 🔔 Notificaciones
+      6.3 🏠 Página Pública
+      6.4 ⚙️ Configuración
 ```
 
-> Los módulos de **Operaciones** son el núcleo del sistema. **Conocimiento** y **Recursos** complementan la operación diaria. **Plataforma** agrupa las capacidades transversales que dan soporte a todos los demás módulos.
+> Los módulos de **Operaciones (§3)** son el núcleo del sistema. **Conocimiento (§4)** y **Recursos (§5)** complementan la operación diaria. **Plataforma (§6)** agrupa las capacidades transversales que dan soporte a todos los demás módulos.
 
 ---
 
@@ -92,7 +92,7 @@ stateDiagram-v2
     end note
     note right of Cerrado
         Puede generar artículo
-        en Base de Conocimientos
+        en Base de Conocimientos §4.1
     end note
 ```
 
@@ -114,21 +114,25 @@ Permite planificar y registrar recorridos de seguridad física, con evidencia ge
 **Capacidades:**
 
 - Planificación de rutas con puntos de control geolocalizados
-- Registro de incidencias y evidencia fotográfica por punto
-- Programación de horarios automática
-- Reportes de cumplimiento de rondas
+- Soporte offline con sincronización posterior al recuperar conectividad
+- Validación de check-in por QR dinámico o estático con ventana de tiempo configurable
+- Registro de incidencias con evidencia fotográfica por punto
+- Programación de horarios recurrentes (diario, semanal, personalizado)
+- Reportes de cumplimiento con porcentaje de completitud por ronda
 
 ---
 
 ### 3.3 📋 Formularios Personalizados
 
-Permite crear formularios operativos adaptados a cada área, sin necesidad de desarrollo adicional.
+Permite crear y distribuir formularios y documentos operativos por área, sin necesidad de desarrollo adicional.
 
 **Capacidades:**
 
-- Campos configurables: texto, número, fecha, selección, archivos
-- Asignación por área o familia
-- Respuestas exportables e integración con tickets y otros módulos
+- Documentos y formularios organizados por categorías y familias
+- Control de acceso por rol, usuario o departamento
+- Descarga con contador de vistas
+- Archivos adjuntos por formulario
+- Integración con tickets y otros módulos
 
 ---
 
@@ -138,14 +142,15 @@ Este grupo gestiona la información generada por la operación y su comunicació
 
 ### 4.1 📚 Base de Conocimientos
 
-Repositorio interno de soluciones y procedimientos. Se alimenta directamente de tickets resueltos, convirtiendo la experiencia operativa en conocimiento reutilizable.
+Repositorio interno de soluciones y procedimientos. Se alimenta directamente de tickets resueltos (§3.1), convirtiendo la experiencia operativa en conocimiento reutilizable.
 
 **Capacidades:**
 
-- Artículos generados desde tickets resueltos
+- Artículos generados desde tickets resueltos con un clic
 - Búsqueda full-text avanzada
-- Clasificación por utilidad y sistema de votación
+- Clasificación por utilidad y sistema de votación por usuario
 - Acceso controlado por rol: público, técnicos, administradores
+- Organización por categorías y familias
 
 ---
 
@@ -155,32 +160,90 @@ Canal centralizado para noticias y anuncios dirigidos al equipo o a áreas espec
 
 **Capacidades:**
 
+- Tipos de publicación: noticia, anuncio, evento, alerta, reconocimiento, cumpleaños
 - Publicación con fechas de vigencia (inicio y fin)
-- Notificaciones automáticas a usuarios al publicar
+- Segmentación por rol, departamento, familia o usuarios específicos
+- Reacciones y comentarios por publicación
 - Archivos adjuntos en noticias
-- Estadísticas de visualización
+- Estadísticas de visualización y reacciones
 
 ---
 
 ## 5. Módulos de Recursos
 
-### 5.1 📦 Inventario _(En desarrollo)_
+### 5.1 📦 Inventario
 
-Control centralizado de todos los activos tecnológicos y físicos de la empresa. Actualmente en fase de desarrollo; los demás módulos están en producción.
+Control centralizado de todos los activos tecnológicos y físicos de la empresa. El módulo está **desarrollado en su mayor parte** — el backend, la base de datos y los flujos principales están completos. Se encuentra en fase de revisión y ajustes finales antes de activarse en producción.
 
-**Submódulos:**
+#### Estado de avance
 
-| Submódulo       | Descripción                                                      |
-| --------------- | ---------------------------------------------------------------- |
-| Equipos         | Código único, QR, historial de asignaciones y mantenimientos     |
-| Licencias       | Claves encriptadas, alertas automáticas de vencimiento           |
-| Consumibles     | Control de stock con alertas de nivel bajo                       |
-| Contratos       | Gestión documental con archivos adjuntos                         |
-| Actas digitales | Entrega, devolución y baja con PDF automático y folio secuencial |
-| Proveedores     | Gestión por tipo y área                                          |
+```mermaid
+graph LR
+    subgraph Completado["✅ Completado"]
+        A[Base de datos<br/>y modelos]
+        B[API REST<br/>completa]
+        C[Equipos y<br/>asignaciones]
+        D[Licencias y<br/>consumibles]
+        E[Actas digitales<br/>con firma]
+        F[Contratos y<br/>pagos]
+        G[Baja de activos<br/>flujo 4 etapas]
+        H[Solicitudes<br/>de activos]
+        I[Reportes<br/>11 tipos]
+        J[Alertas<br/>automáticas]
+    end
 
-- Catálogos personalizables (tipos de equipo, licencia, consumible, unidades de medida)
-- Reportes de inventario con exportación
+    subgraph Pendiente["🔧 Ajustes finales"]
+        K[Formulario<br/>unificado UI]
+        L[Vistas detalle<br/>de familia]
+    end
+
+    A --> B --> C
+    C --> D --> E
+    E --> F --> G
+    G --> H --> I --> J
+    J -.-> K
+    J -.-> L
+```
+
+#### Submódulos implementados
+
+| Submódulo                  | Estado      | Descripción                                                                                                                                     |
+| -------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Equipos**                | ✅ Completo | Código único autogenerado, QR, foto, historial de asignaciones, mantenimientos, depreciación (lineal / saldo decreciente / unidades producidas) |
+| **Modelos y marcas**       | ✅ Completo | Catálogo de marcas y modelos reutilizables, atributos dinámicos por tipo de equipo                                                              |
+| **Lotes de compra**        | ✅ Completo | Registro por lote con proveedor, precio unitario, almacén y condición; generación automática de equipos desde lote                              |
+| **Licencias**              | ✅ Completo | Claves almacenadas, tipos con atributos dinámicos, alcance individual/departamento/empresa, alertas de vencimiento automáticas                  |
+| **Consumibles / MRO**      | ✅ Completo | Stock con mínimo/máximo, movimientos de entrada/salida/ajuste, alerta automática de stock bajo, fecha de expiración                             |
+| **Contratos**              | ✅ Completo | Categorías: arriendo, licencia, servicio, mantenimiento. Ciclo de facturación, alertas a 60/30/15 días, historial de renovaciones               |
+| **Pagos de contratos**     | ✅ Completo | Calendario de pagos programados, alertas a 7 días, vencido y atrasado                                                                           |
+| **Actas digitales**        | ✅ Completo | Entrega y devolución con PDF automático, folio secuencial, firma digital con token de aceptación y hash de verificación                         |
+| **Baja de activos**        | ✅ Completo | Flujo de 4 etapas: solicitud → dictamen técnico → revisión de gestor → aprobación admin, con acta de baja en PDF                                |
+| **Solicitudes de activos** | ✅ Completo | Flujo PENDING → UNDER_REVIEW → APPROVED → FULFILLED con SLA, código único AR-AÑO-SEQ y comentarios internos                                     |
+| **Ventas de activos**      | ✅ Completo | Solicitud de venta con aprobación de admin, datos del comprador, método de pago                                                                 |
+| **Proveedores**            | ✅ Completo | Gestión por tipo y familia, datos fiscales y de contacto                                                                                        |
+| **Almacenes**              | ✅ Completo | Múltiples almacenes por familia con gestor asignado                                                                                             |
+| **Mantenimiento**          | ✅ Completo | Registros preventivos y correctivos, vinculados a tickets, con técnico, costo y partes reemplazadas                                             |
+| **Reportes**               | ✅ Completo | 11 tipos de reportes con exportación                                                                                                            |
+| **Catálogos**              | ✅ Completo | Tipos de equipo, licencia, consumible, unidades de medida — todos personalizables por familia                                                   |
+| **Campos personalizados**  | ✅ Completo | Atributos adicionales definidos por familia (texto, número, fecha, selección, booleano)                                                         |
+| **Configuración por área** | ✅ Completo | Subtypes permitidos, secciones visibles/requeridas, método de depreciación y prefijos de código por familia                                     |
+
+#### Activación del módulo
+
+El inventario se activa de forma controlada en tres niveles independientes, lo que permite un rollout gradual sin afectar al resto del sistema:
+
+```mermaid
+graph TD
+    SYS["⚙️ Sistema Global<br/>(system_modules)"]
+    FAM["🏢 Por Área/Familia<br/>(inventory_family_config)"]
+    USR["👤 Por Usuario<br/>(users.inventoryEnabled)"]
+
+    SYS --> FAM --> USR
+
+    SYS -- "Activa/desactiva el módulo<br/>a nivel global" --> FAM
+    FAM -- "Controla qué áreas<br/>tienen inventario activo" --> USR
+    USR -- "Define si el usuario<br/>puede acceder al módulo" --> FIN[Acceso concedido]
+```
 
 ---
 
@@ -196,18 +259,18 @@ Define la estructura organizacional del sistema: quién puede hacer qué y en qu
 
 ```mermaid
 graph TD
-    SA[🔑 Super Administrador<br/>Acceso total al sistema]
-    AD[🛡️ Administrador<br/>Gestión de su área]
-    TEC[🔧 Técnico<br/>Atención de tickets e inventario]
-    CLI[👤 Cliente<br/>Creación de solicitudes]
+    SA["🔑 Super Administrador<br/>Acceso total al sistema"]
+    AD["🛡️ Administrador<br/>Gestión de su área"]
+    TEC["🔧 Técnico<br/>Atención de tickets e inventario"]
+    CLI["👤 Cliente<br/>Creación de solicitudes"]
 
     SA --> AD
     AD --> TEC
     AD --> CLI
 
-    SA -.->|Configura| SYS[⚙️ Sistema Global]
-    AD -.->|Gestiona| AREA[🏢 Área / Familia]
-    TEC -.->|Resuelve| TKT[🎫 Tickets]
+    SA -.->|Configura| SYS["⚙️ Sistema Global"]
+    AD -.->|Gestiona| AREA["🏢 Área / Familia"]
+    TEC -.->|Resuelve| TKT["🎫 Tickets §3.1"]
     CLI -.->|Crea| TKT
 ```
 
@@ -215,26 +278,33 @@ graph TD
 
 - Áreas (familias) con departamentos, técnicos y gestores asignados
 - Configuración independiente de tickets e inventario por área
-- Gestores de inventario delegados por área
+- Gestores de inventario con permisos delegados por área
+- Exportación de usuarios con filtros
 
 ---
 
 ### 6.2 🔔 Notificaciones
 
-Sistema unificado de alertas que opera en todos los módulos.
+Sistema unificado de alertas que opera transversalmente en todos los módulos.
 
-| Canal              | Descripción                                 |
-| ------------------ | ------------------------------------------- |
-| En la aplicación   | Notificaciones en tiempo real               |
-| Correo electrónico | Envío con reintentos automáticos ante fallo |
-| Navegador (push)   | Notificaciones fuera de la aplicación       |
+| Canal              | Descripción                                         |
+| ------------------ | --------------------------------------------------- |
+| En la aplicación   | Tiempo real, sin recarga de página                  |
+| Correo electrónico | Cola de envío con reintentos automáticos ante fallo |
+| Navegador (push)   | Notificaciones fuera de la aplicación               |
 
-**Alertas automáticas configuradas:**
+**Alertas automáticas por módulo:**
 
-- Stock de consumibles por debajo del mínimo
-- Licencias próximas a vencer
-- Contratos próximos a vencer
-- Garantías de equipos por vencer
+| Módulo     | Evento que dispara la alerta                         |
+| ---------- | ---------------------------------------------------- |
+| Inventario | Stock de consumibles bajo mínimo                     |
+| Inventario | Licencia próxima a vencer                            |
+| Inventario | Contrato próximo a vencer (60 / 30 / 15 días)        |
+| Inventario | Pago de contrato próximo (7 días, vencido, atrasado) |
+| Inventario | Garantía de equipo por vencer                        |
+| Inventario | Alquiler próximo a vencer                            |
+| Actas      | Acta de entrega/devolución pendiente de firma        |
+| Tickets    | Asignación, actualización, respuesta, cierre         |
 
 ---
 
@@ -244,9 +314,10 @@ Sitio web corporativo editable desde el panel de administración, sin necesidad 
 
 **Capacidades:**
 
-- Secciones configurables: Hero, Servicios, Banners
-- SEO optimizado
-- Control total desde el panel de administración
+- Secciones configurables: Hero, Servicios, Banners con fechas de vigencia
+- Logo, favicon, colores y datos de contacto editables
+- SEO optimizado: meta título, descripción y palabras clave por página
+- Estadísticas de clics y vistas en banners
 
 ---
 
@@ -257,17 +328,18 @@ Ajustes globales del sistema y controles de acceso.
 **Configuración global:**
 
 - SMTP para envío de correos
-- Parámetros de SLA por prioridad
+- Parámetros de SLA por prioridad y categoría
 - Límites de tamaño de archivos adjuntos
-- Login con Google y Microsoft (OAuth)
+- Login con Google y Microsoft (OAuth) — configurable sin tocar código
 
 **Controles de seguridad:**
 
 - Control de acceso por roles y áreas
 - Auditoría completa de todas las acciones del sistema
 - Bloqueo de cuenta por intentos de acceso fallidos
-- Encriptación de datos sensibles (claves de licencias, etc.)
+- Encriptación de datos sensibles (claves de licencias, tokens)
 - Rate limiting contra ataques automatizados
+- Webhooks configurables para integraciones externas
 
 ---
 
@@ -372,31 +444,36 @@ Todos los componentes del servidor corren dentro de contenedores Docker gestiona
 
 ### Política de backups
 
+El sistema implementa backups automáticos con seguimiento de estado, checksum de integridad y compresión. Cada backup queda registrado en la base de datos con tipo, módulo, tamaño y resultado.
+
 ```mermaid
-graph LR
-    subgraph Diario
-        D1[Backup incremental<br/>automático]
-    end
-    subgraph Semanal
-        S1[Backup completo]
-    end
-    subgraph Retención
-        R1[30 días<br/>de historial]
-    end
-    subgraph Validación
-        V1[Prueba de restauración<br/>mensual]
+flowchart LR
+    subgraph Frecuencia
+        D["🔄 Incremental<br/>Diario — automático"]
+        S["📦 Completo<br/>Semanal"]
     end
 
-    D1 --> R1
-    S1 --> R1
-    R1 --> V1
+    subgraph Almacenamiento
+        R["🗄️ Retención<br/>30 días de historial<br/>Ubicación separada<br/>al servidor principal"]
+    end
+
+    subgraph Validación
+        V["✅ Prueba de restauración<br/>Mensual — ejecución real"]
+    end
+
+    D --> R
+    S --> R
+    R --> V
 ```
 
-- **Backup incremental:** diario, automatizado, sin intervención manual
-- **Backup completo:** semanal, incluye base de datos y archivos adjuntos
-- **Retención:** 30 días de historial disponible para restauración
-- **Validación:** prueba de restauración real ejecutada cada mes para garantizar integridad
-- **Almacenamiento:** los backups se guardan en ubicación separada al servidor principal
+| Concepto              | Detalle                                            |
+| --------------------- | -------------------------------------------------- |
+| Backup incremental    | Diario, automatizado, sin intervención manual      |
+| Backup completo       | Semanal, incluye base de datos y archivos adjuntos |
+| Compresión y checksum | Verificación de integridad en cada backup generado |
+| Retención             | 30 días de historial disponible para restauración  |
+| Almacenamiento        | Ubicación separada al servidor principal           |
+| Validación            | Prueba de restauración real ejecutada cada mes     |
 
 ---
 
@@ -404,17 +481,17 @@ graph LR
 
 ```mermaid
 gantt
-    title Fases de Despliegue
-    dateFormat  YYYY-MM-DD
-    axisFormat  %d/%m
+    title Estimado de Despliegue (días hábiles desde inicio)
+    dateFormat  D
+    axisFormat  Día %d
 
     section Infraestructura
-    Selección de proveedor        :a1, 2026-06-02, 2d
+    Selección de proveedor        :a1, 1, 2d
     Provisionamiento del servidor :a2, after a1, 1d
     Docker + Firewall + SSH       :a3, after a2, 1d
 
     section Red y Dominio
-    Alta de dominio               :b1, after a2, 2d
+    Alta de dominio               :b1, after a1, 2d
     Certificado SSL               :b2, after b1, 1d
 
     section Sistema
@@ -426,6 +503,8 @@ gantt
     Pruebas de seguridad          :d2, after d1, 1d
     Documentación final           :d3, after d2, 1d
 ```
+
+> Duración total estimada: **~10 días hábiles** desde la selección del proveedor hasta la entrega documentada.
 
 **Checklist de despliegue:**
 
