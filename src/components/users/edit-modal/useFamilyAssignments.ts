@@ -308,10 +308,14 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
       try {
         const viewerIsSuperAdmin = (session?.user as any)?.isSuperAdmin === true
 
+        // Para módulos de inventario y patrullas usamos scope=all para que la API
+        // no filtre por el scope del admin viewer (que podría no tener asignaciones propias).
+        // El filtro de módulo habilitado (inventoryEnabled/patrolsEnabled) sí se aplica.
+        // Los fetches sin scope=all se usan para calcular el scope del viewer (readOnly locks).
         const [ticketModuleRes, inventoryModuleRes, patrolModuleRes, allRes] = await Promise.all([
           fetch('/api/families?includeInactive=false&module=tickets'),
-          fetch('/api/families?includeInactive=false&module=inventory'),
-          fetch('/api/families?includeInactive=false&module=patrols'),
+          fetch('/api/families?includeInactive=false&module=inventory&scope=all'),
+          fetch('/api/families?includeInactive=false&module=patrols&scope=all'),
           fetch('/api/families?includeInactive=false&scope=all'),
         ])
 
@@ -342,7 +346,7 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
           if (!userNativeFamilyId) return list
           const alreadyIn = list.some(f => f.id === userNativeFamilyId)
           if (alreadyIn) return list
-          // Buscarla en allActiveFamilies o en cualquiera de las listas de módulo
+          // Buscarla en cualquiera de las listas disponibles
           const nativeFamily =
             allActiveFamilies.find(f => f.id === userNativeFamilyId) ??
             tModuleFamilies.find(f => f.id === userNativeFamilyId) ??
@@ -356,34 +360,31 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
           setInventoryFamilies(iModuleFamilies)
           setPatrolFamilies(pModuleFamilies)
         } else {
-          // Para Admin Normal: usar la intersección entre el módulo y el scope del viewer,
-          // pero siempre incluyendo la familia nativa del usuario editado.
-          setTicketFamilies(
-            ensureNativeFamily(
-              tModuleFamilies.length > 0
-                ? allActiveFamilies.filter(f => tModuleFamilies.some(t => t.id === f.id))
-                : allActiveFamilies
-            )
-          )
-          setInventoryFamilies(
-            ensureNativeFamily(
-              iModuleFamilies.length > 0
-                ? allActiveFamilies.filter(f => iModuleFamilies.some(i => i.id === f.id))
-                : allActiveFamilies
-            )
-          )
-          setPatrolFamilies(
-            ensureNativeFamily(
-              pModuleFamilies.length > 0
-                ? allActiveFamilies.filter(f => pModuleFamilies.some(p => p.id === f.id))
-                : allActiveFamilies
-            )
-          )
+          // Para Admin Normal: las listas de inventario y patrullas ya vienen sin filtro
+          // de scope (scope=all), por lo que las usamos directamente asegurando que la
+          // familia nativa del usuario editado esté incluida.
+          // Para tickets sí mantenemos la intersección con el scope del viewer.
+          const viewerTicketFamilies =
+            tModuleFamilies.length > 0
+              ? allActiveFamilies.filter(f => tModuleFamilies.some(t => t.id === f.id))
+              : allActiveFamilies
 
-          // El scope del admin viewer ya viene en tModuleFamilies (mismo endpoint)
+          setTicketFamilies(ensureNativeFamily(viewerTicketFamilies))
+          setInventoryFamilies(ensureNativeFamily(iModuleFamilies))
+          setPatrolFamilies(ensureNativeFamily(pModuleFamilies))
+
+          // Para los readOnly locks necesitamos el scope real del viewer (sin scope=all).
+          // Hacemos fetches adicionales sin scope=all para obtener solo lo que el viewer puede asignar.
+          const [viewerInvRes, viewerPatrolRes] = await Promise.all([
+            fetch('/api/families?includeInactive=false&module=inventory'),
+            fetch('/api/families?includeInactive=false&module=patrols'),
+          ])
+          const viewerInvFamilies = await parseFamilies(viewerInvRes)
+          const viewerPatrolFamilies = await parseFamilies(viewerPatrolRes)
+
           setAdminTicketScopeIds(tModuleFamilies.map(f => f.id))
-          setAdminInventoryScopeIds(iModuleFamilies.map(f => f.id))
-          setAdminPatrolScopeIds(pModuleFamilies.map(f => f.id))
+          setAdminInventoryScopeIds(viewerInvFamilies.map(f => f.id))
+          setAdminPatrolScopeIds(viewerPatrolFamilies.map(f => f.id))
           setAdminScopeIds(tModuleFamilies.map(f => f.id))
         }
 
