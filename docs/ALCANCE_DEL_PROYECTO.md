@@ -239,7 +239,7 @@ Tu Servidor en la Nube
 
 ## 11. Más información
 
-Si quieres saber más, consulta estos documentos:
+Saber más, consultar estos documentos:
 
 - [README.md](./README.md) - Todo sobre el sistema
 - [DEPLOYMENT.md](./DEPLOYMENT.md) - Cómo instalar el sistema
