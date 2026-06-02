@@ -24,7 +24,7 @@ https://gestion.local  (o http://localhost:3000)
 
 ```
 Email:     internet.freecom@gmail.com
-Contraseña: admin123
+Contraseña: ********
 ```
 
 ---
