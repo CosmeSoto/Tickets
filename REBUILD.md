@@ -72,7 +72,10 @@ npm run dev
 ### Producción
 
 ```bash
-# Despliegue automático (detecta IP, genera certs, levanta):
+# Despliegue automático (detecta IP, actualiza NEXTAUTH_URL, genera certs, levanta):
+# ⚠️  IMPORTANTE: Este script actualiza NEXTAUTH_URL con la IP actual del servidor.
+# Siempre usar este script para desplegar — no levantar con docker compose directamente
+# sin antes haber corrido este script al menos una vez.
 sudo ./start-production.sh
 
 # Reconstruir desde cero (borra datos):
@@ -293,14 +296,16 @@ SELECT table_name FROM information_schema.tables WHERE table_name = 'patrol_fami
 
 ## Solución de Problemas
 
-| Problema                          | Solución                                                      |
-| --------------------------------- | ------------------------------------------------------------- |
-| App no arranca                    | `docker logs tickets-app` — verificar DATABASE_URL            |
-| No accede a gestion.local         | Verificar `/etc/hosts` y que nginx esté corriendo             |
-| Certificado SSL no confiable      | Aceptar excepción o instalar CA de mkcert en clientes         |
-| Dashboard rondas vacío            | Verificar que hay patrullas programadas para hoy (UTC-5)      |
-| Técnico no aparece en categorías  | Verificar `technician_family_assignments` para esa familia    |
-| Agente no aparece en programación | Verificar `patrol_family_assignments` + `patrolsEnabled=true` |
+| Problema                                     | Solución                                                                                                                                                                                                                     |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| App no arranca                               | `docker logs tickets-app` — verificar DATABASE_URL                                                                                                                                                                           |
+| No accede a gestion.local                    | Verificar `/etc/hosts` y que nginx esté corriendo                                                                                                                                                                            |
+| Certificado SSL no confiable                 | Aceptar excepción o instalar CA de mkcert en clientes                                                                                                                                                                        |
+| **404 en `/api/admin/news` u otros módulos** | **NEXTAUTH_URL incorrecta.** Correr `sudo ./start-production.sh` — detecta la IP y actualiza `.env.production` automáticamente. O editar manualmente: `NEXTAUTH_URL=https://<IP_DEL_SERVIDOR>` y reiniciar el contenedor app |
+| Módulo carga vacío tras restaurar backup     | Igual que arriba — si se reconstruyó sin `start-production.sh`, el `NEXTAUTH_URL` puede quedar con dominio errado                                                                                                            |
+| Dashboard rondas vacío                       | Verificar que hay patrullas programadas para hoy (UTC-5)                                                                                                                                                                     |
+| Técnico no aparece en categorías             | Verificar `technician_family_assignments` para esa familia                                                                                                                                                                   |
+| Agente no aparece en programación            | Verificar `patrol_family_assignments` + `patrolsEnabled=true`                                                                                                                                                                |
 
 ---
 

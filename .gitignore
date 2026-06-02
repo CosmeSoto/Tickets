@@ -63,6 +63,7 @@ next-env.d.ts
 *.sh
 !scripts/**/*.sh
 !docker/**/*.sh
+!start-production.sh
 
 # Archivos de documentación temporal
 EMAIL_SYSTEM.md
