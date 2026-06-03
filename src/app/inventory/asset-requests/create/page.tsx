@@ -1,10 +1,9 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { Button } from '@/components/ui/button'
 import { AssetRequestCreateForm } from '@/components/inventory/asset-requests/asset-request-create-form'
+import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
 import { ArrowLeft } from 'lucide-react'
-import Link from 'next/link'
 
 export default function CreateAssetRequestPage() {
   const router = useRouter()
@@ -18,22 +17,21 @@ export default function CreateAssetRequestPage() {
   }
 
   return (
-    <div className='container mx-auto py-6 space-y-6'>
-      {/* Header */}
-      <div className='flex items-center gap-4'>
-        <Link href='/inventory/asset-requests'>
-          <Button variant='ghost' size='icon'>
-            <ArrowLeft className='h-4 w-4' />
-          </Button>
-        </Link>
-        <div>
-          <h1 className='text-3xl font-bold'>Nueva Solicitud de Activo</h1>
-          <p className='text-muted-foreground'>Completa el formulario para solicitar un activo</p>
-        </div>
+    <RoleDashboardLayout
+      title='Nueva Solicitud de Activo'
+      subtitle='Completa el formulario para solicitar un activo'
+    >
+      <div className='max-w-4xl mx-auto space-y-4'>
+        <button
+          type='button'
+          onClick={() => router.push('/inventory/asset-requests')}
+          className='flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors'
+        >
+          <ArrowLeft className='h-4 w-4' />
+          Solicitudes de Activos
+        </button>
+        <AssetRequestCreateForm onSuccess={handleSuccess} onCancel={handleCancel} />
       </div>
-
-      {/* Formulario */}
-      <AssetRequestCreateForm onSuccess={handleSuccess} onCancel={handleCancel} />
-    </div>
+    </RoleDashboardLayout>
   )
 }

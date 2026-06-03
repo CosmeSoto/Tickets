@@ -120,11 +120,7 @@ export function AssetRequestCreateForm({ onSuccess, onCancel }: AssetRequestCrea
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Nueva Solicitud de Activo</CardTitle>
-        <CardDescription>Completa el formulario para solicitar un activo</CardDescription>
-      </CardHeader>
-      <CardContent>
+      <CardContent className='pt-6'>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className='space-y-6'>
             {/* Tipo de Activo */}
@@ -176,9 +172,6 @@ export function AssetRequestCreateForm({ onSuccess, onCancel }: AssetRequestCrea
                       ))}
                     </SelectContent>
                   </Select>
-                  {/* <FormDescription>
-                    Selecciona la familia a la que pertenece el activo
-                  </FormDescription> */}
                   <FormMessage />
                 </FormItem>
               )}
@@ -208,11 +201,11 @@ export function AssetRequestCreateForm({ onSuccess, onCancel }: AssetRequestCrea
                 <FormItem>
                   <FormLabel>Justificación *</FormLabel>
                   <FormControl>
-                    <Textarea placeholder='Mínimo 20 caracteres. Explica el propósito y la necesidad' {...field} />
+                    <Textarea
+                      placeholder='Mínimo 20 caracteres. Explica el propósito y la necesidad'
+                      {...field}
+                    />
                   </FormControl>
-                  {/* <FormDescription>
-                    Explica por qué necesitas este activo...
-                  </FormDescription> */}
                   <FormMessage />
                 </FormItem>
               )}

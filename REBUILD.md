@@ -84,6 +84,9 @@ docker compose -f docker-compose.prod.yml --env-file .env.production up --build
 
 # Reconstruir solo la app:
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build app
+docker compose -f docker-compose.prod.yml --env-file .env.production build app
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d app
+
 
 # Reconstruir solo Redis:
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build redis
