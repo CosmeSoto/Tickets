@@ -22,11 +22,23 @@ chown -R nextjs:nodejs "$UPLOADS_DIR" "$BACKUP_DIR" "$LOGS_DIR" 2>/dev/null || t
 
 # ── 1. Sincronizar schema de base de datos ───────────────────────────────────
 echo "==> Sincronizando schema de base de datos..."
-$PRISMA_CLI db push --accept-data-loss || {
+DB_PUSH_OK=false
+
+# Intentar db push con reintentos (puede tardar si Postgres acaba de iniciar)
+for attempt in 1 2 3; do
+  if $PRISMA_CLI db push --accept-data-loss 2>&1; then
+    DB_PUSH_OK=true
+    break
+  fi
+  echo "==> db push intento ${attempt} falló — esperando 5s..."
+  sleep 5
+done
+
+if [ "$DB_PUSH_OK" = "false" ]; then
   echo "==> db push falló — intentando migrate deploy como fallback..."
-  $PRISMA_CLI migrate deploy
-}
-echo "==> Schema sincronizado."
+  $PRISMA_CLI migrate deploy 2>&1 || echo "==> migrate deploy también falló — continuando de todas formas"
+fi
+echo "==> Schema sincronizado (o advertencia ignorada)."
 
 # ── 2. Seed inicial (solo si la tabla de usuarios está vacía) ─────────────────
 # Usa node directamente para consultar la BD — más confiable que parsear prisma CLI.
