@@ -81,7 +81,7 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
   /** Módulos seleccionados para restaurar. Vacío = restauración completa */
   const [selectedModules, setSelectedModules] = useState<RestoreModuleId[]>([])
   /** Modo de restauración: replace (reemplazar) o merge (fusionar/agregar) */
-  const [restoreMode, setRestoreMode] = useState<RestoreMode>('replace')
+  const [restoreMode, setRestoreMode] = useState<RestoreMode>('merge')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
 
@@ -93,7 +93,7 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
       setRestorePreview(null)
       setShowConfirmation(false)
       setSelectedModules([])
-      setRestoreMode('replace')
+      setRestoreMode('merge')
     }
   }, [completedBackups, selectedBackup])
 
@@ -158,7 +158,7 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
     setSelectedBackup(backup)
     setShowConfirmation(false)
     setSelectedModules([])
-    setRestoreMode('replace')
+    setRestoreMode('merge')
     loadRestorePreview(backup)
   }
 
@@ -210,7 +210,7 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
           setSelectedBackup(null)
           setRestorePreview(null)
           setSelectedModules([])
-          setRestoreMode('replace')
+          setRestoreMode('merge')
           onRefresh()
         }, 2000)
       } else {
@@ -651,29 +651,6 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
                   <div className='grid grid-cols-1 gap-2'>
                     <label
                       className={`flex items-start gap-3 p-3 rounded-md border cursor-pointer transition-colors text-xs ${
-                        restoreMode === 'replace'
-                          ? 'border-destructive/60 bg-destructive/5 text-foreground'
-                          : 'border-border hover:bg-muted text-muted-foreground'
-                      }`}
-                    >
-                      <input
-                        type='radio'
-                        name='restoreMode'
-                        value='replace'
-                        checked={restoreMode === 'replace'}
-                        onChange={() => setRestoreMode('replace')}
-                        className='mt-0.5'
-                      />
-                      <div>
-                        <p className='font-medium text-foreground'>Reemplazar</p>
-                        <p className='text-muted-foreground mt-0.5'>
-                          Borra los datos actuales del módulo y los reemplaza con los del backup.
-                          Úsalo para volver a un estado anterior exacto.
-                        </p>
-                      </div>
-                    </label>
-                    <label
-                      className={`flex items-start gap-3 p-3 rounded-md border cursor-pointer transition-colors text-xs ${
                         restoreMode === 'merge'
                           ? 'border-primary bg-primary/5 text-foreground'
                           : 'border-border hover:bg-muted text-muted-foreground'
@@ -692,6 +669,29 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
                         <p className='text-muted-foreground mt-0.5'>
                           Agrega los registros del backup sin borrar los que ya existen. Úsalo para
                           combinar usuarios o datos de dos backups distintos.
+                        </p>
+                      </div>
+                    </label>
+                    <label
+                      className={`flex items-start gap-3 p-3 rounded-md border cursor-pointer transition-colors text-xs ${
+                        restoreMode === 'replace'
+                          ? 'border-destructive/60 bg-destructive/5 text-foreground'
+                          : 'border-border hover:bg-muted text-muted-foreground'
+                      }`}
+                    >
+                      <input
+                        type='radio'
+                        name='restoreMode'
+                        value='replace'
+                        checked={restoreMode === 'replace'}
+                        onChange={() => setRestoreMode('replace')}
+                        className='mt-0.5'
+                      />
+                      <div>
+                        <p className='font-medium text-foreground'>Reemplazar</p>
+                        <p className='text-muted-foreground mt-0.5'>
+                          Borra los datos actuales del módulo y los reemplaza con los del backup.
+                          Úsalo para volver a un estado anterior exacto.
                         </p>
                       </div>
                     </label>

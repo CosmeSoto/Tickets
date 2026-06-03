@@ -192,7 +192,7 @@ const HomePageContent = React.memo(function HomePageContent() {
 
         {/* ── Hero ───────────────────────────────────────────────────────── */}
         <section
-          className='relative flex-1 flex items-center py-24 sm:py-32 overflow-hidden'
+          className='relative flex-1 flex items-center py-16 sm:py-20 overflow-hidden'
           style={
             hasHeroImage
               ? {
@@ -219,12 +219,12 @@ const HomePageContent = React.memo(function HomePageContent() {
 
           <div className='relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center w-full'>
             {/* Badge */}
-            <div className='inline-flex items-center gap-2 bg-primary/10 border border-primary/25 text-primary text-sm font-medium px-4 py-1.5 rounded-full mb-8'>
+            <div className='inline-flex items-center gap-2 bg-primary/10 border border-primary/25 text-primary text-sm font-medium px-4 py-1.5 rounded-full mb-6'>
               <span className='w-2 h-2 rounded-full bg-primary animate-pulse' />
               Gestión Integral de Operaciones integral
             </div>
 
-            <h1 className='text-4xl sm:text-5xl md:text-6xl font-bold mb-6 text-foreground leading-tight'>
+            <h1 className='text-4xl sm:text-5xl md:text-6xl font-bold mb-5 text-foreground leading-tight'>
               {(() => {
                 const words = d.heroTitle.trim().split(/\s+/).filter(Boolean)
                 if (words.length === 0) {
@@ -242,7 +242,7 @@ const HomePageContent = React.memo(function HomePageContent() {
                 )
               })()}
             </h1>
-            <p className='text-lg sm:text-xl text-muted-foreground mb-10 max-w-2xl mx-auto leading-relaxed'>
+            <p className='text-lg sm:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto leading-relaxed'>
               {d.heroSubtitle}
             </p>
             <div className='flex flex-col sm:flex-row gap-4 justify-center'>
@@ -272,12 +272,12 @@ const HomePageContent = React.memo(function HomePageContent() {
 
         {/* ── Services ───────────────────────────────────────────────────── */}
         {d.servicesEnabled && services.length > 0 && (
-          <section id='servicios' className='py-20 border-y border-border relative overflow-hidden'>
+          <section id='servicios' className='py-16 border-y border-border relative overflow-hidden'>
             <div className='absolute inset-0 bg-gradient-to-b from-muted/50 via-muted/30 to-muted/50 pointer-events-none' />
             <div className='absolute inset-0 bg-[radial-gradient(ellipse_at_top,hsl(var(--primary)/0.06),transparent_60%)] pointer-events-none' />
 
             <div className='relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
-              <div className='text-center mb-14'>
+              <div className='text-center mb-12'>
                 <div className='flex items-center justify-center gap-3 mb-4'>
                   <div className='h-px w-12 bg-primary/40' />
                   <span className='text-primary text-sm font-semibold uppercase tracking-widest'>
