@@ -224,8 +224,28 @@ export default function OAuthSettingsPage() {
     }
   }
 
+  const fallbackCopy = (text: string) => {
+    const el = document.createElement('textarea')
+    el.value = text
+    el.style.position = 'fixed'
+    el.style.opacity = '0'
+    document.body.appendChild(el)
+    el.focus()
+    el.select()
+    try {
+      document.execCommand('copy')
+    } catch (err) {
+      console.error('Failed to copy:', err)
+    }
+    document.body.removeChild(el)
+  }
+
   const copyToClipboard = (text: string, field: string) => {
-    navigator.clipboard.writeText(text)
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(text).catch(() => fallbackCopy(text))
+    } else {
+      fallbackCopy(text)
+    }
     setCopiedField(field)
     setTimeout(() => setCopiedField(null), 2000)
     toast({

@@ -137,9 +137,29 @@ export default function AdminKnowledgeDetailPage() {
     }
   }
 
+  const fallbackCopy = (text: string) => {
+    const el = document.createElement('textarea')
+    el.value = text
+    el.style.position = 'fixed'
+    el.style.opacity = '0'
+    document.body.appendChild(el)
+    el.focus()
+    el.select()
+    try {
+      document.execCommand('copy')
+    } catch (err) {
+      console.error('Failed to copy:', err)
+    }
+    document.body.removeChild(el)
+  }
+
   const handleShare = () => {
     const url = window.location.href
-    navigator.clipboard.writeText(url)
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(url).catch(() => fallbackCopy(url))
+    } else {
+      fallbackCopy(url)
+    }
     const articleTitle = article?.title || 'el artículo'
     toast({
       title: 'Enlace copiado exitosamente',

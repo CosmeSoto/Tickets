@@ -312,12 +312,32 @@ export function useCheckpoints({ checkpoints, reload }: UseCheckpointsOptions) {
     setDisplayModalOpen(true)
   }, [])
 
+  const fallbackCopy = useCallback((text: string) => {
+    const el = document.createElement('textarea')
+    el.value = text
+    el.style.position = 'fixed'
+    el.style.opacity = '0'
+    document.body.appendChild(el)
+    el.focus()
+    el.select()
+    try {
+      document.execCommand('copy')
+    } catch (err) {
+      console.error('Failed to copy:', err)
+    }
+    document.body.removeChild(el)
+  }, [])
+
   const copyDisplayUrl = useCallback(() => {
     if (!selectedCheckpointForDisplay) return
     const url = `${window.location.origin}/patrol-checkpoint-display/${selectedCheckpointForDisplay.id}`
-    navigator.clipboard.writeText(url)
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(url).catch(() => fallbackCopy(url))
+    } else {
+      fallbackCopy(url)
+    }
     toast({ title: 'URL copiada al portapapeles' })
-  }, [selectedCheckpointForDisplay, toast])
+  }, [selectedCheckpointForDisplay, toast, fallbackCopy])
 
   return {
     dialogOpen,

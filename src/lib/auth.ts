@@ -363,7 +363,7 @@ export const authOptions: NextAuthOptions = {
                 token.isSuperAdmin = (dbUser as any).isSuperAdmin ?? false
                 token.ticketsEnabled = dbUser.ticketsEnabled ?? true
                 token.inventoryEnabled = dbUser.inventoryEnabled ?? true
-                token.canRequestAssets = dbUser.canRequestAssets ?? false
+                token.canRequestAssets = dbUser.canRequestAssets ?? true
                 token.patrolsEnabled = dbUser.patrolsEnabled ?? false
                 token.isOAuth = true
               } else {
@@ -454,7 +454,7 @@ export const authOptions: NextAuthOptions = {
               token.isSuperAdmin = (dbUser as any).isSuperAdmin ?? false
               token.ticketsEnabled = dbUser.ticketsEnabled ?? true
               token.inventoryEnabled = dbUser.inventoryEnabled ?? true
-              token.canRequestAssets = dbUser.canRequestAssets ?? false
+              token.canRequestAssets = dbUser.canRequestAssets ?? true
               token.patrolsEnabled = dbUser.patrolsEnabled ?? false
               token.newsEnabled = dbUser.newsEnabled ?? false
               token.formsEnabled = dbUser.formsEnabled ?? false
@@ -500,7 +500,7 @@ export const authOptions: NextAuthOptions = {
           // Agregar ticketsEnabled e inventoryEnabled desde el token
           ;(session.user as any).ticketsEnabled = (token.ticketsEnabled as boolean) ?? true
           ;(session.user as any).inventoryEnabled = (token.inventoryEnabled as boolean) ?? true
-          ;(session.user as any).canRequestAssets = (token.canRequestAssets as boolean) ?? false
+          ;(session.user as any).canRequestAssets = (token.canRequestAssets as boolean) ?? true
           session.user.patrolsEnabled = (token.patrolsEnabled as boolean) ?? false
           ;(session.user as any).newsEnabled = (token.newsEnabled as boolean) ?? false
           ;(session.user as any).formsEnabled = (token.formsEnabled as boolean) ?? false

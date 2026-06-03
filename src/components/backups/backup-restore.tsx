@@ -688,7 +688,7 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
                         className='mt-0.5'
                       />
                       <div>
-                        <p className='font-medium text-foreground'>Fusionar (merge)</p>
+                        <p className='font-medium text-foreground'>Fusionar</p>
                         <p className='text-muted-foreground mt-0.5'>
                           Agrega los registros del backup sin borrar los que ya existen. Úsalo para
                           combinar usuarios o datos de dos backups distintos.

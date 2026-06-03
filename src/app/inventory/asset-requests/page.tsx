@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -12,10 +12,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { AssetRequestList } from '@/components/inventory/asset-requests/asset-request-list'
-import { Plus, Search, RefreshCw, Filter } from 'lucide-react'
-import { toast } from 'sonner'
+import { Plus, Search, RefreshCw, Filter, X } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { ModuleLayout } from '@/components/common/layout/module-layout'
+import { DataTable } from '@/components/common/views/data-table'
+import { ExportButton } from '@/components/common/export-button'
+import { createAssetRequestColumns } from '@/components/inventory/asset-requests/asset-request-columns'
+import { usePagination } from '@/hooks/common/use-pagination'
+import { useExport } from '@/hooks/common/use-export'
 import { AssetRequestStatus, AssetType } from '@prisma/client'
 
 interface AssetRequest {
@@ -41,25 +45,58 @@ interface ListResponse {
   totalPages: number
 }
 
+const STATUS_OPTIONS = [
+  { value: 'all', label: 'Todos los estados' },
+  { value: 'PENDING', label: 'Pendiente' },
+  { value: 'UNDER_REVIEW', label: 'En Revisión' },
+  { value: 'APPROVED', label: 'Aprobada' },
+  { value: 'REJECTED', label: 'Rechazada' },
+  { value: 'FULFILLED', label: 'Cumplida' },
+]
+
+const TYPE_OPTIONS = [
+  { value: 'all', label: 'Todos los tipos' },
+  { value: 'EQUIPMENT', label: 'Equipo' },
+  { value: 'LICENSE', label: 'Licencia' },
+  { value: 'MAINTENANCE', label: 'Mantenimiento' },
+]
+
+const EXPORT_COLUMNS = [
+  { key: 'code', header: 'Código' },
+  { key: 'assetType', header: 'Tipo' },
+  { key: 'description', header: 'Descripción' },
+  { key: 'familyName', header: 'Familia' },
+  { key: 'requesterName', header: 'Solicitante' },
+  { key: 'status', header: 'Estado' },
+  { key: 'createdAt', header: 'Creado' },
+]
+
 export default function AssetRequestsPage() {
   const router = useRouter()
   const [requests, setRequests] = useState<AssetRequest[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(20)
   const [totalPages, setTotalPages] = useState(1)
-  const [isLoading, setIsLoading] = useState(true)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  // Filtros
+  // Filters
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [typeFilter, setTypeFilter] = useState<string>('all')
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
 
-  const loadRequests = async () => {
-    setIsLoading(true)
+  const hasActiveFilters = search || statusFilter !== 'all' || typeFilter !== 'all'
+  const activeFiltersCount = [statusFilter !== 'all', typeFilter !== 'all'].filter(Boolean).length
+
+  const loadRequests = useCallback(async () => {
+    setLoading(true)
+    setError(null)
     try {
       const params = new URLSearchParams({
         page: page.toString(),
-        limit: '20',
+        limit: limit.toString(),
       })
 
       if (search) params.append('search', search)
@@ -75,133 +112,197 @@ export default function AssetRequestsPage() {
       setRequests(data.data)
       setTotal(data.total)
       setTotalPages(data.totalPages)
-    } catch (error) {
-      console.error('Error:', error)
-      toast.error('Error al cargar solicitudes')
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Error al cargar solicitudes'
+      setError(message)
     } finally {
-      setIsLoading(false)
+      setLoading(false)
     }
-  }
+  }, [page, limit, search, statusFilter, typeFilter])
 
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(1)
+  }, [search, statusFilter, typeFilter])
+
+  // Initial load and when page/limit/filters change
   useEffect(() => {
     loadRequests()
-  }, [page, statusFilter, typeFilter])
+  }, [loadRequests])
 
-  const handleSearch = () => {
+  const handleFilterChange = useCallback(() => {
+    // Already handled by useEffect
+  }, [])
+
+  const handleViewRequest = (request: AssetRequest) => {
+    router.push(`/inventory/asset-requests/${request.id}`)
+  }
+
+  const handleClearFilters = () => {
+    setSearch('')
+    setStatusFilter('all')
+    setTypeFilter('all')
     setPage(1)
-    loadRequests()
   }
 
-  const handlePageChange = (newPage: number) => {
-    setPage(newPage)
-  }
+  const paginationConfig = useMemo(
+    () => ({
+      page,
+      limit,
+      total,
+      onPageChange: (newPage: number) => setPage(newPage),
+      onLimitChange: (newLimit: number) => {
+        setLimit(newLimit)
+        setPage(1)
+      },
+    }),
+    [page, limit, total]
+  )
+
+  const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
+    filename: 'solicitudes-activos',
+    title: 'Solicitudes de Activos',
+    subtitle: `Exportado el ${new Date().toLocaleDateString('es-ES')} • ${total} solicitudes`,
+    getData: () => requests,
+    columns: EXPORT_COLUMNS,
+  })
+
+  const columns = useMemo(() => createAssetRequestColumns({ onView: handleViewRequest }), [])
 
   return (
-    <div className='container mx-auto py-6 space-y-6'>
-      {/* Header */}
-      <div className='flex items-center justify-between'>
-        <div>
-          <h1 className='text-3xl font-bold'>Mis Solicitudes de Activos</h1>
-          <p className='text-muted-foreground'>
-            Gestiona tus solicitudes de equipos, licencias y mantenimiento
-          </p>
-        </div>
+    <ModuleLayout
+      title='Solicitudes de Activos'
+      subtitle='Gestiona las solicitudes de equipos, licencias y mantenimiento'
+      loading={loading && requests.length === 0}
+      error={error}
+      onRetry={loadRequests}
+      headerActions={
+        <Button asChild>
+          <Link href='/inventory/asset-requests/create'>
+            <Plus className='h-4 w-4 mr-2' />
+            Nueva Solicitud
+          </Link>
+        </Button>
+      }
+    >
+      {/* Filters */}
+      <div className='space-y-4 mb-6'>
         <div className='flex gap-2'>
-          <Button onClick={loadRequests} variant='outline' disabled={isLoading}>
-            <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+          <div className='relative flex-1'>
+            <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4' />
+            <Input
+              type='text'
+              placeholder='Buscar por código o descripción...'
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleFilterChange()}
+              className='pl-10'
+            />
+          </div>
+          <Button
+            variant={showAdvancedFilters ? 'default' : 'outline'}
+            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+            className='flex items-center gap-2'
+          >
+            <Filter className='w-4 h-4' />
+            Filtros
+            {activeFiltersCount > 0 && (
+              <Badge variant='secondary' className='ml-1'>
+                {activeFiltersCount}
+              </Badge>
+            )}
+          </Button>
+          <Button variant='outline' onClick={loadRequests} className='flex items-center gap-2'>
+            <RefreshCw className='w-4 h-4' />
             Actualizar
           </Button>
-          <Link href='/inventory/asset-requests/create'>
-            <Button>
-              <Plus className='mr-2 h-4 w-4' />
-              Nueva Solicitud
+          {hasActiveFilters && (
+            <Button
+              variant='ghost'
+              onClick={handleClearFilters}
+              className='flex items-center gap-2'
+            >
+              <X className='w-4 h-4' />
+              Limpiar
             </Button>
-          </Link>
+          )}
         </div>
-      </div>
 
-      {/* Filtros */}
-      <Card>
-        <CardHeader>
-          <CardTitle className='flex items-center gap-2'>
-            <Filter className='h-5 w-5' />
-            Filtros
-          </CardTitle>
-          <CardDescription>Filtra y busca tus solicitudes</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className='grid grid-cols-1 md:grid-cols-4 gap-4'>
-            {/* Búsqueda */}
-            <div className='md:col-span-2'>
-              <div className='flex gap-2'>
-                <div className='relative flex-1'>
-                  <Search className='absolute left-2 top-2.5 h-4 w-4 text-muted-foreground' />
-                  <Input
-                    placeholder='Buscar..'
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleSearch()}
-                    className='pl-8'
-                  />
-                </div>
-                <Button onClick={handleSearch} disabled={isLoading}>
-                  Buscar
-                </Button>
-              </div>
-            </div>
-
-            {/* Filtro de Estado */}
+        {showAdvancedFilters && (
+          <div className='grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-lg bg-gray-50'>
             <div>
+              <label className='text-sm font-medium mb-2 block'>Estado</label>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger>
-                  <SelectValue placeholder='Estado' />
+                  <SelectValue placeholder='Todos los estados' />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value='all'>Todos los estados</SelectItem>
-                  <SelectItem value='PENDING'>Pendiente</SelectItem>
-                  <SelectItem value='UNDER_REVIEW'>En Revisión</SelectItem>
-                  <SelectItem value='APPROVED'>Aprobada</SelectItem>
-                  <SelectItem value='REJECTED'>Rechazada</SelectItem>
-                  <SelectItem value='FULFILLED'>Cumplida</SelectItem>
+                  {STATUS_OPTIONS.map(status => (
+                    <SelectItem key={status.value} value={status.value}>
+                      {status.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
-
-            {/* Filtro de Tipo */}
             <div>
+              <label className='text-sm font-medium mb-2 block'>Tipo de Activo</label>
               <Select value={typeFilter} onValueChange={setTypeFilter}>
                 <SelectTrigger>
-                  <SelectValue placeholder='Tipo' />
+                  <SelectValue placeholder='Todos los tipos' />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value='all'>Todos los tipos</SelectItem>
-                  <SelectItem value='EQUIPMENT'>Equipo</SelectItem>
-                  <SelectItem value='LICENSE'>Licencia</SelectItem>
-                  <SelectItem value='MAINTENANCE'>Mantenimiento</SelectItem>
+                  {TYPE_OPTIONS.map(type => (
+                    <SelectItem key={type.value} value={type.value}>
+                      {type.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        )}
+      </div>
 
-      {/* Lista de Solicitudes */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Solicitudes ({total})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <AssetRequestList
-            requests={requests}
-            total={total}
-            page={page}
-            totalPages={totalPages}
-            onPageChange={handlePageChange}
-            isLoading={isLoading}
-            baseUrl='/inventory/asset-requests'
+      {/* Data Table */}
+      <DataTable
+        title='Solicitudes de Activos'
+        description={`Listado de solicitudes (${total} total)`}
+        data={requests}
+        columns={columns}
+        loading={loading}
+        pagination={paginationConfig}
+        onRefresh={loadRequests}
+        onRowClick={handleViewRequest}
+        actions={
+          <ExportButton
+            onExportCSV={exportCSV}
+            onExportExcel={exportExcel}
+            onExportPDF={exportPDF}
+            loading={exporting}
+            disabled={requests.length === 0}
           />
-        </CardContent>
-      </Card>
-    </div>
+        }
+        emptyState={{
+          icon: <Plus className='h-12 w-12 text-muted-foreground mx-auto mb-4' />,
+          title: hasActiveFilters ? 'No se encontraron solicitudes' : 'No hay solicitudes',
+          description: hasActiveFilters
+            ? 'Intenta ajustar los filtros de búsqueda'
+            : 'Comienza creando tu primera solicitud de activo',
+          action: hasActiveFilters ? (
+            <Button variant='outline' onClick={handleClearFilters}>
+              Limpiar filtros
+            </Button>
+          ) : (
+            <Button asChild>
+              <Link href='/inventory/asset-requests/create'>
+                <Plus className='h-4 w-4 mr-2' />
+                Nueva Solicitud
+              </Link>
+            </Button>
+          ),
+        }}
+      />
+    </ModuleLayout>
   )
 }

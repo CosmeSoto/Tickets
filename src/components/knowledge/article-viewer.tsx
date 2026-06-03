@@ -139,6 +139,22 @@ export function ArticleViewer({ articleId, onVote, showActions = true }: Article
 
     const url = `${window.location.origin}/knowledge/${article.id}`
 
+    const fallbackCopy = (text: string) => {
+      const el = document.createElement('textarea')
+      el.value = text
+      el.style.position = 'fixed'
+      el.style.opacity = '0'
+      document.body.appendChild(el)
+      el.focus()
+      el.select()
+      try {
+        document.execCommand('copy')
+      } catch (err) {
+        console.error('Failed to copy:', err)
+      }
+      document.body.removeChild(el)
+    }
+
     if (navigator.share) {
       try {
         await navigator.share({
@@ -150,7 +166,15 @@ export function ArticleViewer({ articleId, onVote, showActions = true }: Article
         // Usuario canceló
       }
     } else {
-      await navigator.clipboard.writeText(url)
+      if (navigator?.clipboard?.writeText) {
+        try {
+          await navigator.clipboard.writeText(url)
+        } catch (err) {
+          fallbackCopy(url)
+        }
+      } else {
+        fallbackCopy(url)
+      }
       toast.success('Enlace copiado al portapapeles')
     }
   }

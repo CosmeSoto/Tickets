@@ -224,39 +224,57 @@ async function restoreWithPgRestore(
       }
     } else {
       // Modo merge: insertar solo registros nuevos, ignorar duplicados (ON CONFLICT DO NOTHING)
-      // pg_restore no soporta merge nativo → usamos un archivo temporal de SQL y lo procesamos
+      // Estrategia: volcar el SQL a stdout (sin conectarse), modificar los INSERTs, luego ejecutar
       const tempSqlPath = `${filepath}.merge_temp.sql`
       const tableFlags = tables.map(t => `--table="${t}"`).join(' ')
-      const dumpSqlCmd =
-        `PGPASSWORD="${dbConfig.password}" pg_restore ` +
-        `-h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d ${dbConfig.database} ` +
-        `--data-only --no-owner --no-privileges ` +
-        `${tableFlags} --file="${tempSqlPath}" ` +
-        `"${filepath}" 2>&1 || true`
 
       try {
-        await execAsync(dumpSqlCmd, { timeout: 300000, maxBuffer: 1024 * 1024 * 50 })
+        // 1. Volcar SQL a stdout — SIN flags de conexión, solo extrae el SQL del .dump
+        const dumpSqlCmd =
+          `pg_restore --data-only --no-owner --no-privileges ` + `${tableFlags} "${filepath}"`
 
-        // Reescribir el SQL para convertir INSERT en INSERT ... ON CONFLICT DO NOTHING
-        const { readFile: readF, writeFile: writeF } = await import('fs/promises')
-        const sqlContent = await readF(tempSqlPath, 'utf-8')
+        let sqlContent: string
+        try {
+          const { stdout } = await execAsync(dumpSqlCmd, {
+            timeout: 300000,
+            maxBuffer: 1024 * 1024 * 200,
+          })
+          sqlContent = stdout
+        } catch (dumpErr: any) {
+          // pg_restore retorna exit code != 0 si hay warnings — usar stdout de todas formas
+          if (dumpErr.stdout && dumpErr.stdout.length > 0) {
+            sqlContent = dumpErr.stdout
+          } else {
+            throw new Error(
+              `No se pudo extraer SQL del dump: ${(dumpErr as Error).message?.slice(0, 200)}`
+            )
+          }
+        }
+
+        if (!sqlContent || sqlContent.trim().length === 0) {
+          throw new Error('El dump no generó contenido SQL para las tablas seleccionadas')
+        }
+
+        // 2. Reescribir cada INSERT para agregar ON CONFLICT DO NOTHING
         const mergedSql = sqlContent
           .split('\n')
           .map(line => {
-            // Añadir ON CONFLICT DO NOTHING a cada INSERT que no lo tenga ya
-            if (/^INSERT INTO /i.test(line.trim()) && !line.includes('ON CONFLICT')) {
-              return line.replace(/;$/, ' ON CONFLICT DO NOTHING;')
+            const trimmed = line.trim()
+            if (/^INSERT INTO /i.test(trimmed) && !line.includes('ON CONFLICT')) {
+              return line.replace(/;(\s*)$/, ' ON CONFLICT DO NOTHING;$1')
             }
             return line
           })
           .join('\n')
 
+        const { writeFile: writeF } = await import('fs/promises')
         await writeF(tempSqlPath, mergedSql, 'utf-8')
 
-        // Deshabilitar FK constraints durante el merge
+        // 3. Ejecutar el SQL modificado desactivando FK constraints temporalmente
         const mergeCmd =
           `PGPASSWORD="${dbConfig.password}" psql ` +
           `-h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d ${dbConfig.database} ` +
+          `-v ON_ERROR_STOP=0 ` +
           `-c "SET session_replication_role = replica;" ` +
           `-f "${tempSqlPath}" ` +
           `-c "SET session_replication_role = DEFAULT;" 2>&1 || true`
@@ -266,15 +284,21 @@ async function restoreWithPgRestore(
           maxBuffer: 1024 * 1024 * 50,
         })
 
-        if (mergeOut && mergeOut.includes('ERROR')) {
+        if (mergeOut) {
           const errors = mergeOut.split('\n').filter(l => l.includes('ERROR'))
           const criticalErrors = errors.filter(
-            e => !e.includes('does not exist') && !e.includes('already exists')
+            e =>
+              !e.includes('does not exist') &&
+              !e.includes('already exists') &&
+              !e.includes('duplicate key') &&
+              !e.includes('ON CONFLICT')
           )
           if (criticalErrors.length > 0) {
             console.warn('[RESTORE] Errores en merge:', criticalErrors.slice(0, 5).join('\n'))
           }
         }
+
+        console.log(`[RESTORE] Merge completado para tablas: ${tables.join(', ')}`)
       } finally {
         try {
           await unlink(tempSqlPath)
