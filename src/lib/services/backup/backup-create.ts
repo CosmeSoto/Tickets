@@ -4,10 +4,7 @@ import { writeFile, stat, mkdir } from 'fs/promises'
 import { join } from 'path'
 import { randomUUID } from 'crypto'
 import prisma from '@/lib/prisma'
-import {
-  BackupInfo,
-  BackupModuleId,
-} from './backup-types'
+import { BackupInfo, BackupModuleId } from './backup-types'
 import {
   BACKUP_DIR,
   hasPgTools,
@@ -17,9 +14,7 @@ import {
   calculateChecksum,
   encryptFile,
 } from './backup-utils'
-import {
-  generateAndSaveBackupMetadata,
-} from './backup-metadata'
+import { generateAndSaveBackupMetadata } from './backup-metadata'
 import { cleanOldBackups } from './backup-cleanup'
 import { BackupCloudService, type CloudProvider } from '../backup-cloud-service'
 
@@ -35,7 +30,6 @@ async function ensureBackupDirectory() {
     console.log(`Intentando usar directorio alternativo: ${altDir}`)
     await mkdir(altDir, { recursive: true, mode: 0o755 })
     console.log(`Directorio alternativo asegurado: ${altDir}`)
-    (this as any).BACKUP_DIR = altDir
   }
 }
 
@@ -78,7 +72,9 @@ export async function createBackup(
   try {
     const config = await getBackupConfig()
     const dbConfig = parseDatabaseUrl()
-    console.log(`[BACKUP] Iniciando: ${filename} (método: ${pgToolsAvailable ? 'pg_dump' : 'prisma'})`)
+    console.log(
+      `[BACKUP] Iniciando: ${filename} (método: ${pgToolsAvailable ? 'pg_dump' : 'prisma'})`
+    )
 
     if (pgToolsAvailable) {
       const command = `PGPASSWORD="${dbConfig.password}" pg_dump -h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d ${dbConfig.database} -Fc --no-owner --no-privileges --verbose -f "${filepath}"`
@@ -245,9 +241,7 @@ async function createBackupWithPrisma(filepath: string): Promise<void> {
     await fetchTable('technician_family_assignments', () =>
       prisma.technician_family_assignments.findMany()
     )
-    await fetchTable('client_family_assignments', () =>
-      prisma.client_family_assignments.findMany()
-    )
+    await fetchTable('client_family_assignments', () => prisma.client_family_assignments.findMany())
     await fetchTable('inventory_manager_families', () =>
       prisma.inventory_manager_families.findMany()
     )
@@ -275,9 +269,7 @@ async function createBackupWithPrisma(filepath: string): Promise<void> {
 
     await fetchTable('knowledge_articles', () => prisma.knowledge_articles.findMany())
     await fetchTable('article_votes', () => prisma.article_votes.findMany())
-    await fetchTable('ticket_knowledge_articles', () =>
-      prisma.ticket_knowledge_articles.findMany()
-    )
+    await fetchTable('ticket_knowledge_articles', () => prisma.ticket_knowledge_articles.findMany())
 
     await fetchTable('equipment', () => prisma.equipment.findMany())
     await fetchTable('equipment_assignments', () => prisma.equipment_assignments.findMany())

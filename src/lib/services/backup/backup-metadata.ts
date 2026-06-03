@@ -32,12 +32,15 @@ export async function generateAndSaveBackupMetadata(
       }
     }
 
+    const isDump = filepath.endsWith('.dump')
+
     const metadata: BackupMetadata = {
       version: '1.0',
       createdAt: new Date().toISOString(),
       tableCounts,
       totalRecords: Object.values(tableCounts).reduce((a, b) => a + b, 0),
       fileSize,
+      dumpFormat: isDump ? 'pg_dump_custom' : 'json',
     }
 
     const metadataPath = `${filepath}.meta.json`
@@ -74,6 +77,7 @@ export async function loadBackupMetadata(
 
 export async function extractMetadataFromDump(filepath: string): Promise<BackupMetadata> {
   const tableCounts: Record<string, number> = {}
+  let dbVersion: string | undefined
 
   try {
     const { stdout } = await execAsync(`pg_restore --list "${filepath}" 2>/dev/null`)
@@ -83,56 +87,75 @@ export async function extractMetadataFromDump(filepath: string): Promise<BackupM
       const trimmed = line.trim()
       if (!trimmed || trimmed.startsWith(';')) continue
 
-      // pg_restore --list format examples:
-      // "3456; 0 0 TABLE DATA public users tickets_user"
-      // "3457; 2200 16384 TABLE public users tickets_user"
-      const tableDataMatch = trimmed.match(/TABLE DATA\s+(\w+)\s+(\w+)/)
+      // Capturar versión de PostgreSQL del dump si está en los comentarios
+      const versionMatch = trimmed.match(/PostgreSQL\s+([\d.]+)/)
+      if (versionMatch && !dbVersion) {
+        dbVersion = versionMatch[1]
+      }
+
+      // pg_restore --list format: "3456; 0 0 TABLE DATA public users tickets_user"
+      const tableDataMatch = trimmed.match(/TABLE DATA\s+(\w+)\s+(\S+)/)
       if (tableDataMatch) {
         const schema = tableDataMatch[1]
         const tableName = tableDataMatch[2]
         if (schema === 'public' && !tableName.startsWith('pg_')) {
+          // Inicializar en 0 — luego contaremos filas reales del dump
           tableCounts[tableName] = 0
         }
       }
     }
 
-    // Si encontramos tablas, contar registros consultando la BD actual
-    // (el dump fue creado de esta misma BD, así que los conteos son una buena referencia)
+    // Contar filas reales extrayendo el dump y parseando los bloques COPY
+    // Esto es más lento pero da los conteos correctos del backup, no de la BD actual
     if (Object.keys(tableCounts).length > 0) {
-      for (const table of Object.keys(tableCounts)) {
-        try {
-          const result = await prisma.$queryRawUnsafe<[{ count: bigint }]>(
-            `SELECT COUNT(*) as count FROM "${table}"`
-          )
-          tableCounts[table] = Number(result[0]?.count ?? 0)
-        } catch {
-          // Tabla puede no existir, dejar en 0
+      try {
+        const tableFlags = Object.keys(tableCounts)
+          .map(t => `--table="${t}"`)
+          .join(' ')
+        const { stdout: dumpSql } = await execAsync(
+          `pg_restore --data-only --no-owner --no-privileges -f - ${tableFlags} "${filepath}" 2>/dev/null`,
+          { timeout: 120000, maxBuffer: 1024 * 1024 * 200 }
+        ).catch((err: any) => ({ stdout: err.stdout || '' }))
+
+        if (dumpSql) {
+          // Parsear bloques COPY para contar filas por tabla
+          const copyRegex = /^COPY\s+(?:public\.)?("?[\w]+"?)\s*\([^)]+\)\s+FROM\s+stdin\s*;/im
+          let currentTable: string | null = null
+          let rowCount = 0
+
+          for (const line of dumpSql.split('\n')) {
+            const match = line.match(
+              /^COPY\s+(?:public\.)?("?[\w]+"?)\s*\([^)]+\)\s+FROM\s+stdin\s*;/i
+            )
+            if (match) {
+              if (currentTable !== null) {
+                tableCounts[currentTable.replace(/"/g, '')] = rowCount
+              }
+              currentTable = match[1].replace(/"/g, '')
+              rowCount = 0
+            } else if (line === '\\.') {
+              if (currentTable !== null) {
+                tableCounts[currentTable] = rowCount
+                currentTable = null
+                rowCount = 0
+              }
+            } else if (currentTable !== null && line.trim()) {
+              rowCount++
+            }
+          }
+          // Cerrar último bloque si no terminó con \.
+          if (currentTable !== null) {
+            tableCounts[currentTable] = rowCount
+          }
         }
+      } catch {
+        // Si falla el conteo real, dejar en 0 — es mejor que contar la BD actual
+        console.warn('[METADATA] No se pudo contar filas del dump, usando 0')
       }
     }
   } catch (err) {
-    console.warn('[METADATA] pg_restore --list falló, intentando conteo directo de BD')
-
-    // Fallback: contar directamente de la BD (asumimos que el dump tiene lo mismo)
-    try {
-      const result = await prisma.$queryRaw`
-        SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename
-      `
-      const tables = (result as Array<{ tablename: string }>).map(row => row.tablename)
-
-      for (const table of tables) {
-        try {
-          const countResult = await prisma.$queryRawUnsafe<[{ count: bigint }]>(
-            `SELECT COUNT(*) as count FROM "${table}"`
-          )
-          tableCounts[table] = Number(countResult[0]?.count ?? 0)
-        } catch {
-          continue
-        }
-      }
-    } catch (dbErr) {
-      console.warn('[METADATA] No se pudo contar registros:', dbErr)
-    }
+    console.warn('[METADATA] pg_restore --list falló:', err)
+    // Fallback mínimo sin consultar la BD actual
   }
 
   const fileStats = await stat(filepath)
@@ -144,5 +167,7 @@ export async function extractMetadataFromDump(filepath: string): Promise<BackupM
     tableCounts,
     totalRecords,
     fileSize: fileStats.size,
+    dumpFormat: 'pg_dump_custom',
+    ...(dbVersion && { dbVersion }),
   }
 }

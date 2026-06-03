@@ -27,6 +27,11 @@ export interface BackupMetadata {
   tableCounts: Record<string, number>
   totalRecords: number
   fileSize: number
+  // Campos opcionales para trazabilidad
+  importedFrom?: string
+  dumpFormat?: 'pg_dump_custom' | 'sql' | 'json'
+  modules?: string[]
+  dbVersion?: string
 }
 
 export interface DatabaseConfig {
@@ -53,4 +58,11 @@ export interface BackupConfig {
   cronScope: 'tickets' | 'full'
 }
 
-export type BackupModuleId = 'tickets' | 'news' | 'patrols' | 'families' | 'audits' | 'configurations' | 'users'
+export type BackupModuleId =
+  | 'tickets'
+  | 'news'
+  | 'patrols'
+  | 'families'
+  | 'audits'
+  | 'configurations'
+  | 'users'

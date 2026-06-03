@@ -186,8 +186,12 @@ async function restoreWithPgRestore(
 
     if (mode === 'replace') {
       // Modo reemplazo: TRUNCATE + insertar todo del backup
+      // Usamos session_replication_role = replica para desactivar FKs sin necesitar superuser
       const truncateSQL = tables.map(t => `TRUNCATE TABLE "${t}" CASCADE;`).join(' ')
-      const truncateCmd = `PGPASSWORD="${dbConfig.password}" psql -h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d ${dbConfig.database} -c "SET session_replication_role = replica; ${truncateSQL} SET session_replication_role = DEFAULT;" 2>&1`
+      const truncateCmd =
+        `PGPASSWORD="${dbConfig.password}" psql ` +
+        `-h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d ${dbConfig.database} ` +
+        `-c "SET session_replication_role = replica; ${truncateSQL} SET session_replication_role = DEFAULT;" 2>&1`
 
       try {
         await execAsync(truncateCmd, { timeout: 60000, maxBuffer: 1024 * 1024 * 10 })
@@ -200,37 +204,80 @@ async function restoreWithPgRestore(
       }
 
       const tableFlags = tables.map(t => `--table="${t}"`).join(' ')
-      const command =
-        `PGPASSWORD="${dbConfig.password}" pg_restore ` +
-        `-h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d ${dbConfig.database} ` +
-        `--data-only --no-owner --no-privileges --disable-triggers ` +
-        `${tableFlags} ` +
-        `"${filepath}" 2>&1 || true`
-      const { stdout } = await execAsync(command, {
-        timeout: 600000,
-        maxBuffer: 1024 * 1024 * 50,
-      })
-      if (stdout && stdout.includes('ERROR')) {
-        const errors = stdout.split('\n').filter(l => l.includes('ERROR'))
-        const criticalErrors = errors.filter(
-          e =>
-            !e.includes('does not exist') &&
-            !e.includes('already exists') &&
-            !e.includes('duplicate key')
-        )
-        if (criticalErrors.length > 0) {
-          console.warn('[RESTORE] Errores:', criticalErrors.slice(0, 5).join('\n'))
+      // Nota: NO usamos --disable-triggers porque requiere superuser.
+      // En su lugar usamos session_replication_role = replica vía psql antes/después,
+      // pero pg_restore necesita conectarse como la misma sesión — usamos un wrapper con psql.
+      // Extraemos el SQL con pg_restore -f - y lo ejecutamos con psql (como en merge).
+      const dumpSqlCmd =
+        `pg_restore --data-only --no-owner --no-privileges -f - ` + `${tableFlags} "${filepath}"`
+
+      let sqlContent: string
+      try {
+        const { stdout } = await execAsync(dumpSqlCmd, {
+          timeout: 300000,
+          maxBuffer: 1024 * 1024 * 200,
+        })
+        sqlContent = stdout
+      } catch (dumpErr: any) {
+        if (dumpErr.stdout && dumpErr.stdout.length > 0) {
+          sqlContent = dumpErr.stdout
+        } else {
+          throw new Error(
+            `No se pudo extraer SQL del dump: ${(dumpErr as Error).message?.slice(0, 200)}`
+          )
         }
+      }
+
+      if (!sqlContent || sqlContent.trim().length === 0) {
+        throw new Error('El dump no generó contenido SQL para las tablas seleccionadas')
+      }
+
+      const tempReplacePath = `${filepath}.replace_temp.sql`
+      try {
+        const { writeFile: writeF } = await import('fs/promises')
+        await writeF(tempReplacePath, sqlContent, 'utf-8')
+
+        const replaceCmd =
+          `PGPASSWORD="${dbConfig.password}" psql ` +
+          `-h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d ${dbConfig.database} ` +
+          `-v ON_ERROR_STOP=0 ` +
+          `-c "SET session_replication_role = replica;" ` +
+          `-f "${tempReplacePath}" ` +
+          `-c "SET session_replication_role = DEFAULT;" 2>&1 || true`
+
+        const { stdout } = await execAsync(replaceCmd, {
+          timeout: 600000,
+          maxBuffer: 1024 * 1024 * 50,
+        })
+        if (stdout && stdout.includes('ERROR')) {
+          const errors = stdout.split('\n').filter(l => l.includes('ERROR'))
+          const criticalErrors = errors.filter(
+            e =>
+              !e.includes('does not exist') &&
+              !e.includes('already exists') &&
+              !e.includes('duplicate key')
+          )
+          if (criticalErrors.length > 0) {
+            console.warn('[RESTORE] Errores en replace:', criticalErrors.slice(0, 5).join('\n'))
+          }
+        }
+      } finally {
+        try {
+          await unlink(tempReplacePath)
+        } catch {}
       }
     } else {
       // Modo merge: insertar solo registros nuevos, ignorar duplicados (ON CONFLICT DO NOTHING)
-      // Estrategia: volcar el SQL a stdout (sin conectarse), modificar los INSERTs, luego ejecutar
+      // IMPORTANTE: pg_dump custom genera sentencias COPY, no INSERT.
+      // Estrategia correcta:
+      //   1. Extraer el SQL con pg_restore -f - (produce COPY ... FROM stdin)
+      //   2. Convertir cada bloque COPY a INSERTs individuales con ON CONFLICT DO NOTHING
+      //   3. Ejecutar con FKs desactivadas temporalmente
       const tempSqlPath = `${filepath}.merge_temp.sql`
       const tableFlags = tables.map(t => `--table="${t}"`).join(' ')
 
       try {
-        // 1. Volcar SQL a stdout — SIN flags de conexión, solo extrae el SQL del .dump
-        // -f - redirige la salida a stdout en lugar de ejecutar contra una BD
+        // 1. Extraer SQL del dump a stdout (produce sentencias COPY, no INSERT)
         const dumpSqlCmd =
           `pg_restore --data-only --no-owner --no-privileges -f - ` + `${tableFlags} "${filepath}"`
 
@@ -242,7 +289,7 @@ async function restoreWithPgRestore(
           })
           sqlContent = stdout
         } catch (dumpErr: any) {
-          // pg_restore retorna exit code != 0 si hay warnings — usar stdout de todas formas
+          // pg_restore retorna exit code != 0 si hay warnings — usar stdout si hay contenido
           if (dumpErr.stdout && dumpErr.stdout.length > 0) {
             sqlContent = dumpErr.stdout
           } else {
@@ -256,22 +303,24 @@ async function restoreWithPgRestore(
           throw new Error('El dump no generó contenido SQL para las tablas seleccionadas')
         }
 
-        // 2. Reescribir cada INSERT para agregar ON CONFLICT DO NOTHING
-        const mergedSql = sqlContent
-          .split('\n')
-          .map(line => {
-            const trimmed = line.trim()
-            if (/^INSERT INTO /i.test(trimmed) && !line.includes('ON CONFLICT')) {
-              return line.replace(/;(\s*)$/, ' ON CONFLICT DO NOTHING;$1')
-            }
-            return line
-          })
-          .join('\n')
+        // 2. Convertir bloques COPY a INSERTs con ON CONFLICT DO NOTHING
+        // El formato COPY de pg_dump es:
+        //   COPY public."tabla" (col1, col2, ...) FROM stdin;
+        //   val1\tval2\t...
+        //   \.
+        const mergedSql = convertCopyToInsertOnConflict(sqlContent)
+
+        if (!mergedSql || mergedSql.trim().length === 0) {
+          throw new Error(
+            'No se pudo convertir el contenido del dump a sentencias INSERT. ' +
+              'Verifica que el dump contenga datos para las tablas seleccionadas.'
+          )
+        }
 
         const { writeFile: writeF } = await import('fs/promises')
         await writeF(tempSqlPath, mergedSql, 'utf-8')
 
-        // 3. Ejecutar el SQL modificado desactivando FK constraints temporalmente
+        // 3. Ejecutar el SQL modificado desactivando FKs temporalmente vía session_replication_role
         const mergeCmd =
           `PGPASSWORD="${dbConfig.password}" psql ` +
           `-h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d ${dbConfig.database} ` +
@@ -286,7 +335,8 @@ async function restoreWithPgRestore(
         })
 
         if (mergeOut) {
-          const errors = mergeOut.split('\n').filter(l => l.includes('ERROR'))
+          const lines = mergeOut.split('\n')
+          const errors = lines.filter(l => l.includes('ERROR'))
           const criticalErrors = errors.filter(
             e =>
               !e.includes('does not exist') &&
@@ -296,6 +346,14 @@ async function restoreWithPgRestore(
           )
           if (criticalErrors.length > 0) {
             console.warn('[RESTORE] Errores en merge:', criticalErrors.slice(0, 5).join('\n'))
+          }
+          // Contar inserciones exitosas para logging
+          const insertCount = lines.filter(l => l.trim() === 'INSERT 0 1').length
+          const skippedCount = lines.filter(l => l.trim() === 'INSERT 0 0').length
+          if (insertCount > 0 || skippedCount > 0) {
+            console.log(
+              `[RESTORE] Merge: ${insertCount} insertados, ${skippedCount} ya existían (omitidos)`
+            )
           }
         }
 
@@ -331,6 +389,79 @@ async function restoreWithPgRestore(
     }
     console.log('[RESTORE] Restauración completa finalizada')
   }
+}
+
+/**
+ * Convierte bloques COPY de pg_dump a sentencias INSERT ... ON CONFLICT DO NOTHING.
+ *
+ * pg_dump custom exportado con -f - produce:
+ *   COPY public."tabla" (col1, col2, ...) FROM stdin;
+ *   val1\tval2\t...
+ *   \.
+ *
+ * Esta función transforma cada fila en:
+ *   INSERT INTO public."tabla" (col1, col2, ...) VALUES ($1, $2, ...) ON CONFLICT DO NOTHING;
+ *
+ * Los valores NULL se convierten desde \N (representación pg_dump).
+ * Los valores con caracteres especiales se escapan correctamente.
+ */
+function convertCopyToInsertOnConflict(sql: string): string {
+  const output: string[] = []
+  const lines = sql.split('\n')
+  let i = 0
+
+  while (i < lines.length) {
+    const line = lines[i]
+
+    // Detectar inicio de bloque COPY
+    // Formato: COPY [public.]"tabla" (col1, col2, ...) FROM stdin;
+    const copyMatch = line.match(
+      /^COPY\s+(?:public\.)?("?[\w]+"?)\s*\(([^)]+)\)\s+FROM\s+stdin\s*;/i
+    )
+
+    if (copyMatch) {
+      const tableName = copyMatch[1]
+      const columnsPart = copyMatch[2]
+      const columns = columnsPart.split(',').map(c => c.trim())
+
+      i++ // avanzar a la primera fila de datos
+
+      while (i < lines.length) {
+        const dataLine = lines[i]
+
+        // Fin del bloque COPY
+        if (dataLine === '\\.') {
+          i++
+          break
+        }
+
+        // Parsear valores tab-separated
+        const rawValues = dataLine.split('\t')
+        const sqlValues = rawValues.map(v => {
+          if (v === '\\N') return 'NULL'
+          // Escapar comillas simples y backslashes
+          const escaped = v.replace(/\\/g, '\\\\').replace(/'/g, "''")
+          return `'${escaped}'`
+        })
+
+        const colList = columns.join(', ')
+        const valList = sqlValues.join(', ')
+        output.push(
+          `INSERT INTO ${tableName} (${colList}) VALUES (${valList}) ON CONFLICT DO NOTHING;`
+        )
+
+        i++
+      }
+    } else {
+      // Líneas que no son COPY (comentarios, SET, etc.) — conservar
+      if (line.trim() && !line.startsWith('--')) {
+        output.push(line)
+      }
+      i++
+    }
+  }
+
+  return output.join('\n')
 }
 
 function getTablesForModules(modules: string[]): string[] {
