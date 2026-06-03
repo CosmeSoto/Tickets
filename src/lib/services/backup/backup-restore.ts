@@ -230,8 +230,9 @@ async function restoreWithPgRestore(
 
       try {
         // 1. Volcar SQL a stdout — SIN flags de conexión, solo extrae el SQL del .dump
+        // -f - redirige la salida a stdout en lugar de ejecutar contra una BD
         const dumpSqlCmd =
-          `pg_restore --data-only --no-owner --no-privileges ` + `${tableFlags} "${filepath}"`
+          `pg_restore --data-only --no-owner --no-privileges -f - ` + `${tableFlags} "${filepath}"`
 
         let sqlContent: string
         try {
