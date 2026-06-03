@@ -31,7 +31,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { useToast } from '@/hooks/use-toast'
-import { PdfPreviewModal } from '@/components/ui/pdf-preview-modal'
+import { FilePreviewModal } from '@/components/ui/file-preview-modal'
 import type { FormFeedItem } from './types'
 import { formatFileSize, getFileEmoji } from './types'
 
@@ -465,12 +465,17 @@ export function FormDetail({
 
       {/* Modal de vista previa para PDFs locales */}
       {showPreview && isLocal && canPreview && previewSrc && form.fileType?.includes('pdf') && (
-        <PdfPreviewModal
-          previewUrl={previewSrc}
-          downloadUrl={`/api/forms/${form.id}/file?download=true`}
-          fileName={form.title}
-          title={form.title}
+        <FilePreviewModal
+          isOpen={showPreview}
           onClose={() => setShowPreview(false)}
+          file={{
+            id: form.id,
+            originalName: form.title,
+            mimeType: form.fileType ?? 'application/pdf',
+            size: form.fileSize ?? 0,
+            url: previewSrc,
+            downloadUrl: `/api/forms/${form.id}/file?download=true`,
+          }}
         />
       )}
     </>
