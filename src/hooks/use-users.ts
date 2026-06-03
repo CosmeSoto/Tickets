@@ -25,6 +25,12 @@ export interface UserData {
         color: string
         description?: string
         familyId?: string | null
+        family?: {
+          id: string
+          name: string
+          code: string
+          color?: string | null
+        } | null
       }
   phone?: string
   avatar?: string

@@ -333,9 +333,18 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
         setAllFamilies(allActiveFamilies)
 
         // Familia nativa del usuario siendo editado — debe estar siempre disponible
-        const userNativeFamilyId =
-          user && typeof user.department === 'object'
-            ? ((user.department as any)?.familyId ?? null)
+        const userDept = user && typeof user.department === 'object' ? user.department : null
+        const userNativeFamilyId = userDept?.familyId ?? null
+        // Objeto completo de la familia nativa si viene embebido en el departamento
+        const userNativeFamilyObj: FamilyOption | null =
+          userNativeFamilyId && userDept?.family
+            ? {
+                id: userDept.family.id,
+                name: userDept.family.name,
+                code: userDept.family.code,
+                color: userDept.family.color ?? null,
+                isActive: true,
+              }
             : null
 
         /**
@@ -346,8 +355,9 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
           if (!userNativeFamilyId) return list
           const alreadyIn = list.some(f => f.id === userNativeFamilyId)
           if (alreadyIn) return list
-          // Buscarla en cualquiera de las listas disponibles
+          // Usar el objeto embebido primero, luego buscar en las listas cargadas
           const nativeFamily =
+            userNativeFamilyObj ??
             allActiveFamilies.find(f => f.id === userNativeFamilyId) ??
             tModuleFamilies.find(f => f.id === userNativeFamilyId) ??
             iModuleFamilies.find(f => f.id === userNativeFamilyId) ??

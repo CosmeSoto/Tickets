@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronDown, Search, RefreshCw, Lock } from 'lucide-react'
+import { ChevronDown, Search, RefreshCw, Lock, Info } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
@@ -28,8 +28,10 @@ interface ModuleAccessCardProps {
   families: ModuleFamily[]
   /** IDs de familias asignadas a este módulo */
   assignedFamilyIds: string[]
-  /** Familia nativa del usuario (por departamento) */
+  /** Familia nativa del usuario (por departamento) — siempre aparece fija arriba, sin edición */
   nativeFamilyId?: string | null
+  /** Objeto completo de la familia nativa, para mostrarla aunque no esté en `families` */
+  nativeFamily?: ModuleFamily | null
   /** Callback al asignar/desasignar familia */
   onAssignFamily: (familyId: string) => Promise<any>
   onUnassignFamily: (familyId: string) => Promise<any>
@@ -46,6 +48,13 @@ interface ModuleAccessCardProps {
   readOnlyFamilyIds?: string[]
   loading?: boolean
   disabled?: boolean
+  /**
+   * 'standard' (default): selector de familias normal
+   * 'patrol': modo contextual — la familia nativa ya actúa como agente;
+   *           el selector adicional solo se muestra si hay más de una familia
+   *           disponible o ya tiene asignaciones adicionales.
+   */
+  familyMode?: 'standard' | 'patrol'
 }
 
 export function ModuleAccessCard({
@@ -57,12 +66,14 @@ export function ModuleAccessCard({
   families,
   assignedFamilyIds,
   nativeFamilyId,
+  nativeFamily,
   onAssignFamily,
   onUnassignFamily,
   options,
   readOnlyFamilyIds = [],
   loading,
   disabled,
+  familyMode = 'standard',
 }: ModuleAccessCardProps) {
   const [expanded, setExpanded] = useState(false)
   const [search, setSearch] = useState('')
@@ -72,13 +83,25 @@ export function ModuleAccessCard({
   const assignedSet = new Set(assignedFamilyIds)
   const readOnlySet = new Set(readOnlyFamilyIds)
 
-  const filteredFamilies = families.filter(
+  // Resolver el objeto de la familia nativa
+  const resolvedNativeFamily: ModuleFamily | null =
+    nativeFamily ?? (nativeFamilyId ? (families.find(f => f.id === nativeFamilyId) ?? null) : null)
+
+  // Familias adicionales (excluir la nativa — se muestra por separado)
+  const additionalFamilies = families.filter(f => f.isActive && f.id !== nativeFamilyId)
+
+  const filteredFamilies = additionalFamilies.filter(
     f =>
-      f.isActive &&
-      (search === '' ||
-        f.name.toLowerCase().includes(search.toLowerCase()) ||
-        f.code.toLowerCase().includes(search.toLowerCase()))
+      search === '' ||
+      f.name.toLowerCase().includes(search.toLowerCase()) ||
+      f.code.toLowerCase().includes(search.toLowerCase())
   )
+
+  // En modo patrol: mostrar el selector adicional solo si hay familias extra disponibles
+  // o el usuario ya tiene asignaciones más allá de la nativa
+  const hasAdditionalAssignments = assignedFamilyIds.some(id => id !== nativeFamilyId)
+  const showAdditionalFamilySelector =
+    familyMode === 'standard' || additionalFamilies.length > 0 || hasAdditionalAssignments
 
   const handleFamilyToggle = async (familyId: string, checked: boolean) => {
     if (savingId) return
@@ -142,7 +165,7 @@ export function ModuleAccessCard({
       {/* Contenido expandible — solo cuando está habilitado */}
       {enabled && (
         <div className='border-t border-primary/20'>
-          {/* Opciones específicas del módulo */}
+          {/* Opciones específicas del módulo (ej. inventario) */}
           {options && (
             <div className='px-3 py-2 space-y-2 border-b border-primary/10'>
               {options.onToggleManager !== undefined && (
@@ -176,104 +199,175 @@ export function ModuleAccessCard({
             </div>
           )}
 
-          {/* Selector de familias — desplegable */}
+          {/* ── Sección de familias ── */}
           <div className='px-3 py-2'>
-            <button
-              type='button'
-              onClick={() => setExpanded(!expanded)}
-              className='w-full flex items-center justify-between text-xs font-medium text-muted-foreground hover:text-foreground transition-colors'
-            >
-              <span>Familias asignadas</span>
-              <ChevronDown
-                className={cn('h-3.5 w-3.5 transition-transform', expanded && 'rotate-180')}
-              />
-            </button>
-
-            {expanded && (
-              <div className='mt-2 space-y-2'>
-                {/* Buscador */}
-                <div className='relative'>
-                  <Search className='absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground' />
-                  <Input
-                    placeholder='Buscar familia...'
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                    className='pl-7 h-7 text-xs'
-                  />
+            {/* Modo patrol sin familias adicionales: info compacta */}
+            {familyMode === 'patrol' && !showAdditionalFamilySelector && resolvedNativeFamily && (
+              <div className='flex items-start gap-2 rounded-md bg-muted/30 border border-dashed px-2.5 py-2'>
+                <Info className='h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5' />
+                <div className='min-w-0'>
+                  <p className='text-[11px] text-muted-foreground leading-snug'>
+                    Opera en{' '}
+                    <span className='font-medium text-foreground'>{resolvedNativeFamily.name}</span>{' '}
+                    por su departamento.
+                  </p>
                 </div>
+              </div>
+            )}
 
-                {/* Lista de familias */}
-                {loading ? (
-                  <div className='flex items-center justify-center py-4'>
-                    <RefreshCw className='h-4 w-4 animate-spin text-muted-foreground' />
-                  </div>
-                ) : (
-                  <div className='space-y-1 max-h-48 overflow-y-auto pr-1'>
-                    {filteredFamilies.map(family => {
-                      const isNative = nativeFamilyId === family.id
-                      const isAssigned = assignedSet.has(family.id) || isNative
-                      const isReadOnly = readOnlySet.has(family.id)
-                      const isSaving = savingId === family.id
-                      const isDisabled = isSaving || isNative || isReadOnly
+            {/* Selector de familias (standard siempre, patrol solo si hay opciones adicionales) */}
+            {showAdditionalFamilySelector && (
+              <>
+                <button
+                  type='button'
+                  onClick={() => setExpanded(!expanded)}
+                  className='w-full flex items-center justify-between text-xs font-medium text-muted-foreground hover:text-foreground transition-colors'
+                >
+                  <span>Familias asignadas</span>
+                  <ChevronDown
+                    className={cn('h-3.5 w-3.5 transition-transform', expanded && 'rotate-180')}
+                  />
+                </button>
 
-                      return (
-                        <div
-                          key={family.id}
-                          className={cn(
-                            'flex items-center justify-between rounded-md border px-2.5 py-1.5',
-                            isNative && 'bg-primary/5 border-primary/20',
-                            isReadOnly && !isNative && 'opacity-50 bg-muted/20'
-                          )}
-                        >
-                          <div className='flex items-center gap-2'>
-                            <Checkbox
-                              checked={isAssigned}
-                              onCheckedChange={v =>
-                                !isDisabled && handleFamilyToggle(family.id, !!v)
-                              }
-                              disabled={isDisabled}
-                              className={isDisabled ? 'opacity-60' : ''}
-                            />
-                            {family.color && (
-                              <div
-                                className='w-2.5 h-2.5 rounded-full flex-shrink-0'
-                                style={{ backgroundColor: family.color }}
-                              />
-                            )}
-                            <div>
-                              <p className='text-xs font-medium leading-none'>{family.name}</p>
-                              <p className='text-[10px] text-muted-foreground font-mono'>
-                                {family.code}
-                              </p>
+                {/* Contexto extra para rondas */}
+                {familyMode === 'patrol' && !expanded && (
+                  <p className='text-[10px] text-muted-foreground mt-0.5'>
+                    Para supervisores o agentes en varias instalaciones
+                  </p>
+                )}
+
+                {expanded && (
+                  <div className='mt-2 space-y-2'>
+                    {/* Buscador */}
+                    <div className='relative'>
+                      <Search className='absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground' />
+                      <Input
+                        placeholder='Buscar familia...'
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        className='pl-7 h-7 text-xs'
+                      />
+                    </div>
+
+                    {loading ? (
+                      <div className='flex items-center justify-center py-4'>
+                        <RefreshCw className='h-4 w-4 animate-spin text-muted-foreground' />
+                      </div>
+                    ) : (
+                      <div className='space-y-1'>
+                        {/* Familia nativa — fija arriba, sin edición */}
+                        {resolvedNativeFamily && (
+                          <>
+                            <p className='text-[10px] font-semibold text-muted-foreground uppercase tracking-wide px-0.5 pt-1'>
+                              Familia nativa
+                            </p>
+                            <div className='flex items-center justify-between rounded-md border border-primary/30 bg-primary/5 px-2.5 py-1.5'>
+                              <div className='flex items-center gap-2'>
+                                <Checkbox
+                                  checked
+                                  disabled
+                                  className='opacity-60 cursor-not-allowed'
+                                />
+                                {resolvedNativeFamily.color && (
+                                  <div
+                                    className='w-2.5 h-2.5 rounded-full flex-shrink-0'
+                                    style={{ backgroundColor: resolvedNativeFamily.color }}
+                                  />
+                                )}
+                                <div>
+                                  <p className='text-xs font-medium leading-none'>
+                                    {resolvedNativeFamily.name}
+                                  </p>
+                                  <p className='text-[10px] text-muted-foreground font-mono'>
+                                    {resolvedNativeFamily.code}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className='flex items-center gap-1'>
+                                <Badge
+                                  variant='outline'
+                                  className='text-[9px] px-1 py-0 border-primary/30 text-primary'
+                                >
+                                  Nativa
+                                </Badge>
+                                <Lock className='h-3 w-3 text-primary/40' />
+                              </div>
                             </div>
-                          </div>
-                          <div className='flex items-center gap-1'>
-                            {isNative && (
-                              <Badge
-                                variant='outline'
-                                className='text-[9px] px-1 py-0 border-primary/30 text-primary'
+                            {filteredFamilies.length > 0 && (
+                              <p className='text-[10px] font-semibold text-muted-foreground uppercase tracking-wide px-0.5 pt-1'>
+                                {familyMode === 'patrol'
+                                  ? 'Instalaciones adicionales'
+                                  : 'Familias adicionales'}
+                              </p>
+                            )}
+                          </>
+                        )}
+
+                        {/* Familias adicionales asignables */}
+                        <div className='space-y-1 max-h-48 overflow-y-auto pr-1'>
+                          {filteredFamilies.map(family => {
+                            const isAssigned = assignedSet.has(family.id)
+                            const isReadOnly = readOnlySet.has(family.id)
+                            const isSaving = savingId === family.id
+                            const isDisabled = isSaving || isReadOnly
+
+                            return (
+                              <div
+                                key={family.id}
+                                className={cn(
+                                  'flex items-center justify-between rounded-md border px-2.5 py-1.5',
+                                  isReadOnly && 'opacity-50 bg-muted/20'
+                                )}
                               >
-                                Nativa
-                              </Badge>
-                            )}
-                            {isReadOnly && !isNative && (
-                              <Lock className='h-3 w-3 text-muted-foreground' />
-                            )}
-                            {isSaving && (
-                              <RefreshCw className='h-3 w-3 animate-spin text-muted-foreground' />
-                            )}
-                          </div>
+                                <div className='flex items-center gap-2'>
+                                  <Checkbox
+                                    checked={isAssigned}
+                                    onCheckedChange={v =>
+                                      !isDisabled && handleFamilyToggle(family.id, !!v)
+                                    }
+                                    disabled={isDisabled}
+                                    className={isDisabled ? 'opacity-60' : ''}
+                                  />
+                                  {family.color && (
+                                    <div
+                                      className='w-2.5 h-2.5 rounded-full flex-shrink-0'
+                                      style={{ backgroundColor: family.color }}
+                                    />
+                                  )}
+                                  <div>
+                                    <p className='text-xs font-medium leading-none'>
+                                      {family.name}
+                                    </p>
+                                    <p className='text-[10px] text-muted-foreground font-mono'>
+                                      {family.code}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className='flex items-center gap-1'>
+                                  {isReadOnly && <Lock className='h-3 w-3 text-muted-foreground' />}
+                                  {isSaving && (
+                                    <RefreshCw className='h-3 w-3 animate-spin text-muted-foreground' />
+                                  )}
+                                </div>
+                              </div>
+                            )
+                          })}
+                          {filteredFamilies.length === 0 && !resolvedNativeFamily && (
+                            <p className='text-center text-xs text-muted-foreground py-3'>
+                              {search ? 'Sin resultados' : 'No hay familias activas'}
+                            </p>
+                          )}
+                          {filteredFamilies.length === 0 && resolvedNativeFamily && search && (
+                            <p className='text-center text-xs text-muted-foreground py-2'>
+                              Sin resultados
+                            </p>
+                          )}
                         </div>
-                      )
-                    })}
-                    {filteredFamilies.length === 0 && (
-                      <p className='text-center text-xs text-muted-foreground py-3'>
-                        {search ? 'Sin resultados' : 'No hay familias activas'}
-                      </p>
+                      </div>
                     )}
                   </div>
                 )}
-              </div>
+              </>
             )}
           </div>
         </div>

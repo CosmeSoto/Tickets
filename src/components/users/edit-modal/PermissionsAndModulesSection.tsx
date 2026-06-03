@@ -91,6 +91,21 @@ export function PermissionsAndModulesSection({
 }: PermissionsAndModulesSectionProps) {
   const { modules: systemModules } = useSystemModules()
 
+  // Familia nativa del usuario: viene del departamento asignado
+  const deptObj = user && typeof user.department === 'object' ? (user.department as any) : null
+  const nativeFamilyId: string | null = deptObj?.familyId ?? null
+  // Construir el objeto ModuleFamily con los datos que vienen embebidos en el departamento
+  const nativeFamily =
+    nativeFamilyId && deptObj?.family
+      ? {
+          id: deptObj.family.id as string,
+          name: deptObj.family.name as string,
+          code: deptObj.family.code as string,
+          color: deptObj.family.color as string | null,
+          isActive: true,
+        }
+      : null
+
   return (
     <div className='space-y-3'>
       <h3 className='text-sm font-semibold text-foreground'>Estado y permisos</h3>
@@ -159,11 +174,8 @@ export function PermissionsAndModulesSection({
                     ? adminFamilyIds
                     : clientFamilyIds
               }
-              nativeFamilyId={
-                user && typeof user.department === 'object'
-                  ? ((user.department as any)?.familyId ?? null)
-                  : null
-              }
+              nativeFamilyId={nativeFamilyId}
+              nativeFamily={nativeFamily}
               readOnlyFamilyIds={ticketReadOnlyIds}
               onAssignFamily={
                 formData.role === 'TECHNICIAN'
@@ -191,11 +203,8 @@ export function PermissionsAndModulesSection({
               onToggle={v => onToggle('inventoryEnabled', v)}
               families={inventoryFamilies}
               assignedFamilyIds={inventoryFamilyIds}
-              nativeFamilyId={
-                user && typeof user.department === 'object'
-                  ? ((user.department as any)?.familyId ?? null)
-                  : null
-              }
+              nativeFamilyId={nativeFamilyId}
+              nativeFamily={nativeFamily}
               readOnlyFamilyIds={inventoryReadOnlyIds}
               onAssignFamily={handlers.handleAssignInventoryFamily}
               onUnassignFamily={handlers.handleUnassignInventoryFamily}
@@ -217,14 +226,12 @@ export function PermissionsAndModulesSection({
               onToggle={v => onToggle('patrolsEnabled', v)}
               families={patrolFamilies}
               assignedFamilyIds={patrolFamilyIds}
-              nativeFamilyId={
-                user && typeof user.department === 'object'
-                  ? ((user.department as any)?.familyId ?? null)
-                  : null
-              }
+              nativeFamilyId={nativeFamilyId}
+              nativeFamily={nativeFamily}
               readOnlyFamilyIds={patrolReadOnlyIds}
               onAssignFamily={handlers.handleAssignPatrolFamily}
               onUnassignFamily={handlers.handleUnassignPatrolFamily}
+              familyMode='patrol'
               loading={loadingFamilies}
               disabled={loading}
             />

@@ -48,8 +48,9 @@ const nextConfig: NextConfig = {
             value: 'on',
           },
           {
+            // SAMEORIGIN en vez de DENY — permite iframes del mismo origen (vista previa de PDFs)
             key: 'X-Frame-Options',
-            value: 'DENY',
+            value: 'SAMEORIGIN',
           },
           {
             key: 'X-Content-Type-Options',
@@ -58,6 +59,34 @@ const nextConfig: NextConfig = {
           {
             key: 'Referrer-Policy',
             value: 'origin-when-cross-origin',
+          },
+        ],
+      },
+      // Rutas de archivos para vista previa — no restringir frames del mismo origen
+      {
+        source: '/api/forms/:id/file',
+        headers: [
+          {
+            key: 'X-Frame-Options',
+            value: 'SAMEORIGIN',
+          },
+        ],
+      },
+      {
+        source: '/api/attachments/:id',
+        headers: [
+          {
+            key: 'X-Frame-Options',
+            value: 'SAMEORIGIN',
+          },
+        ],
+      },
+      {
+        source: '/api/tickets/:ticketId/attachments/:attachmentId',
+        headers: [
+          {
+            key: 'X-Frame-Options',
+            value: 'SAMEORIGIN',
           },
         ],
       },

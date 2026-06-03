@@ -64,9 +64,18 @@ export function FilePreviewModal({ isOpen, onClose, file }: FilePreviewModalProp
     setPdfError('')
   }, [file?.id])
 
-  // Verificar disponibilidad del PDF antes de mostrar el iframe
+  // Verificar disponibilidad del PDF antes de mostrar el iframe.
+  // Solo para URLs externas — las rutas relativas del mismo origen se confían directamente.
   useEffect(() => {
     if (!file || !isPDF || !isOpen) return
+
+    const isRelativeUrl = file.url.startsWith('/')
+
+    // Rutas del mismo origen: ir directo al iframe sin fetch verificador
+    if (isRelativeUrl) {
+      setPdfState('ready')
+      return
+    }
 
     const controller = new AbortController()
     setPdfState('loading')
@@ -193,6 +202,29 @@ export function FilePreviewModal({ isOpen, onClose, file }: FilePreviewModalProp
                   src={file.url}
                   className='w-full h-full border-0 rounded'
                   title={file.originalName}
+                  onError={() => {
+                    setPdfState('error')
+                    setPdfError('El navegador no pudo mostrar el PDF.')
+                  }}
+                  onLoad={e => {
+                    // Detectar si el iframe cargó una página de error (respuesta no-PDF del servidor)
+                    try {
+                      const doc = (e.target as HTMLIFrameElement).contentDocument
+                      if (doc && doc.contentType && !doc.contentType.includes('pdf')) {
+                        const bodyText = doc.body?.innerText ?? ''
+                        if (
+                          bodyText.includes('not found') ||
+                          bodyText.includes('404') ||
+                          bodyText.includes('Unauthorized')
+                        ) {
+                          setPdfState('error')
+                          setPdfError(bodyText.trim().slice(0, 80) || 'Archivo no encontrado')
+                        }
+                      }
+                    } catch {
+                      // cross-origin o acceso denegado al contentDocument — ignorar
+                    }
+                  }}
                 />
               )}
             </div>
