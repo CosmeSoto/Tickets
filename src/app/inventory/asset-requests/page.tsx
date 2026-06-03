@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/select'
 import { Plus, Search, RefreshCw, Filter, X } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
-import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
+import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { DataTable } from '@/components/common/views/data-table'
 import { ExportButton } from '@/components/common/export-button'
 import { createAssetRequestColumns } from '@/components/inventory/asset-requests/asset-request-columns'
@@ -170,9 +170,12 @@ export default function AssetRequestsPage() {
   const columns = useMemo(() => createAssetRequestColumns({ onView: handleViewRequest }), [])
 
   return (
-    <RoleDashboardLayout
+    <ModuleLayout
       title='Solicitudes de Activos'
       subtitle='Gestiona las solicitudes de equipos, licencias y mantenimiento'
+      loading={loading && requests.length === 0}
+      error={error}
+      onRetry={loadRequests}
       headerActions={
         <Button asChild>
           <Link href='/inventory/asset-requests/create'>
@@ -300,6 +303,6 @@ export default function AssetRequestsPage() {
           ),
         }}
       />
-    </RoleDashboardLayout>
+    </ModuleLayout>
   )
 }
