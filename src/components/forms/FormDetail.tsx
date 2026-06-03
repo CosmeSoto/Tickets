@@ -31,6 +31,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { useToast } from '@/hooks/use-toast'
+import { PdfPreviewModal } from '@/components/ui/pdf-preview-modal'
 import type { FormFeedItem } from './types'
 import { formatFileSize, getFileEmoji } from './types'
 
@@ -216,225 +217,262 @@ export function FormDetail({
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className='sm:max-w-2xl max-h-[90vh] overflow-y-auto max-w-[95vw] w-full p-4 sm:p-6'>
-        <DialogHeader>
-          <div className='flex items-start justify-between gap-2'>
-            <div className='flex-1 min-w-0'>
-              {/* Badges */}
-              <div className='flex items-center gap-2 mb-2 flex-wrap'>
-                <span className='text-2xl'>{getFileEmoji(form.fileType)}</span>
-                {form.category && (
-                  <Badge variant='secondary' className='gap-1'>
-                    <Tag className='h-3 w-3' />
-                    {form.category.name}
-                  </Badge>
-                )}
-                {form.version && <Badge variant='outline'>v{form.version}</Badge>}
-                {form.isFeatured && (
-                  <Badge className='gap-1 bg-primary/10 text-primary'>
-                    <Star className='h-3 w-3' />
-                    Destacado
-                  </Badge>
-                )}
-              </div>
-              <DialogTitle className='text-xl leading-snug break-words'>{form.title}</DialogTitle>
-              {/* Metadatos */}
-              <div className='flex flex-wrap gap-3 mt-2 text-xs text-muted-foreground'>
-                <span className='flex items-center gap-1'>
-                  <User className='h-3.5 w-3.5' />
-                  {form.createdBy.name}
-                </span>
-                <span className='flex items-center gap-1'>
-                  <Calendar className='h-3.5 w-3.5' />
-                  {new Date(form.createdAt).toLocaleDateString('es-EC', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                  })}
-                </span>
-                <span className='flex items-center gap-1'>
-                  <Download className='h-3.5 w-3.5' />
-                  {downloadCount} descarga{downloadCount !== 1 ? 's' : ''}
-                </span>
-              </div>
-            </div>
-
-            {/* Acciones de gestión */}
-            {mode === 'manage' && canModify && (
-              <div className='flex gap-1 flex-shrink-0'>
-                {onEdit && (
-                  <Button
-                    variant='outline'
-                    size='sm'
-                    onClick={() => {
-                      onClose()
-                      onEdit(form)
-                    }}
-                    className='gap-1.5'
-                  >
-                    <Edit className='h-3.5 w-3.5' />
-                    Editar
-                  </Button>
-                )}
-                {onDelete && (
-                  <Button
-                    variant='outline'
-                    size='sm'
-                    onClick={() => {
-                      onClose()
-                      onDelete(form)
-                    }}
-                    className='gap-1.5 text-destructive hover:text-destructive'
-                  >
-                    <Trash2 className='h-3.5 w-3.5' />
-                    Eliminar
-                  </Button>
-                )}
-              </div>
-            )}
-          </div>
-        </DialogHeader>
-
-        <div className='space-y-4'>
-          {/* Descripción corta */}
-          {form.description && (
-            <p className='text-sm text-muted-foreground leading-relaxed'>{form.description}</p>
-          )}
-
-          {/* Resumen / descripción larga */}
-          {form.summary && (
-            <>
-              <Separator />
-              <div className='space-y-1'>
-                <p className='text-sm font-medium'>Descripción completa</p>
-                <p className='text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap'>
-                  {form.summary}
-                </p>
-              </div>
-            </>
-          )}
-
-          {/* Sección de archivo */}
-          {hasFile ? (
-            <>
-              <Separator />
-              <div className='space-y-3'>
-                {/* Info del archivo */}
-                <div className='flex items-center gap-3 p-3 rounded-lg bg-muted/40 border'>
-                  <span className='text-2xl flex-shrink-0'>{getFileEmoji(form.fileType)}</span>
-                  <div className='flex-1 min-w-0'>
-                    <p className='text-sm font-medium'>
-                      {getFileLabel(form.fileType, form.fileUrl)}
-                    </p>
-                    <div className='flex items-center gap-2 text-xs text-muted-foreground flex-wrap'>
-                      {form.fileSize && <span>{formatFileSize(form.fileSize)}</span>}
-                      {!isLocal && (
-                        <span className='flex items-center gap-1'>
-                          <ExternalLink className='h-3 w-3' />
-                          Enlace externo
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Botones de acción */}
-                <div className='flex flex-wrap gap-2'>
-                  {isLocal ? (
-                    // Archivo local
-                    <>
-                      <Button onClick={handleDownload} disabled={downloading} className='gap-2'>
-                        <Download className='h-4 w-4' />
-                        {downloading ? 'Descargando...' : 'Descargar'}
-                      </Button>
-
-                      {/* Vista previa solo para PDF e imágenes */}
-                      {canPreview && (
-                        <Button
-                          variant='outline'
-                          onClick={() => setShowPreview(v => !v)}
-                          className='gap-2'
-                        >
-                          {showPreview ? (
-                            <>
-                              <EyeOff className='h-4 w-4' />
-                              Ocultar vista previa
-                            </>
-                          ) : (
-                            <>
-                              <Eye className='h-4 w-4' />
-                              Vista previa
-                            </>
-                          )}
-                        </Button>
-                      )}
-                    </>
-                  ) : (
-                    // URL externa (Google Drive, OneDrive, Dropbox, etc.)
-                    <>
-                      <Button onClick={handleDownload} disabled={downloading} className='gap-2'>
-                        <ExternalLink className='h-4 w-4' />
-                        {downloading ? 'Abriendo...' : 'Abrir documento'}
-                      </Button>
-
-                      {/* Vista previa embebida para servicios que la soportan */}
-                      {canPreview && (
-                        <Button
-                          variant='outline'
-                          onClick={() => setShowPreview(v => !v)}
-                          className='gap-2'
-                        >
-                          {showPreview ? (
-                            <>
-                              <EyeOff className='h-4 w-4' />
-                              Ocultar vista previa
-                            </>
-                          ) : (
-                            <>
-                              <Eye className='h-4 w-4' />
-                              Vista previa
-                            </>
-                          )}
-                        </Button>
-                      )}
-                    </>
+    <>
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className='sm:max-w-2xl max-h-[90vh] overflow-y-auto max-w-[95vw] w-full p-4 sm:p-6'>
+          <DialogHeader>
+            <div className='flex items-start justify-between gap-2'>
+              <div className='flex-1 min-w-0'>
+                {/* Badges */}
+                <div className='flex items-center gap-2 mb-2 flex-wrap'>
+                  <span className='text-2xl'>{getFileEmoji(form.fileType)}</span>
+                  {form.category && (
+                    <Badge variant='secondary' className='gap-1'>
+                      <Tag className='h-3 w-3' />
+                      {form.category.name}
+                    </Badge>
+                  )}
+                  {form.version && <Badge variant='outline'>v{form.version}</Badge>}
+                  {form.isFeatured && (
+                    <Badge className='gap-1 bg-primary/10 text-primary'>
+                      <Star className='h-3 w-3' />
+                      Destacado
+                    </Badge>
                   )}
                 </div>
+                <DialogTitle className='text-xl leading-snug break-words'>{form.title}</DialogTitle>
+                {/* Metadatos */}
+                <div className='flex flex-wrap gap-3 mt-2 text-xs text-muted-foreground'>
+                  <span className='flex items-center gap-1'>
+                    <User className='h-3.5 w-3.5' />
+                    {form.createdBy.name}
+                  </span>
+                  <span className='flex items-center gap-1'>
+                    <Calendar className='h-3.5 w-3.5' />
+                    {new Date(form.createdAt).toLocaleDateString('es-EC', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                    })}
+                  </span>
+                  <span className='flex items-center gap-1'>
+                    <Download className='h-3.5 w-3.5' />
+                    {downloadCount} descarga{downloadCount !== 1 ? 's' : ''}
+                  </span>
+                </div>
               </div>
 
-              {/* Vista previa inline */}
-              {showPreview && canPreview && previewSrc && (
-                <div className='rounded-lg overflow-hidden border bg-muted/30'>
-                  {form.fileType?.includes('image') ||
-                  form.fileUrl?.match(/\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i) ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={previewSrc}
-                      alt={form.title}
-                      className='w-full max-h-[500px] object-contain'
-                    />
-                  ) : (
-                    <iframe
-                      src={previewSrc}
-                      title={form.title}
-                      className='w-full h-[500px] border-0'
-                      allow='autoplay'
-                    />
+              {/* Acciones de gestión */}
+              {mode === 'manage' && canModify && (
+                <div className='flex gap-1 flex-shrink-0'>
+                  {onEdit && (
+                    <Button
+                      variant='outline'
+                      size='sm'
+                      onClick={() => {
+                        onClose()
+                        onEdit(form)
+                      }}
+                      className='gap-1.5'
+                    >
+                      <Edit className='h-3.5 w-3.5' />
+                      Editar
+                    </Button>
+                  )}
+                  {onDelete && (
+                    <Button
+                      variant='outline'
+                      size='sm'
+                      onClick={() => {
+                        onClose()
+                        onDelete(form)
+                      }}
+                      className='gap-1.5 text-destructive hover:text-destructive'
+                    >
+                      <Trash2 className='h-3.5 w-3.5' />
+                      Eliminar
+                    </Button>
                   )}
                 </div>
               )}
-            </>
-          ) : (
-            <div className='flex flex-col items-center justify-center py-8 text-center border border-dashed rounded-lg'>
-              <FileText className='h-8 w-8 text-muted-foreground mb-2' />
-              <p className='text-sm text-muted-foreground'>
-                Este documento no tiene un archivo adjunto todavía.
-              </p>
             </div>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+          </DialogHeader>
+
+          <div className='space-y-4'>
+            {/* Descripción corta */}
+            {form.description && (
+              <p className='text-sm text-muted-foreground leading-relaxed'>{form.description}</p>
+            )}
+
+            {/* Resumen / descripción larga */}
+            {form.summary && (
+              <>
+                <Separator />
+                <div className='space-y-1'>
+                  <p className='text-sm font-medium'>Descripción completa</p>
+                  <p className='text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap'>
+                    {form.summary}
+                  </p>
+                </div>
+              </>
+            )}
+
+            {/* Sección de archivo */}
+            {hasFile ? (
+              <>
+                <Separator />
+                <div className='space-y-3'>
+                  {/* Info del archivo */}
+                  <div className='flex items-center gap-3 p-3 rounded-lg bg-muted/40 border'>
+                    <span className='text-2xl flex-shrink-0'>{getFileEmoji(form.fileType)}</span>
+                    <div className='flex-1 min-w-0'>
+                      <p className='text-sm font-medium'>
+                        {getFileLabel(form.fileType, form.fileUrl)}
+                      </p>
+                      <div className='flex items-center gap-2 text-xs text-muted-foreground flex-wrap'>
+                        {form.fileSize && <span>{formatFileSize(form.fileSize)}</span>}
+                        {!isLocal && (
+                          <span className='flex items-center gap-1'>
+                            <ExternalLink className='h-3 w-3' />
+                            Enlace externo
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Botones de acción */}
+                  <div className='flex flex-wrap gap-2'>
+                    {isLocal ? (
+                      // Archivo local
+                      <>
+                        <Button onClick={handleDownload} disabled={downloading} className='gap-2'>
+                          <Download className='h-4 w-4' />
+                          {downloading ? 'Descargando...' : 'Descargar'}
+                        </Button>
+
+                        {/* Vista previa: PDF → modal dedicado, imagen → inline */}
+                        {canPreview && (
+                          <Button
+                            variant='outline'
+                            onClick={() => setShowPreview(v => !v)}
+                            className='gap-2'
+                          >
+                            {showPreview &&
+                            (form.fileType?.includes('image') ||
+                              form.fileUrl?.match(/\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i)) ? (
+                              <>
+                                <EyeOff className='h-4 w-4' />
+                                Ocultar vista previa
+                              </>
+                            ) : (
+                              <>
+                                <Eye className='h-4 w-4' />
+                                Vista previa
+                              </>
+                            )}
+                          </Button>
+                        )}
+                      </>
+                    ) : (
+                      // URL externa (Google Drive, OneDrive, Dropbox, etc.)
+                      <>
+                        <Button onClick={handleDownload} disabled={downloading} className='gap-2'>
+                          <ExternalLink className='h-4 w-4' />
+                          {downloading ? 'Abriendo...' : 'Abrir documento'}
+                        </Button>
+
+                        {/* Vista previa embebida para servicios que la soportan */}
+                        {canPreview && (
+                          <Button
+                            variant='outline'
+                            onClick={() => setShowPreview(v => !v)}
+                            className='gap-2'
+                          >
+                            {showPreview ? (
+                              <>
+                                <EyeOff className='h-4 w-4' />
+                                Ocultar vista previa
+                              </>
+                            ) : (
+                              <>
+                                <Eye className='h-4 w-4' />
+                                Vista previa
+                              </>
+                            )}
+                          </Button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Vista previa inline para imágenes locales */}
+                {showPreview &&
+                  canPreview &&
+                  previewSrc &&
+                  isLocal &&
+                  (form.fileType?.includes('image') ||
+                    form.fileUrl?.match(/\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i)) && (
+                    <div className='rounded-lg overflow-hidden border bg-muted/30'>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={previewSrc}
+                        alt={form.title}
+                        className='w-full max-h-[500px] object-contain'
+                      />
+                    </div>
+                  )}
+
+                {/* Vista previa inline para URLs externas embebibles (Google Drive, OneDrive, etc.) */}
+                {showPreview && canPreview && previewSrc && !isLocal && (
+                  <div className='rounded-lg overflow-hidden border bg-muted/30'>
+                    {/* Para PDFs directos, usar object con fallback a Google Docs Viewer */}
+                    {form.fileType?.includes('pdf') &&
+                    !previewSrc.includes('drive.google.com') &&
+                    !previewSrc.includes('onedrive') &&
+                    !previewSrc.includes('sharepoint') &&
+                    !previewSrc.includes('dropbox') ? (
+                      <object data={previewSrc} type='application/pdf' className='w-full h-[500px]'>
+                        <iframe
+                          src={`https://docs.google.com/viewer?url=${encodeURIComponent(previewSrc)}&embedded=true`}
+                          className='w-full h-[500px] border-0'
+                          title={form.title}
+                        />
+                      </object>
+                    ) : (
+                      <iframe
+                        src={previewSrc}
+                        title={form.title}
+                        className='w-full h-[500px] border-0'
+                        allow='autoplay'
+                      />
+                    )}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className='flex flex-col items-center justify-center py-8 text-center border border-dashed rounded-lg'>
+                <FileText className='h-8 w-8 text-muted-foreground mb-2' />
+                <p className='text-sm text-muted-foreground'>
+                  Este documento no tiene un archivo adjunto todavía.
+                </p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de vista previa para PDFs locales */}
+      {showPreview && isLocal && canPreview && previewSrc && form.fileType?.includes('pdf') && (
+        <PdfPreviewModal
+          previewUrl={previewSrc}
+          downloadUrl={`/api/forms/${form.id}/file?download=true`}
+          fileName={form.title}
+          title={form.title}
+          onClose={() => setShowPreview(false)}
+        />
+      )}
+    </>
   )
 }

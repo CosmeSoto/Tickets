@@ -48,6 +48,7 @@ export async function GET(request: NextRequest, { params }: Params) {
       const attachment = form.form_attachments[0]
 
       if (!existsSync(attachment.path)) {
+        console.error(`[forms/file] Archivo no encontrado en disco: ${attachment.path}`)
         return new NextResponse('File not found on disk', { status: 404 })
       }
 
