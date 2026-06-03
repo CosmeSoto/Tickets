@@ -159,6 +159,7 @@ export default function LoginPage() {
                   required
                   disabled={isLoading}
                   className='pl-9 h-11 bg-background'
+                  autoComplete='email'
                 />
               </div>
             </div>
@@ -183,6 +184,7 @@ export default function LoginPage() {
                   required
                   disabled={isLoading}
                   className='pl-9 pr-10 h-11 bg-background'
+                  autoComplete='current-password'
                 />
                 <Button
                   type='button'
