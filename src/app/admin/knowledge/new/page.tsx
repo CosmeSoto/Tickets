@@ -12,7 +12,6 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Switch } from '@/components/ui/switch'
 import {
   Select,
@@ -23,8 +22,6 @@ import {
 } from '@/components/ui/select'
 import { ArrowLeft, Save, X, Plus, Loader2, BookOpen, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
 function NewArticleContent() {
@@ -41,7 +38,6 @@ function NewArticleContent() {
   const [tags, setTags] = useState<string[]>([])
   const [tagInput, setTagInput] = useState('')
   const [isPublished, setIsPublished] = useState(true)
-  const [activeTab, setActiveTab] = useState<'edit' | 'preview'>('edit')
   const [isSaving, setIsSaving] = useState(false)
   const [sourceTicketId, setSourceTicketId] = useState<string | null>(null)
   const [loadingSuggestions, setLoadingSuggestions] = useState(false)
@@ -331,37 +327,16 @@ function NewArticleContent() {
             <Label>
               Contenido <span className='text-red-500'>*</span>
             </Label>
-            <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)}>
-              <TabsList className='grid w-full grid-cols-2'>
-                <TabsTrigger value='edit'>Editar</TabsTrigger>
-                <TabsTrigger value='preview'>Vista Previa</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value='edit' className='space-y-2'>
-                <Textarea
-                  value={content}
-                  onChange={e => setContent(e.target.value)}
-                  placeholder='Escribe el contenido en Markdown...'
-                  rows={16}
-                  className='font-mono text-sm'
-                />
-                <p className='text-xs text-muted-foreground'>
-                  {content.length} caracteres (mínimo 50). Soporta Markdown.
-                </p>
-              </TabsContent>
-
-              <TabsContent value='preview'>
-                <div className='border rounded-lg p-6 min-h-[400px] prose prose-slate dark:prose-invert max-w-none'>
-                  {content ? (
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
-                  ) : (
-                    <p className='text-muted-foreground'>
-                      Escribe contenido para ver la vista previa
-                    </p>
-                  )}
-                </div>
-              </TabsContent>
-            </Tabs>
+            <Textarea
+              value={content}
+              onChange={e => setContent(e.target.value)}
+              placeholder='Escribe el contenido en Markdown...'
+              rows={16}
+              className='font-mono text-sm'
+            />
+            <p className='text-xs text-muted-foreground'>
+              {content.length} caracteres (mínimo 50). Soporta Markdown.
+            </p>
           </div>
 
           {/* Tags */}
