@@ -520,13 +520,17 @@ export function RoleDashboardLayout({
       return true
     })
 
-    // Añadir "Solicitudes de Activos" para CLIENT si canRequestAssets es true
-    if (navKey === 'CLIENT' && canRequestAssets) {
+    // Añadir "Solicitudes de Activos" para CLIENT y CLIENT_MANAGER si canRequestAssets es true
+    if ((navKey === 'CLIENT' || navKey === 'CLIENT_MANAGER') && canRequestAssets) {
+      // CLIENT usa "Mis Equipos", CLIENT_MANAGER usa "Inventario"
+      const targetItemName = navKey === 'CLIENT' ? 'Mis Equipos' : 'Inventario'
       navigation = navigation.map(item => {
-        if (item.name === 'Mis Equipos' && item.children) {
+        if (item.name === targetItemName && item.children) {
           const newChildren = [...item.children]
+          // Insertar antes de "Mantenimientos" si existe, si no al final
           const insertIndex = newChildren.findIndex(child => child.name === 'Mantenimientos')
-          newChildren.splice(insertIndex, 0, {
+          const position = insertIndex >= 0 ? insertIndex : newChildren.length
+          newChildren.splice(position, 0, {
             name: 'Solicitudes de Activos',
             href: '/inventory/asset-requests',
             icon: FileText,
