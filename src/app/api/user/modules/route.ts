@@ -241,7 +241,8 @@ export async function GET(request: Request) {
           canManageNews: true,
           forms: true,
           canManageForms: true,
-          canRequestAssets: false, // ADMIN no usa solicitudes de activos como solicitante
+          canRequestAssets: false,
+          canManageInventory: true,
           families: [],
         }
       }
@@ -252,10 +253,11 @@ export async function GET(request: Request) {
           inventory: inventoryEnabled || canManageInventory,
           patrols: patrolsEnabled,
           news: newsEnabled,
-          canManageNews: true, // Admins siempre pueden gestionar noticias
+          canManageNews: true,
           forms: formsEnabled,
-          canManageForms: true, // Admins siempre pueden gestionar documentos
-          canRequestAssets: false, // ADMIN no usa solicitudes de activos como solicitante
+          canManageForms: true,
+          canRequestAssets: false,
+          canManageInventory: true,
           families: [],
         }
       }
@@ -269,6 +271,7 @@ export async function GET(request: Request) {
         forms: formsEnabled,
         canManageForms,
         canRequestAssets,
+        canManageInventory,
         families: [],
       }
     }
@@ -469,13 +472,11 @@ export async function GET(request: Request) {
       inventory: resolvedInventory,
       patrols: resolvedPatrols,
       news: resolvedNews,
-      // Para gestores de noticias (no admin): canManageNews desde DB
       canManageNews: role === 'ADMIN' ? true : canManageNews,
       forms: resolvedForms,
-      // Para gestores de documentos (no admin): canManageForms desde DB
       canManageForms: role === 'ADMIN' ? true : canManageForms,
-      // ADMIN no solicita activos como usuario final
       canRequestAssets: role === 'ADMIN' ? false : canRequestAssets,
+      canManageInventory: role === 'ADMIN' ? true : canManageInventory,
       families: enrichedFamilies,
     }
   })

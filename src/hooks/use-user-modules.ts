@@ -10,6 +10,9 @@ interface UserModules {
   news: boolean
   forms: boolean
   canRequestAssets: boolean
+  canManageInventory: boolean
+  canManageNews: boolean
+  canManageForms: boolean
   families: Array<{
     id: string
     name: string
@@ -32,6 +35,9 @@ const DEFAULT: UserModules = {
   news: false,
   forms: false,
   canRequestAssets: false,
+  canManageInventory: false,
+  canManageNews: false,
+  canManageForms: false,
   families: [],
 }
 

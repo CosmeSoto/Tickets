@@ -288,7 +288,18 @@ const navigationByRole: Record<string, NavItem[]> = {
         { name: 'Reportes', href: '/inventory/reports', icon: BarChart3 },
       ],
     },
+    {
+      name: 'Mis Rondas',
+      href: '/patrol',
+      icon: Shield,
+      children: [{ name: 'Patrullas Activas', href: '/patrol', icon: MapPin }],
+    },
     // Noticias no aparece en el sidebar del CLIENT — el feed está embebido en el dashboard.
+    {
+      name: 'Documentos',
+      href: '/forms',
+      icon: FileText,
+    },
   ],
 }
 
@@ -418,6 +429,7 @@ export function RoleDashboardLayout({
     news: hasNews,
     forms: hasForms,
     canRequestAssets,
+    canManageInventory: canManageInventoryFromModules,
   } = useUserModules()
 
   // Solo ocultar si definitivamente no hay sesión (no durante la carga/revalidación)
@@ -438,7 +450,10 @@ export function RoleDashboardLayout({
 
   const canManageNews = (session.user as any)?.canManageNews === true
   const userRole = session.user.role as string
-  const canManageInventory = (session.user as any).canManageInventory
+  // canManageInventory: usar el valor del hook (siempre fresco desde DB)
+  // con fallback a la sesión en caso de que el hook aún esté cargando
+  const canManageInventory =
+    canManageInventoryFromModules || (session.user as any).canManageInventory
   const isSuperAdmin = (session.user as any).isSuperAdmin === true
 
   const navKey =
