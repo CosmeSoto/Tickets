@@ -490,6 +490,17 @@ const MERGE_UPDATE_TABLES = new Set([
   '"technician_assignments"',
 ])
 
+/**
+ * Tablas cuya PK no es "id" — necesitan ON CONFLICT con la columna correcta.
+ * Para tablas no listadas aquí se asume PK = "id".
+ */
+const TABLE_PK_MAP: Record<string, string> = {
+  notification_preferences: '"userId"',
+  verification_tokens: 'identifier',
+  folio_counters: '"year", type',
+  ticket_code_counters: '"familyId", year',
+}
+
 function convertCopyToInsertOnConflict(sql: string): string {
   const output: string[] = []
 
@@ -542,9 +553,12 @@ function convertCopyToInsertOnConflict(sql: string): string {
         MERGE_UPDATE_TABLES.has(`"${tableKey}"`) ||
         MERGE_UPDATE_TABLES.has(tableKey)
 
-      // Para UPDATE: generar SET de todos los campos excepto id
+      // Para UPDATE: generar SET de todos los campos excepto la(s) columna(s) PK
+      const pkCol = TABLE_PK_MAP[tableKey] ?? 'id'
+      // Extraer las columnas PK para excluirlas del SET (pueden ser compuestas: "col1", col2)
+      const pkCols = new Set(pkCol.split(',').map(c => c.trim().replace(/"/g, '').toLowerCase()))
       const updateCols = columns
-        .filter(c => c.replace(/"/g, '').toLowerCase() !== 'id')
+        .filter(c => !pkCols.has(c.replace(/"/g, '').toLowerCase()))
         .map(c => `${c}=EXCLUDED.${c}`)
         .join(', ')
 
@@ -581,8 +595,9 @@ function convertCopyToInsertOnConflict(sql: string): string {
         const colList = columns.join(', ')
         const valList = sqlValues.join(', ')
 
+        const pkCol = TABLE_PK_MAP[tableKey] ?? 'id'
         const conflictClause = shouldUpdate
-          ? `ON CONFLICT (id) DO UPDATE SET ${updateCols}`
+          ? `ON CONFLICT (${pkCol}) DO UPDATE SET ${updateCols}`
           : `ON CONFLICT DO NOTHING`
 
         output.push(`INSERT INTO ${tableName} (${colList}) VALUES (${valList}) ${conflictClause};`)
