@@ -44,6 +44,7 @@ export async function GET(request: Request) {
   let canManageNews = false
   let formsEnabled = false
   let canManageForms = false
+  let canRequestAssets = false
 
   if (targetUserId && targetUserId !== session.user.id) {
     const targetUser = await prisma.users.findUnique({
@@ -60,6 +61,7 @@ export async function GET(request: Request) {
         canManageNews: true,
         formsEnabled: true,
         canManageForms: true,
+        canRequestAssets: true,
       },
     })
     if (!targetUser) return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 })
@@ -74,11 +76,14 @@ export async function GET(request: Request) {
     canManageNews = targetUser.canManageNews ?? false
     formsEnabled = targetUser.formsEnabled ?? false
     canManageForms = targetUser.canManageForms ?? false
+    canRequestAssets = targetUser.canRequestAssets ?? false
   } else {
     // Cargar flags del usuario actual desde DB (la sesión puede estar desactualizada)
     const currentUser = await prisma.users.findUnique({
       where: { id: userId },
       select: {
+        role: true,
+        isSuperAdmin: true,
         ticketsEnabled: true,
         inventoryEnabled: true,
         canManageInventory: true,
@@ -87,9 +92,12 @@ export async function GET(request: Request) {
         canManageNews: true,
         formsEnabled: true,
         canManageForms: true,
+        canRequestAssets: true,
       },
     })
     if (currentUser) {
+      role = currentUser.role
+      isSuperAdmin = currentUser.isSuperAdmin ?? false
       ticketsEnabled = currentUser.ticketsEnabled ?? true
       inventoryEnabled = currentUser.inventoryEnabled ?? false
       canManageInventory = currentUser.canManageInventory ?? false
@@ -98,6 +106,7 @@ export async function GET(request: Request) {
       canManageNews = currentUser.canManageNews ?? false
       formsEnabled = currentUser.formsEnabled ?? false
       canManageForms = currentUser.canManageForms ?? false
+      canRequestAssets = currentUser.canRequestAssets ?? false
     }
   }
 
@@ -436,7 +445,17 @@ export async function GET(request: Request) {
       resolvedPatrols = true
       resolvedNews = true
       resolvedForms = true
+    } else if (role === 'CLIENT') {
+      // Para CLIENT: el flag del usuario es suficiente para mostrar el módulo.
+      // No bloqueamos por falta de familias — el usuario verá el módulo vacío
+      // si aún no tiene asignaciones, lo cual es UX correcta.
+      resolvedTickets = ticketsEnabled
+      resolvedInventory = inventoryEnabled || canManageInventory
+      resolvedPatrols = patrolsEnabled
+      resolvedNews = newsEnabled
+      resolvedForms = formsEnabled
     } else {
+      // ADMIN normal y TECHNICIAN: requieren al menos una familia activa en el módulo
       resolvedTickets = ticketsEnabled && ticketFamilyIds.size > 0
       resolvedInventory = (inventoryEnabled || canManageInventory) && inventoryFamilyIds.size > 0
       resolvedPatrols = patrolsEnabled && patrolFamilyIds.size > 0

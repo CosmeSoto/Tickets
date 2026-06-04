@@ -205,12 +205,16 @@ export function useNotificationSSE({
           const data = JSON.parse(e.data)
 
           if (data.type === 'session_refresh') {
-            // Invalidar cache local de módulos antes del reload
+            // Limpiar cache local de módulos
             window.dispatchEvent(new CustomEvent('modules-updated'))
-            // Dar un breve momento para que el evento se procese, luego reload
+            // Recargar con un pequeño delay para que el cache Redis ya esté invalidado
+            // (el servidor invalida antes de emitir el SSE)
             setTimeout(() => {
-              window.location.reload()
-            }, 100)
+              // Añadir _t para forzar bypass del cache en /api/user/modules
+              const url = new URL(window.location.href)
+              url.searchParams.set('_refresh', Date.now().toString())
+              window.location.href = url.toString()
+            }, 150)
             return
           }
 

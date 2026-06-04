@@ -61,8 +61,14 @@ export function useUserModules() {
       }
 
       const now = Date.now()
+
+      // Si la URL tiene _refresh, forzar bypass de cache siempre
+      const hasRefreshParam =
+        typeof window !== 'undefined' && new URL(window.location.href).searchParams.has('_refresh')
+      const shouldBypass = bypassCache || hasRefreshParam
+
       const memHit =
-        !bypassCache &&
+        !shouldBypass &&
         modulesMemoryCache &&
         modulesMemoryCache.userId === userId &&
         now - modulesMemoryCache.at < MODULES_MEMORY_TTL_MS
@@ -74,9 +80,9 @@ export function useUserModules() {
       }
 
       try {
-        const url = bypassCache ? `/api/user/modules?_t=${Date.now()}` : '/api/user/modules'
+        const url = shouldBypass ? `/api/user/modules?_t=${Date.now()}` : '/api/user/modules'
         const res = await fetch(url, {
-          headers: bypassCache ? { 'Cache-Control': 'no-cache' } : {},
+          headers: shouldBypass ? { 'Cache-Control': 'no-cache' } : {},
         })
         if (res.ok) {
           const data = await res.json()
