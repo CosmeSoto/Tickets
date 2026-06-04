@@ -31,7 +31,14 @@ export async function GET(request: NextRequest) {
     if (publicAccess) {
       const departments = await prisma.departments.findMany({
         where: { isActive: true },
-        select: { id: true, name: true, description: true, color: true },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          color: true,
+          familyId: true,
+          family: { select: { id: true, name: true, code: true, color: true } },
+        },
         orderBy: [{ order: 'asc' }, { name: 'asc' }],
       })
       return NextResponse.json(
