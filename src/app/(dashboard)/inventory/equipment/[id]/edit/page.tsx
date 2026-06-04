@@ -3,7 +3,7 @@
 import { use, useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
+import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { EquipmentAssetForm } from '@/components/inventory/asset-forms/EquipmentAssetForm'
 import { Card, CardContent } from '@/components/ui/card'
 import { Loader2, ArrowLeft } from 'lucide-react'
@@ -86,13 +86,14 @@ export default function EditEquipmentPage({ params }: EditEquipmentPageProps) {
     }
   }
 
+  // Estado de carga inicial
   if (status === 'loading' || loading) {
     return (
-      <RoleDashboardLayout title='Cargando...' subtitle='Obteniendo información del equipo'>
+      <ModuleLayout title='Cargando...' subtitle='Obteniendo información del equipo'>
         <div className='flex items-center justify-center h-64'>
           <Loader2 className='h-8 w-8 animate-spin text-primary' />
         </div>
-      </RoleDashboardLayout>
+      </ModuleLayout>
     )
   }
 
@@ -100,11 +101,11 @@ export default function EditEquipmentPage({ params }: EditEquipmentPageProps) {
 
   if (!equipment) {
     return (
-      <RoleDashboardLayout title='Error' subtitle='Equipo no encontrado'>
+      <ModuleLayout title='Error' subtitle='Equipo no encontrado'>
         <div className='flex items-center justify-center h-64'>
           <p className='text-muted-foreground'>No se encontró el equipo solicitado</p>
         </div>
-      </RoleDashboardLayout>
+      </ModuleLayout>
     )
   }
 
@@ -113,13 +114,13 @@ export default function EditEquipmentPage({ params }: EditEquipmentPageProps) {
 
   if (!familyId || !familyConfig) {
     return (
-      <RoleDashboardLayout title='Error' subtitle='Configuración de familia no encontrada'>
+      <ModuleLayout title='Error' subtitle='Configuración de familia no encontrada'>
         <div className='flex items-center justify-center h-64'>
           <p className='text-muted-foreground'>
             No se encontró la configuración de la familia del equipo
           </p>
         </div>
-      </RoleDashboardLayout>
+      </ModuleLayout>
     )
   }
 
@@ -131,7 +132,7 @@ export default function EditEquipmentPage({ params }: EditEquipmentPageProps) {
   })
 
   return (
-    <RoleDashboardLayout title={equipmentTitle} subtitle={equipment.code}>
+    <ModuleLayout title={equipmentTitle} subtitle={equipment.code}>
       <div className='max-w-4xl mx-auto space-y-4'>
         <button
           type='button'
@@ -158,6 +159,6 @@ export default function EditEquipmentPage({ params }: EditEquipmentPageProps) {
           </CardContent>
         </Card>
       </div>
-    </RoleDashboardLayout>
+    </ModuleLayout>
   )
 }

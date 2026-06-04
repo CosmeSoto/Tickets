@@ -232,6 +232,7 @@ export async function GET(request: Request) {
           canManageNews: true,
           forms: true,
           canManageForms: true,
+          canRequestAssets: false, // ADMIN no usa solicitudes de activos como solicitante
           families: [],
         }
       }
@@ -245,6 +246,7 @@ export async function GET(request: Request) {
           canManageNews: true, // Admins siempre pueden gestionar noticias
           forms: formsEnabled,
           canManageForms: true, // Admins siempre pueden gestionar documentos
+          canRequestAssets: false, // ADMIN no usa solicitudes de activos como solicitante
           families: [],
         }
       }
@@ -257,6 +259,7 @@ export async function GET(request: Request) {
         canManageNews,
         forms: formsEnabled,
         canManageForms,
+        canRequestAssets,
         families: [],
       }
     }
@@ -452,6 +455,8 @@ export async function GET(request: Request) {
       forms: resolvedForms,
       // Para gestores de documentos (no admin): canManageForms desde DB
       canManageForms: role === 'ADMIN' ? true : canManageForms,
+      // ADMIN no solicita activos como usuario final
+      canRequestAssets: role === 'ADMIN' ? false : canRequestAssets,
       families: enrichedFamilies,
     }
   })

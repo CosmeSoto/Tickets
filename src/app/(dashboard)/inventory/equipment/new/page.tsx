@@ -3,7 +3,7 @@
 import { Suspense, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
+import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { UnifiedAssetForm } from '@/components/inventory/unified-asset-form'
 import { Card, CardContent } from '@/components/ui/card'
 import { ArrowLeft, Loader2 } from 'lucide-react'
@@ -21,18 +21,18 @@ function NewEquipmentPageContent() {
 
   if (status === 'loading') {
     return (
-      <RoleDashboardLayout title='Nuevo Activo Individual' subtitle='Cargando...'>
+      <ModuleLayout title='Nuevo Activo Individual' subtitle='Cargando...'>
         <div className='flex items-center justify-center h-64'>
           <Loader2 className='h-8 w-8 animate-spin text-primary' />
         </div>
-      </RoleDashboardLayout>
+      </ModuleLayout>
     )
   }
 
   if (!session?.user || session.user.role === 'CLIENT') return null
 
   return (
-    <RoleDashboardLayout
+    <ModuleLayout
       title='Nuevo Activo Individual'
       subtitle='Registra un activo individual en el inventario'
     >
@@ -56,17 +56,17 @@ function NewEquipmentPageContent() {
           </CardContent>
         </Card>
       </div>
-    </RoleDashboardLayout>
+    </ModuleLayout>
   )
 }
 
 function NewEquipmentPageSuspenseFallback() {
   return (
-    <RoleDashboardLayout title='Nuevo Activo Individual' subtitle='Cargando...'>
+    <ModuleLayout title='Nuevo Activo Individual' subtitle='Cargando...'>
       <div className='flex items-center justify-center h-64'>
         <Loader2 className='h-8 w-8 animate-spin text-primary' />
       </div>
-    </RoleDashboardLayout>
+    </ModuleLayout>
   )
 }
 

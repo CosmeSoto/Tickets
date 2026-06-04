@@ -417,6 +417,7 @@ export function RoleDashboardLayout({
     patrols: hasPatrols,
     news: hasNews,
     forms: hasForms,
+    canRequestAssets,
   } = useUserModules()
 
   // Solo ocultar si definitivamente no hay sesión (no durante la carga/revalidación)
@@ -435,7 +436,6 @@ export function RoleDashboardLayout({
     )
   }
 
-  const canRequestAssets = (session.user as any)?.canRequestAssets ?? false
   const canManageNews = (session.user as any)?.canManageNews === true
   const userRole = session.user.role as string
   const canManageInventory = (session.user as any).canManageInventory

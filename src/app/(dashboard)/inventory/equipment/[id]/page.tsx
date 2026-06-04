@@ -4,7 +4,7 @@ import { use } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { useEffect } from 'react'
-import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
+import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { EquipmentDetail } from '@/components/inventory/equipment-detail'
 
 interface EquipmentDetailPageProps {
@@ -24,11 +24,11 @@ export default function EquipmentDetailPage({ params }: EquipmentDetailPageProps
 
   if (status === 'loading') {
     return (
-      <RoleDashboardLayout title="Cargando..." subtitle="Obteniendo información del equipo">
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <ModuleLayout title='Cargando...' subtitle='Obteniendo información del equipo'>
+        <div className='flex items-center justify-center h-64'>
+          <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-primary' />
         </div>
-      </RoleDashboardLayout>
+      </ModuleLayout>
     )
   }
 
@@ -37,16 +37,13 @@ export default function EquipmentDetailPage({ params }: EquipmentDetailPageProps
   }
 
   return (
-    <RoleDashboardLayout
-      title="Detalle del Equipo"
-      subtitle="Información completa del equipo"
-    >
-      <EquipmentDetail 
-        equipmentId={id} 
+    <ModuleLayout title='Detalle del Equipo' subtitle='Información completa del equipo'>
+      <EquipmentDetail
+        equipmentId={id}
         userRole={session.user.role}
         userId={session.user.id}
         isSuperAdmin={(session.user as any)?.isSuperAdmin === true}
       />
-    </RoleDashboardLayout>
+    </ModuleLayout>
   )
 }

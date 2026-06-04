@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Layers, Package } from 'lucide-react'
-import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
+import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { FamilySelector } from '@/components/inventory/family-selector'
 import { useFamilyOptions } from '@/hooks/use-family-options'
@@ -23,10 +23,7 @@ export default function NewInventoryPage() {
   }
 
   return (
-    <RoleDashboardLayout
-      title='Nuevo Activo'
-      subtitle='Selecciona modalidad y familia para continuar'
-    >
+    <ModuleLayout title='Nuevo Activo' subtitle='Selecciona modalidad y familia para continuar'>
       <div className='max-w-4xl mx-auto space-y-4'>
         <button
           type='button'
@@ -80,6 +77,6 @@ export default function NewInventoryPage() {
           </CardContent>
         </Card>
       </div>
-    </RoleDashboardLayout>
+    </ModuleLayout>
   )
 }
