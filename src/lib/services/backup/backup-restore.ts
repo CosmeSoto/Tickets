@@ -590,8 +590,15 @@ function convertCopyToInsertOnConflict(sql: string): string {
         i++
       }
     } else {
-      // Líneas que no son COPY (comentarios, SET, etc.) — conservar
-      if (line.trim() && !line.startsWith('--')) {
+      // Líneas que no son COPY (comentarios, SET, etc.) — conservar,
+      // pero filtrar el set_config de search_path que resetearía el esquema
+      if (
+        line.trim() &&
+        !line.startsWith('--') &&
+        !line.includes('set_config(') &&
+        !line.startsWith('\\restrict') &&
+        !line.startsWith('\\unrestrict')
+      ) {
         output.push(line)
       }
       i++
