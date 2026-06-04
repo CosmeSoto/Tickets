@@ -257,7 +257,7 @@ export async function seedAttributes(prisma: PrismaClient, familyMap: Map<string
           isRequired: attr.isRequired,
           isVisible: attr.isVisible,
           order: attr.order,
-          helpText: attr.helpText,
+          helpText: (attr as any).helpText ?? null,
           options: attr.options ? { options: attr.options } : undefined,
         },
         create: {
@@ -269,7 +269,7 @@ export async function seedAttributes(prisma: PrismaClient, familyMap: Map<string
           isRequired: attr.isRequired,
           isVisible: attr.isVisible,
           order: attr.order,
-          helpText: attr.helpText,
+          helpText: (attr as any).helpText ?? null,
           options: attr.options ? { options: attr.options } : undefined,
         },
       })

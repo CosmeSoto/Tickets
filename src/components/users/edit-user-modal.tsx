@@ -39,6 +39,7 @@ interface EditUserData {
   inventoryEnabled: boolean
   patrolsEnabled: boolean
   newsEnabled: boolean
+  canManageNews: boolean
   formsEnabled: boolean
   canManageForms: boolean
   isSuperAdmin: boolean
@@ -73,6 +74,7 @@ export function EditUserModal({
     inventoryEnabled: false,
     patrolsEnabled: false,
     newsEnabled: false,
+    canManageNews: false,
     formsEnabled: false,
     canManageForms: false,
     isSuperAdmin: false,
@@ -143,6 +145,7 @@ export function EditUserModal({
         inventoryEnabled: (user as any).inventoryEnabled ?? false,
         patrolsEnabled: (user as any).patrolsEnabled ?? false,
         newsEnabled: (user as any).newsEnabled ?? false,
+        canManageNews: (user as any).canManageNews ?? false,
         formsEnabled: (user as any).formsEnabled ?? false,
         canManageForms: (user as any).canManageForms ?? false,
         isSuperAdmin: user.isSuperAdmin ?? false,
@@ -242,6 +245,7 @@ export function EditUserModal({
           inventoryEnabled: formData.inventoryEnabled,
           patrolsEnabled: formData.patrolsEnabled,
           newsEnabled: formData.newsEnabled,
+          canManageNews: formData.canManageNews,
           formsEnabled: formData.formsEnabled,
           canManageForms: formData.canManageForms,
           isSuperAdmin: formData.role === 'ADMIN' ? formData.isSuperAdmin : false,
@@ -303,6 +307,7 @@ export function EditUserModal({
       | 'inventoryEnabled'
       | 'patrolsEnabled'
       | 'newsEnabled'
+      | 'canManageNews'
       | 'formsEnabled'
       | 'canManageForms'
       | 'canManageInventory'
@@ -315,12 +320,17 @@ export function EditUserModal({
         inventoryEnabled: value,
         canManageInventory: p.role === 'TECHNICIAN' ? value : p.canManageInventory,
       }))
+    } else if (field === 'newsEnabled') {
+      setFormData(p => ({
+        ...p,
+        newsEnabled: value,
+        // Al desactivar noticias se limpia canManageNews automáticamente
+        canManageNews: value ? p.canManageNews : false,
+      }))
     } else if (field === 'formsEnabled') {
       setFormData(p => ({
         ...p,
         formsEnabled: value,
-        // Al activar el módulo no se hereda canManageForms; debe otorgarse explícitamente.
-        // Al desactivar el módulo se limpia canManageForms automáticamente.
         canManageForms: false,
       }))
     } else {

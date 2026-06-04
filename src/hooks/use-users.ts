@@ -41,6 +41,7 @@ export interface UserData {
   inventoryEnabled?: boolean
   patrolsEnabled?: boolean
   newsEnabled?: boolean
+  canManageNews?: boolean
   formsEnabled?: boolean
   canManageForms?: boolean
   isSuperAdmin?: boolean

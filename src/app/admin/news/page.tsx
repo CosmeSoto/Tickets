@@ -259,7 +259,8 @@ export default function AdminNewsPage() {
         const res = await fetch(`/api/users/${session.user.id}`)
         if (res.ok) {
           const data = await res.json()
-          if (data.user?.newsEnabled) {
+          // canManageNews = puede crear/editar noticias. newsEnabled = solo ver.
+          if (data.user?.canManageNews) {
             setHasAccess(true)
             loadNews()
             loadUsersAndDepartments()
@@ -272,7 +273,7 @@ export default function AdminNewsPage() {
         const res = await fetch(`/api/user/modules?_t=${Date.now()}`)
         if (res.ok) {
           const data = await res.json()
-          if (data.news) {
+          if (data.canManageNews) {
             setHasAccess(true)
             loadNews()
             loadUsersAndDepartments()
@@ -281,7 +282,7 @@ export default function AdminNewsPage() {
         }
       } catch {}
 
-      if ((session.user as any).newsEnabled) {
+      if ((session.user as any).canManageNews) {
         setHasAccess(true)
         loadNews()
         loadUsersAndDepartments()

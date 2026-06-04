@@ -22,6 +22,7 @@ const updateUserSchema = z.object({
   inventoryEnabled: z.boolean().optional(),
   patrolsEnabled: z.boolean().optional(),
   newsEnabled: z.boolean().optional(),
+  canManageNews: z.boolean().optional(),
   formsEnabled: z.boolean().optional(),
   canManageForms: z.boolean().optional(),
   isSuperAdmin: z.boolean().optional(),

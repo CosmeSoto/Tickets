@@ -28,14 +28,26 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 401 })
     }
 
-    // SECURITY: clientes no pueden listar usuarios, excepto si tienen newsEnabled (para gestión de noticias)
+    // SECURITY: solo ADMIN puede listar usuarios sin restricción.
+    // CLIENT/TECHNICIAN pueden listar si tienen canManageNews o canManageForms
+    // (necesario para el selector de visibilidad en noticias y documentos)
     if (session.user.role === 'CLIENT') {
-      // Verificar si tiene newsEnabled para permitir listar usuarios en el contexto de noticias
       const currentUser = await prisma.users.findUnique({
         where: { id: session.user.id },
-        select: { newsEnabled: true },
+        select: { canManageNews: true, canManageForms: true },
       })
-      if (!currentUser?.newsEnabled) {
+      if (!currentUser?.canManageNews && !currentUser?.canManageForms) {
+        return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 403 })
+      }
+    }
+
+    // TECHNICIAN: igual que CLIENT
+    if (session.user.role === 'TECHNICIAN') {
+      const currentUser = await prisma.users.findUnique({
+        where: { id: session.user.id },
+        select: { canManageNews: true, canManageForms: true },
+      })
+      if (!currentUser?.canManageNews && !currentUser?.canManageForms) {
         return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 403 })
       }
     }
@@ -53,6 +65,7 @@ export async function GET(request: NextRequest) {
     const canManageInventory = searchParams.get('canManageInventory')
     const patrolsEnabled = searchParams.get('patrolsEnabled')
     const isSuperAdmin = searchParams.get('isSuperAdmin')
+    const formsEnabled = searchParams.get('formsEnabled')
 
     // Construir filtros para Prisma
     const where: any = {}
@@ -75,6 +88,10 @@ export async function GET(request: NextRequest) {
 
     if (isSuperAdmin !== null) {
       where.isSuperAdmin = isSuperAdmin === 'true'
+    }
+
+    if (formsEnabled !== null) {
+      where.formsEnabled = formsEnabled === 'true'
     }
 
     if (departmentId) {
@@ -230,6 +247,7 @@ export async function GET(request: NextRequest) {
         inventoryEnabled: true,
         patrolsEnabled: true,
         newsEnabled: true,
+        canManageNews: true,
         formsEnabled: true,
         canManageForms: true,
         isSuperAdmin: true,

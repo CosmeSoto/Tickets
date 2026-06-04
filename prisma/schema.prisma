@@ -447,6 +447,7 @@ model users {
   inventoryEnabled                                  Boolean                         @default(false)
   patrolsEnabled                                    Boolean                         @default(false) @map("patrols_enabled")
   newsEnabled                                       Boolean                         @default(false) @map("news_enabled")
+  canManageNews                                     Boolean                         @default(false) @map("can_manage_news")
   formsEnabled                                      Boolean                         @default(false) @map("forms_enabled")
   canManageForms                                    Boolean                         @default(false) @map("can_manage_forms")
   lastLogin                                         DateTime?

@@ -9,6 +9,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { FileService } from '@/lib/services/file-service'
+import { assertCanManageForms, assertCanModifyForm } from '@/lib/forms/forms-access'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -19,6 +20,20 @@ export async function POST(request: NextRequest, { params }: Params) {
     if (!session?.user) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
+
+    // Verificar permiso de gestión
+    const deniedManage = await assertCanManageForms(session.user.id, session.user.role)
+    if (deniedManage) return deniedManage
+
+    // Verificar que puede modificar este documento específico
+    const isSuperAdmin = (session.user as any).isSuperAdmin === true
+    const deniedModify = await assertCanModifyForm(
+      id,
+      session.user.id,
+      session.user.role,
+      isSuperAdmin
+    )
+    if (deniedModify) return deniedModify
 
     const form = await prisma.forms.findUnique({
       where: { id },

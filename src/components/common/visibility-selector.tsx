@@ -33,6 +33,8 @@ interface VisibilitySelectorProps {
   onFamilyIdsChange: (ids: string[]) => void
   onDepartmentIdsChange: (ids: string[]) => void
   onUserIdsChange: (ids: string[]) => void
+  /** Texto descriptivo debajo del campo de búsqueda de usuarios */
+  usersHint?: string
 }
 
 const ROLE_OPTIONS = [
@@ -52,6 +54,7 @@ export function VisibilitySelector({
   onFamilyIdsChange,
   onDepartmentIdsChange,
   onUserIdsChange,
+  usersHint,
 }: VisibilitySelectorProps) {
   const [familySearch, setFamilySearch] = useState('')
   const [userSearch, setUserSearch] = useState('')
@@ -375,6 +378,7 @@ export function VisibilitySelector({
                 className='pl-8 h-8 text-xs'
               />
             </div>
+            {usersHint && <p className='text-[10px] text-muted-foreground px-0.5'>{usersHint}</p>}
             <div className='h-[200px] rounded-lg border p-2 overflow-y-auto'>
               <div className='space-y-0.5'>
                 {filteredUsers.map(user => (

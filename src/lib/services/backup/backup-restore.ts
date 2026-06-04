@@ -388,6 +388,24 @@ async function restoreWithPgRestore(
       }
     }
     console.log('[RESTORE] Restauración completa finalizada')
+
+    // Sincronizar schema tras restauración completa.
+    // Un backup antiguo puede no incluir columnas nuevas (ej. can_manage_news).
+    // prisma db push aplica solo los cambios faltantes sin borrar datos existentes.
+    console.log('[RESTORE] Sincronizando schema con prisma db push...')
+    try {
+      const prismaCli = `node ./node_modules/prisma/build/index.js`
+      const { stdout: pushOut } = await execAsync(`${prismaCli} db push --accept-data-loss 2>&1`, {
+        timeout: 120000,
+      })
+      console.log('[RESTORE] Schema sincronizado correctamente')
+    } catch (pushErr) {
+      // No lanzar error — la restauración fue exitosa, el push fallido es recuperable al reiniciar
+      console.warn(
+        '[RESTORE] Advertencia: db push falló tras restauración:',
+        (pushErr as Error).message?.slice(0, 200)
+      )
+    }
   }
 }
 

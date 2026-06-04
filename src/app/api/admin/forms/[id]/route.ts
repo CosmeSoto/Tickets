@@ -10,6 +10,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
+import { assertCanManageForms, assertCanModifyForm } from '@/lib/forms/forms-access'
 
 // Campos comunes de include (mismo que en route.ts padre)
 const FORM_INCLUDE = {
@@ -52,6 +53,10 @@ export async function GET(_request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
+    // Solo quien puede gestionar puede acceder al detalle admin
+    const denied = await assertCanManageForms(session.user.id, session.user.role)
+    if (denied) return denied
+
     const form = await prisma.forms.findUnique({
       where: { id },
       include: FORM_INCLUDE,
@@ -76,6 +81,20 @@ export async function PUT(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
+    // Verificar permiso de gestión
+    const deniedManage = await assertCanManageForms(session.user.id, session.user.role)
+    if (deniedManage) return deniedManage
+
+    // Verificar que puede modificar este documento específico
+    const isSuperAdmin = (session.user as any).isSuperAdmin === true
+    const deniedModify = await assertCanModifyForm(
+      id,
+      session.user.id,
+      session.user.role,
+      isSuperAdmin
+    )
+    if (deniedModify) return deniedModify
+
     const data = await request.json()
 
     if (!data.title?.trim()) {
@@ -87,6 +106,11 @@ export async function PUT(request: NextRequest, { params }: Params) {
     if (!existing) {
       return NextResponse.json({ error: 'Formulario no encontrado' }, { status: 404 })
     }
+
+    // TECHNICIAN/CLIENT con canManageForms no pueden cambiar isActive ni isFeatured
+    const isAdminRole = session.user.role === 'ADMIN'
+    const effectiveIsActive = isAdminRole ? data.isActive !== false : existing.isActive
+    const effectiveIsFeatured = isAdminRole ? data.isFeatured === true : existing.isFeatured
 
     // Actualizar en transacción: primero borrar relaciones antiguas, luego recrear
     const form = await prisma.$transaction(async tx => {
@@ -109,8 +133,8 @@ export async function PUT(request: NextRequest, { params }: Params) {
           fileUrl: data.fileUrl?.trim() || null,
           fileSize: data.fileSize ?? null,
           fileType: data.fileType?.trim() || null,
-          isActive: data.isActive !== false,
-          isFeatured: data.isFeatured === true,
+          isActive: effectiveIsActive,
+          isFeatured: effectiveIsFeatured,
           updatedById: session.user.id,
           // Recrear relaciones de visibilidad
           form_roles: data.roles?.length
@@ -142,8 +166,8 @@ export async function PUT(request: NextRequest, { params }: Params) {
       },
       newValues: {
         title: data.title?.trim(),
-        isActive: data.isActive !== false,
-        isFeatured: data.isFeatured === true,
+        isActive: effectiveIsActive,
+        isFeatured: effectiveIsFeatured,
       },
       request,
     })
@@ -162,6 +186,20 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     if (!session?.user) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
+
+    // Verificar permiso de gestión
+    const deniedManage = await assertCanManageForms(session.user.id, session.user.role)
+    if (deniedManage) return deniedManage
+
+    // Verificar que puede modificar este documento específico
+    const isSuperAdmin = (session.user as any).isSuperAdmin === true
+    const deniedModify = await assertCanModifyForm(
+      id,
+      session.user.id,
+      session.user.role,
+      isSuperAdmin
+    )
+    if (deniedModify) return deniedModify
 
     const existing = await prisma.forms.findUnique({ where: { id } })
     if (!existing) {

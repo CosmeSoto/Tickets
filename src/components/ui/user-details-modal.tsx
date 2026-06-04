@@ -223,7 +223,13 @@ export function UserDetailsModal({
                   Gestor de Inventario
                 </div>
               )}
-              {user.canManageForms && (
+              {(user as any).canManageNews && (
+                <div className='flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium border border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-400'>
+                  <Shield className='h-3 w-3' />
+                  Gestor de Noticias
+                </div>
+              )}
+              {(user as any).canManageForms && (
                 <div className='flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium border border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-800 dark:bg-purple-950/30 dark:text-purple-400'>
                   <Shield className='h-3 w-3' />
                   Gestor de Documentos
@@ -241,6 +247,7 @@ export function UserDetailsModal({
             inventoryEnabled={user.inventoryEnabled}
             patrolsEnabled={user.patrolsEnabled}
             newsEnabled={(user as any).newsEnabled}
+            canManageNews={(user as any).canManageNews}
             formsEnabled={(user as any).formsEnabled}
             canManageForms={(user as any).canManageForms}
             defaultCollapsed

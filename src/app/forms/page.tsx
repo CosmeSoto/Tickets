@@ -21,18 +21,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import { Switch } from '@/components/ui/switch'
-import { Separator } from '@/components/ui/separator'
 import { useToast } from '@/hooks/use-toast'
-import { InlineCreateSelect } from '@/components/ui/inline-create-select'
-import { FormCategoryInlineForm } from '@/components/forms/FormCategoryInlineForm'
-import { FileDropZone } from '@/components/common/file-drop-zone'
+import { DocumentFormDialog, EMPTY_DOCUMENT_FORM } from '@/components/forms/DocumentFormDialog'
+import type { DocumentFormData } from '@/components/forms/DocumentFormDialog'
 import type { PendingFile } from '@/components/common/file-drop-zone'
-import { MediaUrlInput } from '@/components/common/media-url-input'
-import { VisibilitySelector } from '@/components/common/visibility-selector'
 import type { FormFeedItem, FormItem } from '@/components/forms/types'
 
 interface CategoryOption {
@@ -55,23 +47,6 @@ interface FamilyOption {
   id: string
   name: string
   departments: DepartmentOption[]
-}
-
-const EMPTY_FORM = {
-  title: '',
-  description: '',
-  summary: '',
-  version: '',
-  categoryId: '',
-  fileUrl: '',
-  fileSize: null as number | null,
-  fileType: '',
-  isActive: true,
-  isFeatured: false,
-  roles: [] as string[],
-  userIds: [] as string[],
-  departmentIds: [] as string[],
-  familyIds: [] as string[],
 }
 
 export default function PublicFormsPage() {
@@ -99,7 +74,7 @@ export default function PublicFormsPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [formData, setFormData] = useState({ ...EMPTY_FORM })
+  const [formData, setFormData] = useState<DocumentFormData>({ ...EMPTY_DOCUMENT_FORM })
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
 
   // ── Exportación ────────────────────────────────────────────────────────────
@@ -204,7 +179,10 @@ export default function PublicFormsPage() {
   const loadUsersAndDepartments = async () => {
     try {
       const [usersRes, deptsRes, familiesRes] = await Promise.all([
-        fetch('/api/users?limit=500'),
+        // Cargar todos los usuarios activos para el selector de visibilidad.
+        // No filtramos por formsEnabled porque la visibilidad se puede configurar
+        // para cualquier usuario aunque no tenga el módulo activo todavía.
+        fetch('/api/users?limit=500&isActive=true'),
         fetch('/api/departments'),
         fetch('/api/families?includeInactive=false&scope=all'),
       ])
@@ -304,7 +282,7 @@ export default function PublicFormsPage() {
       setShowCreateDialog(false)
       setEditingForm(null)
       setPendingFiles([])
-      setFormData({ ...EMPTY_FORM })
+      setFormData({ ...EMPTY_DOCUMENT_FORM })
       loadForms()
     } catch (err) {
       toast({
@@ -488,7 +466,7 @@ export default function PublicFormsPage() {
           <Button
             size='sm'
             onClick={() => {
-              setFormData({ ...EMPTY_FORM })
+              setFormData({ ...EMPTY_DOCUMENT_FORM })
               setEditingForm(null)
               setShowCreateDialog(true)
             }}
@@ -557,7 +535,7 @@ export default function PublicFormsPage() {
             <Button
               size='sm'
               onClick={() => {
-                setFormData({ ...EMPTY_FORM })
+                setFormData({ ...EMPTY_DOCUMENT_FORM })
                 setShowCreateDialog(true)
               }}
             >
@@ -587,218 +565,33 @@ export default function PublicFormsPage() {
         />
       )}
 
-      {/* ── Dialog crear / editar ─────────────────────────────────────────── */}
+      {/* ── Dialog crear / editar — componente unificado DocumentFormDialog ── */}
       {canManage && (
-        <Dialog
+        <DocumentFormDialog
           open={showCreateDialog}
           onOpenChange={open => {
             setShowCreateDialog(open)
             if (!open) {
               setEditingForm(null)
               setPendingFiles([])
+              setFormData({ ...EMPTY_DOCUMENT_FORM })
             }
           }}
-        >
-          <DialogContent className='sm:max-w-3xl max-h-[90vh] overflow-y-auto'>
-            <DialogHeader>
-              <DialogTitle>{editingForm ? 'Editar documento' : 'Nuevo documento'}</DialogTitle>
-              <DialogDescription>
-                Complete la información para {editingForm ? 'actualizar' : 'crear'} el documento
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} onClick={e => e.stopPropagation()} className='space-y-4'>
-              <div className='grid grid-cols-2 gap-4'>
-                <div className='space-y-2 col-span-2'>
-                  <Label>
-                    Título <span className='text-destructive'>*</span>
-                  </Label>
-                  <Input
-                    required
-                    value={formData.title}
-                    onChange={e => setFormData(p => ({ ...p, title: e.target.value }))}
-                  />
-                </div>
-                <div className='space-y-2 col-span-2'>
-                  <Label>Descripción</Label>
-                  <Textarea
-                    value={formData.description}
-                    onChange={e => setFormData(p => ({ ...p, description: e.target.value }))}
-                    rows={2}
-                  />
-                </div>
-                <div className='space-y-2'>
-                  <Label>Resumen (opcional)</Label>
-                  <Input
-                    value={formData.summary}
-                    onChange={e => setFormData(p => ({ ...p, summary: e.target.value }))}
-                  />
-                </div>
-                <div className='space-y-2'>
-                  <Label>Versión (opcional)</Label>
-                  <Input
-                    value={formData.version}
-                    onChange={e => setFormData(p => ({ ...p, version: e.target.value }))}
-                    placeholder='v1.0'
-                  />
-                </div>
-                <div className='space-y-2 col-span-2'>
-                  <Label>
-                    Categoría <span className='text-destructive'>*</span>
-                  </Label>
-                  <InlineCreateSelect
-                    options={categories.map(c => ({
-                      id: c.id,
-                      name: c.name,
-                      description: c.description ?? undefined,
-                    }))}
-                    value={formData.categoryId}
-                    onChange={v => setFormData(p => ({ ...p, categoryId: v }))}
-                    placeholder='Seleccionar categoría'
-                    createLabel='Crear categoría'
-                    createTitle='Crear categoría'
-                    editTitle='Editar categoría'
-                    allowClear
-                    createForm={FormCategoryInlineForm}
-                    onDelete={handleDeleteCategory}
-                    deleteConfirmMessage='¿Eliminar esta categoría? Los documentos asociados quedarán sin categoría.'
-                    onAfterSave={() => loadCategories()}
-                  />
-                </div>
-                <div className='space-y-2 col-span-2'>
-                  <Label>Archivo</Label>
-                  <div className='space-y-3'>
-                    {editingForm?.fileUrl && pendingFiles.length === 0 && (
-                      <div className='flex items-center gap-3 p-3 rounded-lg border bg-muted/30'>
-                        <span className='text-xl'>📄</span>
-                        <div className='flex-1 min-w-0'>
-                          <p className='text-sm font-medium truncate'>
-                            {editingForm.fileType || 'Archivo adjunto'}
-                          </p>
-                        </div>
-                        <div className='flex gap-2 flex-shrink-0'>
-                          <Button
-                            type='button'
-                            variant='outline'
-                            size='sm'
-                            onClick={() => window.open(editingForm.fileUrl!, '_blank')}
-                          >
-                            Ver
-                          </Button>
-                          <Button
-                            type='button'
-                            variant='ghost'
-                            size='sm'
-                            className='text-destructive hover:text-destructive'
-                            onClick={() =>
-                              setFormData(p => ({
-                                ...p,
-                                fileUrl: '',
-                                fileSize: null,
-                                fileType: '',
-                              }))
-                            }
-                          >
-                            Quitar
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                    <FileDropZone
-                      pendingFiles={pendingFiles}
-                      onPendingFilesChange={files => {
-                        setPendingFiles(files)
-                        if (files.length > 0) {
-                          const f = files[0].file
-                          setFormData(p => ({
-                            ...p,
-                            fileUrl: '',
-                            fileSize: f.size,
-                            fileType: f.type,
-                          }))
-                        } else {
-                          setFormData(p => ({
-                            ...p,
-                            fileUrl: editingForm?.fileUrl || '',
-                            fileSize: editingForm?.fileSize ?? null,
-                            fileType: editingForm?.fileType || '',
-                          }))
-                        }
-                      }}
-                      maxFiles={1}
-                      acceptLabel='PDF, Word, Excel, imágenes'
-                      accept='.pdf,.doc,.docx,.xls,.xlsx,image/*'
-                      allowedTypes={[
-                        'application/pdf',
-                        'application/msword',
-                        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                        'application/vnd.ms-excel',
-                        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                        'image/jpeg',
-                        'image/jpg',
-                        'image/png',
-                        'image/gif',
-                        'image/webp',
-                      ]}
-                    />
-                    {pendingFiles.length === 0 && !editingForm?.fileUrl && (
-                      <MediaUrlInput
-                        label=''
-                        value={formData.fileUrl}
-                        onChange={v => setFormData(p => ({ ...p, fileUrl: v }))}
-                        placeholder='O pega una URL externa (Google Drive, OneDrive, Dropbox, PDF...)'
-                        optional={false}
-                      />
-                    )}
-                  </div>
-                </div>
-              </div>
-              <div className='flex items-center gap-6 pt-2'>
-                <div className='flex items-center gap-2'>
-                  <Switch
-                    checked={formData.isActive}
-                    onCheckedChange={v => setFormData(p => ({ ...p, isActive: v }))}
-                  />
-                  <Label>Activo</Label>
-                </div>
-                <div className='flex items-center gap-2'>
-                  <Switch
-                    checked={formData.isFeatured}
-                    onCheckedChange={v => setFormData(p => ({ ...p, isFeatured: v }))}
-                  />
-                  <Label>Destacado</Label>
-                </div>
-              </div>
-              <Separator />
-              <VisibilitySelector
-                families={families}
-                users={users}
-                selectedRoles={formData.roles}
-                selectedFamilyIds={formData.familyIds}
-                selectedDepartmentIds={formData.departmentIds}
-                selectedUserIds={formData.userIds}
-                onRolesChange={roles => setFormData(p => ({ ...p, roles }))}
-                onFamilyIdsChange={familyIds => setFormData(p => ({ ...p, familyIds }))}
-                onDepartmentIdsChange={departmentIds => setFormData(p => ({ ...p, departmentIds }))}
-                onUserIdsChange={userIds => setFormData(p => ({ ...p, userIds }))}
-              />
-              <DialogFooter>
-                <Button
-                  type='button'
-                  variant='outline'
-                  onClick={() => {
-                    setShowCreateDialog(false)
-                    setEditingForm(null)
-                  }}
-                >
-                  Cancelar
-                </Button>
-                <Button type='submit' disabled={saving}>
-                  {saving ? 'Guardando...' : editingForm ? 'Actualizar' : 'Crear'}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+          formData={formData}
+          setFormData={setFormData}
+          pendingFiles={pendingFiles}
+          setPendingFiles={setPendingFiles}
+          editingForm={editingForm}
+          categories={categories}
+          users={users}
+          families={families}
+          saving={saving}
+          onSubmit={handleSubmit}
+          onDeleteCategory={handleDeleteCategory}
+          onLoadCategories={loadCategories}
+          collapseAdvanced
+          usersHint='Solo aparecen usuarios con el módulo de Documentos activo'
+        />
       )}
 
       {/* ── Dialog eliminar ───────────────────────────────────────────────── */}

@@ -15,37 +15,35 @@ interface Params {
   params: Promise<{ id: string }>
 }
 
-/** Verifica si el usuario tiene acceso a gestión de noticias (admin o newsEnabled) */
+/** Verifica si el usuario tiene acceso a gestión de noticias (admin o canManageNews) */
 async function hasNewsManagementAccess(session: any): Promise<boolean> {
   if (session.user.role === 'ADMIN' || session.user.isSuperAdmin) return true
   const user = await prisma.users.findUnique({
     where: { id: session.user.id },
-    select: { newsEnabled: true },
+    select: { canManageNews: true },
   })
-  return user?.newsEnabled === true
+  return user?.canManageNews === true
 }
 
-/** Verifica si el usuario puede modificar una noticia específica (es el creador o es SuperAdmin) */
+/** Verifica si el usuario puede modificar una noticia específica */
 async function canModifyNews(
   session: any,
   newsId: string
 ): Promise<{ allowed: boolean; reason?: string }> {
-  const isSuperAdmin = (session.user as any).isSuperAdmin === true
-
-  // Verificar desde DB (más fiable que la sesión)
   const dbUser = await prisma.users.findUnique({
     where: { id: session.user.id },
-    select: { isSuperAdmin: true, newsEnabled: true },
+    select: { isSuperAdmin: true, canManageNews: true, role: true },
   })
 
   if (dbUser?.isSuperAdmin) return { allowed: true }
+  // Admin normal puede modificar cualquier noticia
+  if (dbUser?.role === 'ADMIN') return { allowed: true }
 
-  // Verificar que tiene acceso al módulo
-  if (session.user.role !== 'ADMIN' && !dbUser?.newsEnabled) {
-    return { allowed: false, reason: 'No autorizado' }
+  // TECHNICIAN/CLIENT: solo si tiene canManageNews y es el creador
+  if (!dbUser?.canManageNews) {
+    return { allowed: false, reason: 'No tienes permisos para gestionar noticias' }
   }
 
-  // Verificar que es el creador
   const news = await prisma.news.findUnique({
     where: { id: newsId },
     select: { createdById: true },

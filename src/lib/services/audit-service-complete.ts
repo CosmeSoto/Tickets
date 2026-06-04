@@ -25,6 +25,9 @@ export interface AuditLogData {
     | 'equipment'
     | 'inventory'
     | 'patrol'
+    | 'news'
+    | 'form'
+    | 'backup'
   entityId?: string
   userId: string
   details?: Record<string, any>

@@ -21,6 +21,7 @@ interface PermissionsAndModulesSectionProps {
     inventoryEnabled: boolean
     patrolsEnabled: boolean
     newsEnabled: boolean
+    canManageNews: boolean
     formsEnabled: boolean
     canManageForms: boolean
     canManageInventory: boolean
@@ -48,6 +49,7 @@ interface PermissionsAndModulesSectionProps {
       | 'inventoryEnabled'
       | 'patrolsEnabled'
       | 'newsEnabled'
+      | 'canManageNews'
       | 'formsEnabled'
       | 'canManageForms'
       | 'canManageInventory'
@@ -91,10 +93,9 @@ export function PermissionsAndModulesSection({
 }: PermissionsAndModulesSectionProps) {
   const { modules: systemModules } = useSystemModules()
 
-  // Familia nativa del usuario: viene del departamento asignado
+  // Familia nativa: viene del departamento asignado
   const deptObj = user && typeof user.department === 'object' ? (user.department as any) : null
   const nativeFamilyId: string | null = deptObj?.familyId ?? null
-  // Construir el objeto ModuleFamily con los datos que vienen embebidos en el departamento
   const nativeFamily =
     nativeFamilyId && deptObj?.family
       ? {
@@ -146,8 +147,8 @@ export function PermissionsAndModulesSection({
               Acceso como Administrador de Familia
             </p>
             <p className='text-xs text-muted-foreground'>
-              Los módulos habilitados abajo determinan qué secciones verá este admin. Además, solo
-              verá datos de las familias que tenga asignadas.
+              Los módulos habilitados determinan qué secciones verá. Solo verá datos de sus familias
+              asignadas.
             </p>
           </div>
         )}
@@ -160,6 +161,7 @@ export function PermissionsAndModulesSection({
           </p>
 
           <div className='space-y-2'>
+            {/* ── Tickets ── */}
             <ModuleAccessCard
               moduleKey='tickets'
               moduleName='Tickets de Soporte'
@@ -195,6 +197,7 @@ export function PermissionsAndModulesSection({
               disabled={loading}
             />
 
+            {/* ── Inventario ── */}
             <ModuleAccessCard
               moduleKey='inventory'
               moduleName='Inventario'
@@ -218,16 +221,19 @@ export function PermissionsAndModulesSection({
               disabled={loading}
             />
 
+            {/* ── Rondas ── */}
+            {/* CLIENT: solo agente — sin familia nativa en el card ni selector adicional */}
+            {/* TECHNICIAN/ADMIN: supervisor multi-instalación — mostrar selector completo */}
             <ModuleAccessCard
               moduleKey='patrols'
               moduleName='Rondas y Patrullajes'
               role={formData.role}
               enabled={formData.patrolsEnabled}
               onToggle={v => onToggle('patrolsEnabled', v)}
-              families={patrolFamilies}
-              assignedFamilyIds={patrolFamilyIds}
-              nativeFamilyId={nativeFamilyId}
-              nativeFamily={nativeFamily}
+              families={formData.role === 'CLIENT' ? [] : patrolFamilies}
+              assignedFamilyIds={formData.role === 'CLIENT' ? [] : patrolFamilyIds}
+              nativeFamilyId={formData.role === 'CLIENT' ? null : nativeFamilyId}
+              nativeFamily={formData.role === 'CLIENT' ? null : nativeFamily}
               readOnlyFamilyIds={patrolReadOnlyIds}
               onAssignFamily={handlers.handleAssignPatrolFamily}
               onUnassignFamily={handlers.handleUnassignPatrolFamily}
@@ -236,51 +242,52 @@ export function PermissionsAndModulesSection({
               disabled={loading}
             />
 
-            <div className='flex items-center justify-between rounded-lg border px-3 py-2.5'>
-              <div>
-                <p className='text-sm font-medium flex items-center gap-2'>📰 Noticias</p>
-                <p className='text-xs text-muted-foreground'>
-                  Permite al usuario ver el módulo de noticias
-                </p>
-              </div>
-              <Switch
-                checked={formData.newsEnabled}
-                onCheckedChange={v => onToggle('newsEnabled', v)}
-                disabled={loading}
-              />
-            </div>
+            {/* ── Noticias ── */}
+            <ModuleAccessCard
+              moduleKey='news'
+              moduleName='Noticias'
+              role={formData.role}
+              enabled={formData.newsEnabled}
+              onToggle={v => onToggle('newsEnabled', v)}
+              families={[]}
+              assignedFamilyIds={[]}
+              onAssignFamily={async () => {}}
+              onUnassignFamily={async () => {}}
+              options={
+                // ADMIN siempre gestiona — solo TECHNICIAN puede tener toggle de gestión de noticias
+                formData.role === 'TECHNICIAN'
+                  ? {
+                      canManageNews: formData.canManageNews,
+                      onToggleManageNews: v => onToggle('canManageNews', v),
+                    }
+                  : undefined
+              }
+              disabled={loading}
+            />
 
-            <div className='flex items-center justify-between rounded-lg border px-3 py-2.5'>
-              <div>
-                <p className='text-sm font-medium flex items-center gap-2'>📄 Documentos</p>
-                <p className='text-xs text-muted-foreground'>
-                  Permite al usuario ver el módulo de documentos
-                </p>
-              </div>
-              <Switch
-                checked={formData.formsEnabled}
-                onCheckedChange={v => onToggle('formsEnabled', v)}
-                disabled={loading}
-              />
-            </div>
-
-            {formData.formsEnabled && (
-              <div className='flex items-center justify-between rounded-lg border px-3 py-2.5 bg-muted/30'>
-                <div>
-                  <p className='text-sm font-medium flex items-center gap-2'>
-                    🔧 Permitir gestión de documentos
-                  </p>
-                  <p className='text-xs text-muted-foreground'>
-                    Permite crear, editar y eliminar documentos de sus familias
-                  </p>
-                </div>
-                <Switch
-                  checked={formData.canManageForms}
-                  onCheckedChange={v => onToggle('canManageForms', v)}
-                  disabled={loading}
-                />
-              </div>
-            )}
+            {/* ── Documentos ── */}
+            {/* CLIENT: solo puede ver documentos, sin opción de gestionar */}
+            <ModuleAccessCard
+              moduleKey='forms'
+              moduleName='Documentos'
+              role={formData.role}
+              enabled={formData.formsEnabled}
+              onToggle={v => onToggle('formsEnabled', v)}
+              families={[]}
+              assignedFamilyIds={[]}
+              onAssignFamily={async () => {}}
+              onUnassignFamily={async () => {}}
+              options={
+                // Solo TECHNICIAN puede tener canManageForms — CLIENT solo ve
+                formData.role === 'TECHNICIAN'
+                  ? {
+                      canManageForms: formData.canManageForms,
+                      onToggleManageForms: v => onToggle('canManageForms', v),
+                    }
+                  : undefined
+              }
+              disabled={loading}
+            />
           </div>
         </div>
       )}
@@ -290,12 +297,15 @@ export function PermissionsAndModulesSection({
           userId={user.id}
           role={formData.role}
           canManageInventory={formData.canManageInventory}
+          canRequestAssets={formData.canRequestAssets}
           ticketsEnabled={formData.ticketsEnabled}
           inventoryEnabled={formData.inventoryEnabled}
           patrolsEnabled={formData.patrolsEnabled}
           newsEnabled={formData.newsEnabled}
+          canManageNews={formData.canManageNews}
           formsEnabled={formData.formsEnabled}
           canManageForms={formData.canManageForms}
+          defaultCollapsed
         />
       )}
 
@@ -304,12 +314,15 @@ export function PermissionsAndModulesSection({
           userId={user.id}
           role={formData.role}
           canManageInventory={true}
+          canRequestAssets={true}
           ticketsEnabled={true}
           inventoryEnabled={true}
           patrolsEnabled={true}
           newsEnabled={true}
+          canManageNews={true}
           formsEnabled={true}
           canManageForms={true}
+          defaultCollapsed
         />
       )}
     </div>

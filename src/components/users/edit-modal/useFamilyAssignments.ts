@@ -366,9 +366,10 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
         }
 
         if (viewerIsSuperAdmin) {
-          setTicketFamilies(tModuleFamilies)
-          setInventoryFamilies(iModuleFamilies)
-          setPatrolFamilies(pModuleFamilies)
+          // SuperAdmin ve todo — también garantizar que la nativa esté incluida
+          setTicketFamilies(ensureNativeFamily(tModuleFamilies))
+          setInventoryFamilies(ensureNativeFamily(iModuleFamilies))
+          setPatrolFamilies(ensureNativeFamily(pModuleFamilies))
         } else {
           // Para Admin Normal: las listas de inventario y patrullas ya vienen sin filtro
           // de scope (scope=all), por lo que las usamos directamente asegurando que la

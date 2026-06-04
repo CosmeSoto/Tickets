@@ -41,6 +41,7 @@ export async function GET(request: Request) {
   let inventoryEnabled = false
   let patrolsEnabled = false
   let newsEnabled = false
+  let canManageNews = false
   let formsEnabled = false
   let canManageForms = false
 
@@ -56,6 +57,7 @@ export async function GET(request: Request) {
         inventoryEnabled: true,
         patrolsEnabled: true,
         newsEnabled: true,
+        canManageNews: true,
         formsEnabled: true,
         canManageForms: true,
       },
@@ -69,6 +71,7 @@ export async function GET(request: Request) {
     inventoryEnabled = targetUser.inventoryEnabled ?? false
     patrolsEnabled = targetUser.patrolsEnabled ?? false
     newsEnabled = targetUser.newsEnabled ?? false
+    canManageNews = targetUser.canManageNews ?? false
     formsEnabled = targetUser.formsEnabled ?? false
     canManageForms = targetUser.canManageForms ?? false
   } else {
@@ -81,6 +84,7 @@ export async function GET(request: Request) {
         canManageInventory: true,
         patrolsEnabled: true,
         newsEnabled: true,
+        canManageNews: true,
         formsEnabled: true,
         canManageForms: true,
       },
@@ -91,6 +95,7 @@ export async function GET(request: Request) {
       canManageInventory = currentUser.canManageInventory ?? false
       patrolsEnabled = currentUser.patrolsEnabled ?? false
       newsEnabled = currentUser.newsEnabled ?? false
+      canManageNews = currentUser.canManageNews ?? false
       formsEnabled = currentUser.formsEnabled ?? false
       canManageForms = currentUser.canManageForms ?? false
     }
@@ -224,7 +229,9 @@ export async function GET(request: Request) {
           inventory: true,
           patrols: true,
           news: true,
+          canManageNews: true,
           forms: true,
+          canManageForms: true,
           families: [],
         }
       }
@@ -235,18 +242,21 @@ export async function GET(request: Request) {
           inventory: inventoryEnabled || canManageInventory,
           patrols: patrolsEnabled,
           news: newsEnabled,
+          canManageNews: true, // Admins siempre pueden gestionar noticias
           forms: formsEnabled,
+          canManageForms: true, // Admins siempre pueden gestionar documentos
           families: [],
         }
       }
       // Para técnicos y clientes sin familias: respetar los flags del usuario
-      // Esto permite que un usuario con módulos habilitados vea la sección aunque no tenga familias aún
       return {
         tickets: ticketsEnabled,
         inventory: inventoryEnabled || canManageInventory,
         patrols: patrolsEnabled,
         news: newsEnabled,
+        canManageNews,
         forms: formsEnabled,
+        canManageForms,
         families: [],
       }
     }
@@ -424,8 +434,6 @@ export async function GET(request: Request) {
       resolvedNews = true
       resolvedForms = true
     } else {
-      // Para todos los roles (incluido admin normal):
-      // El flag del usuario es el permiso. Si tiene familias asignadas para ese módulo, lo ve.
       resolvedTickets = ticketsEnabled && ticketFamilyIds.size > 0
       resolvedInventory = (inventoryEnabled || canManageInventory) && inventoryFamilyIds.size > 0
       resolvedPatrols = patrolsEnabled && patrolFamilyIds.size > 0
@@ -439,7 +447,11 @@ export async function GET(request: Request) {
       inventory: resolvedInventory,
       patrols: resolvedPatrols,
       news: resolvedNews,
+      // Para gestores de noticias (no admin): canManageNews desde DB
+      canManageNews: role === 'ADMIN' ? true : canManageNews,
       forms: resolvedForms,
+      // Para gestores de documentos (no admin): canManageForms desde DB
+      canManageForms: role === 'ADMIN' ? true : canManageForms,
       families: enrichedFamilies,
     }
   })

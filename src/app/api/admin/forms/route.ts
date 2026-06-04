@@ -9,6 +9,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
+import { assertCanManageForms } from '@/lib/forms/forms-access'
 
 // Campos comunes de include para devolver un form completo
 const FORM_INCLUDE = {
@@ -47,6 +48,10 @@ export async function GET(request: NextRequest) {
     if (!session?.user) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
+
+    // Solo ADMIN o usuarios con canManageForms pueden acceder al panel de gestión
+    const denied = await assertCanManageForms(session.user.id, session.user.role)
+    if (denied) return denied
 
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
@@ -101,6 +106,10 @@ export async function POST(request: NextRequest) {
     if (!session?.user) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
+
+    // Verificar permiso de gestión
+    const denied = await assertCanManageForms(session.user.id, session.user.role)
+    if (denied) return denied
 
     const data = await request.json()
 

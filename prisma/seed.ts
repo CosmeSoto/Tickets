@@ -1,6 +1,6 @@
 import { PrismaClient, UserRole } from '@prisma/client'
 import bcrypt from 'bcryptjs'
-import { randomUUID } from 'crypto'
+import { randomUUID, createHash } from 'crypto'
 import { seedCustomFields } from './seeds/custom-fields.seed'
 import { seedInventoryTypes } from './seeds/inventory-types.seed'
 import { seedEquipmentBrands } from './seeds/equipment-brands.seed'
@@ -19,6 +19,23 @@ import { seedWarehouses } from './seeds/warehouses.seed'
 const prisma = new PrismaClient()
 const now = new Date()
 const year = now.getFullYear()
+
+/**
+ * Genera un UUID v4 determinista basado en un namespace + nombre.
+ * El mismo input siempre produce el mismo UUID, garantizando consistencia
+ * entre reconstrucciones de contenedores (dev y producción).
+ */
+function deterministicUUID(namespace: string, name: string): string {
+  const hash = createHash('sha256').update(`${namespace}:${name}`).digest('hex')
+  // Formatear como UUID v4 (con bits fijos según el estándar)
+  return [
+    hash.slice(0, 8),
+    hash.slice(8, 12),
+    '4' + hash.slice(13, 16), // versión 4
+    ((parseInt(hash[16], 16) & 0x3) | 0x8).toString(16) + hash.slice(17, 20), // variante RFC4122
+    hash.slice(20, 32),
+  ].join('-')
+}
 
 // ============================================
 // MAIN
@@ -187,7 +204,7 @@ async function seedFamilies(): Promise<Map<string, string>> {
     const family = await prisma.families.upsert({
       where: { code: f.code },
       update: { name: f.name, icon: f.icon, color: f.color, order: f.order },
-      create: { id: randomUUID(), ...f, isActive: true },
+      create: { id: deterministicUUID('family', f.code), ...f, isActive: true },
     })
     map.set(f.code, family.id)
   }
@@ -511,7 +528,7 @@ async function seedDepartments(familyMap: Map<string, string>): Promise<Map<stri
       where: { name: dept.name },
       update: { description: dept.description, color: dept.color, order: dept.order, familyId },
       create: {
-        id: randomUUID(),
+        id: deterministicUUID('department', dept.name),
         name: dept.name,
         description: dept.description,
         color: dept.color,

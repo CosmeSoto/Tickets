@@ -10,7 +10,7 @@
 services:
   # ── Base de datos ───────────────────────────────────────────────────────────
   postgres:
-    image: postgres:16-alpine
+    image: postgres:17-alpine
     container_name: tickets-postgres-dev
     environment:
       POSTGRES_DB: tickets_db

@@ -178,7 +178,10 @@ export function FormDetail({
 
   const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
   const isOwner = form.createdBy.id === session?.user?.id
-  const canModify = isSuperAdmin || isOwner
+  const isAdmin = session?.user?.role === 'ADMIN'
+  // Admin (normal o super) puede modificar cualquier documento.
+  // TECHNICIAN/CLIENT con canManageForms solo pueden modificar los que crearon.
+  const canModify = isAdmin || isOwner
 
   const handleDownload = async () => {
     if (!hasFile) {
