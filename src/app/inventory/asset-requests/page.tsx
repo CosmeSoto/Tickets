@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -73,6 +74,7 @@ const EXPORT_COLUMNS = [
 
 export default function AssetRequestsPage() {
   const router = useRouter()
+  const { data: session, status } = useSession()
   const [requests, setRequests] = useState<AssetRequest[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -124,6 +126,24 @@ export default function AssetRequestsPage() {
   useEffect(() => {
     setPage(1)
   }, [search, statusFilter, typeFilter])
+
+  // Guard de acceso: verificar canRequestAssets antes de mostrar la página.
+  // ADMIN y SuperAdmin siempre tienen acceso. Resto de roles: requieren canRequestAssets.
+  useEffect(() => {
+    if (status === 'loading') return
+    if (!session) {
+      router.replace('/login')
+      return
+    }
+    const isSuperAdmin = (session.user as any)?.isSuperAdmin === true
+    const isAdmin = session.user.role === 'ADMIN'
+    const canReq = (session.user as any)?.canRequestAssets === true
+    if (!isSuperAdmin && !isAdmin && !canReq) {
+      // Redirigir al dashboard según el rol
+      const fallback = session.user.role === 'TECHNICIAN' ? '/technician' : '/client'
+      router.replace(fallback)
+    }
+  }, [session, status, router])
 
   // Initial load and when page/limit/filters change
   useEffect(() => {

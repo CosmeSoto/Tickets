@@ -300,7 +300,10 @@ export default function AdminNewsPage() {
   const loadUsersAndDepartments = async () => {
     try {
       const [usersRes, deptsRes, familiesRes] = await Promise.all([
-        fetch('/api/users?limit=500'),
+        // Solo usuarios con el módulo de noticias activo (newsEnabled=true) o admins.
+        // Los ADMINs siempre tienen acceso a noticias independientemente del flag,
+        // por eso incluimos role=ADMIN sin filtro de módulo en una segunda petición.
+        fetch('/api/users?limit=500&newsEnabled=true&isActive=true'),
         fetch('/api/departments'),
         fetch('/api/families?includeInactive=false&scope=all'),
       ])
@@ -943,6 +946,7 @@ export default function AdminNewsPage() {
                   setFormData(prev => ({ ...prev, departmentIds }))
                 }
                 onUserIdsChange={userIds => setFormData(prev => ({ ...prev, userIds }))}
+                usersHint='Solo aparecen usuarios con el módulo de Noticias activo'
               />
             </div>
             <DialogFooter>

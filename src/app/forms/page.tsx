@@ -179,10 +179,8 @@ export default function PublicFormsPage() {
   const loadUsersAndDepartments = async () => {
     try {
       const [usersRes, deptsRes, familiesRes] = await Promise.all([
-        // Cargar todos los usuarios activos para el selector de visibilidad.
-        // No filtramos por formsEnabled porque la visibilidad se puede configurar
-        // para cualquier usuario aunque no tenga el módulo activo todavía.
-        fetch('/api/users?limit=500&isActive=true'),
+        // Solo usuarios con el módulo de documentos activo (formsEnabled=true).
+        fetch('/api/users?limit=500&isActive=true&formsEnabled=true'),
         fetch('/api/departments'),
         fetch('/api/families?includeInactive=false&scope=all'),
       ])

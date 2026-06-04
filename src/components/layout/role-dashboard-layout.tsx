@@ -254,11 +254,8 @@ const navigationByRole: Record<string, NavItem[]> = {
       icon: Shield,
       children: [{ name: 'Patrullas Activas', href: '/patrol', icon: MapPin }],
     },
-    {
-      name: 'Noticias',
-      href: '/admin/news',
-      icon: Newspaper,
-    },
+    // Noticias no aparece en el sidebar del CLIENT — el feed está embebido en el dashboard.
+    // El link solo aplica a TECHNICIAN con canManageNews y a ADMIN.
     {
       name: 'Documentos',
       href: '/forms',
@@ -291,11 +288,7 @@ const navigationByRole: Record<string, NavItem[]> = {
         { name: 'Reportes', href: '/inventory/reports', icon: BarChart3 },
       ],
     },
-    {
-      name: 'Noticias',
-      href: '/admin/news',
-      icon: Newspaper,
-    },
+    // Noticias no aparece en el sidebar del CLIENT — el feed está embebido en el dashboard.
   ],
 }
 
@@ -443,6 +436,7 @@ export function RoleDashboardLayout({
   }
 
   const canRequestAssets = (session.user as any)?.canRequestAssets ?? false
+  const canManageNews = (session.user as any)?.canManageNews === true
   const userRole = session.user.role as string
   const canManageInventory = (session.user as any).canManageInventory
   const isSuperAdmin = (session.user as any).isSuperAdmin === true
@@ -492,8 +486,16 @@ export function RoleDashboardLayout({
       ) {
         return hasPatrols
       }
-      // Ocultar Noticias si el usuario no tiene newsEnabled
+      // Ocultar Noticias si el usuario no tiene newsEnabled.
+      // CLIENT: nunca muestra el link aunque tenga newsEnabled — las noticias
+      //         ya están en el dashboard como feed embebido.
+      // TECHNICIAN: solo muestra el link si tiene canManageNews (puede gestionar).
+      //             Si solo tiene newsEnabled sin canManageNews, ve el feed en el
+      //             dashboard pero no necesita el link de gestión.
+      // ADMIN: siempre visible (filtrado en su propio bloque arriba).
       if (item.href === '/admin/news' || item.name === 'Noticias') {
+        if (userRole === 'CLIENT') return false
+        if (userRole === 'TECHNICIAN') return hasNews && canManageNews
         return hasNews
       }
       // Ocultar Formularios si el usuario no tiene formsEnabled

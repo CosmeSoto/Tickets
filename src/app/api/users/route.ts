@@ -66,6 +66,7 @@ export async function GET(request: NextRequest) {
     const patrolsEnabled = searchParams.get('patrolsEnabled')
     const isSuperAdmin = searchParams.get('isSuperAdmin')
     const formsEnabled = searchParams.get('formsEnabled')
+    const newsEnabled = searchParams.get('newsEnabled')
 
     // Construir filtros para Prisma
     const where: any = {}
@@ -92,6 +93,10 @@ export async function GET(request: NextRequest) {
 
     if (formsEnabled !== null) {
       where.formsEnabled = formsEnabled === 'true'
+    }
+
+    if (newsEnabled !== null) {
+      where.newsEnabled = newsEnabled === 'true'
     }
 
     if (departmentId) {

@@ -1,6 +1,8 @@
 'use client'
 
+import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { AssetRequestCreateForm } from '@/components/inventory/asset-requests/asset-request-create-form'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
@@ -8,6 +10,23 @@ import { ArrowLeft, Plus } from 'lucide-react'
 
 export default function CreateAssetRequestPage() {
   const router = useRouter()
+  const { data: session, status } = useSession()
+
+  // Guard de acceso: solo usuarios con canRequestAssets (o ADMIN/SuperAdmin)
+  useEffect(() => {
+    if (status === 'loading') return
+    if (!session) {
+      router.replace('/login')
+      return
+    }
+    const isSuperAdmin = (session.user as any)?.isSuperAdmin === true
+    const isAdmin = session.user.role === 'ADMIN'
+    const canReq = (session.user as any)?.canRequestAssets === true
+    if (!isSuperAdmin && !isAdmin && !canReq) {
+      const fallback = session.user.role === 'TECHNICIAN' ? '/technician' : '/client'
+      router.replace(fallback)
+    }
+  }, [session, status, router])
 
   const handleSuccess = () => {
     router.push('/inventory/asset-requests')

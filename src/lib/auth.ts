@@ -413,7 +413,7 @@ export const authOptions: NextAuthOptions = {
               token.isSuperAdmin = false
               token.ticketsEnabled = true
               token.inventoryEnabled = true
-              token.canRequestAssets = false
+              token.canRequestAssets = true // Prisma default = true
               token.patrolsEnabled = false
               token.newsEnabled = false
             }

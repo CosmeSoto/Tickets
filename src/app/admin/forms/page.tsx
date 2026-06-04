@@ -151,7 +151,8 @@ export default function AdminFormsPage() {
   const loadUsersAndDepartments = async () => {
     try {
       const [usersRes, deptsRes, familiesRes] = await Promise.all([
-        fetch('/api/users?limit=500&isActive=true'),
+        // Solo usuarios con el módulo de documentos activo (formsEnabled=true) o admins.
+        fetch('/api/users?limit=500&isActive=true&formsEnabled=true'),
         fetch('/api/departments'),
         fetch('/api/families?includeInactive=false&scope=all'),
       ])
