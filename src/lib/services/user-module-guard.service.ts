@@ -130,7 +130,7 @@ export class UserModuleGuardService {
     if (disabling.includes('canRequestAssets')) {
       const pendingRequests = await prisma.asset_requests.count({
         where: {
-          requestedById: userId,
+          requesterId: userId,
           status: { in: ['PENDING', 'APPROVED'] },
         },
       })
