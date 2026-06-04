@@ -241,7 +241,7 @@ async function restoreWithPgRestore(
           `PGPASSWORD="${dbConfig.password}" psql ` +
           `-h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d ${dbConfig.database} ` +
           `-v ON_ERROR_STOP=0 ` +
-          `-c "SET session_replication_role = replica;" ` +
+          `-c "SET session_replication_role = replica; SET search_path = public;" ` +
           `-f "${tempReplacePath}" ` +
           `-c "SET session_replication_role = DEFAULT;" 2>&1 || true`
 
@@ -321,11 +321,13 @@ async function restoreWithPgRestore(
         await writeF(tempSqlPath, mergedSql, 'utf-8')
 
         // 3. Ejecutar el SQL modificado desactivando FKs temporalmente vía session_replication_role
+        // IMPORTANTE: el dump incluye "SET search_path = ''" que hace que las tablas sin prefijo
+        // de esquema no se encuentren. Forzamos search_path = public antes de ejecutar el archivo.
         const mergeCmd =
           `PGPASSWORD="${dbConfig.password}" psql ` +
           `-h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d ${dbConfig.database} ` +
           `-v ON_ERROR_STOP=0 ` +
-          `-c "SET session_replication_role = replica;" ` +
+          `-c "SET session_replication_role = replica; SET search_path = public;" ` +
           `-f "${tempSqlPath}" ` +
           `-c "SET session_replication_role = DEFAULT;" 2>&1 || true`
 
