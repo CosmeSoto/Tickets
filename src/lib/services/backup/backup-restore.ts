@@ -423,6 +423,70 @@ async function restoreWithPgRestore(
  * Los valores NULL se convierten desde \N (representación pg_dump).
  * Los valores con caracteres especiales se escapan correctamente.
  */
+/**
+ * Tablas donde el merge debe ACTUALIZAR si ya existe el registro.
+ *
+ * Por qué DO UPDATE en vez de DO NOTHING para estas tablas:
+ * - El seed crea datos base (familias, departamentos, usuarios admin, categorías, etc.)
+ *   con UUIDs deterministas. Un backup real también tiene esos mismos UUIDs con datos actualizados.
+ * - DO NOTHING ignoraría el backup porque los registros "ya existen" (del seed).
+ * - DO UPDATE garantiza que el backup siempre gana sobre el seed — restauración real.
+ *
+ * Tablas con DO NOTHING (datos que no genera el seed, solo el uso real):
+ * - tickets, comments, attachments, notifications, ratings — no existen al inicio
+ * - news, patrols, equipment — ídem
+ */
+const MERGE_UPDATE_TABLES = new Set([
+  // Usuarios y auth
+  'users',
+  '"users"',
+  'user_settings',
+  '"user_settings"',
+  'notification_preferences',
+  '"notification_preferences"',
+  'accounts',
+  '"accounts"',
+  'sessions',
+  '"sessions"',
+  'oauth_accounts',
+  '"oauth_accounts"',
+  // Estructura organizacional (creada por seed)
+  'families',
+  '"families"',
+  'departments',
+  '"departments"',
+  'categories',
+  '"categories"',
+  // Configuraciones (creadas por seed)
+  'ticket_family_config',
+  '"ticket_family_config"',
+  'inventory_family_config',
+  '"inventory_family_config"',
+  'patrol_family_config',
+  '"patrol_family_config"',
+  'sla_policies',
+  '"sla_policies"',
+  'system_settings',
+  '"system_settings"',
+  'system_modules',
+  '"system_modules"',
+  'site_config',
+  '"site_config"',
+  // Asignaciones de familias por usuario
+  'technician_family_assignments',
+  '"technician_family_assignments"',
+  'client_family_assignments',
+  '"client_family_assignments"',
+  'admin_family_assignments',
+  '"admin_family_assignments"',
+  'inventory_manager_families',
+  '"inventory_manager_families"',
+  'patrol_family_assignments',
+  '"patrol_family_assignments"',
+  'technician_assignments',
+  '"technician_assignments"',
+])
+
 function convertCopyToInsertOnConflict(sql: string): string {
   const output: string[] = []
   const lines = sql.split('\n')
@@ -441,6 +505,22 @@ function convertCopyToInsertOnConflict(sql: string): string {
       const tableName = copyMatch[1]
       const columnsPart = copyMatch[2]
       const columns = columnsPart.split(',').map(c => c.trim())
+
+      // Determinar si esta tabla debe hacer UPDATE en conflicto
+      const tableKey = tableName
+        .replace(/"/g, '')
+        .replace(/^public\./i, '')
+        .toLowerCase()
+      const shouldUpdate =
+        MERGE_UPDATE_TABLES.has(tableName) ||
+        MERGE_UPDATE_TABLES.has(`"${tableKey}"`) ||
+        MERGE_UPDATE_TABLES.has(tableKey)
+
+      // Para UPDATE: generar SET de todos los campos excepto id
+      const updateCols = columns
+        .filter(c => c.replace(/"/g, '').toLowerCase() !== 'id')
+        .map(c => `${c}=EXCLUDED.${c}`)
+        .join(', ')
 
       i++ // avanzar a la primera fila de datos
 
@@ -464,9 +544,12 @@ function convertCopyToInsertOnConflict(sql: string): string {
 
         const colList = columns.join(', ')
         const valList = sqlValues.join(', ')
-        output.push(
-          `INSERT INTO ${tableName} (${colList}) VALUES (${valList}) ON CONFLICT DO NOTHING;`
-        )
+
+        const conflictClause = shouldUpdate
+          ? `ON CONFLICT (id) DO UPDATE SET ${updateCols}`
+          : `ON CONFLICT DO NOTHING`
+
+        output.push(`INSERT INTO ${tableName} (${colList}) VALUES (${valList}) ${conflictClause};`)
 
         i++
       }
