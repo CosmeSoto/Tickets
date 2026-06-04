@@ -217,32 +217,15 @@ export function UserDetailsModal({
               <ModuleChip enabled={user.patrolsEnabled === true} label='🛡️ Rondas' />
               <ModuleChip enabled={(user as any).newsEnabled === true} label='📰 Noticias' />
               <ModuleChip enabled={(user as any).formsEnabled === true} label='📄 Documentos' />
-              {user.canManageInventory && (
-                <div className='flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium border border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-400'>
-                  <Shield className='h-3 w-3' />
-                  Gestor de Inventario
-                </div>
-              )}
-              {(user as any).canManageNews && (
-                <div className='flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium border border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-400'>
-                  <Shield className='h-3 w-3' />
-                  Gestor de Noticias
-                </div>
-              )}
-              {(user as any).canManageForms && (
-                <div className='flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium border border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-800 dark:bg-purple-950/30 dark:text-purple-400'>
-                  <Shield className='h-3 w-3' />
-                  Gestor de Documentos
-                </div>
-              )}
             </div>
           </div>
 
-          {/* ── Estado de acceso (familias por módulo) ── */}
+          {/* ── Perfil de acceso (familias + permisos adicionales por módulo) ── */}
           <UserModulesPanel
             userId={user.id}
             role={user.role}
             canManageInventory={user.canManageInventory ?? false}
+            canRequestAssets={(user as any).canRequestAssets ?? false}
             ticketsEnabled={user.ticketsEnabled}
             inventoryEnabled={user.inventoryEnabled}
             patrolsEnabled={user.patrolsEnabled}
