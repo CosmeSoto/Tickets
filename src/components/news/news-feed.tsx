@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
+import { useUserModules } from '@/hooks/use-user-modules'
 import {
   Newspaper,
   Calendar,
@@ -93,14 +94,21 @@ interface NewsFeedProps {
 
 export function NewsFeed({ className }: NewsFeedProps) {
   const { data: session } = useSession()
+  const { news: newsModuleEnabled, loading: modulesLoading } = useUserModules()
   const [news, setNews] = useState<NewsItem[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null)
   const [activeTab, setActiveTab] = useState('all')
   const [period, setPeriod] = useState<string>('')
 
+  const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
+  const isAdmin = session?.user?.role === 'ADMIN'
+  // SuperAdmin y Admin siempre tienen acceso. Resto de roles: respetar el flag newsEnabled.
+  const canViewNews = isSuperAdmin || isAdmin || newsModuleEnabled
+
   const loadNews = async (tab: string = 'all', selectedPeriod: string = '') => {
     if (!session?.user) return
+    if (!canViewNews) return
 
     try {
       setLoading(true)
@@ -120,10 +128,12 @@ export function NewsFeed({ className }: NewsFeedProps) {
   }
 
   useEffect(() => {
-    if (session?.user) {
+    if (session?.user && canViewNews) {
       loadNews(activeTab, period)
+    } else if (!modulesLoading && !canViewNews) {
+      setLoading(false)
     }
-  }, [session])
+  }, [session, canViewNews, modulesLoading])
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab)
@@ -152,6 +162,11 @@ export function NewsFeed({ className }: NewsFeedProps) {
   const urgentNews = news.filter(n => n.priority === 'URGENT').sort(sortByDate)
   const featuredNews = news.filter(n => n.isFeatured && n.priority !== 'URGENT').sort(sortByDate)
   const regularNews = news.filter(n => !n.isFeatured && n.priority !== 'URGENT').sort(sortByDate)
+
+  // Si el módulo de noticias no está habilitado para este usuario, no renderizar nada.
+  // Los admins (incluido superadmin) siempre tienen acceso.
+  // Mientras se cargan los módulos no mostrar nada para evitar flash.
+  if (modulesLoading || !canViewNews) return null
 
   return (
     <div className={className}>

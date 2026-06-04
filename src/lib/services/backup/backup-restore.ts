@@ -350,10 +350,11 @@ async function restoreWithPgRestore(
           // Contar inserciones exitosas para logging
           const insertCount = lines.filter(l => l.trim() === 'INSERT 0 1').length
           const skippedCount = lines.filter(l => l.trim() === 'INSERT 0 0').length
-          if (insertCount > 0 || skippedCount > 0) {
-            console.log(
-              `[RESTORE] Merge: ${insertCount} insertados, ${skippedCount} ya existían (omitidos)`
-            )
+          console.log(
+            `[RESTORE] Merge: ${insertCount} insertados, ${skippedCount} ya existían (omitidos), ${errors.length} errores`
+          )
+          if (mergeOut.trim()) {
+            console.log(`[RESTORE] psql output: ${mergeOut.trim().substring(0, 800)}`)
           }
         }
 
@@ -489,7 +490,30 @@ const MERGE_UPDATE_TABLES = new Set([
 
 function convertCopyToInsertOnConflict(sql: string): string {
   const output: string[] = []
-  const lines = sql.split('\n')
+
+  // Pre-procesar: unir líneas de continuación del header COPY.
+  // pg_restore con -f - puede partir líneas largas, por ejemplo:
+  //   COPY public.users (id, email, "passwordHash", "departmentId",
+  //    phone, ...) FROM stdin;
+  // Necesitamos que quede en una sola línea para que el regex funcione.
+  const rawLines = sql.split('\n')
+  const lines: string[] = []
+  for (let j = 0; j < rawLines.length; j++) {
+    const l = rawLines[j]
+    // Si la línea anterior empezó con COPY y aún no terminó con "FROM stdin;"
+    // o si esta línea es continuación de un COPY (empieza con espacio y no es datos)
+    if (
+      lines.length > 0 &&
+      lines[lines.length - 1].match(/^COPY\s/i) &&
+      !lines[lines.length - 1].match(/FROM\s+stdin\s*;$/i)
+    ) {
+      // Línea de continuación del header COPY — unirla a la anterior
+      lines[lines.length - 1] = lines[lines.length - 1].trimEnd() + ' ' + l.trim()
+    } else {
+      lines.push(l)
+    }
+  }
+
   let i = 0
 
   while (i < lines.length) {
@@ -535,6 +559,16 @@ function convertCopyToInsertOnConflict(sql: string): string {
 
         // Parsear valores tab-separated
         const rawValues = dataLine.split('\t')
+
+        // Si el número de valores no coincide con las columnas, la fila está corrupta — omitir
+        if (rawValues.length !== columns.length) {
+          console.warn(
+            `[RESTORE] Fila omitida en ${tableName}: esperaba ${columns.length} cols, obtuvo ${rawValues.length}. Inicio: ${dataLine.substring(0, 60)}`
+          )
+          i++
+          continue
+        }
+
         const sqlValues = rawValues.map(v => {
           if (v === '\\N') return 'NULL'
           // Escapar comillas simples y backslashes

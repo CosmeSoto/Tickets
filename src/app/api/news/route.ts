@@ -30,12 +30,21 @@ export async function GET(request: NextRequest) {
         role: true,
         departmentId: true,
         newsEnabled: true,
+        isSuperAdmin: true,
         departments: { select: { familyId: true } },
       },
     })
 
     // Si el usuario no existe, devolver vacío
     if (!user) {
+      return NextResponse.json({ news: [] })
+    }
+
+    // Verificar que el módulo de noticias esté habilitado para el usuario.
+    // Los admins (incluido superadmin) siempre tienen acceso.
+    const isSuperAdmin = user.isSuperAdmin === true
+    const isAdmin = user.role === 'ADMIN'
+    if (!isSuperAdmin && !isAdmin && !user.newsEnabled) {
       return NextResponse.json({ news: [] })
     }
 
