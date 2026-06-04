@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ChevronDown, Activity, CheckCircle2, XCircle } from 'lucide-react'
+import { ChevronDown, Activity } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { ModuleLine, FamilyChip } from './module-panel-chips'
 
 interface UserModulesPanelProps {
   userId: string
@@ -41,70 +42,6 @@ interface ModulesData {
       forms: boolean
     }
   }>
-}
-
-// Chip de familia con el color real de la familia
-function FamilyChip({ name, color }: { name: string; color?: string | null }) {
-  return (
-    <span className='inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-background border font-medium'>
-      {color && (
-        <span className='w-1.5 h-1.5 rounded-full shrink-0' style={{ backgroundColor: color }} />
-      )}
-      {name}
-    </span>
-  )
-}
-
-// Línea de módulo con icono de estado, descripción y familias
-function ModuleLine({
-  emoji,
-  label,
-  active,
-  capability,
-  role: roleText,
-  families,
-}: {
-  emoji: string
-  label: string
-  active: boolean
-  capability: string
-  role?: string
-  families?: Array<{ id: string; name: string; color?: string | null }>
-}) {
-  return (
-    <div
-      className={cn(
-        'rounded-lg border px-3 py-2.5 space-y-1.5 transition-colors',
-        active ? 'bg-primary/5 border-primary/20' : 'border-border opacity-50'
-      )}
-    >
-      <div className='flex items-center justify-between gap-2'>
-        <div className='flex items-center gap-2 min-w-0'>
-          <span className='text-base shrink-0'>{emoji}</span>
-          <div className='min-w-0'>
-            <span className='text-xs font-semibold text-foreground'>{label}</span>
-            {active && (
-              <p className='text-[10px] text-muted-foreground leading-snug mt-0.5'>{capability}</p>
-            )}
-          </div>
-        </div>
-        <div className='shrink-0'>
-          {active ? (
-            <CheckCircle2 className='h-3.5 w-3.5 text-primary' />
-          ) : (
-            <XCircle className='h-3.5 w-3.5 text-muted-foreground/40' />
-          )}
-        </div>
-      </div>
-      {active && families && families.length > 0 && (
-        <div className='flex flex-wrap gap-1'>
-          {families.map(f => (
-            <FamilyChip key={f.id} name={f.name} color={f.color} />
-          ))}
-        </div>
-      )}
-    </div>
-  )
 }
 
 export function UserModulesPanel({
@@ -202,12 +139,41 @@ export function UserModulesPanel({
     ? 'Descarga documentos · crea y gestiona los de sus familias'
     : 'Consulta y descarga documentos disponibles para su perfil'
 
+  // Permisos adicionales por módulo
+  const inventoryPerms: Array<{ icon: string; label: string }> = []
+  if (canManageInventory) inventoryPerms.push({ icon: '🔧', label: 'Gestión completa' })
+  if (canRequestAssets) inventoryPerms.push({ icon: '📋', label: 'Solicitar activos' })
+
+  const newsPerms: Array<{ icon: string; label: string }> = []
+  if (canManageNews) newsPerms.push({ icon: '✏️', label: 'Crear y publicar noticias' })
+
+  const formsPerms: Array<{ icon: string; label: string }> = []
+  if (canManageForms) formsPerms.push({ icon: '✏️', label: 'Crear y gestionar documentos' })
+
   const allModules = [
-    { key: 'tickets' as const, emoji: '🎫', label: 'Tickets de Soporte', cap: ticketsCap },
-    { key: 'inventory' as const, emoji: '📦', label: 'Inventario', cap: inventoryCap },
-    { key: 'patrols' as const, emoji: '🛡️', label: 'Rondas y Patrullajes', cap: patrolsCap },
-    { key: 'news' as const, emoji: '📰', label: 'Noticias', cap: newsCap },
-    { key: 'forms' as const, emoji: '📄', label: 'Documentos', cap: formsCap },
+    {
+      key: 'tickets' as const,
+      emoji: '🎫',
+      label: 'Tickets de Soporte',
+      cap: ticketsCap,
+      perms: [] as Array<{ icon: string; label: string }>,
+    },
+    {
+      key: 'inventory' as const,
+      emoji: '📦',
+      label: 'Inventario',
+      cap: inventoryCap,
+      perms: inventoryPerms,
+    },
+    {
+      key: 'patrols' as const,
+      emoji: '🛡️',
+      label: 'Rondas y Patrullajes',
+      cap: patrolsCap,
+      perms: [] as Array<{ icon: string; label: string }>,
+    },
+    { key: 'news' as const, emoji: '📰', label: 'Noticias', cap: newsCap, perms: newsPerms },
+    { key: 'forms' as const, emoji: '📄', label: 'Documentos', cap: formsCap, perms: formsPerms },
   ]
 
   return (
@@ -243,6 +209,7 @@ export function UserModulesPanel({
               label={m.label}
               active={active[m.key]}
               capability={m.cap}
+              extraPermissions={active[m.key] && m.perms.length > 0 ? m.perms : undefined}
               families={
                 active[m.key] && m.key !== 'news' && m.key !== 'forms'
                   ? familiesByModule(m.key)
