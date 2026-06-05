@@ -4,24 +4,19 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Package,
   Calendar,
   DollarSign,
-  Search,
   CheckCircle,
   UserCheck,
   Wrench,
   Archive,
   Layers,
-  Plus,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import Link from 'next/link'
 
 interface BatchMetrics {
   total: number
@@ -55,7 +50,6 @@ export function BatchesTab({ canCreate = false }: BatchesTabProps) {
   const router = useRouter()
   const [batches, setBatches] = useState<BatchItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -78,16 +72,6 @@ export function BatchesTab({ canCreate = false }: BatchesTabProps) {
     load()
   }, [load])
 
-  const filtered = search.trim()
-    ? batches.filter(
-        b =>
-          b.batchCode.toLowerCase().includes(search.toLowerCase()) ||
-          b.model.brand.toLowerCase().includes(search.toLowerCase()) ||
-          b.model.model.toLowerCase().includes(search.toLowerCase()) ||
-          (b.supplier?.name ?? '').toLowerCase().includes(search.toLowerCase())
-      )
-    : batches
-
   if (loading) {
     return (
       <div className='space-y-4'>
@@ -100,27 +84,6 @@ export function BatchesTab({ canCreate = false }: BatchesTabProps) {
 
   return (
     <div className='space-y-4'>
-      {/* Barra de búsqueda + botón crear */}
-      <div className='flex items-center gap-3'>
-        <div className='relative flex-1'>
-          <Search className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
-          <Input
-            placeholder='Buscar por código, marca, modelo o proveedor...'
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className='pl-9'
-          />
-        </div>
-        {canCreate && (
-          <Button size='sm' asChild>
-            <Link href='/inventory/new'>
-              <Plus className='mr-2 h-4 w-4' />
-              Nuevo Lote
-            </Link>
-          </Button>
-        )}
-      </div>
-
       {/* Resumen rápido */}
       {batches.length > 0 && (
         <div className='grid grid-cols-2 sm:grid-cols-4 gap-3'>
@@ -148,29 +111,17 @@ export function BatchesTab({ canCreate = false }: BatchesTabProps) {
       )}
 
       {/* Lista de lotes */}
-      {filtered.length === 0 ? (
+      {batches.length === 0 ? (
         <div className='text-center py-16 text-muted-foreground'>
-          {batches.length === 0 ? (
-            <div className='space-y-3'>
-              <Layers className='h-12 w-12 mx-auto opacity-30' />
-              <p className='font-medium'>No hay lotes registrados</p>
-              <p className='text-sm'>Los lotes agrupan múltiples equipos de la misma compra.</p>
-              {canCreate && (
-                <Button size='sm' asChild className='mt-2'>
-                  <Link href='/inventory/new'>
-                    <Plus className='mr-2 h-4 w-4' />
-                    Crear primer lote
-                  </Link>
-                </Button>
-              )}
-            </div>
-          ) : (
-            <p>No hay lotes que coincidan con la búsqueda</p>
-          )}
+          <div className='space-y-3'>
+            <Layers className='h-12 w-12 mx-auto opacity-30' />
+            <p className='font-medium'>No hay lotes registrados</p>
+            <p className='text-sm'>Los lotes agrupan múltiples equipos de la misma compra.</p>
+          </div>
         </div>
       ) : (
         <div className='space-y-3'>
-          {filtered.map(batch => (
+          {batches.map(batch => (
             <Card
               key={batch.id}
               className='cursor-pointer hover:shadow-md transition-all hover:border-primary/30'
