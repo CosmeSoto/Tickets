@@ -36,16 +36,14 @@ export function KnowledgeCard({
         <div className='flex items-start justify-between gap-2 mb-2'>
           <div className='flex-1'>
             {article.category && (
-              <Badge
-                variant='outline'
-                className='mb-2'
+              <span
+                className='mb-2 block text-sm font-medium'
                 style={{
-                  borderColor: article.category.color || undefined,
                   color: article.category.color || undefined,
                 }}
               >
                 {article.category.name}
-              </Badge>
+              </span>
             )}
           </div>
           <div className='flex items-center gap-2'>

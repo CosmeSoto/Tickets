@@ -45,15 +45,14 @@ export function createKnowledgeColumns({
         if (!article.category) return <span className='text-muted-foreground'>-</span>
 
         return (
-          <Badge
-            variant='outline'
+          <span
+            className='text-sm font-medium'
             style={{
-              borderColor: article.category.color || undefined,
               color: article.category.color || undefined,
             }}
           >
             {article.category.name}
-          </Badge>
+          </span>
         )
       },
     },

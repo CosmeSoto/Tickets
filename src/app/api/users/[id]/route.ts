@@ -226,6 +226,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         invalidateCache(`perm:inv:${targetId}`),
         invalidateCache(`user:settings:${targetId}`),
         invalidateCache(`user:modules:${targetId}`),
+        invalidateCache(`inv:families:*`),
         invalidateCache(`users:list:*`),
       ])
     } catch {

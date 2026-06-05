@@ -48,13 +48,26 @@ export async function getAccessibleFamilyIds(
     }
   }
 
-  // Gestor de inventario (cualquier rol): sus familias asignadas
+  // Gestor de inventario (cualquier rol): sus familias asignadas + familia nativa
   if (canManageInventory) {
     const assignments = await prisma.inventory_manager_families.findMany({
       where: { managerId: userId },
       select: { familyId: true },
     })
-    return assignments.map(a => a.familyId)
+    const assignedIds = assignments.map(a => a.familyId)
+
+    // Siempre incluir la familia nativa (departamento del usuario)
+    const user = await prisma.users.findUnique({
+      where: { id: userId },
+      select: { departments: { select: { familyId: true } } },
+    })
+    const nativeFamilyId = user?.departments?.familyId
+
+    const allIds = nativeFamilyId ? [...new Set([...assignedIds, nativeFamilyId])] : assignedIds
+
+    // Si no tiene ninguna familia (ni asignada ni nativa), devolver undefined
+    // para que vea todas — mejor que bloquearle completamente
+    return allIds.length > 0 ? allIds : undefined
   }
 
   // Otros roles sin gestión: sin restricción de familia (la API aplica sus propios filtros)
