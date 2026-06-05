@@ -50,12 +50,14 @@ export async function GET(request: NextRequest) {
       where.AND = [familyFilter]
     } else {
       // Sin familyId explícito: aplicar scope de inventario del usuario
+      // Aplica tanto para ADMIN normal como para gestores (canManageInventory=true)
       const { getInventorySessionContext } = await import('@/lib/inventory/inventory-session')
       const invCtx = await getInventorySessionContext(session.user)
-      if (session.user.role === 'ADMIN' && !invCtx.user.isSuperAdmin) {
+      const isSuperAdmin = (session.user as any).isSuperAdmin === true
+
+      if (!isSuperAdmin && invCtx.scope.familyIds !== undefined) {
         const { buildInventoryFamilyWhere } = await import('@/lib/inventory/scope-filter')
-        const scope = invCtx.scope
-        const familyFilter = buildInventoryFamilyWhere(scope.familyIds, true) // includeGlobal=true para proveedores
+        const familyFilter = buildInventoryFamilyWhere(invCtx.scope.familyIds, true) // includeGlobal=true para proveedores
         if (Object.keys(familyFilter).length > 0) {
           where.AND = [...((where.AND as any[]) ?? []), familyFilter]
         }
