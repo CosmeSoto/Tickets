@@ -17,10 +17,18 @@ export default function NewBulkEquipmentPage() {
   const searchParams = useSearchParams()
   const defaultFamilyId = searchParams.get('familyId') ?? undefined
 
+  const canManageInventory = (session?.user as any)?.canManageInventory === true
+
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login')
-    else if (session?.user?.role === 'CLIENT') router.push('/inventory')
-  }, [status, session, router])
+    else if (
+      status === 'authenticated' &&
+      session?.user?.role === 'CLIENT' &&
+      !canManageInventory
+    ) {
+      router.push('/inventory')
+    }
+  }, [status, session, router, canManageInventory])
 
   if (status === 'loading') {
     return (
@@ -31,7 +39,7 @@ export default function NewBulkEquipmentPage() {
     )
   }
 
-  if (!session?.user || session.user.role === 'CLIENT') return null
+  if (!session?.user || (session.user.role === 'CLIENT' && !canManageInventory)) return null
 
   const subtitle = defaultFamilyId
     ? 'Selecciona el tipo de activo y completa los datos del lote'

@@ -14,10 +14,18 @@ function NewEquipmentPageContent() {
   const searchParams = useSearchParams()
   const defaultFamilyId = searchParams.get('familyId') ?? undefined
 
+  const canManageInventory = (session?.user as any)?.canManageInventory === true
+
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login')
-    else if (session?.user?.role === 'CLIENT') router.push('/inventory')
-  }, [status, session, router])
+    else if (
+      status === 'authenticated' &&
+      session?.user?.role === 'CLIENT' &&
+      !canManageInventory
+    ) {
+      router.push('/inventory')
+    }
+  }, [status, session, router, canManageInventory])
 
   if (status === 'loading') {
     return (
@@ -29,7 +37,7 @@ function NewEquipmentPageContent() {
     )
   }
 
-  if (!session?.user || session.user.role === 'CLIENT') return null
+  if (!session?.user || (session.user.role === 'CLIENT' && !canManageInventory)) return null
 
   return (
     <ModuleLayout

@@ -26,10 +26,18 @@ export default function EditEquipmentPage({ params }: EditEquipmentPageProps) {
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
+  const canManageInventory = (session?.user as any)?.canManageInventory === true
+
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login')
-    else if (session?.user?.role === 'CLIENT') router.push('/inventory')
-  }, [status, session, router])
+    else if (
+      status === 'authenticated' &&
+      session?.user?.role === 'CLIENT' &&
+      !canManageInventory
+    ) {
+      router.push('/inventory')
+    }
+  }, [status, session, router, canManageInventory])
 
   useEffect(() => {
     if (!id) return
@@ -97,7 +105,7 @@ export default function EditEquipmentPage({ params }: EditEquipmentPageProps) {
     )
   }
 
-  if (!session?.user || session.user.role === 'CLIENT') return null
+  if (!session?.user || (session.user.role === 'CLIENT' && !canManageInventory)) return null
 
   if (!equipment) {
     return (
