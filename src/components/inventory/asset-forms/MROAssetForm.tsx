@@ -136,14 +136,6 @@ export function MROAssetForm({
 
   return (
     <form onSubmit={handleSubmit} className='space-y-5'>
-      <button
-        type='button'
-        onClick={onBack}
-        className='text-sm text-muted-foreground hover:text-foreground'
-      >
-        ← Atrás
-      </button>
-
       {/* ── 1. NOMBRE ─────────────────────────────────────────────── */}
       <div className='space-y-1'>
         <Label>

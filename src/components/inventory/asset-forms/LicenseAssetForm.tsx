@@ -145,14 +145,6 @@ export function LicenseAssetForm({
 
   return (
     <form onSubmit={handleSubmit} className='space-y-5'>
-      <button
-        type='button'
-        onClick={onBack}
-        className='text-sm text-muted-foreground hover:text-foreground'
-      >
-        ← Atrás
-      </button>
-
       <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
         <div className='space-y-1'>
           <Label>

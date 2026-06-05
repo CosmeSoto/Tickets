@@ -590,15 +590,6 @@ export function EquipmentAssetForm({
 
   return (
     <form onSubmit={handleSubmit} className='space-y-5'>
-      {/* Botón atrás superior */}
-      <button
-        type='button'
-        onClick={onBack}
-        className='text-sm text-muted-foreground hover:text-foreground'
-      >
-        ← Atrás
-      </button>
-
       {/* ── 1. IDENTIFICACIÓN ─────────────────────────────────────── */}
       <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
         {/* Tipo de equipo */}
