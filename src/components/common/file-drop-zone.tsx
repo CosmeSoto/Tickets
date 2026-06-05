@@ -238,7 +238,7 @@ export function FileDropZone({
                   {acceptLabel} · Máx {maxSizeMB}MB por archivo
                 </p>
               </div>
-              <div className='flex gap-2 mt-1'>
+              <div className='flex gap-2 mt-1 flex-wrap'>
                 <Button
                   type='button'
                   variant='outline'

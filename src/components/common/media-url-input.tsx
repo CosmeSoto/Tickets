@@ -307,7 +307,7 @@ export function MediaUrlInput({
           />
         </div>
         {hasUrl && (
-          <div className='flex items-center gap-1 flex-shrink-0'>
+          <div className='flex items-center gap-1 flex-shrink-0 flex-wrap'>
             {showPreview && media.canPreview && (
               <Button
                 type='button'
