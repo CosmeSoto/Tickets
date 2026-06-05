@@ -313,14 +313,7 @@ export default function AssetRequestsPage() {
             <Button variant='outline' onClick={handleClearFilters}>
               Limpiar filtros
             </Button>
-          ) : (
-            <Button asChild>
-              <Link href='/inventory/asset-requests/create'>
-                <Plus className='h-4 w-4 mr-2' />
-                Nueva Solicitud
-              </Link>
-            </Button>
-          ),
+          ) : undefined,
         }}
       />
     </ModuleLayout>
