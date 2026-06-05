@@ -733,7 +733,7 @@ export default function AdminNewsPage() {
       </div>
 
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent className='sm:max-w-3xl max-h-[90vh] overflow-y-auto w-[95vw]'>
+        <DialogContent className='w-[calc(100vw-2rem)] max-w-3xl max-h-[90dvh] overflow-y-auto p-4 sm:p-6'>
           <DialogHeader>
             <DialogTitle>{editingNews ? 'Editar noticia' : 'Nueva noticia'}</DialogTitle>
             <DialogDescription>
@@ -741,37 +741,44 @@ export default function AdminNewsPage() {
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className='space-y-4'>
-            <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
-              <div className='space-y-2 col-span-2'>
-                <Label>Título</Label>
-                <Input
-                  required
-                  value={formData.title}
-                  onChange={e => setFormData({ ...formData, title: e.target.value })}
-                />
-              </div>
-              <div className='space-y-2 col-span-2'>
-                <Label>
-                  Extracto{' '}
-                  <span className='text-xs text-muted-foreground font-normal'>
-                    (Texto visible en la lista antes de abrir la noticia)
-                  </span>
-                </Label>
-                <Input
-                  value={formData.summary}
-                  onChange={e => setFormData({ ...formData, summary: e.target.value })}
-                  placeholder='Ej: Se informa a todo el personal que...'
-                  maxLength={500}
-                />
-              </div>
-              <div className='space-y-2 col-span-2'>
-                <Label>Contenido</Label>
-                <Textarea
-                  value={formData.content}
-                  onChange={e => setFormData({ ...formData, content: e.target.value })}
-                  rows={6}
-                />
-              </div>
+            {/* Título — siempre ancho completo */}
+            <div className='space-y-2'>
+              <Label>Título</Label>
+              <Input
+                required
+                value={formData.title}
+                onChange={e => setFormData({ ...formData, title: e.target.value })}
+              />
+            </div>
+
+            {/* Extracto — siempre ancho completo */}
+            <div className='space-y-2'>
+              <Label>
+                Extracto{' '}
+                <span className='text-xs text-muted-foreground font-normal'>
+                  (Texto visible en la lista antes de abrir la noticia)
+                </span>
+              </Label>
+              <Input
+                value={formData.summary}
+                onChange={e => setFormData({ ...formData, summary: e.target.value })}
+                placeholder='Ej: Se informa a todo el personal que...'
+                maxLength={500}
+              />
+            </div>
+
+            {/* Contenido — siempre ancho completo */}
+            <div className='space-y-2'>
+              <Label>Contenido</Label>
+              <Textarea
+                value={formData.content}
+                onChange={e => setFormData({ ...formData, content: e.target.value })}
+                rows={6}
+              />
+            </div>
+
+            {/* Tipo · Prioridad · Estado — 1 col en móvil, 3 col en sm+ */}
+            <div className='grid grid-cols-1 sm:grid-cols-3 gap-4'>
               <div className='space-y-2'>
                 <Label>Tipo</Label>
                 <Select
@@ -826,27 +833,33 @@ export default function AdminNewsPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className='space-y-2 col-span-2'>
-                <MediaUrlInput
-                  label='Imagen o enlace multimedia (URL externa)'
-                  value={formData.imageUrl}
-                  onChange={v => setFormData({ ...formData, imageUrl: v })}
-                  placeholder='https://drive.google.com/... · OneDrive · YouTube · URL de imagen...'
-                />
-              </div>
-              <div className='space-y-2 col-span-2'>
-                <Label>Archivos adjuntos</Label>
-                <p className='text-xs text-muted-foreground -mt-1'>
-                  Las imágenes adjuntas se incluyen en el carrusel. PDFs y documentos aparecen como
-                  descargables.
-                </p>
-                <NewsAttachmentsUploader
-                  pendingFiles={pendingFiles}
-                  onPendingFilesChange={setPendingFiles}
-                  uploadedAttachments={uploadedAttachments}
-                  onDeleteUploaded={editingNews ? handleDeleteAttachment : undefined}
-                />
-              </div>
+            </div>
+
+            {/* Imagen/multimedia — siempre ancho completo */}
+            <MediaUrlInput
+              label='Imagen o enlace multimedia (URL externa)'
+              value={formData.imageUrl}
+              onChange={v => setFormData({ ...formData, imageUrl: v })}
+              placeholder='https://drive.google.com/... · OneDrive · YouTube · URL de imagen...'
+            />
+
+            {/* Archivos adjuntos — siempre ancho completo */}
+            <div className='space-y-2'>
+              <Label>Archivos adjuntos</Label>
+              <p className='text-xs text-muted-foreground'>
+                Las imágenes adjuntas se incluyen en el carrusel. PDFs y documentos aparecen como
+                descargables.
+              </p>
+              <NewsAttachmentsUploader
+                pendingFiles={pendingFiles}
+                onPendingFilesChange={setPendingFiles}
+                uploadedAttachments={uploadedAttachments}
+                onDeleteUploaded={editingNews ? handleDeleteAttachment : undefined}
+              />
+            </div>
+
+            {/* Fechas — 1 col en móvil, 2 col en sm+ */}
+            <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
               <div className='space-y-2'>
                 <Label>
                   Fecha de inicio
@@ -866,7 +879,7 @@ export default function AdminNewsPage() {
                         : 'Seleccionar fecha'}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className='w-auto p-0'>
+                  <PopoverContent className='w-auto p-0' align='start'>
                     <Calendar
                       mode='single'
                       selected={formData.startDate ?? undefined}
@@ -895,7 +908,7 @@ export default function AdminNewsPage() {
                         : 'Seleccionar fecha'}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className='w-auto p-0'>
+                  <PopoverContent className='w-auto p-0' align='start'>
                     <Calendar
                       mode='single'
                       selected={formData.endDate ?? undefined}
@@ -906,8 +919,10 @@ export default function AdminNewsPage() {
                 </Popover>
               </div>
             </div>
-            <div className='space-y-4 pt-4'>
-              <div className='flex flex-wrap gap-4 items-center'>
+
+            <div className='space-y-4 pt-2'>
+              {/* Switches — apilados en móvil, en fila en sm+ */}
+              <div className='flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:gap-4 sm:items-center'>
                 <div className='flex items-center gap-2'>
                   <Switch
                     checked={formData.isFeatured}
