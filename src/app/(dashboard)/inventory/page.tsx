@@ -82,7 +82,7 @@ function InventoryContent() {
               <Button size='sm' asChild>
                 <Link href='/inventory/new'>
                   <Plus className='mr-2 h-4 w-4' />
-                  Nuevo Activo
+                  {tab === 'batches' ? 'Nuevo Lote' : 'Nuevo Activo'}
                 </Link>
               </Button>
             </div>

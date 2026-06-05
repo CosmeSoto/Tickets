@@ -219,8 +219,8 @@ export function VisibilitySelector({
       )}
 
       <Tabs defaultValue='roles' className='w-full'>
-        <TabsList className='w-full grid grid-cols-3'>
-          <TabsTrigger value='roles' className='text-xs gap-1'>
+        <TabsList className='w-full flex overflow-x-auto gap-1 p-1'>
+          <TabsTrigger value='roles' className='text-xs gap-1 flex-shrink-0'>
             <Shield className='h-3.5 w-3.5' />
             Roles
             {selectedRoles.length > 0 && (
@@ -229,7 +229,7 @@ export function VisibilitySelector({
               </Badge>
             )}
           </TabsTrigger>
-          <TabsTrigger value='families' className='text-xs gap-1'>
+          <TabsTrigger value='families' className='text-xs gap-1 flex-shrink-0'>
             <Building2 className='h-3.5 w-3.5' />
             Áreas
             {selectedFamilyIds.length + selectedDepartmentIds.length > 0 && (
@@ -245,7 +245,7 @@ export function VisibilitySelector({
               </Badge>
             )}
           </TabsTrigger>
-          <TabsTrigger value='users' className='text-xs gap-1'>
+          <TabsTrigger value='users' className='text-xs gap-1 flex-shrink-0'>
             <Users className='h-3.5 w-3.5' />
             Usuarios
             {selectedUserIds.length > 0 && (

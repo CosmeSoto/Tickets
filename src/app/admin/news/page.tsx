@@ -733,7 +733,7 @@ export default function AdminNewsPage() {
       </div>
 
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent className='sm:max-w-3xl max-h-[90vh] overflow-y-auto'>
+        <DialogContent className='sm:max-w-3xl max-h-[90vh] overflow-y-auto w-[95vw]'>
           <DialogHeader>
             <DialogTitle>{editingNews ? 'Editar noticia' : 'Nueva noticia'}</DialogTitle>
             <DialogDescription>
@@ -907,27 +907,27 @@ export default function AdminNewsPage() {
               </div>
             </div>
             <div className='space-y-4 pt-4'>
-              <div className='flex items-center justify-between'>
+              <div className='flex flex-wrap gap-4 items-center'>
                 <div className='flex items-center gap-2'>
                   <Switch
                     checked={formData.isFeatured}
                     onCheckedChange={v => setFormData({ ...formData, isFeatured: v })}
                   />
-                  <Label>Destacado</Label>
+                  <Label className='text-sm'>Destacado</Label>
                 </div>
                 <div className='flex items-center gap-2'>
                   <Switch
                     checked={formData.allowComments}
                     onCheckedChange={v => setFormData({ ...formData, allowComments: v })}
                   />
-                  <Label>Permitir comentarios</Label>
+                  <Label className='text-sm'>Permitir comentarios</Label>
                 </div>
                 <div className='flex items-center gap-2'>
                   <Switch
                     checked={formData.allowReactions}
                     onCheckedChange={v => setFormData({ ...formData, allowReactions: v })}
                   />
-                  <Label>Permitir reacciones</Label>
+                  <Label className='text-sm'>Permitir reacciones</Label>
                 </div>
               </div>
 
@@ -949,7 +949,7 @@ export default function AdminNewsPage() {
                 usersHint='Solo aparecen usuarios con el módulo de Noticias activo'
               />
             </div>
-            <DialogFooter>
+            <DialogFooter className='flex-col sm:flex-row gap-2'>
               <Button
                 type='button'
                 variant='outline'
@@ -957,10 +957,11 @@ export default function AdminNewsPage() {
                   setShowCreateDialog(false)
                   setEditingNews(null)
                 }}
+                className='w-full sm:w-auto'
               >
                 Cancelar
               </Button>
-              <Button type='submit' disabled={saving}>
+              <Button type='submit' disabled={saving} className='w-full sm:w-auto'>
                 {saving ? 'Guardando...' : editingNews ? 'Actualizar' : 'Crear'}
               </Button>
             </DialogFooter>

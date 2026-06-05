@@ -137,7 +137,7 @@ export default function BackupsPage() {
 
   const headerActionsMemo = useMemo(
     () => (
-      <div className='flex items-center space-x-3'>
+      <div className='flex items-center gap-2 flex-wrap'>
         <Button variant='outline' onClick={refreshData} disabled={loading} size='sm'>
           <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
           Actualizar
@@ -186,41 +186,41 @@ export default function BackupsPage() {
     <>
       <div className='space-y-6'>
         <Tabs value={activeTab} onValueChange={setActiveTab} className='space-y-6'>
-          <TabsList className='w-full grid grid-cols-3 sm:grid-cols-5 bg-muted'>
+          <TabsList className='w-full flex overflow-x-auto bg-muted gap-1 p-1'>
             <TabsTrigger
               value='dashboard'
-              className='flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2'
+              className='flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 flex-shrink-0 px-3'
             >
               <BarChart3 className='h-4 w-4' />
-              <span className='text-xs sm:text-sm'>Dashboard</span>
+              <span className='text-xs sm:text-sm whitespace-nowrap'>Dashboard</span>
             </TabsTrigger>
             <TabsTrigger
               value='backups'
-              className='flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2'
+              className='flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 flex-shrink-0 px-3'
             >
               <Database className='h-4 w-4' />
-              <span className='text-xs sm:text-sm'>Backups</span>
+              <span className='text-xs sm:text-sm whitespace-nowrap'>Backups</span>
             </TabsTrigger>
             <TabsTrigger
               value='restore'
-              className='flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2'
+              className='flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 flex-shrink-0 px-3'
             >
               <RotateCcw className='h-4 w-4' />
-              <span className='text-xs sm:text-sm'>Restaurar</span>
+              <span className='text-xs sm:text-sm whitespace-nowrap'>Restaurar</span>
             </TabsTrigger>
             <TabsTrigger
               value='config'
-              className='flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2'
+              className='flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 flex-shrink-0 px-3'
             >
               <Settings className='h-4 w-4' />
-              <span className='text-xs sm:text-sm'>Config</span>
+              <span className='text-xs sm:text-sm whitespace-nowrap'>Config</span>
             </TabsTrigger>
             <TabsTrigger
               value='monitoring'
-              className='flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2'
+              className='flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 flex-shrink-0 px-3'
             >
               <Activity className='h-4 w-4' />
-              <span className='text-xs sm:text-sm'>Monitoreo</span>
+              <span className='text-xs sm:text-sm whitespace-nowrap'>Monitoreo</span>
             </TabsTrigger>
           </TabsList>
 

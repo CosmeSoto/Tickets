@@ -305,7 +305,7 @@ export default function PatrolExecutionPage() {
       title={patrol.route.name}
       subtitle={scheduledLabel}
       headerActions={
-        <div className='flex items-center gap-2'>
+        <div className='flex items-center gap-2 flex-wrap'>
           <PatrolOfflineIndicator isOnline={isOnline} queuedCount={queuedCount} />
           <PatrolStatusBadge status={patrol.status} />
           <Button
