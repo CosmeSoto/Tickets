@@ -4,6 +4,7 @@ import { Button } from '../button'
 import { Clock, AlertCircle } from 'lucide-react'
 import type { PlanFormData } from '@/hooks/use-resolution-plan'
 import { formatDuration } from '@/lib/utils/time-utils'
+import { DatePickerWithTime } from '@/components/ui/date-time-picker'
 
 interface PlanFormDialogProps {
   planForm: PlanFormData
@@ -63,36 +64,24 @@ export function PlanFormDialog({
         <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
           <div>
             <label className='text-sm font-medium'>Fecha de Inicio</label>
-            <div className='grid grid-cols-2 gap-2'>
-              <Input
-                type='date'
-                value={planForm.startDate}
-                onChange={e => setPlanForm(prev => ({ ...prev, startDate: e.target.value }))}
-              />
-              <Input
-                type='time'
-                value={planForm.startTime}
-                onChange={e => setPlanForm(prev => ({ ...prev, startTime: e.target.value }))}
-                placeholder='HH:MM'
-              />
-            </div>
+            <DatePickerWithTime
+              dateValue={planForm.startDate}
+              timeValue={planForm.startTime}
+              onDateChange={v => setPlanForm(prev => ({ ...prev, startDate: v }))}
+              onTimeChange={v => setPlanForm(prev => ({ ...prev, startTime: v }))}
+              showTime
+            />
           </div>
 
           <div>
             <label className='text-sm font-medium'>Fecha Objetivo</label>
-            <div className='grid grid-cols-2 gap-2'>
-              <Input
-                type='date'
-                value={planForm.targetDate}
-                onChange={e => setPlanForm(prev => ({ ...prev, targetDate: e.target.value }))}
-              />
-              <Input
-                type='time'
-                value={planForm.targetTime}
-                onChange={e => setPlanForm(prev => ({ ...prev, targetTime: e.target.value }))}
-                placeholder='HH:MM'
-              />
-            </div>
+            <DatePickerWithTime
+              dateValue={planForm.targetDate}
+              timeValue={planForm.targetTime}
+              onDateChange={v => setPlanForm(prev => ({ ...prev, targetDate: v }))}
+              onTimeChange={v => setPlanForm(prev => ({ ...prev, targetTime: v }))}
+              showTime
+            />
           </div>
         </div>
 

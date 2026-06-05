@@ -20,6 +20,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { TimePicker } from '@/components/ui/time-picker'
 import { Switch } from '@/components/ui/switch'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
@@ -417,25 +418,17 @@ export function NotificationSettingsCard({
                 {preferences.quietHours.enabled && (
                   <div className='grid grid-cols-2 gap-4 pt-4 pl-6 border-l-2 border-indigo-200 dark:border-indigo-800'>
                     <div className='space-y-2'>
-                      <Label htmlFor='startTime' className='text-sm font-medium'>
-                        Hora de inicio
-                      </Label>
-                      <Input
-                        id='startTime'
-                        type='time'
+                      <Label className='text-sm font-medium'>Hora de inicio</Label>
+                      <TimePicker
                         value={preferences.quietHours.startTime}
-                        onChange={e => updateQuietHours('startTime', e.target.value)}
+                        onChange={v => updateQuietHours('startTime', v)}
                       />
                     </div>
                     <div className='space-y-2'>
-                      <Label htmlFor='endTime' className='text-sm font-medium'>
-                        Hora de fin
-                      </Label>
-                      <Input
-                        id='endTime'
-                        type='time'
+                      <Label className='text-sm font-medium'>Hora de fin</Label>
+                      <TimePicker
                         value={preferences.quietHours.endTime}
-                        onChange={e => updateQuietHours('endTime', e.target.value)}
+                        onChange={v => updateQuietHours('endTime', v)}
                       />
                     </div>
                   </div>

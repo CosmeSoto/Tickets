@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { TimePicker } from '@/components/ui/time-picker'
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -325,11 +326,11 @@ export function BackupConfiguration({ onConfigChange }: BackupConfigurationProps
 
             <div className='space-y-2'>
               <Label className='text-sm font-medium'>Hora de Ejecución</Label>
-              <Input
-                type='time'
+              <TimePicker
                 value={config.scheduleTime}
-                onChange={e => updateConfig('scheduleTime', e.target.value)}
+                onChange={v => updateConfig('scheduleTime', v)}
                 disabled={!config.enabled}
+                className='w-full'
               />
               <p className='text-xs text-muted-foreground'>
                 Hora en la que se ejecutarán los backups automáticos

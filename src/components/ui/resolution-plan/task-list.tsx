@@ -29,12 +29,9 @@ import {
 } from '../dropdown-menu'
 import type { ResolutionPlan, TaskFormData, ResolutionTask } from '@/hooks/use-resolution-plan'
 import { getStatusIcon, getStatusBadge } from './plan-status-icons'
-import {
-  formatDate,
-  getPriorityColor,
-  getPriorityLabel,
-} from './plan-helpers'
+import { formatDate, getPriorityColor, getPriorityLabel } from './plan-helpers'
 import { formatDuration, calculateDuration } from '@/lib/utils/time-utils'
+import { TimePicker } from '@/components/ui/time-picker'
 
 interface TaskListProps {
   plan: ResolutionPlan
@@ -125,20 +122,16 @@ export function TaskList({
                 <div className='grid grid-cols-2 gap-2 mt-1'>
                   <div>
                     <label className='text-xs text-muted-foreground'>Hora inicio</label>
-                    <Input
-                      type='time'
+                    <TimePicker
                       value={newTask.startTime}
-                      onChange={e => setNewTask(prev => ({ ...prev, startTime: e.target.value }))}
-                      placeholder='HH:MM'
+                      onChange={v => setNewTask(prev => ({ ...prev, startTime: v }))}
                     />
                   </div>
                   <div>
                     <label className='text-xs text-muted-foreground'>Hora fin</label>
-                    <Input
-                      type='time'
+                    <TimePicker
                       value={newTask.endTime}
-                      onChange={e => setNewTask(prev => ({ ...prev, endTime: e.target.value }))}
-                      placeholder='HH:MM'
+                      onChange={v => setNewTask(prev => ({ ...prev, endTime: v }))}
                     />
                   </div>
                 </div>

@@ -5,6 +5,8 @@ import { Loader2, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { DateTimePicker } from '@/components/ui/date-time-picker'
+import { TimePicker } from '@/components/ui/time-picker'
 import {
   Select,
   SelectContent,
@@ -408,25 +410,21 @@ export function ScheduleFormDialog({
                 <Label className='text-sm font-medium'>
                   Fecha y hora de inicio <span className='text-destructive'>*</span>
                 </Label>
-                <Input
-                  type='datetime-local'
+                <DateTimePicker
                   value={form.scheduledStart}
-                  onChange={e => handleStartChange(e.target.value)}
+                  onChange={v => handleStartChange(v)}
                   disabled={saving}
-                  className='h-10'
                 />
               </div>
               <div className='space-y-1.5'>
                 <Label className='text-sm font-medium'>
                   Fecha y hora de fin <span className='text-destructive'>*</span>
                 </Label>
-                <Input
-                  type='datetime-local'
+                <DateTimePicker
                   value={form.scheduledEnd}
-                  min={form.scheduledStart}
-                  onChange={e => setForm(f => ({ ...f, scheduledEnd: e.target.value }))}
+                  onChange={v => setForm(f => ({ ...f, scheduledEnd: v }))}
+                  minDate={form.scheduledStart ? new Date(form.scheduledStart) : undefined}
                   disabled={saving}
-                  className='h-10'
                 />
               </div>
             </div>
@@ -436,12 +434,10 @@ export function ScheduleFormDialog({
                 <Label className='text-sm font-medium'>
                   Primera fecha de inicio <span className='text-destructive'>*</span>
                 </Label>
-                <Input
-                  type='datetime-local'
+                <DateTimePicker
                   value={form.scheduledStart}
-                  onChange={e => handleStartChange(e.target.value)}
+                  onChange={v => handleStartChange(v)}
                   disabled={saving}
-                  className='h-10'
                 />
                 <p className='text-xs text-muted-foreground'>
                   Desde cuándo empieza la programación
@@ -451,12 +447,11 @@ export function ScheduleFormDialog({
                 <Label className='text-sm font-medium'>
                   Hora de fin de cada ronda <span className='text-destructive'>*</span>
                 </Label>
-                <Input
-                  type='time'
+                <TimePicker
                   value={form.endTimeOnly}
-                  onChange={e => setForm(f => ({ ...f, endTimeOnly: e.target.value }))}
+                  onChange={v => setForm(f => ({ ...f, endTimeOnly: v }))}
                   disabled={saving}
-                  className='h-10'
+                  className='w-full'
                 />
                 <p className='text-xs text-muted-foreground'>Hora a la que termina cada ronda</p>
               </div>

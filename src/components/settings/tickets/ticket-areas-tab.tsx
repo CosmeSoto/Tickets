@@ -22,6 +22,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { FamilyIcon } from '@/components/inventory/family-badge'
+import { TimePicker } from '@/components/ui/time-picker'
 import type { Family, TicketFamilyConfig, SlaRow } from '@/hooks/use-ticket-settings'
 import { DAY_OPTIONS, PRIORITY_LABELS, PRIORITY_COLORS } from '@/hooks/use-ticket-settings'
 
@@ -279,26 +280,20 @@ export function TicketAreasTab({
                 <div className='grid grid-cols-2 gap-4'>
                   <div>
                     <Label htmlFor='hours-start'>Entrada</Label>
-                    <Input
+                    <TimePicker
                       id='hours-start'
-                      type='time'
                       value={config.businessHoursStart.substring(0, 5)}
-                      onChange={e =>
-                        onSetConfig({ ...config, businessHoursStart: `${e.target.value}:00` })
-                      }
-                      className='mt-1'
+                      onChange={v => onSetConfig({ ...config, businessHoursStart: `${v}:00` })}
+                      className='mt-1 w-full'
                     />
                   </div>
                   <div>
                     <Label htmlFor='hours-end'>Salida</Label>
-                    <Input
+                    <TimePicker
                       id='hours-end'
-                      type='time'
                       value={config.businessHoursEnd.substring(0, 5)}
-                      onChange={e =>
-                        onSetConfig({ ...config, businessHoursEnd: `${e.target.value}:00` })
-                      }
-                      className='mt-1'
+                      onChange={v => onSetConfig({ ...config, businessHoursEnd: `${v}:00` })}
+                      className='mt-1 w-full'
                     />
                   </div>
                 </div>
