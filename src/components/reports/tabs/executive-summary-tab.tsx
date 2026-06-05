@@ -76,7 +76,7 @@ export function ExecutiveSummaryTab({ data, loading, isAllFamilies }: ExecutiveS
   return (
     <div className='space-y-4'>
       {/* Fila 1 — métricas principales */}
-      <div className='grid grid-cols-2 sm:grid-cols-4 gap-3'>
+      <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3'>
         <KPICard label='Total tickets' value={totalTickets.toLocaleString()} icon={BarChart3} />
         <KPICard
           label='Pendientes'
@@ -109,7 +109,7 @@ export function ExecutiveSummaryTab({ data, loading, isAllFamilies }: ExecutiveS
       </div>
 
       {/* Fila 2 — métricas secundarias */}
-      <div className='grid grid-cols-2 sm:grid-cols-4 gap-3'>
+      <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3'>
         <KPICard
           label='Abiertos'
           sublabel='Sin atender'

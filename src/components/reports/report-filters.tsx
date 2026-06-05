@@ -44,10 +44,10 @@ export function ReportFilters({
   return (
     <Card>
       <CardContent className='py-4'>
-        <div className='flex flex-wrap items-center gap-3'>
+        <div className='flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-4'>
           {/* Familia */}
-          <div className='flex items-center gap-2'>
-            <span className='text-sm font-medium text-muted-foreground whitespace-nowrap'>
+          <div className='flex items-center gap-2 flex-1 min-w-[200px]'>
+            <span className='text-sm font-medium text-muted-foreground whitespace-nowrap shrink-0'>
               Familia:
             </span>
             {loadingFamilies ? (
@@ -65,7 +65,7 @@ export function ReportFilters({
                 allowAll
                 allowClear
                 popoverWidth='260px'
-                className='w-52'
+                className='w-full sm:w-52'
                 disabled={loadingFamilies}
               />
             )}
@@ -82,44 +82,46 @@ export function ReportFilters({
             )}
           </div>
 
-          <div className='w-px h-6 bg-border hidden sm:block' />
+          <div className='w-full sm:w-px sm:h-6 bg-border hidden sm:block' />
 
           {/* Date range */}
-          <div className='flex items-center gap-2'>
-            <Label className='text-sm font-medium text-muted-foreground whitespace-nowrap'>
-              Desde:
-            </Label>
-            <Input
-              type='date'
-              value={startDate}
-              onChange={e => onStartDateChange(e.target.value)}
-              className='w-36 h-9 text-sm'
-            />
+          <div className='flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-2 flex-1'>
+            <div className='flex items-center gap-2'>
+              <Label className='text-sm font-medium text-muted-foreground whitespace-nowrap shrink-0'>
+                Desde:
+              </Label>
+              <Input
+                type='date'
+                value={startDate}
+                onChange={e => onStartDateChange(e.target.value)}
+                className='w-full sm:w-36 h-9 text-sm'
+              />
+            </div>
+            <div className='flex items-center gap-2'>
+              <Label className='text-sm font-medium text-muted-foreground whitespace-nowrap shrink-0'>
+                Hasta:
+              </Label>
+              <Input
+                type='date'
+                value={endDate}
+                onChange={e => onEndDateChange(e.target.value)}
+                className='w-full sm:w-36 h-9 text-sm'
+              />
+            </div>
+            {(startDate || endDate) && (
+              <Button
+                variant='ghost'
+                size='sm'
+                onClick={onClearDates}
+                className='text-muted-foreground h-9'
+              >
+                Limpiar
+              </Button>
+            )}
           </div>
-          <div className='flex items-center gap-2'>
-            <Label className='text-sm font-medium text-muted-foreground whitespace-nowrap'>
-              Hasta:
-            </Label>
-            <Input
-              type='date'
-              value={endDate}
-              onChange={e => onEndDateChange(e.target.value)}
-              className='w-36 h-9 text-sm'
-            />
-          </div>
-          {(startDate || endDate) && (
-            <Button
-              variant='ghost'
-              size='sm'
-              onClick={onClearDates}
-              className='text-muted-foreground h-9'
-            >
-              Limpiar
-            </Button>
-          )}
 
           {selectedFamily && (
-            <div className='flex items-center gap-2 ml-auto'>
+            <div className='flex items-center gap-2 sm:ml-auto'>
               <span
                 className='inline-block h-3 w-3 rounded-full flex-shrink-0'
                 style={{ backgroundColor: selectedFamily.color ?? '#6B7280' }}

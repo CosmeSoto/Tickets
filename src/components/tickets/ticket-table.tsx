@@ -313,8 +313,157 @@ export function TicketTable({
           </div>
         )}
 
-        {/* Tabla con estados de error granulares */}
-        <div className='rounded-md border'>
+        {/* Vista para móviles (tarjetas) y escritorio (tabla) */}
+        {/* Móviles */}
+        <div className='space-y-3 sm:hidden'>
+          {loading ? (
+            <Card>
+              <CardContent className='py-8 text-center'>
+                <div className='flex items-center justify-center'>
+                  <RefreshCw className='h-6 w-6 animate-spin mr-2' />
+                  <div>
+                    <div className='font-medium'>Cargando tickets...</div>
+                    <div className='text-sm text-muted-foreground mt-1'>
+                      {debouncedSearch
+                        ? `Buscando "${debouncedSearch}"`
+                        : 'Obteniendo datos del servidor'}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : error ? (
+            <Card>
+              <CardContent className='py-8 text-center'>
+                <div className='flex flex-col items-center space-y-3'>
+                  <div className='text-destructive font-medium'>Error al cargar tickets</div>
+                  <div className='text-sm text-muted-foreground max-w-md text-center'>{error}</div>
+                  <Button
+                    variant='outline'
+                    size='sm'
+                    onClick={() => loadTickets(currentPage)}
+                    className='mt-2'
+                  >
+                    <RefreshCw className='h-4 w-4 mr-2' />
+                    Reintentar
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ) : tickets && tickets.length === 0 ? (
+            <Card>
+              <CardContent className='py-8 text-center'>
+                <div className='flex flex-col items-center space-y-2'>
+                  <div className='text-muted-foreground font-medium'>
+                    {debouncedSearch ||
+                    statusFilter !== 'all' ||
+                    priorityFilter !== 'all' ||
+                    assigneeFilter !== 'all'
+                      ? 'No se encontraron tickets con los filtros aplicados'
+                      : 'No hay tickets disponibles'}
+                  </div>
+                  {(debouncedSearch ||
+                    statusFilter !== 'all' ||
+                    priorityFilter !== 'all' ||
+                    assigneeFilter !== 'all') && (
+                    <Button
+                      variant='outline'
+                      size='sm'
+                      onClick={() => {
+                        setSearch('')
+                        setStatusFilter('all')
+                        setPriorityFilter('all')
+                        setAssigneeFilter('all')
+                      }}
+                      className='mt-2'
+                    >
+                      Limpiar filtros
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            (sortedTickets || []).map(ticket => (
+              <Card key={ticket.id} className='overflow-hidden'>
+                <CardContent className='p-4 space-y-3'>
+                  <div className='flex items-start justify-between gap-3'>
+                    <div className='flex-1 min-w-0'>
+                      <div className='font-medium text-foreground line-clamp-2'>{ticket.title}</div>
+                      <div className='text-sm text-muted-foreground'>#{ticket.id.slice(-8)}</div>
+                    </div>
+                    <Button variant='outline' size='sm' asChild className='shrink-0'>
+                      <Link href={getTicketUrl(ticket.id)}>
+                        <Eye className='h-4 w-4' />
+                      </Link>
+                    </Button>
+                  </div>
+
+                  <div className='flex flex-wrap gap-2'>
+                    <Badge className={getStatusColor(ticket.status)}>
+                      {getStatusLabel(ticket.status)}
+                    </Badge>
+                    <Badge className={getPriorityColor(ticket.priority)}>
+                      {getPriorityLabel(ticket.priority)}
+                    </Badge>
+                    <div className='flex items-center gap-1 text-sm text-muted-foreground'>
+                      <div
+                        className='w-2.5 h-2.5 rounded-full'
+                        style={{ backgroundColor: ticket.category.color }}
+                      />
+                      {ticket.category.name}
+                    </div>
+                  </div>
+
+                  <div className='space-y-1.5 text-sm'>
+                    <div className='flex items-center gap-2 text-muted-foreground'>
+                      <User className='h-3.5 w-3.5' />
+                      <span className='font-medium text-foreground'>Cliente:</span>{' '}
+                      {ticket.client.name}
+                    </div>
+                    {ticket.assignee && (
+                      <div className='flex items-center gap-2 text-muted-foreground'>
+                        <User className='h-3.5 w-3.5' />
+                        <span className='font-medium text-foreground'>Asignado:</span>{' '}
+                        {ticket.assignee.name}
+                      </div>
+                    )}
+                    {!ticket.assignee && (
+                      <div className='flex items-center gap-2 text-muted-foreground'>
+                        <User className='h-3.5 w-3.5' />
+                        <span className='font-medium text-foreground'>Asignado:</span> Sin asignar
+                      </div>
+                    )}
+                  </div>
+
+                  <div className='flex items-center justify-between text-xs text-muted-foreground pt-1 border-t'>
+                    <div className='flex items-center gap-1'>
+                      <Calendar className='h-3.5 w-3.5' />
+                      Creado: {getTimeAgo(ticket.createdAt)}
+                    </div>
+                    <div className='flex items-center gap-3'>
+                      {ticket._count.comments > 0 && (
+                        <div className='flex items-center gap-1'>
+                          <MessageSquare className='h-3.5 w-3.5' />
+                          {ticket._count.comments}
+                        </div>
+                      )}
+                      {ticket._count.attachments > 0 && (
+                        <div className='flex items-center gap-1'>
+                          <Paperclip className='h-3.5 w-3.5' />
+                          {ticket._count.attachments}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
+
+        {/* Escritorio (tabla) */}
+        <div className='rounded-md border hidden sm:block'>
           <Table>
             <TableHeader>
               <TableRow>
