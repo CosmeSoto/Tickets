@@ -110,6 +110,7 @@ const navigationByRole: Record<string, NavItem[]> = {
         { name: 'Checkpoints', href: '/admin/patrols/checkpoints', icon: MapPin },
         { name: 'Rutas', href: '/admin/patrols/routes', icon: ClipboardList },
         { name: 'Programación', href: '/admin/patrols/schedules', icon: ClipboardList },
+        { name: 'Novedades', href: '/admin/patrols/incidents', icon: AlertTriangle },
         { name: 'Reportes', href: '/admin/patrols/reports', icon: BarChart3 },
         { name: 'Configuración', href: '/admin/settings/patrols', icon: Settings },
       ],
@@ -162,6 +163,7 @@ const navigationByRole: Record<string, NavItem[]> = {
       children: [
         { name: 'Dashboard', href: '/admin/patrols', icon: LayoutDashboard },
         { name: 'Mis Rondas', href: '/patrol', icon: MapPin },
+        { name: 'Mis Novedades', href: '/patrol/incidents', icon: AlertTriangle },
         { name: 'Reportes', href: '/admin/patrols/reports', icon: BarChart3 },
       ],
     },
@@ -210,6 +212,7 @@ const navigationByRole: Record<string, NavItem[]> = {
       children: [
         { name: 'Dashboard', href: '/admin/patrols', icon: LayoutDashboard },
         { name: 'Mis Rondas', href: '/patrol', icon: MapPin },
+        { name: 'Mis Novedades', href: '/patrol/incidents', icon: AlertTriangle },
         { name: 'Reportes', href: '/admin/patrols/reports', icon: BarChart3 },
       ],
     },
@@ -252,7 +255,10 @@ const navigationByRole: Record<string, NavItem[]> = {
       name: 'Mis Rondas',
       href: '/patrol',
       icon: Shield,
-      children: [{ name: 'Patrullas Activas', href: '/patrol', icon: MapPin }],
+      children: [
+        { name: 'Patrullas Activas', href: '/patrol', icon: MapPin },
+        { name: 'Mis Novedades', href: '/patrol/incidents', icon: AlertTriangle },
+      ],
     },
     // Noticias no aparece en el sidebar del CLIENT — el feed está embebido en el dashboard.
     // El link solo aplica a TECHNICIAN con canManageNews y a ADMIN.
@@ -292,7 +298,10 @@ const navigationByRole: Record<string, NavItem[]> = {
       name: 'Mis Rondas',
       href: '/patrol',
       icon: Shield,
-      children: [{ name: 'Patrullas Activas', href: '/patrol', icon: MapPin }],
+      children: [
+        { name: 'Patrullas Activas', href: '/patrol', icon: MapPin },
+        { name: 'Mis Novedades', href: '/patrol/incidents', icon: AlertTriangle },
+      ],
     },
     // Noticias no aparece en el sidebar del CLIENT — el feed está embebido en el dashboard.
     {

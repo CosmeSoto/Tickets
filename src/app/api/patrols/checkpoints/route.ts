@@ -59,6 +59,7 @@ export async function GET(request: NextRequest) {
     const page = Math.max(1, parseInt(searchParams.get('page') ?? '1'))
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') ?? '25')))
     const includeInactive = searchParams.get('includeInactive') === 'true'
+    const sortParam = searchParams.get('sort') // e.g. "name:asc", "createdAt:desc"
 
     const where = {
       ...(familyId ? { familyId } : {}),
@@ -81,11 +82,23 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Determine sort order: use explicit sort param if provided, otherwise default to createdAt desc
+    const ALLOWED_SORT_FIELDS = ['name', 'createdAt', 'updatedAt', 'location'] as const
+    type SortField = typeof ALLOWED_SORT_FIELDS[number]
+    let orderBy: Record<string, 'asc' | 'desc'> = { createdAt: 'desc' }
+
+    if (sortParam) {
+      const [field, direction] = sortParam.split(':')
+      if (ALLOWED_SORT_FIELDS.includes(field as SortField) && ['asc', 'desc'].includes(direction)) {
+        orderBy = { [field]: direction as 'asc' | 'desc' }
+      }
+    }
+
     const [checkpoints, total] = await Promise.all([
       prisma.patrol_checkpoints.findMany({
         where,
         select: SAFE_CHECKPOINT_SELECT,
-        orderBy: { name: 'asc' },
+        orderBy,
         skip: (page - 1) * limit,
         take: limit,
       }),

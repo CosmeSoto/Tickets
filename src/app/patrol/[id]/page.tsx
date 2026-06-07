@@ -3,9 +3,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useParams } from 'next/navigation'
-import { ArrowLeft, Play, CheckCircle2, Loader2, Camera, Upload, QrCode } from 'lucide-react'
+import { ArrowLeft, Play, CheckCircle2, Loader2, Camera, Upload, QrCode, ClipboardList } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
 import { usePatrolData } from '@/hooks/use-patrol-data'
 import { usePatrolOfflineQueue } from '@/hooks/use-patrol-offline-queue'
@@ -16,10 +17,34 @@ import { PatrolCheckpointList } from '@/components/patrol/patrol-checkpoint-list
 import { PatrolCheckInCard } from '@/components/patrol/patrol-checkin-card'
 import { PatrolOfflineIndicator } from '@/components/patrol/patrol-offline-indicator'
 import { PatrolCheckpointScanner } from '@/components/patrol/patrol-checkpoint-scanner'
-import { PatrolIncidentButton } from '@/components/patrol/patrol-incident-button'
+import { IncidentFormDialog } from '@/components/patrols/incidents/incident-form-dialog'
 import { FileInputWithCamera } from '@/components/common/file-input-with-camera'
 import { compressImageFile, fileToBase64 } from '@/lib/utils/image-utils'
 import { formatDurationMinutes } from '@/lib/utils/patrol-utils'
+
+interface PatrolIncidentItem {
+  id: string
+  description: string
+  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
+  status: 'OPEN' | 'RESOLVED' | 'ESCALATED'
+  checkpointId: string
+  createdAt: string
+  checkpoint?: { id: string; name: string }
+}
+
+const SEVERITY_COLORS: Record<string, string> = {
+  LOW: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+  MEDIUM: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+  HIGH: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
+  CRITICAL: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+}
+
+const SEVERITY_LABELS: Record<string, string> = {
+  LOW: 'Baja',
+  MEDIUM: 'Media',
+  HIGH: 'Alta',
+  CRITICAL: 'Crítica',
+}
 
 export default function PatrolExecutionPage() {
   const { data: session, status } = useSession()
@@ -38,7 +63,12 @@ export default function PatrolExecutionPage() {
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [photoAction, setPhotoAction] = useState<'start' | 'end' | null>(null)
-  const [lastCheckInId, setLastCheckInId] = useState<string | null>(null)
+
+  // Incident reporting state
+  const [incidentDialogOpen, setIncidentDialogOpen] = useState(false)
+  const [incidentCheckpointId, setIncidentCheckpointId] = useState<string>('')
+  const [incidentCheckpointName, setIncidentCheckpointName] = useState<string>('')
+  const [patrolIncidents, setPatrolIncidents] = useState<PatrolIncidentItem[]>([])
 
   // Auth guard
   useEffect(() => {
@@ -67,6 +97,22 @@ export default function PatrolExecutionPage() {
       })
     }
   }, [syncNow])
+
+  // ── Fetch incidents for this patrol ─────────────────────────────────────────
+  const fetchPatrolIncidents = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/patrols/incidents?patrolId=${patrolId}`)
+      if (!res.ok) return
+      const json = await res.json()
+      setPatrolIncidents(json.data ?? [])
+    } catch {
+      // Silently fail — incidents list is non-critical
+    }
+  }, [patrolId])
+
+  useEffect(() => {
+    if (patrolId) fetchPatrolIncidents()
+  }, [patrolId, fetchPatrolIncidents])
 
   // ── Foto handler ────────────────────────────────────────────────────────────
   const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -247,13 +293,16 @@ export default function PatrolExecutionPage() {
           return
         }
 
-        setLastCheckInId(data.checkInId)
         toast({
           title: 'Check-in registrado ✓',
           description: `Completitud: ${data.completionPercentage}%`,
         })
         setPhotoFile(null)
         setPhotoPreview(null)
+        // Track the scanned checkpoint for incident reporting
+        setIncidentCheckpointId(checkpointId)
+        const scannedCp = patrol?.route.routeCheckpoints.find(rc => rc.checkpoint.id === checkpointId)
+        setIncidentCheckpointName(scannedCp?.checkpoint.name ?? '')
         refresh()
       } catch {
         // Sin red — encolar offline
@@ -268,7 +317,7 @@ export default function PatrolExecutionPage() {
         setSubmittingCheckIn(false)
       }
     },
-    [patrolId, photoFile, addToQueue, toast, refresh]
+    [patrolId, patrol, photoFile, addToQueue, toast, refresh]
   )
 
   if (status === 'loading' || !session) return null
@@ -475,16 +524,26 @@ export default function PatrolExecutionPage() {
 
         {/* Botón de incidente — visible siempre que la patrulla esté en progreso */}
         {isInProgress && (
-          <div className='flex justify-end'>
-            <PatrolIncidentButton
-              patrolId={patrolId}
-              familyId={patrol.familyId}
-              checkInId={
-                lastCheckInId ?? patrol.checkIns[patrol.checkIns.length - 1]?.id ?? patrolId
-              }
-              incidentCategoryId={patrol.familyConfig?.patrolIncidentCategoryId}
-              onIncidentCreated={() => toast({ title: 'Incidente reportado' })}
-            />
+          <div className='flex items-center justify-between gap-2'>
+            <Button
+              variant='outline'
+              size='sm'
+              className='gap-2'
+              onClick={() => {
+                // Use the last scanned checkpoint, or the last checked-in checkpoint
+                if (!incidentCheckpointId && patrol.checkIns.length > 0) {
+                  const lastCi = patrol.checkIns[patrol.checkIns.length - 1]
+                  setIncidentCheckpointId(lastCi.checkpointId)
+                  const cp = checkpoints.find(rc => rc.checkpoint.id === lastCi.checkpointId)
+                  setIncidentCheckpointName(cp?.checkpoint.name ?? '')
+                }
+                setIncidentDialogOpen(true)
+              }}
+              disabled={patrol.checkIns.length === 0 && !incidentCheckpointId}
+            >
+              <ClipboardList className='h-4 w-4' />
+              📋 Reportar Novedad
+            </Button>
           </div>
         )}
 
@@ -528,7 +587,58 @@ export default function PatrolExecutionPage() {
             </CardContent>
           </Card>
         )}
+
+        {/* Mini-lista de novedades reportadas en esta patrulla */}
+        {patrolIncidents.length > 0 && (
+          <Card>
+            <CardHeader className='pb-2'>
+              <CardTitle className='text-sm flex items-center gap-2'>
+                📋 Novedades reportadas ({patrolIncidents.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className='space-y-2'>
+              {patrolIncidents.map(incident => (
+                <div
+                  key={incident.id}
+                  className='flex items-start justify-between gap-2 p-2 rounded-md border bg-muted/30'
+                >
+                  <div className='flex-1 min-w-0'>
+                    <p className='text-sm truncate'>{incident.description}</p>
+                    <p className='text-xs text-muted-foreground mt-0.5'>
+                      {incident.checkpoint?.name ?? 'Checkpoint'} ·{' '}
+                      {new Date(incident.createdAt).toLocaleTimeString('es-EC', {
+                        timeZone: 'America/Guayaquil',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </p>
+                  </div>
+                  <Badge
+                    variant='secondary'
+                    className={`text-xs shrink-0 ${SEVERITY_COLORS[incident.severity] ?? ''}`}
+                  >
+                    {SEVERITY_LABELS[incident.severity] ?? incident.severity}
+                  </Badge>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
       </div>
+
+      {/* Incident Form Dialog */}
+      <IncidentFormDialog
+        open={incidentDialogOpen}
+        onOpenChange={setIncidentDialogOpen}
+        mode='create'
+        patrolId={patrolId}
+        checkpointId={incidentCheckpointId}
+        checkpointName={incidentCheckpointName}
+        onSuccess={() => {
+          fetchPatrolIncidents()
+          toast({ title: 'Novedad reportada', description: 'La novedad se registró correctamente' })
+        }}
+      />
     </ModuleLayout>
   )
 }

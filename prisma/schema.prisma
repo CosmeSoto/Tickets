@@ -346,6 +346,7 @@ model tickets {
   family                           families?                   @relation(fields: [familyId], references: [id])
   checkInId                        String?                     @map("check_in_id")
   checkIn                          patrol_check_ins?           @relation(fields: [checkInId], references: [id])
+  patrol_incidents                 patrol_incidents[]
 
   @@index([assigneeId, status])
   @@index([categoryId, status])
@@ -528,6 +529,8 @@ model users {
   form_users                                        form_users[]
   form_downloads                                    form_downloads[]
   form_attachments_uploaded                         form_attachments[]              @relation("FormAttachmentUploader")
+  incidentsAsAgent                                  patrol_incidents[]              @relation("IncidentAgent")
+  incidentsAsResolver                               patrol_incidents[]              @relation("IncidentResolver")
 
   @@index([departmentId])
   @@index([name, email])
@@ -2430,6 +2433,19 @@ enum PatrolRecurrence {
   CUSTOM
 }
 
+enum IncidentSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum IncidentStatus {
+  OPEN
+  RESOLVED
+  ESCALATED
+}
+
 model patrol_family_config {
   id                          String   @id @default(uuid())
   familyId                    String   @unique @map("family_id")
@@ -2478,6 +2494,7 @@ model patrol_checkpoints {
   family           families                   @relation(fields: [familyId], references: [id])
   routeCheckpoints patrol_route_checkpoints[]
   checkIns         patrol_check_ins[]
+  incidents        patrol_incidents[]
 
   @@index([familyId, isActive])
   @@index([qrType, isActive])
@@ -2564,6 +2581,7 @@ model patrols {
   missedCheckpointIds  String[]     @default([]) @map("missed_checkpoint_ids")
   startPhotoId         String?      @map("start_photo_id")
   endPhotoId           String?      @map("end_photo_id")
+  reminderSentAt       DateTime?    @map("reminder_sent_at")
   createdAt            DateTime     @default(now()) @map("created_at")
   updatedAt            DateTime     @updatedAt @map("updated_at")
 
@@ -2572,6 +2590,7 @@ model patrols {
   route      patrol_routes      @relation(fields: [routeId], references: [id])
   agent      users              @relation("PatrolAgentExecution", fields: [agentId], references: [id])
   checkIns   patrol_check_ins[]
+  incidents  patrol_incidents[]
   startPhoto patrol_photos?     @relation("PatrolStartPhoto", fields: [startPhotoId], references: [id])
   endPhoto   patrol_photos?     @relation("PatrolEndPhoto", fields: [endPhotoId], references: [id])
 
@@ -2617,6 +2636,7 @@ model patrol_photos {
   id         String    @id @default(uuid())
   checkInId  String?   @map("check_in_id")
   patrolId   String?   @map("patrol_id")
+  incidentId String?   @map("incident_id")
   path       String
   size       Int
   mimeType   String    @map("mime_type")
@@ -2624,15 +2644,47 @@ model patrol_photos {
   deletedAt  DateTime? @map("deleted_at")
   createdAt  DateTime  @default(now()) @map("created_at")
 
-  checkIn     patrol_check_ins? @relation(fields: [checkInId], references: [id])
-  patrolStart patrols[]         @relation("PatrolStartPhoto")
-  patrolEnd   patrols[]         @relation("PatrolEndPhoto")
+  checkIn     patrol_check_ins?  @relation(fields: [checkInId], references: [id])
+  incident    patrol_incidents?  @relation(fields: [incidentId], references: [id], onDelete: SetNull)
+  patrolStart patrols[]          @relation("PatrolStartPhoto")
+  patrolEnd   patrols[]          @relation("PatrolEndPhoto")
 
   @@index([checkInId])
   @@index([patrolId])
+  @@index([incidentId])
   @@index([capturedAt(sort: Desc)])
   @@index([deletedAt])
   @@map("patrol_photos")
+}
+
+model patrol_incidents {
+  id            String           @id @default(uuid())
+  patrolId      String           @map("patrol_id")
+  checkpointId  String           @map("checkpoint_id")
+  agentId       String           @map("agent_id")
+  description   String
+  severity      IncidentSeverity
+  status        IncidentStatus   @default(OPEN)
+  photoIds      String[]         @default([]) @map("photo_ids")
+  ticketId      String?          @map("ticket_id")
+  resolvedAt    DateTime?        @map("resolved_at")
+  resolvedById  String?          @map("resolved_by_id")
+  createdAt     DateTime         @default(now()) @map("created_at")
+  updatedAt     DateTime         @updatedAt @map("updated_at")
+
+  patrol     patrols            @relation(fields: [patrolId], references: [id], onDelete: Cascade)
+  checkpoint patrol_checkpoints @relation(fields: [checkpointId], references: [id])
+  agent      users              @relation("IncidentAgent", fields: [agentId], references: [id])
+  ticket     tickets?           @relation(fields: [ticketId], references: [id])
+  resolvedBy users?             @relation("IncidentResolver", fields: [resolvedById], references: [id])
+  photos     patrol_photos[]
+
+  @@index([patrolId, createdAt(sort: Desc)])
+  @@index([agentId, createdAt(sort: Desc)])
+  @@index([checkpointId, status])
+  @@index([status, severity])
+  @@index([ticketId])
+  @@map("patrol_incidents")
 }
 
 // ============================================
