@@ -611,8 +611,8 @@ export function CategorySelector({
       {/* Compact summary when confirmed (not in confirmation mode) */}
       {!state.showConfirmation && selectedCategory && (
         <Card className='border-green-500/30 bg-green-50/30 dark:bg-green-950/10'>
-          <CardContent className='pt-4'>
-            <div className='flex items-center justify-between'>
+          <CardContent className='p-3'>
+            <div className='flex flex-col gap-3'>
               <div className='flex items-center gap-3 flex-1 min-w-0'>
                 <CheckCircle2 className='h-5 w-5 text-green-600 flex-shrink-0' />
                 <div className='flex-1 min-w-0'>
@@ -635,38 +635,40 @@ export function CategorySelector({
                   </div>
                 </div>
               </div>
-              <Button
-                type='button'
-                variant='ghost'
-                size='sm'
-                onClick={() => {
-                  setState({
-                    selectedPath: [],
-                    mode: 'full',
-                    searchQuery: '',
-                    showConfirmation: true,
-                    selectionStartTime: Date.now(),
-                    interactionMethod: null,
-                  })
-                  setCategoryMetadata(null)
-                  setConfidenceScore(0)
-                  onChange('')
-                }}
-                className='flex-shrink-0 text-muted-foreground hover:text-destructive'
-              >
-                <X className='h-4 w-4 mr-1' />
-                Limpiar
-              </Button>
-              <Button
-                type='button'
-                variant='ghost'
-                size='sm'
-                onClick={() => setState(prev => ({ ...prev, showConfirmation: true }))}
-                className='flex-shrink-0'
-              >
-                <Info className='h-4 w-4 mr-1' />
-                Ver detalles
-              </Button>
+              <div className='flex items-center gap-2 justify-end'>
+                <Button
+                  type='button'
+                  variant='ghost'
+                  size='sm'
+                  onClick={() => setState(prev => ({ ...prev, showConfirmation: true }))}
+                  className='flex-shrink-0'
+                >
+                  <Info className='h-4 w-4 mr-1' />
+                  Ver detalles
+                </Button>
+                <Button
+                  type='button'
+                  variant='destructive'
+                  size='sm'
+                  onClick={() => {
+                    setState({
+                      selectedPath: [],
+                      mode: 'full',
+                      searchQuery: '',
+                      showConfirmation: true,
+                      selectionStartTime: Date.now(),
+                      interactionMethod: null,
+                    })
+                    setCategoryMetadata(null)
+                    setConfidenceScore(0)
+                    onChange('')
+                  }}
+                  className='flex-shrink-0'
+                >
+                  <X className='h-4 w-4 mr-1' />
+                  Limpiar
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
