@@ -1,7 +1,6 @@
 'use client'
 
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import {
   Select,
@@ -10,6 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { DateTimePicker } from '@/components/ui/date-time-picker'
 import { X } from 'lucide-react'
 
 interface IncidentFiltersProps {
@@ -136,22 +136,22 @@ export function IncidentFilters({
           </div>
 
           {/* Fecha desde */}
-          <div className='space-y-1 min-w-[140px] flex-1'>
+          <div className='space-y-1 min-w-[160px] flex-1'>
             <label className='text-sm font-medium text-muted-foreground'>Fecha desde</label>
-            <Input
-              type='date'
+            <DateTimePicker
               value={filters.dateFrom}
-              onChange={(e) => onFilterChange('dateFrom', e.target.value)}
+              onChange={(v) => onFilterChange('dateFrom', v)}
+              placeholder='Desde'
             />
           </div>
 
           {/* Fecha hasta */}
-          <div className='space-y-1 min-w-[140px] flex-1'>
+          <div className='space-y-1 min-w-[160px] flex-1'>
             <label className='text-sm font-medium text-muted-foreground'>Fecha hasta</label>
-            <Input
-              type='date'
+            <DateTimePicker
               value={filters.dateTo}
-              onChange={(e) => onFilterChange('dateTo', e.target.value)}
+              onChange={(v) => onFilterChange('dateTo', v)}
+              placeholder='Hasta'
             />
           </div>
 

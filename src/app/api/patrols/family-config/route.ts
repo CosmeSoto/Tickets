@@ -15,7 +15,12 @@ export async function GET() {
   }
 
   try {
-    const isSuperAdmin = (session.user as any).isSuperAdmin === true
+    // Leer isSuperAdmin directamente de la BD (la sesión puede estar desactualizada)
+    const dbUser = await prisma.users.findUnique({
+      where: { id: session.user.id },
+      select: { isSuperAdmin: true },
+    })
+    const isSuperAdmin = dbUser?.isSuperAdmin === true
 
     let configs: Array<{ familyId: string; patrolsEnabled: boolean }>
     if (isSuperAdmin) {
