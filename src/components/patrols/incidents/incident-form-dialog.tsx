@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Camera, Paperclip } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
 import { compressImageFile, fileToBase64 } from '@/lib/utils/image-utils'
+import { FileInputWithCamera } from '@/components/common/file-input-with-camera'
 
 interface IncidentFormDialogProps {
   open: boolean
@@ -170,14 +171,37 @@ export function IncidentFormDialog({
             <Label htmlFor='incident-photo' className='text-sm'>
               Foto (opcional)
             </Label>
-            <input
-              id='incident-photo'
-              type='file'
+            <FileInputWithCamera
               accept='image/jpeg,image/png'
               onChange={handlePhotoChange}
-              disabled={saving}
-              className='block w-full text-sm text-muted-foreground file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-primary file:text-primary-foreground hover:file:bg-primary/90 cursor-pointer'
-            />
+            >
+              {({ openFile, openCamera, showCamera }) => (
+                <div className='flex items-center gap-2 flex-wrap'>
+                  {showCamera && (
+                    <Button
+                      type='button'
+                      variant='outline'
+                      size='sm'
+                      onClick={() => openCamera()}
+                      disabled={saving}
+                    >
+                      <Camera className='h-3.5 w-3.5 mr-1.5' />
+                      Cámara
+                    </Button>
+                  )}
+                  <Button
+                    type='button'
+                    variant='outline'
+                    size='sm'
+                    onClick={openFile}
+                    disabled={saving}
+                  >
+                    <Paperclip className='h-3.5 w-3.5 mr-1.5' />
+                    {showCamera ? 'Galería' : 'Seleccionar'}
+                  </Button>
+                </div>
+              )}
+            </FileInputWithCamera>
             {photoPreview && (
               <img
                 src={photoPreview}
