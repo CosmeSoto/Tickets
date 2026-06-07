@@ -152,7 +152,7 @@ export async function GET(request: NextRequest) {
       }))
 
       // Incidentes abiertos originados en patrullas
-      const [openIncidents, inProgressIncidents, recentIncidents] = await Promise.all([
+      const [openIncidents, inProgressIncidents, recentIncidents, recentPatrols] = await Promise.all([
         prisma.tickets.count({
           where: { source: 'PATROL', status: 'OPEN', ...familyFilter },
         }),
@@ -173,6 +173,27 @@ export async function GET(request: NextRequest) {
           },
           orderBy: { createdAt: 'desc' },
           take: 5,
+        }),
+        // Patrullas recientes (completadas/incompletas) para tabla del dashboard
+        prisma.patrols.findMany({
+          where: {
+            ...familyFilter,
+            status: { in: ['COMPLETED', 'INCOMPLETE', 'MISSED'] },
+            scheduledStart: { gte: last7Days },
+          },
+          select: {
+            id: true,
+            status: true,
+            scheduledStart: true,
+            startedAt: true,
+            completedAt: true,
+            completionPercentage: true,
+            agent: { select: { name: true } },
+            route: { select: { name: true } },
+            family: { select: { name: true } },
+          },
+          orderBy: { scheduledStart: 'desc' },
+          take: 10,
         }),
       ])
 
@@ -199,6 +220,17 @@ export async function GET(request: NextRequest) {
           ticketCode: t.ticketCode,
           reportedBy: t.users_tickets_clientIdTousers.name,
           family: t.family?.name ?? null,
+        })),
+        recentPatrols: recentPatrols.map(p => ({
+          id: p.id,
+          status: p.status,
+          routeName: p.route.name,
+          agentName: p.agent.name,
+          familyName: p.family.name,
+          scheduledStart: p.scheduledStart,
+          startedAt: p.startedAt,
+          completedAt: p.completedAt,
+          completionPercentage: p.completionPercentage,
         })),
       }
     })

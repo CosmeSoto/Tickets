@@ -256,9 +256,9 @@ export default function PatrolListPage() {
       {/* Filtros de estado */}
       <div className='flex gap-2 flex-wrap mb-4'>
         {[
-          { value: 'active', label: 'Activas' },
-          { value: 'COMPLETED', label: 'Completadas' },
-          { value: 'MISSED', label: 'Omitidas' },
+          { value: 'active', label: '🟡 Activas' },
+          { value: 'COMPLETED,INCOMPLETE', label: '✅ Historial' },
+          { value: 'MISSED', label: '❌ Omitidas' },
           { value: 'all', label: 'Todas' },
         ].map(opt => (
           <Button

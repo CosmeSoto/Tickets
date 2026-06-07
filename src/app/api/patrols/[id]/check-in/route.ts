@@ -112,10 +112,50 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         qrWindowMinutes: true,
         geofenceRadiusMeters: true,
         alertCompletionThreshold: true,
+        strictTimeValidation: true,
       },
     })
     const qrWindowMinutes = familyConfig?.qrWindowMinutes ?? 5
     const familyRadius = familyConfig?.geofenceRadiusMeters ?? 50
+    const strictTimeValidation = familyConfig?.strictTimeValidation ?? true
+
+    // ── Validar tiempo mínimo entre scans (solo en modo estricto) ──────────
+    // Evita que un agente escanee todos los QR en 1 minuto sin recorrer la ruta.
+    // Tiempo mínimo = (duración estimada de la ruta / número de checkpoints) * 0.3
+    // Ejemplo: ruta de 60min con 6 checkpoints → mínimo ~3 min entre scans
+    if (strictTimeValidation) {
+      const lastValidCheckIn = await prisma.patrol_check_ins.findFirst({
+        where: { patrolId, validationResult: 'VALID' },
+        orderBy: { deviceTimestamp: 'desc' },
+        select: { deviceTimestamp: true, checkpointId: true },
+      })
+
+      if (lastValidCheckIn && lastValidCheckIn.checkpointId !== data.checkpointId) {
+        const totalCheckpoints = patrol.route.routeCheckpoints.length
+        const estimatedMinutes = patrol.scheduledEnd
+          ? Math.round((new Date(patrol.scheduledEnd).getTime() - new Date(patrol.scheduledStart).getTime()) / 60000)
+          : 60
+
+        // Mínimo 1 minuto entre scans, máximo 30% del tiempo promedio por checkpoint
+        const avgMinPerCheckpoint = totalCheckpoints > 1 ? estimatedMinutes / totalCheckpoints : 5
+        const minIntervalMs = Math.max(1, Math.floor(avgMinPerCheckpoint * 0.3)) * 60 * 1000
+
+        const elapsed = new Date(data.deviceTimestamp).getTime() - lastValidCheckIn.deviceTimestamp.getTime()
+
+        if (elapsed < minIntervalMs) {
+          const minMinutes = Math.ceil(minIntervalMs / 60000)
+          const elapsedSecs = Math.round(elapsed / 1000)
+          return NextResponse.json(
+            {
+              error: `Debes esperar al menos ${minMinutes} min entre checkpoints. Han pasado solo ${elapsedSecs}s.`,
+              code: 'TOO_FAST_BETWEEN_CHECKPOINTS',
+              minIntervalMinutes: minMinutes,
+            },
+            { status: 422 }
+          )
+        }
+      }
+    }
 
     // ── Validar foto requerida ─────────────────────────────────────────────
     // Solo se exige foto cuando el checkpoint está marcado como sensible.

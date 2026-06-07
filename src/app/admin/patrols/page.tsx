@@ -68,6 +68,17 @@ interface DashboardData {
     reportedBy: string
     family: string | null
   }>
+  recentPatrols?: Array<{
+    id: string
+    status: string
+    routeName: string
+    agentName: string
+    familyName: string
+    scheduledStart: string
+    startedAt: string | null
+    completedAt: string | null
+    completionPercentage: number
+  }>
 }
 
 export default function PatrolDashboardPage() {
@@ -274,6 +285,44 @@ export default function PatrolDashboardPage() {
 
         {/* ── Panel lateral ── */}
         <div className='space-y-4'>
+          {/* Patrullas Recientes (últimos 7 días) */}
+          {data && data.recentPatrols && data.recentPatrols.length > 0 && (
+            <Card>
+              <CardHeader className='pb-3'>
+                <CardTitle className='text-sm flex items-center gap-2'>
+                  <Clock className='h-4 w-4' />
+                  Patrullas Recientes (7d)
+                </CardTitle>
+              </CardHeader>
+              <CardContent className='space-y-2'>
+                {data.recentPatrols.map((patrol: any) => (
+                  <div
+                    key={patrol.id}
+                    className='p-2 rounded border hover:bg-muted/30 cursor-pointer transition-colors'
+                    onClick={() => router.push(`/patrol/${patrol.id}`)}
+                  >
+                    <div className='flex items-center justify-between mb-1'>
+                      <span className='text-xs font-medium truncate max-w-[140px]'>{patrol.routeName}</span>
+                      <PatrolStatusBadge status={patrol.status} />
+                    </div>
+                    <div className='flex items-center justify-between text-[10px] text-muted-foreground'>
+                      <span>{patrol.agentName}</span>
+                      <span>{patrol.completionPercentage}%</span>
+                    </div>
+                  </div>
+                ))}
+                <Button
+                  variant='link'
+                  size='sm'
+                  className='p-0 h-auto text-xs'
+                  onClick={() => router.push('/admin/patrols/reports')}
+                >
+                  Ver reportes completos →
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Últimos 7 días */}
           <Card>
             <CardHeader className='pb-3'>
