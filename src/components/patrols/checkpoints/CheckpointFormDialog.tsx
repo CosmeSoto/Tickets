@@ -8,6 +8,13 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -84,20 +91,22 @@ export function CheckpointFormDialog({
             <Label htmlFor='cp-family' className='text-sm'>
               Área <span className='text-destructive'>*</span>
             </Label>
-            <select
-              id='cp-family'
+            <Select
               value={form.familyId}
-              onChange={e => setForm(f => ({ ...f, familyId: e.target.value }))}
-              className='w-full h-9 rounded-md border border-input bg-background px-3 text-sm'
+              onValueChange={v => setForm(f => ({ ...f, familyId: v }))}
               disabled={saving || !!editingId}
             >
-              <option value=''>Selecciona un área</option>
-              {families.map(f => (
-                <option key={f.id} value={f.id}>
-                  {f.name} ({f.code})
-                </option>
-              ))}
-            </select>
+              <SelectTrigger id='cp-family' className='h-9'>
+                <SelectValue placeholder='Selecciona un área' />
+              </SelectTrigger>
+              <SelectContent>
+                {families.map(f => (
+                  <SelectItem key={f.id} value={f.id}>
+                    {f.name} ({f.code})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Nombre */}
