@@ -92,10 +92,10 @@ export function ConfirmationPanel({
           </div>
 
           {/* Stats in compact row */}
-          <div className='grid grid-cols-4 gap-1.5 text-xs'>
+          <div className='grid grid-cols-2 md:grid-cols-4 gap-2 text-xs'>
             <div className='flex flex-col items-start gap-0.5'>
               <p className='text-muted-foreground leading-none'>Depto.</p>
-              <p className='font-medium truncate'>{metadata.departmentName}</p>
+              <p className='font-medium break-words'>{metadata.departmentName}</p>
             </div>
 
             <div className='flex flex-col items-start gap-0.5'>
