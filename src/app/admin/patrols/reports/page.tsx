@@ -16,6 +16,14 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Progress } from '@/components/ui/progress'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { DateTimePicker } from '@/components/ui/date-time-picker'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { DataTable } from '@/components/ui/data-table'
 import { ExportButton } from '@/components/common/export-button'
@@ -247,36 +255,44 @@ export default function PatrolReportsPage() {
           {/* Área */}
           <div className='space-y-1.5'>
             <Label className='text-xs'>Área</Label>
-            <select
+            <Select
               value={familyId}
-              onChange={e => setFamilyId(e.target.value)}
-              className='w-full h-9 rounded-md border border-input bg-background px-3 text-sm'
+              onValueChange={setFamilyId}
             >
-              <option value=''>Todas las áreas</option>
-              {families.map(f => (
-                <option key={f.id} value={f.id}>
-                  {f.name}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className='h-9'>
+                <SelectValue placeholder='Todas las áreas' />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value=''>Todas las áreas</SelectItem>
+                {families.map(f => (
+                  <SelectItem key={f.id} value={f.id}>
+                    {f.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Personal (solo en modo personal) */}
           {groupBy === 'agent' && (
             <div className='space-y-1.5'>
               <Label className='text-xs'>Personal</Label>
-              <select
+              <Select
                 value={agentId}
-                onChange={e => setAgentId(e.target.value)}
-                className='w-full h-9 rounded-md border border-input bg-background px-3 text-sm'
+                onValueChange={setAgentId}
               >
-                <option value=''>Todo el personal</option>
-                {agents.map(g => (
-                  <option key={g.id} value={g.id}>
-                    {g.name}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className='h-9'>
+                  <SelectValue placeholder='Todo el personal' />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value=''>Todo el personal</SelectItem>
+                  {agents.map(g => (
+                    <SelectItem key={g.id} value={g.id}>
+                      {g.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           )}
 
@@ -284,40 +300,42 @@ export default function PatrolReportsPage() {
           {groupBy === 'route' && (
             <div className='space-y-1.5'>
               <Label className='text-xs'>Ruta</Label>
-              <select
+              <Select
                 value={routeId}
-                onChange={e => setRouteId(e.target.value)}
-                className='w-full h-9 rounded-md border border-input bg-background px-3 text-sm'
+                onValueChange={setRouteId}
               >
-                <option value=''>Todas las rutas</option>
-                {routes.map(r => (
-                  <option key={r.id} value={r.id}>
-                    {r.name}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className='h-9'>
+                  <SelectValue placeholder='Todas las rutas' />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value=''>Todas las rutas</SelectItem>
+                  {routes.map(r => (
+                    <SelectItem key={r.id} value={r.id}>
+                      {r.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           )}
 
           {/* Desde */}
           <div className='space-y-1.5'>
             <Label className='text-xs'>Desde</Label>
-            <Input
-              type='datetime-local'
+            <DateTimePicker
               value={from}
-              onChange={e => setFrom(e.target.value)}
-              className='h-9 text-sm'
+              onChange={setFrom}
+              className='h-9'
             />
           </div>
 
           {/* Hasta */}
           <div className='space-y-1.5'>
             <Label className='text-xs'>Hasta</Label>
-            <Input
-              type='datetime-local'
+            <DateTimePicker
               value={to}
-              onChange={e => setTo(e.target.value)}
-              className='h-9 text-sm'
+              onChange={setTo}
+              className='h-9'
             />
           </div>
         </div>
