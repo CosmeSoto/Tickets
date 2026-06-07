@@ -19,6 +19,7 @@ const createUserSchema = z.object({
   patrolsEnabled: z.boolean().optional(),
   newsEnabled: z.boolean().optional(),
   canManageInventory: z.boolean().optional(),
+  canRequestAssets: z.boolean().optional(),
 })
 
 export async function GET(request: NextRequest) {

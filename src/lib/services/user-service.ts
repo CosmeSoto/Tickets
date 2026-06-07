@@ -48,6 +48,7 @@ export interface CreateUserData {
   newsEnabled?: boolean
   canManageNews?: boolean
   canManageInventory?: boolean
+  canRequestAssets?: boolean
   formsEnabled?: boolean
   canManageForms?: boolean
   assignedCategories?: {
@@ -281,6 +282,7 @@ export class UserService {
           newsEnabled: data.newsEnabled ?? false,
           canManageNews: data.canManageNews ?? false,
           canManageInventory: data.canManageInventory ?? false,
+          canRequestAssets: data.canRequestAssets ?? false,
           formsEnabled: data.formsEnabled ?? false,
           canManageForms: data.canManageForms ?? false,
           isEmailVerified: false,
