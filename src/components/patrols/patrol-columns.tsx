@@ -307,9 +307,9 @@ export function createScheduleColumns({
         // Para recurrencias, mostrar solo la hora; para NONE mostrar fecha+hora
         const isRecurring = schedule.recurrence !== 'NONE'
         const startLabel = isRecurring
-          ? start.toLocaleTimeString('es-EC', { timeStyle: 'short' })
-          : start.toLocaleString('es-EC', { dateStyle: 'short', timeStyle: 'short' })
-        const endLabel = end.toLocaleTimeString('es-EC', { timeStyle: 'short' })
+          ? `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`
+          : `${start.toLocaleDateString('es-EC', { dateStyle: 'short' })} ${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`
+        const endLabel = `${String(end.getHours()).padStart(2, '0')}:${String(end.getMinutes()).padStart(2, '0')}`
         return (
           <div className='text-xs'>
             <span className='text-foreground font-medium'>{startLabel}</span>
