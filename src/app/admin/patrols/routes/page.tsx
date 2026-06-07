@@ -449,6 +449,7 @@ export default function RoutesPage() {
         onRefresh={reload}
         externalSearch={true}
         hideInternalFilters={true}
+        onRowClick={openEdit}
         rowActions={(route: PatrolRoute) => (
           <div className='flex items-center gap-1 justify-end'>
             <Button size='sm' variant='ghost' onClick={() => openEdit(route)}>

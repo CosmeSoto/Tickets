@@ -287,6 +287,7 @@ export default function CheckpointsPage() {
         onRefresh={reload}
         externalSearch={true}
         hideInternalFilters={true}
+        onRowClick={openEdit}
         rowActions={(cp: Checkpoint) => (
           <div className='flex items-center gap-1'>
             <Button size='sm' variant='ghost' onClick={() => openEdit(cp)}>
