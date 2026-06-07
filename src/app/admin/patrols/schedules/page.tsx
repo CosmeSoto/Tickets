@@ -405,7 +405,8 @@ export default function SchedulesPage() {
         onRefresh={reload}
         externalSearch={true}
         hideInternalFilters={true}
-        rowActions={schedule => (
+        onRowClick={openEdit}
+        rowActions={(schedule: PatrolSchedule) => (
           <div className='flex items-center gap-1 justify-end'>
             <Button size='sm' variant='ghost' onClick={() => openEdit(schedule)}>
               <Pencil className='h-3.5 w-3.5' />
