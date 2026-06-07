@@ -27,6 +27,9 @@ interface IncidentFiltersProps {
   onClear: () => void
 }
 
+// Radix Select no permite value="" — usamos un sentinel para "todos"
+const ALL = '__all__'
+
 export function IncidentFilters({
   families,
   agents,
@@ -42,6 +45,11 @@ export function IncidentFilters({
     filters.dateTo !== '' ||
     filters.agentId !== ''
 
+  // Convierte '' ↔ ALL para compatibilidad con Radix Select
+  const handleChange = (key: string, v: string) => {
+    onFilterChange(key, v === ALL ? '' : v)
+  }
+
   return (
     <Card>
       <CardContent className='pt-4 pb-4'>
@@ -50,14 +58,14 @@ export function IncidentFilters({
           <div className='space-y-1 min-w-[160px] flex-1'>
             <label className='text-sm font-medium text-muted-foreground'>Familia</label>
             <Select
-              value={filters.familyId}
-              onValueChange={(v) => onFilterChange('familyId', v)}
+              value={filters.familyId || ALL}
+              onValueChange={(v) => handleChange('familyId', v)}
             >
               <SelectTrigger>
                 <SelectValue placeholder='Todas las áreas' />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value=''>Todas las áreas</SelectItem>
+                <SelectItem value={ALL}>Todas las áreas</SelectItem>
                 {families.map((f) => (
                   <SelectItem key={f.id} value={f.id}>
                     {f.name}
@@ -71,14 +79,14 @@ export function IncidentFilters({
           <div className='space-y-1 min-w-[140px] flex-1'>
             <label className='text-sm font-medium text-muted-foreground'>Severidad</label>
             <Select
-              value={filters.severity}
-              onValueChange={(v) => onFilterChange('severity', v)}
+              value={filters.severity || ALL}
+              onValueChange={(v) => handleChange('severity', v)}
             >
               <SelectTrigger>
                 <SelectValue placeholder='Todas' />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value=''>Todas</SelectItem>
+                <SelectItem value={ALL}>Todas</SelectItem>
                 <SelectItem value='LOW'>Baja</SelectItem>
                 <SelectItem value='MEDIUM'>Media</SelectItem>
                 <SelectItem value='HIGH'>Alta</SelectItem>
@@ -91,14 +99,14 @@ export function IncidentFilters({
           <div className='space-y-1 min-w-[140px] flex-1'>
             <label className='text-sm font-medium text-muted-foreground'>Estado</label>
             <Select
-              value={filters.status}
-              onValueChange={(v) => onFilterChange('status', v)}
+              value={filters.status || ALL}
+              onValueChange={(v) => handleChange('status', v)}
             >
               <SelectTrigger>
                 <SelectValue placeholder='Todos' />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value=''>Todos</SelectItem>
+                <SelectItem value={ALL}>Todos</SelectItem>
                 <SelectItem value='OPEN'>Abierta</SelectItem>
                 <SelectItem value='RESOLVED'>Resuelta</SelectItem>
                 <SelectItem value='ESCALATED'>Escalada</SelectItem>
@@ -110,14 +118,14 @@ export function IncidentFilters({
           <div className='space-y-1 min-w-[160px] flex-1'>
             <label className='text-sm font-medium text-muted-foreground'>Agente</label>
             <Select
-              value={filters.agentId}
-              onValueChange={(v) => onFilterChange('agentId', v)}
+              value={filters.agentId || ALL}
+              onValueChange={(v) => handleChange('agentId', v)}
             >
               <SelectTrigger>
                 <SelectValue placeholder='Todos los agentes' />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value=''>Todos los agentes</SelectItem>
+                <SelectItem value={ALL}>Todos los agentes</SelectItem>
                 {agents.map((a) => (
                   <SelectItem key={a.id} value={a.id}>
                     {a.name}
