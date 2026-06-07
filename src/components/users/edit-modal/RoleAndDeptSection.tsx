@@ -5,6 +5,13 @@ import { Label } from '@/components/ui/label'
 import { DepartmentSelector } from '@/components/ui/department-selector'
 import { USER_ROLE_FORM_OPTIONS, type UserRole } from '@/lib/constants/user-constants'
 import { useSession } from 'next-auth/react'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 interface RoleAndDeptSectionProps {
   role: UserRole
@@ -41,22 +48,22 @@ export function RoleAndDeptSection({
           <Label htmlFor='edit-role'>
             Rol del usuario <span className='text-destructive'>*</span>
           </Label>
-          <select
-            id='edit-role'
+          <Select
             value={role}
+            onValueChange={r => onChange('role', r)}
             disabled={isCurrentUser}
-            onChange={e => {
-              const r = e.target.value as UserRole
-              onChange('role', r)
-            }}
-            className='flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:cursor-not-allowed'
           >
-            {USER_ROLE_FORM_OPTIONS.map(r => (
-              <option key={r.value} value={r.value}>
-                {r.label}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger id='edit-role' className='h-9'>
+              <SelectValue placeholder='Seleccionar rol' />
+            </SelectTrigger>
+            <SelectContent>
+              {USER_ROLE_FORM_OPTIONS.map(r => (
+                <SelectItem key={r.value} value={r.value}>
+                  {r.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           {isCurrentUser && (
             <p className='text-xs text-amber-600'>No puedes cambiar tu propio rol</p>
           )}

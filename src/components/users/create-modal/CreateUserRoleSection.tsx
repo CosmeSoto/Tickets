@@ -4,6 +4,13 @@ import { Label } from '@/components/ui/label'
 import { Building, Crown } from 'lucide-react'
 import { USER_ROLE_FORM_OPTIONS, type UserRole } from '@/lib/constants/user-constants'
 import { DepartmentSelector } from '@/components/ui/department-selector'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 interface CreateUserRoleSectionProps {
   role: UserRole
@@ -39,18 +46,21 @@ export function CreateUserRoleSection({
           <Label htmlFor='create-role'>
             Rol del usuario <span className='text-destructive'>*</span>
           </Label>
-          <select
-            id='create-role'
+          <Select
             value={role}
-            onChange={e => onRoleChange(e.target.value as UserRole)}
-            className='flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+            onValueChange={onRoleChange}
           >
-            {USER_ROLE_FORM_OPTIONS.map(r => (
-              <option key={r.value} value={r.value}>
-                {r.label}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger id='create-role' className='h-9'>
+              <SelectValue placeholder='Seleccionar rol' />
+            </SelectTrigger>
+            <SelectContent>
+              {USER_ROLE_FORM_OPTIONS.map(r => (
+                <SelectItem key={r.value} value={r.value}>
+                  {r.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className='space-y-1'>
           <Label>
