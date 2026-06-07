@@ -175,7 +175,7 @@ export function SLAPoliciesTab({ isSuperAdmin = false }: { isSuperAdmin?: boolea
       {/* Tabla de políticas globales */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
               <CardTitle className="flex items-center gap-2">
                 <Bell className="h-5 w-5" />
@@ -185,7 +185,7 @@ export function SLAPoliciesTab({ isSuperAdmin = false }: { isSuperAdmin?: boolea
                 Tiempos de respuesta y resolución en horas hábiles por nivel de prioridad
               </CardDescription>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Button
                 variant="outline"
                 size="sm"
@@ -226,100 +226,103 @@ export function SLAPoliciesTab({ isSuperAdmin = false }: { isSuperAdmin?: boolea
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Prioridad</TableHead>
-                <TableHead className="text-center">Respuesta (h)</TableHead>
-                <TableHead className="text-center">Resolución (h)</TableHead>
-                <TableHead className="text-center">Solo horas hábiles</TableHead>
-                <TableHead className="text-center">Estado</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {PRIORITIES.map((priority) => {
-                const row = editRows[priority]
-                const policy = policies.find((p) => p.priority === priority)
-                return (
-                  <TableRow key={priority}>
-                    <TableCell>
-                      <Badge variant={PRIORITY_META[priority].variant}>
-                        {PRIORITY_META[priority].label}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {editing && isSuperAdmin ? (
-                        <Input
-                          type="number"
-                          min={1}
-                          max={720}
-                          className="w-20 mx-auto text-center font-mono h-8"
-                          value={row?.response ?? ''}
-                          onChange={(e) => updateRow(priority, 'response', parseInt(e.target.value) || 1)}
-                        />
-                      ) : (
-                        <span className="font-mono font-medium">{row?.response ?? DEFAULTS[priority].response}</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {editing && isSuperAdmin ? (
-                        <Input
-                          type="number"
-                          min={1}
-                          max={720}
-                          className="w-20 mx-auto text-center font-mono h-8"
-                          value={row?.resolution ?? ''}
-                          onChange={(e) => updateRow(priority, 'resolution', parseInt(e.target.value) || 1)}
-                        />
-                      ) : (
-                        <span className="font-mono font-medium">{row?.resolution ?? DEFAULTS[priority].resolution}</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {editing && isSuperAdmin ? (
-                        <div className="flex justify-center">
-                          <Switch
-                            checked={row?.businessHoursOnly ?? false}
-                            onCheckedChange={(v) => updateRow(priority, 'businessHoursOnly', v)}
+        <CardContent className="p-0 sm:p-6">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Prioridad</TableHead>
+                  <TableHead className="text-center">Respuesta (h)</TableHead>
+                  <TableHead className="text-center">Resolución (h)</TableHead>
+                  <TableHead className="text-center">Solo horas hábiles</TableHead>
+                  <TableHead className="text-center">Estado</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {PRIORITIES.map((priority) => {
+                  const row = editRows[priority]
+                  const policy = policies.find((p) => p.priority === priority)
+                  return (
+                    <TableRow key={priority}>
+                      <TableCell>
+                        <Badge variant={PRIORITY_META[priority].variant}>
+                          {PRIORITY_META[priority].label}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {editing && isSuperAdmin ? (
+                          <Input
+                            type="number"
+                            min={1}
+                            max={720}
+                            className="w-20 mx-auto text-center font-mono h-8"
+                            value={row?.response ?? ''}
+                            onChange={(e) => updateRow(priority, 'response', parseInt(e.target.value) || 1)}
                           />
-                        </div>
-                      ) : (
-                        <Badge variant={row?.businessHoursOnly ? 'default' : 'secondary'} className="text-xs">
-                          {row?.businessHoursOnly ? 'Sí' : 'No'}
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {policy ? (
-                        <Badge variant="default" className="text-xs bg-green-100 text-green-700 border-green-200">
-                          Activa
-                        </Badge>
-                      ) : (
-                        <Badge variant="secondary" className="text-xs">
-                          Sin política
-                        </Badge>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
+                        ) : (
+                          <span className="font-mono font-medium">{row?.response ?? DEFAULTS[priority].response}</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {editing && isSuperAdmin ? (
+                          <Input
+                            type="number"
+                            min={1}
+                            max={720}
+                            className="w-20 mx-auto text-center font-mono h-8"
+                            value={row?.resolution ?? ''}
+                            onChange={(e) => updateRow(priority, 'resolution', parseInt(e.target.value) || 1)}
+                          />
+                        ) : (
+                          <span className="font-mono font-medium">{row?.resolution ?? DEFAULTS[priority].resolution}</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {editing && isSuperAdmin ? (
+                          <div className="flex justify-center">
+                            <Switch
+                              checked={row?.businessHoursOnly ?? false}
+                              onCheckedChange={(v) => updateRow(priority, 'businessHoursOnly', v)}
+                            />
+                          </div>
+                        ) : (
+                          <Badge variant={row?.businessHoursOnly ? 'default' : 'secondary'} className="text-xs">
+                            {row?.businessHoursOnly ? 'Sí' : 'No'}
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {policy ? (
+                          <Badge variant="default" className="text-xs bg-green-100 text-green-700 border-green-200">
+                            Activa
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className="text-xs">
+                            Sin política
+                          </Badge>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          </div>
+          <div className="p-4 sm:p-0">
+            {!isSuperAdmin && (
+              <p className="text-xs text-muted-foreground mt-4 flex items-center gap-1">
+                <Info className="h-3 w-3" />
+                Solo el Super Admin puede modificar las políticas SLA.
+              </p>
+            )}
 
-          {!isSuperAdmin && (
-            <p className="text-xs text-muted-foreground mt-4 flex items-center gap-1">
-              <Info className="h-3 w-3" />
-              Solo el Super Admin puede modificar las políticas SLA.
-            </p>
-          )}
-
-          {policies.length === 0 && (
-            <div className="mt-4 p-3 rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 text-sm text-amber-800 dark:text-amber-300">
-              ⚠️ No hay políticas SLA en la base de datos. Los valores mostrados son los predeterminados del sistema.
-              {isSuperAdmin && ' Crea las políticas desde la API o el seed para poder editarlas aquí.'}
-            </div>
-          )}
+            {policies.length === 0 && (
+              <div className="mt-4 p-3 rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 text-sm text-amber-800 dark:text-amber-300">
+                ⚠️ No hay políticas SLA en la base de datos. Los valores mostrados son los predeterminados del sistema.
+                {isSuperAdmin && ' Crea las políticas desde la API o el seed para poder editarlas aquí.'}
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 
