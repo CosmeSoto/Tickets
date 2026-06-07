@@ -289,13 +289,7 @@ export default function ClientDashboard() {
                 {recentTickets.length === 0 ? (
                   <div className='text-center py-8'>
                     <Ticket className='h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-50' />
-                    <p className='text-sm text-muted-foreground mb-3'>No tienes tickets aún</p>
-                    <Button size='sm' asChild>
-                      <Link href='/client/tickets/create'>
-                        <Plus className='h-4 w-4 mr-2' />
-                        Crear tu primer ticket
-                      </Link>
-                    </Button>
+                    <p className='text-sm text-muted-foreground'>No tienes tickets aún</p>
                   </div>
                 ) : (
                   recentTickets.map(ticket => (
