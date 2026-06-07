@@ -85,9 +85,9 @@ export default function PatrolReportsPage() {
   const router = useRouter()
 
   const [groupBy, setGroupBy] = useState<'agent' | 'route'>('agent')
-  const [familyId, setFamilyId] = useState<string | null>(null)
-  const [agentId, setAgentId] = useState<string | null>(null)
-  const [routeId, setRouteId] = useState<string | null>(null)
+  const [familyId, setFamilyId] = useState<string>('all')
+  const [agentId, setAgentId] = useState<string>('all')
+  const [routeId, setRouteId] = useState<string>('all')
   const [from, setFrom] = useState(defaultFrom)
   const [to, setTo] = useState(defaultTo)
 
@@ -133,9 +133,9 @@ export default function PatrolReportsPage() {
         to: new Date(to).toISOString(),
         groupBy,
         limit: '100',
-        ...(familyId ? { familyId } : {}),
-        ...(agentId ? { agentId } : {}),
-        ...(routeId ? { routeId } : {}),
+        ...(familyId && familyId !== 'all' ? { familyId } : {}),
+        ...(agentId && agentId !== 'all' ? { agentId } : {}),
+        ...(routeId && routeId !== 'all' ? { routeId } : {}),
       })
       const res = await fetch(`/api/patrols/reports/compliance?${params}`)
       const data = await res.json()
@@ -263,6 +263,7 @@ export default function PatrolReportsPage() {
                 <SelectValue placeholder='Todas las áreas' />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value='all'>Todas las áreas</SelectItem>
                 {families.map(f => (
                   <SelectItem key={f.id} value={f.id}>
                     {f.name}
@@ -284,6 +285,7 @@ export default function PatrolReportsPage() {
                   <SelectValue placeholder='Todo el personal' />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value='all'>Todo el personal</SelectItem>
                   {agents.map(g => (
                     <SelectItem key={g.id} value={g.id}>
                       {g.name}
@@ -306,6 +308,7 @@ export default function PatrolReportsPage() {
                   <SelectValue placeholder='Todas las rutas' />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value='all'>Todas las rutas</SelectItem>
                   {routes.map(r => (
                     <SelectItem key={r.id} value={r.id}>
                       {r.name}
