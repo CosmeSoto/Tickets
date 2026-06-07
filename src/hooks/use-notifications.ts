@@ -195,23 +195,51 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
         destination = `/inventory/maintenance/${notification.metadata.maintenanceId}`
       } else if (notification.metadata?.equipmentId) {
         destination = `/inventory/equipment/${notification.metadata.equipmentId}`
+      } else if (notification.metadata?.patrolId) {
+        // Rondas: si es admin va al dashboard, si es agente va a la ejecución
+        destination =
+          role === 'admin'
+            ? '/admin/patrols'
+            : `/patrol/${notification.metadata.patrolId}`
+      } else if (notification.metadata?.scheduleId) {
+        // Programaciones de ronda
+        destination =
+          role === 'admin'
+            ? '/admin/patrols/schedules'
+            : '/patrol'
+      } else if (notification.metadata?.routeId) {
+        // Rutas de ronda
+        destination =
+          role === 'admin'
+            ? '/admin/patrols/routes'
+            : '/patrol'
       } else if (notification.metadata?.ticketId) {
         destination = `/${rolePrefix}/tickets/${notification.metadata.ticketId}`
       }
 
       if (!destination) return
 
-      const destRole = destination.startsWith('/admin')
-        ? 'ADMIN'
-        : destination.startsWith('/technician')
-          ? 'TECHNICIAN'
-          : destination.startsWith('/client')
-            ? 'CLIENT'
-            : null
+      // Rutas compartidas: accesibles por cualquier rol con el módulo habilitado.
+      // No requieren hard-navigation ni detección de rol.
+      const isSharedRoute =
+        destination.startsWith('/inventory') ||
+        destination.startsWith('/admin/news') ||
+        destination.startsWith('/admin/forms') ||
+        destination.startsWith('/patrol')
 
-      if (destRole && destRole !== session?.user?.role) {
-        window.location.href = destination
-        return
+      if (!isSharedRoute) {
+        const destRole = destination.startsWith('/admin')
+          ? 'ADMIN'
+          : destination.startsWith('/technician')
+            ? 'TECHNICIAN'
+            : destination.startsWith('/client')
+              ? 'CLIENT'
+              : null
+
+        if (destRole && destRole !== session?.user?.role) {
+          window.location.href = destination
+          return
+        }
       }
 
       router.push(destination)

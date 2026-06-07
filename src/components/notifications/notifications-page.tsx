@@ -89,7 +89,10 @@ function NotificationCard({
     notification.metadata?.link ||
     notification.metadata?.actId ||
     notification.metadata?.maintenanceId ||
-    notification.metadata?.equipmentId
+    notification.metadata?.equipmentId ||
+    notification.metadata?.patrolId ||
+    notification.metadata?.scheduleId ||
+    notification.metadata?.routeId
   )
 
   return (
@@ -176,7 +179,17 @@ function NotificationCard({
                     : notification.metadata?.equipmentId ||
                         notification.metadata?.link?.includes('/equipment/')
                       ? 'Ver equipo'
-                      : 'Ver ticket'}
+                      : notification.metadata?.patrolId ||
+                          notification.metadata?.scheduleId ||
+                          notification.metadata?.routeId
+                        ? 'Ver ronda'
+                        : notification.metadata?.link?.includes('/inventory/')
+                          ? 'Ver inventario'
+                          : notification.metadata?.link?.includes('/news')
+                            ? 'Ver noticia'
+                            : notification.metadata?.link?.includes('/forms')
+                              ? 'Ver documento'
+                              : 'Ver ticket'}
               </Button>
             )}
             <Button

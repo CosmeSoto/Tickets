@@ -286,6 +286,37 @@ export async function PUT(request: NextRequest, { params }: Params) {
             newsType: news.type,
           })
         }
+
+        // Crear notificaciones persistentes para usuarios con el módulo de noticias habilitado
+        const { NotificationService } = await import('@/lib/services/notification-service')
+        const { NotificationType } = await import('@prisma/client')
+        const targetUsers = await prisma.users.findMany({
+          where: {
+            newsEnabled: true,
+            isActive: true,
+            id: { not: session.user.id },
+          },
+          select: { id: true },
+        })
+
+        const newsPriority = news.priority ?? 'MEDIUM'
+        const priorityLabel =
+          newsPriority === 'URGENT' ? '🚨 ' : newsPriority === 'HIGH' ? '⚠️ ' : ''
+
+        await Promise.allSettled(
+          targetUsers.map(u =>
+            NotificationService.push({
+              userId: u.id,
+              type:
+                newsPriority === 'URGENT' || newsPriority === 'HIGH'
+                  ? NotificationType.WARNING
+                  : NotificationType.INFO,
+              title: `${priorityLabel}Nueva noticia publicada`,
+              message: `${news.title}`,
+              metadata: { link: '/admin/news', newsId: news.id },
+            })
+          )
+        )
       } catch {
         // no-op: notificación opcional
       }

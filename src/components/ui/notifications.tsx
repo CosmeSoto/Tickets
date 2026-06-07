@@ -138,7 +138,10 @@ export function Notifications({ className, variant = 'bell', maxVisible = 5 }: N
       notification.metadata?.link ||
       notification.metadata?.actId ||
       notification.metadata?.maintenanceId ||
-      notification.metadata?.equipmentId
+      notification.metadata?.equipmentId ||
+      notification.metadata?.patrolId ||
+      notification.metadata?.scheduleId ||
+      notification.metadata?.routeId
     if (hasDestination) navigateToTicket(notification)
   }
 
@@ -300,7 +303,14 @@ export function Notifications({ className, variant = 'bell', maxVisible = 5 }: N
               className='flex items-center gap-1 flex-shrink-0'
               onClick={e => e.stopPropagation()}
             >
-              {n.ticketId && (
+              {(n.ticketId ||
+                n.metadata?.link ||
+                n.metadata?.actId ||
+                n.metadata?.maintenanceId ||
+                n.metadata?.equipmentId ||
+                n.metadata?.patrolId ||
+                n.metadata?.scheduleId ||
+                n.metadata?.routeId) && (
                 <Button
                   variant='ghost'
                   size='sm'
@@ -373,7 +383,10 @@ function BellNotificationItem({
     n.metadata?.link ||
     n.metadata?.actId ||
     n.metadata?.maintenanceId ||
-    n.metadata?.equipmentId
+    n.metadata?.equipmentId ||
+    n.metadata?.patrolId ||
+    n.metadata?.scheduleId ||
+    n.metadata?.routeId
   )
 
   return (

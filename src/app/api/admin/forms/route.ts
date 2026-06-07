@@ -169,6 +169,36 @@ export async function POST(request: NextRequest) {
       request,
     })
 
+    // Notificar a usuarios con el módulo de documentos habilitado
+    if (form.isActive) {
+      try {
+        const { NotificationService } = await import('@/lib/services/notification-service')
+        const { NotificationType } = await import('@prisma/client')
+        const targetUsers = await prisma.users.findMany({
+          where: {
+            formsEnabled: true,
+            isActive: true,
+            id: { not: session.user.id },
+          },
+          select: { id: true },
+        })
+
+        await Promise.allSettled(
+          targetUsers.map(u =>
+            NotificationService.push({
+              userId: u.id,
+              type: NotificationType.INFO,
+              title: 'Nuevo documento disponible',
+              message: `${form.title}`,
+              metadata: { link: '/admin/forms', formId: form.id },
+            })
+          )
+        )
+      } catch {
+        // no-op: notificación opcional
+      }
+    }
+
     return NextResponse.json({ form }, { status: 201 })
   } catch (error) {
     console.error('Error creando formulario:', error)
