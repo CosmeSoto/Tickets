@@ -17,7 +17,10 @@ interface TimePickerProps {
  * TimePicker — selector de hora en formato 24h (HH:mm).
  * Reemplaza <Input type="time"> con una UI consistente en todos los browsers.
  *
- * Muestra dos spinners numéricos (horas 0-23, minutos 0-59) con el icono de reloj.
+ * Muestra dos campos numéricos (horas 0-23, minutos 0-59) con el icono de reloj.
+ * Optimizado para teclados virtuales (móvil): no emite cambios al padre hasta
+ * que el usuario confirma (blur o avanza al siguiente campo), evitando resets
+ * de foco causados por re-renders.
  */
 export function TimePicker({
   value = '',
@@ -36,8 +39,12 @@ export function TimePicker({
     return value.split(':')[1] ?? ''
   })
 
-  // Sync interno cuando el valor externo cambia
+  // Ref para evitar que el sync externo sobreescriba mientras el usuario edita
+  const isEditingRef = React.useRef(false)
+
+  // Sync interno cuando el valor externo cambia — solo si NO está editando
   React.useEffect(() => {
+    if (isEditingRef.current) return
     if (!value) {
       setHours('')
       setMinutes('')
@@ -48,38 +55,75 @@ export function TimePicker({
     setMinutes(m)
   }, [value])
 
-  const emit = (h: string, m: string) => {
-    if (!h && !m) {
-      onChange?.('')
-      return
-    }
-    const hh = h.padStart(2, '0')
-    const mm = m.padStart(2, '0')
-    onChange?.(`${hh}:${mm}`)
-  }
+  const emit = React.useCallback(
+    (h: string, m: string) => {
+      if (!h && !m) {
+        onChange?.('')
+        return
+      }
+      const hh = h.padStart(2, '0')
+      const mm = m.padStart(2, '0')
+      onChange?.(`${hh}:${mm}`)
+    },
+    [onChange]
+  )
 
-  const handleHours = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let raw = e.target.value.replace(/\D/g, '').slice(0, 2)
-    // Clamp 0-23
-    if (raw !== '' && parseInt(raw, 10) > 23) raw = '23'
-    setHours(raw)
-    emit(raw, minutes)
-  }
-
-  const handleMinutes = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let raw = e.target.value.replace(/\D/g, '').slice(0, 2)
-    // Clamp 0-59
-    if (raw !== '' && parseInt(raw, 10) > 59) raw = '59'
-    setMinutes(raw)
-    emit(hours, raw)
-  }
-
-  // Auto-avanzar al campo minutos al escribir 2 dígitos de hora
   const hoursRef = React.useRef<HTMLInputElement>(null)
   const minutesRef = React.useRef<HTMLInputElement>(null)
 
-  const onHoursKeyUp = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (hours.length === 2) minutesRef.current?.focus()
+  const handleHoursChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let raw = e.target.value.replace(/\D/g, '').slice(0, 2)
+    if (raw !== '' && parseInt(raw, 10) > 23) raw = '23'
+    setHours(raw)
+
+    // Auto-avanzar al campo minutos al completar 2 dígitos
+    if (raw.length === 2) {
+      // Emitir el valor parcial antes de mover foco
+      emit(raw, minutes)
+      // Delay mínimo para que el state se aplique antes del focus change
+      setTimeout(() => minutesRef.current?.focus(), 0)
+    }
+  }
+
+  const handleMinutesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let raw = e.target.value.replace(/\D/g, '').slice(0, 2)
+    if (raw !== '' && parseInt(raw, 10) > 59) raw = '59'
+    setMinutes(raw)
+
+    // Emitir al completar 2 dígitos (UX: el usuario terminó de escribir)
+    if (raw.length === 2) {
+      emit(hours, raw)
+    }
+  }
+
+  const handleFocus = () => {
+    isEditingRef.current = true
+  }
+
+  const handleHoursBlur = () => {
+    // Si solo escribió 1 dígito, emitir al salir
+    emit(hours, minutes)
+    // Solo marcar como no-editing si el foco no va al otro campo
+    setTimeout(() => {
+      if (
+        document.activeElement !== hoursRef.current &&
+        document.activeElement !== minutesRef.current
+      ) {
+        isEditingRef.current = false
+      }
+    }, 0)
+  }
+
+  const handleMinutesBlur = () => {
+    emit(hours, minutes)
+    setTimeout(() => {
+      if (
+        document.activeElement !== hoursRef.current &&
+        document.activeElement !== minutesRef.current
+      ) {
+        isEditingRef.current = false
+      }
+    }, 0)
   }
 
   return (
@@ -98,9 +142,12 @@ export function TimePicker({
         type='text'
         inputMode='numeric'
         value={hours}
-        onChange={handleHours}
-        onKeyUp={onHoursKeyUp}
-        onFocus={e => e.target.select()}
+        onChange={handleHoursChange}
+        onFocus={e => {
+          handleFocus()
+          e.target.select()
+        }}
+        onBlur={handleHoursBlur}
         placeholder='HH'
         maxLength={2}
         disabled={disabled}
@@ -113,8 +160,12 @@ export function TimePicker({
         type='text'
         inputMode='numeric'
         value={minutes}
-        onChange={handleMinutes}
-        onFocus={e => e.target.select()}
+        onChange={handleMinutesChange}
+        onFocus={e => {
+          handleFocus()
+          e.target.select()
+        }}
+        onBlur={handleMinutesBlur}
         placeholder='MM'
         maxLength={2}
         disabled={disabled}

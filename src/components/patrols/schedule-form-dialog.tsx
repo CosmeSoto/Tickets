@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Loader2, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -56,13 +56,21 @@ export function ScheduleFormDialog({
   const { toast } = useToast()
   const [form, setForm] = useState<FormData>(EMPTY_FORM)
 
+  // Solo resetear el formulario cuando el diálogo se abre (open pasa a true)
+  // o cuando initialForm cambia (edición). NO depender de families para evitar
+  // resets accidentales causados por re-fetch de datos del padre.
+  const familiesRef = useRef(families)
+  familiesRef.current = families
+
   useEffect(() => {
+    if (!open) return
     if (initialForm) {
       setForm(initialForm)
     } else {
-      setForm({ ...EMPTY_FORM, familyId: families[0]?.id ?? '' })
+      setForm({ ...EMPTY_FORM, familyId: familiesRef.current[0]?.id ?? '' })
     }
-  }, [open, initialForm, families])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialForm])
 
   const toggleDay = useCallback(
     (localDay: number) => {
@@ -126,7 +134,19 @@ export function ScheduleFormDialog({
       }
       scheduledEndISO = endDate.toISOString()
     } else {
-      scheduledEndISO = new Date(form.scheduledEnd).toISOString()
+      const startDate = new Date(form.scheduledStart)
+      const endDate = new Date(form.scheduledEnd)
+      // Si la hora de fin es anterior o igual a la de inicio pero en el mismo día,
+      // asumimos que cruza medianoche → avanzar al día siguiente.
+      if (
+        endDate <= startDate &&
+        endDate.getFullYear() === startDate.getFullYear() &&
+        endDate.getMonth() === startDate.getMonth() &&
+        endDate.getDate() === startDate.getDate()
+      ) {
+        endDate.setDate(endDate.getDate() + 1)
+      }
+      scheduledEndISO = endDate.toISOString()
     }
 
     const startISO = new Date(form.scheduledStart).toISOString()

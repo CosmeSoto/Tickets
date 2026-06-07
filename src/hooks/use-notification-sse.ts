@@ -207,14 +207,18 @@ export function useNotificationSSE({
           if (data.type === 'session_refresh') {
             // Limpiar cache local de módulos
             window.dispatchEvent(new CustomEvent('modules-updated'))
-            // Recargar con un pequeño delay para que el cache Redis ya esté invalidado
-            // (el servidor invalida antes de emitir el SSE)
-            setTimeout(() => {
-              // Añadir _t para forzar bypass del cache en /api/user/modules
-              const url = new URL(window.location.href)
-              url.searchParams.set('_refresh', Date.now().toString())
-              window.location.href = url.toString()
-            }, 150)
+
+            // Solo forzar reload completo si la cuenta fue desactivada.
+            // Para cambios de permisos/módulos, el evento 'modules-updated' ya
+            // hace que useUserModules recargue los datos en background sin perder
+            // el estado del formulario abierto.
+            if (data.reason === 'account_deactivated') {
+              setTimeout(() => {
+                const url = new URL(window.location.href)
+                url.searchParams.set('_refresh', Date.now().toString())
+                window.location.href = url.toString()
+              }, 150)
+            }
             return
           }
 

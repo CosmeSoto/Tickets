@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Plus, CalendarClock, Pencil, PowerOff, Power, Trash2 } from 'lucide-react'
@@ -140,15 +140,23 @@ export default function SchedulesPage() {
     }
   }, [])
 
+  // Solo cargar familias y agentes una vez al montar (cuando la sesión ya está disponible).
+  // NO depender del objeto session directamente porque su referencia cambia cada vez
+  // que SessionProvider revalida el token (cada 5 min o al volver de otra pestaña),
+  // lo cual causaría re-fetch innecesarios y podría resetear el formulario del diálogo.
+  const hasFetchedRef = React.useRef(false)
+
   useEffect(() => {
     if (status === 'loading') return
     if (!session) {
       router.push('/login')
       return
     }
+    if (hasFetchedRef.current) return
+    hasFetchedRef.current = true
     fetchFamilies()
     fetchAgents()
-  }, [session, status, router, fetchFamilies, fetchAgents])
+  }, [status]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // handleFamilyChange: notifica al padre para cargar rutas y agentes del área seleccionada
   const handleFamilyChange = useCallback(
@@ -213,7 +221,19 @@ export default function SchedulesPage() {
       }
       scheduledEndISO = endDate.toISOString()
     } else {
-      scheduledEndISO = new Date(form.scheduledEnd).toISOString()
+      const startDate = new Date(form.scheduledStart)
+      const endDate = new Date(form.scheduledEnd)
+      // Cruce de medianoche en modo "una sola vez": si fin <= inicio en el mismo día,
+      // asumimos que el fin es al día siguiente.
+      if (
+        endDate <= startDate &&
+        endDate.getFullYear() === startDate.getFullYear() &&
+        endDate.getMonth() === startDate.getMonth() &&
+        endDate.getDate() === startDate.getDate()
+      ) {
+        endDate.setDate(endDate.getDate() + 1)
+      }
+      scheduledEndISO = endDate.toISOString()
     }
 
     const startISO = new Date(form.scheduledStart).toISOString()
