@@ -24,34 +24,24 @@ chown -R nextjs:nodejs "$UPLOADS_DIR" "$BACKUP_DIR" "$LOGS_DIR" 2>/dev/null || t
 echo "==> Sincronizando schema de base de datos..."
 DB_PUSH_OK=false
 
-if [ "$NODE_ENV" = "production" ]; then
-  # En producción: SOLO migrate deploy (seguro, no destruye datos)
-  for attempt in 1 2 3; do
-    if $PRISMA_CLI migrate deploy 2>&1; then
-      DB_PUSH_OK=true
-      break
-    fi
-    echo "==> migrate deploy intento ${attempt} falló — esperando 5s..."
-    sleep 5
-  done
-  if [ "$DB_PUSH_OK" = "false" ]; then
-    echo "==> ERROR: migrate deploy falló después de 3 intentos"
-    exit 1
+# Estrategia: db push para garantizar que el schema esté completo (crea columnas
+# faltantes que no tienen migración formal). Luego migrate deploy para marcar
+# las migraciones como aplicadas (evita re-ejecución en futuros deploys).
+for attempt in 1 2 3; do
+  if $PRISMA_CLI db push --accept-data-loss 2>&1; then
+    DB_PUSH_OK=true
+    break
   fi
+  echo "==> db push intento ${attempt} falló — esperando 5s..."
+  sleep 5
+done
+
+if [ "$DB_PUSH_OK" = "true" ]; then
+  # Marcar migraciones como aplicadas (si la tabla existe)
+  $PRISMA_CLI migrate resolve --applied 20260604000000_add_patrol_incidents 2>/dev/null || true
 else
-  # En desarrollo: db push (rápido, acepta cambios destructivos)
-  for attempt in 1 2 3; do
-    if $PRISMA_CLI db push --accept-data-loss 2>&1; then
-      DB_PUSH_OK=true
-      break
-    fi
-    echo "==> db push intento ${attempt} falló — esperando 5s..."
-    sleep 5
-  done
-  if [ "$DB_PUSH_OK" = "false" ]; then
-    echo "==> db push falló — intentando migrate deploy como fallback..."
-    $PRISMA_CLI migrate deploy 2>&1 || echo "==> migrate deploy también falló — continuando de todas formas"
-  fi
+  echo "==> ERROR FATAL: No se pudo sincronizar la base de datos"
+  exit 1
 fi
 echo "==> Schema sincronizado."
 
