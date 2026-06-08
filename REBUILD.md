@@ -9,7 +9,9 @@
 docker compose -f docker-compose.dev.yml down -v
 docker compose -f docker-compose.dev.yml up --build
 
-# Reconstruir solo la app:
+# Reconstruir solo la app (limpiando caché de Next.js):
+docker compose -f docker-compose.dev.yml down app
+docker volume rm $(docker volume ls -q | grep dev_next_cache) 2>/dev/null || true
 docker compose -f docker-compose.dev.yml up -d --build app
 
 # Reconstruir solo Redis:
@@ -72,29 +74,40 @@ npm run dev
 ### Producción
 
 ```bash
-# Despliegue automático (detecta IP, actualiza NEXTAUTH_URL, genera certs, levanta):
-# ⚠️  IMPORTANTE: Este script actualiza NEXTAUTH_URL con la IP actual del servidor.
-# Siempre usar este script para desplegar — no levantar con docker compose directamente
-# sin antes haber corrido este script al menos una vez.
+# ═══════════════════════════════════════════════════════════════════════════════
+# PRIMERA VEZ o cuando algo está roto (rebuild total ~5-10 min):
+# ═══════════════════════════════════════════════════════════════════════════════
+sudo ./start-production.sh --clean
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# DESPUÉS DE HACER CAMBIOS DE CÓDIGO (rebuild incremental ~2-3 min):
+# Solo recompila lo que cambió. NO borra datos ni volúmenes.
+# ═══════════════════════════════════════════════════════════════════════════════
 sudo ./start-production.sh
 
-# Reconstruir desde cero (borra datos):
-docker compose -f docker-compose.prod.yml --env-file .env.production down -v
-docker compose -f docker-compose.prod.yml --env-file .env.production up --build
+# ═══════════════════════════════════════════════════════════════════════════════
+# COMANDOS MANUALES (si prefieres no usar el script):
+# ═══════════════════════════════════════════════════════════════════════════════
 
-# Reconstruir solo la app:
-docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build app
+# Aplicar cambios de código (rebuild incremental, NO borra datos):
 docker compose -f docker-compose.prod.yml --env-file .env.production build app
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d app
 
+# Rebuild total sin caché (si lo anterior no refleja cambios):
+docker compose -f docker-compose.prod.yml --env-file .env.production build --no-cache app
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d app
+
+# Reconstruir desde cero (⚠️ BORRA DATOS de BD, Redis, uploads):
+docker compose -f docker-compose.prod.yml --env-file .env.production down -v
+sudo ./start-production.sh --clean
 
 # Reconstruir solo Redis:
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build redis
 
-# Levantar sin reconstruir:
+# Levantar sin reconstruir (si solo se reinició el servidor):
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d
 
-# Reiniciar servicios:
+# Reiniciar servicios (sin reconstruir):
 docker compose -f docker-compose.prod.yml --env-file .env.production restart app
 docker compose -f docker-compose.prod.yml --env-file .env.production restart redis
 
@@ -130,11 +143,6 @@ docker compose -f docker-compose.prod.yml --env-file .env.production down --remo
 
 # Destruir todo (⚠️ BORRA DATOS):
 docker compose -f docker-compose.prod.yml --env-file .env.production down -v
-
-cd /home/administrador/projects/Tickets
-sudo docker builder prune -f
-sudo ./start-production.sh
-
 ```
 
 ---
@@ -309,7 +317,7 @@ SELECT table_name FROM information_schema.tables WHERE table_name = 'patrol_fami
 | App no arranca                               | `docker logs tickets-app` — verificar DATABASE_URL                                                                                                                                                                           |
 | No accede a gestion.local                    | Verificar `/etc/hosts` y que nginx esté corriendo                                                                                                                                                                            |
 | Certificado SSL no confiable                 | Aceptar excepción o instalar CA de mkcert en clientes                                                                                                                                                                        |
-| **404 en `/api/admin/news` u otros módulos** | **NEXTAUTH_URL incorrecta.** Correr `sudo ./start-production.sh` — detecta la IP y actualiza `.env.production` automáticamente. O editar manualmente: `NEXTAUTH_URL=https://<IP_DEL_SERVIDOR>` y reiniciar el contenedor app |
+| **404 en `/api/admin/news` u otros módulos** | **Imagen Docker desactualizada.** Aplicar cambios con: `sudo ./start-production.sh`. Si persiste, reconstruir sin caché: `sudo ./start-production.sh --clean`. Los datos (BD, uploads) NO se borran. |
 | Módulo carga vacío tras restaurar backup     | Igual que arriba — si se reconstruyó sin `start-production.sh`, el `NEXTAUTH_URL` puede quedar con dominio errado                                                                                                            |
 | Dashboard rondas vacío                       | Verificar que hay patrullas programadas para hoy (UTC-5)                                                                                                                                                                     |
 | Técnico no aparece en categorías             | Verificar `technician_family_assignments` para esa familia                                                                                                                                                                   |

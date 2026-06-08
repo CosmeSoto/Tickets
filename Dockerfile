@@ -24,6 +24,9 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# Limpiar cualquier caché de build previo que pudiera estar en el contexto
+RUN rm -rf .next
+
 # Generar cliente Prisma para Linux
 RUN npx prisma generate
 

@@ -7,7 +7,8 @@
 # y levanta todos los servicios con docker compose.
 #
 # Uso:
-#   sudo ./start-production.sh
+#   sudo ./start-production.sh            # rebuild normal (detecta cambios)
+#   sudo ./start-production.sh --clean    # rebuild total sin caché (primera vez o errores)
 #
 # Requisitos:
 #   - Docker y Docker Compose instalados
@@ -16,6 +17,12 @@
 ##############################################################################
 
 set -e
+
+# ── Parámetros ─────────────────────────────────────────────────────────────────
+CLEAN_BUILD=false
+if [ "$1" = "--clean" ] || [ "$1" = "--no-cache" ]; then
+  CLEAN_BUILD=true
+fi
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DOMAIN="gestion.local"
@@ -166,13 +173,21 @@ fi
 echo "🐳 Levantando servicios con Docker Compose..."
 echo ""
 
-# Limpiar caché de build si hay imágenes rotas previas
-if docker images | grep -q "tickets-app"; then
-  echo "🧹 Limpiando imagen anterior de tickets-app..."
-  docker rmi tickets-app 2>/dev/null || true
+if [ "$CLEAN_BUILD" = true ]; then
+  # ── Rebuild total (primera vez o cuando algo está roto) ──────────────────────
+  echo "🧹 Modo --clean: reconstrucción total sin caché..."
+  COMPOSE_PROJECT=$(basename "$SCRIPT_DIR" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]//g')
+  docker rmi "${COMPOSE_PROJECT}-app" 2>/dev/null || true
+  docker rmi "tickets-app" 2>/dev/null || true
+  docker builder prune -f --filter "until=1h" 2>/dev/null || true
+  docker compose --env-file "$SCRIPT_DIR/.env.production" -f "$SCRIPT_DIR/docker-compose.prod.yml" build --no-cache app
+else
+  # ── Rebuild incremental (detecta cambios en archivos automáticamente) ────────
+  echo "🔨 Rebuild incremental (detecta cambios en código)..."
+  docker compose --env-file "$SCRIPT_DIR/.env.production" -f "$SCRIPT_DIR/docker-compose.prod.yml" build app
 fi
 
-docker compose --env-file "$SCRIPT_DIR/.env.production" -f "$SCRIPT_DIR/docker-compose.prod.yml" up -d --build
+docker compose --env-file "$SCRIPT_DIR/.env.production" -f "$SCRIPT_DIR/docker-compose.prod.yml" up -d
 
 echo ""
 echo "╔══════════════════════════════════════════════════════════════╗"
