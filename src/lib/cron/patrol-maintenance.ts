@@ -11,6 +11,7 @@ export interface PatrolMaintenanceResult {
   photosDeleted: number
   photoErrors: number
   patrolsMissed: number
+  patrolsAutoClosed: number
   patrolsGenerated: number
   reminderssSent: number
   timestamp: string
@@ -25,6 +26,7 @@ export async function runPatrolMaintenanceJobs(): Promise<PatrolMaintenanceResul
   let photosDeleted = 0
   let photoErrors = 0
   let patrolsMissed = 0
+  let patrolsAutoClosed = 0
   let patrolsGenerated = 0
   let reminderssSent = 0
 
@@ -35,11 +37,18 @@ export async function runPatrolMaintenanceJobs(): Promise<PatrolMaintenanceResul
     console.error('[patrol-maintenance] Error en job de recordatorios:', err)
   }
 
-  // 2. Detección de patrullas perdidas
+  // 2. Detección de patrullas perdidas (PENDING que expiraron sin iniciar)
   try {
     patrolsMissed = await PatrolSchedulerService.detectMissedPatrols()
   } catch (err) {
     console.error('[patrol-maintenance] Error en job de detección de patrullas perdidas:', err)
+  }
+
+  // 2b. Cierre automático de patrullas IN_PROGRESS que vencieron sin finalizar
+  try {
+    patrolsAutoClosed = await PatrolSchedulerService.autoCloseExpiredPatrols()
+  } catch (err) {
+    console.error('[patrol-maintenance] Error en job de cierre automático de rondas vencidas:', err)
   }
 
   // 3. Regeneración de patrullas futuras para schedules activos con recurrencia
@@ -61,5 +70,13 @@ export async function runPatrolMaintenanceJobs(): Promise<PatrolMaintenanceResul
     }
   }
 
-  return { photosDeleted, photoErrors, patrolsMissed, patrolsGenerated, reminderssSent, timestamp }
+  return {
+    photosDeleted,
+    photoErrors,
+    patrolsMissed,
+    patrolsAutoClosed,
+    patrolsGenerated,
+    reminderssSent,
+    timestamp,
+  }
 }
