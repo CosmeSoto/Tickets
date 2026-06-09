@@ -72,33 +72,40 @@ npm run dev
 ### Producción
 
 ```bash
-# Despliegue automático (detecta IP, hace git pull, actualiza NEXTAUTH_URL, genera certs, levanta):
-# ⚠️  IMPORTANTE: Este script actualiza NEXTAUTH_URL con la IP actual del servidor.
-# Siempre usar este script para desplegar — no levantar con docker compose directamente
-# sin antes haber corrido este script al menos una vez.
-
-# DESPUÉS DE HACER CAMBIOS DE CÓDIGO (rebuild incremental ~2-3 min):
-# Hace git pull + reconstruye solo lo que cambió. NO borra datos ni volúmenes.
-sudo ./start-production.sh
-
+# ═══════════════════════════════════════════════════════════════════════════════
 # PRIMERA VEZ o cuando algo está roto (rebuild total ~5-10 min):
-# Hace git pull + borra volúmenes + reconstruye todo desde cero.
-# ⚠️  BORRA LOS DATOS de la base de datos.
+# ═══════════════════════════════════════════════════════════════════════════════
 sudo ./start-production.sh --clean
 
-# Reconstruir solo la app:
-docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build app
+# ═══════════════════════════════════════════════════════════════════════════════
+# DESPUÉS DE HACER CAMBIOS DE CÓDIGO (rebuild incremental ~2-3 min):
+# Solo recompila lo que cambió. NO borra datos ni volúmenes.
+# ═══════════════════════════════════════════════════════════════════════════════
+sudo ./start-production.sh
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# COMANDOS MANUALES (si prefieres no usar el script):
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Aplicar cambios de código (rebuild incremental, NO borra datos):
 docker compose -f docker-compose.prod.yml --env-file .env.production build app
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d app
 
+# Rebuild total sin caché (si lo anterior no refleja cambios):
+docker compose -f docker-compose.prod.yml --env-file .env.production build --no-cache app
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d app
+
+# Reconstruir desde cero (⚠️ BORRA DATOS de BD, Redis, uploads):
+docker compose -f docker-compose.prod.yml --env-file .env.production down -v
+sudo ./start-production.sh --clean
 
 # Reconstruir solo Redis:
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build redis
 
-# Levantar sin reconstruir:
+# Levantar sin reconstruir (si solo se reinició el servidor):
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d
 
-# Reiniciar servicios:
+# Reiniciar servicios (sin reconstruir):
 docker compose -f docker-compose.prod.yml --env-file .env.production restart app
 docker compose -f docker-compose.prod.yml --env-file .env.production restart redis
 
@@ -131,15 +138,9 @@ docker compose -f docker-compose.prod.yml --env-file .env.production start
 
 # Eliminar contenedores huérfanos:
 docker compose -f docker-compose.prod.yml --env-file .env.production down --remove-orphans
-
-# Destruir todo (⚠️ BORRA DATOS):
-docker compose -f docker-compose.prod.yml --env-file .env.production down -v
-
-cd /home/administrador/projects/Tickets
-sudo docker builder prune -f
-sudo ./start-production.sh
-
 ```
+
+> ⚠️ **IMPORTANTE:** `start-production.sh` detecta la IP, hace `git pull`, actualiza `NEXTAUTH_URL` y regenera certificados SSL si cambia la IP. Siempre úsalo para desplegar — no levantes con `docker compose` directamente sin haberlo corrido al menos una vez.
 
 ---
 
