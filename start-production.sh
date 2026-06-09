@@ -25,10 +25,27 @@ MARKER="# gestion-local-auto"
 CERTS_DIR="$SCRIPT_DIR/docker/certs"
 ENV_FILE="$SCRIPT_DIR/.env.production"
 
+# ── Modo clean (--clean borra volúmenes antes de levantar) ────────────────────
+CLEAN_MODE=false
+for arg in "$@"; do
+  if [ "$arg" = "--clean" ]; then
+    CLEAN_MODE=true
+  fi
+done
+
 echo "╔══════════════════════════════════════════════════════════════╗"
 echo "║        Sistema de Gestión — Inicio de Producción Local      ║"
 echo "╚══════════════════════════════════════════════════════════════╝"
 echo ""
+
+# ── 0. Sincronizar código con el repositorio ───────────────────────────────────
+if git -C "$SCRIPT_DIR" rev-parse --is-inside-work-tree &>/dev/null; then
+  echo "🔄 Sincronizando código con el repositorio..."
+  git -C "$SCRIPT_DIR" pull --ff-only origin main 2>&1 && echo "✅ Código actualizado" || {
+    echo "⚠️  No se pudo hacer git pull (sin red o conflictos). Continuando con el código actual."
+  }
+  echo ""
+fi
 
 # ── 1. Detectar IP actual ──────────────────────────────────────────────────────
 get_local_ip() {
@@ -170,6 +187,12 @@ echo ""
 if docker images | grep -q "tickets-app"; then
   echo "🧹 Limpiando imagen anterior de tickets-app..."
   docker rmi tickets-app 2>/dev/null || true
+fi
+
+if [ "$CLEAN_MODE" = true ]; then
+  echo "🧨 Modo --clean: deteniendo servicios y borrando volúmenes..."
+  docker compose --env-file "$SCRIPT_DIR/.env.production" -f "$SCRIPT_DIR/docker-compose.prod.yml" down -v 2>/dev/null || true
+  echo "✅ Volúmenes eliminados (rebuild total)"
 fi
 
 docker compose --env-file "$SCRIPT_DIR/.env.production" -f "$SCRIPT_DIR/docker-compose.prod.yml" up -d --build

@@ -72,15 +72,19 @@ npm run dev
 ### Producción
 
 ```bash
-# Despliegue automático (detecta IP, actualiza NEXTAUTH_URL, genera certs, levanta):
+# Despliegue automático (detecta IP, hace git pull, actualiza NEXTAUTH_URL, genera certs, levanta):
 # ⚠️  IMPORTANTE: Este script actualiza NEXTAUTH_URL con la IP actual del servidor.
 # Siempre usar este script para desplegar — no levantar con docker compose directamente
 # sin antes haber corrido este script al menos una vez.
+
+# DESPUÉS DE HACER CAMBIOS DE CÓDIGO (rebuild incremental ~2-3 min):
+# Hace git pull + reconstruye solo lo que cambió. NO borra datos ni volúmenes.
 sudo ./start-production.sh
 
-# Reconstruir desde cero (borra datos):
-docker compose -f docker-compose.prod.yml --env-file .env.production down -v
-docker compose -f docker-compose.prod.yml --env-file .env.production up --build
+# PRIMERA VEZ o cuando algo está roto (rebuild total ~5-10 min):
+# Hace git pull + borra volúmenes + reconstruye todo desde cero.
+# ⚠️  BORRA LOS DATOS de la base de datos.
+sudo ./start-production.sh --clean
 
 # Reconstruir solo la app:
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build app
