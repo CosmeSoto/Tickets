@@ -239,9 +239,20 @@ export default function PatrolExecutionPage() {
 
         const data = await res.json()
         if (!res.ok) {
+          let errorTitle = 'Check-in rechazado'
+          let errorDesc = data.error ?? 'Token inválido'
+
+          if (data.code === 'CHECKPOINT_ALREADY_VISITED') {
+            errorTitle = 'Ya registrado'
+            errorDesc = 'Este punto de control ya fue escaneado en esta ronda.'
+          } else if (data.code === 'SCAN_WINDOW_EXPIRED') {
+            errorTitle = 'Tiempo expirado'
+            errorDesc = data.error ?? 'El tiempo de escaneo para esta ronda ya expiró.'
+          }
+
           toast({
-            title: 'Check-in rechazado',
-            description: data.error ?? 'Token inválido',
+            title: errorTitle,
+            description: errorDesc,
             variant: 'destructive',
           })
           return
@@ -483,7 +494,9 @@ export default function PatrolExecutionPage() {
                 lastCheckInId ?? patrol.checkIns[patrol.checkIns.length - 1]?.id ?? patrolId
               }
               incidentCategoryId={patrol.familyConfig?.patrolIncidentCategoryId}
-              onIncidentCreated={() => toast({ title: 'Incidente reportado' })}
+              onIncidentCreated={ticketId => {
+                setLastCheckInId(ticketId)
+              }}
             />
           </div>
         )}

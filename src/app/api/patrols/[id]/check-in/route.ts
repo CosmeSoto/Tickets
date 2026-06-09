@@ -15,8 +15,6 @@ import { PatrolGeofenceService } from '@/lib/services/patrol-geofence.service'
 import { PatrolPhotoService } from '@/lib/services/patrol-photo.service'
 import { calculateCompletionPercentage } from '@/lib/patrol/patrol-completion'
 import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
-import { NotificationService } from '@/lib/services/notification-service'
-import { NotificationType } from '@prisma/client'
 
 const checkInSchema = z.object({
   checkpointId: z.string().uuid(),
@@ -45,6 +43,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         id: true,
         agentId: true,
         familyId: true,
+        scheduleId: true,
         status: true,
         scheduledStart: true,
         scheduledEnd: true,
@@ -105,17 +104,77 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const checkpoint = routeCheckpoint.checkpoint
 
-    // Obtener config de familia
-    const familyConfig = await prisma.patrol_family_config.findUnique({
-      where: { familyId: patrol.familyId },
-      select: {
-        qrWindowMinutes: true,
-        geofenceRadiusMeters: true,
-        alertCompletionThreshold: true,
-      },
-    })
+    // Obtener config de familia y override de la programación en paralelo
+    const [familyConfig, scheduleConfig] = await Promise.all([
+      prisma.patrol_family_config.findUnique({
+        where: { familyId: patrol.familyId },
+        select: {
+          qrWindowMinutes: true,
+          geofenceRadiusMeters: true,
+          alertCompletionThreshold: true,
+          gracePeriodMinutes: true,
+          strictTimeValidation: true,
+        },
+      }),
+      patrol.scheduleId
+        ? prisma.patrol_schedules.findUnique({
+            where: { id: patrol.scheduleId },
+            select: { overrideTimeValidation: true },
+          })
+        : Promise.resolve(null),
+    ])
     const qrWindowMinutes = familyConfig?.qrWindowMinutes ?? 5
     const familyRadius = familyConfig?.geofenceRadiusMeters ?? 50
+
+    // ── Validar ventana de tiempo para escanear ────────────────────────────
+    // Jerarquía igual que al iniciar la patrulla:
+    //   1. overrideTimeValidation del schedule (si no es null) → prioridad
+    //   2. strictTimeValidation de la familia → default
+    const strictTimeValidation =
+      scheduleConfig?.overrideTimeValidation !== null &&
+      scheduleConfig?.overrideTimeValidation !== undefined
+        ? scheduleConfig.overrideTimeValidation
+        : (familyConfig?.strictTimeValidation ?? true)
+
+    if (strictTimeValidation) {
+      const now = new Date()
+      const gracePeriodMinutes = familyConfig?.gracePeriodMinutes ?? 15
+      const latestScan = new Date(patrol.scheduledEnd.getTime() + gracePeriodMinutes * 60 * 1000)
+
+      if (now > latestScan) {
+        const minutesPast = Math.floor((now.getTime() - patrol.scheduledEnd.getTime()) / 60000)
+        const h = Math.floor(minutesPast / 60)
+        const m = minutesPast % 60
+        const timeLabel = h > 0 && m > 0 ? `${h}h ${m}min` : h > 0 ? `${h}h` : `${m} minutos`
+        return NextResponse.json(
+          {
+            error: `El tiempo de escaneo para esta ronda ya expiró hace ${timeLabel}. No se pueden registrar más check-ins.`,
+            code: 'SCAN_WINDOW_EXPIRED',
+          },
+          { status: 422 }
+        )
+      }
+    }
+
+    // ── Validar si el checkpoint ya fue visitado (re-escaneo) ─────────────
+    const existingValidCheckIn = await prisma.patrol_check_ins.findFirst({
+      where: {
+        patrolId,
+        checkpointId: data.checkpointId,
+        validationResult: 'VALID',
+      },
+      select: { id: true, serverTimestamp: true },
+    })
+
+    if (existingValidCheckIn) {
+      return NextResponse.json(
+        {
+          error: 'Este checkpoint ya fue registrado en esta ronda. No se permiten re-escaneos.',
+          code: 'CHECKPOINT_ALREADY_VISITED',
+        },
+        { status: 409 }
+      )
+    }
 
     // ── Validar foto requerida ─────────────────────────────────────────────
     // Solo se exige foto cuando el checkpoint está marcado como sensible.
