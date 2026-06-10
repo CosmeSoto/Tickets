@@ -214,6 +214,41 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
     }
 
+    // ── Guardia de cambio de rol ──────────────────────────────────────────────
+    // Si el rol cambia, verificar que el usuario no tenga trabajo activo en
+    // ningún módulo habilitado antes de permitir el cambio.
+    if (
+      session.user.role === 'ADMIN' &&
+      validatedData.role &&
+      validatedData.role !== currentUser.role
+    ) {
+      try {
+        const { UserModuleGuardService, ModuleDisableBlockedError } =
+          await import('@/lib/services/user-module-guard.service')
+        await UserModuleGuardService.assertCanChangeRole({
+          userId: targetId,
+          userName: currentUser.name,
+          currentRole: currentUser.role,
+          newRole: validatedData.role,
+        })
+      } catch (guardErr: any) {
+        const { ModuleDisableBlockedError } =
+          await import('@/lib/services/user-module-guard.service')
+        if (guardErr instanceof ModuleDisableBlockedError) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: `No se puede cambiar el rol de ${guardErr.userName}: tiene trabajo activo pendiente.`,
+              blockers: guardErr.blockers,
+              context: 'role',
+            },
+            { status: 422 }
+          )
+        }
+        throw guardErr
+      }
+    }
+
     // Actualizar el usuario
     const user = await UserService.updateUser(targetId, validatedData)
 

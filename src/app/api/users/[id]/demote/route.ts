@@ -8,18 +8,12 @@ import { randomUUID } from 'crypto'
  * Endpoint para convertir un técnico a cliente
  * Valida que no tenga tickets pendientes ni asignaciones activas
  */
-export async function POST(
-  _request: NextRequest,
-  context: { params: Promise<{ id: string }> }
-) {
+export async function POST(_request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
 
     if (!session || session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { success: false, error: 'No autorizado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ success: false, error: 'No autorizado' }, { status: 401 })
     }
 
     const params = await context.params
@@ -27,14 +21,11 @@ export async function POST(
 
     // Verificar que el usuario existe y es técnico
     const user = await prisma.users.findUnique({
-      where: { id: userId }
+      where: { id: userId },
     })
 
     if (!user) {
-      return NextResponse.json(
-        { success: false, error: 'Usuario no encontrado' },
-        { status: 404 }
-      )
+      return NextResponse.json({ success: false, error: 'Usuario no encontrado' }, { status: 404 })
     }
 
     if (user.role !== 'TECHNICIAN') {
@@ -44,52 +35,30 @@ export async function POST(
       )
     }
 
-    // Contar tickets pendientes
-    const pendingTickets = await prisma.tickets.count({
-      where: {
-        assigneeId: userId,
-        status: {
-          in: ['OPEN', 'IN_PROGRESS']
-        }
+    // Validar que no tenga trabajo activo en ningún módulo habilitado
+    try {
+      const { UserModuleGuardService, ModuleDisableBlockedError } =
+        await import('@/lib/services/user-module-guard.service')
+      await UserModuleGuardService.assertCanChangeRole({
+        userId,
+        userName: user.name,
+        currentRole: 'TECHNICIAN',
+        newRole: 'CLIENT',
+      })
+    } catch (guardErr: any) {
+      const { ModuleDisableBlockedError } = await import('@/lib/services/user-module-guard.service')
+      if (guardErr instanceof ModuleDisableBlockedError) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `No se puede degradar a ${user.name}: tiene trabajo activo pendiente.`,
+            blockers: guardErr.blockers,
+            context: 'role',
+          },
+          { status: 422 }
+        )
       }
-    })
-
-    if (pendingTickets > 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'No se puede convertir a cliente',
-          details: {
-            reason: 'tickets_pending',
-            message: `El técnico tiene ${pendingTickets} ticket(s) pendiente(s). Debe resolver o reasignar todos los tickets antes de convertirlo a cliente.`,
-            pendingTickets
-          }
-        },
-        { status: 400 }
-      )
-    }
-
-    // Contar asignaciones activas
-    const activeAssignments = await prisma.technician_assignments.count({
-      where: {
-        technicianId: userId,
-        isActive: true
-      }
-    })
-
-    if (activeAssignments > 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'No se puede convertir a cliente',
-          details: {
-            reason: 'assignments_active',
-            message: `El técnico tiene ${activeAssignments} asignación(es) de categoría(s) activa(s). Debe eliminar todas las asignaciones antes de convertirlo a cliente.`,
-            activeAssignments
-          }
-        },
-        { status: 400 }
-      )
+      throw guardErr
     }
 
     // Convertir a cliente
@@ -97,8 +66,8 @@ export async function POST(
       where: { id: userId },
       data: {
         role: 'CLIENT',
-        updatedAt: new Date()
-      }
+        updatedAt: new Date(),
+      },
     })
 
     // Registrar en auditoría
@@ -113,17 +82,19 @@ export async function POST(
           previousRole: 'TECHNICIAN',
           newRole: 'CLIENT',
           userName: user.name,
-          userEmail: user.email
+          userEmail: user.email,
         },
-        createdAt: new Date()
-      }
+        createdAt: new Date(),
+      },
     })
 
     // Invalidar cache de usuarios
     try {
       const { invalidateCache } = await import('@/lib/api-cache')
       await invalidateCache(['users:*'])
-    } catch { /* Redis no disponible */ }
+    } catch {
+      /* Redis no disponible */
+    }
 
     return NextResponse.json({
       success: true,
@@ -132,8 +103,8 @@ export async function POST(
         id: updatedUser.id,
         name: updatedUser.name,
         email: updatedUser.email,
-        role: updatedUser.role
-      }
+        role: updatedUser.role,
+      },
     })
   } catch (error) {
     console.error('[CRITICAL] Error demoting technician:', error)
@@ -141,7 +112,7 @@ export async function POST(
       {
         success: false,
         error: 'Error al convertir técnico a cliente',
-        details: error instanceof Error ? error.message : 'Error desconocido'
+        details: error instanceof Error ? error.message : 'Error desconocido',
       },
       { status: 500 }
     )
