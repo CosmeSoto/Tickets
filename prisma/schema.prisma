@@ -1011,7 +1011,7 @@ model equipment {
   typeId                String                    @map("type_id")
   departmentId          String?                   @map("department_id")
   status                EquipmentStatus           @default(AVAILABLE)
-  condition             EquipmentCondition        @default(GOOD)
+  condition             EquipmentCondition        @default(USED)
   ownershipType         OwnershipType             @default(FIXED_ASSET) @map("ownership_type")
   purchaseDate          DateTime?                 @map("purchase_date")
   purchasePrice         Float?                    @map("purchase_price")
@@ -1892,10 +1892,8 @@ enum EquipmentStatus {
 
 enum EquipmentCondition {
   NEW
-  LIKE_NEW
-  GOOD
-  FAIR
-  POOR
+  USED
+  DAMAGED
 }
 
 enum OwnershipType {

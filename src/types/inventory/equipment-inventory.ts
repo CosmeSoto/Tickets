@@ -26,6 +26,6 @@ export interface EquipmentFilters {
 
 export type EquipmentStatus = 'AVAILABLE' | 'ASSIGNED' | 'MAINTENANCE' | 'RETIRED' | 'LOST' | 'SOLD'
 
-export type EquipmentCondition = 'NEW' | 'GOOD' | 'FAIR' | 'POOR'
+export type EquipmentCondition = 'NEW' | 'USED' | 'DAMAGED'
 
 export type OwnershipType = 'FIXED_ASSET' | 'RENTAL' | 'LOAN'

@@ -171,7 +171,7 @@ export function BulkEquipmentForm({
       model: prefillData?.model || '',
       typeId: prefillData?.typeId || '',
       departmentId: prefillData?.departmentId || '',
-      condition: prefillData?.condition || 'GOOD',
+      condition: prefillData?.condition || 'USED',
       ownershipType: 'FIXED_ASSET',
       ...prefillData,
     },
@@ -782,10 +782,8 @@ export function BulkEquipmentForm({
               onChange={e => setValue('condition', e.target.value as any)}
             >
               <option value='NEW'>Nuevo</option>
-              <option value='LIKE_NEW'>Como Nuevo</option>
-              <option value='GOOD'>Bueno</option>
-              <option value='FAIR'>Regular</option>
-              <option value='POOR'>Malo</option>
+              <option value='USED'>Usado</option>
+              <option value='DAMAGED'>Dañado</option>
             </SimpleSelect>
           </div>
           {isVisible('WAREHOUSE') && (

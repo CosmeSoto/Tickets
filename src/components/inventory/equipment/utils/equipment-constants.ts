@@ -25,10 +25,8 @@ export const STATUS_COLORS: Record<string, string> = {
 
 export const CONDITION_LABELS: Record<string, string> = {
   NEW: 'Nuevo',
-  LIKE_NEW: 'Como Nuevo',
-  GOOD: 'Bueno',
-  FAIR: 'Regular',
-  POOR: 'Malo',
+  USED: 'Usado',
+  DAMAGED: 'Dañado',
 }
 
 export const TYPE_LABELS: Record<string, string> = {

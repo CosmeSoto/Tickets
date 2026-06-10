@@ -491,15 +491,15 @@ export function EquipmentAssetForm({
   // Estados permitidos por condición
   const allowedStatusesByCondition: Record<string, string[]> = {
     NEW: ['AVAILABLE', 'ASSIGNED', 'MAINTENANCE', 'FOR_SALE'],
-    GOOD: ['AVAILABLE', 'ASSIGNED', 'MAINTENANCE', 'FOR_SALE'],
-    POOR: ['DAMAGED', 'FOR_SALE', 'RETIRED'],
+    USED: ['AVAILABLE', 'ASSIGNED', 'MAINTENANCE', 'FOR_SALE'],
+    DAMAGED: ['DAMAGED', 'FOR_SALE', 'RETIRED'],
   }
 
   // Mensajes informativos por condición
   const conditionMessage: Record<string, string> = {
     NEW: 'Activo nuevo — información financiera obligatoria.',
-    GOOD: 'Se puede asignar, poner en mantenimiento o vender.',
-    POOR: 'Se puede vender como piezas, dar de baja o marcar como dañado.',
+    USED: 'Se puede asignar, poner en mantenimiento o vender.',
+    DAMAGED: 'Se puede vender como piezas, dar de baja o marcar como dañado.',
   }
 
   // Lógica de campos visibles
@@ -509,7 +509,7 @@ export function EquipmentAssetForm({
     condition === 'NEW'
 
   const showEstimatedPrice =
-    (condition === 'GOOD' || condition === 'POOR') && acquisitionMode === 'FIXED_ASSET'
+    (condition === 'USED' || condition === 'DAMAGED') && acquisitionMode === 'FIXED_ASSET'
 
   // Estado actualizado solo si es permitido por la condición
   useEffect(() => {
@@ -789,8 +789,8 @@ export function EquipmentAssetForm({
           </Label>
           <SimpleSelect value={condition} onChange={e => setCondition(e.target.value)}>
             <option value='NEW'>Nuevo</option>
-            <option value='GOOD'>Bueno</option>
-            <option value='POOR'>Malo</option>
+            <option value='USED'>Usado</option>
+            <option value='DAMAGED'>Dañado</option>
           </SimpleSelect>
           {conditionMessage[condition] && (
             <p

@@ -25,7 +25,7 @@ export const individualEquipmentSchema = z.object({
   physicalLocation: z.string().optional(),
 
   condition: z
-    .enum(['NEW', 'GOOD', 'FAIR', 'POOR'], {
+    .enum(['NEW', 'USED', 'DAMAGED'], {
       errorMap: () => ({ message: 'Condición inválida' }),
     })
     .optional(),

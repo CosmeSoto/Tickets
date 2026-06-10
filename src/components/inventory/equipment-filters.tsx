@@ -41,10 +41,8 @@ const EQUIPMENT_STATUS_LABELS: Record<EquipmentStatus, string> = {
 
 const EQUIPMENT_CONDITION_LABELS: Record<EquipmentCondition, string> = {
   NEW: 'Nuevo',
-  LIKE_NEW: 'Como Nuevo',
-  GOOD: 'Bueno',
-  FAIR: 'Regular',
-  POOR: 'Malo',
+  USED: 'Usado',
+  DAMAGED: 'Dañado',
 }
 
 export function EquipmentFilters({ filters, onFiltersChange, onReset }: EquipmentFiltersProps) {
