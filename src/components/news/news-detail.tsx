@@ -173,6 +173,7 @@ export function NewsDetail({
   const [replyTo, setReplyTo] = useState<NewsComment | null>(null)
   const [submittingComment, setSubmittingComment] = useState(false)
   const [comments, setComments] = useState<NewsComment[]>([])
+  const [showDates, setShowDates] = useState(false)
   const initializedRef = useRef<string | null>(null)
 
   const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
@@ -729,18 +730,29 @@ export function NewsDetail({
         {news.content}
       </div>
       {(news.startDate || news.endDate) && (
-        <div className='flex items-center gap-2 sm:gap-4 text-xs text-muted-foreground flex-wrap'>
-          {news.startDate && (
-            <span className='flex items-center gap-1'>
-              <Calendar className='h-3 w-3' />
-              Inicio: {new Date(news.startDate).toLocaleDateString('es-EC')}
-            </span>
-          )}
-          {news.endDate && (
-            <span className='flex items-center gap-1'>
-              <Calendar className='h-3 w-3' />
-              Fin: {new Date(news.endDate).toLocaleDateString('es-EC')}
-            </span>
+        <div className='space-y-2'>
+          <button
+            type='button'
+            onClick={() => setShowDates(!showDates)}
+            className='flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors'
+          >
+            <Calendar className='h-3.5 w-3.5' />
+          </button>
+          {showDates && (
+            <div className='flex items-center gap-2 sm:gap-4 text-xs text-muted-foreground flex-wrap'>
+              {news.startDate && (
+                <span className='flex items-center gap-1'>
+                  <Calendar className='h-3 w-3' />
+                  Inicio: {new Date(news.startDate).toLocaleDateString('es-EC')}
+                </span>
+              )}
+              {news.endDate && (
+                <span className='flex items-center gap-1'>
+                  <Calendar className='h-3 w-3' />
+                  Fin: {new Date(news.endDate).toLocaleDateString('es-EC')}
+                </span>
+              )}
+            </div>
           )}
         </div>
       )}
