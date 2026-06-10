@@ -439,6 +439,7 @@ export function RoleDashboardLayout({
     forms: hasForms,
     canRequestAssets,
     canManageInventory: canManageInventoryFromModules,
+    canManageNews: canManageNewsFromModules,
   } = useUserModules()
 
   // Solo ocultar si definitivamente no hay sesión (no durante la carga/revalidación)
@@ -457,7 +458,9 @@ export function RoleDashboardLayout({
     )
   }
 
-  const canManageNews = (session.user as any)?.canManageNews === true
+  // canManageNews: leer del hook (fresco desde DB) — la sesión puede estar desactualizada
+  // si un admin acaba de cambiar el permiso sin que el usuario haya vuelto a hacer login.
+  const canManageNews = canManageNewsFromModules || (session.user as any)?.canManageNews === true
   const userRole = session.user.role as string
   // canManageInventory: usar el valor del hook (siempre fresco desde DB)
   // con fallback a la sesión en caso de que el hook aún esté cargando
