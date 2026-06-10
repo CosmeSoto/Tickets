@@ -176,6 +176,40 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       )
     }
 
+    // ── Validar orden secuencial ───────────────────────────────────────────
+    // El agente debe escanear los checkpoints en el orden definido en la ruta.
+    // Se obtienen los checkpoints requeridos ya visitados y se verifica que el
+    // checkpoint que intenta escanear sea el siguiente en la secuencia.
+    const visitedCheckIns = await prisma.patrol_check_ins.findMany({
+      where: { patrolId, validationResult: 'VALID' },
+      select: { checkpointId: true },
+    })
+    const visitedSet = new Set(visitedCheckIns.map(ci => ci.checkpointId))
+
+    // Ordenar todos los checkpoints de la ruta por su orden
+    const sortedRoute = [...patrol.route.routeCheckpoints].sort((a, b) => a.order - b.order)
+
+    // El siguiente esperado es el primer checkpoint no visitado (en orden)
+    const nextExpected = sortedRoute.find(rc => !visitedSet.has(rc.checkpointId))
+
+    if (nextExpected && nextExpected.checkpointId !== data.checkpointId) {
+      // Buscar el nombre del checkpoint esperado para el mensaje
+      const expectedName = nextExpected.checkpoint.name
+      const attemptedOrder = routeCheckpoint.order
+      const expectedOrder = nextExpected.order
+
+      return NextResponse.json(
+        {
+          error: `Debes escanear el checkpoint #${expectedOrder} (${expectedName}) antes que el #${attemptedOrder}. Sigue el orden de la ruta.`,
+          code: 'CHECKPOINT_OUT_OF_ORDER',
+          expectedCheckpointId: nextExpected.checkpointId,
+          expectedCheckpointName: expectedName,
+          expectedOrder,
+        },
+        { status: 422 }
+      )
+    }
+
     // ── Validar foto requerida ─────────────────────────────────────────────
     // Solo se exige foto cuando el checkpoint está marcado como sensible.
     // La presencia de GPS no implica obligatoriedad de foto.

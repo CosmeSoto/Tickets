@@ -245,6 +245,11 @@ export default function PatrolExecutionPage() {
           if (data.code === 'CHECKPOINT_ALREADY_VISITED') {
             errorTitle = 'Ya registrado'
             errorDesc = 'Este punto de control ya fue escaneado en esta ronda.'
+          } else if (data.code === 'CHECKPOINT_OUT_OF_ORDER') {
+            errorTitle = 'Orden incorrecto'
+            errorDesc =
+              data.error ??
+              `Debes seguir el orden de la ruta. Escanea el checkpoint #${data.expectedOrder} (${data.expectedCheckpointName}) primero.`
           } else if (data.code === 'SCAN_WINDOW_EXPIRED') {
             errorTitle = 'Tiempo expirado'
             errorDesc = data.error ?? 'El tiempo de escaneo para esta ronda ya expiró.'
@@ -516,6 +521,7 @@ export default function PatrolExecutionPage() {
               visitedIds={visitedIds}
               currentCheckpointId={nextCheckpoint?.checkpoint.id}
               estimatedDurationMinutes={patrol.route.estimatedDurationMinutes}
+              scheduledStart={patrol.scheduledStart}
               onCheckpointClick={isInProgress ? () => setScannerActive(true) : undefined}
             />
           </CardContent>
