@@ -28,6 +28,7 @@ import {
   Download,
   ChevronLeft,
   ChevronRight,
+  FileText,
 } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -39,6 +40,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useToast } from '@/hooks/use-toast'
 import { detectMedia } from '@/components/common/media-url-input'
+import { FilePreviewModal, PreviewFile } from '@/components/ui/file-preview-modal'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -174,6 +176,7 @@ export function NewsDetail({
   const [submittingComment, setSubmittingComment] = useState(false)
   const [comments, setComments] = useState<NewsComment[]>([])
   const [showDates, setShowDates] = useState(false)
+  const [previewFile, setPreviewFile] = useState<PreviewFile | null>(null)
   const initializedRef = useRef<string | null>(null)
 
   const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
@@ -705,22 +708,50 @@ export function NewsDetail({
           </p>
           <div className='space-y-1'>
             {downloadAttachments.map(att => (
-              <a
+              <div
                 key={att.id}
-                href={`/api/news/${news.id}/attachments/${att.id}/file`}
-                target='_blank'
-                rel='noopener noreferrer'
-                className='flex items-center gap-2.5 p-2 rounded-lg border bg-muted/30 hover:bg-muted/60 transition-colors group'
+                className='flex items-center justify-between gap-2.5 p-2 rounded-lg border bg-muted/30 hover:bg-muted/60 transition-colors'
               >
-                <span className='text-lg flex-shrink-0'>{getFileIcon(att.mimeType)}</span>
-                <div className='flex-1 min-w-0'>
-                  <p className='text-sm font-medium truncate'>{att.originalName}</p>
-                  {att.size > 0 && (
-                    <p className='text-xs text-muted-foreground'>{formatSize(att.size)}</p>
-                  )}
+                <div className='flex items-center gap-2.5 min-w-0'>
+                  <span className='text-lg flex-shrink-0'>{getFileIcon(att.mimeType)}</span>
+                  <div className='flex-1 min-w-0'>
+                    <p className='text-sm font-medium truncate'>{att.originalName}</p>
+                    {att.size > 0 && (
+                      <p className='text-xs text-muted-foreground'>{formatSize(att.size)}</p>
+                    )}
+                  </div>
                 </div>
-                <Download className='h-3.5 w-3.5 text-muted-foreground group-hover:text-foreground transition-colors flex-shrink-0' />
-              </a>
+                <div className='flex items-center gap-1'>
+                  <Button
+                    variant='outline'
+                    size='sm'
+                    className='h-8'
+                    onClick={() => {
+                      setPreviewFile({
+                        id: att.id,
+                        originalName: att.originalName,
+                        mimeType: att.mimeType,
+                        size: att.size,
+                        url: `/api/news/${news.id}/attachments/${att.id}/file?preview=true`,
+                        downloadUrl: `/api/news/${news.id}/attachments/${att.id}/file`,
+                      })
+                    }}
+                  >
+                    <FileText className='h-3.5 w-3.5 mr-1.5' />
+                    Vista previa
+                  </Button>
+                  <Button variant='outline' size='sm' className='h-8' asChild>
+                    <a
+                      href={`/api/news/${news.id}/attachments/${att.id}/file`}
+                      target='_blank'
+                      rel='noopener noreferrer'
+                    >
+                      <Download className='h-3.5 w-3.5 mr-1.5' />
+                      Descargar
+                    </a>
+                  </Button>
+                </div>
+              </div>
             ))}
           </div>
         </div>
@@ -886,6 +917,11 @@ export function NewsDetail({
           </Tabs>
         )}
       </DialogContent>
+      <FilePreviewModal
+        isOpen={!!previewFile}
+        onClose={() => setPreviewFile(null)}
+        file={previewFile}
+      />
     </Dialog>
   )
 }

@@ -152,7 +152,9 @@ export function DocumentFormDialog({
         <DialogHeader>
           <DialogTitle>{editingForm ? 'Editar documento' : 'Nuevo documento'}</DialogTitle>
           <DialogDescription>
-            Complete la información para {editingForm ? 'actualizar' : 'crear'} el documento
+            Complete la información para {editingForm ? 'actualizar' : 'crear'} el documento o
+            formulario que los colaboradores utilizarán para gestionar solicitudes y procesos
+            internos.
           </DialogDescription>
         </DialogHeader>
 
@@ -164,6 +166,7 @@ export function DocumentFormDialog({
                 Título <span className='text-destructive'>*</span>
               </Label>
               <Input
+                placeholder='Ej: Solicitud de permiso laboral'
                 required
                 value={formData.title}
                 onChange={e => setFormData(p => ({ ...p, title: e.target.value }))}
