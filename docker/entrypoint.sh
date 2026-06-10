@@ -20,6 +20,52 @@ LOGS_DIR="/app/logs"
 mkdir -p "$UPLOADS_DIR" "$BACKUP_DIR" "$LOGS_DIR"
 chown -R nextjs:nodejs "$UPLOADS_DIR" "$BACKUP_DIR" "$LOGS_DIR" 2>/dev/null || true
 
+# ── 0b. Pre-migración: limpiar bodegas sin familia antes del db push ─────────
+# Las bodegas deben pertenecer siempre a una familia (family_id NOT NULL desde
+# schema actual). Si existen registros con family_id = NULL de versiones anteriores,
+# el db push fallaría al intentar SET NOT NULL. Este bloque los elimina primero
+# solo si no tienen ítems asignados; si los tienen, los marca como inactivos para
+# evitar pérdida de datos y permite que el operador los reasigne manualmente.
+echo "==> Verificando bodegas huérfanas (sin familia)..."
+node -e "
+const { PrismaClient } = require('@prisma/client');
+const p = new PrismaClient();
+async function fixOrphans() {
+  let fixed = 0, warned = 0;
+  try {
+    // Solo actúa si la columna family_id acepta NULL todavía
+    const orphans = await p.\$queryRaw\`
+      SELECT w.id, w.name,
+        (SELECT COUNT(*) FROM equipment WHERE warehouse_id = w.id) +
+        (SELECT COUNT(*) FROM consumables WHERE warehouse_id = w.id) +
+        (SELECT COUNT(*) FROM equipment_batches WHERE warehouse_id = w.id) AS total_items
+      FROM warehouses w
+      WHERE w.family_id IS NULL
+    \`;
+    for (const row of orphans) {
+      if (Number(row.total_items) === 0) {
+        await p.\$executeRaw\`DELETE FROM warehouses WHERE id = ${row.id}\`;
+        console.log('  Eliminada bodega huérfana sin ítems: ' + row.name);
+        fixed++;
+      } else {
+        await p.\$executeRaw\`UPDATE warehouses SET is_active = false WHERE id = ${row.id}\`;
+        console.warn('  ADVERTENCIA: bodega huérfana con ítems desactivada: ' + row.name + ' — asignar familia manualmente');
+        warned++;
+      }
+    }
+    if (fixed === 0 && warned === 0) console.log('  No hay bodegas huérfanas.');
+  } catch (e) {
+    // Si family_id ya es NOT NULL o la tabla no existe aún, ignorar
+    if (!e.message.includes('null') && !e.message.includes('does not exist')) {
+      console.log('  Pre-check bodegas: ' + e.message);
+    }
+  } finally {
+    await p.\$disconnect();
+  }
+}
+fixOrphans();
+" 2>/dev/null || true
+
 # ── 1. Sincronizar schema de base de datos ───────────────────────────────────
 echo "==> Sincronizando schema de base de datos..."
 DB_PUSH_OK=false

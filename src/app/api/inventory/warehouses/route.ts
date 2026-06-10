@@ -8,7 +8,7 @@ import { randomUUID } from 'crypto'
 /**
  * GET /api/inventory/warehouses
  * Lista bodegas.
- * ?familyId=  → filtra por familia (incluye bodegas sin familia = compartidas)
+ * ?familyId=  → filtra estrictamente por familia (las bodegas son exclusivas por familia)
  * ?includeInactive=true → incluye inactivas (solo ADMIN)
  */
 export async function GET(request: NextRequest) {
@@ -29,15 +29,18 @@ export async function GET(request: NextRequest) {
     const familyId = request.nextUrl.searchParams.get('familyId') ?? undefined
 
     // Determinar filtro de familia
+    // Las bodegas son exclusivas por familia — nunca se comparten entre familias.
+    // Bodegas con familyId=null se consideran huérfanas y solo son visibles para SuperAdmin.
     let familyFilter: Record<string, any> = {}
     if (familyId) {
-      familyFilter = { OR: [{ familyId }, { familyId: null }] }
+      // Filtro estricto: solo bodegas de la familia solicitada
+      familyFilter = { familyId }
     } else if (isAdmin && !(user as any).isSuperAdmin) {
-      // Admin Normal sin familyId explícito: aplicar scope de inventario
+      // Admin Normal sin familyId explícito: aplicar scope de inventario sin incluir globales
       const { buildInventoryFamilyWhere } = await import('@/lib/inventory/scope-filter')
       const { getInventorySessionContext } = await import('@/lib/inventory/inventory-session')
       const scope = (await getInventorySessionContext(user)).scope
-      familyFilter = buildInventoryFamilyWhere(scope.familyIds, true) // includeGlobal=true para bodegas compartidas
+      familyFilter = buildInventoryFamilyWhere(scope.familyIds, false) // includeGlobal=false: no mezclar bodegas entre familias
     }
 
     const warehouses = await (prisma.warehouses.findMany as any)({
@@ -61,6 +64,7 @@ export async function GET(request: NextRequest) {
 /**
  * POST /api/inventory/warehouses
  * Crea una nueva bodega. ADMIN o gestor con canManageInventory.
+ * familyId es REQUERIDO — las bodegas siempre deben pertenecer a una familia.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -78,6 +82,17 @@ export async function POST(request: NextRequest) {
     if (!name?.trim())
       return NextResponse.json({ error: 'El nombre es requerido' }, { status: 400 })
 
+    // Las bodegas deben pertenecer a una familia — no se admiten bodegas globales
+    if (!familyId?.trim())
+      return NextResponse.json(
+        { error: 'La familia (familyId) es requerida para crear una bodega' },
+        { status: 400 }
+      )
+
+    // Verificar que la familia existe
+    const family = await prisma.families.findUnique({ where: { id: familyId } })
+    if (!family) return NextResponse.json({ error: 'Familia no encontrada' }, { status: 404 })
+
     const warehouse = await (prisma.warehouses.create as any)({
       data: {
         id: randomUUID(),
@@ -85,7 +100,7 @@ export async function POST(request: NextRequest) {
         location: location ?? null,
         description: description ?? null,
         managerId: managerId ?? null,
-        familyId: familyId ?? null,
+        familyId: familyId,
       },
       include: {
         manager: { select: { id: true, name: true, email: true } },

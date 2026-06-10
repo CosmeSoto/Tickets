@@ -93,6 +93,14 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
     }
 
+    // No permitir desvincular una bodega de su familia (familyId no puede ser null)
+    if ('familyId' in body && (familyId === null || familyId === '')) {
+      return NextResponse.json(
+        { error: 'No se puede desvincular una bodega de su familia' },
+        { status: 400 }
+      )
+    }
+
     if (managerId !== undefined && managerId !== null) {
       const managerExists = await prisma.users.findUnique({ where: { id: managerId } })
       if (!managerExists) {
@@ -110,7 +118,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         ...(location !== undefined && { location }),
         ...(description !== undefined && { description }),
         ...(managerId !== undefined && { managerId }),
-        ...('familyId' in body && { familyId: familyId ?? null }),
+        // Solo actualizar familyId si se envía un valor válido (nunca null)
+        ...('familyId' in body && familyId && { familyId }),
       },
       include: {
         manager: { select: { id: true, name: true, email: true } },

@@ -116,7 +116,10 @@ async function main() {
   await seedTicketCodeCounters(familyMap)
 
   // 17. BODEGA POR DEFECTO
-  await seedDefaultWarehouse()
+  // NOTA: La bodega por defecto global fue eliminada.
+  // Cada familia gestiona sus propias bodegas (ver seedWarehouses arriba).
+  // Las bodegas sin familyId se consideran huérfanas y no deben existir.
+  await cleanOrphanWarehouses()
 
   // 18. LANDING PAGE
   await seedLandingPage()
@@ -887,24 +890,48 @@ async function seedTicketCodeCounters(familyMap: Map<string, string>) {
 }
 
 // ============================================
-// 17. BODEGA POR DEFECTO
+// 17. LIMPIAR BODEGAS HUÉRFANAS (sin familyId)
 // ============================================
+// Las bodegas deben pertenecer exclusivamente a una familia.
+// Bodegas con familyId=null son huérfanas: se eliminan si no tienen ítems,
+// o se registra una advertencia para corrección manual si tienen ítems asignados.
 
-async function seedDefaultWarehouse() {
-  const existing = await prisma.warehouses.findFirst({ where: { name: 'Bodega Principal' } })
-  if (!existing) {
-    await prisma.warehouses.create({
-      data: {
-        id: randomUUID(),
-        name: 'Bodega Principal',
-        location: 'Instalaciones principales',
-        isActive: true,
-      },
-    })
-    console.log('✅ Bodega Principal creada')
-  } else {
-    console.log('⏭️  Bodega Principal ya existe')
+async function cleanOrphanWarehouses() {
+  const orphans = await prisma.warehouses.findMany({
+    where: { familyId: null },
+    include: {
+      _count: { select: { equipment: true, consumables: true, batches: true } },
+    },
+  })
+
+  if (orphans.length === 0) {
+    console.log('✅ No hay bodegas huérfanas (sin familyId)')
+    return
   }
+
+  let deleted = 0
+  let warned = 0
+
+  for (const warehouse of orphans) {
+    const totalItems =
+      warehouse._count.equipment + warehouse._count.consumables + warehouse._count.batches
+
+    if (totalItems === 0) {
+      await prisma.warehouses.delete({ where: { id: warehouse.id } })
+      deleted++
+    } else {
+      console.warn(
+        `⚠️  Bodega huérfana "${warehouse.name}" (${warehouse.id}) tiene ${totalItems} ítems — asignar familyId manualmente`
+      )
+      warned++
+    }
+  }
+
+  if (deleted > 0) console.log(`🗑️  ${deleted} bodega(s) huérfana(s) eliminada(s)`)
+  if (warned > 0)
+    console.log(
+      `⚠️  ${warned} bodega(s) huérfana(s) con ítems — requieren asignación manual de familia`
+    )
 }
 
 // ============================================
