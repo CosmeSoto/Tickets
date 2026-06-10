@@ -194,6 +194,17 @@ export function ModuleAccessCard({
       {/* Contenido expandible — solo cuando está habilitado */}
       {enabled && (
         <div className='border-t border-primary/20'>
+          {/* Nota de solo lectura para clientes en el módulo de noticias */}
+          {moduleKey === 'news' && role === 'CLIENT' && (
+            <div className='flex items-center gap-2 px-3 py-2 bg-muted/40 border-b border-primary/10'>
+              <Info className='h-3.5 w-3.5 text-muted-foreground shrink-0' />
+              <p className='text-[11px] text-muted-foreground'>
+                Los clientes solo pueden <span className='font-medium'>ver</span> noticias. La
+                gestión (crear, publicar) está disponible desde el rol{' '}
+                <span className='font-medium'>Técnico</span> en adelante.
+              </p>
+            </div>
+          )}
           {/* Opciones específicas del módulo (ej. inventario) */}
           {options && (
             <div className='px-3 py-2 space-y-2 border-b border-primary/10'>

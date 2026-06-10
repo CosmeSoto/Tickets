@@ -128,9 +128,9 @@ export function getModuleRoleDescription(moduleKey: string, role: string): strin
       CLIENT: 'Ejecutar rondas de seguridad asignadas como agente',
     },
     news: {
-      ADMIN: 'Ver noticias y comunicados del sistema',
-      TECHNICIAN: 'Ver noticias y comunicados del sistema',
-      CLIENT: 'Ver noticias y comunicados del sistema',
+      ADMIN: 'Crear, publicar y gestionar noticias y comunicados del sistema',
+      TECHNICIAN: 'Ver noticias · puede habilitarse como redactor para crear y publicar',
+      CLIENT: 'Solo lectura · ve noticias y comunicados publicados para su perfil',
     },
     forms: {
       ADMIN: 'Gestionar documentos del sistema',
