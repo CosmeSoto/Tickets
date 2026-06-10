@@ -676,8 +676,12 @@ export default function AdminNewsPage() {
           }}
           rowActions={item => {
             const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
+            const isAdmin = session?.user?.role === 'ADMIN'
+            const hasManageNews = (session?.user as any)?.canManageNews === true
             const isOwner = item.createdBy.id === session?.user?.id
-            const canModify = isSuperAdmin || isOwner
+            // SuperAdmin y Admin normal: pueden modificar cualquier noticia
+            // TECHNICIAN/CLIENT con canManageNews: solo sus propias noticias
+            const canModify = isSuperAdmin || isAdmin || (hasManageNews && isOwner)
 
             return (
               <div className='flex gap-2'>
