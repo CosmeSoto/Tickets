@@ -59,7 +59,10 @@ export function ArticlePreviewModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className='max-w-4xl max-h-[90vh]' aria-describedby={undefined}>
+      <DialogContent
+        className='max-w-4xl max-h-[90vh] w-[95vw] p-4 sm:p-6'
+        aria-describedby={undefined}
+      >
         <div className='overflow-y-auto max-h-[calc(90vh-20px)]'>
           {loading ? (
             <div className='flex items-center justify-center py-12'>
@@ -68,7 +71,9 @@ export function ArticlePreviewModal({
           ) : article ? (
             <>
               <DialogHeader>
-                <DialogTitle className='text-2xl'>{article.title}</DialogTitle>
+                <DialogTitle className='text-xl sm:text-2xl break-words'>
+                  {article.title}
+                </DialogTitle>
                 <DialogDescription>
                   <div className='flex flex-wrap gap-2 mt-2'>
                     {article.category && (

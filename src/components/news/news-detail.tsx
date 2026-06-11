@@ -795,75 +795,72 @@ export function NewsDetail({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className='sm:max-w-2xl max-h-[90vh] overflow-y-auto max-w-[95vw] w-full p-4 sm:p-6'>
-        <DialogHeader>
-          <div className='flex items-start justify-between gap-2'>
-            <div className='flex-1 min-w-0'>
-              <div className='flex items-center gap-2 mb-1 flex-wrap'>
-                <Badge variant='secondary'>{TYPE_LABELS[news.type] || news.type}</Badge>
-                <Badge className={PRIORITY_COLORS[news.priority]}>
-                  {PRIORITY_LABELS[news.priority] || news.priority}
+        <DialogHeader className='relative'>
+          {/* Acciones de gestión - Siempre en la parte superior derecha */}
+          {mode === 'manage' && canManage && (
+            <div className='flex gap-2 flex-shrink-0 mb-3 sm:absolute sm:top-4 sm:right-4'>
+              {onEdit && (
+                <Button
+                  variant='outline'
+                  size='sm'
+                  onClick={() => {
+                    onClose()
+                    onEdit(news)
+                  }}
+                  className='gap-1.5'
+                >
+                  <Edit className='h-3.5 w-3.5' />
+                  Editar
+                </Button>
+              )}
+              {onDelete && (
+                <Button
+                  variant='outline'
+                  size='sm'
+                  onClick={() => {
+                    onClose()
+                    onDelete(news)
+                  }}
+                  className='gap-1.5 text-destructive hover:text-destructive'
+                >
+                  <Trash2 className='h-3.5 w-3.5' />
+                  Eliminar
+                </Button>
+              )}
+            </div>
+          )}
+
+          <div className='flex-1 min-w-0'>
+            <div className='flex items-center gap-2 mb-2 flex-wrap'>
+              <Badge variant='secondary'>{TYPE_LABELS[news.type] || news.type}</Badge>
+              <Badge className={PRIORITY_COLORS[news.priority]}>
+                {PRIORITY_LABELS[news.priority] || news.priority}
+              </Badge>
+              {news.isFeatured && <Badge className='bg-yellow-500 text-white'>⭐ Destacado</Badge>}
+              {news.status !== 'PUBLISHED' && (
+                <Badge variant='outline' className='text-muted-foreground'>
+                  {news.status === 'DRAFT' ? 'Borrador' : 'Archivado'}
                 </Badge>
-                {news.isFeatured && (
-                  <Badge className='bg-yellow-500 text-white'>⭐ Destacado</Badge>
-                )}
-                {news.status !== 'PUBLISHED' && (
-                  <Badge variant='outline' className='text-muted-foreground'>
-                    {news.status === 'DRAFT' ? 'Borrador' : 'Archivado'}
-                  </Badge>
-                )}
-              </div>
-              <DialogTitle className='text-xl leading-snug break-words overflow-hidden'>
-                {news.title}
-              </DialogTitle>
-              <div className='flex items-center gap-3 mt-2'>
-                <Avatar className='h-7 w-7'>
-                  <AvatarImage src={news.createdBy?.avatar || ''} />
-                  <AvatarFallback className='text-xs'>
-                    {news.createdBy?.name?.charAt(0).toUpperCase() || '?'}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <p className='text-sm font-medium'>{news.createdBy?.name || 'Autor'}</p>
-                  <p className='text-xs text-muted-foreground flex items-center gap-1'>
-                    <Clock className='h-3 w-3' />
-                    {timeAgo}
-                  </p>
-                </div>
+              )}
+            </div>
+            <DialogTitle className='text-xl sm:text-2xl leading-tight whitespace-normal break-words'>
+              {news.title}
+            </DialogTitle>
+            <div className='flex items-center gap-3 mt-3'>
+              <Avatar className='h-8 w-8 flex-shrink-0'>
+                <AvatarImage src={news.createdBy?.avatar || ''} />
+                <AvatarFallback className='text-xs'>
+                  {news.createdBy?.name?.charAt(0).toUpperCase() || '?'}
+                </AvatarFallback>
+              </Avatar>
+              <div className='min-w-0'>
+                <p className='text-sm font-medium truncate'>{news.createdBy?.name || 'Autor'}</p>
+                <p className='text-xs text-muted-foreground flex items-center gap-1'>
+                  <Clock className='h-3 w-3 flex-shrink-0' />
+                  {timeAgo}
+                </p>
               </div>
             </div>
-            {/* Acciones de gestión */}
-            {mode === 'manage' && canManage && (
-              <div className='flex gap-1 flex-shrink-0'>
-                {onEdit && (
-                  <Button
-                    variant='outline'
-                    size='sm'
-                    onClick={() => {
-                      onClose()
-                      onEdit(news)
-                    }}
-                    className='gap-1.5'
-                  >
-                    <Edit className='h-3.5 w-3.5' />
-                    Editar
-                  </Button>
-                )}
-                {onDelete && (
-                  <Button
-                    variant='outline'
-                    size='sm'
-                    onClick={() => {
-                      onClose()
-                      onDelete(news)
-                    }}
-                    className='gap-1.5 text-destructive hover:text-destructive'
-                  >
-                    <Trash2 className='h-3.5 w-3.5' />
-                    Eliminar
-                  </Button>
-                )}
-              </div>
-            )}
           </div>
         </DialogHeader>
 

@@ -737,7 +737,7 @@ export default function AdminNewsPage() {
       </div>
 
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent className='w-[calc(100vw-2rem)] max-w-3xl max-h-[90dvh] overflow-y-auto p-4 sm:p-6'>
+        <DialogContent className='w-[95vw] max-w-4xl max-h-[90dvh] overflow-y-auto p-4 sm:p-6 rounded-lg sm:rounded-xl'>
           <DialogHeader>
             <DialogTitle>{editingNews ? 'Editar noticia' : 'Nueva noticia'}</DialogTitle>
             <DialogDescription>
