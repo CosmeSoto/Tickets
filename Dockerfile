@@ -69,6 +69,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modul
 COPY --chown=nextjs:nodejs docker/migrate-data.sh ./docker/migrate-data.sh
 RUN chmod +x ./docker/migrate-data.sh
 
+# Script pre-migración (JS puro, sin interpolación bash)
+COPY --chown=nextjs:nodejs docker/fix-orphan-warehouses.js ./docker/fix-orphan-warehouses.js
+
 # Herramientas para seed (tsx + dependencias mínimas del CLI)
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/tsx              ./node_modules/tsx
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/bcryptjs         ./node_modules/bcryptjs

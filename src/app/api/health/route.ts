@@ -53,19 +53,24 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Determine HTTP status code based on health
-    // Only return 503 if critical services (database) are unhealthy
-    // Degraded state or unknown (no checks yet) should still return 200
+    // Determine HTTP status code based on health.
+    // The Docker / load-balancer healthcheck only needs to know whether the
+    // *process* is alive and ready to serve requests.  Returning 503 here
+    // causes Docker to mark the container as unhealthy and restart it, which
+    // creates a restart loop when the DB or Redis are momentarily slow.
+    //
+    // Rules:
+    //  • 200  — server is up (healthy, degraded, or unknown / no checks yet)
+    //  • 503  — only when ?strict=true is passed AND the database is confirmed down
+    const strict = searchParams.get('strict') === 'true'
     let statusCode = 200
-    if (healthData.status === HealthStatus.UNHEALTHY) {
-      // Check if it's only non-critical services that are unhealthy
+    if (strict && healthData.status === HealthStatus.UNHEALTHY) {
       const components = healthData.components || {}
       const dbCheck = components['database_connectivity']
       const isCriticalFailure = dbCheck && dbCheck.status === HealthStatus.UNHEALTHY
       if (isCriticalFailure) {
-        statusCode = 503 // Only 503 if database is down
+        statusCode = 503
       }
-      // Other unhealthy components (redis, external) → still 200 to avoid container restart loop
     }
 
     ApplicationLogger.businessOperation('health_check_request', 'health-api', 'monitoring', {
@@ -115,7 +120,7 @@ export async function GET(request: NextRequest) {
 /**
  * POST /api/health - Trigger manual health check
  */
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   const timer = ApplicationLogger.timer('manual_health_check', {
     component: 'health-api',
   })

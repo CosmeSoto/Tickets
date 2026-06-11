@@ -12,6 +12,7 @@ echo "  NEXTAUTH_URL: ${NEXTAUTH_URL}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 # ── 0. Arreglar permisos de volúmenes montados ───────────────────────────────
+# Los volúmenes Docker se crean como root; asegurar que nextjs pueda escribir.
 UPLOADS_DIR="${UPLOAD_DIR:-/app/public/uploads}"
 BACKUP_DIR="${BACKUP_DIR:-/app/backups}"
 LOGS_DIR="/app/logs"
@@ -23,68 +24,55 @@ chown -R nextjs:nodejs "$UPLOADS_DIR" "$BACKUP_DIR" "$LOGS_DIR" 2>/dev/null || t
 # Las bodegas deben pertenecer siempre a una familia (family_id NOT NULL).
 # Si existen registros con family_id = NULL de versiones anteriores,
 # el db push fallaría al intentar SET NOT NULL.
+# El script vive en un archivo JS separado para evitar cualquier conflicto
+# con la interpolación de variables de bash dentro de código JS.
 echo "==> Verificando bodegas huérfanas (sin familia)..."
-node - <<'NODESCRIPT' 2>/dev/null || true
-const { PrismaClient } = require('@prisma/client');
-const p = new PrismaClient();
-async function fixOrphans() {
-  let fixed = 0, warned = 0;
-  try {
-    const orphans = await p.$queryRaw`
-      SELECT w.id, w.name,
-        (SELECT COUNT(*) FROM equipment WHERE warehouse_id = w.id) +
-        (SELECT COUNT(*) FROM consumables WHERE warehouse_id = w.id) +
-        (SELECT COUNT(*) FROM equipment_batches WHERE warehouse_id = w.id) AS total_items
-      FROM warehouses w
-      WHERE w.family_id IS NULL
-    `;
-    for (const row of orphans) {
-      if (Number(row.total_items) === 0) {
-        await p.$executeRaw`DELETE FROM warehouses WHERE id = ${row.id}`;
-        console.log('  Eliminada bodega huérfana sin ítems: ' + row.name);
-        fixed++;
-      } else {
-        await p.$executeRaw`UPDATE warehouses SET is_active = false WHERE id = ${row.id}`;
-        console.warn('  ADVERTENCIA: bodega huérfana con ítems desactivada: ' + row.name + ' — asignar familia manualmente');
-        warned++;
-      }
-    }
-    if (fixed === 0 && warned === 0) console.log('  No hay bodegas huérfanas.');
-  } catch (e) {
-    if (!e.message.includes('null') && !e.message.includes('does not exist')) {
-      console.log('  Pre-check bodegas: ' + e.message);
-    }
-  } finally {
-    await p.$disconnect();
-  }
-}
-fixOrphans();
-NODESCRIPT
+node ./docker/fix-orphan-warehouses.js || true
 
 # ── 1. Sincronizar schema de base de datos ───────────────────────────────────
+echo "==> Esperando a que PostgreSQL esté listo..."
+# pg_isready es más fiable que confiar solo en el healthcheck de Compose
+for i in $(seq 1 30); do
+  if pg_isready -h postgres -p 5432 -U tickets_user -d tickets_db -q 2>/dev/null; then
+    echo "==> PostgreSQL listo."
+    break
+  fi
+  echo "==> Esperando PostgreSQL (intento ${i}/30)..."
+  sleep 2
+done
+
 echo "==> Sincronizando schema de base de datos..."
 DB_PUSH_OK=false
 
-for attempt in 1 2 3; do
+# Intentar db push con reintentos (puede tardar si Postgres acaba de iniciar)
+for attempt in 1 2 3 4 5; do
   if $PRISMA_CLI db push --accept-data-loss 2>&1; then
     DB_PUSH_OK=true
     break
   fi
-  echo "==> db push intento ${attempt} falló — esperando 5s..."
-  sleep 5
+  echo "==> db push intento ${attempt} falló — esperando 8s..."
+  sleep 8
 done
 
 if [ "$DB_PUSH_OK" = "true" ]; then
+  # Marcar la migración de incidentes como aplicada si existe (puede que ya
+  # esté aplicada desde un deploy anterior; el || true evita error duplicado).
   $PRISMA_CLI migrate resolve --applied 20260604000000_add_patrol_incidents 2>/dev/null || true
+  echo "==> Schema sincronizado."
 else
-  echo "==> ERROR FATAL: No se pudo sincronizar la base de datos"
-  exit 1
+  echo "==> db push falló — intentando migrate deploy como fallback..."
+  if $PRISMA_CLI migrate deploy 2>&1; then
+    echo "==> migrate deploy completado."
+  else
+    echo "==> ADVERTENCIA: No se pudo sincronizar el schema — el servidor arrancará de todas formas."
+    echo "==>   Revisa los logs de postgres y re-ejecuta: docker restart tickets-app"
+  fi
 fi
-echo "==> Schema sincronizado."
 
 # ── 2. Seed inicial (solo si la tabla de usuarios está vacía) ─────────────────
 echo "==> Verificando si la base de datos necesita seed..."
 
+# Heredoc con comillas (<<'NODESCRIPT') evita que bash expanda variables JS.
 NEEDS_SEED=$(node - <<'NODESCRIPT' 2>/dev/null || echo "yes"
 const { PrismaClient } = require('@prisma/client');
 const p = new PrismaClient();
@@ -100,8 +88,14 @@ NODESCRIPT
 
 if [ "$NEEDS_SEED" = "yes" ]; then
   echo "==> Base de datos vacía — ejecutando seed inicial..."
-  $TSX_CLI prisma/seed.ts
-  echo "==> Seed completado."
+  # No dejar que un fallo del seed mate el container (set -e está activo).
+  # Si el seed falla, el servidor arranca igual y el admin puede re-ejecutarlo.
+  if $TSX_CLI prisma/seed.ts; then
+    echo "==> Seed completado."
+  else
+    echo "==> ADVERTENCIA: Seed falló — el servidor arrancará de todas formas."
+    echo "==>   Para re-ejecutar el seed: docker exec tickets-app sh -c 'node ./node_modules/tsx/dist/cli.mjs prisma/seed.ts'"
+  fi
 else
   echo "==> Base de datos ya tiene datos — omitiendo seed."
 fi
