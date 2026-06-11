@@ -223,81 +223,80 @@ export function FormDetail({
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className='sm:max-w-2xl max-h-[90vh] overflow-y-auto max-w-[95vw] w-full p-4 sm:p-6'>
-          <DialogHeader>
-            <div className='flex items-start justify-between gap-2'>
-              <div className='flex-1 min-w-0'>
-                {/* Badges */}
-                <div className='flex items-center gap-2 mb-2 flex-wrap'>
-                  <span className='text-2xl'>{getFileEmoji(form.fileType)}</span>
-                  {form.category && (
-                    <Badge variant='secondary' className='gap-1'>
-                      <Tag className='h-3 w-3' />
-                      {form.category.name}
-                    </Badge>
-                  )}
-                  {form.version && <Badge variant='outline'>v{form.version}</Badge>}
-                  {form.isFeatured && (
-                    <Badge className='gap-1 bg-primary/10 text-primary'>
-                      <Star className='h-3 w-3' />
-                      Destacado
-                    </Badge>
-                  )}
-                </div>
-                <DialogTitle className='text-xl leading-snug break-words'>{form.title}</DialogTitle>
-                {/* Metadatos */}
-                <div className='flex flex-wrap gap-3 mt-2 text-xs text-muted-foreground'>
-                  <span className='flex items-center gap-1'>
-                    <User className='h-3.5 w-3.5' />
-                    {form.createdBy.name}
-                  </span>
-                  <span className='flex items-center gap-1'>
-                    <Calendar className='h-3.5 w-3.5' />
-                    {new Date(form.createdAt).toLocaleDateString('es-EC', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                    })}
-                  </span>
-                  <span className='flex items-center gap-1'>
-                    <Download className='h-3.5 w-3.5' />
-                    {downloadCount} descarga{downloadCount !== 1 ? 's' : ''}
-                  </span>
-                </div>
+          <DialogHeader className='relative'>
+            {/* Acciones de gestión - Siempre en la parte superior derecha */}
+            {mode === 'manage' && canModify && (
+              <div className='flex gap-2 flex-shrink-0 mb-3 sm:absolute sm:top-4 sm:right-4'>
+                {onEdit && (
+                  <Button
+                    variant='outline'
+                    size='sm'
+                    onClick={() => {
+                      onClose()
+                      onEdit(form)
+                    }}
+                    className='gap-1.5'
+                  >
+                    <Edit className='h-3.5 w-3.5' />
+                    Editar
+                  </Button>
+                )}
+                {onDelete && (
+                  <Button
+                    variant='outline'
+                    size='sm'
+                    onClick={() => {
+                      onClose()
+                      onDelete(form)
+                    }}
+                    className='gap-1.5 text-destructive hover:text-destructive'
+                  >
+                    <Trash2 className='h-3.5 w-3.5' />
+                    Eliminar
+                  </Button>
+                )}
               </div>
-
-              {/* Acciones de gestión */}
-              {mode === 'manage' && canModify && (
-                <div className='flex gap-1 flex-shrink-0'>
-                  {onEdit && (
-                    <Button
-                      variant='outline'
-                      size='sm'
-                      onClick={() => {
-                        onClose()
-                        onEdit(form)
-                      }}
-                      className='gap-1.5'
-                    >
-                      <Edit className='h-3.5 w-3.5' />
-                      Editar
-                    </Button>
-                  )}
-                  {onDelete && (
-                    <Button
-                      variant='outline'
-                      size='sm'
-                      onClick={() => {
-                        onClose()
-                        onDelete(form)
-                      }}
-                      className='gap-1.5 text-destructive hover:text-destructive'
-                    >
-                      <Trash2 className='h-3.5 w-3.5' />
-                      Eliminar
-                    </Button>
-                  )}
-                </div>
-              )}
+            )}
+            <div className='flex-1 min-w-0'>
+              {/* Badges */}
+              <div className='flex items-center gap-2 mb-2 flex-wrap'>
+                <span className='text-2xl'>{getFileEmoji(form.fileType)}</span>
+                {form.category && (
+                  <Badge variant='secondary' className='gap-1'>
+                    <Tag className='h-3 w-3' />
+                    {form.category.name}
+                  </Badge>
+                )}
+                {form.version && <Badge variant='outline'>v{form.version}</Badge>}
+                {form.isFeatured && (
+                  <Badge className='gap-1 bg-primary/10 text-primary'>
+                    <Star className='h-3 w-3' />
+                    Destacado
+                  </Badge>
+                )}
+              </div>
+              <DialogTitle className='text-xl sm:text-2xl leading-tight whitespace-normal break-words'>
+                {form.title}
+              </DialogTitle>
+              {/* Metadatos */}
+              <div className='flex flex-wrap gap-3 mt-3 text-xs text-muted-foreground'>
+                <span className='flex items-center gap-1'>
+                  <User className='h-3.5 w-3.5' />
+                  {form.createdBy.name}
+                </span>
+                <span className='flex items-center gap-1'>
+                  <Calendar className='h-3.5 w-3.5' />
+                  {new Date(form.createdAt).toLocaleDateString('es-EC', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                  })}
+                </span>
+                <span className='flex items-center gap-1'>
+                  <Download className='h-3.5 w-3.5' />
+                  {downloadCount} descarga{downloadCount !== 1 ? 's' : ''}
+                </span>
+              </div>
             </div>
           </DialogHeader>
 

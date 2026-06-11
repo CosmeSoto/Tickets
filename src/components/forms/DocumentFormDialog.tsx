@@ -148,7 +148,7 @@ export function DocumentFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className='sm:max-w-3xl max-h-[90vh] overflow-y-auto'>
+      <DialogContent className='sm:max-w-3xl max-h-[90vh] overflow-y-auto max-w-[95vw] w-full p-4 sm:p-6'>
         <DialogHeader>
           <DialogTitle>{editingForm ? 'Editar documento' : 'Nuevo documento'}</DialogTitle>
           <DialogDescription>

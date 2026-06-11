@@ -4,12 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Loader2, ExternalLink } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -43,10 +38,28 @@ interface IncidentDetail {
   ticket?: { id: string; ticketCode: string; status: string } | null
 }
 
-const SEVERITY_BADGE: Record<string, string> = { LOW: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200', MEDIUM: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200', HIGH: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200', CRITICAL: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' }
-const SEVERITY_LABELS: Record<string, string> = { LOW: 'Baja', MEDIUM: 'Media', HIGH: 'Alta', CRITICAL: 'Crítica' }
-const STATUS_BADGE: Record<string, string> = { OPEN: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200', RESOLVED: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200', ESCALATED: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' }
-const STATUS_LABELS: Record<string, string> = { OPEN: 'Abierta', RESOLVED: 'Resuelta', ESCALATED: 'Escalada' }
+const SEVERITY_BADGE: Record<string, string> = {
+  LOW: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+  MEDIUM: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+  HIGH: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
+  CRITICAL: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+}
+const SEVERITY_LABELS: Record<string, string> = {
+  LOW: 'Baja',
+  MEDIUM: 'Media',
+  HIGH: 'Alta',
+  CRITICAL: 'Crítica',
+}
+const STATUS_BADGE: Record<string, string> = {
+  OPEN: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+  RESOLVED: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+  ESCALATED: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
+}
+const STATUS_LABELS: Record<string, string> = {
+  OPEN: 'Abierta',
+  RESOLVED: 'Resuelta',
+  ESCALATED: 'Escalada',
+}
 
 export function IncidentDetailDialog({
   open,
@@ -69,7 +82,11 @@ export function IncidentDetailDialog({
       const json = await res.json()
       setIncident(json.data || json)
     } catch {
-      toast({ title: 'Error', description: 'No se pudo cargar el detalle de la novedad', variant: 'destructive' })
+      toast({
+        title: 'Error',
+        description: 'No se pudo cargar el detalle de la novedad',
+        variant: 'destructive',
+      })
       onOpenChange(false)
     } finally {
       setLoading(false)
@@ -88,7 +105,9 @@ export function IncidentDetailDialog({
     if (!incident || !confirmAction) return
     setActionLoading(true)
     try {
-      const res = await fetch(`/api/patrols/incidents/${incident.id}/${confirmAction}`, { method: 'POST' })
+      const res = await fetch(`/api/patrols/incidents/${incident.id}/${confirmAction}`, {
+        method: 'POST',
+      })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error || 'Error al ejecutar la acción')
@@ -114,15 +133,18 @@ export function IncidentDetailDialog({
   const formatDate = (dateStr: string) => {
     try {
       return new Date(dateStr).toLocaleString('es-CO', {
-        dateStyle: 'medium', timeStyle: 'short',
+        dateStyle: 'medium',
+        timeStyle: 'short',
       })
-    } catch { return dateStr }
+    } catch {
+      return dateStr
+    }
   }
 
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className='sm:max-w-lg max-h-[90vh] overflow-y-auto'>
+        <DialogContent className='sm:max-w-lg max-h-[90vh] overflow-y-auto max-w-[95vw] w-full p-4 sm:p-6'>
           <DialogHeader>
             <DialogTitle>Detalle de Novedad</DialogTitle>
           </DialogHeader>
@@ -152,15 +174,23 @@ export function IncidentDetailDialog({
               {/* Context info */}
               <div className='space-y-1.5 text-sm'>
                 {incident.checkpoint && (
-                  <p>📍 Checkpoint: <span className='font-medium'>{incident.checkpoint.name}</span></p>
+                  <p>
+                    📍 Checkpoint: <span className='font-medium'>{incident.checkpoint.name}</span>
+                  </p>
                 )}
                 {incident.patrol?.route && (
-                  <p>🛤️ Ruta: <span className='font-medium'>{incident.patrol.route.name}</span></p>
+                  <p>
+                    🛤️ Ruta: <span className='font-medium'>{incident.patrol.route.name}</span>
+                  </p>
                 )}
                 {incident.agent && (
-                  <p>👤 Agente: <span className='font-medium'>{incident.agent.name}</span></p>
+                  <p>
+                    👤 Agente: <span className='font-medium'>{incident.agent.name}</span>
+                  </p>
                 )}
-                <p>📅 Fecha: <span className='font-medium'>{formatDate(incident.createdAt)}</span></p>
+                <p>
+                  📅 Fecha: <span className='font-medium'>{formatDate(incident.createdAt)}</span>
+                </p>
               </div>
 
               {/* Photo */}
@@ -217,7 +247,12 @@ export function IncidentDetailDialog({
       </Dialog>
 
       {/* Confirmation AlertDialog */}
-      <AlertDialog open={confirmAction !== null} onOpenChange={v => { if (!v) setConfirmAction(null) }}>
+      <AlertDialog
+        open={confirmAction !== null}
+        onOpenChange={v => {
+          if (!v) setConfirmAction(null)
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
