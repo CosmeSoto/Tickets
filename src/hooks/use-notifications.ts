@@ -189,6 +189,11 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
             destination = `/${rolePrefix}/tickets/${ticketIdMatch[1]}`
           }
         }
+      } else if (notification.metadata?.patrolId) {
+        destination = `/patrol/${notification.metadata.patrolId}`
+      } else if (notification.metadata?.scheduleId) {
+        // Notificación de ronda asignada — ir a la lista de rondas del agente
+        destination = `/patrol`
       } else if (notification.metadata?.actId) {
         destination = `/inventory/acts/${notification.metadata.actId}`
       } else if (notification.metadata?.maintenanceId) {

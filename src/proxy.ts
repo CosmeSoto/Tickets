@@ -116,9 +116,19 @@ export async function proxy(request: NextRequest) {
   if (request.nextUrl.pathname.startsWith('/api/')) {
     const response = NextResponse.next()
 
+    // Rutas que sirven archivos para vista previa en iframe (mismo origen).
+    // Estas necesitan SAMEORIGIN en lugar de DENY para que el FilePreviewModal funcione.
+    const isFilePreviewRoute =
+      /^\/api\/forms\/[^/]+\/file/.test(path) ||
+      /^\/api\/admin\/forms\/[^/]+\/attachments\/[^/]+\/file/.test(path) ||
+      /^\/api\/news\/[^/]+\/attachments\/[^/]+\/file/.test(path) ||
+      /^\/api\/admin\/news\/[^/]+\/attachments\/[^/]+\/file/.test(path) ||
+      /^\/api\/attachments\/[^/]+/.test(path) ||
+      /^\/api\/tickets\/[^/]+\/attachments\/[^/]+/.test(path)
+
     // Headers de seguridad básicos para APIs
     response.headers.set('X-Content-Type-Options', 'nosniff')
-    response.headers.set('X-Frame-Options', 'DENY')
+    response.headers.set('X-Frame-Options', isFilePreviewRoute ? 'SAMEORIGIN' : 'DENY')
     response.headers.set('X-Request-ID', requestId)
 
     // Rate limiting — excluye /api/auth/ y SSE stream

@@ -22,7 +22,14 @@ interface PatrolCheckpointListProps {
   onCheckpointClick?: (checkpoint: Checkpoint) => void
   /** Duración estimada total de la ruta en minutos — para calcular tiempo entre checkpoints */
   estimatedDurationMinutes?: number
+  /** Inicio programado de la ronda — para calcular hora estimada de cada checkpoint */
+  scheduledStart?: string | null
   className?: string
+}
+
+/** Formatea una Date a HH:MM */
+function formatTime(date: Date): string {
+  return date.toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit', hour12: false })
 }
 
 export function PatrolCheckpointList({
@@ -31,18 +38,34 @@ export function PatrolCheckpointList({
   currentCheckpointId,
   onCheckpointClick,
   estimatedDurationMinutes,
+  scheduledStart,
   className,
 }: PatrolCheckpointListProps) {
-  // Tiempo estimado entre checkpoints
   const totalCheckpoints = checkpoints.length
+
+  // Minutos entre cada checkpoint (distribución uniforme)
   const minutesPerCheckpoint =
     estimatedDurationMinutes && totalCheckpoints > 0
       ? Math.round(estimatedDurationMinutes / totalCheckpoints)
       : null
 
+  // Hora de inicio para calcular llegada estimada a cada punto
+  const startDate = scheduledStart ? new Date(scheduledStart) : null
+
+  /**
+   * Calcula la hora estimada de llegada a un checkpoint según su posición (0-indexed).
+   * Checkpoint 0 (entrada) → scheduledStart
+   * Checkpoint N → scheduledStart + N * minutesPerCheckpoint
+   */
+  const getEstimatedArrival = (idx: number): string | null => {
+    if (!startDate || !minutesPerCheckpoint) return null
+    const arrivalMs = startDate.getTime() + idx * minutesPerCheckpoint * 60 * 1000
+    return formatTime(new Date(arrivalMs))
+  }
+
   return (
     <div className={cn('space-y-3', className)}>
-      {/* Resumen de tiempo si hay duración estimada */}
+      {/* Resumen global de tiempo */}
       {minutesPerCheckpoint !== null && minutesPerCheckpoint > 0 && (
         <div className='flex items-center gap-2 px-1 text-xs text-muted-foreground'>
           <Clock className='h-3.5 w-3.5 flex-shrink-0' />
@@ -62,6 +85,7 @@ export function PatrolCheckpointList({
           const visited = visitedIds.has(cp.id)
           const isCurrent = cp.id === currentCheckpointId
           const isPending = !visited && !isCurrent
+          const estimatedArrival = getEstimatedArrival(idx)
 
           return (
             <li
@@ -118,6 +142,30 @@ export function PatrolCheckpointList({
                   )}
                 </div>
                 <p className='text-xs text-muted-foreground mt-0.5 truncate'>{cp.location}</p>
+
+                {/* Hora estimada de llegada */}
+                {estimatedArrival && (
+                  <div
+                    className={cn(
+                      'flex items-center gap-1 mt-1',
+                      visited && 'text-green-600 dark:text-green-400',
+                      isCurrent && 'text-blue-600 dark:text-blue-400',
+                      isPending && 'text-muted-foreground'
+                    )}
+                  >
+                    <Clock className='h-3 w-3 flex-shrink-0' aria-hidden />
+                    <span className='text-xs'>
+                      {visited ? 'Estimado: ' : isCurrent ? 'Llegar a las: ' : 'A las '}
+                      <span className='font-medium'>{estimatedArrival}</span>
+                      {minutesPerCheckpoint && idx > 0 && !visited && (
+                        <span className='text-muted-foreground/70'>
+                          {' '}
+                          (+{minutesPerCheckpoint} min)
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Tipo de QR */}

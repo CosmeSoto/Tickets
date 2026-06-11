@@ -136,6 +136,8 @@ export function Notifications({ className, variant = 'bell', maxVisible = 5 }: N
     const hasDestination =
       notification.ticketId ||
       notification.metadata?.link ||
+      notification.metadata?.patrolId ||
+      notification.metadata?.scheduleId ||
       notification.metadata?.actId ||
       notification.metadata?.maintenanceId ||
       notification.metadata?.equipmentId ||
@@ -172,7 +174,7 @@ export function Notifications({ className, variant = 'bell', maxVisible = 5 }: N
         {isOpen && (
           <>
             <div className='fixed inset-0 z-40' onClick={() => setIsOpen(false)} />
-            <Card className='absolute right-0 top-full mt-2 w-80 max-h-96 z-50 shadow-xl border-2'>
+            <Card className='fixed sm:absolute right-2 sm:right-0 left-2 sm:left-auto top-16 sm:top-full sm:mt-2 w-auto sm:w-80 max-h-[80vh] sm:max-h-96 z-50 shadow-xl border-2'>
               <CardHeader className='pb-2'>
                 <div className='flex items-center justify-between'>
                   <CardTitle className='text-sm font-semibold'>
@@ -381,6 +383,8 @@ function BellNotificationItem({
   const isClickable = !!(
     n.ticketId ||
     n.metadata?.link ||
+    n.metadata?.patrolId ||
+    n.metadata?.scheduleId ||
     n.metadata?.actId ||
     n.metadata?.maintenanceId ||
     n.metadata?.equipmentId ||

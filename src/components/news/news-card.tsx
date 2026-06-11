@@ -55,6 +55,13 @@ interface NewsItem {
   createdAt: string
   updatedAt: string
   createdBy: { id: string; name: string; email: string; avatar: string | null }
+  news_attachments?: Array<{
+    id: string
+    filename: string
+    originalName: string
+    path: string
+    mimeType?: string
+  }>
   _count: { news_views: number; news_reactions: number; news_comments: number }
 }
 
@@ -119,25 +126,47 @@ export function NewsCard({
   // Obtener thumbnail: usa detectMedia para soportar Google Drive, OneDrive, YouTube, etc.
   // Solo mostramos thumbnail si es una imagen directa (no iframe — no cabe en 80x80)
   const getThumbnail = (): { src: string; isImage: boolean } | null => {
-    if (!news.imageUrl) return null
-    const media = detectMedia(news.imageUrl)
-    if (media.type === 'image' && media.embedUrl) {
-      return { src: media.embedUrl, isImage: true }
-    }
-    // Para YouTube: usar thumbnail de alta calidad
-    if (media.type === 'youtube' && news.imageUrl) {
-      const ytMatch = news.imageUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&?/]+)/)
-      if (ytMatch) {
-        return { src: `https://img.youtube.com/vi/${ytMatch[1]}/mqdefault.jpg`, isImage: true }
+    // 1. Primero intentar con imageUrl (URL externa)
+    if (news.imageUrl) {
+      const media = detectMedia(news.imageUrl)
+      if (media.type === 'image' && media.embedUrl) {
+        return { src: media.embedUrl, isImage: true }
+      }
+      // Para YouTube: usar thumbnail de alta calidad
+      if (media.type === 'youtube' && news.imageUrl) {
+        const ytMatch = news.imageUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&?/]+)/)
+        if (ytMatch) {
+          return { src: `https://img.youtube.com/vi/${ytMatch[1]}/mqdefault.jpg`, isImage: true }
+        }
+      }
+      // Para Google Drive con imagen: usar thumbnail de Drive
+      if (media.type === 'google-drive') {
+        const gdMatch = news.imageUrl.match(/drive\.google\.com\/file\/d\/([^/]+)/)
+        if (gdMatch) {
+          return {
+            src: `https://drive.google.com/thumbnail?id=${gdMatch[1]}&sz=w200`,
+            isImage: true,
+          }
+        }
       }
     }
-    // Para Google Drive con imagen: usar thumbnail de Drive
-    if (media.type === 'google-drive') {
-      const gdMatch = news.imageUrl.match(/drive\.google\.com\/file\/d\/([^/]+)/)
-      if (gdMatch) {
-        return { src: `https://drive.google.com/thumbnail?id=${gdMatch[1]}&sz=w200`, isImage: true }
+
+    // 2. Fallback: usar el primer adjunto que sea imagen subida al servidor
+    if (news.news_attachments && news.news_attachments.length > 0) {
+      const imageAttachment = news.news_attachments.find(a => {
+        if (a.mimeType) return a.mimeType.startsWith('image/')
+        // Sin mimeType: inferir por extensión del nombre de archivo
+        const ext = a.originalName?.split('.').pop()?.toLowerCase() ?? ''
+        return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif', 'svg'].includes(ext)
+      })
+      if (imageAttachment) {
+        return {
+          src: `/api/news/${news.id}/attachments/${imageAttachment.id}/file`,
+          isImage: true,
+        }
       }
     }
+
     return null
   }
 

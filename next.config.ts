@@ -65,30 +65,27 @@ const nextConfig: NextConfig = {
       // Rutas de archivos para vista previa — no restringir frames del mismo origen
       {
         source: '/api/forms/:id/file',
-        headers: [
-          {
-            key: 'X-Frame-Options',
-            value: 'SAMEORIGIN',
-          },
-        ],
+        headers: [{ key: 'X-Frame-Options', value: 'SAMEORIGIN' }],
+      },
+      {
+        source: '/api/admin/forms/:id/attachments/:attachmentId/file',
+        headers: [{ key: 'X-Frame-Options', value: 'SAMEORIGIN' }],
+      },
+      {
+        source: '/api/news/:id/attachments/:attachmentId/file',
+        headers: [{ key: 'X-Frame-Options', value: 'SAMEORIGIN' }],
+      },
+      {
+        source: '/api/admin/news/:id/attachments/:attachmentId/file',
+        headers: [{ key: 'X-Frame-Options', value: 'SAMEORIGIN' }],
       },
       {
         source: '/api/attachments/:id',
-        headers: [
-          {
-            key: 'X-Frame-Options',
-            value: 'SAMEORIGIN',
-          },
-        ],
+        headers: [{ key: 'X-Frame-Options', value: 'SAMEORIGIN' }],
       },
       {
         source: '/api/tickets/:ticketId/attachments/:attachmentId',
-        headers: [
-          {
-            key: 'X-Frame-Options',
-            value: 'SAMEORIGIN',
-          },
-        ],
+        headers: [{ key: 'X-Frame-Options', value: 'SAMEORIGIN' }],
       },
       {
         source: '/api/(.*)',

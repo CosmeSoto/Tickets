@@ -32,6 +32,8 @@ import type { Technician, TechnicianFormData, Department, Category } from '@/typ
 import { validateTechnicianForm } from '../TechnicianManagement.module'
 import { extractApiError, extractCatchError } from '@/lib/utils/api-error'
 import { SimpleCategoryAssignment } from './SimpleCategoryAssignment'
+import { ModuleBlockersDialog } from '@/components/users/module-blockers-dialog'
+import type { ModuleBlocker } from '@/lib/services/user-module-guard.service'
 
 interface Props {
   open: boolean
@@ -67,6 +69,7 @@ export function TechnicianFormDialog({
   const [formData, setFormData] = useState<TechnicianFormData>(initialFormData)
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [blockers, setBlockers] = useState<ModuleBlocker[] | null>(null)
 
   const isEditing = !!editingTechnician
   const isPromoting = !!promotingUser
@@ -190,6 +193,24 @@ export function TechnicianFormDialog({
         onSuccess()
         onClose()
       } else {
+        // Caso especial: guard de rol/módulos bloqueó la operación
+        if (response.status === 422 && result.blockers && Array.isArray(result.blockers)) {
+          const total = (result.blockers as ModuleBlocker[]).reduce(
+            (s: number, b: ModuleBlocker) => s + b.count,
+            0
+          )
+          const names = [
+            ...new Set((result.blockers as ModuleBlocker[]).map((b: ModuleBlocker) => b.module)),
+          ].join(', ')
+          toast({
+            title: 'No se puede promover',
+            description: `${promotingUser?.name ?? 'El usuario'} tiene ${total} elemento${total !== 1 ? 's' : ''} pendiente${total !== 1 ? 's' : ''} en: ${names}. Resuélvelos antes de cambiar el rol.`,
+            variant: 'destructive',
+            duration: 6000,
+          })
+          setBlockers(result.blockers as ModuleBlocker[])
+          return
+        }
         // Marcar errores de campo si vienen del servidor
         if (result.details && Array.isArray(result.details)) {
           const fieldErrors: Record<string, string> = {}
@@ -244,160 +265,175 @@ export function TechnicianFormDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className='max-w-4xl max-h-[90vh]' aria-describedby={undefined}>
-        <DialogHeader>
-          <DialogTitle className='flex items-center space-x-2'>
-            <User className='h-5 w-5' />
-            <span>{title}</span>
-          </DialogTitle>
-          <DialogDescription>
-            {isEditing
-              ? 'Modifica la información del técnico'
-              : isPromoting
-                ? 'Configura los datos para promover este usuario a técnico'
-                : 'Completa la información para crear un nuevo técnico'}
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className='max-w-4xl max-h-[90vh]' aria-describedby={undefined}>
+          <DialogHeader>
+            <DialogTitle className='flex items-center space-x-2'>
+              <User className='h-5 w-5' />
+              <span>{title}</span>
+            </DialogTitle>
+            <DialogDescription>
+              {isEditing
+                ? 'Modifica la información del técnico'
+                : isPromoting
+                  ? 'Configura los datos para promover este usuario a técnico'
+                  : 'Completa la información para crear un nuevo técnico'}
+            </DialogDescription>
+          </DialogHeader>
 
-        <form
-          onSubmit={handleSubmit}
-          className='space-y-6 overflow-y-auto max-h-[calc(90vh-120px)]'
-        >
-          {/* Información básica - Solo lectura para técnicos existentes */}
-          <Card>
-            <CardHeader>
-              <CardTitle className='text-lg'>Información Básica</CardTitle>
-              <p className='text-sm text-muted-foreground'>
-                Los datos personales solo se pueden editar desde el módulo de usuarios
-              </p>
-            </CardHeader>
-            <CardContent className='space-y-4'>
-              <div className='bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4'>
-                <p className='text-sm text-blue-900'>
-                  <strong>Nota:</strong> Nombre, email, teléfono y departamento están bloqueados.
-                  Para editarlos, ve al módulo de usuarios del administrador.
+          <form
+            onSubmit={handleSubmit}
+            className='space-y-6 overflow-y-auto max-h-[calc(90vh-120px)]'
+          >
+            {/* Información básica - Solo lectura para técnicos existentes */}
+            <Card>
+              <CardHeader>
+                <CardTitle className='text-lg'>Información Básica</CardTitle>
+                <p className='text-sm text-muted-foreground'>
+                  Los datos personales solo se pueden editar desde el módulo de usuarios
                 </p>
-              </div>
-
-              <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-                <div>
-                  <Label htmlFor='name'>Nombre completo *</Label>
-                  <Input
-                    id='name'
-                    value={formData.name}
-                    onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder='Nombre del técnico'
-                    className={errors.name ? 'border-red-500' : ''}
-                    disabled={true} // Siempre bloqueado - editar desde usuarios
-                  />
-                  {errors.name && <p className='text-sm text-red-500 mt-1'>{errors.name}</p>}
-                  <p className='text-xs text-muted-foreground mt-1'>
-                    Editar desde el módulo de usuarios
+              </CardHeader>
+              <CardContent className='space-y-4'>
+                <div className='bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4'>
+                  <p className='text-sm text-blue-900'>
+                    <strong>Nota:</strong> Nombre, email, teléfono y departamento están bloqueados.
+                    Para editarlos, ve al módulo de usuarios del administrador.
                   </p>
                 </div>
 
-                <div>
-                  <Label htmlFor='email'>Email *</Label>
-                  <Input
-                    id='email'
-                    type='email'
-                    value={formData.email}
-                    onChange={e => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                    placeholder='email@ejemplo.com'
-                    className={errors.email ? 'border-red-500' : ''}
-                    disabled={true} // Siempre bloqueado - editar desde usuarios
-                  />
-                  {errors.email && <p className='text-sm text-red-500 mt-1'>{errors.email}</p>}
-                  <p className='text-xs text-muted-foreground mt-1'>
-                    Editar desde el módulo de usuarios
-                  </p>
+                <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+                  <div>
+                    <Label htmlFor='name'>Nombre completo *</Label>
+                    <Input
+                      id='name'
+                      value={formData.name}
+                      onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                      placeholder='Nombre del técnico'
+                      className={errors.name ? 'border-red-500' : ''}
+                      disabled={true} // Siempre bloqueado - editar desde usuarios
+                    />
+                    {errors.name && <p className='text-sm text-red-500 mt-1'>{errors.name}</p>}
+                    <p className='text-xs text-muted-foreground mt-1'>
+                      Editar desde el módulo de usuarios
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label htmlFor='email'>Email *</Label>
+                    <Input
+                      id='email'
+                      type='email'
+                      value={formData.email}
+                      onChange={e => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                      placeholder='email@ejemplo.com'
+                      className={errors.email ? 'border-red-500' : ''}
+                      disabled={true} // Siempre bloqueado - editar desde usuarios
+                    />
+                    {errors.email && <p className='text-sm text-red-500 mt-1'>{errors.email}</p>}
+                    <p className='text-xs text-muted-foreground mt-1'>
+                      Editar desde el módulo de usuarios
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label htmlFor='phone'>Teléfono</Label>
+                    <Input
+                      id='phone'
+                      value={formData.phone}
+                      onChange={e => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                      placeholder='+1 234 567 8900'
+                      className={errors.phone ? 'border-red-500' : ''}
+                      disabled={true} // Siempre bloqueado - editar desde usuarios
+                    />
+                    {errors.phone && <p className='text-sm text-red-500 mt-1'>{errors.phone}</p>}
+                    <p className='text-xs text-muted-foreground mt-1'>
+                      Editar desde el módulo de usuarios
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label htmlFor='department'>Departamento</Label>
+                    <Select
+                      value={formData.departmentId || 'none'}
+                      onValueChange={value =>
+                        setFormData(prev => ({
+                          ...prev,
+                          departmentId: value === 'none' ? null : value,
+                        }))
+                      }
+                      disabled={true} // Siempre bloqueado - editar desde usuarios
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder='Seleccionar departamento' />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value='none'>Sin departamento</SelectItem>
+                        {departments.map(dept => (
+                          <SelectItem key={dept.id} value={dept.id}>
+                            <div className='flex items-center space-x-2'>
+                              <div
+                                className='w-3 h-3 rounded-full'
+                                style={{ backgroundColor: dept.color }}
+                              />
+                              <span>{dept.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className='text-xs text-muted-foreground mt-1'>
+                      Editar desde el módulo de usuarios
+                    </p>
+                  </div>
                 </div>
 
-                <div>
-                  <Label htmlFor='phone'>Teléfono</Label>
-                  <Input
-                    id='phone'
-                    value={formData.phone}
-                    onChange={e => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-                    placeholder='+1 234 567 8900'
-                    className={errors.phone ? 'border-red-500' : ''}
-                    disabled={true} // Siempre bloqueado - editar desde usuarios
-                  />
-                  {errors.phone && <p className='text-sm text-red-500 mt-1'>{errors.phone}</p>}
-                  <p className='text-xs text-muted-foreground mt-1'>
-                    Editar desde el módulo de usuarios
-                  </p>
-                </div>
-
-                <div>
-                  <Label htmlFor='department'>Departamento</Label>
-                  <Select
-                    value={formData.departmentId || 'none'}
-                    onValueChange={value =>
-                      setFormData(prev => ({
-                        ...prev,
-                        departmentId: value === 'none' ? null : value,
-                      }))
+                <div className='flex items-center space-x-2'>
+                  <Switch
+                    id='isActive'
+                    checked={formData.isActive}
+                    onCheckedChange={checked =>
+                      setFormData(prev => ({ ...prev, isActive: checked }))
                     }
-                    disabled={true} // Siempre bloqueado - editar desde usuarios
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder='Seleccionar departamento' />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value='none'>Sin departamento</SelectItem>
-                      {departments.map(dept => (
-                        <SelectItem key={dept.id} value={dept.id}>
-                          <div className='flex items-center space-x-2'>
-                            <div
-                              className='w-3 h-3 rounded-full'
-                              style={{ backgroundColor: dept.color }}
-                            />
-                            <span>{dept.name}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className='text-xs text-muted-foreground mt-1'>
-                    Editar desde el módulo de usuarios
-                  </p>
+                  />
+                  <Label htmlFor='isActive'>Técnico activo</Label>
                 </div>
-              </div>
+              </CardContent>
+            </Card>
 
-              <div className='flex items-center space-x-2'>
-                <Switch
-                  id='isActive'
-                  checked={formData.isActive}
-                  onCheckedChange={checked => setFormData(prev => ({ ...prev, isActive: checked }))}
-                />
-                <Label htmlFor='isActive'>Técnico activo</Label>
-              </div>
-            </CardContent>
-          </Card>
+            {/* Asignaciones de categorías - SIMPLIFICADO */}
+            <SimpleCategoryAssignment
+              assignments={formData.assignedCategories}
+              availableCategories={availableCategories}
+              errors={errors}
+              onAdd={addCategoryAssignment}
+              onRemove={removeCategoryAssignment}
+              onUpdate={updateCategoryAssignment}
+            />
 
-          {/* Asignaciones de categorías - SIMPLIFICADO */}
-          <SimpleCategoryAssignment
-            assignments={formData.assignedCategories}
-            availableCategories={availableCategories}
-            errors={errors}
-            onAdd={addCategoryAssignment}
-            onRemove={removeCategoryAssignment}
-            onUpdate={updateCategoryAssignment}
-          />
+            <DialogFooter>
+              <Button type='button' variant='outline' onClick={onClose} disabled={loading}>
+                Cancelar
+              </Button>
+              <Button type='submit' disabled={loading}>
+                <Save className='h-4 w-4 mr-2' />
+                {loading ? 'Guardando...' : 'Guardar'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
-          <DialogFooter>
-            <Button type='button' variant='outline' onClick={onClose} disabled={loading}>
-              Cancelar
-            </Button>
-            <Button type='submit' disabled={loading}>
-              <Save className='h-4 w-4 mr-2' />
-              {loading ? 'Guardando...' : 'Guardar'}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+      {/* Diálogo detallado de bloqueadores cuando el guard impide la promoción */}
+      {blockers && (
+        <ModuleBlockersDialog
+          open={!!blockers}
+          onClose={() => setBlockers(null)}
+          userName={promotingUser?.name ?? ''}
+          blockers={blockers}
+          context='role'
+        />
+      )}
+    </>
   )
 }

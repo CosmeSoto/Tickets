@@ -15,8 +15,6 @@ import { PatrolGeofenceService } from '@/lib/services/patrol-geofence.service'
 import { PatrolPhotoService } from '@/lib/services/patrol-photo.service'
 import { calculateCompletionPercentage } from '@/lib/patrol/patrol-completion'
 import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
-import { NotificationService } from '@/lib/services/notification-service'
-import { NotificationType } from '@prisma/client'
 
 const checkInSchema = z.object({
   checkpointId: z.string().uuid(),
@@ -45,6 +43,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         id: true,
         agentId: true,
         familyId: true,
+        scheduleId: true,
         status: true,
         scheduledStart: true,
         scheduledEnd: true,
@@ -105,56 +104,110 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const checkpoint = routeCheckpoint.checkpoint
 
-    // Obtener config de familia
-    const familyConfig = await prisma.patrol_family_config.findUnique({
-      where: { familyId: patrol.familyId },
-      select: {
-        qrWindowMinutes: true,
-        geofenceRadiusMeters: true,
-        alertCompletionThreshold: true,
-        strictTimeValidation: true,
-      },
-    })
+    // Obtener config de familia y override de la programación en paralelo
+    const [familyConfig, scheduleConfig] = await Promise.all([
+      prisma.patrol_family_config.findUnique({
+        where: { familyId: patrol.familyId },
+        select: {
+          qrWindowMinutes: true,
+          geofenceRadiusMeters: true,
+          alertCompletionThreshold: true,
+          gracePeriodMinutes: true,
+          strictTimeValidation: true,
+        },
+      }),
+      patrol.scheduleId
+        ? prisma.patrol_schedules.findUnique({
+            where: { id: patrol.scheduleId },
+            select: { overrideTimeValidation: true },
+          })
+        : Promise.resolve(null),
+    ])
     const qrWindowMinutes = familyConfig?.qrWindowMinutes ?? 5
     const familyRadius = familyConfig?.geofenceRadiusMeters ?? 50
-    const strictTimeValidation = familyConfig?.strictTimeValidation ?? true
 
-    // ── Validar tiempo mínimo entre scans (solo en modo estricto) ──────────
-    // Evita que un agente escanee todos los QR en 1 minuto sin recorrer la ruta.
-    // Tiempo mínimo = (duración estimada de la ruta / número de checkpoints) * 0.3
-    // Ejemplo: ruta de 60min con 6 checkpoints → mínimo ~3 min entre scans
+    // ── Validar ventana de tiempo para escanear ────────────────────────────
+    // Jerarquía igual que al iniciar la patrulla:
+    //   1. overrideTimeValidation del schedule (si no es null) → prioridad
+    //   2. strictTimeValidation de la familia → default
+    const strictTimeValidation =
+      scheduleConfig?.overrideTimeValidation !== null &&
+      scheduleConfig?.overrideTimeValidation !== undefined
+        ? scheduleConfig.overrideTimeValidation
+        : (familyConfig?.strictTimeValidation ?? true)
+
     if (strictTimeValidation) {
-      const lastValidCheckIn = await prisma.patrol_check_ins.findFirst({
-        where: { patrolId, validationResult: 'VALID' },
-        orderBy: { deviceTimestamp: 'desc' },
-        select: { deviceTimestamp: true, checkpointId: true },
-      })
+      const now = new Date()
+      const gracePeriodMinutes = familyConfig?.gracePeriodMinutes ?? 15
+      const latestScan = new Date(patrol.scheduledEnd.getTime() + gracePeriodMinutes * 60 * 1000)
 
-      if (lastValidCheckIn && lastValidCheckIn.checkpointId !== data.checkpointId) {
-        const totalCheckpoints = patrol.route.routeCheckpoints.length
-        const estimatedMinutes = patrol.scheduledEnd
-          ? Math.round((new Date(patrol.scheduledEnd).getTime() - new Date(patrol.scheduledStart).getTime()) / 60000)
-          : 60
-
-        // Mínimo 1 minuto entre scans, máximo 30% del tiempo promedio por checkpoint
-        const avgMinPerCheckpoint = totalCheckpoints > 1 ? estimatedMinutes / totalCheckpoints : 5
-        const minIntervalMs = Math.max(1, Math.floor(avgMinPerCheckpoint * 0.3)) * 60 * 1000
-
-        const elapsed = new Date(data.deviceTimestamp).getTime() - lastValidCheckIn.deviceTimestamp.getTime()
-
-        if (elapsed < minIntervalMs) {
-          const minMinutes = Math.ceil(minIntervalMs / 60000)
-          const elapsedSecs = Math.round(elapsed / 1000)
-          return NextResponse.json(
-            {
-              error: `Debes esperar al menos ${minMinutes} min entre checkpoints. Han pasado solo ${elapsedSecs}s.`,
-              code: 'TOO_FAST_BETWEEN_CHECKPOINTS',
-              minIntervalMinutes: minMinutes,
-            },
-            { status: 422 }
-          )
-        }
+      if (now > latestScan) {
+        const minutesPast = Math.floor((now.getTime() - patrol.scheduledEnd.getTime()) / 60000)
+        const h = Math.floor(minutesPast / 60)
+        const m = minutesPast % 60
+        const timeLabel = h > 0 && m > 0 ? `${h}h ${m}min` : h > 0 ? `${h}h` : `${m} minutos`
+        return NextResponse.json(
+          {
+            error: `El tiempo de escaneo para esta ronda ya expiró hace ${timeLabel}. No se pueden registrar más check-ins.`,
+            code: 'SCAN_WINDOW_EXPIRED',
+          },
+          { status: 422 }
+        )
       }
+    }
+
+    // ── Validar si el checkpoint ya fue visitado (re-escaneo) ─────────────
+    const existingValidCheckIn = await prisma.patrol_check_ins.findFirst({
+      where: {
+        patrolId,
+        checkpointId: data.checkpointId,
+        validationResult: 'VALID',
+      },
+      select: { id: true, serverTimestamp: true },
+    })
+
+    if (existingValidCheckIn) {
+      return NextResponse.json(
+        {
+          error: 'Este checkpoint ya fue registrado en esta ronda. No se permiten re-escaneos.',
+          code: 'CHECKPOINT_ALREADY_VISITED',
+        },
+        { status: 409 }
+      )
+    }
+
+    // ── Validar orden secuencial ───────────────────────────────────────────
+    // El agente debe escanear los checkpoints en el orden definido en la ruta.
+    // Se obtienen los checkpoints requeridos ya visitados y se verifica que el
+    // checkpoint que intenta escanear sea el siguiente en la secuencia.
+    const visitedCheckIns = await prisma.patrol_check_ins.findMany({
+      where: { patrolId, validationResult: 'VALID' },
+      select: { checkpointId: true },
+    })
+    const visitedSet = new Set(visitedCheckIns.map(ci => ci.checkpointId))
+
+    // Ordenar todos los checkpoints de la ruta por su orden
+    const sortedRoute = [...patrol.route.routeCheckpoints].sort((a, b) => a.order - b.order)
+
+    // El siguiente esperado es el primer checkpoint no visitado (en orden)
+    const nextExpected = sortedRoute.find(rc => !visitedSet.has(rc.checkpointId))
+
+    if (nextExpected && nextExpected.checkpointId !== data.checkpointId) {
+      // Buscar el nombre del checkpoint esperado para el mensaje
+      const expectedName = nextExpected.checkpoint.name
+      const attemptedOrder = routeCheckpoint.order
+      const expectedOrder = nextExpected.order
+
+      return NextResponse.json(
+        {
+          error: `Debes escanear el checkpoint #${expectedOrder} (${expectedName}) antes que el #${attemptedOrder}. Sigue el orden de la ruta.`,
+          code: 'CHECKPOINT_OUT_OF_ORDER',
+          expectedCheckpointId: nextExpected.checkpointId,
+          expectedCheckpointName: expectedName,
+          expectedOrder,
+        },
+        { status: 422 }
+      )
     }
 
     // ── Validar foto requerida ─────────────────────────────────────────────

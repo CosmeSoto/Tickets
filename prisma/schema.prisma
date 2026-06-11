@@ -1014,7 +1014,7 @@ model equipment {
   typeId                String                    @map("type_id")
   departmentId          String?                   @map("department_id")
   status                EquipmentStatus           @default(AVAILABLE)
-  condition             EquipmentCondition        @default(GOOD)
+  condition             EquipmentCondition        @default(USED)
   ownershipType         OwnershipType             @default(FIXED_ASSET) @map("ownership_type")
   purchaseDate          DateTime?                 @map("purchase_date")
   purchasePrice         Float?                    @map("purchase_price")
@@ -1641,14 +1641,14 @@ model warehouses {
   location    String?             @db.VarChar(200)
   description String?
   managerId   String?             @map("manager_id")
-  familyId    String?             @map("family_id")
+  familyId    String              @map("family_id")
   isActive    Boolean             @default(true) @map("is_active")
   createdAt   DateTime            @default(now()) @map("created_at")
   updatedAt   DateTime            @updatedAt @map("updated_at")
   consumables consumables[]
   equipment   equipment[]
   batches     equipment_batches[]
-  family      families?           @relation(fields: [familyId], references: [id])
+  family      families            @relation(fields: [familyId], references: [id])
   manager     users?              @relation("WarehouseManager", fields: [managerId], references: [id])
 
   @@index([isActive])
@@ -1895,10 +1895,8 @@ enum EquipmentStatus {
 
 enum EquipmentCondition {
   NEW
-  LIKE_NEW
-  GOOD
-  FAIR
-  POOR
+  USED
+  DAMAGED
 }
 
 enum OwnershipType {

@@ -98,16 +98,14 @@ export function getRenewalAlertClass(isExpired: boolean): string {
 
 const ASSET_CONDITION_COLORS: Record<string, string> = {
   NEW: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-  GOOD: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-  FAIR: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
-  POOR: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+  USED: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+  DAMAGED: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
 }
 
 const ASSET_CONDITION_LABELS: Record<string, string> = {
   NEW: 'Nuevo',
-  GOOD: 'Bueno',
-  FAIR: 'Regular',
-  POOR: 'Malo',
+  USED: 'Usado',
+  DAMAGED: 'Dañado',
 }
 
 export function getAssetConditionColor(condition: string): string {

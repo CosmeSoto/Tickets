@@ -89,7 +89,7 @@ export type EquipmentStatus =
   | 'RETIRED'
   | 'FOR_SALE'
   | 'SOLD'
-export type EquipmentCondition = 'NEW' | 'LIKE_NEW' | 'GOOD' | 'FAIR' | 'POOR'
+export type EquipmentCondition = 'NEW' | 'USED' | 'DAMAGED'
 export type OwnershipType = 'FIXED_ASSET' | 'RENTAL' | 'LOAN'
 
 export interface AssignmentForm {

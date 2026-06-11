@@ -1,46 +1,39 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { SearchableSelect } from '@/components/ui/searchable-select'
-import { useToast } from '@/hooks/use-toast'
 import type { InlineSelectOption } from '@/components/ui/inline-create-select'
-import { useInventoryFamilies } from '@/contexts/families-context'
 import { useFamilyOptions } from '@/hooks/use-family-options'
 
 interface Props {
-  /** Si se pasa, pre-selecciona la familia y la muestra como sugerencia */
+  /** Si se pasa, pre-selecciona la familia */
   defaultFamilyId?: string
   onSuccess: (item: InlineSelectOption) => void
   onCancel: () => void
 }
 
-interface Family {
-  id: string
-  name: string
-}
-
 export function WarehouseInlineForm({ defaultFamilyId, onSuccess, onCancel }: Props) {
-  const { toast } = useToast()
   const [name, setName] = useState('')
   const [location, setLocation] = useState('')
   const [familyId, setFamilyId] = useState(defaultFamilyId ?? '')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  // Familias de inventario desde el contexto global (cache Redis, sin peticion extra) - memoizadas
   const { families } = useFamilyOptions()
-
-  // Familias ya disponibles desde el contexto global
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
     if (!name.trim()) {
       setError('El nombre es obligatorio')
+      return
+    }
+    if (!familyId) {
+      setError('Debes seleccionar una familia para la bodega')
       return
     }
     setLoading(true)
@@ -51,7 +44,7 @@ export function WarehouseInlineForm({ defaultFamilyId, onSuccess, onCancel }: Pr
         body: JSON.stringify({
           name: name.trim(),
           location: location.trim() || undefined,
-          familyId: familyId || null,
+          familyId,
         }),
       })
       const data = await res.json()
@@ -91,20 +84,16 @@ export function WarehouseInlineForm({ defaultFamilyId, onSuccess, onCancel }: Pr
       </div>
       <div className='space-y-1'>
         <Label>
-          Familia{' '}
-          <span className='text-xs font-normal text-muted-foreground'>
-            (opcional — vacío = bodega compartida)
-          </span>
+          Familia <span className='text-destructive'>*</span>
         </Label>
         <SearchableSelect
           options={families}
           value={familyId}
           onChange={setFamilyId}
-          placeholder='Compartida (todas las familias)'
+          placeholder='Selecciona una familia...'
         />
         <p className='text-xs text-muted-foreground'>
-          Si asignas una familia, esta bodega aparecerá primero al crear activos de esa familia. Las
-          bodegas sin familia son visibles para todas.
+          Las bodegas pertenecen a una sola familia y solo son visibles para esa área.
         </p>
       </div>
       {error && <p className='text-sm text-destructive'>{error}</p>}

@@ -459,6 +459,153 @@ export class PatrolSchedulerService {
     return missedCount
   }
 
+  // ── Cierre automático de rondas IN_PROGRESS vencidas ──────────────────────
+
+  /**
+   * Cierra automáticamente las patrullas que están IN_PROGRESS pero superaron
+   * su scheduledEnd + gracePeriodMinutes sin que el agente las finalizara.
+   *
+   * Estado final: INCOMPLETE si hay checkpoints no visitados, COMPLETED si todos visitados.
+   * Notifica a los supervisores con el resumen de checkpoints faltantes.
+   *
+   * Diseñado para ejecutarse como cron job cada 5 minutos.
+   *
+   * @returns Número de patrullas cerradas automáticamente
+   */
+  static async autoCloseExpiredPatrols(): Promise<number> {
+    const now = new Date()
+    let closedCount = 0
+
+    // Obtener configuraciones de familia para conocer el grace period
+    const familyConfigs = await prisma.patrol_family_config.findMany({
+      where: { patrolsEnabled: true },
+      select: { familyId: true, gracePeriodMinutes: true, alertCompletionThreshold: true },
+    })
+
+    for (const config of familyConfigs) {
+      // Corte: scheduledEnd + gracePeriodMinutes ya pasó
+      const gracePeriodMs = (config.gracePeriodMinutes ?? 15) * 60 * 1000
+      const cutoff = new Date(now.getTime() - gracePeriodMs)
+
+      const expiredPatrols = await prisma.patrols.findMany({
+        where: {
+          familyId: config.familyId,
+          status: 'IN_PROGRESS',
+          scheduledEnd: { lt: cutoff },
+        },
+        select: {
+          id: true,
+          agentId: true,
+          familyId: true,
+          scheduledEnd: true,
+          route: {
+            select: {
+              name: true,
+              routeCheckpoints: {
+                select: { checkpointId: true, isRequired: true },
+              },
+            },
+          },
+          agent: { select: { name: true } },
+          checkIns: {
+            where: { validationResult: 'VALID' },
+            select: { checkpointId: true },
+          },
+        },
+      })
+
+      if (expiredPatrols.length === 0) continue
+
+      for (const patrol of expiredPatrols) {
+        const requiredCheckpointIds = patrol.route.routeCheckpoints
+          .filter(rc => rc.isRequired)
+          .map(rc => rc.checkpointId)
+
+        const visitedIds = new Set(patrol.checkIns.map(ci => ci.checkpointId))
+        const visitedRequired = requiredCheckpointIds.filter(id => visitedIds.has(id)).length
+        const missedIds = requiredCheckpointIds.filter(id => !visitedIds.has(id))
+
+        const completionPct =
+          requiredCheckpointIds.length === 0
+            ? 100
+            : Math.round((visitedRequired / requiredCheckpointIds.length) * 100)
+
+        const finalStatus = missedIds.length === 0 ? 'COMPLETED' : 'INCOMPLETE'
+
+        try {
+          await prisma.patrols.update({
+            where: { id: patrol.id },
+            data: {
+              status: finalStatus,
+              completedAt: now,
+              completionPercentage: completionPct,
+              missedCheckpointIds: missedIds,
+            },
+          })
+          closedCount++
+
+          // Notificar supervisores solo si quedó incompleta bajo el umbral
+          const threshold = config.alertCompletionThreshold ?? 80
+          if (completionPct < threshold) {
+            await this.notifyAutoClose(patrol, config.familyId, completionPct, missedIds.length)
+          }
+        } catch (err) {
+          console.error(`[PatrolSchedulerService] Error cerrando patrulla ${patrol.id}:`, err)
+        }
+      }
+    }
+
+    if (closedCount > 0) {
+      console.log(
+        `[PatrolSchedulerService] ${closedCount} patrullas IN_PROGRESS cerradas automáticamente por vencimiento`
+      )
+    }
+    return closedCount
+  }
+
+  /**
+   * Notifica a los supervisores cuando una patrulla se cierra automáticamente por vencimiento.
+   */
+  private static async notifyAutoClose(
+    patrol: {
+      id: string
+      agentId: string
+      familyId: string
+      route: { name: string }
+      agent: { name: string }
+      scheduledEnd: Date
+    },
+    familyId: string,
+    completionPct: number,
+    missedCount: number
+  ): Promise<void> {
+    const supervisors = await getPatrolSupervisors(familyId)
+    if (supervisors.length === 0) return
+
+    const endTime = patrol.scheduledEnd.toLocaleString('es-EC', {
+      timeZone: 'America/Guayaquil',
+      dateStyle: 'short',
+      timeStyle: 'short',
+    })
+
+    for (const supervisor of supervisors) {
+      await NotificationService.push({
+        userId: supervisor.id,
+        type: NotificationType.PATROL_INCOMPLETE,
+        title: 'Ronda cerrada automáticamente',
+        message: `La ronda "${patrol.route.name}" del agente ${patrol.agent.name} fue cerrada automáticamente al vencer el horario (${endTime}). Completitud: ${completionPct}%. ${missedCount} checkpoint(s) no visitado(s).`,
+        metadata: {
+          patrolId: patrol.id,
+          agentId: patrol.agentId,
+          familyId: patrol.familyId,
+          autoClosed: true,
+          completionPct,
+          missedCheckpoints: missedCount,
+        },
+      })
+    }
+  }
+
   /**
    * Envía notificaciones PATROL_MISSED a los supervisores de la familia.
    */

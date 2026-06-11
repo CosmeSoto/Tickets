@@ -11,13 +11,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    // Permitir admin o usuarios con newsEnabled
+    // Permitir admin o usuarios con canManageNews (gestores de noticias)
     if (session.user.role !== 'ADMIN') {
       const user = await prisma.users.findUnique({
         where: { id: session.user.id },
-        select: { newsEnabled: true },
+        select: { canManageNews: true },
       })
-      if (!user?.newsEnabled) {
+      if (!user?.canManageNews) {
         return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
       }
     }
@@ -54,13 +54,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    // Permitir admin o usuarios con newsEnabled
+    // Permitir admin o usuarios con canManageNews (gestores de noticias)
     if (session.user.role !== 'ADMIN') {
       const user = await prisma.users.findUnique({
         where: { id: session.user.id },
-        select: { newsEnabled: true },
+        select: { canManageNews: true },
       })
-      if (!user?.newsEnabled) {
+      if (!user?.canManageNews) {
         return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
       }
     }
