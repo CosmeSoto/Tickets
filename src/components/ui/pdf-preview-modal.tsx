@@ -1,8 +1,32 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { X, Download, Loader2, AlertTriangle, FileText, ExternalLink } from 'lucide-react'
+import {
+  X,
+  Download,
+  Loader2,
+  AlertTriangle,
+  FileText,
+  ExternalLink,
+  Smartphone,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
+
+/**
+ * Detecta si el navegador actual es móvil y no puede renderizar PDFs en iframe.
+ */
+function useIsMobileBrowser(): boolean {
+  const [isMobile, setIsMobile] = useState(false)
+  useEffect(() => {
+    const ua = navigator.userAgent
+    const mobile =
+      /android/i.test(ua) ||
+      /iphone|ipad|ipod/i.test(ua) ||
+      (/macintosh/i.test(ua) && navigator.maxTouchPoints > 1)
+    setIsMobile(mobile)
+  }, [])
+  return isMobile
+}
 
 interface PdfPreviewModalProps {
   /** URL del endpoint que devuelve el PDF con Content-Disposition: inline */
@@ -26,6 +50,7 @@ export function PdfPreviewModal({
   const [loadState, setLoadState] = useState<'loading' | 'loaded' | 'error'>('loading')
   const [errorMsg, setErrorMsg] = useState('')
   const iframeRef = useRef<HTMLIFrameElement>(null)
+  const isMobileBrowser = useIsMobileBrowser()
 
   // Verificar disponibilidad del PDF via fetch (mismo origen, sin CORS)
   useEffect(() => {
@@ -95,7 +120,7 @@ export function PdfPreviewModal({
             <span className='font-medium text-sm truncate'>{title}</span>
           </div>
           <div className='flex items-center gap-2 shrink-0'>
-            {loadState === 'loaded' && (
+            {(loadState === 'loaded' || isMobileBrowser) && (
               <>
                 <Button
                   size='sm'
@@ -129,24 +154,21 @@ export function PdfPreviewModal({
 
         {/* Contenido */}
         <div className='flex-1 min-h-0 relative bg-muted/20'>
-          {loadState === 'loading' && (
-            <div className='absolute inset-0 flex flex-col items-center justify-center gap-3'>
-              <Loader2 className='h-8 w-8 animate-spin text-muted-foreground' />
-              <p className='text-sm text-muted-foreground'>Cargando PDF...</p>
-            </div>
-          )}
-
-          {loadState === 'error' && (
+          {/* En navegadores móviles el iframe no puede renderizar PDFs */}
+          {isMobileBrowser ? (
             <div className='absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 text-center'>
-              <AlertTriangle className='h-10 w-10 text-amber-500' />
+              <Smartphone className='h-10 w-10 text-muted-foreground' />
               <div>
-                <p className='font-medium text-sm'>No se puede previsualizar el PDF</p>
-                <p className='text-xs text-muted-foreground mt-1'>{errorMsg}</p>
+                <p className='font-medium text-sm'>Vista previa no disponible en móvil</p>
+                <p className='text-xs text-muted-foreground mt-1'>
+                  Los navegadores móviles no admiten la previsualización de PDFs en línea. Ábrelo en
+                  una nueva pestaña o descárgalo.
+                </p>
               </div>
-              <div className='flex gap-2'>
+              <div className='flex gap-2 flex-wrap justify-center'>
                 <Button size='sm' variant='outline' onClick={handleOpenNewTab}>
                   <ExternalLink className='h-3.5 w-3.5 mr-1.5' />
-                  Abrir en nueva pestaña
+                  Abrir en pestaña
                 </Button>
                 <Button size='sm' variant='outline' onClick={handleDownload}>
                   <Download className='h-3.5 w-3.5 mr-1.5' />
@@ -154,24 +176,53 @@ export function PdfPreviewModal({
                 </Button>
               </div>
             </div>
-          )}
+          ) : (
+            <>
+              {loadState === 'loading' && (
+                <div className='absolute inset-0 flex flex-col items-center justify-center gap-3'>
+                  <Loader2 className='h-8 w-8 animate-spin text-muted-foreground' />
+                  <p className='text-sm text-muted-foreground'>Cargando PDF...</p>
+                </div>
+              )}
 
-          {loadState === 'loaded' && (
-            <iframe
-              ref={iframeRef}
-              src={previewUrl}
-              className='w-full h-full border-0'
-              title={title}
-              onError={() => {
-                setLoadState('error')
-                setErrorMsg('El navegador no pudo mostrar el PDF en el iframe.')
-              }}
-            />
+              {loadState === 'error' && (
+                <div className='absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 text-center'>
+                  <AlertTriangle className='h-10 w-10 text-amber-500' />
+                  <div>
+                    <p className='font-medium text-sm'>No se puede previsualizar el PDF</p>
+                    <p className='text-xs text-muted-foreground mt-1'>{errorMsg}</p>
+                  </div>
+                  <div className='flex gap-2'>
+                    <Button size='sm' variant='outline' onClick={handleOpenNewTab}>
+                      <ExternalLink className='h-3.5 w-3.5 mr-1.5' />
+                      Abrir en nueva pestaña
+                    </Button>
+                    <Button size='sm' variant='outline' onClick={handleDownload}>
+                      <Download className='h-3.5 w-3.5 mr-1.5' />
+                      Descargar
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {loadState === 'loaded' && (
+                <iframe
+                  ref={iframeRef}
+                  src={previewUrl}
+                  className='w-full h-full border-0'
+                  title={title}
+                  onError={() => {
+                    setLoadState('error')
+                    setErrorMsg('El navegador no pudo mostrar el PDF en el iframe.')
+                  }}
+                />
+              )}
+            </>
           )}
         </div>
 
-        {/* Footer */}
-        {loadState === 'loaded' && (
+        {/* Footer — solo en escritorio cuando el PDF cargó */}
+        {loadState === 'loaded' && !isMobileBrowser && (
           <div className='px-5 py-2 border-t bg-muted/40 shrink-0'>
             <p className='text-xs text-muted-foreground text-center'>
               Si el PDF no se muestra, usa{' '}

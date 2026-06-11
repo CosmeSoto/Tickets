@@ -17,6 +17,8 @@ import {
   ChevronRight,
   ZoomIn,
   ZoomOut,
+  ExternalLink,
+  Smartphone,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -74,6 +76,21 @@ const ACCEPTED = [
   'text/plain',
 ].join(',')
 
+// ── Detección de navegador móvil ──────────────────────────────────────────────
+
+function useIsMobileBrowser(): boolean {
+  const [isMobile, setIsMobile] = useState(false)
+  useEffect(() => {
+    const ua = navigator.userAgent
+    const mobile =
+      /android/i.test(ua) ||
+      /iphone|ipad|ipod/i.test(ua) ||
+      (/macintosh/i.test(ua) && navigator.maxTouchPoints > 1)
+    setIsMobile(mobile)
+  }, [])
+  return isMobile
+}
+
 // ── Modal de preview ─────────────────────────────────────────────────────────
 
 interface PreviewModalProps {
@@ -97,6 +114,7 @@ function PreviewModal({
   const isImage = attachment.mimeType.startsWith('image/')
   const isPdf = attachment.mimeType === 'application/pdf'
   const previewUrl = `${baseUrl}/${attachment.id}?preview=true`
+  const isMobileBrowser = useIsMobileBrowser()
 
   const currentIndex = allImages.findIndex(a => a.id === attachment.id)
   const hasPrev = currentIndex > 0
@@ -216,14 +234,42 @@ function PreviewModal({
             </div>
           )}
 
-          {isPdf && (
-            <iframe
-              src={previewUrl}
-              title={attachment.originalName}
-              className='w-full border-0'
-              style={{ height: 'calc(92vh - 52px)', minWidth: '600px' }}
-            />
-          )}
+          {isPdf &&
+            (isMobileBrowser ? (
+              <div
+                className='flex flex-col items-center justify-center gap-4 p-8 text-center w-full'
+                style={{ height: 'calc(92vh - 52px)' }}
+              >
+                <Smartphone className='h-10 w-10 text-muted-foreground' />
+                <div>
+                  <p className='font-medium text-sm'>Vista previa no disponible en móvil</p>
+                  <p className='text-xs text-muted-foreground mt-1'>
+                    Los navegadores móviles no admiten la previsualización de PDFs en línea.
+                  </p>
+                </div>
+                <div className='flex gap-2 flex-wrap justify-center'>
+                  <Button
+                    size='sm'
+                    variant='outline'
+                    onClick={() => window.open(previewUrl, '_blank', 'noopener,noreferrer')}
+                  >
+                    <ExternalLink className='h-3.5 w-3.5 mr-1.5' />
+                    Abrir en pestaña
+                  </Button>
+                  <Button size='sm' variant='outline' onClick={() => onDownload(attachment)}>
+                    <Download className='h-3.5 w-3.5 mr-1.5' />
+                    Descargar
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <iframe
+                src={previewUrl}
+                title={attachment.originalName}
+                className='w-full border-0'
+                style={{ height: 'calc(92vh - 52px)', minWidth: '600px' }}
+              />
+            ))}
 
           {!isImage && !isPdf && (
             <div className='flex flex-col items-center justify-center gap-3 p-12 text-muted-foreground'>

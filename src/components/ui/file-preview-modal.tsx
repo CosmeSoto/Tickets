@@ -23,7 +23,25 @@ import {
   Loader2,
   AlertTriangle,
   ExternalLink,
+  Smartphone,
 } from 'lucide-react'
+
+/**
+ * Detecta si el navegador actual es móvil/tablet y no puede renderizar
+ * PDFs en iframe (Chrome Android, Safari iOS, etc.)
+ */
+function useIsMobileBrowser(): boolean {
+  const [isMobile, setIsMobile] = useState(false)
+  useEffect(() => {
+    const ua = navigator.userAgent
+    const mobile =
+      /android/i.test(ua) ||
+      /iphone|ipad|ipod/i.test(ua) ||
+      (/macintosh/i.test(ua) && navigator.maxTouchPoints > 1) // iPad con iPadOS
+    setIsMobile(mobile)
+  }, [])
+  return isMobile
+}
 
 export interface PreviewFile {
   id: string
@@ -52,6 +70,7 @@ export function FilePreviewModal({ isOpen, onClose, file }: FilePreviewModalProp
   const [imageError, setImageError] = useState(false)
   const [pdfState, setPdfState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [pdfError, setPdfError] = useState('')
+  const isMobileBrowser = useIsMobileBrowser()
 
   const isImage = (file?.mimeType || '').startsWith('image/')
   const isPDF = file?.mimeType === 'application/pdf'
@@ -170,24 +189,21 @@ export function FilePreviewModal({ isOpen, onClose, file }: FilePreviewModalProp
           {/* ── PDF ── */}
           {isPDF && (
             <div className='w-full h-[600px] relative'>
-              {pdfState === 'loading' && (
-                <div className='absolute inset-0 flex flex-col items-center justify-center gap-3'>
-                  <Loader2 className='h-8 w-8 animate-spin text-muted-foreground' />
-                  <p className='text-sm text-muted-foreground'>Cargando PDF...</p>
-                </div>
-              )}
-
-              {pdfState === 'error' && (
+              {/* En navegadores móviles el iframe no puede renderizar PDFs */}
+              {isMobileBrowser ? (
                 <div className='absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 text-center'>
-                  <AlertTriangle className='h-10 w-10 text-amber-500' />
+                  <Smartphone className='h-10 w-10 text-muted-foreground' />
                   <div>
-                    <p className='font-medium text-sm'>No se puede previsualizar el PDF</p>
-                    <p className='text-xs text-muted-foreground mt-1'>{pdfError}</p>
+                    <p className='font-medium text-sm'>Vista previa no disponible en móvil</p>
+                    <p className='text-xs text-muted-foreground mt-1'>
+                      Los navegadores móviles no admiten la previsualización de PDFs en línea.
+                      Ábrelo en una nueva pestaña o descárgalo.
+                    </p>
                   </div>
                   <div className='flex gap-2 flex-wrap justify-center'>
                     <Button size='sm' variant='outline' onClick={handleOpenNewTab}>
                       <ExternalLink className='h-3.5 w-3.5 mr-1.5' />
-                      Abrir en nueva pestaña
+                      Abrir en pestaña
                     </Button>
                     <Button size='sm' variant='outline' onClick={handleDownload}>
                       <Download className='h-3.5 w-3.5 mr-1.5' />
@@ -195,37 +211,66 @@ export function FilePreviewModal({ isOpen, onClose, file }: FilePreviewModalProp
                     </Button>
                   </div>
                 </div>
-              )}
+              ) : (
+                <>
+                  {pdfState === 'loading' && (
+                    <div className='absolute inset-0 flex flex-col items-center justify-center gap-3'>
+                      <Loader2 className='h-8 w-8 animate-spin text-muted-foreground' />
+                      <p className='text-sm text-muted-foreground'>Cargando PDF...</p>
+                    </div>
+                  )}
 
-              {pdfState === 'ready' && (
-                <iframe
-                  src={file.url}
-                  className='w-full h-full border-0 rounded'
-                  title={file.originalName}
-                  onError={() => {
-                    setPdfState('error')
-                    setPdfError('El navegador no pudo mostrar el PDF.')
-                  }}
-                  onLoad={e => {
-                    // Detectar si el iframe cargó una página de error (respuesta no-PDF del servidor)
-                    try {
-                      const doc = (e.target as HTMLIFrameElement).contentDocument
-                      if (doc && doc.contentType && !doc.contentType.includes('pdf')) {
-                        const bodyText = doc.body?.innerText ?? ''
-                        if (
-                          bodyText.includes('not found') ||
-                          bodyText.includes('404') ||
-                          bodyText.includes('Unauthorized')
-                        ) {
-                          setPdfState('error')
-                          setPdfError(bodyText.trim().slice(0, 80) || 'Archivo no encontrado')
+                  {pdfState === 'error' && (
+                    <div className='absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 text-center'>
+                      <AlertTriangle className='h-10 w-10 text-amber-500' />
+                      <div>
+                        <p className='font-medium text-sm'>No se puede previsualizar el PDF</p>
+                        <p className='text-xs text-muted-foreground mt-1'>{pdfError}</p>
+                      </div>
+                      <div className='flex gap-2 flex-wrap justify-center'>
+                        <Button size='sm' variant='outline' onClick={handleOpenNewTab}>
+                          <ExternalLink className='h-3.5 w-3.5 mr-1.5' />
+                          Abrir en nueva pestaña
+                        </Button>
+                        <Button size='sm' variant='outline' onClick={handleDownload}>
+                          <Download className='h-3.5 w-3.5 mr-1.5' />
+                          Descargar
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {pdfState === 'ready' && (
+                    <iframe
+                      src={file.url}
+                      className='w-full h-full border-0 rounded'
+                      title={file.originalName}
+                      onError={() => {
+                        setPdfState('error')
+                        setPdfError('El navegador no pudo mostrar el PDF.')
+                      }}
+                      onLoad={e => {
+                        // Detectar si el iframe cargó una página de error (respuesta no-PDF del servidor)
+                        try {
+                          const doc = (e.target as HTMLIFrameElement).contentDocument
+                          if (doc && doc.contentType && !doc.contentType.includes('pdf')) {
+                            const bodyText = doc.body?.innerText ?? ''
+                            if (
+                              bodyText.includes('not found') ||
+                              bodyText.includes('404') ||
+                              bodyText.includes('Unauthorized')
+                            ) {
+                              setPdfState('error')
+                              setPdfError(bodyText.trim().slice(0, 80) || 'Archivo no encontrado')
+                            }
+                          }
+                        } catch {
+                          // cross-origin o acceso denegado al contentDocument — ignorar
                         }
-                      }
-                    } catch {
-                      // cross-origin o acceso denegado al contentDocument — ignorar
-                    }
-                  }}
-                />
+                      }}
+                    />
+                  )}
+                </>
               )}
             </div>
           )}
