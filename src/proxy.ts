@@ -261,10 +261,10 @@ export async function proxy(request: NextRequest) {
     // /settings es la configuración personal del usuario (accesible para todos los roles)
 
     if (path.startsWith('/admin') && userRole !== 'ADMIN' && !(token as any).isSuperAdmin) {
-      // Excepción: usuarios con newsEnabled pueden acceder a /admin/news
+      // Excepción: usuarios con canManageNews pueden acceder a /admin/news
       // Excepción: usuarios con formsEnabled pueden acceder a /admin/forms
       if (
-        (path.startsWith('/admin/news') && token.newsEnabled === true) ||
+        (path.startsWith('/admin/news') && (token as any).canManageNews === true) ||
         (path.startsWith('/admin/forms') && (token as any).formsEnabled === true)
       ) {
         // Permitir acceso a gestión de noticias o formularios

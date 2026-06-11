@@ -143,7 +143,7 @@ export function FilePreviewModal({ isOpen, onClose, file }: FilePreviewModalProp
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent
-        className='max-w-4xl max-h-[90vh] overflow-hidden flex flex-col'
+        className='max-w-4xl max-h-[90vh] w-[95vw] overflow-hidden flex flex-col p-4 sm:p-6'
         aria-describedby={undefined}
       >
         <DialogHeader>

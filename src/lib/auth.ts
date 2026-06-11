@@ -395,6 +395,7 @@ export const authOptions: NextAuthOptions = {
                   canRequestAssets: true,
                   patrolsEnabled: true,
                   newsEnabled: true,
+                  canManageNews: true,
                   formsEnabled: true,
                   canManageForms: true,
                 },
@@ -406,6 +407,7 @@ export const authOptions: NextAuthOptions = {
               token.canRequestAssets = dbUser?.canRequestAssets ?? false
               token.patrolsEnabled = dbUser?.patrolsEnabled ?? false
               token.newsEnabled = dbUser?.newsEnabled ?? false
+              token.canManageNews = dbUser?.canManageNews ?? false
               token.formsEnabled = dbUser?.formsEnabled ?? false
               token.canManageForms = dbUser?.canManageForms ?? false
             } catch {
@@ -416,6 +418,7 @@ export const authOptions: NextAuthOptions = {
               token.canRequestAssets = true // Prisma default = true
               token.patrolsEnabled = false
               token.newsEnabled = false
+              token.canManageNews = false
             }
           }
         }
@@ -438,6 +441,7 @@ export const authOptions: NextAuthOptions = {
                   canRequestAssets: true,
                   patrolsEnabled: true,
                   newsEnabled: true,
+                  canManageNews: true,
                   formsEnabled: true,
                   canManageForms: true,
                   departmentId: true,
@@ -457,6 +461,7 @@ export const authOptions: NextAuthOptions = {
               token.canRequestAssets = dbUser.canRequestAssets ?? true
               token.patrolsEnabled = dbUser.patrolsEnabled ?? false
               token.newsEnabled = dbUser.newsEnabled ?? false
+              token.canManageNews = (dbUser as any).canManageNews ?? false
               token.formsEnabled = dbUser.formsEnabled ?? false
               token.canManageForms = dbUser.canManageForms ?? false
               token.departmentId = dbUser.departmentId || undefined
@@ -503,6 +508,7 @@ export const authOptions: NextAuthOptions = {
           ;(session.user as any).canRequestAssets = (token.canRequestAssets as boolean) ?? true
           session.user.patrolsEnabled = (token.patrolsEnabled as boolean) ?? false
           ;(session.user as any).newsEnabled = (token.newsEnabled as boolean) ?? false
+          ;(session.user as any).canManageNews = (token.canManageNews as boolean) ?? false
           ;(session.user as any).formsEnabled = (token.formsEnabled as boolean) ?? false
           ;(session.user as any).canManageForms = (token.canManageForms as boolean) ?? false
 
