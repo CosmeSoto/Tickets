@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
         role: true,
         departmentId: true,
         newsEnabled: true,
+        canManageNews: true,
         isSuperAdmin: true,
         departments: { select: { familyId: true } },
       },
@@ -42,9 +43,10 @@ export async function GET(request: NextRequest) {
 
     // Verificar que el módulo de noticias esté habilitado para el usuario.
     // Los admins (incluido superadmin) siempre tienen acceso.
+    // Usuarios con canManageNews también tienen acceso (gestores de noticias).
     const isSuperAdmin = user.isSuperAdmin === true
     const isAdmin = user.role === 'ADMIN'
-    if (!isSuperAdmin && !isAdmin && !user.newsEnabled) {
+    if (!isSuperAdmin && !isAdmin && !user.newsEnabled && !user.canManageNews) {
       return NextResponse.json({ news: [] })
     }
 

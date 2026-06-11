@@ -3,6 +3,7 @@
 import { UnifiedDashboardBase } from '@/components/dashboard/unified-dashboard-base'
 import { TicketsStatsSection } from '@/components/dashboard/modules/tickets-stats-section'
 import { InventoryStatsSection } from '@/components/dashboard/modules/inventory-stats-section'
+import { NewsFeed } from '@/components/news/news-feed'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -76,6 +77,9 @@ export default function TechnicianDashboard() {
 
       {/* 3. Módulo Inventario (autocontenido, aparece solo si es gestor) */}
       <InventoryStatsSection role='TECHNICIAN' />
+
+      {/* 4. Noticias y comunicados (autocontenido, aparece solo si newsEnabled) */}
+      <NewsFeed className='mb-8' />
 
       <div className='grid grid-cols-1 lg:grid-cols-3 gap-6'>
         {/* Tickets Asignados */}
