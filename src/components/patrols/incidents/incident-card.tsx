@@ -21,6 +21,7 @@ interface IncidentCardProps {
   }
   onEdit?: (id: string) => void
   onDelete?: (id: string) => void
+  onClick?: (id: string) => void
   editWindowRemaining?: number
 }
 
@@ -60,12 +61,19 @@ const STATUS_LABELS: Record<string, string> = {
 const formatRemainingTime = (seconds: number) =>
   `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
 
-export function IncidentCard({ incident, onEdit, onDelete, editWindowRemaining }: IncidentCardProps) {
+export function IncidentCard({
+  incident,
+  onEdit,
+  onDelete,
+  onClick,
+  editWindowRemaining,
+}: IncidentCardProps) {
   const timeAgo = formatDistanceToNow(new Date(incident.createdAt), { addSuffix: true, locale: es })
 
   return (
     <div
-      className={`rounded-lg p-4 border bg-card hover:shadow-sm transition-all border-l-4 ${SEVERITY_BORDER[incident.severity]}`}
+      className={`rounded-lg p-4 border bg-card hover:shadow-sm transition-all border-l-4 cursor-pointer ${SEVERITY_BORDER[incident.severity]}`}
+      onClick={() => onClick?.(incident.id)}
     >
       <div className='flex items-start justify-between gap-3'>
         <div className='flex-1 min-w-0'>
@@ -79,8 +87,7 @@ export function IncidentCard({ incident, onEdit, onDelete, editWindowRemaining }
             </Badge>
             {incident.isEditable && editWindowRemaining && editWindowRemaining > 0 && (
               <span className='inline-flex items-center gap-1 text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full'>
-                <Clock className='h-3 w-3' />
-                ⏱ {formatRemainingTime(editWindowRemaining)} restantes
+                <Clock className='h-3 w-3' />⏱ {formatRemainingTime(editWindowRemaining)} restantes
               </span>
             )}
           </div>

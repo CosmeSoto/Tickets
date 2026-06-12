@@ -10,7 +10,7 @@
  * - Edición/eliminación dentro de la ventana de gracia
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { FileWarning } from 'lucide-react'
@@ -320,6 +320,7 @@ export default function MisNovedadesPage() {
           <IncidentCard
             key={incident.id}
             incident={incident}
+            onClick={id => router.push(`/patrol/incidents/${id}`)}
             onEdit={handleEdit}
             onDelete={id => setDeletingId(id)}
           />

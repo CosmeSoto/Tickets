@@ -189,6 +189,12 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
             destination = `/${rolePrefix}/tickets/${ticketIdMatch[1]}`
           }
         }
+      } else if (notification.metadata?.incidentId) {
+        // Novedad de ronda — ir al detalle de la novedad
+        destination =
+          role === 'admin'
+            ? '/admin/patrols/incidents'
+            : `/patrol/incidents/${notification.metadata.incidentId}`
       } else if (notification.metadata?.patrolId) {
         destination = `/patrol/${notification.metadata.patrolId}`
       } else if (notification.metadata?.scheduleId) {
@@ -203,21 +209,13 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
       } else if (notification.metadata?.patrolId) {
         // Rondas: si es admin va al dashboard, si es agente va a la ejecución
         destination =
-          role === 'admin'
-            ? '/admin/patrols'
-            : `/patrol/${notification.metadata.patrolId}`
+          role === 'admin' ? '/admin/patrols' : `/patrol/${notification.metadata.patrolId}`
       } else if (notification.metadata?.scheduleId) {
         // Programaciones de ronda
-        destination =
-          role === 'admin'
-            ? '/admin/patrols/schedules'
-            : '/patrol'
+        destination = role === 'admin' ? '/admin/patrols/schedules' : '/patrol'
       } else if (notification.metadata?.routeId) {
         // Rutas de ronda
-        destination =
-          role === 'admin'
-            ? '/admin/patrols/routes'
-            : '/patrol'
+        destination = role === 'admin' ? '/admin/patrols/routes' : '/patrol'
       } else if (notification.metadata?.ticketId) {
         destination = `/${rolePrefix}/tickets/${notification.metadata.ticketId}`
       }
