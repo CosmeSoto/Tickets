@@ -126,6 +126,31 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const qrWindowMinutes = familyConfig?.qrWindowMinutes ?? 5
     const familyRadius = familyConfig?.geofenceRadiusMeters ?? 50
 
+    // ── Validar intervalo mínimo entre check-ins ───────────────────────────
+    // Evita que un agente escanee todos los checkpoints en segundos (fraude).
+    // Intervalo mínimo: 30 segundos entre escaneos sucesivos.
+    const MIN_INTERVAL_SECONDS = 30
+    const lastCheckIn = await prisma.patrol_check_ins.findFirst({
+      where: { patrolId, validationResult: 'VALID' },
+      orderBy: { serverTimestamp: 'desc' },
+      select: { serverTimestamp: true },
+    })
+
+    if (lastCheckIn) {
+      const elapsedSeconds = (Date.now() - lastCheckIn.serverTimestamp.getTime()) / 1000
+      if (elapsedSeconds < MIN_INTERVAL_SECONDS) {
+        const remaining = Math.ceil(MIN_INTERVAL_SECONDS - elapsedSeconds)
+        return NextResponse.json(
+          {
+            error: `Debes esperar al menos ${remaining} segundos antes de escanear el siguiente checkpoint. Esto garantiza que recorras físicamente la ruta.`,
+            code: 'CHECKIN_TOO_FAST',
+            remainingSeconds: remaining,
+          },
+          { status: 429 }
+        )
+      }
+    }
+
     // ── Validar ventana de tiempo para escanear ────────────────────────────
     // Jerarquía igual que al iniciar la patrulla:
     //   1. overrideTimeValidation del schedule (si no es null) → prioridad
@@ -139,6 +164,23 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (strictTimeValidation) {
       const now = new Date()
       const gracePeriodMinutes = familyConfig?.gracePeriodMinutes ?? 15
+
+      // No permitir escanear ANTES de la hora de inicio (con gracia)
+      const earliestScan = new Date(
+        patrol.scheduledStart.getTime() - gracePeriodMinutes * 60 * 1000
+      )
+      if (now < earliestScan) {
+        const minutesBefore = Math.ceil((patrol.scheduledStart.getTime() - now.getTime()) / 60000)
+        return NextResponse.json(
+          {
+            error: `La ronda aún no ha llegado a su horario de inicio. Faltan ${minutesBefore} minutos. Puedes escanear a partir de ${gracePeriodMinutes} min antes del inicio programado.`,
+            code: 'SCAN_TOO_EARLY',
+          },
+          { status: 422 }
+        )
+      }
+
+      // No permitir escanear DESPUÉS del fin + gracia
       const latestScan = new Date(patrol.scheduledEnd.getTime() + gracePeriodMinutes * 60 * 1000)
 
       if (now > latestScan) {

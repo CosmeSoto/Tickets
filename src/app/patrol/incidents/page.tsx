@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { FileWarning, Loader2 } from 'lucide-react'
+import { FileWarning, Loader2, Download } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { IncidentCard } from '@/components/patrols/incidents/incident-card'
@@ -112,7 +112,11 @@ export default function MisNovedadesPage() {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error || 'Error al eliminar la novedad')
       }
-      toast({ title: 'Novedad eliminada', description: 'La novedad fue eliminada correctamente', variant: 'success' })
+      toast({
+        title: 'Novedad eliminada',
+        description: 'La novedad fue eliminada correctamente',
+        variant: 'success',
+      })
       setDeletingId(null)
       fetchIncidents(page)
     } catch (err) {
@@ -125,6 +129,29 @@ export default function MisNovedadesPage() {
 
   if (status === 'loading' || !session) return null
 
+  // Exportar novedades a CSV
+  const handleExportCSV = () => {
+    if (incidents.length === 0) return
+    const BOM = '\uFEFF'
+    const headers = ['Fecha', 'Severidad', 'Estado', 'Checkpoint', 'Ruta', 'Descripción']
+    const rows = incidents.map(i => [
+      new Date(i.createdAt).toLocaleString('es-EC'),
+      i.severity,
+      i.status === 'OPEN' ? 'Abierta' : i.status === 'RESOLVED' ? 'Resuelta' : 'Escalada',
+      i.checkpoint.name,
+      i.patrol.route.name,
+      `"${i.description.replace(/"/g, '""')}"`,
+    ])
+    const csv = BOM + [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `mis-novedades-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <ModuleLayout
       title='Mis Novedades'
@@ -132,6 +159,14 @@ export default function MisNovedadesPage() {
       loading={loading && incidents.length === 0 && !error}
       error={error}
       onRetry={() => fetchIncidents(page)}
+      headerActions={
+        incidents.length > 0 ? (
+          <Button size='sm' variant='outline' onClick={handleExportCSV}>
+            <Download className='h-4 w-4 mr-2' />
+            Exportar
+          </Button>
+        ) : undefined
+      }
     >
       {/* Incident list */}
       <div className='space-y-3'>
@@ -140,7 +175,7 @@ export default function MisNovedadesPage() {
             key={incident.id}
             incident={incident}
             onEdit={handleEdit}
-            onDelete={(id) => setDeletingId(id)}
+            onDelete={id => setDeletingId(id)}
           />
         ))}
       </div>
@@ -150,7 +185,9 @@ export default function MisNovedadesPage() {
         <Card>
           <CardContent className='flex flex-col items-center justify-center py-16 text-center'>
             <FileWarning className='h-12 w-12 text-muted-foreground/30 mb-4' />
-            <p className='text-sm font-medium text-muted-foreground'>No tienes novedades reportadas</p>
+            <p className='text-sm font-medium text-muted-foreground'>
+              No tienes novedades reportadas
+            </p>
             <p className='text-xs text-muted-foreground mt-1'>
               Las novedades que reportes durante tus rondas aparecerán aquí
             </p>
@@ -188,17 +225,26 @@ export default function MisNovedadesPage() {
         open={editDialogOpen}
         onOpenChange={setEditDialogOpen}
         mode='edit'
-        incident={editingIncident ? {
-          id: editingIncident.id,
-          description: editingIncident.description,
-          severity: editingIncident.severity,
-          photoIds: editingIncident.photos.map(p => p.id),
-        } : undefined}
+        incident={
+          editingIncident
+            ? {
+                id: editingIncident.id,
+                description: editingIncident.description,
+                severity: editingIncident.severity,
+                photoIds: editingIncident.photos.map(p => p.id),
+              }
+            : undefined
+        }
         onSuccess={() => fetchIncidents(page)}
       />
 
       {/* Delete confirmation dialog */}
-      <AlertDialog open={!!deletingId} onOpenChange={(open) => { if (!open) setDeletingId(null) }}>
+      <AlertDialog
+        open={!!deletingId}
+        onOpenChange={open => {
+          if (!open) setDeletingId(null)
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar novedad?</AlertDialogTitle>

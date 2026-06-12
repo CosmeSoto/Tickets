@@ -49,9 +49,11 @@ export async function GET(request: NextRequest) {
     const isSuperAdmin = (session.user as any).isSuperAdmin === true
 
     // Determinar modo: agente vs admin
-    const isAdminMode = userRole === 'ADMIN' || (userRole === 'TECHNICIAN' && await hasPatrolSupervisorAccess(session.user.id))
+    const isAdminMode =
+      userRole === 'ADMIN' ||
+      (userRole === 'TECHNICIAN' && (await hasPatrolSupervisorAccess(session.user.id)))
 
-    let filters: any = {
+    const filters: any = {
       page,
       limit,
       severity,
@@ -77,9 +79,7 @@ export async function GET(request: NextRequest) {
         filters.familyId = familyId
       } else if (accessibleFamilyIds !== undefined) {
         // Filtrar por todas las familias accesibles
-        filters.familyId = accessibleFamilyIds.length === 1
-          ? accessibleFamilyIds[0]
-          : undefined // Se manejará abajo
+        filters.familyId = accessibleFamilyIds.length === 1 ? accessibleFamilyIds[0] : undefined // Se manejará abajo
 
         // Si tiene múltiples familias y no se especifica una, no filtrar por familia
         // (PatrolIncidentService.list filtrará por familyId si se pasa)
@@ -104,9 +104,37 @@ export async function GET(request: NextRequest) {
 
     const result = await PatrolIncidentService.list(filters)
 
+    // Enriquecer con isEditable: el agente puede editar/eliminar dentro de la ventana de gracia
+    let enrichedData = result.data
+    if (!isAdminMode && result.data.length > 0) {
+      // Solo para modo agente — verificar ventana de edición de cada novedad
+      const { default: prisma } = await import('@/lib/prisma')
+      const familyIds = [
+        ...new Set(result.data.map((d: any) => d.patrol?.familyId).filter(Boolean)),
+      ]
+
+      // Cargar gracePeriodMinutes de cada familia involucrada
+      const familyConfigs =
+        familyIds.length > 0
+          ? await prisma.patrol_family_config.findMany({
+              where: { familyId: { in: familyIds as string[] } },
+              select: { familyId: true, gracePeriodMinutes: true },
+            })
+          : []
+      const graceMap = new Map(familyConfigs.map(c => [c.familyId, c.gracePeriodMinutes ?? 5]))
+
+      enrichedData = result.data.map((incident: any) => {
+        const familyId = incident.patrol?.familyId
+        const gracePeriodMs = (graceMap.get(familyId) ?? 5) * 60 * 1000
+        const elapsed = Date.now() - new Date(incident.createdAt).getTime()
+        const isEditable = incident.agentId === session.user.id && elapsed <= gracePeriodMs
+        return { ...incident, isEditable }
+      })
+    }
+
     return NextResponse.json({
       success: true,
-      data: result.data,
+      data: enrichedData,
       pagination: result.pagination,
     })
   } catch (error) {
@@ -137,10 +165,7 @@ export async function POST(request: NextRequest) {
     console.error('[patrols/incidents] POST:', error)
 
     if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: 'Datos inválidos', details: error.errors },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Datos inválidos', details: error.errors }, { status: 400 })
     }
 
     // Errores de negocio del servicio
