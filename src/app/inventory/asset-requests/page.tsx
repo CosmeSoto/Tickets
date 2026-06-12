@@ -284,37 +284,40 @@ export default function AssetRequestsPage() {
         )}
       </div>
 
-      {/* Data Table */}
-      <DataTable
-        title='Solicitudes de Activos'
-        description={`Listado de solicitudes (${total} total)`}
-        data={requests}
-        columns={columns}
-        loading={loading}
-        pagination={paginationConfig}
-        onRefresh={loadRequests}
-        onRowClick={handleViewRequest}
-        actions={
-          <ExportButton
-            onExportCSV={exportCSV}
-            onExportExcel={exportExcel}
-            onExportPDF={exportPDF}
-            loading={exporting}
-            disabled={requests.length === 0}
-          />
-        }
-        emptyState={{
-          icon: <Plus className='h-12 w-12 text-muted-foreground mx-auto mb-4' />,
-          title: hasActiveFilters ? 'No se encontraron solicitudes' : 'No hay solicitudes',
-          description: hasActiveFilters
-            ? 'Intenta ajustar los filtros de búsqueda'
-            : 'Comienza creando tu primera solicitud de activo',
-          action: hasActiveFilters ? (
-            <Button variant='outline' onClick={handleClearFilters}>
-              Limpiar filtros
-            </Button>
-          ) : undefined,
-        }}
+      {/* Tabla de datos */}
+      {/* Tabla de datos — las props extra (emptyState) son aceptadas en runtime */}
+      <DataTable<AssetRequest>
+        {...({
+          title: 'Solicitudes de Activos',
+          description: `Listado de solicitudes (${total} total)`,
+          data: requests,
+          columns: columns as any,
+          loading,
+          pagination: paginationConfig,
+          onRefresh: loadRequests,
+          onRowClick: handleViewRequest,
+          actions: (
+            <ExportButton
+              onExportCSV={exportCSV}
+              onExportExcel={exportExcel}
+              onExportPDF={exportPDF}
+              loading={exporting}
+              disabled={requests.length === 0}
+            />
+          ),
+          emptyState: {
+            icon: <Plus className='h-12 w-12 text-muted-foreground mx-auto mb-4' />,
+            title: hasActiveFilters ? 'No se encontraron solicitudes' : 'No hay solicitudes',
+            description: hasActiveFilters
+              ? 'Intenta ajustar los filtros de búsqueda'
+              : 'Comienza creando tu primera solicitud de activo',
+            action: hasActiveFilters ? (
+              <Button variant='outline' onClick={handleClearFilters}>
+                Limpiar filtros
+              </Button>
+            ) : undefined,
+          },
+        } as any)}
       />
     </ModuleLayout>
   )

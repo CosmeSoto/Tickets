@@ -481,87 +481,99 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'El modelo de equipo no existe' }, { status: 404 })
       }
 
-      asset = await prisma.equipment.create({
-        data: {
-          id: randomUUID(),
-          code: resolvedCode,
-          serialNumber: serialNumber ?? '',
-          brand: equipmentModel.brand.name ?? '',
-          modelDeprecated: equipmentModel.model ?? '',
-          modelId: modelId,
-          typeId: typeId ?? '',
-          departmentId: resolvedDepartmentId,
-          status: (status as any) ?? 'AVAILABLE',
-          condition: (condition as any) ?? 'GOOD',
-          ownershipType: (acquisitionMode as any) ?? 'FIXED_ASSET',
-          acquisitionMode: (acquisitionMode as any) ?? undefined,
-          supplierId: supplierId ?? undefined,
-          contractId: resolvedContractId ?? undefined,
-          purchaseDate: purchaseDate ? new Date(purchaseDate) : undefined,
-          purchasePrice: purchasePrice ?? undefined,
-          invoiceNumber: invoiceNumber ?? undefined,
-          usefulLifeYears: usefulLifeYears ?? undefined,
-          residualValue: residualValue ?? undefined,
-          depreciationMethod: (depreciationMethod as any) ?? undefined,
-          totalUnits: totalUnits ?? undefined,
-          usedUnits: usedUnits ?? undefined,
-          physicalLocation: physicalLocation ?? undefined,
-          warehouseId: resolvedEquipmentWarehouseId,
-          accessories,
-          specifications: specifications ?? undefined,
-          notes: notes ?? undefined,
-          estimatedPrice: estimatedPrice ?? undefined,
-          customValues,
-          qrCode: randomUUID(),
-          saleListingPrice: saleListingPrice ?? null,
-        } as any,
-      })
-
-      // Si el activo se crea como ASSIGNED, registrar la asignación y actualizar departmentId
-      if (status === 'ASSIGNED' && assignedUserId) {
-        // Obtener el departamento del usuario receptor
-        const receiver = await prisma.users.findUnique({
-          where: { id: assignedUserId },
-          select: { departmentId: true },
-        })
-
-        await prisma.equipment_assignments.create({
+      const equipmentId = randomUUID()
+      asset = await prisma.$transaction(async tx => {
+        const created = await (tx.equipment.create as any)({
           data: {
-            id: randomUUID(),
-            equipmentId: asset.id,
-            receiverId: assignedUserId,
-            delivererId: userId,
-            assignmentType: 'PERMANENT',
-            startDate: new Date(),
-            isActive: true,
-            accessories: body.accessories ?? [],
+            id: equipmentId,
+            code: resolvedCode,
+            serialNumber: serialNumber ?? '',
+            brand: equipmentModel.brand?.name ?? '',
+            modelDeprecated: equipmentModel.model ?? '',
+            modelId: modelId,
+            typeId: typeId ?? '',
+            departmentId: resolvedDepartmentId,
+            status: (status as any) ?? 'AVAILABLE',
+            condition: (condition as any) ?? 'GOOD',
+            ownershipType: (acquisitionMode as any) ?? 'FIXED_ASSET',
+            acquisitionMode: (acquisitionMode as any) ?? undefined,
+            supplierId: supplierId ?? undefined,
+            contractId: resolvedContractId ?? undefined,
+            purchaseDate: purchaseDate ? new Date(purchaseDate) : undefined,
+            purchasePrice: purchasePrice ?? undefined,
+            invoiceNumber: invoiceNumber ?? undefined,
+            usefulLifeYears: usefulLifeYears ?? undefined,
+            residualValue: residualValue ?? undefined,
+            depreciationMethod: (depreciationMethod as any) ?? undefined,
+            totalUnits: totalUnits ?? undefined,
+            usedUnits: usedUnits ?? undefined,
+            physicalLocation: physicalLocation ?? undefined,
+            warehouseId: resolvedEquipmentWarehouseId,
+            accessories,
+            specifications: specifications ?? undefined,
+            notes: notes ?? undefined,
+            estimatedPrice: estimatedPrice ?? undefined,
+            customValues:
+              customValues.length > 0
+                ? {
+                    create: customValues.map((cv: { fieldName: string; fieldValue: string }) => ({
+                      fieldName: cv.fieldName,
+                      fieldValue: cv.fieldValue,
+                    })),
+                  }
+                : undefined,
+            qrCode: randomUUID(),
+            saleListingPrice: saleListingPrice ?? null,
           },
         })
 
-        // Actualizar departmentId en el equipo con el departamento del receptor
-        if (receiver?.departmentId) {
-          await (prisma.equipment.update as any)({
-            where: { id: asset.id },
-            data: { departmentId: receiver.departmentId },
+        // Si el activo se crea como ASSIGNED, registrar la asignación y actualizar departmentId
+        if (status === 'ASSIGNED' && assignedUserId) {
+          const receiver = await tx.users.findUnique({
+            where: { id: assignedUserId },
+            select: { departmentId: true },
+          })
+
+          await tx.equipment_assignments.create({
+            data: {
+              id: randomUUID(),
+              equipmentId: created.id,
+              receiverId: assignedUserId,
+              delivererId: userId,
+              assignmentType: 'PERMANENT',
+              startDate: new Date(),
+              isActive: true,
+              accessories: body.accessories ?? [],
+            },
+          })
+
+          if (receiver?.departmentId) {
+            await (tx.equipment.update as any)({
+              where: { id: created.id },
+              data: { departmentId: receiver.departmentId },
+            })
+            created.departmentId = receiver.departmentId
+          }
+        }
+
+        // Si el activo se crea en MAINTENANCE, registrar el mantenimiento
+        if (status === 'MAINTENANCE' && maintenanceDescription) {
+          await tx.maintenance_records.create({
+            data: {
+              id: randomUUID(),
+              equipmentId: created.id,
+              type: (maintenanceType as any) ?? 'CORRECTIVE',
+              status: 'SCHEDULED',
+              date: maintenanceDate ? new Date(maintenanceDate) : new Date(),
+              description: maintenanceDescription,
+              technicianId: maintenanceTechnicianId ?? undefined,
+              requestedById: userId,
+            },
           })
         }
-      }
 
-      // Si el activo se crea en MAINTENANCE, registrar el mantenimiento
-      if (status === 'MAINTENANCE' && maintenanceDescription) {
-        await prisma.maintenance_records.create({
-          data: {
-            id: randomUUID(),
-            equipmentId: asset.id,
-            type: (maintenanceType as any) ?? 'CORRECTIVE',
-            status: 'SCHEDULED',
-            date: maintenanceDate ? new Date(maintenanceDate) : new Date(),
-            description: maintenanceDescription,
-            technicianId: maintenanceTechnicianId ?? undefined,
-            requestedById: userId,
-          },
-        })
-      }
+        return created
+      })
     } else if (subtype === 'MRO') {
       const resolvedWarehouseId = warehouseId ?? defaultWarehouseId
       const initialStatus = calculateConsumableStatus(

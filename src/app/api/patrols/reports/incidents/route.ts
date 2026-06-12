@@ -19,6 +19,9 @@ import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { getPatrolAccessibleFamilyIds } from '@/lib/patrol/patrol-access'
 
+// Acceso al modelo patrol_incidents hasta regenerar el Prisma Client
+const db = prisma as any
+
 export async function GET(request: NextRequest) {
   try {
     // 1. Authenticate session
@@ -89,7 +92,7 @@ export async function GET(request: NextRequest) {
       where.patrol = { familyId: { in: accessibleFamilyIds } }
     }
 
-    // 4. Execute parallel queries
+    // 4. Ejecutar consultas en paralelo
     const [
       severityCounts,
       statusCounts,
@@ -98,36 +101,36 @@ export async function GET(request: NextRequest) {
       resolvedIncidents,
       hotSpotsRaw,
     ] = await Promise.all([
-      // a. Grouped counts by severity
-      prisma.patrol_incidents.groupBy({
+      // a. Conteo agrupado por severidad
+      db.patrol_incidents.groupBy({
         by: ['severity'],
         where,
         _count: { id: true },
       }),
 
-      // b. Counts by status
-      prisma.patrol_incidents.groupBy({
+      // b. Conteo agrupado por estado
+      db.patrol_incidents.groupBy({
         by: ['status'],
         where,
         _count: { id: true },
       }),
 
-      // c. Total count
-      prisma.patrol_incidents.count({ where }),
+      // c. Total de novedades
+      db.patrol_incidents.count({ where }),
 
-      // d. Count ESCALATED
-      prisma.patrol_incidents.count({
+      // d. Total escaladas a ticket
+      db.patrol_incidents.count({
         where: { ...where, status: 'ESCALATED' },
       }),
 
-      // e. Resolved incidents for avg resolution time
-      prisma.patrol_incidents.findMany({
+      // e. Novedades resueltas para calcular tiempo promedio de resolución
+      db.patrol_incidents.findMany({
         where: { ...where, status: 'RESOLVED', resolvedAt: { not: null } },
         select: { createdAt: true, resolvedAt: true },
       }),
 
-      // f. Hot spots: group by checkpointId with count
-      prisma.patrol_incidents.groupBy({
+      // f. Puntos calientes: top 10 checkpoints con más novedades
+      db.patrol_incidents.groupBy({
         by: ['checkpointId'],
         where,
         _count: { id: true },
@@ -136,24 +139,24 @@ export async function GET(request: NextRequest) {
       }),
     ])
 
-    // 5. Format results
+    // 5. Formatear resultados
 
-    // a. By severity
-    const bySeverity = { LOW: 0, MEDIUM: 0, HIGH: 0, CRITICAL: 0 }
+    // a. Conteo por severidad
+    const bySeverity: Record<string, number> = { LOW: 0, MEDIUM: 0, HIGH: 0, CRITICAL: 0 }
     for (const item of severityCounts) {
-      bySeverity[item.severity] = item._count.id
+      bySeverity[item.severity as string] = item._count.id
     }
 
-    // b. By status
-    const byStatus = { OPEN: 0, RESOLVED: 0, ESCALATED: 0 }
+    // b. Conteo por estado
+    const byStatus: Record<string, number> = { OPEN: 0, RESOLVED: 0, ESCALATED: 0 }
     for (const item of statusCounts) {
-      byStatus[item.status] = item._count.id
+      byStatus[item.status as string] = item._count.id
     }
 
-    // c. Resolution stats
+    // c. Tiempo promedio de resolución
     let avgResolutionMinutes = 0
     if (resolvedIncidents.length > 0) {
-      const totalMinutes = resolvedIncidents.reduce((sum, incident) => {
+      const totalMinutes = resolvedIncidents.reduce((sum: number, incident: any) => {
         const created = new Date(incident.createdAt).getTime()
         const resolved = new Date(incident.resolvedAt!).getTime()
         return sum + (resolved - created) / (1000 * 60)
@@ -161,9 +164,8 @@ export async function GET(request: NextRequest) {
       avgResolutionMinutes = Math.round(totalMinutes / resolvedIncidents.length)
     }
 
-    const escalationRate = totalIncidents > 0
-      ? Math.round((escalatedCount / totalIncidents) * 1000) / 10
-      : 0
+    const escalationRate =
+      totalIncidents > 0 ? Math.round((escalatedCount / totalIncidents) * 1000) / 10 : 0
 
     const resolutionStats = {
       avgResolutionMinutes,
@@ -180,7 +182,7 @@ export async function GET(request: NextRequest) {
     }> = []
 
     if (hotSpotsRaw.length > 0) {
-      const checkpointIds = hotSpotsRaw.map(h => h.checkpointId)
+      const checkpointIds = hotSpotsRaw.map((h: any) => h.checkpointId)
       const checkpoints = await prisma.patrol_checkpoints.findMany({
         where: { id: { in: checkpointIds } },
         select: { id: true, name: true, location: true },
@@ -188,7 +190,7 @@ export async function GET(request: NextRequest) {
 
       const checkpointMap = new Map(checkpoints.map(c => [c.id, c]))
 
-      hotSpots = hotSpotsRaw.map(h => {
+      hotSpots = hotSpotsRaw.map((h: any) => {
         const cp = checkpointMap.get(h.checkpointId)
         return {
           checkpointId: h.checkpointId,

@@ -12,6 +12,10 @@ import prisma from '@/lib/prisma'
 import { NotificationService } from '@/lib/services/notification-service'
 import { NotificationType } from '@prisma/client'
 
+// Acceso a campos de patrols que aún no están en el Prisma Client generado
+// (reminderSentAt, route, family, agent) — eliminar cast cuando se regenere el client
+const db = prisma as any
+
 export class PatrolReminderService {
   /**
    * Envía recordatorios de rondas pendientes que están dentro de la ventana
@@ -48,7 +52,7 @@ export class PatrolReminderService {
       const maxScheduledStart = new Date(now.getTime() + windowMs)
 
       // Buscar patrullas PENDING de esta familia dentro de la ventana
-      const patrols = await prisma.patrols.findMany({
+      const patrols = await db.patrols.findMany({
         where: {
           familyId: config.familyId,
           status: 'PENDING',
@@ -88,8 +92,8 @@ export class PatrolReminderService {
             },
           })
 
-          // 4. Marcar como enviado para idempotencia
-          await prisma.patrols.update({
+          // Marcar como enviado — idempotencia para no enviar doble
+          await db.patrols.update({
             where: { id: patrol.id },
             data: { reminderSentAt: new Date() },
           })

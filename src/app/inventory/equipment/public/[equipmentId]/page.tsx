@@ -184,7 +184,7 @@ export default async function EquipmentPublicPage({ params }: PageProps) {
   const activeMaintenance = equipment.maintenanceRecords[0] ?? null
   const photoUrl =
     equipment.photoUrl ??
-    equipment.model?.modelPhotoUrl ??
+    (equipment.model as any)?.modelPhotoUrl ??
     (equipment.attachments[0]
       ? `/api/inventory/equipment/${equipmentId}/attachments/${equipment.attachments[0].id}?preview=true`
       : null)

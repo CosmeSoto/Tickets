@@ -321,7 +321,7 @@ export function NewsFeed({ className }: NewsFeedProps) {
 
       {selectedNews && (
         <NewsDetail
-          news={selectedNews}
+          news={selectedNews as any}
           isOpen={!!selectedNews}
           onClose={() => setSelectedNews(null)}
         />

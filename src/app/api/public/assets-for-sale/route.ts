@@ -84,7 +84,9 @@ export async function GET(request?: NextRequest) {
     const contactWhatsapp = whatsAppSetting?.value || null
 
     // Obtener todos los custom fields legacy de las familias involucradas (fallback)
-    const familyIds = [...new Set(equipment.map(eq => eq.type?.familyId).filter(Boolean))] as string[]
+    const familyIds = [
+      ...new Set(equipment.map(eq => eq.type?.familyId).filter(Boolean)),
+    ] as string[]
     const legacyCustomFields =
       familyIds.length > 0
         ? await prisma.family_custom_fields.findMany({
@@ -111,7 +113,8 @@ export async function GET(request?: NextRequest) {
             throw new Error('Equipo sin relación de tipo')
           }
 
-          const customAttributes: Record<string, { value: string; label: string; type: string }> = {}
+          const customAttributes: Record<string, { value: string; label: string; type: string }> =
+            {}
 
           if (eq.customValues && eq.customValues.length > 0) {
             if (eq.type.attributes && eq.type.attributes.length > 0) {
@@ -192,7 +195,7 @@ export async function GET(request?: NextRequest) {
           return null
         }
       })
-      .filter((item): item is PublicEquipmentItem => item !== null)
+      .filter((item): item is NonNullable<typeof item> => item !== null) as PublicEquipmentItem[]
 
     // Agrupar equipos por modelo
     const groups = groupByModel(publicItems)

@@ -1,8 +1,4 @@
-import { 
-  EquipmentStatus, 
-  EquipmentCondition, 
-  OwnershipType 
-} from '@prisma/client'
+import { EquipmentStatus, EquipmentCondition, OwnershipType } from '@prisma/client'
 
 // Equipment type from DB
 export interface EquipmentTypeInfo {
@@ -13,6 +9,14 @@ export interface EquipmentTypeInfo {
   icon?: string
   isActive: boolean
   order: number
+  familyId?: string | null
+  family?: {
+    id: string
+    name: string
+    code: string
+    color?: string | null
+  } | null
+  trackMaintenance?: boolean
 }
 
 // Department info embedded in equipment
@@ -33,8 +37,13 @@ export interface Equipment {
   id: string
   code: string
   serialNumber: string
+  // Campo deprecated — se mantiene por compatibilidad con datos existentes
   brand: string
-  model: string
+  // model puede venir como string (legacy) o como objeto (con relación al catálogo)
+  model: string | { brand?: { name: string } | null; model: string } | null
+  // Campo deprecated para nombre del modelo legacy
+  modelDeprecated?: string
+  modelId?: string
   typeId: string
   type?: EquipmentTypeInfo
   departmentId?: string
@@ -62,7 +71,7 @@ export interface Equipment {
   rentalNotes?: string
   createdAt: Date
   updatedAt: Date
-  // Active assignment (populated when fetched from detail endpoint)
+  // Asignación activa (se puebla cuando se consulta desde el endpoint de detalle)
   currentAssignment?: { id: string; isActive: boolean } | null
 }
 
@@ -133,7 +142,14 @@ export interface EquipmentDetailResponse {
 // Equipment history event
 export interface EquipmentHistoryEvent {
   id: string
-  type: 'CREATED' | 'UPDATED' | 'ASSIGNED' | 'RETURNED' | 'MAINTENANCE' | 'STATUS_CHANGE' | 'CONDITION_CHANGE'
+  type:
+    | 'CREATED'
+    | 'UPDATED'
+    | 'ASSIGNED'
+    | 'RETURNED'
+    | 'MAINTENANCE'
+    | 'STATUS_CHANGE'
+    | 'CONDITION_CHANGE'
   description: string
   userId?: string
   userName?: string
@@ -161,10 +177,13 @@ export interface RentalEquipmentSummary {
   expiringThisMonth: number
   expiringSoon: number
   totalMonthlyCost: number
-  byProvider: Record<string, {
-    count: number
-    monthlyCost: number
-  }>
+  byProvider: Record<
+    string,
+    {
+      count: number
+      monthlyCost: number
+    }
+  >
   expiringContracts: Array<{
     id: string
     code: string

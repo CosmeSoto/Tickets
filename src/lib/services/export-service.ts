@@ -1,4 +1,4 @@
-import { ReportFilters } from './report-service'
+import { ReportFilters } from './ticket-report.service'
 
 export interface ExportOptions {
   format: 'csv' | 'excel' | 'pdf' | 'json'

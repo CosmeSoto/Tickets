@@ -292,10 +292,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         where: { equipmentId: id },
       })
 
-      // Create new custom values if any
+      // Crear los nuevos valores personalizados si hay
       if (customValues.length > 0) {
         await prisma.equipment_custom_values.createMany({
-          data: customValues.map(cv => ({
+          data: customValues.map((cv: { fieldName: string; fieldValue: string }) => ({
             id: randomUUID(),
             equipmentId: id,
             fieldName: cv.fieldName,

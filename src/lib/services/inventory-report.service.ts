@@ -22,6 +22,7 @@ export class InventoryReportService {
       const models = await prisma.equipment_models.findMany({
         where: params.modelId ? { id: params.modelId } : {},
         include: {
+          brand: true,
           instances: {
             where: instancesWhere,
             select: {
@@ -39,7 +40,7 @@ export class InventoryReportService {
 
       return models.map(model => ({
         modelId: model.id,
-        brand: model.brand,
+        brand: model.brand?.name ?? '',
         model: model.model,
         sku: model.sku,
         type: model.type.name,
@@ -131,7 +132,10 @@ export class InventoryReportService {
         } else {
           byModel.set(key, {
             modelId: eq.model.id,
-            brand: eq.model.brand,
+            brand:
+              typeof eq.model.brand === 'object'
+                ? ((eq.model.brand as any)?.name ?? '')
+                : (eq.model.brand ?? ''),
             model: eq.model.model,
             totalMaintenances: m._count,
             totalCost: m._sum.cost || 0,
@@ -164,7 +168,7 @@ export class InventoryReportService {
       const batches = await prisma.equipment_batches.findMany({
         where,
         include: {
-          model: { select: { brand: true, model: true } },
+          model: { include: { brand: true } },
           supplier: { select: { name: true } },
           equipment: {
             where: params.familyId ? { type: { familyId: params.familyId } } : {},
@@ -180,7 +184,7 @@ export class InventoryReportService {
       return batches.map(batch => ({
         batchId: batch.id,
         batchCode: batch.batchCode,
-        model: `${batch.model.brand} ${batch.model.model}`,
+        model: `${batch.model.brand?.name ?? ''} ${batch.model.model}`.trim(),
         supplier: batch.supplier?.name ?? '—',
         quantity: batch.quantity,
         unitPrice: batch.unitPrice,

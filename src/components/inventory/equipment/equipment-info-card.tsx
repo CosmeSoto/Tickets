@@ -123,7 +123,11 @@ export function EquipmentInfoCard({ equipment }: EquipmentInfoCardProps) {
               </p>
               <div className='grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3'>
                 {sortedCustomValues!.map((item, i) => (
-                  <InfoRow key={i} label={item.fieldLabel} value={item.fieldValue} />
+                  <InfoRow
+                    key={i}
+                    label={(item as any).fieldLabel ?? item.fieldName}
+                    value={item.fieldValue}
+                  />
                 ))}
               </div>
             </div>

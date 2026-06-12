@@ -328,7 +328,7 @@ export function EquipmentAssetForm({
         setEquipmentModels(models)
 
         if (isEditMode && initialEquipment?.modelId) {
-          const modelExists = models.some(m => m.id === initialEquipment.modelId)
+          const modelExists = models.some((m: any) => m.id === initialEquipment.modelId)
           if (modelExists) setSelectedModelId(initialEquipment.modelId)
         }
       })
@@ -412,7 +412,8 @@ export function EquipmentAssetForm({
     }
     // Limpiar departamento manual si pasa a RETIRED (no aplica)
     if (equipmentStatus === 'RETIRED') {
-      setDepartmentId('')
+      // El departamento se maneja automáticamente vía assignedUserDept
+      setAssignedUserDept(null)
     }
   }, [equipmentStatus])
 
@@ -867,7 +868,7 @@ export function EquipmentAssetForm({
       {equipmentStatus === 'ASSIGNED' && assignedUserDept && (
         <div className='rounded-md border border-primary/30 bg-primary/5 p-3'>
           <Label className='text-xs text-muted-foreground'>Departamento</Label>
-          <p className='font-medium'>{assignedUserDept}</p>
+          <p className='font-medium'>{assignedUserDept.name}</p>
         </div>
       )}
 

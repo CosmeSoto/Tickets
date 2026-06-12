@@ -9,10 +9,10 @@ import prisma from '@/lib/prisma'
 import { PatrolIncidentService } from '@/lib/services/patrol-incident.service'
 import { checkPatrolFamilyAccess } from '@/lib/patrol/patrol-access'
 
-export async function POST(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+// Acceso al modelo patrol_incidents hasta regenerar el Prisma Client
+const db = prisma as any
+
+export async function POST(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
@@ -27,7 +27,7 @@ export async function POST(
     const { id } = await params
 
     // Obtener el incidente para verificar acceso a la familia
-    const incident = await prisma.patrol_incidents.findUnique({
+    const incident = await db.patrol_incidents.findUnique({
       where: { id },
       include: { patrol: { select: { familyId: true } } },
     })

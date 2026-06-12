@@ -28,7 +28,7 @@ export function EquipmentModelInlineForm({
 }: Props) {
   const { toast } = useToast()
   const isEdit = !!item
-  const [brandId, setBrandId] = useState<string | null>(item?.brandId ?? initialBrandId ?? null)
+  const [brandId, setBrandId] = useState<string>(item?.brandId ?? initialBrandId ?? '')
   const isBrandLocked = !isEdit && !!initialBrandId
   const [model, setModel] = useState(item?.model ?? '')
   const [sku, setSku] = useState('')
@@ -124,21 +124,19 @@ export function EquipmentModelInlineForm({
             </div>
           ) : (
             <InlineCreateSelect
-              value={brandId}
-              onChange={setBrandId}
-              options={brands}
+              value={brandId as any}
+              onChange={(id: string) => setBrandId(id)}
+              options={brands as any}
               placeholder='Buscar o crear marca...'
-              searchPlaceholder='Buscar marca...'
               createLabel='Crear marca'
-              emptyLabel='No hay marcas'
-              CreateForm={({ onSuccess, onCancel: onBrandCancel }) => (
+              createForm={({ onSuccess, onCancel }: any) => (
                 <EquipmentBrandInlineForm
                   familyId={familyId}
-                  onSuccess={async item => {
+                  onSuccess={async (item: any) => {
                     await handleBrandSuccess(item)
                     onSuccess(item)
                   }}
-                  onCancel={onBrandCancel}
+                  onCancel={onCancel}
                 />
               )}
             />

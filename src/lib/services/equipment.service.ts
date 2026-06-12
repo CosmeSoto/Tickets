@@ -208,7 +208,7 @@ export class EquipmentService {
           {
             model: {
               OR: [
-                { brand: { contains: q, mode: 'insensitive' } },
+                { brand: { name: { contains: q, mode: 'insensitive' } } },
                 { model: { contains: q, mode: 'insensitive' } },
               ],
             },

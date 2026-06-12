@@ -39,6 +39,10 @@ interface FieldRange {
   label: string
 }
 
+// El Record requiere todos los keys de PatrolFamilyConfigInput.
+// Los campos booleanos (patrolsEnabled, requirePhotoOnStart, etc.) y
+// patrolIncidentCategoryId no tienen rango numérico, se validan por separado.
+// Para satisfacer el tipo se les asigna un rango dummy que nunca se usa.
 const FIELD_RANGES: Record<keyof PatrolFamilyConfigInput, FieldRange> = {
   qrWindowMinutes: {
     min: 1,
@@ -85,6 +89,14 @@ const FIELD_RANGES: Record<keyof PatrolFamilyConfigInput, FieldRange> = {
     max: 60,
     label: 'Recordatorio antes (minutos)',
   },
+  // Campos booleanos y string — no tienen rango numérico.
+  // Se incluyen para satisfacer el tipo Record<keyof PatrolFamilyConfigInput, FieldRange>
+  // pero el loop de validación numérica los omite porque sus valores no son números.
+  patrolsEnabled: { min: 0, max: 1, label: 'Rondas habilitadas' },
+  requirePhotoOnStart: { min: 0, max: 1, label: 'Foto al inicio requerida' },
+  requirePhotoOnEnd: { min: 0, max: 1, label: 'Foto al finalizar requerida' },
+  strictTimeValidation: { min: 0, max: 1, label: 'Validación estricta de horario' },
+  patrolIncidentCategoryId: { min: 0, max: 0, label: 'Categoría de incidentes de ronda' },
 }
 
 /**

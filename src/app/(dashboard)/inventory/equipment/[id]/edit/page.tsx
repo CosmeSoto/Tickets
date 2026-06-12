@@ -132,11 +132,12 @@ export default function EditEquipmentPage({ params }: EditEquipmentPageProps) {
     )
   }
 
+  const eqModel = typeof equipment.model === 'object' ? equipment.model : null
   const equipmentTitle = getEquipmentDisplayName({
     equipmentCode: equipment.code,
     equipmentTypeName: equipment.type?.name,
-    equipmentBrandName: equipment.model?.brand?.name || equipment.brand,
-    equipmentModelName: equipment.model?.model || equipment.modelDeprecated,
+    equipmentBrandName: eqModel?.brand?.name || equipment.brand,
+    equipmentModelName: eqModel?.model || (equipment as any).modelDeprecated,
   })
 
   return (

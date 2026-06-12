@@ -14,8 +14,15 @@ export interface Equipment {
   id: string
   code: string
   type?: EquipmentType
+  // Campo legacy (string) — se mantiene por compatibilidad con datos viejos
   brand: string
-  model: string
+  // Campo nuevo: relación con el catálogo de modelos
+  model?: {
+    brand?: { name: string } | null
+    model: string
+  } | null
+  // Campo legacy (string) — se mantiene por compatibilidad con datos viejos
+  modelDeprecated?: string
   serialNumber: string
   status: EquipmentStatus
   condition: EquipmentCondition

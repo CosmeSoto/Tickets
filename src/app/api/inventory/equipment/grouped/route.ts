@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
             {
               model: {
                 OR: [
-                  { brand: { contains: search, mode: 'insensitive' } },
+                  { brand: { name: { contains: search, mode: 'insensitive' } } },
                   { model: { contains: search, mode: 'insensitive' } },
                 ],
               },
@@ -124,7 +124,10 @@ export async function GET(request: NextRequest) {
       const groupsMap = new Map<string, GroupedInventoryRow>()
 
       for (const eq of equipment) {
-        const brand = eq.model?.brand ?? eq.brand
+        const brand =
+          typeof eq.model?.brand === 'object'
+            ? ((eq.model?.brand as any)?.name ?? eq.brand)
+            : (eq.model?.brand ?? eq.brand)
         const modelName = eq.model?.model ?? eq.modelDeprecated
         const groupId = `${brand}|${modelName}|${eq.typeId}`
 

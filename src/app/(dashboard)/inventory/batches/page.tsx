@@ -35,7 +35,9 @@ async function getBatchesData(filters: SearchParams) {
   const filtered = filters.search
     ? batches.filter(
         b =>
-          b.model.brand.toLowerCase().includes(filters.search!.toLowerCase()) ||
+          ((b.model as any).brand?.name ?? '')
+            .toLowerCase()
+            .includes(filters.search!.toLowerCase()) ||
           b.model.model.toLowerCase().includes(filters.search!.toLowerCase()) ||
           b.batchCode.toLowerCase().includes(filters.search!.toLowerCase())
       )
@@ -67,7 +69,7 @@ async function BatchesContent({ searchParams }: { searchParams: SearchParams }) 
     id: b.id,
     batchCode: b.batchCode,
     description: b.description,
-    modelBrand: b.model.brand,
+    modelBrand: (b.model as any).brand?.name ?? '',
     modelName: b.model.model,
     quantity: b.quantity,
     supplierName: b.supplier?.name || '—',

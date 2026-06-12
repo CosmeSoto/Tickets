@@ -199,6 +199,7 @@ export default function SchedulesPage() {
       recurrence: schedule.recurrence as any,
       recurrenceDays: schedule.recurrenceDays,
       overrideTimeValidation: schedule.overrideTimeValidation ?? null,
+      repeatIntervalMinutes: (schedule as any).repeatIntervalMinutes ?? null,
     })
 
     fetchRoutesForFamily(schedule.familyId)

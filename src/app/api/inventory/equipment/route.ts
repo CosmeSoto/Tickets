@@ -64,10 +64,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Obtener datos del modelo
+    // Obtener datos del modelo (incluye marca para los campos deprecated)
     const model = await prisma.equipment_models.findUnique({
       where: { id: validatedData.modelId },
-      include: { type: true },
+      include: { brand: true, type: true },
     })
 
     if (!model) {
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
         code: validatedData.code,
         serialNumber: validatedData.serialNumber || '',
         modelId: validatedData.modelId,
-        brand: model.brand,
+        brand: model.brand?.name ?? '',
         modelDeprecated: model.model,
         typeId: model.typeId,
         departmentId: validatedData.departmentId,

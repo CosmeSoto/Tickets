@@ -36,8 +36,8 @@ export interface PublicEquipmentItem {
       color: string | null
     }
   }
-  customAttributes: Record<string, { value: string; label: string; type: string }>
-  contactWhatsapp: string | null
+  customAttributes?: Record<string, { value: string; label: string; type: string }>
+  contactWhatsapp?: string | null
 }
 
 interface PublicEquipmentCardProps {

@@ -68,7 +68,14 @@ export async function createBulkEquipment(input: BulkEquipmentInput): Promise<Bu
     validatedInput.typeId && validatedInput.typeId !== ''
       ? validatedInput.typeId
       : equipmentModel.typeId
-  const brand = (validatedInput.brand?.trim() || equipmentModel.brand).trim()
+  // brand ahora es una relación — extraer nombre. Fallback al input manual.
+  const brand = (
+    validatedInput.brand?.trim() ||
+    (typeof equipmentModel.brand === 'object'
+      ? (equipmentModel.brand as any)?.name
+      : equipmentModel.brand) ||
+    ''
+  ).trim()
   const modelOld = (validatedInput.model?.trim() || equipmentModel.model).trim()
 
   // 2. Obtener información del tipo de equipo para generar códigos
@@ -260,7 +267,10 @@ export async function getStockInfo(brand: string, model: string, typeId: string)
     const equipment = await prisma.equipment.findMany({
       where: {
         typeId,
-        OR: [{ model: { brand, model } }, { AND: [{ brand }, { modelDeprecated: model }] }],
+        OR: [
+          { model: { brand: { name: brand }, model } },
+          { AND: [{ brand }, { modelDeprecated: model }] },
+        ],
       },
       select: {
         status: true,

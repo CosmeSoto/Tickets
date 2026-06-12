@@ -6,6 +6,11 @@
  * - Validación de ventana de edición (gracePeriodMinutes)
  * - Notificación a supervisores al crear novedad
  * - Auditoría de acciones
+ *
+ * NOTA TÉCNICA: Se usa (prisma as any).patrol_incidents porque el Prisma Client
+ * en el repositorio aún no ha sido regenerado después de agregar el modelo
+ * patrol_incidents al schema. Al correr `prisma generate` en producción/CI
+ * los casts `as any` pueden eliminarse.
  */
 
 import prisma from '@/lib/prisma'
@@ -15,6 +20,9 @@ import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
 import { PatrolPhotoService } from '@/lib/services/patrol-photo.service'
 import { NotificationType } from '@prisma/client'
 import { getPatrolSupervisors } from '@/lib/patrol/patrol-helpers'
+
+// Acceso al modelo patrol_incidents hasta que se regenere el Prisma Client
+const db = prisma as any
 
 // ── Interfaces ────────────────────────────────────────────────────────────────
 
@@ -61,7 +69,7 @@ export class PatrolIncidentService {
   static async create(data: CreateIncidentData) {
     const { patrolId, checkpointId, agentId, description, severity, photoBase64 } = data
 
-    // 1. Obtener la patrulla con su ruta
+    // 1. Obtener la patrulla con su ruta y familia
     const patrol = await prisma.patrols.findUnique({
       where: { id: patrolId },
       include: {
@@ -78,18 +86,18 @@ export class PatrolIncidentService {
       throw new Error('Patrulla no encontrada')
     }
 
-    // 2. Validar que la patrulla está en progreso
+    // 2. Solo se pueden registrar novedades en patrullas activas
     if (patrol.status !== 'IN_PROGRESS') {
       throw new Error('La patrulla no está en progreso')
     }
 
-    // 3. Validar que el agente es el asignado
+    // 3. Verificar que el agente sea el asignado a esta patrulla
     if (patrol.agentId !== agentId) {
       throw new Error('No autorizado: no es el agente asignado a esta patrulla')
     }
 
-    // 4. Validar que el checkpoint pertenece a la ruta
-    const routeCheckpointIds = patrol.route.routeCheckpoints.map(rc => rc.checkpointId)
+    // 4. El checkpoint debe pertenecer a la ruta de esta patrulla
+    const routeCheckpointIds = patrol.route.routeCheckpoints.map((rc: any) => rc.checkpointId)
     if (!routeCheckpointIds.includes(checkpointId)) {
       throw new Error('El checkpoint no pertenece a la ruta de esta patrulla')
     }
@@ -99,18 +107,13 @@ export class PatrolIncidentService {
     let savedPhoto: any = null
 
     if (photoBase64) {
-      savedPhoto = await PatrolPhotoService.savePhoto(
-        photoBase64,
-        null,
-        patrolId,
-        new Date()
-      )
+      savedPhoto = await PatrolPhotoService.savePhoto(photoBase64, null, patrolId, new Date())
       photoIds = [savedPhoto.id]
     }
 
-    // 6. Crear registro de incidente
+    // 6. Crear el registro de novedad
     const incidentId = randomUUID()
-    const incident = await prisma.patrol_incidents.create({
+    const incident = await db.patrol_incidents.create({
       data: {
         id: incidentId,
         patrolId,
@@ -123,15 +126,15 @@ export class PatrolIncidentService {
       },
     })
 
-    // 7. Actualizar la referencia incidentId en la foto
+    // Vincular la foto al incidente si existe
     if (savedPhoto) {
-      await prisma.patrol_photos.update({
+      await (prisma.patrol_photos.update as any)({
         where: { id: savedPhoto.id },
         data: { incidentId: incident.id },
       })
     }
 
-    // 8. Notificar a supervisores
+    // 8. Notificar a supervisores del área (no bloquea la respuesta)
     try {
       const supervisors = await getPatrolSupervisors(patrol.familyId)
       const checkpoint = await prisma.patrol_checkpoints.findUnique({
@@ -158,7 +161,7 @@ export class PatrolIncidentService {
       console.error('[PatrolIncidentService] Error notificando supervisores:', err)
     }
 
-    // 9. Auditoría
+    // 9. Registro de auditoría
     try {
       await AuditServiceComplete.log({
         action: 'patrol_incident_created',
@@ -183,12 +186,12 @@ export class PatrolIncidentService {
   // ── Actualizar novedad ────────────────────────────────────────────────────
 
   /**
-   * Actualiza una novedad existente (descripción, severidad, foto).
-   * Verifica propiedad y ventana de edición.
+   * Actualiza descripción, severidad o foto de una novedad existente.
+   * Solo el agente autor puede editar y dentro de la ventana de gracia.
    */
   static async update(id: string, data: UpdateIncidentData, agentId: string) {
-    // 1. Obtener incidente
-    const incident = await prisma.patrol_incidents.findUnique({
+    // 1. Cargar el incidente con su patrulla para obtener familyId
+    const incident = await db.patrol_incidents.findUnique({
       where: { id },
       include: { patrol: { select: { familyId: true, id: true } } },
     })
@@ -197,23 +200,23 @@ export class PatrolIncidentService {
       throw new Error('Novedad no encontrada')
     }
 
-    // 2. Verificar propiedad
+    // 2. Solo el autor puede modificar la novedad
     if (incident.agentId !== agentId) {
       throw new Error('No autorizado: no es el autor de esta novedad')
     }
 
-    // 3. Verificar ventana de edición
+    // 3. Verificar que no haya expirado la ventana de edición
     const canEdit = await this.isWithinEditWindow(incident, incident.patrol.familyId)
     if (!canEdit) {
       throw new Error('El período de edición ha expirado')
     }
 
-    // 4. Preparar datos de actualización
+    // 4. Preparar los campos a actualizar
     const updateData: any = {}
     if (data.description !== undefined) updateData.description = data.description
     if (data.severity !== undefined) updateData.severity = data.severity
 
-    // 5. Manejar nueva foto
+    // 5. Agregar nueva foto si se proporciona
     if (data.photoBase64) {
       const savedPhoto = await PatrolPhotoService.savePhoto(
         data.photoBase64,
@@ -222,18 +225,16 @@ export class PatrolIncidentService {
         new Date()
       )
 
-      // Actualizar referencia de la foto
-      await prisma.patrol_photos.update({
+      await (prisma.patrol_photos.update as any)({
         where: { id: savedPhoto.id },
         data: { incidentId: incident.id },
       })
 
-      // Agregar al array de photoIds
       updateData.photoIds = [...incident.photoIds, savedPhoto.id]
     }
 
-    // 6. Actualizar registro
-    const updated = await prisma.patrol_incidents.update({
+    // 6. Persistir cambios
+    const updated = await db.patrol_incidents.update({
       where: { id },
       data: updateData,
     })
@@ -244,12 +245,11 @@ export class PatrolIncidentService {
   // ── Eliminar novedad ──────────────────────────────────────────────────────
 
   /**
-   * Elimina una novedad (hard delete).
-   * Verifica propiedad y ventana de edición.
+   * Elimina definitivamente una novedad.
+   * Solo el autor puede eliminarla y dentro de la ventana de gracia.
    */
   static async delete(id: string, agentId: string) {
-    // 1. Obtener incidente
-    const incident = await prisma.patrol_incidents.findUnique({
+    const incident = await db.patrol_incidents.findUnique({
       where: { id },
       include: { patrol: { select: { familyId: true } } },
     })
@@ -258,21 +258,16 @@ export class PatrolIncidentService {
       throw new Error('Novedad no encontrada')
     }
 
-    // 2. Verificar propiedad
     if (incident.agentId !== agentId) {
       throw new Error('No autorizado: no es el autor de esta novedad')
     }
 
-    // 3. Verificar ventana de edición
     const canEdit = await this.isWithinEditWindow(incident, incident.patrol.familyId)
     if (!canEdit) {
       throw new Error('El período de edición ha expirado')
     }
 
-    // 4. Eliminar registro
-    await prisma.patrol_incidents.delete({
-      where: { id },
-    })
+    await db.patrol_incidents.delete({ where: { id } })
   }
 
   // ── Obtener por ID ────────────────────────────────────────────────────────
@@ -281,15 +276,11 @@ export class PatrolIncidentService {
    * Retorna una novedad con todas sus relaciones enriquecidas.
    */
   static async getById(id: string) {
-    const incident = await prisma.patrol_incidents.findUnique({
+    const incident = await db.patrol_incidents.findUnique({
       where: { id },
       include: {
-        agent: {
-          select: { id: true, name: true },
-        },
-        checkpoint: {
-          select: { id: true, name: true, location: true },
-        },
+        agent: { select: { id: true, name: true } },
+        checkpoint: { select: { id: true, name: true, location: true } },
         patrol: {
           select: {
             id: true,
@@ -301,9 +292,8 @@ export class PatrolIncidentService {
           where: { deletedAt: null },
           select: { id: true, path: true },
         },
-        ticket: {
-          select: { id: true, ticketCode: true, status: true },
-        },
+        // El ticket solo existe si la novedad fue escalada por un supervisor/admin
+        ticket: { select: { id: true, ticketCode: true, status: true } },
       },
     })
 
@@ -314,8 +304,8 @@ export class PatrolIncidentService {
 
   /**
    * Lista novedades con filtros y paginación.
-   * - Para agentes: filtrar por agentId, orden createdAt DESC
-   * - Para admin: filtros completos (dateFrom, dateTo, familyId, severity, status, agentId, patrolId)
+   * - Agente: filtra por su agentId
+   * - Admin/Supervisor: filtros completos (familia, severidad, estado, fechas, patrulla)
    */
   static async list(filters: ListIncidentFilters) {
     const {
@@ -332,24 +322,12 @@ export class PatrolIncidentService {
 
     const where: any = {}
 
-    // Filtro por agente
     if (agentId) where.agentId = agentId
-
-    // Filtro por patrulla
     if (patrolId) where.patrolId = patrolId
-
-    // Filtro por familia (a través de la patrulla)
-    if (familyId) {
-      where.patrol = { familyId }
-    }
-
-    // Filtro por severidad
+    if (familyId) where.patrol = { familyId }
     if (severity) where.severity = severity
-
-    // Filtro por estado
     if (status) where.status = status
 
-    // Filtro por rango de fechas
     if (dateFrom || dateTo) {
       where.createdAt = {}
       if (dateFrom) where.createdAt.gte = dateFrom
@@ -359,7 +337,7 @@ export class PatrolIncidentService {
     const skip = (page - 1) * limit
 
     const [incidents, total] = await Promise.all([
-      prisma.patrol_incidents.findMany({
+      db.patrol_incidents.findMany({
         where,
         include: {
           agent: { select: { id: true, name: true } },
@@ -376,15 +354,13 @@ export class PatrolIncidentService {
             where: { deletedAt: null },
             select: { id: true, path: true },
           },
-          ticket: {
-            select: { id: true, ticketCode: true, status: true },
-          },
+          ticket: { select: { id: true, ticketCode: true, status: true } },
         },
         orderBy: { createdAt: 'desc' },
         skip,
         take: limit,
       }),
-      prisma.patrol_incidents.count({ where }),
+      db.patrol_incidents.count({ where }),
     ])
 
     return {
@@ -398,29 +374,24 @@ export class PatrolIncidentService {
     }
   }
 
-  // ── Resolver novedad ────────────────────────────────────────────────────
+  // ── Resolver novedad ──────────────────────────────────────────────────────
 
   /**
-   * Marca una novedad como resuelta.
-   * Solo se puede resolver si el estado es OPEN.
+   * Marca una novedad como resuelta. Solo desde estado OPEN.
+   * Puede ser resuelta por el supervisor o un administrador.
    */
   static async resolve(id: string, resolvedById: string) {
-    // 1. Obtener incidente
-    const incident = await prisma.patrol_incidents.findUnique({
-      where: { id },
-    })
+    const incident = await db.patrol_incidents.findUnique({ where: { id } })
 
     if (!incident) {
       throw new Error('Novedad no encontrada')
     }
 
-    // 2. Validar estado
     if (incident.status !== 'OPEN') {
       throw new Error('La novedad ya fue resuelta o escalada')
     }
 
-    // 3. Actualizar estado a RESOLVED
-    const updated = await prisma.patrol_incidents.update({
+    const updated = await db.patrol_incidents.update({
       where: { id },
       data: {
         status: 'RESOLVED',
@@ -429,7 +400,7 @@ export class PatrolIncidentService {
       },
     })
 
-    // 4. Auditoría
+    // Auditoría
     try {
       await AuditServiceComplete.log({
         action: 'patrol_incident_resolved',
@@ -446,17 +417,14 @@ export class PatrolIncidentService {
       console.error('[PatrolIncidentService] Error en auditoría:', err)
     }
 
-    // 5. Notificar al agente que reportó la novedad
+    // Notificar al agente que reportó la novedad
     try {
       await NotificationService.push({
         userId: incident.agentId,
         type: NotificationType.INFO,
         title: 'Novedad resuelta',
-        message: `Tu novedad ha sido marcada como resuelta.`,
-        metadata: {
-          incidentId: id,
-          patrolId: incident.patrolId,
-        },
+        message: 'Tu novedad ha sido marcada como resuelta.',
+        metadata: { incidentId: id, patrolId: incident.patrolId },
       })
     } catch (err) {
       console.error('[PatrolIncidentService] Error notificando agente:', err)
@@ -468,20 +436,17 @@ export class PatrolIncidentService {
   // ── Escalar novedad a ticket ──────────────────────────────────────────────
 
   /**
-   * Escala una novedad creando un ticket en el sistema de tickets.
-   * Solo se puede escalar si el estado es OPEN.
+   * Escala una novedad creando un ticket de soporte.
+   * Solo supervisores o administradores pueden ejecutar esta acción.
+   * La novedad debe estar en estado OPEN.
    */
   static async escalateToTicket(id: string, escalatedById: string) {
-    // 1. Obtener incidente con relaciones necesarias
-    const incident = await prisma.patrol_incidents.findUnique({
+    // Obtener incidente con datos necesarios para crear el ticket
+    const incident = await db.patrol_incidents.findUnique({
       where: { id },
       include: {
-        patrol: {
-          select: { familyId: true, id: true },
-        },
-        checkpoint: {
-          select: { name: true },
-        },
+        patrol: { select: { familyId: true, id: true } },
+        checkpoint: { select: { name: true } },
       },
     })
 
@@ -489,12 +454,11 @@ export class PatrolIncidentService {
       throw new Error('Novedad no encontrada')
     }
 
-    // 2. Validar estado
     if (incident.status !== 'OPEN') {
       throw new Error('La novedad ya fue resuelta o escalada')
     }
 
-    // 3. Obtener categoryId de la configuración de la familia
+    // Buscar la categoría configurada para el área, o la primera disponible
     const familyConfig = await prisma.patrol_family_config.findUnique({
       where: { familyId: incident.patrol.familyId },
       select: { patrolIncidentCategoryId: true },
@@ -502,7 +466,6 @@ export class PatrolIncidentService {
 
     let categoryId = familyConfig?.patrolIncidentCategoryId ?? null
 
-    // Si no hay categoría configurada, buscar una por defecto
     if (!categoryId) {
       const defaultCategory = await prisma.categories.findFirst({
         where: { level: 1 },
@@ -515,7 +478,7 @@ export class PatrolIncidentService {
       }
     }
 
-    // 4. Mapear severidad a prioridad de ticket
+    // Mapear severidad de ronda a prioridad de ticket
     const severityToPriority: Record<string, 'LOW' | 'MEDIUM' | 'HIGH'> = {
       CRITICAL: 'HIGH',
       HIGH: 'HIGH',
@@ -524,7 +487,7 @@ export class PatrolIncidentService {
     }
     const priority = severityToPriority[incident.severity] ?? 'MEDIUM'
 
-    // 5. Crear ticket
+    // Crear el ticket en el sistema de soporte
     const ticketId = randomUUID()
     const now = new Date()
 
@@ -545,16 +508,13 @@ export class PatrolIncidentService {
       },
     })
 
-    // 6. Actualizar incidente con estado ESCALATED y ticketId
-    const updated = await prisma.patrol_incidents.update({
+    // Marcar la novedad como escalada y vincularla al ticket
+    const updated = await db.patrol_incidents.update({
       where: { id },
-      data: {
-        status: 'ESCALATED',
-        ticketId,
-      },
+      data: { status: 'ESCALATED', ticketId },
     })
 
-    // 7. Auditoría
+    // Auditoría
     try {
       await AuditServiceComplete.log({
         action: 'patrol_incident_escalated',
@@ -573,18 +533,14 @@ export class PatrolIncidentService {
       console.error('[PatrolIncidentService] Error en auditoría:', err)
     }
 
-    // 8. Notificar al agente que su novedad fue escalada
+    // Informar al agente que su novedad fue escalada a ticket
     try {
       await NotificationService.push({
         userId: incident.agentId,
         type: NotificationType.INFO,
         title: 'Novedad escalada a ticket',
         message: `Tu novedad en "${incident.checkpoint.name}" ha sido escalada a un ticket para su seguimiento.`,
-        metadata: {
-          incidentId: id,
-          patrolId: incident.patrolId,
-          ticketId,
-        },
+        metadata: { incidentId: id, patrolId: incident.patrolId, ticketId },
       })
     } catch (err) {
       console.error('[PatrolIncidentService] Error notificando agente:', err)
@@ -596,8 +552,8 @@ export class PatrolIncidentService {
   // ── Ventana de edición ────────────────────────────────────────────────────
 
   /**
-   * Verifica si una novedad está dentro de la ventana de edición.
-   * Consulta `gracePeriodMinutes` de `patrol_family_config` para la familia.
+   * Verifica si todavía se puede editar/eliminar una novedad.
+   * Usa gracePeriodMinutes de la configuración del área; default 5 minutos.
    */
   static async isWithinEditWindow(
     incident: { createdAt: Date },
@@ -608,12 +564,7 @@ export class PatrolIncidentService {
       select: { gracePeriodMinutes: true },
     })
 
-    if (!config) {
-      // Sin configuración, usar default de 5 minutos
-      return (Date.now() - incident.createdAt.getTime()) <= 5 * 60 * 1000
-    }
-
-    const gracePeriodMs = config.gracePeriodMinutes * 60 * 1000
-    return (Date.now() - incident.createdAt.getTime()) <= gracePeriodMs
+    const gracePeriodMs = (config?.gracePeriodMinutes ?? 5) * 60 * 1000
+    return Date.now() - incident.createdAt.getTime() <= gracePeriodMs
   }
 }

@@ -367,9 +367,9 @@ export function TicketTimeline({
                   <p className='font-semibold text-indigo-900 dark:text-indigo-100'>
                     {metadata.planTitle}
                   </p>
-                  {metadata.description && (
+                  {(metadata as any).description && (
                     <p className='text-sm text-indigo-700 dark:text-indigo-300 mt-0.5'>
-                      {metadata.description}
+                      {(metadata as any).description}
                     </p>
                   )}
                 </div>

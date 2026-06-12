@@ -90,7 +90,7 @@ async function BatchDetailContent({ batchId }: { batchId: string }) {
             <Badge variant='secondary'>{batch.quantity} equipos</Badge>
           </div>
           <p className='text-muted-foreground ml-10'>
-            {batch.model.brand} {batch.model.model} · {batch.model.type?.name}
+            {(batch.model as any).brand?.name ?? ''} {batch.model.model} · {batch.model.type?.name}
           </p>
         </div>
         <DeleteBatchButton batchId={batch.id} batchCode={batch.batchCode} />

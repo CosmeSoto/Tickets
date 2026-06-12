@@ -8,9 +8,14 @@ import { notifyUser, notifyMany } from '@/lib/api/notify'
 function equipmentDisplayLabel(eq: {
   brand: string
   modelDeprecated: string
-  model: { brand: string; model: string } | null
+  model: { brand: any; model: string } | null
 }) {
-  return eq.model ? `${eq.model.brand} ${eq.model.model}` : `${eq.brand} ${eq.modelDeprecated}`
+  if (eq.model) {
+    const brandName =
+      typeof eq.model.brand === 'object' ? (eq.model.brand?.name ?? '') : (eq.model.brand ?? '')
+    return `${brandName} ${eq.model.model}`
+  }
+  return `${eq.brand} ${eq.modelDeprecated}`
 }
 
 /**

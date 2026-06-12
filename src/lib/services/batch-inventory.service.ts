@@ -39,12 +39,15 @@ export class BatchService {
     // Obtener datos del modelo
     const model = await prisma.equipment_models.findUnique({
       where: { id: commonData.modelId },
-      include: { type: true },
+      include: { brand: true, type: true },
     })
 
     if (!model) {
       throw new Error('Modelo no encontrado')
     }
+
+    // Resolver nombre de marca para campos deprecated
+    const modelBrandName = model.brand?.name ?? ''
 
     // Generar código de lote
     const batchCode = `BATCH-${Date.now()}`
@@ -58,7 +61,7 @@ export class BatchService {
         const batch = await tx.equipment_batches.create({
           data: {
             batchCode,
-            description: `Lote de ${quantity} ${model.brand} ${model.model}`,
+            description: `Lote de ${quantity} ${modelBrandName} ${model.model}`,
             modelId: commonData.modelId,
             quantity,
             supplierId: commonData.supplierId,
@@ -88,7 +91,7 @@ export class BatchService {
               code: item.code,
               serialNumber: item.serialNumber || '',
               modelId: commonData.modelId,
-              brand: model.brand,
+              brand: modelBrandName,
               modelDeprecated: model.model,
               typeId: model.typeId,
               batchId: batch.id,

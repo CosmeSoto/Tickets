@@ -23,6 +23,7 @@ export interface CreateLicenseData {
   expirationDate?: Date
   cost?: number
   vendor?: string
+  supplierId?: string // ID del proveedor en el catálogo de proveedores
   notes?: string
   assignedToEquipment?: string
   assignedToUser?: string

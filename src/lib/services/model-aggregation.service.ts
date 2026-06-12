@@ -77,10 +77,10 @@ export class ModelAggregationService {
 
     const modelIds = [...new Set(statusGroups.map(g => g.modelId))]
 
-    // 1 query: datos de los modelos
+    // 1 query: datos de los modelos (incluye marca)
     const models = await prisma.equipment_models.findMany({
       where: { id: { in: modelIds } },
-      include: { type: true },
+      include: { brand: true, type: true },
     })
     const modelMap = new Map(models.map(m => [m.id, m]))
 
@@ -159,7 +159,7 @@ export class ModelAggregationService {
 
       result.push({
         modelId,
-        brand: model.brand,
+        brand: model.brand?.name ?? '',
         model: model.model,
         typeId: model.typeId,
         typeName: model.type?.name ?? 'Sin tipo',

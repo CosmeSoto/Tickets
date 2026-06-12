@@ -39,7 +39,7 @@ export interface PublicEquipmentItem {
       type: string
     }
   >
-  contactWhatsapp: string | null
+  contactWhatsapp?: string | null
   createdAt: Date
 }
 

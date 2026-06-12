@@ -52,10 +52,12 @@ export async function GET(
 
     if (!hasAccess) {
       hasAccess =
-        user.isSuperAdmin ||
+        !!user.isSuperAdmin ||
         news.news_roles.some(r => r.role === user.role) ||
         news.news_users.some(u => u.userId === user.id) ||
-        (user.departmentId && news.news_departments.some(d => d.departmentId === user.departmentId))
+        !!(
+          user.departmentId && news.news_departments.some(d => d.departmentId === user.departmentId)
+        )
     }
 
     if (!hasAccess) {

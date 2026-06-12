@@ -39,10 +39,14 @@ const EQUIPMENT_STATUS_LABELS: Record<EquipmentStatus, string> = {
   SOLD: 'Vendido',
 }
 
-const EQUIPMENT_CONDITION_LABELS: Record<EquipmentCondition, string> = {
+const EQUIPMENT_CONDITION_LABELS: Record<string, string> = {
   NEW: 'Nuevo',
   USED: 'Usado',
   DAMAGED: 'Dañado',
+  LIKE_NEW: 'Como nuevo',
+  GOOD: 'Bueno',
+  FAIR: 'Regular',
+  POOR: 'Malo',
 }
 
 export function EquipmentFilters({ filters, onFiltersChange, onReset }: EquipmentFiltersProps) {
@@ -123,7 +127,7 @@ export function EquipmentFilters({ filters, onFiltersChange, onReset }: Equipmen
     if (value === 'all') {
       onFiltersChange({ ...filters, condition: undefined })
     } else {
-      onFiltersChange({ ...filters, condition: [value as EquipmentCondition] })
+      onFiltersChange({ ...filters, condition: [value as any] })
     }
   }
 

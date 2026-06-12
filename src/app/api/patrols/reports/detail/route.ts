@@ -12,6 +12,10 @@ import { getPatrolAccessibleFamilyIds } from '@/lib/patrol/patrol-access'
 import { checkPatrolModuleAccess } from '@/lib/patrol/patrol-helpers'
 import { z } from 'zod'
 
+// Acceso a relaciones de patrols (checkIns, incidents, route, agent) que aún
+// no están en el Prisma Client generado — eliminar cast cuando se regenere el client
+const db = prisma as any
+
 const querySchema = z.object({
   patrolId: z.string().uuid().optional(),
   familyId: z.string().uuid().optional(),
@@ -87,8 +91,9 @@ export async function GET(request: NextRequest) {
     const totalPages = Math.ceil(total / limit)
     const skip = (page - 1) * limit
 
-    // ── Query principal ─────────────────────────────────────────────────────────
-    const patrols = await prisma.patrols.findMany({
+    // ── Query principal — usa db (as any) porque checkIns, incidents, route, agent
+    // ── son relaciones nuevas del schema que el Prisma Client aún no conoce
+    const patrols = await db.patrols.findMany({
       where,
       skip,
       take: limit,
@@ -127,16 +132,16 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    // ── Obtener gracePeriodMinutes por familia ───────────────────────────────────
-    const familyIds = [...new Set(patrols.map(p => p.familyId))]
+    // Procesar cada patrulla — la data viene de db (as any) por lo que necesitamos tipar manualmente
+    const familyIds = [...new Set(patrols.map((p: any) => p.familyId))]
     const familyConfigs = await prisma.patrol_family_config.findMany({
-      where: { familyId: { in: familyIds } },
+      where: { familyId: { in: familyIds as string[] } },
       select: { familyId: true, gracePeriodMinutes: true },
     })
     const graceMap = new Map(familyConfigs.map(c => [c.familyId, c.gracePeriodMinutes]))
 
     // ── Procesar cada patrulla ──────────────────────────────────────────────────
-    const data = patrols.map(patrol => {
+    const data = patrols.map((patrol: any) => {
       const routeCheckpoints = patrol.route.routeCheckpoints
       const checkIns = patrol.checkIns
       const gracePeriodMinutes = graceMap.get(patrol.familyId) ?? 5
@@ -151,7 +156,7 @@ export async function GET(request: NextRequest) {
 
       // Checkpoint timeline
       let previousTimestamp: Date | null = null
-      const checkpointTimeline = routeCheckpoints.map(rc => {
+      const checkpointTimeline = routeCheckpoints.map((rc: any) => {
         const scan = checkInByCheckpoint.get(rc.checkpointId)
         let status: 'ON_TIME' | 'LATE' | 'MISSED' = 'MISSED'
         let scannedAt: string | null = null
@@ -202,15 +207,15 @@ export async function GET(request: NextRequest) {
         )
       }
 
-      // Incident summary
-      const incidents = patrol.incidents
+      // Resumen de novedades
+      const incidents = patrol.incidents || []
       const incidentSummary = {
         total: incidents.length,
         bySeverity: {
-          LOW: incidents.filter(i => i.severity === 'LOW').length,
-          MEDIUM: incidents.filter(i => i.severity === 'MEDIUM').length,
-          HIGH: incidents.filter(i => i.severity === 'HIGH').length,
-          CRITICAL: incidents.filter(i => i.severity === 'CRITICAL').length,
+          LOW: incidents.filter((i: any) => i.severity === 'LOW').length,
+          MEDIUM: incidents.filter((i: any) => i.severity === 'MEDIUM').length,
+          HIGH: incidents.filter((i: any) => i.severity === 'HIGH').length,
+          CRITICAL: incidents.filter((i: any) => i.severity === 'CRITICAL').length,
         },
       }
 

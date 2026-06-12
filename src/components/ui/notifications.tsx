@@ -270,7 +270,7 @@ export function Notifications({ className, variant = 'bell', maxVisible = 5 }: N
             className={cn(
               'flex items-center gap-3 p-3 rounded-lg border transition-all duration-200 cursor-pointer hover:shadow-sm',
               !n.isRead ? 'bg-primary/5 border-primary/20' : 'bg-card border-border',
-              n.type === 'ERROR' || n.type === 'CRITICAL'
+              n.type === 'ERROR' || (n.type as string) === 'CRITICAL'
                 ? 'border-l-2 border-l-red-500'
                 : n.type === 'WARNING'
                   ? 'border-l-2 border-l-orange-500'

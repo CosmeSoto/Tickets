@@ -154,7 +154,7 @@ export async function createBatch(input: CreateBatchInput): Promise<BatchCreateR
     // ── Obtener modelo ─────────────────────────────────────────────────────
     const model = await prisma.equipment_models.findUnique({
       where: { id: input.modelId },
-      include: { type: { include: { family: true } } },
+      include: { brand: true, type: { include: { family: true } } },
     })
     if (!model) throw new Error('Modelo no encontrado')
     if (!model.type.family) throw new Error('El tipo de equipo debe tener una familia asignada')
@@ -210,7 +210,8 @@ export async function createBatch(input: CreateBatchInput): Promise<BatchCreateR
         data: {
           batchCode,
           description:
-            input.description || `Lote de ${input.quantity} ${model.brand} ${model.model}`,
+            input.description ||
+            `Lote de ${input.quantity} ${model.brand?.name ?? ''} ${model.model}`,
           modelId: input.modelId,
           quantity: input.quantity,
           supplierId: input.supplierId || null,
@@ -273,7 +274,7 @@ export async function createBatch(input: CreateBatchInput): Promise<BatchCreateR
           usedUnits: input.usedUnits || null,
           // Campos requeridos
           qrCode,
-          brand: model.brand,
+          brand: model.brand?.name ?? '',
           modelDeprecated: model.model,
           location: null,
           physicalLocation: null,
@@ -288,6 +289,20 @@ export async function createBatch(input: CreateBatchInput): Promise<BatchCreateR
         select: { id: true, code: true, serialNumber: true, status: true, createdAt: true },
         orderBy: { code: 'asc' },
       })
+
+      // 4. Propagar customValues a cada equipo individual
+      if (input.customValues && input.customValues.length > 0) {
+        await tx.equipment_custom_values.createMany({
+          data: createdEquipment.flatMap(eq =>
+            input.customValues!.map(cv => ({
+              equipmentId: eq.id,
+              fieldName: cv.fieldName,
+              fieldValue: cv.fieldValue,
+            }))
+          ),
+          skipDuplicates: true,
+        })
+      }
 
       return { batch, equipment: createdEquipment }
     })

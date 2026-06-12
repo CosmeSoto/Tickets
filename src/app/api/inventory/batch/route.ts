@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
     // Obtener datos del modelo
     const model = await prisma.equipment_models.findUnique({
       where: { id: commonData.modelId },
-      include: { type: true },
+      include: { brand: true, type: true },
     })
 
     if (!model) {
@@ -108,13 +108,17 @@ export async function POST(request: NextRequest) {
     const quantity = equipmentData.length
     const totalPrice = (commonData.unitPrice || 0) * quantity
 
+    // Nombre del modelo para la descripción del lote
+    const modelBrandName = (model as any).brand?.name ?? (model as any).brandId ?? ''
+    const modelDisplayName = `${modelBrandName} ${model.model}`.trim()
+
     // Crear lote y equipos en transacción
     const result = await prisma.$transaction(async tx => {
       // 1. Crear el lote
       const batch = await tx.equipment_batches.create({
         data: {
           batchCode,
-          description: `Lote de ${quantity} ${model.brand} ${model.model}`,
+          description: `Lote de ${quantity} ${modelDisplayName}`,
           modelId: commonData.modelId,
           quantity,
           supplierId: commonData.supplierId,
@@ -144,7 +148,7 @@ export async function POST(request: NextRequest) {
             code: item.code,
             serialNumber: item.serialNumber || '',
             modelId: commonData.modelId,
-            brand: model.brand,
+            brand: modelBrandName,
             modelDeprecated: model.model,
             typeId: model.typeId,
             batchId: batch.id,
