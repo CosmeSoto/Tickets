@@ -3,7 +3,16 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useParams } from 'next/navigation'
-import { ArrowLeft, Play, CheckCircle2, Loader2, Camera, Upload, QrCode, ClipboardList } from 'lucide-react'
+import {
+  ArrowLeft,
+  Play,
+  CheckCircle2,
+  Loader2,
+  Camera,
+  Upload,
+  QrCode,
+  ClipboardList,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -301,7 +310,9 @@ export default function PatrolExecutionPage() {
         setPhotoPreview(null)
         // Track the scanned checkpoint for incident reporting
         setIncidentCheckpointId(checkpointId)
-        const scannedCp = patrol?.route.routeCheckpoints.find(rc => rc.checkpoint.id === checkpointId)
+        const scannedCp = patrol?.route.routeCheckpoints.find(
+          rc => rc.checkpoint.id === checkpointId
+        )
         setIncidentCheckpointName(scannedCp?.checkpoint.name ?? '')
         refresh()
       } catch {
@@ -562,6 +573,7 @@ export default function PatrolExecutionPage() {
               visitedIds={visitedIds}
               currentCheckpointId={nextCheckpoint?.checkpoint.id}
               estimatedDurationMinutes={patrol.route.estimatedDurationMinutes}
+              scheduledStart={patrol.scheduledStart}
               onCheckpointClick={isInProgress ? () => setScannerActive(true) : undefined}
             />
           </CardContent>
