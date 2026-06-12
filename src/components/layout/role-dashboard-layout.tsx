@@ -40,6 +40,7 @@ import {
   Newspaper,
 } from 'lucide-react'
 import { Notifications } from '@/components/ui/notifications'
+import { PushSubscriptionManager } from '@/components/notifications/push-subscription-manager'
 import { Button } from '@/components/ui/button'
 import { SystemLogo } from '@/components/common/system-logo'
 import {
@@ -680,6 +681,7 @@ export function RoleDashboardLayout({
                 </Link>
 
                 <Notifications variant='bell' />
+                <PushSubscriptionManager />
 
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>

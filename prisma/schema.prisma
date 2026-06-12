@@ -531,6 +531,7 @@ model users {
   form_attachments_uploaded                         form_attachments[]              @relation("FormAttachmentUploader")
   incidentsAsAgent                                  patrol_incidents[]              @relation("IncidentAgent")
   incidentsAsResolver                               patrol_incidents[]              @relation("IncidentResolver")
+  pushSubscriptions                                 push_subscriptions[]
 
   @@index([departmentId])
   @@index([name, email])
@@ -3030,4 +3031,27 @@ model form_attachments {
 
   @@index([formId])
   @@map("form_attachments")
+}
+
+// ============================================
+// WEB PUSH SUBSCRIPTIONS
+// ============================================
+// Almacena las suscripciones push de cada dispositivo/navegador.
+// Un usuario puede tener múltiples suscripciones (laptop + móvil + tablet).
+// El endpoint es único por dispositivo — si se re-suscribe, se reemplaza.
+
+model push_subscriptions {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  endpoint  String   @unique // URL única del push service (FCM, Mozilla, Apple)
+  p256dh    String   // Clave pública del cliente para cifrado
+  auth      String   // Token de autenticación del cliente
+  userAgent String?  @map("user_agent") @db.VarChar(500) // Identificar el dispositivo
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user users @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("push_subscriptions")
 }

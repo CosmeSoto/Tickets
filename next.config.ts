@@ -277,6 +277,7 @@ const nextConfig: NextConfig = {
   env: {
     CDN_ENABLED: process.env.CDN_ENABLED || 'false',
     CDN_BASE_URL: process.env.CDN_BASE_URL || '',
+    NEXT_PUBLIC_VAPID_KEY: process.env.VAPID_PUBLIC_KEY || '',
   },
 }
 

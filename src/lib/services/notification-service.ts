@@ -2,6 +2,7 @@ import prisma from '@/lib/prisma'
 import { NotificationType } from '@prisma/client'
 import { randomUUID } from 'crypto'
 import { NotificationEvents } from '@/lib/notification-events'
+import { WebPushService } from '@/lib/services/web-push.service'
 
 export interface CreateNotificationData {
   userId: string
@@ -148,6 +149,7 @@ export class NotificationService {
   /**
    * Enviar notificación directa sin verificar preferencias (para eventos de sistema:
    * inventario, mantenimiento, actas, etc.). Siempre guarda en BD y emite por SSE.
+   * Si el usuario no tiene conexión SSE activa, envía por Web Push.
    */
   static async push(data: CreateNotificationData) {
     try {
@@ -164,6 +166,7 @@ export class NotificationService {
         },
       })
 
+      // 1. Entregar por SSE (tiempo real si tiene pestaña abierta)
       NotificationEvents.emit(data.userId, {
         type: 'new_notification',
         notification: {
@@ -177,6 +180,33 @@ export class NotificationService {
           metadata: notification.metadata,
         },
       })
+
+      // 2. Si no tiene SSE activo → enviar por Web Push (navegador cerrado)
+      const connectedUsers = NotificationEvents.getConnectedUserIds()
+      const hasActiveSSE = connectedUsers.includes(data.userId)
+
+      if (!hasActiveSSE && WebPushService.isConfigured()) {
+        // Determinar URL de destino según metadata
+        let url = '/'
+        if (data.metadata?.ticketId || data.ticketId) {
+          url = `/client/tickets/${data.ticketId || data.metadata?.ticketId}`
+        } else if (data.metadata?.equipmentId) {
+          url = `/inventory/equipment/${data.metadata.equipmentId}`
+        } else if (data.metadata?.patrolId) {
+          url = `/patrol/${data.metadata.patrolId}`
+        }
+
+        WebPushService.sendToUser(data.userId, {
+          title: data.title,
+          body: data.message,
+          id: notification.id,
+          ticketId: data.ticketId ?? undefined,
+          url,
+          metadata: data.metadata,
+        }).catch(err => {
+          console.error('[NotificationService] Error enviando Web Push:', err)
+        })
+      }
 
       return notification
     } catch (error) {
