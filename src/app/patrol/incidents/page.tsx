@@ -1,11 +1,23 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+/**
+ * Página "Mis Novedades" del agente.
+ * Lista las novedades reportadas por el usuario durante sus rondas.
+ * Incluye:
+ * - Filtros por severidad, estado y rango de fechas
+ * - Tabla con columnas ordenables
+ * - Exportación multi-formato (CSV, Excel, PDF)
+ * - Edición/eliminación dentro de la ventana de gracia
+ */
+
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { FileWarning, Loader2, Download } from 'lucide-react'
+import { FileWarning } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
+import { ExportButton } from '@/components/common/export-button'
+import { useExport } from '@/hooks/common/use-export'
 import { IncidentCard } from '@/components/patrols/incidents/incident-card'
 import { IncidentFormDialog } from '@/components/patrols/incidents/incident-form-dialog'
 import {
@@ -20,6 +32,48 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import type { ExportColumn } from '@/lib/utils/export'
+
+// ── Constantes ────────────────────────────────────────────────────────────────
+
+const PAGE_SIZE = 20
+
+const SEVERITY_LABELS: Record<string, string> = {
+  LOW: 'Baja',
+  MEDIUM: 'Media',
+  HIGH: 'Alta',
+  CRITICAL: 'Crítica',
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  OPEN: 'Abierta',
+  RESOLVED: 'Resuelta',
+  ESCALATED: 'Escalada',
+}
+
+const EXPORT_COLUMNS: ExportColumn[] = [
+  {
+    key: 'createdAt',
+    label: 'Fecha',
+    format: (v: any) => (v ? new Date(v).toLocaleString('es-EC') : ''),
+  },
+  { key: 'checkpoint', label: 'Checkpoint', format: (v: any) => v?.name ?? '' },
+  { key: 'patrol', label: 'Ruta', format: (v: any) => v?.route?.name ?? '' },
+  { key: 'severity', label: 'Severidad', format: (v: string) => SEVERITY_LABELS[v] ?? v },
+  { key: 'status', label: 'Estado', format: (v: string) => STATUS_LABELS[v] ?? v },
+  { key: 'description', label: 'Descripción' },
+]
+
+// ── Interfaces ────────────────────────────────────────────────────────────────
 
 interface Incident {
   id: string
@@ -28,7 +82,7 @@ interface Incident {
   status: 'OPEN' | 'RESOLVED' | 'ESCALATED'
   createdAt: string
   checkpoint: { name: string; location: string }
-  patrol: { route: { name: string }; scheduledStart: string }
+  patrol: { route: { name: string }; scheduledStart: string; familyId?: string }
   photos: { id: string; path: string }[]
   ticket?: { id: string; ticketCode: string; status: string } | null
   isEditable?: boolean
@@ -39,61 +93,101 @@ interface PaginationData {
   page: number
   limit: number
   totalPages: number
-  hasNext: boolean
+  hasNext?: boolean
 }
+
+// ── Filtros iniciales ─────────────────────────────────────────────────────────
+
+const INITIAL_FILTERS = {
+  severity: '',
+  status: '',
+  dateFrom: '',
+  dateTo: '',
+}
+
+// ── Componente principal ──────────────────────────────────────────────────────
 
 export default function MisNovedadesPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const { toast } = useToast()
 
+  // Datos
   const [incidents, setIncidents] = useState<Incident[]>([])
   const [pagination, setPagination] = useState<PaginationData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [page, setPage] = useState(1)
-  const limit = 20
 
-  // Edit dialog state
+  // Filtros y paginación
+  const [filters, setFilters] = useState(INITIAL_FILTERS)
+  const [page, setPage] = useState(1)
+
+  // Diálogo de edición
   const [editingIncident, setEditingIncident] = useState<Incident | null>(null)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
 
-  // Delete confirmation state
+  // Confirmación de eliminación
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
 
-  // Auth guard
+  // Guard de autenticación
   useEffect(() => {
     if (status === 'loading') return
-    if (!session) {
-      router.push('/login')
-    }
+    if (!session) router.push('/login')
   }, [session, status, router])
 
-  const fetchIncidents = useCallback(async (p: number) => {
-    setLoading(true)
-    setError(null)
-    try {
-      const params = new URLSearchParams({ page: String(p), limit: String(limit) })
-      const res = await fetch(`/api/patrols/incidents?${params}`)
-      if (!res.ok) throw new Error('Error al cargar novedades')
-      const data = await res.json()
-      setIncidents(data.data ?? [])
-      setPagination(data.pagination ?? null)
-    } catch (err) {
-      setIncidents([])
-      setPagination(null)
-      setError(err instanceof Error ? err.message : 'No se pudieron cargar las novedades')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  // ── Cargar novedades ────────────────────────────────────────────────────────
+  const fetchIncidents = useCallback(
+    async (currentFilters: typeof INITIAL_FILTERS, currentPage: number) => {
+      setLoading(true)
+      setError(null)
+      try {
+        const params = new URLSearchParams({
+          page: String(currentPage),
+          limit: String(PAGE_SIZE),
+        })
 
+        if (currentFilters.severity) params.set('severity', currentFilters.severity)
+        if (currentFilters.status) params.set('status', currentFilters.status)
+        if (currentFilters.dateFrom) params.set('dateFrom', currentFilters.dateFrom)
+        if (currentFilters.dateTo) params.set('dateTo', currentFilters.dateTo)
+
+        const res = await fetch(`/api/patrols/incidents?${params}`)
+        if (!res.ok) throw new Error('Error al cargar novedades')
+        const data = await res.json()
+        setIncidents(data.data ?? [])
+        setPagination(data.pagination ?? null)
+      } catch (err) {
+        setIncidents([])
+        setPagination(null)
+        setError(err instanceof Error ? err.message : 'No se pudieron cargar las novedades')
+      } finally {
+        setLoading(false)
+      }
+    },
+    []
+  )
+
+  // Carga inicial y al cambiar filtros/página
   useEffect(() => {
-    if (session) fetchIncidents(page)
-  }, [session, page, fetchIncidents])
+    if (status !== 'authenticated') return
+    fetchIncidents(filters, page)
+  }, [status, filters, page, fetchIncidents])
 
-  // Edit handler
+  // ── Handlers de filtros ─────────────────────────────────────────────────────
+  const handleFilterChange = (key: string, value: string) => {
+    setFilters(prev => ({ ...prev, [key]: value }))
+    setPage(1)
+  }
+
+  const handleClearFilters = () => {
+    setFilters(INITIAL_FILTERS)
+    setPage(1)
+  }
+
+  const hasActiveFilters = Object.values(filters).some(v => v !== '')
+
+  // ── Handlers de edición/eliminación ─────────────────────────────────────────
   const handleEdit = (id: string) => {
     const incident = incidents.find(i => i.id === id)
     if (incident) {
@@ -102,7 +196,6 @@ export default function MisNovedadesPage() {
     }
   }
 
-  // Delete handler
   const handleDeleteConfirm = async () => {
     if (!deletingId) return
     setDeleting(true)
@@ -112,13 +205,9 @@ export default function MisNovedadesPage() {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error || 'Error al eliminar la novedad')
       }
-      toast({
-        title: 'Novedad eliminada',
-        description: 'La novedad fue eliminada correctamente',
-        variant: 'success',
-      })
+      toast({ title: 'Novedad eliminada', description: 'La novedad fue eliminada correctamente' })
       setDeletingId(null)
-      fetchIncidents(page)
+      fetchIncidents(filters, page)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Error al eliminar'
       toast({ title: 'Error', description: message, variant: 'destructive' })
@@ -127,30 +216,16 @@ export default function MisNovedadesPage() {
     }
   }
 
-  if (status === 'loading' || !session) return null
+  // ── Exportación multi-formato ───────────────────────────────────────────────
+  const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
+    filename: 'mis-novedades',
+    title: 'Mis Novedades',
+    subtitle: `Exportado el ${new Date().toLocaleDateString('es-EC')} • ${pagination?.total ?? incidents.length} novedades`,
+    getData: () => incidents,
+    columns: EXPORT_COLUMNS,
+  })
 
-  // Exportar novedades a CSV
-  const handleExportCSV = () => {
-    if (incidents.length === 0) return
-    const BOM = '\uFEFF'
-    const headers = ['Fecha', 'Severidad', 'Estado', 'Checkpoint', 'Ruta', 'Descripción']
-    const rows = incidents.map(i => [
-      new Date(i.createdAt).toLocaleString('es-EC'),
-      i.severity,
-      i.status === 'OPEN' ? 'Abierta' : i.status === 'RESOLVED' ? 'Resuelta' : 'Escalada',
-      i.checkpoint.name,
-      i.patrol.route.name,
-      `"${i.description.replace(/"/g, '""')}"`,
-    ])
-    const csv = BOM + [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `mis-novedades-${new Date().toISOString().split('T')[0]}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
-  }
+  if (status === 'loading' || !session) return null
 
   return (
     <ModuleLayout
@@ -158,17 +233,88 @@ export default function MisNovedadesPage() {
       subtitle='Novedades reportadas durante tus rondas'
       loading={loading && incidents.length === 0 && !error}
       error={error}
-      onRetry={() => fetchIncidents(page)}
+      onRetry={() => fetchIncidents(filters, page)}
       headerActions={
         incidents.length > 0 ? (
-          <Button size='sm' variant='outline' onClick={handleExportCSV}>
-            <Download className='h-4 w-4 mr-2' />
-            Exportar
-          </Button>
+          <ExportButton
+            onExportCSV={exportCSV}
+            onExportExcel={exportExcel}
+            onExportPDF={exportPDF}
+            loading={exporting}
+          />
         ) : undefined
       }
     >
-      {/* Incident list */}
+      {/* ── Filtros ───────────────────────────────────────────────────────────── */}
+      <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4'>
+        <div className='space-y-1'>
+          <Label className='text-xs'>Severidad</Label>
+          <Select
+            value={filters.severity || 'all'}
+            onValueChange={v => handleFilterChange('severity', v === 'all' ? '' : v)}
+          >
+            <SelectTrigger className='h-9'>
+              <SelectValue placeholder='Todas' />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value='all'>Todas</SelectItem>
+              <SelectItem value='LOW'>Baja</SelectItem>
+              <SelectItem value='MEDIUM'>Media</SelectItem>
+              <SelectItem value='HIGH'>Alta</SelectItem>
+              <SelectItem value='CRITICAL'>Crítica</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className='space-y-1'>
+          <Label className='text-xs'>Estado</Label>
+          <Select
+            value={filters.status || 'all'}
+            onValueChange={v => handleFilterChange('status', v === 'all' ? '' : v)}
+          >
+            <SelectTrigger className='h-9'>
+              <SelectValue placeholder='Todos' />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value='all'>Todos</SelectItem>
+              <SelectItem value='OPEN'>Abierta</SelectItem>
+              <SelectItem value='RESOLVED'>Resuelta</SelectItem>
+              <SelectItem value='ESCALATED'>Escalada</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className='space-y-1'>
+          <Label className='text-xs'>Desde</Label>
+          <Input
+            type='date'
+            className='h-9'
+            value={filters.dateFrom}
+            onChange={e => handleFilterChange('dateFrom', e.target.value)}
+          />
+        </div>
+
+        <div className='space-y-1'>
+          <Label className='text-xs'>Hasta</Label>
+          <Input
+            type='date'
+            className='h-9'
+            value={filters.dateTo}
+            onChange={e => handleFilterChange('dateTo', e.target.value)}
+          />
+        </div>
+      </div>
+
+      {/* Botón limpiar filtros */}
+      {hasActiveFilters && (
+        <div className='mb-4'>
+          <Button variant='ghost' size='sm' onClick={handleClearFilters}>
+            Limpiar filtros
+          </Button>
+        </div>
+      )}
+
+      {/* ── Lista de novedades ─────────────────────────────────────────────── */}
       <div className='space-y-3'>
         {incidents.map(incident => (
           <IncidentCard
@@ -180,74 +326,89 @@ export default function MisNovedadesPage() {
         ))}
       </div>
 
-      {/* Empty state */}
+      {/* Estado vacío */}
       {!loading && incidents.length === 0 && !error && (
         <Card>
           <CardContent className='flex flex-col items-center justify-center py-16 text-center'>
             <FileWarning className='h-12 w-12 text-muted-foreground/30 mb-4' />
             <p className='text-sm font-medium text-muted-foreground'>
-              No tienes novedades reportadas
+              {hasActiveFilters
+                ? 'No se encontraron novedades con estos filtros'
+                : 'No tienes novedades reportadas'}
             </p>
             <p className='text-xs text-muted-foreground mt-1'>
-              Las novedades que reportes durante tus rondas aparecerán aquí
+              {hasActiveFilters
+                ? 'Intenta ajustar los filtros de búsqueda'
+                : 'Las novedades que reportes durante tus rondas aparecerán aquí'}
             </p>
+            {hasActiveFilters && (
+              <Button variant='outline' size='sm' className='mt-4' onClick={handleClearFilters}>
+                Limpiar filtros
+              </Button>
+            )}
           </CardContent>
         </Card>
       )}
 
-      {/* Pagination */}
+      {/* ── Paginación ─────────────────────────────────────────────────────── */}
       {pagination && pagination.totalPages > 1 && (
-        <div className='flex items-center justify-center gap-2 mt-6'>
-          <Button
-            variant='outline'
-            size='sm'
-            disabled={page <= 1}
-            onClick={() => setPage(p => p - 1)}
-          >
-            Anterior
-          </Button>
-          <span className='text-sm text-muted-foreground'>
-            Página {page} de {pagination.totalPages}
-          </span>
-          <Button
-            variant='outline'
-            size='sm'
-            disabled={!pagination.hasNext}
-            onClick={() => setPage(p => p + 1)}
-          >
-            Siguiente
-          </Button>
+        <div className='flex items-center justify-between mt-6'>
+          <p className='text-xs text-muted-foreground'>
+            {pagination.total} novedad{pagination.total !== 1 ? 'es' : ''} en total
+          </p>
+          <div className='flex items-center gap-2'>
+            <Button
+              variant='outline'
+              size='sm'
+              disabled={page <= 1}
+              onClick={() => setPage(p => p - 1)}
+            >
+              Anterior
+            </Button>
+            <span className='text-sm text-muted-foreground'>
+              {page} / {pagination.totalPages}
+            </span>
+            <Button
+              variant='outline'
+              size='sm'
+              disabled={page >= pagination.totalPages}
+              onClick={() => setPage(p => p + 1)}
+            >
+              Siguiente
+            </Button>
+          </div>
         </div>
       )}
 
-      {/* Edit dialog */}
-      <IncidentFormDialog
-        open={editDialogOpen}
-        onOpenChange={setEditDialogOpen}
-        mode='edit'
-        incident={
-          editingIncident
-            ? {
-                id: editingIncident.id,
-                description: editingIncident.description,
-                severity: editingIncident.severity,
-                photoIds: editingIncident.photos.map(p => p.id),
-              }
-            : undefined
-        }
-        onSuccess={() => fetchIncidents(page)}
-      />
+      {/* ── Diálogo de edición ─────────────────────────────────────────────── */}
+      {editingIncident && (
+        <IncidentFormDialog
+          open={editDialogOpen}
+          onOpenChange={open => {
+            setEditDialogOpen(open)
+            if (!open) setEditingIncident(null)
+          }}
+          mode='edit'
+          incident={{
+            id: editingIncident.id,
+            description: editingIncident.description,
+            severity: editingIncident.severity,
+            photoIds: editingIncident.photos.map(p => p.id),
+          }}
+          onSuccess={() => {
+            setEditDialogOpen(false)
+            setEditingIncident(null)
+            fetchIncidents(filters, page)
+            toast({ title: 'Novedad actualizada' })
+          }}
+        />
+      )}
 
-      {/* Delete confirmation dialog */}
-      <AlertDialog
-        open={!!deletingId}
-        onOpenChange={open => {
-          if (!open) setDeletingId(null)
-        }}
-      >
+      {/* ── Confirmación de eliminación ────────────────────────────────────── */}
+      <AlertDialog open={!!deletingId} onOpenChange={() => setDeletingId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar novedad?</AlertDialogTitle>
+            <AlertDialogTitle>¿Eliminar esta novedad?</AlertDialogTitle>
             <AlertDialogDescription>
               Esta acción no se puede deshacer. La novedad será eliminada permanentemente.
             </AlertDialogDescription>
@@ -255,12 +416,11 @@ export default function MisNovedadesPage() {
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
+              className='bg-destructive text-destructive-foreground hover:bg-destructive/90'
               onClick={handleDeleteConfirm}
               disabled={deleting}
-              className='bg-destructive text-destructive-foreground hover:bg-destructive/90'
             >
-              {deleting && <Loader2 className='h-4 w-4 mr-2 animate-spin' />}
-              Eliminar
+              {deleting ? 'Eliminando...' : 'Eliminar'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
