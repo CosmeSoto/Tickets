@@ -355,6 +355,7 @@ export class PatrolIncidentService {
             select: { id: true, path: true },
           },
           ticket: { select: { id: true, ticketCode: true, status: true } },
+          resolvedBy: { select: { id: true, name: true } },
         },
         orderBy: { createdAt: 'desc' },
         skip,

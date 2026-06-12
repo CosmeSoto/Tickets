@@ -7,35 +7,15 @@ import { useToast } from '@/hooks/use-toast'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { ExportButton } from '@/components/common/export-button'
 import { useExport } from '@/hooks/common/use-export'
+import { PATROL_INCIDENTS_ADMIN_EXPORT_COLUMNS } from '@/lib/utils/patrol-utils'
 import { IncidentFilters } from '@/components/patrols/incidents/incident-filters'
-import { IncidentAdminTable, type PatrolIncidentRow } from '@/components/patrols/incidents/incident-admin-table'
+import {
+  IncidentAdminTable,
+  type PatrolIncidentRow,
+} from '@/components/patrols/incidents/incident-admin-table'
 import { IncidentDetailDialog } from '@/components/patrols/incidents/incident-detail-dialog'
-import type { ExportColumn } from '@/lib/utils/export'
 
 const PAGE_SIZE = 25
-
-const SEVERITY_LABELS: Record<string, string> = {
-  LOW: 'Baja',
-  MEDIUM: 'Media',
-  HIGH: 'Alta',
-  CRITICAL: 'Crítica',
-}
-
-const STATUS_LABELS: Record<string, string> = {
-  OPEN: 'Abierta',
-  RESOLVED: 'Resuelta',
-  ESCALATED: 'Escalada',
-}
-
-const EXPORT_COLUMNS: ExportColumn[] = [
-  { key: 'createdAt', label: 'Fecha', format: (v: any) => (v ? new Date(v).toLocaleString('es-CO') : '') },
-  { key: 'agent', label: 'Agente', format: (v: any) => v?.name ?? '' },
-  { key: 'patrol', label: 'Ruta', format: (v: any) => v?.route?.name ?? '' },
-  { key: 'checkpoint', label: 'Checkpoint', format: (v: any) => v?.name ?? '' },
-  { key: 'severity', label: 'Severidad', format: (v: string) => SEVERITY_LABELS[v] ?? v },
-  { key: 'status', label: 'Estado', format: (v: string) => STATUS_LABELS[v] ?? v },
-  { key: 'description', label: 'Descripción' },
-]
 
 const INITIAL_FILTERS = {
   familyId: '',
@@ -68,36 +48,39 @@ export default function AdminPatrolIncidentsPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
 
   // ── Fetch incidents ────────────────────────────────────────────────────────
-  const fetchIncidents = useCallback(async (currentFilters: typeof INITIAL_FILTERS, currentPage: number) => {
-    setLoading(true)
-    setError(null)
-    try {
-      const params = new URLSearchParams()
-      params.set('limit', String(PAGE_SIZE))
-      params.set('offset', String((currentPage - 1) * PAGE_SIZE))
+  const fetchIncidents = useCallback(
+    async (currentFilters: typeof INITIAL_FILTERS, currentPage: number) => {
+      setLoading(true)
+      setError(null)
+      try {
+        const params = new URLSearchParams()
+        params.set('limit', String(PAGE_SIZE))
+        params.set('offset', String((currentPage - 1) * PAGE_SIZE))
 
-      if (currentFilters.familyId) params.set('familyId', currentFilters.familyId)
-      if (currentFilters.severity) params.set('severity', currentFilters.severity)
-      if (currentFilters.status) params.set('status', currentFilters.status)
-      if (currentFilters.dateFrom) params.set('dateFrom', currentFilters.dateFrom)
-      if (currentFilters.dateTo) params.set('dateTo', currentFilters.dateTo)
-      if (currentFilters.agentId) params.set('agentId', currentFilters.agentId)
+        if (currentFilters.familyId) params.set('familyId', currentFilters.familyId)
+        if (currentFilters.severity) params.set('severity', currentFilters.severity)
+        if (currentFilters.status) params.set('status', currentFilters.status)
+        if (currentFilters.dateFrom) params.set('dateFrom', currentFilters.dateFrom)
+        if (currentFilters.dateTo) params.set('dateTo', currentFilters.dateTo)
+        if (currentFilters.agentId) params.set('agentId', currentFilters.agentId)
 
-      const res = await fetch(`/api/patrols/incidents?${params.toString()}`)
-      if (!res.ok) throw new Error('Error al cargar novedades')
+        const res = await fetch(`/api/patrols/incidents?${params.toString()}`)
+        if (!res.ok) throw new Error('Error al cargar novedades')
 
-      const json = await res.json()
-      const data = json.data ?? json.incidents ?? []
-      setIncidents(Array.isArray(data) ? data : [])
-      setTotal(json.total ?? json.pagination?.total ?? data.length ?? 0)
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Error al cargar novedades'
-      setError(msg)
-      toast({ title: 'Error', description: msg, variant: 'destructive' })
-    } finally {
-      setLoading(false)
-    }
-  }, [toast])
+        const json = await res.json()
+        const data = json.data ?? json.incidents ?? []
+        setIncidents(Array.isArray(data) ? data : [])
+        setTotal(json.total ?? json.pagination?.total ?? data.length ?? 0)
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Error al cargar novedades'
+        setError(msg)
+        toast({ title: 'Error', description: msg, variant: 'destructive' })
+      } finally {
+        setLoading(false)
+      }
+    },
+    [toast]
+  )
 
   // ── Fetch families ─────────────────────────────────────────────────────────
   const fetchFamilies = useCallback(async () => {
@@ -107,7 +90,9 @@ export default function AdminPatrolIncidentsPage() {
         const json = await res.json()
         setFamilies(json.data ?? [])
       }
-    } catch { /* silent */ }
+    } catch {
+      /* silent */
+    }
   }, [])
 
   // ── Fetch agents ───────────────────────────────────────────────────────────
@@ -118,7 +103,9 @@ export default function AdminPatrolIncidentsPage() {
         const json = await res.json()
         setAgents((json.data ?? []).map((u: any) => ({ id: u.id, name: u.name })))
       }
-    } catch { /* silent */ }
+    } catch {
+      /* silent */
+    }
   }, [])
 
   // ── Initial load ───────────────────────────────────────────────────────────
@@ -162,13 +149,16 @@ export default function AdminPatrolIncidentsPage() {
   }, [fetchIncidents, filters, page])
 
   // ── Pagination config for DataTable ────────────────────────────────────────
-  const paginationConfig = useMemo(() => ({
-    page,
-    limit: PAGE_SIZE,
-    total,
-    onPageChange: (p: number) => setPage(p),
-    onLimitChange: () => {}, // fixed page size
-  }), [page, total])
+  const paginationConfig = useMemo(
+    () => ({
+      page,
+      limit: PAGE_SIZE,
+      total,
+      onPageChange: (p: number) => setPage(p),
+      onLimitChange: () => {}, // fixed page size
+    }),
+    [page, total]
+  )
 
   // ── Export ─────────────────────────────────────────────────────────────────
   const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
@@ -176,7 +166,7 @@ export default function AdminPatrolIncidentsPage() {
     title: 'Novedades de Rondas',
     subtitle: `Exportado el ${new Date().toLocaleDateString('es-CO')} • ${total} novedades`,
     getData: () => incidents,
-    columns: EXPORT_COLUMNS,
+    columns: PATROL_INCIDENTS_ADMIN_EXPORT_COLUMNS,
   })
 
   if (status === 'loading' || !session) return null

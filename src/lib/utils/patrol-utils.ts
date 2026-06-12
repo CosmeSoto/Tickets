@@ -280,3 +280,112 @@ export const PATROL_COMPLIANCE_ROUTE_EXPORT_COLUMNS: ExportColumn[] = [
     format: (v: any) => (Array.isArray(v) && v.length > 0 ? (v[0]?.name ?? '—') : '—'),
   },
 ]
+
+// ── Novedades (Incidentes) ────────────────────────────────────────────────────
+
+const INCIDENT_SEVERITY_LABELS: Record<string, string> = {
+  LOW: 'Baja',
+  MEDIUM: 'Media',
+  HIGH: 'Alta',
+  CRITICAL: 'Crítica',
+}
+
+const INCIDENT_STATUS_LABELS: Record<string, string> = {
+  OPEN: 'Abierta',
+  RESOLVED: 'Resuelta',
+  ESCALATED: 'Escalada',
+}
+
+/**
+ * Columnas de exportación para novedades — vista AGENTE.
+ * No incluye columna "Agente" porque es el propio usuario.
+ */
+export const PATROL_INCIDENTS_AGENT_EXPORT_COLUMNS: ExportColumn[] = [
+  {
+    key: 'createdAt',
+    label: 'Fecha de Reporte',
+    format: (v: any) =>
+      v
+        ? new Date(v).toLocaleString('es-EC', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          })
+        : '',
+  },
+  { key: 'checkpoint', label: 'Checkpoint', format: (v: any) => v?.name ?? '' },
+  { key: 'checkpoint', label: 'Ubicación', format: (v: any) => v?.location ?? '' },
+  { key: 'patrol', label: 'Ruta', format: (v: any) => v?.route?.name ?? '' },
+  { key: 'severity', label: 'Severidad', format: (v: string) => INCIDENT_SEVERITY_LABELS[v] ?? v },
+  { key: 'status', label: 'Estado', format: (v: string) => INCIDENT_STATUS_LABELS[v] ?? v },
+  { key: 'description', label: 'Descripción' },
+  {
+    key: 'resolvedAt',
+    label: 'Fecha Resolución',
+    format: (v: any) =>
+      v
+        ? new Date(v).toLocaleString('es-EC', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          })
+        : '—',
+  },
+  {
+    key: 'ticket',
+    label: 'Ticket (si escalada)',
+    format: (v: any) => (v?.ticketCode ? `#${v.ticketCode}` : '—'),
+  },
+]
+
+/**
+ * Columnas de exportación para novedades — vista ADMIN/SUPERVISOR.
+ * Incluye agente, resuelto por, y datos completos para informes de gestión.
+ */
+export const PATROL_INCIDENTS_ADMIN_EXPORT_COLUMNS: ExportColumn[] = [
+  {
+    key: 'createdAt',
+    label: 'Fecha de Reporte',
+    format: (v: any) =>
+      v
+        ? new Date(v).toLocaleString('es-EC', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          })
+        : '',
+  },
+  { key: 'agent', label: 'Agente', format: (v: any) => v?.name ?? '' },
+  { key: 'patrol', label: 'Ruta', format: (v: any) => v?.route?.name ?? '' },
+  { key: 'checkpoint', label: 'Checkpoint', format: (v: any) => v?.name ?? '' },
+  { key: 'checkpoint', label: 'Ubicación', format: (v: any) => v?.location ?? '' },
+  { key: 'severity', label: 'Severidad', format: (v: string) => INCIDENT_SEVERITY_LABELS[v] ?? v },
+  { key: 'status', label: 'Estado', format: (v: string) => INCIDENT_STATUS_LABELS[v] ?? v },
+  { key: 'description', label: 'Descripción' },
+  {
+    key: 'resolvedAt',
+    label: 'Fecha Resolución',
+    format: (v: any) =>
+      v
+        ? new Date(v).toLocaleString('es-EC', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          })
+        : '—',
+  },
+  { key: 'resolvedBy', label: 'Resuelto por', format: (v: any) => v?.name ?? '—' },
+  {
+    key: 'ticket',
+    label: 'Ticket Escalado',
+    format: (v: any) => (v?.ticketCode ? `#${v.ticketCode} (${v.status})` : '—'),
+  },
+]

@@ -18,6 +18,7 @@ import { useToast } from '@/hooks/use-toast'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { ExportButton } from '@/components/common/export-button'
 import { useExport } from '@/hooks/common/use-export'
+import { PATROL_INCIDENTS_AGENT_EXPORT_COLUMNS } from '@/lib/utils/patrol-utils'
 import { IncidentCard } from '@/components/patrols/incidents/incident-card'
 import { IncidentFormDialog } from '@/components/patrols/incidents/incident-form-dialog'
 import {
@@ -41,7 +42,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import type { ExportColumn } from '@/lib/utils/export'
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 
@@ -59,19 +59,6 @@ const STATUS_LABELS: Record<string, string> = {
   RESOLVED: 'Resuelta',
   ESCALATED: 'Escalada',
 }
-
-const EXPORT_COLUMNS: ExportColumn[] = [
-  {
-    key: 'createdAt',
-    label: 'Fecha',
-    format: (v: any) => (v ? new Date(v).toLocaleString('es-EC') : ''),
-  },
-  { key: 'checkpoint', label: 'Checkpoint', format: (v: any) => v?.name ?? '' },
-  { key: 'patrol', label: 'Ruta', format: (v: any) => v?.route?.name ?? '' },
-  { key: 'severity', label: 'Severidad', format: (v: string) => SEVERITY_LABELS[v] ?? v },
-  { key: 'status', label: 'Estado', format: (v: string) => STATUS_LABELS[v] ?? v },
-  { key: 'description', label: 'Descripción' },
-]
 
 // ── Interfaces ────────────────────────────────────────────────────────────────
 
@@ -222,7 +209,7 @@ export default function MisNovedadesPage() {
     title: 'Mis Novedades',
     subtitle: `Exportado el ${new Date().toLocaleDateString('es-EC')} • ${pagination?.total ?? incidents.length} novedades`,
     getData: () => incidents,
-    columns: EXPORT_COLUMNS,
+    columns: PATROL_INCIDENTS_AGENT_EXPORT_COLUMNS,
   })
 
   if (status === 'loading' || !session) return null
