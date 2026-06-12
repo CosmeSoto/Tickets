@@ -176,10 +176,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       )
     }
 
-    // ── Validar orden secuencial ───────────────────────────────────────────
-    // El agente debe escanear los checkpoints en el orden definido en la ruta.
-    // Se obtienen los checkpoints requeridos ya visitados y se verifica que el
-    // checkpoint que intenta escanear sea el siguiente en la secuencia.
+    // ── Validar orden secuencial con tolerancia de skip ───────────────────
+    // Regla de negocio:
+    //   - Saltar 1 checkpoint requerido consecutivo → PERMITIDO con advertencia
+    //     (el agente tuvo un contratiempo y puede continuar la ronda)
+    //   - Saltar 2 o más checkpoints requeridos seguidos → INVALIDAR la ronda
+    //     (marca como INCOMPLETE y bloquea más check-ins)
+    //
+    // Un checkpoint "saltado" es uno requerido que aparece ANTES del actual
+    // en el orden de la ruta y que AÚN NO ha sido visitado.
     const visitedCheckIns = await prisma.patrol_check_ins.findMany({
       where: { patrolId, validationResult: 'VALID' },
       select: { checkpointId: true },
@@ -189,26 +194,103 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // Ordenar todos los checkpoints de la ruta por su orden
     const sortedRoute = [...patrol.route.routeCheckpoints].sort((a, b) => a.order - b.order)
 
-    // El siguiente esperado es el primer checkpoint no visitado (en orden)
-    const nextExpected = sortedRoute.find(rc => !visitedSet.has(rc.checkpointId))
+    // Índice del checkpoint que se intenta escanear
+    const attemptedIdx = sortedRoute.findIndex(rc => rc.checkpointId === data.checkpointId)
 
-    if (nextExpected && nextExpected.checkpointId !== data.checkpointId) {
-      // Buscar el nombre del checkpoint esperado para el mensaje
-      const expectedName = nextExpected.checkpoint.name
-      const attemptedOrder = routeCheckpoint.order
-      const expectedOrder = nextExpected.order
+    // Checkpoints requeridos que están ANTES del actual y NO han sido visitados = saltados
+    const skippedRequired = sortedRoute
+      .slice(0, attemptedIdx)
+      .filter(rc => rc.isRequired && !visitedSet.has(rc.checkpointId))
 
+    const MAX_ALLOWED_SKIPS = 1 // un contratiempo puntual es tolerable
+
+    if (skippedRequired.length > MAX_ALLOWED_SKIPS) {
+      // ── Demasiados checkpoints saltados → invalidar ronda ────────────────
+      const requiredCheckpointIds = sortedRoute
+        .filter(rc => rc.isRequired)
+        .map(rc => rc.checkpointId)
+      const missedIds = requiredCheckpointIds.filter(cid => !visitedSet.has(cid))
+      const visitedRequired = requiredCheckpointIds.filter(cid => visitedSet.has(cid)).length
+      const completionPct = calculateCompletionPercentage(
+        visitedRequired,
+        requiredCheckpointIds.length
+      )
+
+      // Cerrar la ronda como INCOMPLETE
+      await prisma.patrols.update({
+        where: { id: patrolId },
+        data: {
+          status: 'INCOMPLETE',
+          completedAt: new Date(),
+          completionPercentage: completionPct,
+          missedCheckpointIds: missedIds,
+        },
+      })
+
+      // Notificar supervisores
+      try {
+        const { getPatrolSupervisors } = await import('@/lib/patrol/patrol-helpers')
+        const { NotificationService } = await import('@/lib/services/notification-service')
+        const { NotificationType } = await import('@prisma/client')
+        const supervisors = await getPatrolSupervisors(patrol.familyId)
+        const agentName = session.user.name ?? session.user.email ?? 'Agente'
+        await Promise.allSettled(
+          supervisors.map(s =>
+            NotificationService.push({
+              userId: s.id,
+              type: NotificationType.PATROL_INCOMPLETE,
+              title: 'Ronda invalidada por checkpoints saltados',
+              message: `La ronda del agente ${agentName} fue invalidada automáticamente: intentó saltar ${skippedRequired.length} checkpoints requeridos consecutivos (más del máximo permitido de ${MAX_ALLOWED_SKIPS}). Completitud: ${completionPct}%.`,
+              metadata: {
+                patrolId,
+                agentId: patrol.agentId,
+                familyId: patrol.familyId,
+                skippedCount: skippedRequired.length,
+                completionPct,
+                autoInvalidated: true,
+              },
+            })
+          )
+        )
+      } catch {
+        // Notificación opcional — no bloquear la respuesta
+      }
+
+      await AuditServiceComplete.log({
+        action: 'PATROL_AUTO_INVALIDATED',
+        entityType: 'patrol',
+        entityId: patrolId,
+        userId: session.user.id,
+        details: {
+          skippedCount: skippedRequired.length,
+          skippedCheckpointIds: skippedRequired.map(rc => rc.checkpointId),
+          completionPct,
+        },
+        request,
+      })
+
+      const skippedNames = skippedRequired
+        .map(rc => `#${rc.order} ${rc.checkpoint.name}`)
+        .join(', ')
       return NextResponse.json(
         {
-          error: `Debes escanear el checkpoint #${expectedOrder} (${expectedName}) antes que el #${attemptedOrder}. Sigue el orden de la ruta.`,
-          code: 'CHECKPOINT_OUT_OF_ORDER',
-          expectedCheckpointId: nextExpected.checkpointId,
-          expectedCheckpointName: expectedName,
-          expectedOrder,
+          error: `Ronda invalidada: tienes ${skippedRequired.length} checkpoints requeridos sin escanear (${skippedNames}). Se permite saltar máximo ${MAX_ALLOWED_SKIPS}. La ronda fue cerrada como incompleta. Debes reportar la novedad al supervisor.`,
+          code: 'PATROL_INVALIDATED_TOO_MANY_SKIPS',
+          skippedCount: skippedRequired.length,
+          skippedCheckpoints: skippedRequired.map(rc => ({
+            id: rc.checkpointId,
+            name: rc.checkpoint.name,
+            order: rc.order,
+          })),
+          completionPercentage: completionPct,
+          patrolStatus: 'INCOMPLETE',
         },
         { status: 422 }
       )
     }
+
+    // Si hay exactamente 1 skip permitido, registramos la advertencia en los metadatos
+    // pero dejamos continuar (se informa al agente en la respuesta exitosa al final)
 
     // ── Validar foto requerida ─────────────────────────────────────────────
     // Solo se exige foto cuando el checkpoint está marcado como sensible.
@@ -366,6 +448,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             order: nextCheckpoint.order,
           }
         : null,
+      // Advertencia cuando el agente saltó 1 checkpoint requerido (tolerancia)
+      ...(skippedRequired.length === 1 && {
+        warning: {
+          code: 'CHECKPOINT_SKIPPED',
+          message: `Saltaste el checkpoint #${skippedRequired[0].order} (${skippedRequired[0].checkpoint.name}). Queda registrado como no visitado. Debes reportar una novedad antes de finalizar la ronda.`,
+          skippedCheckpoints: skippedRequired.map(rc => ({
+            id: rc.checkpointId,
+            name: rc.checkpoint.name,
+            order: rc.order,
+          })),
+          requiresIncidentReport: true,
+        },
+      }),
     })
   } catch (error) {
     console.error('[patrol/[id]/check-in] POST:', error)
