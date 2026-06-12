@@ -2,22 +2,19 @@
 
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { useEffect, Suspense, useState } from 'react'
+import { useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { UnifiedInventoryList } from '@/components/inventory/unified-inventory-list'
 import { BatchesTab } from '@/components/inventory/dashboard/BatchesTab'
 import { Button } from '@/components/ui/button'
-import { Plus, Package, User, Upload, Layers } from 'lucide-react'
+import { Plus, Package, User, Layers } from 'lucide-react'
 import Link from 'next/link'
-import { EquipmentImportModal } from '@/components/inventory/equipment-import-modal'
 
 function InventoryContent() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [importOpen, setImportOpen] = useState(false)
-
   const familyId = searchParams.get('familyId') ?? undefined
   const tab = searchParams.get('tab') ?? 'family'
 
@@ -73,12 +70,6 @@ function InventoryContent() {
         headerActions={
           canCreate && tab !== 'mine' ? (
             <div className='flex items-center gap-2'>
-              {isAdmin && (
-                <Button size='sm' variant='outline' onClick={() => setImportOpen(true)}>
-                  <Upload className='mr-2 h-4 w-4' />
-                  Importar
-                </Button>
-              )}
               <Button size='sm' asChild>
                 <Link href='/inventory/new'>
                   <Plus className='mr-2 h-4 w-4' />
@@ -141,19 +132,6 @@ function InventoryContent() {
           />
         )}
       </ModuleLayout>
-
-      {isAdmin && (
-        <EquipmentImportModal
-          open={importOpen}
-          onOpenChange={setImportOpen}
-          onSuccess={() => {
-            setImportOpen(false)
-            // Forzar recarga de la lista
-            router.refresh()
-          }}
-          familyId={familyId}
-        />
-      )}
     </>
   )
 }
