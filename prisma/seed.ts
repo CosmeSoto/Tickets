@@ -943,7 +943,7 @@ async function seedLandingPage() {
   if (existingContent === 0) {
     await prisma.landing_page_content.create({
       data: {
-        id: randomUUID(),
+        id: 'default',
         heroTitle: 'Soporte Multi-Área Profesional',
         heroSubtitle: 'Gestión de tickets para todas las áreas de tu organización',
         heroCtaPrimary: 'Crear Ticket de Soporte',
@@ -964,41 +964,40 @@ async function seedLandingPage() {
       },
     })
   }
-  const services = [
-    {
-      id: 'service-1',
-      order: 1,
-      enabled: true,
-      icon: 'Wrench',
-      iconColor: 'blue',
-      title: 'Soporte TI',
-      description: 'Atención de incidencias tecnológicas con seguimiento en tiempo real.',
-    },
-    {
-      id: 'service-2',
-      order: 2,
-      enabled: true,
-      icon: 'Server',
-      iconColor: 'green',
-      title: 'Gestión de Inventario',
-      description: 'Control de equipos, asignaciones y actas de entrega digitales.',
-    },
-    {
-      id: 'service-3',
-      order: 3,
-      enabled: true,
-      icon: 'Building2',
-      iconColor: 'orange',
-      title: 'Infraestructura',
-      description: 'Soporte para activos fijos, mantenimiento e infraestructura.',
-    },
-  ]
-  for (const s of services) {
-    await prisma.landing_page_services.upsert({
-      where: { id: s.id },
-      update: { title: s.title, description: s.description },
-      create: s,
-    })
+  const existingServices = await prisma.landing_page_services.count()
+  if (existingServices === 0) {
+    const services = [
+      {
+        id: 'service-1',
+        order: 1,
+        enabled: true,
+        icon: 'Wrench',
+        iconColor: 'blue',
+        title: 'Soporte TI',
+        description: 'Atención de incidencias tecnológicas con seguimiento en tiempo real.',
+      },
+      {
+        id: 'service-2',
+        order: 2,
+        enabled: true,
+        icon: 'Server',
+        iconColor: 'green',
+        title: 'Gestión de Inventario',
+        description: 'Control de equipos, asignaciones y actas de entrega digitales.',
+      },
+      {
+        id: 'service-3',
+        order: 3,
+        enabled: true,
+        icon: 'Building2',
+        iconColor: 'orange',
+        title: 'Infraestructura',
+        description: 'Soporte para activos fijos, mantenimiento e infraestructura.',
+      },
+    ]
+    for (const s of services) {
+      await prisma.landing_page_services.create({ data: s })
+    }
   }
   console.log('✅ Landing page')
 }

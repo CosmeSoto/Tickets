@@ -98,6 +98,55 @@ if [ "$NEEDS_SEED" = "yes" ]; then
   fi
 else
   echo "==> Base de datos ya tiene datos — omitiendo seed."
+  # Verificar datos esenciales que podrían faltar (landing page services, etc.)
+  echo "==> Verificando datos esenciales de landing page..."
+  node - <<'NODESCRIPT' 2>/dev/null || true
+const { PrismaClient } = require('@prisma/client');
+const p = new PrismaClient();
+(async () => {
+  try {
+    const servicesCount = await p.landing_page_services.count();
+    if (servicesCount === 0) {
+      console.log('  → landing_page_services vacía — insertando servicios por defecto...');
+      const services = [
+        { id: 'service-1', order: 1, enabled: true, icon: 'Wrench', iconColor: 'blue', title: 'Soporte TI', description: 'Atención de incidencias tecnológicas con seguimiento en tiempo real.' },
+        { id: 'service-2', order: 2, enabled: true, icon: 'Server', iconColor: 'green', title: 'Gestión de Inventario', description: 'Control de equipos, asignaciones y actas de entrega digitales.' },
+        { id: 'service-3', order: 3, enabled: true, icon: 'Building2', iconColor: 'orange', title: 'Infraestructura', description: 'Soporte para activos fijos, mantenimiento e infraestructura.' },
+      ];
+      for (const s of services) {
+        await p.landing_page_services.create({ data: s });
+      }
+      console.log('  → Servicios de landing insertados.');
+    }
+    const contentCount = await p.landing_page_content.count();
+    if (contentCount === 0) {
+      console.log('  → landing_page_content vacía — insertando contenido por defecto...');
+      await p.landing_page_content.create({
+        data: {
+          id: 'default',
+          heroTitle: 'Soporte Multi-Área Profesional',
+          heroSubtitle: 'Gestión de tickets para todas las áreas de tu organización',
+          heroCtaPrimary: 'Crear Ticket de Soporte',
+          heroCtaPrimaryUrl: '/login',
+          heroCtaSecondary: 'Ver Servicios',
+          heroCtaSecondaryUrl: '#servicios',
+          servicesTitle: 'Nuestros Servicios',
+          servicesSubtitle: 'Soporte técnico integral para todas las áreas',
+          servicesEnabled: true,
+          companyName: 'Sistema de Tickets',
+          companyTagline: 'Gestión Integral de Operaciones',
+          footerText: '© ' + new Date().getFullYear() + ' Sistema de Tickets. Todos los derechos reservados.',
+        },
+      });
+      console.log('  → Contenido de landing insertado.');
+    }
+  } catch (e) {
+    console.error('  → Error verificando landing:', e.message);
+  } finally {
+    await p.$disconnect();
+  }
+})();
+NODESCRIPT
 fi
 
 # ── 3. Copiar uploads iniciales si el volumen está vacío ─────────────────────

@@ -184,6 +184,18 @@ const nextConfig: NextConfig = {
         destination: '/',
         permanent: false,
       },
+      // QR codes apuntan a esta ruta — redirigir a la página pública fuera del layout de inventario
+      {
+        source: '/inventory/equipment/:id/verify',
+        destination: '/verify/equipment/:id',
+        permanent: false,
+      },
+      // Compatibilidad con URLs antiguas de la página pública
+      {
+        source: '/inventory/equipment/public/:id',
+        destination: '/verify/equipment/:id',
+        permanent: false,
+      },
     ]
   },
 
