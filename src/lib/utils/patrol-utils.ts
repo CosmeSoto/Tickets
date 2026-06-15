@@ -443,11 +443,9 @@ export const PATROL_INCIDENTS_ADMIN_EXPORT_COLUMNS: ExportColumn[] = [
 // ── PDF profesional de novedades ──────────────────────────────────────────────
 
 /**
- * Genera un PDF de novedades de rondas con diseño profesional:
- * colores de severidad, badges de estado, sección por área, y resumen ejecutivo.
- * Incluye todos los timestamps disponibles: reporte, inicio de ronda, resolución/escalado,
- * tiempo de atención calculado, y datos del ticket escalado.
- * Llamar solo en cliente (usa window.open).
+ * Genera un PDF de novedades de rondas.
+ * Diseño: header con período y filtros activos + tabla completa con toda la información.
+ * Sin tarjetas de resumen — el foco es que los datos de la tabla sean completos y legibles.
  */
 export function exportIncidentsToPDF(
   incidents: any[],
@@ -465,6 +463,7 @@ export function exportIncidentsToPDF(
     day: 'numeric',
   })
 
+  // Colores de severidad
   const SEV_COLOR: Record<string, string> = {
     CRITICAL: '#dc2626',
     HIGH: '#ea580c',
@@ -505,27 +504,19 @@ export function exportIncidentsToPDF(
     RESOLVED: 'Resuelto',
     CLOSED: 'Cerrado',
   }
+  const SEV_LABELS: Record<string, string> = {
+    CRITICAL: 'Crítica',
+    HIGH: 'Alta',
+    MEDIUM: 'Media',
+    LOW: 'Baja',
+  }
+  const ST_LABELS: Record<string, string> = {
+    OPEN: 'Abierta',
+    RESOLVED: 'Resuelta',
+    ESCALATED: 'Escalada',
+  }
 
-  // Resumen ejecutivo
   const total = incidents.length
-  const open = incidents.filter(i => i.status === 'OPEN').length
-  const resolved = incidents.filter(i => i.status === 'RESOLVED').length
-  const escalated = incidents.filter(i => i.status === 'ESCALATED').length
-  const critical = incidents.filter(i => i.severity === 'CRITICAL').length
-  const high = incidents.filter(i => i.severity === 'HIGH').length
-
-  // Tiempo promedio de atención (solo novedades resueltas/escaladas)
-  const closed = incidents.filter(i => i.resolvedAt)
-  const avgMinutes =
-    closed.length > 0
-      ? Math.round(
-          closed.reduce((acc, i) => {
-            return (
-              acc + (new Date(i.resolvedAt).getTime() - new Date(i.createdAt).getTime()) / 60000
-            )
-          }, 0) / closed.length
-        )
-      : null
 
   const formatTs = (v: any) =>
     v
@@ -547,20 +538,9 @@ export function exportIncidentsToPDF(
   const badge = (text: string, color: string, bg: string) =>
     `<span style="display:inline-block;padding:1px 7px;border-radius:10px;font-size:9px;font-weight:600;color:${color};background:${bg};border:1px solid ${color}30;">${esc(text)}</span>`
 
-  const sevLabel: Record<string, string> = {
-    CRITICAL: 'Crítica',
-    HIGH: 'Alta',
-    MEDIUM: 'Media',
-    LOW: 'Baja',
-  }
-  const stLabel: Record<string, string> = {
-    OPEN: 'Abierta',
-    RESOLVED: 'Resuelta',
-    ESCALATED: 'Escalada',
-  }
-
   const tableRows = incidents
     .map((inc, idx) => {
+      // Tiempo de atención desde reporte hasta resolución/escalado
       const attMin = inc.resolvedAt
         ? Math.round(
             (new Date(inc.resolvedAt).getTime() - new Date(inc.createdAt).getTime()) / 60000
@@ -572,35 +552,41 @@ export function exportIncidentsToPDF(
             ? `${attMin} min`
             : `${Math.floor(attMin / 60)}h ${attMin % 60}min`
           : '—'
+      const attColor = attMin === null ? '#9ca3af' : attMin > 60 ? '#dc2626' : '#16a34a'
 
-      const ticketBadge = inc.ticket?.ticketCode
-        ? `<span style="font-family:monospace;font-size:9px;font-weight:600;background:#f3f4f6;padding:1px 5px;border-radius:4px;">#${esc(inc.ticket.ticketCode)}</span>` +
+      // Ticket badge: código + estado del ticket
+      const ticketCell = inc.ticket?.ticketCode
+        ? `<span style="font-family:monospace;font-size:9px;font-weight:700;background:#f3f4f6;padding:2px 6px;border-radius:4px;">#${esc(inc.ticket.ticketCode)}</span>` +
           (inc.ticket.status
-            ? ` ${badge(TICKET_STATUS_LABELS[inc.ticket.status] ?? inc.ticket.status, TICKET_STATUS_COLOR[inc.ticket.status] ?? '#111', TICKET_STATUS_BG[inc.ticket.status] ?? '#f3f4f6')}`
+            ? `<br/>${badge(
+                TICKET_STATUS_LABELS[inc.ticket.status] ?? inc.ticket.status,
+                TICKET_STATUS_COLOR[inc.ticket.status] ?? '#111',
+                TICKET_STATUS_BG[inc.ticket.status] ?? '#f3f4f6'
+              )}`
             : '')
         : '—'
 
-      return `
-    <tr style="background:${idx % 2 === 0 ? '#ffffff' : '#f9fafb'};">
-      <td style="font-size:9px;color:#374151;white-space:nowrap;">${formatTs(inc.createdAt)}</td>
-      <td><strong style="font-size:10px;">${esc(inc.agent?.name ?? '—')}</strong></td>
-      <td style="font-size:9px;">${esc(inc.patrol?.family?.name ?? '—')}</td>
-      <td style="font-size:9px;">${esc(inc.patrol?.route?.name ?? '—')}</td>
-      <td style="font-size:9px;color:#6b7280;white-space:nowrap;">${formatTs(inc.patrol?.scheduledStart)}</td>
-      <td>${esc(inc.checkpoint?.name ?? '—')}</td>
-      <td style="font-size:9px;color:#6b7280;">${esc(inc.checkpoint?.location ?? '—')}</td>
-      <td>${badge(sevLabel[inc.severity] ?? inc.severity, SEV_COLOR[inc.severity] ?? '#111', SEV_BG[inc.severity] ?? '#f3f4f6')}</td>
-      <td>${badge(stLabel[inc.status] ?? inc.status, STATUS_COLOR[inc.status] ?? '#111', STATUS_BG[inc.status] ?? '#f3f4f6')}</td>
-      <td style="max-width:180px;word-break:break-word;font-size:9px;">${esc(inc.description)}</td>
-      <td style="font-size:9px;color:#374151;white-space:nowrap;">${formatTs(inc.resolvedAt)}</td>
-      <td style="font-size:9px;text-align:center;font-weight:600;color:${attMin !== null && attMin > 60 ? '#dc2626' : attMin !== null ? '#16a34a' : '#9ca3af'};">${attStr}</td>
-      <td style="font-size:9px;">${esc(inc.resolvedBy?.name ?? '—')}</td>
-      <td>${ticketBadge}</td>
+      return `<tr style="background:${idx % 2 === 0 ? '#ffffff' : '#f8fafc'};">
+      <td style="white-space:nowrap;">${formatTs(inc.createdAt)}</td>
+      <td><strong>${esc(inc.agent?.name ?? '—')}</strong></td>
+      <td>${esc(inc.patrol?.family?.name ?? '—')}</td>
+      <td>${esc(inc.patrol?.route?.name ?? '—')}</td>
+      <td style="color:#6b7280;white-space:nowrap;">${formatTs(inc.patrol?.scheduledStart)}</td>
+      <td><strong>${esc(inc.checkpoint?.name ?? '—')}</strong></td>
+      <td style="color:#6b7280;">${esc(inc.checkpoint?.location ?? '—')}</td>
+      <td>${badge(SEV_LABELS[inc.severity] ?? inc.severity, SEV_COLOR[inc.severity] ?? '#111', SEV_BG[inc.severity] ?? '#f3f4f6')}</td>
+      <td>${badge(ST_LABELS[inc.status] ?? inc.status, STATUS_COLOR[inc.status] ?? '#111', STATUS_BG[inc.status] ?? '#f3f4f6')}</td>
+      <td style="max-width:200px;word-break:break-word;">${esc(inc.description)}</td>
+      <td style="white-space:nowrap;">${formatTs(inc.resolvedAt)}</td>
+      <td style="text-align:center;font-weight:600;color:${attColor};">${attStr}</td>
+      <td>${esc(inc.resolvedBy?.name ?? '—')}</td>
+      <td>${ticketCell}</td>
     </tr>`
     })
     .join('')
 
-  const activeFilters = [
+  // Chips de filtros activos
+  const filterChips = [
     filters.familyName ? `Área: <strong>${esc(filters.familyName)}</strong>` : '',
     filters.agentName ? `Agente: <strong>${esc(filters.agentName)}</strong>` : '',
     filters.dateFrom ? `Desde: <strong>${esc(filters.dateFrom)}</strong>` : '',
@@ -612,25 +598,47 @@ export function exportIncidentsToPDF(
   const html = `<!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8"/>
   <title>Novedades de Rondas</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 10px; color: #111827; padding: 28px; background: #fff; }
-    .report-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 18px; padding-bottom: 14px; border-bottom: 3px solid #f59e0b; }
-    .report-header h1 { font-size: 20px; font-weight: 800; color: #111827; }
-    .report-header .subtitle { font-size: 11px; color: #6b7280; margin-top: 3px; }
-    .report-header .meta { text-align: right; font-size: 10px; color: #9ca3af; }
-    .filters-bar { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 6px 12px; font-size: 10px; color: #92400e; margin-bottom: 14px; }
-    .summary { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-bottom: 18px; }
-    .summary-card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px 6px; text-align: center; }
-    .summary-card .val { font-size: 20px; font-weight: 800; line-height: 1; }
-    .summary-card .lbl { font-size: 8px; color: #6b7280; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.04em; }
-    table { width: 100%; border-collapse: collapse; font-size: 10px; }
-    thead tr { background: #1f2937; }
-    th { text-align: left; padding: 7px 7px; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #f9fafb; white-space: nowrap; }
-    td { padding: 5px 7px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
-    .footer { margin-top: 18px; font-size: 9px; color: #9ca3af; text-align: center; border-top: 1px solid #e5e7eb; padding-top: 10px; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 10px; color: #111827; padding: 24px; background: #fff;
+    }
+    /* Header */
+    .header {
+      display: flex; justify-content: space-between; align-items: flex-end;
+      border-bottom: 3px solid #f59e0b; padding-bottom: 12px; margin-bottom: 12px;
+    }
+    .header h1 { font-size: 18px; font-weight: 800; color: #111827; }
+    .header .sub { font-size: 10px; color: #6b7280; margin-top: 2px; }
+    .header .right { text-align: right; font-size: 10px; color: #9ca3af; }
+    .header .right strong { font-size: 12px; color: #374151; display: block; margin-bottom: 2px; }
+    /* Filtros activos */
+    .filters {
+      background: #fffbeb; border: 1px solid #fde68a; border-radius: 5px;
+      padding: 5px 10px; font-size: 9px; color: #92400e; margin-bottom: 12px;
+    }
+    /* Tabla */
+    table { width: 100%; border-collapse: collapse; }
+    thead tr { background: #1e293b; }
+    th {
+      text-align: left; padding: 7px 8px; font-size: 8.5px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.05em; color: #f1f5f9;
+      white-space: nowrap; border-right: 1px solid #334155;
+    }
+    th:last-child { border-right: none; }
+    td {
+      padding: 5px 8px; border-bottom: 1px solid #f1f5f9;
+      border-right: 1px solid #f1f5f9; vertical-align: middle;
+    }
+    td:last-child { border-right: none; }
+    /* Footer */
+    .footer {
+      margin-top: 14px; font-size: 9px; color: #9ca3af;
+      text-align: center; border-top: 1px solid #e5e7eb; padding-top: 8px;
+    }
     @media print {
       body { padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       @page { margin: 1cm; size: A4 landscape; }
@@ -639,49 +647,18 @@ export function exportIncidentsToPDF(
   </style>
 </head>
 <body>
-  <div class="report-header">
+  <div class="header">
     <div>
       <h1>Novedades de Rondas</h1>
-      <div class="subtitle">${esc(subtitle)}</div>
+      <div class="sub">${esc(subtitle)}</div>
     </div>
-    <div class="meta">
-      <div>Generado el ${date}</div>
-      <div style="margin-top:4px;font-size:11px;font-weight:700;">${total} novedad${total !== 1 ? 'es' : ''}</div>
+    <div class="right">
+      <strong>${total} novedad${total !== 1 ? 'es' : ''}</strong>
+      Generado el ${date}
     </div>
   </div>
 
-  ${activeFilters ? `<div class="filters-bar">🔍 Filtros activos: ${activeFilters}</div>` : ''}
-
-  <div class="summary">
-    <div class="summary-card">
-      <div class="val">${total}</div>
-      <div class="lbl">Total</div>
-    </div>
-    <div class="summary-card" style="border-color:#bfdbfe;">
-      <div class="val" style="color:#1d4ed8;">${open}</div>
-      <div class="lbl">Abiertas</div>
-    </div>
-    <div class="summary-card" style="border-color:#bbf7d0;">
-      <div class="val" style="color:#15803d;">${resolved}</div>
-      <div class="lbl">Resueltas</div>
-    </div>
-    <div class="summary-card" style="border-color:#ddd6fe;">
-      <div class="val" style="color:#6d28d9;">${escalated}</div>
-      <div class="lbl">Escaladas</div>
-    </div>
-    <div class="summary-card" style="border-color:#fecaca;">
-      <div class="val" style="color:#dc2626;">${critical}</div>
-      <div class="lbl">Críticas</div>
-    </div>
-    <div class="summary-card" style="border-color:#fed7aa;">
-      <div class="val" style="color:#c2410c;">${high}</div>
-      <div class="lbl">Altas</div>
-    </div>
-    <div class="summary-card" style="border-color:#e5e7eb;">
-      <div class="val" style="color:#374151;">${avgMinutes !== null ? (avgMinutes < 60 ? `${avgMinutes}m` : `${Math.floor(avgMinutes / 60)}h${avgMinutes % 60}m`) : '—'}</div>
-      <div class="lbl">Prom. Atención</div>
-    </div>
-  </div>
+  ${filterChips ? `<div class="filters">🔍 Filtros: ${filterChips}</div>` : ''}
 
   <table>
     <thead>
@@ -696,7 +673,7 @@ export function exportIncidentsToPDF(
         <th>Severidad</th>
         <th>Estado</th>
         <th>Descripción</th>
-        <th>Fecha Resolución/Escalado</th>
+        <th>Fecha Res./Escalado</th>
         <th>T. Atención</th>
         <th>Resuelto por</th>
         <th>Ticket</th>
@@ -706,7 +683,12 @@ export function exportIncidentsToPDF(
   </table>
 
   <div class="footer">Sistema de Tickets — Novedades de Rondas — ${date}</div>
-  <script>window.onload = function() { window.print(); window.onafterprint = function() { window.close(); }; }</script>
+  <script>
+    window.onload = function() {
+      window.print();
+      window.onafterprint = function() { window.close(); };
+    };
+  </script>
 </body>
 </html>`
 
