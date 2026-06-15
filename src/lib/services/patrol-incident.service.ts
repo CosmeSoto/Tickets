@@ -440,8 +440,17 @@ export class PatrolIncidentService {
    * Escala una novedad creando un ticket de soporte.
    * Solo supervisores o administradores pueden ejecutar esta acción.
    * La novedad debe estar en estado OPEN.
+   *
+   * @param id           - ID de la novedad a escalar
+   * @param escalatedById - ID del usuario que ejecuta la acción
+   * @param targetFamilyId - Familia destino del ticket (opcional).
+   *   - TECHNICIAN/supervisor: siempre se usa la familia de la ronda (se ignora este param).
+   *   - Admin normal: puede especificar cualquiera de sus familias asignadas.
+   *     Si no se provee, se usa la familia de la ronda.
+   *   - Super admin: puede especificar cualquier familia del sistema.
+   *     Si no se provee, se usa la familia de la ronda.
    */
-  static async escalateToTicket(id: string, escalatedById: string) {
+  static async escalateToTicket(id: string, escalatedById: string, targetFamilyId?: string) {
     // Obtener incidente con datos necesarios para crear el ticket
     const incident = await db.patrol_incidents.findUnique({
       where: { id },
@@ -459,13 +468,28 @@ export class PatrolIncidentService {
       throw new Error('La novedad ya fue resuelta o escalada')
     }
 
-    // Buscar la categoría configurada para el área, o la primera disponible
+    // Resolver la familia destino del ticket:
+    // Si no se provee targetFamilyId, hereda la familia de la ronda (comportamiento original).
+    const resolvedFamilyId = targetFamilyId ?? incident.patrol.familyId
+    const familyChanged = resolvedFamilyId !== incident.patrol.familyId
+
+    // Buscar la categoría configurada para la familia destino, o la primera disponible.
+    // Cuando se redirige a otra familia se intenta su config primero.
     const familyConfig = await prisma.patrol_family_config.findUnique({
-      where: { familyId: incident.patrol.familyId },
+      where: { familyId: resolvedFamilyId },
       select: { patrolIncidentCategoryId: true },
     })
 
+    // Fallback a la familia de origen si la destino no tiene categoría configurada
     let categoryId = familyConfig?.patrolIncidentCategoryId ?? null
+
+    if (!categoryId && familyChanged) {
+      const originConfig = await prisma.patrol_family_config.findUnique({
+        where: { familyId: incident.patrol.familyId },
+        select: { patrolIncidentCategoryId: true },
+      })
+      categoryId = originConfig?.patrolIncidentCategoryId ?? null
+    }
 
     if (!categoryId) {
       const defaultCategory = await prisma.categories.findFirst({
@@ -502,7 +526,7 @@ export class PatrolIncidentService {
         source: 'PATROL',
         clientId: incident.agentId,
         categoryId,
-        familyId: incident.patrol.familyId,
+        familyId: resolvedFamilyId,
         createdById: escalatedById,
         createdAt: now,
         updatedAt: now,
@@ -515,7 +539,7 @@ export class PatrolIncidentService {
       data: { status: 'ESCALATED', ticketId },
     })
 
-    // Auditoría
+    // Auditoría — registra si la familia fue redirigida
     try {
       await AuditServiceComplete.log({
         action: 'patrol_incident_escalated',
@@ -527,7 +551,9 @@ export class PatrolIncidentService {
           checkpointId: incident.checkpointId,
           severity: incident.severity,
           ticketId,
-          familyId: incident.patrol.familyId,
+          originFamilyId: incident.patrol.familyId,
+          targetFamilyId: resolvedFamilyId,
+          familyRedirected: familyChanged,
         },
       })
     } catch (err) {

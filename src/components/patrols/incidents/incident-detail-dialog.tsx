@@ -15,6 +15,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
 
 interface IncidentDetailDialogProps {
@@ -36,6 +44,17 @@ interface IncidentDetail {
   patrol?: { id: string; route: { name: string }; scheduledStart: string }
   photos?: { id: string; path: string; url?: string }[]
   ticket?: { id: string; ticketCode: string; status: string } | null
+}
+
+interface EscalateFamily {
+  id: string
+  name: string
+}
+
+interface EscalateFamiliesData {
+  canSelectFamily: boolean
+  families: EscalateFamily[]
+  defaultFamilyId: string
 }
 
 const SEVERITY_BADGE: Record<string, string> = {
@@ -73,6 +92,11 @@ export function IncidentDetailDialog({
   const [actionLoading, setActionLoading] = useState(false)
   const [confirmAction, setConfirmAction] = useState<'resolve' | 'escalate' | null>(null)
 
+  // Estado del selector de familia para escalado
+  const [escalateFamilies, setEscalateFamilies] = useState<EscalateFamiliesData | null>(null)
+  const [escalateFamiliesLoading, setEscalateFamiliesLoading] = useState(false)
+  const [selectedFamilyId, setSelectedFamilyId] = useState<string>('')
+
   const fetchIncident = useCallback(async () => {
     if (!incidentId) return
     setLoading(true)
@@ -98,27 +122,80 @@ export function IncidentDetailDialog({
       fetchIncident()
     } else {
       setIncident(null)
+      setEscalateFamilies(null)
+      setSelectedFamilyId('')
     }
   }, [open, incidentId, fetchIncident])
+
+  // Cargar familias disponibles cuando el usuario abre el diálogo de confirmación de escalado
+  const handleEscalateClick = useCallback(async () => {
+    if (!incidentId) return
+    setConfirmAction('escalate')
+
+    // Evitar recargar si ya tenemos los datos
+    if (escalateFamilies) return
+
+    setEscalateFamiliesLoading(true)
+    try {
+      const res = await fetch(`/api/patrols/incidents/${incidentId}/escalate`)
+      if (!res.ok) throw new Error('Error al cargar familias')
+      const json = await res.json()
+      const data: EscalateFamiliesData = json.data
+      setEscalateFamilies(data)
+      setSelectedFamilyId(data.defaultFamilyId)
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'No se pudieron cargar las áreas disponibles',
+        variant: 'destructive',
+      })
+      setConfirmAction(null)
+    } finally {
+      setEscalateFamiliesLoading(false)
+    }
+  }, [incidentId, escalateFamilies, toast])
 
   const handleAction = async () => {
     if (!incident || !confirmAction) return
     setActionLoading(true)
     try {
-      const res = await fetch(`/api/patrols/incidents/${incident.id}/${confirmAction}`, {
-        method: 'POST',
-      })
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.error || 'Error al ejecutar la acción')
-      }
-      const json = await res.json()
       if (confirmAction === 'resolve') {
+        const res = await fetch(`/api/patrols/incidents/${incident.id}/resolve`, {
+          method: 'POST',
+        })
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}))
+          throw new Error(data.error || 'Error al resolver la novedad')
+        }
         toast({ title: 'Éxito', description: 'Novedad marcada como resuelta', variant: 'success' })
       } else {
+        // Escalado: enviar familyId solo si el selector estaba disponible
+        const body: Record<string, string> = {}
+        if (escalateFamilies?.canSelectFamily && selectedFamilyId) {
+          body.familyId = selectedFamilyId
+        }
+
+        const res = await fetch(`/api/patrols/incidents/${incident.id}/escalate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}))
+          throw new Error(data.error || 'Error al escalar la novedad')
+        }
+        const json = await res.json()
         const ticketCode = json.data?.ticketCode || json.ticketCode || ''
-        toast({ title: 'Éxito', description: `Ticket #${ticketCode} creado`, variant: 'success' })
+        const familyName =
+          escalateFamilies?.families.find(f => f.id === selectedFamilyId)?.name ?? ''
+        const familyMsg = familyName ? ` → ${familyName}` : ''
+        toast({
+          title: 'Éxito',
+          description: `Ticket #${ticketCode} creado${familyMsg}`,
+          variant: 'success',
+        })
       }
+
       onActionComplete?.()
       onOpenChange(false)
     } catch (err: unknown) {
@@ -140,6 +217,8 @@ export function IncidentDetailDialog({
       return dateStr
     }
   }
+
+  const selectedFamilyName = escalateFamilies?.families.find(f => f.id === selectedFamilyId)?.name
 
   return (
     <>
@@ -234,7 +313,7 @@ export function IncidentDetailDialog({
                   <Button
                     size='sm'
                     className='bg-amber-500 hover:bg-amber-600 text-white'
-                    onClick={() => setConfirmAction('escalate')}
+                    onClick={handleEscalateClick}
                     disabled={actionLoading}
                   >
                     Escalar a Ticket
@@ -264,9 +343,63 @@ export function IncidentDetailDialog({
                 : '¿Escalar esta novedad a un ticket? Se creará un ticket con los datos de la novedad.'}
             </AlertDialogDescription>
           </AlertDialogHeader>
+
+          {/* Selector de familia — solo para escalado cuando hay más de 1 opción */}
+          {confirmAction === 'escalate' && (
+            <div className='py-2'>
+              {escalateFamiliesLoading ? (
+                <div className='flex items-center gap-2 text-sm text-muted-foreground'>
+                  <Loader2 className='h-4 w-4 animate-spin' />
+                  Cargando áreas disponibles…
+                </div>
+              ) : escalateFamilies?.canSelectFamily ? (
+                <div className='space-y-2'>
+                  <Label htmlFor='escalate-family-select' className='text-sm font-medium'>
+                    Área destino del ticket
+                  </Label>
+                  <Select
+                    value={selectedFamilyId}
+                    onValueChange={setSelectedFamilyId}
+                    disabled={actionLoading}
+                  >
+                    <SelectTrigger id='escalate-family-select' className='w-full'>
+                      <SelectValue placeholder='Selecciona un área…' />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {escalateFamilies.families.map(f => (
+                        <SelectItem key={f.id} value={f.id}>
+                          {f.name}
+                          {f.id === escalateFamilies.defaultFamilyId && (
+                            <span className='ml-1.5 text-xs text-muted-foreground'>(origen)</span>
+                          )}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedFamilyId && selectedFamilyId !== escalateFamilies.defaultFamilyId && (
+                    <p className='text-xs text-amber-600 dark:text-amber-400'>
+                      ⚠️ El ticket se creará en <strong>{selectedFamilyName}</strong>, diferente al
+                      área de la ronda.
+                    </p>
+                  )}
+                </div>
+              ) : (
+                escalateFamilies && (
+                  <p className='text-sm text-muted-foreground'>
+                    📁 Área:{' '}
+                    <span className='font-medium'>{escalateFamilies.families[0]?.name}</span>
+                  </p>
+                )
+              )}
+            </div>
+          )}
+
           <AlertDialogFooter>
             <AlertDialogCancel disabled={actionLoading}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleAction} disabled={actionLoading}>
+            <AlertDialogAction
+              onClick={handleAction}
+              disabled={actionLoading || escalateFamiliesLoading}
+            >
               {actionLoading && <Loader2 className='h-4 w-4 mr-2 animate-spin' />}
               Confirmar
             </AlertDialogAction>
