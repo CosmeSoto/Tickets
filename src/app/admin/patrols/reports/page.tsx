@@ -34,6 +34,11 @@ interface Family {
   name: string
 }
 
+interface Agent {
+  id: string
+  name: string
+}
+
 // ── Helpers ─────────────────────────────────────────────────────────────────────
 
 function defaultFrom() {
@@ -67,7 +72,9 @@ export default function PatrolReportsPage() {
   const [dateFrom, setDateFrom] = useState(defaultFrom)
   const [dateTo, setDateTo] = useState(defaultTo)
   const [familyId, setFamilyId] = useState<string>('all')
+  const [agentId, setAgentId] = useState<string>('all')
   const [families, setFamilies] = useState<Family[]>([])
+  const [agents, setAgents] = useState<Agent[]>([])
 
   // Detail tab state
   const [patrols, setPatrols] = useState<PatrolDetail[]>([])
@@ -90,6 +97,19 @@ export default function PatrolReportsPage() {
     }
   }, [])
 
+  // ── Fetch agents (usuarios con patrullas activas) ────────────────────────────
+  const fetchAgents = useCallback(async () => {
+    try {
+      const res = await fetch('/api/users?patrolsEnabled=true&limit=100')
+      if (res.ok) {
+        const json = await res.json()
+        setAgents((json.data ?? []).map((u: any) => ({ id: u.id, name: u.name })))
+      }
+    } catch {
+      /* silencioso */
+    }
+  }, [])
+
   // ── Fetch detail report ─────────────────────────────────────────────────────
   const fetchDetail = useCallback(
     async (page = 1) => {
@@ -102,6 +122,7 @@ export default function PatrolReportsPage() {
           dateTo: new Date(dateTo).toISOString(),
         })
         if (familyId && familyId !== 'all') params.set('familyId', familyId)
+        if (agentId && agentId !== 'all') params.set('agentId', agentId)
 
         const res = await fetch(`/api/patrols/reports/detail?${params}`)
         const json = await res.json()
@@ -115,7 +136,7 @@ export default function PatrolReportsPage() {
         setDetailLoading(false)
       }
     },
-    [dateFrom, dateTo, familyId]
+    [dateFrom, dateTo, familyId, agentId]
   )
 
   // ── Fetch incident report ───────────────────────────────────────────────────
@@ -127,6 +148,7 @@ export default function PatrolReportsPage() {
         dateTo: new Date(dateTo).toISOString(),
       })
       if (familyId && familyId !== 'all') params.set('familyId', familyId)
+      if (agentId && agentId !== 'all') params.set('agentId', agentId)
 
       const res = await fetch(`/api/patrols/reports/incidents?${params}`)
       const json = await res.json()
@@ -136,15 +158,25 @@ export default function PatrolReportsPage() {
     } finally {
       setIncidentLoading(false)
     }
-  }, [dateFrom, dateTo, familyId])
+  }, [dateFrom, dateTo, familyId, agentId])
 
   // ── Export for detail tab ───────────────────────────────────────────────────
   // Genera filas aplanadas: una fila de resumen por patrulla + una fila por checkpoint.
-  // Esto permite ver los tiempos de escaneo de cada punto en el reporte exportado.
+  const selectedAgentName = agents.find(a => a.id === agentId)?.name
+  const selectedFamilyName = families.find(f => f.id === familyId)?.name
+
+  const exportSubtitle = [
+    `Período: ${new Date(dateFrom).toLocaleDateString('es-EC')} - ${new Date(dateTo).toLocaleDateString('es-EC')}`,
+    selectedFamilyName ? `Área: ${selectedFamilyName}` : '',
+    selectedAgentName ? `Agente: ${selectedAgentName}` : '',
+  ]
+    .filter(Boolean)
+    .join(' · ')
+
   const detailExport = useExport({
     filename: 'reporte-patrullas-detalle',
     title: 'Detalle de Patrullas',
-    subtitle: `Período: ${new Date(dateFrom).toLocaleDateString('es-EC')} - ${new Date(dateTo).toLocaleDateString('es-EC')}`,
+    subtitle: exportSubtitle,
     columns: [
       { key: 'tipo', label: 'Tipo' },
       { key: 'routeName', label: 'Ruta' },
@@ -229,7 +261,8 @@ export default function PatrolReportsPage() {
       return
     }
     fetchFamilies()
-  }, [session, status, router, fetchFamilies])
+    fetchAgents()
+  }, [session, status, router, fetchFamilies, fetchAgents])
 
   // Load data when tab changes
   useEffect(() => {
@@ -259,7 +292,7 @@ export default function PatrolReportsPage() {
           <Search className='h-4 w-4 text-muted-foreground' />
           <h3 className='text-sm font-medium'>Filtros</h3>
         </div>
-        <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4'>
+        <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4'>
           <div className='space-y-1.5'>
             <Label className='text-xs'>Desde</Label>
             <DateTimePicker value={dateFrom} onChange={setDateFrom} className='h-9' />
@@ -279,6 +312,22 @@ export default function PatrolReportsPage() {
                 {families.map(f => (
                   <SelectItem key={f.id} value={f.id}>
                     {f.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className='space-y-1.5'>
+            <Label className='text-xs'>Agente</Label>
+            <Select value={agentId} onValueChange={setAgentId}>
+              <SelectTrigger className='h-9'>
+                <SelectValue placeholder='Todos los agentes' />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value='all'>Todos los agentes</SelectItem>
+                {agents.map(a => (
+                  <SelectItem key={a.id} value={a.id}>
+                    {a.name}
                   </SelectItem>
                 ))}
               </SelectContent>

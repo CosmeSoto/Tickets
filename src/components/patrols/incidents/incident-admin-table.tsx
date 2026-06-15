@@ -11,10 +11,19 @@ export interface PatrolIncidentRow {
   severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
   status: 'OPEN' | 'RESOLVED' | 'ESCALATED'
   createdAt: string
+  resolvedAt: string | null
   agent: { id: string; name: string }
   checkpoint: { id: string; name: string; location: string }
-  patrol: { id: string; route: { name: string }; scheduledStart: string; familyId: string }
-  ticket?: { id: string; ticketCode: string } | null
+  patrol: {
+    id: string
+    scheduledStart: string
+    familyId: string
+    family?: { id: string; name: string } | null
+    route: { id: string; name: string }
+  }
+  photos?: { id: string; path: string }[]
+  resolvedBy?: { id: string; name: string } | null
+  ticket?: { id: string; ticketCode: string; status: string } | null
 }
 
 interface IncidentAdminTableProps {

@@ -7,7 +7,10 @@ import { useToast } from '@/hooks/use-toast'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { ExportButton } from '@/components/common/export-button'
 import { useExport } from '@/hooks/common/use-export'
-import { PATROL_INCIDENTS_ADMIN_EXPORT_COLUMNS } from '@/lib/utils/patrol-utils'
+import {
+  PATROL_INCIDENTS_ADMIN_EXPORT_COLUMNS,
+  exportIncidentsToPDF,
+} from '@/lib/utils/patrol-utils'
 import { IncidentFilters } from '@/components/patrols/incidents/incident-filters'
 import {
   IncidentAdminTable,
@@ -161,13 +164,30 @@ export default function AdminPatrolIncidentsPage() {
   )
 
   // ── Export ─────────────────────────────────────────────────────────────────
-  const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
+  const { exportCSV, exportExcel, exporting } = useExport({
     filename: 'novedades-rondas',
     title: 'Novedades de Rondas',
     subtitle: `Exportado el ${new Date().toLocaleDateString('es-CO')} • ${total} novedades`,
     getData: () => incidents,
     columns: PATROL_INCIDENTS_ADMIN_EXPORT_COLUMNS,
   })
+
+  const exportPDF = () => {
+    const selectedFamily = families.find(f => f.id === filters.familyId)
+    const selectedAgent = agents.find(a => a.id === filters.agentId)
+    exportIncidentsToPDF(
+      incidents,
+      `Exportado el ${new Date().toLocaleDateString('es-EC')} • ${total} novedades`,
+      {
+        familyName: selectedFamily?.name,
+        agentName: selectedAgent?.name,
+        dateFrom: filters.dateFrom
+          ? new Date(filters.dateFrom).toLocaleDateString('es-EC')
+          : undefined,
+        dateTo: filters.dateTo ? new Date(filters.dateTo).toLocaleDateString('es-EC') : undefined,
+      }
+    )
+  }
 
   if (status === 'loading' || !session) return null
 

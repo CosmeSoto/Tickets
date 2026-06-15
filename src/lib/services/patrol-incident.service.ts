@@ -347,6 +347,7 @@ export class PatrolIncidentService {
               id: true,
               scheduledStart: true,
               familyId: true,
+              family: { select: { id: true, name: true } },
               route: { select: { id: true, name: true } },
             },
           },
@@ -542,10 +543,10 @@ export class PatrolIncidentService {
       },
     })
 
-    // Marcar la novedad como escalada y vincularla al ticket
+    // Marcar la novedad como escalada, vincularla al ticket y registrar timestamp
     const updated = await db.patrol_incidents.update({
       where: { id },
-      data: { status: 'ESCALATED', ticketId },
+      data: { status: 'ESCALATED', ticketId, resolvedAt: now, resolvedById: escalatedById },
     })
 
     // Auditoría — registra si la familia fue redirigida
