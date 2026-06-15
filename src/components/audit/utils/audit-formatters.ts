@@ -31,6 +31,13 @@ export function translateAction(action: string): string {
     backup: 'Respaldo',
     restore: 'Restauración',
     config_changed: 'Configuración cambiada',
+    // Patrullas
+    reactivated: 'Reactivó',
+    activated: 'Activó',
+    deactivated: 'Desactivó',
+    completed: 'Completó',
+    missed: 'Omitió',
+    escalated: 'Escaló',
   }
 
   for (const [key, value] of Object.entries(actionMap)) {
@@ -58,6 +65,12 @@ export function translateEntityType(entityType: string): string {
     report: '📊 Reporte',
     settings: '🛠️ Configuración',
     assignment: '📌 Asignación',
+    // Patrullas
+    patrol: '🚶 Patrulla',
+    patrol_schedule: '📅 Programación de Ronda',
+    patrol_route: '🛤️ Ruta de Ronda',
+    patrol_incident: '⚠️ Novedad de Ronda',
+    patrol_checkpoint: '📍 Checkpoint',
   }
   return entityMap[entityType.toLowerCase()] || entityType
 }
@@ -77,6 +90,14 @@ export function getActionColor(action: string): string {
     return 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200'
   if (action.includes('resolved') || action.includes('closed'))
     return 'bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200'
+  if (action.includes('reactivated') || action.includes('activated'))
+    return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+  if (action.includes('deactivated'))
+    return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
+  if (action.includes('completed'))
+    return 'bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200'
+  if (action.includes('escalated'))
+    return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
   return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
 }
 
@@ -172,6 +193,36 @@ export function getActionLabel(action: string): string {
     // Super admin
     super_admin_granted: 'Super Admin Otorgado',
     super_admin_revoked: 'Super Admin Revocado',
+    // Patrullas - Checkpoints
+    PATROL_CHECKPOINT_CREATED: 'Checkpoint Creado',
+    PATROL_CHECKPOINT_UPDATED: 'Checkpoint Actualizado',
+    PATROL_CHECKPOINT_DELETED: 'Checkpoint Eliminado',
+    PATROL_CHECKPOINT_DEACTIVATED: 'Checkpoint Desactivado',
+    PATROL_CHECKPOINT_REACTIVATED: 'Checkpoint Reactivado',
+    // Patrullas - Rutas
+    PATROL_ROUTE_CREATED: 'Ruta de Ronda Creada',
+    PATROL_ROUTE_UPDATED: 'Ruta de Ronda Actualizada',
+    PATROL_ROUTE_DELETED: 'Ruta de Ronda Eliminada',
+    PATROL_ROUTE_DEACTIVATED: 'Ruta de Ronda Desactivada',
+    PATROL_ROUTE_REACTIVATED: 'Ruta de Ronda Reactivada',
+    // Patrullas - Programaciones
+    PATROL_SCHEDULE_CREATED: 'Programación de Ronda Creada',
+    PATROL_SCHEDULE_UPDATED: 'Programación de Ronda Actualizada',
+    PATROL_SCHEDULE_DELETED: 'Programación de Ronda Eliminada',
+    PATROL_SCHEDULE_DEACTIVATED: 'Programación de Ronda Desactivada',
+    PATROL_SCHEDULE_REACTIVATED: 'Programación de Ronda Reactivada',
+    // Patrullas - Novedades
+    PATROL_INCIDENT_CREATED: 'Novedad de Ronda Reportada',
+    PATROL_INCIDENT_UPDATED: 'Novedad de Ronda Actualizada',
+    PATROL_INCIDENT_DELETED: 'Novedad de Ronda Eliminada',
+    PATROL_INCIDENT_RESOLVED: 'Novedad de Ronda Resuelta',
+    PATROL_INCIDENT_ESCALATED: 'Novedad de Ronda Escalada',
+    // Patrullas - Patrullas
+    PATROL_CREATED: 'Patrulla Creada',
+    PATROL_STARTED: 'Patrulla Iniciada',
+    PATROL_COMPLETED: 'Patrulla Completada',
+    PATROL_MISSED: 'Patrulla Omitida',
+    PATROL_INCOMPLETE: 'Patrulla Incompleta',
   }
   return actionLabels[action] || action
 }
@@ -197,6 +248,12 @@ export function getEntityLabel(entityType: string): string {
     sla: 'Acuerdos de Nivel de Servicio',
     report: 'Reportes',
     audit: 'Auditoría',
+    // Patrullas
+    patrol: 'Patrullas',
+    patrol_schedule: 'Programaciones de Rondas',
+    patrol_route: 'Rutas de Rondas',
+    patrol_incident: 'Novedades de Rondas',
+    patrol_checkpoint: 'Checkpoints',
   }
   return entityLabels[entityType] || entityType
 }
@@ -231,6 +288,25 @@ export function getFieldDisplayName(fieldName: string): string {
     updatedAt: 'Última Actualización',
     isEmailVerified: 'Email Verificado',
     lastLogin: 'Último Acceso',
+    // Patrullas
+    routeId: 'Ruta',
+    routeName: 'Ruta',
+    agentId: 'Agente',
+    agentName: 'Agente',
+    recurrence: 'Recurrencia',
+    recurrenceDays: 'Días de Recurrencia',
+    startTime: 'Hora de Inicio',
+    endTime: 'Hora de Fin',
+    checkpointId: 'Checkpoint',
+    checkpointName: 'Checkpoint',
+    latitude: 'Latitud',
+    longitude: 'Longitud',
+    qrCode: 'Código QR',
+    notes: 'Notas',
+    photoUrl: 'Foto',
+    photoBase64: 'Foto',
+    severity: 'Severidad',
+    resolved: 'Resuelto',
   }
   return fieldNames[fieldName] || fieldName
 }

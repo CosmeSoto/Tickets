@@ -80,6 +80,12 @@ export function getAuditColumns(onViewDetails: (log: AuditLog) => void) {
           backup: 'Respaldo',
           restore: 'Restauración',
           config_changed: 'Configuración cambiada',
+          reactivated: 'Reactivado',
+          activated: 'Activado',
+          deactivated: 'Desactivado',
+          completed: 'Completado',
+          missed: 'Omitido',
+          escalated: 'Escalado',
         })) {
           if (action.toLowerCase().includes(key)) {
             translatedAction = value
@@ -221,6 +227,95 @@ export function getAuditColumns(onViewDetails: (log: AuditLog) => void) {
             : action.includes('updated')
               ? 'Actualizó un departamento'
               : 'Modificó un departamento'
+        } else if (entityType.toLowerCase() === 'patrol_checkpoint') {
+          icon = '📍'
+          if (action.includes('created')) {
+            mainDescription = 'Creó un checkpoint'
+            if (details?.entityName) {
+              subDescription = details.entityName
+            }
+          } else if (action.includes('updated')) {
+            mainDescription = 'Actualizó un checkpoint'
+          } else if (action.includes('deleted')) {
+            mainDescription = 'Eliminó un checkpoint'
+            icon = '🗑️'
+          } else if (action.includes('deactivated')) {
+            mainDescription = 'Desactivó un checkpoint'
+            icon = '🔴'
+          } else if (action.includes('reactivated')) {
+            mainDescription = 'Reactivó un checkpoint'
+            icon = '🟢'
+          }
+        } else if (entityType.toLowerCase() === 'patrol_route') {
+          icon = '🛤️'
+          if (action.includes('created')) {
+            mainDescription = 'Creó una ruta'
+            if (details?.entityName) {
+              subDescription = details.entityName
+            }
+          } else if (action.includes('updated')) {
+            mainDescription = 'Actualizó una ruta'
+          } else if (action.includes('deleted')) {
+            mainDescription = 'Eliminó una ruta'
+            icon = '🗑️'
+          } else if (action.includes('deactivated')) {
+            mainDescription = 'Desactivó una ruta'
+            icon = '🔴'
+          } else if (action.includes('reactivated')) {
+            mainDescription = 'Reactivó una ruta'
+            icon = '🟢'
+          }
+        } else if (entityType.toLowerCase() === 'patrol_schedule') {
+          icon = '📅'
+          if (action.includes('created')) {
+            mainDescription = 'Creó una programación'
+            if (details?.entityName) {
+              subDescription = details.entityName
+            }
+          } else if (action.includes('updated')) {
+            mainDescription = 'Actualizó una programación'
+          } else if (action.includes('deleted')) {
+            mainDescription = 'Eliminó una programación'
+            icon = '🗑️'
+          } else if (action.includes('deactivated')) {
+            mainDescription = 'Desactivó una programación'
+            icon = '🔴'
+          } else if (action.includes('reactivated')) {
+            mainDescription = 'Reactivó una programación'
+            icon = '🟢'
+          }
+        } else if (entityType.toLowerCase() === 'patrol_incident') {
+          icon = '⚠️'
+          if (action.includes('created')) {
+            mainDescription = 'Reportó una novedad'
+            if (details?.description) {
+              subDescription = details.description
+            }
+          } else if (action.includes('updated')) {
+            mainDescription = 'Actualizó una novedad'
+          } else if (action.includes('deleted')) {
+            mainDescription = 'Eliminó una novedad'
+            icon = '🗑️'
+          } else if (action.includes('resolved')) {
+            mainDescription = 'Resolvió una novedad'
+            icon = '✅'
+          } else if (action.includes('escalated')) {
+            mainDescription = 'Escaló una novedad'
+            icon = '🚨'
+          }
+        } else if (entityType.toLowerCase() === 'patrol') {
+          icon = '🚶'
+          if (action.includes('created')) {
+            mainDescription = 'Creó una patrulla'
+          } else if (action.includes('started')) {
+            mainDescription = 'Inició una patrulla'
+          } else if (action.includes('completed')) {
+            mainDescription = 'Completó una patrulla'
+            icon = '✅'
+          } else if (action.includes('missed')) {
+            mainDescription = 'Omitió una patrulla'
+            icon = '⚠️'
+          }
         } else if (action.includes('login')) {
           icon = '🔐'
           mainDescription = 'Inició sesión'
