@@ -516,10 +516,19 @@ export class PatrolIncidentService {
     const ticketId = randomUUID()
     const now = new Date()
 
+    // Título: primeras 100 chars de la descripción real de la novedad
+    // Si la descripción es muy corta, se usa completa. El nombre del checkpoint
+    // queda disponible en la descripción completa del ticket.
+    const truncatedDescription =
+      incident.description.length > 100
+        ? `${incident.description.substring(0, 97)}…`
+        : incident.description
+    const ticketTitle = `[${incident.checkpoint.name}] ${truncatedDescription}`
+
     await prisma.tickets.create({
       data: {
         id: ticketId,
-        title: `Novedad en ronda - ${incident.checkpoint.name}`,
+        title: ticketTitle,
         description: incident.description,
         status: 'OPEN',
         priority,

@@ -299,10 +299,12 @@ export default function PatrolDashboardPage() {
                   <div
                     key={patrol.id}
                     className='p-2 rounded border hover:bg-muted/30 cursor-pointer transition-colors'
-                    onClick={() => router.push(`/patrol/${patrol.id}`)}
+                    onClick={() => router.push('/admin/patrols/reports')}
                   >
                     <div className='flex items-center justify-between mb-1'>
-                      <span className='text-xs font-medium truncate max-w-[140px]'>{patrol.routeName}</span>
+                      <span className='text-xs font-medium truncate max-w-[140px]'>
+                        {patrol.routeName}
+                      </span>
                       <PatrolStatusBadge status={patrol.status} />
                     </div>
                     <div className='flex items-center justify-between text-[10px] text-muted-foreground'>

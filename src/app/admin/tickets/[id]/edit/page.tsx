@@ -1,23 +1,39 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useParams } from 'next/navigation'
 import { useSyncDashboardPageMeta } from '@/contexts/dashboard-shell-context'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { StatusBadge, PriorityBadge } from '@/components/ui/status-badge'
-import { CategorySelector } from '@/components/ui/category-selector'
 import { TechnicianSearchSelector } from '@/components/ui/technician-search-selector'
-import { enrichCategories } from '@/lib/utils/category-utils'
-import { ArrowLeft, Save, X } from 'lucide-react'
+import { CategorySelectorWrapper } from '@/features/category-selection'
+import { Layers, ArrowLeft, Save, X } from 'lucide-react'
 import Link from 'next/link'
 import { getTicketDisplayCode } from '@/hooks/use-ticket-data'
 import { useToast } from '@/hooks/use-toast'
 import { useTechnicians } from '@/contexts/users-context'
+
+// ── Types ────────────────────────────────────────────────────────────────────
+
+interface FamilyOption {
+  id: string
+  name: string
+  code: string
+  color?: string | null
+}
 
 interface TicketData {
   id: string
@@ -25,12 +41,25 @@ interface TicketData {
   description?: string
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'
   status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED'
+  familyId?: string | null
   client: { id: string; name: string; email: string }
   assignee?: { id: string; name: string; email: string }
   category: { id: string; name: string; color: string }
   createdAt: string
   updatedAt: string
 }
+
+interface FormData {
+  title: string
+  description: string
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'
+  status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED'
+  categoryId: string
+  assigneeId: string
+  familyId: string
+}
+
+// ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function EditTicketPage() {
   const { data: session, status } = useSession()
@@ -39,121 +68,135 @@ export default function EditTicketPage() {
   const { toast } = useToast()
 
   const [ticket, setTicket] = useState<TicketData | null>(null)
-  const [categories, setCategories] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [familyTechnicians, setFamilyTechnicians] = useState<any[] | null>(null)
 
+  // Familias disponibles para el selector
+  const [availableFamilies, setAvailableFamilies] = useState<FamilyOption[]>([])
+  const [loadingFamilies, setLoadingFamilies] = useState(false)
+
   // ✅ Técnicos desde contexto global — sin petición extra
   const { technicians } = useTechnicians()
-
-  // Técnicos filtrados por familia del ticket (se carga tras obtener el ticket)
   const displayTechnicians = familyTechnicians ?? technicians
 
-  // Form data
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     title: '',
     description: '',
-    priority: 'MEDIUM' as const,
-    status: 'OPEN' as const,
+    priority: 'MEDIUM',
+    status: 'OPEN',
     categoryId: '',
     assigneeId: '',
+    familyId: '',
   })
 
+  // ── Carga de familias disponibles para el cliente del ticket ─────────────
+  const loadFamiliesForClient = useCallback(
+    async (clientId: string) => {
+      setLoadingFamilies(true)
+      try {
+        const isSuperAdmin = (session?.user as any)?.isSuperAdmin ?? false
+        const isAdminUser = session?.user?.role === 'ADMIN'
+
+        let url: string
+        if (isAdminUser && isSuperAdmin) {
+          // Super admin: todas las familias activas
+          url = '/api/families?includeInactive=false'
+        } else {
+          // Admin normal: familias asignadas al cliente
+          url = `/api/families?asClient=true&forClientId=${clientId}`
+        }
+
+        const res = await fetch(url)
+        if (res.ok) {
+          const json = await res.json()
+          setAvailableFamilies(json.data ?? [])
+        }
+      } catch {
+        // silencioso
+      } finally {
+        setLoadingFamilies(false)
+      }
+    },
+    [session]
+  )
+
+  // ── Carga técnicos al cambiar familia ────────────────────────────────────
+  const loadTechniciansForFamily = useCallback(async (familyId: string) => {
+    if (!familyId) return
+    try {
+      const res = await fetch(`/api/users?role=TECHNICIAN&isActive=true&familyId=${familyId}`)
+      const d = await res.json()
+      if (d.data) setFamilyTechnicians(d.data)
+    } catch {
+      // silencioso
+    }
+  }, [])
+
+  // ── Auth + carga inicial ─────────────────────────────────────────────────
   useEffect(() => {
     if (status === 'loading') return
-
     if (!session) {
       router.push('/login')
       return
     }
-
     if (session.user.role !== 'ADMIN') {
       router.push('/unauthorized')
       return
     }
 
+    const loadTicket = async () => {
+      try {
+        setLoading(true)
+        const response = await fetch(`/api/tickets/${params.id}`)
+        if (!response.ok) throw new Error('Error al cargar el ticket')
+
+        const data = await response.json()
+        if (data.success && data.data) {
+          const t: TicketData = data.data
+          setTicket(t)
+          setFormData({
+            title: t.title,
+            description: t.description ?? '',
+            priority: t.priority,
+            status: t.status,
+            categoryId: t.category.id,
+            assigneeId: t.assignee?.id ?? '',
+            familyId: t.familyId ?? '',
+          })
+
+          // Cargar familias disponibles para el cliente
+          loadFamiliesForClient(t.client.id)
+
+          // Cargar técnicos de la familia actual
+          if (t.familyId) loadTechniciansForFamily(t.familyId)
+        } else {
+          throw new Error(data.message || 'Error al cargar el ticket')
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Error desconocido'
+        setError(msg)
+        toast({ variant: 'destructive', title: 'Error', description: msg })
+      } finally {
+        setLoading(false)
+      }
+    }
+
     loadTicket()
-    loadCategories()
-  }, [session, status, router, params.id]) // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session, status, router, params.id])
 
-  const loadTicket = async () => {
-    try {
-      setLoading(true)
-      const response = await fetch(`/api/tickets/${params.id}`)
-
-      if (!response.ok) {
-        throw new Error('Error al cargar el ticket')
-      }
-
-      const data = await response.json()
-
-      if (data.success && data.data) {
-        const ticketData = data.data
-        setTicket(ticketData)
-        setFormData({
-          title: ticketData.title,
-          description: ticketData.description || '',
-          priority: ticketData.priority,
-          status: ticketData.status,
-          categoryId: ticketData.category.id,
-          assigneeId: ticketData.assignee?.id || '',
-        })
-        // Cargar técnicos filtrados por familia si el ticket tiene una
-        if (ticketData.familyId) {
-          fetch(`/api/users?role=TECHNICIAN&isActive=true&familyId=${ticketData.familyId}`)
-            .then(r => r.json())
-            .then(d => {
-              if (d.data) setFamilyTechnicians(d.data)
-            })
-            .catch(() => {})
-        }
-      } else {
-        throw new Error(data.message || 'Error al cargar el ticket')
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
-      setError(errorMessage)
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: errorMessage,
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const loadCategories = async () => {
-    try {
-      const response = await fetch('/api/categories')
-      if (response.ok) {
-        const result = await response.json()
-        if (result.success && Array.isArray(result.data)) {
-          const enrichedCategories = enrichCategories(result.data)
-          setCategories(enrichedCategories)
-        }
-      }
-    } catch (error) {
-      console.error('Error loading categories:', error)
-    }
-  }
-
+  // ── Guardar cambios ──────────────────────────────────────────────────────
   const handleSave = async () => {
     try {
       setSaving(true)
-
       const response = await fetch(`/api/tickets/${params.id}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
       })
-
       const data = await response.json()
-
       if (data.success) {
         toast({
           title: 'Ticket actualizado',
@@ -164,17 +207,14 @@ export default function EditTicketPage() {
         throw new Error(data.message || 'Error al actualizar el ticket')
       }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
-      toast({
-        variant: 'destructive',
-        title: 'Error al guardar',
-        description: errorMessage,
-      })
+      const msg = err instanceof Error ? err.message : 'Error desconocido'
+      toast({ variant: 'destructive', title: 'Error al guardar', description: msg })
     } finally {
       setSaving(false)
     }
   }
 
+  // ── Shell meta ───────────────────────────────────────────────────────────
   const headerActionsResolved = useMemo(() => {
     if (!ticket) return undefined
     return (
@@ -191,18 +231,14 @@ export default function EditTicketPage() {
         </Button>
       </div>
     )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticket, params.id, saving])
 
   const shellMeta = useMemo(() => {
-    if (status === 'loading' || loading) {
+    if (status === 'loading' || loading)
       return { title: 'Editar Ticket', subtitle: 'Modificar información del ticket' }
-    }
-    if (!session || session.user.role !== 'ADMIN') {
-      return { title: '', subtitle: '' }
-    }
-    if (error || !ticket) {
-      return { title: 'Error', subtitle: 'No se pudo cargar el ticket' }
-    }
+    if (!session || session.user.role !== 'ADMIN') return { title: '', subtitle: '' }
+    if (error || !ticket) return { title: 'Error', subtitle: 'No se pudo cargar el ticket' }
     return {
       title: `Editar Ticket #${getTicketDisplayCode(ticket)}`,
       subtitle: ticket.title,
@@ -212,17 +248,16 @@ export default function EditTicketPage() {
 
   useSyncDashboardPageMeta(shellMeta)
 
+  // ── Guardas de render ────────────────────────────────────────────────────
   if (status === 'loading' || loading) {
     return (
       <div className='flex items-center justify-center h-64'>
-        <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-primary'></div>
+        <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-primary' />
       </div>
     )
   }
 
-  if (!session || session.user.role !== 'ADMIN') {
-    return null
-  }
+  if (!session || session.user.role !== 'ADMIN') return null
 
   if (error || !ticket) {
     return (
@@ -243,9 +278,12 @@ export default function EditTicketPage() {
     )
   }
 
+  // Familia actualmente seleccionada (para mostrar nombre en selector único)
+  const selectedFamily = availableFamilies.find(f => f.id === formData.familyId)
+
   return (
     <div className='space-y-6'>
-      {/* Información básica */}
+      {/* ── Información básica ── */}
       <Card>
         <CardHeader>
           <CardTitle>Información Básica</CardTitle>
@@ -261,7 +299,6 @@ export default function EditTicketPage() {
               placeholder='Título del ticket'
             />
           </div>
-
           <div>
             <Label htmlFor='description'>Descripción</Label>
             <Textarea
@@ -275,13 +312,13 @@ export default function EditTicketPage() {
         </CardContent>
       </Card>
 
-      {/* Estado y prioridad */}
+      {/* ── Estado y prioridad ── */}
       <Card>
         <CardHeader>
           <CardTitle>Estado y Prioridad</CardTitle>
           <CardDescription>Configura el estado actual y la prioridad del ticket</CardDescription>
         </CardHeader>
-        <CardContent className='space-y-4'>
+        <CardContent>
           <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
             <div>
               <Label htmlFor='status'>Estado</Label>
@@ -289,10 +326,7 @@ export default function EditTicketPage() {
                 id='status'
                 value={formData.status}
                 onChange={e =>
-                  setFormData(prev => ({
-                    ...prev,
-                    status: e.target.value as typeof formData.status,
-                  }))
+                  setFormData(prev => ({ ...prev, status: e.target.value as FormData['status'] }))
                 }
                 className='w-full px-3 py-2 border border-border rounded-md'
               >
@@ -302,7 +336,6 @@ export default function EditTicketPage() {
                 <option value='CLOSED'>Cerrado</option>
               </select>
             </div>
-
             <div>
               <Label htmlFor='priority'>Prioridad</Label>
               <select
@@ -311,7 +344,7 @@ export default function EditTicketPage() {
                 onChange={e =>
                   setFormData(prev => ({
                     ...prev,
-                    priority: e.target.value as typeof formData.priority,
+                    priority: e.target.value as FormData['priority'],
                   }))
                 }
                 className='w-full px-3 py-2 border border-border rounded-md'
@@ -326,7 +359,101 @@ export default function EditTicketPage() {
         </CardContent>
       </Card>
 
-      {/* Asignación */}
+      {/* ── Área de soporte ── */}
+      <Card>
+        <CardHeader>
+          <CardTitle className='flex items-center gap-2'>
+            <Layers className='h-4 w-4' />
+            Área de Soporte
+          </CardTitle>
+          <CardDescription>
+            Redirige el ticket a otra área si es necesario. Cambiar el área puede limpiar la
+            categoría y técnico asignado.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loadingFamilies ? (
+            <p className='text-xs text-muted-foreground italic'>Cargando áreas disponibles…</p>
+          ) : availableFamilies.length === 0 ? (
+            <p className='text-xs text-muted-foreground italic'>No hay áreas disponibles.</p>
+          ) : availableFamilies.length === 1 ? (
+            // Solo una familia — mostrar como badge informativo
+            <div className='flex items-center gap-2 p-3 rounded-lg border bg-muted/30'>
+              {availableFamilies[0].color && (
+                <span
+                  className='w-3 h-3 rounded-full flex-shrink-0'
+                  style={{ backgroundColor: availableFamilies[0].color }}
+                />
+              )}
+              <span className='text-sm font-medium'>{availableFamilies[0].name}</span>
+              <Badge variant='outline' className='text-xs font-mono ml-auto'>
+                {availableFamilies[0].code}
+              </Badge>
+            </div>
+          ) : (
+            // Múltiples familias — selector completo
+            <>
+              <Select
+                value={formData.familyId}
+                onValueChange={newFamilyId => {
+                  setFormData(prev => ({
+                    ...prev,
+                    familyId: newFamilyId,
+                    // Limpiar categoría y técnico al cambiar de área
+                    categoryId: newFamilyId !== prev.familyId ? '' : prev.categoryId,
+                    assigneeId: newFamilyId !== prev.familyId ? '' : prev.assigneeId,
+                  }))
+                  loadTechniciansForFamily(newFamilyId)
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder='Selecciona el área de soporte…'>
+                    {selectedFamily && (
+                      <div className='flex items-center gap-2'>
+                        {selectedFamily.color && (
+                          <span
+                            className='w-2.5 h-2.5 rounded-full flex-shrink-0'
+                            style={{ backgroundColor: selectedFamily.color }}
+                          />
+                        )}
+                        <span>{selectedFamily.name}</span>
+                        <span className='text-xs text-muted-foreground font-mono'>
+                          {selectedFamily.code}
+                        </span>
+                      </div>
+                    )}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {availableFamilies.map(f => (
+                    <SelectItem key={f.id} value={f.id}>
+                      <div className='flex items-center gap-2'>
+                        {f.color && (
+                          <span
+                            className='w-2.5 h-2.5 rounded-full flex-shrink-0'
+                            style={{ backgroundColor: f.color }}
+                          />
+                        )}
+                        <span>{f.name}</span>
+                        <span className='text-xs text-muted-foreground font-mono ml-1'>
+                          {f.code}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {formData.familyId !== ticket.familyId && (
+                <p className='text-xs text-amber-600 dark:text-amber-400 mt-2'>
+                  ⚠️ El área fue cambiada. La categoría y técnico asignado fueron reiniciados.
+                </p>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── Asignación y categoría ── */}
       <Card>
         <CardHeader>
           <CardTitle>Asignación y Categoría</CardTitle>
@@ -335,16 +462,17 @@ export default function EditTicketPage() {
         <CardContent className='space-y-4'>
           <div>
             <Label>Categoría</Label>
-            <CategorySelector
-              categories={categories}
+            <CategorySelectorWrapper
               value={formData.categoryId}
               onChange={categoryId =>
                 setFormData(prev => ({ ...prev, categoryId: categoryId || '' }))
               }
-              placeholder='Seleccionar categoría'
+              ticketTitle={formData.title}
+              ticketDescription={formData.description}
+              clientId={ticket.client.id}
+              familyId={formData.familyId || undefined}
             />
           </div>
-
           <div>
             <Label>Técnico Asignado</Label>
             <TechnicianSearchSelector
@@ -359,7 +487,7 @@ export default function EditTicketPage() {
         </CardContent>
       </Card>
 
-      {/* Vista previa del estado actual */}
+      {/* ── Vista previa ── */}
       <Card>
         <CardHeader>
           <CardTitle>Vista Previa</CardTitle>
