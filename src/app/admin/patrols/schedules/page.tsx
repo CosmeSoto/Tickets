@@ -409,7 +409,7 @@ export default function SchedulesPage() {
         onRowClick={openEdit}
         rowActions={(schedule: PatrolSchedule) => (
           <div className='flex items-center gap-1 justify-end'>
-            <Button size='sm' variant='ghost' onClick={() => openEdit(schedule)}>
+            <Button size='sm' variant='ghost' onClick={() => openEdit(schedule)} title='Editar'>
               <Pencil className='h-3.5 w-3.5' />
             </Button>
             {schedule.isActive ? (
@@ -418,6 +418,7 @@ export default function SchedulesPage() {
                 variant='ghost'
                 className='text-destructive hover:text-destructive'
                 onClick={() => setDeactivatingId(schedule.id)}
+                title='Desactivar'
               >
                 <PowerOff className='h-3.5 w-3.5' />
               </Button>
@@ -427,6 +428,7 @@ export default function SchedulesPage() {
                 variant='ghost'
                 className='text-green-600 hover:text-green-700 dark:text-green-400'
                 onClick={() => setReactivatingId(schedule.id)}
+                title='Reactivar'
               >
                 <Power className='h-3.5 w-3.5' />
               </Button>

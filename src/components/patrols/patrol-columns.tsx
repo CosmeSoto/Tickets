@@ -329,14 +329,16 @@ export function createScheduleColumns({
             ? ` (${schedule.recurrenceDays.map(d => DAY_LABELS[d] ?? d).join(', ')})`
             : ''
         return (
-          <Badge variant='outline' className='text-xs'>
-            {PATROL_RECURRENCE_LABELS_ES[schedule.recurrence] ?? schedule.recurrence}
+          <div className='text-xs'>
+            <span className='font-medium text-foreground'>
+              {PATROL_RECURRENCE_LABELS_ES[schedule.recurrence] ?? schedule.recurrence}
+            </span>
             {days && (
               <span className='ml-1 text-muted-foreground font-normal hidden lg:inline'>
                 {days}
               </span>
             )}
-          </Badge>
+          </div>
         )
       },
     },

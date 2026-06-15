@@ -187,7 +187,8 @@ export class PatrolIncidentService {
 
   /**
    * Actualiza descripción, severidad o foto de una novedad existente.
-   * Solo el agente autor puede editar y dentro de la ventana de gracia.
+   * Solo el agente autor puede editar, dentro de la ventana de gracia,
+   * y únicamente si la novedad está en estado OPEN.
    */
   static async update(id: string, data: UpdateIncidentData, agentId: string) {
     // 1. Cargar el incidente con su patrulla para obtener familyId
@@ -205,7 +206,12 @@ export class PatrolIncidentService {
       throw new Error('No autorizado: no es el autor de esta novedad')
     }
 
-    // 3. Verificar que no haya expirado la ventana de edición
+    // 3. No se puede editar una novedad resuelta o escalada
+    if (incident.status !== 'OPEN') {
+      throw new Error('No se puede editar una novedad que ya fue resuelta o escalada')
+    }
+
+    // 4. Verificar que no haya expirado la ventana de edición
     const canEdit = await this.isWithinEditWindow(incident, incident.patrol.familyId)
     if (!canEdit) {
       throw new Error('El período de edición ha expirado')
@@ -246,7 +252,8 @@ export class PatrolIncidentService {
 
   /**
    * Elimina definitivamente una novedad.
-   * Solo el autor puede eliminarla y dentro de la ventana de gracia.
+   * Solo el autor puede eliminarla, dentro de la ventana de gracia,
+   * y únicamente si la novedad está en estado OPEN.
    */
   static async delete(id: string, agentId: string) {
     const incident = await db.patrol_incidents.findUnique({
@@ -260,6 +267,11 @@ export class PatrolIncidentService {
 
     if (incident.agentId !== agentId) {
       throw new Error('No autorizado: no es el autor de esta novedad')
+    }
+
+    // No se puede eliminar una novedad resuelta o escalada
+    if (incident.status !== 'OPEN') {
+      throw new Error('No se puede eliminar una novedad que ya fue resuelta o escalada')
     }
 
     const canEdit = await this.isWithinEditWindow(incident, incident.patrol.familyId)

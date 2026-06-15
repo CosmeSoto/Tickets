@@ -20,10 +20,7 @@ const updateIncidentSchema = z.object({
 
 // ── GET ───────────────────────────────────────────────────────────────────────
 
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
@@ -70,11 +67,12 @@ export async function GET(
       }
     }
 
-    // Compute isEditable: requester is the agent AND within edit window
+    // Compute isEditable: requester is the agent, novedad is OPEN, AND within edit window
     let isEditable = false
     if (isOwner) {
       try {
-        isEditable = await PatrolIncidentService.isWithinEditWindow(incident, familyId)
+        const isOpen = (incident as any).status === 'OPEN'
+        isEditable = isOpen && (await PatrolIncidentService.isWithinEditWindow(incident, familyId))
       } catch {
         isEditable = false
       }
@@ -92,10 +90,7 @@ export async function GET(
 
 // ── PATCH ─────────────────────────────────────────────────────────────────────
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
@@ -130,15 +125,16 @@ export async function PATCH(
       return NextResponse.json({ error: message }, { status: 403 })
     }
 
+    if (message === 'No se puede editar una novedad que ya fue resuelta o escalada') {
+      return NextResponse.json({ error: message, code: 'INCIDENT_CLOSED' }, { status: 409 })
+    }
+
     if (message === 'El período de edición ha expirado') {
       return NextResponse.json({ error: message, code: 'EDIT_WINDOW_EXPIRED' }, { status: 403 })
     }
 
     if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: 'Datos inválidos', details: error.errors },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Datos inválidos', details: error.errors }, { status: 400 })
     }
 
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
@@ -173,6 +169,10 @@ export async function DELETE(
 
     if (message === 'No autorizado: no es el autor de esta novedad') {
       return NextResponse.json({ error: message }, { status: 403 })
+    }
+
+    if (message === 'No se puede eliminar una novedad que ya fue resuelta o escalada') {
+      return NextResponse.json({ error: message, code: 'INCIDENT_CLOSED' }, { status: 409 })
     }
 
     if (message === 'El período de edición ha expirado') {

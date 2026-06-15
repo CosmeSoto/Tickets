@@ -452,7 +452,7 @@ export default function RoutesPage() {
         onRowClick={openEdit}
         rowActions={(route: PatrolRoute) => (
           <div className='flex items-center gap-1 justify-end'>
-            <Button size='sm' variant='ghost' onClick={() => openEdit(route)}>
+            <Button size='sm' variant='ghost' onClick={() => openEdit(route)} title='Editar'>
               <Pencil className='h-3.5 w-3.5' />
             </Button>
             {route.isActive && (
@@ -461,6 +461,7 @@ export default function RoutesPage() {
                 variant='ghost'
                 className='text-destructive hover:text-destructive'
                 onClick={() => setDeactivatingId(route.id)}
+                title='Desactivar'
               >
                 <PowerOff className='h-3.5 w-3.5' />
               </Button>
