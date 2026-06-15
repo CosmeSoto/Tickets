@@ -33,7 +33,7 @@ interface FiltersData {
 /**
  * PublicForSalePage — Página pública de listado completo de activos en venta
  *
- * Ruta: /inventory/equipment/public/for-sale
+ * Ruta: /verify/equipment/for-sale
  * Acceso: Sin autenticación requerida
  *
  * Funcionalidad:

@@ -68,7 +68,7 @@ describe('ForSaleSection Visibility', () => {
 
     const viewAllLink = screen.getByText(/Ver todos/i)
     expect(viewAllLink).toBeInTheDocument()
-    expect(viewAllLink.closest('a')).toHaveAttribute('href', '/inventory/equipment/public/for-sale')
+    expect(viewAllLink.closest('a')).toHaveAttribute('href', '/verify/equipment/for-sale')
   })
 
   it('should group items by family when multiple families exist', () => {

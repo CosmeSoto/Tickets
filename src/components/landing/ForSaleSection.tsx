@@ -18,7 +18,7 @@ interface ForSaleSectionProps {
  * - Agrupa equipos por familia cuando hay múltiples familias
  * - Muestra tarjetas PublicEquipmentCard para cada equipo
  * - Cada tarjeta recibe contactWhatsapp desde el item (resuelto por la API)
- * - Incluye enlace "Ver todos" que redirige a /inventory/equipment/public/for-sale
+ * - Incluye enlace "Ver todos" que redirige a /verify/equipment/for-sale
  *
  * Requisitos: 7.3, 7.4, 7.5, 7.6
  */
@@ -100,7 +100,7 @@ export function ForSaleSection({ items }: ForSaleSectionProps) {
         {/* Enlace "Ver todos" */}
         <div className='text-center'>
           <Button asChild variant='outline' size='lg'>
-            <Link href='/inventory/equipment/public/for-sale'>Ver todos los equipos →</Link>
+            <Link href='/verify/equipment/for-sale'>Ver todos los equipos →</Link>
           </Button>
         </div>
       </div>

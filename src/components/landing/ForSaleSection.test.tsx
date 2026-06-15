@@ -133,7 +133,7 @@ describe('ForSaleSection', () => {
   it('renders "Ver todos" link with correct href', () => {
     render(<ForSaleSection items={mockItems} />)
     const link = screen.getByText('Ver todos los equipos →').closest('a')
-    expect(link).toHaveAttribute('href', '/inventory/equipment/public/for-sale')
+    expect(link).toHaveAttribute('href', '/verify/equipment/for-sale')
   })
 
   it('groups items correctly by family', () => {

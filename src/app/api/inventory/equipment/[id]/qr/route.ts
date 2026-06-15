@@ -55,7 +55,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       qrCode,
       equipmentCode: equipment.code,
       equipmentId: equipment.id,
-      verifyUrl: `${baseUrl}/inventory/equipment/public/${equipment.id}`,
+      verifyUrl: `${baseUrl}/verify/equipment/${equipment.id}`,
     })
   } catch (error) {
     console.error('Error en GET /api/inventory/equipment/[id]/qr:', error)

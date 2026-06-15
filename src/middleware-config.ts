@@ -13,7 +13,7 @@ export const publicRoutes = [
   '/help/privacy',
   // Páginas públicas de verificación (accesibles sin login, ej: desde QR)
   '/inventory/equipment/*/verify',
-  '/inventory/equipment/public/*',
+  '/verify/equipment/*',
   '/api/public',
   '/api/uploads',
   '/api/auth/signin',
