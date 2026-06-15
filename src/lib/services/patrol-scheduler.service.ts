@@ -78,13 +78,14 @@ export class PatrolSchedulerService {
   /**
    * Calcula las fechas de ocurrencia para un schedule dentro del horizonte.
    *
-   * Toda la aritmética de fechas usa métodos UTC explícitos para garantizar
-   * comportamiento correcto independientemente del timezone del servidor.
+   * Toda la aritmética de fechas usa la zona horaria de América/Guayaquil (UTC-5 fijo,
+   * sin DST) para que los "días de semana" y las horas coincidan con lo que el usuario
+   * ve en el formulario. Los resultados se devuelven como objetos Date (UTC internamente)
+   * y se persisten en BD como UTC, que es el comportamiento correcto de Prisma/Postgres.
    *
    * Para recurrencia NONE: scheduledStart/End son la fecha exacta de la patrulla.
-   * Para DAILY/WEEKLY/CUSTOM: scheduledStart define la hora de inicio de cada patrulla,
-   *   scheduledEnd define la hora de fin de cada patrulla (la duración).
-   *   El límite de generación es el horizonte de días (no scheduledEnd).
+   * Para DAILY/WEEKLY/CUSTOM: scheduledStart define la hora de inicio de cada patrulla;
+   *   scheduledEnd define la hora de fin. El límite de generación es el horizonte de días.
    */
   private static calculateOccurrences(
     schedule: {
@@ -97,38 +98,67 @@ export class PatrolSchedulerService {
   ): Array<{ start: Date; end: Date }> {
     const occurrences: Array<{ start: Date; end: Date }> = []
 
-    // Horizonte: ahora + horizonDays días (en UTC)
-    const horizonEnd = new Date()
-    horizonEnd.setUTCDate(horizonEnd.getUTCDate() + horizonDays)
-    horizonEnd.setUTCHours(23, 59, 59, 999)
+    // Ecuador: UTC-5 fijo (sin DST)
+    const TZ_OFFSET_MS = -5 * 60 * 60 * 1000
 
-    // Duración de cada patrulla individual
-    // Para recurrencias, normalizar scheduledEnd al mismo día UTC que scheduledStart
-    // para evitar duraciones > 24h por errores del formulario anterior
+    /** Convierte un Date UTC a "milisegundos en hora local de Guayaquil" */
+    const toLocal = (d: Date) => d.getTime() + TZ_OFFSET_MS
+
+    /** Construye un Date UTC desde componentes de hora local de Guayaquil */
+    const fromLocalComponents = (
+      year: number,
+      month: number,
+      day: number,
+      hours: number,
+      minutes: number,
+      seconds = 0,
+      ms = 0
+    ): Date => {
+      // Calcular el timestamp UTC equivalente a esa hora en Guayaquil
+      const utcMs = Date.UTC(year, month, day, hours, minutes, seconds, ms) - TZ_OFFSET_MS
+      return new Date(utcMs)
+    }
+
+    // Horizonte: ahora + horizonDays días (en hora local)
+    const horizonEnd = new Date(Date.now() + horizonDays * 24 * 60 * 60 * 1000)
+
+    // Duración de cada patrulla individual (en ms)
     let durationMs = schedule.scheduledEnd.getTime() - schedule.scheduledStart.getTime()
     if (schedule.recurrence !== PatrolRecurrence.NONE && durationMs > 24 * 60 * 60 * 1000) {
-      // scheduledEnd tiene fecha incorrecta — recalcular usando solo la hora UTC
-      const correctedEnd = new Date(schedule.scheduledStart)
-      correctedEnd.setUTCHours(
-        schedule.scheduledEnd.getUTCHours(),
-        schedule.scheduledEnd.getUTCMinutes(),
-        0,
-        0
+      // scheduledEnd tiene fecha incorrecta — recalcular usando solo la hora local
+      const localStart = toLocal(schedule.scheduledStart)
+      const localEnd = toLocal(schedule.scheduledEnd)
+      const localStartHours = Math.floor((localStart % (24 * 3600 * 1000)) / (3600 * 1000))
+      const localStartMinutes = Math.floor((localStart % (3600 * 1000)) / (60 * 1000))
+      const localEndHours = Math.floor((localEnd % (24 * 3600 * 1000)) / (3600 * 1000))
+      const localEndMinutes = Math.floor((localEnd % (3600 * 1000)) / (60 * 1000))
+
+      const startDate = new Date(schedule.scheduledStart)
+      const correctedEnd = fromLocalComponents(
+        startDate.getUTCFullYear(),
+        startDate.getUTCMonth(),
+        startDate.getUTCDate(),
+        localEndHours,
+        localEndMinutes
       )
-      // Si la hora de fin es anterior o igual a la de inicio, es del día siguiente
       if (correctedEnd <= schedule.scheduledStart) {
         correctedEnd.setUTCDate(correctedEnd.getUTCDate() + 1)
       }
       durationMs = correctedEnd.getTime() - schedule.scheduledStart.getTime()
     }
 
-    // Hora y minutos UTC del scheduledStart (se aplican a cada ocurrencia)
-    const startUTCHours = schedule.scheduledStart.getUTCHours()
-    const startUTCMinutes = schedule.scheduledStart.getUTCMinutes()
+    // Hora y minutos del scheduledStart en hora LOCAL de Guayaquil
+    const localStartMs = toLocal(schedule.scheduledStart)
+    const startLocalHours = Math.floor(
+      (((localStartMs % (24 * 3600 * 1000)) + 24 * 3600 * 1000) % (24 * 3600 * 1000)) /
+        (3600 * 1000)
+    )
+    const startLocalMinutes = Math.floor(
+      (((localStartMs % (3600 * 1000)) + 3600 * 1000) % (3600 * 1000)) / (60 * 1000)
+    )
 
     switch (schedule.recurrence) {
       case PatrolRecurrence.NONE: {
-        // Una sola ocurrencia — usar las fechas exactas del schedule
         occurrences.push({
           start: new Date(schedule.scheduledStart),
           end: new Date(schedule.scheduledEnd),
@@ -137,71 +167,108 @@ export class PatrolSchedulerService {
       }
 
       case PatrolRecurrence.DAILY: {
-        // Una ocurrencia por día desde scheduledStart (o desde hoy si ya pasó) hasta el horizonte.
-        // Usamos UTC para avanzar el cursor día a día sin drift de DST.
-        const cursor = new Date(schedule.scheduledStart)
-
-        // Si scheduledStart ya pasó, empezar desde hoy con la misma hora UTC
         const now = new Date()
-        if (cursor < now) {
-          cursor.setUTCFullYear(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
-          // Mantener la hora UTC original del scheduledStart
-          cursor.setUTCHours(startUTCHours, startUTCMinutes, 0, 0)
-          // Si la hora de hoy ya pasó, empezar mañana
-          if (cursor <= now) {
-            cursor.setUTCDate(cursor.getUTCDate() + 1)
-          }
+        // Margen de 60 min: si la ronda de hoy empezó hace menos de 60 min, igual se incluye
+        const graceCutoff = new Date(now.getTime() - 60 * 60 * 1000)
+
+        // Calcular el día local de inicio del cursor
+        const schedLocalMs = toLocal(schedule.scheduledStart)
+        // Inicio del día local del scheduledStart
+        const schedLocalDay = Math.floor(schedLocalMs / (24 * 3600 * 1000))
+        const nowLocalDay = Math.floor(toLocal(now) / (24 * 3600 * 1000))
+
+        // Comenzar desde el día local del schedule (o desde hoy si ya pasó)
+        let cursorLocalDay = Math.max(schedLocalDay, nowLocalDay)
+
+        // Construir la fecha UTC de la primera ocurrencia del cursor
+        const buildDate = (localDay: number): Date => {
+          // Convertir "día local desde epoch" a componentes fecha
+          const ms = localDay * 24 * 3600 * 1000
+          const tmp = new Date(ms + TZ_OFFSET_MS) // aproximación para extraer componentes
+          const year = tmp.getUTCFullYear()
+          const month = tmp.getUTCMonth()
+          const day = tmp.getUTCDate()
+          return fromLocalComponents(year, month, day, startLocalHours, startLocalMinutes)
         }
 
-        while (cursor <= horizonEnd) {
+        let candidate = buildDate(cursorLocalDay)
+
+        // Si la primera candidata está antes del graceCutoff, avanzar al día siguiente
+        if (candidate < graceCutoff) {
+          cursorLocalDay++
+          candidate = buildDate(cursorLocalDay)
+        }
+
+        // Solo generar desde scheduledStart en adelante
+        if (candidate < schedule.scheduledStart) {
+          candidate = new Date(schedule.scheduledStart)
+        }
+
+        while (candidate <= horizonEnd) {
           occurrences.push({
-            start: new Date(cursor),
-            end: new Date(cursor.getTime() + durationMs),
+            start: new Date(candidate),
+            end: new Date(candidate.getTime() + durationMs),
           })
-          cursor.setUTCDate(cursor.getUTCDate() + 1)
+          // Avanzar exactamente 1 día local (24h en UTC para este timezone sin DST)
+          candidate = new Date(candidate.getTime() + 24 * 60 * 60 * 1000)
         }
         break
       }
 
       case PatrolRecurrence.WEEKLY:
       case PatrolRecurrence.CUSTOM: {
-        // Ocurrencias en los días UTC de la semana especificados en recurrenceDays.
-        // recurrenceDays usa getUTCDay(): 0=Dom, 1=Lun, ..., 6=Sáb (en UTC).
         const days = new Set(schedule.recurrenceDays)
         if (days.size === 0) break
 
-        // Empezar desde el inicio del día UTC del scheduledStart
-        // Si scheduledStart ya pasó, empezar desde hoy
         const now = new Date()
-        const cursor = new Date(schedule.scheduledStart)
-        cursor.setUTCHours(0, 0, 0, 0)
+        // Margen de 60 min: si la ronda de hoy empezó hace menos de 60 min, igual se incluye
+        const graceCutoff = new Date(now.getTime() - 60 * 60 * 1000)
 
-        // Si el inicio del schedule ya pasó, avanzar al día de hoy
-        const todayUTC = new Date()
-        todayUTC.setUTCHours(0, 0, 0, 0)
-        if (cursor < todayUTC) {
-          cursor.setUTCFullYear(
-            todayUTC.getUTCFullYear(),
-            todayUTC.getUTCMonth(),
-            todayUTC.getUTCDate()
-          )
+        // Día local del scheduledStart y de hoy
+        const schedLocalMs = toLocal(schedule.scheduledStart)
+        const schedLocalDay = Math.floor(schedLocalMs / (24 * 3600 * 1000))
+        const nowLocalDay = Math.floor(toLocal(now) / (24 * 3600 * 1000))
+
+        // Empezar desde el día local del schedule (o desde hoy si ya pasó)
+        let cursorLocalDay = Math.max(schedLocalDay, nowLocalDay)
+
+        const buildDate = (localDay: number): Date => {
+          const ms = localDay * 24 * 3600 * 1000
+          const tmp = new Date(ms + TZ_OFFSET_MS)
+          const year = tmp.getUTCFullYear()
+          const month = tmp.getUTCMonth()
+          const day = tmp.getUTCDate()
+          return fromLocalComponents(year, month, day, startLocalHours, startLocalMinutes)
         }
 
-        while (cursor <= horizonEnd) {
-          if (days.has(cursor.getUTCDay())) {
-            // Aplicar la hora UTC del scheduledStart original al día actual
-            const start = new Date(cursor)
-            start.setUTCHours(startUTCHours, startUTCMinutes, 0, 0)
+        // El "día de la semana local" del día cursor
+        const localDayOfWeek = (localDay: number): number => {
+          // epoch en UTC es jueves (4); ajustar con offset local
+          const ms = localDay * 24 * 3600 * 1000 + TZ_OFFSET_MS
+          return new Date(ms).getUTCDay()
+        }
 
-            // Solo incluir si la fecha de inicio es en el futuro (o igual al scheduledStart original)
-            if (start >= schedule.scheduledStart && start >= now && start <= horizonEnd) {
+        let iterations = 0
+        while (iterations < 400) {
+          // máx ~400 días de búsqueda
+          iterations++
+          const candidate = buildDate(cursorLocalDay)
+          if (candidate > horizonEnd) break
+
+          // Comprobar si el día de semana local coincide con los días seleccionados
+          if (days.has(localDayOfWeek(cursorLocalDay))) {
+            if (
+              candidate >= schedule.scheduledStart &&
+              candidate >= graceCutoff &&
+              candidate <= horizonEnd
+            ) {
               occurrences.push({
-                start,
-                end: new Date(start.getTime() + durationMs),
+                start: new Date(candidate),
+                end: new Date(candidate.getTime() + durationMs),
               })
             }
           }
-          cursor.setUTCDate(cursor.getUTCDate() + 1)
+          cursorLocalDay++
         }
         break
       }
