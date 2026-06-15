@@ -29,6 +29,7 @@ interface IncidentAdminTableProps {
   }
   onRowClick: (incident: PatrolIncidentRow) => void
   onRefresh: () => void
+  actions?: React.ReactNode
 }
 
 const SEVERITY_BADGE: Record<string, string> = {
@@ -67,29 +68,29 @@ const columns: Column<PatrolIncidentRow>[] = [
     key: 'createdAt',
     label: 'Fecha',
     sortable: true,
-    render: (item) => format(new Date(item.createdAt), 'dd/MM/yyyy HH:mm', { locale: es }),
+    render: item => format(new Date(item.createdAt), 'dd/MM/yyyy HH:mm', { locale: es }),
   },
   {
     key: 'agent',
     label: 'Agente',
     sortable: true,
-    render: (item) => item.agent.name,
+    render: item => item.agent.name,
   },
   {
     key: 'patrol',
     label: 'Ruta',
-    render: (item) => item.patrol.route.name,
+    render: item => item.patrol.route.name,
   },
   {
     key: 'checkpoint',
     label: 'Checkpoint',
-    render: (item) => item.checkpoint.name,
+    render: item => item.checkpoint.name,
   },
   {
     key: 'severity',
     label: 'Severidad',
     sortable: true,
-    render: (item) => (
+    render: item => (
       <Badge className={`text-[10px] px-1.5 py-0 ${SEVERITY_BADGE[item.severity]}`}>
         {SEVERITY_LABELS[item.severity]}
       </Badge>
@@ -99,7 +100,7 @@ const columns: Column<PatrolIncidentRow>[] = [
     key: 'status',
     label: 'Estado',
     sortable: true,
-    render: (item) => (
+    render: item => (
       <Badge className={`text-[10px] px-1.5 py-0 ${STATUS_BADGE[item.status]}`}>
         {STATUS_LABELS[item.status]}
       </Badge>
@@ -108,7 +109,7 @@ const columns: Column<PatrolIncidentRow>[] = [
   {
     key: 'description',
     label: 'Descripción',
-    render: (item) => (
+    render: item => (
       <span className='text-muted-foreground' title={item.description}>
         {truncate(item.description, 50)}
       </span>
@@ -122,6 +123,7 @@ export function IncidentAdminTable({
   pagination,
   onRowClick,
   onRefresh,
+  actions,
 }: IncidentAdminTableProps) {
   return (
     <DataTable
@@ -132,6 +134,7 @@ export function IncidentAdminTable({
       onRowClick={onRowClick}
       onRefresh={onRefresh}
       pagination={pagination}
+      actions={actions}
       emptyState={{
         title: 'Sin novedades',
         description: 'No se encontraron novedades con los filtros aplicados',

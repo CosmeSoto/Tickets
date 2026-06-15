@@ -21,7 +21,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
-import { compressImageFile, fileToBase64 } from '@/lib/utils/image-utils'
+import { compressImageFile, fileToBase64, fileToDataUrl } from '@/lib/utils/image-utils'
 import { FileInputWithCamera } from '@/components/common/file-input-with-camera'
 
 interface IncidentFormDialogProps {
@@ -31,13 +31,20 @@ interface IncidentFormDialogProps {
   patrolId?: string
   checkpointId?: string
   checkpointName?: string
-  incident?: { id: string; description: string; severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'; photoIds: string[] }
+  incident?: {
+    id: string
+    description: string
+    severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
+    photoIds: string[]
+  }
   onSuccess?: () => void
 }
 
 const SEVERITY_OPTIONS = [
-  { value: 'LOW', label: '🟢 Baja' }, { value: 'MEDIUM', label: '🟡 Media' },
-  { value: 'HIGH', label: '🟠 Alta' }, { value: 'CRITICAL', label: '🔴 Crítica' },
+  { value: 'LOW', label: '🟢 Baja' },
+  { value: 'MEDIUM', label: '🟡 Media' },
+  { value: 'HIGH', label: '🟠 Alta' },
+  { value: 'CRITICAL', label: '🔴 Crítica' },
 ] as const
 
 export function IncidentFormDialog({
@@ -76,16 +83,28 @@ export function IncidentFormDialog({
     const file = e.target.files?.[0]
     if (!file) return
     if (!['image/jpeg', 'image/png'].includes(file.type)) {
-      toast({ title: 'Error', description: 'Solo se permiten imágenes JPEG o PNG', variant: 'destructive' }); return
+      toast({
+        title: 'Error',
+        description: 'Solo se permiten imágenes JPEG o PNG',
+        variant: 'destructive',
+      })
+      return
     }
     if (file.size > 10 * 1024 * 1024) {
-      toast({ title: 'Error', description: 'La imagen no puede superar 10MB', variant: 'destructive' }); return
+      toast({
+        title: 'Error',
+        description: 'La imagen no puede superar 10MB',
+        variant: 'destructive',
+      })
+      return
     }
-    // Comprimir antes de convertir a base64
+    // Vista previa usando el archivo original con data URL completa
+    const previewUrl = await fileToDataUrl(file)
+    setPhotoPreview(previewUrl)
+    // Comprimir antes de convertir a base64 para enviar al servidor
     const compressed = await compressImageFile(file, { maxWidthPx: 1280, quality: 0.82 })
     const base64 = await fileToBase64(compressed)
     setPhotoBase64(base64)
-    setPhotoPreview(base64)
   }
 
   const isValid = description.length >= 10 && severity !== ''
@@ -96,16 +115,31 @@ export function IncidentFormDialog({
     try {
       const body: Record<string, unknown> = { description, severity }
       if (photoBase64) body.photoBase64 = photoBase64
-      const url = mode === 'create' ? '/api/patrols/incidents' : `/api/patrols/incidents/${incident!.id}`
+      const url =
+        mode === 'create' ? '/api/patrols/incidents' : `/api/patrols/incidents/${incident!.id}`
       const method = mode === 'create' ? 'POST' : 'PATCH'
-      if (mode === 'create') { body.patrolId = patrolId; body.checkpointId = checkpointId }
+      if (mode === 'create') {
+        body.patrolId = patrolId
+        body.checkpointId = checkpointId
+      }
 
-      const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error || 'Error al guardar la novedad')
       }
-      toast({ title: 'Éxito', description: mode === 'create' ? 'Novedad reportada correctamente' : 'Novedad actualizada', variant: 'success' })
+      // Solo mostramos toast en modo create, en modo edit la página padre se encarga
+      if (mode === 'create') {
+        toast({
+          title: 'Éxito',
+          description: 'Novedad reportada correctamente',
+          variant: 'success',
+        })
+      }
       onSuccess?.()
       onOpenChange(false)
     } catch (err: unknown) {
@@ -143,7 +177,8 @@ export function IncidentFormDialog({
               rows={4}
             />
             <p className='text-xs text-muted-foreground text-right'>
-              {description.length} caracteres {description.length > 0 && description.length < 10 && '(mínimo 10)'}
+              {description.length} caracteres{' '}
+              {description.length > 0 && description.length < 10 && '(mínimo 10)'}
             </p>
           </div>
 
@@ -171,10 +206,7 @@ export function IncidentFormDialog({
             <Label htmlFor='incident-photo' className='text-sm'>
               Foto (opcional)
             </Label>
-            <FileInputWithCamera
-              accept='image/jpeg,image/png'
-              onChange={handlePhotoChange}
-            >
+            <FileInputWithCamera accept='image/jpeg,image/png' onChange={handlePhotoChange}>
               {({ openFile, openCamera, showCamera }) => (
                 <div className='flex items-center gap-2 flex-wrap'>
                   {showCamera && (

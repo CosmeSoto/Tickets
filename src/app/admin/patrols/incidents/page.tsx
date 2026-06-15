@@ -178,16 +178,6 @@ export default function AdminPatrolIncidentsPage() {
       loading={loading && incidents.length === 0}
       error={error}
       onRetry={() => fetchIncidents(filters, page)}
-      headerActions={
-        incidents.length > 0 ? (
-          <ExportButton
-            onExportCSV={exportCSV}
-            onExportExcel={exportExcel}
-            onExportPDF={exportPDF}
-            loading={exporting}
-          />
-        ) : undefined
-      }
     >
       <IncidentFilters
         families={families}
@@ -204,6 +194,15 @@ export default function AdminPatrolIncidentsPage() {
           pagination={paginationConfig}
           onRowClick={handleRowClick}
           onRefresh={() => fetchIncidents(filters, page)}
+          actions={
+            <ExportButton
+              onExportCSV={exportCSV}
+              onExportExcel={exportExcel}
+              onExportPDF={exportPDF}
+              loading={exporting}
+              disabled={incidents.length === 0}
+            />
+          }
         />
       </div>
 
