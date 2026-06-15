@@ -51,6 +51,9 @@ const patchPatrolSchema = z.discriminatedUnion('action', [
     endPhotoBase64: z.string().optional(),
     capturedAt: z.string().datetime().optional(),
   }),
+  z.object({
+    action: z.literal('cancel'),
+  }),
 ])
 
 // ── GET ───────────────────────────────────────────────────────────────────────
@@ -428,6 +431,51 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         status: finalStatus,
         completionPercentage: completionPct,
       })
+    }
+
+    if (data.action === 'cancel') {
+      // Solo ADMIN puede cancelar rondas (marcarlas como MISSED desde el panel admin)
+      const sessionUser = session.user as { isSuperAdmin?: boolean }
+      const isAdmin = session.user.role === 'ADMIN'
+      if (!isAdmin) {
+        return NextResponse.json(
+          { error: 'Solo los administradores pueden cancelar rondas' },
+          { status: 403 }
+        )
+      }
+
+      // Verificar acceso al área de la patrulla
+      const ok = await canViewPatrolAsStaff(
+        { id: session.user.id, role: session.user.role, isSuperAdmin: sessionUser.isSuperAdmin },
+        patrol.familyId
+      )
+      if (!ok) {
+        return NextResponse.json({ error: 'No autorizado para esta área' }, { status: 403 })
+      }
+
+      // Solo se pueden cancelar rondas PENDING
+      if (patrol.status !== 'PENDING') {
+        return NextResponse.json(
+          { error: 'Solo se pueden cancelar rondas en estado PENDIENTE' },
+          { status: 409 }
+        )
+      }
+
+      await prisma.patrols.update({
+        where: { id },
+        data: { status: 'MISSED' },
+      })
+
+      await AuditServiceComplete.log({
+        action: 'PATROL_CANCELLED_BY_ADMIN',
+        entityType: 'patrol',
+        entityId: id,
+        userId: session.user.id,
+        details: { agentId: patrol.agentId, familyId: patrol.familyId },
+        request,
+      })
+
+      return NextResponse.json({ success: true, status: 'MISSED' })
     }
 
     return NextResponse.json({ error: 'Acción no válida' }, { status: 400 })

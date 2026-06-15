@@ -2,12 +2,19 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Plus, CalendarClock, Pencil, PowerOff, Power, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -41,6 +48,7 @@ import { ScheduleFormDialog } from '@/components/patrols/schedule-form-dialog'
 export default function SchedulesPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { toast } = useToast()
 
   const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
@@ -49,6 +57,8 @@ export default function SchedulesPage() {
   const [routes, setRoutes] = useState<PatrolRoute[]>([])
   const [agents, setAgents] = useState<Agent[]>([])
   const [searchTerm, setSearchTerm] = useState('')
+  // Inicializar desde query param ?agentId= para permitir navegación directa desde el modal de bloqueo
+  const [filterAgentId, setFilterAgentId] = useState(() => searchParams?.get('agentId') ?? '')
   const [includeInactive, setIncludeInactive] = useState(false)
   const [debouncedSearch, setDebouncedSearch] = useState('')
 
@@ -72,9 +82,10 @@ export default function SchedulesPage() {
     const params = new URLSearchParams()
     params.append('limit', '100')
     if (debouncedSearch) params.append('search', debouncedSearch)
+    if (filterAgentId) params.append('agentId', filterAgentId)
     if (includeInactive) params.append('includeInactive', 'true')
     return `/api/patrols/schedules?${params.toString()}`
-  }, [debouncedSearch, includeInactive])
+  }, [debouncedSearch, filterAgentId, includeInactive])
 
   const {
     data: schedulesRaw,
@@ -380,6 +391,26 @@ export default function SchedulesPage() {
             onChange={e => setSearchTerm(e.target.value)}
           />
         </div>
+        {/* Selector de agente — permite filtrar programaciones por agente específico */}
+        <Select
+          value={filterAgentId || 'all'}
+          onValueChange={v => {
+            setFilterAgentId(v === 'all' ? '' : v)
+            pagination.goToPage(1)
+          }}
+        >
+          <SelectTrigger className='sm:w-52'>
+            <SelectValue placeholder='Todos los agentes' />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value='all'>Todos los agentes</SelectItem>
+            {agents.map(a => (
+              <SelectItem key={a.id} value={a.id}>
+                {a.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <div className='flex items-center gap-2'>
           <Switch
             id='show-inactive-sched'

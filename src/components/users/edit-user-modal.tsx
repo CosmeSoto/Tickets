@@ -507,6 +507,7 @@ export function EditUserModal({
           setBlockersContext('module')
         }}
         userName={user?.name ?? ''}
+        userId={user?.id}
         blockers={moduleBlockers ?? []}
         context={blockersContext}
       />
