@@ -164,6 +164,7 @@ export default function EditEquipmentPage({ params }: EditEquipmentPageProps) {
               submitError={submitError}
               isEditMode={true}
               initialEquipment={equipment}
+              equipmentId={id}
             />
           </CardContent>
         </Card>

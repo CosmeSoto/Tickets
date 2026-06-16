@@ -141,6 +141,9 @@ export class EquipmentService {
             orderBy: { createdAt: 'desc' },
             take: 1,
           },
+          equipment_attachments: {
+            orderBy: { createdAt: 'desc' },
+          },
         },
       })
 
@@ -680,6 +683,7 @@ export class EquipmentService {
       CANCELLED: 'RETURNED',
       CREATE_MAINTENANCE: 'MAINTENANCE',
       COMPLETED: 'MAINTENANCE',
+      EQUIPMENT_ATTACHMENT_UPLOAD: 'UPDATED',
     }
     return map[action] || 'UPDATED'
   }
@@ -751,6 +755,8 @@ export class EquipmentService {
         return `Mantenimiento ${details?.type === 'PREVENTIVE' ? 'preventivo' : 'correctivo'} registrado`
       case 'COMPLETED':
         return 'Mantenimiento completado'
+      case 'EQUIPMENT_ATTACHMENT_UPLOAD':
+        return details?.descripcion || 'Archivo adjunto subido al equipo'
       default:
         // Manejar acciones con formato snake_case del AuditServiceComplete
         if (action.includes('_')) {

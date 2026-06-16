@@ -51,6 +51,7 @@ interface EquipmentAssetFormProps {
   maxFileSizeMB?: number
   isEditMode?: boolean
   initialEquipment?: any
+  equipmentId?: string
 }
 
 const ACQUISITION_MODES = [
@@ -114,6 +115,7 @@ export function EquipmentAssetForm({
   maxFileSizeMB = 10,
   isEditMode = false,
   initialEquipment,
+  equipmentId,
 }: EquipmentAssetFormProps) {
   const getInitialBrandId = () => {
     if (!initialEquipment) return ''
@@ -231,6 +233,9 @@ export function EquipmentAssetForm({
   const [notes, setNotes] = useState(initialEquipment?.notes || '')
   const [physicalLocation, setPhysicalLocation] = useState(initialEquipment?.physicalLocation || '')
   const [attachments, setAttachments] = useState<File[]>([])
+  const [existingAttachments, setExistingAttachments] = useState<any[]>(
+    initialEquipment?.equipment_attachments || []
+  )
   const [priceError, setPriceError] = useState('')
   const [saleListingPrice, setSaleListingPrice] = useState(
     initialEquipment?.saleListingPrice != null ? String(initialEquipment.saleListingPrice) : ''
@@ -520,7 +525,7 @@ export function EquipmentAssetForm({
     }
   }, [condition])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setPriceError('')
     if (!equipmentTypeId) return
@@ -576,8 +581,8 @@ export function EquipmentAssetForm({
       }),
       physicalLocation: physicalLocation || undefined,
       notes: notes || undefined,
-      // Archivos adjuntos — se suben después de crear el activo
-      attachments: attachments.length ? attachments : undefined,
+      // En modo creación, pasamos attachments para el backend; en edición, los subimos manualmente
+      attachments: !isEditMode && attachments.length ? attachments : undefined,
       ...(saleListingPrice
         ? { saleListingPrice: parseFloat(saleListingPrice) }
         : { saleListingPrice: null }),
@@ -586,7 +591,20 @@ export function EquipmentAssetForm({
         ? { estimatedPrice: parseFloat(estimatedPrice) }
         : {}),
     }
+    // Call original onSubmit first (to save equipment)
     onSubmit(payload)
+
+    // Now handle uploading new attachments in edit mode
+    if (isEditMode && attachments.length > 0 && equipmentId) {
+      for (const file of attachments) {
+        const formData = new FormData()
+        formData.append('file', file)
+        await fetch(`/api/inventory/equipment/${equipmentId}/attachments`, {
+          method: 'POST',
+          body: formData,
+        })
+      }
+    }
   }
 
   return (
@@ -1329,6 +1347,7 @@ export function EquipmentAssetForm({
 
       <AttachmentsField
         files={attachments}
+        existingAttachments={existingAttachments}
         onChange={setAttachments}
         maxFileSizeMB={maxFileSizeMB}
       />

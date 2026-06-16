@@ -14,13 +14,27 @@ function formatFileSize(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
+interface ExistingAttachment {
+  id: string
+  originalName: string
+  mimeType: string
+  size: number
+  path?: string
+}
+
 interface AttachmentsFieldProps {
   files: File[]
+  existingAttachments?: ExistingAttachment[]
   onChange: (files: File[]) => void
   maxFileSizeMB?: number
 }
 
-export function AttachmentsField({ files, onChange, maxFileSizeMB = 10 }: AttachmentsFieldProps) {
+export function AttachmentsField({
+  files,
+  existingAttachments = [],
+  onChange,
+  maxFileSizeMB = 10,
+}: AttachmentsFieldProps) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [previewName, setPreviewName] = useState('')
 
@@ -52,8 +66,15 @@ export function AttachmentsField({ files, onChange, maxFileSizeMB = 10 }: Attach
     setPreviewName('')
   }
 
-  const images = files.filter(f => IMAGE_TYPES.includes(f.type))
-  const docs = files.filter(f => !IMAGE_TYPES.includes(f.type))
+  const allImages = [
+    ...existingAttachments.filter(a => IMAGE_TYPES.includes(a.mimeType)),
+    ...files.filter(f => IMAGE_TYPES.includes(f.type)),
+  ]
+  const allDocs = [
+    ...existingAttachments.filter(a => !IMAGE_TYPES.includes(a.mimeType)),
+    ...files.filter(f => !IMAGE_TYPES.includes(f.type)),
+  ]
+  const isExisting = (item: File | ExistingAttachment): item is ExistingAttachment => 'id' in item
 
   return (
     <>
@@ -84,7 +105,7 @@ export function AttachmentsField({ files, onChange, maxFileSizeMB = 10 }: Attach
           </FileInputWithCamera>
         </div>
 
-        {files.length === 0 ? (
+        {allImages.length === 0 && allDocs.length === 0 ? (
           <FileInputWithCamera accept={ACCEPTED} multiple onChange={addFiles}>
             {({ openFile, openCamera, showCamera }) => (
               <div
@@ -116,47 +137,63 @@ export function AttachmentsField({ files, onChange, maxFileSizeMB = 10 }: Attach
         ) : (
           <div className='space-y-3'>
             {/* Galería de imágenes */}
-            {images.length > 0 && (
+            {allImages.length > 0 && (
               <div>
                 <p className='text-xs text-muted-foreground mb-1.5 flex items-center gap-1'>
                   <ImageIcon className='h-3.5 w-3.5' />
-                  Imágenes ({images.length})
+                  Imágenes ({allImages.length})
                 </p>
                 <div className='grid grid-cols-3 sm:grid-cols-4 gap-2'>
-                  {images.map((f, i) => {
-                    const url = URL.createObjectURL(f)
+                  {allImages.map((item, i) => {
+                    const isExistingItem = isExisting(item)
+                    const url = isExistingItem ? '#' : URL.createObjectURL(item)
                     return (
                       <div
-                        key={i}
+                        key={isExistingItem ? item.id : `new-${i}`}
                         className='group relative aspect-square rounded-lg overflow-hidden border border-border bg-muted'
                       >
-                        <img
-                          src={url}
-                          alt={f.name}
-                          className='h-full w-full object-cover'
-                          onLoad={() => URL.revokeObjectURL(url)}
-                        />
+                        {isExistingItem ? (
+                          <div className='flex flex-col items-center justify-center h-full w-full bg-muted'>
+                            <ImageIcon className='h-8 w-8 text-muted-foreground' />
+                            <p className='text-xs text-muted-foreground truncate px-1 mt-1'>
+                              {item.originalName}
+                            </p>
+                          </div>
+                        ) : (
+                          <img
+                            src={url}
+                            alt={item.name}
+                            className='h-full w-full object-cover'
+                            onLoad={() => URL.revokeObjectURL(url)}
+                          />
+                        )}
                         <div className='absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center gap-1'>
-                          <button
-                            type='button'
-                            onClick={() => openPreview(f)}
-                            className='opacity-0 group-hover:opacity-100 transition-opacity rounded-full bg-black/60 p-1 text-white hover:bg-black/80'
-                            title='Vista previa'
-                          >
-                            <Eye className='h-3.5 w-3.5' />
-                          </button>
-                          <button
-                            type='button'
-                            onClick={() => remove(files.indexOf(f))}
-                            className='opacity-0 group-hover:opacity-100 transition-opacity rounded-full bg-black/60 p-1 text-white hover:bg-destructive'
-                            title='Eliminar'
-                          >
-                            <X className='h-3.5 w-3.5' />
-                          </button>
+                          {!isExistingItem && (
+                            <button
+                              type='button'
+                              onClick={() => openPreview(item)}
+                              className='opacity-0 group-hover:opacity-100 transition-opacity rounded-full bg-black/60 p-1 text-white hover:bg-black/80'
+                              title='Vista previa'
+                            >
+                              <Eye className='h-3.5 w-3.5' />
+                            </button>
+                          )}
+                          {!isExistingItem && (
+                            <button
+                              type='button'
+                              onClick={() => remove(files.indexOf(item))}
+                              className='opacity-0 group-hover:opacity-100 transition-opacity rounded-full bg-black/60 p-1 text-white hover:bg-destructive'
+                              title='Eliminar'
+                            >
+                              <X className='h-3.5 w-3.5' />
+                            </button>
+                          )}
+                          {isExistingItem && (
+                            <span className='text-xs bg-green-600 text-white px-2 py-1 rounded-full'>
+                              Existente
+                            </span>
+                          )}
                         </div>
-                        <p className='absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[10px] px-1 py-0.5 truncate opacity-0 group-hover:opacity-100 transition-opacity'>
-                          {f.name}
-                        </p>
                       </div>
                     )
                   })}
@@ -165,35 +202,46 @@ export function AttachmentsField({ files, onChange, maxFileSizeMB = 10 }: Attach
             )}
 
             {/* Lista de documentos */}
-            {docs.length > 0 && (
+            {allDocs.length > 0 && (
               <div>
-                {images.length > 0 && (
+                {allImages.length > 0 && (
                   <p className='text-xs text-muted-foreground mb-1.5 flex items-center gap-1'>
                     <FileText className='h-3.5 w-3.5' />
-                    Documentos ({docs.length})
+                    Documentos ({allDocs.length})
                   </p>
                 )}
                 <ul className='space-y-1'>
-                  {docs.map((f, i) => (
-                    <li
-                      key={i}
-                      className='flex items-center gap-2 rounded-md border border-border bg-card px-2.5 py-1.5 text-sm'
-                    >
-                      <FileText className='h-3.5 w-3.5 shrink-0 text-muted-foreground' />
-                      <span className='flex-1 truncate'>{f.name}</span>
-                      <span className='text-xs text-muted-foreground shrink-0'>
-                        {formatFileSize(f.size)}
-                      </span>
-                      <button
-                        type='button'
-                        onClick={() => remove(files.indexOf(f))}
-                        className='rounded p-0.5 hover:bg-muted'
-                        title='Eliminar'
+                  {allDocs.map((item, i) => {
+                    const isExistingItem = isExisting(item)
+                    return (
+                      <li
+                        key={isExistingItem ? item.id : `new-${i}`}
+                        className='flex items-center gap-2 rounded-md border border-border bg-card px-2.5 py-1.5 text-sm'
                       >
-                        <X className='h-3.5 w-3.5 text-muted-foreground' />
-                      </button>
-                    </li>
-                  ))}
+                        <FileText className='h-3.5 w-3.5 shrink-0 text-muted-foreground' />
+                        <span className='flex-1 truncate'>
+                          {isExistingItem ? item.originalName : item.name}
+                        </span>
+                        <span className='text-xs text-muted-foreground shrink-0'>
+                          {formatFileSize(isExistingItem ? item.size : item.size)}
+                        </span>
+                        {isExistingItem ? (
+                          <span className='text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full'>
+                            Existente
+                          </span>
+                        ) : (
+                          <button
+                            type='button'
+                            onClick={() => remove(files.indexOf(item))}
+                            className='rounded p-0.5 hover:bg-muted'
+                            title='Eliminar'
+                          >
+                            <X className='h-3.5 w-3.5 text-muted-foreground' />
+                          </button>
+                        )}
+                      </li>
+                    )
+                  })}
                 </ul>
               </div>
             )}

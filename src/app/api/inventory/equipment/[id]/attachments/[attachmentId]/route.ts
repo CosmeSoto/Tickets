@@ -15,9 +15,6 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string; attachmentId: string }> }
 ) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-
   const { attachmentId } = await params
   const isPreview = req.nextUrl.searchParams.get('preview') === 'true'
 
@@ -51,8 +48,11 @@ export async function DELETE(
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
-  if (!await canManageInventory(session.user.id, session.user.role)) {
-    return NextResponse.json({ error: 'No tienes permiso para gestionar el inventario' }, { status: 403 })
+  if (!(await canManageInventory(session.user.id, session.user.role))) {
+    return NextResponse.json(
+      { error: 'No tienes permiso para gestionar el inventario' },
+      { status: 403 }
+    )
   }
 
   const { id: equipmentId, attachmentId } = await params
@@ -64,7 +64,11 @@ export async function DELETE(
   if (!attachment) return NextResponse.json({ error: 'Archivo no encontrado' }, { status: 404 })
 
   // Eliminar archivo físico
-  try { await unlink(attachment.path) } catch { /* ignorar si ya no existe */ }
+  try {
+    await unlink(attachment.path)
+  } catch {
+    /* ignorar si ya no existe */
+  }
 
   await prisma.equipment_attachments.delete({ where: { id: attachmentId } })
 
@@ -75,7 +79,9 @@ export async function DELETE(
       entityType: 'equipment',
       entityId: equipmentId,
       userId: session.user.id,
-      details: { descripcion: `Archivo adjunto "${attachment.originalName}" eliminado del equipo ${attachment.equipment.code}` },
+      details: {
+        descripcion: `Archivo adjunto "${attachment.originalName}" eliminado del equipo ${attachment.equipment.code}`,
+      },
       createdAt: new Date(),
     },
   })
