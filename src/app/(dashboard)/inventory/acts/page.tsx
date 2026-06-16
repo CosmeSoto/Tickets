@@ -5,15 +5,33 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import {
-  FileText, Clock, CheckCircle, XCircle, AlertTriangle, Package, User, Calendar,
-  ChevronRight, RefreshCw, Filter, ArrowLeftRight, Trash2, TruckIcon,
+  FileText,
+  Clock,
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
+  Package,
+  User,
+  Calendar,
+  ChevronRight,
+  RefreshCw,
+  Filter,
+  ArrowLeftRight,
+  Trash2,
+  TruckIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { useToast } from '@/hooks/use-toast'
 import { format } from 'date-fns'
@@ -92,13 +110,18 @@ function DeliveryActsTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
         const data = await res.json()
         setActs(data.acts ?? [])
         setPagination(data.pagination)
-      } catch { /* silencioso */ }
-      finally { setLoading(false) }
+      } catch {
+        /* silencioso */
+      } finally {
+        setLoading(false)
+      }
     },
     [statusFilter]
   )
 
-  useEffect(() => { fetchActs(1, statusFilter) }, [statusFilter]) // eslint-disable-line
+  useEffect(() => {
+    fetchActs(1, statusFilter)
+  }, [statusFilter]) // eslint-disable-line
 
   const handleDelete = async () => {
     if (!confirmDelete) return
@@ -108,7 +131,11 @@ function DeliveryActsTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
       if (!res.ok) {
         const text = await res.text()
         let msg = 'Error al eliminar'
-        try { msg = JSON.parse(text).error ?? msg } catch { /* HTML error page */ }
+        try {
+          msg = JSON.parse(text).error ?? msg
+        } catch {
+          /* HTML error page */
+        }
         throw new Error(msg)
       }
       toast({ title: 'Acta eliminada', description: `${confirmDelete.folio} eliminada.` })
@@ -116,7 +143,9 @@ function DeliveryActsTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
       fetchActs(1, statusFilter)
     } catch (err: any) {
       toast({ title: 'Error', description: err.message, variant: 'destructive' })
-    } finally { setDeletingId(null) }
+    } finally {
+      setDeletingId(null)
+    }
   }
 
   const pendingCount = acts.filter(a => a.status === 'PENDING').length
@@ -126,30 +155,50 @@ function DeliveryActsTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
       {pendingCount > 0 && (
         <div className='rounded-lg bg-yellow-50 dark:bg-yellow-500/10 border border-yellow-200 dark:border-yellow-500/40 px-4 py-3 flex items-center gap-2 text-sm text-yellow-800 dark:text-yellow-300'>
           <Clock className='h-4 w-4 shrink-0' />
-          {pendingCount} acta{pendingCount > 1 ? 's' : ''} pendiente{pendingCount > 1 ? 's' : ''} de firma
+          {pendingCount} acta{pendingCount > 1 ? 's' : ''} pendiente{pendingCount > 1 ? 's' : ''} de
+          firma
         </div>
       )}
-      <StatusFilterBar statusFilter={statusFilter} total={pagination.total} loading={loading}
-        onFilterChange={s => setStatusFilter(s)} onRefresh={() => fetchActs(1, statusFilter)} />
-      <ActsList acts={acts} loading={loading} emptyMessage='No hay actas de entrega'
+      <StatusFilterBar
+        statusFilter={statusFilter}
+        total={pagination.total}
+        loading={loading}
+        onFilterChange={s => setStatusFilter(s)}
+        onRefresh={() => fetchActs(1, statusFilter)}
+      />
+      <ActsList
+        acts={acts}
+        loading={loading}
+        emptyMessage='No hay actas de entrega'
         renderCard={act => {
           const isMyAction = act.status === 'PENDING' && act.userRole === 'receiver'
           return (
-            <ActCard key={act.id} act={act} highlight={isMyAction}
+            <ActCard
+              key={act.id}
+              act={act}
+              highlight={isMyAction}
               actionBadge={isMyAction ? 'Requiere tu firma' : undefined}
               subtitle={
                 <div className='flex items-center gap-3 text-xs text-muted-foreground flex-wrap'>
-                  <span className='flex items-center gap-1'><User className='h-3 w-3' />
-                    Entrega: <strong className='text-foreground ml-0.5'>{act.delivererInfo?.name}</strong>
+                  <span className='flex items-center gap-1'>
+                    <User className='h-3 w-3' />
+                    Entrega:{' '}
+                    <strong className='text-foreground ml-0.5'>{act.delivererInfo?.name}</strong>
                   </span>
                   <ChevronRight className='h-3 w-3' />
-                  <span>Recibe: <strong className='text-foreground'>{act.receiverInfo?.name}</strong></span>
+                  <span>
+                    Recibe: <strong className='text-foreground'>{act.receiverInfo?.name}</strong>
+                  </span>
                 </div>
               }
-              onDelete={isSuperAdmin ? () => setConfirmDelete({ id: act.id, folio: act.folio }) : undefined}
-              onClick={() => router.push(`/inventory/acts/${act.id}`)} />
+              onDelete={
+                isSuperAdmin ? () => setConfirmDelete({ id: act.id, folio: act.folio }) : undefined
+              }
+              onClick={() => router.push(`/inventory/acts/${act.id}`)}
+            />
           )
-        }} />
+        }}
+      />
       <PaginationBar pagination={pagination} loading={loading} onPage={p => fetchActs(p)} />
 
       <AlertDialog open={!!confirmDelete} onOpenChange={o => !o && setConfirmDelete(null)}>
@@ -157,12 +206,17 @@ function DeliveryActsTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
           <AlertDialogHeader>
             <AlertDialogTitle>Eliminar acta permanentemente</AlertDialogTitle>
             <AlertDialogDescription>
-              Se eliminará el acta <strong>{confirmDelete?.folio}</strong>. La auditoría quedará registrada. Esta acción no se puede deshacer.
+              Se eliminará el acta <strong>{confirmDelete?.folio}</strong>. La auditoría quedará
+              registrada. Esta acción no se puede deshacer.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={!!deletingId}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} disabled={!!deletingId} className='bg-red-600 hover:bg-red-700'>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={!!deletingId}
+              className='bg-red-600 hover:bg-red-700'
+            >
               {deletingId ? 'Eliminando...' : 'Eliminar permanentemente'}
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -194,23 +248,34 @@ function ReturnActsTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
         const data = await res.json()
         setActs(data.acts ?? [])
         setPagination(data.pagination)
-      } catch { /* silencioso */ }
-      finally { setLoading(false) }
+      } catch {
+        /* silencioso */
+      } finally {
+        setLoading(false)
+      }
     },
     [statusFilter]
   )
 
-  useEffect(() => { fetchActs(1, statusFilter) }, [statusFilter]) // eslint-disable-line
+  useEffect(() => {
+    fetchActs(1, statusFilter)
+  }, [statusFilter]) // eslint-disable-line
 
   const handleDelete = async () => {
     if (!confirmDelete) return
     setDeletingId(confirmDelete.id)
     try {
-      const res = await fetch(`/api/inventory/return-acts/${confirmDelete.id}`, { method: 'DELETE' })
+      const res = await fetch(`/api/inventory/return-acts/${confirmDelete.id}`, {
+        method: 'DELETE',
+      })
       if (!res.ok) {
         const text = await res.text()
         let msg = 'Error al eliminar'
-        try { msg = JSON.parse(text).error ?? msg } catch { /* HTML error page */ }
+        try {
+          msg = JSON.parse(text).error ?? msg
+        } catch {
+          /* HTML error page */
+        }
         throw new Error(msg)
       }
       toast({ title: 'Acta eliminada', description: `${confirmDelete.folio} eliminada.` })
@@ -218,7 +283,9 @@ function ReturnActsTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
       fetchActs(1, statusFilter)
     } catch (err: any) {
       toast({ title: 'Error', description: err.message, variant: 'destructive' })
-    } finally { setDeletingId(null) }
+    } finally {
+      setDeletingId(null)
+    }
   }
 
   const pendingCount = acts.filter(a => a.status === 'PENDING').length
@@ -228,36 +295,59 @@ function ReturnActsTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
       {pendingCount > 0 && (
         <div className='rounded-lg bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/40 px-4 py-3 flex items-center gap-2 text-sm text-purple-800 dark:text-purple-300'>
           <ArrowLeftRight className='h-4 w-4 shrink-0' />
-          {pendingCount} devolución{pendingCount > 1 ? 'es' : ''} pendiente{pendingCount > 1 ? 's' : ''} de firma
+          {pendingCount} devolución{pendingCount > 1 ? 'es' : ''} pendiente
+          {pendingCount > 1 ? 's' : ''} de firma
         </div>
       )}
-      <StatusFilterBar statusFilter={statusFilter} total={pagination.total} loading={loading}
-        onFilterChange={s => setStatusFilter(s)} onRefresh={() => fetchActs(1, statusFilter)} />
-      <ActsList acts={acts} loading={loading} emptyMessage='No hay actas de devolución'
+      <StatusFilterBar
+        statusFilter={statusFilter}
+        total={pagination.total}
+        loading={loading}
+        onFilterChange={s => setStatusFilter(s)}
+        onRefresh={() => fetchActs(1, statusFilter)}
+      />
+      <ActsList
+        acts={acts}
+        loading={loading}
+        emptyMessage='No hay actas de devolución'
         renderCard={act => {
           const isMyAction = act.status === 'PENDING' && act.userRole === 'returner'
           const condition = act.returnCondition
           return (
-            <ActCard key={act.id} act={act} highlight={isMyAction} accentColor='purple'
+            <ActCard
+              key={act.id}
+              act={act}
+              highlight={isMyAction}
+              accentColor='purple'
               actionBadge={isMyAction ? 'Requiere tu firma' : undefined}
-              extraBadge={condition ? (
-                <span className={cn('text-xs font-medium', CONDITION_COLORS[condition] ?? '')}>
-                  {CONDITION_LABELS[condition] ?? condition}
-                </span>
-              ) : undefined}
+              extraBadge={
+                condition ? (
+                  <span className={cn('text-xs font-medium', CONDITION_COLORS[condition] ?? '')}>
+                    {CONDITION_LABELS[condition] ?? condition}
+                  </span>
+                ) : undefined
+              }
               subtitle={
                 <div className='flex items-center gap-3 text-xs text-muted-foreground flex-wrap'>
-                  <span className='flex items-center gap-1'><User className='h-3 w-3' />
-                    Devuelve: <strong className='text-foreground ml-0.5'>{act.receiverInfo?.name}</strong>
+                  <span className='flex items-center gap-1'>
+                    <User className='h-3 w-3' />
+                    Devuelve:{' '}
+                    <strong className='text-foreground ml-0.5'>{act.receiverInfo?.name}</strong>
                   </span>
                   <ChevronRight className='h-3 w-3' />
-                  <span>Recibe: <strong className='text-foreground'>{act.delivererInfo?.name}</strong></span>
+                  <span>
+                    Recibe: <strong className='text-foreground'>{act.delivererInfo?.name}</strong>
+                  </span>
                 </div>
               }
-              onDelete={isSuperAdmin ? () => setConfirmDelete({ id: act.id, folio: act.folio }) : undefined}
-              onClick={() => router.push(`/inventory/acts/return/${act.id}`)} />
+              onDelete={
+                isSuperAdmin ? () => setConfirmDelete({ id: act.id, folio: act.folio }) : undefined
+              }
+              onClick={() => router.push(`/inventory/acts/return/${act.id}`)}
+            />
           )
-        }} />
+        }}
+      />
       <PaginationBar pagination={pagination} loading={loading} onPage={p => fetchActs(p)} />
 
       <AlertDialog open={!!confirmDelete} onOpenChange={o => !o && setConfirmDelete(null)}>
@@ -265,12 +355,17 @@ function ReturnActsTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
           <AlertDialogHeader>
             <AlertDialogTitle>Eliminar acta permanentemente</AlertDialogTitle>
             <AlertDialogDescription>
-              Se eliminará el acta <strong>{confirmDelete?.folio}</strong>. La auditoría quedará registrada. Esta acción no se puede deshacer.
+              Se eliminará el acta <strong>{confirmDelete?.folio}</strong>. La auditoría quedará
+              registrada. Esta acción no se puede deshacer.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={!!deletingId}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} disabled={!!deletingId} className='bg-red-600 hover:bg-red-700'>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={!!deletingId}
+              className='bg-red-600 hover:bg-red-700'
+            >
               {deletingId ? 'Eliminando...' : 'Eliminar permanentemente'}
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -321,23 +416,34 @@ function DecommissionActsTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
         const data = await res.json()
         setActs(data.requests ?? [])
         setPagination({ page, total: data.total ?? 0, pages: Math.ceil((data.total ?? 0) / 20) })
-      } catch { /* silencioso */ }
-      finally { setLoading(false) }
+      } catch {
+        /* silencioso */
+      } finally {
+        setLoading(false)
+      }
     },
     [statusFilter]
   )
 
-  useEffect(() => { fetchActs(1, statusFilter) }, [statusFilter]) // eslint-disable-line
+  useEffect(() => {
+    fetchActs(1, statusFilter)
+  }, [statusFilter]) // eslint-disable-line
 
   const handleDelete = async () => {
     if (!confirmDelete) return
     setDeletingId(confirmDelete.id)
     try {
-      const res = await fetch(`/api/inventory/decommission-acts/${confirmDelete.id}`, { method: 'DELETE' })
+      const res = await fetch(`/api/inventory/decommission-acts/${confirmDelete.id}`, {
+        method: 'DELETE',
+      })
       if (!res.ok) {
         const text = await res.text()
         let msg = 'Error al eliminar'
-        try { msg = JSON.parse(text).error ?? msg } catch { /* HTML error page */ }
+        try {
+          msg = JSON.parse(text).error ?? msg
+        } catch {
+          /* HTML error page */
+        }
         throw new Error(msg)
       }
       toast({ title: 'Solicitud eliminada', description: `${confirmDelete.label} eliminada.` })
@@ -345,7 +451,9 @@ function DecommissionActsTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
       fetchActs(1, statusFilter)
     } catch (err: any) {
       toast({ title: 'Error', description: err.message, variant: 'destructive' })
-    } finally { setDeletingId(null) }
+    } finally {
+      setDeletingId(null)
+    }
   }
 
   const pendingCount = acts.filter(a => a.status === 'PENDING').length
@@ -478,7 +586,7 @@ function DecommissionActsTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
                           title='Eliminar (Solo Super Admin)'
                           onClick={e => {
                             e.stopPropagation()
-                            const label = req.act?.folio ?? (req.equipment?.code ?? 'solicitud')
+                            const label = req.act?.folio ?? req.equipment?.code ?? 'solicitud'
                             setConfirmDelete({ id: req.id, label })
                           }}
                           className='ml-auto flex items-center gap-1 text-xs text-red-500 hover:text-red-700 transition-colors'
@@ -502,12 +610,17 @@ function DecommissionActsTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
           <AlertDialogHeader>
             <AlertDialogTitle>Eliminar solicitud permanentemente</AlertDialogTitle>
             <AlertDialogDescription>
-              Se eliminará la solicitud <strong>{confirmDelete?.label}</strong>. La auditoría quedará registrada. Esta acción no se puede deshacer.
+              Se eliminará la solicitud <strong>{confirmDelete?.label}</strong>. La auditoría
+              quedará registrada. Esta acción no se puede deshacer.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={!!deletingId}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} disabled={!!deletingId} className='bg-red-600 hover:bg-red-700'>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={!!deletingId}
+              className='bg-red-600 hover:bg-red-700'
+            >
               {deletingId ? 'Eliminando...' : 'Eliminar permanentemente'}
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -642,7 +755,9 @@ function ActCard({
           <div className='flex-1 min-w-0'>
             <div className='flex items-center gap-2 flex-wrap mb-2'>
               <span className='font-mono font-semibold text-sm'>{act.folio}</span>
-              <Badge className={cn('flex items-center gap-1 text-xs px-2 py-0.5 border', cfg.color)}>
+              <Badge
+                className={cn('flex items-center gap-1 text-xs px-2 py-0.5 border', cfg.color)}
+              >
                 <StatusIcon className='h-3 w-3' />
                 {cfg.label}
               </Badge>
@@ -651,7 +766,9 @@ function ActCard({
             </div>
             <div className='flex items-center gap-1.5 text-sm mb-1'>
               <Package className='h-3.5 w-3.5 text-muted-foreground shrink-0' />
-              <span className='font-medium'>{act.equipmentSnapshot?.code ?? act.equipment?.code}</span>
+              <span className='font-medium'>
+                {act.equipmentSnapshot?.code ?? act.equipment?.code}
+              </span>
               <span className='text-muted-foreground'>—</span>
               <span className='text-muted-foreground truncate'>
                 {act.equipmentSnapshot?.brand ?? act.equipment?.brand}{' '}
@@ -666,17 +783,29 @@ function ActCard({
               {fmtDate(act.createdAt)}
             </div>
             {act.status === 'PENDING' && act.expirationDate && (
-              <div className={cn('text-xs', new Date(act.expirationDate) < new Date() ? 'text-red-500 font-medium' : 'text-muted-foreground')}>
-                Expira: {fmtDate(act.expirationDate)}
+              <div
+                className={cn(
+                  'text-xs',
+                  new Date(act.expirationDate) < new Date()
+                    ? 'text-red-500 font-medium'
+                    : 'text-muted-foreground'
+                )}
+              >
+                Firma hasta: {fmtDate(act.expirationDate)}
               </div>
             )}
-            {act.acceptedAt && <div className='text-green-600 text-xs'>Firmada: {fmtDate(act.acceptedAt)}</div>}
+            {act.acceptedAt && (
+              <div className='text-green-600 text-xs'>Firmada: {fmtDate(act.acceptedAt)}</div>
+            )}
             <div className='flex items-center gap-1 justify-end'>
               {onDelete && (
                 <button
                   type='button'
                   title='Eliminar (Solo Super Admin)'
-                  onClick={e => { e.stopPropagation(); onDelete() }}
+                  onClick={e => {
+                    e.stopPropagation()
+                    onDelete()
+                  }}
                   className='rounded p-0.5 text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors'
                 >
                   <Trash2 className='h-3.5 w-3.5' />

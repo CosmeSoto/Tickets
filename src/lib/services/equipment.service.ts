@@ -638,7 +638,7 @@ export class EquipmentService {
           const después = this.formatValue(change?.después)
           metadata[field] = `${antes} → ${después}`
         }
-      } else if (log.action === 'ASSIGNED') {
+      } else if (log.action === 'ASSIGNED' || log.action === 'ASSIGNMENT_CREATED') {
         if (details?.receiverName) metadata['Asignado a'] = details.receiverName
         if (details?.assignmentType) {
           const typeLabels: Record<string, string> = {
@@ -679,13 +679,15 @@ export class EquipmentService {
       DELETE: 'STATUS_CHANGE',
       PERMANENT_DELETE: 'STATUS_CHANGE',
       ASSIGNED: 'ASSIGNED',
+      ASSIGNMENT_CREATED: 'ASSIGNED',
       RETURNED: 'RETURNED',
       CANCELLED: 'RETURNED',
       CREATE_MAINTENANCE: 'MAINTENANCE',
       COMPLETED: 'MAINTENANCE',
       EQUIPMENT_ATTACHMENT_UPLOAD: 'UPDATED',
+      EQUIPMENT_ATTACHMENT_DELETE: 'UPDATED',
     }
-    return map[action] || 'UPDATED'
+    return map[action] || map[action.toUpperCase()] || 'UPDATED'
   }
 
   /**
@@ -745,6 +747,7 @@ export class EquipmentService {
       case 'PERMANENT_DELETE':
         return `Equipo eliminado permanentemente: ${details?.code || ''} (${details?.brand || ''} ${details?.model || ''})`
       case 'ASSIGNED':
+      case 'ASSIGNMENT_CREATED':
         return `Equipo asignado a ${details?.receiverName || 'un usuario'}`
       case 'RETURNED':
         return 'Equipo devuelto al inventario'
@@ -760,11 +763,30 @@ export class EquipmentService {
       default:
         // Manejar acciones con formato snake_case del AuditServiceComplete
         if (action.includes('_')) {
-          const readable = action
-            .replace('equipment_', 'Equipo ')
-            .replace('assignment_', 'Asignación ')
-            .replace('_', ' ')
-          return readable.charAt(0).toUpperCase() + readable.slice(1)
+          // Diccionario de traducciones completas para acciones conocidas
+          const actionTranslations: Record<string, string> = {
+            equipment_attachment_upload: 'Archivo adjunto subido al equipo',
+            equipment_attachment_delete: 'Archivo adjunto eliminado del equipo',
+            equipment_status_changed: 'Estado del equipo actualizado',
+            equipment_condition_changed: 'Condición del equipo actualizada',
+            assignment_completed: 'Asignación completada',
+            assignment_cancelled: 'Asignación cancelada',
+            maintenance_created: 'Mantenimiento registrado',
+            maintenance_completed: 'Mantenimiento completado',
+            decommission_requested: 'Solicitud de baja creada',
+            decommission_approved: 'Solicitud de baja aprobada',
+            decommission_rejected: 'Solicitud de baja rechazada',
+          }
+          const lowerAction = action.toLowerCase()
+          if (actionTranslations[lowerAction]) {
+            return actionTranslations[lowerAction]
+          }
+          // Fallback genérico para acciones desconocidas
+          const readable = lowerAction
+            .replace(/^equipment_/, '')
+            .replace(/^assignment_/, '')
+            .replace(/_/g, ' ')
+          return `Acción: ${readable.charAt(0).toUpperCase() + readable.slice(1)}`
         }
         return action
     }

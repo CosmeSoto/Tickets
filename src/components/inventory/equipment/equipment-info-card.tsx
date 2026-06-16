@@ -66,7 +66,10 @@ export function EquipmentInfoCard({ equipment }: EquipmentInfoCardProps) {
       })
   })()
 
-  const hasLocation = physicalLocation || equipment.location || warehouse
+  const hasLocation =
+    physicalLocation ||
+    equipment.location ||
+    (warehouse && !['ASSIGNED', 'SOLD'].includes(equipment.status))
   const hasAccessories = equipment.accessories && equipment.accessories.length > 0
   const hasSpecs = equipment.specifications && Object.keys(equipment.specifications).length > 0
   const hasCustomAttributes = sortedCustomValues && sortedCustomValues.length > 0
@@ -144,7 +147,7 @@ export function EquipmentInfoCard({ equipment }: EquipmentInfoCardProps) {
                 Ubicación
               </p>
               <div className='grid grid-cols-1 gap-2 sm:grid-cols-2'>
-                {warehouse && (
+                {warehouse && !['ASSIGNED', 'SOLD'].includes(equipment.status) && (
                   <InfoRow
                     label='Bodega'
                     value={

@@ -549,8 +549,12 @@ export function EquipmentAssetForm({
       departmentId: effectiveDepartmentId || undefined,
       condition,
       status: equipmentStatus,
-      accessories: accessories.length ? accessories : undefined,
-      customValues: customFieldValues.length ? customFieldValues : undefined,
+      accessories: isEditMode ? accessories : accessories.length ? accessories : undefined,
+      customValues: isEditMode
+        ? customFieldValues
+        : customFieldValues.length
+          ? customFieldValues
+          : undefined,
       supplierId: supplierId || undefined,
       contractId: linkedContractId || undefined,
       purchaseDate: purchaseDate || undefined,

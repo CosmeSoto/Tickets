@@ -165,7 +165,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       serialNumber: equipment.serialNumber,
       brand: equipment.brand,
       model: equipment.model
-        ? [equipment.model.brand, equipment.model.model].filter(Boolean).join(' ')
+        ? [equipment.model.brand?.name, equipment.model.model].filter(Boolean).join(' ')
         : equipment.modelDeprecated,
       typeName: equipment.type.name,
       typeIcon: equipment.type.icon,

@@ -870,7 +870,7 @@ export function BulkEquipmentForm({
                   step='0.01'
                   value={purchasePrice}
                   onChange={e => setPurchasePrice(e.target.value)}
-                  placeholder='0.00'
+                  placeholder='Precio sin impuestos'
                 />
               </div>
               <div className='space-y-1'>

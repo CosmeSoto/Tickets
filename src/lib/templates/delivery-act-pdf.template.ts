@@ -46,16 +46,15 @@ const CONDITION_LABELS: Record<string, string> = {
   POOR: 'Malo',
 }
 
-// Colores corporativos
+// Paleta profesional: neutros + acento mínimo
 const C = {
-  primary: '#1E40AF', // azul oscuro
-  accent: '#3B82F6', // azul medio
-  light: '#EFF6FF', // azul muy claro (fondo secciones)
-  border: '#BFDBFE', // borde azul claro
-  text: '#1E293B', // texto principal
-  muted: '#64748B', // texto secundario
-  white: '#FFFFFF',
-  gray: '#F8FAFC',
+  dark: '#1a1a1a', // encabezados y texto principal
+  text: '#333333', // texto cuerpo
+  muted: '#6b7280', // texto secundario
+  border: '#d1d5db', // bordes
+  light: '#f9fafb', // fondo alternado secciones
+  accent: '#374151', // gris oscuro para títulos de sección
+  white: '#ffffff',
 }
 
 export async function generateDeliveryActPDF(
@@ -65,192 +64,306 @@ export async function generateDeliveryActPDF(
 ): Promise<any> {
   const PDFDocument = loadPDFKit()
 
-  // Página A4 apaisada para que todo quepa en una hoja
   const doc = new PDFDocument({
     size: 'A4',
     layout: 'portrait',
-    margins: { top: 0, bottom: 0, left: 0, right: 0 },
+    margins: { top: 40, bottom: 40, left: 40, right: 40 },
     info: {
       Title: `Acta de Entrega - ${act.folio}`,
-      Author: systemInfo?.companyName || 'Sistema de Inventario',
-      Subject: 'Acta de Entrega',
+      Author: systemInfo?.companyName || 'Sistema de Gestión',
+      Subject: 'Acta de Entrega de Equipo',
     },
   })
 
   const W = doc.page.width // 595
-  const H = doc.page.height // 842
-  const ML = 32 // margen lateral
-  const CW = W - ML * 2 // ancho contenido
+  const ML = 40
+  const MR = 40
+  const CW = W - ML - MR // ancho útil ~515
+
+  let y = 40
 
   // ── HEADER ──────────────────────────────────────────────────────────────
-  // Fondo azul oscuro
-  doc.rect(0, 0, W, 72).fill(C.primary)
-
-  const companyName = systemInfo?.companyName || 'Sistema de Inventario'
-  // Header tiene fondo azul oscuro → usar logo oscuro (versión blanca/clara para fondos oscuros)
-  // Fallback al logo claro si no hay versión oscura
-  const logoUrl = systemInfo?.logoDarkUrl || systemInfo?.logoUrl
-
+  const companyName = systemInfo?.companyName || 'Sistema de Gestión'
+  // Fondo blanco → usar logo claro (versión para fondos claros)
+  const logoUrl = systemInfo?.logoUrl
   let logoBuffer: Buffer | null = null
   if (logoUrl) logoBuffer = await fetchImageBuffer(logoUrl)
 
   if (logoBuffer) {
-    doc.image(logoBuffer, ML, 11, { fit: [120, 50], align: 'left' })
+    try {
+      doc.image(logoBuffer, ML, y, { fit: [130, 40], align: 'left' })
+    } catch {
+      doc
+        .fontSize(12)
+        .font('Helvetica-Bold')
+        .fillColor(C.dark)
+        .text(companyName, ML, y + 10)
+    }
   } else {
     doc
-      .fontSize(13)
+      .fontSize(12)
       .font('Helvetica-Bold')
-      .fillColor(C.white)
-      .text(companyName, ML, 22, { width: 160 })
+      .fillColor(C.dark)
+      .text(companyName, ML, y + 10)
   }
 
-  // Título y folio a la derecha
+  // Título del documento a la derecha
   const actTypeLabels: Record<string, string> = {
     EQUIPMENT_ASSIGNMENT: 'ACTA DE ENTREGA',
-    MRO_DELIVERY: 'ACTA DE ENTREGA — MATERIALES MRO',
-    SERVICE_COMPLETION: 'ACTA DE ENTREGA — SERVICIO',
-    ASSET_TRANSFER: 'ACTA DE ENTREGA — TRANSFERENCIA',
+    MRO_DELIVERY: 'ACTA DE ENTREGA — MATERIALES',
+    SERVICE_COMPLETION: 'ACTA DE SERVICIO',
+    ASSET_TRANSFER: 'ACTA DE TRANSFERENCIA',
   }
   const actTypeLabel =
     actTypeLabels[(act as any).actType ?? 'EQUIPMENT_ASSIGNMENT'] ?? 'ACTA DE ENTREGA'
-  doc
-    .fontSize(15)
-    .font('Helvetica-Bold')
-    .fillColor(C.white)
-    .text(actTypeLabel, ML + 160, 16, { width: CW - 160, align: 'right' })
-  doc
-    .fontSize(10)
-    .font('Helvetica')
-    .fillColor('#BFDBFE')
-    .text(act.folio, ML + 160, 36, { width: CW - 160, align: 'right' })
 
-  // Estado del acta
+  doc
+    .fontSize(14)
+    .font('Helvetica-Bold')
+    .fillColor(C.dark)
+    .text(actTypeLabel, ML, y, { width: CW, align: 'right' })
+  doc
+    .fontSize(9)
+    .font('Helvetica')
+    .fillColor(C.muted)
+    .text(act.folio, ML, y + 18, { width: CW, align: 'right' })
+
+  // Estado como badge discreto
   const statusLabel =
-    act.status === 'ACCEPTED' ? 'ACEPTADA' : act.status === 'REJECTED' ? 'RECHAZADA' : 'PENDIENTE'
-  const statusColor =
-    act.status === 'ACCEPTED' ? '#22C55E' : act.status === 'REJECTED' ? '#EF4444' : '#F59E0B'
-  doc.roundedRect(W - ML - 80, 48, 80, 16, 4).fill(statusColor)
+    act.status === 'ACCEPTED' ? 'Firmada' : act.status === 'REJECTED' ? 'Rechazada' : 'Pendiente'
   doc
     .fontSize(8)
+    .font('Helvetica')
+    .fillColor(C.muted)
+    .text(`Estado: ${statusLabel}`, ML, y + 32, { width: CW, align: 'right' })
+
+  y += 56
+
+  // Línea separadora
+  doc
+    .moveTo(ML, y)
+    .lineTo(W - MR, y)
+    .strokeColor(C.border)
+    .lineWidth(0.5)
+    .stroke()
+  y += 16
+
+  // ── Helper functions ─────────────────────────────────────────────────────
+  const sectionTitle = (title: string, startY: number): number => {
+    doc.fontSize(9).font('Helvetica-Bold').fillColor(C.accent).text(title.toUpperCase(), ML, startY)
+    return startY + 14
+  }
+
+  const fieldRow = (
+    label: string,
+    value: string,
+    startY: number,
+    opts?: { halfWidth?: boolean; xOffset?: number }
+  ): number => {
+    const x = ML + (opts?.xOffset || 0)
+    const w = opts?.halfWidth ? CW / 2 - 8 : CW
+    doc.fontSize(7.5).font('Helvetica-Bold').fillColor(C.muted).text(label, x, startY, { width: w })
+    doc
+      .fontSize(9)
+      .font('Helvetica')
+      .fillColor(C.text)
+      .text(value || '—', x, startY + 9, { width: w })
+    return startY + 22
+  }
+
+  const separator = (startY: number): number => {
+    doc
+      .moveTo(ML, startY)
+      .lineTo(W - MR, startY)
+      .strokeColor('#e5e7eb')
+      .lineWidth(0.3)
+      .stroke()
+    return startY + 10
+  }
+
+  // ── DATOS DEL EQUIPO ────────────────────────────────────────────────────
+  y = sectionTitle('Datos del Equipo', y)
+
+  // Fila 1: Código y N° Serie
+  const halfW = CW / 2 - 8
+  doc
+    .fontSize(7.5)
     .font('Helvetica-Bold')
-    .fillColor(C.white)
-    .text(statusLabel, W - ML - 80, 52, { width: 80, align: 'center' })
+    .fillColor(C.muted)
+    .text('CÓDIGO', ML, y, { width: halfW })
+  doc
+    .fontSize(7.5)
+    .font('Helvetica-Bold')
+    .fillColor(C.muted)
+    .text('N° DE SERIE', ML + CW / 2, y, { width: halfW })
+  y += 9
+  doc
+    .fontSize(9)
+    .font('Helvetica')
+    .fillColor(C.text)
+    .text(act.equipmentSnapshot.code, ML, y, { width: halfW })
+  doc
+    .fontSize(9)
+    .font('Helvetica')
+    .fillColor(C.text)
+    .text(act.equipmentSnapshot.serialNumber || '—', ML + CW / 2, y, { width: halfW })
+  y += 16
 
-  const y = 82
-
-  // ── CUERPO: dos columnas ─────────────────────────────────────────────────
-  const colW = (CW - 12) / 2
-  const col1X = ML
-  const col2X = ML + colW + 12
-
-  // Helper: dibuja una tarjeta de sección
-  const card = (x: number, cardY: number, w: number, h: number, title: string, icon?: string) => {
-    doc.roundedRect(x, cardY, w, h, 4).fill(C.light)
-    doc.roundedRect(x, cardY, w, 18, 4).fill(C.accent)
-    // Esquinas inferiores del header rectas
-    doc.rect(x, cardY + 10, w, 8).fill(C.accent)
-    doc
-      .fontSize(8)
-      .font('Helvetica-Bold')
-      .fillColor(C.white)
-      .text((icon ? icon + ' ' : '') + title, x + 8, cardY + 5, { width: w - 16 })
-    return cardY + 22
-  }
-
-  // Helper: fila label + valor
-  const row = (x: number, rowY: number, w: number, label: string, value: string) => {
-    doc
-      .fontSize(7)
-      .font('Helvetica-Bold')
-      .fillColor(C.muted)
-      .text(label.toUpperCase(), x + 6, rowY, { width: w / 2 - 6 })
-    doc
-      .fontSize(8)
-      .font('Helvetica')
-      .fillColor(C.text)
-      .text(value || '—', x + w / 2, rowY, { width: w / 2 - 6 })
-    return rowY + 13
-  }
-
-  // Helper: fila ancha (label arriba, valor abajo)
-  const rowFull = (x: number, rowY: number, w: number, label: string, value: string) => {
-    doc
-      .fontSize(7)
-      .font('Helvetica-Bold')
-      .fillColor(C.muted)
-      .text(label.toUpperCase(), x + 6, rowY, { width: w - 12 })
-    doc
-      .fontSize(8)
-      .font('Helvetica')
-      .fillColor(C.text)
-      .text(value || '—', x + 6, rowY + 9, { width: w - 12 })
-    return rowY + 20
-  }
-
-  // ── COLUMNA IZQUIERDA ────────────────────────────────────────────────────
-
-  // Tarjeta: Equipo
-  const eqH = 130
-  let cy = card(col1X, y, colW, eqH, 'EQUIPO')
-  cy = row(col1X, cy, colW, 'Código', act.equipmentSnapshot.code)
-  cy = row(
-    col1X,
-    cy,
-    colW,
-    'Marca / Modelo',
-    `${act.equipmentSnapshot.brand} ${act.equipmentSnapshot.model}`
-  )
-  cy = row(col1X, cy, colW, 'N° de Serie', act.equipmentSnapshot.serialNumber)
-  cy = row(
-    col1X,
-    cy,
-    colW,
-    'Tipo',
-    act.equipmentSnapshot.typeName || act.equipmentSnapshot.type || '—'
-  )
-  cy = row(
-    col1X,
-    cy,
-    colW,
-    'Condición',
-    CONDITION_LABELS[act.equipmentSnapshot.condition] || act.equipmentSnapshot.condition
-  )
-
-  // Especificaciones (si existen)
-  const specs = act.equipmentSnapshot.specifications
-  const specEntries = specs ? Object.entries(specs).filter(([, v]) => v) : []
-  if (specEntries.length > 0) {
-    const specH = 22 + specEntries.length * 13
-    cy = card(col1X, y + eqH + 8, colW, specH, 'ESPECIFICACIONES')
-    specEntries.forEach(([k, v]) => {
-      cy = row(col1X, cy, colW, k, String(v))
+  // Fila 2: Marca/Modelo y Tipo
+  doc
+    .fontSize(7.5)
+    .font('Helvetica-Bold')
+    .fillColor(C.muted)
+    .text('MARCA / MODELO', ML, y, { width: halfW })
+  doc
+    .fontSize(7.5)
+    .font('Helvetica-Bold')
+    .fillColor(C.muted)
+    .text('TIPO', ML + CW / 2, y, { width: halfW })
+  y += 9
+  doc
+    .fontSize(9)
+    .font('Helvetica')
+    .fillColor(C.text)
+    .text(`${act.equipmentSnapshot.brand} ${act.equipmentSnapshot.model}`, ML, y, { width: halfW })
+  doc
+    .fontSize(9)
+    .font('Helvetica')
+    .fillColor(C.text)
+    .text(act.equipmentSnapshot.typeName || act.equipmentSnapshot.type || '—', ML + CW / 2, y, {
+      width: halfW,
     })
+  y += 16
+
+  // Fila 3: Condición
+  doc
+    .fontSize(7.5)
+    .font('Helvetica-Bold')
+    .fillColor(C.muted)
+    .text('CONDICIÓN', ML, y, { width: halfW })
+  y += 9
+  doc
+    .fontSize(9)
+    .font('Helvetica')
+    .fillColor(C.text)
+    .text(
+      CONDITION_LABELS[act.equipmentSnapshot.condition] || act.equipmentSnapshot.condition,
+      ML,
+      y,
+      { width: halfW }
+    )
+  y += 18
+
+  y = separator(y)
+
+  // ── IMAGEN DEL EQUIPO (si existe) ──────────────────────────────────────
+  const snap = act.equipmentSnapshot as any
+  if (snap.equipmentImagePath) {
+    const imgBuffer = await fetchImageBuffer(snap.equipmentImagePath)
+    if (imgBuffer) {
+      y = sectionTitle('Imagen del Equipo', y)
+      try {
+        doc.image(imgBuffer, ML, y, { fit: [180, 120] })
+        y += 128
+      } catch {
+        // imagen inválida — omitir
+      }
+      y = separator(y)
+    }
   }
 
-  // Accesorios
-  const accY = y + eqH + 8 + (specEntries.length > 0 ? 22 + specEntries.length * 13 + 8 : 0)
+  // ── ACCESORIOS ──────────────────────────────────────────────────────────
   const accList = act.accessories?.length ? act.accessories : []
-  const accH = 22 + Math.max(accList.length, 1) * 13
-  let acy = card(col1X, accY, colW, accH, 'ACCESORIOS')
+  y = sectionTitle('Accesorios Incluidos', y)
   if (accList.length > 0) {
     accList.forEach(a => {
       doc
-        .fontSize(8)
+        .fontSize(9)
         .font('Helvetica')
         .fillColor(C.text)
-        .text(`• ${a}`, col1X + 6, acy, { width: colW - 12 })
-      acy += 13
+        .text(`•  ${a}`, ML + 4, y, { width: CW - 8 })
+      y += 13
     })
   } else {
     doc
-      .fontSize(8)
+      .fontSize(9)
       .font('Helvetica')
       .fillColor(C.muted)
-      .text('Sin accesorios registrados', col1X + 6, acy, { width: colW - 12 })
+      .text('Sin accesorios registrados', ML + 4, y, { width: CW })
+    y += 13
   }
+  y += 6
+  y = separator(y)
 
-  // Sección financiera (condicional — antes de observaciones)
-  const snap = act.equipmentSnapshot as any
+  // ── PARTES INVOLUCRADAS ─────────────────────────────────────────────────
+  y = sectionTitle('Entregado por', y)
+  doc
+    .fontSize(7.5)
+    .font('Helvetica-Bold')
+    .fillColor(C.muted)
+    .text('NOMBRE', ML, y, { width: halfW })
+  doc
+    .fontSize(7.5)
+    .font('Helvetica-Bold')
+    .fillColor(C.muted)
+    .text('CORREO', ML + CW / 2, y, { width: halfW })
+  y += 9
+  doc
+    .fontSize(9)
+    .font('Helvetica')
+    .fillColor(C.text)
+    .text(act.delivererInfo.name, ML, y, { width: halfW })
+  doc
+    .fontSize(9)
+    .font('Helvetica')
+    .fillColor(C.text)
+    .text(act.delivererInfo.email, ML + CW / 2, y, { width: halfW })
+  y += 13
+  if (act.delivererInfo.department) {
+    doc
+      .fontSize(7.5)
+      .font('Helvetica')
+      .fillColor(C.muted)
+      .text(`Departamento: ${act.delivererInfo.department}`, ML, y, { width: CW })
+    y += 12
+  }
+  y += 6
+
+  y = sectionTitle('Recibido por', y)
+  doc
+    .fontSize(7.5)
+    .font('Helvetica-Bold')
+    .fillColor(C.muted)
+    .text('NOMBRE', ML, y, { width: halfW })
+  doc
+    .fontSize(7.5)
+    .font('Helvetica-Bold')
+    .fillColor(C.muted)
+    .text('CORREO', ML + CW / 2, y, { width: halfW })
+  y += 9
+  doc
+    .fontSize(9)
+    .font('Helvetica')
+    .fillColor(C.text)
+    .text(act.receiverInfo.name, ML, y, { width: halfW })
+  doc
+    .fontSize(9)
+    .font('Helvetica')
+    .fillColor(C.text)
+    .text(act.receiverInfo.email, ML + CW / 2, y, { width: halfW })
+  y += 13
+  if (act.receiverInfo.department) {
+    doc
+      .fontSize(7.5)
+      .font('Helvetica')
+      .fillColor(C.muted)
+      .text(`Departamento: ${act.receiverInfo.department}`, ML, y, { width: CW })
+    y += 12
+  }
+  y += 6
+  y = separator(y)
+
+  // ── INFORMACIÓN FINANCIERA (condicional) ─────────────────────────────────
   const hasFinancial = !!(
     snap.supplierName ||
     snap.purchasePrice ||
@@ -258,207 +371,163 @@ export async function generateDeliveryActPDF(
     snap.invoiceNumber ||
     snap.purchaseOrderNumber
   )
-  let nextLeftY = accY + accH + 8
 
   if (hasFinancial) {
-    const finRows = [
-      snap.supplierName
-        ? ['Proveedor', snap.supplierName + (snap.supplierTaxId ? ` (${snap.supplierTaxId})` : '')]
-        : null,
-      snap.purchasePrice != null
-        ? [
-            'Costo adquisición',
-            `$${Number(snap.purchasePrice).toLocaleString('es-EC', { minimumFractionDigits: 2 })}`,
-          ]
-        : null,
-      snap.purchaseDate
-        ? [
-            'Fecha de compra',
-            new Date(snap.purchaseDate).toLocaleDateString('es-EC', {
-              day: '2-digit',
-              month: 'short',
-              year: 'numeric',
-            }),
-          ]
-        : null,
-      snap.invoiceNumber ? ['N° Factura', snap.invoiceNumber] : null,
-      snap.purchaseOrderNumber ? ['N° Orden de Compra', snap.purchaseOrderNumber] : null,
-    ].filter(Boolean) as [string, string][]
-
-    const finH = 22 + finRows.length * 13
-    let fy2 = card(col1X, nextLeftY, colW, finH, 'INFORMACIÓN FINANCIERA')
-    finRows.forEach(([label, value]) => {
-      fy2 = row(col1X, fy2, colW, label, value)
-    })
-    nextLeftY += finH + 8
-  }
-
-  // Imagen del equipo (condicional)
-  if (snap.equipmentImagePath) {
-    const imgBuffer = await fetchImageBuffer(snap.equipmentImagePath)
-    if (imgBuffer) {
-      const imgH = 22 + 110
-      card(col1X, nextLeftY, colW, imgH, 'IMAGEN DEL EQUIPO')
-      try {
-        doc.image(imgBuffer, col1X + 6, nextLeftY + 22, { fit: [colW - 12, 100] })
-      } catch {
-        // imagen inválida — omitir silenciosamente
-      }
-      nextLeftY += imgH + 8
+    y = sectionTitle('Información Financiera', y)
+    if (snap.supplierName) {
+      y = fieldRow(
+        'Proveedor',
+        snap.supplierName + (snap.supplierTaxId ? ` (${snap.supplierTaxId})` : ''),
+        y
+      )
     }
+    if (snap.purchasePrice != null) {
+      y = fieldRow(
+        'Costo de Adquisición',
+        `$${Number(snap.purchasePrice).toLocaleString('es-EC', { minimumFractionDigits: 2 })}`,
+        y
+      )
+    }
+    if (snap.purchaseDate) {
+      y = fieldRow(
+        'Fecha de Compra',
+        new Date(snap.purchaseDate).toLocaleDateString('es-EC', {
+          day: '2-digit',
+          month: 'long',
+          year: 'numeric',
+        }),
+        y
+      )
+    }
+    if (snap.invoiceNumber) y = fieldRow('N° Factura', snap.invoiceNumber, y)
+    if (snap.purchaseOrderNumber) y = fieldRow('N° Orden de Compra', snap.purchaseOrderNumber, y)
+    y = separator(y)
   }
 
-  // Observaciones (si existen)
+  // ── OBSERVACIONES ───────────────────────────────────────────────────────
   if (act.observations) {
-    const obsH = 22 + 26
-    const ocy = card(col1X, nextLeftY, colW, obsH, 'OBSERVACIONES')
-    doc
-      .fontSize(8)
-      .font('Helvetica')
-      .fillColor(C.text)
-      .text(act.observations, col1X + 6, ocy, { width: colW - 12, height: 24, ellipsis: true })
+    y = sectionTitle('Observaciones', y)
+    doc.fontSize(9).font('Helvetica').fillColor(C.text).text(act.observations, ML, y, { width: CW })
+    y += doc.heightOfString(act.observations, { width: CW, fontSize: 9 }) + 10
+    y = separator(y)
   }
 
-  // ── COLUMNA DERECHA ──────────────────────────────────────────────────────
-
-  // Tarjeta: Entregado por
-  const delH = 68
-  let dy = card(col2X, y, colW, delH, 'ENTREGADO POR')
-  dy = row(col2X, dy, colW, 'Nombre', act.delivererInfo.name)
-  dy = row(col2X, dy, colW, 'Email', act.delivererInfo.email)
-  void row(col2X, dy, colW, 'Departamento', act.delivererInfo.department || '—')
-
-  // Tarjeta: Recibido por
-  const recY = y + delH + 8
-  const recH = 68
-  let ry = card(col2X, recY, colW, recH, 'RECIBIDO POR')
-  ry = row(col2X, ry, colW, 'Nombre', act.receiverInfo.name)
-  ry = row(col2X, ry, colW, 'Email', act.receiverInfo.email)
-  void row(col2X, ry, colW, 'Departamento', act.receiverInfo.department || '—')
-
-  // Tarjeta: Fechas
-  const fechasY = recY + recH + 8
-  const fechasH = act.acceptedAt ? 56 : 42
-  let fy = card(col2X, fechasY, colW, fechasH, 'FECHAS')
+  // ── FECHAS ──────────────────────────────────────────────────────────────
+  y = sectionTitle('Fechas', y)
   const fmtDate = (d: string | Date) =>
     new Date(d).toLocaleString('es-EC', {
       day: '2-digit',
-      month: 'short',
+      month: 'long',
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
     })
-  fy = rowFull(col2X, fy, colW, 'Fecha de creación', fmtDate(act.createdAt))
-  if (act.acceptedAt) {
-    rowFull(col2X, fy, colW, 'Fecha de aceptación', fmtDate(act.acceptedAt))
-  }
 
-  // Tarjeta: Firma digital + QR (lado a lado)
-  const sigY = fechasY + fechasH + 8
-  const sigH = 130
-  const sigW = colW - 100 - 8 // espacio para QR de 96px
-
-  // Fondo de la tarjeta completa
-  doc.roundedRect(col2X, sigY, colW, sigH, 4).fill(C.light)
-  doc.roundedRect(col2X, sigY, colW, 18, 4).fill(C.accent)
-  doc.rect(col2X, sigY + 10, colW, 8).fill(C.accent)
   doc
-    .fontSize(8)
+    .fontSize(7.5)
     .font('Helvetica-Bold')
-    .fillColor(C.white)
-    .text('FIRMA DIGITAL Y VERIFICACIÓN', col2X + 8, sigY + 5, { width: colW - 16 })
-
-  if (act.status === 'ACCEPTED' && act.verificationHash) {
-    let scy = sigY + 24
-
-    // Hash (truncado para que quepa)
-    const shortHash = act.verificationHash.substring(0, 32) + '...'
+    .fillColor(C.muted)
+    .text('FECHA DE EMISIÓN', ML, y, { width: halfW })
+  if (act.acceptedAt) {
     doc
-      .fontSize(7)
+      .fontSize(7.5)
       .font('Helvetica-Bold')
       .fillColor(C.muted)
-      .text('HASH DE VERIFICACIÓN', col2X + 6, scy, { width: sigW })
-    scy += 9
+      .text('FECHA DE ACEPTACIÓN', ML + CW / 2, y, { width: halfW })
+  }
+  y += 9
+  doc
+    .fontSize(9)
+    .font('Helvetica')
+    .fillColor(C.text)
+    .text(fmtDate(act.createdAt), ML, y, { width: halfW })
+  if (act.acceptedAt) {
     doc
-      .fontSize(6.5)
+      .fontSize(9)
       .font('Helvetica')
       .fillColor(C.text)
-      .text(shortHash, col2X + 6, scy, { width: sigW })
-    scy += 13
+      .text(fmtDate(act.acceptedAt), ML + CW / 2, y, { width: halfW })
+  }
+  y += 20
+
+  // ── FIRMA DIGITAL + QR ──────────────────────────────────────────────────
+  // Verificar si necesitamos nueva página
+  if (y > 680) {
+    doc.addPage()
+    y = 40
+  }
+
+  y = separator(y)
+  y = sectionTitle('Verificación Digital', y)
+
+  if (act.status === 'ACCEPTED' && act.verificationHash) {
+    // Firma + QR lado a lado
+    const qrSize = 80
+    const sigW = CW - qrSize - 20
+
+    const shortHash = act.verificationHash.substring(0, 40) + '...'
+    doc
+      .fontSize(7.5)
+      .font('Helvetica-Bold')
+      .fillColor(C.muted)
+      .text('HASH DE VERIFICACIÓN', ML, y, { width: sigW })
+    y += 9
+    doc.fontSize(7).font('Helvetica').fillColor(C.text).text(shortHash, ML, y, { width: sigW })
+    y += 14
 
     if (act.signatureTimestamp) {
       doc
-        .fontSize(7)
+        .fontSize(7.5)
         .font('Helvetica-Bold')
         .fillColor(C.muted)
-        .text('FIRMADO EL', col2X + 6, scy, { width: sigW })
-      scy += 9
+        .text('FIRMADO', ML, y, { width: sigW })
+      y += 9
       doc
         .fontSize(8)
         .font('Helvetica')
         .fillColor(C.text)
-        .text(
-          new Date(act.signatureTimestamp).toLocaleString('es-EC', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-          }),
-          col2X + 6,
-          scy,
-          { width: sigW }
-        )
-      scy += 13
+        .text(fmtDate(act.signatureTimestamp), ML, y, { width: sigW })
+      y += 14
     }
 
     if (act.signatureIp) {
-      doc
-        .fontSize(7)
-        .font('Helvetica-Bold')
-        .fillColor(C.muted)
-        .text('IP DE FIRMA', col2X + 6, scy, { width: sigW })
-      scy += 9
-      doc
-        .fontSize(8)
-        .font('Helvetica')
-        .fillColor(C.text)
-        .text(act.signatureIp, col2X + 6, scy, { width: sigW })
+      doc.fontSize(7.5).font('Helvetica-Bold').fillColor(C.muted).text('IP', ML, y, { width: sigW })
+      y += 9
+      doc.fontSize(8).font('Helvetica').fillColor(C.text).text(act.signatureIp, ML, y, {
+        width: sigW,
+      })
     }
 
-    // QR a la derecha dentro de la tarjeta
-    const qrSize = 90
-    const qrX = col2X + colW - qrSize - 6
-    const qrY = sigY + 22
+    // QR a la derecha
+    const qrX = W - MR - qrSize
+    const qrY = y - 46
     doc.image(qrCodeDataUrl, qrX, qrY, { width: qrSize, height: qrSize })
     doc
-      .fontSize(6)
+      .fontSize(6.5)
       .font('Helvetica')
       .fillColor(C.muted)
       .text('Escanear para verificar', qrX, qrY + qrSize + 2, { width: qrSize, align: 'center' })
   } else {
-    // Acta pendiente — solo QR centrado
-    const qrSize = 90
-    const qrX = col2X + (colW - qrSize) / 2
-    doc.image(qrCodeDataUrl, qrX, sigY + 22, { width: qrSize, height: qrSize })
+    // Acta pendiente — QR centrado
+    const qrSize = 80
+    doc.image(qrCodeDataUrl, ML, y, { width: qrSize, height: qrSize })
     doc
-      .fontSize(7)
+      .fontSize(8)
       .font('Helvetica')
       .fillColor(C.muted)
-      .text('Pendiente de firma', col2X + 6, sigY + 24, { width: sigW })
+      .text('Pendiente de firma digital', ML + qrSize + 12, y + 30, { width: CW - qrSize - 12 })
   }
 
   // ── FOOTER ───────────────────────────────────────────────────────────────
-  const footerY = H - 28
-  doc.rect(0, footerY, W, 28).fill(C.primary)
+  const footerY = doc.page.height - 30
   doc
     .fontSize(7)
     .font('Helvetica')
-    .fillColor('#BFDBFE')
+    .fillColor(C.muted)
     .text(
       `Documento generado electrónicamente · ${companyName} · ${new Date().toLocaleDateString('es-EC', { day: '2-digit', month: 'long', year: 'numeric' })}`,
       ML,
-      footerY + 10,
+      footerY,
       { width: CW, align: 'center' }
     )
 

@@ -337,8 +337,8 @@ export default function ActDetailPage({ params: paramsPromise }: PageProps) {
             </AlertTitle>
             <AlertDescription className='text-yellow-700 dark:text-yellow-400'>
               Tienes pendiente aceptar o rechazar la entrega del equipo{' '}
-              <strong>{act.equipmentSnapshot?.code}</strong>. Expira el{' '}
-              <strong>{fmtDate(act.expirationDate)}</strong>.
+              <strong>{act.equipmentSnapshot?.code}</strong>. Tienes hasta el{' '}
+              <strong>{fmtDate(act.expirationDate)}</strong> para firmar.
             </AlertDescription>
           </Alert>
         )}
@@ -358,8 +358,8 @@ export default function ActDetailPage({ params: paramsPromise }: PageProps) {
               Esperando firma del receptor
             </AlertTitle>
             <AlertDescription className='text-blue-700 dark:text-blue-400'>
-              Pendiente de firma por <strong>{act.receiverInfo?.name}</strong>. Expira el{' '}
-              <strong>{fmtDate(act.expirationDate)}</strong>.
+              Pendiente de firma por <strong>{act.receiverInfo?.name}</strong>. Tiene hasta el{' '}
+              <strong>{fmtDate(act.expirationDate)}</strong> para firmar.
             </AlertDescription>
           </Alert>
         )}
@@ -551,7 +551,9 @@ export default function ActDetailPage({ params: paramsPromise }: PageProps) {
                 <p className='text-sm font-medium'>{fmtDateTime(act.createdAt)}</p>
               </div>
               <div>
-                <p className='text-xs text-muted-foreground uppercase tracking-wide mb-1'>Expira</p>
+                <p className='text-xs text-muted-foreground uppercase tracking-wide mb-1'>
+                  Plazo para firmar
+                </p>
                 <p
                   className={cn(
                     'text-sm font-medium',
