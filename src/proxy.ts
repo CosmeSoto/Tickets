@@ -124,7 +124,8 @@ export async function proxy(request: NextRequest) {
       /^\/api\/news\/[^/]+\/attachments\/[^/]+\/file/.test(path) ||
       /^\/api\/admin\/news\/[^/]+\/attachments\/[^/]+\/file/.test(path) ||
       /^\/api\/attachments\/[^/]+/.test(path) ||
-      /^\/api\/tickets\/[^/]+\/attachments\/[^/]+/.test(path)
+      /^\/api\/tickets\/[^/]+\/attachments\/[^/]+/.test(path) ||
+      /^\/api\/inventory\/acts\/[^/]+\/preview/.test(path)
 
     // Headers de seguridad básicos para APIs
     response.headers.set('X-Content-Type-Options', 'nosniff')

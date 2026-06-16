@@ -88,6 +88,10 @@ const nextConfig: NextConfig = {
         headers: [{ key: 'X-Frame-Options', value: 'SAMEORIGIN' }],
       },
       {
+        source: '/api/inventory/acts/:id/preview',
+        headers: [{ key: 'X-Frame-Options', value: 'SAMEORIGIN' }],
+      },
+      {
         source: '/api/(.*)',
         headers: [
           {
