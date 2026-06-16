@@ -277,6 +277,29 @@ export default async function EquipmentPublicPage({ params }: PageProps) {
               </div>
             </>
           )}
+
+          {/* Accesorios */}
+          {equipment.accessories && equipment.accessories.length > 0 && (
+            <>
+              <hr className='border-gray-100' />
+              <div className='space-y-2'>
+                <p className='text-xs text-gray-400 uppercase tracking-wide font-medium flex items-center gap-1.5'>
+                  <Tag className='h-3.5 w-3.5' />
+                  Accesorios
+                </p>
+                <div className='flex flex-wrap gap-1.5'>
+                  {equipment.accessories.map((acc, i) => (
+                    <span
+                      key={i}
+                      className='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200'
+                    >
+                      {acc}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Detalle según estado */}

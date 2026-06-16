@@ -28,6 +28,8 @@ export async function GET(req: NextRequest) {
   const subtypeParam = searchParams.get('subtype') ?? undefined
   const searchQuery = searchParams.get('search')?.trim().toLowerCase() ?? ''
   const personalOnly = searchParams.get('personalOnly') === 'true'
+  const statusFilter = searchParams.get('status') ?? ''
+  const conditionFilter = searchParams.get('condition') ?? ''
   const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10) || 1)
   const pageSizeRaw = parseInt(searchParams.get('pageSize') ?? '20', 10) || 20
 
@@ -133,19 +135,22 @@ export async function GET(req: NextRequest) {
   // - Cliente sin gestión: solo sus equipos asignados
   // - Gestor/Técnico/Admin: equipos de sus familias + equipos asignados personalmente (OR)
   function buildEquipmentWhere() {
+    const extra: Record<string, any> = {}
+    if (statusFilter) extra.status = statusFilter
+    if (conditionFilter) extra.condition = conditionFilter
+
     if (restrictToAssignedOnly) {
-      return { id: { in: personalEquipmentIds } }
+      return { id: { in: personalEquipmentIds }, ...extra }
     }
     if (effectiveFamilyIds !== undefined) {
-      // Gestor con familias: equipos de sus familias OR asignados a él
       const conditions: object[] = [{ type: { familyId: { in: effectiveFamilyIds } } }]
       if (personalEquipmentIds.length > 0) {
         conditions.push({ id: { in: personalEquipmentIds } })
       }
-      return conditions.length > 1 ? { OR: conditions } : conditions[0]
+      const familyFilter = conditions.length > 1 ? { OR: conditions } : conditions[0]
+      return { ...familyFilter, ...extra }
     }
-    // Sin restricción (ADMIN o TECHNICIAN sin gestión)
-    return {}
+    return extra
   }
 
   // Ejecutar 3 queries en paralelo — con paginación aproximada en DB para evitar traer todo a memoria
@@ -202,7 +207,12 @@ export async function GET(req: NextRequest) {
     status: string
     code?: string
     acquisitionMode?: string
+    condition?: string
     createdAt: string
+    purchaseDate?: string
+    purchasePrice?: number
+    invoiceNumber?: string
+    purchaseOrderNumber?: string
   }
 
   const mappedEquipment: UnifiedAsset[] = equipmentItems.map(item => ({
@@ -222,6 +232,12 @@ export async function GET(req: NextRequest) {
     acquisitionMode: (item as any).acquisitionMode ?? (item as any).ownershipType ?? undefined,
     condition: (item as any).condition ?? undefined,
     createdAt: item.createdAt.toISOString(),
+    purchaseDate: (item as any).purchaseDate
+      ? new Date((item as any).purchaseDate).toISOString()
+      : undefined,
+    purchasePrice: (item as any).purchasePrice ?? undefined,
+    invoiceNumber: (item as any).invoiceNumber ?? undefined,
+    purchaseOrderNumber: (item as any).purchaseOrderNumber ?? undefined,
   }))
 
   const mappedConsumables: UnifiedAsset[] = consumableItems.map((item: any) => ({
@@ -330,6 +346,7 @@ export async function POST(req: NextRequest) {
       purchaseDate,
       purchasePrice,
       invoiceNumber,
+      purchaseOrderNumber,
       usefulLifeYears,
       residualValue,
       depreciationMethod,
@@ -502,6 +519,7 @@ export async function POST(req: NextRequest) {
             purchaseDate: purchaseDate ? new Date(purchaseDate) : undefined,
             purchasePrice: purchasePrice ?? undefined,
             invoiceNumber: invoiceNumber ?? undefined,
+            purchaseOrderNumber: purchaseOrderNumber ?? undefined,
             usefulLifeYears: usefulLifeYears ?? undefined,
             residualValue: residualValue ?? undefined,
             depreciationMethod: (depreciationMethod as any) ?? undefined,
@@ -534,14 +552,18 @@ export async function POST(req: NextRequest) {
             select: { departmentId: true },
           })
 
+          const assignmentEndDate = body.assignmentEndDate ?? undefined
+          const resolvedAssignmentType = assignmentEndDate ? 'TEMPORARY' : 'PERMANENT'
+
           await tx.equipment_assignments.create({
             data: {
               id: randomUUID(),
               equipmentId: created.id,
               receiverId: assignedUserId,
               delivererId: userId,
-              assignmentType: 'PERMANENT',
+              assignmentType: resolvedAssignmentType,
               startDate: new Date(),
+              endDate: assignmentEndDate ? new Date(assignmentEndDate) : undefined,
               isActive: true,
               accessories: body.accessories ?? [],
             },

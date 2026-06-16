@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { checkContractAlerts, checkStockAlerts, checkMROExpiryAlerts, checkWarrantyAlerts } from '@/lib/inventory/notifications'
+import {
+  checkContractAlerts,
+  checkStockAlerts,
+  checkMROExpiryAlerts,
+  checkWarrantyAlerts,
+} from '@/lib/inventory/notifications'
 import { CheckLicenseExpirationJob } from '@/lib/jobs/check-license-expiration.job'
 import { CheckRentalExpirationJob } from '@/lib/jobs/check-rental-expiration.job'
+import { CheckAssignmentExpirationJob } from '@/lib/jobs/check-assignment-expiration.job'
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 
@@ -24,6 +30,7 @@ export async function GET(request: NextRequest) {
       checkStockAlerts(),
       CheckLicenseExpirationJob.run(),
       CheckRentalExpirationJob.run(),
+      CheckAssignmentExpirationJob.run(),
     ]
 
     if (mroEnabled?.value !== 'false') tasks.push(checkMROExpiryAlerts())

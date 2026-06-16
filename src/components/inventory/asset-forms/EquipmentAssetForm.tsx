@@ -201,6 +201,9 @@ export function EquipmentAssetForm({
     initialEquipment?.purchasePrice != null ? String(initialEquipment.purchasePrice) : ''
   )
   const [invoiceNumber, setInvoiceNumber] = useState(initialEquipment?.invoiceNumber || '')
+  const [purchaseOrderNumber, setPurchaseOrderNumber] = useState(
+    initialEquipment?.purchaseOrderNumber || ''
+  )
   const [estimatedPrice, setEstimatedPrice] = useState(
     initialEquipment?.estimatedPrice != null ? String(initialEquipment.estimatedPrice) : ''
   )
@@ -230,11 +233,13 @@ export function EquipmentAssetForm({
   const [assignedUserDept, setAssignedUserDept] = useState<{ id: string; name: string } | null>(
     null
   )
+  // Fecha de devolución tentativa (solo para asignaciones en formulario de creación)
+  const [assignmentEndDate, setAssignmentEndDate] = useState('')
   const [notes, setNotes] = useState(initialEquipment?.notes || '')
   const [physicalLocation, setPhysicalLocation] = useState(initialEquipment?.physicalLocation || '')
   const [attachments, setAttachments] = useState<File[]>([])
   const [existingAttachments, setExistingAttachments] = useState<any[]>(
-    initialEquipment?.equipment_attachments || []
+    initialEquipment?.attachments || initialEquipment?.equipment_attachments || []
   )
   const [priceError, setPriceError] = useState('')
   const [saleListingPrice, setSaleListingPrice] = useState(
@@ -560,6 +565,7 @@ export function EquipmentAssetForm({
       purchaseDate: purchaseDate || undefined,
       purchasePrice: purchasePrice ? parseFloat(purchasePrice) : undefined,
       invoiceNumber: invoiceNumber || undefined,
+      purchaseOrderNumber: purchaseOrderNumber || undefined,
       depreciationMethod:
         acquisitionMode === 'FIXED_ASSET' ? depreciationMethod || undefined : undefined,
       usefulLifeYears:
@@ -576,6 +582,8 @@ export function EquipmentAssetForm({
         }),
       warehouseId: showWarehouse ? warehouseId || undefined : undefined,
       assignedUserId: equipmentStatus === 'ASSIGNED' ? assignedUserId || undefined : undefined,
+      assignmentEndDate:
+        equipmentStatus === 'ASSIGNED' && assignmentEndDate ? assignmentEndDate : undefined,
       // Mantenimiento — solo cuando el estado es MAINTENANCE
       ...(equipmentStatus === 'MAINTENANCE' && {
         maintenanceDate: maintenanceDate || undefined,
@@ -956,7 +964,7 @@ export function EquipmentAssetForm({
 
       {/* Asignar a usuario — usa el componente compartido con departamento auto-rellenado */}
       {showAssignmentBlock(equipmentStatus) && (
-        <div className='rounded-lg border border-primary/30 bg-primary/5 p-4'>
+        <div className='rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3'>
           <AssignableUserSelect
             familyId={familyId}
             value={assignedUserId}
@@ -966,6 +974,22 @@ export function EquipmentAssetForm({
             }}
             required
           />
+          <div className='space-y-1'>
+            <Label>
+              Fecha de Devolución Estimada{' '}
+              <span className='text-xs text-muted-foreground font-normal'>(opcional)</span>
+            </Label>
+            <Input
+              type='date'
+              value={assignmentEndDate}
+              onChange={e => setAssignmentEndDate(e.target.value)}
+              min={new Date().toISOString().split('T')[0]}
+            />
+            <p className='text-xs text-muted-foreground'>
+              Si es préstamo o uso temporal, indica la fecha esperada de devolución. El sistema
+              enviará una alerta próxima a esa fecha.
+            </p>
+          </div>
         </div>
       )}
 
@@ -1057,12 +1081,23 @@ export function EquipmentAssetForm({
                 onChange={e => setPurchaseDate(e.target.value)}
               />
             </div>
-            <div className='space-y-1 col-span-2'>
+            <div className='space-y-1 col-span-2 sm:col-span-1'>
               <Label>N° de Factura</Label>
               <Input
                 value={invoiceNumber}
                 onChange={e => setInvoiceNumber(e.target.value)}
                 placeholder='Ej: FAC-2024-0123'
+              />
+            </div>
+            <div className='space-y-1 col-span-2 sm:col-span-1'>
+              <Label>
+                N° Orden de Compra{' '}
+                <span className='text-xs text-muted-foreground font-normal'>(opcional)</span>
+              </Label>
+              <Input
+                value={purchaseOrderNumber}
+                onChange={e => setPurchaseOrderNumber(e.target.value)}
+                placeholder='Ej: OC-2024-001'
               />
             </div>
           </div>

@@ -92,9 +92,30 @@ export function AssignmentDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value='PERMANENT'>Permanente</SelectItem>
-                <SelectItem value='TEMPORARY'>Temporal</SelectItem>
-                <SelectItem value='LOAN'>Préstamo</SelectItem>
+                <SelectItem value='PERMANENT'>
+                  <div className='flex flex-col'>
+                    <span>Permanente</span>
+                    <span className='text-xs text-muted-foreground font-normal'>
+                      Herramienta de trabajo habitual — sin fecha de devolución
+                    </span>
+                  </div>
+                </SelectItem>
+                <SelectItem value='TEMPORARY'>
+                  <div className='flex flex-col'>
+                    <span>Temporal</span>
+                    <span className='text-xs text-muted-foreground font-normal'>
+                      Uso por período definido — requiere fecha de devolución
+                    </span>
+                  </div>
+                </SelectItem>
+                <SelectItem value='LOAN'>
+                  <div className='flex flex-col'>
+                    <span>Préstamo externo</span>
+                    <span className='text-xs text-muted-foreground font-normal'>
+                      Equipo prestado a tercero o de tercero — requiere fecha de devolución
+                    </span>
+                  </div>
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
