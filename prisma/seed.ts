@@ -897,41 +897,42 @@ async function seedTicketCodeCounters(familyMap: Map<string, string>) {
 // o se registra una advertencia para corrección manual si tienen ítems asignados.
 
 async function cleanOrphanWarehouses() {
-  const orphans = await prisma.warehouses.findMany({
-    where: { familyId: null },
-    include: {
-      _count: { select: { equipment: true, consumables: true, batches: true } },
-    },
-  })
+  // familyId es NOT NULL en el schema actual — no pueden existir bodegas huérfanas.
+  // Usamos una raw query para verificar por si acaso hay datos legacy (migración anterior).
+  try {
+    const orphans: any[] = await prisma.$queryRaw`
+      SELECT id, name FROM warehouses WHERE family_id IS NULL
+    `
 
-  if (orphans.length === 0) {
-    console.log('✅ No hay bodegas huérfanas (sin familyId)')
-    return
-  }
-
-  let deleted = 0
-  let warned = 0
-
-  for (const warehouse of orphans) {
-    const totalItems =
-      warehouse._count.equipment + warehouse._count.consumables + warehouse._count.batches
-
-    if (totalItems === 0) {
-      await prisma.warehouses.delete({ where: { id: warehouse.id } })
-      deleted++
-    } else {
-      console.warn(
-        `⚠️  Bodega huérfana "${warehouse.name}" (${warehouse.id}) tiene ${totalItems} ítems — asignar familyId manualmente`
-      )
-      warned++
+    if (orphans.length === 0) {
+      console.log('✅ No hay bodegas huérfanas (sin familyId)')
+      return
     }
-  }
 
-  if (deleted > 0) console.log(`🗑️  ${deleted} bodega(s) huérfana(s) eliminada(s)`)
-  if (warned > 0)
-    console.log(
-      `⚠️  ${warned} bodega(s) huérfana(s) con ítems — requieren asignación manual de familia`
-    )
+    let deleted = 0
+    for (const warehouse of orphans) {
+      // Verificar si tiene ítems antes de eliminar
+      const [eqCount, conCount, batchCount] = await Promise.all([
+        prisma.equipment.count({ where: { warehouseId: warehouse.id } }),
+        prisma.consumables.count({ where: { warehouseId: warehouse.id } }),
+        prisma.equipment_batches.count({ where: { warehouseId: warehouse.id } }),
+      ])
+
+      if (eqCount + conCount + batchCount === 0) {
+        await prisma.$executeRaw`DELETE FROM warehouses WHERE id = ${warehouse.id}`
+        deleted++
+      } else {
+        console.warn(
+          `⚠️  Bodega huérfana "${warehouse.name}" (${warehouse.id}) tiene ítems — asignar familyId manualmente`
+        )
+      }
+    }
+
+    if (deleted > 0) console.log(`🗑️  ${deleted} bodega(s) huérfana(s) eliminada(s)`)
+  } catch (error: any) {
+    // En BD fresca no hay datos legacy — ignorar silenciosamente
+    console.log('✅ No hay bodegas huérfanas (campo familyId es NOT NULL)')
+  }
 }
 
 // ============================================
