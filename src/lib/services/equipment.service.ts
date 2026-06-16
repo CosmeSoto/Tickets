@@ -141,7 +141,7 @@ export class EquipmentService {
             orderBy: { createdAt: 'desc' },
             take: 1,
           },
-          equipment_attachments: {
+          attachments: {
             orderBy: { createdAt: 'desc' },
           },
         },
