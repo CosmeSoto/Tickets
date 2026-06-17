@@ -30,6 +30,30 @@ interface LicenseAssetFormProps {
 
 type Scope = 'Individual' | 'Departamento' | 'Empresa'
 
+// ── Componente definido fuera del padre para evitar remount en cada render ───
+function LicenseTypeAttributesSection({
+  typeId,
+  values,
+  onChange,
+}: {
+  typeId: string
+  values: Array<{ fieldName: string; fieldValue: string }>
+  onChange: (values: Array<{ fieldName: string; fieldValue: string }>) => void
+}) {
+  if (!typeId) return null
+  return (
+    <div className='space-y-2'>
+      <Label>Atributos del Tipo</Label>
+      <TypeAttributesInput
+        typeId={typeId}
+        assetType='license'
+        values={values}
+        onChange={onChange}
+      />
+    </div>
+  )
+}
+
 export function LicenseAssetForm({
   familyId,
   familyConfig,
@@ -117,32 +141,6 @@ export function LicenseAssetForm({
     onSubmit(payload)
   }
 
-  function TypeAttributesSection({
-    typeId,
-    values,
-    onChange,
-  }: {
-    typeId: string
-    values: Array<{ fieldName: string; fieldValue: string }>
-    onChange: (values: Array<{ fieldName: string; fieldValue: string }>) => void
-  }) {
-    if (!typeId) {
-      return null
-    }
-
-    return (
-      <div className='space-y-2'>
-        <Label>Atributos del Tipo</Label>
-        <TypeAttributesInput
-          typeId={typeId}
-          assetType='license'
-          values={values}
-          onChange={onChange}
-        />
-      </div>
-    )
-  }
-
   return (
     <form onSubmit={handleSubmit} className='space-y-5'>
       <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
@@ -196,7 +194,7 @@ export function LicenseAssetForm({
         </div>
       </div>
 
-      <TypeAttributesSection
+      <LicenseTypeAttributesSection
         typeId={licenseTypeId}
         values={customFieldValues}
         onChange={setCustomFieldValues}

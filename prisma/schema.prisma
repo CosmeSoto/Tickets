@@ -1405,8 +1405,8 @@ model units_of_measure {
 model consumables {
   id                  String            @id @default(uuid())
   name                String
-  typeId              String            @map("type_id")
-  unitOfMeasureId     String            @map("unit_of_measure_id")
+  typeId              String?           @map("type_id")
+  unitOfMeasureId     String?           @map("unit_of_measure_id")
   assignedEquipmentId String?           @map("assigned_equipment_id")
   currentStock        Float             @map("current_stock")
   minStock            Float             @map("min_stock")
@@ -1415,6 +1415,7 @@ model consumables {
   location            String?
   notes               String?
   compatibleEquipment String[]          @map("compatible_equipment")
+  customValues        Json?             @map("custom_values")
   supplierId          String?           @map("supplier_id")
   warehouseId         String?           @map("warehouse_id")
   status              ConsumableStatus  @default(ACTIVE)
@@ -1424,8 +1425,8 @@ model consumables {
   updatedAt           DateTime          @updatedAt @map("updated_at")
   assignedEquipment   equipment?        @relation(fields: [assignedEquipmentId], references: [id])
   supplier            suppliers?        @relation(fields: [supplierId], references: [id])
-  consumableType      consumable_types  @relation(fields: [typeId], references: [id])
-  unitOfMeasure       units_of_measure  @relation(fields: [unitOfMeasureId], references: [id])
+  consumableType      consumable_types? @relation(fields: [typeId], references: [id])
+  unitOfMeasure       units_of_measure? @relation(fields: [unitOfMeasureId], references: [id])
   warehouse           warehouses?       @relation(fields: [warehouseId], references: [id])
   movements           stock_movements[]
 

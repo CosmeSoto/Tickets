@@ -6,16 +6,32 @@ export const createLicenseSchema = z.object({
     .min(2, 'El nombre debe tener al menos 2 caracteres')
     .max(200, 'El nombre no puede exceder 200 caracteres'),
   typeId: z.string().min(1, 'El tipo de licencia es requerido'),
+  licenseTypeId: z.string().optional(),
   key: z.string().max(500, 'La clave no puede exceder 500 caracteres').optional().or(z.literal('')),
+  scope: z.enum(['Individual', 'Departamento', 'Empresa']).optional(),
   purchaseDate: z.coerce.date().optional(),
   expirationDate: z.coerce.date().optional(),
   cost: z.number().min(0, 'El costo debe ser mayor o igual a 0').optional(),
   vendor: z.string().max(100).optional(),
   supplierId: z.string().optional(),
+  invoiceNumber: z.string().max(100).optional().or(z.literal('')),
+  purchaseOrderNumber: z.string().max(100).optional().or(z.literal('')),
+  renewalCost: z.number().min(0).optional(),
+  renewalDate: z.coerce.date().optional(),
+  contractId: z.string().optional(),
+  contractNumber: z.string().max(100).optional().or(z.literal('')),
   notes: z.string().max(2000).optional(),
   assignedToEquipment: z.string().optional(),
   assignedToUser: z.string().optional(),
   assignedToDepartment: z.string().optional(),
+  customValues: z
+    .array(
+      z.object({
+        fieldName: z.string(),
+        fieldValue: z.string(),
+      })
+    )
+    .optional(),
 })
 
 export const updateLicenseSchema = createLicenseSchema.partial()

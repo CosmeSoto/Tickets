@@ -40,6 +40,30 @@ const ACQUISITION_MODES = [
 
 type SelectOption = { id: string; name: string; description?: string }
 
+// ── Componente definido fuera del padre para evitar remount en cada render ───
+// Si está dentro de MROAssetForm, React lo ve como tipo nuevo en cada render
+// y hace unmount/remount → los campos de texto pierden el foco al escribir.
+interface TypeAttributesSectionProps {
+  typeId: string
+  values: Array<{ fieldName: string; fieldValue: string }>
+  onChange: (values: Array<{ fieldName: string; fieldValue: string }>) => void
+}
+
+function TypeAttributesSection({ typeId, values, onChange }: TypeAttributesSectionProps) {
+  if (!typeId) return null
+  return (
+    <div className='space-y-2'>
+      <Label>Atributos del Tipo</Label>
+      <TypeAttributesInput
+        typeId={typeId}
+        assetType='consumable'
+        values={values}
+        onChange={onChange}
+      />
+    </div>
+  )
+}
+
 export function MROAssetForm({
   familyId,
   familyConfig,
@@ -98,40 +122,14 @@ export function MROAssetForm({
       unitOfMeasureId: unitOfMeasureId || undefined,
       acquisitionMode,
       supplierId: supplierId || undefined,
-      initialStock: initialStock ? parseFloat(initialStock) : undefined,
-      minStock: minStock ? parseFloat(minStock) : undefined,
-      maxStock: maxStock ? parseFloat(maxStock) : undefined,
+      currentStock: initialStock ? parseFloat(initialStock) : 0,
+      minStock: minStock ? parseFloat(minStock) : 0,
+      maxStock: maxStock ? parseFloat(maxStock) : 0,
       costPerUnit: costPerUnit ? parseFloat(costPerUnit) : undefined,
       warehouseId: warehouseId || undefined,
       notes: notes || undefined,
       customValues: customFieldValues.length ? customFieldValues : undefined,
     })
-  }
-
-  function TypeAttributesSection({
-    typeId,
-    values,
-    onChange,
-  }: {
-    typeId: string
-    values: Array<{ fieldName: string; fieldValue: string }>
-    onChange: (values: Array<{ fieldName: string; fieldValue: string }>) => void
-  }) {
-    if (!typeId) {
-      return null
-    }
-
-    return (
-      <div className='space-y-2'>
-        <Label>Atributos del Tipo</Label>
-        <TypeAttributesInput
-          typeId={typeId}
-          assetType='consumable'
-          values={values}
-          onChange={onChange}
-        />
-      </div>
-    )
   }
 
   return (

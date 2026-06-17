@@ -605,15 +605,6 @@ export async function seedAttributes(prisma: PrismaClient, familyMap: Map<string
         order: 2,
         helpText: 'Ej: HP CF410A',
       },
-      {
-        attributeName: 'unidad_medida',
-        attributeLabel: 'Unidad de Medida',
-        attributeType: 'select',
-        isRequired: true,
-        isVisible: true,
-        order: 3,
-        options: ['Unidad', 'Caja', 'Paquete'],
-      },
     ]
 
     for (const attr of tonerAttrs) {
@@ -679,15 +670,6 @@ export async function seedAttributes(prisma: PrismaClient, familyMap: Map<string
         isVisible: true,
         order: 3,
         options: ['Blanco', 'Amarillo', 'Azul', 'Verde', 'Rosa'],
-      },
-      {
-        attributeName: 'unidad_medida',
-        attributeLabel: 'Unidad de Medida',
-        attributeType: 'select',
-        isRequired: true,
-        isVisible: true,
-        order: 4,
-        options: ['Resma', 'Caja', 'Paquete'],
       },
     ]
 
@@ -1061,6 +1043,16 @@ export async function seedAttributes(prisma: PrismaClient, familyMap: Map<string
       })
     }
     console.log(`  ✅ ${toolAttrs.length} atributos para Herramienta Eléctrica`)
+  }
+
+  // ── Limpieza: eliminar atributos 'unidad_medida' duplicados con el campo global unitOfMeasureId ──
+  const deletedUoM = await prisma.consumable_type_attributes.deleteMany({
+    where: { attributeName: 'unidad_medida' },
+  })
+  if (deletedUoM.count > 0) {
+    console.log(
+      `  🧹 Eliminados ${deletedUoM.count} atributos 'unidad_medida' redundantes (se usa el campo global)`
+    )
   }
 
   console.log('✅ Seed de atributos completado')

@@ -32,8 +32,8 @@ export class ConsumableService {
     const consumable = await prisma.consumables.create({
       data: {
         name: data.name,
-        typeId: data.typeId,
-        unitOfMeasureId: data.unitOfMeasureId,
+        typeId: data.typeId || null,
+        unitOfMeasureId: data.unitOfMeasureId || null,
         assignedEquipmentId: data.assignedEquipmentId || null,
         currentStock: data.currentStock,
         minStock: data.minStock,
@@ -42,6 +42,7 @@ export class ConsumableService {
         location: data.location,
         notes: data.notes,
         compatibleEquipment: data.compatibleEquipment || [],
+        customValues: data.customValues ?? undefined,
       } as any,
       include: consumableInclude,
     })

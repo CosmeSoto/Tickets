@@ -26,8 +26,8 @@ export type StockMovement = Prisma.stock_movementsGetPayload<{
 
 export interface CreateConsumableData {
   name: string
-  typeId: string
-  unitOfMeasureId: string
+  typeId?: string
+  unitOfMeasureId?: string
   assignedEquipmentId?: string
   currentStock: number
   minStock: number
@@ -36,6 +36,7 @@ export interface CreateConsumableData {
   location?: string
   notes?: string
   compatibleEquipment?: string[]
+  customValues?: Array<{ fieldName: string; fieldValue: string }>
 }
 
 export interface UpdateConsumableData {
@@ -49,6 +50,7 @@ export interface UpdateConsumableData {
   location?: string
   notes?: string
   compatibleEquipment?: string[]
+  customValues?: Array<{ fieldName: string; fieldValue: string }>
 }
 
 export interface CreateStockMovementData {
