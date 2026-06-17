@@ -27,6 +27,8 @@ interface AttachmentsFieldProps {
   existingAttachments?: ExistingAttachment[]
   onChange: (files: File[]) => void
   maxFileSizeMB?: number
+  /** equipmentId para construir URLs de preview de attachments existentes */
+  equipmentId?: string
 }
 
 export function AttachmentsField({
@@ -34,6 +36,7 @@ export function AttachmentsField({
   existingAttachments = [],
   onChange,
   maxFileSizeMB = 10,
+  equipmentId,
 }: AttachmentsFieldProps) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [previewName, setPreviewName] = useState('')
@@ -146,25 +149,42 @@ export function AttachmentsField({
                 <div className='grid grid-cols-3 sm:grid-cols-4 gap-2'>
                   {allImages.map((item, i) => {
                     const isExistingItem = isExisting(item)
-                    const url = isExistingItem ? '#' : URL.createObjectURL(item)
+                    // Para items existentes construimos la URL del preview si tenemos equipmentId
+                    const existingPreviewUrl =
+                      isExistingItem && equipmentId
+                        ? `/api/inventory/equipment/${equipmentId}/attachments/${item.id}?preview=true`
+                        : null
+                    const newFileUrl = !isExistingItem ? URL.createObjectURL(item) : null
                     return (
                       <div
                         key={isExistingItem ? item.id : `new-${i}`}
                         className='group relative aspect-square rounded-lg overflow-hidden border border-border bg-muted'
                       >
                         {isExistingItem ? (
-                          <div className='flex flex-col items-center justify-center h-full w-full bg-muted'>
-                            <ImageIcon className='h-8 w-8 text-muted-foreground' />
-                            <p className='text-xs text-muted-foreground truncate px-1 mt-1'>
-                              {item.originalName}
-                            </p>
-                          </div>
+                          existingPreviewUrl ? (
+                            <img
+                              src={existingPreviewUrl}
+                              alt={item.originalName}
+                              className='h-full w-full object-cover'
+                              onError={e => {
+                                // fallback si la imagen no carga
+                                ;(e.target as HTMLImageElement).style.display = 'none'
+                              }}
+                            />
+                          ) : (
+                            <div className='flex flex-col items-center justify-center h-full w-full bg-muted'>
+                              <ImageIcon className='h-8 w-8 text-muted-foreground' />
+                              <p className='text-xs text-muted-foreground truncate px-1 mt-1'>
+                                {item.originalName}
+                              </p>
+                            </div>
+                          )
                         ) : (
                           <img
-                            src={url}
+                            src={newFileUrl!}
                             alt={item.name}
                             className='h-full w-full object-cover'
-                            onLoad={() => URL.revokeObjectURL(url)}
+                            onLoad={() => URL.revokeObjectURL(newFileUrl!)}
                           />
                         )}
                         <div className='absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center gap-1'>
@@ -178,6 +198,18 @@ export function AttachmentsField({
                               <Eye className='h-3.5 w-3.5' />
                             </button>
                           )}
+                          {isExistingItem && existingPreviewUrl && (
+                            <a
+                              href={existingPreviewUrl}
+                              target='_blank'
+                              rel='noopener noreferrer'
+                              onClick={e => e.stopPropagation()}
+                              className='opacity-0 group-hover:opacity-100 transition-opacity rounded-full bg-black/60 p-1 text-white hover:bg-black/80'
+                              title='Ver imagen'
+                            >
+                              <Eye className='h-3.5 w-3.5' />
+                            </a>
+                          )}
                           {!isExistingItem && (
                             <button
                               type='button'
@@ -189,8 +221,8 @@ export function AttachmentsField({
                             </button>
                           )}
                           {isExistingItem && (
-                            <span className='text-xs bg-green-600 text-white px-2 py-1 rounded-full'>
-                              Existente
+                            <span className='absolute bottom-1 left-1 text-xs bg-black/60 text-white px-1.5 py-0.5 rounded'>
+                              Guardada
                             </span>
                           )}
                         </div>

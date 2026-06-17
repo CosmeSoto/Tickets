@@ -74,8 +74,9 @@ export async function queryAssets(params: AssetsQueryParams): Promise<AssetsQuer
     const items = await prisma.equipment.findMany({
       where: { id: { in: personalEquipmentIds } },
       include: {
-        type: { include: { family: true } },
+        type: { include: { family: { include: { customFields: { orderBy: { order: 'asc' } } } } } },
         model: { select: { brand: true, model: true } },
+        customValues: { select: { fieldName: true, fieldValue: true } },
       },
       orderBy: { createdAt: 'desc' },
     })
@@ -143,7 +144,9 @@ export async function queryAssets(params: AssetsQueryParams): Promise<AssetsQuer
       : prisma.equipment.findMany({
           where: buildEquipmentWhere(),
           include: {
-            type: { include: { family: true } },
+            type: {
+              include: { family: { include: { customFields: { orderBy: { order: 'asc' } } } } },
+            },
             model: { select: { brand: true, model: true } },
             customValues: { select: { fieldName: true, fieldValue: true } },
           },
@@ -220,6 +223,30 @@ export async function queryAssets(params: AssetsQueryParams): Promise<AssetsQuer
 }
 
 function mapEquipmentItem(item: any): UnifiedAssetItem {
+  // Catálogo de campos de la familia con orden y labels
+  const familyFields: Array<{ fieldName: string; fieldLabel: string; order: number }> =
+    item.type?.family?.customFields ?? []
+  const fieldMeta = new Map(
+    familyFields.map(f => [f.fieldName, { label: f.fieldLabel, order: f.order }])
+  )
+
+  // Ordenar customValues según el catálogo de la familia
+  const sortedValues = [...(item.customValues ?? [])].sort((a, b) => {
+    const oA = fieldMeta.get(a.fieldName)?.order ?? 999
+    const oB = fieldMeta.get(b.fieldName)?.order ?? 999
+    return oA - oB
+  })
+
+  // Formatear como "Label: Valor" usando el fieldLabel del catálogo (no el fieldName snake_case)
+  const attributesStr = sortedValues.length
+    ? sortedValues
+        .map(cv => {
+          const label = fieldMeta.get(cv.fieldName)?.label ?? cv.fieldName
+          return `${label}: ${cv.fieldValue}`
+        })
+        .join(', ')
+    : undefined
+
   return {
     id: item.id,
     name: item.model
@@ -241,13 +268,7 @@ function mapEquipmentItem(item: any): UnifiedAssetItem {
     purchasePrice: item.purchasePrice ?? undefined,
     invoiceNumber: item.invoiceNumber ?? undefined,
     purchaseOrderNumber: item.purchaseOrderNumber ?? undefined,
-    attributes: item.customValues?.length
-      ? item.customValues
-          .map(
-            (cv: { fieldName: string; fieldValue: string }) => `${cv.fieldName}: ${cv.fieldValue}`
-          )
-          .join(', ')
-      : undefined,
+    attributes: attributesStr,
     accessories: item.accessories?.length ? item.accessories.join(', ') : undefined,
   }
 }

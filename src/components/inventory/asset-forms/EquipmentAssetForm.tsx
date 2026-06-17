@@ -1389,6 +1389,7 @@ export function EquipmentAssetForm({
         existingAttachments={existingAttachments}
         onChange={setAttachments}
         maxFileSizeMB={maxFileSizeMB}
+        equipmentId={isEditMode ? equipmentId : undefined}
       />
 
       {submitError && <p className='text-sm text-destructive'>{submitError}</p>}

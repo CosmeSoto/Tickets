@@ -71,6 +71,8 @@ export function useEquipmentDetail({
     type: 'PREVENTIVE',
     description: '',
     scheduledDate: new Date().toISOString().split('T')[0],
+    externalProvider: undefined,
+    notes: undefined,
   })
 
   // ── Detalle del equipo de carga ──
@@ -271,6 +273,17 @@ export function useEquipmentDetail({
     setSubmittingMaintenance(true)
     try {
       const isClient = userRole === 'CLIENT'
+
+      // Construir notas combinando proveedor externo + notas internas
+      const noteParts: string[] = []
+      if (maintenanceForm.externalProvider?.trim()) {
+        noteParts.push(`Proveedor externo: ${maintenanceForm.externalProvider.trim()}`)
+      }
+      if (maintenanceForm.notes?.trim()) {
+        noteParts.push(maintenanceForm.notes.trim())
+      }
+      const combinedNotes = noteParts.length > 0 ? noteParts.join('\n') : undefined
+
       const response = await fetch('/api/inventory/maintenance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -279,7 +292,9 @@ export function useEquipmentDetail({
           type: maintenanceForm.type,
           description: maintenanceForm.description,
           scheduledDate: maintenanceForm.scheduledDate,
-          ...(isClient ? {} : { technicianId: userId }),
+          notes: combinedNotes,
+          // Si hay proveedor externo, no asignar técnico interno
+          ...(isClient ? {} : maintenanceForm.externalProvider ? {} : { technicianId: userId }),
         }),
       })
 
@@ -299,6 +314,8 @@ export function useEquipmentDetail({
         type: 'PREVENTIVE',
         description: '',
         scheduledDate: new Date().toISOString().split('T')[0],
+        externalProvider: undefined,
+        notes: undefined,
       })
       loadEquipmentDetail()
     } catch (error) {

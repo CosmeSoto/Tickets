@@ -104,7 +104,7 @@ export function AssignmentDialog({
                   <div className='flex flex-col'>
                     <span>Temporal</span>
                     <span className='text-xs text-muted-foreground font-normal'>
-                      Uso por período definido — requiere fecha de devolución
+                      Uso por período definido — fecha de devolución
                     </span>
                   </div>
                 </SelectItem>
@@ -112,7 +112,7 @@ export function AssignmentDialog({
                   <div className='flex flex-col'>
                     <span>Préstamo externo</span>
                     <span className='text-xs text-muted-foreground font-normal'>
-                      Equipo prestado a tercero o de tercero — requiere fecha de devolución
+                      Equipo prestado a tercero o de tercero — fecha de devolución
                     </span>
                   </div>
                 </SelectItem>
@@ -132,17 +132,21 @@ export function AssignmentDialog({
             />
           </div>
 
-          {/* Fecha de fin — solo temporal y préstamo */}
+          {/* Fecha de fin — solo temporal y préstamo, opcional */}
           {(form.assignmentType === 'TEMPORARY' || form.assignmentType === 'LOAN') && (
             <div className='space-y-2'>
               <Label>
-                Fecha de Fin <span className='text-destructive'>*</span>
+                Fecha de Devolución{' '}
+                <span className='text-xs text-muted-foreground font-normal'>(opcional)</span>
               </Label>
               <Input
                 type='date'
                 value={form.endDate}
                 onChange={e => onFormChange({ ...form, endDate: e.target.value })}
               />
+              <p className='text-xs text-muted-foreground'>
+                Si no se conoce la fecha, puede dejarse vacía y actualizarse después.
+              </p>
             </div>
           )}
 

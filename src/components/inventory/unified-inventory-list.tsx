@@ -21,7 +21,6 @@ import {
   STATUS_FILTER_OPTIONS,
   CONDITION_FILTER_OPTIONS,
   OPTIONAL_COLUMNS,
-  DEFAULT_VISIBLE_COLUMNS,
 } from '@/types/inventory/unified-asset'
 import type { AssetSubtype } from '@/lib/inventory/family-config'
 
@@ -107,7 +106,8 @@ export function UnifiedInventoryList({
     return <ArrowUpDown className='inline h-3.5 w-3.5 ml-1 opacity-40' />
   }
 
-  const colCount = 2 + Array.from(visibleColumns).length
+  // 2 columnas fijas (Tipo + Nombre) + las opcionales activas
+  const colCount = 2 + visibleColumns.size
 
   return (
     <div className='space-y-4'>
@@ -198,7 +198,8 @@ export function UnifiedInventoryList({
           {showColumnPicker && (
             <>
               <div className='fixed inset-0 z-10' onClick={() => setShowColumnPicker(false)} />
-              <div className='absolute right-0 z-20 mt-1 w-52 rounded-md border border-border bg-popover shadow-lg overflow-hidden'>
+              {/* max-w evita que se salga del viewport en móvil */}
+              <div className='absolute right-0 z-20 mt-1 w-52 max-w-[calc(100vw-1rem)] rounded-md border border-border bg-popover shadow-lg overflow-hidden'>
                 <p className='px-3 py-2 text-xs font-semibold text-muted-foreground border-b border-border'>
                   Columnas visibles
                 </p>
@@ -211,7 +212,11 @@ export function UnifiedInventoryList({
                       className='flex w-full items-center gap-2.5 px-3 py-1.5 text-sm hover:bg-accent transition-colors'
                     >
                       <span
-                        className={`h-4 w-4 shrink-0 rounded border flex items-center justify-center ${visibleColumns.has(c.key) ? 'bg-primary border-primary' : 'border-border bg-background'}`}
+                        className={`h-4 w-4 shrink-0 rounded border flex items-center justify-center ${
+                          visibleColumns.has(c.key)
+                            ? 'bg-primary border-primary'
+                            : 'border-border bg-background'
+                        }`}
                       >
                         {visibleColumns.has(c.key) && (
                           <Check className='h-2.5 w-2.5 text-primary-foreground' />
@@ -259,34 +264,39 @@ export function UnifiedInventoryList({
         </p>
       )}
 
-      {/* Tabla */}
+      {/* Tabla — overflow-x-auto permite scroll horizontal en móvil */}
       <div className='overflow-x-auto rounded-lg border border-border'>
         <table className='min-w-full divide-y divide-border text-sm'>
           <thead className='bg-muted/50'>
             <tr>
+              {/* Columnas fijas — siempre visibles */}
               <th
-                className='px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 select-none'
+                className='px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap'
                 onClick={() => requestSort('subtype')}
               >
                 Tipo {renderSortIcon('subtype')}
               </th>
+
+              {/* Columnas opcionales — visibles cuando el toggle las activa, sin breakpoints CSS */}
               {col('area') && (
                 <th
-                  className='px-4 py-3 text-left font-medium text-muted-foreground hidden sm:table-cell cursor-pointer hover:bg-muted/50 select-none'
+                  className='px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap'
                   onClick={() => requestSort('familyName')}
                 >
                   Área {renderSortIcon('familyName')}
                 </th>
               )}
+
               <th
                 className='px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 select-none'
                 onClick={() => requestSort('name')}
               >
                 Nombre {renderSortIcon('name')}
               </th>
+
               {col('codigo') && (
                 <th
-                  className='px-4 py-3 text-left font-medium text-muted-foreground hidden md:table-cell cursor-pointer hover:bg-muted/50 select-none'
+                  className='px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap'
                   onClick={() => requestSort('code')}
                 >
                   Código {renderSortIcon('code')}
@@ -294,7 +304,7 @@ export function UnifiedInventoryList({
               )}
               {col('estado') && (
                 <th
-                  className='px-4 py-3 text-left font-medium text-muted-foreground hidden lg:table-cell cursor-pointer hover:bg-muted/50 select-none'
+                  className='px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap'
                   onClick={() => requestSort('status')}
                 >
                   Estado {renderSortIcon('status')}
@@ -302,7 +312,7 @@ export function UnifiedInventoryList({
               )}
               {col('condicion') && (
                 <th
-                  className='px-4 py-3 text-left font-medium text-muted-foreground hidden lg:table-cell cursor-pointer hover:bg-muted/50 select-none'
+                  className='px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap'
                   onClick={() => requestSort('condition')}
                 >
                   Condición {renderSortIcon('condition')}
@@ -310,7 +320,7 @@ export function UnifiedInventoryList({
               )}
               {col('propiedad') && (
                 <th
-                  className='px-4 py-3 text-left font-medium text-muted-foreground hidden lg:table-cell cursor-pointer hover:bg-muted/50 select-none'
+                  className='px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap'
                   onClick={() => requestSort('acquisitionMode')}
                 >
                   Propiedad {renderSortIcon('acquisitionMode')}
@@ -318,34 +328,34 @@ export function UnifiedInventoryList({
               )}
               {col('creado') && (
                 <th
-                  className='px-4 py-3 text-left font-medium text-muted-foreground hidden lg:table-cell cursor-pointer hover:bg-muted/50 select-none'
+                  className='px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap'
                   onClick={() => requestSort('createdAt')}
                 >
                   Creado {renderSortIcon('createdAt')}
                 </th>
               )}
               {col('fechaCompra') && (
-                <th className='px-4 py-3 text-left font-medium text-muted-foreground hidden xl:table-cell select-none whitespace-nowrap'>
+                <th className='px-4 py-3 text-left font-medium text-muted-foreground select-none whitespace-nowrap'>
                   F. Compra
                 </th>
               )}
               {col('factura') && (
-                <th className='px-4 py-3 text-left font-medium text-muted-foreground hidden xl:table-cell select-none whitespace-nowrap'>
+                <th className='px-4 py-3 text-left font-medium text-muted-foreground select-none whitespace-nowrap'>
                   N° Factura
                 </th>
               )}
               {col('ordenCompra') && (
-                <th className='px-4 py-3 text-left font-medium text-muted-foreground hidden xl:table-cell select-none whitespace-nowrap'>
+                <th className='px-4 py-3 text-left font-medium text-muted-foreground select-none whitespace-nowrap'>
                   N° OC
                 </th>
               )}
               {col('atributos') && (
-                <th className='px-4 py-3 text-left font-medium text-muted-foreground hidden xl:table-cell select-none'>
+                <th className='px-4 py-3 text-left font-medium text-muted-foreground select-none whitespace-nowrap'>
                   Atributos
                 </th>
               )}
               {col('accesorios') && (
-                <th className='px-4 py-3 text-left font-medium text-muted-foreground hidden xl:table-cell select-none'>
+                <th className='px-4 py-3 text-left font-medium text-muted-foreground select-none whitespace-nowrap'>
                   Accesorios
                 </th>
               )}
@@ -380,54 +390,54 @@ export function UnifiedInventoryList({
                     <SubtypeBadge subtype={asset.subtype} size='sm' />
                   </td>
                   {col('area') && (
-                    <td className='px-4 py-3 hidden sm:table-cell'>
+                    <td className='px-4 py-3'>
                       <FamilyBadge family={asset.family} size='sm' />
                     </td>
                   )}
                   <td className='px-4 py-3 font-medium text-foreground'>{asset.name}</td>
                   {col('codigo') && (
-                    <td className='px-4 py-3 text-muted-foreground font-mono text-xs hidden md:table-cell'>
+                    <td className='px-4 py-3 text-muted-foreground font-mono text-xs'>
                       {asset.code ?? asset.id.slice(0, 8)}
                     </td>
                   )}
                   {col('estado') && (
-                    <td className='px-4 py-3 hidden lg:table-cell'>
+                    <td className='px-4 py-3'>
                       <StatusBadge status={asset.status} />
                     </td>
                   )}
                   {col('condicion') && (
-                    <td className='px-4 py-3 hidden lg:table-cell'>
+                    <td className='px-4 py-3'>
                       <ConditionBadge condition={asset.condition} />
                     </td>
                   )}
                   {col('propiedad') && (
-                    <td className='px-4 py-3 text-muted-foreground text-xs hidden lg:table-cell'>
-                      {asset.acquisitionMode ? getAcquisitionModeLabel(asset.acquisitionMode) : ''}
+                    <td className='px-4 py-3 text-muted-foreground text-xs'>
+                      {asset.acquisitionMode ? getAcquisitionModeLabel(asset.acquisitionMode) : '—'}
                     </td>
                   )}
                   {col('creado') && (
-                    <td className='px-4 py-3 text-muted-foreground hidden lg:table-cell'>
+                    <td className='px-4 py-3 text-muted-foreground text-xs'>
                       {formatDate(asset.createdAt)}
                     </td>
                   )}
                   {col('fechaCompra') && (
-                    <td className='px-4 py-3 text-muted-foreground text-xs hidden xl:table-cell'>
+                    <td className='px-4 py-3 text-muted-foreground text-xs'>
                       {asset.purchaseDate ? formatDate(asset.purchaseDate) : '—'}
                     </td>
                   )}
                   {col('factura') && (
-                    <td className='px-4 py-3 text-muted-foreground text-xs hidden xl:table-cell font-mono'>
+                    <td className='px-4 py-3 text-muted-foreground text-xs font-mono'>
                       {asset.invoiceNumber ?? '—'}
                     </td>
                   )}
                   {col('ordenCompra') && (
-                    <td className='px-4 py-3 text-muted-foreground text-xs hidden xl:table-cell font-mono'>
+                    <td className='px-4 py-3 text-muted-foreground text-xs font-mono'>
                       {asset.purchaseOrderNumber ?? '—'}
                     </td>
                   )}
                   {col('atributos') && (
                     <td
-                      className='px-4 py-3 text-muted-foreground text-xs hidden xl:table-cell max-w-[180px] truncate'
+                      className='px-4 py-3 text-muted-foreground text-xs max-w-[200px] truncate'
                       title={asset.attributes ?? ''}
                     >
                       {asset.attributes || '—'}
@@ -435,7 +445,7 @@ export function UnifiedInventoryList({
                   )}
                   {col('accesorios') && (
                     <td
-                      className='px-4 py-3 text-muted-foreground text-xs hidden xl:table-cell max-w-[180px] truncate'
+                      className='px-4 py-3 text-muted-foreground text-xs max-w-[200px] truncate'
                       title={asset.accessories ?? ''}
                     >
                       {asset.accessories || '—'}

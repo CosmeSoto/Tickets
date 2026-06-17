@@ -119,6 +119,42 @@ export function MaintenanceDialog({
               onChange={e => onFormChange({ ...form, scheduledDate: e.target.value })}
             />
           </div>
+
+          {/* Proveedor externo — solo para ADMIN/TECHNICIAN */}
+          {userRole !== 'CLIENT' && (
+            <div className='space-y-2'>
+              <Label>
+                Proveedor Externo{' '}
+                <span className='text-xs text-muted-foreground font-normal'>(opcional)</span>
+              </Label>
+              <Input
+                value={form.externalProvider ?? ''}
+                onChange={e =>
+                  onFormChange({ ...form, externalProvider: e.target.value || undefined })
+                }
+                placeholder='Ej: Servicio Técnico Dell, Proveedor XYZ...'
+              />
+              <p className='text-xs text-muted-foreground'>
+                Si el mantenimiento lo realiza un proveedor externo en lugar de un técnico interno.
+              </p>
+            </div>
+          )}
+
+          {/* Notas adicionales — solo para ADMIN/TECHNICIAN */}
+          {userRole !== 'CLIENT' && (
+            <div className='space-y-2'>
+              <Label>
+                Notas Internas{' '}
+                <span className='text-xs text-muted-foreground font-normal'>(opcional)</span>
+              </Label>
+              <Textarea
+                value={form.notes ?? ''}
+                onChange={e => onFormChange({ ...form, notes: e.target.value || undefined })}
+                placeholder='Notas internas del técnico...'
+                rows={2}
+              />
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant='outline' onClick={() => onOpenChange(false)} disabled={submitting}>
