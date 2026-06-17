@@ -221,7 +221,7 @@ const HomePageContent = React.memo(function HomePageContent() {
             {/* Badge */}
             <div className='inline-flex items-center gap-2 bg-primary/10 border border-primary/25 text-primary text-sm font-medium px-4 py-1.5 rounded-full mb-6'>
               <span className='w-2 h-2 rounded-full bg-primary animate-pulse' />
-              Gestión Integral de Operaciones integral
+              Gestión Integral de Operaciones
             </div>
 
             <h1 className='text-4xl sm:text-5xl md:text-6xl font-bold mb-5 text-foreground leading-tight'>
