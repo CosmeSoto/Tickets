@@ -124,7 +124,7 @@ const p = new PrismaClient();
       await p.landing_page_content.create({
         data: {
           id: 'default',
-          heroTitle: 'Soporte Multi-Área Profesional',
+          heroTitle: 'Soporte Multi-Área',
           heroSubtitle: 'Gestión de tickets para todas las áreas de tu organización',
           heroCtaPrimary: 'Crear Ticket de Soporte',
           heroCtaPrimaryUrl: '/login',
