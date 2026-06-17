@@ -22,16 +22,14 @@ export async function GET(request: NextRequest) {
     }
 
     const searchParams = request.nextUrl.searchParams
-    const type = searchParams.get('type') || undefined
     const activeParam = searchParams.get('active')
     const search = searchParams.get('search') || undefined
     const familyId = searchParams.get('familyId') || undefined
 
     const where: Record<string, unknown> = {}
 
-    if (type) {
-      where.type = type
-    }
+    // Nota: el antiguo campo 'type' (enum) fue migrado a 'typeId' (relación)
+    // Se ignora el parámetro ?type= para evitar errores de Prisma con campo inexistente
 
     if (activeParam !== null && activeParam !== undefined) {
       where.isActive = activeParam === 'true'
@@ -75,7 +73,8 @@ export async function GET(request: NextRequest) {
     })
 
     return NextResponse.json(suppliers)
-  } catch {
+  } catch (error) {
+    console.error('[GET /api/inventory/suppliers]', error)
     return NextResponse.json({ error: 'Error al obtener proveedores' }, { status: 500 })
   }
 }
@@ -148,14 +147,15 @@ export async function POST(request: NextRequest) {
         details: {
           message: `Proveedor "${supplier.name}" creado por ${session.user.email}`,
           supplierName: supplier.name,
-          supplierType: (supplier as any).type,
+          typeId: supplier.typeId,
           taxId: supplier.taxId,
         },
       },
     })
 
     return NextResponse.json(supplier, { status: 201 })
-  } catch {
+  } catch (error) {
+    console.error('[POST /api/inventory/suppliers]', error)
     return NextResponse.json({ error: 'Error al crear proveedor' }, { status: 500 })
   }
 }

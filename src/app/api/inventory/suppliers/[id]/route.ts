@@ -53,7 +53,9 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     }
 
     return NextResponse.json(supplier)
-  } catch {
+  } catch (err) {
+    if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+    console.error('[GET /api/inventory/suppliers/[id]]', err)
     return NextResponse.json({ error: 'Error al obtener proveedor' }, { status: 500 })
   }
 }
@@ -128,8 +130,8 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
       where: { id },
       data: {
         name: name.trim(),
-        type: typeId || null,
-        familyId: familyId || null,
+        typeId: typeId !== undefined ? typeId || null : existing.typeId,
+        familyId: familyId !== undefined ? familyId || null : existing.familyId,
         taxId: taxId || null,
         email: email || null,
         phone: phone || null,
@@ -150,13 +152,15 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
         details: {
           message: `Proveedor "${supplier.name}" actualizado por ${session.user.email}`,
           supplierName: supplier.name,
-          supplierType: (supplier as any).type,
+          typeId: supplier.typeId,
         },
       },
     })
 
     return NextResponse.json(supplier)
-  } catch {
+  } catch (err) {
+    if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+    console.error('[PUT /api/inventory/suppliers/[id]]', err)
     return NextResponse.json({ error: 'Error al actualizar proveedor' }, { status: 500 })
   }
 }
@@ -231,7 +235,9 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     })
 
     return NextResponse.json(supplier)
-  } catch {
+  } catch (err) {
+    if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+    console.error('[PATCH /api/inventory/suppliers/[id]]', err)
     return NextResponse.json({ error: 'Error al desactivar proveedor' }, { status: 500 })
   }
 }
@@ -303,7 +309,9 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
     })
 
     return NextResponse.json({ success: true })
-  } catch {
+  } catch (err) {
+    if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+    console.error('[DELETE /api/inventory/suppliers/[id]]', err)
     return NextResponse.json({ error: 'Error al eliminar proveedor' }, { status: 500 })
   }
 }
