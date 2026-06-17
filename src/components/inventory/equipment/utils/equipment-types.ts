@@ -117,7 +117,9 @@ export interface MaintenanceForm {
   type: 'PREVENTIVE' | 'CORRECTIVE'
   description: string
   scheduledDate: string
-  /** Nombre del proveedor externo (cuando el mantenimiento lo hace un tercero) */
+  /** ID del proveedor externo seleccionado de la lista */
+  externalProviderId?: string
+  /** Nombre/texto del proveedor externo (cuando el mantenimiento lo hace un tercero) */
   externalProvider?: string
   /** Notas adicionales internas */
   notes?: string

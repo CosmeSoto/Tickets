@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { FamilyCombobox } from '@/components/ui/family-combobox'
 import { FamilyBadge } from '@/components/inventory/family-badge'
@@ -12,7 +13,15 @@ import {
   getAssetConditionLabel,
   getAcquisitionModeLabel,
 } from '@/lib/utils/inventory-utils'
-import { Search, ArrowUpDown, ArrowUp, ArrowDown, SlidersHorizontal, Check } from 'lucide-react'
+import {
+  Search,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  SlidersHorizontal,
+  Check,
+  Printer,
+} from 'lucide-react'
 import { MetricsSection } from '@/components/inventory/dashboard/metrics-section'
 import { AlertsSection } from '@/components/inventory/dashboard/alerts-section'
 import { useInventoryList } from '@/hooks/inventory/use-inventory-list'
@@ -23,6 +32,7 @@ import {
   OPTIONAL_COLUMNS,
 } from '@/types/inventory/unified-asset'
 import type { AssetSubtype } from '@/lib/inventory/family-config'
+import { QRBulkPrintDialog } from '@/components/inventory/qr-bulk-print-dialog'
 
 interface UnifiedInventoryListProps {
   initialFamilyId?: string
@@ -99,6 +109,33 @@ export function UnifiedInventoryList({
     exporting,
   } = useInventoryList({ initialFamilyId, personalOnly })
 
+  // ── Selección y bulk QR ──────────────────────────────────────────────────
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkPrintOpen, setBulkPrintOpen] = useState(false)
+
+  const equipmentAssets = sortedAssets.filter(a => a.subtype === 'EQUIPMENT')
+
+  const toggleSelection = useCallback((id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+
+  const toggleSelectAll = useCallback(() => {
+    const equipIds = equipmentAssets.map(a => a.id)
+    const allSelected = equipIds.length > 0 && equipIds.every(id => selectedIds.has(id))
+    setSelectedIds(allSelected ? new Set() : new Set(equipIds))
+  }, [equipmentAssets, selectedIds])
+
+  // Limpiar selección al cambiar de página o filtros
+  const handlePageChange = (p: number | ((prev: number) => number)) => {
+    setSelectedIds(new Set())
+    setPage(p)
+  }
+
   const renderSortIcon = (key: string) => {
     const s = getSortIcon(key)
     if (s === 'asc') return <ArrowUp className='inline h-3.5 w-3.5 ml-1' />
@@ -106,8 +143,8 @@ export function UnifiedInventoryList({
     return <ArrowUpDown className='inline h-3.5 w-3.5 ml-1 opacity-40' />
   }
 
-  // 2 columnas fijas (Tipo + Nombre) + las opcionales activas
-  const colCount = 2 + visibleColumns.size
+  // 2 columnas fijas (Tipo + Nombre) + las opcionales activas + 1 checkbox
+  const colCount = 3 + visibleColumns.size
 
   return (
     <div className='space-y-4'>
@@ -264,11 +301,43 @@ export function UnifiedInventoryList({
         </p>
       )}
 
+      {/* Barra de selección bulk QR — solo equipos */}
+      {!personalOnly && equipmentAssets.length > 0 && (
+        <div className='flex items-center gap-3'>
+          <label className='flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none'>
+            <input
+              type='checkbox'
+              className='h-4 w-4 accent-primary cursor-pointer'
+              checked={
+                equipmentAssets.length > 0 && equipmentAssets.every(a => selectedIds.has(a.id))
+              }
+              onChange={toggleSelectAll}
+              aria-label='Seleccionar todos los equipos visibles'
+            />
+            {selectedIds.size > 0
+              ? `${selectedIds.size} equipo${selectedIds.size > 1 ? 's' : ''} seleccionado${selectedIds.size > 1 ? 's' : ''}`
+              : 'Seleccionar equipos para imprimir QR'}
+          </label>
+          {selectedIds.size > 0 && (
+            <button
+              type='button'
+              onClick={() => setBulkPrintOpen(true)}
+              className='flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-sm hover:bg-accent transition-colors'
+            >
+              <Printer className='h-3.5 w-3.5' />
+              Imprimir {selectedIds.size} QR{selectedIds.size > 1 ? 's' : ''}
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Tabla — overflow-x-auto permite scroll horizontal en móvil */}
       <div className='overflow-x-auto rounded-lg border border-border'>
         <table className='min-w-full divide-y divide-border text-sm'>
           <thead className='bg-muted/50'>
             <tr>
+              {/* Checkbox de selección — solo equipos tienen QR */}
+              <th className='px-3 py-3 w-10' />
               {/* Columnas fijas — siempre visibles */}
               <th
                 className='px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap'
@@ -386,6 +455,17 @@ export function UnifiedInventoryList({
                     router.push(`/inventory/${asset.subtype.toLowerCase()}/${asset.id}`)
                   }
                 >
+                  <td className='px-3 py-3' onClick={e => e.stopPropagation()}>
+                    {asset.subtype === 'EQUIPMENT' && (
+                      <input
+                        type='checkbox'
+                        className='h-4 w-4 accent-primary cursor-pointer'
+                        checked={selectedIds.has(asset.id)}
+                        onChange={() => toggleSelection(asset.id)}
+                        aria-label={`Seleccionar ${asset.name}`}
+                      />
+                    )}
+                  </td>
                   <td className='px-4 py-3'>
                     <SubtypeBadge subtype={asset.subtype} size='sm' />
                   </td>
@@ -464,7 +544,7 @@ export function UnifiedInventoryList({
           <button
             type='button'
             disabled={page <= 1}
-            onClick={() => setPage(p => p - 1)}
+            onClick={() => handlePageChange(p => p - 1)}
             className='rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50 transition-colors'
           >
             Anterior
@@ -475,13 +555,20 @@ export function UnifiedInventoryList({
           <button
             type='button'
             disabled={page >= totalPages}
-            onClick={() => setPage(p => p + 1)}
+            onClick={() => handlePageChange(p => p + 1)}
             className='rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50 transition-colors'
           >
             Siguiente
           </button>
         </div>
       )}
+      {/* Bulk QR print dialog */}
+      <QRBulkPrintDialog
+        open={bulkPrintOpen}
+        onOpenChange={setBulkPrintOpen}
+        selectedIds={selectedIds}
+        assets={sortedAssets}
+      />
     </div>
   )
 }

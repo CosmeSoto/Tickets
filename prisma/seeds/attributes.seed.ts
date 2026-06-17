@@ -168,7 +168,7 @@ export async function seedAttributes(prisma: PrismaClient, familyMap: Map<string
       },
       {
         attributeName: 'pantalla_pulgadas',
-        attributeLabel: 'Tamaño Pantalla (pulgadas)',
+        attributeLabel: 'Pantalla',
         attributeType: 'select',
         isRequired: true,
         isVisible: true,

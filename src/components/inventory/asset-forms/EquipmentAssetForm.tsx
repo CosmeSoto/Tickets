@@ -1388,6 +1388,26 @@ export function EquipmentAssetForm({
         files={attachments}
         existingAttachments={existingAttachments}
         onChange={setAttachments}
+        onDeleteExisting={
+          isEditMode && equipmentId
+            ? async (attachmentId: string) => {
+                try {
+                  const res = await fetch(
+                    `/api/inventory/equipment/${equipmentId}/attachments/${attachmentId}`,
+                    { method: 'DELETE' }
+                  )
+                  if (res.ok) {
+                    setExistingAttachments(prev => prev.filter(a => a.id !== attachmentId))
+                  } else {
+                    const err = await res.json()
+                    toast.error(err.error || 'No se pudo eliminar el adjunto')
+                  }
+                } catch {
+                  toast.error('Error al eliminar el adjunto')
+                }
+              }
+            : undefined
+        }
         maxFileSizeMB={maxFileSizeMB}
         equipmentId={isEditMode ? equipmentId : undefined}
       />

@@ -181,7 +181,7 @@ export function EquipmentDetail({
           canConvertToPurchase={canConvertToPurchase ?? false}
           canSell={
             (userRole === 'ADMIN' || isSuperAdmin) &&
-            !['SOLD', 'RETIRED', 'ASSIGNED'].includes(equipment.status) &&
+            equipment.status === 'FOR_SALE' &&
             !isAssigned &&
             !(equipment as any).sale
           }
@@ -288,7 +288,19 @@ export function EquipmentDetail({
 
         {/* Columna lateral — QR + asignación */}
         <div className='space-y-6'>
-          <EquipmentQRCard qrCode={qrCode} equipmentCode={equipment.code} onDownload={downloadQR} />
+          <EquipmentQRCard
+            qrCode={qrCode}
+            equipmentCode={equipment.code}
+            equipmentName={
+              [
+                equipment.model?.brand?.name || equipment.brand,
+                equipment.model?.model || equipment.modelDeprecated,
+              ]
+                .filter(Boolean)
+                .join(' ') || undefined
+            }
+            onDownload={downloadQR}
+          />
           {currentAssignment && <EquipmentAssignmentCard assignment={currentAssignment} />}
         </div>
       </div>
@@ -333,6 +345,7 @@ export function EquipmentDetail({
         equipmentType={equipment.type}
         currentAssignment={currentAssignment}
         userRole={userRole}
+        familyId={(equipment.type as any)?.family?.id}
         form={maintenanceForm}
         onFormChange={setMaintenanceForm}
         onSubmit={submitMaintenance}

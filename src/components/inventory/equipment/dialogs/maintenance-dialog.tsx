@@ -22,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { SupplierSelect } from '@/components/inventory/suppliers/SupplierSelect'
 import { getEquipmentDisplayName } from '@/lib/utils/equipment-display'
 import type { MaintenanceForm, EquipmentType, Assignment } from '../utils/equipment-types'
 
@@ -35,6 +36,8 @@ interface MaintenanceDialogProps {
   equipmentType?: EquipmentType
   currentAssignment?: Assignment
   userRole: string
+  /** familyId del equipo — para filtrar proveedores por familia */
+  familyId?: string
   form: MaintenanceForm
   onFormChange: (form: MaintenanceForm) => void
   onSubmit: () => void
@@ -51,6 +54,7 @@ export function MaintenanceDialog({
   equipmentType,
   currentAssignment,
   userRole,
+  familyId,
   form,
   onFormChange,
   onSubmit,
@@ -87,6 +91,7 @@ export function MaintenanceDialog({
             )}
           </DialogDescription>
         </DialogHeader>
+
         <div className='space-y-4 py-2'>
           <div className='space-y-2'>
             <Label>Tipo de Mantenimiento *</Label>
@@ -103,6 +108,7 @@ export function MaintenanceDialog({
               </SelectContent>
             </Select>
           </div>
+
           <div className='space-y-2'>
             <Label>Descripción *</Label>
             <Textarea
@@ -111,6 +117,7 @@ export function MaintenanceDialog({
               placeholder='Describe el mantenimiento a realizar...'
             />
           </div>
+
           <div className='space-y-2'>
             <Label>Fecha Programada *</Label>
             <Input
@@ -127,12 +134,14 @@ export function MaintenanceDialog({
                 Proveedor Externo{' '}
                 <span className='text-xs text-muted-foreground font-normal'>(opcional)</span>
               </Label>
-              <Input
-                value={form.externalProvider ?? ''}
-                onChange={e =>
-                  onFormChange({ ...form, externalProvider: e.target.value || undefined })
+              <SupplierSelect
+                value={form.externalProviderId ?? null}
+                onChange={supplierId =>
+                  onFormChange({ ...form, externalProviderId: supplierId ?? undefined })
                 }
-                placeholder='Ej: Servicio Técnico Dell, Proveedor XYZ...'
+                familyId={familyId}
+                placeholder='Seleccionar proveedor externo...'
+                allowCreate={true}
               />
               <p className='text-xs text-muted-foreground'>
                 Si el mantenimiento lo realiza un proveedor externo en lugar de un técnico interno.
@@ -156,6 +165,7 @@ export function MaintenanceDialog({
             </div>
           )}
         </div>
+
         <DialogFooter>
           <Button variant='outline' onClick={() => onOpenChange(false)} disabled={submitting}>
             Cancelar

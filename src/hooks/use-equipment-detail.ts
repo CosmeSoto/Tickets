@@ -71,6 +71,7 @@ export function useEquipmentDetail({
     type: 'PREVENTIVE',
     description: '',
     scheduledDate: new Date().toISOString().split('T')[0],
+    externalProviderId: undefined,
     externalProvider: undefined,
     notes: undefined,
   })
@@ -274,10 +275,24 @@ export function useEquipmentDetail({
     try {
       const isClient = userRole === 'CLIENT'
 
+      // Resolver nombre del proveedor externo (por ID o por texto libre)
+      let resolvedProviderName = maintenanceForm.externalProvider?.trim() ?? ''
+      if (maintenanceForm.externalProviderId) {
+        try {
+          const res = await fetch(`/api/inventory/suppliers/${maintenanceForm.externalProviderId}`)
+          if (res.ok) {
+            const sup = await res.json()
+            resolvedProviderName = sup.name ?? resolvedProviderName
+          }
+        } catch {
+          // silencioso — usar texto libre si lo hay
+        }
+      }
+
       // Construir notas combinando proveedor externo + notas internas
       const noteParts: string[] = []
-      if (maintenanceForm.externalProvider?.trim()) {
-        noteParts.push(`Proveedor externo: ${maintenanceForm.externalProvider.trim()}`)
+      if (resolvedProviderName) {
+        noteParts.push(`Proveedor externo: ${resolvedProviderName}`)
       }
       if (maintenanceForm.notes?.trim()) {
         noteParts.push(maintenanceForm.notes.trim())
@@ -293,8 +308,12 @@ export function useEquipmentDetail({
           description: maintenanceForm.description,
           scheduledDate: maintenanceForm.scheduledDate,
           notes: combinedNotes,
-          // Si hay proveedor externo, no asignar técnico interno
-          ...(isClient ? {} : maintenanceForm.externalProvider ? {} : { technicianId: userId }),
+          // Si hay proveedor externo (por ID o texto), no asignar técnico interno
+          ...(isClient
+            ? {}
+            : maintenanceForm.externalProviderId || maintenanceForm.externalProvider
+              ? {}
+              : { technicianId: userId }),
         }),
       })
 
@@ -314,6 +333,7 @@ export function useEquipmentDetail({
         type: 'PREVENTIVE',
         description: '',
         scheduledDate: new Date().toISOString().split('T')[0],
+        externalProviderId: undefined,
         externalProvider: undefined,
         notes: undefined,
       })

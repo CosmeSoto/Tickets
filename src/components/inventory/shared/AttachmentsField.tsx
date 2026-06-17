@@ -26,6 +26,8 @@ interface AttachmentsFieldProps {
   files: File[]
   existingAttachments?: ExistingAttachment[]
   onChange: (files: File[]) => void
+  /** Callback para eliminar un adjunto ya guardado en la BD */
+  onDeleteExisting?: (id: string) => void
   maxFileSizeMB?: number
   /** equipmentId para construir URLs de preview de attachments existentes */
   equipmentId?: string
@@ -35,6 +37,7 @@ export function AttachmentsField({
   files,
   existingAttachments = [],
   onChange,
+  onDeleteExisting,
   maxFileSizeMB = 10,
   equipmentId,
 }: AttachmentsFieldProps) {
@@ -49,7 +52,7 @@ export function AttachmentsField({
     const maxBytes = maxFileSizeMB * 1024 * 1024
     const toAdd: File[] = []
     Array.from(list).forEach(f => {
-      if (f.size > maxBytes) return // silently skip oversized (could add toast)
+      if (f.size > maxBytes) return
       if (!files.find(x => x.name === f.name && x.size === f.size)) toAdd.push(f)
     })
     if (toAdd.length > 0) onChange([...files, ...toAdd])
@@ -149,7 +152,6 @@ export function AttachmentsField({
                 <div className='grid grid-cols-3 sm:grid-cols-4 gap-2'>
                   {allImages.map((item, i) => {
                     const isExistingItem = isExisting(item)
-                    // Para items existentes construimos la URL del preview si tenemos equipmentId
                     const existingPreviewUrl =
                       isExistingItem && equipmentId
                         ? `/api/inventory/equipment/${equipmentId}/attachments/${item.id}?preview=true`
@@ -167,7 +169,6 @@ export function AttachmentsField({
                               alt={item.originalName}
                               className='h-full w-full object-cover'
                               onError={e => {
-                                // fallback si la imagen no carga
                                 ;(e.target as HTMLImageElement).style.display = 'none'
                               }}
                             />
@@ -188,6 +189,7 @@ export function AttachmentsField({
                           />
                         )}
                         <div className='absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center gap-1'>
+                          {/* Vista previa — nuevo archivo */}
                           {!isExistingItem && (
                             <button
                               type='button'
@@ -198,6 +200,7 @@ export function AttachmentsField({
                               <Eye className='h-3.5 w-3.5' />
                             </button>
                           )}
+                          {/* Ver en nueva pestaña — existente */}
                           {isExistingItem && existingPreviewUrl && (
                             <a
                               href={existingPreviewUrl}
@@ -210,6 +213,7 @@ export function AttachmentsField({
                               <Eye className='h-3.5 w-3.5' />
                             </a>
                           )}
+                          {/* Eliminar nuevo archivo */}
                           {!isExistingItem && (
                             <button
                               type='button'
@@ -220,10 +224,19 @@ export function AttachmentsField({
                               <X className='h-3.5 w-3.5' />
                             </button>
                           )}
-                          {isExistingItem && (
-                            <span className='absolute bottom-1 left-1 text-xs bg-black/60 text-white px-1.5 py-0.5 rounded'>
-                              Guardada
-                            </span>
+                          {/* Eliminar existente — si hay callback */}
+                          {isExistingItem && onDeleteExisting && (
+                            <button
+                              type='button'
+                              onClick={e => {
+                                e.stopPropagation()
+                                onDeleteExisting(item.id)
+                              }}
+                              className='opacity-0 group-hover:opacity-100 transition-opacity rounded-full bg-black/60 p-1 text-white hover:bg-destructive'
+                              title='Eliminar adjunto'
+                            >
+                              <X className='h-3.5 w-3.5' />
+                            </button>
                           )}
                         </div>
                       </div>
@@ -255,12 +268,23 @@ export function AttachmentsField({
                           {isExistingItem ? item.originalName : item.name}
                         </span>
                         <span className='text-xs text-muted-foreground shrink-0'>
-                          {formatFileSize(isExistingItem ? item.size : item.size)}
+                          {formatFileSize(item.size)}
                         </span>
                         {isExistingItem ? (
-                          <span className='text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full'>
-                            Existente
-                          </span>
+                          onDeleteExisting ? (
+                            <button
+                              type='button'
+                              onClick={() => onDeleteExisting(item.id)}
+                              className='rounded p-0.5 hover:bg-destructive/10 text-muted-foreground hover:text-destructive'
+                              title='Eliminar adjunto'
+                            >
+                              <X className='h-3.5 w-3.5' />
+                            </button>
+                          ) : (
+                            <span className='text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 px-2 py-0.5 rounded-full'>
+                              Guardado
+                            </span>
+                          )
                         ) : (
                           <button
                             type='button'

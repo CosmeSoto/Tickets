@@ -145,7 +145,7 @@ export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<stri
         {
           familyId: technologyFamilyId,
           fieldName: 'pantalla_pulgadas',
-          fieldLabel: 'Tamaño Pantalla (pulgadas)',
+          fieldLabel: 'Pantalla',
           fieldType: 'number',
           fieldOptions: {
             min: 10,
