@@ -56,6 +56,8 @@ interface MaintenanceDetail {
   cost: number | null
   partsReplaced: string[]
   notes: string | null
+  supplierInvoice: string | null
+  warrantyExpiresAt: string | null
   acceptedAt: string | null
   completedAt: string | null
   createdAt: string
@@ -70,6 +72,7 @@ interface MaintenanceDetail {
     assignments: { receiver: { id: string; name: string; email: string } }[]
   }
   technician: { id: string; name: string; email: string } | null
+  supplier: { id: string; name: string; phone?: string | null; email?: string | null } | null
   requestedBy: { id: string; name: string; email: string } | null
   ticket: { id: string; title: string; status: string } | null
 }
@@ -129,6 +132,8 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
   const [completeCost, setCompleteCost] = useState('')
   const [completeParts, setCompleteParts] = useState('')
   const [completeNotes, setCompleteNotes] = useState('')
+  const [completeSupplierInvoice, setCompleteSupplierInvoice] = useState('')
+  const [completeWarrantyDate, setCompleteWarrantyDate] = useState('')
   const [returnTo, setReturnTo] = useState<'available' | 'previous_user'>('available')
 
   const role = session?.user?.role
@@ -244,6 +249,8 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
           : undefined,
         returnTo,
         notes: completeNotes || undefined,
+        supplierInvoice: completeSupplierInvoice || undefined,
+        warrantyExpiresAt: completeWarrantyDate || undefined,
       })
       const destMsg = result.reAssigned
         ? 'El equipo fue reasignado al usuario anterior.'
@@ -603,6 +610,28 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
                 <span className='text-sm'>{maintenance.technician.name}</span>
               </div>
             )}
+            {maintenance.supplier && (
+              <div className='flex justify-between items-center'>
+                <span className='text-muted-foreground text-sm flex items-center gap-1'>
+                  <Package className='h-3 w-3' /> Proveedor externo
+                </span>
+                <span className='text-sm font-medium'>{maintenance.supplier.name}</span>
+              </div>
+            )}
+            {maintenance.supplierInvoice && (
+              <div className='flex justify-between items-center'>
+                <span className='text-muted-foreground text-sm'>Factura proveedor</span>
+                <span className='text-sm font-mono'>{maintenance.supplierInvoice}</span>
+              </div>
+            )}
+            {maintenance.warrantyExpiresAt && (
+              <div className='flex justify-between items-center'>
+                <span className='text-muted-foreground text-sm'>Garantía hasta</span>
+                <span className='text-sm'>
+                  {new Date(maintenance.warrantyExpiresAt).toLocaleDateString('es-CL')}
+                </span>
+              </div>
+            )}
             {assignedUser && (
               <div className='flex justify-between items-center'>
                 <span className='text-muted-foreground text-sm'>Usuario asignado</span>
@@ -785,6 +814,33 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
                 rows={2}
               />
             </div>
+            {/* Campos de proveedor externo — solo si tiene proveedor asignado */}
+            {maintenance?.supplier && (
+              <div className='rounded-lg border border-border p-3 space-y-3 bg-muted/30'>
+                <p className='text-xs font-semibold text-muted-foreground'>
+                  Datos del proveedor: {maintenance.supplier.name}
+                </p>
+                <div>
+                  <Label>N° Factura del proveedor (opcional)</Label>
+                  <Input
+                    placeholder='Ej: FAC-2026-001'
+                    value={completeSupplierInvoice}
+                    onChange={e => setCompleteSupplierInvoice(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label>Garantía hasta (opcional)</Label>
+                  <Input
+                    type='date'
+                    value={completeWarrantyDate}
+                    onChange={e => setCompleteWarrantyDate(e.target.value)}
+                  />
+                  <p className='text-xs text-muted-foreground mt-1'>
+                    Si el proveedor ofrece garantía por el trabajo realizado
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant='outline' onClick={() => setShowComplete(false)}>

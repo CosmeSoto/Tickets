@@ -1,5 +1,7 @@
 'use client'
 
+// NOTA: La configuración de la "Página Pública" YA EXISTE en su propia página
+// en el sidebar: /admin/help-config, NO ES NECESARIO AGREGARLA AQUÍ
 import { useState, useEffect, Suspense } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'

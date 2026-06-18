@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import {
   Wrench,
@@ -93,6 +93,7 @@ const TYPE_LABELS: Record<string, string> = { PREVENTIVE: 'Preventivo', CORRECTI
 export default function MaintenanceListPage() {
   const { data: session } = useSession()
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   const [records, setRecords] = useState<MaintenanceItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -100,6 +101,7 @@ export default function MaintenanceListPage() {
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [typeFilter, setTypeFilter] = useState('ALL')
   const [familyFilter, setFamilyFilter] = useState('all')
+  const [supplierIdFilter] = useState(searchParams?.get('supplierId') || '')
   const [showNew, setShowNew] = useState(false)
   const [showByModel, setShowByModel] = useState(false)
 
@@ -128,12 +130,13 @@ export default function MaintenanceListPage() {
       if (typeFilter !== 'ALL') params.set('type', typeFilter)
       if (activeTab === 'mine') params.set('personalOnly', 'true')
       if (familyFilter !== 'all') params.set('familyId', familyFilter)
+      if (supplierIdFilter) params.set('supplierId', supplierIdFilter)
       const res = await fetch(`/api/inventory/maintenance?${params}`, { cache: 'no-store' })
       if (res.ok) setRecords(await res.json())
     } finally {
       setLoading(false)
     }
-  }, [statusFilter, typeFilter, activeTab, familyFilter])
+  }, [statusFilter, typeFilter, activeTab, familyFilter, supplierIdFilter])
 
   useEffect(() => {
     fetchRecords()
@@ -232,11 +235,11 @@ export default function MaintenanceListPage() {
               <DropdownMenuContent align='end'>
                 <DropdownMenuItem onClick={() => setShowNew(true)}>
                   <Plus className='h-4 w-4 mr-2' />
-                  Mantenimiento Individual
+                  Equipo Individual
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setShowByModel(true)}>
                   <Package className='h-4 w-4 mr-2' />
-                  Mantenimiento por Modelo
+                  Por Modelo (masivo)
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

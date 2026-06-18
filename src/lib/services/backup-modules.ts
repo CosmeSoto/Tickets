@@ -13,6 +13,7 @@ export type BackupModuleId =
   | 'users'
   | 'audits'
   | 'configurations'
+  | 'inventory'
 
 export interface BackupModuleDefinition {
   id: BackupModuleId
@@ -61,13 +62,19 @@ export const BACKUP_MODULE_REGISTRY: Record<BackupModuleId, BackupModuleDefiniti
     label: 'Configuraciones del Sistema',
     description: 'Configuraciones generales del sistema (system_settings, site_config, etc.).',
   },
+  inventory: {
+    id: 'inventory',
+    label: 'Inventario',
+    description:
+      'Equipos, licencias, consumibles, mantenimientos, proveedores, contratos, bodegas, modelos, marcas, tipos y sus configuraciones.',
+  },
 }
-
-export const DEFAULT_BACKUP_CRON_SCOPE: 'full' | BackupModuleId = 'full'
 
 export function isBackupModuleId(value: unknown): value is BackupModuleId {
   return typeof value === 'string' && value in BACKUP_MODULE_REGISTRY
 }
+
+export const DEFAULT_BACKUP_CRON_SCOPE: 'full' | BackupModuleId = 'full'
 
 /** Orden de inserción respetando FKs típicas del módulo tickets (sin SLA policies globales). */
 export const TICKETS_MODULE_RESTORE_ORDER = [
@@ -495,4 +502,106 @@ export async function exportUsersModuleData(): Promise<Record<UsersModuleTable, 
     technician_family_assignments: technician_family_assignments as unknown[],
     inventory_manager_families: inventory_manager_families as unknown[],
   }
+}
+
+// ── Módulo Inventario ─────────────────────────────────────────────────────────
+
+/** Orden de inserción respetando FKs del módulo inventario. */
+export const INVENTORY_MODULE_RESTORE_ORDER = [
+  'supplier_types',
+  'suppliers',
+  'units_of_measure',
+  'equipment_types',
+  'equipment_type_attributes',
+  'consumable_types',
+  'consumable_type_attributes',
+  'license_types',
+  'license_type_attributes',
+  'equipment_models',
+  'equipment_brands',
+  'warehouses',
+  'equipment',
+  'equipment_custom_values',
+  'equipment_attachments',
+  'equipment_assignments',
+  'equipment_sales',
+  'maintenance_records',
+  'delivery_acts',
+  'return_acts',
+  'decommission_requests',
+  'decommission_acts',
+  'decommission_attachments',
+  'software_licenses',
+  'license_attachments',
+  'consumables',
+  'stock_movements',
+  'contracts',
+  'contract_lines',
+  'contract_attachments',
+  'contract_payments',
+  'equipment_batches',
+  'asset_requests',
+  'asset_request_sla_metrics',
+] as const
+
+export type InventoryModuleTable = (typeof INVENTORY_MODULE_RESTORE_ORDER)[number]
+
+/**
+ * Exporta datos del módulo inventario (JSON).
+ * Incluye: equipos, licencias, consumibles, mantenimientos, proveedores, contratos, bodegas, etc.
+ */
+export async function exportInventoryModuleData(): Promise<Record<string, unknown[]>> {
+  const data: Record<string, unknown[]> = {}
+
+  const fetchTable = async (name: string, fetcher: () => Promise<any[]>) => {
+    try {
+      data[name] = await fetcher()
+    } catch {
+      data[name] = []
+    }
+  }
+
+  // Catálogos
+  await fetchTable('supplier_types', () => prisma.supplier_types.findMany())
+  await fetchTable('suppliers', () => prisma.suppliers.findMany())
+  await fetchTable('units_of_measure', () => prisma.units_of_measure.findMany())
+  await fetchTable('equipment_types', () => prisma.equipment_types.findMany())
+  await fetchTable('equipment_type_attributes', () => prisma.equipment_type_attributes.findMany())
+  await fetchTable('consumable_types', () => prisma.consumable_types.findMany())
+  await fetchTable('consumable_type_attributes', () => prisma.consumable_type_attributes.findMany())
+  await fetchTable('license_types', () => prisma.license_types.findMany())
+  await fetchTable('license_type_attributes', () => prisma.license_type_attributes.findMany())
+  await fetchTable('equipment_models', () => prisma.equipment_models.findMany())
+  await fetchTable('equipment_brands', () => prisma.equipment_brands.findMany())
+  await fetchTable('warehouses', () => prisma.warehouses.findMany())
+
+  // Activos
+  await fetchTable('equipment', () => prisma.equipment.findMany())
+  await fetchTable('equipment_custom_values', () => prisma.equipment_custom_values.findMany())
+  await fetchTable('equipment_attachments', () => prisma.equipment_attachments.findMany())
+  await fetchTable('equipment_assignments', () => prisma.equipment_assignments.findMany())
+  await fetchTable('equipment_sales', () => prisma.equipment_sales.findMany())
+  await fetchTable('maintenance_records', () => prisma.maintenance_records.findMany())
+  await fetchTable('delivery_acts', () => prisma.delivery_acts.findMany())
+  await fetchTable('return_acts', () => prisma.return_acts.findMany())
+  await fetchTable('decommission_requests', () => prisma.decommission_requests.findMany())
+  await fetchTable('decommission_acts', () => prisma.decommission_acts.findMany())
+  await fetchTable('decommission_attachments', () => prisma.decommission_attachments.findMany())
+  await fetchTable('software_licenses', () => prisma.software_licenses.findMany())
+  await fetchTable('license_attachments', () => prisma.license_attachments.findMany())
+  await fetchTable('consumables', () => prisma.consumables.findMany())
+  await fetchTable('stock_movements', () => prisma.stock_movements.findMany())
+
+  // Contratos
+  await fetchTable('contracts', () => prisma.contracts.findMany())
+  await fetchTable('contract_lines', () => prisma.contract_lines.findMany())
+  await fetchTable('contract_attachments', () => prisma.contract_attachments.findMany())
+  await fetchTable('contract_payments', () => prisma.contract_payments.findMany())
+
+  // Lotes y solicitudes
+  await fetchTable('equipment_batches', () => prisma.equipment_batches.findMany())
+  await fetchTable('asset_requests', () => prisma.asset_requests.findMany())
+  await fetchTable('asset_request_sla_metrics', () => prisma.asset_request_sla_metrics.findMany())
+
+  return data
 }

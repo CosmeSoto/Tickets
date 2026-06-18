@@ -67,6 +67,7 @@ export async function GET(request: NextRequest) {
       include: {
         supplierType: { select: { id: true, name: true } },
         family: { select: { id: true, name: true, color: true } },
+        _count: { select: { maintenances: true } },
       },
       orderBy: { name: 'asc' },
       take: 500,

@@ -302,20 +302,21 @@ export default function SuppliersPage() {
                   >
                     Estado
                   </SortableTableHead>
+                  <TableHead className='hidden lg:table-cell text-center'>Mant.</TableHead>
                   <TableHead className='text-right'>Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={8} className='text-center py-8 text-muted-foreground'>
+                    <TableCell colSpan={9} className='text-center py-8 text-muted-foreground'>
                       <RefreshCw className='h-4 w-4 animate-spin mx-auto mb-2' />
                       Cargando...
                     </TableCell>
                   </TableRow>
                 ) : suppliers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className='text-center py-8 text-muted-foreground'>
+                    <TableCell colSpan={9} className='text-center py-8 text-muted-foreground'>
                       No se encontraron proveedores
                       {activeFilter === 'true' && (
                         <p className='text-xs mt-1'>
@@ -356,6 +357,20 @@ export default function SuppliersPage() {
                         <Badge variant={s.isActive ? 'default' : 'secondary'}>
                           {s.isActive ? 'Activo' : 'Inactivo'}
                         </Badge>
+                      </TableCell>
+                      <TableCell className='hidden lg:table-cell text-center'>
+                        {s._count?.maintenances > 0 ? (
+                          <a
+                            href={`/inventory/maintenance?supplierId=${s.id}`}
+                            onClick={e => e.stopPropagation()}
+                            className='inline-flex items-center justify-center h-6 min-w-6 px-1.5 rounded-full bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20 transition-colors'
+                            title='Ver mantenimientos de este proveedor'
+                          >
+                            {s._count.maintenances}
+                          </a>
+                        ) : (
+                          <span className='text-xs text-muted-foreground'>0</span>
+                        )}
                       </TableCell>
                       <TableCell className='text-right'>
                         <div className='flex justify-end gap-1'>

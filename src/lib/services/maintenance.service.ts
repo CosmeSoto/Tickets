@@ -31,7 +31,7 @@ export class MaintenanceService {
     }
 
     // Estados que NO permiten mantenimiento
-    const invalidStatuses = ['RETIRED', 'SOLD']
+    const invalidStatuses = ['RETIRED', 'SOLD', 'FOR_SALE']
     if (invalidStatuses.includes(equipment.status)) {
       return {
         valid: false,
@@ -100,13 +100,14 @@ export class MaintenanceService {
           partsReplaced: data.partsReplaced || [],
           ticketId: data.ticketId,
           technicianId: data.technicianId || userId,
+          supplierId: data.supplierId || null,
           requestedById: data.requestedById,
           status: 'SCHEDULED',
           notes: data.notes,
           previousStatus: equipment?.status ?? null,
           previousDepartmentId: equipmentFull?.departmentId ?? null,
         },
-        include: { equipment: true, technician: true, ticket: true },
+        include: { equipment: true, technician: true, supplier: true, ticket: true },
       })
 
       await tx.equipment.update({
@@ -126,6 +127,8 @@ export class MaintenanceService {
             equipmentId: data.equipmentId,
             type: data.type,
             scheduledDate: data.scheduledDate,
+            supplierId: data.supplierId || null,
+            supplierName: (maintenance as any).supplier?.name || null,
             previousStatus: equipment?.status ?? null,
             warning: validation.warning,
           },
@@ -330,8 +333,10 @@ export class MaintenanceService {
           ...(data.cost !== undefined && { cost: data.cost }),
           ...(data.partsReplaced && { partsReplaced: data.partsReplaced }),
           ...(data.notes && { notes: data.notes }),
+          ...(data.supplierInvoice && { supplierInvoice: data.supplierInvoice }),
+          ...(data.warrantyExpiresAt && { warrantyExpiresAt: data.warrantyExpiresAt }),
         },
-        include: { equipment: true, technician: true, ticket: true },
+        include: { equipment: true, technician: true, supplier: true, ticket: true },
       })
 
       let reAssigned = false
@@ -768,6 +773,7 @@ export class MaintenanceService {
           },
         },
         technician: { select: { id: true, name: true, email: true } },
+        supplier: { select: { id: true, name: true, phone: true, email: true } },
         requestedBy: { select: { id: true, name: true, email: true } },
         ticket: { select: { id: true, title: true, status: true } },
       },

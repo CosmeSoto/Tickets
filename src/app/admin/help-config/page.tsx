@@ -1,5 +1,7 @@
 'use client'
 
+// PÁGINA DEDICADA PARA LA CONFIGURACIÓN DE LA PÁGINA PÚBLICA
+// NO ES NECESARIO AGREGARLA NUEVAMENTE EN "CONFIGURACIÓN DEL SISTEMA"
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
@@ -23,7 +25,7 @@ export default function HelpConfigPage() {
 
   if (status === 'loading') {
     return (
-      <ModuleLayout title="Página Pública" loading={true}>
+      <ModuleLayout title='Página Pública' loading={true}>
         <div />
       </ModuleLayout>
     )
@@ -35,8 +37,8 @@ export default function HelpConfigPage() {
 
   return (
     <ModuleLayout
-      title="Página Pública"
-      subtitle="Personaliza el contenido y apariencia de la página de inicio pública"
+      title='Página Pública'
+      subtitle='Personaliza el contenido y apariencia de la página de inicio pública'
     >
       <LandingPageCMSTab isSuperAdmin={isSuperAdmin} />
     </ModuleLayout>

@@ -96,7 +96,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     ) {
       const cancelled = await prisma.asset_requests.updateMany({
         where: { requesterId: userId, status: { in: ['PENDING', 'APPROVED'] } },
-        data: { status: 'CANCELLED' },
+        data: { status: 'REJECTED' },
       })
       results.assetRequests = { cancelled: cancelled.count }
     }

@@ -72,7 +72,6 @@ export function useEquipmentDetail({
     description: '',
     scheduledDate: new Date().toISOString().split('T')[0],
     externalProviderId: undefined,
-    externalProvider: undefined,
     notes: undefined,
   })
 
@@ -275,30 +274,6 @@ export function useEquipmentDetail({
     try {
       const isClient = userRole === 'CLIENT'
 
-      // Resolver nombre del proveedor externo (por ID o por texto libre)
-      let resolvedProviderName = maintenanceForm.externalProvider?.trim() ?? ''
-      if (maintenanceForm.externalProviderId) {
-        try {
-          const res = await fetch(`/api/inventory/suppliers/${maintenanceForm.externalProviderId}`)
-          if (res.ok) {
-            const sup = await res.json()
-            resolvedProviderName = sup.name ?? resolvedProviderName
-          }
-        } catch {
-          // silencioso — usar texto libre si lo hay
-        }
-      }
-
-      // Construir notas combinando proveedor externo + notas internas
-      const noteParts: string[] = []
-      if (resolvedProviderName) {
-        noteParts.push(`Proveedor externo: ${resolvedProviderName}`)
-      }
-      if (maintenanceForm.notes?.trim()) {
-        noteParts.push(maintenanceForm.notes.trim())
-      }
-      const combinedNotes = noteParts.length > 0 ? noteParts.join('\n') : undefined
-
       const response = await fetch('/api/inventory/maintenance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -307,13 +282,11 @@ export function useEquipmentDetail({
           type: maintenanceForm.type,
           description: maintenanceForm.description,
           scheduledDate: maintenanceForm.scheduledDate,
-          notes: combinedNotes,
-          // Si hay proveedor externo (por ID o texto), no asignar técnico interno
-          ...(isClient
-            ? {}
-            : maintenanceForm.externalProviderId || maintenanceForm.externalProvider
-              ? {}
-              : { technicianId: userId }),
+          // Proveedor externo como relación real (supplierId)
+          supplierId: maintenanceForm.externalProviderId || undefined,
+          notes: maintenanceForm.notes?.trim() || undefined,
+          // Si hay proveedor externo, no asignar técnico interno
+          ...(isClient ? {} : maintenanceForm.externalProviderId ? {} : { technicianId: userId }),
         }),
       })
 
@@ -334,7 +307,6 @@ export function useEquipmentDetail({
         description: '',
         scheduledDate: new Date().toISOString().split('T')[0],
         externalProviderId: undefined,
-        externalProvider: undefined,
         notes: undefined,
       })
       loadEquipmentDetail()
@@ -381,7 +353,12 @@ export function useEquipmentDetail({
   const canEdit = canManage && !isRetired
   const canAssign = canManage && equipment?.status === 'AVAILABLE'
   const canReturn = canManage && isAssigned
-  const canMaintenance = canManage && !isRetired && !isInMaintenance
+  const canMaintenance =
+    canManage &&
+    !isRetired &&
+    !isInMaintenance &&
+    equipment?.status !== 'FOR_SALE' &&
+    equipment?.status !== 'SOLD'
 
   const hasActiveMaintenance =
     isInMaintenance ||

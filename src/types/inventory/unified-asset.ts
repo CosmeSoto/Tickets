@@ -46,6 +46,7 @@ export const STATUS_FILTER_OPTIONS = [
   { value: 'DAMAGED', label: 'Dañado' },
   { value: 'RETIRED', label: 'Retirado' },
   { value: 'FOR_SALE', label: 'En venta' },
+  { value: 'SOLD', label: 'Vendido' },
 ]
 
 /** Condiciones del equipo — enum EquipmentCondition: NEW, USED, DAMAGED (definitivo) */

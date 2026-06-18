@@ -19,6 +19,8 @@ export interface CreateMaintenanceData {
   partsReplaced?: string[]
   ticketId?: string
   technicianId?: string
+  /** Proveedor externo que realizará el mantenimiento */
+  supplierId?: string
   requestedById?: string
   notes?: string
 }
@@ -28,4 +30,8 @@ export interface UpdateMaintenanceData {
   cost?: number
   partsReplaced?: string[]
   notes?: string
+  /** Factura del proveedor externo */
+  supplierInvoice?: string
+  /** Fecha de vencimiento de garantía del proveedor */
+  warrantyExpiresAt?: Date
 }

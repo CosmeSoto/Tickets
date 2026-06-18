@@ -33,12 +33,14 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get('type') || undefined
     const familyId = searchParams.get('familyId') || undefined
     const personalOnly = searchParams.get('personalOnly') === 'true'
+    const supplierId = searchParams.get('supplierId') || undefined
 
     const isClient = session.user.role === 'CLIENT'
 
     const where: any = {}
     if (status) where.status = status
     if (type) where.type = type
+    if (supplierId) where.supplierId = supplierId
 
     // Filtrar por familia a través del equipo
     if (familyId) {
@@ -86,6 +88,7 @@ export async function GET(request: NextRequest) {
           },
         },
         technician: { select: { id: true, name: true } },
+        supplier: { select: { id: true, name: true } },
         requestedBy: { select: { id: true, name: true } },
       },
     })
@@ -109,7 +112,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { equipmentId, type, description, scheduledDate, technicianId, notes } = body
+    const { equipmentId, type, description, scheduledDate, technicianId, supplierId, notes } = body
 
     if (!equipmentId || !type || !description || !scheduledDate) {
       return NextResponse.json(
@@ -180,6 +183,7 @@ export async function POST(request: NextRequest) {
           description,
           scheduledDate: new Date(scheduledDate),
           technicianId: technicianId || session.user.id,
+          supplierId: supplierId || undefined,
           notes,
         },
         session.user.id

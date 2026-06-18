@@ -119,8 +119,6 @@ export interface MaintenanceForm {
   scheduledDate: string
   /** ID del proveedor externo seleccionado de la lista */
   externalProviderId?: string
-  /** Nombre/texto del proveedor externo (cuando el mantenimiento lo hace un tercero) */
-  externalProvider?: string
   /** Notas adicionales internas */
   notes?: string
 }

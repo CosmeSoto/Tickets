@@ -45,9 +45,16 @@ export async function createBackup(
 
   const moduleKey: BackupModuleId | null =
     options?.module != null &&
-    ['tickets', 'news', 'patrols', 'families', 'audits', 'configurations', 'users'].includes(
-      options.module
-    )
+    [
+      'tickets',
+      'news',
+      'patrols',
+      'families',
+      'audits',
+      'configurations',
+      'users',
+      'inventory',
+    ].includes(options.module)
       ? options.module
       : null
 

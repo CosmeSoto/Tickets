@@ -43,10 +43,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const backup = await BackupService.createBackup(
-      type,
-      moduleOpt ? { module: moduleOpt } : undefined
-    )
+    const backup = await BackupService.createBackup(type, { module: moduleOpt ?? null })
     return NextResponse.json(backup)
   } catch (error) {
     console.error('Error al crear backup:', error)
