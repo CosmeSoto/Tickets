@@ -212,15 +212,20 @@ export function PermissionsAndModulesSection({
               onAssignFamily={handlers.handleAssignInventoryFamily}
               onUnassignFamily={handlers.handleUnassignInventoryFamily}
               options={{
-                canManageInventory: formData.canManageInventory,
-                onToggleManager: v => onToggle('canManageInventory', v),
-                // "Solicitar activos" solo aplica a CLIENT.
-                // ADMIN siempre tiene acceso completo al módulo.
-                // TECHNICIAN no tiene el link en su sidebar — el permiso no le aplica.
+                // "Gestión completa" — visible para TECHNICIAN y ADMIN (no CLIENT)
+                canManageInventory:
+                  formData.role !== 'CLIENT' ? formData.canManageInventory : undefined,
+                onToggleManager:
+                  formData.role !== 'CLIENT' ? v => onToggle('canManageInventory', v) : undefined,
+                // "Solicitar activos" — visible para TECHNICIAN y CLIENT (no ADMIN, que siempre puede)
                 canRequestAssets:
-                  formData.role === 'CLIENT' ? formData.canRequestAssets : undefined,
+                  formData.role === 'CLIENT' || formData.role === 'TECHNICIAN'
+                    ? formData.canRequestAssets
+                    : undefined,
                 onToggleRequestAssets:
-                  formData.role === 'CLIENT' ? v => onToggle('canRequestAssets', v) : undefined,
+                  formData.role === 'CLIENT' || formData.role === 'TECHNICIAN'
+                    ? v => onToggle('canRequestAssets', v)
+                    : undefined,
               }}
               loading={loadingFamilies}
               disabled={loading}

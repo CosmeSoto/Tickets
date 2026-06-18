@@ -7,7 +7,8 @@
  *   - EquipmentAssetForm (nuevo activo con estado MAINTENANCE)
  *   - EquipmentForm (editar activo con estado MAINTENANCE)
  *
- * Muestra: fecha de ingreso, tipo, técnico asignado y descripción.
+ * Muestra: fecha de ingreso, tipo, técnico/proveedor, y descripción.
+ * El usuario elige entre técnico interno o proveedor externo.
  */
 
 import { useState, useEffect } from 'react'
@@ -16,6 +17,7 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { SearchableSelect } from '@/components/ui/searchable-select'
+import { SupplierSelect } from '@/components/inventory/suppliers/SupplierSelect'
 
 interface Technician {
   id: string
@@ -30,8 +32,11 @@ interface MaintenanceStatusBlockProps {
   onTypeChange: (v: 'PREVENTIVE' | 'CORRECTIVE') => void
   technicianId: string
   onTechnicianChange: (id: string) => void
+  supplierId?: string
+  onSupplierChange?: (id: string) => void
   description: string
   onDescriptionChange: (v: string) => void
+  familyId?: string
 }
 
 export function MaintenanceStatusBlock({
@@ -41,11 +46,17 @@ export function MaintenanceStatusBlock({
   onTypeChange,
   technicianId,
   onTechnicianChange,
+  supplierId,
+  onSupplierChange,
   description,
   onDescriptionChange,
+  familyId,
 }: MaintenanceStatusBlockProps) {
   const [technicians, setTechnicians] = useState<Technician[]>([])
   const [loading, setLoading] = useState(false)
+  const [responsibleType, setResponsibleType] = useState<'internal' | 'external'>(
+    supplierId ? 'external' : 'internal'
+  )
 
   useEffect(() => {
     setLoading(true)
@@ -55,6 +66,15 @@ export function MaintenanceStatusBlock({
       .catch(() => setTechnicians([]))
       .finally(() => setLoading(false))
   }, [])
+
+  const handleResponsibleTypeChange = (newType: 'internal' | 'external') => {
+    setResponsibleType(newType)
+    if (newType === 'internal') {
+      onSupplierChange?.('')
+    } else {
+      onTechnicianChange('')
+    }
+  }
 
   return (
     <div className='rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 space-y-3'>
@@ -86,18 +106,64 @@ export function MaintenanceStatusBlock({
         </div>
       </div>
 
-      {/* Técnico */}
-      <div className='space-y-1'>
-        <Label>Técnico asignado</Label>
-        <SearchableSelect
-          options={technicians.map(t => ({ id: t.id, name: t.name || t.email }))}
-          value={technicianId}
-          onChange={onTechnicianChange}
-          placeholder={loading ? 'Cargando técnicos...' : 'Buscar técnico...'}
-          disabled={loading}
-          emptyLabel='Sin técnico asignado'
-        />
-      </div>
+      {/* Selector: técnico interno o proveedor externo */}
+      {onSupplierChange && (
+        <div className='space-y-1'>
+          <Label>¿Quién realiza el mantenimiento?</Label>
+          <div className='flex gap-2'>
+            <button
+              type='button'
+              onClick={() => handleResponsibleTypeChange('internal')}
+              className={`flex-1 px-3 py-2 rounded-md border text-sm transition-colors ${
+                responsibleType === 'internal'
+                  ? 'border-primary bg-primary/5 text-primary font-medium'
+                  : 'border-border hover:border-muted-foreground/50'
+              }`}
+            >
+              Técnico interno
+            </button>
+            <button
+              type='button'
+              onClick={() => handleResponsibleTypeChange('external')}
+              className={`flex-1 px-3 py-2 rounded-md border text-sm transition-colors ${
+                responsibleType === 'external'
+                  ? 'border-primary bg-primary/5 text-primary font-medium'
+                  : 'border-border hover:border-muted-foreground/50'
+              }`}
+            >
+              Proveedor externo
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Técnico interno */}
+      {responsibleType === 'internal' && (
+        <div className='space-y-1'>
+          <Label>Técnico asignado</Label>
+          <SearchableSelect
+            options={technicians.map(t => ({ id: t.id, name: t.name || t.email }))}
+            value={technicianId}
+            onChange={onTechnicianChange}
+            placeholder={loading ? 'Cargando técnicos...' : 'Buscar técnico...'}
+            disabled={loading}
+            emptyLabel='Sin técnico asignado'
+          />
+        </div>
+      )}
+
+      {/* Proveedor externo */}
+      {responsibleType === 'external' && onSupplierChange && (
+        <div className='space-y-1'>
+          <Label>Proveedor externo</Label>
+          <SupplierSelect
+            value={supplierId || null}
+            onChange={v => onSupplierChange(v || '')}
+            familyId={familyId}
+            placeholder='Seleccionar proveedor...'
+          />
+        </div>
+      )}
 
       {/* Descripción */}
       <div className='space-y-1'>

@@ -263,5 +263,39 @@ export async function seedWarehouses(prisma: PrismaClient, familyMap: Map<string
   }
   console.log(`  ✅ ${securityWarehouses.length} bodegas para Seguridad`)
 
+  // ============================================
+  // BODEGA DE RECEPCIÓN (COMPRAS) — UNA POR FAMILIA
+  // Permite al departamento de Compras recibir activos
+  // antes de distribuirlos a la bodega definitiva de cada familia.
+  // ============================================
+
+  const allFamilyIds = [techFamilyId, fixedAssetsFamilyId, maintenanceFamilyId, securityFamilyId]
+  let receptionCount = 0
+
+  for (const fId of allFamilyIds) {
+    if (!fId) continue
+    const existing = await prisma.warehouses.findFirst({
+      where: { name: 'Recepción Compras', familyId: fId },
+    })
+    if (!existing) {
+      await prisma.warehouses.create({
+        data: {
+          id: randomUUID(),
+          name: 'Recepción Compras',
+          location: 'Área de recepción — Depto. Compras',
+          description:
+            'Bodega transitoria de recepción. Los activos adquiridos ingresan aquí antes de ser distribuidos a su bodega definitiva.',
+          familyId: fId,
+          managerId: admin.id,
+          isActive: true,
+        },
+      })
+      receptionCount++
+    }
+  }
+  if (receptionCount > 0) {
+    console.log(`  ✅ ${receptionCount} bodegas "Recepción Compras" creadas`)
+  }
+
   console.log('✅ Seed de bodegas completado')
 }

@@ -25,7 +25,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { useFetch } from '@/hooks/common/use-fetch'
-import { ContractForm } from '@/components/contracts/contract-form'
+import { QuickContractForm } from '@/components/contracts/quick-contract-form'
 import type { Contract } from '@/types/contracts'
 import { CONTRACT_CATEGORY_LABELS } from '@/types/contracts'
 
@@ -131,7 +131,7 @@ export function ContractPicker({ value, onChange, supplierId, familyId, disabled
           disabled={disabled}
         >
           <FileSignature className='h-4 w-4' />
-          Vincular o crear contrato
+          Vincular contrato existente o crear uno nuevo
         </Button>
       )}
 
@@ -224,8 +224,9 @@ export function ContractPicker({ value, onChange, supplierId, familyId, disabled
 
               {/* ── Tab: crear ────────────────────────────────────────── */}
               <TabsContent value='create' className='pt-4'>
-                <ContractForm
-                  contract={null}
+                <QuickContractForm
+                  supplierId={supplierId}
+                  familyId={familyId}
                   onSuccess={handleCreated}
                   onCancel={() => setOpen(false)}
                 />

@@ -252,6 +252,7 @@ export function EquipmentAssetForm({
   )
   const [maintenanceType, setMaintenanceType] = useState<'PREVENTIVE' | 'CORRECTIVE'>('CORRECTIVE')
   const [maintenanceTechnicianId, setMaintenanceTechnicianId] = useState('')
+  const [maintenanceSupplierId, setMaintenanceSupplierId] = useState('')
   const [maintenanceDescription, setMaintenanceDescription] = useState('')
   const [techniciansList, setTechniciansList] = useState<
     { id: string; name: string; email: string }[]
@@ -589,6 +590,7 @@ export function EquipmentAssetForm({
         maintenanceDate: maintenanceDate || undefined,
         maintenanceType: maintenanceType || undefined,
         maintenanceTechnicianId: maintenanceTechnicianId || undefined,
+        maintenanceSupplierId: maintenanceSupplierId || undefined,
         maintenanceDescription: maintenanceDescription || undefined,
       }),
       physicalLocation: physicalLocation || undefined,
@@ -1002,48 +1004,56 @@ export function EquipmentAssetForm({
           onTypeChange={setMaintenanceType}
           technicianId={maintenanceTechnicianId}
           onTechnicianChange={setMaintenanceTechnicianId}
+          supplierId={maintenanceSupplierId}
+          onSupplierChange={setMaintenanceSupplierId}
           description={maintenanceDescription}
           onDescriptionChange={setMaintenanceDescription}
+          familyId={familyId}
         />
       )}
 
       {/* ── 4. ADQUISICIÓN ────────────────────────────────────────── */}
-      {/* Modalidad */}
-      <div className='space-y-1'>
-        <Label>¿Cómo se adquirió este equipo?</Label>
-        <SimpleSelect
-          value={acquisitionMode}
-          onChange={e => setAcquisitionMode(e.target.value as typeof acquisitionMode)}
-          options={ACQUISITION_MODES}
-        />
-        <p className='text-xs text-muted-foreground'>
-          {ACQUISITION_MODES.find(m => m.value === acquisitionMode)?.help}
-        </p>
-      </div>
+      {/* Ocultar cuando el estado es transitorio (MAINTENANCE/FOR_SALE) — solo datos operativos */}
+      {equipmentStatus !== 'MAINTENANCE' && equipmentStatus !== 'FOR_SALE' && (
+        <>
+          {/* Modalidad */}
+          <div className='space-y-1'>
+            <Label>¿Cómo se adquirió este equipo?</Label>
+            <SimpleSelect
+              value={acquisitionMode}
+              onChange={e => setAcquisitionMode(e.target.value as typeof acquisitionMode)}
+              options={ACQUISITION_MODES}
+            />
+            <p className='text-xs text-muted-foreground'>
+              {ACQUISITION_MODES.find(m => m.value === acquisitionMode)?.help}
+            </p>
+          </div>
 
-      {/* Proveedor */}
-      <div className='space-y-1'>
-        <Label>
-          {supplierLabel} {supplierRequired && <span className='text-destructive'>*</span>}
-        </Label>
-        <SupplierSelect
-          value={supplierId || null}
-          onChange={v => setSupplierId(v || '')}
-          familyId={familyId}
-        />
-      </div>
+          {/* Proveedor */}
+          <div className='space-y-1'>
+            <Label>
+              {supplierLabel} {supplierRequired && <span className='text-destructive'>*</span>}
+            </Label>
+            <SupplierSelect
+              value={supplierId || null}
+              onChange={v => setSupplierId(v || '')}
+              familyId={familyId}
+            />
+          </div>
 
-      {/* Contrato — SOLO RENTAL (NO para LOAN) */}
-      {acquisitionMode === 'RENTAL' && (
-        <div className='rounded-md border border-border p-4 space-y-3'>
-          <p className='text-sm font-medium'>Contrato de arrendamiento</p>
-          <ContractPicker
-            value={linkedContractId}
-            onChange={setLinkedContractId}
-            supplierId={supplierId || null}
-            familyId={familyId}
-          />
-        </div>
+          {/* Contrato — SOLO RENTAL (NO para LOAN) */}
+          {acquisitionMode === 'RENTAL' && (
+            <div className='rounded-md border border-border p-4 space-y-3'>
+              <p className='text-sm font-medium'>Contrato de arrendamiento</p>
+              <ContractPicker
+                value={linkedContractId}
+                onChange={setLinkedContractId}
+                supplierId={supplierId || null}
+                familyId={familyId}
+              />
+            </div>
+          )}
+        </>
       )}
 
       {/* ── 6. FINANCIERO + DEPRECIACIÓN ──────────────────────────── */}

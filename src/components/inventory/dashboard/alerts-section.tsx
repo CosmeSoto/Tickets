@@ -74,7 +74,7 @@ export function AlertsSection() {
               {alerts.lowStockConsumables} consumible{alerts.lowStockConsumables !== 1 ? 's' : ''}{' '}
               con stock bajo del mínimo
             </span>
-            <Link href='/inventory/consumables'>
+            <Link href='/inventory'>
               <Button variant='outline' size='sm'>
                 Ver
               </Button>

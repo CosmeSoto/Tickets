@@ -126,9 +126,9 @@ export async function GET(request: NextRequest) {
         where: { ...requestScope, status: 'PENDING' },
       }),
 
-      // Actas pendientes de firma
+      // Actas pendientes de firma (delivery_acts no tiene familyId directo)
       prisma.delivery_acts.count({
-        where: { ...requestScope, status: 'PENDING' },
+        where: { status: 'PENDING' },
       }),
     ])
 

@@ -341,7 +341,10 @@ export function EditUserModal({
       setFormData(p => ({
         ...p,
         inventoryEnabled: value,
+        // TECHNICIAN: al activar inventario, activa gestión completa automáticamente
         canManageInventory: p.role === 'TECHNICIAN' ? value : p.canManageInventory,
+        // ADMIN normal: al activar inventario, activa ambos permisos automáticamente
+        ...(p.role === 'ADMIN' ? { canManageInventory: value, canRequestAssets: value } : {}),
       }))
     } else if (field === 'newsEnabled') {
       setFormData(p => ({
