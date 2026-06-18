@@ -13,7 +13,8 @@ import type { EquipmentCondition } from '@prisma/client'
 
 export const dynamic = 'force-dynamic'
 
-const CONDITIONS: EquipmentCondition[] = ['NEW', 'LIKE_NEW', 'GOOD', 'FAIR', 'POOR']
+// Solo 3 condiciones válidas (enum EquipmentCondition definitivo)
+const CONDITIONS: EquipmentCondition[] = ['NEW', 'USED', 'DAMAGED']
 
 /**
  * GET /api/public/assets-for-sale

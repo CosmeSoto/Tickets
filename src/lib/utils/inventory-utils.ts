@@ -94,7 +94,7 @@ export function getRenewalAlertClass(isExpired: boolean): string {
     : 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200'
 }
 
-// ── Condición del equipo ──────────────────────────────────────────────────
+// ── Condición del equipo (3 valores definitivos: NEW, USED, DAMAGED) ──────────
 
 const ASSET_CONDITION_COLORS: Record<string, string> = {
   NEW: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',

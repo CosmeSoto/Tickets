@@ -246,7 +246,7 @@ export class ConsumableService {
         }),
       ])
 
-    const typeIds = byType.map(t => t.typeId)
+    const typeIds = byType.map(t => t.typeId).filter((id): id is string => id !== null)
     const types =
       typeIds.length > 0
         ? await prisma.consumable_types.findMany({
@@ -258,7 +258,7 @@ export class ConsumableService {
 
     const byTypeMap: Record<string, number> = {}
     byType.forEach(item => {
-      byTypeMap[typeMap[item.typeId] || item.typeId] = item._count
+      byTypeMap[typeMap[item.typeId ?? ''] || item.typeId || 'Sin tipo'] = item._count
     })
 
     return {

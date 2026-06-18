@@ -11,7 +11,7 @@ import type { PublicEquipmentItem, BulkEquipmentInput } from '@/types/equipment-
  * Arbitrario para el enum de condición de equipo
  */
 export const equipmentConditionArbitrary = (): fc.Arbitrary<EquipmentCondition> =>
-  fc.constantFrom<EquipmentCondition>('NEW', 'LIKE_NEW', 'GOOD', 'FAIR', 'POOR')
+  fc.constantFrom<EquipmentCondition>('NEW', 'NEW', 'USED', 'USED', 'DAMAGED')
 
 /**
  * Arbitrario para el enum de estado de equipo

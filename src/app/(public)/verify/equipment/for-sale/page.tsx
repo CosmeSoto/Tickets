@@ -293,10 +293,8 @@ export default function PublicForSalePage() {
                     <SelectContent>
                       <SelectItem value='all'>Todas las condiciones</SelectItem>
                       <SelectItem value='NEW'>Nuevo</SelectItem>
-                      <SelectItem value='LIKE_NEW'>Como Nuevo</SelectItem>
-                      <SelectItem value='GOOD'>Bueno</SelectItem>
-                      <SelectItem value='FAIR'>Regular</SelectItem>
-                      <SelectItem value='POOR'>Malo</SelectItem>
+                      <SelectItem value='USED'>Usado</SelectItem>
+                      <SelectItem value='DAMAGED'>Dañado</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

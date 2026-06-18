@@ -277,7 +277,7 @@ describe(
             typeId: type.id,
             departmentId: (await prisma.departments.findFirst())!.id,
             status: 'AVAILABLE',
-            condition: 'GOOD',
+            condition: 'USED',
             ownershipType: 'FIXED_ASSET',
             qrCode: `EQ-test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           },

@@ -43,11 +43,9 @@ function getConditionColor(condition: string): 'default' | 'secondary' | 'destru
   switch (condition) {
     case 'NEW':
       return 'default'
-    case 'GOOD':
+    case 'USED':
       return 'secondary'
-    case 'FAIR':
-      return 'outline'
-    case 'POOR':
+    case 'DAMAGED':
       return 'destructive'
     default:
       return 'outline'
@@ -60,9 +58,8 @@ function getConditionColor(condition: string): 'default' | 'secondary' | 'destru
 function translateCondition(condition: string): string {
   const translations: Record<string, string> = {
     NEW: 'Nuevo',
-    GOOD: 'Bueno',
-    FAIR: 'Regular',
-    POOR: 'Malo',
+    USED: 'Usado',
+    DAMAGED: 'Dañado',
   }
   return translations[condition] || condition
 }
@@ -197,7 +194,7 @@ export function GroupedEquipmentCard({
           disabled={isLoadingContact}
         >
           <MessageCircle className='mr-2 h-4 w-4' />
-          {isLoadingContact ? 'Abriendo WhatsApp...' : 'Contactar'}
+          {isLoadingContact ? 'Abriendo...' : 'Contactar Depto. de Compras'}
         </Button>
       </CardFooter>
     </Card>

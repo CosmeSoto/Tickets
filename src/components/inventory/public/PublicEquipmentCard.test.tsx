@@ -21,7 +21,7 @@ const mockItem: PublicEquipmentItem = {
   code: 'TECH-LAP-OWN-2024-0001',
   brand: 'Dell',
   model: 'Latitude 5420',
-  condition: 'GOOD',
+  condition: 'USED',
   photoUrl: 'https://example.com/photo.jpg',
   specifications: {
     Procesador: 'Intel Core i5',
@@ -130,15 +130,15 @@ describe('PublicEquipmentCard', () => {
     rerender(<PublicEquipmentCard item={newItem} />)
     expect(screen.getByText('Nuevo')).toBeInTheDocument()
 
-    const likeNewItem = { ...mockItem, condition: 'LIKE_NEW' as const }
+    const likeNewItem = { ...mockItem, condition: 'NEW' as const }
     rerender(<PublicEquipmentCard item={likeNewItem} />)
     expect(screen.getByText('Como Nuevo')).toBeInTheDocument()
 
-    const fairItem = { ...mockItem, condition: 'FAIR' as const }
+    const fairItem = { ...mockItem, condition: 'USED' as const }
     rerender(<PublicEquipmentCard item={fairItem} />)
     expect(screen.getByText('Regular')).toBeInTheDocument()
 
-    const poorItem = { ...mockItem, condition: 'POOR' as const }
+    const poorItem = { ...mockItem, condition: 'DAMAGED' as const }
     rerender(<PublicEquipmentCard item={poorItem} />)
     expect(screen.getByText('Malo')).toBeInTheDocument()
   })

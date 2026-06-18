@@ -55,9 +55,8 @@ function formatDate(date: Date): string {
 function translateCondition(condition: string): string {
   const translations: Record<string, string> = {
     NEW: 'Nuevo',
-    GOOD: 'Bueno',
-    FAIR: 'Regular',
-    POOR: 'Malo',
+    USED: 'Usado',
+    DAMAGED: 'Dañado',
   }
   return translations[condition] || condition
 }
@@ -69,11 +68,9 @@ function getConditionColor(condition: string): 'default' | 'secondary' | 'destru
   switch (condition) {
     case 'NEW':
       return 'default'
-    case 'GOOD':
+    case 'USED':
       return 'secondary'
-    case 'FAIR':
-      return 'outline'
-    case 'POOR':
+    case 'DAMAGED':
       return 'destructive'
     default:
       return 'outline'

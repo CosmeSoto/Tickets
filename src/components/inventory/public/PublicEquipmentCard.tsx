@@ -19,7 +19,7 @@ export interface PublicEquipmentItem {
   code: string
   brand: string
   model: string
-  condition: 'NEW' | 'LIKE_NEW' | 'GOOD' | 'FAIR' | 'POOR'
+  condition: 'NEW' | 'USED' | 'DAMAGED'
   photoUrl: string | null
   specifications: Record<string, string> | null
   accessories: string[] | null
@@ -53,20 +53,12 @@ const CONDITION_BADGE: Record<string, { label: string; className: string }> = {
     label: 'Nuevo',
     className: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30',
   },
-  LIKE_NEW: {
-    label: 'Como Nuevo',
+  USED: {
+    label: 'Usado',
     className: 'bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-500/30',
   },
-  GOOD: {
-    label: 'Bueno',
-    className: 'bg-slate-500/15 text-slate-700 dark:text-slate-400 border-slate-500/30',
-  },
-  FAIR: {
-    label: 'Regular',
-    className: 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30',
-  },
-  POOR: {
-    label: 'Malo',
+  DAMAGED: {
+    label: 'Dañado',
     className: 'bg-destructive/10 text-destructive border-destructive/30',
   },
 }
@@ -193,13 +185,13 @@ export function PublicEquipmentCard({ item, onViewDetails }: PublicEquipmentCard
             className='inline-flex items-center justify-center gap-2 w-full px-4 py-2 rounded-md bg-[#25D366] hover:bg-[#1ebe5d] text-white text-sm font-medium transition-colors'
           >
             <MessageCircle className='h-4 w-4' />
-            Contactar por WhatsApp
+            Contactar Depto. de Compras
           </a>
         ) : (
           <Button asChild variant='default' className='w-full gap-2'>
             <Link href='/login'>
               <MessageCircle className='h-4 w-4' />
-              Contactar
+              Contactar Depto. de Compras
             </Link>
           </Button>
         )}

@@ -258,27 +258,27 @@ export class ReturnActService {
       switch ((act as any).returnCondition) {
         case 'DAMAGED':
           newEquipmentStatus = 'DAMAGED'
-          newEquipmentCondition = 'POOR'
+          newEquipmentCondition = 'DAMAGED'
           break
         case 'POOR':
           newEquipmentStatus = 'MAINTENANCE'
-          newEquipmentCondition = 'POOR'
+          newEquipmentCondition = 'DAMAGED'
           break
         case 'FAIR':
           newEquipmentStatus = 'AVAILABLE'
-          newEquipmentCondition = 'FAIR'
+          newEquipmentCondition = 'USED'
           break
         case 'GOOD':
           newEquipmentStatus = 'AVAILABLE'
-          newEquipmentCondition = 'GOOD'
+          newEquipmentCondition = 'USED'
           break
         case 'EXCELLENT':
           newEquipmentStatus = 'AVAILABLE'
-          newEquipmentCondition = 'GOOD' as EquipmentCondition
+          newEquipmentCondition = 'NEW'
           break
         default:
           newEquipmentStatus = 'AVAILABLE'
-          newEquipmentCondition = 'GOOD'
+          newEquipmentCondition = 'USED'
       }
 
       // Actualizar acta, asignación y equipo en transacción

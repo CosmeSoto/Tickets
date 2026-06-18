@@ -48,7 +48,7 @@ export const STATUS_FILTER_OPTIONS = [
   { value: 'FOR_SALE', label: 'En venta' },
 ]
 
-/** Solo los 3 valores que existen en el enum EquipmentCondition */
+/** Condiciones del equipo — enum EquipmentCondition: NEW, USED, DAMAGED (definitivo) */
 export const CONDITION_FILTER_OPTIONS = [
   { value: '', label: 'Todas las condiciones' },
   { value: 'NEW', label: 'Nuevo' },
