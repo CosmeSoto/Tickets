@@ -620,7 +620,7 @@ async function seedSiteConfig() {
   const configs = [
     {
       key: 'site_name',
-      value: 'Sistema de Tickets Multi-Familia',
+      value: 'Gestión Operaciones',
       description: 'Nombre del sitio web',
     },
     { key: 'company_name', value: 'Mi Empresa', description: 'Nombre de la empresa' },
@@ -954,10 +954,10 @@ async function seedLandingPage() {
         servicesTitle: 'Nuestros Servicios',
         servicesSubtitle: 'Soporte técnico integral para todas las áreas',
         servicesEnabled: true,
-        companyName: 'Sistema de Tickets Multi-Familia',
+        companyName: 'Gestión Operaciones',
         companyTagline: 'Soporte profesional para toda la organización',
         footerText: `© ${year} Sistema de Tickets. Todos los derechos reservados.`,
-        metaTitle: 'Sistema de Tickets Multi-Familia',
+        metaTitle: 'Gestión Operaciones',
         metaDescription: 'Sistema profesional de gestión de tickets multi-área',
         showStats: false,
         showTestimonials: false,
