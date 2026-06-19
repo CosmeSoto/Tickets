@@ -155,10 +155,13 @@ export async function getRecentActivity(role: string, _userId: string) {
   return activities.slice(0, 5)
 }
 
-export async function getFamilyMetrics() {
+export async function getFamilyMetrics(scopeFamilyIds?: string[]) {
   try {
     const families = await prisma.families.findMany({
-      where: { isActive: true },
+      where: {
+        isActive: true,
+        ...(scopeFamilyIds ? { id: { in: scopeFamilyIds } } : {}),
+      },
       select: {
         id: true,
         name: true,

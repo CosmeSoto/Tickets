@@ -79,7 +79,13 @@ export async function getAdminStats(userId: string, isSuperAdmin: boolean) {
     plansStats,
     avgFirstResponseTime,
   ] = await Promise.all([
-    prisma.users.count(),
+    prisma.users.count({
+      where: isSuperAdmin
+        ? {}
+        : adminFamilyIds.length > 0
+          ? { departments: { familyId: { in: adminFamilyIds } } }
+          : { id: '__NONE__' },
+    }),
     prisma.tickets.count({ where: ticketFamilyFilter }),
     prisma.tickets.count({ where: { status: 'OPEN', ...ticketFamilyFilter } }),
     prisma.tickets.count({ where: { status: 'IN_PROGRESS', ...ticketFamilyFilter } }),
@@ -187,7 +193,7 @@ export async function getAdminStats(userId: string, isSuperAdmin: boolean) {
     ...(await (async () => {
       const [recentActivity, familyMetrics, proactiveAlerts] = await Promise.all([
         getRecentActivity('ADMIN', userId),
-        getFamilyMetrics(),
+        getFamilyMetrics(isSuperAdmin ? undefined : adminFamilyIds),
         getProactiveAlerts(),
       ])
       return { recentActivity, familyMetrics, proactiveAlerts }

@@ -10,8 +10,8 @@ async function calculateAvgResponseTime(): Promise<string> {
     const ticketsWithComments = await prisma.tickets.findMany({
       where: {
         comments: {
-          some: {}
-        }
+          some: {},
+        },
       },
       select: {
         id: true,
@@ -19,9 +19,9 @@ async function calculateAvgResponseTime(): Promise<string> {
         comments: {
           orderBy: { createdAt: 'asc' },
           take: 1,
-          select: { createdAt: true }
-        }
-      }
+          select: { createdAt: true },
+        },
+      },
     })
 
     if (ticketsWithComments.length === 0) return '2h'
@@ -30,7 +30,7 @@ async function calculateAvgResponseTime(): Promise<string> {
     const totalMinutes = ticketsWithComments.reduce((acc, ticket) => {
       if (ticket.comments[0]) {
         const diff = ticket.comments[0].createdAt.getTime() - ticket.createdAt.getTime()
-        return acc + (diff / (1000 * 60)) // convertir a minutos
+        return acc + diff / (1000 * 60) // convertir a minutos
       }
       return acc
     }, 0)
@@ -52,7 +52,7 @@ async function calculateSystemUptime(): Promise<number> {
   try {
     // Buscar configuración de uptime en system_settings
     const uptimeSetting = await prisma.system_settings.findUnique({
-      where: { key: 'system_uptime' }
+      where: { key: 'system_uptime' },
     })
 
     if (uptimeSetting) {
@@ -65,14 +65,14 @@ async function calculateSystemUptime(): Promise<number> {
 
     const [totalTickets, processedTickets] = await Promise.all([
       prisma.tickets.count({
-        where: { createdAt: { gte: last30Days } }
+        where: { createdAt: { gte: last30Days } },
       }),
       prisma.tickets.count({
         where: {
           createdAt: { gte: last30Days },
-          status: { in: ['IN_PROGRESS', 'RESOLVED', 'CLOSED'] }
-        }
-      })
+          status: { in: ['IN_PROGRESS', 'RESOLVED', 'CLOSED'] },
+        },
+      }),
     ])
 
     if (totalTickets === 0) return 99.9
@@ -90,7 +90,7 @@ async function calculateSystemUptime(): Promise<number> {
 async function getSupportSchedule() {
   try {
     const scheduleSetting = await prisma.system_settings.findUnique({
-      where: { key: 'support_schedule' }
+      where: { key: 'support_schedule' },
     })
 
     if (scheduleSetting) {
@@ -101,14 +101,14 @@ async function getSupportSchedule() {
     return {
       days: 'Lun - Vie',
       hours: '8:00 - 18:00',
-      timezone: 'America/Lima'
+      timezone: 'America/Lima',
     }
   } catch (error) {
     console.error('Error getting support schedule:', error)
     return {
       days: 'Lun - Vie',
       hours: '8:00 - 18:00',
-      timezone: 'America/Lima'
+      timezone: 'America/Lima',
     }
   }
 }
@@ -125,7 +125,7 @@ async function calculateGlobalSatisfaction() {
       return {
         avgRating: 0,
         totalRatings: 0,
-        percentage: 0
+        percentage: 0,
       }
     }
 
@@ -135,14 +135,14 @@ async function calculateGlobalSatisfaction() {
     return {
       avgRating: Math.round(avgRating * 10) / 10,
       totalRatings: ratings.length,
-      percentage
+      percentage,
     }
   } catch (error) {
     console.error('Error calculating satisfaction:', error)
     return {
       avgRating: 0,
       totalRatings: 0,
-      percentage: 0
+      percentage: 0,
     }
   }
 }
@@ -155,12 +155,43 @@ export async function GET() {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
+    const role = (session.user as any).role as string
+
+    // Para clientes, solo devolver métricas de servicio (no datos internos)
+    if (role === 'CLIENT') {
+      // Calcular solo lo que necesita el cliente
+      const [responseTime, schedule] = await Promise.all([
+        calculateAvgResponseTime(),
+        getSupportSchedule(),
+      ])
+
+      const responseMinutes = parseInt(responseTime)
+      let responseStatus = 'excellent'
+      if (responseTime.includes('h')) {
+        const hours = parseInt(responseTime)
+        if (hours > 4) responseStatus = 'needs_improvement'
+        else if (hours > 2) responseStatus = 'good'
+      } else if (responseMinutes > 120) {
+        responseStatus = 'needs_improvement'
+      } else if (responseMinutes > 60) {
+        responseStatus = 'good'
+      }
+
+      return NextResponse.json({
+        responseTime,
+        responseStatus,
+        schedule,
+        lastUpdated: new Date().toISOString(),
+      })
+    }
+
+    // Para ADMIN y TECHNICIAN: métricas completas
     // Calcular todas las métricas en paralelo
     const [responseTime, uptime, schedule, satisfaction] = await Promise.all([
       calculateAvgResponseTime(),
       calculateSystemUptime(),
       getSupportSchedule(),
-      calculateGlobalSatisfaction()
+      calculateGlobalSatisfaction(),
     ])
 
     // Determinar estado del tiempo de respuesta
@@ -186,9 +217,14 @@ export async function GET() {
         rating: satisfaction.avgRating,
         percentage: satisfaction.percentage,
         totalRatings: satisfaction.totalRatings,
-        status: satisfaction.avgRating >= 4.5 ? 'excellent' : satisfaction.avgRating >= 4 ? 'good' : 'needs_improvement'
+        status:
+          satisfaction.avgRating >= 4.5
+            ? 'excellent'
+            : satisfaction.avgRating >= 4
+              ? 'good'
+              : 'needs_improvement',
       },
-      lastUpdated: new Date().toISOString()
+      lastUpdated: new Date().toISOString(),
     })
   } catch (error) {
     console.error('Error fetching system metrics:', error)

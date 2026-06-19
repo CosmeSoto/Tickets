@@ -69,6 +69,7 @@ interface TicketsStats {
 interface TicketsStatsSectionProps {
   stats: TicketsStats
   role: 'ADMIN' | 'TECHNICIAN' | 'CLIENT'
+  isSuperAdmin?: boolean
   isLoading?: boolean
 }
 
@@ -82,7 +83,12 @@ const TICKET_LINKS: Record<string, string> = {
 
 // ── Componente ────────────────────────────────────────────────────────────────
 
-export function TicketsStatsSection({ stats, role, isLoading }: TicketsStatsSectionProps) {
+export function TicketsStatsSection({
+  stats,
+  role,
+  isLoading,
+  isSuperAdmin,
+}: TicketsStatsSectionProps) {
   if (isLoading) {
     return (
       <div className='mb-8'>
@@ -131,7 +137,7 @@ export function TicketsStatsSection({ stats, role, isLoading }: TicketsStatsSect
         {/* Cards principales */}
         <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4'>
           <SymmetricStatsCard
-            title='Total Usuarios'
+            title={isSuperAdmin ? 'Total Usuarios' : 'Usuarios de mis Áreas'}
             value={stats.totalUsers ?? 0}
             icon={Users}
             color='blue'

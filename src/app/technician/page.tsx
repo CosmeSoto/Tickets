@@ -22,7 +22,12 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { useUnifiedDashboard } from '@/hooks/use-unified-dashboard'
-import { getPriorityColor, getStatusColor } from '@/lib/utils/ticket-utils'
+import {
+  getPriorityColor,
+  getStatusColor,
+  getPriorityLabel,
+  getStatusLabel,
+} from '@/lib/utils/ticket-utils'
 import { AssignedFamiliesPanel } from '@/components/dashboard/assigned-families-panel'
 
 export default function TechnicianDashboard() {
@@ -49,7 +54,7 @@ export default function TechnicianDashboard() {
       isLoading={isLoading}
       isAuthorized={isAuthorized}
       error={error}
-      title='Dashboard Técnico'
+      title='Tablero Técnico'
       subtitle={`${urgentTickets > 0 ? `${urgentTickets} urgentes · ` : ''}${overdueTickets > 0 ? `${overdueTickets} vencidos · ` : ''}${stats.assignedTickets || 0} tickets asignados`}
       loadingMessage='Cargando tus tickets asignados...'
       onRefresh={refetch}
@@ -127,10 +132,10 @@ export default function TechnicianDashboard() {
                               className={getPriorityColor(ticket.priority)}
                               variant='secondary'
                             >
-                              {ticket.priority}
+                              {getPriorityLabel(ticket.priority)}
                             </Badge>
                             <Badge className={getStatusColor(ticket.status)} variant='secondary'>
-                              {ticket.status}
+                              {getStatusLabel(ticket.status)}
                             </Badge>
                             {ticket.isOverdue && (
                               <Badge variant='destructive' className='text-xs'>

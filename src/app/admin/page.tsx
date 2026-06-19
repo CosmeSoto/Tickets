@@ -160,7 +160,7 @@ export default function AdminDashboard() {
       )}
 
       {/* 2. Módulo Tickets — solo si tiene acceso */}
-      {hasTickets && <TicketsStatsSection stats={stats} role='ADMIN' />}
+      {hasTickets && <TicketsStatsSection stats={stats} role='ADMIN' isSuperAdmin={isSuperAdmin} />}
 
       {/* 3. Módulo Inventario — solo si tiene acceso */}
       {hasInventory && <InventoryStatsSection role='ADMIN' />}
