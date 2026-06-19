@@ -67,7 +67,7 @@ export function QuickContractForm({
         body: JSON.stringify({
           name: name.trim(),
           contractNumber: contractNumber.trim() || undefined,
-          category: 'LEASE',
+          category: 'EQUIPMENT_RENTAL',
           supplierId: supplierId || undefined,
           familyId: familyId || undefined,
           startDate: startDate || undefined,

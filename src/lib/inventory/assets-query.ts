@@ -74,7 +74,12 @@ export async function queryAssets(params: AssetsQueryParams): Promise<AssetsQuer
     const items = await prisma.equipment.findMany({
       where: { id: { in: personalEquipmentIds } },
       include: {
-        type: { include: { family: { include: { customFields: { orderBy: { order: 'asc' } } } } } },
+        type: {
+          include: {
+            family: { include: { customFields: { orderBy: { order: 'asc' } } } },
+            attributes: { orderBy: { order: 'asc' } },
+          },
+        },
         model: { select: { brand: true, model: true } },
         customValues: { select: { fieldName: true, fieldValue: true } },
       },
@@ -223,11 +228,19 @@ export async function queryAssets(params: AssetsQueryParams): Promise<AssetsQuer
 }
 
 function mapEquipmentItem(item: any): UnifiedAssetItem {
-  // Catálogo de campos de la familia con orden y labels
+  // Catálogo de campos: primero del tipo de equipo (equipment_type_attributes), fallback a familia (legacy)
+  const typeAttrs: Array<{ attributeName: string; attributeLabel: string; order: number }> =
+    item.type?.attributes ?? []
   const familyFields: Array<{ fieldName: string; fieldLabel: string; order: number }> =
     item.type?.family?.customFields ?? []
-  const fieldMeta = new Map(
-    familyFields.map(f => [f.fieldName, { label: f.fieldLabel, order: f.order }])
+
+  // Construir mapa de metadata: type attributes tienen prioridad sobre family fields
+  const fieldMeta = new Map<string, { label: string; order: number }>()
+  // Primero agregar family fields (legacy)
+  familyFields.forEach(f => fieldMeta.set(f.fieldName, { label: f.fieldLabel, order: f.order }))
+  // Luego sobreescribir con type attributes (nuevos, tienen prioridad)
+  typeAttrs.forEach(a =>
+    fieldMeta.set(a.attributeName, { label: a.attributeLabel, order: a.order })
   )
 
   // Ordenar customValues según el catálogo de la familia
