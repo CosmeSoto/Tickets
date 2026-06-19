@@ -54,7 +54,7 @@ export default function TechnicianDashboard() {
       isLoading={isLoading}
       isAuthorized={isAuthorized}
       error={error}
-      title='Tablero Técnico'
+      title='Dashboard Técnico'
       subtitle={`${urgentTickets > 0 ? `${urgentTickets} urgentes · ` : ''}${overdueTickets > 0 ? `${overdueTickets} vencidos · ` : ''}${stats.assignedTickets || 0} tickets asignados`}
       loadingMessage='Cargando tus tickets asignados...'
       onRefresh={refetch}

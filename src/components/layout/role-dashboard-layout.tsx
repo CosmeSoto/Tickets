@@ -73,7 +73,7 @@ interface NavItem {
 // Navegación por rol con submenús
 const navigationByRole: Record<string, NavItem[]> = {
   ADMIN: [
-    { name: 'Tablero', href: '/admin', icon: LayoutDashboard },
+    { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
     {
       name: 'Tickets',
       href: '/admin/tickets',
@@ -107,7 +107,7 @@ const navigationByRole: Record<string, NavItem[]> = {
       href: '/admin/patrols',
       icon: Shield,
       children: [
-        { name: 'Tablero', href: '/admin/patrols', icon: LayoutDashboard },
+        { name: 'Dashboard', href: '/admin/patrols', icon: LayoutDashboard },
         { name: 'Checkpoints', href: '/admin/patrols/checkpoints', icon: MapPin },
         { name: 'Rutas', href: '/admin/patrols/routes', icon: ClipboardList },
         { name: 'Programación', href: '/admin/patrols/schedules', icon: ClipboardList },
@@ -135,7 +135,7 @@ const navigationByRole: Record<string, NavItem[]> = {
 
   // Técnico SIN gestión de inventario: tickets + sus equipos asignados
   TECHNICIAN: [
-    { name: 'Tablero', href: '/technician', icon: LayoutDashboard },
+    { name: 'Dashboard', href: '/technician', icon: LayoutDashboard },
     {
       name: 'Tickets',
       href: '/technician/tickets',
@@ -162,7 +162,7 @@ const navigationByRole: Record<string, NavItem[]> = {
       href: '/admin/patrols',
       icon: Shield,
       children: [
-        { name: 'Tablero', href: '/admin/patrols', icon: LayoutDashboard },
+        { name: 'Dashboard', href: '/admin/patrols', icon: LayoutDashboard },
         { name: 'Mis Rondas', href: '/patrol', icon: MapPin },
         { name: 'Mis Novedades', href: '/patrol/incidents', icon: AlertTriangle },
         { name: 'Reportes', href: '/admin/patrols/reports', icon: BarChart3 },
@@ -182,7 +182,7 @@ const navigationByRole: Record<string, NavItem[]> = {
 
   // Técnico CON gestión de inventario: tickets + inventario operativo de sus familias
   TECHNICIAN_MANAGER: [
-    { name: 'Tablero', href: '/technician', icon: LayoutDashboard },
+    { name: 'Dashboard', href: '/technician', icon: LayoutDashboard },
     {
       name: 'Tickets',
       href: '/technician/tickets',
@@ -211,7 +211,7 @@ const navigationByRole: Record<string, NavItem[]> = {
       href: '/admin/patrols',
       icon: Shield,
       children: [
-        { name: 'Tablero', href: '/admin/patrols', icon: LayoutDashboard },
+        { name: 'Dashboard', href: '/admin/patrols', icon: LayoutDashboard },
         { name: 'Mis Rondas', href: '/patrol', icon: MapPin },
         { name: 'Mis Novedades', href: '/patrol/incidents', icon: AlertTriangle },
         { name: 'Reportes', href: '/admin/patrols/reports', icon: BarChart3 },
@@ -231,7 +231,7 @@ const navigationByRole: Record<string, NavItem[]> = {
 
   // Cliente: sus tickets + sus equipos asignados + mantenimientos
   CLIENT: [
-    { name: 'Tablero', href: '/client', icon: LayoutDashboard },
+    { name: 'Dashboard', href: '/client', icon: LayoutDashboard },
     {
       name: 'Mis Tickets',
       href: '/client/tickets',
@@ -272,7 +272,7 @@ const navigationByRole: Record<string, NavItem[]> = {
 
   // Cliente CON gestión de inventario: tickets + inventario operativo de sus familias
   CLIENT_MANAGER: [
-    { name: 'Tablero', href: '/client', icon: LayoutDashboard },
+    { name: 'Dashboard', href: '/client', icon: LayoutDashboard },
     {
       name: 'Mis Tickets',
       href: '/client/tickets',
