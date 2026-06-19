@@ -604,6 +604,13 @@ export class PatrolIncidentService {
       console.error('[PatrolIncidentService] Error notificando agente:', err)
     }
 
+    // Notificar a admins y técnicos de la familia destino (nuevo ticket creado desde ronda)
+    try {
+      await NotificationService.notifyTicketCreated(ticketId)
+    } catch (err) {
+      console.error('[PatrolIncidentService] Error notificando familia destino:', err)
+    }
+
     return { incident: updated, ticketId }
   }
 

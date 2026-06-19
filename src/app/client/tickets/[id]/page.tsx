@@ -9,6 +9,7 @@ import {
   Tag,
   Paperclip,
   AlertCircle,
+  CheckCircle,
   Trash2,
   Edit,
   Save,
@@ -257,7 +258,7 @@ export default function ClientTicketDetailPage() {
           </Card>
 
           {/* Banner: ticket resuelto */}
-          {ticket.status === 'RESOLVED' && (
+          {ticket.status === 'RESOLVED' && ticket.source !== 'PATROL' && (
             <Card className='border-amber-300 bg-amber-50 dark:bg-amber-950 dark:border-amber-700'>
               <CardContent className='pt-5 flex items-start gap-3'>
                 <Star className='h-5 w-5 text-amber-600 shrink-0 mt-0.5' />
@@ -276,6 +277,24 @@ export default function ClientTicketDetailPage() {
                     <Star className='h-4 w-4 mr-2' />
                     Calificar
                   </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Banner informativo: ticket de rondas resuelto (agente no califica) */}
+          {ticket.status === 'RESOLVED' && ticket.source === 'PATROL' && (
+            <Card className='border-green-300 bg-green-50 dark:bg-green-950 dark:border-green-700'>
+              <CardContent className='pt-5 flex items-start gap-3'>
+                <CheckCircle className='h-5 w-5 text-green-600 shrink-0 mt-0.5' />
+                <div>
+                  <p className='font-semibold text-green-900 dark:text-green-100'>
+                    Novedad resuelta
+                  </p>
+                  <p className='text-sm text-green-800 dark:text-green-200 mt-1'>
+                    La novedad que reportaste ha sido atendida y resuelta. El supervisor se
+                    encargará de cerrar el seguimiento.
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -377,7 +396,10 @@ export default function ClientTicketDetailPage() {
           <TicketRatingSystem
             ticketId={ticket.id}
             technicianId={ticket.assignee?.id}
-            canRate={ticket.status === 'RESOLVED' || ticket.status === 'CLOSED'}
+            canRate={
+              ticket.source !== 'PATROL' &&
+              (ticket.status === 'RESOLVED' || ticket.status === 'CLOSED')
+            }
             showTechnicianStats={false}
             mode='client'
             onRatingSubmitted={() => {
@@ -425,7 +447,10 @@ export default function ClientTicketDetailPage() {
             <TicketRatingSystem
               ticketId={ticket.id}
               technicianId={ticket.assignee?.id}
-              canRate={ticket.status === 'RESOLVED' || ticket.status === 'CLOSED'}
+              canRate={
+                ticket.source !== 'PATROL' &&
+                (ticket.status === 'RESOLVED' || ticket.status === 'CLOSED')
+              }
               showTechnicianStats={false}
               mode='client'
               onRatingSubmitted={() => {

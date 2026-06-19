@@ -344,7 +344,9 @@ export default function AdminTicketDetailPage() {
             </Card>
           )}
 
-          {session?.user?.id === ticket.client?.id &&
+          {(ticket.source === 'PATROL' && ticket.createdById
+            ? session?.user?.id === ticket.createdById
+            : session?.user?.id === ticket.client?.id) &&
             (ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') && (
               <TicketRatingSystem
                 ticketId={ticket.id}
@@ -418,7 +420,9 @@ export default function AdminTicketDetailPage() {
             ticketId={ticket.id}
             technicianId={ticket.assignee?.id}
             canRate={
-              session?.user?.id === ticket.client.id &&
+              (ticket.source === 'PATROL' && ticket.createdById
+                ? session?.user?.id === ticket.createdById
+                : session?.user?.id === ticket.client.id) &&
               (ticket.status === 'RESOLVED' || ticket.status === 'CLOSED')
             }
             showTechnicianStats

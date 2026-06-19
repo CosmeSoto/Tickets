@@ -42,6 +42,8 @@ export interface Ticket {
   description: string
   status: TicketStatus['value']
   priority: TicketPriority['value']
+  source?: 'WEB' | 'EMAIL' | 'PHONE' | 'PATROL' | 'API'
+  createdById?: string | null
   client: User
   assignee?: User
   category: Category

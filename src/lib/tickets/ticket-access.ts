@@ -201,8 +201,13 @@ async function technicianHasTicketAccess(
   userId: string,
   ticket: TicketAccessRecord
 ): Promise<boolean> {
+  // El técnico es el asignado → acceso directo
   if (ticket.assigneeId === userId) return true
 
+  // El técnico es el cliente/reportante del ticket (ej: escalado desde rondas)
+  if (ticket.clientId === userId) return true
+
+  // El técnico es colaborador del ticket
   const isCollaborator = await prisma.ticket_collaborators.findUnique({
     where: {
       ticketId_collaboratorId: { ticketId: ticket.id, collaboratorId: userId },

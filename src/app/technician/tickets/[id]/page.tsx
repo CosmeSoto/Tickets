@@ -110,7 +110,13 @@ export default function TechnicianTicketDetailPage() {
     isAssignedResolver && (ticket?.status === 'RESOLVED' || ticket?.status === 'CLOSED')
   const hasArticle = !!ticket?.knowledgeArticleId
   const isRequester = ticket?.client?.id === session?.user?.id
-  const canRate = isRequester && (ticket?.status === 'RESOLVED' || ticket?.status === 'CLOSED')
+  // Para tickets escalados desde rondas, el que califica es el createdById (admin que escaló),
+  // no el agente (clientId). El agente solo ve que fue resuelta.
+  const canRate =
+    ticket?.source === 'PATROL' && ticket?.createdById
+      ? session?.user?.id === ticket.createdById &&
+        (ticket?.status === 'RESOLVED' || ticket?.status === 'CLOSED')
+      : isRequester && (ticket?.status === 'RESOLVED' || ticket?.status === 'CLOSED')
 
   useEffect(() => {
     if (authStatus === 'loading') return

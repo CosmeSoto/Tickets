@@ -656,15 +656,32 @@ export class NotificationService {
         throw new Error('Ticket not found')
       }
 
-      // Notificar al cliente con call-to-action para calificar
+      // Determinar quién debe calificar:
+      // - Tickets normales: el clientId
+      // - Tickets escalados de rondas (source=PATROL): el createdById (admin que escaló)
+      const raterUserId =
+        ticket.source === 'PATROL' && ticket.createdById ? ticket.createdById : ticket.clientId
+
+      // Notificar al responsable de calificar con call-to-action
       const notification = await this.createNotification({
-        userId: ticket.clientId,
+        userId: raterUserId,
         type: 'SUCCESS',
         title: 'Ticket resuelto - Califica el servicio',
-        message: `Tu ticket "${ticket.title}" ha sido resuelto. Por favor califica el servicio recibido para cerrar el ticket.`,
+        message: `${ticket.source === 'PATROL' ? 'El ticket escalado desde rondas' : 'Tu ticket'} "${ticket.title}" ha sido resuelto. Por favor califica el servicio recibido para cerrar el ticket.`,
         ticketId: ticket.id,
         specificType: 'statusChanged',
       })
+
+      // Si es ticket de rondas, también notificar al agente que su novedad fue resuelta
+      if (ticket.source === 'PATROL' && ticket.createdById && ticket.clientId !== raterUserId) {
+        await this.push({
+          userId: ticket.clientId,
+          type: 'SUCCESS',
+          title: 'Novedad resuelta',
+          message: `La novedad que reportaste ha sido resuelta (ticket "${ticket.title}").`,
+          ticketId: ticket.id,
+        }).catch(() => {})
+      }
 
       return notification
     } catch (error) {

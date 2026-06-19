@@ -168,6 +168,8 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
         status: true,
         clientId: true,
         assigneeId: true,
+        source: true,
+        createdById: true,
       },
     })
 
@@ -175,10 +177,17 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
       return NextResponse.json({ success: false, error: 'Ticket no encontrado' }, { status: 404 })
     }
 
-    // Solo el cliente puede calificar su propio ticket
-    if (ticket.clientId !== session.user.id) {
+    // Determinar quién puede calificar:
+    // - Tickets normales: el clientId (quien creó el ticket)
+    // - Tickets escalados de rondas (source=PATROL): el createdById (admin/supervisor que escaló)
+    //   porque el clientId en este caso es el agente que reportó la novedad y no tiene
+    //   contexto para evaluar la resolución del ticket.
+    const canRateUserId =
+      ticket.source === 'PATROL' && ticket.createdById ? ticket.createdById : ticket.clientId
+
+    if (canRateUserId !== session.user.id) {
       return NextResponse.json(
-        { success: false, error: 'Solo el cliente puede calificar este ticket' },
+        { success: false, error: 'No tienes permisos para calificar este ticket' },
         { status: 403 }
       )
     }
