@@ -142,12 +142,21 @@ export class PatrolIncidentService {
         select: { name: true },
       })
 
+      // Mapear severidad a español
+      const severityLabels: Record<string, string> = {
+        LOW: 'Baja',
+        MEDIUM: 'Media',
+        HIGH: 'Alta',
+        CRITICAL: 'Crítica',
+      }
+      const severityLabel = severityLabels[severity] ?? severity
+
       for (const supervisor of supervisors) {
         await NotificationService.push({
           userId: supervisor.id,
           type: NotificationType.WARNING,
           title: 'Nueva novedad reportada',
-          message: `Novedad ${severity} en checkpoint "${checkpoint?.name ?? checkpointId}" - Ruta: ${patrol.route.name}`,
+          message: `Novedad ${severityLabel} en checkpoint "${checkpoint?.name ?? checkpointId}" - Ruta: ${patrol.route.name}`,
           metadata: {
             incidentId: incident.id,
             patrolId,
