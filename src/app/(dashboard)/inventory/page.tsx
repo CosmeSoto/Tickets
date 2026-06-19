@@ -71,7 +71,13 @@ function InventoryContent() {
           canCreate && tab !== 'mine' ? (
             <div className='flex items-center gap-2'>
               <Button size='sm' asChild>
-                <Link href='/inventory/new'>
+                <Link
+                  href={
+                    tab === 'batches'
+                      ? '/inventory/new?mode=bulk'
+                      : '/inventory/new?mode=individual'
+                  }
+                >
                   <Plus className='mr-2 h-4 w-4' />
                   {tab === 'batches' ? 'Nuevo Lote' : 'Nuevo Activo'}
                 </Link>

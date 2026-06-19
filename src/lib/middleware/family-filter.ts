@@ -204,16 +204,31 @@ export async function hasAccessToEquipment(
 
   const familyId = equipment.type?.familyId ?? null
 
-  // Family Admin: verificar familia
+  // Family Admin: verificar asignación
   if (userRole === 'ADMIN' && !isSuperAdmin) {
     if (!familyId) return false
-    return await hasAccessToFamily(userId, userRole, isSuperAdmin, familyId)
+    // Verificar en admin_family_assignments Y inventory_manager_families
+    const familyIds = await getUserFamilyIds(userId)
+    if (familyIds.includes(familyId)) return true
+
+    // Fallback: verificar en inventory_manager_families (admin con canManageInventory)
+    const inventoryAssignment = await prisma.inventory_manager_families.findFirst({
+      where: { managerId: userId, familyId },
+    })
+    return !!inventoryAssignment
   }
 
   // Technician: verificar familia
   if (userRole === 'TECHNICIAN') {
     if (!familyId) return false
-    return await hasAccessToFamily(userId, userRole, isSuperAdmin, familyId)
+    const hasFamily = await hasAccessToFamily(userId, userRole, isSuperAdmin, familyId)
+    if (hasFamily) return true
+
+    // Fallback: verificar en inventory_manager_families (técnico con canManageInventory)
+    const inventoryAssignment = await prisma.inventory_manager_families.findFirst({
+      where: { managerId: userId, familyId },
+    })
+    return !!inventoryAssignment
   }
 
   // Client: verificar asignación

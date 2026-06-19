@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, Layers, Package } from 'lucide-react'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -13,8 +13,12 @@ type CreationMode = 'individual' | 'bulk'
 
 export default function NewInventoryPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { families, loading } = useFamilyOptions()
-  const [mode, setMode] = useState<CreationMode>('individual')
+
+  // Si viene ?mode=bulk o ?mode=individual en la URL, se usa directamente sin mostrar selector
+  const presetMode = searchParams?.get('mode') as CreationMode | null
+  const [mode, setMode] = useState<CreationMode>(presetMode === 'bulk' ? 'bulk' : 'individual')
 
   const handleFamilySelect = (familyId: string) => {
     const targetPath =
@@ -22,8 +26,14 @@ export default function NewInventoryPage() {
     router.push(`${targetPath}?familyId=${familyId}`)
   }
 
+  const title = mode === 'bulk' ? 'Nuevo Lote' : 'Nuevo Activo'
+  const subtitle =
+    mode === 'bulk'
+      ? 'Selecciona la familia para crear un lote de activos'
+      : 'Selecciona la familia para crear un activo individual'
+
   return (
-    <ModuleLayout title='Nuevo Activo' subtitle='Selecciona modalidad y familia para continuar'>
+    <ModuleLayout title={title} subtitle={subtitle}>
       <div className='max-w-4xl mx-auto space-y-4'>
         <button
           type='button'
@@ -37,34 +47,43 @@ export default function NewInventoryPage() {
         <Card>
           <CardHeader className='space-y-4'>
             <div>
-              <CardTitle>¿Cómo deseas crear el activo?</CardTitle>
+              <CardTitle>
+                {mode === 'bulk'
+                  ? '¿A qué familia pertenece el lote?'
+                  : '¿A qué familia pertenece el activo?'}
+              </CardTitle>
               <CardDescription>
-                Elige si crearás un activo individual o un lote y luego selecciona la familia.
+                {mode === 'bulk'
+                  ? 'Selecciona la familia donde se registrará el lote de activos.'
+                  : 'Selecciona la familia donde se registrará el activo.'}
               </CardDescription>
             </div>
 
-            <div className='inline-flex rounded-lg border bg-muted/30 p-1 gap-1 w-fit'>
-              <Button
-                type='button'
-                size='sm'
-                variant={mode === 'individual' ? 'default' : 'ghost'}
-                className='h-8'
-                onClick={() => setMode('individual')}
-              >
-                <Package className='h-4 w-4 mr-1.5' />
-                Activo individual
-              </Button>
-              <Button
-                type='button'
-                size='sm'
-                variant={mode === 'bulk' ? 'default' : 'ghost'}
-                className='h-8'
-                onClick={() => setMode('bulk')}
-              >
-                <Layers className='h-4 w-4 mr-1.5' />
-                Lote de activos
-              </Button>
-            </div>
+            {/* Selector de modalidad — solo si no viene pre-definido en la URL */}
+            {!presetMode && (
+              <div className='inline-flex rounded-lg border bg-muted/30 p-1 gap-1 w-fit'>
+                <Button
+                  type='button'
+                  size='sm'
+                  variant={mode === 'individual' ? 'default' : 'ghost'}
+                  className='h-8'
+                  onClick={() => setMode('individual')}
+                >
+                  <Package className='h-4 w-4 mr-1.5' />
+                  Activo individual
+                </Button>
+                <Button
+                  type='button'
+                  size='sm'
+                  variant={mode === 'bulk' ? 'default' : 'ghost'}
+                  className='h-8'
+                  onClick={() => setMode('bulk')}
+                >
+                  <Layers className='h-4 w-4 mr-1.5' />
+                  Lote de activos
+                </Button>
+              </div>
+            )}
           </CardHeader>
 
           <CardContent className='space-y-4'>

@@ -1055,5 +1055,441 @@ export async function seedAttributes(prisma: PrismaClient, familyMap: Map<string
     )
   }
 
+  // ============================================
+  // ATRIBUTOS COMUNES PARA TIPOS EN TODAS LAS FAMILIAS
+  // Busca todos los tipos Laptop/Desktop/Monitor en familias diferentes a TECHNOLOGY
+  // y les asigna los mismos atributos base (procesador, ram, almacenamiento, etc.)
+  // ============================================
+
+  const commonComputerAttrs = [
+    {
+      attributeName: 'procesador',
+      attributeLabel: 'Procesador',
+      attributeType: 'text',
+      isRequired: true,
+      isVisible: true,
+      order: 4,
+      helpText: 'Ej: Intel Core i5-1235U',
+    },
+    {
+      attributeName: 'ram',
+      attributeLabel: 'RAM (GB)',
+      attributeType: 'number',
+      isRequired: true,
+      isVisible: true,
+      order: 5,
+    },
+    {
+      attributeName: 'almacenamiento',
+      attributeLabel: 'Almacenamiento (GB)',
+      attributeType: 'number',
+      isRequired: true,
+      isVisible: true,
+      order: 6,
+    },
+    {
+      attributeName: 'tipo_disco',
+      attributeLabel: 'Tipo de Disco',
+      attributeType: 'select',
+      isRequired: true,
+      isVisible: true,
+      order: 7,
+      options: ['SSD', 'HDD', 'NVMe'],
+    },
+    {
+      attributeName: 'sistema_operativo',
+      attributeLabel: 'Sistema Operativo',
+      attributeType: 'select',
+      isRequired: true,
+      isVisible: true,
+      order: 8,
+      options: ['Windows 11 Pro', 'Windows 10 Pro', 'Ubuntu 22.04', 'macOS'],
+    },
+  ]
+
+  const monitorAttrs = [
+    {
+      attributeName: 'tamano_pantalla',
+      attributeLabel: 'Tamaño (pulgadas)',
+      attributeType: 'number',
+      isRequired: true,
+      isVisible: true,
+      order: 4,
+    },
+    {
+      attributeName: 'resolucion',
+      attributeLabel: 'Resolución',
+      attributeType: 'select',
+      isRequired: true,
+      isVisible: true,
+      order: 5,
+      options: ['1920x1080 (Full HD)', '2560x1440 (2K)', '3840x2160 (4K)'],
+    },
+    {
+      attributeName: 'tipo_panel',
+      attributeLabel: 'Tipo de Panel',
+      attributeType: 'select',
+      isRequired: false,
+      isVisible: true,
+      order: 6,
+      options: ['IPS', 'VA', 'TN', 'OLED'],
+    },
+    {
+      attributeName: 'conexiones',
+      attributeLabel: 'Conexiones',
+      attributeType: 'text',
+      isRequired: false,
+      isVisible: true,
+      order: 7,
+      helpText: 'Ej: HDMI, DisplayPort, USB-C',
+    },
+  ]
+
+  // Buscar tipos en familias diferentes a TECHNOLOGY
+  const commonLaptops = await prisma.equipment_types.findMany({
+    where: { name: 'Laptop', familyId: { not: techFamilyId } },
+  })
+  const commonDesktops = await prisma.equipment_types.findMany({
+    where: { name: 'Desktop', familyId: { not: techFamilyId } },
+  })
+  const commonMonitors = await prisma.equipment_types.findMany({
+    where: { name: 'Monitor', familyId: { not: techFamilyId } },
+  })
+  const commonPrinters = await prisma.equipment_types.findMany({
+    where: { name: 'Impresora', familyId: { not: techFamilyId } },
+  })
+
+  // Atributos extra solo para laptops (además de los comunes de computador)
+  const laptopExtraAttrs: typeof commonComputerAttrs = [
+    {
+      attributeName: 'pantalla_pulgadas',
+      attributeLabel: 'Tamaño Pantalla (pulgadas)',
+      attributeType: 'number',
+      isRequired: false,
+      isVisible: true,
+      order: 9,
+      helpText: 'Ej: 14',
+    },
+  ]
+
+  // Atributos para impresoras comunes
+  const printerCommonAttrs: Array<{
+    attributeName: string
+    attributeLabel: string
+    attributeType: string
+    isRequired: boolean
+    isVisible: boolean
+    order: number
+    options?: string[]
+    helpText?: string
+  }> = [
+    {
+      attributeName: 'tipo_impresion',
+      attributeLabel: 'Tipo de Impresión',
+      attributeType: 'select',
+      isRequired: true,
+      isVisible: true,
+      order: 4,
+      options: ['Láser', 'Inyección', 'Matricial', 'Térmica'],
+    },
+    {
+      attributeName: 'color',
+      attributeLabel: 'Color',
+      attributeType: 'select',
+      isRequired: true,
+      isVisible: true,
+      order: 5,
+      options: ['Color', 'Monocromática'],
+    },
+    {
+      attributeName: 'conectividad',
+      attributeLabel: 'Conectividad',
+      attributeType: 'select',
+      isRequired: false,
+      isVisible: true,
+      order: 6,
+      options: ['USB', 'Red (Ethernet)', 'WiFi', 'USB + Red', 'USB + WiFi'],
+    },
+  ]
+
+  // Atributos para teléfonos (móviles y convencionales)
+  const phoneCommonAttrs: Array<{
+    attributeName: string
+    attributeLabel: string
+    attributeType: string
+    isRequired: boolean
+    isVisible: boolean
+    order: number
+    options?: string[]
+    helpText?: string
+  }> = [
+    {
+      attributeName: 'tipo_telefono',
+      attributeLabel: 'Tipo',
+      attributeType: 'select',
+      isRequired: true,
+      isVisible: true,
+      order: 4,
+      options: ['Móvil', 'Convencional (fijo)', 'IP', 'Inalámbrico DECT'],
+    },
+    {
+      attributeName: 'extension',
+      attributeLabel: 'Extensión',
+      attributeType: 'text',
+      isRequired: false,
+      isVisible: true,
+      order: 5,
+      helpText: 'Ej: 201, 305 (solo para fijos/IP)',
+    },
+    {
+      attributeName: 'linea_telefonica',
+      attributeLabel: 'Línea / Número',
+      attributeType: 'text',
+      isRequired: false,
+      isVisible: true,
+      order: 6,
+      helpText: 'Ej: +593 987654321',
+    },
+    {
+      attributeName: 'plan_datos',
+      attributeLabel: 'Plan / Operador',
+      attributeType: 'text',
+      isRequired: false,
+      isVisible: true,
+      order: 7,
+      helpText: 'Ej: Claro 10GB, CNT Corporativo',
+    },
+  ]
+
+  let commonAttrCount = 0
+
+  // Laptops: atributos de computador + pantalla
+  for (const eqType of commonLaptops) {
+    for (const attr of [...commonComputerAttrs, ...laptopExtraAttrs]) {
+      await prisma.equipment_type_attributes.upsert({
+        where: {
+          equipmentTypeId_attributeName: {
+            equipmentTypeId: eqType.id,
+            attributeName: attr.attributeName,
+          },
+        },
+        update: {
+          attributeLabel: attr.attributeLabel,
+          attributeType: attr.attributeType,
+          isRequired: attr.isRequired,
+          isVisible: attr.isVisible,
+          order: attr.order,
+          helpText: attr.helpText,
+          options: attr.options ? { options: attr.options } : undefined,
+        },
+        create: {
+          id: randomUUID(),
+          equipmentTypeId: eqType.id,
+          attributeName: attr.attributeName,
+          attributeLabel: attr.attributeLabel,
+          attributeType: attr.attributeType,
+          isRequired: attr.isRequired,
+          isVisible: attr.isVisible,
+          order: attr.order,
+          helpText: attr.helpText,
+          options: attr.options ? { options: attr.options } : undefined,
+        },
+      })
+      commonAttrCount++
+    }
+  }
+
+  // Desktops: atributos de computador
+  for (const eqType of commonDesktops) {
+    for (const attr of commonComputerAttrs) {
+      await prisma.equipment_type_attributes.upsert({
+        where: {
+          equipmentTypeId_attributeName: {
+            equipmentTypeId: eqType.id,
+            attributeName: attr.attributeName,
+          },
+        },
+        update: {
+          attributeLabel: attr.attributeLabel,
+          attributeType: attr.attributeType,
+          isRequired: attr.isRequired,
+          isVisible: attr.isVisible,
+          order: attr.order,
+          helpText: attr.helpText,
+          options: attr.options ? { options: attr.options } : undefined,
+        },
+        create: {
+          id: randomUUID(),
+          equipmentTypeId: eqType.id,
+          attributeName: attr.attributeName,
+          attributeLabel: attr.attributeLabel,
+          attributeType: attr.attributeType,
+          isRequired: attr.isRequired,
+          isVisible: attr.isVisible,
+          order: attr.order,
+          helpText: attr.helpText,
+          options: attr.options ? { options: attr.options } : undefined,
+        },
+      })
+      commonAttrCount++
+    }
+  }
+
+  // Monitores
+  for (const eqType of commonMonitors) {
+    for (const attr of monitorAttrs) {
+      await prisma.equipment_type_attributes.upsert({
+        where: {
+          equipmentTypeId_attributeName: {
+            equipmentTypeId: eqType.id,
+            attributeName: attr.attributeName,
+          },
+        },
+        update: {
+          attributeLabel: attr.attributeLabel,
+          attributeType: attr.attributeType,
+          isRequired: attr.isRequired,
+          isVisible: attr.isVisible,
+          order: attr.order,
+          helpText: attr.helpText,
+          options: attr.options ? { options: attr.options } : undefined,
+        },
+        create: {
+          id: randomUUID(),
+          equipmentTypeId: eqType.id,
+          attributeName: attr.attributeName,
+          attributeLabel: attr.attributeLabel,
+          attributeType: attr.attributeType,
+          isRequired: attr.isRequired,
+          isVisible: attr.isVisible,
+          order: attr.order,
+          helpText: attr.helpText,
+          options: attr.options ? { options: attr.options } : undefined,
+        },
+      })
+      commonAttrCount++
+    }
+  }
+
+  // Impresoras
+  for (const eqType of commonPrinters) {
+    for (const attr of printerCommonAttrs) {
+      await prisma.equipment_type_attributes.upsert({
+        where: {
+          equipmentTypeId_attributeName: {
+            equipmentTypeId: eqType.id,
+            attributeName: attr.attributeName,
+          },
+        },
+        update: {
+          attributeLabel: attr.attributeLabel,
+          attributeType: attr.attributeType,
+          isRequired: attr.isRequired,
+          isVisible: attr.isVisible,
+          order: attr.order,
+          helpText: attr.helpText,
+          options: attr.options ? { options: attr.options } : undefined,
+        },
+        create: {
+          id: randomUUID(),
+          equipmentTypeId: eqType.id,
+          attributeName: attr.attributeName,
+          attributeLabel: attr.attributeLabel,
+          attributeType: attr.attributeType,
+          isRequired: attr.isRequired,
+          isVisible: attr.isVisible,
+          order: attr.order,
+          helpText: attr.helpText,
+          options: attr.options ? { options: attr.options } : undefined,
+        },
+      })
+      commonAttrCount++
+    }
+  }
+
+  // Teléfonos
+  const commonPhones = await prisma.equipment_types.findMany({
+    where: { name: 'Teléfono', familyId: { not: techFamilyId } },
+  })
+  for (const eqType of commonPhones) {
+    for (const attr of phoneCommonAttrs) {
+      await prisma.equipment_type_attributes.upsert({
+        where: {
+          equipmentTypeId_attributeName: {
+            equipmentTypeId: eqType.id,
+            attributeName: attr.attributeName,
+          },
+        },
+        update: {
+          attributeLabel: attr.attributeLabel,
+          attributeType: attr.attributeType,
+          isRequired: attr.isRequired,
+          isVisible: attr.isVisible,
+          order: attr.order,
+          helpText: attr.helpText,
+          options: attr.options ? { options: attr.options } : undefined,
+        },
+        create: {
+          id: randomUUID(),
+          equipmentTypeId: eqType.id,
+          attributeName: attr.attributeName,
+          attributeLabel: attr.attributeLabel,
+          attributeType: attr.attributeType,
+          isRequired: attr.isRequired,
+          isVisible: attr.isVisible,
+          order: attr.order,
+          helpText: attr.helpText,
+          options: attr.options ? { options: attr.options } : undefined,
+        },
+      })
+      commonAttrCount++
+    }
+  }
+
+  // También agregar atributos de teléfono al tipo PHONE de TECHNOLOGY (si no los tiene)
+  const techPhone = await prisma.equipment_types.findFirst({
+    where: { name: 'Teléfono', familyId: techFamilyId },
+  })
+  if (techPhone) {
+    for (const attr of phoneCommonAttrs) {
+      await prisma.equipment_type_attributes.upsert({
+        where: {
+          equipmentTypeId_attributeName: {
+            equipmentTypeId: techPhone.id,
+            attributeName: attr.attributeName,
+          },
+        },
+        update: {
+          attributeLabel: attr.attributeLabel,
+          attributeType: attr.attributeType,
+          isRequired: attr.isRequired,
+          isVisible: attr.isVisible,
+          order: attr.order,
+          helpText: attr.helpText,
+          options: attr.options ? { options: attr.options } : undefined,
+        },
+        create: {
+          id: randomUUID(),
+          equipmentTypeId: techPhone.id,
+          attributeName: attr.attributeName,
+          attributeLabel: attr.attributeLabel,
+          attributeType: attr.attributeType,
+          isRequired: attr.isRequired,
+          isVisible: attr.isVisible,
+          order: attr.order,
+          helpText: attr.helpText,
+          options: attr.options ? { options: attr.options } : undefined,
+        },
+      })
+      commonAttrCount++
+    }
+  }
+
+  if (commonAttrCount > 0) {
+    console.log(
+      `  ✅ ${commonAttrCount} atributos comunes para tipos Laptop/Desktop/Monitor en otras familias`
+    )
+  }
+
   console.log('✅ Seed de atributos completado')
 }

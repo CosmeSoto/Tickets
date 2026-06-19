@@ -323,7 +323,68 @@ export async function seedConsumableTypes(prisma: PrismaClient, familyMap: Map<s
 export async function seedInventoryTypes(prisma: PrismaClient, familyMap: Map<string, string>) {
   console.log('📦 Creando tipos de inventario...')
   await seedEquipmentTypes(prisma, familyMap)
+  await seedCommonEquipmentTypesForAllFamilies(prisma, familyMap)
   await seedLicenseTypes(prisma, familyMap)
   await seedConsumableTypes(prisma, familyMap)
   console.log('✅ Tipos de inventario creados')
+}
+
+/**
+ * Crea tipos de equipo comunes (Laptop, Desktop, Monitor) en todas las familias
+ * que no sean TECHNOLOGY (que ya los tiene). Esto permite a Compras registrar
+ * equipos informáticos para cualquier familia.
+ */
+async function seedCommonEquipmentTypesForAllFamilies(
+  prisma: PrismaClient,
+  familyMap: Map<string, string>
+) {
+  const commonTypes = [
+    { code: 'LAPTOP', name: 'Laptop', icon: 'Laptop', order: 50 },
+    { code: 'DESKTOP', name: 'Desktop', icon: 'Monitor', order: 51 },
+    { code: 'MONITOR', name: 'Monitor', icon: 'Monitor', order: 52 },
+    { code: 'PRINTER', name: 'Impresora', icon: 'Printer', order: 53 },
+    { code: 'PHONE', name: 'Teléfono', icon: 'Phone', order: 54 },
+  ]
+
+  // Familias donde los tipos comunes deben existir (excluyendo TECHNOLOGY que ya los tiene)
+  const targetFamilies = [
+    'FIXED_ASSETS',
+    'MAINTENANCE',
+    'SECURITY',
+    'SERVICES',
+    'GREEN_AREAS',
+    'ADMINISTRATIVE',
+    'COMMERCIAL',
+  ]
+  let created = 0
+
+  for (const familyCode of targetFamilies) {
+    const familyId = familyMap.get(familyCode)
+    if (!familyId) continue
+
+    for (const type of commonTypes) {
+      const uniqueCode = `${type.code}_${familyCode}`
+      const existing = await prisma.equipment_types.findFirst({
+        where: { OR: [{ code: uniqueCode }, { name: type.name, familyId }] },
+      })
+      if (!existing) {
+        await prisma.equipment_types.create({
+          data: {
+            id: randomUUID(),
+            code: uniqueCode,
+            name: type.name,
+            icon: type.icon,
+            order: type.order,
+            familyId,
+            isActive: true,
+          },
+        })
+        created++
+      }
+    }
+  }
+
+  if (created > 0) {
+    console.log(`  ✓ ${created} tipos comunes (Laptop/Desktop/Monitor/Impresora) en otras familias`)
+  }
 }
