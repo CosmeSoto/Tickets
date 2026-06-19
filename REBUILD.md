@@ -174,6 +174,9 @@ npx prisma migrate dev --name nombre_del_cambio
 
 # O dentro del contenedor de dev:
 docker exec tickets-app-dev npx prisma migrate dev --name nombre_del_cambio
+
+# Cargar seeder:
+sudo docker exec tickets-app sh -c 'node ./node_modules/tsx/dist/cli.mjs prisma/seed.ts'
 ```
 
 ### Conectarse a la BD
@@ -312,16 +315,16 @@ SELECT table_name FROM information_schema.tables WHERE table_name = 'patrol_fami
 
 ## Solución de Problemas
 
-| Problema                                     | Solución                                                                                                                                                                                                                     |
-| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| App no arranca                               | `docker logs tickets-app` — verificar DATABASE_URL                                                                                                                                                                           |
-| No accede a gestion.local                    | Verificar `/etc/hosts` y que nginx esté corriendo                                                                                                                                                                            |
-| Certificado SSL no confiable                 | Aceptar excepción o instalar CA de mkcert en clientes                                                                                                                                                                        |
+| Problema                                     | Solución                                                                                                                                                                                             |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| App no arranca                               | `docker logs tickets-app` — verificar DATABASE_URL                                                                                                                                                   |
+| No accede a gestion.local                    | Verificar `/etc/hosts` y que nginx esté corriendo                                                                                                                                                    |
+| Certificado SSL no confiable                 | Aceptar excepción o instalar CA de mkcert en clientes                                                                                                                                                |
 | **404 en `/api/admin/news` u otros módulos** | **Imagen Docker desactualizada.** Aplicar cambios con: `sudo ./start-production.sh`. Si persiste, reconstruir sin caché: `sudo ./start-production.sh --clean`. Los datos (BD, uploads) NO se borran. |
-| Módulo carga vacío tras restaurar backup     | Igual que arriba — si se reconstruyó sin `start-production.sh`, el `NEXTAUTH_URL` puede quedar con dominio errado                                                                                                            |
-| Dashboard rondas vacío                       | Verificar que hay patrullas programadas para hoy (UTC-5)                                                                                                                                                                     |
-| Técnico no aparece en categorías             | Verificar `technician_family_assignments` para esa familia                                                                                                                                                                   |
-| Agente no aparece en programación            | Verificar `patrol_family_assignments` + `patrolsEnabled=true`                                                                                                                                                                |
+| Módulo carga vacío tras restaurar backup     | Igual que arriba — si se reconstruyó sin `start-production.sh`, el `NEXTAUTH_URL` puede quedar con dominio errado                                                                                    |
+| Dashboard rondas vacío                       | Verificar que hay patrullas programadas para hoy (UTC-5)                                                                                                                                             |
+| Técnico no aparece en categorías             | Verificar `technician_family_assignments` para esa familia                                                                                                                                           |
+| Agente no aparece en programación            | Verificar `patrol_family_assignments` + `patrolsEnabled=true`                                                                                                                                        |
 
 ---
 

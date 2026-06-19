@@ -16,7 +16,12 @@ export async function seedAttributes(prisma: PrismaClient, familyMap: Map<string
 
   // Obtener tipos de equipo existentes
   const computerType = await prisma.equipment_types.findFirst({
-    where: { name: 'Computadora de Escritorio', familyId: techFamilyId },
+    where: {
+      OR: [
+        { name: 'Desktop', familyId: techFamilyId },
+        { name: 'Computadora de Escritorio', familyId: techFamilyId },
+      ],
+    },
   })
   const laptopType = await prisma.equipment_types.findFirst({
     where: { name: 'Laptop', familyId: techFamilyId },
@@ -1145,18 +1150,18 @@ export async function seedAttributes(prisma: PrismaClient, familyMap: Map<string
     },
   ]
 
-  // Buscar tipos en familias diferentes a TECHNOLOGY
+  // Buscar tipos en TODAS las familias (upsert no duplica si ya existe)
   const commonLaptops = await prisma.equipment_types.findMany({
-    where: { name: 'Laptop', familyId: { not: techFamilyId } },
+    where: { name: 'Laptop' },
   })
   const commonDesktops = await prisma.equipment_types.findMany({
-    where: { name: 'Desktop', familyId: { not: techFamilyId } },
+    where: { name: 'Desktop' },
   })
   const commonMonitors = await prisma.equipment_types.findMany({
-    where: { name: 'Monitor', familyId: { not: techFamilyId } },
+    where: { name: 'Monitor' },
   })
   const commonPrinters = await prisma.equipment_types.findMany({
-    where: { name: 'Impresora', familyId: { not: techFamilyId } },
+    where: { name: 'Impresora' },
   })
 
   // Atributos extra solo para laptops (además de los comunes de computador)
@@ -1409,7 +1414,7 @@ export async function seedAttributes(prisma: PrismaClient, familyMap: Map<string
 
   // Teléfonos
   const commonPhones = await prisma.equipment_types.findMany({
-    where: { name: 'Teléfono', familyId: { not: techFamilyId } },
+    where: { name: 'Teléfono' },
   })
   for (const eqType of commonPhones) {
     for (const attr of phoneCommonAttrs) {
@@ -1432,45 +1437,6 @@ export async function seedAttributes(prisma: PrismaClient, familyMap: Map<string
         create: {
           id: randomUUID(),
           equipmentTypeId: eqType.id,
-          attributeName: attr.attributeName,
-          attributeLabel: attr.attributeLabel,
-          attributeType: attr.attributeType,
-          isRequired: attr.isRequired,
-          isVisible: attr.isVisible,
-          order: attr.order,
-          helpText: attr.helpText,
-          options: attr.options ? { options: attr.options } : undefined,
-        },
-      })
-      commonAttrCount++
-    }
-  }
-
-  // También agregar atributos de teléfono al tipo PHONE de TECHNOLOGY (si no los tiene)
-  const techPhone = await prisma.equipment_types.findFirst({
-    where: { name: 'Teléfono', familyId: techFamilyId },
-  })
-  if (techPhone) {
-    for (const attr of phoneCommonAttrs) {
-      await prisma.equipment_type_attributes.upsert({
-        where: {
-          equipmentTypeId_attributeName: {
-            equipmentTypeId: techPhone.id,
-            attributeName: attr.attributeName,
-          },
-        },
-        update: {
-          attributeLabel: attr.attributeLabel,
-          attributeType: attr.attributeType,
-          isRequired: attr.isRequired,
-          isVisible: attr.isVisible,
-          order: attr.order,
-          helpText: attr.helpText,
-          options: attr.options ? { options: attr.options } : undefined,
-        },
-        create: {
-          id: randomUUID(),
-          equipmentTypeId: techPhone.id,
           attributeName: attr.attributeName,
           attributeLabel: attr.attributeLabel,
           attributeType: attr.attributeType,
