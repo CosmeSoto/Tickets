@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useSession } from 'next-auth/react'
 import { MetricCard, MetricCardSkeleton } from './metric-card'
 import {
   Package,
@@ -22,7 +23,14 @@ interface DashboardStats {
   pendingActs: number
 }
 
-export function MetricsSection() {
+interface MetricsSectionProps {
+  /** Rol del usuario — controla qué métricas financieras se muestran */
+  userRole?: string
+}
+
+export function MetricsSection({ userRole: propRole }: MetricsSectionProps) {
+  const { data: session } = useSession()
+  const userRole = propRole || session?.user?.role
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -78,6 +86,9 @@ export function MetricsSection() {
     }).format(value)
   }
 
+  // Métricas financieras solo para ADMIN (no para TECHNICIAN ni gestores sin rol ADMIN)
+  const showFinancialMetrics = userRole === 'ADMIN'
+
   return (
     <div className='space-y-4'>
       {/* Primera fila: Métricas principales */}
@@ -89,13 +100,15 @@ export function MetricsSection() {
           color='blue'
           subtitle='Equipos registrados'
         />
-        <MetricCard
-          title='Valor Total'
-          value={formatCurrency(stats.totalValue)}
-          icon={DollarSign}
-          color='green'
-          subtitle='Valor de inventario'
-        />
+        {showFinancialMetrics && (
+          <MetricCard
+            title='Valor Total'
+            value={formatCurrency(stats.totalValue)}
+            icon={DollarSign}
+            color='green'
+            subtitle='Valor de inventario'
+          />
+        )}
         <MetricCard
           title='Disponibles'
           value={(stats.equipmentByStatus.AVAILABLE || 0).toLocaleString()}
@@ -121,13 +134,15 @@ export function MetricsSection() {
           color='yellow'
           subtitle='Requieren atención'
         />
-        <MetricCard
-          title='Costo de Arrendamientos'
-          value={formatCurrency(stats.rentalMonthlyCost)}
-          icon={CreditCard}
-          color='purple'
-          subtitle='Mensual'
-        />
+        {showFinancialMetrics && (
+          <MetricCard
+            title='Costo de Arrendamientos'
+            value={formatCurrency(stats.rentalMonthlyCost)}
+            icon={CreditCard}
+            color='purple'
+            subtitle='Mensual'
+          />
+        )}
         <MetricCard
           title='Solicitudes Pendientes'
           value={stats.pendingRequests.toLocaleString()}
