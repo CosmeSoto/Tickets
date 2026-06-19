@@ -1168,7 +1168,7 @@ export async function seedAttributes(prisma: PrismaClient, familyMap: Map<string
   const laptopExtraAttrs: typeof commonComputerAttrs = [
     {
       attributeName: 'pantalla_pulgadas',
-      attributeLabel: 'Tamaño Pantalla (pulgadas)',
+      attributeLabel: 'Pantalla (pulgadas)',
       attributeType: 'number',
       isRequired: false,
       isVisible: true,
