@@ -14,24 +14,51 @@ export { formatDurationMinutes } from './patrol-format'
 // ── Supervisores de familia ───────────────────────────────────────────────────
 
 /**
- * Devuelve los IDs de supervisores (ADMIN + TECHNICIAN con patrolsEnabled)
+ * Devuelve los IDs de supervisores (ADMIN con familia asignada + TECHNICIAN con patrolsEnabled)
  * asignados a una familia específica.
  *
- * Usado en notificaciones de check-in rechazado, ronda incompleta, etc.
+ * ADMIN: no requiere patrolsEnabled — si tiene la familia asignada, es supervisor.
+ * TECHNICIAN: requiere patrolsEnabled + familia asignada.
+ *
+ * Usado en notificaciones de check-in rechazado, ronda incompleta, novedad creada, etc.
  */
 export async function getPatrolSupervisors(familyId: string): Promise<{ id: string }[]> {
-  return prisma.users.findMany({
-    where: {
-      isActive: true,
-      patrolsEnabled: true,
-      role: { in: ['ADMIN', 'TECHNICIAN'] },
-      OR: [
-        { adminFamilyAssignments: { some: { familyId, isActive: true } } },
-        { technicianFamilyAssignments: { some: { familyId, isActive: true } } },
-      ],
-    },
-    select: { id: true },
-  })
+  const [admins, technicians] = await Promise.all([
+    // Admins: solo necesitan tener la familia asignada (o ser super admin)
+    prisma.users.findMany({
+      where: {
+        isActive: true,
+        role: 'ADMIN',
+        OR: [
+          { isSuperAdmin: true },
+          { adminFamilyAssignments: { some: { familyId, isActive: true } } },
+          { departments: { familyId } },
+        ],
+      },
+      select: { id: true },
+    }),
+    // Técnicos: necesitan patrolsEnabled + familia asignada
+    prisma.users.findMany({
+      where: {
+        isActive: true,
+        role: 'TECHNICIAN',
+        patrolsEnabled: true,
+        technicianFamilyAssignments: { some: { familyId, isActive: true } },
+      },
+      select: { id: true },
+    }),
+  ])
+
+  // Deduplicar
+  const ids = new Set<string>()
+  const result: { id: string }[] = []
+  for (const u of [...admins, ...technicians]) {
+    if (!ids.has(u.id)) {
+      ids.add(u.id)
+      result.push(u)
+    }
+  }
+  return result
 }
 
 // ── Verificación de acceso al módulo ─────────────────────────────────────────

@@ -264,11 +264,13 @@ export async function proxy(request: NextRequest) {
     if (path.startsWith('/admin') && userRole !== 'ADMIN' && !(token as any).isSuperAdmin) {
       // Excepción: usuarios con canManageNews pueden acceder a /admin/news
       // Excepción: usuarios con formsEnabled pueden acceder a /admin/forms
+      // Excepción: técnicos con patrolsEnabled pueden acceder a /admin/patrols (supervisores de rondas)
       if (
         (path.startsWith('/admin/news') && (token as any).canManageNews === true) ||
-        (path.startsWith('/admin/forms') && (token as any).formsEnabled === true)
+        (path.startsWith('/admin/forms') && (token as any).formsEnabled === true) ||
+        (path.startsWith('/admin/patrols') && (token as any).patrolsEnabled === true)
       ) {
-        // Permitir acceso a gestión de noticias o formularios
+        // Permitir acceso a gestión de noticias, formularios o rondas
       } else {
         ApplicationLogger.securityEvent(
           'insufficient_privileges',
