@@ -46,6 +46,9 @@ export class LicenseService {
         assignedToEquipment: data.assignedToEquipment || null,
         assignedToUser: data.assignedToUser || null,
         assignedToDepartment: data.assignedToDepartment || null,
+        ...(data.customValues && data.customValues.length > 0
+          ? { customValues: data.customValues }
+          : {}),
       },
       include: licenseInclude,
     })
@@ -61,11 +64,19 @@ export class LicenseService {
     data: UpdateLicenseData,
     _userId: string
   ): Promise<SoftwareLicense> {
-    const updateData: any = { ...data }
+    const { customValues, ...rest } = data as UpdateLicenseData & {
+      customValues?: Array<{ fieldName: string; fieldValue: string }>
+    }
+    const updateData: any = { ...rest }
 
     // Solo encriptar si se envía una nueva clave
-    if (data.key !== undefined) {
-      updateData.key = data.key ? EncryptionService.encrypt(data.key) : null
+    if (rest.key !== undefined) {
+      updateData.key = rest.key ? EncryptionService.encrypt(rest.key) : null
+    }
+
+    // Persistir customValues si vienen en el payload
+    if (customValues !== undefined) {
+      updateData.customValues = customValues.length > 0 ? customValues : null
     }
 
     const license = await prisma.software_licenses.update({

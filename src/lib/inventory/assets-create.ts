@@ -378,6 +378,7 @@ export async function createAsset(
         assignedToDepartment: body.assignedToDepartment
           ? String(body.assignedToDepartment)
           : undefined,
+        customValues: Array.isArray(body.customValues) ? body.customValues : undefined,
       },
       userId
     )

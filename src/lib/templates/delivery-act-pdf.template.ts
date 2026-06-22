@@ -181,119 +181,295 @@ export async function generateDeliveryActPDF(
     return startY + 10
   }
 
-  // ── DATOS DEL EQUIPO ────────────────────────────────────────────────────
-  y = sectionTitle('Datos del Equipo', y)
-
-  // Fila 1: Código y N° Serie
-  const halfW = CW / 2 - 8
-  doc
-    .fontSize(7.5)
-    .font('Helvetica-Bold')
-    .fillColor(C.muted)
-    .text('CÓDIGO', ML, y, { width: halfW })
-  doc
-    .fontSize(7.5)
-    .font('Helvetica-Bold')
-    .fillColor(C.muted)
-    .text('N° DE SERIE', ML + CW / 2, y, { width: halfW })
-  y += 9
-  doc
-    .fontSize(9)
-    .font('Helvetica')
-    .fillColor(C.text)
-    .text(act.equipmentSnapshot.code, ML, y, { width: halfW })
-  doc
-    .fontSize(9)
-    .font('Helvetica')
-    .fillColor(C.text)
-    .text(act.equipmentSnapshot.serialNumber || '—', ML + CW / 2, y, { width: halfW })
-  y += 16
-
-  // Fila 2: Marca/Modelo y Tipo
-  doc
-    .fontSize(7.5)
-    .font('Helvetica-Bold')
-    .fillColor(C.muted)
-    .text('MARCA / MODELO', ML, y, { width: halfW })
-  doc
-    .fontSize(7.5)
-    .font('Helvetica-Bold')
-    .fillColor(C.muted)
-    .text('TIPO', ML + CW / 2, y, { width: halfW })
-  y += 9
-  doc
-    .fontSize(9)
-    .font('Helvetica')
-    .fillColor(C.text)
-    .text(`${act.equipmentSnapshot.brand} ${act.equipmentSnapshot.model}`, ML, y, { width: halfW })
-  doc
-    .fontSize(9)
-    .font('Helvetica')
-    .fillColor(C.text)
-    .text(act.equipmentSnapshot.typeName || act.equipmentSnapshot.type || '—', ML + CW / 2, y, {
-      width: halfW,
-    })
-  y += 16
-
-  // Fila 3: Condición
-  doc
-    .fontSize(7.5)
-    .font('Helvetica-Bold')
-    .fillColor(C.muted)
-    .text('CONDICIÓN', ML, y, { width: halfW })
-  y += 9
-  doc
-    .fontSize(9)
-    .font('Helvetica')
-    .fillColor(C.text)
-    .text(
-      CONDITION_LABELS[act.equipmentSnapshot.condition] || act.equipmentSnapshot.condition,
-      ML,
-      y,
-      { width: halfW }
-    )
-  y += 18
-
-  y = separator(y)
-
-  // ── IMAGEN DEL EQUIPO (si existe) ──────────────────────────────────────
+  // ── SECCIÓN DE ACTIVO — layout condicional por tipo de acta ────────────
   const snap = act.equipmentSnapshot as any
-  if (snap.equipmentImagePath) {
-    const imgBuffer = await fetchImageBuffer(snap.equipmentImagePath)
-    if (imgBuffer) {
-      y = sectionTitle('Imagen del Equipo', y)
-      try {
-        doc.image(imgBuffer, ML, y, { fit: [180, 120] })
-        y += 128
-      } catch {
-        // imagen inválida — omitir
-      }
-      y = separator(y)
-    }
-  }
+  const actType: string = snap.actType ?? 'EQUIPMENT_ASSIGNMENT'
+  const halfW = CW / 2 - 8
 
-  // ── ACCESORIOS ──────────────────────────────────────────────────────────
-  const accList = act.accessories?.length ? act.accessories : []
-  y = sectionTitle('Accesorios Incluidos', y)
-  if (accList.length > 0) {
-    accList.forEach(a => {
-      doc
-        .fontSize(9)
-        .font('Helvetica')
-        .fillColor(C.text)
-        .text(`•  ${a}`, ML + 4, y, { width: CW - 8 })
-      y += 13
-    })
-  } else {
+  if (actType === 'MRO_DELIVERY') {
+    // ── Materiales / Consumibles ─────────────────────────────────────────
+    y = sectionTitle('Material Entregado', y)
+
+    // Nombre completo del material
+    y = fieldRow('NOMBRE DEL MATERIAL', snap.name || snap.code || '—', y)
+
+    // Categoría | Cantidad entregada
+    doc
+      .fontSize(7.5)
+      .font('Helvetica-Bold')
+      .fillColor(C.muted)
+      .text('CATEGORÍA', ML, y, { width: halfW })
+    doc
+      .fontSize(7.5)
+      .font('Helvetica-Bold')
+      .fillColor(C.muted)
+      .text('CANTIDAD ENTREGADA', ML + CW / 2, y, { width: halfW })
+    y += 9
     doc
       .fontSize(9)
       .font('Helvetica')
+      .fillColor(C.text)
+      .text(snap.brand || '—', ML, y, { width: halfW })
+    const qtyLabel = snap.quantity != null ? `${snap.quantity} ${snap.unit ?? ''}`.trim() : '—'
+    doc
+      .fontSize(9)
+      .font('Helvetica')
+      .fillColor(C.text)
+      .text(qtyLabel, ML + CW / 2, y, { width: halfW })
+    y += 20
+
+    y = separator(y)
+  } else if (actType === 'SERVICE_COMPLETION') {
+    // ── Servicio / Mantenimiento ─────────────────────────────────────────
+    y = sectionTitle('Equipo Intervenido', y)
+
+    doc
+      .fontSize(7.5)
+      .font('Helvetica-Bold')
       .fillColor(C.muted)
-      .text('Sin accesorios registrados', ML + 4, y, { width: CW })
-    y += 13
+      .text('CÓDIGO', ML, y, { width: halfW })
+    doc
+      .fontSize(7.5)
+      .font('Helvetica-Bold')
+      .fillColor(C.muted)
+      .text('N° DE SERIE', ML + CW / 2, y, { width: halfW })
+    y += 9
+    doc
+      .fontSize(9)
+      .font('Helvetica')
+      .fillColor(C.text)
+      .text(snap.code || '—', ML, y, { width: halfW })
+    doc
+      .fontSize(9)
+      .font('Helvetica')
+      .fillColor(C.text)
+      .text(snap.serialNumber || '—', ML + CW / 2, y, { width: halfW })
+    y += 16
+
+    doc
+      .fontSize(7.5)
+      .font('Helvetica-Bold')
+      .fillColor(C.muted)
+      .text('MARCA / MODELO', ML, y, { width: halfW })
+    doc
+      .fontSize(7.5)
+      .font('Helvetica-Bold')
+      .fillColor(C.muted)
+      .text('TIPO', ML + CW / 2, y, { width: halfW })
+    y += 9
+    doc
+      .fontSize(9)
+      .font('Helvetica')
+      .fillColor(C.text)
+      .text(`${snap.brand || ''} ${snap.model || ''}`.trim() || '—', ML, y, { width: halfW })
+    doc
+      .fontSize(9)
+      .font('Helvetica')
+      .fillColor(C.text)
+      .text(snap.typeName || '—', ML + CW / 2, y, { width: halfW })
+    y += 18
+
+    y = separator(y)
+
+    // Descripción del servicio realizado
+    y = sectionTitle('Descripción del Servicio Realizado', y)
+    const serviceDesc = snap.serviceDescription || '—'
+    doc.fontSize(9).font('Helvetica').fillColor(C.text).text(serviceDesc, ML, y, { width: CW })
+    y += doc.heightOfString(serviceDesc, { width: CW }) + 10
+
+    y = separator(y)
+  } else if (actType === 'ASSET_TRANSFER') {
+    // ── Transferencia entre bodegas ──────────────────────────────────────
+    y = sectionTitle('Activo Transferido', y)
+
+    doc
+      .fontSize(7.5)
+      .font('Helvetica-Bold')
+      .fillColor(C.muted)
+      .text('CÓDIGO', ML, y, { width: halfW })
+    doc
+      .fontSize(7.5)
+      .font('Helvetica-Bold')
+      .fillColor(C.muted)
+      .text('N° DE SERIE', ML + CW / 2, y, { width: halfW })
+    y += 9
+    doc
+      .fontSize(9)
+      .font('Helvetica')
+      .fillColor(C.text)
+      .text(snap.code || '—', ML, y, { width: halfW })
+    doc
+      .fontSize(9)
+      .font('Helvetica')
+      .fillColor(C.text)
+      .text(snap.serialNumber || '—', ML + CW / 2, y, { width: halfW })
+    y += 16
+
+    doc
+      .fontSize(7.5)
+      .font('Helvetica-Bold')
+      .fillColor(C.muted)
+      .text('MARCA / MODELO', ML, y, { width: halfW })
+    doc
+      .fontSize(7.5)
+      .font('Helvetica-Bold')
+      .fillColor(C.muted)
+      .text('TIPO', ML + CW / 2, y, { width: halfW })
+    y += 9
+    doc
+      .fontSize(9)
+      .font('Helvetica')
+      .fillColor(C.text)
+      .text(`${snap.brand || ''} ${snap.model || ''}`.trim() || '—', ML, y, { width: halfW })
+    doc
+      .fontSize(9)
+      .font('Helvetica')
+      .fillColor(C.text)
+      .text(snap.typeName || '—', ML + CW / 2, y, { width: halfW })
+    y += 18
+
+    y = separator(y)
+
+    // Origen → Destino de bodega
+    y = sectionTitle('Movimiento de Bodega', y)
+    doc
+      .fontSize(7.5)
+      .font('Helvetica-Bold')
+      .fillColor(C.muted)
+      .text('BODEGA ORIGEN', ML, y, { width: halfW })
+    doc
+      .fontSize(7.5)
+      .font('Helvetica-Bold')
+      .fillColor(C.muted)
+      .text('BODEGA DESTINO', ML + CW / 2, y, { width: halfW })
+    y += 9
+    doc
+      .fontSize(9)
+      .font('Helvetica')
+      .fillColor(C.text)
+      .text(snap.originWarehouse || '—', ML, y, { width: halfW })
+    doc
+      .fontSize(9)
+      .font('Helvetica')
+      .fillColor(C.text)
+      .text(snap.destinationWarehouse || snap.warehouseDestId || '—', ML + CW / 2, y, {
+        width: halfW,
+      })
+    y += 20
+
+    y = separator(y)
+  } else {
+    // ── EQUIPMENT_ASSIGNMENT (flujo estándar de asignación) ──────────────
+    y = sectionTitle('Datos del Equipo', y)
+
+    doc
+      .fontSize(7.5)
+      .font('Helvetica-Bold')
+      .fillColor(C.muted)
+      .text('CÓDIGO', ML, y, { width: halfW })
+    doc
+      .fontSize(7.5)
+      .font('Helvetica-Bold')
+      .fillColor(C.muted)
+      .text('N° DE SERIE', ML + CW / 2, y, { width: halfW })
+    y += 9
+    doc
+      .fontSize(9)
+      .font('Helvetica')
+      .fillColor(C.text)
+      .text(act.equipmentSnapshot.code || '—', ML, y, { width: halfW })
+    doc
+      .fontSize(9)
+      .font('Helvetica')
+      .fillColor(C.text)
+      .text(act.equipmentSnapshot.serialNumber || '—', ML + CW / 2, y, { width: halfW })
+    y += 16
+
+    doc
+      .fontSize(7.5)
+      .font('Helvetica-Bold')
+      .fillColor(C.muted)
+      .text('MARCA / MODELO', ML, y, { width: halfW })
+    doc
+      .fontSize(7.5)
+      .font('Helvetica-Bold')
+      .fillColor(C.muted)
+      .text('TIPO', ML + CW / 2, y, { width: halfW })
+    y += 9
+    doc
+      .fontSize(9)
+      .font('Helvetica')
+      .fillColor(C.text)
+      .text(`${act.equipmentSnapshot.brand} ${act.equipmentSnapshot.model}`, ML, y, {
+        width: halfW,
+      })
+    doc
+      .fontSize(9)
+      .font('Helvetica')
+      .fillColor(C.text)
+      .text(act.equipmentSnapshot.typeName || act.equipmentSnapshot.type || '—', ML + CW / 2, y, {
+        width: halfW,
+      })
+    y += 16
+
+    doc
+      .fontSize(7.5)
+      .font('Helvetica-Bold')
+      .fillColor(C.muted)
+      .text('CONDICIÓN', ML, y, { width: halfW })
+    y += 9
+    doc
+      .fontSize(9)
+      .font('Helvetica')
+      .fillColor(C.text)
+      .text(
+        CONDITION_LABELS[act.equipmentSnapshot.condition] || act.equipmentSnapshot.condition || '—',
+        ML,
+        y,
+        { width: halfW }
+      )
+    y += 18
+
+    y = separator(y)
+
+    // Imagen del equipo (si existe)
+    if (snap.equipmentImagePath) {
+      const imgBuffer = await fetchImageBuffer(snap.equipmentImagePath)
+      if (imgBuffer) {
+        y = sectionTitle('Imagen del Equipo', y)
+        try {
+          doc.image(imgBuffer, ML, y, { fit: [180, 120] })
+          y += 128
+        } catch {
+          // imagen inválida — omitir
+        }
+        y = separator(y)
+      }
+    }
+
+    // Accesorios
+    const accList = act.accessories?.length ? act.accessories : []
+    y = sectionTitle('Accesorios Incluidos', y)
+    if (accList.length > 0) {
+      accList.forEach((a: string) => {
+        doc
+          .fontSize(9)
+          .font('Helvetica')
+          .fillColor(C.text)
+          .text(`•  ${a}`, ML + 4, y, { width: CW - 8 })
+        y += 13
+      })
+    } else {
+      doc
+        .fontSize(9)
+        .font('Helvetica')
+        .fillColor(C.muted)
+        .text('Sin accesorios registrados', ML + 4, y, { width: CW })
+      y += 13
+    }
+    y += 6
+    y = separator(y)
   }
-  y += 6
-  y = separator(y)
 
   // ── PARTES INVOLUCRADAS ─────────────────────────────────────────────────
   y = sectionTitle('Entregado por', y)

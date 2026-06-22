@@ -53,7 +53,7 @@ export function ContractPicker({ value, onChange, supplierId, familyId, disabled
     },
     transform: d => {
       const list = d.contracts ?? []
-      return list.filter(c => c.status === 'ACTIVE' || c.status === 'DRAFT')
+      return list.filter((c: { status: string }) => c.status === 'ACTIVE' || c.status === 'DRAFT')
     },
     enabled: open && tab === 'link',
   })

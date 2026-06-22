@@ -184,13 +184,14 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const validatedData = createLicenseSchema.parse(body)
-    const { contractId, scope, licenseTypeId, customValues: _customValues, ...rest } = validatedData
+    const { contractId, scope, licenseTypeId, customValues, ...rest } = validatedData
 
     const license = await LicenseService.createLicense(
       {
         ...rest,
         typeId: rest.typeId || licenseTypeId!,
         licenseScope: mapLicenseScope(scope),
+        customValues: customValues && customValues.length > 0 ? customValues : undefined,
       },
       session.user.id
     )

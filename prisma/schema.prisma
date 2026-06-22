@@ -1290,6 +1290,7 @@ model software_licenses {
   purchaseOrderNumber   String?                 @map("purchase_order_number") @db.VarChar(100)
   licenseScope          LicenseScope?           @map("license_scope")
   contractType          ContractType?           @map("contract_type")
+  customValues          Json?                   @map("custom_values")
   createdAt             DateTime                @default(now()) @map("created_at")
   updatedAt             DateTime                @updatedAt @map("updated_at")
   decommission_requests decommission_requests[]

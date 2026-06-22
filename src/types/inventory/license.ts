@@ -34,6 +34,8 @@ export interface CreateLicenseData {
   assignedToEquipment?: string
   assignedToUser?: string
   assignedToDepartment?: string
+  /** Atributos personalizados del tipo de licencia */
+  customValues?: Array<{ fieldName: string; fieldValue: string }>
 }
 
 export interface UpdateLicenseData {
@@ -48,6 +50,8 @@ export interface UpdateLicenseData {
   assignedToEquipment?: string | null
   assignedToUser?: string | null
   assignedToDepartment?: string | null
+  /** Atributos personalizados del tipo de licencia */
+  customValues?: Array<{ fieldName: string; fieldValue: string }>
 }
 
 export interface AssignLicenseData {

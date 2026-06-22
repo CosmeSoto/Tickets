@@ -38,7 +38,7 @@ export async function buildGeneralActSnapshot(params: {
     const consumable = await prisma.consumables.findUnique({
       where: { id: referenceId },
       include: {
-        type: { select: { name: true } },
+        consumableType: { select: { name: true } },
         unitOfMeasure: { select: { name: true, symbol: true } },
       },
     })
@@ -50,7 +50,7 @@ export async function buildGeneralActSnapshot(params: {
       referenceId,
       id: consumable.id,
       code: consumable.name,
-      brand: consumable.type?.name ?? 'Material',
+      brand: consumable.consumableType?.name ?? 'Material',
       model: `${quantity ?? 0} ${unit}`,
       name: consumable.name,
       quantity: quantity ?? 0,
