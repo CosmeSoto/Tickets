@@ -353,19 +353,6 @@ export default function AdminTicketDetailPage() {
             </Card>
           )}
 
-          {(ticket.source === 'PATROL' && ticket.createdById
-            ? session?.user?.id === ticket.createdById
-            : session?.user?.id === ticket.client?.id) &&
-            (ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') && (
-              <TicketRatingSystem
-                ticketId={ticket.id}
-                technicianId={ticket.assignee?.id}
-                canRate={ticket.status === 'RESOLVED' || ticket.status === 'CLOSED'}
-                mode='client'
-                onRatingSubmitted={loadTicket}
-              />
-            )}
-
           <Tabs defaultValue='timeline'>
             <TabsList className='grid w-full grid-cols-3'>
               <TabsTrigger value='timeline'>Historial</TabsTrigger>
