@@ -185,7 +185,9 @@ export function IncidentDetailDialog({
           throw new Error(data.error || 'Error al escalar la novedad')
         }
         const json = await res.json()
-        const ticketCode = json.data?.ticketCode || json.ticketCode || ''
+        const ticketCode =
+          json.data?.ticketCode ||
+          (json.data?.ticketId ? String(json.data.ticketId).slice(-8).toUpperCase() : '')
         const familyName =
           escalateFamilies?.families.find(f => f.id === selectedFamilyId)?.name ?? ''
         const familyMsg = familyName ? ` → ${familyName}` : ''

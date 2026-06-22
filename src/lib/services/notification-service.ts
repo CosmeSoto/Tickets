@@ -330,13 +330,18 @@ export class NotificationService {
 
       if (uniqueRecipients.length === 0) return []
 
+      const isPatrolEscalation = ticket.source === 'PATROL' && ticket.createdById
+      const notificationMessage = isPatrolEscalation
+        ? `Nueva novedad de ronda escalada: "${ticket.title}"`
+        : `${ticket.users_tickets_clientIdTousers.name} ha creado el ticket "${ticket.title}"`
+
       const notifications = await Promise.all(
         uniqueRecipients.map(recipient =>
           this.createNotification({
             userId: recipient.id,
             type: 'INFO',
             title: 'Nuevo ticket creado',
-            message: `${ticket.users_tickets_clientIdTousers.name} ha creado el ticket "${ticket.title}"`,
+            message: notificationMessage,
             ticketId: ticket.id,
             specificType: 'ticketCreated',
             metadata: {

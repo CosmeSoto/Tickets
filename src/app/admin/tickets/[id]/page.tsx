@@ -289,6 +289,12 @@ export default function AdminTicketDetailPage() {
 
   const isSuperAdmin = (session as any)?.user?.isSuperAdmin === true
   const isRequester = ticket.client?.id === session?.user?.id
+  const ratingUserId =
+    ticket.source === 'PATROL' && ticket.createdById ? ticket.createdById : ticket.client?.id
+  const ratingUserName =
+    ticket.source === 'PATROL' && ticket.createdBy?.name
+      ? ticket.createdBy.name
+      : ticket.client?.name
 
   return (
     <TicketDetailLayout
@@ -325,7 +331,7 @@ export default function AdminTicketDetailPage() {
             onEditFormChange={handleEditFormChange}
           />
 
-          {ticket.status === 'RESOLVED' && session?.user?.id !== ticket.client?.id && (
+          {ticket.status === 'RESOLVED' && session?.user?.id !== ratingUserId && (
             <Card className='border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950'>
               <CardContent className='pt-4 pb-4 flex items-start gap-3'>
                 <AlertCircle className='h-5 w-5 text-amber-600 shrink-0 mt-0.5' />
@@ -334,8 +340,11 @@ export default function AdminTicketDetailPage() {
                     Esperando calificación del solicitante
                   </p>
                   <p className='text-xs text-amber-800 dark:text-amber-200 mt-0.5'>
-                    El ticket se cerrará automáticamente cuando{' '}
-                    <strong>{ticket.client?.name}</strong> envíe su calificación.
+                    El ticket se cerrará automáticamente cuando <strong>{ratingUserName}</strong>{' '}
+                    envíe su calificación.
+                    {ticket.source === 'PATROL' && (
+                      <> (supervisor que escaló la novedad desde rondas)</>
+                    )}
                     {isSuperAdmin &&
                       ' Como Super Admin puedes cerrarlo directamente desde el botón en el encabezado.'}
                   </p>

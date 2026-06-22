@@ -15,11 +15,15 @@
 
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
+import { readFile } from 'fs/promises'
 import { NotificationService } from '@/lib/services/notification-service'
 import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
 import { PatrolPhotoService } from '@/lib/services/patrol-photo.service'
+import { TicketService } from '@/lib/services/ticket-service'
+import { FileService } from '@/lib/services/file-service'
 import { NotificationType } from '@prisma/client'
 import { getPatrolSupervisors } from '@/lib/patrol/patrol-helpers'
+import { getUploadDir } from '@/lib/upload-path'
 
 // Acceso al modelo patrol_incidents hasta que se regenere el Prisma Client
 const db = prisma as any
@@ -479,6 +483,10 @@ export class PatrolIncidentService {
       include: {
         patrol: { select: { familyId: true, id: true } },
         checkpoint: { select: { name: true } },
+        photos: {
+          where: { deletedAt: null },
+          select: { id: true, path: true, mimeType: true },
+        },
       },
     })
 
@@ -534,10 +542,6 @@ export class PatrolIncidentService {
     }
     const priority = severityToPriority[incident.severity] ?? 'MEDIUM'
 
-    // Crear el ticket en el sistema de soporte
-    const ticketId = randomUUID()
-    const now = new Date()
-
     // Título: primeras 100 chars de la descripción real de la novedad
     // Si la descripción es muy corta, se usa completa. El nombre del checkpoint
     // queda disponible en la descripción completa del ticket.
@@ -547,22 +551,39 @@ export class PatrolIncidentService {
         : incident.description
     const ticketTitle = `[${incident.checkpoint.name}] ${truncatedDescription}`
 
-    await prisma.tickets.create({
-      data: {
-        id: ticketId,
-        title: ticketTitle,
-        description: incident.description,
-        status: 'OPEN',
-        priority,
-        source: 'PATROL',
-        clientId: incident.agentId,
-        categoryId,
-        familyId: resolvedFamilyId,
-        createdById: escalatedById,
-        createdAt: now,
-        updatedAt: now,
-      },
+    // Crear el ticket vía TicketService para generar ticketCode e historial
+    const ticket = await TicketService.createTicket({
+      title: ticketTitle,
+      description: incident.description,
+      location: incident.checkpoint.name,
+      priority,
+      categoryId,
+      clientId: incident.agentId,
+      createdById: escalatedById,
+      historyUserId: escalatedById,
+      source: 'PATROL',
+      familyId: resolvedFamilyId,
     })
+
+    const ticketId = ticket.id
+    const now = new Date()
+
+    // Adjuntar fotos de la novedad al ticket (no bloquea el escalado si falla)
+    for (const [index, photo] of (incident.photos ?? []).entries()) {
+      try {
+        const fileBuffer = await readFile(getUploadDir(photo.path))
+        await FileService.uploadBase64Attachment({
+          ticketId,
+          uploadedBy: escalatedById,
+          base64: fileBuffer.toString('base64'),
+          mimeType: photo.mimeType || 'image/jpeg',
+          originalName: `novedad-ronda-${index + 1}.jpg`,
+          skipHistory: index > 0,
+        })
+      } catch (err) {
+        console.error('[PatrolIncidentService] Error adjuntando foto al ticket:', err)
+      }
+    }
 
     // Marcar la novedad como escalada, vincularla al ticket y registrar timestamp
     const updated = await db.patrol_incidents.update({
@@ -611,7 +632,11 @@ export class PatrolIncidentService {
       console.error('[PatrolIncidentService] Error notificando familia destino:', err)
     }
 
-    return { incident: updated, ticketId }
+    return {
+      incident: updated,
+      ticketId,
+      ticketCode: ticket.ticketCode ?? null,
+    }
   }
 
   // ── Ventana de edición ────────────────────────────────────────────────────

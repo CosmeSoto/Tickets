@@ -72,6 +72,13 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
             role: true,
           },
         },
+        users_tickets_createdByIdTousers: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
         categories: {
           select: {
             id: true,
@@ -167,6 +174,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
       ...ticket,
       client: ticket.users_tickets_clientIdTousers,
       assignee: ticket.users_tickets_assigneeIdTousers,
+      createdBy: ticket.users_tickets_createdByIdTousers,
       category: ticket.categories,
       history: ticket.ticket_history.map(h => ({
         ...h,

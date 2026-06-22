@@ -249,8 +249,10 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
       },
     })
 
-    // Cerrar ticket automáticamente tras la calificación del cliente
+    // Cerrar ticket automáticamente tras la calificación
     if (ticket.status === 'RESOLVED') {
+      const isPatrolTicket = ticket.source === 'PATROL' && !!ticket.createdById
+
       await prisma.tickets.update({
         where: { id: ticketId },
         data: {
@@ -268,7 +270,9 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
           field: 'status',
           oldValue: 'RESOLVED',
           newValue: 'CLOSED',
-          comment: 'Ticket cerrado automáticamente tras calificación del cliente',
+          comment: isPatrolTicket
+            ? 'Ticket cerrado automáticamente tras calificación del supervisor'
+            : 'Ticket cerrado automáticamente tras calificación del cliente',
           ticketId,
           userId: session.user.id,
           createdAt: new Date(),
@@ -281,7 +285,9 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
           userId: ticket.assigneeId,
           type: 'SUCCESS',
           title: 'Ticket cerrado por calificación',
-          message: `El cliente calificó y cerró el ticket: "${ticket.title}" con ${data.rating} estrellas. Ahora puedes promoverlo a artículo de conocimiento.`,
+          message: isPatrolTicket
+            ? `El supervisor calificó y cerró el ticket escalado desde rondas: "${ticket.title}" con ${data.rating} estrellas.`
+            : `El cliente calificó y cerró el ticket: "${ticket.title}" con ${data.rating} estrellas. Ahora puedes promoverlo a artículo de conocimiento.`,
           ticketId,
         }).catch(() => {})
       }

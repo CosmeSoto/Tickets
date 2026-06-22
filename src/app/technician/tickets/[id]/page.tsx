@@ -110,6 +110,9 @@ export default function TechnicianTicketDetailPage() {
     isAssignedResolver && (ticket?.status === 'RESOLVED' || ticket?.status === 'CLOSED')
   const hasArticle = !!ticket?.knowledgeArticleId
   const isRequester = ticket?.client?.id === session?.user?.id
+  const ratingUserId =
+    ticket?.source === 'PATROL' && ticket?.createdById ? ticket.createdById : ticket?.client?.id
+  const ratingUserLabel = ticket?.source === 'PATROL' ? 'supervisor' : 'cliente'
   // Para tickets escalados desde rondas, el que califica es el createdById (admin que escaló),
   // no el agente (clientId). El agente solo ve que fue resuelta.
   const canRate =
@@ -279,16 +282,16 @@ export default function TechnicianTicketDetailPage() {
           </Card>
 
           {/* Banner: resuelto esperando calificación */}
-          {ticket.status === 'RESOLVED' && !isRequester && (
+          {ticket.status === 'RESOLVED' && session?.user?.id !== ratingUserId && (
             <Card className='border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950'>
               <CardContent className='pt-5 flex items-start gap-3'>
                 <Star className='h-5 w-5 text-amber-600 shrink-0 mt-0.5' />
                 <div>
                   <p className='font-medium text-amber-900 dark:text-amber-100'>
-                    Esperando calificación del cliente
+                    Esperando calificación del {ratingUserLabel}
                   </p>
                   <p className='text-sm text-amber-800 dark:text-amber-200 mt-1'>
-                    El ticket se cerrará automáticamente cuando el cliente califique.
+                    El ticket se cerrará automáticamente cuando el {ratingUserLabel} califique.
                   </p>
                 </div>
               </CardContent>

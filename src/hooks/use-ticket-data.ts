@@ -44,6 +44,7 @@ export interface Ticket {
   priority: TicketPriority['value']
   source?: 'WEB' | 'EMAIL' | 'PHONE' | 'PATROL' | 'API'
   createdById?: string | null
+  createdBy?: Pick<User, 'id' | 'name' | 'email'> | null
   client: User
   assignee?: User
   category: Category
