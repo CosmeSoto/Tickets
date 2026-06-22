@@ -260,12 +260,90 @@ function printResults() {
       console.log('   3. Resolver códigos duplicados')
     }
 
-    if (results.some(r => r.category === 'Relational Integrity' && r.status === 'ERROR')) {
-      console.log('   4. Corregir referencias inválidas')
+    if (results.some(r => r.category === 'Contract Links' && r.status === 'ERROR')) {
+      console.log('   5. Ejecutar: npx tsx scripts/migrate-equipment-contract-links.ts --apply')
     }
   }
 
   console.log('='.repeat(80) + '\n')
+}
+
+async function auditContractLinks() {
+  console.log('\n📋 Auditando vínculos de contratos en equipos...')
+
+  const withLegacyId = await prisma.equipment.findMany({
+    where: { contractId: { not: null } },
+    select: { id: true, code: true, contractId: true, rentalContractNumber: true },
+  })
+
+  const misplaced: Array<{ code: string; contractId: string }> = []
+  const orphan: Array<{ code: string; contractId: string }> = []
+  const legacyOk: Array<{ code: string; contractId: string; name: string }> = []
+
+  for (const eq of withLegacyId) {
+    if (!eq.contractId) continue
+    const [asBusiness, asLegacy] = await Promise.all([
+      prisma.contracts.findUnique({ where: { id: eq.contractId }, select: { id: true } }),
+      prisma.software_licenses.findUnique({
+        where: { id: eq.contractId },
+        select: { name: true },
+      }),
+    ])
+    if (asBusiness) misplaced.push({ code: eq.code, contractId: eq.contractId })
+    else if (asLegacy)
+      legacyOk.push({ code: eq.code, contractId: eq.contractId, name: asLegacy.name })
+    else orphan.push({ code: eq.code, contractId: eq.contractId })
+  }
+
+  const withLineAndLegacy = await prisma.$queryRaw<Array<{ code: string }>>`
+    SELECT e.code
+    FROM equipment e
+    INNER JOIN contract_lines cl ON cl.equipment_id = e.id
+    WHERE e.contract_id IS NOT NULL
+  `
+
+  if (misplaced.length > 0) {
+    results.push({
+      category: 'Contract Links',
+      status: 'ERROR',
+      count: misplaced.length,
+      message: `${misplaced.length} equipos con contract_id apuntando a contracts (requiere migración)`,
+      details: misplaced.slice(0, 10),
+    })
+  }
+
+  if (orphan.length > 0) {
+    results.push({
+      category: 'Contract Links',
+      status: 'WARNING',
+      count: orphan.length,
+      message: `${orphan.length} equipos con contract_id huérfano`,
+      details: orphan.slice(0, 10),
+    })
+  }
+
+  if (withLineAndLegacy.length > 0) {
+    results.push({
+      category: 'Contract Links',
+      status: 'WARNING',
+      count: withLineAndLegacy.length,
+      message: `${withLineAndLegacy.length} equipos ya migrados pero con contract_id legado sin limpiar`,
+      details: withLineAndLegacy.slice(0, 10),
+    })
+  }
+
+  if (misplaced.length === 0 && orphan.length === 0 && withLineAndLegacy.length === 0) {
+    results.push({
+      category: 'Contract Links',
+      status: legacyOk.length > 0 ? 'WARNING' : 'OK',
+      count: legacyOk.length,
+      message:
+        legacyOk.length > 0
+          ? `${legacyOk.length} equipos usan contratos legados (software_licenses) — revisar si deben migrarse`
+          : 'Vínculos de contrato en equipos consistentes',
+      details: legacyOk.length > 0 ? legacyOk.slice(0, 5) : undefined,
+    })
+  }
 }
 
 async function main() {
@@ -277,6 +355,7 @@ async function main() {
     await auditBrandModel()
     await auditEquipmentTypes()
     await auditCodes()
+    await auditContractLinks()
     await auditRelationalIntegrity()
     await auditStatistics()
 

@@ -14,6 +14,10 @@ import {
   getDecommissionContractImpact,
   releaseEquipmentFromContracts,
 } from '@/lib/inventory/equipment-contract'
+import {
+  getDecommissionContractImpactForLicense,
+  releaseLicenseFromContracts,
+} from '@/lib/inventory/license-contract'
 
 /**
  * POST /api/inventory/decommission-acts/[id]/approve
@@ -185,6 +189,27 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
 
       await releaseEquipmentFromContracts(decommissionRequest.equipmentId).catch(err => {
         console.error('[decommission/approve] Error liberando contrato del equipo:', err)
+      })
+
+      if (contractImpact) {
+        const payload = {
+          contractId: contractImpact.contractId,
+          contractNumber: contractImpact.contractNumber,
+          contractSource: contractImpact.contractSource,
+        }
+        if (contractImpact.remainingActiveAssets > 0) {
+          contractWarning = { contractWarning: true, ...payload }
+        } else {
+          lastAssetForContract = { lastAssetForContract: true, ...payload }
+        }
+      }
+    } else if (decommissionRequest.assetType === 'LICENSE' && decommissionRequest.licenseId) {
+      const contractImpact = await getDecommissionContractImpactForLicense(
+        decommissionRequest.licenseId
+      )
+
+      await releaseLicenseFromContracts(decommissionRequest.licenseId).catch(err => {
+        console.error('[decommission/approve] Error liberando contrato de la licencia:', err)
       })
 
       if (contractImpact) {

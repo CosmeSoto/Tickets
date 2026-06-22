@@ -31,6 +31,13 @@ export function computePaymentStatus(dueDate: Date, paidDate: Date | null): Paym
   return 'SCHEDULED'
 }
 
+export class PaymentsAlreadyExistError extends Error {
+  constructor() {
+    super('Este contrato ya tiene pagos programados. Elimínalos o cancélalos antes de regenerar.')
+    this.name = 'PaymentsAlreadyExistError'
+  }
+}
+
 // ── Servicio ──────────────────────────────────────────────────────────────────
 
 export class ContractPaymentService {
@@ -293,9 +300,7 @@ export class ContractPaymentService {
       },
     })
     if (existingPayments > 0) {
-      throw new Error(
-        'Este contrato ya tiene pagos programados. Elimínalos o cancélalos antes de regenerar.'
-      )
+      throw new PaymentsAlreadyExistError()
     }
 
     const payments: Date[] = []

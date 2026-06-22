@@ -88,11 +88,28 @@ export async function checkStockAlerts(): Promise<void> {
   }
 }
 
-export async function notifyOrphanContract(contractId: string): Promise<void> {
-  const contract = await prisma.software_licenses.findUnique({
-    where: { id: contractId },
-    select: { id: true, name: true },
-  })
+export async function notifyOrphanContract(
+  contractId: string,
+  source: 'business' | 'legacy' = 'legacy'
+): Promise<void> {
+  let contractName = contractId
+  let link = '/inventory/contracts'
+
+  if (source === 'business') {
+    const contract = await prisma.contracts.findUnique({
+      where: { id: contractId },
+      select: { id: true, name: true, contractNumber: true },
+    })
+    contractName = contract?.contractNumber ?? contract?.name ?? contractId
+    link = `/inventory/contracts`
+  } else {
+    const contract = await prisma.software_licenses.findUnique({
+      where: { id: contractId },
+      select: { id: true, name: true },
+    })
+    contractName = contract?.name ?? contractId
+    link = '/inventory/licenses'
+  }
 
   const adminIds = await getAdminIds()
   await Promise.all(
@@ -101,8 +118,8 @@ export async function notifyOrphanContract(contractId: string): Promise<void> {
         userId: id,
         type: 'WARNING',
         title: 'Contrato sin activos vinculados',
-        message: `El contrato "${contract?.name ?? contractId}" ha quedado sin activos vinculados.`,
-        metadata: { link: '/inventory/licenses' },
+        message: `El contrato "${contractName}" ha quedado sin activos vinculados.`,
+        metadata: { link },
       }).catch(() => {})
     )
   )
@@ -113,7 +130,7 @@ export async function notifyOrphanContract(contractId: string): Promise<void> {
       action: 'NOTIFICATION_SENT',
       entityType: 'contract',
       entityId: contractId,
-      details: { type: 'ORPHAN_CONTRACT_ALERT' },
+      details: { type: 'ORPHAN_CONTRACT_ALERT', source },
     },
   })
 }

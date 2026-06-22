@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { ContractPaymentService } from '@/lib/services/contract-payment.service'
+import {
+  ContractPaymentService,
+  PaymentsAlreadyExistError,
+} from '@/lib/services/contract-payment.service'
 import { prisma } from '@/lib/prisma'
 import {
   assertContractAccess,
@@ -91,6 +94,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     )
   } catch (error) {
     console.error('Error generando pagos:', error)
+    if (error instanceof PaymentsAlreadyExistError) {
+      return NextResponse.json(
+        { error: error.message, code: 'PAYMENTS_ALREADY_EXIST' },
+        { status: 409 }
+      )
+    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Error al generar pagos' },
       { status: 500 }

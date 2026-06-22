@@ -22,6 +22,7 @@ import { useToast } from '@/hooks/use-toast'
 import { useInventoryFamilies } from '@/contexts/families-context'
 import { useFetch } from '@/hooks/common/use-fetch'
 import { FileUploadZone } from '@/components/ui/file-upload-zone'
+import { ContractPaymentsPanel } from '@/components/contracts/contract-payments-panel'
 import {
   CONTRACT_CATEGORY_LABELS,
   CONTRACT_LINE_TYPE_LABELS,
@@ -660,6 +661,13 @@ export function ContractForm({ contract, onSuccess, onCancel }: Props) {
           )}
         </CardContent>
       </Card>
+
+      {isEditing && contract?.id && (
+        <ContractPaymentsPanel
+          contractId={contract.id}
+          hasBillingDates={!!(contract.startDate && contract.endDate)}
+        />
+      )}
 
       {/* ── Notas ───────────────────────────────────────────────────────── */}
       <div className='space-y-1'>

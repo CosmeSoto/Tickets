@@ -87,3 +87,50 @@ export function mapLicenseScope(
   }
   return map[scope]
 }
+
+export interface DecommissionContractImpact {
+  contractId: string
+  contractNumber: string
+  contractSource: 'business'
+  remainingActiveAssets: number
+}
+
+/** Evalúa impacto en contratos al dar de baja una licencia. */
+export async function getDecommissionContractImpactForLicense(
+  licenseId: string
+): Promise<DecommissionContractImpact | null> {
+  const businessContractId = await getLinkedBusinessContractIdForLicense(licenseId)
+  if (!businessContractId) return null
+
+  const contract = await prisma.contracts.findUnique({
+    where: { id: businessContractId },
+    select: { id: true, name: true, contractNumber: true },
+  })
+  if (!contract) return null
+
+  const remainingActiveAssets = await prisma.contract_lines.count({
+    where: {
+      contractId: businessContractId,
+      NOT: { licenseId },
+      OR: [
+        { equipmentId: { not: null }, equipment: { status: { not: 'RETIRED' } } },
+        {
+          licenseId: { not: null },
+          license: { expirationDate: { gt: new Date('2000-01-02') } },
+        },
+      ],
+    },
+  })
+
+  return {
+    contractId: contract.id,
+    contractNumber: contract.contractNumber || contract.name,
+    contractSource: 'business',
+    remainingActiveAssets,
+  }
+}
+
+/** Libera vínculos contrato ↔ licencia tras una baja. */
+export async function releaseLicenseFromContracts(licenseId: string): Promise<void> {
+  await prisma.contract_lines.deleteMany({ where: { licenseId } })
+}
