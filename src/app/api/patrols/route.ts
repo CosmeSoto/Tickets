@@ -1,6 +1,7 @@
 /**
- * GET /api/patrols — Patrullas del guardia autenticado (paginado).
- * Usado por /patrol (Mis Rondas).
+ * GET /api/patrols — Patrullas paginadas.
+ * - AGENT (CLIENT/TECHNICIAN con patrolsEnabled): solo sus patrullas (agentId).
+ * - ADMIN / TECHNICIAN supervisor: todas las patrullas de sus familias accesibles.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -9,6 +10,7 @@ import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import type { PatrolStatus } from '@prisma/client'
 import { calculateCompletionPercentage } from '@/lib/patrol/patrol-completion'
+import { getPatrolAccessibleFamilyIds } from '@/lib/patrol/patrol-access'
 
 const ALL_STATUSES: readonly PatrolStatus[] = [
   'PENDING',
@@ -32,19 +34,26 @@ export async function GET(request: NextRequest) {
     const session = await getServerSession(authOptions)
     if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
-    const sessionUser = session.user as { patrolsEnabled?: boolean }
-    const fromToken = sessionUser.patrolsEnabled
+    const role = session.user.role
+    const userId = session.user.id
+    const isSuperAdmin = (session.user as any).isSuperAdmin === true
+    const patrolsEnabled = (session.user as any).patrolsEnabled
 
-    if (fromToken === false) {
-      return NextResponse.json({ error: 'Módulo de patrullas no habilitado' }, { status: 403 })
-    }
+    // ADMIN siempre tiene acceso. Para otros roles, verificar patrolsEnabled.
+    if (role !== 'ADMIN') {
+      const enabled =
+        patrolsEnabled === true
+          ? true
+          : patrolsEnabled === false
+            ? false
+            : ((
+                await prisma.users.findUnique({
+                  where: { id: userId },
+                  select: { patrolsEnabled: true },
+                })
+              )?.patrolsEnabled ?? false)
 
-    if (fromToken !== true) {
-      const me = await prisma.users.findUnique({
-        where: { id: session.user.id },
-        select: { patrolsEnabled: true },
-      })
-      if (!me?.patrolsEnabled) {
+      if (!enabled) {
         return NextResponse.json({ error: 'Módulo de patrullas no habilitado' }, { status: 403 })
       }
     }
@@ -55,16 +64,27 @@ export async function GET(request: NextRequest) {
     const statusParam = searchParams.get('status')
     const statusWhere = buildStatusWhere(statusParam)
 
-    // Para el filtro 'active' (PENDING + IN_PROGRESS), ordenar por scheduledStart asc
-    // mostrando primero las más próximas/actuales.
-    // Para otros filtros, ordenar desc para ver las más recientes primero.
     const isActiveFilter =
       statusParam === 'PENDING,IN_PROGRESS' || statusParam === 'IN_PROGRESS,PENDING'
     const orderBy = isActiveFilter
       ? { scheduledStart: 'asc' as const }
       : { scheduledStart: 'desc' as const }
 
-    const where = { agentId: session.user.id, ...statusWhere }
+    // Construir filtro según rol:
+    // - ADMIN: ve todas las patrullas de sus familias (sin filtro de agentId)
+    // - TECHNICIAN/CLIENT agente: solo sus propias patrullas
+    const where: Record<string, any> = { ...statusWhere }
+
+    if (role === 'ADMIN') {
+      const familyIds = await getPatrolAccessibleFamilyIds(userId, role, isSuperAdmin)
+      if (familyIds !== undefined && familyIds.length > 0) {
+        where.familyId = { in: familyIds }
+      }
+      // Super admin: sin filtro de familia → ve todo
+    } else {
+      // Agente (TECHNICIAN/CLIENT): solo sus patrullas asignadas
+      where.agentId = userId
+    }
 
     const [total, rows] = await Promise.all([
       prisma.patrols.count({ where }),

@@ -99,7 +99,10 @@ export default function PatrolExecutionPage() {
           <Button
             variant='ghost'
             size='sm'
-            onClick={() => router.push('/patrol')}
+            onClick={() => {
+              const role = (session?.user as any)?.role
+              router.push(role === 'ADMIN' ? '/admin/patrols' : '/patrol')
+            }}
             className='gap-1'
           >
             <ArrowLeft className='h-4 w-4' /> Volver

@@ -70,7 +70,8 @@ export default function PatrolListPage() {
       return
     }
     const user = session.user as any
-    if (user.patrolsEnabled === false) {
+    // ADMIN siempre puede ver rondas. Para otros roles, verificar patrolsEnabled.
+    if (user.role !== 'ADMIN' && user.patrolsEnabled === false) {
       router.push('/unauthorized')
       return
     }
