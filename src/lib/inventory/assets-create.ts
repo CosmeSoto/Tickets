@@ -11,6 +11,11 @@ import {
 } from '@/lib/inventory/asset-validation'
 import { generateAssetCode } from '@/lib/inventory/asset-code-generator'
 import { calculateConsumableStatus } from '@/lib/inventory/consumable-status'
+import { linkEquipmentToContract } from '@/lib/inventory/equipment-contract'
+import { linkLicenseToBusinessContract, mapLicenseScope } from '@/lib/inventory/license-contract'
+import { DeliveryActService } from '@/lib/services/delivery-act.service'
+import { ConsumableService } from '@/lib/services/consumable.service'
+import { LicenseService } from '@/lib/services/license.service'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type CreateAssetBody = Record<string, any>
@@ -36,12 +41,7 @@ export async function createAsset(
     name,
     acquisitionMode,
     supplierId,
-    contractAction,
     contractId: bodyContractId,
-    contractNumber,
-    contractStartDate,
-    contractEndDate,
-    contractMonthlyCost,
     code,
     serialNumber,
     brandId,
@@ -75,33 +75,22 @@ export async function createAsset(
   const supplierValidation = validateSupplierRequirement(acquisitionMode, supplierId)
   if (!supplierValidation.valid) return { error: supplierValidation.error!, status: 422 }
 
-  const contractValidation = validateContractRequirement(
-    acquisitionMode,
-    bodyContractId,
-    contractAction
-  )
+  const contractValidation = validateContractRequirement(acquisitionMode, bodyContractId)
   if (!contractValidation.valid) return { error: contractValidation.error!, status: 422 }
 
-  // Crear contrato embebido si corresponde
-  let resolvedContractId: string | undefined = bodyContractId ?? undefined
-  if (contractAction === 'create') {
-    const defaultLicenseType = await prisma.license_types.findFirst({
-      where: { isActive: true },
-      orderBy: { order: 'asc' },
-    })
-    const newContract = await prisma.software_licenses.create({
-      data: {
-        id: randomUUID(),
-        name: contractNumber ?? 'Contrato',
-        typeId: defaultLicenseType?.id ?? '',
-        vendor: supplierId ?? undefined,
-        cost: contractMonthlyCost ?? undefined,
-        purchaseDate: contractStartDate ? new Date(contractStartDate) : undefined,
-        expirationDate: contractEndDate ? new Date(contractEndDate) : undefined,
-        supplierId: supplierId ?? undefined,
-      },
-    })
-    resolvedContractId = newContract.id
+  if (bodyContractId) {
+    const contractExists =
+      (await prisma.contracts.findUnique({
+        where: { id: bodyContractId },
+        select: { id: true },
+      })) ??
+      (await prisma.software_licenses.findUnique({
+        where: { id: bodyContractId },
+        select: { id: true },
+      }))
+    if (!contractExists) {
+      return { error: 'El contrato seleccionado no existe', status: 404 }
+    }
   }
 
   // Código automático
@@ -161,6 +150,8 @@ export async function createAsset(
     if (!equipmentModel) return { error: 'El modelo de equipo no existe', status: 404 }
 
     const equipmentId = randomUUID()
+    let createdAssignmentId: string | undefined
+
     asset = await prisma.$transaction(async tx => {
       const created = await (tx.equipment.create as any)({
         data: {
@@ -177,7 +168,6 @@ export async function createAsset(
           ownershipType: acquisitionMode ?? 'FIXED_ASSET',
           acquisitionMode: acquisitionMode ?? undefined,
           supplierId: supplierId ?? undefined,
-          contractId: resolvedContractId ?? undefined,
           purchaseDate: purchaseDate ? new Date(purchaseDate) : undefined,
           purchasePrice: purchasePrice ?? undefined,
           invoiceNumber: invoiceNumber ?? undefined,
@@ -213,7 +203,7 @@ export async function createAsset(
           select: { departmentId: true },
         })
         const assignmentEndDate = body.assignmentEndDate ?? undefined
-        await tx.equipment_assignments.create({
+        const assignment = await tx.equipment_assignments.create({
           data: {
             id: randomUUID(),
             equipmentId: created.id,
@@ -226,6 +216,7 @@ export async function createAsset(
             accessories,
           },
         })
+        createdAssignmentId = assignment.id
         if (receiver?.departmentId) {
           await (tx.equipment.update as any)({
             where: { id: created.id },
@@ -253,45 +244,149 @@ export async function createAsset(
       return created
     })
 
+    const equipmentLabel =
+      `${equipmentModel.brand?.name ?? ''} ${equipmentModel.model ?? ''}`.trim()
+
+    if (bodyContractId && acquisitionMode === 'RENTAL') {
+      await linkEquipmentToContract(asset.id, bodyContractId, equipmentLabel || resolvedCode)
+    }
+
+    if (createdAssignmentId) {
+      const familyConfig = await prisma.inventory_family_config.findFirst({
+        where: { family: { equipmentTypes: { some: { id: typeId } } } },
+        select: { requireDeliveryAct: true },
+      })
+      if (familyConfig?.requireDeliveryAct !== false) {
+        try {
+          await DeliveryActService.generateDeliveryAct(createdAssignmentId)
+        } catch (err) {
+          console.error('[createAsset] Error generando acta de entrega:', err)
+        }
+      }
+    }
+
     // ── MRO ──────────────────────────────────────────────────────────────────
   } else if (subtype === 'MRO') {
+    if (!name?.trim()) return { error: 'El nombre del material es obligatorio', status: 400 }
+    if (!typeId) return { error: 'El tipo de consumible es obligatorio', status: 400 }
+    if (!unitOfMeasureId) return { error: 'La unidad de medida es obligatoria', status: 400 }
+
+    const consumableType = await prisma.consumable_types.findUnique({
+      where: { id: typeId },
+      select: { familyId: true, name: true },
+    })
+    if (!consumableType) {
+      return { error: 'El tipo de consumible no existe', status: 404 }
+    }
+    if (consumableType.familyId && consumableType.familyId !== familyId) {
+      return {
+        error: 'El tipo de consumible no pertenece al área seleccionada',
+        status: 422,
+      }
+    }
+
+    const parsedMin = minStock ?? 0
+    const parsedMax = maxStock ?? 0
+    const parsedCurrent = currentStock ?? 0
+    if (parsedMax > 0 && parsedMax < parsedMin) {
+      return { error: 'El stock máximo debe ser mayor o igual al mínimo', status: 422 }
+    }
+    if (parsedMax > 0 && parsedCurrent > parsedMax) {
+      return { error: 'El stock inicial no puede exceder el stock máximo', status: 422 }
+    }
+
     const resolvedWarehouseId = warehouseId ?? defaultWarehouseId
     const initialStatus = calculateConsumableStatus(
-      currentStock ?? 0,
-      minStock ?? 0,
+      parsedCurrent,
+      parsedMin,
       expirationDate ? new Date(expirationDate) : null
     )
+    const customValues = Array.isArray(body.customValues) ? body.customValues : undefined
+
     asset = await prisma.consumables.create({
       data: {
         id: randomUUID(),
-        name: name ?? '',
-        typeId: typeId ?? '',
-        unitOfMeasureId: unitOfMeasureId ?? '',
-        currentStock: currentStock ?? 0,
-        minStock: minStock ?? 0,
-        maxStock: maxStock ?? 0,
+        name: name.trim(),
+        typeId,
+        unitOfMeasureId,
+        currentStock: 0,
+        minStock: parsedMin,
+        maxStock: parsedMax,
         supplierId: supplierId ?? undefined,
         warehouseId: resolvedWarehouseId,
         status: initialStatus,
         expirationDate: expirationDate ? new Date(expirationDate) : undefined,
+        costPerUnit: body.costPerUnit ?? undefined,
+        notes: body.notes ? String(body.notes) : undefined,
+        customValues: customValues?.length ? customValues : undefined,
       },
     })
+
+    if (parsedCurrent > 0) {
+      await ConsumableService.createStockMovement(
+        {
+          consumableId: asset.id,
+          type: 'ENTRY',
+          quantity: parsedCurrent,
+          reason: 'Stock inicial',
+        },
+        userId
+      )
+      asset = await prisma.consumables.findUniqueOrThrow({ where: { id: asset.id } })
+    }
 
     // ── LICENSE ───────────────────────────────────────────────────────────────
   } else if (subtype === 'LICENSE') {
     const resolvedLicenseTypeId = body.licenseTypeId || typeId
     if (!resolvedLicenseTypeId) return { error: 'El tipo de licencia es obligatorio', status: 400 }
-    asset = await prisma.software_licenses.create({
-      data: {
-        id: randomUUID(),
-        name: name ?? '',
-        typeId: resolvedLicenseTypeId,
-        key: key ?? undefined,
-        expirationDate: expirationDate ? new Date(expirationDate) : undefined,
-        supplierId: supplierId ?? undefined,
-        cost: cost ?? undefined,
-      },
+    if (!name?.trim()) return { error: 'El nombre de la licencia es obligatorio', status: 400 }
+
+    const licenseType = await prisma.license_types.findFirst({
+      where: { id: resolvedLicenseTypeId, familyId },
+      select: { id: true },
     })
+    if (!licenseType) {
+      return { error: 'El tipo de licencia no pertenece al área seleccionada', status: 422 }
+    }
+
+    const licenseNotes = [
+      body.notes ? String(body.notes) : null,
+      body.contractNumber && !bodyContractId ? `N° contrato: ${String(body.contractNumber)}` : null,
+    ]
+      .filter(Boolean)
+      .join('\n')
+
+    const license = await LicenseService.createLicense(
+      {
+        name: name.trim(),
+        typeId: resolvedLicenseTypeId,
+        key: key ? String(key) : undefined,
+        purchaseDate: purchaseDate ? new Date(purchaseDate) : undefined,
+        expirationDate: expirationDate ? new Date(expirationDate) : undefined,
+        cost: cost ?? undefined,
+        supplierId: supplierId ?? undefined,
+        invoiceNumber: body.invoiceNumber ? String(body.invoiceNumber) : undefined,
+        purchaseOrderNumber: body.purchaseOrderNumber
+          ? String(body.purchaseOrderNumber)
+          : undefined,
+        renewalCost: body.renewalCost ?? undefined,
+        renewalDate: body.renewalDate ? new Date(body.renewalDate) : undefined,
+        licenseScope: mapLicenseScope(body.scope),
+        contractType: body.hasRecurring ? 'SOFTWARE' : undefined,
+        notes: licenseNotes || undefined,
+        assignedToUser: body.assignedToUser ? String(body.assignedToUser) : undefined,
+        assignedToDepartment: body.assignedToDepartment
+          ? String(body.assignedToDepartment)
+          : undefined,
+      },
+      userId
+    )
+
+    if (bodyContractId) {
+      await linkLicenseToBusinessContract(license.id, bodyContractId, license.name)
+    }
+
+    asset = license
   } else {
     return { error: 'Subtipo no válido', status: 422 }
   }

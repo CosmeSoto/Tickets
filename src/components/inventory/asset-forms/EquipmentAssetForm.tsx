@@ -190,7 +190,7 @@ export function EquipmentAssetForm({
   >(initialEquipment?.customValues || [])
   const [supplierId, setSupplierId] = useState(getInitialSupplierId())
   const [linkedContractId, setLinkedContractId] = useState<string | null>(
-    initialEquipment?.contractId || null
+    initialEquipment?.businessContractId || initialEquipment?.contractId || null
   )
   const [purchaseDate, setPurchaseDate] = useState(
     initialEquipment?.purchaseDate

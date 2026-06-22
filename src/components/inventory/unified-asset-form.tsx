@@ -141,15 +141,22 @@ export function UnifiedAssetForm({
 
       const asset = await res.json()
 
-      if (attachments.length > 0 && selectedSubtype === 'EQUIPMENT' && asset.id) {
-        const uploadUrl = `/api/inventory/equipment/${asset.id}/attachments`
-        await Promise.allSettled(
-          attachments.map(async file => {
-            const fd = new FormData()
-            fd.append('file', file)
-            await fetch(uploadUrl, { method: 'POST', body: fd })
-          })
-        )
+      if (attachments.length > 0 && asset.id) {
+        const uploadUrl =
+          selectedSubtype === 'EQUIPMENT'
+            ? `/api/inventory/equipment/${asset.id}/attachments`
+            : selectedSubtype === 'LICENSE'
+              ? `/api/inventory/licenses/${asset.id}/attachments`
+              : null
+        if (uploadUrl) {
+          await Promise.allSettled(
+            attachments.map(async file => {
+              const fd = new FormData()
+              fd.append('file', file)
+              await fetch(uploadUrl, { method: 'POST', body: fd })
+            })
+          )
+        }
       }
 
       toast.success('Activo creado exitosamente')

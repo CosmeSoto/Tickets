@@ -11,6 +11,7 @@ import type {
   EquipmentSummary,
 } from '@/types/inventory/equipment'
 import { db as prisma } from '@/lib/server'
+import { getLinkedBusinessContractId } from '@/lib/inventory/equipment-contract'
 
 /**
  * Servicio para gestión de equipos
@@ -163,11 +164,13 @@ export class EquipmentService {
       // Obtener asignación actual
       const currentAssignment = (equipment.assignments as any[]).find((a: any) => a.isActive)
 
+      const businessContractId = await getLinkedBusinessContractId(id)
+
       // Construir historial
       const history = await this.buildEquipmentHistory(id)
 
       return {
-        equipment: equipment as any,
+        equipment: { ...(equipment as any), businessContractId },
         currentAssignment,
         history,
         maintenanceRecords: (equipment as any).maintenanceRecords,

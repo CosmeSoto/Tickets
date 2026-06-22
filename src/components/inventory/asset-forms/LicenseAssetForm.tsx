@@ -137,6 +137,7 @@ export function LicenseAssetForm({
           }),
       notes: notes || undefined,
       customValues: customFieldValues.length ? customFieldValues : undefined,
+      attachments: attachments.length ? attachments : undefined,
     }
     onSubmit(payload)
   }

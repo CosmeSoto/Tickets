@@ -224,8 +224,7 @@ export async function GET(request: NextRequest) {
 
 import { randomUUID } from 'crypto'
 import { canManageInventory } from '@/lib/inventory-access'
-import { FolioService } from '@/lib/services/folio.service'
-import { DigitalSignatureService } from '@/lib/services/digital-signature.service'
+import { DeliveryActService } from '@/lib/services/delivery-act.service'
 
 /**
  * POST /api/inventory/acts
@@ -255,6 +254,7 @@ export async function POST(request: NextRequest) {
       quantity,
       warehouseDestId,
       assignmentId,
+      receiverId,
     } = body
 
     if (actType === 'EQUIPMENT_ASSIGNMENT') {
@@ -266,6 +266,10 @@ export async function POST(request: NextRequest) {
 
     if (!referenceId) {
       return NextResponse.json({ error: 'referenceId es requerido' }, { status: 400 })
+    }
+
+    if (!receiverId) {
+      return NextResponse.json({ error: 'receiverId es requerido' }, { status: 400 })
     }
 
     if (actType === 'MRO_DELIVERY' && !quantity) {
@@ -287,35 +291,23 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const folio = await FolioService.generateDeliveryActFolio()
-    const acceptanceToken = DigitalSignatureService.generateAcceptanceToken()
-    const expirationDate = new Date()
-    expirationDate.setDate(expirationDate.getDate() + 7)
-
     const delivererInfo = {
       id: session.user.id,
-      name: session.user.name,
-      email: session.user.email,
+      name: session.user.name ?? session.user.email ?? session.user.id,
+      email: session.user.email ?? '',
       role: session.user.role,
     }
 
-    const act = await (prisma.delivery_acts as any).create({
-      data: {
-        id: randomUUID(),
-        folio,
-        assignmentId: assignmentId ?? null,
-        equipmentSnapshot: {},
-        delivererInfo,
-        receiverInfo: {},
-        accessories: [],
-        termsVersion: '1.0',
-        status: 'PENDING',
-        acceptanceToken,
-        expirationDate,
-        actType,
-        referenceId,
-        referenceType: referenceType ?? actType,
-      },
+    const act = await DeliveryActService.createGeneralDeliveryAct({
+      actType,
+      referenceId,
+      receiverId,
+      delivererInfo,
+      description,
+      quantity,
+      warehouseDestId,
+      referenceType,
+      assignmentId,
     })
 
     await prisma.audit_logs.create({
@@ -325,13 +317,17 @@ export async function POST(request: NextRequest) {
         entityType: 'delivery_act',
         entityId: act.id,
         userId: session.user.id,
-        details: { folio, actType, referenceId },
+        details: { folio: act.folio, actType, referenceId, receiverId },
         createdAt: new Date(),
       },
     })
 
     return NextResponse.json({ act }, { status: 201 })
-  } catch {
+  } catch (error) {
+    console.error('Error en POST /api/inventory/acts:', error)
+    if (error instanceof Error) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
     return NextResponse.json({ error: 'Error al crear el acta' }, { status: 500 })
   }
 }

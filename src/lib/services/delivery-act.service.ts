@@ -4,6 +4,7 @@ import { DigitalSignatureService } from './digital-signature.service'
 import { PDFGeneratorService } from './pdf-generator.service'
 import { InventoryNotificationService } from './inventory-notification.service'
 import type { DeliveryAct, UserInfo } from '@/types/inventory/delivery-act'
+import { buildActReceiverInfo, buildGeneralActSnapshot } from '@/lib/inventory/general-delivery-act'
 import { db as prisma } from '@/lib/server'
 
 /**
@@ -55,6 +56,7 @@ export class DeliveryActService {
           equipment: {
             include: {
               type: true,
+              model: { select: { model: true } },
               supplier: { select: { name: true, taxId: true } },
               attachments: {
                 where: { mimeType: { startsWith: 'image/' } },
@@ -299,7 +301,10 @@ export class DeliveryActService {
         },
       })
 
-      const equipoLabel = `${(act as any).assignment?.equipment?.code} — ${(act as any).assignment?.equipment?.brand} ${(act as any).assignment?.equipment?.model?.model || (act as any).assignment?.equipment?.modelDeprecated}`
+      const snapshot = act.equipmentSnapshot as Record<string, unknown>
+      const equipoLabel = act.assignmentId
+        ? `${(act as any).assignment?.equipment?.code} — ${(act as any).assignment?.equipment?.brand} ${(act as any).assignment?.equipment?.model?.model || (act as any).assignment?.equipment?.modelDeprecated}`
+        : `${snapshot.code ?? snapshot.name ?? 'Activo'} — ${snapshot.brand ?? ''} ${snapshot.model ?? ''}`.trim()
 
       // Registrar en auditoría con información completa y legible
       await prisma.audit_logs.create({
@@ -317,7 +322,7 @@ export class DeliveryActService {
             firmaDigital: signature.hash.substring(0, 20) + '...',
             ipOrigen: signature.ipAddress,
             fechaAceptacion: signature.timestamp.toLocaleString('es-ES'),
-            descripcion: `${act.receiverInfo.name} aceptó y firmó el acta de entrega del equipo ${(act as any).assignment?.equipment?.code}. La entrega queda registrada oficialmente.`,
+            descripcion: `${act.receiverInfo.name} aceptó y firmó el acta de entrega del equipo ${(act as any).assignment?.equipment?.code ?? snapshot.code ?? 'referenciado'}. La entrega queda registrada oficialmente.`,
           },
         },
       })
@@ -377,20 +382,26 @@ export class DeliveryActService {
           },
         })
 
-        // Marcar asignación como inactiva
-        await tx.equipment_assignments.update({
-          where: { id: act.assignmentId },
-          data: {
-            isActive: false,
-            actualEndDate: new Date(),
-          },
-        })
+        // Cancelar asignación solo si el acta está ligada a una
+        if (act.assignmentId && act.assignment) {
+          await tx.equipment_assignments.update({
+            where: { id: act.assignmentId },
+            data: {
+              isActive: false,
+              actualEndDate: new Date(),
+            },
+          })
 
-        // Restaurar estado del equipo a AVAILABLE
-        await tx.equipment.update({
-          where: { id: act.assignment.equipmentId },
-          data: { status: 'AVAILABLE' },
-        })
+          await tx.equipment.update({
+            where: { id: act.assignment.equipmentId },
+            data: { status: 'AVAILABLE' },
+          })
+        }
+
+        const snapshot = act.equipmentSnapshot as Record<string, unknown>
+        const equipoLabel = act.assignmentId
+          ? `${act.assignment?.equipment?.code} — ${act.assignment?.equipment?.brand} ${act.assignment?.equipment?.model?.model || act.assignment?.equipment?.modelDeprecated}`
+          : `${snapshot.code ?? snapshot.name ?? 'Activo'} — ${snapshot.brand ?? ''} ${snapshot.model ?? ''}`.trim()
 
         // Registrar en auditoría
         await tx.audit_logs.create({
@@ -402,12 +413,18 @@ export class DeliveryActService {
             userId: userId,
             details: {
               folio: act.folio,
-              equipo: `${act.assignment?.equipment?.code} — ${act.assignment?.equipment?.brand} ${act.assignment?.equipment?.model?.model || act.assignment?.equipment?.modelDeprecated}`,
+              equipo: equipoLabel,
               rechazadoPor: `${act.receiverInfo.name} (${act.receiverInfo.email})`,
               entregadoPor: `${act.delivererInfo.name} (${act.delivererInfo.email})`,
               motivoRechazo: reason,
-              equipoRestauradoA: 'Disponible en bodega',
-              descripcion: `${act.receiverInfo.name} rechazó el acta de entrega del equipo ${act.assignment?.equipment?.code}. El equipo fue devuelto a bodega y la asignación fue cancelada.`,
+              ...(act.assignmentId
+                ? {
+                    equipoRestauradoA: 'Disponible en bodega',
+                    descripcion: `${act.receiverInfo.name} rechazó el acta de entrega del equipo ${act.assignment?.equipment?.code}. El equipo fue devuelto a bodega y la asignación fue cancelada.`,
+                  }
+                : {
+                    descripcion: `${act.receiverInfo.name} rechazó el acta ${act.folio}.`,
+                  }),
             },
           },
         })
@@ -496,6 +513,63 @@ export class DeliveryActService {
       console.error('Error obteniendo actas próximas a expirar:', error)
       throw error
     }
+  }
+
+  /**
+   * Crea un acta para tipos distintos a EQUIPMENT_ASSIGNMENT (MRO, servicio, traslado).
+   */
+  static async createGeneralDeliveryAct(params: {
+    actType: string
+    referenceId: string
+    receiverId: string
+    delivererInfo: UserInfo
+    description?: string
+    quantity?: number
+    warehouseDestId?: string
+    referenceType?: string
+    assignmentId?: string
+  }): Promise<DeliveryAct> {
+    const [receiverInfo, equipmentSnapshot] = await Promise.all([
+      buildActReceiverInfo(params.receiverId),
+      buildGeneralActSnapshot({
+        actType: params.actType,
+        referenceId: params.referenceId,
+        quantity: params.quantity,
+        description: params.description,
+        warehouseDestId: params.warehouseDestId,
+      }),
+    ])
+
+    const folio = await FolioService.generateDeliveryActFolio()
+    const acceptanceToken = DigitalSignatureService.generateAcceptanceToken()
+    const expirationDate = new Date()
+    expirationDate.setDate(expirationDate.getDate() + 7)
+
+    const act = await (prisma.delivery_acts.create as any)({
+      data: {
+        id: randomUUID(),
+        folio,
+        assignmentId: params.assignmentId ?? null,
+        equipmentSnapshot,
+        delivererInfo: params.delivererInfo,
+        receiverInfo,
+        accessories: [],
+        observations: params.description ?? null,
+        termsVersion: '1.0',
+        status: 'PENDING',
+        acceptanceToken,
+        expirationDate,
+        actType: params.actType as any,
+        referenceId: params.referenceId,
+        referenceType: params.referenceType ?? params.actType,
+      },
+    })
+
+    InventoryNotificationService.sendActCreatedNotification(act.id).catch(error => {
+      console.error('Error enviando notificación de acta general:', error)
+    })
+
+    return act as unknown as DeliveryAct
   }
 
   /**

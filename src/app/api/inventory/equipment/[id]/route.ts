@@ -7,6 +7,11 @@ import { ZodError } from 'zod'
 import { canManageInventory, canManageAsset, inventoryForbidden } from '@/lib/inventory-access'
 import { prisma } from '@/lib/prisma'
 import { calculateDepreciation, familySupportsDepreciation } from '@/lib/inventory/depreciation'
+import {
+  syncEquipmentContractLink,
+  getLinkedBusinessContractId,
+} from '@/lib/inventory/equipment-contract'
+import { getEquipmentDisplayName } from '@/lib/utils/equipment-display'
 import { hasAccessToEquipment } from '@/lib/middleware/family-filter'
 import { randomUUID } from 'crypto'
 
@@ -302,6 +307,54 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
             fieldValue: cv.fieldValue,
           })),
         })
+      }
+    }
+
+    if ('contractId' in body || ('acquisitionMode' in body && acquisitionMode === 'RENTAL')) {
+      const effectiveAcquisitionMode =
+        acquisitionMode ??
+        (
+          await prisma.equipment.findUnique({
+            where: { id },
+            select: { acquisitionMode: true },
+          })
+        )?.acquisitionMode
+
+      const contractIdFromBody =
+        'contractId' in body ? ((body.contractId as string | null | undefined) ?? null) : undefined
+
+      if (effectiveAcquisitionMode === 'RENTAL') {
+        const linkedContractId =
+          contractIdFromBody !== undefined
+            ? contractIdFromBody
+            : await getLinkedBusinessContractId(id)
+
+        if (!linkedContractId) {
+          return NextResponse.json(
+            { error: 'Debes asociar un contrato para activos en arrendamiento' },
+            { status: 422 }
+          )
+        }
+
+        if (contractIdFromBody !== undefined) {
+          const updatedEquipment = await prisma.equipment.findUnique({
+            where: { id },
+            include: { model: { include: { brand: true } }, type: true },
+          })
+          const equipmentLabel = updatedEquipment
+            ? getEquipmentDisplayName({
+                equipmentCode: updatedEquipment.code,
+                equipmentTypeName: updatedEquipment.type?.name,
+                equipmentBrandName: updatedEquipment.model?.brand?.name || updatedEquipment.brand,
+                equipmentModelName:
+                  updatedEquipment.model?.model || updatedEquipment.modelDeprecated,
+              })
+            : id
+
+          await syncEquipmentContractLink(id, contractIdFromBody, equipmentLabel)
+        }
+      } else if (contractIdFromBody !== undefined) {
+        await syncEquipmentContractLink(id, contractIdFromBody, id)
       }
     }
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { LicenseService } from '@/lib/services/license.service'
+import { linkLicenseToBusinessContract, mapLicenseScope } from '@/lib/inventory/license-contract'
 import { createLicenseSchema, licenseFiltersSchema } from '@/lib/validations/inventory/license'
 import { canManageInventory, inventoryForbidden } from '@/lib/inventory-access'
 import { ZodError } from 'zod'
@@ -183,7 +184,20 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const validatedData = createLicenseSchema.parse(body)
-    const license = await LicenseService.createLicense(validatedData, session.user.id)
+    const { contractId, scope, licenseTypeId, customValues: _customValues, ...rest } = validatedData
+
+    const license = await LicenseService.createLicense(
+      {
+        ...rest,
+        typeId: rest.typeId || licenseTypeId!,
+        licenseScope: mapLicenseScope(scope),
+      },
+      session.user.id
+    )
+
+    if (contractId) {
+      await linkLicenseToBusinessContract(license.id, contractId, license.name)
+    }
 
     await AuditServiceComplete.log({
       action: AuditActionsComplete.LICENSE_CREATED,

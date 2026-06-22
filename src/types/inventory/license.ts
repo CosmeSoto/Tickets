@@ -24,6 +24,12 @@ export interface CreateLicenseData {
   cost?: number
   vendor?: string
   supplierId?: string // ID del proveedor en el catálogo de proveedores
+  invoiceNumber?: string
+  purchaseOrderNumber?: string
+  renewalCost?: number
+  renewalDate?: Date
+  licenseScope?: 'INDIVIDUAL' | 'DEPARTMENT' | 'COMPANY'
+  contractType?: 'SOFTWARE' | 'SERVICE_EXTERNAL' | 'MAINTENANCE' | 'INSURANCE' | 'SLA'
   notes?: string
   assignedToEquipment?: string
   assignedToUser?: string

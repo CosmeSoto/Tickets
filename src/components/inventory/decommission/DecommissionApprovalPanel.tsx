@@ -125,6 +125,7 @@ export function DecommissionApprovalPanel({
   const [lastContractDialog, setLastContractDialog] = useState<{
     contractId: string
     contractNumber: string
+    contractSource: 'business' | 'legacy'
   } | null>(null)
   const [closingContract, setClosingContract] = useState(false)
   const [showPdfPreview, setShowPdfPreview] = useState(false)
@@ -237,7 +238,11 @@ export function DecommissionApprovalPanel({
       toast({ title: 'Solicitud aprobada', description: `Folio generado: ${json.folio}` })
       setApproveOpen(false)
       if (json.lastAssetForContract) {
-        setLastContractDialog({ contractId: json.contractId, contractNumber: json.contractNumber })
+        setLastContractDialog({
+          contractId: json.contractId,
+          contractNumber: json.contractNumber,
+          contractSource: json.contractSource ?? 'business',
+        })
       } else if (json.contractWarning) {
         toast({
           title: 'Contrato vinculado',
@@ -283,13 +288,23 @@ export function DecommissionApprovalPanel({
     if (!lastContractDialog) return
     setClosingContract(true)
     try {
-      const res = await fetch(`/api/inventory/licenses/${lastContractDialog.contractId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isActive: false }),
-      })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error || 'Error al cerrar el contrato')
+      if (lastContractDialog.contractSource === 'legacy') {
+        const res = await fetch(`/api/inventory/licenses/${lastContractDialog.contractId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ isActive: false }),
+        })
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error || 'Error al cerrar el contrato')
+      } else {
+        const res = await fetch(`/api/contracts/${lastContractDialog.contractId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'TERMINATED' }),
+        })
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error || 'Error al cerrar el contrato')
+      }
       toast({
         title: 'Contrato cerrado',
         description: `El contrato ${lastContractDialog.contractNumber} fue cerrado.`,

@@ -44,15 +44,17 @@ export function ContractPicker({ value, onChange, supplierId, familyId, disabled
   const [open, setOpen] = useState(false)
   const [tab, setTab] = useState<'link' | 'create'>('link')
 
-  // Contratos activos disponibles para vincular
+  // Contratos activos o borradores vinculables desde creación de activos
   const { data: contracts, reload } = useFetch<Contract>('/api/contracts', {
     params: {
-      status: 'ACTIVE',
       pageSize: 200,
       ...(supplierId ? { supplierId } : {}),
       ...(familyId ? { familyId } : {}),
     },
-    transform: d => d.contracts ?? [],
+    transform: d => {
+      const list = d.contracts ?? []
+      return list.filter(c => c.status === 'ACTIVE' || c.status === 'DRAFT')
+    },
     enabled: open && tab === 'link',
   })
 

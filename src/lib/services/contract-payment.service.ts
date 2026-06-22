@@ -286,6 +286,18 @@ export class ContractPaymentService {
   }) {
     const { contractId, startDate, endDate, billingCycle, amount, currency, createdBy } = params
 
+    const existingPayments = await prisma.contract_payments.count({
+      where: {
+        contractId,
+        status: { notIn: ['CANCELLED'] },
+      },
+    })
+    if (existingPayments > 0) {
+      throw new Error(
+        'Este contrato ya tiene pagos programados. Elimínalos o cancélalos antes de regenerar.'
+      )
+    }
+
     const payments: Date[] = []
     const currentDate = new Date(startDate)
 
@@ -300,6 +312,7 @@ export class ContractPaymentService {
         case 'QUARTERLY':
           currentDate.setMonth(currentDate.getMonth() + 3)
           break
+        case 'SEMIANNUAL':
         case 'BIANNUAL':
           currentDate.setMonth(currentDate.getMonth() + 6)
           break

@@ -6,6 +6,7 @@ import { DeliveryActService } from '@/lib/services/delivery-act.service'
 import { InventoryDepartmentService } from '@/lib/services/inventory-department.service'
 import { createAssignmentSchema } from '@/lib/validations/inventory/assignment'
 import { ZodError } from 'zod'
+import { prisma } from '@/lib/prisma'
 
 /**
  * POST /api/inventory/assignments
@@ -14,12 +15,9 @@ import { ZodError } from 'zod'
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user) {
-      return NextResponse.json(
-        { error: 'No autenticado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
     // Solo ADMIN y TECHNICIAN pueden crear asignaciones
@@ -51,46 +49,51 @@ export async function POST(request: NextRequest) {
     }
 
     // Crear asignación
-    const assignment = await AssignmentService.createAssignment(
-      validatedData,
-      session.user.id
-    )
+    const assignment = await AssignmentService.createAssignment(validatedData, session.user.id)
 
-    // Generar acta de entrega automáticamente
-    const deliveryAct = await DeliveryActService.generateDeliveryAct(assignment.id)
+    // Generar acta de entrega si la familia lo requiere
+    let deliveryAct = null
+    let acceptanceUrl: string | null = null
 
-    // Construir URL de aceptación
-    const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
-    const acceptanceUrl = `${baseUrl}/acts/${deliveryAct.id}/accept?token=${deliveryAct.acceptanceToken}`
+    const equipment = await prisma.equipment.findUnique({
+      where: { id: validatedData.equipmentId },
+      select: { typeId: true },
+    })
+    const familyConfig = equipment?.typeId
+      ? await prisma.inventory_family_config.findFirst({
+          where: { family: { equipmentTypes: { some: { id: equipment.typeId } } } },
+          select: { requireDeliveryAct: true },
+        })
+      : null
+
+    if (familyConfig?.requireDeliveryAct !== false) {
+      deliveryAct = await DeliveryActService.generateDeliveryAct(assignment.id)
+      const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
+      acceptanceUrl = `${baseUrl}/acts/${deliveryAct.id}/accept?token=${deliveryAct.acceptanceToken}`
+    }
 
     // Auditoría ya se registra en AssignmentService.createAssignment
 
-    return NextResponse.json({
-      assignment,
-      deliveryAct,
-      acceptanceUrl,
-    }, { status: 201 })
+    return NextResponse.json(
+      {
+        assignment,
+        deliveryAct,
+        acceptanceUrl,
+      },
+      { status: 201 }
+    )
   } catch (error) {
     console.error('Error en POST /api/inventory/assignments:', error)
-    
+
     if (error instanceof ZodError) {
-      return NextResponse.json(
-        { error: 'Datos inválidos', details: error.errors },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Datos inválidos', details: error.errors }, { status: 400 })
     }
 
     if (error instanceof Error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
-    return NextResponse.json(
-      { error: 'Error al crear asignación' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error al crear asignación' }, { status: 500 })
   }
 }
 
@@ -101,12 +104,9 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user) {
-      return NextResponse.json(
-        { error: 'No autenticado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
     const searchParams = request.nextUrl.searchParams
@@ -114,8 +114,12 @@ export async function GET(request: NextRequest) {
       equipmentId: searchParams.get('equipmentId') || undefined,
       receiverId: searchParams.get('receiverId') || undefined,
       delivererId: searchParams.get('delivererId') || undefined,
-      isActive: searchParams.get('isActive') === 'true' ? true : 
-                searchParams.get('isActive') === 'false' ? false : undefined,
+      isActive:
+        searchParams.get('isActive') === 'true'
+          ? true
+          : searchParams.get('isActive') === 'false'
+            ? false
+            : undefined,
     }
 
     const page = parseInt(searchParams.get('page') || '1')
@@ -126,10 +130,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(result)
   } catch (error) {
     console.error('Error en GET /api/inventory/assignments:', error)
-    
-    return NextResponse.json(
-      { error: 'Error al obtener asignaciones' },
-      { status: 500 }
-    )
+
+    return NextResponse.json({ error: 'Error al obtener asignaciones' }, { status: 500 })
   }
 }

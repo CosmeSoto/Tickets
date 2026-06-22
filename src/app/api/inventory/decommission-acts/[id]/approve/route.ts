@@ -10,6 +10,10 @@ import { mkdir } from 'fs/promises'
 import { existsSync } from 'fs'
 import { notifyUser } from '@/lib/api/notify'
 import { isAdminOfFamily } from '@/lib/inventory-access'
+import {
+  getDecommissionContractImpact,
+  releaseEquipmentFromContracts,
+} from '@/lib/inventory/equipment-contract'
 
 /**
  * POST /api/inventory/decommission-acts/[id]/approve
@@ -19,10 +23,7 @@ import { isAdminOfFamily } from '@/lib/inventory-access'
  * - Admin normal: solo puede aprobar solicitudes de sus familias en estado MANAGER_REVIEW
  *   (o PENDING/TECHNICAL_REVIEW si no hay gestores asignados a esa familia)
  */
-export async function POST(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
@@ -36,34 +37,41 @@ export async function POST(
   const isSuperAdmin = (session.user as any).isSuperAdmin === true
   const { id: requestId } = await params
 
-  const decommissionRequest = await prisma.decommission_requests.findUnique({
+  const decommissionRequest = (await prisma.decommission_requests.findUnique({
     where: { id: requestId },
     include: {
       equipment: {
         select: {
-          id: true, code: true, brand: true, model: true, serialNumber: true,
+          id: true,
+          code: true,
+          brand: true,
+          model: true,
+          serialNumber: true,
           type: { select: { familyId: true } },
         },
       },
       license: {
         select: {
-          id: true, name: true, vendor: true,
+          id: true,
+          name: true,
+          vendor: true,
           licenseType: { select: { familyId: true } },
         },
       },
       requester: { select: { id: true, name: true, email: true } },
       attachments: true,
     },
-  }) as any
+  })) as any
 
   if (!decommissionRequest) {
     return NextResponse.json({ error: 'Solicitud no encontrada' }, { status: 404 })
   }
 
   // Obtener familyId del activo
-  const familyId: string | null = decommissionRequest.assetType === 'EQUIPMENT'
-    ? decommissionRequest.equipment?.type?.familyId ?? null
-    : decommissionRequest.license?.licenseType?.familyId ?? null
+  const familyId: string | null =
+    decommissionRequest.assetType === 'EQUIPMENT'
+      ? (decommissionRequest.equipment?.type?.familyId ?? null)
+      : (decommissionRequest.license?.licenseType?.familyId ?? null)
 
   // Verificar que el admin tiene acceso a esta familia
   const hasAccess = await isAdminOfFamily(session.user.id, isSuperAdmin, familyId)
@@ -87,21 +95,24 @@ export async function POST(
       TECHNICAL_REVIEW: 'está pendiente de elevación por el gestor',
     }
     return NextResponse.json(
-      { error: `La solicitud ${statusLabels[decommissionRequest.status] ?? 'no está lista para aprobación'}` },
+      {
+        error: `La solicitud ${statusLabels[decommissionRequest.status] ?? 'no está lista para aprobación'}`,
+      },
       { status: 409 }
     )
   }
 
-  const assetName = decommissionRequest.assetType === 'EQUIPMENT'
-    ? `${decommissionRequest.equipment?.code} - ${decommissionRequest.equipment?.brand} ${decommissionRequest.equipment?.model}`
-    : decommissionRequest.license?.name || 'Activo'
+  const assetName =
+    decommissionRequest.assetType === 'EQUIPMENT'
+      ? `${decommissionRequest.equipment?.code} - ${decommissionRequest.equipment?.brand} ${decommissionRequest.equipment?.model}`
+      : decommissionRequest.license?.name || 'Activo'
 
   const adminName = session.user.name || session.user.email || 'Administrador'
   const currentYear = new Date().getFullYear()
   const actId = randomUUID()
 
   try {
-    const act = await prisma.$transaction(async (tx) => {
+    const act = await prisma.$transaction(async tx => {
       // Folio BAJA
       let counter = await tx.folio_counters.findUnique({
         where: { year_type: { year: currentYear, type: 'BAJA' } },
@@ -126,7 +137,10 @@ export async function POST(
 
       // Actualizar activo
       if (decommissionRequest.assetType === 'EQUIPMENT' && decommissionRequest.equipmentId) {
-        await tx.equipment.update({ where: { id: decommissionRequest.equipmentId }, data: { status: 'RETIRED' } })
+        await tx.equipment.update({
+          where: { id: decommissionRequest.equipmentId },
+          data: { status: 'RETIRED' },
+        })
       } else if (decommissionRequest.assetType === 'LICENSE' && decommissionRequest.licenseId) {
         await tx.software_licenses.update({
           where: { id: decommissionRequest.licenseId },
@@ -136,68 +150,81 @@ export async function POST(
 
       // Crear acta
       const newAct = await tx.decommission_acts.create({
-        data: { id: actId, folio, requestId, approvedById: session.user.id, approvedAt: new Date() },
+        data: {
+          id: actId,
+          folio,
+          requestId,
+          approvedById: session.user.id,
+          approvedAt: new Date(),
+        },
       })
 
       return newAct
     })
 
     // Lógica post-baja: verificar contrato vinculado al equipo dado de baja
-    let contractWarning: { contractWarning: true; contractId: string; contractNumber: string } | undefined
-    let lastAssetForContract: { lastAssetForContract: true; contractId: string; contractNumber: string } | undefined
+    let contractWarning:
+      | {
+          contractWarning: true
+          contractId: string
+          contractNumber: string
+          contractSource: 'business' | 'legacy'
+        }
+      | undefined
+    let lastAssetForContract:
+      | {
+          lastAssetForContract: true
+          contractId: string
+          contractNumber: string
+          contractSource: 'business' | 'legacy'
+        }
+      | undefined
 
     if (decommissionRequest.assetType === 'EQUIPMENT' && decommissionRequest.equipmentId) {
-      const equipmentWithContract = await prisma.equipment.findUnique({
-        where: { id: decommissionRequest.equipmentId },
-        select: { contractId: true },
+      const contractImpact = await getDecommissionContractImpact(decommissionRequest.equipmentId)
+
+      await releaseEquipmentFromContracts(decommissionRequest.equipmentId).catch(err => {
+        console.error('[decommission/approve] Error liberando contrato del equipo:', err)
       })
 
-      if (equipmentWithContract?.contractId) {
-        const contractId = equipmentWithContract.contractId
-
-        const [activeCount, contractRecord] = await Promise.all([
-          prisma.equipment.count({
-            where: {
-              contractId,
-              status: { not: 'RETIRED' },
-            },
-          }),
-          (prisma.software_licenses as any).findUnique({
-            where: { id: contractId },
-            select: { name: true },
-          }),
-        ])
-
-        const contractNumber: string = contractRecord?.name ?? contractId
-
-        if (activeCount > 0) {
-          contractWarning = { contractWarning: true, contractId, contractNumber }
+      if (contractImpact) {
+        const payload = {
+          contractId: contractImpact.contractId,
+          contractNumber: contractImpact.contractNumber,
+          contractSource: contractImpact.contractSource,
+        }
+        if (contractImpact.remainingActiveAssets > 0) {
+          contractWarning = { contractWarning: true, ...payload }
         } else {
-          lastAssetForContract = { lastAssetForContract: true, contractId, contractNumber }
+          lastAssetForContract = { lastAssetForContract: true, ...payload }
         }
       }
     }
 
     // Audit log de baja con info de contrato (único — el de dentro de la transacción ya no existe)
-    await prisma.audit_logs.create({
-      data: {
-        id: randomUUID(),
-        action: 'DECOMMISSION',
-        entityType: 'asset',
-        entityId: decommissionRequest.equipmentId ?? decommissionRequest.licenseId ?? requestId,
-        userId: session.user.id,
-        details: {
-          folio: act.folio,
-          assetName,
-          contractId: contractWarning?.contractId ?? lastAssetForContract?.contractId ?? null,
+    await prisma.audit_logs
+      .create({
+        data: {
+          id: randomUUID(),
+          action: 'DECOMMISSION',
+          entityType: 'asset',
+          entityId: decommissionRequest.equipmentId ?? decommissionRequest.licenseId ?? requestId,
+          userId: session.user.id,
+          details: {
+            folio: act.folio,
+            assetName,
+            contractId: contractWarning?.contractId ?? lastAssetForContract?.contractId ?? null,
+          },
+          createdAt: new Date(),
         },
-        createdAt: new Date(),
-      },
-    }).catch(() => {})
+      })
+      .catch(() => {})
 
     // Generar PDF (fuera de la transacción — fallo no revierte la aprobación)
     try {
-      const systemContent = await prisma.landing_page_content.findFirst({ where: { id: 'default' } })
+      const systemContent = await prisma.landing_page_content.findFirst({
+        where: { id: 'default' },
+      })
       const systemInfo = {
         logoUrl: (systemContent as any)?.companyLogoLightUrl || null,
         logoDarkUrl: (systemContent as any)?.companyLogoDarkUrl || null,
@@ -217,7 +244,10 @@ export async function POST(
         },
         equipment: decommissionRequest.equipment,
         license: decommissionRequest.license,
-        approvedBy: { name: session.user.name || session.user.email || 'Admin', email: session.user.email || '' },
+        approvedBy: {
+          name: session.user.name || session.user.email || 'Admin',
+          email: session.user.email || '',
+        },
         attachmentPaths,
         systemInfo,
       })
@@ -240,17 +270,19 @@ export async function POST(
         data: { pdfPath: `/uploads/decommission-acts/${pdfFilename}` },
       })
     } catch (pdfError) {
-      await prisma.audit_logs.create({
-        data: {
-          id: randomUUID(),
-          action: 'DECOMMISSION_PDF_ERROR',
-          entityType: 'inventory',
-          entityId: actId,
-          userId: session.user.id,
-          details: { error: String(pdfError) },
-          createdAt: new Date(),
-        },
-      }).catch(() => {})
+      await prisma.audit_logs
+        .create({
+          data: {
+            id: randomUUID(),
+            action: 'DECOMMISSION_PDF_ERROR',
+            entityType: 'inventory',
+            entityId: actId,
+            userId: session.user.id,
+            details: { error: String(pdfError) },
+            createdAt: new Date(),
+          },
+        })
+        .catch(() => {})
     }
 
     // Notificaciones
@@ -273,17 +305,21 @@ export async function POST(
       }
     )
 
-    await prisma.audit_logs.create({
-      data: {
-        id: randomUUID(),
-        action: 'DECOMMISSION_APPROVED',
-        entityType: 'inventory',
-        entityId: requestId,
-        userId: session.user.id,
-        details: { descripcion: `${adminName} aprobó la baja de "${assetName}". Folio: ${act.folio}` },
-        createdAt: new Date(),
-      },
-    }).catch(() => {})
+    await prisma.audit_logs
+      .create({
+        data: {
+          id: randomUUID(),
+          action: 'DECOMMISSION_APPROVED',
+          entityType: 'inventory',
+          entityId: requestId,
+          userId: session.user.id,
+          details: {
+            descripcion: `${adminName} aprobó la baja de "${assetName}". Folio: ${act.folio}`,
+          },
+          createdAt: new Date(),
+        },
+      })
+      .catch(() => {})
 
     return NextResponse.json({
       act,
@@ -296,7 +332,12 @@ export async function POST(
   }
 }
 
-function buildApprovalEmail(requesterName: string, assetName: string, folio: string, adminName: string): string {
+function buildApprovalEmail(
+  requesterName: string,
+  assetName: string,
+  folio: string,
+  adminName: string
+): string {
   return `<!DOCTYPE html><html><head><meta charset="UTF-8">
 <style>body{font-family:Arial,sans-serif;line-height:1.6;color:#333}.container{max-width:600px;margin:0 auto;padding:20px}.header{background:#1E40AF;color:white;padding:20px;border-radius:5px 5px 0 0}.content{background:#f9fafb;padding:20px;border:1px solid #e5e7eb}.info-box{background:white;padding:15px;margin:15px 0;border-left:4px solid #22C55E}.footer{text-align:center;margin-top:20px;color:#6b7280;font-size:12px}</style>
 </head><body><div class="container">
