@@ -36,6 +36,7 @@
     "db:reset": "npx prisma db push --force-reset && npm run db:seed",
     "migrate:audit": "tsx scripts/audit-inventory-data.ts",
     "migrate:assign-serials": "tsx scripts/assign-temp-serials.ts",
+    "migrate:contract-links": "tsx scripts/migrate-equipment-contract-links.ts",
     "verify:batch-migration": "tsx scripts/verify-batch-migration.ts",
     "prepare": "husky"
   },
