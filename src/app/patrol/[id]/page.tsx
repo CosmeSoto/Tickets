@@ -82,6 +82,11 @@ export default function PatrolExecutionPage() {
   const nextCheckpoint = checkpoints.find(rc => !visitedIds.has(rc.checkpoint.id))
   const isInProgress = patrol.status === 'IN_PROGRESS'
 
+  // El agente asignado es el único que puede operar (escanear, finalizar, reportar).
+  // Admins y supervisores son observadores — solo ven el progreso.
+  const isAssignedAgent = patrol.agentId === session.user.id
+  const isObserver = !isAssignedAgent
+
   const scheduledLabel = new Date(patrol.scheduledStart).toLocaleString('es-EC', {
     timeZone: 'America/Guayaquil',
     dateStyle: 'short',
@@ -128,8 +133,8 @@ export default function PatrolExecutionPage() {
           />
         )}
 
-        {/* 3. Foto requerida (inicio/fin) */}
-        {exec.photoAction && (
+        {/* 3. Foto requerida (inicio/fin) — solo para el agente */}
+        {!isObserver && exec.photoAction && (
           <PatrolPhotoCard
             action={exec.photoAction}
             photoPreview={exec.photoPreview}
@@ -138,24 +143,39 @@ export default function PatrolExecutionPage() {
           />
         )}
 
-        {/* 4. Botones de acción + Reportar Novedad */}
-        <PatrolActionButtons
-          status={patrol.status}
-          scannerActive={exec.scannerActive}
-          submittingCheckIn={exec.submittingCheckIn}
-          startingPatrol={exec.startingPatrol}
-          endingPatrol={exec.endingPatrol}
-          canFinish={!exec.requiresIncidentForSkip}
-          requiresIncidentForSkip={exec.requiresIncidentForSkip}
-          hasCheckIns={patrol.checkIns.length > 0}
-          onStart={exec.handleStart}
-          onToggleScanner={() => exec.setScannerActive(s => !s)}
-          onEnd={exec.handleEnd}
-          onOpenIncident={() => exec.openIncidentDialog(checkpoints, patrol.checkIns)}
-        />
+        {/* 4. Botones de acción + Reportar Novedad — solo para el agente asignado */}
+        {!isObserver && (
+          <PatrolActionButtons
+            status={patrol.status}
+            scannerActive={exec.scannerActive}
+            submittingCheckIn={exec.submittingCheckIn}
+            startingPatrol={exec.startingPatrol}
+            endingPatrol={exec.endingPatrol}
+            canFinish={!exec.requiresIncidentForSkip}
+            requiresIncidentForSkip={exec.requiresIncidentForSkip}
+            hasCheckIns={patrol.checkIns.length > 0}
+            onStart={exec.handleStart}
+            onToggleScanner={() => exec.setScannerActive(s => !s)}
+            onEnd={exec.handleEnd}
+            onOpenIncident={() => exec.openIncidentDialog(checkpoints, patrol.checkIns)}
+          />
+        )}
 
-        {/* 5. Scanner QR */}
-        {exec.scannerActive && (
+        {/* Banner modo observador — visible solo para admin/supervisor */}
+        {isObserver && isInProgress && (
+          <Card className='border-blue-200 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-800'>
+            <CardContent className='pt-4 pb-3 flex items-center gap-2 text-sm text-blue-800 dark:text-blue-200'>
+              <span className='text-base'>👁️</span>
+              <span>
+                <strong>Modo observador</strong> — estás monitoreando esta ronda en tiempo real.
+                Solo el agente asignado puede operar.
+              </span>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* 5. Scanner QR — solo para el agente asignado */}
+        {!isObserver && exec.scannerActive && (
           <Card>
             <CardContent className='pt-4'>
               <PatrolCheckpointScanner
@@ -190,7 +210,9 @@ export default function PatrolExecutionPage() {
               currentCheckpointId={nextCheckpoint?.checkpoint.id}
               estimatedDurationMinutes={patrol.route.estimatedDurationMinutes}
               scheduledStart={patrol.scheduledStart}
-              onCheckpointClick={isInProgress ? () => exec.setScannerActive(true) : undefined}
+              onCheckpointClick={
+                isInProgress && !isObserver ? () => exec.setScannerActive(true) : undefined
+              }
             />
           </CardContent>
         </Card>
@@ -220,16 +242,18 @@ export default function PatrolExecutionPage() {
         <PatrolIncidentsList incidents={exec.patrolIncidents} />
       </div>
 
-      {/* Dialog de novedad (portal) */}
-      <IncidentFormDialog
-        open={exec.incidentDialogOpen}
-        onOpenChange={exec.setIncidentDialogOpen}
-        mode='create'
-        patrolId={patrolId}
-        checkpointId={exec.incidentCheckpointId}
-        checkpointName={exec.incidentCheckpointName}
-        onSuccess={exec.handleIncidentSuccess}
-      />
+      {/* Dialog de novedad — solo disponible para el agente asignado */}
+      {!isObserver && (
+        <IncidentFormDialog
+          open={exec.incidentDialogOpen}
+          onOpenChange={exec.setIncidentDialogOpen}
+          mode='create'
+          patrolId={patrolId}
+          checkpointId={exec.incidentCheckpointId}
+          checkpointName={exec.incidentCheckpointName}
+          onSuccess={exec.handleIncidentSuccess}
+        />
+      )}
     </ModuleLayout>
   )
 }
