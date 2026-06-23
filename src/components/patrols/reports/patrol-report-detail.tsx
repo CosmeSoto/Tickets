@@ -1,11 +1,20 @@
 'use client'
 
 import { ReactNode } from 'react'
-import { ChevronDown, ChevronRight, CheckCircle2, XCircle, Clock } from 'lucide-react'
+import {
+  ChevronDown,
+  ChevronRight,
+  ChevronLeft,
+  ChevronsLeft,
+  ChevronsRight,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  Loader2,
+} from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Loader2 } from 'lucide-react'
 
 // ── Types ───────────────────────────────────────────────────────────────────────
 
@@ -69,6 +78,26 @@ const STATUS_BADGE: Record<string, { label: string; className: string }> = {
   },
 }
 
+// ── Pagination helper — genera array de páginas con elipsis ───────────────────
+
+function buildPageNumbers(current: number, total: number): (number | '...')[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
+
+  const pages: (number | '...')[] = []
+  const delta = 1
+
+  const left = Math.max(2, current - delta)
+  const right = Math.min(total - 1, current + delta)
+
+  pages.push(1)
+  if (left > 2) pages.push('...')
+  for (let i = left; i <= right; i++) pages.push(i)
+  if (right < total - 1) pages.push('...')
+  pages.push(total)
+
+  return pages
+}
+
 // ── Component ───────────────────────────────────────────────────────────────────
 
 interface PatrolReportDetailProps {
@@ -78,7 +107,6 @@ interface PatrolReportDetailProps {
   expandedPatrol: string | null
   onToggleExpand: (id: string) => void
   onPageChange: (page: number) => void
-  /** Botón de exportación para renderizar junto al conteo de resultados */
   exportButton?: ReactNode
 }
 
@@ -111,18 +139,25 @@ export function PatrolReportDetail({
     )
   }
 
+  const totalCount = pagination?.total ?? patrols.length
+  const rangeStart = pagination ? (pagination.page - 1) * pagination.limit + 1 : 1
+  const rangeEnd = pagination
+    ? Math.min(pagination.page * pagination.limit, pagination.total)
+    : patrols.length
+
   return (
     <div className='space-y-3'>
-      {/* Barra de acciones: conteo de resultados + exportar */}
+      {/* Barra superior: conteo + exportar */}
       <div className='flex items-center justify-between'>
         <p className='text-xs text-muted-foreground'>
-          {pagination
-            ? `${pagination.total} patrulla${pagination.total !== 1 ? 's' : ''}`
-            : `${patrols.length} patrulla${patrols.length !== 1 ? 's' : ''}`}
+          {pagination && pagination.total > pagination.limit
+            ? `Mostrando ${rangeStart}–${rangeEnd} de ${totalCount} patrulla${totalCount !== 1 ? 's' : ''}`
+            : `${totalCount} patrulla${totalCount !== 1 ? 's' : ''}`}
         </p>
         {exportButton}
       </div>
 
+      {/* Lista de patrullas */}
       {patrols.map(patrol => (
         <Card key={patrol.id}>
           <CardContent className='p-4'>
@@ -160,7 +195,7 @@ export function PatrolReportDetail({
                   )}
                 </div>
               </div>
-              {/* Completion bar */}
+              {/* Barra de completitud */}
               <div className='w-24 flex-shrink-0'>
                 <div className='text-xs text-right text-muted-foreground mb-0.5'>
                   {patrol.completionPercentage}%
@@ -174,7 +209,7 @@ export function PatrolReportDetail({
               </div>
             </div>
 
-            {/* Expanded checkpoint timeline */}
+            {/* Timeline de checkpoints (expandido) */}
             {expandedPatrol === patrol.id && (
               <div className='mt-4 border-t pt-3'>
                 <p className='text-xs font-medium text-muted-foreground mb-2'>
@@ -220,28 +255,85 @@ export function PatrolReportDetail({
         </Card>
       ))}
 
-      {/* Pagination */}
+      {/* Paginación completa */}
       {pagination && pagination.totalPages > 1 && (
-        <div className='flex items-center justify-between pt-4'>
-          <p className='text-xs text-muted-foreground'>
-            Página {pagination.page} de {pagination.totalPages} ({pagination.total} patrullas)
+        <div className='flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t'>
+          {/* Info de página */}
+          <p className='text-xs text-muted-foreground order-2 sm:order-1'>
+            Página {pagination.page} de {pagination.totalPages} &middot;{' '}
+            {pagination.total} resultado{pagination.total !== 1 ? 's' : ''}
           </p>
-          <div className='flex gap-2'>
+
+          {/* Botones de navegación */}
+          <div className='flex items-center gap-1 order-1 sm:order-2'>
+            {/* Primera */}
             <Button
-              size='sm'
+              size='icon'
               variant='outline'
+              className='h-8 w-8'
+              disabled={!pagination.hasPrev}
+              onClick={() => onPageChange(1)}
+              title='Primera página'
+            >
+              <ChevronsLeft className='h-3.5 w-3.5' />
+            </Button>
+
+            {/* Anterior */}
+            <Button
+              size='icon'
+              variant='outline'
+              className='h-8 w-8'
               disabled={!pagination.hasPrev}
               onClick={() => onPageChange(pagination.page - 1)}
+              title='Página anterior'
             >
-              Anterior
+              <ChevronLeft className='h-3.5 w-3.5' />
             </Button>
+
+            {/* Números con elipsis */}
+            {buildPageNumbers(pagination.page, pagination.totalPages).map((p, idx) =>
+              p === '...' ? (
+                <span
+                  key={`ellipsis-${idx}`}
+                  className='px-1 text-muted-foreground text-sm select-none'
+                >
+                  …
+                </span>
+              ) : (
+                <Button
+                  key={p}
+                  size='icon'
+                  variant={p === pagination.page ? 'default' : 'outline'}
+                  className='h-8 w-8 text-xs'
+                  onClick={() => onPageChange(p as number)}
+                >
+                  {p}
+                </Button>
+              )
+            )}
+
+            {/* Siguiente */}
             <Button
-              size='sm'
+              size='icon'
               variant='outline'
+              className='h-8 w-8'
               disabled={!pagination.hasNext}
               onClick={() => onPageChange(pagination.page + 1)}
+              title='Página siguiente'
             >
-              Siguiente
+              <ChevronRight className='h-3.5 w-3.5' />
+            </Button>
+
+            {/* Última */}
+            <Button
+              size='icon'
+              variant='outline'
+              className='h-8 w-8'
+              disabled={!pagination.hasNext}
+              onClick={() => onPageChange(pagination.totalPages)}
+              title='Última página'
+            >
+              <ChevronsRight className='h-3.5 w-3.5' />
             </Button>
           </div>
         </div>

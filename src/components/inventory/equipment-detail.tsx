@@ -33,6 +33,7 @@ import { PermanentDeleteDialog } from './equipment/dialogs/permanent-delete-dial
 import { DecommissionDialog } from './equipment/dialogs/decommission-dialog'
 import { ConvertToPurchaseDialog } from './equipment/dialogs/convert-to-purchase-dialog'
 import { SaleDialog } from './equipment/dialogs/sale-dialog'
+import { TransferFamilyDialog } from './transfer-family-dialog'
 import { Button } from '@/components/ui/button'
 
 interface EquipmentDetailProps {
@@ -50,6 +51,7 @@ export function EquipmentDetail({
 }: EquipmentDetailProps) {
   const [showDepreciation, setShowDepreciation] = useState(false)
   const [showSaleDialog, setShowSaleDialog] = useState(false)
+  const [showTransferFamilyDialog, setShowTransferFamilyDialog] = useState(false)
   const router = useRouter()
 
   const {
@@ -185,6 +187,7 @@ export function EquipmentDetail({
             !isAssigned &&
             !(equipment as any).sale
           }
+          canTransferFamily={userRole === 'ADMIN' || isSuperAdmin}
           isSuperAdmin={isSuperAdmin}
           isInMaintenance={isInMaintenance}
           onReportProblem={handleReportProblem}
@@ -197,6 +200,7 @@ export function EquipmentDetail({
           onPermanentDelete={() => setShowPermanentDeleteDialog(true)}
           onConvertToPurchase={() => setShowConvertToPurchaseDialog(true)}
           onSell={() => setShowSaleDialog(true)}
+          onTransferFamily={() => setShowTransferFamilyDialog(true)}
         />
       </div>
 
@@ -411,6 +415,17 @@ export function EquipmentDetail({
         equipmentModelName={equipment.model?.model || equipment.modelDeprecated}
         defaultAccessories={equipment.accessories ?? []}
         isSuperAdmin={isSuperAdmin}
+        onSuccess={loadEquipmentDetail}
+      />
+
+      <TransferFamilyDialog
+        open={showTransferFamilyDialog}
+        onOpenChange={setShowTransferFamilyDialog}
+        assetId={equipmentId}
+        assetKind='EQUIPMENT'
+        assetLabel={`${equipment.model?.brand?.name || equipment.brand} ${equipment.model?.model || equipment.modelDeprecated} (${equipment.code})`}
+        currentFamilyId={(equipment.type as any)?.familyId ?? null}
+        currentFamilyName={(equipment.type as any)?.family?.name ?? null}
         onSuccess={loadEquipmentDetail}
       />
     </div>

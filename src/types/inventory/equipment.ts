@@ -150,6 +150,7 @@ export interface EquipmentHistoryEvent {
     | 'MAINTENANCE'
     | 'STATUS_CHANGE'
     | 'CONDITION_CHANGE'
+    | 'FAMILY_TRANSFER'
   description: string
   userId?: string
   userName?: string

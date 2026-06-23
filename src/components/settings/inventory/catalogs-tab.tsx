@@ -235,11 +235,13 @@ export function CatalogsTab({ familyId, familyColor }: CatalogsTabProps) {
             loading={equipmentTypes.loading}
             saving={equipmentTypes.saving}
             familyColor={familyColor}
+            currentFamilyId={familyId}
             onCreateType={handleCreateEquipmentType}
             onEditType={handleEditEquipmentType}
             onDeleteType={equipmentTypes.deleteType}
             onToggleActive={equipmentTypes.toggleActive}
             onManageAttributes={handleManageEquipmentAttributes}
+            onCloneSuccess={() => { /* No recargar: el tipo se copia a OTRA familia */ }}
           />
         </CardContent>
       </Card>
@@ -262,11 +264,13 @@ export function CatalogsTab({ familyId, familyColor }: CatalogsTabProps) {
             loading={licenseTypes.loading}
             saving={licenseTypes.saving}
             familyColor={familyColor}
+            currentFamilyId={familyId}
             onCreateType={handleCreateLicenseType}
             onEditType={handleEditLicenseType}
             onDeleteType={licenseTypes.deleteType}
             onToggleActive={licenseTypes.toggleActive}
             onManageAttributes={handleManageLicenseAttributes}
+            onCloneSuccess={() => { /* Tipo copiado a otra familia */ }}
           />
         </CardContent>
       </Card>
@@ -289,11 +293,13 @@ export function CatalogsTab({ familyId, familyColor }: CatalogsTabProps) {
             loading={consumableTypes.loading}
             saving={consumableTypes.saving}
             familyColor={familyColor}
+            currentFamilyId={familyId}
             onCreateType={handleCreateConsumableType}
             onEditType={handleEditConsumableType}
             onDeleteType={consumableTypes.deleteType}
             onToggleActive={consumableTypes.toggleActive}
             onManageAttributes={handleManageConsumableAttributes}
+            onCloneSuccess={() => { /* Tipo copiado a otra familia */ }}
           />
         </CardContent>
       </Card>

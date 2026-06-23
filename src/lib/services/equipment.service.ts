@@ -689,6 +689,7 @@ export class EquipmentService {
       COMPLETED: 'MAINTENANCE',
       EQUIPMENT_ATTACHMENT_UPLOAD: 'UPDATED',
       EQUIPMENT_ATTACHMENT_DELETE: 'UPDATED',
+      ASSET_FAMILY_TRANSFER: 'FAMILY_TRANSFER',
     }
     return map[action] || map[action.toUpperCase()] || 'UPDATED'
   }
@@ -763,6 +764,8 @@ export class EquipmentService {
         return 'Mantenimiento completado'
       case 'EQUIPMENT_ATTACHMENT_UPLOAD':
         return details?.descripcion || 'Archivo adjunto subido al equipo'
+      case 'ASSET_FAMILY_TRANSFER':
+        return `Transferido de área "${details?.fromFamilyName ?? details?.fromFamilyId ?? '—'}" a "${details?.toFamilyName ?? details?.toFamilyId ?? '—'}"${details?.attributesLost?.length ? ` · ${details.attributesLost.length} atributo(s) no migrados` : ''}`
       default:
         // Manejar acciones con formato snake_case del AuditServiceComplete
         if (action.includes('_')) {

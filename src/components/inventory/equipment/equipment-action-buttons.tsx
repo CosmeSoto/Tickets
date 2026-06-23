@@ -15,6 +15,7 @@ import {
   ShoppingCart,
   RotateCcw,
   DollarSign,
+  ArrowRightLeft,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -37,6 +38,7 @@ interface EquipmentActionButtonsProps {
   canPermanentDelete: boolean
   canConvertToPurchase: boolean
   canSell: boolean
+  canTransferFamily?: boolean
   isSuperAdmin?: boolean
   isInMaintenance: boolean
   onReportProblem: () => void
@@ -49,6 +51,7 @@ interface EquipmentActionButtonsProps {
   onPermanentDelete: () => void
   onConvertToPurchase: () => void
   onSell: () => void
+  onTransferFamily?: () => void
 }
 
 export function EquipmentActionButtons({
@@ -62,6 +65,7 @@ export function EquipmentActionButtons({
   canPermanentDelete,
   canConvertToPurchase,
   canSell,
+  canTransferFamily = false,
   isSuperAdmin = false,
   isInMaintenance,
   onReportProblem,
@@ -74,6 +78,7 @@ export function EquipmentActionButtons({
   onPermanentDelete,
   onConvertToPurchase,
   onSell,
+  onTransferFamily,
 }: EquipmentActionButtonsProps) {
   const hasSecondaryActions =
     canEdit ||
@@ -82,6 +87,7 @@ export function EquipmentActionButtons({
     canRequestMaintenance ||
     canConvertToPurchase ||
     canSell ||
+    canTransferFamily ||
     canRetire ||
     canPermanentDelete
 
@@ -147,6 +153,12 @@ export function EquipmentActionButtons({
               <DropdownMenuItem onClick={onSell}>
                 <DollarSign className='h-4 w-4 mr-2' />
                 {isSuperAdmin ? 'Registrar venta' : 'Solicitar venta'}
+              </DropdownMenuItem>
+            )}
+            {canTransferFamily && (
+              <DropdownMenuItem onClick={onTransferFamily}>
+                <ArrowRightLeft className='h-4 w-4 mr-2' />
+                Transferir a otra área
               </DropdownMenuItem>
             )}
             {(canRetire || canPermanentDelete) &&

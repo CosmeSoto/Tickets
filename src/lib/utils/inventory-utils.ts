@@ -54,6 +54,7 @@ const EVENT_ICON_COLORS: Record<string, string> = {
   MAINTENANCE: 'text-amber-600 dark:text-amber-400',
   STATUS_CHANGE: 'text-red-600 dark:text-red-400',
   CONDITION_CHANGE: 'text-red-600 dark:text-red-400',
+  FAMILY_TRANSFER: 'text-blue-600 dark:text-blue-400',
   DECOMMISSIONED: 'text-gray-600 dark:text-gray-400',
 }
 

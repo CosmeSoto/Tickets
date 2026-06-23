@@ -16,6 +16,7 @@ import {
   CheckCircle,
   XCircle,
   Download,
+  Copy,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -40,6 +41,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { useExport } from '@/hooks/common/use-export'
 import type { AnyType, TypeKind } from '@/hooks/inventory/use-type-management'
+import { CloneTypeDialog } from './clone-type-dialog'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -49,11 +51,15 @@ interface TypeSectionProps<T extends AnyType> {
   loading: boolean
   saving: boolean
   familyColor?: string | null
+  /** ID de la familia actual (para excluirla del selector de destino al clonar) */
+  currentFamilyId?: string | null
   onCreateType: () => void
   onEditType: (type: T) => void
   onDeleteType: (typeId: string) => Promise<boolean>
   onToggleActive: (typeId: string) => Promise<boolean>
   onManageAttributes: (type: T) => void
+  /** Callback tras clonar exitosamente un tipo a otra área */
+  onCloneSuccess?: () => void
 }
 
 const TYPE_LABELS: Record<TypeKind, { singular: string; plural: string }> = {
@@ -70,14 +76,18 @@ export function TypeSection<T extends AnyType>({
   loading,
   saving,
   familyColor,
+  currentFamilyId = null,
   onCreateType,
   onEditType,
   onDeleteType,
   onToggleActive,
   onManageAttributes,
+  onCloneSuccess,
 }: TypeSectionProps<T>) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [typeToDelete, setTypeToDelete] = useState<T | null>(null)
+  const [cloneDialogOpen, setCloneDialogOpen] = useState(false)
+  const [typeToClone, setTypeToClone] = useState<T | null>(null)
 
   const labels = TYPE_LABELS[typeKind]
 
@@ -242,6 +252,15 @@ export function TypeSection<T extends AnyType>({
             >
               <Trash2 className='h-4 w-4 text-destructive' />
             </Button>
+            <Button
+              variant='ghost'
+              size='sm'
+              onClick={() => { setTypeToClone(type); setCloneDialogOpen(true) }}
+              disabled={saving}
+              title='Copiar a otra área'
+            >
+              <Copy className='h-4 w-4 text-blue-500' />
+            </Button>
           </div>
         )}
         emptyState={{
@@ -279,6 +298,18 @@ export function TypeSection<T extends AnyType>({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Clone to another family dialog */}
+      {typeToClone && (
+        <CloneTypeDialog
+          open={cloneDialogOpen}
+          onOpenChange={setCloneDialogOpen}
+          sourceType={typeToClone}
+          typeKind={typeKind}
+          currentFamilyId={currentFamilyId ?? null}
+          onSuccess={() => { onCloneSuccess?.() }}
+        />
+      )}
     </>
   )
 }

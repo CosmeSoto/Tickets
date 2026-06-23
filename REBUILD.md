@@ -147,7 +147,49 @@ docker compose -f docker-compose.prod.yml --env-file .env.production down -v
 
 ---
 
-## Migraciones
+## Cambios de Schema Pendientes de Aplicar
+
+Al reconstruir contenedores, `entrypoint.sh` ejecuta `prisma db push` automáticamente.
+Los siguientes cambios se aplican solos al hacer el próximo rebuild:
+
+| Campo | Tabla | Tipo | Descripción |
+|-------|-------|------|-------------|
+| `custom_values` | `software_licenses` | `Json?` | Atributos personalizados de tipos de licencia |
+
+Si necesitas aplicarlo manualmente sin reconstruir:
+
+```bash
+# En producción (SSH):
+docker compose -f docker-compose.prod.yml --env-file .env.production exec app \
+  node ./node_modules/prisma/build/index.js db push --accept-data-loss
+```
+
+---
+
+## Nuevas Funcionalidades (Fase 6+)
+
+### Transferencia de activos entre áreas
+
+Permite a admins con acceso a ambas familias reasignar un equipo, licencia o MRO de un área a otra. Accesible desde:
+
+- **Equipos** → Menú "⋯" → "Transferir a otra área"
+- **Licencias** → Ficha de detalle → botón "Transferir área"
+- **MRO** → Ficha de detalle → botón "Transferir área"
+
+Reglas:
+- Equipo con asignación activa: bloqueado
+- Atributos compatibles se conservan, los incompatibles se muestran en preview
+- Queda registrado en el historial del equipo y en `audit_logs`
+
+### Copiar tipos entre áreas
+
+Desde `Configuración → Área → Catálogos`, cada tipo de equipo/licencia/consumible tiene un botón **"Copiar a área"** (ícono de copia azul).
+
+Selecciona el área destino, nombre opcional y si copiar los atributos personalizados. El tipo se crea en la familia destino sin afectar el origen.
+
+---
+
+
 
 ### Desarrollo (Docker)
 

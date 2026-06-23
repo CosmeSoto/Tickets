@@ -1,6 +1,6 @@
 'use client'
 
-import { Clock, Package, Edit, UserPlus, RotateCcw, Wrench, AlertCircle } from 'lucide-react'
+import { Clock, Package, Edit, UserPlus, RotateCcw, Wrench, AlertCircle, ArrowRightLeft } from 'lucide-react'
 import { formatDateTime } from '@/lib/utils'
 import type { EquipmentHistoryEvent } from '@/types/inventory/equipment'
 import { getEventIconColor } from '@/lib/utils/inventory-utils'
@@ -17,6 +17,7 @@ const EVENT_ICONS: Record<string, any> = {
   MAINTENANCE: Wrench,
   STATUS_CHANGE: AlertCircle,
   CONDITION_CHANGE: AlertCircle,
+  FAMILY_TRANSFER: ArrowRightLeft,
 }
 
 export function EquipmentHistory({ history }: EquipmentHistoryProps) {
