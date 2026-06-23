@@ -27,6 +27,7 @@ export interface UnifiedAssetItem {
   family: { name: string; icon: string | null; color: string | null }
   status: string
   code?: string
+  typeName?: string
   acquisitionMode?: string
   condition?: string
   createdAt: string
@@ -194,6 +195,7 @@ export async function queryAssets(params: AssetsQueryParams): Promise<AssetsQuer
         icon: item.consumableType?.family?.icon ?? null,
         color: item.consumableType?.family?.color ?? null,
       },
+      typeName: item.consumableType?.name ?? undefined,
       status: 'ACTIVE',
       createdAt: item.createdAt.toISOString(),
     })),
@@ -207,6 +209,7 @@ export async function queryAssets(params: AssetsQueryParams): Promise<AssetsQuer
         icon: item.licenseType?.family?.icon ?? null,
         color: item.licenseType?.family?.color ?? null,
       },
+      typeName: item.licenseType?.name ?? undefined,
       status: 'ACTIVE',
       createdAt: item.createdAt.toISOString(),
     })),
@@ -272,6 +275,7 @@ function mapEquipmentItem(item: any): UnifiedAssetItem {
       icon: item.type?.family?.icon ?? null,
       color: item.type?.family?.color ?? null,
     },
+    typeName: item.type?.name ?? undefined,
     status: item.status ?? 'ACTIVE',
     code: item.code ?? undefined,
     acquisitionMode: item.acquisitionMode ?? item.ownershipType ?? undefined,

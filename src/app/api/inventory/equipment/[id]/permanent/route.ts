@@ -6,8 +6,7 @@ import { EquipmentService } from '@/lib/services/equipment.service'
 /**
  * DELETE /api/inventory/equipment/[id]/permanent
  * Elimina permanentemente un equipo.
- * - Admin normal: solo equipos RETIRED
- * - SuperAdmin: cualquier equipo no asignado
+ * SOLO Super Admin puede ejecutar esta acción.
  */
 export async function DELETE(
   request: NextRequest,
@@ -20,14 +19,20 @@ export async function DELETE(
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    if (session.user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Solo los administradores pueden eliminar equipos permanentemente' }, { status: 403 })
+    const isSuperAdmin = (session.user as any).isSuperAdmin === true
+
+    // Solo Super Admin puede eliminar permanentemente
+    if (session.user.role !== 'ADMIN' || !isSuperAdmin) {
+      return NextResponse.json(
+        { error: 'Solo el Super Administrador puede eliminar equipos permanentemente' },
+        { status: 403 }
+      )
     }
 
-    const isSuperAdmin = (session.user as any).isSuperAdmin === true
     const { id } = await params
 
-    await EquipmentService.permanentDeleteEquipment(id, session.user.id, isSuperAdmin)
+    // SuperAdmin puede omitir el check de estado RETIRED (skipStatusCheck = true)
+    await EquipmentService.permanentDeleteEquipment(id, session.user.id, true)
 
     return NextResponse.json({ message: 'Equipo eliminado permanentemente' })
   } catch (error) {

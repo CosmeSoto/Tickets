@@ -362,113 +362,92 @@ export async function generateDeliveryActPDF(
     // ── EQUIPMENT_ASSIGNMENT (flujo estándar de asignación) ──────────────
     y = sectionTitle('Datos del Equipo', y)
 
-    doc
-      .fontSize(7.5)
-      .font('Helvetica-Bold')
-      .fillColor(C.muted)
-      .text('CÓDIGO', ML, y, { width: halfW })
-    doc
-      .fontSize(7.5)
-      .font('Helvetica-Bold')
-      .fillColor(C.muted)
-      .text('N° DE SERIE', ML + CW / 2, y, { width: halfW })
-    y += 9
-    doc
-      .fontSize(9)
-      .font('Helvetica')
-      .fillColor(C.text)
-      .text(act.equipmentSnapshot.code || '—', ML, y, { width: halfW })
-    doc
-      .fontSize(9)
-      .font('Helvetica')
-      .fillColor(C.text)
-      .text(act.equipmentSnapshot.serialNumber || '—', ML + CW / 2, y, { width: halfW })
-    y += 16
+    // Columna izquierda: datos + condición | Columna derecha: imagen miniatura
+    const imgBuffer = snap.equipmentImagePath
+      ? await fetchImageBuffer(snap.equipmentImagePath)
+      : null
+    const imgW = imgBuffer ? 80 : 0
+    const dataW = imgBuffer ? CW - imgW - 12 : CW
 
-    doc
-      .fontSize(7.5)
-      .font('Helvetica-Bold')
-      .fillColor(C.muted)
-      .text('MARCA / MODELO', ML, y, { width: halfW })
-    doc
-      .fontSize(7.5)
-      .font('Helvetica-Bold')
-      .fillColor(C.muted)
-      .text('TIPO', ML + CW / 2, y, { width: halfW })
+    // Fila 1: Código | N° Serie
+    doc.fontSize(7.5).font('Helvetica-Bold').fillColor(C.muted)
+      .text('CÓDIGO', ML, y, { width: dataW / 2 })
+    doc.fontSize(7.5).font('Helvetica-Bold').fillColor(C.muted)
+      .text('N° DE SERIE', ML + dataW / 2, y, { width: dataW / 2 })
     y += 9
-    doc
-      .fontSize(9)
-      .font('Helvetica')
-      .fillColor(C.text)
-      .text(`${act.equipmentSnapshot.brand} ${act.equipmentSnapshot.model}`, ML, y, {
-        width: halfW,
-      })
-    doc
-      .fontSize(9)
-      .font('Helvetica')
-      .fillColor(C.text)
-      .text(act.equipmentSnapshot.typeName || act.equipmentSnapshot.type || '—', ML + CW / 2, y, {
-        width: halfW,
-      })
-    y += 16
+    doc.fontSize(9).font('Helvetica').fillColor(C.text)
+      .text(act.equipmentSnapshot.code || '—', ML, y, { width: dataW / 2 })
+    doc.fontSize(9).font('Helvetica').fillColor(C.text)
+      .text(act.equipmentSnapshot.serialNumber || '—', ML + dataW / 2, y, { width: dataW / 2 })
+    y += 14
 
-    doc
-      .fontSize(7.5)
-      .font('Helvetica-Bold')
-      .fillColor(C.muted)
-      .text('CONDICIÓN', ML, y, { width: halfW })
+    // Fila 2: Marca/Modelo | Tipo
+    doc.fontSize(7.5).font('Helvetica-Bold').fillColor(C.muted)
+      .text('MARCA / MODELO', ML, y, { width: dataW / 2 })
+    doc.fontSize(7.5).font('Helvetica-Bold').fillColor(C.muted)
+      .text('TIPO', ML + dataW / 2, y, { width: dataW / 2 })
     y += 9
-    doc
-      .fontSize(9)
-      .font('Helvetica')
-      .fillColor(C.text)
+    doc.fontSize(9).font('Helvetica').fillColor(C.text)
+      .text(`${act.equipmentSnapshot.brand} ${act.equipmentSnapshot.model}`, ML, y, { width: dataW / 2 })
+    doc.fontSize(9).font('Helvetica').fillColor(C.text)
+      .text(act.equipmentSnapshot.typeName || act.equipmentSnapshot.type || '—', ML + dataW / 2, y, { width: dataW / 2 })
+    y += 14
+
+    // Fila 3: Condición
+    doc.fontSize(7.5).font('Helvetica-Bold').fillColor(C.muted)
+      .text('CONDICIÓN', ML, y, { width: dataW / 2 })
+    y += 9
+    doc.fontSize(9).font('Helvetica').fillColor(C.text)
       .text(
         CONDITION_LABELS[act.equipmentSnapshot.condition] || act.equipmentSnapshot.condition || '—',
-        ML,
-        y,
-        { width: halfW }
+        ML, y, { width: dataW / 2 }
       )
-    y += 18
+    y += 14
 
-    y = separator(y)
-
-    // Imagen del equipo (si existe)
-    if (snap.equipmentImagePath) {
-      const imgBuffer = await fetchImageBuffer(snap.equipmentImagePath)
-      if (imgBuffer) {
-        y = sectionTitle('Imagen del Equipo', y)
-        try {
-          doc.image(imgBuffer, ML, y, { fit: [180, 120] })
-          y += 128
-        } catch {
-          // imagen inválida — omitir
-        }
-        y = separator(y)
-      }
+    // Imagen miniatura a la derecha, alineada al tope del bloque
+    if (imgBuffer) {
+      const imgTop = y - 50 // alinear con el inicio de los datos
+      try {
+        doc.image(imgBuffer, ML + dataW + 12, imgTop, { fit: [imgW, imgW], align: 'center' })
+      } catch { /* imagen inválida — omitir */ }
     }
 
-    // Accesorios
+    // Accesorios en línea (no lista vertical)
     const accList = act.accessories?.length ? act.accessories : []
-    y = sectionTitle('Accesorios Incluidos', y)
     if (accList.length > 0) {
-      accList.forEach((a: string) => {
-        doc
-          .fontSize(9)
-          .font('Helvetica')
-          .fillColor(C.text)
-          .text(`•  ${a}`, ML + 4, y, { width: CW - 8 })
-        y += 13
-      })
-    } else {
-      doc
-        .fontSize(9)
-        .font('Helvetica')
-        .fillColor(C.muted)
-        .text('Sin accesorios registrados', ML + 4, y, { width: CW })
-      y += 13
+      y += 2
+      doc.fontSize(7.5).font('Helvetica-Bold').fillColor(C.muted).text('ACCESORIOS', ML, y)
+      y += 9
+      doc.fontSize(8.5).font('Helvetica').fillColor(C.text)
+        .text(accList.join('  ·  '), ML, y, { width: CW })
+      y += 12
     }
-    y += 6
+
+    y += 4
     y = separator(y)
+
+    // Atributos personalizados ordenados — layout 3 columnas compacto
+    const customVals: Array<{ fieldName: string; fieldValue: string; label?: string }> =
+      snap.customValues ?? []
+    if (customVals.length > 0) {
+      y = sectionTitle('Atributos', y)
+      const colW = Math.floor(CW / 3) - 6
+      let col = 0
+      const rowStartY = y
+      customVals.forEach((cv, i) => {
+        const xPos = ML + col * (colW + 6)
+        const label = (cv as any).label ?? cv.fieldName
+        doc.fontSize(7).font('Helvetica-Bold').fillColor(C.muted).text(label.toUpperCase(), xPos, y, { width: colW })
+        doc.fontSize(8.5).font('Helvetica').fillColor(C.text).text(cv.fieldValue || '—', xPos, y + 8, { width: colW })
+        col++
+        if (col >= 3) {
+          col = 0
+          y += 22
+        }
+      })
+      if (col > 0) y += 22
+      y = separator(y)
+    }
   }
 
   // ── PARTES INVOLUCRADAS ─────────────────────────────────────────────────
@@ -626,73 +605,57 @@ export async function generateDeliveryActPDF(
   }
   y += 20
 
-  // ── FIRMA DIGITAL + QR ──────────────────────────────────────────────────
-  // Verificar si necesitamos nueva página
-  if (y > 680) {
+  // ── FIRMA DIGITAL + QR — siempre en la misma página (pie compacto) ──────
+  // Solo agregar página si queda muy poco espacio (<120px)
+  const pageH = doc.page.height
+  const footerReserve = 120
+  if (y > pageH - footerReserve - 40) {
     doc.addPage()
     y = 40
   }
 
   y = separator(y)
-  y = sectionTitle('Verificación Digital', y)
+
+  // QR pequeño a la derecha + datos de firma a la izquierda, en una sola fila compacta
+  const qrSize = 64
+  const sigW = CW - qrSize - 16
+  const sigStartY = y
+
+  doc
+    .fontSize(8)
+    .font('Helvetica-Bold')
+    .fillColor(C.accent)
+    .text('VERIFICACIÓN DIGITAL', ML, y)
+  y += 12
 
   if (act.status === 'ACCEPTED' && act.verificationHash) {
-    // Firma + QR lado a lado
-    const qrSize = 80
-    const sigW = CW - qrSize - 20
-
-    const shortHash = act.verificationHash.substring(0, 40) + '...'
-    doc
-      .fontSize(7.5)
-      .font('Helvetica-Bold')
-      .fillColor(C.muted)
-      .text('HASH DE VERIFICACIÓN', ML, y, { width: sigW })
-    y += 9
-    doc.fontSize(7).font('Helvetica').fillColor(C.text).text(shortHash, ML, y, { width: sigW })
-    y += 14
-
+    const shortHash = act.verificationHash.substring(0, 36) + '...'
+    doc.fontSize(7).font('Helvetica').fillColor(C.muted).text('Hash: ' + shortHash, ML, y, { width: sigW })
+    y += 10
     if (act.signatureTimestamp) {
-      doc
-        .fontSize(7.5)
-        .font('Helvetica-Bold')
-        .fillColor(C.muted)
-        .text('FIRMADO', ML, y, { width: sigW })
-      y += 9
-      doc
-        .fontSize(8)
-        .font('Helvetica')
-        .fillColor(C.text)
-        .text(fmtDate(act.signatureTimestamp), ML, y, { width: sigW })
-      y += 14
-    }
-
-    if (act.signatureIp) {
-      doc.fontSize(7.5).font('Helvetica-Bold').fillColor(C.muted).text('IP', ML, y, { width: sigW })
-      y += 9
-      doc.fontSize(8).font('Helvetica').fillColor(C.text).text(act.signatureIp, ML, y, {
-        width: sigW,
+      const fmtSig = new Date(act.signatureTimestamp).toLocaleString('es-EC', {
+        day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
       })
+      doc.fontSize(7).font('Helvetica').fillColor(C.muted).text('Firmado: ' + fmtSig, ML, y, { width: sigW })
+      y += 10
     }
-
-    // QR a la derecha
-    const qrX = W - MR - qrSize
-    const qrY = y - 46
-    doc.image(qrCodeDataUrl, qrX, qrY, { width: qrSize, height: qrSize })
-    doc
-      .fontSize(6.5)
-      .font('Helvetica')
-      .fillColor(C.muted)
-      .text('Escanear para verificar', qrX, qrY + qrSize + 2, { width: qrSize, align: 'center' })
+    if (act.signatureIp) {
+      doc.fontSize(7).font('Helvetica').fillColor(C.muted).text('IP: ' + act.signatureIp, ML, y, { width: sigW })
+      y += 10
+    }
   } else {
-    // Acta pendiente — QR centrado
-    const qrSize = 80
-    doc.image(qrCodeDataUrl, ML, y, { width: qrSize, height: qrSize })
-    doc
-      .fontSize(8)
-      .font('Helvetica')
-      .fillColor(C.muted)
-      .text('Pendiente de firma digital', ML + qrSize + 12, y + 30, { width: CW - qrSize - 12 })
+    doc.fontSize(8).font('Helvetica').fillColor(C.muted).text('Pendiente de firma digital', ML, y, { width: sigW })
+    y += 10
   }
+
+  // QR a la derecha del bloque de firma
+  const qrX = W - MR - qrSize
+  const qrY = sigStartY
+  doc.image(qrCodeDataUrl, qrX, qrY, { width: qrSize, height: qrSize })
+  doc.fontSize(6).font('Helvetica').fillColor(C.muted)
+    .text('Escanear para verificar', qrX, qrY + qrSize + 2, { width: qrSize, align: 'center' })
+
+  y = Math.max(y, qrY + qrSize + 10)
 
   // ── FOOTER ───────────────────────────────────────────────────────────────
   const footerY = doc.page.height - 30

@@ -457,6 +457,13 @@ export async function POST(
     const oldFamilyId = asset.currentFamilyId
     const oldTypeId = asset.currentTypeId
 
+    // Obtener nombre de la familia destino para el audit_log
+    const targetFamily = await prisma.families.findUnique({
+      where: { id: targetFamilyId },
+      select: { name: true },
+    })
+    const targetFamilyName = targetFamily?.name ?? targetFamilyId
+
     await prisma.$transaction(async tx => {
       if (asset.kind === 'EQUIPMENT') {
         // Determinar bodega destino
@@ -508,7 +515,9 @@ export async function POST(
           details: {
             assetLabel: asset.label,
             fromFamilyId: oldFamilyId,
+            fromFamilyName: asset.currentFamilyName ?? oldFamilyId,
             toFamilyId: targetFamilyId,
+            toFamilyName: targetFamilyName,
             fromTypeId: oldTypeId,
             toTypeId: targetTypeId,
             attributesPreserved: valuesToPersist.length,

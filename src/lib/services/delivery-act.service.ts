@@ -55,7 +55,14 @@ export class DeliveryActService {
         include: {
           equipment: {
             include: {
-              type: true,
+              type: {
+                include: {
+                  attributes: {
+                    orderBy: { order: 'asc' },
+                    select: { attributeName: true, attributeLabel: true, order: true },
+                  },
+                },
+              },
               model: { select: { model: true } },
               supplier: { select: { name: true, taxId: true } },
               attachments: {
@@ -64,6 +71,10 @@ export class DeliveryActService {
                 take: 1,
               },
               department: { include: { family: true } },
+              customValues: {
+                orderBy: { fieldName: 'asc' },
+                select: { fieldName: true, fieldValue: true },
+              },
             },
           },
           receiver: { include: { departments: true } },
@@ -92,6 +103,25 @@ export class DeliveryActService {
         ? `/api/uploads/equipment/${eq.id}/${firstAttachment.filename}`
         : eq.photoUrl || null
 
+      // Ordenar customValues según el orden definido en los atributos del tipo
+      const typeAttrOrder: Map<string, { label: string; order: number }> = new Map(
+        (eq.type?.attributes ?? []).map((a: any) => [
+          a.attributeName,
+          { label: a.attributeLabel ?? a.attributeName, order: a.order ?? 999 },
+        ])
+      )
+      const rawCustomValues: Array<{ fieldName: string; fieldValue: string }> =
+        eq.customValues ?? []
+      const sortedCustomValues = rawCustomValues
+        .filter(v => v.fieldValue !== '' && v.fieldValue != null)
+        .map(v => ({
+          fieldName: v.fieldName,
+          fieldValue: v.fieldValue,
+          label: typeAttrOrder.get(v.fieldName)?.label ?? v.fieldName,
+          order: typeAttrOrder.get(v.fieldName)?.order ?? 999,
+        }))
+        .sort((a, b) => a.order - b.order)
+
       const equipmentSnapshot = {
         id: eq.id,
         code: eq.code,
@@ -102,6 +132,8 @@ export class DeliveryActService {
         typeName: eq.type?.name || '',
         condition: eq.condition,
         specifications: eq.specifications,
+        // Atributos personalizados ordenados según catálogo del tipo
+        customValues: sortedCustomValues,
         // Campos financieros (opcionales)
         supplierName: eq.supplier?.name ?? null,
         supplierTaxId: eq.supplier?.taxId ?? null,

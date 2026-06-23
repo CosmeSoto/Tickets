@@ -468,7 +468,7 @@ export default function ActDetailPage({ params: paramsPromise }: PageProps) {
                 ['Número de Serie', act.equipmentSnapshot?.serialNumber || '—'],
                 [
                   'Tipo',
-                  EQUIPMENT_TYPE_LABELS[act.equipmentSnapshot?.type] || act.equipmentSnapshot?.type,
+                  act.equipmentSnapshot?.typeName || EQUIPMENT_TYPE_LABELS[act.equipmentSnapshot?.type] || act.equipmentSnapshot?.type || '—',
                 ],
                 ['Marca', act.equipmentSnapshot?.brand],
                 ['Modelo', act.equipmentSnapshot?.model],

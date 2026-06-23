@@ -29,7 +29,8 @@ export async function canManageInventory(userId: string, role: string): Promise<
  *
  * Jerarquía:
  *   SuperAdmin  → puede gestionar cualquier activo
- *   Admin       → puede gestionar activos de sus familias asignadas (o todos si no tiene asignaciones)
+ *   Admin       → puede gestionar activos de sus familias de INVENTARIO (inventory_manager_families
+ *                 + familia nativa). Si no tiene ninguna asignada, puede gestionar todo.
  *   Gestor      → puede gestionar activos de sus familias asignadas en inventory_manager_families
  *   Otros       → no pueden gestionar activos
  */
@@ -43,10 +44,12 @@ export async function canManageAsset(
 
   if (role === 'ADMIN') {
     if (!assetFamilyId) return true
-    const { getAdminFamilyScope } = await import('@/lib/auth/admin-scope')
-    const scope = await getAdminFamilyScope(userId, false)
-    if (!scope.familyIds || scope.familyIds.length === 0) return true
-    return scope.familyIds.includes(assetFamilyId)
+    // Usar el scope de inventario (inventory_manager_families + nativa), no el scope general
+    const { getModuleFamilyIds } = await import('@/lib/auth/admin-scope')
+    const inventoryFamilyIds = await getModuleFamilyIds(userId, 'inventory')
+    // Si no tiene ninguna familia de inventario asignada, puede gestionar todas
+    if (inventoryFamilyIds.length === 0) return true
+    return inventoryFamilyIds.includes(assetFamilyId)
   }
 
   const user = await prisma.users.findUnique({
@@ -129,7 +132,8 @@ export async function isManagerOfFamily(userId: string, familyId: string): Promi
 /**
  * Verifica si un ADMIN puede aprobar bajas de una familia específica.
  * - SuperAdmin: siempre sí
- * - Admin normal: solo si tiene esa familia asignada (o si no tiene ninguna asignada)
+ * - Admin normal: solo si tiene esa familia en su scope de inventario
+ *   (inventory_manager_families + familia nativa). Sin asignaciones → acceso total.
  */
 export async function isAdminOfFamily(
   userId: string,
@@ -140,10 +144,10 @@ export async function isAdminOfFamily(
   if (!familyId) return true // activo sin familia → cualquier admin puede
 
   try {
-    const { getAdminFamilyScope } = await import('@/lib/auth/admin-scope')
-    const scope = await getAdminFamilyScope(userId, false)
-    if (!scope.familyIds || scope.familyIds.length === 0) return true
-    return scope.familyIds.includes(familyId)
+    const { getModuleFamilyIds } = await import('@/lib/auth/admin-scope')
+    const inventoryFamilyIds = await getModuleFamilyIds(userId, 'inventory')
+    if (inventoryFamilyIds.length === 0) return true
+    return inventoryFamilyIds.includes(familyId)
   } catch {
     return false
   }

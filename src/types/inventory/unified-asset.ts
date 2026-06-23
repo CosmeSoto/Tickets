@@ -8,6 +8,8 @@ export interface UnifiedAsset {
   family: { name: string; icon: string | null; color: string | null }
   status: string
   code?: string
+  /** Nombre legible del tipo de activo (ej. "Desktop", "Laptop", "Licencia Office") */
+  typeName?: string
   acquisitionMode?: string
   condition?: string
   createdAt: string
@@ -69,6 +71,7 @@ export type ColumnKey =
   | 'fechaCompra'
   | 'factura'
   | 'ordenCompra'
+  | 'precio'
   | 'atributos'
   | 'accesorios'
 
@@ -82,6 +85,7 @@ export const OPTIONAL_COLUMNS: { key: ColumnKey; label: string }[] = [
   { key: 'fechaCompra', label: 'Fecha de Compra' },
   { key: 'factura', label: 'N° Factura' },
   { key: 'ordenCompra', label: 'N° Orden de Compra' },
+  { key: 'precio', label: 'Precio / Valor' },
   { key: 'atributos', label: 'Atributos' },
   { key: 'accesorios', label: 'Accesorios' },
 ]
@@ -106,6 +110,7 @@ export const COLUMN_KEY_TO_ASSET_KEY: Record<ColumnKey, string> = {
   fechaCompra: 'purchaseDate',
   factura: 'invoiceNumber',
   ordenCompra: 'purchaseOrderNumber',
+  precio: 'purchasePrice',
   atributos: 'attributes',
   accesorios: 'accessories',
 }

@@ -418,6 +418,14 @@ export function UnifiedInventoryList({
                   N° OC
                 </th>
               )}
+              {col('precio') && (
+                <th
+                  className='px-4 py-3 text-right font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap'
+                  onClick={() => requestSort('purchasePrice')}
+                >
+                  Valor {renderSortIcon('purchasePrice')}
+                </th>
+              )}
               {col('atributos') && (
                 <th className='px-4 py-3 text-left font-medium text-muted-foreground select-none whitespace-nowrap'>
                   Atributos
@@ -467,7 +475,14 @@ export function UnifiedInventoryList({
                     )}
                   </td>
                   <td className='px-4 py-3'>
-                    <SubtypeBadge subtype={asset.subtype} size='sm' />
+                    <div className='flex flex-col gap-0.5'>
+                      <SubtypeBadge subtype={asset.subtype} size='sm' />
+                      {asset.typeName && (
+                        <span className='text-xs text-muted-foreground leading-tight'>
+                          {asset.typeName}
+                        </span>
+                      )}
+                    </div>
                   </td>
                   {col('area') && (
                     <td className='px-4 py-3'>
@@ -513,6 +528,13 @@ export function UnifiedInventoryList({
                   {col('ordenCompra') && (
                     <td className='px-4 py-3 text-muted-foreground text-xs font-mono'>
                       {asset.purchaseOrderNumber ?? '—'}
+                    </td>
+                  )}
+                  {col('precio') && (
+                    <td className='px-4 py-3 text-right text-sm tabular-nums text-muted-foreground'>
+                      {asset.purchasePrice != null
+                        ? new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(asset.purchasePrice)
+                        : '—'}
                     </td>
                   )}
                   {col('atributos') && (

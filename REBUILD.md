@@ -295,10 +295,29 @@ Si cambia tu IP: ejecutar `sudo ./start-production.sh` y actualizar hosts en los
 | Módulo     | Cliente                   | Técnico                              | Admin normal                                      | Super Admin |
 | ---------- | ------------------------- | ------------------------------------ | ------------------------------------------------- | ----------- |
 | Tickets    | Crea/sigue tickets        | Crea sus tickets / Atiende asignados | Crea propios y de su personal / Gestiona familias | Todo        |
-| Inventario | Ve sus equipos / Gestor\* | Gestor\*                             | Gestiona de sus familias                          | Todo        |
+| Inventario | Ve sus equipos / Gestor\* | Gestor\*                             | Gestiona de sus familias de inventario            | Todo        |
 | Rondas     | Agente (ejecuta)          | Supervisor (gestiona + ejecuta)      | Ve reportes de sus familias                       | Todo        |
 
 \*Gestor = `canManageInventory=true`
+
+### Acciones de inventario por nivel
+
+| Acción | Admin normal (con familia) | Super Admin |
+|--------|---------------------------|-------------|
+| Crear / editar equipo | ✅ | ✅ |
+| Asignar equipo | ✅ | ✅ |
+| **Devolver equipo a bodega** | ✅ | ✅ |
+| Crear acta de devolución | ✅ | ✅ |
+| Retirar equipo (baja) | ✅ | ✅ |
+| Aprobar / rechazar bajas | ✅ (familias asignadas) | ✅ |
+| Transferir activo entre áreas | ✅ (acceso a ambas familias) | ✅ |
+| Copiar tipos entre áreas | ✅ | ✅ |
+| **Eliminar equipo permanentemente** | ❌ | ✅ |
+| **Eliminar actas** | ❌ | ✅ |
+
+### Cómo se resuelve el scope de inventario para Admin normal
+
+El sistema usa `inventory_manager_families` (no `admin_family_assignments`) para determinar qué familias puede gestionar un admin en el módulo de inventario. Si no tiene ninguna familia asignada en inventario, puede gestionar todas.
 
 ### Asignación de familias por módulo (independientes)
 
