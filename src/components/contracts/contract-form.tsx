@@ -318,7 +318,10 @@ export function ContractForm({ contract, onSuccess, onCancel }: Props) {
             </Label>
             <Combobox
               value={watch('category')}
-              onValueChange={v => setValue('category', v as any)}
+              onValueChange={v => {
+                // Nunca limpiar la categoría — si el Combobox envía '' (deselección) se ignora
+                if (v && v !== '') setValue('category', v as any)
+              }}
               options={categoryOptions}
               placeholder='Seleccionar categoría'
               searchPlaceholder='Buscar categoría...'
@@ -380,7 +383,7 @@ export function ContractForm({ contract, onSuccess, onCancel }: Props) {
             <Label>Ciclo de facturación</Label>
             <Select
               value={watch('billingCycle')}
-              onValueChange={v => setValue('billingCycle', v as any)}
+              onValueChange={v => { if (v) setValue('billingCycle', v as any) }}
             >
               <SelectTrigger>
                 <SelectValue />

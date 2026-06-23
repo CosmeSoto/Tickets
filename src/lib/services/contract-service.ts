@@ -13,6 +13,30 @@ import { randomUUID } from 'crypto'
 import { createAuditLog } from '@/lib/audit'
 import { NotificationService } from '@/lib/services/notification-service'
 import { EXPIRING_DAYS, type ContractStatus } from '@/types/contracts'
+import { CONTRACT_CATEGORY_VALUES, CONTRACT_BILLING_CYCLE_VALUES, CONTRACT_LINE_TYPE_VALUES } from '@/lib/validations/contracts'
+
+// ── Guard helpers ─────────────────────────────────────────────────────────────
+
+function toValidCategory(value: unknown): typeof CONTRACT_CATEGORY_VALUES[number] {
+  if (typeof value === 'string' && (CONTRACT_CATEGORY_VALUES as readonly string[]).includes(value)) {
+    return value as typeof CONTRACT_CATEGORY_VALUES[number]
+  }
+  return 'SERVICE' // fallback seguro
+}
+
+function toValidBillingCycle(value: unknown): typeof CONTRACT_BILLING_CYCLE_VALUES[number] {
+  if (typeof value === 'string' && (CONTRACT_BILLING_CYCLE_VALUES as readonly string[]).includes(value)) {
+    return value as typeof CONTRACT_BILLING_CYCLE_VALUES[number]
+  }
+  return 'MONTHLY'
+}
+
+function toValidLineType(value: unknown): typeof CONTRACT_LINE_TYPE_VALUES[number] {
+  if (typeof value === 'string' && (CONTRACT_LINE_TYPE_VALUES as readonly string[]).includes(value)) {
+    return value as typeof CONTRACT_LINE_TYPE_VALUES[number]
+  }
+  return 'SERVICE'
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -233,7 +257,7 @@ export class ContractService {
         contractNumber: contractData.contractNumber || null,
         name: contractData.name,
         description: contractData.description || null,
-        category: contractData.category as any,
+        category: toValidCategory(contractData.category),
         status: 'DRAFT',
         supplierId: contractData.supplierId || null,
         familyId: contractData.familyId || null,
@@ -243,7 +267,7 @@ export class ContractService {
         endDate: contractData.endDate ? new Date(contractData.endDate) : null,
         autoRenew: contractData.autoRenew ?? false,
         renewalNoticeDays: contractData.renewalNoticeDays ?? 30,
-        billingCycle: (contractData.billingCycle as any) ?? 'MONTHLY',
+        billingCycle: toValidBillingCycle(contractData.billingCycle),
         totalValue: contractData.totalValue ?? null,
         monthlyCost: contractData.monthlyCost ?? null,
         currency: contractData.currency ?? 'USD',
@@ -258,7 +282,7 @@ export class ContractService {
             ? {
                 create: lines.map((l, i) => ({
                   id: randomUUID(),
-                  type: l.type as any,
+                  type: toValidLineType(l.type),
                   description: l.description,
                   quantity: l.quantity ?? 1,
                   unitPrice: l.unitPrice ?? null,
@@ -334,7 +358,7 @@ export class ContractService {
         ...(data.contractNumber !== undefined && { contractNumber: data.contractNumber || null }),
         ...(data.name !== undefined && { name: data.name }),
         ...(data.description !== undefined && { description: data.description || null }),
-        ...(data.category !== undefined && { category: data.category as any }),
+        ...(data.category !== undefined && { category: toValidCategory(data.category) }),
         ...(data.supplierId !== undefined && { supplierId: data.supplierId || null }),
         ...(data.familyId !== undefined && { familyId: data.familyId || null }),
         ...(data.modelId !== undefined && { modelId: data.modelId || null }),
@@ -347,7 +371,7 @@ export class ContractService {
         }),
         ...(data.autoRenew !== undefined && { autoRenew: data.autoRenew }),
         ...(data.renewalNoticeDays !== undefined && { renewalNoticeDays: data.renewalNoticeDays }),
-        ...(data.billingCycle !== undefined && { billingCycle: data.billingCycle as any }),
+        ...(data.billingCycle !== undefined && { billingCycle: toValidBillingCycle(data.billingCycle) }),
         ...(data.totalValue !== undefined && { totalValue: data.totalValue }),
         ...(data.monthlyCost !== undefined && { monthlyCost: data.monthlyCost }),
         ...(data.currency !== undefined && { currency: data.currency }),
@@ -356,7 +380,7 @@ export class ContractService {
         ...(data.contactPhone !== undefined && { contactPhone: data.contactPhone || null }),
         ...(data.notes !== undefined && { notes: data.notes || null }),
         ...(data.termsUrl !== undefined && { termsUrl: data.termsUrl || null }),
-        ...(data.status !== undefined && { status: data.status as any }),
+        ...(data.status !== undefined && { status: data.status as any }), // status tiene su propio enum con más valores, mantenemos as any para flexibilidad
       },
       include: CONTRACT_INCLUDE,
     })
@@ -430,7 +454,7 @@ export class ContractService {
         data: lines.map((l, i) => ({
           id: randomUUID(),
           contractId,
-          type: l.type as any,
+          type: toValidLineType(l.type),
           description: l.description,
           quantity: l.quantity ?? 1,
           unitPrice: l.unitPrice ?? null,
@@ -628,7 +652,7 @@ export class ContractService {
         endDate: newEndDate,
         totalValue: updateTerms?.totalValue ?? originalContract.totalValue,
         monthlyCost: updateTerms?.monthlyCost ?? originalContract.monthlyCost,
-        billingCycle: (updateTerms?.billingCycle as any) ?? originalContract.billingCycle,
+        billingCycle: updateTerms?.billingCycle ? toValidBillingCycle(updateTerms.billingCycle) : originalContract.billingCycle,
         currency: originalContract.currency,
         contactName: originalContract.contactName,
         contactEmail: originalContract.contactEmail,

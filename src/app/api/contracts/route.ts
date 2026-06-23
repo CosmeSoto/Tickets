@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { ContractService } from '@/lib/services/contract-service'
 import { canManageInventory, inventoryForbidden } from '@/lib/inventory-access'
+import { createContractSchema } from '@/lib/validations/contracts'
+import { ZodError } from 'zod'
 
 // GET /api/contracts — listar contratos
 export async function GET(req: NextRequest) {
@@ -46,13 +48,55 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const body = await req.json()
+    const raw = await req.json()
+    // Si category llega vacía (deselección del Combobox), aplicar default
+    if (!raw.category || raw.category === '') raw.category = 'SERVICE'
+
+    const p = createContractSchema.parse(raw)
+
     const contract = await ContractService.create({
-      ...body,
+      contractNumber:    p.contractNumber    ?? undefined,
+      name:              p.name,
+      description:       p.description       ?? undefined,
+      category:          p.category,
+      supplierId:        p.supplierId        ?? undefined,
+      familyId:          p.familyId          ?? undefined,
+      modelId:           p.modelId           ?? undefined,
+      batchId:           p.batchId           ?? undefined,
+      startDate:         p.startDate         ?? undefined,
+      endDate:           p.endDate           ?? undefined,
+      autoRenew:         p.autoRenew,
+      renewalNoticeDays: p.renewalNoticeDays,
+      billingCycle:      p.billingCycle,
+      totalValue:        p.totalValue        ?? undefined,
+      monthlyCost:       p.monthlyCost       ?? undefined,
+      currency:          p.currency,
+      contactName:       p.contactName       ?? undefined,
+      contactEmail:      p.contactEmail      || undefined,
+      contactPhone:      p.contactPhone      ?? undefined,
+      notes:             p.notes             ?? undefined,
+      termsUrl:          p.termsUrl          || undefined,
+      lines:             p.lines.map(l => ({
+        type:        l.type,
+        description: l.description,
+        quantity:    l.quantity,
+        unitPrice:   l.unitPrice   ?? undefined,
+        equipmentId: l.equipmentId ?? undefined,
+        licenseId:   l.licenseId   ?? undefined,
+        notes:       l.notes       ?? undefined,
+        order:       l.order,
+      })),
       createdBy: session.user.id,
     })
     return NextResponse.json(contract, { status: 201 })
   } catch (err: any) {
+    if (err instanceof ZodError) {
+      const first = err.errors[0]
+      return NextResponse.json(
+        { error: first?.message ?? 'Datos inválidos', field: first?.path?.join('.'), details: err.errors },
+        { status: 422 }
+      )
+    }
     console.error('[POST /api/contracts]', err)
     return NextResponse.json({ error: err.message ?? 'Error al crear contrato' }, { status: 500 })
   }

@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { ContractService } from '@/lib/services/contract-service'
 import { canManageInventory, canManageAsset, inventoryForbidden } from '@/lib/inventory-access'
+import { updateContractSchema } from '@/lib/validations/contracts'
+import { ZodError } from 'zod'
 
 // GET /api/contracts/[id]
 export async function GET(_req: NextRequest, context: { params: Promise<{ id: string }> }) {
@@ -63,18 +65,55 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
   }
 
   try {
-    const body = await req.json()
-    const { lines, ...contractData } = body
+    const raw = await req.json()
+    // Si category llega vacía (deselección del Combobox) omitirla del update
+    if (raw.category === '') delete raw.category
 
-    await ContractService.update(params.id, contractData, session.user.id)
+    const { lines: rawLines, ...rest } = raw
+    const p = updateContractSchema.parse(rest)
 
-    if (Array.isArray(lines)) {
-      await ContractService.upsertLines(params.id, lines, session.user.id)
+    // Construir objeto sin nulls (el servicio espera undefined, no null)
+    const updateData: Parameters<typeof ContractService.update>[1] = {}
+    if (p.contractNumber !== undefined) updateData.contractNumber = p.contractNumber ?? undefined
+    if (p.name !== undefined)           updateData.name = p.name
+    if (p.description !== undefined)    updateData.description = p.description ?? undefined
+    if (p.category !== undefined)       updateData.category = p.category
+    if (p.supplierId !== undefined)     updateData.supplierId = p.supplierId ?? undefined
+    if (p.familyId !== undefined)       updateData.familyId = p.familyId ?? undefined
+    if (p.modelId !== undefined)        updateData.modelId = p.modelId ?? undefined
+    if (p.batchId !== undefined)        updateData.batchId = p.batchId ?? undefined
+    if (p.startDate !== undefined)      updateData.startDate = p.startDate ?? undefined
+    if (p.endDate !== undefined)        updateData.endDate = p.endDate ?? undefined
+    if (p.autoRenew !== undefined)      updateData.autoRenew = p.autoRenew
+    if (p.renewalNoticeDays !== undefined) updateData.renewalNoticeDays = p.renewalNoticeDays
+    if (p.billingCycle !== undefined)   updateData.billingCycle = p.billingCycle
+    if (p.totalValue !== undefined)     updateData.totalValue = p.totalValue ?? undefined
+    if (p.monthlyCost !== undefined)    updateData.monthlyCost = p.monthlyCost ?? undefined
+    if (p.currency !== undefined)       updateData.currency = p.currency
+    if (p.contactName !== undefined)    updateData.contactName = p.contactName ?? undefined
+    if (p.contactEmail !== undefined)   updateData.contactEmail = p.contactEmail || undefined
+    if (p.contactPhone !== undefined)   updateData.contactPhone = p.contactPhone ?? undefined
+    if (p.notes !== undefined)          updateData.notes = p.notes ?? undefined
+    if (p.termsUrl !== undefined)       updateData.termsUrl = p.termsUrl || undefined
+    // status puede venir del cuerpo (ej. TERMINATED al cerrar contrato)
+    if (raw.status !== undefined)       updateData.status = raw.status
+
+    await ContractService.update(params.id, updateData, session.user.id)
+
+    if (Array.isArray(rawLines)) {
+      await ContractService.upsertLines(params.id, rawLines, session.user.id)
     }
 
     const updated = await ContractService.getById(params.id)
     return NextResponse.json(updated)
   } catch (err: any) {
+    if (err instanceof ZodError) {
+      const first = err.errors[0]
+      return NextResponse.json(
+        { error: first?.message ?? 'Datos inválidos', field: first?.path?.join('.'), details: err.errors },
+        { status: 422 }
+      )
+    }
     console.error('[PUT /api/contracts/[id]]', err)
     return NextResponse.json({ error: err.message ?? 'Error al actualizar' }, { status: 500 })
   }
