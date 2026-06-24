@@ -271,7 +271,7 @@ const HomePageContent = React.memo(function HomePageContent() {
         </section>
 
         {/* ── Services ───────────────────────────────────────────────────── */}
-        {d.servicesEnabled && services.length > 0 && (
+        {d.servicesEnabled && services?.length > 0 && (
           <section id='servicios' className='py-16 border-y border-border relative overflow-hidden'>
             <div className='absolute inset-0 bg-gradient-to-b from-muted/50 via-muted/30 to-muted/50 pointer-events-none' />
             <div className='absolute inset-0 bg-[radial-gradient(ellipse_at_top,hsl(var(--primary)/0.06),transparent_60%)] pointer-events-none' />
