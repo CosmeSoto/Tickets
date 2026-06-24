@@ -502,6 +502,51 @@ export default function ActDetailPage({ params: paramsPromise }: PageProps) {
                 </ul>
               </>
             )}
+
+            {/* Imagen del equipo */}
+            {act.equipmentSnapshot?.equipmentImagePath && (
+              <>
+                <Separator className='my-4' />
+                <p className='text-xs text-muted-foreground uppercase tracking-wide mb-2'>
+                  Imagen del equipo
+                </p>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={act.equipmentSnapshot.equipmentImagePath}
+                  alt={`${act.equipmentSnapshot.brand} ${act.equipmentSnapshot.model}`}
+                  className='rounded-md border border-border object-contain max-h-48 max-w-xs'
+                />
+              </>
+            )}
+
+            {/* Atributos personalizados */}
+            {act.equipmentSnapshot?.customValues &&
+              Array.isArray(act.equipmentSnapshot.customValues) &&
+              act.equipmentSnapshot.customValues.length > 0 && (
+                <>
+                  <Separator className='my-4' />
+                  <p className='text-xs text-muted-foreground uppercase tracking-wide mb-3'>
+                    Atributos del equipo
+                  </p>
+                  <div className='grid gap-3 sm:grid-cols-2 md:grid-cols-3'>
+                    {(
+                      act.equipmentSnapshot.customValues as Array<{
+                        fieldName: string
+                        fieldValue: string
+                        label?: string
+                        order?: number
+                      }>
+                    ).map(cv => (
+                      <div key={cv.fieldName}>
+                        <p className='text-xs text-muted-foreground uppercase tracking-wide mb-1'>
+                          {cv.label ?? cv.fieldName}
+                        </p>
+                        <p className='font-medium text-sm'>{cv.fieldValue || '—'}</p>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
           </CardContent>
         </Card>
 

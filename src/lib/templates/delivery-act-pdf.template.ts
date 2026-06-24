@@ -362,12 +362,17 @@ export async function generateDeliveryActPDF(
     // ── EQUIPMENT_ASSIGNMENT (flujo estándar de asignación) ──────────────
     y = sectionTitle('Datos del Equipo', y)
 
-    // Columna izquierda: datos + condición | Columna derecha: imagen miniatura
+    // Pre-cargar imagen para calcular el ancho disponible para los datos de texto
     const imgBuffer = snap.equipmentImagePath
       ? await fetchImageBuffer(snap.equipmentImagePath)
       : null
-    const imgW = imgBuffer ? 80 : 0
-    const dataW = imgBuffer ? CW - imgW - 12 : CW
+    const IMG_W = 90   // ancho de la miniatura
+    const IMG_H = 90   // alto máximo
+    const IMG_GAP = 12 // espacio entre texto e imagen
+    const dataW = imgBuffer ? CW - IMG_W - IMG_GAP : CW
+
+    // Guardar Y de inicio del bloque de datos para anclar la imagen
+    const blockStartY = y
 
     // Fila 1: Código | N° Serie
     doc.fontSize(7.5).font('Helvetica-Bold').fillColor(C.muted)
@@ -390,7 +395,10 @@ export async function generateDeliveryActPDF(
     doc.fontSize(9).font('Helvetica').fillColor(C.text)
       .text(`${act.equipmentSnapshot.brand} ${act.equipmentSnapshot.model}`, ML, y, { width: dataW / 2 })
     doc.fontSize(9).font('Helvetica').fillColor(C.text)
-      .text(act.equipmentSnapshot.typeName || act.equipmentSnapshot.type || '—', ML + dataW / 2, y, { width: dataW / 2 })
+      .text(
+        act.equipmentSnapshot.typeName || act.equipmentSnapshot.type || '—',
+        ML + dataW / 2, y, { width: dataW / 2 }
+      )
     y += 14
 
     // Fila 3: Condición
@@ -404,15 +412,17 @@ export async function generateDeliveryActPDF(
       )
     y += 14
 
-    // Imagen miniatura a la derecha, alineada al tope del bloque
+    // Imagen: anclada al blockStartY, columna derecha
     if (imgBuffer) {
-      const imgTop = y - 50 // alinear con el inicio de los datos
+      const imgX = ML + dataW + IMG_GAP
       try {
-        doc.image(imgBuffer, ML + dataW + 12, imgTop, { fit: [imgW, imgW], align: 'center' })
-      } catch { /* imagen inválida — omitir */ }
+        doc.image(imgBuffer, imgX, blockStartY, { fit: [IMG_W, IMG_H] })
+      } catch { /* imagen inválida — ignorar silenciosamente */ }
+      // Asegurar que y no quede por encima del borde inferior de la imagen
+      y = Math.max(y, blockStartY + IMG_H + 4)
     }
 
-    // Accesorios en línea (no lista vertical)
+    // Accesorios en línea
     const accList = act.accessories?.length ? act.accessories : []
     if (accList.length > 0) {
       y += 2
@@ -420,25 +430,26 @@ export async function generateDeliveryActPDF(
       y += 9
       doc.fontSize(8.5).font('Helvetica').fillColor(C.text)
         .text(accList.join('  ·  '), ML, y, { width: CW })
-      y += 12
+      y += 13
     }
 
     y += 4
     y = separator(y)
 
-    // Atributos personalizados ordenados — layout 3 columnas compacto
+    // Atributos personalizados — grid de 3 columnas compacto
     const customVals: Array<{ fieldName: string; fieldValue: string; label?: string }> =
       snap.customValues ?? []
     if (customVals.length > 0) {
       y = sectionTitle('Atributos', y)
       const colW = Math.floor(CW / 3) - 6
       let col = 0
-      const rowStartY = y
-      customVals.forEach((cv, i) => {
+      customVals.forEach(cv => {
         const xPos = ML + col * (colW + 6)
         const label = (cv as any).label ?? cv.fieldName
-        doc.fontSize(7).font('Helvetica-Bold').fillColor(C.muted).text(label.toUpperCase(), xPos, y, { width: colW })
-        doc.fontSize(8.5).font('Helvetica').fillColor(C.text).text(cv.fieldValue || '—', xPos, y + 8, { width: colW })
+        doc.fontSize(7).font('Helvetica-Bold').fillColor(C.muted)
+          .text(label.toUpperCase(), xPos, y, { width: colW })
+        doc.fontSize(8.5).font('Helvetica').fillColor(C.text)
+          .text(cv.fieldValue || '—', xPos, y + 8, { width: colW })
         col++
         if (col >= 3) {
           col = 0
