@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer'
 import prisma from './prisma'
+import { getFamilyScopedAdmins } from '@/lib/notifications/family-recipients'
 
 // Configuración por defecto
 const DEFAULT_EMAIL_CONFIG = {
@@ -8,7 +9,7 @@ const DEFAULT_EMAIL_CONFIG = {
   secure: false, // true para 465, false para otros puertos
   user: 'internet.freecom@gmail.com',
   from: 'Sistema de Tickets <internet.freecom@gmail.com>',
-  enabled: true
+  enabled: true,
 }
 
 interface EmailConfig {
@@ -27,9 +28,17 @@ async function getEmailConfig(): Promise<EmailConfig> {
     const settings = await prisma.system_settings.findMany({
       where: {
         key: {
-          in: ['smtpHost', 'smtpPort', 'smtpUser', 'smtpPassword', 'smtpSecure', 'emailFrom', 'emailEnabled']
-        }
-      }
+          in: [
+            'smtpHost',
+            'smtpPort',
+            'smtpUser',
+            'smtpPassword',
+            'smtpSecure',
+            'emailFrom',
+            'emailEnabled',
+          ],
+        },
+      },
     })
 
     const config: any = { ...DEFAULT_EMAIL_CONFIG }
@@ -79,14 +88,14 @@ async function createTransporter() {
   const transportConfig: any = {
     host: config.host,
     port: config.port,
-    secure: config.secure
+    secure: config.secure,
   }
 
   // Solo agregar auth si hay contraseña configurada
   if (config.password) {
     transportConfig.auth = {
       user: config.user,
-      pass: config.password
+      pass: config.password,
     }
   }
 
@@ -118,7 +127,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<boolean> {
       to: Array.isArray(options.to) ? options.to.join(', ') : options.to,
       subject: options.subject,
       html: options.html,
-      text: options.text || options.html.replace(/<[^>]*>/g, '') // Fallback a texto plano
+      text: options.text || options.html.replace(/<[^>]*>/g, ''), // Fallback a texto plano
     })
 
     console.log(`Email sent successfully to: ${options.to}`)
@@ -137,15 +146,15 @@ export async function sendTicketCreatedEmail(ticketId: string) {
       where: { id: ticketId },
       include: {
         users_tickets_clientIdTousers: {
-          select: { name: true, email: true }
+          select: { name: true, email: true },
         },
         users_tickets_assigneeIdTousers: {
-          select: { name: true, email: true }
+          select: { name: true, email: true },
         },
         categories: {
-          select: { name: true }
-        }
-      }
+          select: { name: true },
+        },
+      },
     })
 
     if (!ticket) return false
@@ -213,12 +222,16 @@ export async function sendTicketCreatedEmail(ticketId: string) {
                 <span class="label">Cliente:</span>
                 <span class="value">${ticket.users_tickets_clientIdTousers.name}</span>
               </div>
-              ${ticket.users_tickets_assigneeIdTousers ? `
+              ${
+                ticket.users_tickets_assigneeIdTousers
+                  ? `
               <div class="info-row">
                 <span class="label">Asignado a:</span>
                 <span class="value">${ticket.users_tickets_assigneeIdTousers.name}</span>
               </div>
-              ` : ''}
+              `
+                  : ''
+              }
             </div>
             <p><strong>Descripción:</strong></p>
             <p>${ticket.description}</p>
@@ -238,7 +251,7 @@ export async function sendTicketCreatedEmail(ticketId: string) {
     return await sendEmail({
       to: recipients,
       subject: `Nuevo Ticket: ${ticket.title}`,
-      html
+      html,
     })
   } catch (error) {
     console.error('Error sending ticket created email:', error)
@@ -252,19 +265,19 @@ export async function sendCommentAddedEmail(commentId: string) {
       where: { id: commentId },
       include: {
         users: {
-          select: { name: true, email: true }
+          select: { name: true, email: true },
         },
         tickets: {
           include: {
             users_tickets_clientIdTousers: {
-              select: { name: true, email: true }
+              select: { name: true, email: true },
             },
             users_tickets_assigneeIdTousers: {
-              select: { name: true, email: true }
-            }
-          }
-        }
-      }
+              select: { name: true, email: true },
+            },
+          },
+        },
+      },
     })
 
     if (!comment) return false
@@ -272,12 +285,18 @@ export async function sendCommentAddedEmail(commentId: string) {
     const recipients: string[] = []
 
     // Email al cliente (si el comentario no es del cliente)
-    if (comment.authorId !== comment.tickets.clientId && comment.tickets.users_tickets_clientIdTousers.email) {
+    if (
+      comment.authorId !== comment.tickets.clientId &&
+      comment.tickets.users_tickets_clientIdTousers.email
+    ) {
       recipients.push(comment.tickets.users_tickets_clientIdTousers.email)
     }
 
     // Email al técnico asignado (si el comentario no es del técnico)
-    if (comment.authorId !== comment.tickets.assigneeId && comment.tickets.users_tickets_assigneeIdTousers?.email) {
+    if (
+      comment.authorId !== comment.tickets.assigneeId &&
+      comment.tickets.users_tickets_assigneeIdTousers?.email
+    ) {
       recipients.push(comment.tickets.users_tickets_assigneeIdTousers.email)
     }
 
@@ -326,7 +345,7 @@ export async function sendCommentAddedEmail(commentId: string) {
     return await sendEmail({
       to: recipients,
       subject: `Nuevo comentario en: ${comment.tickets.title}`,
-      html
+      html,
     })
   } catch (error) {
     console.error('Error sending comment email:', error)
@@ -340,12 +359,12 @@ export async function sendTicketStatusChangedEmail(ticketId: string, newStatus: 
       where: { id: ticketId },
       include: {
         users_tickets_clientIdTousers: {
-          select: { name: true, email: true }
+          select: { name: true, email: true },
         },
         users_tickets_assigneeIdTousers: {
-          select: { name: true, email: true }
-        }
-      }
+          select: { name: true, email: true },
+        },
+      },
     })
 
     if (!ticket || !ticket.users_tickets_clientIdTousers.email) return false
@@ -354,7 +373,7 @@ export async function sendTicketStatusChangedEmail(ticketId: string, newStatus: 
       OPEN: 'Abierto',
       IN_PROGRESS: 'En Progreso',
       RESOLVED: 'Resuelto',
-      CLOSED: 'Cerrado'
+      CLOSED: 'Cerrado',
     }
 
     const html = `
@@ -383,10 +402,14 @@ export async function sendTicketStatusChangedEmail(ticketId: string, newStatus: 
                 ${statusLabels[newStatus] || newStatus}
               </div>
             </center>
-            ${newStatus === 'RESOLVED' || newStatus === 'CLOSED' ? `
+            ${
+              newStatus === 'RESOLVED' || newStatus === 'CLOSED'
+                ? `
               <p style="margin-top: 20px;">Tu ticket ha sido ${newStatus === 'RESOLVED' ? 'resuelto' : 'cerrado'}. Si tienes alguna pregunta adicional, no dudes en crear un nuevo ticket.</p>
               ${newStatus === 'CLOSED' ? '<p><strong>¿Te gustaría calificar el servicio recibido?</strong></p>' : ''}
-            ` : ''}
+            `
+                : ''
+            }
             <center>
               <a href="${process.env.NEXTAUTH_URL}/tickets/${ticket.id}" class="button">Ver Ticket</a>
             </center>
@@ -403,7 +426,7 @@ export async function sendTicketStatusChangedEmail(ticketId: string, newStatus: 
     return await sendEmail({
       to: ticket.users_tickets_clientIdTousers.email,
       subject: `Ticket actualizado: ${ticket.title}`,
-      html
+      html,
     })
   } catch (error) {
     console.error('Error sending status change email:', error)
@@ -417,15 +440,15 @@ export async function sendTicketAssignedEmail(ticketId: string) {
       where: { id: ticketId },
       include: {
         users_tickets_clientIdTousers: {
-          select: { name: true, email: true }
+          select: { name: true, email: true },
         },
         users_tickets_assigneeIdTousers: {
-          select: { name: true, email: true }
+          select: { name: true, email: true },
         },
         categories: {
-          select: { name: true }
-        }
-      }
+          select: { name: true },
+        },
+      },
     })
 
     if (!ticket || !ticket.users_tickets_assigneeIdTousers?.email) return false
@@ -476,7 +499,7 @@ export async function sendTicketAssignedEmail(ticketId: string) {
     return await sendEmail({
       to: ticket.users_tickets_assigneeIdTousers.email,
       subject: `Nuevo ticket asignado: ${ticket.title}`,
-      html
+      html,
     })
   } catch (error) {
     console.error('Error sending assignment email:', error)
@@ -491,23 +514,20 @@ export async function sendTicketCreatedToAdminEmail(ticketId: string) {
       where: { id: ticketId },
       include: {
         users_tickets_clientIdTousers: {
-          select: { name: true, email: true }
+          select: { name: true, email: true },
         },
         categories: {
-          select: { name: true }
-        }
-      }
+          select: { name: true },
+        },
+      },
     })
 
     if (!ticket) return false
 
-    // Obtener todos los administradores
-    const admins = await prisma.users.findMany({
-      where: { 
-        role: 'ADMIN',
-        isActive: true
-      },
-      select: { email: true, name: true }
+    const admins = await getFamilyScopedAdmins(ticket.familyId, {
+      id: true,
+      email: true,
+      name: true,
     })
 
     if (admins.length === 0) return false
@@ -601,7 +621,7 @@ export async function sendTicketCreatedToAdminEmail(ticketId: string) {
     return await sendEmail({
       to: adminEmails,
       subject: `[ADMIN] Nuevo Ticket #${ticket.id.substring(0, 8)} - ${ticket.priority} - Requiere Asignación`,
-      html
+      html,
     })
   } catch (error) {
     console.error('Error sending ticket created to admin email:', error)
@@ -616,15 +636,15 @@ export async function sendTicketAssignedToTechnicianEmail(ticketId: string) {
       where: { id: ticketId },
       include: {
         users_tickets_clientIdTousers: {
-          select: { name: true, email: true, phone: true }
+          select: { name: true, email: true, phone: true },
         },
         users_tickets_assigneeIdTousers: {
-          select: { name: true, email: true }
+          select: { name: true, email: true },
         },
         categories: {
-          select: { name: true }
-        }
-      }
+          select: { name: true },
+        },
+      },
     })
 
     if (!ticket || !ticket.users_tickets_assigneeIdTousers?.email) return false
@@ -717,7 +737,7 @@ export async function sendTicketAssignedToTechnicianEmail(ticketId: string) {
     return await sendEmail({
       to: ticket.users_tickets_assigneeIdTousers.email,
       subject: `[ASIGNADO] Ticket #${ticket.id.substring(0, 8)} - ${ticket.title}`,
-      html
+      html,
     })
   } catch (error) {
     console.error('Error sending ticket assigned to technician email:', error)
@@ -732,18 +752,23 @@ export async function sendTicketAssignedToClientEmail(ticketId: string) {
       where: { id: ticketId },
       include: {
         users_tickets_clientIdTousers: {
-          select: { name: true, email: true }
+          select: { name: true, email: true },
         },
         users_tickets_assigneeIdTousers: {
-          select: { name: true, email: true }
+          select: { name: true, email: true },
         },
         categories: {
-          select: { name: true }
-        }
-      }
+          select: { name: true },
+        },
+      },
     })
 
-    if (!ticket || !ticket.users_tickets_clientIdTousers.email || !ticket.users_tickets_assigneeIdTousers) return false
+    if (
+      !ticket ||
+      !ticket.users_tickets_clientIdTousers.email ||
+      !ticket.users_tickets_assigneeIdTousers
+    )
+      return false
 
     const html = `
       <!DOCTYPE html>
@@ -815,7 +840,7 @@ export async function sendTicketAssignedToClientEmail(ticketId: string) {
     return await sendEmail({
       to: ticket.users_tickets_clientIdTousers.email,
       subject: `Técnico asignado a tu ticket: ${ticket.title}`,
-      html
+      html,
     })
   } catch (error) {
     console.error('Error sending ticket assigned to client email:', error)
@@ -830,26 +855,23 @@ export async function sendTicketResolvedToAdminEmail(ticketId: string) {
       where: { id: ticketId },
       include: {
         users_tickets_clientIdTousers: {
-          select: { name: true, email: true }
+          select: { name: true, email: true },
         },
         users_tickets_assigneeIdTousers: {
-          select: { name: true, email: true }
+          select: { name: true, email: true },
         },
         categories: {
-          select: { name: true }
-        }
-      }
+          select: { name: true },
+        },
+      },
     })
 
     if (!ticket) return false
 
-    // Obtener todos los administradores
-    const admins = await prisma.users.findMany({
-      where: { 
-        role: 'ADMIN',
-        isActive: true
-      },
-      select: { email: true, name: true }
+    const admins = await getFamilyScopedAdmins(ticket.familyId, {
+      id: true,
+      email: true,
+      name: true,
     })
 
     if (admins.length === 0) return false
@@ -858,7 +880,7 @@ export async function sendTicketResolvedToAdminEmail(ticketId: string) {
     if (adminEmails.length === 0) return false
 
     // Calcular tiempo de resolución
-    const resolutionTime = ticket.resolvedAt 
+    const resolutionTime = ticket.resolvedAt
       ? Math.round((ticket.resolvedAt.getTime() - ticket.createdAt.getTime()) / (1000 * 60 * 60))
       : 0
 
@@ -936,7 +958,7 @@ export async function sendTicketResolvedToAdminEmail(ticketId: string) {
     return await sendEmail({
       to: adminEmails,
       subject: `[ADMIN] Ticket Resuelto #${ticket.id.substring(0, 8)} - ${ticket.title}`,
-      html
+      html,
     })
   } catch (error) {
     console.error('Error sending ticket resolved to admin email:', error)
@@ -951,15 +973,15 @@ export async function sendRatingToAdminEmail(ticketId: string, rating: number) {
       where: { id: ticketId },
       include: {
         users_tickets_clientIdTousers: {
-          select: { name: true, email: true }
+          select: { name: true, email: true },
         },
         users_tickets_assigneeIdTousers: {
-          select: { name: true, email: true }
+          select: { name: true, email: true },
         },
         categories: {
-          select: { name: true }
-        }
-      }
+          select: { name: true },
+        },
+      },
     })
 
     if (!ticket) return false
@@ -973,19 +995,17 @@ export async function sendRatingToAdminEmail(ticketId: string, rating: number) {
         responseTime: true,
         technicalSkill: true,
         communication: true,
-        problemResolution: true
-      }
+        problemResolution: true,
+      },
     })
 
     if (!ratingData) return false
 
-    // Obtener todos los administradores
-    const admins = await prisma.users.findMany({
-      where: { 
-        role: 'ADMIN',
-        isActive: true
-      },
-      select: { email: true, name: true }
+    // Obtener administradores con scope de familia del ticket
+    const admins = await getFamilyScopedAdmins(ticket.familyId, {
+      id: true,
+      email: true,
+      name: true,
     })
 
     if (admins.length === 0) return false
@@ -1069,12 +1089,16 @@ export async function sendRatingToAdminEmail(ticketId: string, rating: number) {
               </div>
             </div>
             
-            ${ratingData.feedback ? `
+            ${
+              ratingData.feedback
+                ? `
               <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #e5e7eb; margin: 20px 0;">
                 <strong>Comentarios del Cliente:</strong>
                 <p style="margin: 10px 0 0 0;">${ratingData.feedback}</p>
               </div>
-            ` : ''}
+            `
+                : ''
+            }
             
             <center>
               <a href="${process.env.NEXTAUTH_URL}/admin/tickets/${ticket.id}" class="button">Ver Ticket Completo</a>
@@ -1091,7 +1115,7 @@ export async function sendRatingToAdminEmail(ticketId: string, rating: number) {
     return await sendEmail({
       to: adminEmails,
       subject: `[ADMIN] Nueva Calificación ${stars} - Ticket #${ticket.id.substring(0, 8)}`,
-      html
+      html,
     })
   } catch (error) {
     console.error('Error sending rating to admin email:', error)

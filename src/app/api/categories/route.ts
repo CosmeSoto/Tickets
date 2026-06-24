@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
-import { NotificationService } from '@/lib/services/notification-service'
+import { notifyFamilyScopedAdminsExcept } from '@/lib/api/notify'
 import { canManageCategory, getDepartmentFamilyId } from '@/lib/category-access'
 import { invalidateCache } from '@/lib/api-cache'
 
@@ -364,22 +364,14 @@ export async function POST(request: NextRequest) {
       request,
     })
 
-    // Notificación in-app a otros admins
-    const admins = await prisma.users.findMany({
-      where: { role: 'ADMIN', isActive: true, id: { not: session.user.id } },
-      select: { id: true },
-    })
-    // Notificación in-app a otros admins
-    await Promise.all(
-      admins.map(admin =>
-        NotificationService.push({
-          userId: admin.id,
-          type: 'INFO',
-          title: `Nueva categoría creada: ${category.name}`,
-          message: `Se creó la categoría "${category.name}" (Nivel ${category.level}) en el departamento ${category.departments?.name ?? 'sin departamento'}.`,
-        }).catch(err => console.error('[NOTIFY] Error:', err))
-      )
-    )
+    // Notificación in-app a super admins + admin nativo del área
+    await notifyFamilyScopedAdminsExcept(
+      targetFamilyId,
+      session.user.id,
+      'INFO',
+      `Nueva categoría creada: ${category.name}`,
+      `Se creó la categoría "${category.name}" (Nivel ${category.level}) en el departamento ${category.departments?.name ?? 'sin departamento'}.`
+    ).catch(err => console.error('[NOTIFY] Error:', err))
 
     // Invalidar caché de categorías
     await invalidateCache([

@@ -12,28 +12,42 @@ import { prisma } from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import { createAuditLog } from '@/lib/audit'
 import { NotificationService } from '@/lib/services/notification-service'
+import { getFamilyScopedAdmins } from '@/lib/notifications/family-recipients'
 import { EXPIRING_DAYS, type ContractStatus } from '@/types/contracts'
-import { CONTRACT_CATEGORY_VALUES, CONTRACT_BILLING_CYCLE_VALUES, CONTRACT_LINE_TYPE_VALUES } from '@/lib/validations/contracts'
+import {
+  CONTRACT_CATEGORY_VALUES,
+  CONTRACT_BILLING_CYCLE_VALUES,
+  CONTRACT_LINE_TYPE_VALUES,
+} from '@/lib/validations/contracts'
 
 // ── Guard helpers ─────────────────────────────────────────────────────────────
 
-function toValidCategory(value: unknown): typeof CONTRACT_CATEGORY_VALUES[number] {
-  if (typeof value === 'string' && (CONTRACT_CATEGORY_VALUES as readonly string[]).includes(value)) {
-    return value as typeof CONTRACT_CATEGORY_VALUES[number]
+function toValidCategory(value: unknown): (typeof CONTRACT_CATEGORY_VALUES)[number] {
+  if (
+    typeof value === 'string' &&
+    (CONTRACT_CATEGORY_VALUES as readonly string[]).includes(value)
+  ) {
+    return value as (typeof CONTRACT_CATEGORY_VALUES)[number]
   }
   return 'SERVICE' // fallback seguro
 }
 
-function toValidBillingCycle(value: unknown): typeof CONTRACT_BILLING_CYCLE_VALUES[number] {
-  if (typeof value === 'string' && (CONTRACT_BILLING_CYCLE_VALUES as readonly string[]).includes(value)) {
-    return value as typeof CONTRACT_BILLING_CYCLE_VALUES[number]
+function toValidBillingCycle(value: unknown): (typeof CONTRACT_BILLING_CYCLE_VALUES)[number] {
+  if (
+    typeof value === 'string' &&
+    (CONTRACT_BILLING_CYCLE_VALUES as readonly string[]).includes(value)
+  ) {
+    return value as (typeof CONTRACT_BILLING_CYCLE_VALUES)[number]
   }
   return 'MONTHLY'
 }
 
-function toValidLineType(value: unknown): typeof CONTRACT_LINE_TYPE_VALUES[number] {
-  if (typeof value === 'string' && (CONTRACT_LINE_TYPE_VALUES as readonly string[]).includes(value)) {
-    return value as typeof CONTRACT_LINE_TYPE_VALUES[number]
+function toValidLineType(value: unknown): (typeof CONTRACT_LINE_TYPE_VALUES)[number] {
+  if (
+    typeof value === 'string' &&
+    (CONTRACT_LINE_TYPE_VALUES as readonly string[]).includes(value)
+  ) {
+    return value as (typeof CONTRACT_LINE_TYPE_VALUES)[number]
   }
   return 'SERVICE'
 }
@@ -371,7 +385,9 @@ export class ContractService {
         }),
         ...(data.autoRenew !== undefined && { autoRenew: data.autoRenew }),
         ...(data.renewalNoticeDays !== undefined && { renewalNoticeDays: data.renewalNoticeDays }),
-        ...(data.billingCycle !== undefined && { billingCycle: toValidBillingCycle(data.billingCycle) }),
+        ...(data.billingCycle !== undefined && {
+          billingCycle: toValidBillingCycle(data.billingCycle),
+        }),
         ...(data.totalValue !== undefined && { totalValue: data.totalValue }),
         ...(data.monthlyCost !== undefined && { monthlyCost: data.monthlyCost }),
         ...(data.currency !== undefined && { currency: data.currency }),
@@ -517,6 +533,27 @@ export class ContractService {
         },
       })
 
+      // Super admins + admin nativo de la familia (excluir creador si ya fue notificado)
+      const familyAdmins = await getFamilyScopedAdmins(contract.familyId, { id: true })
+      await Promise.all(
+        familyAdmins
+          .filter(admin => admin.id !== contract.createdBy)
+          .map(admin =>
+            NotificationService.push({
+              userId: admin.id,
+              type: 'WARNING',
+              title: `Contrato por vencer: ${contract.name}`,
+              message: `El contrato "${contract.name}" con ${supplierName}${familyName ? ` (${familyName})` : ''} vence en ${daysUntilExpiry} día(s).`,
+              metadata: {
+                contractId: contract.id,
+                contractName: contract.name,
+                daysUntilExpiry,
+                endDate: contract.endDate?.toISOString(),
+              },
+            })
+          )
+      )
+
       // Marcar como alertado
       await prisma.contracts.update({
         where: { id: contract.id },
@@ -652,7 +689,9 @@ export class ContractService {
         endDate: newEndDate,
         totalValue: updateTerms?.totalValue ?? originalContract.totalValue,
         monthlyCost: updateTerms?.monthlyCost ?? originalContract.monthlyCost,
-        billingCycle: updateTerms?.billingCycle ? toValidBillingCycle(updateTerms.billingCycle) : originalContract.billingCycle,
+        billingCycle: updateTerms?.billingCycle
+          ? toValidBillingCycle(updateTerms.billingCycle)
+          : originalContract.billingCycle,
         currency: originalContract.currency,
         contactName: originalContract.contactName,
         contactEmail: originalContract.contactEmail,

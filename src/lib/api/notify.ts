@@ -11,7 +11,10 @@
  *   // Notificación in-app a un usuario
  *   await notifyUser(userId, 'SUCCESS', 'Título', 'Mensaje', { link: '/ruta' })
  *
- *   // Notificación in-app a todos los admins
+ *   // Notificación in-app a super admins + admin nativo de la familia
+ *   await notifyFamilyScopedAdmins(familyId, 'WARNING', 'Título', 'Mensaje', { link: '/ruta' })
+ *
+ *   // Notificación in-app a todos los admins (eventos globales del sistema)
  *   await notifyAdmins('WARNING', 'Título', 'Mensaje', { link: '/ruta' })
  *
  *   // Notificación in-app + email en una sola llamada
@@ -22,6 +25,10 @@
 
 import prisma from '@/lib/prisma'
 import { NotificationService } from '@/lib/services/notification-service'
+import {
+  getFamilyScopedAdmins,
+  getFamilyScopedAdminsForFamilies,
+} from '@/lib/notifications/family-recipients'
 import { randomUUID } from 'crypto'
 import type { NotificationType } from '@prisma/client'
 
@@ -62,6 +69,63 @@ export async function notifyUser(
   }
 }
 
+// ─── Notificar a super admins + admin nativo de familia ───────────────────────
+
+export async function notifyFamilyScopedAdmins(
+  familyId: string | null | undefined,
+  type: NotificationType,
+  title: string,
+  message: string,
+  options: NotifyOptions = {}
+): Promise<void> {
+  const { metadata } = options
+  const admins = await getFamilyScopedAdmins(familyId, { id: true })
+
+  await Promise.allSettled(
+    admins.map(admin =>
+      NotificationService.push({ userId: admin.id, type, title, message, metadata })
+    )
+  )
+}
+
+/** Igual que notifyFamilyScopedAdmins pero excluye un usuario (p. ej. quien realizó la acción). */
+export async function notifyFamilyScopedAdminsExcept(
+  familyId: string | null | undefined,
+  excludeUserId: string,
+  type: NotificationType,
+  title: string,
+  message: string,
+  options: NotifyOptions = {}
+): Promise<void> {
+  const { metadata } = options
+  const admins = await getFamilyScopedAdmins(familyId, { id: true })
+
+  await Promise.allSettled(
+    admins
+      .filter(admin => admin.id !== excludeUserId)
+      .map(admin => NotificationService.push({ userId: admin.id, type, title, message, metadata }))
+  )
+}
+
+/** Notifica admins de varias familias (p. ej. categoría movida entre áreas). */
+export async function notifyFamilyScopedAdminsForFamiliesExcept(
+  familyIds: (string | null | undefined)[],
+  excludeUserId: string,
+  type: NotificationType,
+  title: string,
+  message: string,
+  options: NotifyOptions = {}
+): Promise<void> {
+  const { metadata } = options
+  const admins = await getFamilyScopedAdminsForFamilies(familyIds, { id: true })
+
+  await Promise.allSettled(
+    admins
+      .filter(admin => admin.id !== excludeUserId)
+      .map(admin => NotificationService.push({ userId: admin.id, type, title, message, metadata }))
+  )
+}
+
 // ─── Notificar a todos los admins ─────────────────────────────────────────────
 
 export async function notifyAdmins(
@@ -78,7 +142,7 @@ export async function notifyAdmins(
   })
 
   await Promise.allSettled(
-    admins.map((admin) =>
+    admins.map(admin =>
       NotificationService.push({ userId: admin.id, type, title, message, metadata })
     )
   )
@@ -101,7 +165,7 @@ export async function notifyAdminsExcept(
   })
 
   await Promise.allSettled(
-    admins.map((admin) =>
+    admins.map(admin =>
       NotificationService.push({ userId: admin.id, type, title, message, metadata })
     )
   )
@@ -119,9 +183,7 @@ export async function notifyMany(
   const { metadata } = options
 
   await Promise.allSettled(
-    userIds.map((userId) =>
-      NotificationService.push({ userId, type, title, message, metadata })
-    )
+    userIds.map(userId => NotificationService.push({ userId, type, title, message, metadata }))
   )
 }
 
@@ -173,7 +235,7 @@ export async function notifyAdminsWithEmail(
   })
 
   await Promise.allSettled([
-    ...admins.map((admin) =>
+    ...admins.map(admin =>
       NotificationService.push({ userId: admin.id, type, title, message, metadata })
     ),
     enqueueEmail(email),

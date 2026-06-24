@@ -8,12 +8,14 @@ import { writeFile, mkdir } from 'fs/promises'
 import { existsSync } from 'fs'
 import { getUploadDir } from '@/lib/upload-path'
 import { FolioService } from '@/lib/services/folio.service'
-import { notifyAdmins } from '@/lib/api/notify'
+import { notifyFamilyScopedAdmins } from '@/lib/api/notify'
 
 const decommissionInclude = {
   requester: { select: { id: true, name: true, email: true } },
   reviewer: { select: { id: true, name: true, email: true } },
-  equipment: { select: { id: true, code: true, brand: true, model: true, serialNumber: true, status: true } },
+  equipment: {
+    select: { id: true, code: true, brand: true, model: true, serialNumber: true, status: true },
+  },
   license: { select: { id: true, name: true, vendor: true } },
   attachments: true,
   act: { select: { id: true, folio: true, pdfPath: true, approvedAt: true } },
@@ -30,7 +32,10 @@ export async function GET(request: NextRequest) {
   const isAdmin = session.user.role === 'ADMIN'
   const canManage = await canManageInventory(session.user.id, session.user.role)
   if (!isAdmin && !canManage && session.user.role !== 'TECHNICIAN') {
-    return NextResponse.json({ error: 'No tienes permiso para ver solicitudes de baja' }, { status: 403 })
+    return NextResponse.json(
+      { error: 'No tienes permiso para ver solicitudes de baja' },
+      { status: 403 }
+    )
   }
 
   const sp = request.nextUrl.searchParams
@@ -85,7 +90,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Tipo de activo inválido' }, { status: 400 })
     }
     if (!reason || reason.trim().length < 10) {
-      return NextResponse.json({ error: 'El motivo debe tener al menos 10 caracteres' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'El motivo debe tener al menos 10 caracteres' },
+        { status: 400 }
+      )
     }
     if (assetType === 'EQUIPMENT' && !equipmentId) {
       return NextResponse.json({ error: 'Se requiere el ID del equipo' }, { status: 400 })
@@ -99,16 +107,23 @@ export async function POST(request: NextRequest) {
 
     // Validar equipo: no debe tener asignación activa
     if (assetType === 'EQUIPMENT' && equipmentId) {
-      const equipment = await prisma.equipment.findUnique({ where: { id: equipmentId }, select: { status: true, code: true } })
+      const equipment = await prisma.equipment.findUnique({
+        where: { id: equipmentId },
+        select: { status: true, code: true },
+      })
       if (!equipment) return NextResponse.json({ error: 'Equipo no encontrado' }, { status: 404 })
 
       const activeAssignment = await prisma.equipment_assignments.findFirst({
         where: { equipmentId, isActive: true },
       })
       if (activeAssignment) {
-        return NextResponse.json({
-          error: 'No se puede solicitar la baja de un equipo que está asignado. Primero debe registrar su devolución',
-        }, { status: 422 })
+        return NextResponse.json(
+          {
+            error:
+              'No se puede solicitar la baja de un equipo que está asignado. Primero debe registrar su devolución',
+          },
+          { status: 422 }
+        )
       }
     }
 
@@ -120,13 +135,19 @@ export async function POST(request: NextRequest) {
       },
     })
     if (existingPending) {
-      return NextResponse.json({ error: 'Ya existe una solicitud de baja pendiente para este activo' }, { status: 409 })
+      return NextResponse.json(
+        { error: 'Ya existe una solicitud de baja pendiente para este activo' },
+        { status: 409 }
+      )
     }
 
     // Validar al menos 1 imagen para equipos
     const files = formData.getAll('images') as File[]
     if (assetType === 'EQUIPMENT' && files.length === 0) {
-      return NextResponse.json({ error: 'Se requiere al menos una imagen como evidencia' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'Se requiere al menos una imagen como evidencia' },
+        { status: 400 }
+      )
     }
 
     // Advertencia: licencia con contractEndDate vigente
@@ -158,6 +179,12 @@ export async function POST(request: NextRequest) {
         })
         autoApproveDecommission = familyConfig?.autoApproveDecommission ?? false
       }
+    } else if (assetType === 'LICENSE' && licenseId) {
+      const licenseWithFamily = await prisma.software_licenses.findUnique({
+        where: { id: licenseId },
+        select: { licenseType: { select: { familyId: true } } },
+      })
+      familyId = licenseWithFamily?.licenseType?.familyId ?? null
     }
 
     // Crear solicitud
@@ -168,7 +195,7 @@ export async function POST(request: NextRequest) {
       const folio = await FolioService.generateDecommissionActFolio()
       const actId = randomUUID()
 
-      await prisma.$transaction(async (tx) => {
+      await prisma.$transaction(async tx => {
         await tx.decommission_requests.create({
           data: {
             id: requestId,
@@ -177,7 +204,7 @@ export async function POST(request: NextRequest) {
             licenseId: null,
             requestedById: session.user.id,
             reason: reason.trim(),
-            condition: condition as any || null,
+            condition: (condition as any) || null,
             status: 'APPROVED',
             reviewedById: session.user.id,
             reviewedAt: new Date(),
@@ -201,22 +228,24 @@ export async function POST(request: NextRequest) {
       })
 
       // Audit log con autoApproved y reason
-      await prisma.audit_logs.create({
-        data: {
-          id: randomUUID(),
-          action: 'DECOMMISSION',
-          entityType: 'asset',
-          entityId: equipmentId,
-          userId: session.user.id,
-          details: {
-            autoApproved: true,
-            reason: reason.trim(),
-            familyId,
-            folio,
+      await prisma.audit_logs
+        .create({
+          data: {
+            id: randomUUID(),
+            action: 'DECOMMISSION',
+            entityType: 'asset',
+            entityId: equipmentId,
+            userId: session.user.id,
+            details: {
+              autoApproved: true,
+              reason: reason.trim(),
+              familyId,
+              folio,
+            },
+            createdAt: new Date(),
           },
-          createdAt: new Date(),
-        },
-      }).catch(() => {})
+        })
+        .catch(() => {})
     } else {
       // Flujo normal: crear request con status = PENDING
       await prisma.decommission_requests.create({
@@ -227,28 +256,30 @@ export async function POST(request: NextRequest) {
           licenseId: licenseId || null,
           requestedById: session.user.id,
           reason: reason.trim(),
-          condition: condition as any || null,
+          condition: (condition as any) || null,
           status: 'PENDING',
         },
       })
 
       // Audit log para solicitud pendiente
-      await prisma.audit_logs.create({
-        data: {
-          id: randomUUID(),
-          action: 'DECOMMISSION',
-          entityType: 'asset',
-          entityId: equipmentId ?? licenseId ?? requestId,
-          userId: session.user.id,
-          details: {
-            autoApproved: false,
-            reason: reason.trim(),
-            familyId,
-            requestId,
+      await prisma.audit_logs
+        .create({
+          data: {
+            id: randomUUID(),
+            action: 'DECOMMISSION',
+            entityType: 'asset',
+            entityId: equipmentId ?? licenseId ?? requestId,
+            userId: session.user.id,
+            details: {
+              autoApproved: false,
+              reason: reason.trim(),
+              familyId,
+              requestId,
+            },
+            createdAt: new Date(),
           },
-          createdAt: new Date(),
-        },
-      }).catch(() => {})
+        })
+        .catch(() => {})
     }
 
     // Guardar imágenes adjuntas
@@ -281,10 +312,16 @@ export async function POST(request: NextRequest) {
     // Obtener nombre del activo para la notificación
     let assetName = 'Activo desconocido'
     if (assetType === 'EQUIPMENT' && equipmentId) {
-      const eq = await prisma.equipment.findUnique({ where: { id: equipmentId }, select: { code: true, brand: true, model: true } })
+      const eq = await prisma.equipment.findUnique({
+        where: { id: equipmentId },
+        select: { code: true, brand: true, model: true },
+      })
       if (eq) assetName = `${eq.code} - ${eq.brand} ${eq.model}`
     } else if (assetType === 'LICENSE' && licenseId) {
-      const lic = await prisma.software_licenses.findUnique({ where: { id: licenseId }, select: { name: true } })
+      const lic = await prisma.software_licenses.findUnique({
+        where: { id: licenseId },
+        select: { name: true },
+      })
       if (lic) assetName = lic.name
     }
 
@@ -292,7 +329,8 @@ export async function POST(request: NextRequest) {
 
     // Notificar a todos los ADMIN (solo si es PENDING — si fue auto-aprobado, no requiere revisión)
     if (!autoApproveDecommission) {
-      await notifyAdmins(
+      await notifyFamilyScopedAdmins(
+        familyId,
         'WARNING',
         'Nueva Solicitud de Baja',
         `${requesterName} solicitó la baja de "${assetName}". Motivo: ${reason.trim().substring(0, 100)}`,
@@ -301,17 +339,21 @@ export async function POST(request: NextRequest) {
     }
 
     // Audit log de creación (legacy — mantenido para compatibilidad)
-    await prisma.audit_logs.create({
-      data: {
-        id: randomUUID(),
-        action: 'DECOMMISSION_REQUEST_CREATED',
-        entityType: 'inventory',
-        entityId: requestId,
-        userId: session.user.id,
-        details: { descripcion: `${requesterName} creó solicitud de baja para "${assetName}". Motivo: ${reason.trim().substring(0, 200)}` },
-        createdAt: new Date(),
-      },
-    }).catch(() => {})
+    await prisma.audit_logs
+      .create({
+        data: {
+          id: randomUUID(),
+          action: 'DECOMMISSION_REQUEST_CREATED',
+          entityType: 'inventory',
+          entityId: requestId,
+          userId: session.user.id,
+          details: {
+            descripcion: `${requesterName} creó solicitud de baja para "${assetName}". Motivo: ${reason.trim().substring(0, 200)}`,
+          },
+          createdAt: new Date(),
+        },
+      })
+      .catch(() => {})
 
     const result = await prisma.decommission_requests.findUnique({
       where: { id: requestId },

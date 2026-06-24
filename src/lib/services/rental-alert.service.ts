@@ -12,6 +12,7 @@ import { prisma } from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import { createAuditLog } from '@/lib/audit'
 import { NotificationService } from '@/lib/services/notification-service'
+import { getFamilyScopedAdmins } from '@/lib/notifications/family-recipients'
 
 const EXPIRING_DAYS = 30 // Alertar 30 días antes del vencimiento
 
@@ -51,7 +52,11 @@ export class RentalAlertService {
       )
 
       // Buscar administradores de la familia del equipo
-      const admins = await this.getFamilyAdmins(equipment.type.family?.id ?? null)
+      const admins = await getFamilyScopedAdmins(equipment.type.family?.id ?? null, {
+        id: true,
+        name: true,
+        email: true,
+      })
 
       // Información del equipo
       const equipmentInfo = `${equipment.model?.brand || equipment.brand} ${equipment.model?.model || equipment.modelDeprecated} (${equipment.code})`
@@ -136,7 +141,11 @@ export class RentalAlertService {
       )
 
       // Buscar administradores de la familia
-      const admins = await this.getFamilyAdmins(contract.familyId)
+      const admins = await getFamilyScopedAdmins(contract.familyId, {
+        id: true,
+        name: true,
+        email: true,
+      })
 
       const modelInfo = contract.model
         ? `${contract.model.brand} ${contract.model.model}`
@@ -170,41 +179,6 @@ export class RentalAlertService {
     }
 
     return contractAlerts
-  }
-
-  /**
-   * Obtiene administradores de una familia
-   */
-  private static async getFamilyAdmins(familyId: string | null) {
-    if (!familyId) {
-      // Si no hay familia, notificar a todos los admins
-      return prisma.users.findMany({
-        where: { role: 'ADMIN', isActive: true },
-        select: { id: true, name: true, email: true },
-      })
-    }
-
-    // Administradores asignados a la familia
-    const adminAssignments = await prisma.admin_family_assignments.findMany({
-      where: { familyId, isActive: true },
-      include: { admin: { select: { id: true, name: true, email: true, isActive: true } } },
-    })
-
-    const admins = adminAssignments.filter(a => a.admin.isActive).map(a => a.admin)
-
-    // Si no hay admins asignados, usar gestores de inventario de la familia
-    if (admins.length === 0) {
-      const managers = await prisma.inventory_manager_families.findMany({
-        where: { familyId },
-        include: {
-          manager: { select: { id: true, name: true, email: true, isActive: true } },
-        },
-      })
-
-      return managers.filter(m => m.manager.isActive).map(m => m.manager)
-    }
-
-    return admins
   }
 
   /**

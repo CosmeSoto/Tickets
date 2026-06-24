@@ -12,6 +12,7 @@
 import { prisma } from '@/lib/prisma'
 import { createAuditLog } from '@/lib/audit'
 import { NotificationService } from '@/lib/services/notification-service'
+import { getFamilyScopedAdmins } from '@/lib/notifications/family-recipients'
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -543,26 +544,8 @@ export class SalesManagerService {
       metadata?: any
     }
   ) {
-    // Obtener administradores de la familia
-    const admins = await prisma.users.findMany({
-      where: {
-        OR: [
-          { role: 'ADMIN' },
-          { canManageInventory: true },
-          {
-            adminFamilyAssignments: {
-              some: {
-                familyId,
-                isActive: true,
-              },
-            },
-          },
-        ],
-      },
-      select: { id: true },
-    })
+    const admins = await getFamilyScopedAdmins(familyId, { id: true })
 
-    // Enviar notificaciones
     for (const admin of admins) {
       await NotificationService.push({
         userId: admin.id,

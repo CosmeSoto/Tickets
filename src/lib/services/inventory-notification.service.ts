@@ -6,7 +6,40 @@ import { generateDeliveryActRejectedEmail } from '../email-templates/inventory/d
 import { generateDeliveryActExpiredEmail } from '../email-templates/inventory/delivery-act-expired'
 import type { DeliveryAct } from '@/types/inventory/delivery-act'
 import { NotificationService } from './notification-service'
+import { getFamilyScopedAdmins } from '@/lib/notifications/family-recipients'
 import { db as prisma } from '@/lib/server'
+
+async function notifyDeliveryActFamilyAdmins(
+  familyId: string | null | undefined,
+  excludeUserIds: string[],
+  notification: {
+    type: 'INFO' | 'WARNING' | 'SUCCESS' | 'INVENTORY'
+    title: string
+    message: string
+    metadata: Record<string, unknown>
+  }
+): Promise<void> {
+  const admins = await getFamilyScopedAdmins(familyId, { id: true })
+  const recipients = admins.filter(admin => !excludeUserIds.includes(admin.id))
+
+  await Promise.all(
+    recipients.map(admin =>
+      NotificationService.push({
+        userId: admin.id,
+        type: notification.type,
+        title: notification.title,
+        message: notification.message,
+        metadata: notification.metadata,
+      })
+    )
+  )
+}
+
+async function getActFamilyId(act: {
+  assignment?: { equipment?: { type?: { familyId?: string | null } | null } | null } | null
+}): Promise<string | null> {
+  return act.assignment?.equipment?.type?.familyId ?? null
+}
 
 // Helper para parsear JSON de forma segura
 function parseJsonField<T>(field: any): T {
@@ -34,9 +67,9 @@ export class InventoryNotificationService {
               equipment: true,
               receiver: true,
               deliverer: true,
-            }
-          }
-        }
+            },
+          },
+        },
       })
 
       if (!act) {
@@ -78,8 +111,8 @@ export class InventoryNotificationService {
             type: 'delivery_act_created',
             actId: act.id,
             folio: act.folio,
-          })
-        }
+          }),
+        },
       })
 
       // Crear notificación in-app para el receptor
@@ -88,7 +121,13 @@ export class InventoryNotificationService {
         type: 'INVENTORY',
         title: `Acta de entrega pendiente — ${equipmentCode}`,
         message: `Tienes un acta de entrega pendiente para el equipo ${equipmentCode} (${equipmentDescription}). Debes firmarla antes del ${new Date(act.expirationDate).toLocaleDateString('es-ES')}.`,
-        metadata: { type: 'delivery_act_created', actId: act.id, folio: act.folio, equipmentId: act.assignment?.equipmentId, link: `/inventory/acts/${act.id}` },
+        metadata: {
+          type: 'delivery_act_created',
+          actId: act.id,
+          folio: act.folio,
+          equipmentId: act.assignment?.equipmentId,
+          link: `/inventory/acts/${act.id}`,
+        },
       })
 
       // Notificación al entregador
@@ -97,7 +136,13 @@ export class InventoryNotificationService {
         type: 'INVENTORY',
         title: `Acta generada — ${equipmentCode}`,
         message: `Se generó el acta ${act.folio} para la entrega de ${equipmentCode} a ${receiverInfo.name}. Pendiente de firma del receptor.`,
-        metadata: { type: 'delivery_act_created', actId: act.id, folio: act.folio, equipmentId: act.assignment?.equipmentId, link: `/inventory/acts/${act.id}` },
+        metadata: {
+          type: 'delivery_act_created',
+          actId: act.id,
+          folio: act.folio,
+          equipmentId: act.assignment?.equipmentId,
+          link: `/inventory/acts/${act.id}`,
+        },
       })
 
       console.log(`Notificación de acta creada enviada para ${act.folio}`)
@@ -119,9 +164,9 @@ export class InventoryNotificationService {
             include: {
               equipment: true,
               receiver: true,
-            }
-          }
-        }
+            },
+          },
+        },
       })
 
       if (!act || act.status !== 'PENDING') {
@@ -140,7 +185,12 @@ export class InventoryNotificationService {
 
       // Generar email
       const emailData = generateDeliveryActReminderEmail({
-        act: { ...act, equipmentSnapshot, receiverInfo, delivererInfo: parseJsonField<any>(act.delivererInfo) } as DeliveryAct,
+        act: {
+          ...act,
+          equipmentSnapshot,
+          receiverInfo,
+          delivererInfo: parseJsonField<any>(act.delivererInfo),
+        } as DeliveryAct,
         acceptanceUrl,
         receiverName: receiverInfo.name,
         equipmentCode,
@@ -163,8 +213,8 @@ export class InventoryNotificationService {
             actId: act.id,
             folio: act.folio,
             daysRemaining,
-          })
-        }
+          }),
+        },
       })
 
       // Crear notificación in-app
@@ -173,7 +223,13 @@ export class InventoryNotificationService {
         type: 'INVENTORY',
         title: daysRemaining === 1 ? '¡URGENTE! Acta por Expirar' : 'Recordatorio: Acta Pendiente',
         message: `Tu acta de entrega para ${equipmentCode} expira en ${daysRemaining} ${daysRemaining === 1 ? 'día' : 'días'}.`,
-        metadata: { type: 'delivery_act_reminder', actId: act.id, folio: act.folio, daysRemaining, link: acceptanceUrl },
+        metadata: {
+          type: 'delivery_act_reminder',
+          actId: act.id,
+          folio: act.folio,
+          daysRemaining,
+          link: acceptanceUrl,
+        },
       })
 
       console.log(`Recordatorio enviado para ${act.folio} (${daysRemaining} días restantes)`)
@@ -192,21 +248,27 @@ export class InventoryNotificationService {
       const act = await prisma.delivery_acts.findUnique({
         where: { id: actId },
         include: {
-          assignment: { include: { equipment: true, receiver: true, deliverer: true } }
-        }
+          assignment: {
+            include: {
+              equipment: { include: { type: { select: { familyId: true } } } },
+              receiver: true,
+              deliverer: true,
+            },
+          },
+        },
       })
 
       if (!act) throw new Error('Acta no encontrada')
 
       const equipmentSnapshot = parseJsonField<any>(act.equipmentSnapshot)
-      const receiverInfo     = parseJsonField<any>(act.receiverInfo)
-      const delivererInfo    = parseJsonField<any>(act.delivererInfo)
+      const receiverInfo = parseJsonField<any>(act.receiverInfo)
+      const delivererInfo = parseJsonField<any>(act.delivererInfo)
 
-      const baseUrl              = process.env.NEXTAUTH_URL || 'http://localhost:3000'
-      const equipmentCode        = equipmentSnapshot.code
+      const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
+      const equipmentCode = equipmentSnapshot.code
       const equipmentDescription = `${equipmentSnapshot.brand} ${equipmentSnapshot.model}`
-      const actLink              = `/inventory/acts/${act.id}`
-      const acceptedAtStr        = act.acceptedAt
+      const actLink = `/inventory/acts/${act.id}`
+      const acceptedAtStr = act.acceptedAt
         ? new Date(act.acceptedAt).toLocaleString('es-ES')
         : new Date().toLocaleString('es-ES')
 
@@ -242,8 +304,14 @@ export class InventoryNotificationService {
             body: receiverEmailData.html,
             status: 'pending',
             templateName: 'delivery_act_accepted',
-            templateData: JSON.stringify({ type: 'delivery_act_accepted', actId: act.id, folio: act.folio, recipient: 'receiver', pdfPath }),
-          }
+            templateData: JSON.stringify({
+              type: 'delivery_act_accepted',
+              actId: act.id,
+              folio: act.folio,
+              recipient: 'receiver',
+              pdfPath,
+            }),
+          },
         }),
         prisma.email_queue.create({
           data: {
@@ -253,8 +321,14 @@ export class InventoryNotificationService {
             body: delivererEmailData.html,
             status: 'pending',
             templateName: 'delivery_act_accepted',
-            templateData: JSON.stringify({ type: 'delivery_act_accepted', actId: act.id, folio: act.folio, recipient: 'deliverer', pdfPath }),
-          }
+            templateData: JSON.stringify({
+              type: 'delivery_act_accepted',
+              actId: act.id,
+              folio: act.folio,
+              recipient: 'deliverer',
+              pdfPath,
+            }),
+          },
         }),
       ])
 
@@ -265,33 +339,47 @@ export class InventoryNotificationService {
           type: 'SUCCESS',
           title: `✅ Acta firmada — ${equipmentCode}`,
           message: `Has aceptado y firmado el acta ${act.folio} para el equipo ${equipmentCode} (${equipmentDescription}). La entrega queda registrada el ${acceptedAtStr}.`,
-          metadata: { type: 'delivery_act_accepted', actId: act.id, folio: act.folio, equipmentId: act.assignment?.equipmentId, link: actLink },
+          metadata: {
+            type: 'delivery_act_accepted',
+            actId: act.id,
+            folio: act.folio,
+            equipmentId: act.assignment?.equipmentId,
+            link: actLink,
+          },
         }),
         NotificationService.push({
           userId: delivererInfo.id,
           type: 'SUCCESS',
           title: `✅ Acta aceptada por ${receiverInfo.name}`,
           message: `${receiverInfo.name} aceptó y firmó el acta ${act.folio} para el equipo ${equipmentCode} (${equipmentDescription}). Fecha de firma: ${acceptedAtStr}.`,
-          metadata: { type: 'delivery_act_accepted', actId: act.id, folio: act.folio, equipmentId: act.assignment?.equipmentId, link: actLink },
+          metadata: {
+            type: 'delivery_act_accepted',
+            actId: act.id,
+            folio: act.folio,
+            equipmentId: act.assignment?.equipmentId,
+            link: actLink,
+          },
         }),
       ])
 
-      // Si hay admins distintos al entregador, notificarlos también
-      const admins = await prisma.users.findMany({
-        where: { role: 'ADMIN', id: { not: delivererInfo.id } },
-        select: { id: true },
+      // Super admins + admin nativo de la familia del equipo (excluir entregador)
+      const familyId = await getActFamilyId(act)
+      await notifyDeliveryActFamilyAdmins(familyId, [delivererInfo.id], {
+        type: 'INFO',
+        title: `Acta aceptada — ${equipmentCode}`,
+        message: `${receiverInfo.name} aceptó el acta ${act.folio} entregada por ${delivererInfo.name}. Equipo: ${equipmentCode}.`,
+        metadata: {
+          type: 'delivery_act_accepted',
+          actId: act.id,
+          folio: act.folio,
+          equipmentId: act.assignment?.equipmentId,
+          link: actLink,
+        },
       })
-      await Promise.all(admins.map(admin =>
-        NotificationService.push({
-          userId: admin.id,
-          type: 'INFO',
-          title: `Acta aceptada — ${equipmentCode}`,
-          message: `${receiverInfo.name} aceptó el acta ${act.folio} entregada por ${delivererInfo.name}. Equipo: ${equipmentCode}.`,
-          metadata: { type: 'delivery_act_accepted', actId: act.id, folio: act.folio, equipmentId: act.assignment?.equipmentId, link: actLink },
-        })
-      ))
 
-      console.log(`Notificaciones de aceptación enviadas para ${act.folio} → receptor: ${receiverInfo.name}, entregador: ${delivererInfo.name}`)
+      console.log(
+        `Notificaciones de aceptación enviadas para ${act.folio} → receptor: ${receiverInfo.name}, entregador: ${delivererInfo.name}`
+      )
     } catch (error) {
       console.error('Error enviando notificación de aceptación:', error)
       throw error
@@ -307,24 +395,30 @@ export class InventoryNotificationService {
       const act = await prisma.delivery_acts.findUnique({
         where: { id: actId },
         include: {
-          assignment: { include: { equipment: true, receiver: true, deliverer: true } }
-        }
+          assignment: {
+            include: {
+              equipment: { include: { type: { select: { familyId: true } } } },
+              receiver: true,
+              deliverer: true,
+            },
+          },
+        },
       })
 
       if (!act) throw new Error('Acta no encontrada')
 
       const equipmentSnapshot = parseJsonField<any>(act.equipmentSnapshot)
-      const receiverInfo     = parseJsonField<any>(act.receiverInfo)
-      const delivererInfo    = parseJsonField<any>(act.delivererInfo)
+      const receiverInfo = parseJsonField<any>(act.receiverInfo)
+      const delivererInfo = parseJsonField<any>(act.delivererInfo)
 
-      const baseUrl              = process.env.NEXTAUTH_URL || 'http://localhost:3000'
-      const equipmentCode        = equipmentSnapshot.code
+      const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
+      const equipmentCode = equipmentSnapshot.code
       const equipmentDescription = `${equipmentSnapshot.brand} ${equipmentSnapshot.model}`
-      const actLink              = `/inventory/acts/${act.id}`
-      const rejectedAtStr        = act.rejectedAt
+      const actLink = `/inventory/acts/${act.id}`
+      const rejectedAtStr = act.rejectedAt
         ? new Date(act.rejectedAt).toLocaleString('es-ES')
         : new Date().toLocaleString('es-ES')
-      const motivo               = act.rejectionReason || 'No especificado'
+      const motivo = act.rejectionReason || 'No especificado'
 
       // ── Email al entregador ───────────────────────────────────────────────
       const emailData = generateDeliveryActRejectedEmail({
@@ -344,8 +438,12 @@ export class InventoryNotificationService {
           body: emailData.html,
           status: 'pending',
           templateName: 'delivery_act_rejected',
-          templateData: JSON.stringify({ type: 'delivery_act_rejected', actId: act.id, folio: act.folio }),
-        }
+          templateData: JSON.stringify({
+            type: 'delivery_act_rejected',
+            actId: act.id,
+            folio: act.folio,
+          }),
+        },
       })
 
       // ── Notificaciones in-app ─────────────────────────────────────────────
@@ -355,31 +453,42 @@ export class InventoryNotificationService {
           type: 'WARNING',
           title: `⚠️ Acta rechazada — ${equipmentCode}`,
           message: `${receiverInfo.name} rechazó el acta ${act.folio} para el equipo ${equipmentCode} (${equipmentDescription}). Motivo: "${motivo}". El equipo volvió a estar disponible. Fecha: ${rejectedAtStr}.`,
-          metadata: { type: 'delivery_act_rejected', actId: act.id, folio: act.folio, equipmentId: act.assignment?.equipmentId, link: actLink },
+          metadata: {
+            type: 'delivery_act_rejected',
+            actId: act.id,
+            folio: act.folio,
+            equipmentId: act.assignment?.equipmentId,
+            link: actLink,
+          },
         }),
         NotificationService.push({
           userId: receiverInfo.id,
           type: 'INFO',
           title: `Rechazo registrado — ${equipmentCode}`,
           message: `Rechazaste el acta ${act.folio} para el equipo ${equipmentCode}. El entregador ha sido notificado. El equipo volvió a bodega.`,
-          metadata: { type: 'delivery_act_rejected', actId: act.id, folio: act.folio, equipmentId: act.assignment?.equipmentId, link: actLink },
+          metadata: {
+            type: 'delivery_act_rejected',
+            actId: act.id,
+            folio: act.folio,
+            equipmentId: act.assignment?.equipmentId,
+            link: actLink,
+          },
         }),
       ])
 
-      // Notificar a admins distintos al entregador
-      const admins = await prisma.users.findMany({
-        where: { role: 'ADMIN', id: { not: delivererInfo.id } },
-        select: { id: true },
+      const familyId = await getActFamilyId(act)
+      await notifyDeliveryActFamilyAdmins(familyId, [delivererInfo.id], {
+        type: 'WARNING',
+        title: `Acta rechazada — ${equipmentCode}`,
+        message: `${receiverInfo.name} rechazó el acta ${act.folio}. Motivo: "${motivo}". Entregador: ${delivererInfo.name}.`,
+        metadata: {
+          type: 'delivery_act_rejected',
+          actId: act.id,
+          folio: act.folio,
+          equipmentId: act.assignment?.equipmentId,
+          link: actLink,
+        },
       })
-      await Promise.all(admins.map(admin =>
-        NotificationService.push({
-          userId: admin.id,
-          type: 'WARNING',
-          title: `Acta rechazada — ${equipmentCode}`,
-          message: `${receiverInfo.name} rechazó el acta ${act.folio}. Motivo: "${motivo}". Entregador: ${delivererInfo.name}.`,
-          metadata: { type: 'delivery_act_rejected', actId: act.id, folio: act.folio, equipmentId: act.assignment?.equipmentId, link: actLink },
-        })
-      ))
 
       console.log(`Notificaciones de rechazo enviadas para ${act.folio}`)
     } catch (error) {
@@ -401,9 +510,9 @@ export class InventoryNotificationService {
               equipment: true,
               receiver: true,
               deliverer: true,
-            }
-          }
-        }
+            },
+          },
+        },
       })
 
       if (!act) {
@@ -440,8 +549,8 @@ export class InventoryNotificationService {
             type: 'delivery_act_expired',
             actId: act.id,
             folio: act.folio,
-          })
-        }
+          }),
+        },
       })
 
       // Email al entregador
@@ -457,8 +566,8 @@ export class InventoryNotificationService {
             type: 'delivery_act_expired',
             actId: act.id,
             folio: act.folio,
-          })
-        }
+          }),
+        },
       })
 
       // Notificaciones in-app
@@ -468,14 +577,24 @@ export class InventoryNotificationService {
           type: 'INVENTORY',
           title: 'Acta Expirada',
           message: `El acta ${act.folio} ha expirado sin ser aceptada.`,
-          metadata: { type: 'delivery_act_expired', actId: act.id, folio: act.folio, link: `/inventory/acts/${act.id}` },
+          metadata: {
+            type: 'delivery_act_expired',
+            actId: act.id,
+            folio: act.folio,
+            link: `/inventory/acts/${act.id}`,
+          },
         }),
         NotificationService.push({
           userId: delivererInfo.id,
           type: 'INVENTORY',
           title: 'Acta Expirada',
           message: `El acta ${act.folio} ha expirado sin ser aceptada.`,
-          metadata: { type: 'delivery_act_expired', actId: act.id, folio: act.folio, link: `/inventory/acts/${act.id}` },
+          metadata: {
+            type: 'delivery_act_expired',
+            actId: act.id,
+            folio: act.folio,
+            link: `/inventory/acts/${act.id}`,
+          },
         }),
       ])
 
@@ -504,9 +623,9 @@ export class InventoryNotificationService {
           expirationDate: {
             gte: targetDate,
             lt: nextDay,
-          }
+          },
         },
-        select: { id: true }
+        select: { id: true },
       })
 
       return acts.map(act => act.id)

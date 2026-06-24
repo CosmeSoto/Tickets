@@ -21,6 +21,7 @@ import { AssetRequestStatus, AssetType, UserRole } from '@prisma/client'
 import { FolioService } from './folio.service'
 import { AuditServiceComplete } from './audit-service-complete'
 import { NotificationService } from './notification-service'
+import { getFamilyScopedAdmins, getNativeFamilyAdmins } from '@/lib/notifications/family-recipients'
 import { EmailService } from '@/lib/services/email/email-service'
 import { createModuleCache, getSetting } from '@/lib/api-cache'
 import { getAccessibleFamilyIds } from '@/lib/inventory/family-access'
@@ -996,17 +997,7 @@ export class AssetRequestService {
 
       if (!request) return
 
-      const familyAdmins = await prisma.users.findMany({
-        where: {
-          role: 'ADMIN',
-          isSuperAdmin: false,
-          isActive: true,
-          adminFamilyAssignments: {
-            some: { familyId: request.familyId, isActive: true },
-          },
-        },
-        select: { id: true },
-      })
+      const familyAdmins = await getNativeFamilyAdmins(request.familyId, { id: true })
 
       const recipients = [...superAdmins, ...familyAdmins]
 
@@ -1074,17 +1065,7 @@ export class AssetRequestService {
         })
 
         // Notificar a Family Admins de la familia
-        const familyAdmins = await prisma.users.findMany({
-          where: {
-            role: 'ADMIN',
-            isSuperAdmin: false,
-            isActive: true,
-            adminFamilyAssignments: {
-              some: { familyId, isActive: true },
-            },
-          },
-          select: { id: true },
-        })
+        const familyAdmins = await getNativeFamilyAdmins(familyId, { id: true })
 
         await Promise.all(
           familyAdmins.map(admin =>

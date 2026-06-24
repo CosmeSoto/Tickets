@@ -9,6 +9,7 @@ import { ZodError } from 'zod'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 import prisma from '@/lib/prisma'
 import { NotificationService } from '@/lib/services/notification-service'
+import { getFamilyScopedAdmins } from '@/lib/notifications/family-recipients'
 import { getRenewalAlertStatus } from '@/lib/inventory/renewal-alert'
 import { withCache, invalidateCache, buildCacheKey } from '@/lib/api-cache'
 
@@ -222,6 +223,7 @@ export async function POST(request: NextRequest) {
     notifyAdminsNewLicense(
       license.name,
       license.licenseType?.name || 'Sin tipo',
+      license.licenseType?.familyId ?? null,
       validatedData.cost
     ).catch(err => console.error('[NOTIFICATION] Error notificando nueva licencia:', err))
 
@@ -235,11 +237,13 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function notifyAdminsNewLicense(name: string, typeName: string, cost?: number) {
-  const admins = await prisma.users.findMany({
-    where: { role: 'ADMIN' },
-    select: { id: true },
-  })
+async function notifyAdminsNewLicense(
+  name: string,
+  typeName: string,
+  familyId: string | null,
+  cost?: number
+) {
+  const admins = await getFamilyScopedAdmins(familyId, { id: true })
 
   for (const admin of admins) {
     await NotificationService.push({

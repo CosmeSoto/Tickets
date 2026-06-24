@@ -7,6 +7,7 @@ import { ZodError } from 'zod'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 import prisma from '@/lib/prisma'
 import { NotificationService } from '@/lib/services/notification-service'
+import { getFamilyScopedAdmins } from '@/lib/notifications/family-recipients'
 import { randomUUID } from 'crypto'
 import {
   assertInventoryResourceManage,
@@ -127,10 +128,11 @@ async function checkLowStockAndNotify(consumableId: string) {
 
   if (!isLowStock) return
 
-  // Obtener admins
-  const admins = await prisma.users.findMany({
-    where: { role: 'ADMIN' },
-    select: { id: true, email: true, name: true },
+  // Super admins + admin nativo de la familia del consumible
+  const admins = await getFamilyScopedAdmins(consumable.consumableType?.familyId ?? null, {
+    id: true,
+    email: true,
+    name: true,
   })
 
   const title = isOutOfStock

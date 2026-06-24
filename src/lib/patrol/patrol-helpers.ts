@@ -17,23 +17,19 @@ export { formatDurationMinutes } from './patrol-format'
  * Devuelve los IDs de supervisores (ADMIN con familia asignada + TECHNICIAN con patrolsEnabled)
  * asignados a una familia específica.
  *
- * ADMIN: no requiere patrolsEnabled — si tiene la familia asignada, es supervisor.
+ * ADMIN: super admin + admin cuya familia nativa coincide (no admins con asignación adicional).
  * TECHNICIAN: requiere patrolsEnabled + familia asignada.
  *
  * Usado en notificaciones de check-in rechazado, ronda incompleta, novedad creada, etc.
  */
 export async function getPatrolSupervisors(familyId: string): Promise<{ id: string }[]> {
   const [admins, technicians] = await Promise.all([
-    // Admins: solo necesitan tener la familia asignada (o ser super admin)
+    // Admins: super admin + admin nativo de la familia de la ronda
     prisma.users.findMany({
       where: {
         isActive: true,
         role: 'ADMIN',
-        OR: [
-          { isSuperAdmin: true },
-          { adminFamilyAssignments: { some: { familyId, isActive: true } } },
-          { departments: { familyId } },
-        ],
+        OR: [{ isSuperAdmin: true }, { departments: { familyId, isActive: true } }],
       },
       select: { id: true },
     }),

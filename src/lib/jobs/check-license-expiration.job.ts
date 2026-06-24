@@ -2,6 +2,7 @@ import prisma from '@/lib/prisma'
 import { LicenseService } from '../services/license.service'
 import { randomUUID } from 'crypto'
 import { NotificationService } from '../services/notification-service'
+import { getFamilyScopedAdmins } from '@/lib/notifications/family-recipients'
 
 /**
  * Job para verificar licencias próximas a expirar
@@ -13,7 +14,9 @@ export class CheckLicenseExpirationJob {
    */
   static async sendExpirationNotifications(daysBeforeExpiration: number): Promise<number> {
     try {
-      console.log(`[CheckLicenseExpirationJob] Enviando alertas (${daysBeforeExpiration} días antes)...`)
+      console.log(
+        `[CheckLicenseExpirationJob] Enviando alertas (${daysBeforeExpiration} días antes)...`
+      )
 
       const expiringLicenses = await LicenseService.getExpiringLicenses(daysBeforeExpiration)
 
@@ -22,26 +25,31 @@ export class CheckLicenseExpirationJob {
         return 0
       }
 
-      // Obtener usuarios ADMIN para notificar
-      const admins = await prisma.users.findMany({
-        where: { role: 'ADMIN' },
-        select: { id: true, email: true, name: true },
-      })
-
+      // Obtener admins con scope de la familia de cada licencia
       let notificationsSent = 0
 
       for (const license of expiringLicenses) {
+        const familyId = (license as any).licenseType?.familyId ?? null
+        const admins = await getFamilyScopedAdmins(familyId, {
+          id: true,
+          email: true,
+          name: true,
+        })
+
+        if (admins.length === 0) continue
+
         const daysRemaining = Math.ceil(
-          (new Date(license.expirationDate!).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
+          (new Date(license.expirationDate!).getTime() - new Date().getTime()) /
+            (1000 * 60 * 60 * 24)
         )
 
-        const assignedTo = license.equipment 
+        const assignedTo = license.equipment
           ? `Equipo: ${license.equipment.code}`
           : license.user
-          ? `Usuario: ${license.user.name}`
-          : license.department
-          ? `Departamento: ${license.department.name}`
-          : 'No asignada'
+            ? `Usuario: ${license.user.name}`
+            : license.department
+              ? `Departamento: ${license.department.name}`
+              : 'No asignada'
 
         const typeName = license.licenseType?.name || 'Sin tipo'
 
@@ -51,7 +59,10 @@ export class CheckLicenseExpirationJob {
             await NotificationService.push({
               userId: admin.id,
               type: daysRemaining <= 7 ? 'ERROR' : 'WARNING',
-              title: daysRemaining <= 7 ? '¡URGENTE! Licencia por Expirar' : 'Licencia Próxima a Expirar',
+              title:
+                daysRemaining <= 7
+                  ? '¡URGENTE! Licencia por Expirar'
+                  : 'Licencia Próxima a Expirar',
               message: `La licencia "${license.name}" (${typeName}) expira en ${daysRemaining} ${daysRemaining === 1 ? 'día' : 'días'}. ${assignedTo}`,
               metadata: { link: `/inventory/licenses` },
             })
@@ -61,9 +72,10 @@ export class CheckLicenseExpirationJob {
               data: {
                 id: randomUUID(),
                 toEmail: admin.email,
-                subject: daysRemaining <= 7
-                  ? `¡URGENTE! Licencia por Expirar - ${license.name}`
-                  : `Licencia Próxima a Expirar - ${license.name}`,
+                subject:
+                  daysRemaining <= 7
+                    ? `¡URGENTE! Licencia por Expirar - ${license.name}`
+                    : `Licencia Próxima a Expirar - ${license.name}`,
                 body: this.generateEmailBody(license, daysRemaining, admin.name, assignedTo),
                 status: 'pending',
                 attempts: 0,
@@ -74,12 +86,17 @@ export class CheckLicenseExpirationJob {
 
             notificationsSent++
           } catch (error) {
-            console.error(`[CheckLicenseExpirationJob] Error enviando notificación para ${license.name}:`, error)
+            console.error(
+              `[CheckLicenseExpirationJob] Error enviando notificación para ${license.name}:`,
+              error
+            )
           }
         }
       }
 
-      console.log(`[CheckLicenseExpirationJob] ${notificationsSent} notificaciones enviadas para ${expiringLicenses.length} licencias`)
+      console.log(
+        `[CheckLicenseExpirationJob] ${notificationsSent} notificaciones enviadas para ${expiringLicenses.length} licencias`
+      )
       return notificationsSent
     } catch (error) {
       console.error('[CheckLicenseExpirationJob] Error enviando notificaciones:', error)
@@ -174,7 +191,9 @@ export class CheckLicenseExpirationJob {
     try {
       const [firstSetting, secondSetting] = await Promise.all([
         prisma.system_settings.findUnique({ where: { key: 'inventory.license_alert_days_first' } }),
-        prisma.system_settings.findUnique({ where: { key: 'inventory.license_alert_days_second' } }),
+        prisma.system_settings.findUnique({
+          where: { key: 'inventory.license_alert_days_second' },
+        }),
       ])
       const daysFirst = firstSetting ? parseInt(firstSetting.value, 10) : 30
       const daysSecond = secondSetting ? parseInt(secondSetting.value, 10) : 7

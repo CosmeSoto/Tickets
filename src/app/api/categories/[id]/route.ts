@@ -5,66 +5,94 @@ import prisma from '@/lib/prisma'
 import { z } from 'zod'
 import { randomUUID } from 'crypto'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
-import { NotificationService } from '@/lib/services/notification-service'
-import { canManageCategory, getCategoryFamilyId, getDepartmentFamilyId } from '@/lib/category-access'
+import {
+  notifyFamilyScopedAdminsExcept,
+  notifyFamilyScopedAdminsForFamiliesExcept,
+} from '@/lib/api/notify'
+import {
+  canManageCategory,
+  getCategoryFamilyId,
+  getDepartmentFamilyId,
+} from '@/lib/category-access'
 
 const updateCategorySchema = z.object({
-  name: z.string().min(1, 'El nombre es requerido').max(100, 'El nombre es muy largo').transform(s => s.trim()),
-  description: z.string().optional().transform(s => s?.trim() || ''),
+  name: z
+    .string()
+    .min(1, 'El nombre es requerido')
+    .max(100, 'El nombre es muy largo')
+    .transform(s => s.trim()),
+  description: z
+    .string()
+    .optional()
+    .transform(s => s?.trim() || ''),
   parentId: z.string().optional().nullable(),
   departmentId: z.string().min(1, 'El departamento es requerido'),
-  color: z.string().regex(/^#[0-9A-F]{6}$/i, 'Color inválido').default('#6B7280'),
+  color: z
+    .string()
+    .regex(/^#[0-9A-F]{6}$/i, 'Color inválido')
+    .default('#6B7280'),
   isActive: z.boolean().default(true),
-  assignedTechnicians: z.array(z.object({
-    id: z.string().min(1, 'ID de técnico requerido'),
-    priority: z.number().min(1, 'Prioridad mínima es 1').max(10, 'Prioridad máxima es 10'),
-    maxTickets: z.number().optional().nullable(),
-    autoAssign: z.boolean().default(false)
-  })).optional().default([]),
+  assignedTechnicians: z
+    .array(
+      z.object({
+        id: z.string().min(1, 'ID de técnico requerido'),
+        priority: z.number().min(1, 'Prioridad mínima es 1').max(10, 'Prioridad máxima es 10'),
+        maxTickets: z.number().optional().nullable(),
+        autoAssign: z.boolean().default(false),
+      })
+    )
+    .optional()
+    .default([]),
 })
 
 // GET individual category
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     if (process.env.NODE_ENV === 'development') {
       console.log('🔍 [API-CATEGORY] GET individual - ID:', id)
     }
-    
+
     const session = await getServerSession(authOptions)
     if (!session) {
-      return NextResponse.json(
-        { success: false, error: 'No autorizado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ success: false, error: 'No autorizado' }, { status: 401 })
     }
 
     const category = await prisma.categories.findUnique({
       where: { id },
       include: {
         departments: {
-          select: { id: true, name: true, color: true, description: true, familyId: true, family: { select: { id: true, name: true, code: true, color: true } } }
+          select: {
+            id: true,
+            name: true,
+            color: true,
+            description: true,
+            familyId: true,
+            family: { select: { id: true, name: true, code: true, color: true } },
+          },
         },
         other_categories: {
           select: { id: true, name: true, color: true, level: true, isActive: true },
           where: { isActive: true },
-          orderBy: { name: 'asc' }
+          orderBy: { name: 'asc' },
         },
         _count: {
-          select: { tickets: true, other_categories: true, knowledge_articles: true, sla_policies: true }
+          select: {
+            tickets: true,
+            other_categories: true,
+            knowledge_articles: true,
+            sla_policies: true,
+          },
         },
         technician_assignments: {
           where: { isActive: true },
           include: {
             users: {
-              select: { id: true, name: true, email: true }
-            }
-          }
-        }
-      }
+              select: { id: true, name: true, email: true },
+            },
+          },
+        },
+      },
     })
 
     if (!category) {
@@ -84,15 +112,14 @@ export async function GET(
         email: assignment.users.email,
         priority: assignment.priority,
         maxTickets: assignment.maxTickets,
-        autoAssign: assignment.autoAssign
-      }))
+        autoAssign: assignment.autoAssign,
+      })),
     }
 
     return NextResponse.json({
       success: true,
-      data: enrichedCategory
+      data: enrichedCategory,
     })
-
   } catch (error) {
     console.error('❌ [API-CATEGORY] Error GET:', error)
     return NextResponse.json(
@@ -103,19 +130,13 @@ export async function GET(
 }
 
 // PUT - Update category
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
 
     const session = await getServerSession(authOptions)
     if (!session || session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { success: false, error: 'No autorizado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ success: false, error: 'No autorizado' }, { status: 401 })
     }
 
     // Cargar estado anterior completo (para oldValues en auditoría)
@@ -131,7 +152,7 @@ export async function PUT(
         isActive: true,
         departmentId: true,
         departments: { select: { name: true, familyId: true, family: { select: { name: true } } } },
-      }
+      },
     })
 
     if (!existingCategory) {
@@ -165,8 +186,8 @@ export async function PUT(
             error: 'Datos inválidos',
             details: validationError.errors.map(e => ({
               field: e.path.join('.'),
-              message: e.message
-            }))
+              message: e.message,
+            })),
           },
           { status: 400 }
         )
@@ -180,7 +201,7 @@ export async function PUT(
       if (validatedData.parentId) {
         const parent = await prisma.categories.findUnique({
           where: { id: validatedData.parentId },
-          select: { level: true }
+          select: { level: true },
         })
         if (!parent) {
           return NextResponse.json(
@@ -206,8 +227,8 @@ export async function PUT(
         name: validatedData.name,
         parentId: validatedData.parentId || null,
         level,
-        id: { not: id }
-      }
+        id: { not: id },
+      },
     })
     if (duplicateCategory) {
       return NextResponse.json(
@@ -221,7 +242,7 @@ export async function PUT(
     if (validatedData.departmentId) {
       const newDept = await prisma.departments.findUnique({
         where: { id: validatedData.departmentId },
-        select: { name: true, family: { select: { name: true } } }
+        select: { name: true, family: { select: { name: true } } },
       })
       newDeptName = newDept?.name ?? null
     }
@@ -230,7 +251,11 @@ export async function PUT(
     if (validatedData.departmentId !== existingCategory.departmentId) {
       const newFamilyId = await getDepartmentFamilyId(validatedData.departmentId)
       if (newFamilyId && newFamilyId !== currentFamilyId) {
-        const hasPermissionNewFamily = await canManageCategory(session.user.id, isSuperAdmin, newFamilyId)
+        const hasPermissionNewFamily = await canManageCategory(
+          session.user.id,
+          isSuperAdmin,
+          newFamilyId
+        )
         if (!hasPermissionNewFamily) {
           return NextResponse.json(
             { success: false, error: 'No tienes permiso para mover categorías a esta área' },
@@ -277,28 +302,37 @@ export async function PUT(
         departmentId: validatedData.departmentId,
         level,
         parentId: validatedData.parentId || null,
-        updatedAt: new Date()
+        updatedAt: new Date(),
       },
       include: {
-        departments: { select: { id: true, name: true, color: true, description: true, familyId: true, family: { select: { id: true, name: true, code: true, color: true } } } },
+        departments: {
+          select: {
+            id: true,
+            name: true,
+            color: true,
+            description: true,
+            familyId: true,
+            family: { select: { id: true, name: true, code: true, color: true } },
+          },
+        },
         other_categories: {
           select: { id: true, name: true, color: true, level: true, isActive: true },
           where: { isActive: true },
-          orderBy: { name: 'asc' }
+          orderBy: { name: 'asc' },
         },
         _count: { select: { tickets: true, other_categories: true } },
         technician_assignments: {
           where: { isActive: true },
-          include: { users: { select: { id: true, name: true, email: true } } }
-        }
-      }
+          include: { users: { select: { id: true, name: true, email: true } } },
+        },
+      },
     })
 
     // Actualizar asignaciones de técnicos
     if (validatedData.assignedTechnicians !== undefined) {
       await prisma.technician_assignments.updateMany({
         where: { categoryId: id },
-        data: { isActive: false, updatedAt: new Date() }
+        data: { isActive: false, updatedAt: new Date() },
       })
       if (validatedData.assignedTechnicians.length > 0) {
         await prisma.technician_assignments.createMany({
@@ -313,7 +347,7 @@ export async function PUT(
             createdAt: new Date(),
             updatedAt: new Date(),
           })),
-          skipDuplicates: true
+          skipDuplicates: true,
         })
       }
     }
@@ -322,18 +356,27 @@ export async function PUT(
     const finalCategory = await prisma.categories.findUnique({
       where: { id },
       include: {
-        departments: { select: { id: true, name: true, color: true, description: true, familyId: true, family: { select: { id: true, name: true, code: true, color: true } } } },
+        departments: {
+          select: {
+            id: true,
+            name: true,
+            color: true,
+            description: true,
+            familyId: true,
+            family: { select: { id: true, name: true, code: true, color: true } },
+          },
+        },
         other_categories: {
           select: { id: true, name: true, color: true, level: true, isActive: true },
           where: { isActive: true },
-          orderBy: { name: 'asc' }
+          orderBy: { name: 'asc' },
         },
         _count: { select: { tickets: true, other_categories: true } },
         technician_assignments: {
           where: { isActive: true },
-          include: { users: { select: { id: true, name: true, email: true } } }
-        }
-      }
+          include: { users: { select: { id: true, name: true, email: true } } },
+        },
+      },
     })
 
     // ── Auditoría con oldValues / newValues ──────────────────────────────────
@@ -357,35 +400,39 @@ export async function PUT(
 
     // ── Notificaciones in-app a todos los admins cuando cambia algo relevante ─
     if (deptChanged || nameChanged || statusChanged) {
-      const admins = await prisma.users.findMany({
-        where: { role: 'ADMIN', isActive: true, id: { not: session.user.id } },
-        select: { id: true },
-      })
-
       const notifParts: string[] = []
-      if (nameChanged) notifParts.push(`nombre: "${existingCategory.name}" → "${validatedData.name}"`)
-      if (deptChanged) notifParts.push(`departamento: "${existingCategory.departments?.name ?? 'ninguno'}" → "${newDeptName ?? 'ninguno'}"`)
-      if (statusChanged) notifParts.push(`estado: ${existingCategory.isActive ? 'activa' : 'inactiva'} → ${validatedData.isActive ? 'activa' : 'inactiva'}`)
+      if (nameChanged)
+        notifParts.push(`nombre: "${existingCategory.name}" → "${validatedData.name}"`)
+      if (deptChanged)
+        notifParts.push(
+          `departamento: "${existingCategory.departments?.name ?? 'ninguno'}" → "${newDeptName ?? 'ninguno'}"`
+        )
+      if (statusChanged)
+        notifParts.push(
+          `estado: ${existingCategory.isActive ? 'activa' : 'inactiva'} → ${validatedData.isActive ? 'activa' : 'inactiva'}`
+        )
 
       const message = `Categoría actualizada — ${notifParts.join(', ')}`
 
-      if (admins.length > 0) {
-        await Promise.all(admins.map(admin =>
-          NotificationService.push({
-            userId: admin.id,
-            type: 'INFO',
-            title: `Categoría modificada: ${validatedData.name}`,
-            message,
-          }).catch(err => console.error('[NOTIFY] Error:', err))
-        ))
-      }
+      const notifyFamilyIds = deptChanged
+        ? [currentFamilyId, await getDepartmentFamilyId(validatedData.departmentId)]
+        : [currentFamilyId]
+
+      await notifyFamilyScopedAdminsForFamiliesExcept(
+        notifyFamilyIds,
+        session.user.id,
+        'INFO',
+        `Categoría modificada: ${validatedData.name}`,
+        message
+      ).catch(err => console.error('[NOTIFY] Error:', err))
     }
 
     const enrichedCategory = {
       ...(finalCategory ?? updatedCategory),
       levelName: getLevelName(level),
-      canDelete: (finalCategory ?? updatedCategory)._count.tickets === 0 &&
-                 (finalCategory ?? updatedCategory)._count.other_categories === 0,
+      canDelete:
+        (finalCategory ?? updatedCategory)._count.tickets === 0 &&
+        (finalCategory ?? updatedCategory)._count.other_categories === 0,
       assignedTechnicians: (finalCategory ?? updatedCategory).technician_assignments.map(a => ({
         id: a.users.id,
         name: a.users.name,
@@ -393,37 +440,36 @@ export async function PUT(
         priority: a.priority,
         maxTickets: a.maxTickets,
         autoAssign: a.autoAssign,
-      }))
+      })),
     }
 
     return NextResponse.json({
       success: true,
       data: enrichedCategory,
-      message: 'Categoría actualizada exitosamente'
+      message: 'Categoría actualizada exitosamente',
     })
-
   } catch (error) {
     console.error('❌ [API-CATEGORY] Error PUT:', error)
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { 
-          success: false, 
-          error: 'Datos inválidos', 
+        {
+          success: false,
+          error: 'Datos inválidos',
           details: error.errors.map(e => ({
             field: e.path.join('.'),
-            message: e.message
-          }))
+            message: e.message,
+          })),
         },
         { status: 400 }
       )
     }
-    
+
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         error: 'Error interno del servidor',
-        message: error instanceof Error ? error.message : 'Error desconocido'
+        message: error instanceof Error ? error.message : 'Error desconocido',
       },
       { status: 500 }
     )
@@ -440,10 +486,7 @@ export async function DELETE(
 
     const session = await getServerSession(authOptions)
     if (!session || session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { success: false, error: 'No autorizado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ success: false, error: 'No autorizado' }, { status: 401 })
     }
 
     // Verificar que la categoría existe y se puede eliminar
@@ -456,17 +499,17 @@ export async function DELETE(
             other_categories: true,
             knowledge_articles: true,
             sla_policies: true,
-          }
+          },
         },
         technician_assignments: {
           where: { isActive: true },
           include: {
             users: {
-              select: { id: true, name: true, email: true }
-            }
-          }
-        }
-      }
+              select: { id: true, name: true, email: true },
+            },
+          },
+        },
+      },
     })
 
     if (!category) {
@@ -489,8 +532,7 @@ export async function DELETE(
 
     // Verificar restricciones de eliminación
     const errors: string[] = []
-    if (category._count.tickets > 0)
-      errors.push(`${category._count.tickets} ticket(s) asignado(s)`)
+    if (category._count.tickets > 0) errors.push(`${category._count.tickets} ticket(s) asignado(s)`)
     if (category._count.other_categories > 0)
       errors.push(`${category._count.other_categories} subcategoría(s)`)
 
@@ -502,7 +544,7 @@ export async function DELETE(
           details: {
             tickets: category._count.tickets,
             subcategories: category._count.other_categories,
-          }
+          },
         },
         { status: 400 }
       )
@@ -531,29 +573,21 @@ export async function DELETE(
         knowledgeArticlesDeleted: category._count.knowledge_articles,
         slaPoliciesDeleted: category._count.sla_policies,
       },
-      request
+      request,
     })
 
-    // Notificación in-app a otros admins
-    const admins = await prisma.users.findMany({
-      where: { role: 'ADMIN', isActive: true, id: { not: session.user.id } },
-      select: { id: true },
-    })
-    // Notificación in-app a otros admins
-    await Promise.all(admins.map(admin =>
-      NotificationService.push({
-        userId: admin.id,
-        type: 'WARNING',
-        title: `Categoría eliminada: ${category.name}`,
-        message: `Se eliminó la categoría "${category.name}" (Nivel ${category.level}).`,
-      }).catch(err => console.error('[NOTIFY] Error:', err))
-    ))
-    
+    await notifyFamilyScopedAdminsExcept(
+      categoryFamilyId,
+      session.user.id,
+      'WARNING',
+      `Categoría eliminada: ${category.name}`,
+      `Se eliminó la categoría "${category.name}" (Nivel ${category.level}).`
+    ).catch(err => console.error('[NOTIFY] Error:', err))
+
     return NextResponse.json({
       success: true,
-      message: 'Categoría eliminada exitosamente'
+      message: 'Categoría eliminada exitosamente',
     })
-    
   } catch (error) {
     console.error('❌ [API-CATEGORY] Error DELETE:', error)
     return NextResponse.json(
@@ -565,10 +599,15 @@ export async function DELETE(
 
 function getLevelName(level: number): string {
   switch (level) {
-    case 1: return 'Principal'
-    case 2: return 'Subcategoría'
-    case 3: return 'Especialidad'
-    case 4: return 'Detalle'
-    default: return `Nivel ${level}`
+    case 1:
+      return 'Principal'
+    case 2:
+      return 'Subcategoría'
+    case 3:
+      return 'Especialidad'
+    case 4:
+      return 'Detalle'
+    default:
+      return `Nivel ${level}`
   }
 }

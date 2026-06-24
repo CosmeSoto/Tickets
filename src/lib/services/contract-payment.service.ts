@@ -12,6 +12,7 @@ import { prisma } from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import { createAuditLog } from '@/lib/audit'
 import { NotificationService } from '@/lib/services/notification-service'
+import { getFamilyScopedAdmins } from '@/lib/notifications/family-recipients'
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -494,7 +495,11 @@ export class ContractPaymentService {
     }
 
     // Obtener administradores de la familia del contrato
-    const admins = await this.getFamilyAdmins(contract.familyId)
+    const admins = await getFamilyScopedAdmins(contract.familyId, {
+      id: true,
+      name: true,
+      email: true,
+    })
 
     for (const admin of admins) {
       await NotificationService.createNotification({
@@ -515,48 +520,6 @@ export class ContractPaymentService {
         },
       })
     }
-  }
-
-  // ── Obtener administradores de familia ─────────────────────────────────────
-
-  private static async getFamilyAdmins(familyId: string | null) {
-    if (!familyId) {
-      // Si no hay familia, notificar a gestores de inventario
-      return await prisma.users.findMany({
-        where: {
-          OR: [{ role: 'ADMIN' }, { canManageInventory: true }],
-        },
-        select: { id: true, name: true, email: true },
-      })
-    }
-
-    // Admins y técnicos con asignación activa a la familia
-    const familyAdmins = await prisma.users.findMany({
-      where: {
-        isActive: true,
-        OR: [
-          {
-            role: 'ADMIN',
-            adminFamilyAssignments: { some: { familyId, isActive: true } },
-          },
-          {
-            role: 'TECHNICIAN',
-            technicianFamilyAssignments: { some: { familyId, isActive: true } },
-          },
-        ],
-      },
-      select: { id: true, name: true, email: true },
-    })
-
-    // Si no hay admins en la familia, usar gestores de inventario
-    if (familyAdmins.length === 0) {
-      return await prisma.users.findMany({
-        where: { canManageInventory: true },
-        select: { id: true, name: true, email: true },
-      })
-    }
-
-    return familyAdmins
   }
 
   // ── Estadísticas de pagos ───────────────────────────────────────────────────

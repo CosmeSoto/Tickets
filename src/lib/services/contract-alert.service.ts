@@ -1,6 +1,7 @@
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import { NotificationService } from './notification-service'
+import { getFamilyScopedAdmins } from '@/lib/notifications/family-recipients'
 
 export class ContractAlertService {
   /**
@@ -113,7 +114,11 @@ export class ContractAlertService {
     actualDays: number
   ) {
     // Obtener administradores de la familia
-    const admins = await this.getFamilyAdmins(contract.familyId)
+    const admins = await getFamilyScopedAdmins(contract.familyId, {
+      id: true,
+      name: true,
+      email: true,
+    })
 
     const message = `
 El contrato "${contract.name}" vence en ${actualDays} día(s).
@@ -151,55 +156,6 @@ Por favor, revise el contrato y considere su renovación.
         },
       })
     }
-  }
-
-  /**
-   * Obtiene administradores de una familia
-   */
-  private static async getFamilyAdmins(familyId: string | null) {
-    if (!familyId) {
-      // Si no hay familia, notificar a gestores de inventario
-      return await prisma.users.findMany({
-        where: {
-          OR: [{ role: 'ADMIN' }, { canManageInventory: true }],
-          isActive: true,
-        },
-        select: { id: true, name: true, email: true },
-      })
-    }
-
-    // Obtener admins de la familia
-    const familyAdmins = await prisma.users.findMany({
-      where: {
-        OR: [
-          {
-            adminFamilyAssignments: {
-              some: { familyId },
-            },
-          },
-          {
-            technicianFamilyAssignments: {
-              some: { familyId },
-            },
-          },
-        ],
-        isActive: true,
-      },
-      select: { id: true, name: true, email: true },
-    })
-
-    // Si no hay admins en la familia, usar gestores de inventario
-    if (familyAdmins.length === 0) {
-      return await prisma.users.findMany({
-        where: {
-          canManageInventory: true,
-          isActive: true,
-        },
-        select: { id: true, name: true, email: true },
-      })
-    }
-
-    return familyAdmins
   }
 
   /**

@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import { isManagerOfFamily } from '@/lib/inventory-access'
-import { notifyAdmins } from '@/lib/api/notify'
+import { notifyFamilyScopedAdmins } from '@/lib/api/notify'
 
 /**
  * POST /api/inventory/decommission-acts/[id]/elevate
@@ -103,7 +103,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   })
 
   // Notificar a los admins de la familia
-  await notifyAdmins(
+  await notifyFamilyScopedAdmins(
+    familyId,
     'WARNING',
     `Solicitud de baja elevada — ${assetName}`,
     `${managerName} elevó la solicitud de baja de "${assetName}" para tu aprobación.${notes ? ` Notas: ${notes.trim().substring(0, 100)}` : ''}`,

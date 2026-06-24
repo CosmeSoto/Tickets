@@ -1,13 +1,30 @@
 import { prisma } from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import { NotificationService } from '@/lib/services/notification-service'
+import { getFamilyScopedAdmins } from '@/lib/notifications/family-recipients'
+import type { NotificationType } from '@prisma/client'
 
-async function getAdminIds(): Promise<string[]> {
-  const admins = await prisma.users.findMany({
-    where: { role: 'ADMIN', isActive: true },
-    select: { id: true },
-  })
-  return admins.map(a => a.id)
+async function notifyFamilyAdmins(
+  familyId: string | null | undefined,
+  notification: {
+    type: NotificationType
+    title: string
+    message: string
+    metadata?: Record<string, unknown>
+  }
+): Promise<void> {
+  const admins = await getFamilyScopedAdmins(familyId, { id: true })
+  await Promise.all(
+    admins.map(admin =>
+      NotificationService.push({
+        userId: admin.id,
+        type: notification.type,
+        title: notification.title,
+        message: notification.message,
+        metadata: notification.metadata,
+      }).catch(() => {})
+    )
+  )
 }
 
 export async function checkContractAlerts(): Promise<void> {
@@ -22,23 +39,21 @@ export async function checkContractAlerts(): Promise<void> {
 
   const expiringContracts = await prisma.software_licenses.findMany({
     where: { expirationDate: { gte: today, lte: alertDate } },
-    select: { id: true, name: true, expirationDate: true },
+    select: {
+      id: true,
+      name: true,
+      expirationDate: true,
+      licenseType: { select: { familyId: true } },
+    },
   })
 
-  const adminIds = await getAdminIds()
-
   for (const contract of expiringContracts) {
-    await Promise.all(
-      adminIds.map(id =>
-        NotificationService.push({
-          userId: id,
-          type: 'WARNING',
-          title: 'Contrato próximo a vencer',
-          message: `El contrato "${contract.name}" vence el ${contract.expirationDate?.toLocaleDateString('es-CL') ?? 'fecha desconocida'}.`,
-          metadata: { link: '/inventory/licenses' },
-        }).catch(() => {})
-      )
-    )
+    await notifyFamilyAdmins(contract.licenseType.familyId, {
+      type: 'WARNING',
+      title: 'Contrato próximo a vencer',
+      message: `El contrato "${contract.name}" vence el ${contract.expirationDate?.toLocaleDateString('es-CL') ?? 'fecha desconocida'}.`,
+      metadata: { link: '/inventory/licenses' },
+    })
 
     await prisma.audit_logs.create({
       data: {
@@ -53,24 +68,26 @@ export async function checkContractAlerts(): Promise<void> {
 }
 
 export async function checkStockAlerts(): Promise<void> {
-  const lowStockItems = await prisma.$queryRaw<
-    { id: string; name: string; currentStock: number; minStock: number }[]
-  >`SELECT id, name, current_stock AS "currentStock", min_stock AS "minStock" FROM consumables WHERE current_stock <= min_stock`
+  const consumables = await prisma.consumables.findMany({
+    where: { status: 'ACTIVE' },
+    select: {
+      id: true,
+      name: true,
+      currentStock: true,
+      minStock: true,
+      consumableType: { select: { familyId: true } },
+    },
+  })
 
-  const adminIds = await getAdminIds()
+  const lowStockItems = consumables.filter(item => item.currentStock <= item.minStock)
 
   for (const item of lowStockItems) {
-    await Promise.all(
-      adminIds.map(id =>
-        NotificationService.push({
-          userId: id,
-          type: 'WARNING',
-          title: 'Stock bajo de consumible',
-          message: `El material "${item.name}" tiene stock bajo: ${item.currentStock} unidades (mínimo: ${item.minStock}).`,
-          metadata: { link: '/inventory/consumables' },
-        }).catch(() => {})
-      )
-    )
+    await notifyFamilyAdmins(item.consumableType?.familyId ?? null, {
+      type: 'WARNING',
+      title: 'Stock bajo de consumible',
+      message: `El material "${item.name}" tiene stock bajo: ${item.currentStock} unidades (mínimo: ${item.minStock}).`,
+      metadata: { link: '/inventory/consumables' },
+    })
 
     await prisma.audit_logs.create({
       data: {
@@ -94,35 +111,32 @@ export async function notifyOrphanContract(
 ): Promise<void> {
   let contractName = contractId
   let link = '/inventory/contracts'
+  let familyId: string | null = null
 
   if (source === 'business') {
     const contract = await prisma.contracts.findUnique({
       where: { id: contractId },
-      select: { id: true, name: true, contractNumber: true },
+      select: { id: true, name: true, contractNumber: true, familyId: true },
     })
     contractName = contract?.contractNumber ?? contract?.name ?? contractId
+    familyId = contract?.familyId ?? null
     link = `/inventory/contracts`
   } else {
     const contract = await prisma.software_licenses.findUnique({
       where: { id: contractId },
-      select: { id: true, name: true },
+      select: { id: true, name: true, licenseType: { select: { familyId: true } } },
     })
     contractName = contract?.name ?? contractId
+    familyId = contract?.licenseType?.familyId ?? null
     link = '/inventory/licenses'
   }
 
-  const adminIds = await getAdminIds()
-  await Promise.all(
-    adminIds.map(id =>
-      NotificationService.push({
-        userId: id,
-        type: 'WARNING',
-        title: 'Contrato sin activos vinculados',
-        message: `El contrato "${contractName}" ha quedado sin activos vinculados.`,
-        metadata: { link },
-      }).catch(() => {})
-    )
-  )
+  await notifyFamilyAdmins(familyId, {
+    type: 'WARNING',
+    title: 'Contrato sin activos vinculados',
+    message: `El contrato "${contractName}" ha quedado sin activos vinculados.`,
+    metadata: { link },
+  })
 
   await prisma.audit_logs.create({
     data: {
@@ -175,10 +189,9 @@ export async function checkMROExpiryAlerts(): Promise<void> {
       expirationDate: true,
       expiryAlertSentAt: true,
       currentStock: true,
+      consumableType: { select: { familyId: true } },
     },
   })
-
-  const adminIds = await getAdminIds()
 
   for (const item of expiringItems) {
     if (item.expiryAlertSentAt) {
@@ -187,32 +200,24 @@ export async function checkMROExpiryAlerts(): Promise<void> {
       if (sentDate.getTime() === today.getTime()) continue
     }
 
-    await Promise.all(
-      adminIds.map(id =>
-        NotificationService.push({
-          userId: id,
-          type: 'WARNING',
-          title: 'Consumible próximo a caducar',
-          message: `Material "${item.name}" caduca el ${item.expirationDate?.toLocaleDateString('es-CL') ?? 'fecha desconocida'}. Stock actual: ${item.currentStock}.`,
-          metadata: { link: '/inventory/consumables' },
-        }).catch(() => {})
-      )
-    )
+    const familyId = item.consumableType?.familyId ?? null
+
+    await notifyFamilyAdmins(familyId, {
+      type: 'WARNING',
+      title: 'Consumible próximo a caducar',
+      message: `Material "${item.name}" caduca el ${item.expirationDate?.toLocaleDateString('es-CL') ?? 'fecha desconocida'}. Stock actual: ${item.currentStock}.`,
+      metadata: { link: '/inventory/consumables' },
+    })
 
     const urgentDate = new Date(today)
     urgentDate.setDate(urgentDate.getDate() + urgentDays)
     if (item.expirationDate && item.expirationDate <= urgentDate) {
-      await Promise.all(
-        adminIds.map(id =>
-          NotificationService.push({
-            userId: id,
-            type: 'ERROR',
-            title: '¡URGENTE! Consumible caduca pronto',
-            message: `Material "${item.name}" caduca en menos de ${urgentDays} días (${item.expirationDate!.toLocaleDateString('es-CL')}). Stock: ${item.currentStock}.`,
-            metadata: { link: '/inventory/consumables' },
-          }).catch(() => {})
-        )
-      )
+      await notifyFamilyAdmins(familyId, {
+        type: 'ERROR',
+        title: '¡URGENTE! Consumible caduca pronto',
+        message: `Material "${item.name}" caduca en menos de ${urgentDays} días (${item.expirationDate.toLocaleDateString('es-CL')}). Stock: ${item.currentStock}.`,
+        metadata: { link: '/inventory/consumables' },
+      })
     }
 
     await prisma.consumables.update({
@@ -253,10 +258,15 @@ export async function checkWarrantyAlerts(): Promise<void> {
       warrantyExpiration: { gte: today, lte: alertDate },
       status: { not: 'RETIRED' },
     },
-    select: { id: true, code: true, brand: true, model: true, warrantyExpiration: true },
+    select: {
+      id: true,
+      code: true,
+      brand: true,
+      model: true,
+      warrantyExpiration: true,
+      type: { select: { familyId: true } },
+    },
   })
-
-  const adminIds = await getAdminIds()
 
   for (const equip of expiringEquipment) {
     const alreadySent = await prisma.audit_logs.findFirst({
@@ -270,17 +280,12 @@ export async function checkWarrantyAlerts(): Promise<void> {
     })
     if (alreadySent) continue
 
-    await Promise.all(
-      adminIds.map(id =>
-        NotificationService.push({
-          userId: id,
-          type: 'WARNING',
-          title: 'Garantía de equipo por vencer',
-          message: `Garantía por vencer: ${equip.brand} ${equip.model} (${equip.code}) vence el ${equip.warrantyExpiration?.toLocaleDateString('es-CL') ?? 'fecha desconocida'}.`,
-          metadata: { link: `/inventory/equipment/${equip.id}` },
-        }).catch(() => {})
-      )
-    )
+    await notifyFamilyAdmins(equip.type.familyId, {
+      type: 'WARNING',
+      title: 'Garantía de equipo por vencer',
+      message: `Garantía por vencer: ${equip.brand} ${equip.model} (${equip.code}) vence el ${equip.warrantyExpiration?.toLocaleDateString('es-CL') ?? 'fecha desconocida'}.`,
+      metadata: { link: `/inventory/equipment/${equip.id}` },
+    })
 
     await prisma.audit_logs.create({
       data: {

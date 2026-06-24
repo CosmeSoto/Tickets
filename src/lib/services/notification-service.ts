@@ -3,6 +3,10 @@ import { NotificationType } from '@prisma/client'
 import { randomUUID } from 'crypto'
 import { NotificationEvents } from '@/lib/notification-events'
 import { WebPushService } from '@/lib/services/web-push.service'
+import {
+  getFamilyScopedAdmins,
+  getFamilyScopedAdminsForFamilies,
+} from '@/lib/notifications/family-recipients'
 
 export interface CreateNotificationData {
   userId: string
@@ -280,8 +284,9 @@ export class NotificationService {
   }
   /**
    * Notificar cuando se crea un ticket
-   * - Notifica a todos los admins
-   * - Notifica a técnicos activos asignados a la familia del ticket
+   * - Super admins
+   * - Admin cuya familia nativa coincide con la del ticket
+   * - El técnico asignado recibe notifyTicketAssigned por separado
    */
   static async notifyTicketCreated(ticketId: string) {
     try {
@@ -301,31 +306,17 @@ export class NotificationService {
         throw new Error('Ticket not found')
       }
 
-      // Obtener todos los admins
-      const admins = await prisma.users.findMany({
-        where: { role: 'ADMIN', isActive: true },
-        select: { id: true, name: true, email: true },
+      const admins = await getFamilyScopedAdmins(ticket.familyId, {
+        id: true,
+        name: true,
+        email: true,
       })
 
-      // Obtener técnicos de la familia del ticket (si aplica)
-      const technicianWhere: any = { role: 'TECHNICIAN', isActive: true }
-      if (ticket.familyId) {
-        technicianWhere.technicianFamilyAssignments = {
-          some: { familyId: ticket.familyId, isActive: true },
-        }
-      }
-      const technicians = await prisma.users.findMany({
-        where: technicianWhere,
-        select: { id: true, name: true, email: true },
-      })
-
-      // Deduplicar: excluir al técnico ya asignado (recibirá notificación específica de asignación)
-      const assignedTechId = ticket.assigneeId
-      const uniqueRecipients = [...admins, ...technicians].filter(
-        (r, idx, arr) =>
-          arr.findIndex(x => x.id === r.id) === idx && // dedup por id
-          r.id !== ticket.clientId && // no notificar al cliente que creó el ticket
-          r.id !== assignedTechId // el técnico asignado recibe notif de asignación, no esta
+      const uniqueRecipients = admins.filter(
+        recipient =>
+          recipient.id !== ticket.clientId &&
+          recipient.id !== ticket.createdById &&
+          recipient.id !== ticket.assigneeId
       )
 
       if (uniqueRecipients.length === 0) return []
@@ -364,7 +355,7 @@ export class NotificationService {
    * Notificar cuando un ticket cambia de familia
    * - Notifica al cliente del ticket
    * - Notifica al técnico asignado (si existe)
-   * - Notifica a todos los admins activos
+   * - Super admins + admins nativos de la familia anterior y nueva
    */
   static async notifyFamilyChange(
     ticketId: string,
@@ -410,10 +401,8 @@ export class NotificationService {
         recipientIds.push(ticket.assigneeId)
       }
 
-      // Todos los admins activos
-      const admins = await prisma.users.findMany({
-        where: { role: 'ADMIN', isActive: true },
-        select: { id: true },
+      const admins = await getFamilyScopedAdminsForFamilies([oldFamilyId, newFamilyId], {
+        id: true,
       })
       for (const admin of admins) {
         if (!recipientIds.includes(admin.id)) {
@@ -568,12 +557,9 @@ export class NotificationService {
       if (isInternalComment) {
         const notifications = []
 
-        // Si lo escribe el técnico → notificar a todos los admins
+        // Si lo escribe el técnico → super admins + admin nativo de la familia del ticket
         if (author.role === 'TECHNICIAN') {
-          const admins = await prisma.users.findMany({
-            where: { role: 'ADMIN', isActive: true },
-            select: { id: true },
-          })
+          const admins = await getFamilyScopedAdmins(ticket.familyId, { id: true })
           for (const admin of admins) {
             if (admin.id === author.id) continue
             const n = await this.createNotification({

@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto'
 import { NotificationService } from '../services/notification-service'
+import { getFamilyScopedAdmins } from '@/lib/notifications/family-recipients'
 import { db as prisma } from '@/lib/server'
 
 /**
@@ -41,6 +42,7 @@ export class CheckRentalExpirationJob {
           rentalMonthlyCost: true,
           rentalContactName: true,
           rentalContactEmail: true,
+          type: { select: { familyId: true } },
         },
       })
 
@@ -56,7 +58,9 @@ export class CheckRentalExpirationJob {
    */
   static async sendExpirationNotifications(daysBeforeExpiration: number): Promise<number> {
     try {
-      console.log(`[CheckRentalExpirationJob] Enviando alertas (${daysBeforeExpiration} días antes)...`)
+      console.log(
+        `[CheckRentalExpirationJob] Enviando alertas (${daysBeforeExpiration} días antes)...`
+      )
 
       const expiringRentals = await this.getExpiringRentals(daysBeforeExpiration)
 
@@ -65,15 +69,17 @@ export class CheckRentalExpirationJob {
         return 0
       }
 
-      // Obtener usuarios ADMIN para notificar
-      const admins = await prisma.users.findMany({
-        where: { role: 'ADMIN' },
-        select: { id: true, email: true, name: true },
-      })
-
       let notificationsSent = 0
 
       for (const rental of expiringRentals) {
+        const admins = await getFamilyScopedAdmins(rental.type?.familyId ?? null, {
+          id: true,
+          email: true,
+          name: true,
+        })
+
+        if (admins.length === 0) continue
+
         const daysRemaining = daysBeforeExpiration
         const equipmentDescription = `${rental.brand} ${rental.model} (${rental.code})`
         const expirationDate = rental.rentalEndDate!
@@ -84,9 +90,10 @@ export class CheckRentalExpirationJob {
             await NotificationService.push({
               userId: admin.id,
               type: daysRemaining === 1 ? 'ERROR' : 'WARNING',
-              title: daysRemaining === 1
-                ? '¡URGENTE! Contrato de Renta por Vencer'
-                : 'Contrato de Renta Próximo a Vencer',
+              title:
+                daysRemaining === 1
+                  ? '¡URGENTE! Contrato de Renta por Vencer'
+                  : 'Contrato de Renta Próximo a Vencer',
               message: `El contrato de renta del equipo ${equipmentDescription} con ${rental.rentalProvider} vence en ${daysRemaining} ${daysRemaining === 1 ? 'día' : 'días'} (${expirationDate.toLocaleDateString('es-ES')}).`,
               metadata: { link: `/inventory/equipment/${rental.id}` },
             })
@@ -96,9 +103,10 @@ export class CheckRentalExpirationJob {
               data: {
                 id: randomUUID(),
                 toEmail: admin.email,
-                subject: daysRemaining === 1
-                  ? `¡URGENTE! Contrato de Renta por Vencer - ${rental.code}`
-                  : `Contrato de Renta Próximo a Vencer - ${rental.code}`,
+                subject:
+                  daysRemaining === 1
+                    ? `¡URGENTE! Contrato de Renta por Vencer - ${rental.code}`
+                    : `Contrato de Renta Próximo a Vencer - ${rental.code}`,
                 body: this.generateEmailBody(rental, daysRemaining, admin.name),
                 status: 'pending',
                 attempts: 0,
@@ -109,12 +117,17 @@ export class CheckRentalExpirationJob {
 
             notificationsSent++
           } catch (error) {
-            console.error(`[CheckRentalExpirationJob] Error enviando notificación para ${rental.code}:`, error)
+            console.error(
+              `[CheckRentalExpirationJob] Error enviando notificación para ${rental.code}:`,
+              error
+            )
           }
         }
       }
 
-      console.log(`[CheckRentalExpirationJob] ${notificationsSent} notificaciones enviadas para ${expiringRentals.length} equipos`)
+      console.log(
+        `[CheckRentalExpirationJob] ${notificationsSent} notificaciones enviadas para ${expiringRentals.length} equipos`
+      )
       return notificationsSent
     } catch (error) {
       console.error('[CheckRentalExpirationJob] Error enviando notificaciones:', error)
@@ -125,11 +138,7 @@ export class CheckRentalExpirationJob {
   /**
    * Genera el cuerpo del email de alerta
    */
-  private static generateEmailBody(
-    rental: any,
-    daysRemaining: number,
-    adminName: string
-  ): string {
+  private static generateEmailBody(rental: any, daysRemaining: number, adminName: string): string {
     const equipmentDescription = `${rental.brand} ${rental.model}`
     const expirationDate = rental.rentalEndDate!.toLocaleDateString('es-ES', {
       weekday: 'long',
@@ -179,13 +188,17 @@ export class CheckRentalExpirationJob {
         <li>Planificar la devolución si no se renovará</li>
       </ul>
 
-      ${rental.rentalContactName || rental.rentalContactEmail ? `
+      ${
+        rental.rentalContactName || rental.rentalContactEmail
+          ? `
       <p><strong>Contacto del Proveedor:</strong></p>
       <div class="info-box">
         ${rental.rentalContactName ? `<p><strong>Nombre:</strong> ${rental.rentalContactName}</p>` : ''}
         ${rental.rentalContactEmail ? `<p><strong>Email:</strong> ${rental.rentalContactEmail}</p>` : ''}
       </div>
-      ` : ''}
+      `
+          : ''
+      }
 
       <p style="text-align: center;">
         <a href="${process.env.NEXTAUTH_URL}/inventory/equipment/${rental.id}" class="button">
@@ -217,7 +230,9 @@ export class CheckRentalExpirationJob {
     try {
       const [firstSetting, secondSetting] = await Promise.all([
         prisma.system_settings.findUnique({ where: { key: 'inventory.license_alert_days_first' } }),
-        prisma.system_settings.findUnique({ where: { key: 'inventory.license_alert_days_second' } }),
+        prisma.system_settings.findUnique({
+          where: { key: 'inventory.license_alert_days_second' },
+        }),
       ])
       const daysFirst = firstSetting ? parseInt(firstSetting.value, 10) : 30
       const daysSecond = secondSetting ? parseInt(secondSetting.value, 10) : 7

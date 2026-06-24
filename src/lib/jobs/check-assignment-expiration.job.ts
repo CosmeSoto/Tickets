@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto'
 import { NotificationService } from '../services/notification-service'
+import { getFamilyScopedAdmins } from '@/lib/notifications/family-recipients'
 import { db as prisma } from '@/lib/server'
 
 /**
@@ -26,7 +27,15 @@ export class CheckAssignmentExpirationJob {
         },
       },
       include: {
-        equipment: { select: { id: true, code: true, brand: true, modelDeprecated: true } },
+        equipment: {
+          select: {
+            id: true,
+            code: true,
+            brand: true,
+            modelDeprecated: true,
+            type: { select: { familyId: true } },
+          },
+        },
         receiver: { select: { id: true, name: true, email: true } },
         deliverer: { select: { id: true, name: true, email: true } },
       },
@@ -48,11 +57,6 @@ export class CheckAssignmentExpirationJob {
       return 0
     }
 
-    const admins = await prisma.users.findMany({
-      where: { role: 'ADMIN', isActive: true },
-      select: { id: true },
-    })
-
     let sent = 0
 
     for (const assignment of expiring) {
@@ -65,6 +69,7 @@ export class CheckAssignmentExpirationJob {
         year: 'numeric',
       })
       const equipmentLabel = `${eq.brand} ${eq.modelDeprecated} (${eq.code})`
+      const familyAdmins = await getFamilyScopedAdmins(eq.type?.familyId ?? null, { id: true })
 
       // Notificar al receptor del equipo
       await NotificationService.createNotification({
@@ -81,8 +86,8 @@ export class CheckAssignmentExpirationJob {
         },
       })
 
-      // Notificar a admins
-      for (const admin of admins) {
+      // Notificar a super admins + admin nativo de la familia del equipo
+      for (const admin of familyAdmins) {
         await NotificationService.createNotification({
           userId: admin.id,
           title: `Asignación próxima a vencer — ${eq.code}`,
