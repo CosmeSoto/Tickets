@@ -112,11 +112,12 @@ export async function queryAssets(params: AssetsQueryParams): Promise<AssetsQuer
   } else if (role === 'CLIENT') {
     restrictToAssignedOnly = true
   } else if (role === 'TECHNICIAN') {
-    const techAssignments = await prisma.technician_family_assignments.findMany({
-      where: { technicianId: userId, isActive: true },
-      select: { familyId: true },
-    })
-    if (techAssignments.length > 0) allowedFamilyIds = techAssignments.map(a => a.familyId)
+    allowedFamilyIds = await getAccessibleFamilyIds(
+      userId,
+      role,
+      isSuperAdmin,
+      userCanManageInventory
+    )
   }
 
   const effectiveFamilyIds: string[] | undefined = (() => {

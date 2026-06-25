@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { randomUUID } from 'crypto'
-import { getAccessibleFamilyIds } from '@/lib/inventory/family-access'
+import { getAccessibleFamilyIds, checkFamilyManageAccess } from '@/lib/inventory/family-access'
 import { canManageInventory } from '@/lib/inventory-access'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -375,27 +375,35 @@ export async function POST(
       return NextResponse.json({ error: 'Activo no encontrado' }, { status: 404 })
     }
 
-    // ── Verificar acceso a familia ORIGEN ────────────────────────────────────
-    const accessible = await getAccessibleFamilyIds(
+    // ── Verificar acceso operativo a familia ORIGEN y DESTINO ───────────────
+    if (asset.currentFamilyId) {
+      const canManageSource = await checkFamilyManageAccess(
+        session.user.id,
+        asset.currentFamilyId,
+        session.user.role,
+        isSuperAdmin,
+        canManage
+      )
+      if (!canManageSource) {
+        return NextResponse.json(
+          { error: 'No tienes permiso para transferir activos desde esta familia' },
+          { status: 403 }
+        )
+      }
+    }
+
+    const canManageTarget = await checkFamilyManageAccess(
       session.user.id,
+      targetFamilyId,
       session.user.role,
       isSuperAdmin,
       canManage
     )
-
-    if (accessible !== undefined) {
-      if (asset.currentFamilyId && !accessible.includes(asset.currentFamilyId)) {
-        return NextResponse.json(
-          { error: 'No tienes acceso a la familia de origen del activo' },
-          { status: 403 }
-        )
-      }
-      if (!accessible.includes(targetFamilyId)) {
-        return NextResponse.json(
-          { error: 'No tienes acceso a la familia destino' },
-          { status: 403 }
-        )
-      }
+    if (!canManageTarget) {
+      return NextResponse.json(
+        { error: 'No tienes permiso para transferir activos a esta familia' },
+        { status: 403 }
+      )
     }
 
     // ── Restricción: equipo con asignación activa ────────────────────────────

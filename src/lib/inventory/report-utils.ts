@@ -93,21 +93,21 @@ export function formatCurrency(value: number | null | undefined): string {
 }
 
 /**
- * Obtiene los IDs de familias accesibles para un usuario.
- * ADMIN → null (sin restricción)
- * Gestor → array de familyIds asignados
+ * Obtiene los IDs de familias accesibles para reportes de inventario (scope visibility).
+ * ADMIN super → null (sin restricción)
  */
 export async function getAccessibleFamilyIds(
   userId: string,
-  role: string
+  role: string,
+  isSuperAdmin = false,
+  canManageInventory = false
 ): Promise<string[] | null> {
-  if (role === 'ADMIN') return null
-
-  const assignments = await prisma.inventory_manager_families.findMany({
-    where: { managerId: userId },
-    select: { familyId: true },
-  })
-  return assignments.map((a) => a.familyId)
+  const { getAccessibleFamilyIds: getInventoryFamilies } = await import(
+    '@/lib/inventory/family-access'
+  )
+  const ids = await getInventoryFamilies(userId, role, isSuperAdmin, canManageInventory)
+  if (ids === undefined) return null
+  return ids
 }
 
 /**

@@ -147,8 +147,8 @@ export function PermissionsAndModulesSection({
               Acceso como Administrador de Familia
             </p>
             <p className='text-xs text-muted-foreground'>
-              Los módulos habilitados determinan qué secciones verá. Solo verá datos de sus familias
-              asignadas.
+              Los módulos habilitados determinan qué secciones verá. La gestión operativa de
+              tickets es en su familia nativa; las adicionales son visibilidad y apoyo.
             </p>
           </div>
         )}

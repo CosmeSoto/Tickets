@@ -16,6 +16,7 @@ import { InventoryGlobalTab } from '@/components/settings/inventory/inventory-gl
 
 function InventorySettingsContent() {
   const {
+    isSuperAdmin,
     families,
     selectedFamilyId,
     selectedFamily,
@@ -72,11 +73,15 @@ function InventorySettingsContent() {
           <TabsTrigger value='global' className='flex-1 sm:flex-none flex items-center gap-2'>
             <Settings className='h-4 w-4' />
             Reglas generales
+            {!isSuperAdmin && (
+              <span className='text-xs text-muted-foreground hidden sm:inline'>(solo lectura)</span>
+            )}
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value='areas'>
           <InventoryAreasTab
+            isSuperAdmin={isSuperAdmin}
             families={families}
             selectedFamilyId={selectedFamilyId}
             selectedFamily={selectedFamily}
@@ -104,6 +109,7 @@ function InventorySettingsContent() {
 
         <TabsContent value='global'>
           <InventoryGlobalTab
+            isSuperAdmin={isSuperAdmin}
             globalRules={globalRules}
             savingGlobal={savingGlobal}
             families={families.map(f => ({ ...f, color: f.color ?? null }))}

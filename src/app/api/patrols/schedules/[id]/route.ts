@@ -10,7 +10,7 @@ import { authOptions } from '@/lib/auth'
 import { z } from 'zod'
 import prisma from '@/lib/prisma'
 import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
-import { checkPatrolFamilyAccess, canDeletePatrolResource } from '@/lib/patrol/patrol-access'
+import { checkPatrolFamilyAccess, checkPatrolFamilyOperate, canDeletePatrolResource } from '@/lib/patrol/patrol-access'
 import { PatrolSchedulerService } from '@/lib/services/patrol-scheduler.service'
 import {
   assertScheduleAgent,
@@ -112,7 +112,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const isSuperAdmin = (session.user as any).isSuperAdmin === true
 
     // Verificar acceso a la familia del schedule (original)
-    const hasAccessOriginal = await checkPatrolFamilyAccess(
+    const hasAccessOriginal = await checkPatrolFamilyOperate(
       session.user.id,
       existing.familyId,
       session.user.role,
@@ -193,7 +193,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     // Si cambia la familia, verificar acceso a la nueva familia
     if (targetFamilyId !== existing.familyId) {
-      const hasAccessNew = await checkPatrolFamilyAccess(
+      const hasAccessNew = await checkPatrolFamilyOperate(
         session.user.id,
         targetFamilyId,
         session.user.role,
@@ -328,14 +328,14 @@ export async function DELETE(
     if (!existing) return NextResponse.json({ error: 'Schedule no encontrado' }, { status: 404 })
 
     // Verificar acceso a la familia
-    const hasAccess = await checkPatrolFamilyAccess(
+    const hasAccess = await checkPatrolFamilyOperate(
       session.user.id,
       existing.familyId,
       session.user.role,
       isSuperAdmin
     )
     if (!hasAccess) {
-      return NextResponse.json({ error: 'No tienes acceso a esta área' }, { status: 403 })
+      return NextResponse.json({ error: 'No tienes acceso para modificar programaciones en esta área' }, { status: 403 })
     }
 
     // Reactivar

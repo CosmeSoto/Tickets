@@ -116,6 +116,7 @@ export function TicketAreasTab({
                         checked={family.ticketFamilyConfig?.ticketsEnabled ?? false}
                         onCheckedChange={() => onToggleTickets(family)}
                         className='scale-75'
+                        disabled={!isSuperAdmin}
                       />
                       <ChevronRight className='h-4 w-4 text-muted-foreground' />
                     </div>
@@ -231,18 +232,21 @@ export function TicketAreasTab({
                         label: 'Tickets habilitados',
                         desc: 'Permite crear tickets nuevos en esta área. Los tickets existentes no se afectan.',
                         key: 'ticketsEnabled' as const,
+                        superAdminOnly: true,
                       },
                       {
                         id: 'auto-assign',
                         label: 'Asignación respeta el área',
                         desc: 'La asignación automática solo elige técnicos que pertenecen a esta área',
                         key: 'autoAssignRespectsFamilies' as const,
+                        superAdminOnly: false,
                       },
                       {
                         id: 'is-default',
                         label: 'Área de respaldo del sistema',
                         desc: 'Recibe tickets cuando el sistema no puede determinar el área (solo una área puede ser el respaldo)',
                         key: 'isDefault' as const,
+                        superAdminOnly: true,
                       },
                     ] as const
                   ).map(item => (
@@ -257,6 +261,7 @@ export function TicketAreasTab({
                       <Switch
                         checked={config[item.key] as boolean}
                         onCheckedChange={v => onSetConfig({ ...config, [item.key]: v })}
+                        disabled={item.superAdminOnly && !isSuperAdmin}
                       />
                     </div>
                   ))}

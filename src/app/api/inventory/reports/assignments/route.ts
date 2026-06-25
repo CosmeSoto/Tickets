@@ -47,7 +47,12 @@ export async function GET(request: NextRequest) {
     const format = searchParams.get('format') || undefined
 
     // Obtener familias accesibles
-    const accessibleFamilyIds = await getAccessibleFamilyIds(user.id, user.role)
+    const accessibleFamilyIds = await getAccessibleFamilyIds(
+      user.id,
+      user.role,
+      (user as any).isSuperAdmin === true,
+      isAdmin ? false : await canManageInventory(user.id, user.role)
+    )
 
     // Construir filtro de familias
     let familyFilter: string[] | undefined

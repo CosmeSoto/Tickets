@@ -12,16 +12,18 @@ export interface ManagerScope {
  */
 export class InventoryDepartmentService {
   /**
-   * Valida que el receptor de una asignación pertenezca al mismo departamento que el equipo.
-   * Siempre valida: equipment.departmentId es NOT NULL por diseño.
-   * Retorna { valid: false, requiredDeptName, receiverDeptName } si los departamentos difieren.
+   * Valida departamento del receptor vs equipo.
+   *
+   * Reglas (flujo Compras → área → persona):
+   * - Equipo sin departamento o AVAILABLE en bodega Compras: entrega cross-área permitida.
+   * - Equipo ya en custodia de un departamento: receptor debe ser del mismo departamento.
    */
   static async validateAssignmentDepartment(
     equipmentId: string,
     receiverId: string
   ): Promise<{ valid: boolean; requiredDeptName?: string; receiverDeptName?: string }> {
     const [equipment, receiver] = await Promise.all([
-      (prisma as any).equipment.findUnique({
+      prisma.equipment.findUnique({
         where: { id: equipmentId },
         include: { department: true },
       }),
@@ -39,77 +41,60 @@ export class InventoryDepartmentService {
       throw new Error('Usuario receptor no encontrado')
     }
 
-    const equipmentDeptId: string | null = (equipment as any).departmentId ?? null
+    const equipmentDeptId = equipment.departmentId ?? null
 
-    // Si el equipo no tiene departamento (está disponible, en bodega, etc.), no validamos el departamento
-    if (!equipmentDeptId) {
+    // Bodega Compras / sin departamento: entrega a otra área
+    if (!equipmentDeptId || equipment.status === 'AVAILABLE') {
       return { valid: true }
     }
 
-    const receiverDeptId: string | null = receiver.departmentId ?? null
+    const receiverDeptId = receiver.departmentId ?? null
 
     if (equipmentDeptId === receiverDeptId) {
       return { valid: true }
     }
 
-    const requiredDeptName: string | undefined = (equipment as any).department?.name
-    const receiverDeptName: string | undefined = (receiver as any).departments?.name
-
-    return { valid: false, requiredDeptName, receiverDeptName }
+    return {
+      valid: false,
+      requiredDeptName: equipment.department?.name,
+      receiverDeptName: receiver.departments?.name,
+    }
   }
 
   /**
-   * Retorna el scope de gestión de un gestor de inventario.
-   * Prioridad: si tiene inventory_manager_families → type "family".
-   * Si solo tiene inventory_manager_departments → type "departments".
-   * Si ninguno → type "none".
+   * Scope de gestión del gestor (asistente Compras, etc.).
+   * Deriva departamentos accesibles desde inventory_manager_families + familia nativa.
    */
   static async getManagerScope(managerId: string): Promise<ManagerScope> {
-    // 1. Consultar inventory_manager_families
-    const familyAssignments = await (prisma as any).inventory_manager_families.findMany({
-      where: { managerId },
-      include: {
-        family: {
-          include: {
-            departments: {
-              where: { isActive: true },
-              select: { id: true },
-            },
-          },
-        },
-      },
+    const { getInventoryOperationalFamilyIds } = await import('@/lib/auth/family-scope')
+
+    const user = await prisma.users.findUnique({
+      where: { id: managerId },
+      select: { role: true, canManageInventory: true, departments: { select: { familyId: true } } },
     })
 
-    if (familyAssignments.length > 0) {
-      const familyIds: string[] = familyAssignments.map((fa: any) => fa.familyId as string)
-      const departmentIds: string[] = familyAssignments.flatMap((fa: any) =>
-        (fa.family?.departments ?? []).map((d: any) => d.id as string)
-      )
-      return { type: 'family', familyIds, departmentIds }
+    const canManage = user?.canManageInventory === true
+    const familyIds = (await getInventoryOperationalFamilyIds(
+      managerId,
+      user?.role ?? 'TECHNICIAN',
+      false,
+      canManage
+    )) ?? []
+
+    if (familyIds.length === 0) {
+      return { type: 'none', familyIds: [], departmentIds: [] }
     }
 
-    // 2. Consultar inventory_manager_departments
-    const deptAssignments = await (prisma as any).inventory_manager_departments.findMany({
-      where: { managerId },
-      include: {
-        department: {
-          select: { id: true, familyId: true },
-        },
-      },
+    const departments = await prisma.departments.findMany({
+      where: { familyId: { in: familyIds }, isActive: true },
+      select: { id: true },
     })
 
-    if (deptAssignments.length > 0) {
-      const departmentIds: string[] = deptAssignments.map((da: any) => da.departmentId as string)
-      const familyIdSet = new Set<string>(
-        deptAssignments
-          .map((da: any) => da.department?.familyId as string | null)
-          .filter((fid: string | null): fid is string => fid !== null)
-      )
-      return { type: 'departments', familyIds: Array.from(familyIdSet), departmentIds }
+    return {
+      type: 'family',
+      familyIds,
+      departmentIds: departments.map(d => d.id),
     }
-
-    // 3. Sin asignaciones
-    return { type: 'none', familyIds: [], departmentIds: [] }
   }
 
   /**

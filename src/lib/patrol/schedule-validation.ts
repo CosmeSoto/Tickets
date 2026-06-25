@@ -3,7 +3,7 @@
  */
 
 import prisma from '@/lib/prisma'
-import { checkPatrolFamilyAccess } from '@/lib/patrol/patrol-access'
+import { checkPatrolFamilyOperate } from '@/lib/patrol/patrol-access'
 import { PatrolSchedulerService } from '@/lib/services/patrol-scheduler.service'
 
 export interface ScheduleSlot {
@@ -99,7 +99,7 @@ export async function assertScheduleFamilyAccess(params: {
   isSuperAdmin: boolean
   familyId: string
 }): Promise<void> {
-  const allowed = await checkPatrolFamilyAccess(
+  const allowed = await checkPatrolFamilyOperate(
     params.userId,
     params.familyId,
     params.role,

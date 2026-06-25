@@ -222,6 +222,14 @@ export function useTicketSettings() {
 
   const handleToggleTickets = useCallback(
     async (family: Family) => {
+      if (!isSuperAdmin) {
+        toast({
+          title: 'Acción restringida',
+          description: 'Solo el Super Administrador puede activar o desactivar tickets por área',
+          variant: 'destructive',
+        })
+        return
+      }
       try {
         const res = await fetch(`/api/families/${family.id}/ticket-config`, {
           method: 'PUT',
@@ -241,7 +249,7 @@ export function useTicketSettings() {
         toast({ title: 'Error', description: 'Error de conexión', variant: 'destructive' })
       }
     },
-    [selectedFamilyId, loadFamilies, loadConfig, toast]
+    [selectedFamilyId, loadFamilies, loadConfig, toast, isSuperAdmin]
   )
 
   const toggleDay = useCallback(
@@ -265,9 +273,8 @@ export function useTicketSettings() {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              ticketsEnabled: config.ticketsEnabled,
+              ...(isSuperAdmin ? { ticketsEnabled: config.ticketsEnabled, isDefault: config.isDefault } : {}),
               codePrefix: config.codePrefix,
-              isDefault: config.isDefault,
               autoAssignRespectsFamilies: config.autoAssignRespectsFamilies,
               alertVolumeThreshold: config.alertVolumeThreshold,
               businessHoursStart: config.businessHoursStart,
@@ -277,7 +284,7 @@ export function useTicketSettings() {
           }).then(r => r.json())
         )
       }
-      if (globalDirty) {
+      if (globalDirty && isSuperAdmin) {
         promises.push(
           fetch('/api/admin/settings', {
             method: 'PUT',
@@ -314,7 +321,7 @@ export function useTicketSettings() {
     } finally {
       setSaving(false)
     }
-  }, [config, selectedFamilyId, globalDirty, globalSettings, loadFamilies, toast])
+  }, [config, selectedFamilyId, globalDirty, globalSettings, loadFamilies, toast, isSuperAdmin])
 
   const setGlobal = useCallback(
     <K extends keyof GlobalSettings>(key: K, value: GlobalSettings[K]) => {

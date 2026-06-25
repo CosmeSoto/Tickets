@@ -113,9 +113,9 @@ export function useSystemModules() {
 export function getModuleRoleDescription(moduleKey: string, role: string): string {
   const descriptions: Record<string, Record<string, string>> = {
     tickets: {
-      ADMIN: 'Crear propios y de su personal, gestionar tickets de sus familias',
-      TECHNICIAN: 'Crear sus tickets y atender los asignados por categoría',
-      CLIENT: 'Crear y seguir sus propios tickets de soporte',
+      ADMIN: 'Gestiona en su familia nativa; ve y apoya en áreas adicionales',
+      TECHNICIAN: 'Atiende tickets en su familia nativa; puede solicitar en otras áreas',
+      CLIENT: 'Crear y seguir tickets en su área y áreas de servicio adicionales',
     },
     inventory: {
       ADMIN: 'Gestionar activos de inventario de sus familias asignadas',
@@ -139,6 +139,28 @@ export function getModuleRoleDescription(moduleKey: string, role: string): strin
     },
   }
   return descriptions[moduleKey]?.[role] ?? 'Acceso al módulo'
+}
+
+/** Texto breve bajo el selector de familias adicionales (sin saturar la UI). */
+export function getAdditionalFamilyHint(moduleKey: string, role: string): string | null {
+  const hints: Record<string, Record<string, string>> = {
+    tickets: {
+      ADMIN: 'Visibilidad y apoyo. La gestión plena es en la familia nativa.',
+      TECHNICIAN: 'Solo para solicitar soporte. Atiende tickets en su familia nativa.',
+      CLIENT: 'Áreas donde puede solicitar servicios de soporte.',
+    },
+    patrols: {
+      ADMIN: 'Instalaciones adicionales que puede supervisar.',
+      TECHNICIAN: 'Instalaciones adicionales donde puede patrullar o supervisar.',
+      CLIENT: 'Instalaciones adicionales asignadas como agente.',
+    },
+    inventory: {
+      ADMIN: 'Áreas adicionales de gestión de activos (según permiso).',
+      TECHNICIAN: 'Áreas donde puede solicitar o gestionar activos.',
+      CLIENT: 'Áreas donde puede solicitar equipos o mantenimientos.',
+    },
+  }
+  return hints[moduleKey]?.[role] ?? null
 }
 
 /**

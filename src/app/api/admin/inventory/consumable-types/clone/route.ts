@@ -7,7 +7,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
-import { getAccessibleFamilyIds } from '@/lib/inventory/family-access'
+import { getInventoryManageFamilyIds } from '@/lib/inventory/family-access'
 import { canManageInventory } from '@/lib/inventory-access'
 
 function slugify(name: string) {
@@ -35,8 +35,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'sourceTypeId y targetFamilyId son requeridos' }, { status: 400 })
     }
 
-    const accessible = await getAccessibleFamilyIds(session.user.id, session.user.role, isSuperAdmin, canManage)
-    if (accessible !== undefined && !accessible.includes(targetFamilyId)) {
+    const manageable = await getInventoryManageFamilyIds(session.user.id, session.user.role, isSuperAdmin, canManage)
+    if (manageable !== undefined && !manageable.includes(targetFamilyId)) {
       return NextResponse.json({ error: 'Sin acceso a la familia destino' }, { status: 403 })
     }
 

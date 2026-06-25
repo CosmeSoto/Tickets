@@ -77,6 +77,7 @@ const DEPRECIATION_METHODS = [
 ]
 
 interface InventoryAreasTabProps {
+  isSuperAdmin: boolean
   families: Family[]
   selectedFamilyId: string | null
   selectedFamily: Family | undefined
@@ -102,6 +103,7 @@ interface InventoryAreasTabProps {
 }
 
 export function InventoryAreasTab({
+  isSuperAdmin,
   families,
   selectedFamilyId,
   selectedFamily,
@@ -191,11 +193,20 @@ export function InventoryAreasTab({
                       className='flex items-center gap-1 flex-shrink-0 ml-2'
                       onClick={e => e.stopPropagation()}
                     >
-                      <Switch
-                        checked={family.inventoryEnabled ?? true}
-                        onCheckedChange={() => onToggleInventory(family)}
-                        className='scale-75'
-                      />
+                      {isSuperAdmin ? (
+                        <Switch
+                          checked={family.inventoryEnabled ?? true}
+                          onCheckedChange={() => onToggleInventory(family)}
+                          className='scale-75'
+                        />
+                      ) : (
+                        <Badge
+                          variant={family.inventoryEnabled ? 'default' : 'secondary'}
+                          className='text-[10px] scale-90'
+                        >
+                          {family.inventoryEnabled ? 'On' : 'Off'}
+                        </Badge>
+                      )}
                       <ChevronRight className='h-4 w-4 text-muted-foreground' />
                     </div>
                   </div>
@@ -247,7 +258,7 @@ export function InventoryAreasTab({
                 <Badge variant={form.inventoryEnabled ? 'default' : 'secondary'}>
                   {form.inventoryEnabled ? 'Habilitado' : 'Deshabilitado'}
                 </Badge>
-                {form.inventoryEnabled && (
+                {form.inventoryEnabled && isSuperAdmin && (
                   <div className='flex items-center gap-2 pl-2 border-l'>
                     <TooltipProvider>
                       <Tooltip>

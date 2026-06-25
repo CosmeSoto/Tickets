@@ -59,53 +59,45 @@ export async function GET(request: NextRequest) {
       where.departments = { familyId }
     }
 
-    // Para ADMIN no-superadmin: restringir a familias asignadas
-    // Para TECHNICIAN: solo categorías de sus familias asignadas
-    // Para CLIENT: solo categorías de su familia nativa + client_family_assignments
+    // Para ADMIN no-superadmin: visibilidad en listados
+    // Para TECHNICIAN: consumer al crear tickets; operational con scope=operational
+    // Para CLIENT: consumer (nativa + client_family_assignments)
     const role = session.user.role
     const isSuperAdmin = (session.user as any).isSuperAdmin === true
+    const scopeMode = searchParams.get('scope') === 'operational' ? 'operational' : 'consumer'
 
     if (!familyId) {
-      // familyId explícito tiene prioridad — no sobreescribir
       if (role === 'ADMIN' && !isSuperAdmin) {
         try {
-          const { getAdminFamilyScope } = await import('@/lib/auth/admin-scope')
-          const scope = await getAdminFamilyScope(session.user.id, false)
-          if (scope.familyIds && scope.familyIds.length > 0) {
-            where.departments = { familyId: { in: scope.familyIds } }
+          const { getTicketVisibilityFamilyIds } = await import('@/lib/auth/family-scope')
+          const { buildFamilyFilter } = await import('@/lib/auth/admin-scope')
+          const visibilityIds = await getTicketVisibilityFamilyIds(session.user.id, 'ADMIN', false)
+          const filter = buildFamilyFilter({ familyIds: visibilityIds })
+          if (filter.familyId) {
+            where.departments = { familyId: filter.familyId }
           }
         } catch {
-          /* tabla no existe → no restringir */
+          /* fallback */
         }
       } else if (role === 'TECHNICIAN') {
-        const techAssignments = await prisma.technician_family_assignments.findMany({
-          where: { technicianId: session.user.id, isActive: true },
-          select: { familyId: true },
-        })
-        if (techAssignments.length > 0) {
-          where.departments = { familyId: { in: techAssignments.map(a => a.familyId) } }
+        const { getTicketScopeFamilyIds } = await import('@/lib/auth/family-scope')
+        const scopeIds = await getTicketScopeFamilyIds(
+          session.user.id,
+          'TECHNICIAN',
+          false,
+          scopeMode
+        )
+        if (scopeIds && scopeIds.length > 0) {
+          where.departments = { familyId: { in: scopeIds } }
         } else {
-          // Técnico sin familias asignadas → no mostrar categorías
           where.departments = { familyId: { in: [] } }
         }
       } else if (role === 'CLIENT') {
-        const [userDept, clientAssignments] = await Promise.all([
-          prisma.users.findUnique({
-            where: { id: session.user.id },
-            select: { departments: { select: { familyId: true } } },
-          }),
-          prisma.client_family_assignments.findMany({
-            where: { clientId: session.user.id, isActive: true },
-            select: { familyId: true },
-          }),
-        ])
-        const allowedFamilyIds = new Set<string>(clientAssignments.map(a => a.familyId))
-        if (userDept?.departments?.familyId) allowedFamilyIds.add(userDept.departments.familyId)
-
-        if (allowedFamilyIds.size > 0) {
-          where.departments = { familyId: { in: Array.from(allowedFamilyIds) } }
+        const { getTicketConsumerFamilyIds } = await import('@/lib/auth/family-scope')
+        const consumerIds = await getTicketConsumerFamilyIds(session.user.id, 'CLIENT', false)
+        if (consumerIds && consumerIds.length > 0) {
+          where.departments = { familyId: { in: consumerIds } }
         } else {
-          // Cliente sin familias → no mostrar categorías
           where.departments = { familyId: { in: [] } }
         }
       }

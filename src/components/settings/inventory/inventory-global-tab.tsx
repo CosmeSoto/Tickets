@@ -12,6 +12,7 @@ import { Separator } from '@/components/ui/separator'
 import type { GlobalRules } from '@/hooks/use-inventory-settings'
 
 interface InventoryGlobalTabProps {
+  isSuperAdmin: boolean
   globalRules: GlobalRules
   savingGlobal: boolean
   families: Array<{ id: string; name: string; code: string; color: string | null }>
@@ -20,19 +21,31 @@ interface InventoryGlobalTabProps {
 }
 
 export function InventoryGlobalTab({
+  isSuperAdmin,
   globalRules,
   savingGlobal,
   families,
   onSetGlobal,
   onSave,
 }: InventoryGlobalTabProps) {
+  const readOnly = !isSuperAdmin
+
   return (
     <div className='max-w-4xl space-y-6'>
       <div className='flex items-start gap-3 p-4 rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800'>
         <Info className='h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0' />
         <p className='text-sm text-blue-800 dark:text-blue-300'>
-          Estas reglas aplican a <strong>todo el módulo de inventario</strong>. La configuración
-          específica por área se gestiona en la pestaña &quot;Por área&quot;.
+          {readOnly ? (
+            <>
+              Estas reglas aplican a <strong>todo el módulo de inventario</strong>. Solo el{' '}
+              <strong>Super Administrador</strong> puede modificarlas.
+            </>
+          ) : (
+            <>
+              Estas reglas aplican a <strong>todo el módulo de inventario</strong>. La
+              configuración específica por área se gestiona en la pestaña &quot;Por área&quot;.
+            </>
+          )}
         </p>
       </div>
 
@@ -57,6 +70,7 @@ export function InventoryGlobalTab({
             <Switch
               checked={globalRules.lowStockAlertEnabled}
               onCheckedChange={v => onSetGlobal('lowStockAlertEnabled', v)}
+              disabled={readOnly}
             />
           </div>
 
@@ -76,6 +90,7 @@ export function InventoryGlobalTab({
               <Switch
                 checked={globalRules.licenseAlertEnabled}
                 onCheckedChange={v => onSetGlobal('licenseAlertEnabled', v)}
+                disabled={readOnly}
               />
             </div>
             {globalRules.licenseAlertEnabled && (
@@ -92,6 +107,7 @@ export function InventoryGlobalTab({
                         onSetGlobal('licenseAlertDaysFirst', parseInt(e.target.value) || 30)
                       }
                       className='w-24 h-8 text-sm font-mono'
+                      disabled={readOnly}
                     />
                     <span className='text-xs text-muted-foreground'>días</span>
                   </div>
@@ -108,6 +124,7 @@ export function InventoryGlobalTab({
                         onSetGlobal('licenseAlertDaysSecond', parseInt(e.target.value) || 7)
                       }
                       className='w-24 h-8 text-sm font-mono'
+                      disabled={readOnly}
                     />
                     <span className='text-xs text-muted-foreground'>días</span>
                   </div>
@@ -124,6 +141,7 @@ export function InventoryGlobalTab({
                         onSetGlobal('contractAlertDays', parseInt(e.target.value) || 30)
                       }
                       className='w-24 h-8 text-sm font-mono'
+                      disabled={readOnly}
                     />
                     <span className='text-xs text-muted-foreground'>días</span>
                   </div>
@@ -146,6 +164,7 @@ export function InventoryGlobalTab({
               <Switch
                 checked={globalRules.warrantyAlertEnabled}
                 onCheckedChange={v => onSetGlobal('warrantyAlertEnabled', v)}
+                disabled={readOnly}
               />
             </div>
             {globalRules.warrantyAlertEnabled && (
@@ -159,6 +178,7 @@ export function InventoryGlobalTab({
                     value={globalRules.warrantyAlertDays}
                     onChange={e => onSetGlobal('warrantyAlertDays', parseInt(e.target.value) || 30)}
                     className='w-24 h-8 text-sm font-mono'
+                    disabled={readOnly}
                   />
                   <span className='text-xs text-muted-foreground'>días antes del vencimiento</span>
                 </div>
@@ -188,6 +208,7 @@ export function InventoryGlobalTab({
               value={globalRules.actExpirationDays}
               onChange={e => onSetGlobal('actExpirationDays', parseInt(e.target.value) || 7)}
               className='w-24 font-mono'
+              disabled={readOnly}
             />
             <div>
               <p className='text-sm font-medium'>días para aceptar un acta</p>
@@ -199,12 +220,14 @@ export function InventoryGlobalTab({
         </CardContent>
       </Card>
 
-      <div className='flex justify-end'>
-        <Button onClick={onSave} disabled={savingGlobal}>
-          <Save className={`h-4 w-4 mr-2 ${savingGlobal ? 'animate-spin' : ''}`} />
-          {savingGlobal ? 'Guardando...' : 'Guardar reglas generales'}
-        </Button>
-      </div>
+      {isSuperAdmin && (
+        <div className='flex justify-end'>
+          <Button onClick={onSave} disabled={savingGlobal}>
+            <Save className={`h-4 w-4 mr-2 ${savingGlobal ? 'animate-spin' : ''}`} />
+            {savingGlobal ? 'Guardando...' : 'Guardar reglas generales'}
+          </Button>
+        </div>
+      )}
     </div>
   )
 }

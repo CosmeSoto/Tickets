@@ -15,7 +15,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
-import { checkPatrolFamilyAccess } from '@/lib/patrol/patrol-access'
+import { checkPatrolFamilyOperate } from '@/lib/patrol/patrol-access'
 import { z } from 'zod'
 
 const bodySchema = z.object({
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
       })
 
       for (const { familyId } of agentFamilies) {
-        const hasAccess = await checkPatrolFamilyAccess(
+        const hasAccess = await checkPatrolFamilyOperate(
           session.user.id,
           familyId,
           session.user.role,

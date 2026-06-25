@@ -14,6 +14,7 @@ import { PatrolQRService } from '@/lib/services/patrol-qr.service'
 import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
 import { randomUUID } from 'crypto'
 import { checkPatrolModuleAccess } from '@/lib/patrol/patrol-helpers'
+import { checkPatrolFamilyOperate } from '@/lib/patrol/patrol-access'
 
 // Campos seguros para devolver en respuestas (excluye qrSecret y qrStaticToken)
 const SAFE_CHECKPOINT_SELECT = {
@@ -140,6 +141,20 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const data = createCheckpointSchema.parse(body)
+
+    const isSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
+    const canOperate = await checkPatrolFamilyOperate(
+      session.user.id,
+      data.familyId,
+      session.user.role,
+      isSuperAdmin
+    )
+    if (!canOperate) {
+      return NextResponse.json(
+        { error: 'No tienes acceso para crear checkpoints en esta área' },
+        { status: 403 }
+      )
+    }
 
     // qrType se determina automáticamente por hasConnectivity
     const qrType = data.hasConnectivity ? 'DYNAMIC' : 'STATIC'

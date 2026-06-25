@@ -13,34 +13,42 @@ import {
   getAccessibleFamilies,
   createUserContext,
 } from '@/lib/middleware/family-filter'
-import { prisma } from '@/lib/prisma'
 import { UserRole } from '@prisma/client'
 
-// Mock de Prisma
-jest.mock('@/lib/prisma', () => ({
-  prisma: {
-    admin_family_assignments: {
-      findMany: jest.fn(),
-    },
-    technician_family_assignments: {
-      findMany: jest.fn(),
-    },
-    equipment_assignments: {
-      findMany: jest.fn(),
-      findFirst: jest.fn(),
-    },
-    equipment: {
-      findUnique: jest.fn(),
-    },
-    families: {
-      findMany: jest.fn(),
-    },
-  },
+const nativeFamilyId = 'family-native'
+
+jest.mock('@/lib/auth/admin-scope', () => ({
+  getModuleFamilyIds: jest.fn().mockResolvedValue([]),
 }))
+
+jest.mock('@/lib/prisma', () => {
+  const prismaMock = {
+    users: { findUnique: jest.fn() },
+    admin_family_assignments: { findMany: jest.fn() },
+    technician_family_assignments: { findMany: jest.fn() },
+    inventory_manager_families: { findMany: jest.fn() },
+    equipment_assignments: { findMany: jest.fn(), findFirst: jest.fn() },
+    equipment: { findUnique: jest.fn() },
+    families: { findMany: jest.fn() },
+  }
+  return {
+    prisma: prismaMock,
+    __esModule: true,
+    default: prismaMock,
+  }
+})
+
+import { prisma } from '@/lib/prisma'
+import { getModuleFamilyIds } from '@/lib/auth/admin-scope'
 
 describe('Family Filter Middleware', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    ;(prisma.users.findUnique as jest.Mock).mockResolvedValue({
+      departments: { familyId: nativeFamilyId },
+    })
+    ;(getModuleFamilyIds as jest.Mock).mockResolvedValue([])
+    ;(prisma.inventory_manager_families.findMany as jest.Mock).mockResolvedValue([])
   })
 
   describe('applyEquipmentFamilyFilter', () => {
@@ -56,17 +64,14 @@ describe('Family Filter Middleware', () => {
       expect(filter).toEqual({})
     })
 
-    it('FAMILY_ADMIN: debe filtrar por familias asignadas', async () => {
+    it('FAMILY_ADMIN: debe filtrar por familias del módulo inventario', async () => {
       const context = {
         userId: 'admin-1',
         userRole: 'ADMIN' as UserRole,
         isSuperAdmin: false,
       }
 
-      ;(prisma.admin_family_assignments.findMany as jest.Mock).mockResolvedValue([
-        { familyId: 'family-1' },
-        { familyId: 'family-2' },
-      ])
+      ;(getModuleFamilyIds as jest.Mock).mockResolvedValue(['family-1', 'family-2'])
 
       const filter = await applyEquipmentFamilyFilter(context)
 
@@ -75,35 +80,49 @@ describe('Family Filter Middleware', () => {
       })
     })
 
-    it('FAMILY_ADMIN sin familias: debe retornar filtro que no muestra nada', async () => {
+    it('FAMILY_ADMIN sin familias de módulo: usa familia nativa', async () => {
       const context = {
         userId: 'admin-1',
         userRole: 'ADMIN' as UserRole,
         isSuperAdmin: false,
       }
 
-      ;(prisma.admin_family_assignments.findMany as jest.Mock).mockResolvedValue([])
-
       const filter = await applyEquipmentFamilyFilter(context)
 
-      expect(filter).toEqual({ id: 'none' })
+      expect(filter).toEqual({ familyId: { in: [nativeFamilyId] } })
     })
 
-    it('TECHNICIAN: debe filtrar por familias asignadas', async () => {
+    it('TECHNICIAN gestor: filtra por nativa e inventory_manager_families', async () => {
       const context = {
         userId: 'tech-1',
         userRole: 'TECHNICIAN' as UserRole,
         isSuperAdmin: false,
+        canManageInventory: true,
       }
 
-      ;(prisma.technician_family_assignments.findMany as jest.Mock).mockResolvedValue([
+      ;(prisma.inventory_manager_families.findMany as jest.Mock).mockResolvedValue([
         { familyId: 'family-1' },
       ])
 
       const filter = await applyEquipmentFamilyFilter(context)
 
       expect(filter).toEqual({
-        familyId: { in: ['family-1'] },
+        familyId: { in: expect.arrayContaining([nativeFamilyId, 'family-1']) },
+      })
+    })
+
+    it('TECHNICIAN sin gestión: solo familia nativa', async () => {
+      const context = {
+        userId: 'tech-1',
+        userRole: 'TECHNICIAN' as UserRole,
+        isSuperAdmin: false,
+        canManageInventory: false,
+      }
+
+      const filter = await applyEquipmentFamilyFilter(context)
+
+      expect(filter).toEqual({
+        familyId: { in: [nativeFamilyId] },
       })
     })
 
@@ -153,13 +172,11 @@ describe('Family Filter Middleware', () => {
       expect(hasAccess).toBe(true)
     })
 
-    it('FAMILY_ADMIN: debe tener acceso a equipos de sus familias', async () => {
+    it('FAMILY_ADMIN: debe tener acceso a equipos de familias visibles', async () => {
       ;(prisma.equipment.findUnique as jest.Mock).mockResolvedValue({
-        familyId: 'family-1',
+        type: { familyId: 'family-1' },
       })
-      ;(prisma.admin_family_assignments.findMany as jest.Mock).mockResolvedValue([
-        { familyId: 'family-1' },
-      ])
+      ;(getModuleFamilyIds as jest.Mock).mockResolvedValue(['family-1'])
 
       const hasAccess = await hasAccessToEquipment(
         'admin-1',
@@ -173,11 +190,9 @@ describe('Family Filter Middleware', () => {
 
     it('FAMILY_ADMIN: NO debe tener acceso a equipos de otras familias', async () => {
       ;(prisma.equipment.findUnique as jest.Mock).mockResolvedValue({
-        familyId: 'family-2',
+        type: { familyId: 'family-2' },
       })
-      ;(prisma.admin_family_assignments.findMany as jest.Mock).mockResolvedValue([
-        { familyId: 'family-1' },
-      ])
+      ;(getModuleFamilyIds as jest.Mock).mockResolvedValue(['family-1'])
 
       const hasAccess = await hasAccessToEquipment(
         'admin-1',
@@ -238,21 +253,16 @@ describe('Family Filter Middleware', () => {
       expect(hasAccess).toBe(true)
     })
 
-    it('FAMILY_ADMIN: debe tener acceso a familias asignadas', async () => {
-      ;(prisma.admin_family_assignments.findMany as jest.Mock).mockResolvedValue([
-        { familyId: 'family-1' },
-        { familyId: 'family-2' },
-      ])
+    it('FAMILY_ADMIN: debe tener acceso a familias del módulo inventario', async () => {
+      ;(getModuleFamilyIds as jest.Mock).mockResolvedValue(['family-1', 'family-2'])
 
       const hasAccess = await hasAccessToFamily('admin-1', 'ADMIN' as UserRole, false, 'family-1')
 
       expect(hasAccess).toBe(true)
     })
 
-    it('FAMILY_ADMIN: NO debe tener acceso a familias no asignadas', async () => {
-      ;(prisma.admin_family_assignments.findMany as jest.Mock).mockResolvedValue([
-        { familyId: 'family-1' },
-      ])
+    it('FAMILY_ADMIN: NO debe tener acceso a familias fuera de visibilidad', async () => {
+      ;(getModuleFamilyIds as jest.Mock).mockResolvedValue(['family-1'])
 
       const hasAccess = await hasAccessToFamily('admin-1', 'ADMIN' as UserRole, false, 'family-2')
 
@@ -289,16 +299,14 @@ describe('Family Filter Middleware', () => {
       })
     })
 
-    it('FAMILY_ADMIN: debe retornar solo sus familias', async () => {
+    it('FAMILY_ADMIN: debe retornar familias visibles de inventario', async () => {
       const context = {
         userId: 'admin-1',
         userRole: 'ADMIN' as UserRole,
         isSuperAdmin: false,
       }
 
-      ;(prisma.admin_family_assignments.findMany as jest.Mock).mockResolvedValue([
-        { familyId: 'family-1' },
-      ])
+      ;(getModuleFamilyIds as jest.Mock).mockResolvedValue(['family-1'])
       ;(prisma.families.findMany as jest.Mock).mockResolvedValue([
         { id: 'family-1', name: 'Computadoras', code: 'COMP', color: '#FF0000' },
       ])

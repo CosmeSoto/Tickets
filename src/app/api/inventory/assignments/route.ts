@@ -7,6 +7,7 @@ import { InventoryDepartmentService } from '@/lib/services/inventory-department.
 import { createAssignmentSchema } from '@/lib/validations/inventory/assignment'
 import { ZodError } from 'zod'
 import { prisma } from '@/lib/prisma'
+import { canManageAsset } from '@/lib/inventory-access'
 
 /**
  * POST /api/inventory/assignments
@@ -32,6 +33,32 @@ export async function POST(request: NextRequest) {
 
     // Validar datos
     const validatedData = createAssignmentSchema.parse(body)
+
+    const equipmentForScope = await prisma.equipment.findUnique({
+      where: { id: validatedData.equipmentId },
+      select: {
+        status: true,
+        type: { select: { familyId: true } },
+      },
+    })
+    if (!equipmentForScope) {
+      return NextResponse.json({ error: 'Equipo no encontrado' }, { status: 404 })
+    }
+
+    const isSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
+    const assetFamilyId = equipmentForScope.type?.familyId ?? null
+    const allowed = await canManageAsset(
+      session.user.id,
+      session.user.role,
+      isSuperAdmin,
+      assetFamilyId
+    )
+    if (!allowed) {
+      return NextResponse.json(
+        { error: 'No tienes permiso para asignar equipos de esta familia' },
+        { status: 403 }
+      )
+    }
 
     // Validar que el receptor pertenezca al mismo departamento que el equipo
     const deptValidation = await InventoryDepartmentService.validateAssignmentDepartment(

@@ -1,10 +1,18 @@
 /**
  * Control de acceso centralizado para operaciones sobre tickets por ID.
- * Alineado con el filtrado de GET /api/tickets (familias, asignación, colaboradores).
+ *
+ * Reglas de scope (ver family-scope.ts):
+ * - Admin visibility: nativa + admin_family_assignments
+ * - Admin operate: solo nativa
+ * - Técnico cola sin asignar: solo nativa; asignado/colaborador/cliente: acceso directo
  */
 
 import prisma from '@/lib/prisma'
-import { getUserFamilyScope } from '@/lib/auth/admin-scope'
+import {
+  adminCanOperateTicketFamily,
+  adminCanViewTicketFamily,
+  technicianCanAccessUnassignedQueue,
+} from '@/lib/auth/family-scope'
 
 export type TicketAccessAction =
   | 'read'
@@ -109,7 +117,7 @@ async function canReadTicket(user: TicketAccessUser, ticket: TicketAccessRecord)
   }
 
   if (user.role === 'ADMIN') {
-    return adminHasFamilyAccess(user, ticket.familyId)
+    return adminCanViewTicketFamily(user.id, ticket.familyId, user.isSuperAdmin === true)
   }
 
   if (user.role === 'TECHNICIAN') {
@@ -138,12 +146,12 @@ async function canWriteTicket(
   }
 
   if (user.role === 'ADMIN') {
-    return adminHasFamilyAccess(user, ticket.familyId)
+    return adminCanOperateTicketFamily(user.id, ticket.familyId, user.isSuperAdmin === true)
   }
 
   if (user.role === 'TECHNICIAN') {
     if (ticket.assigneeId === user.id) return true
-    return technicianHasTicketAccess(user.id, ticket)
+    return technicianHasWorkQueueAccess(user.id, ticket)
   }
 
   return false
@@ -154,10 +162,9 @@ async function canAssignTicket(
   ticket: TicketAccessRecord
 ): Promise<boolean> {
   if (user.role !== 'ADMIN') return false
-  return adminHasFamilyAccess(user, ticket.familyId)
+  return adminCanOperateTicketFamily(user.id, ticket.familyId, user.isSuperAdmin === true)
 }
 
-/** Crear/editar/eliminar plan de resolución: admin (scope) o técnico asignado únicamente */
 async function canManageResolutionPlan(
   user: TicketAccessUser,
   ticket: TicketAccessRecord
@@ -166,7 +173,7 @@ async function canManageResolutionPlan(
     return ticket.assigneeId === user.id
   }
   if (user.role === 'ADMIN') {
-    return adminHasFamilyAccess(user, ticket.familyId)
+    return adminCanOperateTicketFamily(user.id, ticket.familyId, user.isSuperAdmin === true)
   }
   return false
 }
@@ -176,7 +183,7 @@ async function canManageCollaborators(
   ticket: TicketAccessRecord
 ): Promise<boolean> {
   if (user.role === 'ADMIN') {
-    return adminHasFamilyAccess(user, ticket.familyId)
+    return adminCanOperateTicketFamily(user.id, ticket.familyId, user.isSuperAdmin === true)
   }
   if (user.role === 'TECHNICIAN' && ticket.assigneeId === user.id) {
     return true
@@ -189,7 +196,7 @@ async function canDeleteTicket(
   ticket: TicketAccessRecord
 ): Promise<boolean> {
   if (user.role === 'ADMIN') {
-    return adminHasFamilyAccess(user, ticket.familyId)
+    return adminCanOperateTicketFamily(user.id, ticket.familyId, user.isSuperAdmin === true)
   }
   if (user.role === 'CLIENT') {
     return ticket.clientId === user.id
@@ -197,58 +204,39 @@ async function canDeleteTicket(
   return false
 }
 
-async function technicianHasTicketAccess(
+/** Acceso por relación directa (asignado, solicitante, colaborador). */
+async function technicianHasDirectTicketAccess(
   userId: string,
   ticket: TicketAccessRecord
 ): Promise<boolean> {
-  // El técnico es el asignado → acceso directo
   if (ticket.assigneeId === userId) return true
-
-  // El técnico es el cliente/reportante del ticket (ej: escalado desde rondas)
   if (ticket.clientId === userId) return true
 
-  // El técnico es colaborador del ticket
   const isCollaborator = await prisma.ticket_collaborators.findUnique({
     where: {
       ticketId_collaboratorId: { ticketId: ticket.id, collaboratorId: userId },
     },
     select: { ticketId: true },
   })
-  if (isCollaborator) return true
-
-  if (!ticket.familyId) {
-    return ticket.assigneeId === null
-  }
-
-  const techFamilies = await prisma.technician_family_assignments.findMany({
-    where: { technicianId: userId, isActive: true },
-    select: { familyId: true },
-  })
-  const techFamilyIds = techFamilies.map(a => a.familyId)
-  if (techFamilyIds.length === 0) {
-    return ticket.assigneeId === null
-  }
-
-  if (!techFamilyIds.includes(ticket.familyId)) {
-    return false
-  }
-
-  return ticket.assigneeId === null || ticket.assigneeId === userId
+  return Boolean(isCollaborator)
 }
 
-async function adminHasFamilyAccess(
-  user: TicketAccessUser,
-  familyId: string | null
+/** Cola de trabajo: solo tickets sin asignar en familia nativa del técnico. */
+async function technicianHasWorkQueueAccess(
+  userId: string,
+  ticket: TicketAccessRecord
 ): Promise<boolean> {
-  if (user.isSuperAdmin) return true
-  if (user.role !== 'ADMIN') return false
+  if (ticket.assigneeId !== null && ticket.assigneeId !== userId) return false
+  return technicianCanAccessUnassignedQueue(userId, ticket.familyId)
+}
 
-  const scope = await getUserFamilyScope(user.id, 'ADMIN', false)
-  if (scope.familyIds === undefined) return true
-  if (scope.familyIds.length === 0) return false
-
-  if (!familyId) return true
-  return scope.familyIds.includes(familyId)
+async function technicianHasTicketAccess(
+  userId: string,
+  ticket: TicketAccessRecord
+): Promise<boolean> {
+  if (await technicianHasDirectTicketAccess(userId, ticket)) return true
+  if (ticket.assigneeId !== null && ticket.assigneeId !== userId) return false
+  return technicianCanAccessUnassignedQueue(userId, ticket.familyId)
 }
 
 /** Usuario de sesión NextAuth → TicketAccessUser */

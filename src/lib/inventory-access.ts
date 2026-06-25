@@ -1,11 +1,16 @@
 import prisma from '@/lib/prisma'
 import { withCache } from '@/lib/api-cache'
+import {
+  adminCanOperateInventoryFamily,
+  getInventoryOperationalFamilyIds,
+  getInventoryVisibilityFamilyIds,
+  managerCanOperateInventoryFamily,
+} from '@/lib/auth/family-scope'
 
 /**
  * Verifica si un usuario tiene permiso GLOBAL de gestión de inventario.
- * - ADMIN: siempre sí
- * - Cualquier otro rol: solo si canManageInventory === true en la BD
- * Resultado cacheado 5 minutos en Redis para evitar queries repetidas.
+ * - ADMIN: siempre sí (acceso al módulo; scope por familia aplica aparte)
+ * - Otros: canManageInventory en BD
  */
 export async function canManageInventory(userId: string, role: string): Promise<boolean> {
   if (role === 'ADMIN') return true
@@ -25,14 +30,7 @@ export async function canManageInventory(userId: string, role: string): Promise<
 }
 
 /**
- * Verifica si un usuario puede gestionar (crear/editar/eliminar) un activo específico.
- *
- * Jerarquía:
- *   SuperAdmin  → puede gestionar cualquier activo
- *   Admin       → puede gestionar activos de sus familias de INVENTARIO (inventory_manager_families
- *                 + familia nativa). Si no tiene ninguna asignada, puede gestionar todo.
- *   Gestor      → puede gestionar activos de sus familias asignadas en inventory_manager_families
- *   Otros       → no pueden gestionar activos
+ * CRUD de activos en una familia concreta (scope operational).
  */
 export async function canManageAsset(
   userId: string,
@@ -42,32 +40,20 @@ export async function canManageAsset(
 ): Promise<boolean> {
   if (role === 'ADMIN' && isSuperAdmin) return true
 
-  if (role === 'ADMIN') {
-    if (!assetFamilyId) return true
-    // Usar el scope de inventario (inventory_manager_families + nativa), no el scope general
-    const { getModuleFamilyIds } = await import('@/lib/auth/admin-scope')
-    const inventoryFamilyIds = await getModuleFamilyIds(userId, 'inventory')
-    // Si no tiene ninguna familia de inventario asignada, puede gestionar todas
-    if (inventoryFamilyIds.length === 0) return true
-    return inventoryFamilyIds.includes(assetFamilyId)
-  }
-
   const user = await prisma.users.findUnique({
     where: { id: userId },
     select: { canManageInventory: true, isActive: true },
   })
-  if (!user?.isActive || !user.canManageInventory) return false
+  if (!user?.isActive) return false
 
-  if (!assetFamilyId) return false
-  const assignment = await prisma.inventory_manager_families.findFirst({
-    where: { managerId: userId, familyId: assetFamilyId },
-  })
-  return assignment !== null
+  if (role === 'ADMIN') {
+    return adminCanOperateInventoryFamily(userId, assetFamilyId ?? null, false)
+  }
+
+  if (!user.canManageInventory) return false
+  return managerCanOperateInventoryFamily(userId, assetFamilyId ?? null, true)
 }
 
-/**
- * Obtiene el familyId de un activo (equipo o licencia) a partir de su tipo.
- */
 export async function getAssetFamilyId(
   assetType: 'EQUIPMENT' | 'LICENSE',
   assetId: string
@@ -79,83 +65,42 @@ export async function getAssetFamilyId(
         select: { type: { select: { familyId: true } } },
       })
       return eq?.type?.familyId ?? null
-    } else {
-      const lic = await prisma.software_licenses.findUnique({
-        where: { id: assetId },
-        select: { licenseType: { select: { familyId: true } } },
-      })
-      return lic?.licenseType?.familyId ?? null
     }
+    const lic = await prisma.software_licenses.findUnique({
+      where: { id: assetId },
+      select: { licenseType: { select: { familyId: true } } },
+    })
+    return lic?.licenseType?.familyId ?? null
   } catch {
     return null
   }
 }
 
-/**
- * Verifica si un TECHNICIAN está asignado a una familia específica.
- */
+/** @deprecated Usar managerCanOperateInventoryFamily — técnico gestor nativo o asignado */
 export async function isTechnicianOfFamily(
   technicianId: string,
   familyId: string
 ): Promise<boolean> {
-  try {
-    const assignment = await prisma.technician_family_assignments.findFirst({
-      where: { technicianId, familyId, isActive: true },
-    })
-    return assignment !== null
-  } catch {
-    return false
-  }
+  return managerCanOperateInventoryFamily(technicianId, familyId, true)
 }
 
-/**
- * Verifica si un usuario es GESTOR de una familia específica.
- * (canManageInventory = true + asignado a esa familia en inventory_manager_families)
- */
 export async function isManagerOfFamily(userId: string, familyId: string): Promise<boolean> {
-  try {
-    const user = await prisma.users.findUnique({
-      where: { id: userId },
-      select: { canManageInventory: true, isActive: true },
-    })
-    if (!user?.isActive || !user.canManageInventory) return false
-
-    const assignment = await prisma.inventory_manager_families.findFirst({
-      where: { managerId: userId, familyId },
-    })
-    return assignment !== null
-  } catch {
-    return false
-  }
+  return managerCanOperateInventoryFamily(userId, familyId, true)
 }
 
-/**
- * Verifica si un ADMIN puede aprobar bajas de una familia específica.
- * - SuperAdmin: siempre sí
- * - Admin normal: solo si tiene esa familia en su scope de inventario
- *   (inventory_manager_families + familia nativa). Sin asignaciones → acceso total.
- */
+/** Aprobar bajas: admin solo en familia nativa; super admin siempre */
 export async function isAdminOfFamily(
   userId: string,
   isSuperAdmin: boolean,
   familyId: string | null
 ): Promise<boolean> {
   if (isSuperAdmin) return true
-  if (!familyId) return true // activo sin familia → cualquier admin puede
-
-  try {
-    const { getModuleFamilyIds } = await import('@/lib/auth/admin-scope')
-    const inventoryFamilyIds = await getModuleFamilyIds(userId, 'inventory')
-    if (inventoryFamilyIds.length === 0) return true
-    return inventoryFamilyIds.includes(familyId)
-  } catch {
-    return false
-  }
+  if (!familyId) return false
+  return adminCanOperateInventoryFamily(userId, familyId, false)
 }
 
-/**
- * Respuesta estándar de acceso denegado para inventario
- */
 export function inventoryForbidden() {
   return Response.json({ error: 'No tienes permiso para gestionar el inventario' }, { status: 403 })
 }
+
+export { getInventoryOperationalFamilyIds, getInventoryVisibilityFamilyIds }

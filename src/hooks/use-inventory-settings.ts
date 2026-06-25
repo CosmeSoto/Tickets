@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { useToast } from '@/hooks/use-toast'
 import { DEFAULT_FAMILY_CONFIG, DEFAULT_MODE_CONFIG } from '@/lib/inventory/family-config-types'
 import type {
@@ -115,6 +116,8 @@ export function useInventorySettings() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const { toast } = useToast()
+  const { data: session } = useSession()
+  const isSuperAdmin = (session?.user as { isSuperAdmin?: boolean })?.isSuperAdmin === true
 
   // ── State ──
   const [families, setFamilies] = useState<Family[]>([])
@@ -215,6 +218,14 @@ export function useInventorySettings() {
   // ── Toggle inventory for a family ──
   const handleToggleInventory = useCallback(
     async (family: Family) => {
+      if (!isSuperAdmin) {
+        toast({
+          title: 'Acción restringida',
+          description: 'Solo el Super Administrador puede activar o desactivar inventario por área',
+          variant: 'destructive',
+        })
+        return
+      }
       const newValue = !(family.inventoryEnabled ?? true)
       setFamilies(prev =>
         prev.map(f => (f.id === family.id ? { ...f, inventoryEnabled: newValue } : f))
@@ -250,7 +261,7 @@ export function useInventorySettings() {
         toast({ title: 'Error', description: 'Error de conexión', variant: 'destructive' })
       }
     },
-    [selectedFamilyId, loadConfig, toast]
+    [selectedFamilyId, loadConfig, toast, isSuperAdmin]
   )
 
   // ── Save family config ──
@@ -310,7 +321,12 @@ export function useInventorySettings() {
       if (res.ok) {
         toast({ title: 'Guardado', description: 'Reglas globales actualizadas' })
       } else {
-        toast({ title: 'Error', description: 'No se pudo guardar', variant: 'destructive' })
+        const data = await res.json().catch(() => ({}))
+        toast({
+          title: 'Error',
+          description: data.error || 'No se pudo guardar (requiere Super Administrador)',
+          variant: 'destructive',
+        })
       }
     } catch {
       toast({ title: 'Error', description: 'Error de conexión', variant: 'destructive' })
@@ -431,6 +447,7 @@ export function useInventorySettings() {
   const selectedFamily = families.find(f => f.id === selectedFamilyId)
 
   return {
+    isSuperAdmin,
     // Data
     families,
     selectedFamilyId,

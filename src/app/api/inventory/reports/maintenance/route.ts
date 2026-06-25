@@ -47,7 +47,12 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status') || undefined
     const format = searchParams.get('format') || undefined
 
-    const accessibleFamilyIds = await getAccessibleFamilyIds(user.id, user.role)
+    const accessibleFamilyIds = await getAccessibleFamilyIds(
+      user.id,
+      user.role,
+      (user as any).isSuperAdmin === true,
+      isAdmin ? false : await canManageInventory(user.id, user.role)
+    )
 
     // Construir where
     const where: Record<string, unknown> = {}

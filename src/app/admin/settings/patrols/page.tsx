@@ -9,6 +9,7 @@ import { PatrolAreasTab } from '@/components/settings/patrol/patrol-areas-tab'
 
 function PatrolSettingsContent() {
   const {
+    isSuperAdmin,
     families,
     selectedFamilyId,
     selectedFamily,
@@ -41,6 +42,7 @@ function PatrolSettingsContent() {
       }
     >
       <PatrolAreasTab
+        isSuperAdmin={isSuperAdmin}
         families={families}
         selectedFamilyId={selectedFamilyId}
         selectedFamily={selectedFamily}

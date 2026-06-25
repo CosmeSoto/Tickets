@@ -24,10 +24,9 @@ export async function GET(request: NextRequest) {
 
     const requesterIsSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
     if (!requesterIsSuperAdmin) {
-      const { getAdminFamilyScope } = await import('@/lib/auth/admin-scope')
-      const scope = await getAdminFamilyScope(session.user.id, false)
-      const allowed = scope.familyIds ?? []
-      if (!allowed.includes(familyId)) {
+      const { adminCanOperateTicketFamily } = await import('@/lib/auth/family-scope')
+      const allowed = await adminCanOperateTicketFamily(session.user.id, familyId, false)
+      if (!allowed) {
         return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 403 })
       }
     }

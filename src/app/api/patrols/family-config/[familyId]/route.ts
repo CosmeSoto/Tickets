@@ -8,6 +8,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getOrCreatePatrolFamilyConfig } from '@/lib/patrol/patrol-family-config'
 import { validatePatrolFamilyConfig } from '@/lib/patrol/patrol-config-validator'
+import { sanitizePatrolConfigBody } from '@/lib/auth/module-config-access'
 import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
 import prisma from '@/lib/prisma'
 
@@ -49,13 +50,14 @@ export async function PUT(
     }
 
     const { familyId } = await params
-    const body = await request.json()
-
-    // Admin Normal: verificar que tiene acceso a esta familia en el módulo de patrullas
     const isSuperAdmin = (session.user as any).isSuperAdmin === true
+    const rawBody = await request.json()
+    const body = sanitizePatrolConfigBody(rawBody as Record<string, unknown>, isSuperAdmin)
+
+    // Admin Normal: verificar que tiene acceso operativo en la familia nativa
     if (!isSuperAdmin) {
-      const { checkPatrolFamilyAccess } = await import('@/lib/patrol/patrol-access')
-      const hasAccess = await checkPatrolFamilyAccess(
+      const { checkPatrolFamilyOperate } = await import('@/lib/patrol/patrol-access')
+      const hasAccess = await checkPatrolFamilyOperate(
         session.user.id,
         familyId,
         session.user.role,

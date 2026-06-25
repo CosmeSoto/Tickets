@@ -11,6 +11,7 @@ import prisma from '@/lib/prisma'
 import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
 import { randomUUID } from 'crypto'
 import { checkPatrolModuleAccess } from '@/lib/patrol/patrol-helpers'
+import { checkPatrolFamilyOperate } from '@/lib/patrol/patrol-access'
 
 const createRouteSchema = z.object({
   familyId: z.string().uuid(),
@@ -129,6 +130,20 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const data = createRouteSchema.parse(body)
+
+    const isSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
+    const canOperate = await checkPatrolFamilyOperate(
+      session.user.id,
+      data.familyId,
+      session.user.role,
+      isSuperAdmin
+    )
+    if (!canOperate) {
+      return NextResponse.json(
+        { error: 'No tienes acceso para crear rutas en esta área' },
+        { status: 403 }
+      )
+    }
 
     // Validar que todos los checkpoints existen y están activos
     const checkpointIds = data.checkpoints.map(c => c.checkpointId)

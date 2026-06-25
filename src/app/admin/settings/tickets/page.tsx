@@ -72,7 +72,8 @@ function TicketSettingsContent() {
           <TabsTrigger
             value='global'
             className='flex-1 sm:flex-none flex items-center gap-2'
-            onClick={() => setGlobalDirty(true)}
+            onClick={() => isSuperAdmin && setGlobalDirty(true)}
+            disabled={!isSuperAdmin}
           >
             <Settings className='h-4 w-4' />
             Reglas generales

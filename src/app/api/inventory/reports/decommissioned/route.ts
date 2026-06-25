@@ -45,7 +45,12 @@ export async function GET(request: NextRequest) {
     const reason = searchParams.get('reason') || undefined
     const format = searchParams.get('format') || undefined
 
-    const accessibleFamilyIds = await getAccessibleFamilyIds(user.id, user.role)
+    const accessibleFamilyIds = await getAccessibleFamilyIds(
+      user.id,
+      user.role,
+      (user as any).isSuperAdmin === true,
+      isAdmin ? false : await canManageInventory(user.id, user.role)
+    )
 
     let familyFilter: string[] | undefined
     if (accessibleFamilyIds !== null) {

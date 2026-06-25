@@ -24,7 +24,7 @@ import { NotificationService } from './notification-service'
 import { getFamilyScopedAdmins, getNativeFamilyAdmins } from '@/lib/notifications/family-recipients'
 import { EmailService } from '@/lib/services/email/email-service'
 import { createModuleCache, getSetting } from '@/lib/api-cache'
-import { getAccessibleFamilyIds } from '@/lib/inventory/family-access'
+import { getAccessibleFamilyIds, checkInventoryRequestFamilyAccess } from '@/lib/inventory/family-access'
 import { validateReviewerComment } from '@/lib/validations/inventory/asset-request'
 import { SLAService } from './sla-service'
 
@@ -366,10 +366,14 @@ export class AssetRequestService {
       throw new Error('ASSET_REQUESTS_DISABLED')
     }
 
-    // 2. Verificar acceso del usuario a la familia
-    const accessibleFamilyIds = await getAccessibleFamilyIds(userId, userRole, isSuperAdmin, false)
-
-    if (accessibleFamilyIds !== undefined && !accessibleFamilyIds.includes(data.familyId)) {
+    // 2. Verificar acceso del usuario a la familia (scope consumer)
+    const canRequestInFamily = await checkInventoryRequestFamilyAccess(
+      userId,
+      data.familyId,
+      userRole,
+      isSuperAdmin
+    )
+    if (!canRequestInFamily) {
       throw new Error('FAMILY_ACCESS_DENIED')
     }
 

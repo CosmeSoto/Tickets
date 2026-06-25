@@ -179,7 +179,6 @@ export default function FamilyDetailPage({ params }: { params: Promise<{ id: str
             onDepartmentsChanged={handleDepartmentsChanged}
             canEditFamilyMetadata={data.currentUserIsSuperAdmin}
           />
-          />
 
           {/* Informational notice — replaces the removed Personal tab */}
           <InformationalNotice

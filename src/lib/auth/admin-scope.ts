@@ -1,16 +1,10 @@
 /**
  * Helper centralizado para determinar el scope de familias de cualquier usuario.
- * Usado por todos los endpoints que necesitan filtrar datos por familias del usuario.
  *
- * Reglas:
- * - Super Admin: undefined (sin restricción, ve todo)
- * - Admin normal: admin_family_assignments + familia nativa
- * - Técnico: technician_family_assignments + familia nativa
- * - Cliente: client_family_assignments + familia nativa
+ * Para reglas por capas (nativa / consumer / operational / visibility) ver family-scope.ts.
  *
- * Para módulos específicos:
- * - Inventario: inventory_manager_families
- * - Rondas: patrol_family_assignments (con fallback a nativa)
+ * getUserFamilyScope = visibilidad legacy (nativa + asignaciones del rol).
+ * Módulos específicos: inventario → inventory_manager_families; rondas → patrol_family_assignments.
  */
 
 import prisma from '@/lib/prisma'
@@ -178,14 +172,15 @@ export async function getAdminUnionDepartmentIds(
   return (await getDepartmentIdsForScope({ familyIds: Array.from(unionSet) })) ?? []
 }
 
-/** Filtro Prisma de tickets para admin no-super (alineado con dashboard stats). */
+/** Filtro Prisma de tickets para admin no-super (visibilidad en dashboard). */
 export async function getAdminTicketFamilyFilter(
   adminId: string,
   isSuperAdmin: boolean
 ): Promise<Record<string, unknown>> {
   if (isSuperAdmin) return {}
-  const scope = await getAdminFamilyScope(adminId, false)
-  return buildFamilyFilter({ familyIds: scope.familyIds ?? [] })
+  const { getTicketVisibilityFamilyIds } = await import('@/lib/auth/family-scope')
+  const visibilityIds = await getTicketVisibilityFamilyIds(adminId, 'ADMIN', false)
+  return buildFamilyFilter({ familyIds: visibilityIds })
 }
 
 export type AdminUserScopeResult =

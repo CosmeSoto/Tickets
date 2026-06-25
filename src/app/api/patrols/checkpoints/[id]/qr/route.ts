@@ -9,7 +9,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { PatrolQRService } from '@/lib/services/patrol-qr.service'
-import { checkPatrolFamilyAccess } from '@/lib/patrol/patrol-access'
+import { checkPatrolFamilyOperate } from '@/lib/patrol/patrol-access'
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -53,7 +53,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     if (!checkpoint.isActive)
       return NextResponse.json({ error: 'Checkpoint inactivo' }, { status: 409 })
 
-    const hasAccess = await checkPatrolFamilyAccess(
+    const hasAccess = await checkPatrolFamilyOperate(
       session.user.id,
       checkpoint.familyId,
       session.user.role,

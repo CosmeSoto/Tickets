@@ -3,17 +3,38 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { TicketFamilyConfigService } from '@/lib/services/ticket-family-config.service'
 import { invalidateCache } from '@/lib/api-cache'
+import {
+  canReadModuleFamilyConfig,
+  canWriteModuleFamilyConfig,
+  sanitizeTicketConfigBody,
+} from '@/lib/auth/module-config-access'
 
 // GET /api/families/[id]/ticket-config
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session || session.user.role !== 'ADMIN') {
+    if (!session?.user) {
       return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 401 })
     }
 
-    const { id } = await params
-    const config = await TicketFamilyConfigService.getByFamilyId(id)
+    const { id: familyId } = await params
+    const isSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
+
+    const canRead = await canReadModuleFamilyConfig(
+      session.user.id,
+      session.user.role,
+      isSuperAdmin,
+      familyId,
+      'tickets'
+    )
+    if (!canRead) {
+      return NextResponse.json(
+        { success: false, message: 'No tienes permiso para ver esta configuración' },
+        { status: 403 }
+      )
+    }
+
+    const config = await TicketFamilyConfigService.getByFamilyId(familyId)
 
     if (!config) {
       return NextResponse.json(
@@ -36,16 +57,35 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session || session.user.role !== 'ADMIN') {
+    if (!session?.user) {
       return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 401 })
     }
 
-    const { id } = await params
-    const body = await request.json()
+    const { id: familyId } = await params
+    const isSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
 
-    const updated = await TicketFamilyConfigService.update(id, body, session.user.id)
+    const canWrite = await canWriteModuleFamilyConfig(
+      session.user.id,
+      session.user.role,
+      isSuperAdmin,
+      familyId,
+      'tickets'
+    )
+    if (!canWrite) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'No tienes permiso para modificar la configuración de tickets de esta familia',
+        },
+        { status: 403 }
+      )
+    }
 
-    // Invalidar caché de módulos de todos los usuarios — ticketsEnabled cambió
+    const rawBody = await request.json()
+    const body = sanitizeTicketConfigBody(rawBody as Record<string, unknown>, isSuperAdmin)
+
+    const updated = await TicketFamilyConfigService.update(familyId, body, session.user.id)
+
     try {
       await Promise.all([invalidateCache('user:modules:*'), invalidateCache('dashboard:*')])
     } catch {

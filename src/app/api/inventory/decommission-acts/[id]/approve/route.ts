@@ -9,7 +9,6 @@ import { getUploadDir } from '@/lib/upload-path'
 import { mkdir } from 'fs/promises'
 import { existsSync } from 'fs'
 import { notifyUser } from '@/lib/api/notify'
-import { isAdminOfFamily } from '@/lib/inventory-access'
 import {
   getDecommissionContractImpact,
   releaseEquipmentFromContracts,
@@ -22,10 +21,8 @@ import {
 /**
  * POST /api/inventory/decommission-acts/[id]/approve
  *
- * Solo ADMIN puede aprobar.
- * - SuperAdmin: puede aprobar cualquier solicitud en cualquier estado
- * - Admin normal: solo puede aprobar solicitudes de sus familias en estado MANAGER_REVIEW
- *   (o PENDING/TECHNICAL_REVIEW si no hay gestores asignados a esa familia)
+ * Solo Super Admin puede aprobar la baja definitiva.
+ * (Las áreas y Compras pueden solicitar; la aprobación es jerarquía superior.)
  */
 export async function POST(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions)
@@ -39,6 +36,13 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
   }
 
   const isSuperAdmin = (session.user as any).isSuperAdmin === true
+  if (!isSuperAdmin) {
+    return NextResponse.json(
+      { error: 'Solo el Super Administrador puede aprobar la baja definitiva de equipos' },
+      { status: 403 }
+    )
+  }
+
   const { id: requestId } = await params
 
   const decommissionRequest = (await prisma.decommission_requests.findUnique({
@@ -71,26 +75,13 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     return NextResponse.json({ error: 'Solicitud no encontrada' }, { status: 404 })
   }
 
-  // Obtener familyId del activo
+  // Obtener familyId del activo (auditoría / notificaciones)
   const familyId: string | null =
     decommissionRequest.assetType === 'EQUIPMENT'
       ? (decommissionRequest.equipment?.type?.familyId ?? null)
       : (decommissionRequest.license?.licenseType?.familyId ?? null)
 
-  // Verificar que el admin tiene acceso a esta familia
-  const hasAccess = await isAdminOfFamily(session.user.id, isSuperAdmin, familyId)
-  if (!hasAccess) {
-    return NextResponse.json(
-      { error: 'No tienes permiso para aprobar bajas de esta familia' },
-      { status: 403 }
-    )
-  }
-
-  // SuperAdmin puede aprobar desde cualquier estado
-  // Admin normal solo desde MANAGER_REVIEW (o PENDING si no hay gestores en la familia)
-  const approvableStatuses = isSuperAdmin
-    ? ['PENDING', 'TECHNICAL_REVIEW', 'MANAGER_REVIEW']
-    : ['MANAGER_REVIEW', 'PENDING'] // PENDING como fallback si no hay gestores
+  const approvableStatuses = ['PENDING', 'TECHNICAL_REVIEW', 'MANAGER_REVIEW']
 
   if (!approvableStatuses.includes(decommissionRequest.status)) {
     const statusLabels: Record<string, string> = {

@@ -17,9 +17,7 @@ import type { Category } from '@/features/category-selection/types'
  * Reglas:
  * - Solo categorías usadas >= minUsage veces (default: 2)
  * - Solo categorías que pertenecen a familias a las que el usuario tiene acceso HOY
- *   (CLIENT: familia nativa + client_family_assignments activos)
- *   (TECHNICIAN: technician_family_assignments activos)
- *   (ADMIN: admin_family_assignments activos, o todas si es superAdmin)
+ *   (scope consumer vía family-scope.ts)
  * - Sin historial suficiente → array vacío, nunca datos de otros usuarios
  *
  * Query params:
@@ -56,52 +54,28 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // ── 1. Determinar familias accesibles HOY según el rol ────────────────────
+    // ── 1. Familias donde el usuario puede solicitar tickets (consumer) ─────────
     const isSuperAdmin = (session.user as any).isSuperAdmin === true
-    let allowedFamilyIds: Set<string> | null = null // null = sin restricción (superAdmin)
+    let allowedFamilyIds: Set<string> | null = null
 
-    if (session.user.role === 'CLIENT') {
-      const [userDept, clientAssignments] = await Promise.all([
-        prisma.users.findUnique({
-          where: { id: clientId },
-          select: { departments: { select: { familyId: true } } },
-        }),
-        prisma.client_family_assignments.findMany({
-          where: { clientId, isActive: true },
-          select: { familyId: true },
-        }),
-      ])
-      allowedFamilyIds = new Set(clientAssignments.map(a => a.familyId))
-      if (userDept?.departments?.familyId) allowedFamilyIds.add(userDept.departments.familyId)
-    } else if (session.user.role === 'TECHNICIAN') {
-      // Misma lógica que asClient=true: unión de todas las fuentes
-      const [userDept, clientAssignments, techAssignments] = await Promise.all([
-        prisma.users.findUnique({
-          where: { id: clientId },
-          select: { departments: { select: { familyId: true } } },
-        }),
-        prisma.client_family_assignments.findMany({
-          where: { clientId, isActive: true },
-          select: { familyId: true },
-        }),
-        prisma.technician_family_assignments.findMany({
-          where: { technicianId: clientId, isActive: true },
-          select: { familyId: true },
-        }),
-      ])
-      allowedFamilyIds = new Set([
-        ...clientAssignments.map(a => a.familyId),
-        ...techAssignments.map(a => a.familyId),
-      ])
-      if (userDept?.departments?.familyId) allowedFamilyIds.add(userDept.departments.familyId)
-    } else if (session.user.role === 'ADMIN' && !isSuperAdmin) {
-      const { getAdminFamilyScope } = await import('@/lib/auth/admin-scope')
-      const scope = await getAdminFamilyScope(clientId, false)
-      if (scope.familyIds && scope.familyIds.length > 0) {
-        allowedFamilyIds = new Set(scope.familyIds)
+    if (!(session.user.role === 'ADMIN' && isSuperAdmin)) {
+      const targetUser = await prisma.users.findUnique({
+        where: { id: clientId },
+        select: { role: true },
+      })
+      const targetRole = targetUser?.role ?? session.user.role
+      const { getTicketConsumerFamilyIds } = await import('@/lib/auth/family-scope')
+      const consumerIds = await getTicketConsumerFamilyIds(
+        clientId,
+        targetRole,
+        targetRole === 'ADMIN' && isSuperAdmin
+      )
+      if (consumerIds === undefined) {
+        allowedFamilyIds = null
+      } else {
+        allowedFamilyIds = new Set(consumerIds)
       }
     }
-    // ADMIN superAdmin → allowedFamilyIds = null (sin restricción)
 
     // Sin familias asignadas para CLIENT/TECHNICIAN → no hay frecuentes posibles
     if (allowedFamilyIds !== null && allowedFamilyIds.size === 0) {

@@ -1,82 +1,37 @@
 import { prisma } from '@/lib/prisma'
-import { getModuleFamilyIds } from '@/lib/auth/admin-scope'
+import {
+  getInventoryConsumerFamilyIds,
+  getInventoryOperationalFamilyIds,
+  getInventoryVisibilityFamilyIds,
+  isFamilyInScope,
+} from '@/lib/auth/family-scope'
 
 /**
- * Retorna los IDs de familias accesibles para un usuario según su rol:
+ * Scope de familias para inventario (ver family-scope.ts).
  *
- * - SuperAdmin (ADMIN + isSuperAdmin): acceso total → undefined (sin restricción)
- * - Admin normal (ADMIN sin isSuperAdmin): sus familias en inventory_manager_families + nativa
- * - Gestor (canManageInventory=true): sus familias en inventory_manager_families
- * - Cualquier otro rol: undefined (sin restricción de familia, la API decide qué mostrar)
- *
- * Retorna:
- *   undefined  → sin restricción (ver todo)
- *   string[]   → solo esas familias (puede ser array vacío si no tiene ninguna asignada)
+ * - visibility: listados, dashboard, lectura
+ * - operational: CRUD activos (admin solo nativa; gestor nativa + inventory_manager_families)
+ * - consumer: solicitud de activos (canRequestAssets)
  */
+
 export async function getAccessibleFamilyIds(
   userId: string,
   role: string,
   isSuperAdmin: boolean,
   canManageInventory: boolean
 ): Promise<string[] | undefined> {
-  // SuperAdmin: acceso total
-  if (role === 'ADMIN' && isSuperAdmin) return undefined
-
-  // Admin normal: familias de inventario asignadas + nativa
-  if (role === 'ADMIN') {
-    try {
-      const inventoryFamilyIds = await getModuleFamilyIds(userId, 'inventory')
-      if (inventoryFamilyIds.length === 0) {
-        // Admin sin asignaciones de inventario: solo su familia nativa
-        const user = await prisma.users.findUnique({
-          where: { id: userId },
-          select: { departments: { select: { familyId: true } } },
-        })
-        const nativeFamilyId = user?.departments?.familyId
-        return nativeFamilyId ? [nativeFamilyId] : []
-      }
-      return inventoryFamilyIds
-    } catch (error) {
-      console.error('[getAccessibleFamilyIds] Error loading inventory scope:', error)
-      // Fallback: solo familia nativa
-      const user = await prisma.users.findUnique({
-        where: { id: userId },
-        select: { departments: { select: { familyId: true } } },
-      })
-      const nativeFamilyId = user?.departments?.familyId
-      return nativeFamilyId ? [nativeFamilyId] : []
-    }
-  }
-
-  // Gestor de inventario (cualquier rol): sus familias asignadas + familia nativa
-  if (canManageInventory) {
-    const assignments = await prisma.inventory_manager_families.findMany({
-      where: { managerId: userId },
-      select: { familyId: true },
-    })
-    const assignedIds = assignments.map(a => a.familyId)
-
-    // Siempre incluir la familia nativa (departamento del usuario)
-    const user = await prisma.users.findUnique({
-      where: { id: userId },
-      select: { departments: { select: { familyId: true } } },
-    })
-    const nativeFamilyId = user?.departments?.familyId
-
-    const allIds = nativeFamilyId ? [...new Set([...assignedIds, nativeFamilyId])] : assignedIds
-
-    // Si no tiene ninguna familia (ni asignada ni nativa), devolver undefined
-    // para que vea todas — mejor que bloquearle completamente
-    return allIds.length > 0 ? allIds : undefined
-  }
-
-  // Otros roles sin gestión: sin restricción de familia (la API aplica sus propios filtros)
-  return undefined
+  return getInventoryVisibilityFamilyIds(userId, role, isSuperAdmin, canManageInventory)
 }
 
-/**
- * Verifica si un usuario tiene acceso a una familia específica.
- */
+export async function getInventoryManageFamilyIds(
+  userId: string,
+  role: string,
+  isSuperAdmin: boolean,
+  canManageInventory: boolean
+): Promise<string[] | undefined> {
+  return getInventoryOperationalFamilyIds(userId, role, isSuperAdmin, canManageInventory)
+}
+
 export async function checkFamilyAccess(
   userId: string,
   assetFamilyId: string,
@@ -84,7 +39,37 @@ export async function checkFamilyAccess(
   isSuperAdmin: boolean,
   canManageInventory: boolean
 ): Promise<boolean> {
-  const accessible = await getAccessibleFamilyIds(userId, role, isSuperAdmin, canManageInventory)
-  if (accessible === undefined) return true
-  return accessible.includes(assetFamilyId)
+  const accessible = await getInventoryVisibilityFamilyIds(
+    userId,
+    role,
+    isSuperAdmin,
+    canManageInventory
+  )
+  return isFamilyInScope(assetFamilyId, accessible)
+}
+
+export async function checkFamilyManageAccess(
+  userId: string,
+  assetFamilyId: string,
+  role: string,
+  isSuperAdmin: boolean,
+  canManageInventory: boolean
+): Promise<boolean> {
+  const operational = await getInventoryOperationalFamilyIds(
+    userId,
+    role,
+    isSuperAdmin,
+    canManageInventory
+  )
+  return isFamilyInScope(assetFamilyId, operational)
+}
+
+export async function checkInventoryRequestFamilyAccess(
+  userId: string,
+  familyId: string,
+  role: string,
+  isSuperAdmin: boolean
+): Promise<boolean> {
+  const consumer = await getInventoryConsumerFamilyIds(userId, role, isSuperAdmin)
+  return isFamilyInScope(familyId, consumer)
 }

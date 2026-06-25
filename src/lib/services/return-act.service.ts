@@ -315,12 +315,13 @@ export class ReturnActService {
           },
         })
 
-        // Actualizar estado y condición del equipo
+        // Actualizar estado y condición del equipo; liberar custodia de área (vuelve a bodega Compras)
         await tx.equipment.update({
           where: { id: (act as any).assignment.equipmentId },
           data: {
             status: newEquipmentStatus,
             condition: newEquipmentCondition,
+            departmentId: null,
           },
         })
 

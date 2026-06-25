@@ -16,8 +16,7 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const includeInactive = searchParams.get('includeInactive') === 'true'
-    // asClient=true: devolver familias donde el usuario actúa como CLIENTE
-    // (familia nativa del depto + client_family_assignments)
+    // asClient=true: familias donde el usuario puede SOLICITAR tickets (scope consumer)
     // Útil para TECHNICIAN y ADMIN cuando crean tickets propios
     const asClient = searchParams.get('asClient') === 'true'
     // forClientId: permite a ADMIN obtener las familias de un cliente específico
@@ -25,58 +24,25 @@ export async function GET(request: NextRequest) {
 
     // ── asClient: cualquier rol actuando como cliente ───────────────────────
     if (asClient && session.user.role !== 'CLIENT') {
-      // Si es ADMIN y especifica forClientId, obtener familias de ese cliente
       const targetId = session.user.role === 'ADMIN' && forClientId ? forClientId : session.user.id
 
-      // Consultas en paralelo según el rol del solicitante
-      const [user, clientAssignments, roleAssignments] = await Promise.all([
-        prisma.users.findUnique({
-          where: { id: targetId },
-          select: { departments: { select: { familyId: true } } },
-        }),
-        // Familias explícitas de cliente (client_family_assignments)
-        prisma.client_family_assignments.findMany({
-          where: { clientId: targetId, isActive: true },
-          select: { familyId: true },
-        }),
-        // Familias del rol de trabajo:
-        // TECHNICIAN → technician_family_assignments (puede crear tickets en las que atiende)
-        // ADMIN      → admin_family_assignments (puede crear tickets en las que gestiona)
-        // forClientId (cliente real) → no tiene rol de trabajo, array vacío
-        forClientId
-          ? Promise.resolve([])
-          : session.user.role === 'TECHNICIAN'
-            ? prisma.technician_family_assignments.findMany({
-                where: { technicianId: targetId, isActive: true },
-                select: { familyId: true },
-              })
-            : session.user.role === 'ADMIN'
-              ? prisma.admin_family_assignments.findMany({
-                  where: { adminId: targetId, isActive: true },
-                  select: { familyId: true },
-                })
-              : Promise.resolve([]),
-      ])
+      const { getTicketConsumerFamilyIds } = await import('@/lib/auth/family-scope')
+      const targetUser = await prisma.users.findUnique({
+        where: { id: targetId },
+        select: { role: true },
+      })
+      const targetRole = forClientId ? (targetUser?.role ?? 'CLIENT') : session.user.role
+      const consumerIds = await getTicketConsumerFamilyIds(targetId, targetRole, false)
 
-      const userFamilyId = user?.departments?.familyId ?? null
-      const allowedFamilyIds = new Set<string>([
-        ...clientAssignments.map(a => a.familyId),
-        ...roleAssignments.map(a => a.familyId),
-      ])
-      if (userFamilyId) allowedFamilyIds.add(userFamilyId)
+      let allowedFamilyIds = new Set(consumerIds ?? [])
 
-      // Admin Normal con forClientId: intersectar familias del cliente con el scope del admin
-      // Solo mostrar familias que AMBOS (cliente y admin) tienen acceso
+      // Admin Normal con forClientId: intersectar con visibilidad del admin
       if (forClientId && session.user.role === 'ADMIN' && !(session.user as any).isSuperAdmin) {
-        const { getAdminFamilyScope } = await import('@/lib/auth/admin-scope')
-        const adminScope = await getAdminFamilyScope(session.user.id, false)
-        if (adminScope.familyIds && adminScope.familyIds.length > 0) {
-          const adminFamilySet = new Set(adminScope.familyIds)
-          // Eliminar familias que el admin no tiene en su scope
+        const { getTicketVisibilityFamilyIds } = await import('@/lib/auth/family-scope')
+        const adminVisibility = await getTicketVisibilityFamilyIds(session.user.id, 'ADMIN', false)
+        if (adminVisibility) {
           for (const fId of allowedFamilyIds) {
-            if (!adminFamilySet.has(fId)) {
-              allowedFamilyIds.delete(fId)
-            }
+            if (!adminVisibility.includes(fId)) allowedFamilyIds.delete(fId)
           }
         }
       }

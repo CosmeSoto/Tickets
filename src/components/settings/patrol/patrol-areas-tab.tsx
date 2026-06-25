@@ -27,6 +27,7 @@ import { FamilyIcon } from '@/components/inventory/family-badge'
 import type { PatrolFamily, PatrolFormState } from '@/hooks/use-patrol-settings'
 
 interface PatrolAreasTabProps {
+  isSuperAdmin: boolean
   families: PatrolFamily[]
   selectedFamilyId: string | null
   selectedFamily: PatrolFamily | undefined
@@ -40,6 +41,7 @@ interface PatrolAreasTabProps {
 }
 
 export function PatrolAreasTab({
+  isSuperAdmin,
   families,
   selectedFamilyId,
   selectedFamily,
@@ -110,6 +112,7 @@ export function PatrolAreasTab({
                         checked={family.patrolsEnabled ?? true}
                         onCheckedChange={() => onTogglePatrols(family)}
                         className='scale-75'
+                        disabled={!isSuperAdmin}
                         aria-label={`Habilitar patrullas para ${family.name}`}
                       />
                       <ChevronRight className='h-4 w-4 text-muted-foreground' />

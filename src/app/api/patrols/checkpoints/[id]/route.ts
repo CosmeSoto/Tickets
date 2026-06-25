@@ -13,7 +13,7 @@ import { z } from 'zod'
 import prisma from '@/lib/prisma'
 import { PatrolQRService } from '@/lib/services/patrol-qr.service'
 import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
-import { checkPatrolFamilyAccess, canDeletePatrolResource } from '@/lib/patrol/patrol-access'
+import { checkPatrolFamilyAccess, checkPatrolFamilyOperate, canDeletePatrolResource } from '@/lib/patrol/patrol-access'
 
 const SAFE_CHECKPOINT_SELECT = {
   id: true,
@@ -97,7 +97,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     // Verificar acceso a la familia del checkpoint
     const isSuperAdmin = (session.user as any).isSuperAdmin === true
-    const hasAccess = await checkPatrolFamilyAccess(
+    const hasAccess = await checkPatrolFamilyOperate(
       session.user.id,
       existing.familyId,
       session.user.role,
@@ -198,7 +198,7 @@ export async function DELETE(
 
     // Soft delete (desactivar): ADMIN y TECHNICIAN pueden hacerlo (con acceso a la familia)
     if (!isPermanent) {
-      const hasAccess = await checkPatrolFamilyAccess(
+      const hasAccess = await checkPatrolFamilyOperate(
         session.user.id,
         existing.familyId,
         session.user.role,

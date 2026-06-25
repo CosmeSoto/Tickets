@@ -7,7 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
-import { getModuleEmoji, getModuleRoleDescription } from '@/hooks/use-system-modules'
+import { getModuleEmoji, getModuleRoleDescription, getAdditionalFamilyHint } from '@/hooks/use-system-modules'
 import { useToast } from '@/hooks/use-toast'
 
 export interface ModuleFamily {
@@ -301,8 +301,14 @@ export function ModuleAccessCard({
                     />
                   </button>
 
-                  {/* Contexto extra para rondas */}
-                  {familyMode === 'patrol' && !expanded && (
+                  {/* Contexto para familias adicionales */}
+                  {getAdditionalFamilyHint(moduleKey, role) && (
+                    <p className='text-[10px] text-muted-foreground mt-1 mb-0.5 px-0.5'>
+                      {getAdditionalFamilyHint(moduleKey, role)}
+                    </p>
+                  )}
+
+                  {familyMode === 'patrol' && !expanded && !getAdditionalFamilyHint(moduleKey, role) && (
                     <p className='text-[10px] text-muted-foreground mt-0.5'>
                       Para supervisores o agentes en varias instalaciones
                     </p>

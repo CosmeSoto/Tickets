@@ -13,7 +13,7 @@ import { NotificationService } from '@/lib/services/notification-service'
 import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
 import { NotificationType } from '@prisma/client'
 import { randomUUID } from 'crypto'
-import { checkPatrolFamilyAccess, canDeletePatrolResource } from '@/lib/patrol/patrol-access'
+import { checkPatrolFamilyAccess, checkPatrolFamilyOperate, canDeletePatrolResource } from '@/lib/patrol/patrol-access'
 
 const patchRouteSchema = z.object({
   name: z.string().min(1).max(200).optional(),
@@ -98,14 +98,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     // Verificar acceso a la familia de la ruta
     const isSuperAdmin = (session.user as any).isSuperAdmin === true
-    const hasAccess = await checkPatrolFamilyAccess(
+    const hasAccess = await checkPatrolFamilyOperate(
       session.user.id,
       existing.familyId,
       session.user.role,
       isSuperAdmin
     )
     if (!hasAccess) {
-      return NextResponse.json({ error: 'No tienes acceso a esta área' }, { status: 403 })
+      return NextResponse.json({ error: 'No tienes acceso para modificar rutas en esta área' }, { status: 403 })
     }
 
     const body = await request.json()
@@ -187,7 +187,7 @@ export async function DELETE(
 
     // Soft delete (desactivar): ADMIN y TECHNICIAN pueden hacerlo (con acceso a la familia)
     if (!isPermanent) {
-      const hasAccess = await checkPatrolFamilyAccess(
+      const hasAccess = await checkPatrolFamilyOperate(
         session.user.id,
         existing.familyId,
         session.user.role,

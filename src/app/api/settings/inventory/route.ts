@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { z } from 'zod'
+import { requireSuperAdmin } from '@/lib/auth/require-super-admin'
 
 const inventorySettingsSchema = z.object({
   manager_ids: z.array(z.string()).optional().default([]),
@@ -75,8 +76,10 @@ export async function GET(_request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-    if (session.user.role !== 'ADMIN') return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+    const gate = await requireSuperAdmin(session)
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status })
+    }
 
     const body = await request.json()
     const settings = inventorySettingsSchema.parse(body)

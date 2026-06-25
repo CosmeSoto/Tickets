@@ -3,12 +3,6 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { BackupService } from '@/lib/services/backup-service'
 
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-}
-
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)

@@ -8,7 +8,12 @@ import { EmailService } from '@/lib/services/email/email-service'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 import { NotificationService } from '@/lib/services/notification-service'
 import { TicketService } from '@/lib/services/ticket-service'
-import { getUserFamilyScope } from '@/lib/auth/admin-scope'
+import {
+  getTicketConsumerFamilyIds,
+  getTicketVisibilityFamilyIds,
+  isFamilyInScope,
+} from '@/lib/auth/family-scope'
+import { buildFamilyFilter } from '@/lib/auth/admin-scope'
 import {
   assertValidPatrolIncident,
   PatrolIncidentValidationError,
@@ -87,28 +92,36 @@ export async function GET(request: NextRequest) {
       if (viewMode === 'created') {
         where.clientId = session.user.id
       } else {
-        const techFamilies = await prisma.technician_family_assignments.findMany({
-          where: { technicianId: session.user.id, isActive: true },
-          select: { familyId: true },
-        })
-        const techFamilyIds = techFamilies.map(a => a.familyId)
+        const nativeFamilyId = await (
+          await import('@/lib/auth/family-scope')
+        ).getNativeFamilyId(session.user.id)
 
-        if (techFamilyIds.length > 0) {
-          andParts.push({ familyId: { in: techFamilyIds } })
-          andParts.push({
-            OR: [{ assigneeId: session.user.id }, { assigneeId: null }],
-          })
-        } else {
-          andParts.push({
-            OR: [{ assigneeId: session.user.id }, { assigneeId: null }],
-          })
-        }
+        const workQueueFilter = nativeFamilyId
+          ? {
+              AND: [{ familyId: nativeFamilyId }, { assigneeId: null }],
+            }
+          : null
+
+        andParts.push({
+          OR: [
+            { assigneeId: session.user.id },
+            { clientId: session.user.id },
+            {
+              ticket_collaborators: {
+                some: { collaboratorId: session.user.id },
+              },
+            },
+            ...(workQueueFilter ? [workQueueFilter] : []),
+          ],
+        })
       }
     } else if (session.user.role === 'ADMIN' && !(session.user as any).isSuperAdmin) {
-      // Admin Normal: filtrar tickets por su scope de familias (admin_family_assignments + nativa)
-      const { getUserFamilyScope, buildFamilyFilter } = await import('@/lib/auth/admin-scope')
-      const scope = await getUserFamilyScope(session.user.id, 'ADMIN', false)
-      const familyFilter = buildFamilyFilter(scope)
+      const visibilityIds = await getTicketVisibilityFamilyIds(
+        session.user.id,
+        'ADMIN',
+        false
+      )
+      const familyFilter = buildFamilyFilter({ familyIds: visibilityIds })
       if (Object.keys(familyFilter).length > 0) {
         andParts.push(familyFilter)
       }
@@ -344,8 +357,12 @@ export async function POST(request: NextRequest) {
 
     const isSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
     if (!isSuperAdmin && effectiveFamilyId) {
-      const scope = await getUserFamilyScope(session.user.id, session.user.role, false)
-      if (scope.familyIds && !scope.familyIds.includes(effectiveFamilyId)) {
+      const consumerIds = await getTicketConsumerFamilyIds(
+        session.user.id,
+        session.user.role,
+        false
+      )
+      if (!isFamilyInScope(effectiveFamilyId, consumerIds)) {
         return NextResponse.json(
           { success: false, message: 'No tienes permiso para crear tickets en esta familia' },
           { status: 403 }

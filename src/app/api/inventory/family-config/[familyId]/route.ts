@@ -3,7 +3,11 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
-import { canManageInventory } from '@/lib/inventory-access'
+import {
+  canReadModuleFamilyConfig,
+  canWriteModuleFamilyConfig,
+  sanitizeInventoryConfigBody,
+} from '@/lib/auth/module-config-access'
 import { z } from 'zod'
 import { DEFAULT_FAMILY_CONFIG } from '@/lib/inventory/family-config'
 
@@ -51,14 +55,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ fami
   const { role, id: userId } = session.user as { role: string; id: string }
   const isSuperAdmin = (session.user as any).isSuperAdmin === true
 
-  if (role !== 'ADMIN' && !isSuperAdmin) {
-    const allowed = await canManageInventory(userId, role)
-    if (!allowed) {
-      return NextResponse.json(
-        { error: 'No tienes permiso para ver la configuración' },
-        { status: 403 }
-      )
-    }
+  const canRead = await canReadModuleFamilyConfig(userId, role, isSuperAdmin, familyId, 'inventory')
+  if (!canRead) {
+    return NextResponse.json(
+      { error: 'No tienes permiso para ver la configuración de esta familia' },
+      { status: 403 }
+    )
   }
 
   try {
@@ -90,18 +92,20 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ fami
     return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
   }
 
-  const { role } = session.user as { role: string; id: string }
+  const { role, id: userId } = session.user as { role: string; id: string }
   const isSuperAdmin = (session.user as any).isSuperAdmin === true
 
-  if (role !== 'ADMIN' && !isSuperAdmin) {
+  const canWrite = await canWriteModuleFamilyConfig(userId, role, isSuperAdmin, familyId, 'inventory')
+  if (!canWrite) {
     return NextResponse.json(
-      { error: 'No tienes permiso para modificar la configuración' },
+      { error: 'No tienes permiso para modificar la configuración de esta familia' },
       { status: 403 }
     )
   }
 
   try {
-    const body = await req.json()
+    const rawBody = await req.json()
+    const body = sanitizeInventoryConfigBody(rawBody as Record<string, unknown>, isSuperAdmin)
     const validated = updateConfigSchema.parse(body)
 
     const family = await prisma.families.findUnique({ where: { id: familyId } })
@@ -123,11 +127,20 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ fami
             : undefined,
     } as any // cast necesario porque Zod infiere string en lugar del enum DepreciationMethod
 
-    // inventoryEnabled ahora es un campo real en la BD
+    // inventoryEnabled: solo Super Admin puede cambiarlo
+    const inventoryEnabledPatch =
+      isSuperAdmin && validated.inventoryEnabled !== undefined
+        ? { inventoryEnabled: validated.inventoryEnabled }
+        : {}
+
     const config = await prisma.inventory_family_config.upsert({
       where: { familyId },
-      create: { familyId, inventoryEnabled: validated.inventoryEnabled ?? true, ...configData },
-      update: { inventoryEnabled: validated.inventoryEnabled ?? true, ...configData },
+      create: {
+        familyId,
+        inventoryEnabled: isSuperAdmin ? (validated.inventoryEnabled ?? true) : true,
+        ...configData,
+      },
+      update: { ...configData, ...inventoryEnabledPatch },
     })
 
     // Invalidar caché de módulos — inventoryEnabled cambió

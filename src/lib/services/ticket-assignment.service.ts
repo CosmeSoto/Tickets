@@ -50,17 +50,12 @@ export class AssignmentService {
         throw new Error('No hay técnicos disponibles para este ticket')
       }
 
-      // 🎯 PRIORIDAD 1: técnicos asignados a la familia del ticket
-      // Los admins son elegibles para cualquier familia
+      // 🎯 PRIORIDAD 1: técnicos con familia NATIVA igual a la del ticket
       if (ticket.familyId) {
-        const techsFromFamily = await prisma.technician_family_assignments.findMany({
-          where: { familyId: ticket.familyId, isActive: true },
-          select: { technicianId: true },
-        })
-        const familyTechIds = new Set(techsFromFamily.map(t => t.technicianId))
-        // Técnicos de la familia + todos los admins (no están restringidos por familia)
+        const { getTechnicianIdsNativeToFamily } = await import('@/lib/auth/family-scope')
+        const nativeTechIds = new Set(await getTechnicianIdsNativeToFamily(ticket.familyId))
         const techsInFamily = availableTechnicians.filter(
-          t => familyTechIds.has(t.id) || t.role === 'ADMIN'
+          t => nativeTechIds.has(t.id) || t.role === 'ADMIN'
         )
         if (techsInFamily.length > 0) {
           availableTechnicians = techsInFamily
@@ -262,14 +257,13 @@ export class AssignmentService {
           reasons.push('Técnico especializado')
         }
 
-        // Factor 1: Familia coincidente (20% del peso)
+        // Factor 1: Familia nativa coincidente (20% del peso)
         if (ticket.familyId) {
-          const familyAssignment = await prisma.technician_family_assignments.findFirst({
-            where: { technicianId: technician.id, familyId: ticket.familyId, isActive: true },
-          })
-          if (familyAssignment) {
+          const { technicianIsNativeToFamily } = await import('@/lib/auth/family-scope')
+          const isNative = await technicianIsNativeToFamily(technician.id, ticket.familyId)
+          if (isNative) {
             score += 0.2
-            reasons.push('Asignado a la familia del ticket')
+            reasons.push('Familia nativa del ticket')
           }
         }
 

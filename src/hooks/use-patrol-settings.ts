@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { useToast } from '@/hooks/use-toast'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -82,6 +83,8 @@ export function usePatrolSettings() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const { toast } = useToast()
+  const { data: session } = useSession()
+  const isSuperAdmin = (session?.user as { isSuperAdmin?: boolean })?.isSuperAdmin === true
 
   const [families, setFamilies] = useState<PatrolFamily[]>([])
   const [selectedFamilyId, setSelectedFamilyId] = useState<string | null>(
@@ -158,6 +161,14 @@ export function usePatrolSettings() {
   // ── Toggle patrolsEnabled para una familia (optimista) ─────────────────────
   const handleTogglePatrols = useCallback(
     async (family: PatrolFamily) => {
+      if (!isSuperAdmin) {
+        toast({
+          title: 'Acción restringida',
+          description: 'Solo el Super Administrador puede activar o desactivar rondas por área',
+          variant: 'destructive',
+        })
+        return
+      }
       const newValue = !(family.patrolsEnabled ?? true)
       // Actualización optimista
       setFamilies(prev =>
@@ -196,7 +207,7 @@ export function usePatrolSettings() {
         toast({ title: 'Error', description: 'Error de conexión', variant: 'destructive' })
       }
     },
-    [selectedFamilyId, loadConfig, toast]
+    [selectedFamilyId, loadConfig, toast, isSuperAdmin]
   )
 
   // ── Guardar configuración ──────────────────────────────────────────────────
@@ -204,10 +215,12 @@ export function usePatrolSettings() {
     if (!selectedFamilyId) return
     setSaving(true)
     try {
+      const { patrolsEnabled: _ignored, ...operationalForm } = form
+      const payload = isSuperAdmin ? form : operationalForm
       const res = await fetch(`/api/patrols/family-config/${selectedFamilyId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       })
       const data = await res.json()
       if (data.success) {
@@ -230,7 +243,7 @@ export function usePatrolSettings() {
     } finally {
       setSaving(false)
     }
-  }, [selectedFamilyId, form, toast])
+  }, [selectedFamilyId, form, toast, isSuperAdmin])
 
   // ── Helpers de formulario ──────────────────────────────────────────────────
   const setField = useCallback(
@@ -251,6 +264,7 @@ export function usePatrolSettings() {
   const selectedFamily = families.find(f => f.id === selectedFamilyId)
 
   return {
+    isSuperAdmin,
     families,
     selectedFamilyId,
     selectedFamily,
