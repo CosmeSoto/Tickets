@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import { getPatrolAccessibleFamilyIds } from '@/lib/patrol/patrol-access'
+import { getPatrolAccessibleFamilyIds, checkPatrolFamilyAccess } from '@/lib/patrol/patrol-access'
 import { checkPatrolModuleAccess } from '@/lib/patrol/patrol-helpers'
 import { z } from 'zod'
 
@@ -71,6 +71,15 @@ export async function GET(request: NextRequest) {
     }
 
     if (familyId) {
+      const hasAccess = await checkPatrolFamilyAccess(
+        session.user.id,
+        familyId,
+        session.user.role,
+        isSuperAdmin
+      )
+      if (!hasAccess) {
+        return NextResponse.json({ error: 'No tienes acceso a esta área' }, { status: 403 })
+      }
       where.familyId = familyId
     } else if (accessibleFamilyIds !== undefined && accessibleFamilyIds.length > 0) {
       where.familyId = { in: accessibleFamilyIds }

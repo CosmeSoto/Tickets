@@ -184,11 +184,10 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       // Accesorios y especificaciones
       accessories: equipment.accessories ?? [],
       specifications: null,
-      // Notas
-      notes: equipment.notes ?? null,
+      // Notas internas no se exponen en verificación pública QR
       // Foto: primero adjunto, luego campo legacy
       photoUrl: firstAttachmentId
-        ? `/api/inventory/equipment/${equipment.id}/attachments/${firstAttachmentId}?preview=true`
+        ? `/api/public/equipment-attachments/${firstAttachmentId}`
         : (equipment.photoUrl ?? null),
       // Asignación
       assignment: assignmentInfo,

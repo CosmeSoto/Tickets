@@ -1,11 +1,12 @@
 /**
  * GET /api/admin/news/[id]/attachments/[attachmentId]/file
- * Sirve el archivo adjunto de una noticia.
+ * Sirve el archivo adjunto de una noticia (gestores con acceso).
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { assertCanViewNews } from '@/lib/news/news-access'
 import { readFile } from 'fs/promises'
 import { existsSync } from 'fs'
 
@@ -19,17 +20,22 @@ export async function GET(
       return new NextResponse('No autorizado', { status: 401 })
     }
 
-    const { attachmentId } = await params
+    const { id: newsId, attachmentId } = await params
+
+    const denied = await assertCanViewNews(newsId, session.user.id, { allowAdminBypass: true })
+    if (denied) {
+      const status = denied.status
+      return new NextResponse(status === 404 ? 'Noticia no encontrada' : 'No autorizado', { status })
+    }
 
     const attachment = await prisma.news_attachments.findUnique({
       where: { id: attachmentId },
     })
 
-    if (!attachment) {
+    if (!attachment || attachment.newsId !== newsId) {
       return new NextResponse('Archivo no encontrado', { status: 404 })
     }
 
-    // Verificar que el archivo existe en disco
     if (!existsSync(attachment.path)) {
       return new NextResponse('Archivo no disponible', { status: 404 })
     }

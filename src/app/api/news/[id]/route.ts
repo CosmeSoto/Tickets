@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getNewsViewer, userCanAccessNews } from '@/lib/news/news-access'
 
 interface Params {
   params: Promise<{ id: string }>
@@ -27,15 +28,7 @@ export async function GET(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    const user = await prisma.users.findUnique({
-      where: { id: session.user.id },
-      select: {
-        id: true,
-        role: true,
-        departmentId: true,
-        isSuperAdmin: true,
-      },
-    })
+    const user = await getNewsViewer(session.user.id)
 
     if (!user) {
       return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 })
@@ -104,63 +97,21 @@ export async function GET(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'Noticia no encontrada' }, { status: 404 })
     }
 
-    // El creador siempre tiene acceso a su propia noticia
     const isCreator = news.createdById === user.id
-    const isSuperAdmin = user.isSuperAdmin === true
-    const isAdmin = user.role === 'ADMIN'
 
-    // Solo el creador y admins pueden ver noticias no publicadas
-    if (news.status !== 'PUBLISHED' && !isCreator && !isSuperAdmin && !isAdmin) {
+    if (news.status !== 'PUBLISHED' && !isCreator && !user.isSuperAdmin && user.role !== 'ADMIN') {
       return NextResponse.json({ error: 'Noticia no encontrada' }, { status: 404 })
     }
 
-    // Verificar rango de fechas para usuarios normales
-    const now = new Date()
-    if (!isCreator && !isSuperAdmin && !isAdmin) {
-      if (news.startDate && news.startDate > now) {
-        return NextResponse.json({ error: 'Noticia no encontrada' }, { status: 404 })
-      }
-      if (news.endDate && news.endDate < now) {
-        return NextResponse.json({ error: 'Noticia no encontrada' }, { status: 404 })
-      }
+    if (
+      !userCanAccessNews(news, user, {
+        allowAdminBypass: true,
+        requirePublished: news.status === 'PUBLISHED',
+      })
+    ) {
+      return NextResponse.json({ error: 'No tienes acceso a esta noticia' }, { status: 403 })
     }
 
-    const noRestrictions =
-      news.news_roles.length === 0 &&
-      news.news_users.length === 0 &&
-      news.news_departments.length === 0 &&
-      (news as any).news_families.length === 0
-
-    const hasAccess =
-      isCreator ||
-      isSuperAdmin ||
-      isAdmin ||
-      noRestrictions ||
-      news.news_roles.some((nr: any) => nr.role === user.role) ||
-      news.news_users.some((nu: any) => nu.userId === user.id) ||
-      (user.departmentId
-        ? news.news_departments.some((nd: any) => nd.departmentId === user.departmentId)
-        : false)
-
-    if (!hasAccess) {
-      // Verificar acceso por familia (requiere lookup del departamento)
-      const userDept = user.departmentId
-        ? await prisma.departments.findUnique({
-            where: { id: user.departmentId },
-            select: { familyId: true },
-          })
-        : null
-      const userFamilyId = userDept?.familyId
-      const hasFamilyAccess = userFamilyId
-        ? (news as any).news_families.some((nf: any) => nf.familyId === userFamilyId)
-        : false
-
-      if (!hasFamilyAccess) {
-        return NextResponse.json({ error: 'No tienes acceso a esta noticia' }, { status: 403 })
-      }
-    }
-
-    // Filtrar comentarios ocultos para usuarios que no son creador ni superadmin
     const canSeeHidden = user.isSuperAdmin || news.createdById === user.id
     if (!canSeeHidden && news.news_comments) {
       ;(news as any).news_comments = (news.news_comments as any[])

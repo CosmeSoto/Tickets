@@ -21,8 +21,18 @@ export async function POST(
       }, { status: 401 })
     }
 
-    // Solo el propio usuario o un admin puede cambiar el avatar
-    if (session.user.id !== id && session.user.role !== 'ADMIN') {
+    // Solo el propio usuario o un admin en su ámbito puede cambiar el avatar
+    if (session.user.id !== id && session.user.role === 'ADMIN') {
+      const { assertAdminCanManageUser } = await import('@/lib/auth/admin-scope')
+      const scopeCheck = await assertAdminCanManageUser(
+        session.user.id,
+        (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true,
+        id
+      )
+      if (!scopeCheck.allowed) {
+        return NextResponse.json({ success: false, error: scopeCheck.error }, { status: scopeCheck.status })
+      }
+    } else if (session.user.id !== id && session.user.role !== 'ADMIN') {
       return NextResponse.json({ 
         success: false,
         error: 'No tienes permisos para realizar esta acción' 
@@ -147,8 +157,18 @@ export async function DELETE(
       }, { status: 401 })
     }
 
-    // Solo el propio usuario o un admin puede eliminar el avatar
-    if (session.user.id !== id && session.user.role !== 'ADMIN') {
+    // Solo el propio usuario o un admin en su ámbito puede eliminar el avatar
+    if (session.user.id !== id && session.user.role === 'ADMIN') {
+      const { assertAdminCanManageUser } = await import('@/lib/auth/admin-scope')
+      const scopeCheck = await assertAdminCanManageUser(
+        session.user.id,
+        (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true,
+        id
+      )
+      if (!scopeCheck.allowed) {
+        return NextResponse.json({ success: false, error: scopeCheck.error }, { status: scopeCheck.status })
+      }
+    } else if (session.user.id !== id && session.user.role !== 'ADMIN') {
       return NextResponse.json({ 
         success: false,
         error: 'No tienes permisos para realizar esta acción' 

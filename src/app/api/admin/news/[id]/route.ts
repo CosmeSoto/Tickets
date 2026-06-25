@@ -290,14 +290,12 @@ export async function PUT(request: NextRequest, { params }: Params) {
         // Crear notificaciones persistentes para usuarios con el módulo de noticias habilitado
         const { NotificationService } = await import('@/lib/services/notification-service')
         const { NotificationType } = await import('@prisma/client')
-        const targetUsers = await prisma.users.findMany({
-          where: {
-            newsEnabled: true,
-            isActive: true,
-            id: { not: session.user.id },
-          },
-          select: { id: true },
-        })
+        const {
+          getNewsNotificationLink,
+          getNewsNotificationRecipientIds,
+        } = await import('@/lib/news/news-access')
+
+        const targetUsers = await getNewsNotificationRecipientIds(news.id, session.user.id)
 
         const newsPriority = news.priority ?? 'MEDIUM'
         const priorityLabel =
@@ -313,7 +311,10 @@ export async function PUT(request: NextRequest, { params }: Params) {
                   : NotificationType.INFO,
               title: `${priorityLabel}Nueva noticia publicada`,
               message: `${news.title}`,
-              metadata: { link: '/admin/news', newsId: news.id },
+              metadata: {
+                link: getNewsNotificationLink(u),
+                newsId: news.id,
+              },
             })
           )
         )

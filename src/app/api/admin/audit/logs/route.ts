@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
           : searchParams.get('entityType') || undefined,
       action: searchParams.get('action') || undefined,
       userId: searchParams.get('userId') || undefined,
+      familyId: searchParams.get('familyId') || undefined,
       limit: Math.min(parseInt(searchParams.get('limit') || '50'), 500),
       offset: Math.max(0, parseInt(searchParams.get('offset') || '0')),
     }
@@ -31,6 +32,7 @@ export async function GET(request: NextRequest) {
       entityType: filters.entityType,
       action: filters.action,
       userId: filters.userId,
+      familyId: filters.familyId,
       limit: filters.limit,
       offset: filters.offset,
       days,

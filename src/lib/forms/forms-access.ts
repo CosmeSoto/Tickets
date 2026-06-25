@@ -8,8 +8,8 @@
  *   - Puede crear, editar y eliminar cualquier documento
  *
  * Admin normal (ADMIN sin isSuperAdmin):
- *   - Ve todos los documentos (igual que SuperAdmin en lectura)
- *   - Puede gestionar (crear/editar/eliminar) documentos de sus familias asignadas
+ *   - Ve todos los documentos en lectura (API admin)
+ *   - Puede gestionar cualquier documento
  *
  * TECHNICIAN o CLIENT con canManageForms=true:
  *   - Ve solo documentos donde tiene visibilidad (formsEnabled debe estar activo)

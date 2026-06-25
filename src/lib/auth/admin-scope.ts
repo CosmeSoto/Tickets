@@ -157,3 +157,100 @@ export async function getModuleFamilyIds(
 
   return assignedIds
 }
+
+/**
+ * Departamentos visibles para un admin no-super (Union_Scope: tickets + inventario + rondas).
+ * undefined = sin restricción (super admin). [] = sin acceso a ningún usuario.
+ */
+export async function getAdminUnionDepartmentIds(
+  adminId: string,
+  isSuperAdmin: boolean
+): Promise<string[] | undefined> {
+  if (isSuperAdmin) return undefined
+
+  const scope = await getAdminFamilyScope(adminId, false)
+  const unionSet = new Set<string>(scope.familyIds ?? [])
+  for (const id of await getModuleFamilyIds(adminId, 'inventory')) unionSet.add(id)
+  for (const id of await getModuleFamilyIds(adminId, 'patrols')) unionSet.add(id)
+
+  if (unionSet.size === 0) return []
+
+  return (await getDepartmentIdsForScope({ familyIds: Array.from(unionSet) })) ?? []
+}
+
+/** Filtro Prisma de tickets para admin no-super (alineado con dashboard stats). */
+export async function getAdminTicketFamilyFilter(
+  adminId: string,
+  isSuperAdmin: boolean
+): Promise<Record<string, unknown>> {
+  if (isSuperAdmin) return {}
+  const scope = await getAdminFamilyScope(adminId, false)
+  return buildFamilyFilter({ familyIds: scope.familyIds ?? [] })
+}
+
+export type AdminUserScopeResult =
+  | { allowed: true }
+  | { allowed: false; status: number; error: string }
+
+/** Valida que un admin no-super pueda ver/editar/eliminar un usuario objetivo. */
+export async function assertAdminCanManageUser(
+  adminId: string,
+  isSuperAdmin: boolean,
+  targetUserId: string
+): Promise<AdminUserScopeResult> {
+  if (isSuperAdmin || adminId === targetUserId) return { allowed: true }
+
+  const deptIds = await getAdminUnionDepartmentIds(adminId, false)
+  if (deptIds === undefined) return { allowed: true }
+  if (deptIds.length === 0) {
+    return { allowed: false, status: 403, error: 'No tienes usuarios en tu ámbito' }
+  }
+
+  const target = await prisma.users.findUnique({
+    where: { id: targetUserId },
+    select: { departmentId: true, isSuperAdmin: true },
+  })
+  if (!target) {
+    return { allowed: false, status: 404, error: 'Usuario no encontrado' }
+  }
+  if (target.isSuperAdmin) {
+    return { allowed: false, status: 403, error: 'No autorizado' }
+  }
+  if (!target.departmentId || !deptIds.includes(target.departmentId)) {
+    return { allowed: false, status: 403, error: 'No autorizado para gestionar este usuario' }
+  }
+  return { allowed: true }
+}
+
+/** Familias visibles para admin no-super (Union_Scope). undefined = sin restricción. */
+export async function getAdminUnionFamilyIds(
+  adminId: string,
+  isSuperAdmin: boolean
+): Promise<string[] | undefined> {
+  if (isSuperAdmin) return undefined
+
+  const scope = await getAdminFamilyScope(adminId, false)
+  const unionSet = new Set<string>(scope.familyIds ?? [])
+  for (const id of await getModuleFamilyIds(adminId, 'inventory')) unionSet.add(id)
+  for (const id of await getModuleFamilyIds(adminId, 'patrols')) unionSet.add(id)
+
+  return Array.from(unionSet)
+}
+
+/** Valida que un admin no-super pueda leer/gestionar recursos de una familia. */
+export async function assertAdminCanAccessFamily(
+  adminId: string,
+  isSuperAdmin: boolean,
+  familyId: string
+): Promise<AdminUserScopeResult> {
+  if (isSuperAdmin) return { allowed: true }
+
+  const familyIds = await getAdminUnionFamilyIds(adminId, false)
+  if (!familyIds || familyIds.length === 0) {
+    return { allowed: false, status: 403, error: 'No tienes familias asignadas' }
+  }
+  if (!familyIds.includes(familyId)) {
+    return { allowed: false, status: 403, error: 'No autorizado para acceder a esta familia' }
+  }
+  return { allowed: true }
+}

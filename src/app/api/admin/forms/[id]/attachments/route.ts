@@ -10,6 +10,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { FileService } from '@/lib/services/file-service'
 import { assertCanManageForms, assertCanModifyForm } from '@/lib/forms/forms-access'
+import { assertCanViewForm } from '@/lib/forms/form-visibility'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -93,6 +94,9 @@ export async function GET(_request: NextRequest, { params }: Params) {
     if (!session?.user) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
+
+    const deniedView = await assertCanViewForm(id, session.user.id)
+    if (deniedView) return deniedView
 
     const attachments = await FileService.getFilesByForm(id)
     return NextResponse.json({ attachments })

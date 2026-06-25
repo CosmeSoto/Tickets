@@ -46,12 +46,25 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    // Los usuarios pueden ver su propio perfil, los admins pueden ver cualquiera
-    if (session.user.role !== 'ADMIN' && session.user.id !== (await params).id) {
+    // Los usuarios pueden ver su propio perfil, los admins pueden ver usuarios en su ámbito
+    const targetId = (await params).id
+    if (session.user.role !== 'ADMIN' && session.user.id !== targetId) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
     }
 
-    const user = await UserService.getUserById((await params).id)
+    if (session.user.role === 'ADMIN' && session.user.id !== targetId) {
+      const { assertAdminCanManageUser } = await import('@/lib/auth/admin-scope')
+      const scopeCheck = await assertAdminCanManageUser(
+        session.user.id,
+        (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true,
+        targetId
+      )
+      if (!scopeCheck.allowed) {
+        return NextResponse.json({ error: scopeCheck.error }, { status: scopeCheck.status })
+      }
+    }
+
+    const user = await UserService.getUserById(targetId)
 
     if (!user) {
       return NextResponse.json(
@@ -92,13 +105,28 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
     }
 
+    const targetId = (await params).id
+    const isSelf = session.user.id === targetId
+
+    if (session.user.role === 'ADMIN' && !isSelf) {
+      const { assertAdminCanManageUser } = await import('@/lib/auth/admin-scope')
+      const scopeCheck = await assertAdminCanManageUser(
+        session.user.id,
+        (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true,
+        targetId
+      )
+      if (!scopeCheck.allowed) {
+        return NextResponse.json({ success: false, error: scopeCheck.error }, { status: scopeCheck.status })
+      }
+    }
+
     const body = await request.json()
 
     // Validar datos de entrada
     const validatedData = updateUserSchema.parse(body)
 
     // Obtener datos del usuario antes de la actualización para comparar cambios
-    const currentUser = await UserService.getUserById((await params).id)
+    const currentUser = await UserService.getUserById(targetId)
     if (!currentUser) {
       return NextResponse.json(
         {
@@ -116,9 +144,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       delete validatedData.assignedCategories // Solo admins pueden asignar categorías
       delete (validatedData as any).canRequestAssets // Solo admins pueden modificar canRequestAssets
     }
-
-    const targetId = (await params).id
-    const isSelf = session.user.id === targetId
 
     // Un admin no puede desactivar su propia cuenta
     if (isSelf && validatedData.isActive === false) {
@@ -505,7 +530,8 @@ export async function DELETE(
     }
 
     // No permitir que el admin se elimine a sí mismo
-    if (session.user.id === (await params).id) {
+    const targetId = (await params).id
+    if (session.user.id === targetId) {
       return NextResponse.json(
         {
           success: false,
@@ -515,8 +541,18 @@ export async function DELETE(
       )
     }
 
+    const { assertAdminCanManageUser } = await import('@/lib/auth/admin-scope')
+    const scopeCheck = await assertAdminCanManageUser(
+      session.user.id,
+      (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true,
+      targetId
+    )
+    if (!scopeCheck.allowed) {
+      return NextResponse.json({ success: false, error: scopeCheck.error }, { status: scopeCheck.status })
+    }
+
     // Obtener datos del usuario antes de eliminarlo para las notificaciones
-    const userToDelete = await UserService.getUserById((await params).id)
+    const userToDelete = await UserService.getUserById(targetId)
     if (!userToDelete) {
       return NextResponse.json(
         {

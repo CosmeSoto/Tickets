@@ -3,6 +3,12 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { FileService } from '@/lib/services/file-service'
 import { readFile } from 'fs/promises'
+import prisma from '@/lib/prisma'
+import {
+  assertTicketAccessById,
+  TicketAccessError,
+  toTicketAccessUser,
+} from '@/lib/tickets/ticket-access'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -11,7 +17,25 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    const fileInfo = await FileService.downloadFile((await params).id)
+    const attachmentId = (await params).id
+    const attachment = await prisma.attachments.findUnique({
+      where: { id: attachmentId },
+      select: { ticketId: true },
+    })
+    if (!attachment) {
+      return NextResponse.json({ error: 'Archivo no encontrado' }, { status: 404 })
+    }
+
+    try {
+      await assertTicketAccessById(toTicketAccessUser(session.user), attachment.ticketId, 'read')
+    } catch (err) {
+      if (err instanceof TicketAccessError) {
+        return NextResponse.json({ error: err.message }, { status: err.statusCode })
+      }
+      throw err
+    }
+
+    const fileInfo = await FileService.downloadFile(attachmentId)
     const fileBuffer = await readFile(fileInfo.path)
 
     // Verificar si es una solicitud de descarga o vista previa

@@ -153,43 +153,51 @@ export async function GET(request: NextRequest) {
     }
 
     // ADMIN normal: solo ver usuarios de sus familias (Union_Scope: no super admins, no usuarios de otras familias)
-    if (session.user.role === 'ADMIN' && !(session.user as any).isSuperAdmin) {
-      const { getAdminFamilyScope, getModuleFamilyIds } = await import('@/lib/auth/admin-scope')
-      const scope = await getAdminFamilyScope(session.user.id, false)
-      const inventoryFamilyIds = await getModuleFamilyIds(session.user.id, 'inventory')
-      const patrolFamilyIds = await getModuleFamilyIds(session.user.id, 'patrols')
+    const requesterIsSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
+    const cacheScopeKey =
+      session.user.role === 'ADMIN'
+        ? requesterIsSuperAdmin
+          ? 'super'
+          : `admin:${session.user.id}`
+        : session.user.role
 
-      // Union_Scope: combinar todas las familias de todos los módulos
-      const unionSet = new Set<string>()
-      if (scope.familyIds) {
-        scope.familyIds.forEach(id => unionSet.add(id))
-      }
-      inventoryFamilyIds.forEach(id => unionSet.add(id))
-      patrolFamilyIds.forEach(id => unionSet.add(id))
+    if (session.user.role === 'ADMIN' && !requesterIsSuperAdmin) {
+      const { getAdminUnionDepartmentIds } = await import('@/lib/auth/admin-scope')
+      const deptIds = await getAdminUnionDepartmentIds(session.user.id, false)
 
-      if (unionSet.size > 0) {
-        // Obtener departamentos de las familias del Union_Scope
-        const depts = await (
-          await import('@/lib/prisma')
-        ).default.departments.findMany({
-          where: { familyId: { in: Array.from(unionSet) }, isActive: true },
-          select: { id: true },
+      if (!deptIds || deptIds.length === 0) {
+        return NextResponse.json({
+          success: true,
+          data: [],
+          meta: {
+            total: 0,
+            filters: { role, isActive, departmentId, department },
+          },
         })
-        const deptIds = depts.map(d => d.id)
-
-        if (deptIds.length > 0) {
-          where.AND = [
-            ...(where.AND ?? []),
-            { departmentId: { in: deptIds } },
-            { isSuperAdmin: false },
-          ]
-        }
       }
+
+      where.AND = [...(where.AND ?? []), { departmentId: { in: deptIds } }, { isSuperAdmin: false }]
+    } else if (session.user.role !== 'ADMIN') {
+      const { getUserFamilyScope, getDepartmentIdsForScope } = await import('@/lib/auth/admin-scope')
+      const scope = await getUserFamilyScope(session.user.id, session.user.role, false)
+      const deptIds = await getDepartmentIdsForScope(scope)
+      if (!deptIds || deptIds.length === 0) {
+        return NextResponse.json({
+          success: true,
+          data: [],
+          meta: {
+            total: 0,
+            filters: { role, isActive, departmentId, department },
+          },
+        })
+      }
+      where.AND = [...(where.AND ?? []), { departmentId: { in: deptIds } }]
     }
 
     // Intentar servir desde caché (solo para listas sin búsqueda de texto)
     if (!search) {
       const cacheKey = buildCacheKey('users:list', {
+        scope: cacheScopeKey,
         role: role ?? 'all',
         isActive: isActive ?? 'all',
         departmentId: departmentId ?? '',
@@ -355,6 +363,7 @@ export async function GET(request: NextRequest) {
     // Cache 30s para listas sin búsqueda de texto (se invalida en POST/PUT/DELETE)
     if (!search) {
       const cacheKey = buildCacheKey('users:list', {
+        scope: cacheScopeKey,
         role: role ?? 'all',
         isActive: isActive ?? 'all',
         departmentId: departmentId ?? '',
@@ -404,10 +413,13 @@ export async function POST(request: NextRequest) {
       validatedData.isSuperAdmin = false
     }
 
-    // Verificar si el departamento existe (si se proporciona departmentId)
+    const requesterIsSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
+
+    // Verificar si el departamento existe y está en el ámbito del admin
     if (validatedData.departmentId) {
       const department = await prisma.departments.findUnique({
         where: { id: validatedData.departmentId },
+        select: { id: true, familyId: true },
       })
 
       if (!department) {
@@ -416,6 +428,26 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         )
       }
+
+      if (!requesterIsSuperAdmin && department.familyId) {
+        const { assertAdminCanAccessFamily } = await import('@/lib/auth/admin-scope')
+        const familyScope = await assertAdminCanAccessFamily(
+          session.user.id,
+          false,
+          department.familyId
+        )
+        if (!familyScope.allowed) {
+          return NextResponse.json(
+            { success: false, error: 'No puedes crear usuarios fuera de tu ámbito de familias' },
+            { status: 403 }
+          )
+        }
+      }
+    } else if (!requesterIsSuperAdmin) {
+      return NextResponse.json(
+        { success: false, error: 'Debes asignar un departamento al crear usuarios en tu ámbito' },
+        { status: 400 }
+      )
     }
 
     // Crear el usuario usando el servicio

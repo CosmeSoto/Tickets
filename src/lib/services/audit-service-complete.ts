@@ -55,6 +55,7 @@ export interface AuditLogFilter {
   limit?: number
   offset?: number
   search?: string
+  familyId?: string
 }
 
 export interface AuditExportOptions {
@@ -156,6 +157,7 @@ export class AuditServiceComplete {
         limit = 50,
         offset = 0,
         search,
+        familyId,
       } = filter
 
       const where: any = {}
@@ -177,6 +179,18 @@ export class AuditServiceComplete {
         where.createdAt = {}
         if (startDate) where.createdAt.gte = startDate
         if (endDate) where.createdAt.lte = endDate
+      }
+
+      if (familyId) {
+        where.AND = [
+          ...(where.AND ?? []),
+          {
+            OR: [
+              { details: { path: ['familyId'], equals: familyId } },
+              { entityId: familyId },
+            ],
+          },
+        ]
       }
 
       const logs = await prisma.audit_logs.findMany({

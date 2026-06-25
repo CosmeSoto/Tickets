@@ -63,6 +63,17 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 
     if (!schedule) return NextResponse.json({ error: 'Schedule no encontrado' }, { status: 404 })
 
+    const isSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
+    const hasAccess = await checkPatrolFamilyAccess(
+      session.user.id,
+      schedule.familyId,
+      session.user.role,
+      isSuperAdmin
+    )
+    if (!hasAccess) {
+      return NextResponse.json({ error: 'No tienes acceso a esta área' }, { status: 403 })
+    }
+
     return NextResponse.json({ success: true, data: schedule })
   } catch (error) {
     console.error('[patrol/schedules/[id]] GET:', error)

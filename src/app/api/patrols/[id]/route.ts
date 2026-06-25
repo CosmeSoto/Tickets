@@ -14,30 +14,14 @@ import { NotificationService } from '@/lib/services/notification-service'
 import { calculateCompletionPercentage } from '@/lib/patrol/patrol-completion'
 import { NotificationType } from '@prisma/client'
 import { getPatrolSupervisors } from '@/lib/patrol/patrol-helpers'
+import { checkPatrolFamilyAccess } from '@/lib/patrol/patrol-access'
 
-/** Admin/técnico: solo patrullas del área (familia) asignada; admin sin asignaciones = acceso legacy total. */
+/** Admin/técnico: patrullas solo del área (familia) asignada. */
 async function canViewPatrolAsStaff(
   user: { id: string; role: string; isSuperAdmin?: boolean },
   familyId: string
 ): Promise<boolean> {
-  if (user.role === 'ADMIN') {
-    if (user.isSuperAdmin) return true
-    const forFamily = await prisma.admin_family_assignments.count({
-      where: { adminId: user.id, familyId, isActive: true },
-    })
-    if (forFamily > 0) return true
-    const anyAssign = await prisma.admin_family_assignments.count({
-      where: { adminId: user.id, isActive: true },
-    })
-    return anyAssign === 0
-  }
-  if (user.role === 'TECHNICIAN') {
-    const n = await prisma.technician_family_assignments.count({
-      where: { technicianId: user.id, familyId, isActive: true },
-    })
-    return n > 0
-  }
-  return false
+  return checkPatrolFamilyAccess(user.id, familyId, user.role, user.isSuperAdmin === true)
 }
 
 const patchPatrolSchema = z.discriminatedUnion('action', [

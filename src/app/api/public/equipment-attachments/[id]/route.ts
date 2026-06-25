@@ -9,10 +9,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     const attachment = await prisma.equipment_attachments.findUnique({
       where: { id },
+      include: { equipment: { select: { id: true } } },
     })
 
-    if (!attachment) {
+    if (!attachment?.equipment) {
       return NextResponse.json({ error: 'Archivo no encontrado' }, { status: 404 })
+    }
+
+    // Endpoint público (QR): solo imágenes del equipo verificable
+    if (!attachment.mimeType.startsWith('image/')) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
     }
 
     if (!existsSync(attachment.path)) {

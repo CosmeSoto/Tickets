@@ -192,7 +192,11 @@ export async function getAdminStats(userId: string, isSuperAdmin: boolean) {
     },
     ...(await (async () => {
       const [recentActivity, familyMetrics, proactiveAlerts] = await Promise.all([
-        getRecentActivity('ADMIN', userId),
+        getRecentActivity(
+          'ADMIN',
+          userId,
+          isSuperAdmin ? undefined : ticketFamilyFilter
+        ),
         getFamilyMetrics(isSuperAdmin ? undefined : adminFamilyIds),
         getProactiveAlerts(),
       ])

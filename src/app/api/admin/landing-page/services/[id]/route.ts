@@ -9,8 +9,9 @@ export async function PUT(
 ) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session || session.user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    const superCheck = await (await import('@/lib/auth/require-super-admin')).requireSuperAdmin(session)
+    if (!superCheck.ok) {
+      return NextResponse.json({ error: superCheck.error }, { status: superCheck.status })
     }
 
     const { id } = await params
@@ -52,8 +53,9 @@ export async function DELETE(
 ) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session || session.user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    const superCheck = await (await import('@/lib/auth/require-super-admin')).requireSuperAdmin(session)
+    if (!superCheck.ok) {
+      return NextResponse.json({ error: superCheck.error }, { status: superCheck.status })
     }
 
     const { id } = await params

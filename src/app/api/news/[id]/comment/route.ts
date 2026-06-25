@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { assertCanViewNews } from '@/lib/news/news-access'
 
 interface Params {
   params: Promise<{ id: string }>
@@ -31,6 +32,9 @@ export async function POST(request: NextRequest, { params }: Params) {
         { status: 400 }
       )
     }
+
+    const denied = await assertCanViewNews(id, session.user.id)
+    if (denied) return denied
 
     const news = await prisma.news.findUnique({
       where: { id: id },

@@ -15,6 +15,7 @@
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { useAudit } from '@/hooks/use-audit'
 import { useExport } from '@/hooks/common/use-export'
+import { useToast } from '@/hooks/use-toast'
 import { AuditStatsCards } from '@/components/audit/audit-stats-cards'
 import { AuditFiltersComponent } from '@/components/audit/audit-filters'
 import { AuditTable } from '@/components/audit/audit-table'
@@ -50,16 +51,32 @@ export default function AuditPage() {
     closeLogDetails,
     handlePageChange,
     handleLimitChange,
+    handleExportCSV,
+    handleExportJSON,
   } = useAudit()
 
-  // Exportación estándar (CSV, Excel, PDF) usando los datos filtrados de la tabla
-  const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
+  const { toast } = useToast()
+
+  // PDF desde la página visible; CSV/JSON vía API con todos los filtros
+  const { exportPDF, exporting } = useExport({
     filename: 'auditoria',
     title: 'Registro de Auditoría',
     subtitle: `Exportado el ${new Date().toLocaleDateString('es-EC')} • ${logs.length} registros`,
     columns: AUDIT_EXPORT_COLUMNS,
     getData: () => logs,
   })
+
+  const onExportCSV = () =>
+    handleExportCSV(
+      msg => toast({ title: 'Exportación completada', description: msg }),
+      err => toast({ title: 'Error al exportar', description: err, variant: 'destructive' })
+    )
+
+  const onExportJSON = () =>
+    handleExportJSON(
+      msg => toast({ title: 'Exportación completada', description: msg }),
+      err => toast({ title: 'Error al exportar', description: err, variant: 'destructive' })
+    )
 
   // ── Loading state (sesión) ──
   if (status === 'loading') {
@@ -100,8 +117,8 @@ export default function AuditPage() {
           loading={loading}
           onFilterChange={updateFilter}
           onClearFilters={clearFilters}
-          onExportCSV={exportCSV}
-          onExportJSON={exportExcel}
+          onExportCSV={onExportCSV}
+          onExportJSON={onExportJSON}
           onExportPDF={exportPDF}
         />
 

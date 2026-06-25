@@ -177,6 +177,8 @@ export default function FamilyDetailPage({ params }: { params: Promise<{ id: str
             departments={data.departments}
             onFamilyUpdated={handleFamilyUpdated}
             onDepartmentsChanged={handleDepartmentsChanged}
+            canEditFamilyMetadata={data.currentUserIsSuperAdmin}
+          />
           />
 
           {/* Informational notice — replaces the removed Personal tab */}

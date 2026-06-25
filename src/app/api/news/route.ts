@@ -10,6 +10,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import {
+  buildNewsVisibilityConditions,
+  getNewsViewer,
+  hasNewsModuleAccess,
+} from '@/lib/news/news-access'
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,31 +27,9 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get('type')
     const period = searchParams.get('period')
 
-    // Obtener usuario desde DB
-    const user = await prisma.users.findUnique({
-      where: { id: session.user.id },
-      select: {
-        id: true,
-        role: true,
-        departmentId: true,
-        newsEnabled: true,
-        canManageNews: true,
-        isSuperAdmin: true,
-        departments: { select: { familyId: true } },
-      },
-    })
+    const user = await getNewsViewer(session.user.id)
 
-    // Si el usuario no existe, devolver vacío
-    if (!user) {
-      return NextResponse.json({ news: [] })
-    }
-
-    // Verificar que el módulo de noticias esté habilitado para el usuario.
-    // Los admins (incluido superadmin) siempre tienen acceso.
-    // Usuarios con canManageNews también tienen acceso (gestores de noticias).
-    const isSuperAdmin = user.isSuperAdmin === true
-    const isAdmin = user.role === 'ADMIN'
-    if (!isSuperAdmin && !isAdmin && !user.newsEnabled && !user.canManageNews) {
+    if (!user || !hasNewsModuleAccess(user)) {
       return NextResponse.json({ news: [] })
     }
 
@@ -77,29 +60,7 @@ export async function GET(request: NextRequest) {
     // Filtro de visibilidad: la noticia es visible si:
     // - No tiene restricciones (ningún rol, usuario, departamento, familia asignado)
     // - O el usuario cumple alguna de las restricciones
-    const userFamilyId = user.departments?.familyId
-    const visibilityConditions: any[] = [
-      // Sin restricciones = visible para todos
-      {
-        news_roles: { none: {} },
-        news_users: { none: {} },
-        news_departments: { none: {} },
-        news_families: { none: {} },
-      },
-      // Restricción por rol
-      { news_roles: { some: { role: user.role } } },
-      // Restricción por usuario específico
-      { news_users: { some: { userId: user.id } } },
-      // El creador siempre ve sus propias noticias
-      { createdById: user.id },
-    ]
-
-    if (user.departmentId) {
-      visibilityConditions.push({ news_departments: { some: { departmentId: user.departmentId } } })
-    }
-    if (userFamilyId) {
-      visibilityConditions.push({ news_families: { some: { familyId: userFamilyId } } })
-    }
+    const visibilityConditions = buildNewsVisibilityConditions(user)
 
     andConditions.push({ OR: visibilityConditions })
 

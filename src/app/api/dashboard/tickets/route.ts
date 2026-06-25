@@ -16,15 +16,20 @@ export async function GET(request: NextRequest) {
     const userId = session.user.id
     const limit = parseInt(searchParams.get('limit') || '5')
 
-    const where: any = {}
+    const where: Record<string, unknown> = {}
 
     // Filtrar tickets según el rol
     if (role === 'TECHNICIAN') {
       where.assigneeId = userId
     } else if (role === 'CLIENT') {
       where.clientId = userId
+    } else if (role === 'ADMIN') {
+      const { getAdminTicketFamilyFilter } = await import('@/lib/auth/admin-scope')
+      Object.assign(
+        where,
+        await getAdminTicketFamilyFilter(userId, (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true)
+      )
     }
-    // Para ADMIN, mostrar todos los tickets
 
     const tickets = await prisma.tickets.findMany({
       where,
@@ -110,12 +115,18 @@ export async function GET(request: NextRequest) {
     // Estadísticas adicionales por rol
     let additionalStats = {}
     if (role === 'ADMIN') {
+      const { getAdminTicketFamilyFilter } = await import('@/lib/auth/admin-scope')
+      const familyFilter = await getAdminTicketFamilyFilter(
+        userId,
+        (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
+      )
       const [pendingAssignment, overdueTickets] = await Promise.all([
-        prisma.tickets.count({ where: { assigneeId: null, status: 'OPEN' } }),
+        prisma.tickets.count({ where: { assigneeId: null, status: 'OPEN', ...familyFilter } }),
         prisma.tickets.count({
           where: {
             status: { in: ['OPEN', 'IN_PROGRESS'] },
             createdAt: { lt: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+            ...familyFilter,
           },
         }),
       ])

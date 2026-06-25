@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { assertCanViewNews } from '@/lib/news/news-access'
 
 interface Params {
   params: Promise<{ id: string }>
@@ -21,13 +22,8 @@ export async function POST(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    const news = await prisma.news.findUnique({
-      where: { id: id },
-    })
-
-    if (!news) {
-      return NextResponse.json({ error: 'Noticia no encontrada' }, { status: 404 })
-    }
+    const denied = await assertCanViewNews(id, session.user.id)
+    if (denied) return denied
 
     const existingView = await prisma.news_views.findUnique({
       where: {

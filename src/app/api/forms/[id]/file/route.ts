@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { assertCanViewForm } from '@/lib/forms/form-visibility'
 import { readFile } from 'fs/promises'
 import { existsSync } from 'fs'
 
@@ -23,6 +24,13 @@ export async function GET(request: NextRequest, { params }: Params) {
 
     if (!session?.user) {
       return new NextResponse('Unauthorized', { status: 401 })
+    }
+
+    const denied = await assertCanViewForm(id, session.user.id)
+    if (denied) {
+      return new NextResponse(denied.status === 404 ? 'Not found' : 'Forbidden', {
+        status: denied.status,
+      })
     }
 
     // Obtener el form con su adjunto

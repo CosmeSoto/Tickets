@@ -11,6 +11,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import {
+  buildFormVisibilityConditions,
+  getFormViewer,
+  hasFormsModuleAccess,
+} from '@/lib/forms/form-visibility'
 
 export async function GET(request: NextRequest) {
   try {
@@ -23,61 +28,12 @@ export async function GET(request: NextRequest) {
     const categoryId = searchParams.get('categoryId')
     const search = searchParams.get('search')
 
-    // Obtener usuario desde DB con su familia/departamento
-    const user = await prisma.users.findUnique({
-      where: { id: session.user.id },
-      select: {
-        id: true,
-        role: true,
-        departmentId: true,
-        formsEnabled: true,
-        isSuperAdmin: true,
-        departments: { select: { familyId: true } },
-      },
-    })
-
-    if (!user) return NextResponse.json({ forms: [] })
-
-    // ADMIN y superadmin siempre tienen acceso (independiente de formsEnabled)
-    const isAdminOrSuper = user.role === 'ADMIN' || user.isSuperAdmin === true
-
-    // Solo usuarios con acceso al módulo (o admin/superadmin)
-    if (!user.formsEnabled && !isAdminOrSuper) {
+    const user = await getFormViewer(session.user.id)
+    if (!user || !hasFormsModuleAccess(user)) {
       return NextResponse.json({ forms: [] })
     }
 
-    // ── Filtro de visibilidad (igual que noticias) ────────────────────────────
-    // Un documento es visible si:
-    //   - No tiene restricciones (ningún rol, usuario, departamento, familia)
-    //   - O el usuario cumple alguna restricción
-    const userFamilyId = user.departments?.familyId
-
-    const visibilityConditions: any[] = [
-      // Sin restricciones = visible para todos
-      {
-        form_roles: { none: {} },
-        form_users: { none: {} },
-        form_departments: { none: {} },
-        form_families: { none: {} },
-      },
-      // Por rol
-      { form_roles: { some: { role: user.role } } },
-      // Por usuario específico
-      { form_users: { some: { userId: user.id } } },
-      // El creador siempre ve sus propios documentos
-      { createdById: user.id },
-    ]
-
-    if (user.departmentId) {
-      visibilityConditions.push({
-        form_departments: { some: { departmentId: user.departmentId } },
-      })
-    }
-    if (userFamilyId) {
-      visibilityConditions.push({
-        form_families: { some: { familyId: userFamilyId } },
-      })
-    }
+    const visibilityConditions = buildFormVisibilityConditions(user)
 
     const where: any = {
       isActive: true,

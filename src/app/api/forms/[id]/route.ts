@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { assertCanViewForm } from '@/lib/forms/form-visibility'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -18,6 +19,9 @@ export async function GET(_request: NextRequest, { params }: Params) {
     if (!session?.user) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
+
+    const denied = await assertCanViewForm(id, session.user.id)
+    if (denied) return denied
 
     const form = await prisma.forms.findUnique({
       where: { id, isActive: true },

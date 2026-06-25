@@ -9,6 +9,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { PatrolQRService } from '@/lib/services/patrol-qr.service'
+import { checkPatrolFamilyAccess } from '@/lib/patrol/patrol-access'
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -22,12 +23,14 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     }
 
     const { id } = await params
+    const isSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
 
     // Obtener checkpoint con qrSecret (solo para uso interno — nunca se devuelve)
     const checkpoint = await prisma.patrol_checkpoints.findUnique({
       where: { id },
       select: {
         id: true,
+        familyId: true,
         name: true,
         qrType: true,
         qrSecret: true, // Solo para generar el token — NUNCA en la respuesta
@@ -49,6 +52,16 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'Checkpoint no encontrado' }, { status: 404 })
     if (!checkpoint.isActive)
       return NextResponse.json({ error: 'Checkpoint inactivo' }, { status: 409 })
+
+    const hasAccess = await checkPatrolFamilyAccess(
+      session.user.id,
+      checkpoint.familyId,
+      session.user.role,
+      isSuperAdmin
+    )
+    if (!hasAccess) {
+      return NextResponse.json({ error: 'No tienes acceso a esta área' }, { status: 403 })
+    }
 
     // Generar token según tipo de QR
     let token: string

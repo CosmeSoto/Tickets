@@ -33,7 +33,8 @@ const settingsSchema = z
     backupFrequency: z.enum(['daily', 'weekly', 'monthly']).optional(),
     backupRetention: z.coerce.number().min(7).max(365).optional(),
   })
-  .passthrough()
+
+const SENSITIVE_SETTING_KEYS = new Set(['smtpPassword'])
 
 // Configuración por defecto
 const defaultSettings = {
@@ -123,7 +124,19 @@ export async function GET() {
       return result
     })
 
-    return NextResponse.json(settings, {
+    const isSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
+    const safeSettings = {
+      ...settings,
+      smtpPasswordConfigured: Boolean(settings.smtpPassword),
+    }
+    delete safeSettings.smtpPassword
+    if (!isSuperAdmin) {
+      for (const key of SENSITIVE_SETTING_KEYS) {
+        delete safeSettings[key]
+      }
+    }
+
+    return NextResponse.json(safeSettings, {
       headers: { 'Cache-Control': 'private, max-age=120, stale-while-revalidate=180' },
     })
   } catch (error) {
@@ -138,6 +151,17 @@ export async function PUT(request: NextRequest) {
 
     if (!session || session.user.role !== 'ADMIN') {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
+    const requester = await prisma.users.findUnique({
+      where: { id: session.user.id },
+      select: { isSuperAdmin: true },
+    })
+    if (!requester?.isSuperAdmin) {
+      return NextResponse.json(
+        { error: 'Solo el Super Administrador puede modificar la configuración del sistema' },
+        { status: 403 }
+      )
     }
 
     const body = await request.json()

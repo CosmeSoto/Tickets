@@ -208,6 +208,7 @@ export function AuditFiltersComponent({
               {filters.search && ` Búsqueda: "${filters.search}"`}
               {filters.entityType !== 'all' && ` | Módulo: ${filters.entityType}`}
               {filters.action && ` | Acción: "${filters.action}"`}
+              {filters.familyId && ` | Familia filtrada`}
               {filters.days !== '30' && ` | Período: ${filters.days} días`}
             </div>
           </div>

@@ -306,14 +306,12 @@ export async function POST(request: NextRequest) {
         // Crear notificaciones persistentes para usuarios con el módulo de noticias habilitado
         const { NotificationService } = await import('@/lib/services/notification-service')
         const { NotificationType } = await import('@prisma/client')
-        const targetUsers = await prisma.users.findMany({
-          where: {
-            newsEnabled: true,
-            isActive: true,
-            id: { not: session.user.id }, // No notificar al creador
-          },
-          select: { id: true },
-        })
+        const {
+          getNewsNotificationLink,
+          getNewsNotificationRecipientIds,
+        } = await import('@/lib/news/news-access')
+
+        const targetUsers = await getNewsNotificationRecipientIds(news.id, session.user.id)
 
         const priorityLabel =
           priority === 'URGENT' ? '🚨 ' : priority === 'HIGH' ? '⚠️ ' : ''
@@ -328,7 +326,10 @@ export async function POST(request: NextRequest) {
                   : NotificationType.INFO,
               title: `${priorityLabel}Nueva noticia publicada`,
               message: `${data.title}`,
-              metadata: { link: '/admin/news', newsId: news.id },
+              metadata: {
+                link: getNewsNotificationLink(u),
+                newsId: news.id,
+              },
             })
           )
         )

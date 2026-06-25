@@ -15,6 +15,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (session.user.role !== 'ADMIN')
       return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
 
+    const requester = await prisma.users.findUnique({
+      where: { id: session.user.id },
+      select: { isSuperAdmin: true },
+    })
+    if (!requester?.isSuperAdmin) {
+      return NextResponse.json(
+        { error: 'Solo el Super Administrador puede editar datos generales de familias' },
+        { status: 403 }
+      )
+    }
+
     const { id } = await params
 
     const existing = await prisma.families.findUnique({ where: { id } })

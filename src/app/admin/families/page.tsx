@@ -366,10 +366,12 @@ export default function FamiliesPage() {
                     <TableCell colSpan={8} className='text-center py-12 text-muted-foreground'>
                       <Layers className='h-10 w-10 mx-auto mb-3 opacity-30' />
                       <p>No hay familias registradas</p>
-                      <Button className='mt-3' onClick={openCreateDialog}>
-                        <Plus className='h-4 w-4 mr-2' />
-                        Crear primera familia
-                      </Button>
+                      {isSuperAdmin && (
+                        <Button className='mt-3' onClick={openCreateDialog}>
+                          <Plus className='h-4 w-4 mr-2' />
+                          Crear primera familia
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ) : filteredFamilies.length === 0 ? (

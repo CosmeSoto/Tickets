@@ -20,6 +20,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     const { id } = await params
 
+    const requesterIsSuperAdmin =
+      (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
+    const familyScope = await (
+      await import('@/lib/auth/admin-scope')
+    ).assertAdminCanAccessFamily(session.user.id, requesterIsSuperAdmin, id)
+    if (!familyScope.allowed) {
+      return NextResponse.json({ error: familyScope.error }, { status: familyScope.status })
+    }
+
     // Caché 30 segundos — datos de familia, se invalida en mutaciones
     const cacheKey = buildCacheKey('admin:family', { id })
     const data = await withCache(cacheKey, 30, async () => {

@@ -18,8 +18,18 @@ export async function GET(
       )
     }
 
-    // Verificar permisos: ADMIN puede ver cualquier usuario, otros solo pueden ver sus propias estadísticas
-    if (session.user.role !== 'ADMIN' && session.user.id !== userId) {
+    // Verificar permisos: ADMIN en ámbito o el propio usuario
+    if (session.user.role === 'ADMIN' && session.user.id !== userId) {
+      const { assertAdminCanManageUser } = await import('@/lib/auth/admin-scope')
+      const scopeCheck = await assertAdminCanManageUser(
+        session.user.id,
+        (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true,
+        userId
+      )
+      if (!scopeCheck.allowed) {
+        return NextResponse.json({ success: false, error: scopeCheck.error }, { status: scopeCheck.status })
+      }
+    } else if (session.user.role !== 'ADMIN' && session.user.id !== userId) {
       return NextResponse.json(
         { success: false, error: 'No autorizado' },
         { status: 403 }

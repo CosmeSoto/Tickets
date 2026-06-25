@@ -14,6 +14,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     const { id } = await params
+
+    const requesterIsSuperAdmin =
+      (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
+    const familyScope = await (
+      await import('@/lib/auth/admin-scope')
+    ).assertAdminCanAccessFamily(session.user.id, requesterIsSuperAdmin, id)
+    if (!familyScope.allowed) {
+      return NextResponse.json({ success: false, message: familyScope.error }, { status: familyScope.status })
+    }
+
     const family = await FamilyService.findById(id)
 
     if (!family) {

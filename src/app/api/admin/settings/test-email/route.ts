@@ -16,8 +16,9 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
 
-    if (!session || session.user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    const superCheck = await (await import('@/lib/auth/require-super-admin')).requireSuperAdmin(session)
+    if (!superCheck.ok) {
+      return NextResponse.json({ error: superCheck.error }, { status: superCheck.status })
     }
 
     const body = await request.json()

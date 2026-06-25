@@ -126,11 +126,16 @@ function formatTimeAgo(date: Date): string {
   return 'ahora'
 }
 
-export async function getRecentActivity(role: string, _userId: string) {
+export async function getRecentActivity(
+  role: string,
+  _userId: string,
+  ticketFamilyFilter?: Record<string, unknown>
+) {
   const activities: any[] = []
 
   if (role === 'ADMIN') {
     const recentTickets = await prisma.tickets.findMany({
+      where: ticketFamilyFilter ?? {},
       take: 5,
       orderBy: { createdAt: 'desc' },
       include: {

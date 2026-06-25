@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { assertCanViewNews } from '@/lib/news/news-access'
 
 interface Params {
   params: Promise<{ id: string }>
@@ -29,6 +30,9 @@ export async function POST(request: NextRequest, { params }: Params) {
     if (!validReactions.includes(reaction)) {
       return NextResponse.json({ error: 'Reacción no válida' }, { status: 400 })
     }
+
+    const denied = await assertCanViewNews(id, session.user.id)
+    if (denied) return denied
 
     const news = await prisma.news.findUnique({
       where: { id: id },
@@ -92,6 +96,9 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     if (!session?.user) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
+
+    const denied = await assertCanViewNews(id, session.user.id)
+    if (denied) return denied
 
     await prisma.news_reactions.deleteMany({
       where: {

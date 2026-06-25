@@ -16,6 +16,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: false }, { status: 401 })
   }
 
+  const requester = await prisma.users.findUnique({
+    where: { id: session.user.id },
+    select: { isSuperAdmin: true },
+  })
+  if (!requester?.isSuperAdmin) {
+    return NextResponse.json(
+      { success: false, message: 'Solo el administrador principal puede ver asignaciones de familias' },
+      { status: 403 }
+    )
+  }
+
   const { searchParams } = new URL(request.url)
   const adminId = searchParams.get('adminId')
 

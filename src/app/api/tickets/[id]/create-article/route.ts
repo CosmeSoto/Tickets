@@ -42,6 +42,21 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const { id: ticketId } = await params
 
+    const {
+      assertTicketAccessById,
+      TicketAccessError,
+      toTicketAccessUser,
+    } = await import('@/lib/tickets/ticket-access')
+
+    try {
+      await assertTicketAccessById(toTicketAccessUser(session.user), ticketId, 'write')
+    } catch (err) {
+      if (err instanceof TicketAccessError) {
+        return NextResponse.json({ error: err.message }, { status: err.statusCode })
+      }
+      throw err
+    }
+
     // Obtener ticket con toda la información necesaria
     const ticket = await prisma.tickets.findUnique({
       where: { id: ticketId },

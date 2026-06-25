@@ -254,7 +254,7 @@ function SettingsPage() {
         Recargar
       </Button>
       {/* Solo mostrar botón guardar si NO estamos en la pestaña OAuth o SLA */}
-      {activeTab !== 'oauth' && activeTab !== 'sla' && (
+      {activeTab !== 'oauth' && activeTab !== 'sla' && isSuperAdmin && (
         <Button onClick={saveSettings} disabled={saving}>
           <Save className={`h-4 w-4 mr-2 ${saving ? 'animate-spin' : ''}`} />
           {saving ? 'Guardando...' : 'Guardar'}
@@ -355,8 +355,11 @@ function SettingsPage() {
                     id='supportEmail'
                     type='email'
                     value={settings.supportEmail}
-                    onChange={e => setSettings({ ...settings, supportEmail: e.target.value })}
+                    onChange={e =>
+                      isSuperAdmin && setSettings({ ...settings, supportEmail: e.target.value })
+                    }
                     placeholder='soporte@empresa.com'
+                    disabled={!isSuperAdmin}
                   />
                 </div>
               </div>
@@ -366,9 +369,12 @@ function SettingsPage() {
                 <Textarea
                   id='systemDescription'
                   value={settings.systemDescription}
-                  onChange={e => setSettings({ ...settings, systemDescription: e.target.value })}
+                  onChange={e =>
+                    isSuperAdmin && setSettings({ ...settings, systemDescription: e.target.value })
+                  }
                   placeholder='Gestión Integral de Operaciones'
                   rows={3}
+                  disabled={!isSuperAdmin}
                 />
               </div>
             </CardContent>

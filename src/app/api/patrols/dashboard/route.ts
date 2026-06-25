@@ -10,6 +10,7 @@ import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { withCache, buildCacheKey } from '@/lib/api-cache'
 import { checkPatrolModuleAccess } from '@/lib/patrol/patrol-helpers'
+import { checkPatrolFamilyAccess } from '@/lib/patrol/patrol-access'
 
 export async function GET(request: NextRequest) {
   try {
@@ -40,6 +41,15 @@ export async function GET(request: NextRequest) {
     // Si no, usar todas las familias accesibles del usuario
     let familyFilter: Record<string, any> = {}
     if (familyIdParam) {
+      const hasAccess = await checkPatrolFamilyAccess(
+        session.user.id,
+        familyIdParam,
+        session.user.role,
+        isSuperAdmin
+      )
+      if (!hasAccess) {
+        return NextResponse.json({ error: 'No tienes acceso a esta área' }, { status: 403 })
+      }
       familyFilter = { familyId: familyIdParam }
     } else if (accessibleFamilyIds !== undefined && accessibleFamilyIds.length > 0) {
       familyFilter = { familyId: { in: accessibleFamilyIds } }

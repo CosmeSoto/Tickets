@@ -55,6 +55,8 @@ interface TabGeneralProps {
   departments: DepartmentData[]
   onFamilyUpdated: (updated: FamilyBase) => void
   onDepartmentsChanged: () => void
+  /** Solo Super Admin puede editar metadatos de la familia */
+  canEditFamilyMetadata?: boolean
 }
 
 const DEFAULT_DEPT_FORM: DepartmentFormData = {
@@ -83,6 +85,7 @@ export function TabGeneral({
   departments,
   onFamilyUpdated,
   onDepartmentsChanged,
+  canEditFamilyMetadata = false,
 }: TabGeneralProps) {
   const { toast } = useToast()
 
@@ -111,7 +114,10 @@ export function TabGeneral({
       .trim()
       .replace(/\s+/g, '_') // espacios → guión bajo
 
+  const fieldDisabled = saving || !canEditFamilyMetadata
+
   const handleSave = async () => {
+    if (!canEditFamilyMetadata) return
     if (!form.name.trim()) {
       toast({ title: 'Error', description: 'El nombre es requerido', variant: 'destructive' })
       return
@@ -272,19 +278,21 @@ export function TabGeneral({
               <CardTitle className='text-base'>Datos básicos</CardTitle>
               <CardDescription>Información principal de la familia</CardDescription>
             </div>
-            <Button
-              onClick={handleSave}
-              disabled={saving}
-              size='sm'
-              className='w-full sm:w-auto shrink-0'
-            >
-              {saving ? (
-                <RefreshCw className='h-4 w-4 animate-spin' />
-              ) : (
-                <Save className='h-4 w-4' />
-              )}
-              <span className='ml-2 hidden sm:inline'>{saving ? 'Guardando...' : 'Guardar'}</span>
-            </Button>
+            {canEditFamilyMetadata && (
+              <Button
+                onClick={handleSave}
+                disabled={fieldDisabled}
+                size='sm'
+                className='w-full sm:w-auto shrink-0'
+              >
+                {saving ? (
+                  <RefreshCw className='h-4 w-4 animate-spin' />
+                ) : (
+                  <Save className='h-4 w-4' />
+                )}
+                <span className='ml-2 hidden sm:inline'>{saving ? 'Guardando...' : 'Guardar'}</span>
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent className='space-y-3'>
@@ -307,7 +315,7 @@ export function TabGeneral({
                   }))
                 }}
                 placeholder='Ej: Tecnología'
-                disabled={saving}
+                disabled={fieldDisabled}
                 className='h-8 text-sm'
               />
             </div>
@@ -342,7 +350,7 @@ export function TabGeneral({
                   setCodeError(null)
                 }}
                 placeholder='AUTO'
-                disabled={saving}
+                disabled={fieldDisabled}
                 className={`h-8 text-sm font-mono ${!codeManuallyEdited ? 'text-muted-foreground' : ''}`}
               />
               {codeError && <p className='text-xs text-destructive'>{codeError}</p>}
@@ -368,7 +376,7 @@ export function TabGeneral({
                 value={form.description}
                 onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
                 placeholder='Descripción de la familia'
-                disabled={saving}
+                disabled={fieldDisabled}
                 className='h-8 text-sm'
               />
             </div>
@@ -382,7 +390,7 @@ export function TabGeneral({
                 value={form.order}
                 onChange={e => setForm(f => ({ ...f, order: parseInt(e.target.value) || 0 }))}
                 min={0}
-                disabled={saving}
+                disabled={fieldDisabled}
                 className='h-8 text-sm'
               />
             </div>
@@ -424,7 +432,7 @@ export function TabGeneral({
                     }`}
                     style={{ backgroundColor: c.value }}
                     title={c.label}
-                    disabled={saving}
+                    disabled={fieldDisabled}
                   />
                 ))}
               </div>
@@ -434,7 +442,7 @@ export function TabGeneral({
                 id='family-active'
                 checked={form.isActive}
                 onCheckedChange={v => setForm(f => ({ ...f, isActive: v }))}
-                disabled={saving}
+                disabled={fieldDisabled}
               />
               <Label htmlFor='family-active' className='cursor-pointer text-sm'>
                 {form.isActive ? 'Activa' : 'Inactiva'}
@@ -455,10 +463,12 @@ export function TabGeneral({
               </CardTitle>
               <CardDescription>Departamentos que pertenecen a esta familia</CardDescription>
             </div>
-            <Button size='sm' onClick={openCreateDept} className='w-full sm:w-auto shrink-0'>
-              <Plus className='h-4 w-4 mr-2' />
-              Nuevo departamento
-            </Button>
+            {canEditFamilyMetadata && (
+              <Button size='sm' onClick={openCreateDept} className='w-full sm:w-auto shrink-0'>
+                <Plus className='h-4 w-4 mr-2' />
+                Nuevo departamento
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent className='p-0'>
@@ -466,10 +476,12 @@ export function TabGeneral({
             <div className='text-center py-10 text-muted-foreground'>
               <Building className='h-8 w-8 mx-auto mb-2 opacity-30' />
               <p className='text-sm'>No hay departamentos en esta familia</p>
-              <Button size='sm' variant='outline' className='mt-3' onClick={openCreateDept}>
-                <Plus className='h-4 w-4 mr-2' />
-                Crear primer departamento
-              </Button>
+              {canEditFamilyMetadata && (
+                <Button size='sm' variant='outline' className='mt-3' onClick={openCreateDept}>
+                  <Plus className='h-4 w-4 mr-2' />
+                  Crear primer departamento
+                </Button>
+              )}
             </div>
           ) : (
             <div className='divide-y'>

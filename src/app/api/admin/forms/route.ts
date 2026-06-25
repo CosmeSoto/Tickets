@@ -174,14 +174,12 @@ export async function POST(request: NextRequest) {
       try {
         const { NotificationService } = await import('@/lib/services/notification-service')
         const { NotificationType } = await import('@prisma/client')
-        const targetUsers = await prisma.users.findMany({
-          where: {
-            formsEnabled: true,
-            isActive: true,
-            id: { not: session.user.id },
-          },
-          select: { id: true },
-        })
+        const {
+          getFormNotificationLink,
+          getFormNotificationRecipientIds,
+        } = await import('@/lib/forms/form-visibility')
+
+        const targetUsers = await getFormNotificationRecipientIds(form.id, session.user.id)
 
         await Promise.allSettled(
           targetUsers.map(u =>
@@ -190,7 +188,10 @@ export async function POST(request: NextRequest) {
               type: NotificationType.INFO,
               title: 'Nuevo documento disponible',
               message: `${form.title}`,
-              metadata: { link: '/admin/forms', formId: form.id },
+              metadata: {
+                link: getFormNotificationLink(u),
+                formId: form.id,
+              },
             })
           )
         )

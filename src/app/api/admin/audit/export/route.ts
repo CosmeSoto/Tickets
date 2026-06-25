@@ -54,6 +54,18 @@ export async function POST(request: NextRequest) {
       where.userId = filters.userId
     }
 
+    if (filters.familyId) {
+      where.AND = [
+        ...(where.AND ?? []),
+        {
+          OR: [
+            { details: { path: ['familyId'], equals: filters.familyId } },
+            { entityId: filters.familyId },
+          ],
+        },
+      ]
+    }
+
     // Filtro de fecha (días)
     if (filters.days) {
       const daysAgo = new Date()

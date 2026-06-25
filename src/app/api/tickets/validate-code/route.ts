@@ -22,6 +22,16 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    const requesterIsSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
+    if (!requesterIsSuperAdmin) {
+      const { getAdminFamilyScope } = await import('@/lib/auth/admin-scope')
+      const scope = await getAdminFamilyScope(session.user.id, false)
+      const allowed = scope.familyIds ?? []
+      if (!allowed.includes(familyId)) {
+        return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 403 })
+      }
+    }
+
     const result = await TicketCodeService.validateManualCode(code, familyId)
 
     return NextResponse.json({ success: true, data: result })
