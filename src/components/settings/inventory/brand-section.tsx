@@ -188,7 +188,7 @@ export function BrandSection({
             <Button
               variant='outline'
               onClick={() => setCloneDialogOpen(true)}
-              disabled={saving || !familyId || brands.length === 0}
+              disabled={saving || !familyId}
               size='sm'
             >
               <Copy className='h-4 w-4 mr-2' />
@@ -275,6 +275,7 @@ export function BrandSection({
           </DialogHeader>
           <EquipmentBrandInlineForm
             familyId={familyId || undefined}
+            adminApi
             item={selectedBrand ? { id: selectedBrand.id, name: selectedBrand.name } : undefined}
             onSuccess={handleBrandFormSuccess}
             onCancel={() => setBrandFormOpen(false)}

@@ -717,7 +717,7 @@ export async function seedAttributes(prisma: PrismaClient, familyMap: Map<string
   }
 
   // ============================================
-  // ATRIBUTOS PARA FIXED_ASSETS (Activos Fijos)
+  // TIPOS: Aire Acondicionado / Generador (Arquitectura / Operaciones)
   // ============================================
 
   const acUnitType = await prisma.equipment_types.findFirst({
@@ -878,7 +878,7 @@ export async function seedAttributes(prisma: PrismaClient, familyMap: Map<string
   }
 
   // ============================================
-  // ATRIBUTOS PARA SECURITY (Seguridad)
+  // TIPOS: Cámara IP (Operaciones — Seguridad)
   // ============================================
 
   const cameraType = await prisma.equipment_types.findFirst({
@@ -969,7 +969,7 @@ export async function seedAttributes(prisma: PrismaClient, familyMap: Map<string
   }
 
   // ============================================
-  // ATRIBUTOS PARA MAINTENANCE (Mantenimiento)
+  // TIPOS: Herramienta Eléctrica (Operaciones — Mantenimiento)
   // ============================================
 
   const powerToolType = await prisma.equipment_types.findFirst({

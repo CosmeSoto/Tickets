@@ -80,6 +80,7 @@ async function main() {
 
   // 11. MARCAS DE EQUIPOS
   await seedEquipmentBrands(prisma, familyMap)
+  await syncBrandFamilies(familyMap)
 
   // 13. UNIDADES DE MEDIDA
   await seedUnitsOfMeasure()
@@ -465,6 +466,21 @@ async function syncCategoryFamilies() {
       AND (c.family_id IS NULL OR c.family_id IS DISTINCT FROM d.family_id)
   `
   console.log(`✅ Categorías sincronizadas con familia del departamento (${result} filas)`)
+}
+
+/** Asigna family_id a marcas legacy (family_id NULL) → Tecnología */
+async function syncBrandFamilies(familyMap: Map<string, string>) {
+  const techFamilyId = familyMap.get('TECHNOLOGY')
+  if (!techFamilyId) return
+
+  const result = await prisma.equipment_brands.updateMany({
+    where: { familyId: null },
+    data: { familyId: techFamilyId },
+  })
+
+  if (result.count > 0) {
+    console.log(`✅ ${result.count} marcas legacy asignadas a Tecnología`)
+  }
 }
 
 // ============================================

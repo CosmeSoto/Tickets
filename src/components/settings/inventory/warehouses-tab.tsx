@@ -276,7 +276,7 @@ export function WarehousesTab({ familyId }: WarehousesTabProps) {
             <Button
               variant='outline'
               onClick={() => setCloneDialogOpen(true)}
-              disabled={loading || saving || !familyId || warehouses.length === 0}
+              disabled={loading || saving || !familyId}
               size='sm'
             >
               <Copy className='h-4 w-4 mr-2' />

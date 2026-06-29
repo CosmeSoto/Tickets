@@ -1,10 +1,7 @@
 /**
- * Seed: Custom Fields (Atributos Dinámicos)
+ * Seed: Custom Fields (Atributos Dinámicos por familia)
  *
- * Crea campos personalizados para diferentes familias:
- * - Tecnología: procesador, ram, almacenamiento, sistema_operativo
- * - Activos Fijos: año_construccion, area_m2, estado_conservacion
- * - Mantenimiento: frecuencia_mantenimiento, ultima_revision
+ * Familias: Tecnología, Arquitectura, Operaciones, Administrativa, Comercial, Marketing
  */
 
 import { Prisma, PrismaClient } from '@prisma/client'

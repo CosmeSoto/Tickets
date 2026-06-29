@@ -64,6 +64,18 @@ async function verifySeed() {
     console.log('\n🎫 Categorías de tickets:')
     console.log(`   ${categories > 0 ? '✅' : '❌'} Total: ${categories}`)
 
+    const brands = await prisma.equipment_brands.count()
+    const brandsWithoutFamily = await prisma.equipment_brands.count({ where: { familyId: null } })
+    console.log('\n🏷️  Marcas de equipos:')
+    console.log(`   ${brands > 0 ? '✅' : '❌'} Total: ${brands}`)
+    if (brandsWithoutFamily > 0) {
+      console.log(`   ⚠️  Sin familia: ${brandsWithoutFamily} (re-ejecutar seed)`)
+    }
+
+    const warehouses = await prisma.warehouses.count()
+    console.log('\n🏭 Bodegas:')
+    console.log(`   ${warehouses >= 10 ? '✅' : '⚠️'} Total: ${warehouses} (esperado ≥ 10)`)
+
     console.log('\n📊 Resumen:')
     const allGood =
       admin &&
@@ -71,7 +83,10 @@ async function verifySeed() {
       slaPolicies.length >= 8 &&
       siteConfig.length >= 5 &&
       departments >= 25 &&
-      categories > 0
+      categories > 0 &&
+      brands > 0 &&
+      brandsWithoutFamily === 0 &&
+      warehouses >= 10
 
     if (allGood) {
       console.log('   ✅ Seed completado correctamente')

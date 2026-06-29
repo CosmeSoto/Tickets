@@ -31,10 +31,10 @@ export function useBrandManagement({ familyId }: UseBrandManagementOptions = {})
     try {
       const params = new URLSearchParams()
       if (familyId) params.set('familyId', familyId)
-      const response = await fetch(`/api/inventory/brands?${params}`)
+      const response = await fetch(`/api/admin/inventory/brands?${params}`)
       if (!response.ok) throw new Error('Error al cargar marcas')
       const data = await response.json()
-      setBrands(data.brands)
+      setBrands(data.brands ?? [])
     } catch (error) {
       console.error('Error loading brands:', error)
       toast({
@@ -58,7 +58,7 @@ export function useBrandManagement({ familyId }: UseBrandManagementOptions = {})
     }): Promise<EquipmentBrand | null> => {
       setSaving(true)
       try {
-        const response = await fetch('/api/inventory/brands', {
+        const response = await fetch('/api/admin/inventory/brands', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ...data, familyId }),
@@ -102,7 +102,7 @@ export function useBrandManagement({ familyId }: UseBrandManagementOptions = {})
     ): Promise<boolean> => {
       setSaving(true)
       try {
-        const response = await fetch(`/api/inventory/brands/${id}`, {
+        const response = await fetch(`/api/admin/inventory/brands/${id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data),
@@ -136,7 +136,7 @@ export function useBrandManagement({ familyId }: UseBrandManagementOptions = {})
     async (id: string): Promise<boolean> => {
       setSaving(true)
       try {
-        const response = await fetch(`/api/inventory/brands/${id}`, {
+        const response = await fetch(`/api/admin/inventory/brands/${id}`, {
           method: 'DELETE',
         })
 

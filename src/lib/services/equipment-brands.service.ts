@@ -12,7 +12,7 @@ export interface CreateBrandInput {
   logoUrl?: string
   isActive?: boolean
   order?: number
-  familyId?: string
+  familyId: string
 }
 
 export interface UpdateBrandInput {
@@ -39,6 +39,10 @@ export async function createBrand(data: CreateBrandInput) {
       throw new Error('Ya existe una marca con ese código')
     }
 
+    if (!data.familyId) {
+      throw new Error('familyId es requerido')
+    }
+
     // Crear la marca
     const brand = await prisma.equipment_brands.create({
       data: {
@@ -48,7 +52,7 @@ export async function createBrand(data: CreateBrandInput) {
         logoUrl: data.logoUrl || null,
         isActive: data.isActive ?? true,
         order: data.order ?? 0,
-        familyId: data.familyId || null,
+        familyId: data.familyId,
       },
     })
 
@@ -80,27 +84,40 @@ export async function getBrandById(id: string) {
 }
 
 /**
- * Lista marcas con filtros y paginación
+ * Lista marcas de una familia (configuración admin).
+ */
+export async function listBrandsForFamily(familyId: string, includeInactive = false) {
+  return prisma.equipment_brands.findMany({
+    where: {
+      familyId,
+      ...(includeInactive ? {} : { isActive: true }),
+    },
+    orderBy: [{ order: 'asc' }, { name: 'asc' }],
+  })
+}
+
+/**
+ * Lista marcas con filtros y paginación (operación / formularios).
  */
 export async function listBrands({
   page = 1,
   limit = 50,
   familyId,
-  familyFilter,
+  scopeFilter,
   isActive = true,
   search,
 }: {
   page?: number
   limit?: number
   familyId?: string
-  familyFilter?: Record<string, unknown>
+  scopeFilter?: Record<string, unknown>
   isActive?: boolean
   search?: string
 }) {
   try {
-    const where: Record<string, unknown> = { ...(familyFilter ?? {}) }
+    const where: Record<string, unknown> = { ...(scopeFilter ?? {}) }
 
-    if (familyId && !familyFilter) {
+    if (familyId && !scopeFilter) {
       where.familyId = familyId
     }
 

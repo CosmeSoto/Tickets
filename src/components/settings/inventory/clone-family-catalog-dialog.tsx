@@ -67,6 +67,18 @@ export function CloneFamilyCatalogDialog({
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Error al copiar')
 
+      if (data.created === 0 && data.skipped === 0) {
+        toast({
+          title: 'Sin datos para copiar',
+          description:
+            kind === 'brands'
+              ? 'El área origen no tiene marcas. Crea marcas o ejecuta el seed primero.'
+              : 'El área origen no tiene bodegas. Crea bodegas o ejecuta el seed primero.',
+          variant: 'destructive',
+        })
+        return
+      }
+
       toast({
         title: kind === 'brands' ? 'Marcas copiadas' : 'Bodegas copiadas',
         description: `${data.created} creados, ${data.skipped} omitidos (ya existían)`,

@@ -14,9 +14,17 @@ interface Props {
   item?: InlineSelectOption
   onSuccess: (item: InlineSelectOption) => void
   onCancel: () => void
+  /** true = configuración admin; false = formularios de activos */
+  adminApi?: boolean
 }
 
-export function EquipmentBrandInlineForm({ familyId, item, onSuccess, onCancel }: Props) {
+export function EquipmentBrandInlineForm({
+  familyId,
+  item,
+  onSuccess,
+  onCancel,
+  adminApi = false,
+}: Props) {
   const { toast } = useToast()
   const isEdit = !!item
   const [name, setName] = useState(item?.name ?? '')
@@ -45,13 +53,18 @@ export function EquipmentBrandInlineForm({ familyId, item, onSuccess, onCancel }
       setError('El nombre es obligatorio')
       return
     }
+    if (!isEdit && !familyId) {
+      setError('Selecciona un área antes de crear la marca')
+      return
+    }
     if (!isEdit && !code.trim()) {
       setError('El código es obligatorio')
       return
     }
     setLoading(true)
     try {
-      const url = isEdit ? `/api/inventory/brands/${item!.id}` : '/api/inventory/brands'
+      const base = adminApi ? '/api/admin/inventory/brands' : '/api/inventory/brands'
+      const url = isEdit ? `${base}/${item!.id}` : base
       const method = isEdit ? 'PUT' : 'POST'
       const body: any = {
         name: name.trim(),
