@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs'
 import { randomUUID, createHash } from 'crypto'
 import { seedCustomFields } from './seeds/custom-fields.seed'
 import { seedInventoryTypes } from './seeds/inventory-types.seed'
-import { seedEquipmentBrands } from './seeds/equipment-brands.seed'
+import { seedEquipmentBrands, syncBrandFamilies } from './seeds/equipment-brands.seed'
 import { seedCategoriesTechnology } from './seeds/categories-technology.seed'
 import { seedCategoriesArchitecture } from './seeds/categories-architecture.seed'
 import { seedCategoriesMaintenance } from './seeds/categories-maintenance.seed'
@@ -80,7 +80,7 @@ async function main() {
 
   // 11. MARCAS DE EQUIPOS
   await seedEquipmentBrands(prisma, familyMap)
-  await syncBrandFamilies(familyMap)
+  await syncBrandFamilies(prisma, familyMap)
 
   // 13. UNIDADES DE MEDIDA
   await seedUnitsOfMeasure()
@@ -466,21 +466,6 @@ async function syncCategoryFamilies() {
       AND (c.family_id IS NULL OR c.family_id IS DISTINCT FROM d.family_id)
   `
   console.log(`✅ Categorías sincronizadas con familia del departamento (${result} filas)`)
-}
-
-/** Asigna family_id a marcas legacy (family_id NULL) → Tecnología */
-async function syncBrandFamilies(familyMap: Map<string, string>) {
-  const techFamilyId = familyMap.get('TECHNOLOGY')
-  if (!techFamilyId) return
-
-  const result = await prisma.equipment_brands.updateMany({
-    where: { familyId: null },
-    data: { familyId: techFamilyId },
-  })
-
-  if (result.count > 0) {
-    console.log(`✅ ${result.count} marcas legacy asignadas a Tecnología`)
-  }
 }
 
 // ============================================

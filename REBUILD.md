@@ -85,6 +85,9 @@ sudo ./start-production.sh --clean
 # ═══════════════════════════════════════════════════════════════════════════════
 sudo ./start-production.sh
 
+# Al arrancar, el entrypoint verifica catálogos de inventario (marcas, tipos, bodegas)
+# y ejecuta ensure-catalogs automáticamente si faltan — no hace falta correr seed a mano.
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # COMANDOS MANUALES (si prefieres no usar el script):
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -217,8 +220,12 @@ npx prisma migrate dev --name nombre_del_cambio
 # O dentro del contenedor de dev:
 docker exec tickets-app-dev npx prisma migrate dev --name nombre_del_cambio
 
-# Cargar seeder:
+# Cargar seeder completo (BD vacía o reset):
 sudo docker exec tickets-app sh -c 'node ./node_modules/tsx/dist/cli.mjs prisma/seed.ts'
+
+# Solo catálogos de inventario (marcas, tipos, bodegas) — si ya hay usuarios pero catálogos vacíos:
+sudo docker exec tickets-app sh -c 'node ./node_modules/tsx/dist/cli.mjs prisma/ensure-catalogs.ts'
+# o localmente: npm run db:seed-catalogs
 ```
 
 ### Conectarse a la BD

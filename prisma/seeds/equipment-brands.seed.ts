@@ -50,3 +50,19 @@ export async function seedEquipmentBrands(prisma: PrismaClient, familyMap: Map<s
 
   console.log(`  ✓ ${count} marcas de equipos (${BRAND_FAMILIES.length} familias)`)
 }
+
+/** Asigna marcas sin familyId a Tecnología (migración de datos viejos) */
+export async function syncBrandFamilies(prisma: PrismaClient, familyMap: Map<string, string>) {
+  const techFamilyId = familyMap.get('TECHNOLOGY')
+  if (!techFamilyId) return 0
+
+  const result = await prisma.equipment_brands.updateMany({
+    where: { familyId: null },
+    data: { familyId: techFamilyId },
+  })
+
+  if (result.count > 0) {
+    console.log(`  ✓ ${result.count} marcas legacy asignadas a Tecnología`)
+  }
+  return result.count
+}

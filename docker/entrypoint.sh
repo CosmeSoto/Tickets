@@ -97,10 +97,52 @@ if [ "$NEEDS_SEED" = "yes" ]; then
     echo "==>   Para re-ejecutar el seed: docker exec tickets-app sh -c 'node ./node_modules/tsx/dist/cli.mjs prisma/seed.ts'"
   fi
 else
-  echo "==> Base de datos ya tiene datos — omitiendo seed."
-  # Verificar datos esenciales que podrían faltar (landing page services, etc.)
-  echo "==> Verificando datos esenciales de landing page..."
-  node - <<'NODESCRIPT' 2>/dev/null || true
+  echo "==> Base de datos ya tiene usuarios — omitiendo seed completo."
+fi
+
+# Catálogos de inventario (tipos, marcas, bodegas) — siempre verificar al arrancar
+echo "==> Verificando catálogos de inventario..."
+CATALOG_CHECK=0
+node - <<'NODESCRIPT' || CATALOG_CHECK=$?
+const { PrismaClient } = require('@prisma/client');
+const p = new PrismaClient();
+(async () => {
+  try {
+    const [types, brands, warehouses] = await Promise.all([
+      p.equipment_types.count(),
+      p.equipment_brands.count(),
+      p.warehouses.count(),
+    ]);
+    if (types === 0 || brands === 0 || warehouses === 0) {
+      console.log('  → Catálogos incompletos (tipos=' + types + ', marcas=' + brands + ', bodegas=' + warehouses + ')');
+      process.exit(2);
+    }
+    console.log('  → Catálogos OK (tipos=' + types + ', marcas=' + brands + ', bodegas=' + warehouses + ')');
+    process.exit(0);
+  } catch (e) {
+    console.error('  → Error verificando catálogos:', e.message);
+    process.exit(1);
+  } finally {
+    await p.$disconnect();
+  }
+})();
+NODESCRIPT
+
+if [ "$CATALOG_CHECK" = "2" ]; then
+  echo "==> Ejecutando ensure-catalogs..."
+  if $TSX_CLI prisma/ensure-catalogs.ts; then
+    echo "==> Catálogos de inventario restaurados."
+  else
+    echo "==> ADVERTENCIA: ensure-catalogs falló — ejecuta manualmente:"
+    echo "==>   docker exec tickets-app sh -c 'node ./node_modules/tsx/dist/cli.mjs prisma/ensure-catalogs.ts'"
+  fi
+elif [ "$CATALOG_CHECK" != "0" ]; then
+  echo "==> ADVERTENCIA: No se pudo verificar catálogos (código $CATALOG_CHECK)"
+fi
+
+# Verificar datos esenciales que podrían faltar (landing page services, etc.)
+echo "==> Verificando datos esenciales de landing page..."
+node - <<'NODESCRIPT' 2>/dev/null || true
 const { PrismaClient } = require('@prisma/client');
 const p = new PrismaClient();
 (async () => {
@@ -147,7 +189,6 @@ const p = new PrismaClient();
   }
 })();
 NODESCRIPT
-fi
 
 # ── 3. Copiar uploads iniciales si el volumen está vacío ─────────────────────
 UPLOADS_DIR="${UPLOAD_DIR:-/app/public/uploads}"
