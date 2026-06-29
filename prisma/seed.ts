@@ -4,9 +4,8 @@ import { randomUUID, createHash } from 'crypto'
 import { seedCustomFields } from './seeds/custom-fields.seed'
 import { seedInventoryTypes } from './seeds/inventory-types.seed'
 import { seedEquipmentBrands } from './seeds/equipment-brands.seed'
-import { seedCategories, seedCategoriesOtherFamilies } from './seeds/categories.seed'
 import { seedCategoriesTechnology } from './seeds/categories-technology.seed'
-import { seedCategoriesFixedAssets } from './seeds/categories-fixed-assets.seed'
+import { seedCategoriesArchitecture } from './seeds/categories-architecture.seed'
 import { seedCategoriesMaintenance } from './seeds/categories-maintenance.seed'
 import { seedCategoriesServices } from './seeds/categories-services.seed'
 import { seedCategoriesSecurity } from './seeds/categories-security.seed'
@@ -15,6 +14,7 @@ import { seedCategoriesAdministrative } from './seeds/categories-administrative.
 import { seedCategoriesCommercial } from './seeds/categories-commercial.seed'
 import { seedAttributes } from './seeds/attributes.seed'
 import { seedWarehouses } from './seeds/warehouses.seed'
+import { ORGANIGRAM_FAMILIES } from './seeds/family-map'
 
 const prisma = new PrismaClient()
 const now = new Date()
@@ -42,9 +42,8 @@ function deterministicUUID(namespace: string, name: string): string {
 // ============================================
 
 async function main() {
-  console.log('🌱 Iniciando seed multi-familia desde cero...\n')
+  console.log('🌱 Iniciando seed (organigrama PSF)...\n')
 
-  // 1. FAMILIAS GLOBALES (primero — todo depende de ellas)
   const familyMap = await seedFamilies()
 
   // 2. CONFIGURACIONES DE TICKETS POR FAMILIA
@@ -65,22 +64,15 @@ async function main() {
   // 8. POLÍTICAS DE SLA (globales + por familia TECHNOLOGY)
   await seedSLAPolicies(familyMap)
 
-  // 9. CATEGORÍAS (todas bajo TECHNOLOGY)
-  await seedCategories(prisma, deptMap)
-
-  // 9b. CATEGORÍAS OTRAS FAMILIAS (Mantenimiento, Seguridad, Servicios, Administrativa)
-  await seedCategoriesOtherFamilies(prisma, deptMap)
-
-  // NOTA: categories-technology.seed.ts es el archivo organizado para Tecnología y Comunicaciones
-
-  // 9c. CATEGORÍAS FAMILIAS COMPLETAS (Centro Comercial)
-  await seedCategoriesFixedAssets(prisma, deptMap)
-  await seedCategoriesMaintenance(prisma, deptMap)
-  await seedCategoriesServices(prisma, deptMap)
-  await seedCategoriesSecurity(prisma, deptMap)
-  await seedCategoriesGreenAreas(prisma, deptMap)
+  // 9. CATEGORÍAS DE TICKETS (un archivo por familia/área)
+  await seedCategoriesTechnology(prisma, deptMap)
   await seedCategoriesAdministrative(prisma, deptMap)
   await seedCategoriesCommercial(prisma, deptMap)
+  await seedCategoriesArchitecture(prisma, deptMap)
+  await seedCategoriesMaintenance(prisma, deptMap)
+  await seedCategoriesSecurity(prisma, deptMap)
+  await seedCategoriesGreenAreas(prisma, deptMap)
+  await seedCategoriesServices(prisma, deptMap)
 
   // 10. TIPOS DE INVENTARIO (equipos, licencias, consumibles)
   await seedInventoryTypes(prisma, familyMap)
@@ -97,9 +89,6 @@ async function main() {
   // 13c. CAMPOS PERSONALIZADOS (custom fields por familia)
   await seedCustomFields(prisma, familyMap)
 
-  // 13d. MIGRAR suppliers existentes: type enum → typeId
-  await migrateSupplierTypes()
-
   // 13e. ATRIBUTOS DE TIPOS (equipment, license, consumable)
   await seedAttributes(prisma, familyMap)
 
@@ -115,10 +104,7 @@ async function main() {
   // 16. CONTADORES DE CÓDIGO DE TICKET
   await seedTicketCodeCounters(familyMap)
 
-  // 17. BODEGA POR DEFECTO
-  // NOTA: La bodega por defecto global fue eliminada.
-  // Cada familia gestiona sus propias bodegas (ver seedWarehouses arriba).
-  // Las bodegas sin familyId se consideran huérfanas y no deben existir.
+  // 17. LIMPIAR BODEGAS HUÉRFANAS (sin familyId)
   await cleanOrphanWarehouses()
 
   // 18. LANDING PAGE
@@ -131,87 +117,20 @@ async function main() {
 }
 
 // ============================================
-// HELPERS
-// ============================================
-
-async function upsertCategory(data: {
-  name: string
-  description: string
-  level: number
-  parentId: string | null
-  departmentId: string
-  order: number
-  color: string
-}) {
-  const existing = await prisma.categories.findFirst({
-    where: { name: data.name, level: data.level, parentId: data.parentId },
-  })
-  if (existing) {
-    return prisma.categories.update({
-      where: { id: existing.id },
-      data: {
-        description: data.description,
-        departmentId: data.departmentId,
-        order: data.order,
-        color: data.color,
-        updatedAt: now,
-      },
-    })
-  }
-  return prisma.categories.create({
-    data: { id: randomUUID(), ...data, isActive: true, createdAt: now, updatedAt: now },
-  })
-}
-
-// ============================================
 // 1. FAMILIAS GLOBALES
 // ============================================
 
 async function seedFamilies(): Promise<Map<string, string>> {
-  const families = [
-    {
-      code: 'TECHNOLOGY',
-      name: 'Tecnología y Comunicaciones',
-      icon: 'Monitor',
-      color: '#3B82F6',
-      order: 1,
-    },
-    {
-      code: 'FIXED_ASSETS',
-      name: 'Activos Fijos e Infraestructura',
-      icon: 'Building2',
-      color: '#F59E0B',
-      order: 2,
-    },
-    { code: 'MAINTENANCE', name: 'Mantenimiento', icon: 'Wrench', color: '#10B981', order: 3 },
-    { code: 'SERVICES', name: 'Servicios Generales', icon: 'Settings', color: '#8B5CF6', order: 4 },
-    { code: 'SECURITY', name: 'Seguridad', icon: 'Shield', color: '#EF4444', order: 5 },
-    { code: 'GREEN_AREAS', name: 'Áreas Verdes', icon: 'Leaf', color: '#22C55E', order: 6 },
-    {
-      code: 'ADMINISTRATIVE',
-      name: 'Gestión Administrativa',
-      icon: 'Briefcase',
-      color: '#6B7280',
-      order: 7,
-    },
-    {
-      code: 'COMMERCIAL',
-      name: 'Comercial y Marketing',
-      icon: 'TrendingUp',
-      color: '#EC4899',
-      order: 8,
-    },
-  ]
   const map = new Map<string, string>()
-  for (const f of families) {
+  for (const f of ORGANIGRAM_FAMILIES) {
     const family = await prisma.families.upsert({
       where: { code: f.code },
-      update: { name: f.name, icon: f.icon, color: f.color, order: f.order },
+      update: { name: f.name, icon: f.icon, color: f.color, order: f.order, isActive: true },
       create: { id: deterministicUUID('family', f.code), ...f, isActive: true },
     })
     map.set(f.code, family.id)
   }
-  console.log(`✅ ${families.length} familias globales`)
+  console.log(`✅ ${ORGANIGRAM_FAMILIES.length} familias (organigrama PSF)`)
   return map
 }
 
@@ -224,15 +143,12 @@ async function seedTicketFamilyConfigs(familyMap: Map<string, string>) {
   // allowedFromFamilies vacío = acepta de TODAS las familias
   const enabledFamilies = [
     { code: 'TECHNOLOGY', prefix: 'TI', isDefault: true, allowedFromFamilies: [] },
-    { code: 'FIXED_ASSETS', prefix: 'INF', isDefault: false, allowedFromFamilies: [] },
-    { code: 'MAINTENANCE', prefix: 'MNT', isDefault: false, allowedFromFamilies: [] },
-    { code: 'SERVICES', prefix: 'SRV', isDefault: false, allowedFromFamilies: [] },
-    { code: 'SECURITY', prefix: 'SEG', isDefault: false, allowedFromFamilies: [] },
     { code: 'ADMINISTRATIVE', prefix: 'ADM', isDefault: false, allowedFromFamilies: [] },
     { code: 'COMMERCIAL', prefix: 'COM', isDefault: false, allowedFromFamilies: [] },
+    { code: 'MARKETING', prefix: 'MKT', isDefault: false, allowedFromFamilies: [] },
+    { code: 'ARCHITECTURE', prefix: 'ARQ', isDefault: false, allowedFromFamilies: [] },
+    { code: 'OPERATIONS', prefix: 'OPE', isDefault: false, allowedFromFamilies: [] },
   ]
-  // GREEN_AREAS: ticketsEnabled = false
-  const disabledFamilies = ['GREEN_AREAS']
 
   for (const f of enabledFamilies) {
     const familyId = familyMap.get(f.code)!
@@ -259,26 +175,7 @@ async function seedTicketFamilyConfigs(familyMap: Map<string, string>) {
       } as any,
     })
   }
-  for (const code of disabledFamilies) {
-    const familyId = familyMap.get(code)!
-    await prisma.ticket_family_config.upsert({
-      where: { familyId },
-      update: { ticketsEnabled: false } as any,
-      create: {
-        id: randomUUID(),
-        familyId,
-        ticketsEnabled: false,
-        codePrefix: code.slice(0, 5),
-        isDefault: false,
-        allowedFromFamilies: [],
-        autoAssignRespectsFamilies: true,
-        businessHoursStart: '08:00:00',
-        businessHoursEnd: '17:00:00',
-        businessDays: 'MON,TUE,WED,THU,FRI',
-      } as any,
-    })
-  }
-  console.log('✅ Configuraciones de tickets por familia (allowedFromFamilies vacío = todas)')
+  console.log('✅ Configuraciones de tickets por familia')
 }
 
 // ============================================
@@ -290,36 +187,6 @@ async function seedInventoryFamilyConfigs(familyMap: Map<string, string>) {
     string,
     { allowedSubtypes: any[]; visibleSections: any[]; requiredSections: any[] }
   > = {
-    TECHNOLOGY: {
-      allowedSubtypes: ['EQUIPMENT', 'LICENSE', 'MRO'],
-      visibleSections: ['FINANCIAL', 'DEPRECIATION', 'CONTRACT', 'WAREHOUSE'],
-      requiredSections: ['FINANCIAL'],
-    },
-    FIXED_ASSETS: {
-      allowedSubtypes: ['EQUIPMENT', 'LICENSE', 'MRO'],
-      visibleSections: ['FINANCIAL', 'DEPRECIATION', 'CONTRACT', 'WAREHOUSE'],
-      requiredSections: ['FINANCIAL', 'DEPRECIATION'],
-    },
-    MAINTENANCE: {
-      allowedSubtypes: ['MRO'],
-      visibleSections: ['FINANCIAL', 'STOCK_MRO', 'WAREHOUSE'],
-      requiredSections: ['FINANCIAL'],
-    },
-    SERVICES: {
-      allowedSubtypes: ['MRO', 'LICENSE'],
-      visibleSections: ['FINANCIAL', 'CONTRACT', 'STOCK_MRO'],
-      requiredSections: [],
-    },
-    SECURITY: {
-      allowedSubtypes: ['EQUIPMENT', 'MRO'],
-      visibleSections: ['FINANCIAL', 'DEPRECIATION', 'WAREHOUSE'],
-      requiredSections: ['FINANCIAL'],
-    },
-    GREEN_AREAS: {
-      allowedSubtypes: ['MRO'],
-      visibleSections: ['FINANCIAL', 'STOCK_MRO'],
-      requiredSections: [],
-    },
     ADMINISTRATIVE: {
       allowedSubtypes: ['EQUIPMENT', 'LICENSE'],
       visibleSections: ['FINANCIAL', 'CONTRACT'],
@@ -328,6 +195,26 @@ async function seedInventoryFamilyConfigs(familyMap: Map<string, string>) {
     COMMERCIAL: {
       allowedSubtypes: ['EQUIPMENT', 'LICENSE'],
       visibleSections: ['FINANCIAL', 'DEPRECIATION', 'CONTRACT'],
+      requiredSections: ['FINANCIAL'],
+    },
+    MARKETING: {
+      allowedSubtypes: ['EQUIPMENT', 'LICENSE'],
+      visibleSections: ['FINANCIAL', 'DEPRECIATION', 'CONTRACT'],
+      requiredSections: ['FINANCIAL'],
+    },
+    ARCHITECTURE: {
+      allowedSubtypes: ['EQUIPMENT', 'LICENSE', 'MRO'],
+      visibleSections: ['FINANCIAL', 'DEPRECIATION', 'CONTRACT', 'WAREHOUSE'],
+      requiredSections: ['FINANCIAL', 'DEPRECIATION'],
+    },
+    OPERATIONS: {
+      allowedSubtypes: ['EQUIPMENT', 'MRO', 'LICENSE'],
+      visibleSections: ['FINANCIAL', 'DEPRECIATION', 'CONTRACT', 'STOCK_MRO', 'WAREHOUSE'],
+      requiredSections: ['FINANCIAL'],
+    },
+    TECHNOLOGY: {
+      allowedSubtypes: ['EQUIPMENT', 'LICENSE', 'MRO'],
+      visibleSections: ['FINANCIAL', 'DEPRECIATION', 'CONTRACT', 'WAREHOUSE'],
       requiredSections: ['FINANCIAL'],
     },
   }
@@ -361,167 +248,179 @@ async function seedInventoryFamilyConfigs(familyMap: Map<string, string>) {
 
 async function seedDepartments(familyMap: Map<string, string>): Promise<Map<string, string>> {
   const departments = [
-    // ADMINISTRATIVE
+    // ── GESTIÓN ADMINISTRATIVA ──────────────────────────────────────────────
     {
       name: 'Administración',
-      description: 'Departamento de Administración del Sistema',
+      description: 'Dirección financiera y administrativa',
       color: '#3B82F6',
       order: 1,
       familyCode: 'ADMINISTRATIVE',
     },
     {
       name: 'Contabilidad',
-      description: 'Departamento de Contabilidad y Finanzas',
+      description: 'Contabilidad general y finanzas',
       color: '#EF4444',
       order: 2,
       familyCode: 'ADMINISTRATIVE',
     },
     {
       name: 'Compras',
-      description: 'Departamento de Compras y Adquisiciones',
+      description: 'Compras y adquisiciones',
       color: '#06B6D4',
       order: 3,
       familyCode: 'ADMINISTRATIVE',
     },
     {
       name: 'Recursos Humanos',
-      description: 'Departamento de Talento Humano y RRHH',
+      description: 'Talento humano, recepción y servicios internos',
       color: '#8B5CF6',
       order: 4,
       familyCode: 'ADMINISTRATIVE',
     },
     {
-      name: 'Seguridad y Salud Ocupacional',
-      description: 'Departamento de SSO',
-      color: '#14B8A6',
+      name: 'Mensajería',
+      description: 'Mensajería y correspondencia interna',
+      color: '#A855F7',
       order: 5,
       familyCode: 'ADMINISTRATIVE',
     },
-    // TECHNOLOGY
-    {
-      name: 'Tecnologías de la Información',
-      description: 'Departamento de TI - Infraestructura y Sistemas',
-      color: '#10B981',
-      order: 6,
-      familyCode: 'TECHNOLOGY',
-    },
-    {
-      name: 'Soporte Técnico',
-      description: 'Departamento de Soporte y Mesa de Ayuda',
-      color: '#F59E0B',
-      order: 7,
-      familyCode: 'TECHNOLOGY',
-    },
-    {
-      name: 'Seguridad Informática',
-      description: 'Departamento de Seguridad de la Información',
-      color: '#DC2626',
-      order: 8,
-      familyCode: 'TECHNOLOGY',
-    },
-    {
-      name: 'Usuarios y Privilegios',
-      description: 'Departamento de Gestión de Usuarios y Accesos',
-      color: '#6366F1',
-      order: 9,
-      familyCode: 'TECHNOLOGY',
-    },
-    {
-      name: 'Telefonía',
-      description: 'Departamento de Telefonía y Comunicaciones',
-      color: '#0EA5E9',
-      order: 10,
-      familyCode: 'TECHNOLOGY',
-    },
-    // COMMERCIAL
+    // ── COMERCIAL ───────────────────────────────────────────────────────────
     {
       name: 'Comercial',
-      description: 'Departamento Comercial y Ventas',
+      description: 'Dirección comercial y ventas',
       color: '#F97316',
-      order: 11,
+      order: 6,
       familyCode: 'COMMERCIAL',
     },
+    // ── MARKETING ───────────────────────────────────────────────────────────
     {
       name: 'Marketing',
-      description: 'Departamento de Marketing y Publicidad',
+      description: 'Marketing general, producción y eventos',
       color: '#EC4899',
-      order: 12,
-      familyCode: 'COMMERCIAL',
+      order: 7,
+      familyCode: 'MARKETING',
     },
-    // FIXED_ASSETS
+    {
+      name: 'Medios Digitales',
+      description: 'Community manager, pauta y web',
+      color: '#DB2777',
+      order: 8,
+      familyCode: 'MARKETING',
+    },
+    {
+      name: 'Diseño',
+      description: 'Diseño gráfico y visual',
+      color: '#BE185D',
+      order: 9,
+      familyCode: 'MARKETING',
+    },
+    // ── ARQUITECTURA ────────────────────────────────────────────────────────
     {
       name: 'Arquitectura',
-      description: 'Departamento de Arquitectura y Diseño',
+      description: 'Dirección de arquitectura y diseño de espacios',
       color: '#6366F1',
-      order: 13,
-      familyCode: 'FIXED_ASSETS',
+      order: 10,
+      familyCode: 'ARCHITECTURE',
     },
+    // ── OPERACIONES ─────────────────────────────────────────────────────────
     {
-      name: 'Mantenimiento',
-      description: 'Departamento de Mantenimiento e Infraestructura',
-      color: '#84CC16',
-      order: 14,
-      familyCode: 'FIXED_ASSETS',
+      name: 'Parqueaderos',
+      description: 'Operación y supervisión de parqueaderos',
+      color: '#0D9488',
+      order: 11,
+      familyCode: 'OPERATIONS',
     },
-    // MAINTENANCE
-    {
-      name: 'Mantenimiento Civil',
-      description: 'Mantenimiento de obras civiles e infraestructura',
-      color: '#10B981',
-      order: 15,
-      familyCode: 'MAINTENANCE',
-    },
-    {
-      name: 'Mantenimiento Eléctrico',
-      description: 'Mantenimiento de instalaciones eléctricas',
-      color: '#F59E0B',
-      order: 16,
-      familyCode: 'MAINTENANCE',
-    },
-    {
-      name: 'Mantenimiento Mecánico',
-      description: 'Mantenimiento de equipos mecánicos',
-      color: '#EF4444',
-      order: 17,
-      familyCode: 'MAINTENANCE',
-    },
-    // SECURITY
     {
       name: 'Seguridad Física',
-      description: 'Seguridad física y vigilancia',
+      description: 'Supervisión y agentes de seguridad',
       color: '#EF4444',
-      order: 18,
-      familyCode: 'SECURITY',
+      order: 12,
+      familyCode: 'OPERATIONS',
     },
     {
       name: 'CCTV y Control de Acceso',
       description: 'Cámaras, control de acceso y alarmas',
       color: '#DC2626',
-      order: 19,
-      familyCode: 'SECURITY',
+      order: 13,
+      familyCode: 'OPERATIONS',
     },
-    // SERVICES
+    {
+      name: 'Mantenimiento Civil',
+      description: 'Mantenimiento civil e infraestructura',
+      color: '#10B981',
+      order: 14,
+      familyCode: 'OPERATIONS',
+    },
+    {
+      name: 'Mantenimiento Eléctrico',
+      description: 'Instalaciones eléctricas',
+      color: '#F59E0B',
+      order: 15,
+      familyCode: 'OPERATIONS',
+    },
+    {
+      name: 'Mantenimiento Mecánico',
+      description: 'Equipos mecánicos e hidráulicos',
+      color: '#84CC16',
+      order: 16,
+      familyCode: 'OPERATIONS',
+    },
     {
       name: 'Limpieza',
-      description: 'Servicios de limpieza y aseo',
+      description: 'Limpieza general de instalaciones',
       color: '#06B6D4',
-      order: 20,
-      familyCode: 'SERVICES',
+      order: 17,
+      familyCode: 'OPERATIONS',
     },
-    {
-      name: 'Mensajería',
-      description: 'Servicios de mensajería y correspondencia',
-      color: '#8B5CF6',
-      order: 21,
-      familyCode: 'SERVICES',
-    },
-    // GREEN_AREAS
     {
       name: 'Áreas Verdes',
-      description: 'Mantenimiento de jardines y áreas verdes',
+      description: 'Jardinería y mantenimiento de áreas verdes',
       color: '#22C55E',
+      order: 18,
+      familyCode: 'OPERATIONS',
+    },
+    {
+      name: 'Seguridad y Salud Ocupacional',
+      description: 'SSO, salud ocupacional y bienestar',
+      color: '#14B8A6',
+      order: 19,
+      familyCode: 'OPERATIONS',
+    },
+    // ── TECNOLOGÍA Y COMUNICACIONES ─────────────────────────────────────────
+    {
+      name: 'Tecnologías de la Información',
+      description: 'Coordinación TI, infraestructura y sistemas',
+      color: '#10B981',
+      order: 20,
+      familyCode: 'TECHNOLOGY',
+    },
+    {
+      name: 'Soporte Técnico',
+      description: 'Soporte, mesa de ayuda y analistas TI',
+      color: '#F59E0B',
+      order: 21,
+      familyCode: 'TECHNOLOGY',
+    },
+    {
+      name: 'Seguridad Informática',
+      description: 'Seguridad de la información',
+      color: '#DC2626',
       order: 22,
-      familyCode: 'GREEN_AREAS',
+      familyCode: 'TECHNOLOGY',
+    },
+    {
+      name: 'Usuarios y Privilegios',
+      description: 'Gestión de usuarios y accesos',
+      color: '#6366F1',
+      order: 23,
+      familyCode: 'TECHNOLOGY',
+    },
+    {
+      name: 'Telefonía',
+      description: 'Telefonía y comunicaciones',
+      color: '#0EA5E9',
+      order: 24,
+      familyCode: 'TECHNOLOGY',
     },
   ]
   const map = new Map<string, string>()
@@ -871,12 +770,11 @@ async function seedFolioCounters() {
 async function seedTicketCodeCounters(familyMap: Map<string, string>) {
   const familiesWithSeq: Array<{ code: string; lastSequence: number }> = [
     { code: 'TECHNOLOGY', lastSequence: 0 },
-    { code: 'FIXED_ASSETS', lastSequence: 0 },
     { code: 'ADMINISTRATIVE', lastSequence: 0 },
     { code: 'COMMERCIAL', lastSequence: 0 },
-    { code: 'SECURITY', lastSequence: 0 },
-    { code: 'MAINTENANCE', lastSequence: 0 },
-    { code: 'SERVICES', lastSequence: 0 },
+    { code: 'MARKETING', lastSequence: 0 },
+    { code: 'ARCHITECTURE', lastSequence: 0 },
+    { code: 'OPERATIONS', lastSequence: 0 },
   ]
   for (const { code, lastSequence } of familiesWithSeq) {
     const familyId = familyMap.get(code)!
@@ -1106,16 +1004,16 @@ async function seedSupplierTypes(familyMap: Map<string, string>) {
     { code: 'MIXED', name: 'Mixto', description: 'Proveedor de múltiples categorías' },
     { code: 'SERVICE', name: 'Servicios', description: 'Proveedor de servicios y mantenimiento' },
     {
-      code: 'FIXED_ASSETS',
-      name: 'Activos Fijos',
-      description: 'Proveedor de activos fijos e infraestructura',
-      familyCode: 'FIXED_ASSETS',
+      code: 'ARCHITECTURE',
+      name: 'Arquitectura',
+      description: 'Proveedor de servicios de arquitectura',
+      familyCode: 'ARCHITECTURE',
     },
     {
-      code: 'MAINTENANCE',
-      name: 'Mantenimiento',
-      description: 'Proveedor de servicios de mantenimiento',
-      familyCode: 'MAINTENANCE',
+      code: 'OPERATIONS',
+      name: 'Operaciones',
+      description: 'Proveedor de servicios operativos y mantenimiento',
+      familyCode: 'OPERATIONS',
     },
   ]
 
@@ -1134,32 +1032,4 @@ async function seedSupplierTypes(familyMap: Map<string, string>) {
     `
   }
   console.log('✅ Tipos de proveedor')
-}
-
-async function migrateSupplierTypes() {
-  // Si la columna 'type' (enum) aún existe en suppliers, migrar a typeId
-  try {
-    // Primero verificar si la columna existe
-    const columnExists = await prisma.$queryRaw<{ exists: boolean }[]>`
-      SELECT EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_name = 'suppliers' AND column_name = 'type'
-      ) AS exists
-    `
-
-    if (columnExists[0]?.exists) {
-      const result = await prisma.$executeRaw`
-        UPDATE suppliers s
-        SET type_id = st.id
-        FROM supplier_types st
-        WHERE s.type_id IS NULL
-          AND st.code = s.type::text
-      `
-      console.log(`✅ Migración suppliers type → typeId (${result} registros actualizados)`)
-    } else {
-      console.log('⏭️  Migración suppliers (columna type no existe)')
-    }
-  } catch (error) {
-    console.log('⏭️  Migración suppliers (ya migrada o error)', (error as Error)?.message)
-  }
 }

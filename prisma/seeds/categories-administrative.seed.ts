@@ -49,7 +49,6 @@ export async function seedCategoriesAdministrative(
   const deptContabilidad = deptMap.get('Contabilidad')
   const deptCompras = deptMap.get('Compras')
   const deptRRHH = deptMap.get('Recursos Humanos')
-  const deptSSO = deptMap.get('Seguridad y Salud Ocupacional')
 
   if (!deptAdministracion) {
     console.log('⚠️  Departamentos de ADMINISTRATIVE no encontrados, saltando seed...')

@@ -1,7 +1,7 @@
 /**
- * Seed: Categorías para Familia SERVICIOS GENERALES (SERVICES)
+ * Seed: Categorías para Familia OPERACIONES — Limpieza, Mensajería, Parqueaderos y SSO
  *
- * Categorías completas para centro comercial: limpieza, mensajería, atención al cliente.
+ * Limpieza y áreas operativas bajo Operaciones. Mensajería permanece bajo Gestión Administrativa.
  */
 
 import { PrismaClient } from '@prisma/client'
@@ -44,9 +44,11 @@ async function upsertCategory(
 export async function seedCategoriesServices(prisma: PrismaClient, deptMap: Map<string, string>) {
   const deptLimpieza = deptMap.get('Limpieza')
   const deptMensajeria = deptMap.get('Mensajería')
+  const deptParqueaderos = deptMap.get('Parqueaderos')
+  const deptSSO = deptMap.get('Seguridad y Salud Ocupacional')
 
-  if (!deptLimpieza || !deptMensajeria) {
-    console.log('⚠️  Departamentos de SERVICES no encontrados, saltando seed...')
+  if (!deptLimpieza) {
+    console.log('⚠️  Departamento Limpieza no encontrado, saltando seed...')
     return
   }
 
@@ -216,7 +218,8 @@ export async function seedCategoriesServices(prisma: PrismaClient, deptMap: Map<
     color: '#EF4444',
   })
 
-  // ==================== DEPARTAMENTO MENSAJERÍA ====================
+  // ==================== DEPARTAMENTO MENSAJERÍA (Gestión Administrativa) ====================
+  if (deptMensajeria) {
   const solicitudMensajeria = await upsertCategory(prisma, {
     name: 'Solicitud de Mensajería',
     description: 'Solicitudes de servicio de mensajería y envíos',
@@ -340,6 +343,83 @@ export async function seedCategoriesServices(prisma: PrismaClient, deptMap: Map<
     order: 2,
     color: '#10B981',
   })
+  }
 
-  console.log('✅ Categorías SERVICES (Servicios Generales)')
+  // ==================== DEPARTAMENTO PARQUEADEROS ====================
+  if (deptParqueaderos) {
+    const solicitudParqueadero = await upsertCategory(prisma, {
+      name: 'Solicitud de Parqueadero',
+      description: 'Solicitudes relacionadas con operación de parqueaderos',
+      level: 1,
+      parentId: null,
+      departmentId: deptParqueaderos,
+      order: 1,
+      color: '#0D9488',
+    })
+
+    await upsertCategory(prisma, {
+      name: 'Incidente en Parqueadero',
+      description: 'Incidentes, daños o novedades en parqueaderos',
+      level: 1,
+      parentId: null,
+      departmentId: deptParqueaderos,
+      order: 2,
+      color: '#EF4444',
+    })
+
+    await upsertCategory(prisma, {
+      name: 'Control de Acceso Vehicular',
+      description: 'Problemas con barreras, tarjetas o acceso vehicular',
+      level: 2,
+      parentId: solicitudParqueadero.id,
+      departmentId: deptParqueaderos,
+      order: 1,
+      color: '#0D9488',
+    })
+  }
+
+  // ==================== DEPARTAMENTO SSO ====================
+  if (deptSSO) {
+    const solicitudSSO = await upsertCategory(prisma, {
+      name: 'Solicitud SSO',
+      description: 'Solicitudes de seguridad y salud ocupacional',
+      level: 1,
+      parentId: null,
+      departmentId: deptSSO,
+      order: 1,
+      color: '#14B8A6',
+    })
+
+    await upsertCategory(prisma, {
+      name: 'Incidente de Seguridad Laboral',
+      description: 'Accidentes, incidentes o riesgos en el trabajo',
+      level: 1,
+      parentId: null,
+      departmentId: deptSSO,
+      order: 2,
+      color: '#EF4444',
+    })
+
+    await upsertCategory(prisma, {
+      name: 'Examen Médico Ocupacional',
+      description: 'Solicitud o consulta de exámenes médicos',
+      level: 2,
+      parentId: solicitudSSO.id,
+      departmentId: deptSSO,
+      order: 1,
+      color: '#14B8A6',
+    })
+
+    await upsertCategory(prisma, {
+      name: 'Capacitación SSO',
+      description: 'Solicitud de capacitación en seguridad ocupacional',
+      level: 2,
+      parentId: solicitudSSO.id,
+      departmentId: deptSSO,
+      order: 2,
+      color: '#14B8A6',
+    })
+  }
+
+  console.log('✅ Categorías OPERATIONS (Limpieza, Parqueaderos, SSO, Mensajería)')
 }

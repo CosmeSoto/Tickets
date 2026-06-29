@@ -1,5 +1,5 @@
 /**
- * Seed: Categorías para Familia SEGURIDAD (SECURITY)
+ * Seed: Categorías para Familia OPERACIONES — Seguridad
  *
  * Categorías completas para centro comercial: seguridad física, CCTV, control de acceso.
  */
@@ -46,7 +46,7 @@ export async function seedCategoriesSecurity(prisma: PrismaClient, deptMap: Map<
   const deptCctv = deptMap.get('CCTV y Control de Acceso')
 
   if (!deptSeguridadFisica || !deptCctv) {
-    console.log('⚠️  Departamentos de SECURITY no encontrados, saltando seed...')
+    console.log('⚠️  Departamentos de Operaciones (Seguridad) no encontrados, saltando seed...')
     return
   }
 
@@ -361,5 +361,5 @@ export async function seedCategoriesSecurity(prisma: PrismaClient, deptMap: Map<
     color: '#3B82F6',
   })
 
-  console.log('✅ Categorías SECURITY (Seguridad)')
+  console.log('✅ Categorías OPERATIONS — Seguridad')
 }

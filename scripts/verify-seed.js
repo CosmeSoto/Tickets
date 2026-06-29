@@ -8,7 +8,6 @@ async function verifySeed() {
   console.log('🔍 Verificando seed de la base de datos...\n')
 
   try {
-    // Verificar usuario admin
     const admin = await prisma.users.findUnique({
       where: { email: 'internet.freecom@gmail.com' },
       include: {
@@ -33,47 +32,46 @@ async function verifySeed() {
       console.log('   ❌ No encontrado')
     }
 
-    // Verificar políticas SLA
+    const families = await prisma.families.findMany({
+      where: { isActive: true },
+      orderBy: { order: 'asc' },
+    })
+
+    console.log('\n🏛️  Familias activas (organigrama):')
+    if (families.length > 0) {
+      console.log(`   ✅ Total: ${families.length}`)
+      families.forEach(f => console.log(`      ${f.order}. ${f.name} (${f.code})`))
+    } else {
+      console.log('   ❌ No encontradas')
+    }
+
     const slaPolicies = await prisma.sla_policies.findMany({
       orderBy: { priority: 'asc' },
     })
 
     console.log('\n⏱️  Políticas de SLA:')
-    if (slaPolicies.length > 0) {
-      console.log(`   ✅ Total: ${slaPolicies.length} políticas`)
-      slaPolicies.forEach(policy => {
-        console.log(`\n   📋 ${policy.name}`)
-        console.log(`      Prioridad: ${policy.priority}`)
-        console.log(`      Respuesta: ${policy.responseTimeHours}h`)
-        console.log(`      Resolución: ${policy.resolutionTimeHours}h`)
-        console.log(`      Horario: ${policy.businessHoursOnly ? 'Laboral' : '24/7'}`)
-        console.log(`      Activa: ${policy.isActive ? 'Sí' : 'No'}`)
-      })
-    } else {
-      console.log('   ❌ No encontradas')
-    }
+    console.log(`   ${slaPolicies.length >= 8 ? '✅' : '⚠️'} Total: ${slaPolicies.length} (esperado ≥ 8)`)
 
-    // Verificar configuración del sitio
     const siteConfig = await prisma.site_config.findMany()
-
     console.log('\n⚙️  Configuración del Sitio:')
-    if (siteConfig.length > 0) {
-      console.log(`   ✅ Total: ${siteConfig.length} configuraciones`)
-      siteConfig.forEach(config => {
-        console.log(`      ${config.key}: ${config.value}`)
-      })
-    } else {
-      console.log('   ❌ No encontrada')
-    }
+    console.log(`   ${siteConfig.length >= 5 ? '✅' : '❌'} Total: ${siteConfig.length}`)
 
-    // Verificar departamentos
     const departments = await prisma.departments.count()
     console.log('\n🏢 Departamentos:')
-    console.log(`   ${departments > 0 ? '✅' : '❌'} Total: ${departments}`)
+    console.log(`   ${departments >= 20 ? '✅' : '⚠️'} Total: ${departments} (esperado ~24)`)
 
-    // Resumen
+    const categories = await prisma.categories.count()
+    console.log('\n🎫 Categorías de tickets:')
+    console.log(`   ${categories > 0 ? '✅' : '❌'} Total: ${categories}`)
+
     console.log('\n📊 Resumen:')
-    const allGood = admin && slaPolicies.length === 4 && siteConfig.length >= 5 && departments > 0
+    const allGood =
+      admin &&
+      families.length === 6 &&
+      slaPolicies.length >= 8 &&
+      siteConfig.length >= 5 &&
+      departments >= 20 &&
+      categories > 0
 
     if (allGood) {
       console.log('   ✅ Seed completado correctamente')

@@ -1,7 +1,5 @@
 /**
- * Seed: Categorías para Familia ACTIVOS FIJOS E INFRAESTRUCTURA (FIXED_ASSETS)
- *
- * Categorías completas para centro comercial: infraestructura, edificios, locales, etc.
+ * Seed: Categorías para Familia ARQUITECTURA (ARCHITECTURE)
  */
 
 import { PrismaClient } from '@prisma/client'
@@ -41,15 +39,15 @@ async function upsertCategory(
   })
 }
 
-export async function seedCategoriesFixedAssets(
+export async function seedCategoriesArchitecture(
   prisma: PrismaClient,
   deptMap: Map<string, string>
 ) {
   const deptArquitectura = deptMap.get('Arquitectura')
-  const deptMantenimientoInfra = deptMap.get('Mantenimiento')
+  const deptMantenimientoInfra = deptMap.get('Mantenimiento Civil')
 
   if (!deptArquitectura || !deptMantenimientoInfra) {
-    console.log('⚠️  Departamentos de FIXED_ASSETS no encontrados, saltando seed...')
+    console.log('⚠️  Departamentos de ARCHITECTURE/OPERATIONS no encontrados, saltando seed...')
     return
   }
 
@@ -578,5 +576,5 @@ export async function seedCategoriesFixedAssets(
     color: '#EF4444',
   })
 
-  console.log('✅ Categorías FIXED_ASSETS (Activos Fijos e Infraestructura)')
+  console.log('✅ Categorías ARCHITECTURE (Arquitectura)')
 }

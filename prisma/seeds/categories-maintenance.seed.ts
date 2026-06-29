@@ -1,5 +1,5 @@
 /**
- * Seed: Categorías para Familia MANTENIMIENTO (MAINTENANCE)
+ * Seed: Categorías para Familia OPERACIONES — Mantenimiento
  *
  * Categorías completas para centro comercial: mantenimiento civil, eléctrico, mecánico.
  */
@@ -50,7 +50,7 @@ export async function seedCategoriesMaintenance(
   const deptMecanico = deptMap.get('Mantenimiento Mecánico')
 
   if (!deptCivil || !deptElectrico || !deptMecanico) {
-    console.log('⚠️  Departamentos de MAINTENANCE no encontrados, saltando seed...')
+    console.log('⚠️  Departamentos de Operaciones (Mantenimiento) no encontrados, saltando seed...')
     return
   }
 
@@ -459,5 +459,5 @@ export async function seedCategoriesMaintenance(
     color: '#3B82F6',
   })
 
-  console.log('✅ Categorías MAINTENANCE (Mantenimiento)')
+  console.log('✅ Categorías OPERATIONS — Mantenimiento')
 }

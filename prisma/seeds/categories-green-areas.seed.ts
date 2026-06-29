@@ -1,5 +1,5 @@
 /**
- * Seed: Categorías para Familia ÁREAS VERDES (GREEN_AREAS)
+ * Seed: Categorías para Familia OPERACIONES — Áreas Verdes
  *
  * Categorías completas para centro comercial: jardinería, mantenimiento de áreas verdes.
  */
@@ -45,7 +45,7 @@ export async function seedCategoriesGreenAreas(prisma: PrismaClient, deptMap: Ma
   const deptAreasVerdes = deptMap.get('Áreas Verdes')
 
   if (!deptAreasVerdes) {
-    console.log('⚠️  Departamento de GREEN_AREAS no encontrado, saltando seed...')
+    console.log('⚠️  Departamento Áreas Verdes no encontrado, saltando seed...')
     return
   }
 
@@ -184,5 +184,5 @@ export async function seedCategoriesGreenAreas(prisma: PrismaClient, deptMap: Ma
     color: '#3B82F6',
   })
 
-  console.log('✅ Categorías GREEN_AREAS (Áreas Verdes)')
+  console.log('✅ Categorías OPERATIONS — Áreas Verdes')
 }

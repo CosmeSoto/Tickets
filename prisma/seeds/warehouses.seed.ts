@@ -1,19 +1,50 @@
 import { PrismaClient } from '@prisma/client'
 import { randomUUID } from 'crypto'
 
+type WarehouseSeed = {
+  name: string
+  location: string
+  description: string
+  familyId: string
+  managerId: string
+  isActive: boolean
+}
+
+async function upsertWarehouses(prisma: PrismaClient, warehouses: WarehouseSeed[]) {
+  for (const warehouse of warehouses) {
+    const existing = await prisma.warehouses.findFirst({
+      where: { name: warehouse.name, familyId: warehouse.familyId },
+    })
+
+    if (existing) {
+      await prisma.warehouses.update({
+        where: { id: existing.id },
+        data: {
+          location: warehouse.location,
+          description: warehouse.description,
+          managerId: warehouse.managerId,
+          isActive: warehouse.isActive,
+        },
+      })
+    } else {
+      await prisma.warehouses.create({
+        data: { id: randomUUID(), ...warehouse },
+      })
+    }
+  }
+}
+
 /**
- * Seed de bodegas por familia
- * Crea bodegas de ejemplo para cada familia que maneja inventario
+ * Bodegas por familia (organigrama PSF).
+ * Solo TECHNOLOGY, ARCHITECTURE y OPERATIONS manejan inventario físico.
  */
 export async function seedWarehouses(prisma: PrismaClient, familyMap: Map<string, string>) {
   console.log('🏢 Seeding bodegas por familia...')
 
   const techFamilyId = familyMap.get('TECHNOLOGY')!
-  const fixedAssetsFamilyId = familyMap.get('FIXED_ASSETS')!
-  const maintenanceFamilyId = familyMap.get('MAINTENANCE')!
-  const securityFamilyId = familyMap.get('SECURITY')!
+  const architectureFamilyId = familyMap.get('ARCHITECTURE')!
+  const operationsFamilyId = familyMap.get('OPERATIONS')!
 
-  // Obtener usuario admin para asignar como manager
   const admin = await prisma.users.findFirst({
     where: { email: 'internet.freecom@gmail.com' },
   })
@@ -23,259 +54,109 @@ export async function seedWarehouses(prisma: PrismaClient, familyMap: Map<string
     return
   }
 
-  // ============================================
-  // BODEGAS PARA TECNOLOGÍA Y COMUNICACIONES
-  // ============================================
+  const base = { managerId: admin.id, isActive: true }
 
-  const techWarehouses = [
+  const techWarehouses: WarehouseSeed[] = [
     {
       name: 'Bodega TI Principal',
       location: 'Edificio A - Piso 2 - Sala 201',
-      description: 'Bodega principal de equipos tecnológicos y hardware',
+      description: 'Equipos tecnológicos y hardware',
       familyId: techFamilyId,
-      managerId: admin.id,
-      isActive: true,
+      ...base,
     },
     {
       name: 'Bodega de Equipos en Reparación',
       location: 'Edificio A - Piso 1 - Taller',
-      description: 'Equipos en proceso de reparación o mantenimiento',
+      description: 'Equipos en reparación o mantenimiento',
       familyId: techFamilyId,
-      managerId: admin.id,
-      isActive: true,
+      ...base,
     },
     {
       name: 'Bodega de Equipos Obsoletos',
       location: 'Edificio C - Sótano',
-      description: 'Equipos dados de baja pendientes de disposición final',
+      description: 'Equipos dados de baja pendientes de disposición',
       familyId: techFamilyId,
-      managerId: admin.id,
-      isActive: true,
+      ...base,
     },
   ]
 
-  for (const warehouse of techWarehouses) {
-    const existing = await prisma.warehouses.findFirst({
-      where: {
-        name: warehouse.name,
-        familyId: warehouse.familyId,
-      },
-    })
-
-    if (existing) {
-      await prisma.warehouses.update({
-        where: { id: existing.id },
-        data: {
-          location: warehouse.location,
-          description: warehouse.description,
-          managerId: warehouse.managerId,
-          isActive: warehouse.isActive,
-        },
-      })
-    } else {
-      await prisma.warehouses.create({
-        data: {
-          id: randomUUID(),
-          ...warehouse,
-        },
-      })
-    }
-  }
-  console.log(`  ✅ ${techWarehouses.length} bodegas para Tecnología y Comunicaciones`)
-
-  // ============================================
-  // BODEGAS PARA ACTIVOS FIJOS E INFRAESTRUCTURA
-  // ============================================
-
-  const fixedAssetsWarehouses = [
+  const architectureWarehouses: WarehouseSeed[] = [
     {
       name: 'Bodega de Mobiliario',
       location: 'Edificio B - Piso 1',
-      description: 'Almacén de mobiliario de oficina y muebles',
-      familyId: fixedAssetsFamilyId,
-      managerId: admin.id,
-      isActive: true,
+      description: 'Mobiliario de oficina y muebles',
+      familyId: architectureFamilyId,
+      ...base,
     },
     {
-      name: 'Bodega de Equipos de Infraestructura',
-      location: 'Edificio B - Sótano',
-      description: 'Equipos de climatización, generadores, UPS, etc.',
-      familyId: fixedAssetsFamilyId,
-      managerId: admin.id,
-      isActive: true,
-    },
-    {
-      name: 'Bodega de Herramientas',
-      location: 'Edificio B - Piso 1 - Sala 105',
-      description: 'Herramientas y equipos para mantenimiento de infraestructura',
-      familyId: fixedAssetsFamilyId,
-      managerId: admin.id,
-      isActive: true,
+      name: 'Bodega de Planos y Materiales',
+      location: 'Edificio B - Piso 2',
+      description: 'Planos, maquetas y materiales de arquitectura',
+      familyId: architectureFamilyId,
+      ...base,
     },
   ]
 
-  for (const warehouse of fixedAssetsWarehouses) {
-    const existing = await prisma.warehouses.findFirst({
-      where: {
-        name: warehouse.name,
-        familyId: warehouse.familyId,
-      },
-    })
-
-    if (existing) {
-      await prisma.warehouses.update({
-        where: { id: existing.id },
-        data: {
-          location: warehouse.location,
-          description: warehouse.description,
-          managerId: warehouse.managerId,
-          isActive: warehouse.isActive,
-        },
-      })
-    } else {
-      await prisma.warehouses.create({
-        data: {
-          id: randomUUID(),
-          ...warehouse,
-        },
-      })
-    }
-  }
-  console.log(`  ✅ ${fixedAssetsWarehouses.length} bodegas para Activos Fijos e Infraestructura`)
-
-  // ============================================
-  // BODEGAS PARA MANTENIMIENTO
-  // ============================================
-
-  const maintenanceWarehouses = [
+  const operationsWarehouses: WarehouseSeed[] = [
     {
       name: 'Bodega de Repuestos Eléctricos',
       location: 'Edificio D - Piso 1',
       description: 'Repuestos y materiales eléctricos',
-      familyId: maintenanceFamilyId,
-      managerId: admin.id,
-      isActive: true,
+      familyId: operationsFamilyId,
+      ...base,
     },
     {
       name: 'Bodega de Repuestos Mecánicos',
       location: 'Edificio D - Piso 1',
       description: 'Repuestos y materiales mecánicos',
-      familyId: maintenanceFamilyId,
-      managerId: admin.id,
-      isActive: true,
+      familyId: operationsFamilyId,
+      ...base,
     },
     {
       name: 'Bodega de Materiales de Construcción',
       location: 'Edificio D - Exterior',
-      description: 'Materiales para obras civiles y construcción',
-      familyId: maintenanceFamilyId,
-      managerId: admin.id,
-      isActive: true,
+      description: 'Materiales para obras civiles',
+      familyId: operationsFamilyId,
+      ...base,
     },
     {
       name: 'Bodega de Herramientas de Mantenimiento',
-      location: 'Edificio D - Piso 1 - Taller',
-      description: 'Herramientas especializadas para mantenimiento',
-      familyId: maintenanceFamilyId,
-      managerId: admin.id,
-      isActive: true,
+      location: 'Edificio D - Taller',
+      description: 'Herramientas especializadas de mantenimiento',
+      familyId: operationsFamilyId,
+      ...base,
     },
-  ]
-
-  for (const warehouse of maintenanceWarehouses) {
-    const existing = await prisma.warehouses.findFirst({
-      where: {
-        name: warehouse.name,
-        familyId: warehouse.familyId,
-      },
-    })
-
-    if (existing) {
-      await prisma.warehouses.update({
-        where: { id: existing.id },
-        data: {
-          location: warehouse.location,
-          description: warehouse.description,
-          managerId: warehouse.managerId,
-          isActive: warehouse.isActive,
-        },
-      })
-    } else {
-      await prisma.warehouses.create({
-        data: {
-          id: randomUUID(),
-          ...warehouse,
-        },
-      })
-    }
-  }
-  console.log(`  ✅ ${maintenanceWarehouses.length} bodegas para Mantenimiento`)
-
-  // ============================================
-  // BODEGAS PARA SEGURIDAD
-  // ============================================
-
-  const securityWarehouses = [
     {
       name: 'Bodega de Equipos de Seguridad',
       location: 'Edificio E - Piso 1',
-      description: 'Cámaras, sensores, equipos de control de acceso',
-      familyId: securityFamilyId,
-      managerId: admin.id,
-      isActive: true,
+      description: 'Cámaras, sensores y control de acceso',
+      familyId: operationsFamilyId,
+      ...base,
     },
     {
-      name: 'Bodega de Equipos de Vigilancia',
-      location: 'Edificio E - Piso 1',
-      description: 'Equipos de comunicación y vigilancia',
-      familyId: securityFamilyId,
-      managerId: admin.id,
-      isActive: true,
+      name: 'Bodega de Suministros de Limpieza',
+      location: 'Edificio D - Bodega 2',
+      description: 'Productos de limpieza e higiene',
+      familyId: operationsFamilyId,
+      ...base,
     },
   ]
 
-  for (const warehouse of securityWarehouses) {
-    const existing = await prisma.warehouses.findFirst({
-      where: {
-        name: warehouse.name,
-        familyId: warehouse.familyId,
-      },
-    })
+  await upsertWarehouses(prisma, techWarehouses)
+  console.log(`  ✅ ${techWarehouses.length} bodegas — Tecnología y Comunicaciones`)
 
-    if (existing) {
-      await prisma.warehouses.update({
-        where: { id: existing.id },
-        data: {
-          location: warehouse.location,
-          description: warehouse.description,
-          managerId: warehouse.managerId,
-          isActive: warehouse.isActive,
-        },
-      })
-    } else {
-      await prisma.warehouses.create({
-        data: {
-          id: randomUUID(),
-          ...warehouse,
-        },
-      })
-    }
-  }
-  console.log(`  ✅ ${securityWarehouses.length} bodegas para Seguridad`)
+  await upsertWarehouses(prisma, architectureWarehouses)
+  console.log(`  ✅ ${architectureWarehouses.length} bodegas — Arquitectura`)
 
-  // ============================================
-  // BODEGA DE RECEPCIÓN (COMPRAS) — UNA POR FAMILIA
-  // Permite al departamento de Compras recibir activos
-  // antes de distribuirlos a la bodega definitiva de cada familia.
-  // ============================================
+  await upsertWarehouses(prisma, operationsWarehouses)
+  console.log(`  ✅ ${operationsWarehouses.length} bodegas — Operaciones`)
 
-  const allFamilyIds = [techFamilyId, fixedAssetsFamilyId, maintenanceFamilyId, securityFamilyId]
+  const inventoryFamilies = [techFamilyId, architectureFamilyId, operationsFamilyId]
   let receptionCount = 0
 
-  for (const fId of allFamilyIds) {
-    if (!fId) continue
+  for (const familyId of inventoryFamilies) {
     const existing = await prisma.warehouses.findFirst({
-      where: { name: 'Recepción Compras', familyId: fId },
+      where: { name: 'Recepción Compras', familyId },
     })
     if (!existing) {
       await prisma.warehouses.create({
@@ -283,9 +164,8 @@ export async function seedWarehouses(prisma: PrismaClient, familyMap: Map<string
           id: randomUUID(),
           name: 'Recepción Compras',
           location: 'Área de recepción — Depto. Compras',
-          description:
-            'Bodega transitoria de recepción. Los activos adquiridos ingresan aquí antes de ser distribuidos a su bodega definitiva.',
-          familyId: fId,
+          description: 'Bodega transitoria antes de distribuir a la bodega definitiva',
+          familyId,
           managerId: admin.id,
           isActive: true,
         },
@@ -293,6 +173,7 @@ export async function seedWarehouses(prisma: PrismaClient, familyMap: Map<string
       receptionCount++
     }
   }
+
   if (receptionCount > 0) {
     console.log(`  ✅ ${receptionCount} bodegas "Recepción Compras" creadas`)
   }

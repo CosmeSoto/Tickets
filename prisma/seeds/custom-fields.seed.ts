@@ -214,15 +214,15 @@ export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<stri
   }
 
   // ============================================
-  // FAMILIA: ACTIVOS FIJOS (Fixed Assets)
+  // FAMILIA: ARQUITECTURA
   // ============================================
 
-  const fixedAssetsFamilyId = fam('FIXED_ASSETS')
-  if (fixedAssetsFamilyId) {
+  const architectureFamilyId = fam('ARCHITECTURE')
+  if (architectureFamilyId) {
     await prisma.family_custom_fields.createMany({
       data: [
         {
-          familyId: fixedAssetsFamilyId,
+          familyId: architectureFamilyId,
           fieldName: 'fabricante',
           fieldLabel: 'Fabricante',
           fieldType: 'text',
@@ -234,7 +234,7 @@ export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<stri
           helpText: 'Fabricante del equipo o activo',
         },
         {
-          familyId: fixedAssetsFamilyId,
+          familyId: architectureFamilyId,
           fieldName: 'modelo',
           fieldLabel: 'Modelo',
           fieldType: 'text',
@@ -246,7 +246,7 @@ export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<stri
           helpText: 'Modelo del activo',
         },
         {
-          familyId: fixedAssetsFamilyId,
+          familyId: architectureFamilyId,
           fieldName: 'numero_serie',
           fieldLabel: 'Número de Serie',
           fieldType: 'text',
@@ -258,7 +258,7 @@ export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<stri
           helpText: 'Número de serie del fabricante',
         },
         {
-          familyId: fixedAssetsFamilyId,
+          familyId: architectureFamilyId,
           fieldName: 'anio_construccion',
           fieldLabel: 'Año de Construcción/Instalación',
           fieldType: 'number',
@@ -271,7 +271,7 @@ export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<stri
           helpText: 'Año en que se construyó o instaló el activo',
         },
         {
-          familyId: fixedAssetsFamilyId,
+          familyId: architectureFamilyId,
           fieldName: 'capacidad',
           fieldLabel: 'Capacidad',
           fieldType: 'text',
@@ -283,7 +283,7 @@ export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<stri
           helpText: 'Capacidad del equipo (ej: 5 toneladas, 100 kW, 500 litros)',
         },
         {
-          familyId: fixedAssetsFamilyId,
+          familyId: architectureFamilyId,
           fieldName: 'voltaje',
           fieldLabel: 'Voltaje',
           fieldType: 'select',
@@ -295,7 +295,7 @@ export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<stri
           helpText: 'Voltaje de operación',
         },
         {
-          familyId: fixedAssetsFamilyId,
+          familyId: architectureFamilyId,
           fieldName: 'potencia',
           fieldLabel: 'Potencia (kW)',
           fieldType: 'number',
@@ -308,7 +308,7 @@ export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<stri
           helpText: 'Potencia en kilovatios',
         },
         {
-          familyId: fixedAssetsFamilyId,
+          familyId: architectureFamilyId,
           fieldName: 'area_m2',
           fieldLabel: 'Área (m²)',
           fieldType: 'number',
@@ -321,7 +321,7 @@ export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<stri
           helpText: 'Área en metros cuadrados',
         },
         {
-          familyId: fixedAssetsFamilyId,
+          familyId: architectureFamilyId,
           fieldName: 'estado_conservacion',
           fieldLabel: 'Estado de Conservación',
           fieldType: 'select',
@@ -333,7 +333,7 @@ export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<stri
           helpText: 'Estado físico del activo',
         },
         {
-          familyId: fixedAssetsFamilyId,
+          familyId: architectureFamilyId,
           fieldName: 'ubicacion_fisica',
           fieldLabel: 'Ubicación Física',
           fieldType: 'text',
@@ -345,7 +345,7 @@ export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<stri
           helpText: 'Ubicación específica del activo (edificio, piso, sala)',
         },
         {
-          familyId: fixedAssetsFamilyId,
+          familyId: architectureFamilyId,
           fieldName: 'certificaciones',
           fieldLabel: 'Certificaciones',
           fieldType: 'text',
@@ -359,19 +359,19 @@ export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<stri
       ],
       skipDuplicates: true,
     })
-    console.log('  ✓ Campos para Activos Fijos (11 campos)')
+    console.log('  ✓ Campos para Arquitectura (11 campos)')
   }
 
   // ============================================
-  // FAMILIA: MANTENIMIENTO (Maintenance)
+  // FAMILIA: OPERACIONES (mantenimiento + seguridad)
   // ============================================
 
-  const maintenanceFamilyId = fam('MAINTENANCE')
-  if (maintenanceFamilyId) {
+  const operationsFamilyId = fam('OPERATIONS')
+  if (operationsFamilyId) {
     await prisma.family_custom_fields.createMany({
       data: [
         {
-          familyId: maintenanceFamilyId,
+          familyId: operationsFamilyId,
           fieldName: 'frecuencia_mantenimiento',
           fieldLabel: 'Frecuencia de Mantenimiento',
           fieldType: 'select',
@@ -391,7 +391,7 @@ export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<stri
           helpText: 'Frecuencia recomendada de mantenimiento',
         },
         {
-          familyId: maintenanceFamilyId,
+          familyId: operationsFamilyId,
           fieldName: 'ultima_revision',
           fieldLabel: 'Última Revisión',
           fieldType: 'date',
@@ -401,7 +401,7 @@ export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<stri
           helpText: 'Fecha de la última revisión o mantenimiento',
         },
         {
-          familyId: maintenanceFamilyId,
+          familyId: operationsFamilyId,
           fieldName: 'proxima_revision',
           fieldLabel: 'Próxima Revisión',
           fieldType: 'date',
@@ -411,7 +411,7 @@ export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<stri
           helpText: 'Fecha programada para la próxima revisión',
         },
         {
-          familyId: maintenanceFamilyId,
+          familyId: operationsFamilyId,
           fieldName: 'tipo_mantenimiento',
           fieldLabel: 'Tipo de Mantenimiento',
           fieldType: 'select',
@@ -422,22 +422,8 @@ export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<stri
           order: 4,
           helpText: 'Tipo de mantenimiento aplicable',
         },
-      ],
-      skipDuplicates: true,
-    })
-    console.log('  ✓ Campos para Mantenimiento (4 campos)')
-  }
-
-  // ============================================
-  // FAMILIA: SEGURIDAD (Security)
-  // ============================================
-
-  const securityFamilyId = fam('SECURITY')
-  if (securityFamilyId) {
-    await prisma.family_custom_fields.createMany({
-      data: [
         {
-          familyId: securityFamilyId,
+          familyId: operationsFamilyId,
           fieldName: 'marca',
           fieldLabel: 'Marca',
           fieldType: 'text',
@@ -445,11 +431,11 @@ export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<stri
             maxLength: 50,
           },
           isRequired: false,
-          order: 1,
-          helpText: 'Marca del equipo de seguridad (ej: Hikvision, Dahua, Honeywell)',
+          order: 5,
+          helpText: 'Marca del equipo (ej: Hikvision, Dahua, Honeywell)',
         },
         {
-          familyId: securityFamilyId,
+          familyId: operationsFamilyId,
           fieldName: 'modelo',
           fieldLabel: 'Modelo',
           fieldType: 'text',
@@ -457,11 +443,11 @@ export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<stri
             maxLength: 100,
           },
           isRequired: false,
-          order: 2,
+          order: 6,
           helpText: 'Modelo específico del equipo',
         },
         {
-          familyId: securityFamilyId,
+          familyId: operationsFamilyId,
           fieldName: 'numero_serie',
           fieldLabel: 'Número de Serie',
           fieldType: 'text',
@@ -469,11 +455,11 @@ export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<stri
             maxLength: 100,
           },
           isRequired: false,
-          order: 3,
+          order: 7,
           helpText: 'Número de serie del fabricante',
         },
         {
-          familyId: securityFamilyId,
+          familyId: operationsFamilyId,
           fieldName: 'resolucion',
           fieldLabel: 'Resolución',
           fieldType: 'select',
@@ -481,11 +467,11 @@ export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<stri
             options: ['720p (1MP)', '1080p (2MP)', '1440p (4MP)', '4K (8MP)', '5MP', 'Otra'],
           },
           isRequired: false,
-          order: 4,
+          order: 8,
           helpText: 'Resolución de cámara (para cámaras IP)',
         },
         {
-          familyId: securityFamilyId,
+          familyId: operationsFamilyId,
           fieldName: 'tipo_lente',
           fieldLabel: 'Tipo de Lente',
           fieldType: 'select',
@@ -493,21 +479,21 @@ export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<stri
             options: ['Fijo 2.8mm', 'Fijo 3.6mm', 'Fijo 6mm', 'Varifocal 2.8-12mm', 'PTZ', 'Otro'],
           },
           isRequired: false,
-          order: 5,
+          order: 9,
           helpText: 'Tipo de lente de la cámara',
         },
         {
-          familyId: securityFamilyId,
+          familyId: operationsFamilyId,
           fieldName: 'vision_nocturna',
           fieldLabel: 'Visión Nocturna',
           fieldType: 'boolean',
           fieldOptions: Prisma.DbNull,
           isRequired: false,
-          order: 6,
+          order: 10,
           helpText: 'Indica si tiene visión nocturna infrarroja',
         },
         {
-          familyId: securityFamilyId,
+          familyId: operationsFamilyId,
           fieldName: 'direccion_ip',
           fieldLabel: 'Dirección IP',
           fieldType: 'text',
@@ -515,11 +501,11 @@ export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<stri
             maxLength: 50,
           },
           isRequired: false,
-          order: 7,
+          order: 11,
           helpText: 'Dirección IP asignada',
         },
         {
-          familyId: securityFamilyId,
+          familyId: operationsFamilyId,
           fieldName: 'nivel_seguridad',
           fieldLabel: 'Nivel de Seguridad',
           fieldType: 'select',
@@ -527,11 +513,11 @@ export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<stri
             options: ['Bajo', 'Medio', 'Alto', 'Crítico'],
           },
           isRequired: false,
-          order: 8,
+          order: 12,
           helpText: 'Nivel de seguridad del equipo o sistema',
         },
         {
-          familyId: securityFamilyId,
+          familyId: operationsFamilyId,
           fieldName: 'zona_cobertura',
           fieldLabel: 'Zona de Cobertura',
           fieldType: 'text',
@@ -539,11 +525,11 @@ export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<stri
             maxLength: 200,
           },
           isRequired: false,
-          order: 9,
+          order: 13,
           helpText: 'Área o zona que cubre el equipo de seguridad',
         },
         {
-          familyId: securityFamilyId,
+          familyId: operationsFamilyId,
           fieldName: 'certificacion',
           fieldLabel: 'Certificación',
           fieldType: 'text',
@@ -551,13 +537,13 @@ export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<stri
             maxLength: 100,
           },
           isRequired: false,
-          order: 10,
+          order: 14,
           helpText: 'Certificaciones de seguridad (ej: ISO 27001, UL)',
         },
       ],
       skipDuplicates: true,
     })
-    console.log('  ✓ Campos para Seguridad (10 campos)')
+    console.log('  ✓ Campos para Operaciones (14 campos)')
   }
 
   console.log('✅ Campos personalizados creados')

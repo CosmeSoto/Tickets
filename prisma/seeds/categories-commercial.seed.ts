@@ -48,13 +48,15 @@ export async function seedCategoriesCommercial(prisma: PrismaClient, deptMap: Ma
   const counters = { created: 0, updated: 0 }
   const deptComercial = deptMap.get('Comercial')
   const deptMarketing = deptMap.get('Marketing')
+  const deptMediosDigitales = deptMap.get('Medios Digitales')
+  const deptDiseno = deptMap.get('Diseño')
 
-  if (!deptComercial && !deptMarketing) {
-    console.log('⚠️  Departamentos de COMMERCIAL no encontrados, saltando seed...')
+  if (!deptComercial && !deptMarketing && !deptMediosDigitales && !deptDiseno) {
+    console.log('⚠️  Departamentos de COMMERCIAL/MARKETING no encontrados, saltando seed...')
     return
   }
 
-  const deptPrincipal = deptComercial || deptMarketing!
+  const deptPrincipal = deptComercial || deptMarketing || deptMediosDigitales || deptDiseno!
 
   // ==================== DEPARTAMENTO COMERCIAL/MARKETING ====================
   const solicitudComercial = await upsertCategory(
@@ -698,7 +700,97 @@ export async function seedCategoriesCommercial(prisma: PrismaClient, deptMap: Ma
     counters
   )
 
+  // ==================== MEDIOS DIGITALES (Marketing) ====================
+  if (deptMediosDigitales) {
+    const solicitudDigital = await upsertCategory(
+      prisma,
+      {
+        name: 'Solicitud de Medios Digitales',
+        description: 'Pauta, web, redes sociales y contenido digital',
+        level: 1,
+        parentId: null,
+        departmentId: deptMediosDigitales,
+        order: 1,
+        color: '#DB2777',
+      },
+      counters
+    )
+
+    await upsertCategory(
+      prisma,
+      {
+        name: 'Community Manager',
+        description: 'Gestión de redes sociales y comunidad',
+        level: 2,
+        parentId: solicitudDigital.id,
+        departmentId: deptMediosDigitales,
+        order: 1,
+        color: '#DB2777',
+      },
+      counters
+    )
+
+    await upsertCategory(
+      prisma,
+      {
+        name: 'Pauta / Web',
+        description: 'Publicidad digital y actualizaciones web',
+        level: 2,
+        parentId: solicitudDigital.id,
+        departmentId: deptMediosDigitales,
+        order: 2,
+        color: '#DB2777',
+      },
+      counters
+    )
+  }
+
+  // ==================== DISEÑO (Marketing) ====================
+  if (deptDiseno) {
+    const solicitudDiseno = await upsertCategory(
+      prisma,
+      {
+        name: 'Solicitud de Diseño',
+        description: 'Piezas gráficas, branding y material visual',
+        level: 1,
+        parentId: null,
+        departmentId: deptDiseno,
+        order: 1,
+        color: '#BE185D',
+      },
+      counters
+    )
+
+    await upsertCategory(
+      prisma,
+      {
+        name: 'Material Gráfico',
+        description: 'Banners, flyers, señalética y piezas impresas',
+        level: 2,
+        parentId: solicitudDiseno.id,
+        departmentId: deptDiseno,
+        order: 1,
+        color: '#BE185D',
+      },
+      counters
+    )
+
+    await upsertCategory(
+      prisma,
+      {
+        name: 'Branding / Identidad Visual',
+        description: 'Ajustes de marca e identidad corporativa',
+        level: 2,
+        parentId: solicitudDiseno.id,
+        departmentId: deptDiseno,
+        order: 2,
+        color: '#BE185D',
+      },
+      counters
+    )
+  }
+
   console.log(
-    `✅ Categorías COMMERCIAL (Comercial y Marketing): ${counters.created} creadas, ${counters.updated} actualizadas`
+    `✅ Categorías COMMERCIAL/MARKETING: ${counters.created} creadas, ${counters.updated} actualizadas`
   )
 }
