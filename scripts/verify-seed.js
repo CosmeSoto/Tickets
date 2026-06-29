@@ -58,7 +58,7 @@ async function verifySeed() {
 
     const departments = await prisma.departments.count()
     console.log('\n🏢 Departamentos:')
-    console.log(`   ${departments >= 20 ? '✅' : '⚠️'} Total: ${departments} (esperado ~24)`)
+    console.log(`   ${departments >= 25 ? '✅' : '⚠️'} Total: ${departments} (esperado ~25)`)
 
     const categories = await prisma.categories.count()
     console.log('\n🎫 Categorías de tickets:')
@@ -70,7 +70,7 @@ async function verifySeed() {
       families.length === 6 &&
       slaPolicies.length >= 8 &&
       siteConfig.length >= 5 &&
-      departments >= 20 &&
+      departments >= 25 &&
       categories > 0
 
     if (allGood) {

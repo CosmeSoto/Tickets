@@ -50,13 +50,15 @@ export async function seedCategoriesCommercial(prisma: PrismaClient, deptMap: Ma
   const deptMarketing = deptMap.get('Marketing')
   const deptMediosDigitales = deptMap.get('Medios Digitales')
   const deptDiseno = deptMap.get('Diseño')
+  const deptServicioCliente = deptMap.get('Servicio al Cliente')
 
-  if (!deptComercial && !deptMarketing && !deptMediosDigitales && !deptDiseno) {
+  if (!deptComercial && !deptMarketing && !deptMediosDigitales && !deptDiseno && !deptServicioCliente) {
     console.log('⚠️  Departamentos de COMMERCIAL/MARKETING no encontrados, saltando seed...')
     return
   }
 
-  const deptPrincipal = deptComercial || deptMarketing || deptMediosDigitales || deptDiseno!
+  const deptPrincipal =
+    deptComercial || deptMarketing || deptMediosDigitales || deptDiseno || deptServicioCliente!
 
   // ==================== DEPARTAMENTO COMERCIAL/MARKETING ====================
   const solicitudComercial = await upsertCategory(
@@ -785,6 +787,264 @@ export async function seedCategoriesCommercial(prisma: PrismaClient, deptMap: Ma
         departmentId: deptDiseno,
         order: 2,
         color: '#BE185D',
+      },
+      counters
+    )
+  }
+
+  // ==================== SERVICIO AL CLIENTE (Marketing) ====================
+  if (deptServicioCliente) {
+    const atencionCliente = await upsertCategory(
+      prisma,
+      {
+        name: 'Atención al Cliente',
+        description: 'Consultas, orientación y servicio a visitantes o clientes',
+        level: 1,
+        parentId: null,
+        departmentId: deptServicioCliente,
+        order: 1,
+        color: '#E879F9',
+      },
+      counters
+    )
+
+    const puntoCanje = await upsertCategory(
+      prisma,
+      {
+        name: 'Punto de Canje',
+        description: 'Canje de premios, beneficios, cupones y promociones',
+        level: 1,
+        parentId: null,
+        departmentId: deptServicioCliente,
+        order: 2,
+        color: '#C026D3',
+      },
+      counters
+    )
+
+    const reclamoCliente = await upsertCategory(
+      prisma,
+      {
+        name: 'Reclamo o Queja',
+        description: 'Reclamos, quejas y seguimiento de incidencias de servicio',
+        level: 1,
+        parentId: null,
+        departmentId: deptServicioCliente,
+        order: 3,
+        color: '#EF4444',
+      },
+      counters
+    )
+
+    await upsertCategory(
+      prisma,
+      {
+        name: 'Consulta General',
+        description: 'Información general sobre el centro comercial o servicios',
+        level: 2,
+        parentId: atencionCliente.id,
+        departmentId: deptServicioCliente,
+        order: 1,
+        color: '#E879F9',
+      },
+      counters
+    )
+
+    await upsertCategory(
+      prisma,
+      {
+        name: 'Orientación a Visitantes',
+        description: 'Ubicación de locales, horarios y orientación en sitio',
+        level: 2,
+        parentId: atencionCliente.id,
+        departmentId: deptServicioCliente,
+        order: 2,
+        color: '#E879F9',
+      },
+      counters
+    )
+
+    await upsertCategory(
+      prisma,
+      {
+        name: 'Punto de Información',
+        description: 'Información de promociones, eventos y servicios disponibles',
+        level: 2,
+        parentId: atencionCliente.id,
+        departmentId: deptServicioCliente,
+        order: 3,
+        color: '#E879F9',
+      },
+      counters
+    )
+
+    await upsertCategory(
+      prisma,
+      {
+        name: 'Canje de Premios o Beneficios',
+        description: 'Redención de premios, puntos o beneficios de fidelización',
+        level: 2,
+        parentId: puntoCanje.id,
+        departmentId: deptServicioCliente,
+        order: 1,
+        color: '#C026D3',
+      },
+      counters
+    )
+
+    await upsertCategory(
+      prisma,
+      {
+        name: 'Validación de Cupones o Vouchers',
+        description: 'Validación y aplicación de cupones, vouchers o códigos promocionales',
+        level: 2,
+        parentId: puntoCanje.id,
+        departmentId: deptServicioCliente,
+        order: 2,
+        color: '#C026D3',
+      },
+      counters
+    )
+
+    await upsertCategory(
+      prisma,
+      {
+        name: 'Seguimiento de Reclamo',
+        description: 'Consulta o actualización sobre un reclamo en curso',
+        level: 2,
+        parentId: reclamoCliente.id,
+        departmentId: deptServicioCliente,
+        order: 1,
+        color: '#EF4444',
+      },
+      counters
+    )
+  }
+
+  // ==================== SERVICIO AL CLIENTE (Marketing) ====================
+  if (deptServicioCliente) {
+    const atencionCliente = await upsertCategory(
+      prisma,
+      {
+        name: 'Atención al Cliente',
+        description: 'Consultas, orientación y servicio a visitantes o clientes',
+        level: 1,
+        parentId: null,
+        departmentId: deptServicioCliente,
+        order: 1,
+        color: '#E879F9',
+      },
+      counters
+    )
+
+    const puntoCanje = await upsertCategory(
+      prisma,
+      {
+        name: 'Punto de Canje',
+        description: 'Canje de premios, beneficios, cupones y promociones',
+        level: 1,
+        parentId: null,
+        departmentId: deptServicioCliente,
+        order: 2,
+        color: '#C026D3',
+      },
+      counters
+    )
+
+    const reclamoCliente = await upsertCategory(
+      prisma,
+      {
+        name: 'Reclamo o Queja',
+        description: 'Reclamos, quejas y seguimiento de incidencias de servicio',
+        level: 1,
+        parentId: null,
+        departmentId: deptServicioCliente,
+        order: 3,
+        color: '#EF4444',
+      },
+      counters
+    )
+
+    await upsertCategory(
+      prisma,
+      {
+        name: 'Consulta General',
+        description: 'Información general sobre el centro comercial o servicios',
+        level: 2,
+        parentId: atencionCliente.id,
+        departmentId: deptServicioCliente,
+        order: 1,
+        color: '#E879F9',
+      },
+      counters
+    )
+
+    await upsertCategory(
+      prisma,
+      {
+        name: 'Orientación a Visitantes',
+        description: 'Ubicación de locales, horarios y orientación en sitio',
+        level: 2,
+        parentId: atencionCliente.id,
+        departmentId: deptServicioCliente,
+        order: 2,
+        color: '#E879F9',
+      },
+      counters
+    )
+
+    await upsertCategory(
+      prisma,
+      {
+        name: 'Punto de Información',
+        description: 'Información de promociones, eventos y servicios disponibles',
+        level: 2,
+        parentId: atencionCliente.id,
+        departmentId: deptServicioCliente,
+        order: 3,
+        color: '#E879F9',
+      },
+      counters
+    )
+
+    await upsertCategory(
+      prisma,
+      {
+        name: 'Canje de Premios o Beneficios',
+        description: 'Redención de premios, puntos o beneficios de fidelización',
+        level: 2,
+        parentId: puntoCanje.id,
+        departmentId: deptServicioCliente,
+        order: 1,
+        color: '#C026D3',
+      },
+      counters
+    )
+
+    await upsertCategory(
+      prisma,
+      {
+        name: 'Validación de Cupones o Vouchers',
+        description: 'Validación y aplicación de cupones, vouchers o códigos promocionales',
+        level: 2,
+        parentId: puntoCanje.id,
+        departmentId: deptServicioCliente,
+        order: 2,
+        color: '#C026D3',
+      },
+      counters
+    )
+
+    await upsertCategory(
+      prisma,
+      {
+        name: 'Seguimiento de Reclamo',
+        description: 'Consulta o actualización sobre un reclamo en curso',
+        level: 2,
+        parentId: reclamoCliente.id,
+        departmentId: deptServicioCliente,
+        order: 1,
+        color: '#EF4444',
       },
       counters
     )
