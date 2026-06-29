@@ -201,7 +201,13 @@ export function useCategories(options: UseCategoriesOptions = {}) {
     (category: any) => {
       formHook.handleEdit(category)
       // Recargar departamentos, padres y técnicos filtrados por la familia de la categoría
-      const familyId = category.departments?.familyId ?? category.department?.familyId ?? null
+      const familyId =
+        category.familyId ??
+        category.family?.id ??
+        category.departments?.familyId ??
+        category.departments?.family?.id ??
+        category.department?.familyId ??
+        null
       // IDs de técnicos ya asignados a esta categoría (para asegurar que aparezcan en la lista)
       const assignedTechIds = (category.technician_assignments ?? []).map(
         (a: any) => a.technicianId

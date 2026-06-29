@@ -73,6 +73,7 @@ async function main() {
   await seedCategoriesSecurity(prisma, deptMap)
   await seedCategoriesGreenAreas(prisma, deptMap)
   await seedCategoriesServices(prisma, deptMap)
+  await syncCategoryFamilies()
 
   // 10. TIPOS DE INVENTARIO (equipos, licencias, consumibles)
   await seedInventoryTypes(prisma, familyMap)
@@ -451,6 +452,19 @@ async function seedDepartments(familyMap: Map<string, string>): Promise<Map<stri
   }
   console.log(`✅ ${departments.length} departamentos con familyId`)
   return map
+}
+
+/** Sincroniza categories.family_id desde el departamento asociado */
+async function syncCategoryFamilies() {
+  const result = await prisma.$executeRaw`
+    UPDATE categories c
+    SET family_id = d.family_id, updated_at = NOW()
+    FROM departments d
+    WHERE c.department_id = d.id
+      AND d.family_id IS NOT NULL
+      AND (c.family_id IS NULL OR c.family_id IS DISTINCT FROM d.family_id)
+  `
+  console.log(`✅ Categorías sincronizadas con familia del departamento (${result} filas)`)
 }
 
 // ============================================

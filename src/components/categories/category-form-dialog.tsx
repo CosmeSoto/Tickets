@@ -289,7 +289,7 @@ export function CategoryFormDialog({
                 </div>
               ) : (
                 <Combobox
-                  value={formData.familyId || ''}
+                  value={formData.familyId || derivedFamilyId || ''}
                   onValueChange={familyId => {
                     setFormData({ ...formData, familyId, departmentId: null, parentId: null })
                     onLoadDepartments(familyId)

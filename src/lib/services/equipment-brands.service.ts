@@ -86,19 +86,21 @@ export async function listBrands({
   page = 1,
   limit = 50,
   familyId,
+  familyFilter,
   isActive = true,
   search,
 }: {
   page?: number
   limit?: number
   familyId?: string
+  familyFilter?: Record<string, unknown>
   isActive?: boolean
   search?: string
 }) {
   try {
-    const where: any = {}
+    const where: Record<string, unknown> = { ...(familyFilter ?? {}) }
 
-    if (familyId) {
+    if (familyId && !familyFilter) {
       where.familyId = familyId
     }
 

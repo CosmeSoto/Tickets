@@ -546,5 +546,143 @@ export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<stri
     console.log('  ✓ Campos para Operaciones (14 campos)')
   }
 
+  const officeFields = (familyId: string, prefix: string) => [
+    {
+      familyId,
+      fieldName: 'marca',
+      fieldLabel: 'Marca',
+      fieldType: 'text',
+      fieldOptions: { maxLength: 50 },
+      isRequired: false,
+      order: 1,
+      helpText: 'Marca del equipo o activo',
+    },
+    {
+      familyId,
+      fieldName: 'modelo',
+      fieldLabel: 'Modelo',
+      fieldType: 'text',
+      fieldOptions: { maxLength: 100 },
+      isRequired: false,
+      order: 2,
+      helpText: 'Modelo específico',
+    },
+    {
+      familyId,
+      fieldName: 'numero_serie',
+      fieldLabel: 'Número de Serie',
+      fieldType: 'text',
+      fieldOptions: { maxLength: 100 },
+      isRequired: false,
+      order: 3,
+      helpText: 'Número de serie del fabricante',
+    },
+    {
+      familyId,
+      fieldName: 'ubicacion_fisica',
+      fieldLabel: 'Ubicación Física',
+      fieldType: 'text',
+      fieldOptions: { maxLength: 200 },
+      isRequired: false,
+      order: 4,
+      helpText: 'Ubicación del activo (oficina, piso, sala)',
+    },
+    {
+      familyId,
+      fieldName: 'estado_conservacion',
+      fieldLabel: 'Estado de Conservación',
+      fieldType: 'select',
+      fieldOptions: {
+        options: ['Excelente', 'Bueno', 'Regular', 'Malo', 'Crítico'],
+      },
+      isRequired: false,
+      order: 5,
+      helpText: 'Estado físico del activo',
+    },
+    {
+      familyId,
+      fieldName: 'garantia_hasta',
+      fieldLabel: 'Garantía Hasta',
+      fieldType: 'date',
+      fieldOptions: Prisma.DbNull,
+      isRequired: false,
+      order: 6,
+      helpText: 'Fecha de vencimiento de la garantía',
+    },
+    {
+      familyId,
+      fieldName: 'anio_adquisicion',
+      fieldLabel: 'Año de Adquisición',
+      fieldType: 'number',
+      fieldOptions: { min: 1990, max: 2030 },
+      isRequired: false,
+      order: 7,
+      helpText: `Año en que se adquirió el activo (${prefix})`,
+    },
+  ]
+
+  const administrativeFamilyId = fam('ADMINISTRATIVE')
+  if (administrativeFamilyId) {
+    await prisma.family_custom_fields.createMany({
+      data: officeFields(administrativeFamilyId, 'administrativo'),
+      skipDuplicates: true,
+    })
+    console.log('  ✓ Campos para Gestión Administrativa (7 campos)')
+  }
+
+  const commercialFamilyId = fam('COMMERCIAL')
+  if (commercialFamilyId) {
+    await prisma.family_custom_fields.createMany({
+      data: [
+        ...officeFields(commercialFamilyId, 'comercial'),
+        {
+          familyId: commercialFamilyId,
+          fieldName: 'numero_contrato',
+          fieldLabel: 'Número de Contrato',
+          fieldType: 'text',
+          fieldOptions: { maxLength: 100 },
+          isRequired: false,
+          order: 8,
+          helpText: 'Referencia de contrato o acuerdo comercial',
+        },
+      ],
+      skipDuplicates: true,
+    })
+    console.log('  ✓ Campos para Comercial (8 campos)')
+  }
+
+  const marketingFamilyId = fam('MARKETING')
+  if (marketingFamilyId) {
+    await prisma.family_custom_fields.createMany({
+      data: [
+        ...officeFields(marketingFamilyId, 'marketing'),
+        {
+          familyId: marketingFamilyId,
+          fieldName: 'resolucion',
+          fieldLabel: 'Resolución',
+          fieldType: 'select',
+          fieldOptions: {
+            options: ['1920x1080 (Full HD)', '2560x1440 (2K)', '3840x2160 (4K)', 'Otra'],
+          },
+          isRequired: false,
+          order: 8,
+          helpText: 'Resolución de pantallas o displays',
+        },
+        {
+          familyId: marketingFamilyId,
+          fieldName: 'pantalla_pulgadas',
+          fieldLabel: 'Pantalla (pulgadas)',
+          fieldType: 'number',
+          fieldOptions: { min: 10, max: 100 },
+          isRequired: false,
+          order: 9,
+          helpText: 'Tamaño de pantalla para equipos audiovisuales',
+        },
+      ],
+      skipDuplicates: true,
+    })
+    console.log('  ✓ Campos para Marketing (9 campos)')
+  }
+
   console.log('✅ Campos personalizados creados')
 }

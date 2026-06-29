@@ -211,6 +211,7 @@ export function CatalogsTab({ familyId, familyColor }: CatalogsTabProps) {
             onEditBrand={handleEditBrand}
             onDeleteBrand={handleDeleteBrand}
             onToggleActive={handleToggleBrandActive}
+            onCloneSuccess={() => equipmentBrands.loadBrands()}
           />
         </CardContent>
       </Card>

@@ -6,6 +6,7 @@
 import { useState } from 'react'
 import { useWarehouseManagement, Warehouse } from '@/hooks/inventory/use-warehouse-management'
 import { WarehouseFormDialog } from './warehouse-form-dialog'
+import { CloneFamilyCatalogDialog } from './clone-family-catalog-dialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { DataTable, type Column } from '@/components/ui/data-table'
@@ -41,6 +42,7 @@ import {
   CheckCircle,
   XCircle,
   Download,
+  Copy,
 } from 'lucide-react'
 
 interface WarehousesTabProps {
@@ -56,12 +58,14 @@ export function WarehousesTab({ familyId }: WarehousesTabProps) {
     createWarehouse,
     updateWarehouse,
     deleteWarehouse,
+    loadWarehouses,
   } = useWarehouseManagement(familyId)
 
   const [formOpen, setFormOpen] = useState(false)
   const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(null)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [warehouseToDelete, setWarehouseToDelete] = useState<Warehouse | null>(null)
+  const [cloneDialogOpen, setCloneDialogOpen] = useState(false)
 
   // Estado para paginación
   const [page, setPage] = useState(1)
@@ -268,10 +272,21 @@ export function WarehousesTab({ familyId }: WarehousesTabProps) {
           </DropdownMenu>
         }
         actions={
-          <Button onClick={handleCreate} disabled={loading || saving} size='sm'>
-            <Plus className='h-4 w-4 mr-2' />
-            Nueva Bodega
-          </Button>
+          <div className='flex items-center gap-2'>
+            <Button
+              variant='outline'
+              onClick={() => setCloneDialogOpen(true)}
+              disabled={loading || saving || !familyId || warehouses.length === 0}
+              size='sm'
+            >
+              <Copy className='h-4 w-4 mr-2' />
+              Copiar a otras áreas
+            </Button>
+            <Button onClick={handleCreate} disabled={loading || saving} size='sm'>
+              <Plus className='h-4 w-4 mr-2' />
+              Nueva Bodega
+            </Button>
+          </div>
         }
         rowActions={(warehouse: Warehouse) => (
           <div className='flex items-center justify-end gap-1'>
@@ -374,6 +389,16 @@ export function WarehousesTab({ familyId }: WarehousesTabProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <CloneFamilyCatalogDialog
+        open={cloneDialogOpen}
+        onOpenChange={setCloneDialogOpen}
+        kind='warehouses'
+        currentFamilyId={familyId ?? null}
+        onSuccess={() => {
+          void loadWarehouses()
+        }}
+      />
     </>
   )
 }

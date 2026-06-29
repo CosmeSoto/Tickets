@@ -13,6 +13,14 @@ import {
   type CreateBrandInput,
 } from '@/lib/services/equipment-brands.service'
 import { canManageInventory } from '@/lib/inventory-access'
+import {
+  buildCatalogFamilyWhere,
+  requireInventoryCatalogRead,
+} from '@/lib/inventory/inventory-catalog-access'
+import {
+  InventoryAccessError,
+  inventoryAccessToResponse,
+} from '@/lib/inventory/inventory-resource-access'
 import { z } from 'zod'
 
 // Validation schema
@@ -38,13 +46,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    // Check inventory access
-    const hasAccess = await canManageInventory(session.user.id, session.user.role)
-    if (!hasAccess) {
-      return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
-    }
+    const ctx = await requireInventoryCatalogRead(session.user)
 
-    // Parse query params
     const searchParams = request.nextUrl.searchParams
     const page = parseInt(searchParams.get('page') || '1', 10)
     const limit = parseInt(searchParams.get('limit') || '50', 10)
@@ -52,18 +55,22 @@ export async function GET(request: NextRequest) {
     const isActive = searchParams.get('isActive') !== 'false'
     const search = searchParams.get('search') || undefined
 
+    const familyFilter = buildCatalogFamilyWhere(ctx, familyId, false)
     const result = await listBrands({
       page,
       limit,
       familyId,
+      familyFilter,
       isActive,
       search,
     })
 
     return NextResponse.json(result)
-  } catch (error: any) {
+  } catch (error: unknown) {
+    if (error instanceof InventoryAccessError) return inventoryAccessToResponse(error)
     console.error('Error listing brands:', error)
-    return NextResponse.json({ error: error.message || 'Error al listar marcas' }, { status: 500 })
+    const message = error instanceof Error ? error.message : 'Error al listar marcas'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
 

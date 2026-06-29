@@ -184,7 +184,11 @@ export default function CategoriesPage() {
     // Filtro de familia
     if (familyFilter !== 'all') {
       result = result.filter((cat: any) => {
-        const deptFamilyId = cat.departments?.familyId ?? cat.department?.familyId
+        const deptFamilyId =
+          cat.familyId ??
+          cat.family?.id ??
+          cat.departments?.familyId ??
+          cat.departments?.family?.id
         return deptFamilyId === familyFilter
       })
     }
@@ -291,10 +295,13 @@ export default function CategoriesPage() {
       key: 'family',
       header: 'Área',
       sortable: true,
-      accessor: (category: any) => category.departments?.family?.name ?? '',
+      accessor: (category: any) =>
+        category.family?.name ??
+        category.departments?.family?.name ??
+        '',
       className: 'hidden sm:table-cell',
       render: (category: any) => {
-        const family = category.departments?.family
+        const family = category.family ?? category.departments?.family
         if (!family) return <span className='text-xs text-muted-foreground'>—</span>
         return (
           <div className='flex items-center gap-1.5'>

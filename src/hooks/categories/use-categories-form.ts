@@ -112,7 +112,13 @@ export function useCategoriesForm(options: UseCategoriesFormOptions = {}) {
       color: category.color,
       parentId: parentId,
       departmentId: category.departmentId || null,
-      familyId: category.departments?.familyId ?? category.department?.familyId ?? null,
+      familyId:
+        category.familyId ??
+        category.family?.id ??
+        category.departments?.familyId ??
+        category.departments?.family?.id ??
+        category.department?.familyId ??
+        null,
       isActive: category.isActive,
       technician_assignments: category.technician_assignments.map(ta => ({
         technicianId: ta.technicianId,

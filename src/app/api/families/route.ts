@@ -26,12 +26,14 @@ export async function GET(request: NextRequest) {
     if (asClient && session.user.role !== 'CLIENT') {
       const targetId = session.user.role === 'ADMIN' && forClientId ? forClientId : session.user.id
 
-      const { getTicketConsumerFamilyIds } = await import('@/lib/auth/family-scope')
       const targetUser = await prisma.users.findUnique({
         where: { id: targetId },
-        select: { role: true },
+        select: { role: true, departments: { select: { familyId: true } } },
       })
       const targetRole = forClientId ? (targetUser?.role ?? 'CLIENT') : session.user.role
+      const userFamilyId = targetUser?.departments?.familyId ?? null
+
+      const { getTicketConsumerFamilyIds } = await import('@/lib/auth/family-scope')
       const consumerIds = await getTicketConsumerFamilyIds(targetId, targetRole, false)
 
       let allowedFamilyIds = new Set(consumerIds ?? [])

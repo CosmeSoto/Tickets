@@ -113,6 +113,7 @@ export async function GET(request: NextRequest) {
         level: true,
         parentId: true,
         departmentId: true,
+        familyId: true,
         order: true,
         color: true,
         isActive: true,
@@ -133,6 +134,14 @@ export async function GET(request: NextRequest) {
                 color: true,
               },
             },
+          },
+        },
+        family: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            color: true,
           },
         },
         other_categories: {
@@ -320,13 +329,19 @@ export async function POST(request: NextRequest) {
         level,
         parentId: parentId || null,
         departmentId: departmentId || null,
+        familyId: targetFamilyId,
         color: color || '#6B7280',
         order: order || 0,
         isActive: true,
         updatedAt: new Date(),
       },
       include: {
-        departments: true,
+        departments: {
+          include: {
+            family: { select: { id: true, name: true, code: true, color: true } },
+          },
+        },
+        family: { select: { id: true, name: true, code: true, color: true } },
         _count: {
           select: {
             tickets: true,

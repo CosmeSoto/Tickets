@@ -71,6 +71,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             family: { select: { id: true, name: true, code: true, color: true } },
           },
         },
+        family: { select: { id: true, name: true, code: true, color: true } },
         other_categories: {
           select: { id: true, name: true, color: true, level: true, isActive: true },
           where: { isActive: true },
@@ -248,8 +249,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     // Si cambia el departamento, validar permiso en la nueva familia también
+    let resolvedFamilyId =
+      existingCategory.departments?.familyId ?? (await getDepartmentFamilyId(validatedData.departmentId))
     if (validatedData.departmentId !== existingCategory.departmentId) {
       const newFamilyId = await getDepartmentFamilyId(validatedData.departmentId)
+      resolvedFamilyId = newFamilyId
       if (newFamilyId && newFamilyId !== currentFamilyId) {
         const hasPermissionNewFamily = await canManageCategory(
           session.user.id,
@@ -263,6 +267,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           )
         }
       }
+    } else if (validatedData.departmentId) {
+      resolvedFamilyId = await getDepartmentFamilyId(validatedData.departmentId)
     }
 
     // Construir oldValues / newValues para auditoría
@@ -300,6 +306,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         color: validatedData.color,
         isActive: validatedData.isActive,
         departmentId: validatedData.departmentId,
+        familyId: resolvedFamilyId,
         level,
         parentId: validatedData.parentId || null,
         updatedAt: new Date(),
