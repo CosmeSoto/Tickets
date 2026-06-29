@@ -25,7 +25,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useExport } from '@/hooks/common/use-export'
 import { EquipmentBrandInlineForm } from '@/components/inventory/asset-forms/EquipmentBrandInlineForm'
-import { CloneFamilyCatalogDialog } from './clone-family-catalog-dialog'
+import { CloneCatalogItemDialog } from './clone-catalog-item-dialog'
 import type { EquipmentBrand } from '@/hooks/inventory/use-brand-management'
 
 interface BrandSectionProps {
@@ -55,6 +55,7 @@ export function BrandSection({
 }: BrandSectionProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [cloneDialogOpen, setCloneDialogOpen] = useState(false)
+  const [brandToClone, setBrandToClone] = useState<EquipmentBrand | null>(null)
   const [brandToDelete, setBrandToDelete] = useState<EquipmentBrand | null>(null)
   const [brandFormOpen, setBrandFormOpen] = useState(false)
   const [brandFormMode, setBrandFormMode] = useState<'create' | 'edit'>('create')
@@ -184,21 +185,10 @@ export function BrandSection({
           </DropdownMenu>
         }
         actions={
-          <div className='flex items-center gap-2'>
-            <Button
-              variant='outline'
-              onClick={() => setCloneDialogOpen(true)}
-              disabled={saving || !familyId}
-              size='sm'
-            >
-              <Copy className='h-4 w-4 mr-2' />
-              Copiar a otras áreas
-            </Button>
-            <Button onClick={handleCreateBrand} disabled={saving} size='sm'>
-              <Plus className='h-4 w-4 mr-2' />
-              Nueva Marca
-            </Button>
-          </div>
+          <Button onClick={handleCreateBrand} disabled={saving} size='sm'>
+            <Plus className='h-4 w-4 mr-2' />
+            Nueva Marca
+          </Button>
         }
         rowActions={(brand: EquipmentBrand) => (
           <div className='flex items-center justify-end gap-1'>
@@ -228,6 +218,18 @@ export function BrandSection({
               title='Eliminar'
             >
               <Trash2 className='h-4 w-4 text-destructive' />
+            </Button>
+            <Button
+              variant='ghost'
+              size='sm'
+              onClick={() => {
+                setBrandToClone(brand)
+                setCloneDialogOpen(true)
+              }}
+              disabled={saving}
+              title='Copiar a otra área'
+            >
+              <Copy className='h-4 w-4 text-blue-500' />
             </Button>
           </div>
         )}
@@ -283,13 +285,20 @@ export function BrandSection({
         </DialogContent>
       </Dialog>
 
-      <CloneFamilyCatalogDialog
-        open={cloneDialogOpen}
-        onOpenChange={setCloneDialogOpen}
-        kind='brands'
-        currentFamilyId={familyId ?? null}
-        onSuccess={onCloneSuccess}
-      />
+      {brandToClone && (
+        <CloneCatalogItemDialog
+          open={cloneDialogOpen}
+          onOpenChange={open => {
+            setCloneDialogOpen(open)
+            if (!open) setBrandToClone(null)
+          }}
+          kind='brand'
+          itemId={brandToClone.id}
+          itemName={brandToClone.name}
+          currentFamilyId={familyId ?? null}
+          onSuccess={onCloneSuccess}
+        />
+      )}
     </>
   )
 }
