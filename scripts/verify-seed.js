@@ -50,7 +50,9 @@ async function verifySeed() {
     })
 
     console.log('\n⏱️  Políticas de SLA:')
-    console.log(`   ${slaPolicies.length >= 8 ? '✅' : '⚠️'} Total: ${slaPolicies.length} (esperado ≥ 8)`)
+    console.log(
+      `   ${slaPolicies.length >= 8 ? '✅' : '⚠️'} Total: ${slaPolicies.length} (esperado ≥ 8)`
+    )
 
     const siteConfig = await prisma.site_config.findMany()
     console.log('\n⚙️  Configuración del Sitio:')
@@ -76,6 +78,10 @@ async function verifySeed() {
     console.log('\n🏭 Bodegas:')
     console.log(`   ${warehouses >= 10 ? '✅' : '⚠️'} Total: ${warehouses} (esperado ≥ 10)`)
 
+    const supplierTypes = await prisma.supplier_types.count()
+    console.log('\n🚚 Tipos de proveedor:')
+    console.log(`   ${supplierTypes >= 5 ? '✅' : '❌'} Total: ${supplierTypes} (esperado ≥ 5)`)
+
     console.log('\n📊 Resumen:')
     const allGood =
       admin &&
@@ -86,7 +92,8 @@ async function verifySeed() {
       categories > 0 &&
       brands > 0 &&
       brandsWithoutFamily === 0 &&
-      warehouses >= 10
+      warehouses >= 10 &&
+      supplierTypes >= 5
 
     if (allGood) {
       console.log('   ✅ Seed completado correctamente')

@@ -108,16 +108,17 @@ const { PrismaClient } = require('@prisma/client');
 const p = new PrismaClient();
 (async () => {
   try {
-    const [types, brands, warehouses] = await Promise.all([
+    const [types, brands, warehouses, supplierTypes] = await Promise.all([
       p.equipment_types.count(),
       p.equipment_brands.count(),
       p.warehouses.count(),
+      p.supplier_types.count(),
     ]);
-    if (types === 0 || brands === 0 || warehouses === 0) {
-      console.log('  → Catálogos incompletos (tipos=' + types + ', marcas=' + brands + ', bodegas=' + warehouses + ')');
+    if (types === 0 || brands === 0 || warehouses === 0 || supplierTypes === 0) {
+      console.log('  → Catálogos incompletos (tipos=' + types + ', marcas=' + brands + ', bodegas=' + warehouses + ', tipos proveedor=' + supplierTypes + ')');
       process.exit(2);
     }
-    console.log('  → Catálogos OK (tipos=' + types + ', marcas=' + brands + ', bodegas=' + warehouses + ')');
+    console.log('  → Catálogos OK (tipos=' + types + ', marcas=' + brands + ', bodegas=' + warehouses + ', tipos proveedor=' + supplierTypes + ')');
     process.exit(0);
   } catch (e) {
     console.error('  → Error verificando catálogos:', e.message);

@@ -534,14 +534,26 @@ export function EquipmentAssetForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setPriceError('')
-    if (!equipmentTypeId) return
+    if (!equipmentTypeId) {
+      toast.error('Selecciona el tipo de equipo')
+      return
+    }
 
-    // Validar campos obligatorios
-    if (!selectedBrandId) return
-    if (!selectedModelId) return
-    if (!serialNumber.trim()) return
+    if (!selectedBrandId) {
+      toast.error('Selecciona o crea una marca')
+      return
+    }
+    if (!selectedModelId) {
+      toast.error('Selecciona o crea un modelo')
+      return
+    }
+    if (!serialNumber.trim()) {
+      toast.error('Ingresa el número de serie')
+      return
+    }
     if (requireFinancialForNew && condition === 'NEW' && !purchasePrice) {
       setPriceError('El precio de compra es obligatorio para activos nuevos')
+      toast.error('El precio de compra es obligatorio para activos nuevos')
       return
     }
     const selectedModel = equipmentModels.find(m => m.id === selectedModelId)
