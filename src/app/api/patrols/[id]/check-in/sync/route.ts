@@ -14,6 +14,7 @@ import { PatrolGeofenceService } from '@/lib/services/patrol-geofence.service'
 import { PatrolPhotoService } from '@/lib/services/patrol-photo.service'
 import { PatrolOfflineSyncService } from '@/lib/services/patrol-offline-sync.service'
 import { calculateCompletionPercentage } from '@/lib/patrol/patrol-completion'
+import { PATROL_FAMILY_DEFAULTS } from '@/lib/patrol/patrol-family-config'
 import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
 import { NotificationService } from '@/lib/services/notification-service'
 import { NotificationType } from '@prisma/client'
@@ -91,9 +92,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         offlineSyncToleranceMinutes: true,
       },
     })
-    const qrWindowMinutes = familyConfig?.qrWindowMinutes ?? 5
-    const familyRadius = familyConfig?.geofenceRadiusMeters ?? 50
-    const toleranceMinutes = familyConfig?.offlineSyncToleranceMinutes ?? 30
+    const qrWindowMinutes = familyConfig?.qrWindowMinutes ?? PATROL_FAMILY_DEFAULTS.qrWindowMinutes
+    const familyRadius =
+      familyConfig?.geofenceRadiusMeters ?? PATROL_FAMILY_DEFAULTS.geofenceRadiusMeters
+    const toleranceMinutes =
+      familyConfig?.offlineSyncToleranceMinutes ??
+      PATROL_FAMILY_DEFAULTS.offlineSyncToleranceMinutes
 
     // Ordenar cronológicamente y validar timestamps
     const batchResults = PatrolOfflineSyncService.processBatch(

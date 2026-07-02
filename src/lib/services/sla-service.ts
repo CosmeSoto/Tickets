@@ -50,23 +50,25 @@ export class SLAService {
         return
       }
 
+      const effectiveHours = await this.resolveBusinessHours(ticket.familyId, policy)
+
       // Calcular deadlines
       const responseDeadline = this.calculateDeadline(
         ticket.createdAt,
         policy.responseTimeHours,
         policy.businessHoursOnly,
-        policy.businessHoursStart,
-        policy.businessHoursEnd,
-        policy.businessDays
+        effectiveHours.businessHoursStart,
+        effectiveHours.businessHoursEnd,
+        effectiveHours.businessDays
       )
 
       const resolutionDeadline = this.calculateDeadline(
         ticket.createdAt,
         policy.resolutionTimeHours,
         policy.businessHoursOnly,
-        policy.businessHoursStart,
-        policy.businessHoursEnd,
-        policy.businessDays
+        effectiveHours.businessHoursStart,
+        effectiveHours.businessHoursEnd,
+        effectiveHours.businessDays
       )
 
       // Crear métricas SLA
@@ -115,23 +117,25 @@ export class SLAService {
         return
       }
 
+      const effectiveHours = await this.resolveBusinessHours(request.familyId, policy)
+
       // Calcular deadlines
       const responseDeadline = this.calculateDeadline(
         request.createdAt,
         policy.responseTimeHours,
         policy.businessHoursOnly,
-        policy.businessHoursStart,
-        policy.businessHoursEnd,
-        policy.businessDays
+        effectiveHours.businessHoursStart,
+        effectiveHours.businessHoursEnd,
+        effectiveHours.businessDays
       )
 
       const resolutionDeadline = this.calculateDeadline(
         request.createdAt,
         policy.resolutionTimeHours,
         policy.businessHoursOnly,
-        policy.businessHoursStart,
-        policy.businessHoursEnd,
-        policy.businessDays
+        effectiveHours.businessHoursStart,
+        effectiveHours.businessHoursEnd,
+        effectiveHours.businessDays
       )
 
       // Crear métricas SLA para asset request
@@ -222,6 +226,50 @@ export class SLAService {
         isActive: true,
       },
     })
+  }
+
+  /**
+   * Prioriza horario laboral del área sobre el de la política SLA cuando businessHoursOnly está activo.
+   */
+  private static async resolveBusinessHours(
+    familyId: string | null | undefined,
+    policy: {
+      businessHoursOnly: boolean
+      businessHoursStart: string
+      businessHoursEnd: string
+      businessDays: string
+    }
+  ): Promise<{ businessHoursStart: string; businessHoursEnd: string; businessDays: string }> {
+    if (!policy.businessHoursOnly || !familyId) {
+      return {
+        businessHoursStart: policy.businessHoursStart,
+        businessHoursEnd: policy.businessHoursEnd,
+        businessDays: policy.businessDays,
+      }
+    }
+
+    const familyConfig = await prisma.ticket_family_config.findUnique({
+      where: { familyId },
+      select: {
+        businessHoursStart: true,
+        businessHoursEnd: true,
+        businessDays: true,
+      },
+    })
+
+    if (!familyConfig) {
+      return {
+        businessHoursStart: policy.businessHoursStart,
+        businessHoursEnd: policy.businessHoursEnd,
+        businessDays: policy.businessDays,
+      }
+    }
+
+    return {
+      businessHoursStart: familyConfig.businessHoursStart || policy.businessHoursStart,
+      businessHoursEnd: familyConfig.businessHoursEnd || policy.businessHoursEnd,
+      businessDays: familyConfig.businessDays || policy.businessDays,
+    }
   }
 
   /**

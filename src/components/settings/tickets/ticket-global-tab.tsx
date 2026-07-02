@@ -2,7 +2,8 @@
  * Ticket Global Rules Tab Component
  */
 
-import { Info, Layers, Users, Clock, Bell } from 'lucide-react'
+import { Save, Info, Layers, Users, Clock, Bell } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
@@ -16,19 +17,40 @@ import {
 import type { Family, GlobalSettings } from '@/hooks/use-ticket-settings'
 
 interface TicketGlobalTabProps {
+  isSuperAdmin: boolean
   families: Family[]
   globalSettings: GlobalSettings
+  savingGlobal: boolean
   onSetGlobal: <K extends keyof GlobalSettings>(key: K, value: GlobalSettings[K]) => void
+  onSave: () => void
 }
 
-export function TicketGlobalTab({ families, globalSettings, onSetGlobal }: TicketGlobalTabProps) {
+export function TicketGlobalTab({
+  isSuperAdmin,
+  families,
+  globalSettings,
+  savingGlobal,
+  onSetGlobal,
+  onSave,
+}: TicketGlobalTabProps) {
+  const readOnly = !isSuperAdmin
+
   return (
     <div className='max-w-2xl space-y-6'>
       <div className='flex items-start gap-3 p-4 rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800'>
         <Info className='h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0' />
         <p className='text-sm text-blue-800 dark:text-blue-300'>
-          Estas reglas aplican a <strong>todo el sistema</strong>, independientemente del área. Los
-          cambios aquí afectan a todos los usuarios.
+          {readOnly ? (
+            <>
+              Estas reglas aplican a <strong>todo el sistema</strong>. Solo el{' '}
+              <strong>Super Administrador</strong> puede modificarlas.
+            </>
+          ) : (
+            <>
+              Estas reglas aplican a <strong>todo el sistema</strong>, independientemente del área.
+              Los cambios aquí afectan a todos los usuarios.
+            </>
+          )}
         </p>
       </div>
 
@@ -48,6 +70,7 @@ export function TicketGlobalTab({ families, globalSettings, onSetGlobal }: Ticke
           <Select
             value={globalSettings.defaultFamilyId}
             onValueChange={v => onSetGlobal('defaultFamilyId', v)}
+            disabled={readOnly}
           >
             <SelectTrigger>
               <SelectValue placeholder='Sin área de respaldo configurada' />
@@ -89,6 +112,7 @@ export function TicketGlobalTab({ families, globalSettings, onSetGlobal }: Ticke
               value={globalSettings.maxTicketsPerUser}
               onChange={e => onSetGlobal('maxTicketsPerUser', parseInt(e.target.value) || 10)}
               className='w-24 font-mono'
+              disabled={readOnly}
             />
             <p className='text-sm text-muted-foreground'>tickets abiertos máximo por usuario</p>
           </div>
@@ -116,6 +140,7 @@ export function TicketGlobalTab({ families, globalSettings, onSetGlobal }: Ticke
               value={globalSettings.autoCloseDays}
               onChange={e => onSetGlobal('autoCloseDays', parseInt(e.target.value) || 3)}
               className='w-24 font-mono'
+              disabled={readOnly}
             />
             <p className='text-sm text-muted-foreground'>
               días para calificar antes del cierre automático
@@ -133,7 +158,8 @@ export function TicketGlobalTab({ families, globalSettings, onSetGlobal }: Ticke
           </CardTitle>
           <CardDescription>
             Cuando se crea un ticket, el sistema puede asignarlo automáticamente al técnico con
-            menor carga de trabajo en esa categoría
+            menor carga de trabajo. También puedes usar asignación manual desde el detalle del
+            ticket mientras esta opción esté activa.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -147,10 +173,20 @@ export function TicketGlobalTab({ families, globalSettings, onSetGlobal }: Ticke
             <Switch
               checked={globalSettings.autoAssignmentEnabled}
               onCheckedChange={v => onSetGlobal('autoAssignmentEnabled', v)}
+              disabled={readOnly}
             />
           </div>
         </CardContent>
       </Card>
+
+      {isSuperAdmin && (
+        <div className='flex justify-end'>
+          <Button onClick={onSave} disabled={savingGlobal}>
+            <Save className={`h-4 w-4 mr-2 ${savingGlobal ? 'animate-spin' : ''}`} />
+            {savingGlobal ? 'Guardando...' : 'Guardar reglas generales'}
+          </Button>
+        </div>
+      )}
     </div>
   )
 }

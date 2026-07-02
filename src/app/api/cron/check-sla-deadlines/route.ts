@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { SLAService } from '@/lib/services/sla-service'
+import { checkTicketVolumeAlerts } from '@/lib/cron/check-ticket-volume-alerts'
 
 /**
  * Cron Job: Verificar deadlines de SLA próximos a vencer
@@ -12,10 +13,7 @@ export async function GET(request: NextRequest) {
     const cronSecret = process.env.CRON_SECRET
 
     if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-      return NextResponse.json(
-        { success: false, message: 'No autorizado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 401 })
     }
 
     console.log('[CRON] Iniciando verificación de deadlines SLA...')
@@ -23,12 +21,15 @@ export async function GET(request: NextRequest) {
     // Verificar tickets próximos a vencer
     await SLAService.checkUpcomingDeadlines()
 
+    const volumeResult = await checkTicketVolumeAlerts()
+
     console.log('[CRON] Verificación de deadlines SLA completada')
 
     return NextResponse.json({
       success: true,
       message: 'Verificación de deadlines SLA completada',
-      timestamp: new Date().toISOString()
+      volumeAlertsSent: volumeResult.alertsSent,
+      timestamp: new Date().toISOString(),
     })
   } catch (error) {
     console.error('[CRON] Error verificando deadlines SLA:', error)
@@ -36,7 +37,7 @@ export async function GET(request: NextRequest) {
       {
         success: false,
         message: 'Error verificando deadlines SLA',
-        error: error instanceof Error ? error.message : 'Error desconocido'
+        error: error instanceof Error ? error.message : 'Error desconocido',
       },
       { status: 500 }
     )

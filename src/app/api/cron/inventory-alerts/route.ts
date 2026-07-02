@@ -8,6 +8,7 @@ import {
 import { CheckLicenseExpirationJob } from '@/lib/jobs/check-license-expiration.job'
 import { CheckRentalExpirationJob } from '@/lib/jobs/check-rental-expiration.job'
 import { CheckAssignmentExpirationJob } from '@/lib/jobs/check-assignment-expiration.job'
+import { isInventoryAlertEnabled } from '@/lib/settings/runtime-settings'
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 
@@ -20,21 +21,23 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    const [mroEnabled, warrantyEnabled] = await Promise.all([
-      prisma.system_settings.findUnique({ where: { key: 'inventory.mro_expiry_alert_enabled' } }),
-      prisma.system_settings.findUnique({ where: { key: 'inventory.warranty_alert_enabled' } }),
+    const [lowStockEnabled, licenseEnabled, mroEnabled, warrantyEnabled] = await Promise.all([
+      isInventoryAlertEnabled('inventory.low_stock_alert_enabled'),
+      isInventoryAlertEnabled('inventory.license_alert_enabled'),
+      isInventoryAlertEnabled('inventory.mro_expiry_alert_enabled'),
+      isInventoryAlertEnabled('inventory.warranty_alert_enabled'),
     ])
 
     const tasks: Promise<unknown>[] = [
       checkContractAlerts(),
-      checkStockAlerts(),
-      CheckLicenseExpirationJob.run(),
       CheckRentalExpirationJob.run(),
       CheckAssignmentExpirationJob.run(),
     ]
 
-    if (mroEnabled?.value !== 'false') tasks.push(checkMROExpiryAlerts())
-    if (warrantyEnabled?.value !== 'false') tasks.push(checkWarrantyAlerts())
+    if (lowStockEnabled) tasks.push(checkStockAlerts())
+    if (licenseEnabled) tasks.push(CheckLicenseExpirationJob.run())
+    if (mroEnabled) tasks.push(checkMROExpiryAlerts())
+    if (warrantyEnabled) tasks.push(checkWarrantyAlerts())
 
     await Promise.allSettled(tasks)
 

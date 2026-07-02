@@ -100,7 +100,7 @@ export function usePatrolSettings() {
     setLoadingFamilies(true)
     try {
       const [familiesRes, configsRes] = await Promise.all([
-        fetch('/api/families?includeInactive=false&module=patrols&configMode=true'),
+        fetch('/api/families?includeInactive=true&module=patrols&configMode=true'),
         fetch('/api/patrols/family-config'),
       ])
 
@@ -224,6 +224,7 @@ export function usePatrolSettings() {
       })
       const data = await res.json()
       if (data.success) {
+        await loadConfig(selectedFamilyId)
         toast({ title: 'Guardado', description: 'Configuración de patrullas actualizada' })
       } else if (data.details) {
         toast({
@@ -243,7 +244,12 @@ export function usePatrolSettings() {
     } finally {
       setSaving(false)
     }
-  }, [selectedFamilyId, form, toast, isSuperAdmin])
+  }, [selectedFamilyId, form, toast, isSuperAdmin, loadConfig])
+
+  const handleReload = useCallback(async () => {
+    await loadFamilies()
+    if (selectedFamilyId) await loadConfig(selectedFamilyId)
+  }, [loadFamilies, loadConfig, selectedFamilyId])
 
   // ── Helpers de formulario ──────────────────────────────────────────────────
   const setField = useCallback(
@@ -273,6 +279,7 @@ export function usePatrolSettings() {
     loadingConfig,
     saving,
     loadFamilies,
+    handleReload,
     handleSelectFamily,
     handleTogglePatrols,
     handleSave,

@@ -162,7 +162,7 @@ export class FamilyService {
           requirePhotoOnEnd: false,
           offlineSyncToleranceMinutes: 30,
           alertCompletionThreshold: 80,
-          gracePeriodMinutes: 15,
+          gracePeriodMinutes: 5,
           patrolIncidentCategoryId: null,
         },
       })

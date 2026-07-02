@@ -6,6 +6,7 @@
 
 'use client'
 
+import { useEffect, useState } from 'react'
 import {
   Shield,
   ChevronRight,
@@ -16,6 +17,7 @@ import {
   Wifi,
   Bell,
   Clock,
+  AlertTriangle,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -23,6 +25,13 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { FamilyIcon } from '@/components/inventory/family-badge'
 import type { PatrolFamily, PatrolFormState } from '@/hooks/use-patrol-settings'
 
@@ -53,6 +62,18 @@ export function PatrolAreasTab({
   onTogglePatrols,
   onSetField,
 }: PatrolAreasTabProps) {
+  const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([])
+
+  useEffect(() => {
+    fetch('/api/categories/simple?isActive=true')
+      .then(r => (r.ok ? r.json() : null))
+      .then(data => {
+        const list = data?.categories ?? data?.data ?? []
+        setCategories(Array.isArray(list) ? list : [])
+      })
+      .catch(() => setCategories([]))
+  }, [])
+
   return (
     <div className='grid grid-cols-1 lg:grid-cols-3 gap-6'>
       {/* ── Lista de familias ── */}
@@ -451,6 +472,41 @@ export function PatrolAreasTab({
                     aria-label='Activar validación estricta de horario'
                   />
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* ── Incident category ── */}
+            <Card>
+              <CardHeader className='pb-3'>
+                <CardTitle className='text-sm flex items-center gap-2'>
+                  <AlertTriangle className='h-4 w-4' />
+                  Incidentes de ronda
+                </CardTitle>
+                <CardDescription className='text-xs'>
+                  Categoría de ticket que se crea automáticamente cuando se reporta un incidente
+                  durante una ronda
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Select
+                  value={form.patrolIncidentCategoryId ?? '__none__'}
+                  onValueChange={v =>
+                    onSetField('patrolIncidentCategoryId', v === '__none__' ? null : v)
+                  }
+                  disabled={saving}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder='Sin categoría asignada' />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value='__none__'>Sin categoría asignada</SelectItem>
+                    {categories.map(category => (
+                      <SelectItem key={category.id} value={category.id}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </CardContent>
             </Card>
           </div>

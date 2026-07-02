@@ -20,6 +20,7 @@ import {
 } from '@/lib/tickets/patrol-incident-validation'
 import { assertTechnicianActiveInFamily } from '@/lib/tickets/assignee-validation'
 import { FileService } from '@/lib/services/file-service'
+import { getAutoAssignmentEnabled, getMaxTicketsPerUser } from '@/lib/settings/runtime-settings'
 
 export async function GET(request: NextRequest) {
   try {
@@ -116,11 +117,7 @@ export async function GET(request: NextRequest) {
         })
       }
     } else if (session.user.role === 'ADMIN' && !(session.user as any).isSuperAdmin) {
-      const visibilityIds = await getTicketVisibilityFamilyIds(
-        session.user.id,
-        'ADMIN',
-        false
-      )
+      const visibilityIds = await getTicketVisibilityFamilyIds(session.user.id, 'ADMIN', false)
       const familyFilter = buildFamilyFilter({ familyIds: visibilityIds })
       if (Object.keys(familyFilter).length > 0) {
         andParts.push(familyFilter)
@@ -403,6 +400,25 @@ export async function POST(request: NextRequest) {
       createdOnBehalf = ticketData.clientId !== session.user.id
     }
 
+    if (!isPatrolSource) {
+      const maxTickets = await getMaxTicketsPerUser()
+      const openTicketCount = await prisma.tickets.count({
+        where: {
+          clientId,
+          status: { in: ['OPEN', 'IN_PROGRESS'] },
+        },
+      })
+      if (openTicketCount >= maxTickets) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: `Se alcanzó el límite de ${maxTickets} tickets abiertos para este usuario. Cierra o espera la resolución de tickets existentes antes de crear uno nuevo.`,
+          },
+          { status: 422 }
+        )
+      }
+    }
+
     // ── Lógica de escalamiento para técnicos ──────────────────────────────
     // Un técnico puede crear tickets, pero NO puede auto-asignárselos.
     // Si crea un ticket en una categoría donde él está asignado, el sistema
@@ -549,29 +565,57 @@ export async function POST(request: NextRequest) {
       console.error('[SLA] Error asignando SLA al ticket:', err)
     })
 
+    // Asignación automática al crear (si está habilitada y no hay asignado)
+    let ticketAfterAssign = newTicket
+    if (!newTicket.assigneeId) {
+      const autoAssignmentEnabled = await getAutoAssignmentEnabled()
+      if (autoAssignmentEnabled) {
+        try {
+          const { AssignmentService } = await import('@/lib/services/ticket-assignment.service')
+          await AssignmentService.autoAssignTicket(newTicket.id, {
+            categoryId: newTicket.categoryId,
+            priority: newTicket.priority,
+            workloadBalance: true,
+            skillMatch: true,
+          })
+          const refreshed = await prisma.tickets.findUnique({
+            where: { id: newTicket.id },
+            include: {
+              users_tickets_clientIdTousers: true,
+              users_tickets_assigneeIdTousers: true,
+              categories: true,
+            },
+          })
+          if (refreshed) ticketAfterAssign = refreshed as typeof newTicket
+        } catch (autoAssignErr) {
+          console.error('[AUTO-ASSIGN] No se pudo asignar automáticamente:', autoAssignErr)
+        }
+      }
+    }
+
     // ⭐ NUEVO: Disparar webhook de ticket creado
     await WebhookService.trigger(WebhookService.EVENTS.TICKET_CREATED, {
-      ticketId: newTicket.id,
-      title: newTicket.title,
-      priority: newTicket.priority,
-      status: newTicket.status,
+      ticketId: ticketAfterAssign.id,
+      title: ticketAfterAssign.title,
+      priority: ticketAfterAssign.priority,
+      status: ticketAfterAssign.status,
       client: {
-        id: newTicket.users_tickets_clientIdTousers.id,
-        name: newTicket.users_tickets_clientIdTousers.name,
-        email: newTicket.users_tickets_clientIdTousers.email,
+        id: ticketAfterAssign.users_tickets_clientIdTousers.id,
+        name: ticketAfterAssign.users_tickets_clientIdTousers.name,
+        email: ticketAfterAssign.users_tickets_clientIdTousers.email,
       },
       category: {
-        id: newTicket.categories.id,
-        name: newTicket.categories.name,
+        id: ticketAfterAssign.categories.id,
+        name: ticketAfterAssign.categories.name,
       },
-      assignee: newTicket.users_tickets_assigneeIdTousers
+      assignee: ticketAfterAssign.users_tickets_assigneeIdTousers
         ? {
-            id: newTicket.users_tickets_assigneeIdTousers.id,
-            name: newTicket.users_tickets_assigneeIdTousers.name,
-            email: newTicket.users_tickets_assigneeIdTousers.email,
+            id: ticketAfterAssign.users_tickets_assigneeIdTousers.id,
+            name: ticketAfterAssign.users_tickets_assigneeIdTousers.name,
+            email: ticketAfterAssign.users_tickets_assigneeIdTousers.email,
           }
         : null,
-      createdAt: newTicket.createdAt,
+      createdAt: ticketAfterAssign.createdAt,
     }).catch(err => {
       console.error('[WEBHOOK] Error disparando evento TICKET_CREATED:', err)
     })
@@ -579,15 +623,15 @@ export async function POST(request: NextRequest) {
     // ⭐ NUEVO: Enviar email de notificación al cliente
     await EmailService.queueEmail(
       {
-        to: newTicket.users_tickets_clientIdTousers.email,
-        subject: `Ticket #${(newTicket as any).ticketCode ?? newTicket.id.substring(0, 8)} creado`,
+        to: ticketAfterAssign.users_tickets_clientIdTousers.email,
+        subject: `Ticket #${(ticketAfterAssign as any).ticketCode ?? ticketAfterAssign.id.substring(0, 8)} creado`,
         template: 'ticket-created',
         templateData: {
-          ticketId: newTicket.id,
-          title: newTicket.title,
-          clientName: newTicket.users_tickets_clientIdTousers.name,
-          priority: newTicket.priority,
-          category: newTicket.categories.name,
+          ticketId: ticketAfterAssign.id,
+          title: ticketAfterAssign.title,
+          clientName: ticketAfterAssign.users_tickets_clientIdTousers.name,
+          priority: ticketAfterAssign.priority,
+          category: ticketAfterAssign.categories.name,
         },
       },
       session.user.id
@@ -597,20 +641,21 @@ export async function POST(request: NextRequest) {
 
     // ⭐ NUEVO: Enviar email al administrador para que asigne el ticket
     const { triggerTicketCreatedToAdminEmail } = await import('@/lib/email-triggers')
-    void triggerTicketCreatedToAdminEmail(newTicket.id)
+    void triggerTicketCreatedToAdminEmail(ticketAfterAssign.id)
 
     // ⭐ NUEVO: Enviar notificaciones in-app a todos los admins
-    await NotificationService.notifyTicketCreated(newTicket.id).catch(err => {
+    await NotificationService.notifyTicketCreated(ticketAfterAssign.id).catch(err => {
       console.error('[NOTIFICATION] Error enviando notificaciones de ticket creado:', err)
     })
 
     // ⭐ Si el ticket fue asignado al crearse, notificar al técnico asignado
-    if (newTicket.assigneeId) {
-      await NotificationService.notifyTicketAssigned(newTicket.id, newTicket.assigneeId).catch(
-        err => {
-          console.error('[NOTIFICATION] Error enviando notificación de asignación:', err)
-        }
-      )
+    if (ticketAfterAssign.assigneeId) {
+      await NotificationService.notifyTicketAssigned(
+        ticketAfterAssign.id,
+        ticketAfterAssign.assigneeId
+      ).catch(err => {
+        console.error('[NOTIFICATION] Error enviando notificación de asignación:', err)
+      })
     }
 
     let attachmentWarning: string | undefined
@@ -632,11 +677,11 @@ export async function POST(request: NextRequest) {
 
     // Mapear los datos para que coincidan con lo que espera el frontend
     const mappedTicket = {
-      ...newTicket,
-      client: newTicket.users_tickets_clientIdTousers,
-      assignee: newTicket.users_tickets_assigneeIdTousers,
-      category: newTicket.categories,
-      family: (newTicket as any).family,
+      ...ticketAfterAssign,
+      client: ticketAfterAssign.users_tickets_clientIdTousers,
+      assignee: ticketAfterAssign.users_tickets_assigneeIdTousers,
+      category: ticketAfterAssign.categories,
+      family: (ticketAfterAssign as any).family,
     }
 
     return NextResponse.json({

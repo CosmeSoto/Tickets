@@ -107,6 +107,7 @@ export function useTicketSettings() {
   const [loadingFamilies, setLoadingFamilies] = useState(true)
   const [loadingConfig, setLoadingConfig] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [savingGlobal, setSavingGlobal] = useState(false)
   const [slaRows, setSlaRows] = useState<SlaRow[]>(DEFAULTS)
   const [globalSettings, setGlobalSettings] = useState<GlobalSettings>({
     maxTicketsPerUser: 10,
@@ -114,7 +115,12 @@ export function useTicketSettings() {
     autoAssignmentEnabled: true,
     defaultFamilyId: '',
   })
-  const [globalDirty, setGlobalDirty] = useState(false)
+
+  async function parseSaveResponse(res: Response) {
+    const data = await res.json().catch(() => ({}))
+    const ok = res.ok && data.success !== false && !data.error
+    return { ok, data }
+  }
 
   // ── Load families ──
   const loadFamilies = useCallback(async () => {
@@ -263,70 +269,120 @@ export function useTicketSettings() {
     [config]
   )
 
-  const handleSave = useCallback(async () => {
+  const handleSaveArea = useCallback(async () => {
+    if (!config || !selectedFamilyId) {
+      toast({
+        title: 'Sin cambios',
+        description: 'Selecciona un área para guardar',
+        variant: 'destructive',
+      })
+      return
+    }
     setSaving(true)
     try {
-      const promises: Promise<any>[] = []
-      if (config && selectedFamilyId) {
-        promises.push(
-          fetch(`/api/families/${selectedFamilyId}/ticket-config`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              ...(isSuperAdmin ? { ticketsEnabled: config.ticketsEnabled, isDefault: config.isDefault } : {}),
-              codePrefix: config.codePrefix,
-              autoAssignRespectsFamilies: config.autoAssignRespectsFamilies,
-              alertVolumeThreshold: config.alertVolumeThreshold,
-              businessHoursStart: config.businessHoursStart,
-              businessHoursEnd: config.businessHoursEnd,
-              businessDays: config.businessDays,
-            }),
-          }).then(r => r.json())
-        )
+      const res = await fetch(`/api/families/${selectedFamilyId}/ticket-config`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...(isSuperAdmin ? { ticketsEnabled: config.ticketsEnabled } : {}),
+          codePrefix: config.codePrefix,
+          autoAssignRespectsFamilies: config.autoAssignRespectsFamilies,
+          alertVolumeThreshold: config.alertVolumeThreshold,
+          businessHoursStart: config.businessHoursStart,
+          businessHoursEnd: config.businessHoursEnd,
+          businessDays: config.businessDays,
+        }),
+      })
+      const { ok, data } = await parseSaveResponse(res)
+      if (ok) {
+        await loadConfig(selectedFamilyId)
+        await loadFamilies()
+        toast({
+          title: 'Guardado',
+          description: 'Configuración del área actualizada correctamente',
+        })
+        window.dispatchEvent(new CustomEvent('settings-updated'))
+      } else {
+        toast({
+          title: 'Error',
+          description: data.message || data.error || 'Error al guardar configuración del área',
+          variant: 'destructive',
+        })
       }
-      if (globalDirty && isSuperAdmin) {
-        promises.push(
-          fetch('/api/admin/settings', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              maxTicketsPerUser: globalSettings.maxTicketsPerUser,
-              autoCloseDays: globalSettings.autoCloseDays,
-              autoAssignmentEnabled: globalSettings.autoAssignmentEnabled,
-            }),
-          }).then(r => r.json())
-        )
-        if (globalSettings.defaultFamilyId) {
-          promises.push(
-            fetch(`/api/families/${globalSettings.defaultFamilyId}/ticket-config`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ isDefault: true }),
-            }).then(r => r.json())
-          )
-        }
-      }
-      if (promises.length === 0) {
-        toast({ title: 'Sin cambios', description: 'No hay cambios pendientes' })
-        setSaving(false)
-        return
-      }
-      await Promise.all(promises)
-      toast({ title: 'Guardado', description: 'Configuración actualizada correctamente' })
-      setGlobalDirty(false)
-      loadFamilies()
-      window.dispatchEvent(new CustomEvent('settings-updated'))
     } catch {
-      toast({ title: 'Error', description: 'Error al guardar', variant: 'destructive' })
+      toast({ title: 'Error', description: 'Error de conexión', variant: 'destructive' })
     } finally {
       setSaving(false)
     }
-  }, [config, selectedFamilyId, globalDirty, globalSettings, loadFamilies, toast, isSuperAdmin])
+  }, [config, selectedFamilyId, loadConfig, loadFamilies, toast, isSuperAdmin])
+
+  const handleSaveGlobal = useCallback(async () => {
+    if (!isSuperAdmin) {
+      toast({
+        title: 'Acción restringida',
+        description: 'Solo el Super Administrador puede modificar las reglas generales',
+        variant: 'destructive',
+      })
+      return
+    }
+    setSavingGlobal(true)
+    try {
+      const requests: Promise<{ ok: boolean; data: Record<string, unknown> }>[] = [
+        fetch('/api/admin/settings', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            maxTicketsPerUser: globalSettings.maxTicketsPerUser,
+            autoCloseDays: globalSettings.autoCloseDays,
+            autoAssignmentEnabled: globalSettings.autoAssignmentEnabled,
+          }),
+        }).then(parseSaveResponse),
+      ]
+
+      if (globalSettings.defaultFamilyId) {
+        requests.push(
+          fetch(`/api/families/${globalSettings.defaultFamilyId}/ticket-config`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ isDefault: true }),
+          }).then(parseSaveResponse)
+        )
+      }
+
+      const results = await Promise.all(requests)
+      if (results.every(r => r.ok)) {
+        await loadGlobalSettings()
+        await loadFamilies()
+        toast({ title: 'Guardado', description: 'Reglas generales actualizadas' })
+        window.dispatchEvent(new CustomEvent('settings-updated'))
+      } else {
+        const failed = results.find(r => !r.ok)
+        toast({
+          title: 'Error',
+          description:
+            (failed?.data.message as string) ||
+            (failed?.data.error as string) ||
+            'No se pudieron guardar las reglas generales',
+          variant: 'destructive',
+        })
+      }
+    } catch {
+      toast({ title: 'Error', description: 'Error de conexión', variant: 'destructive' })
+    } finally {
+      setSavingGlobal(false)
+    }
+  }, [globalSettings, loadGlobalSettings, loadFamilies, toast, isSuperAdmin])
+
+  const handleReload = useCallback(async () => {
+    await loadFamilies()
+    await loadGlobalSettings()
+    await loadSLAPolicies()
+    if (selectedFamilyId) await loadConfig(selectedFamilyId)
+  }, [loadFamilies, loadGlobalSettings, loadSLAPolicies, loadConfig, selectedFamilyId])
 
   const setGlobal = useCallback(
     <K extends keyof GlobalSettings>(key: K, value: GlobalSettings[K]) => {
       setGlobalSettings(prev => ({ ...prev, [key]: value }))
-      setGlobalDirty(true)
     },
     []
   )
@@ -353,16 +409,17 @@ export function useTicketSettings() {
     loadingFamilies,
     loadingConfig,
     saving,
-    globalDirty,
-    setGlobalDirty,
+    savingGlobal,
 
     // Actions
     loadFamilies,
     loadGlobalSettings,
+    handleReload,
     handleSelectFamily,
     handleToggleTickets,
     toggleDay,
-    handleSave,
+    handleSaveArea,
+    handleSaveGlobal,
     setGlobal,
   }
 }

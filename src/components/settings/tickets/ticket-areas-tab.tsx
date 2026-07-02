@@ -241,13 +241,6 @@ export function TicketAreasTab({
                         key: 'autoAssignRespectsFamilies' as const,
                         superAdminOnly: false,
                       },
-                      {
-                        id: 'is-default',
-                        label: 'Área de respaldo del sistema',
-                        desc: 'Recibe tickets cuando el sistema no puede determinar el área (solo una área puede ser el respaldo)',
-                        key: 'isDefault' as const,
-                        superAdminOnly: true,
-                      },
                     ] as const
                   ).map(item => (
                     <div
@@ -277,8 +270,8 @@ export function TicketAreasTab({
                   Horario laboral
                 </CardTitle>
                 <CardDescription>
-                  Define cuándo está activo el equipo de esta área. Se usa para calcular los tiempos
-                  de SLA.
+                  Define cuándo está activo el equipo de esta área. Se usa para calcular SLA cuando
+                  la política aplica horario laboral.
                 </CardDescription>
               </CardHeader>
               <CardContent className='space-y-4'>

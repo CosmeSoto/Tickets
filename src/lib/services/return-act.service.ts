@@ -5,6 +5,10 @@ import { FolioService } from './folio.service'
 import { DigitalSignatureService } from './digital-signature.service'
 import { PDFGeneratorService } from './pdf-generator.service'
 import type { ReturnAct, UserInfo, CreateReturnActData } from '@/types/inventory/return-act'
+import {
+  addActExpirationDays,
+  getInventoryActExpirationDays,
+} from '@/lib/settings/runtime-settings'
 
 /**
  * Servicio para gestión de actas de devolución
@@ -76,9 +80,9 @@ export class ReturnActService {
       // Generar token de aceptación
       const acceptanceToken = DigitalSignatureService.generateAcceptanceToken()
 
-      // Fecha de expiración: 7 días desde ahora
-      const expirationDate = new Date()
-      expirationDate.setDate(expirationDate.getDate() + 7)
+      // Fecha de expiración según configuración global de inventario
+      const actExpirationDays = await getInventoryActExpirationDays()
+      const expirationDate = addActExpirationDays(new Date(), actExpirationDays)
 
       // Fecha de devolución (por defecto hoy)
       const returnDate = data.returnDate || new Date()

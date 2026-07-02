@@ -5,7 +5,7 @@
 
 'use client'
 
-import { Suspense } from 'react'
+import { Suspense, useState } from 'react'
 import { Save, RefreshCw, Layers, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -15,6 +15,7 @@ import { TicketAreasTab } from '@/components/settings/tickets/ticket-areas-tab'
 import { TicketGlobalTab } from '@/components/settings/tickets/ticket-global-tab'
 
 function TicketSettingsContent() {
+  const [activeTab, setActiveTab] = useState('areas')
   const {
     isSuperAdmin,
     families,
@@ -28,15 +29,17 @@ function TicketSettingsContent() {
     loadingFamilies,
     loadingConfig,
     saving,
-    setGlobalDirty,
-    loadFamilies,
-    loadGlobalSettings,
+    savingGlobal,
+    handleReload,
     handleSelectFamily,
     handleToggleTickets,
     toggleDay,
-    handleSave,
+    handleSaveArea,
+    handleSaveGlobal,
     setGlobal,
   } = useTicketSettings()
+
+  const isReloading = loadingFamilies || loadingConfig
 
   return (
     <ModuleLayout
@@ -44,39 +47,33 @@ function TicketSettingsContent() {
       subtitle='Configura el comportamiento del módulo de tickets'
       headerActions={
         <div className='flex items-center gap-2'>
-          <Button
-            variant='outline'
-            size='sm'
-            onClick={() => {
-              loadFamilies()
-              loadGlobalSettings()
-            }}
-            disabled={loadingFamilies}
-          >
-            <RefreshCw className={`h-4 w-4 ${loadingFamilies ? 'animate-spin' : ''} sm:mr-2`} />
+          <Button variant='outline' size='sm' onClick={handleReload} disabled={isReloading}>
+            <RefreshCw className={`h-4 w-4 ${isReloading ? 'animate-spin' : ''} sm:mr-2`} />
             <span className='hidden sm:inline'>Recargar</span>
           </Button>
-          <Button onClick={handleSave} disabled={saving}>
-            <Save className={`h-4 w-4 ${saving ? 'animate-spin' : ''} sm:mr-2`} />
-            <span className='hidden sm:inline'>{saving ? 'Guardando...' : 'Guardar cambios'}</span>
-          </Button>
+          {activeTab === 'areas' && (
+            <Button onClick={handleSaveArea} disabled={saving || !selectedFamilyId}>
+              <Save className={`h-4 w-4 ${saving ? 'animate-spin' : ''} sm:mr-2`} />
+              <span className='hidden sm:inline'>
+                {saving ? 'Guardando...' : 'Guardar cambios'}
+              </span>
+            </Button>
+          )}
         </div>
       }
     >
-      <Tabs defaultValue='areas' className='space-y-6'>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className='space-y-6'>
         <TabsList className='w-full sm:w-auto'>
           <TabsTrigger value='areas' className='flex-1 sm:flex-none flex items-center gap-2'>
             <Layers className='h-4 w-4' />
             Por área
           </TabsTrigger>
-          <TabsTrigger
-            value='global'
-            className='flex-1 sm:flex-none flex items-center gap-2'
-            onClick={() => isSuperAdmin && setGlobalDirty(true)}
-            disabled={!isSuperAdmin}
-          >
+          <TabsTrigger value='global' className='flex-1 sm:flex-none flex items-center gap-2'>
             <Settings className='h-4 w-4' />
             Reglas generales
+            {!isSuperAdmin && (
+              <span className='text-xs text-muted-foreground hidden sm:inline'>(solo lectura)</span>
+            )}
           </TabsTrigger>
         </TabsList>
 
@@ -100,9 +97,12 @@ function TicketSettingsContent() {
 
         <TabsContent value='global'>
           <TicketGlobalTab
+            isSuperAdmin={isSuperAdmin}
             families={families}
             globalSettings={globalSettings}
+            savingGlobal={savingGlobal}
             onSetGlobal={setGlobal}
+            onSave={handleSaveGlobal}
           />
         </TabsContent>
       </Tabs>

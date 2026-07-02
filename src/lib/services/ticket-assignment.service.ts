@@ -50,15 +50,22 @@ export class AssignmentService {
         throw new Error('No hay técnicos disponibles para este ticket')
       }
 
-      // 🎯 PRIORIDAD 1: técnicos con familia NATIVA igual a la del ticket
+      // 🎯 PRIORIDAD 1: técnicos con familia NATIVA igual a la del ticket (si la config lo exige)
       if (ticket.familyId) {
-        const { getTechnicianIdsNativeToFamily } = await import('@/lib/auth/family-scope')
-        const nativeTechIds = new Set(await getTechnicianIdsNativeToFamily(ticket.familyId))
-        const techsInFamily = availableTechnicians.filter(
-          t => nativeTechIds.has(t.id) || t.role === 'ADMIN'
-        )
-        if (techsInFamily.length > 0) {
-          availableTechnicians = techsInFamily
+        const familyConfig = await prisma.ticket_family_config.findUnique({
+          where: { familyId: ticket.familyId },
+          select: { autoAssignRespectsFamilies: true },
+        })
+
+        if (familyConfig?.autoAssignRespectsFamilies !== false) {
+          const { getTechnicianIdsNativeToFamily } = await import('@/lib/auth/family-scope')
+          const nativeTechIds = new Set(await getTechnicianIdsNativeToFamily(ticket.familyId))
+          const techsInFamily = availableTechnicians.filter(
+            t => nativeTechIds.has(t.id) || t.role === 'ADMIN'
+          )
+          if (techsInFamily.length > 0) {
+            availableTechnicians = techsInFamily
+          }
         }
       }
 
@@ -73,10 +80,13 @@ export class AssignmentService {
       }
 
       // Calcular el mejor técnico
+      const { getMaxTicketsPerUser } = await import('@/lib/settings/runtime-settings')
+      const maxWorkloadTickets = await getMaxTicketsPerUser()
       const bestTechnician = await this.calculateBestTechnician(
         ticket,
         availableTechnicians,
-        criteria
+        criteria,
+        maxWorkloadTickets
       )
 
       // Asignar el ticket
@@ -244,7 +254,8 @@ export class AssignmentService {
   private static async calculateBestTechnician(
     ticket: any,
     technicians: any[],
-    criteria: AssignmentCriteria
+    criteria: AssignmentCriteria,
+    maxWorkloadTickets = 10
   ) {
     const scoredTechnicians = await Promise.all(
       technicians.map(async technician => {
@@ -279,7 +290,8 @@ export class AssignmentService {
         // Factor 2: Carga de trabajo (30% del peso)
         if (criteria.workloadBalance !== false) {
           const workloadScore = this.calculateWorkloadScore(
-            technician._count.tickets_tickets_assigneeIdTousers
+            technician._count.tickets_tickets_assigneeIdTousers,
+            maxWorkloadTickets
           )
           score += workloadScore * 0.3
           reasons.push(
@@ -320,10 +332,9 @@ export class AssignmentService {
   /**
    * Calcula puntuación basada en carga de trabajo (menos carga = mayor puntuación)
    */
-  private static calculateWorkloadScore(activeTickets: number): number {
-    // Máximo 10 tickets activos para puntuación completa
-    const maxTickets = 10
-    return Math.max(0, (maxTickets - activeTickets) / maxTickets)
+  private static calculateWorkloadScore(activeTickets: number, maxTickets = 10): number {
+    const cap = Math.max(1, maxTickets)
+    return Math.max(0, (cap - activeTickets) / cap)
   }
 
   /**

@@ -71,7 +71,7 @@ const ACQUISITION_MODES: { value: AcquisitionMode; label: string; help: string }
 ]
 
 const DEPRECIATION_METHODS = [
-  { value: 'STRAIGHT_LINE', label: 'Línea Recta' },
+  { value: 'LINEAR', label: 'Línea Recta' },
   { value: 'DECLINING_BALANCE', label: 'Saldo Decreciente' },
   { value: 'UNITS_OF_PRODUCTION', label: 'Unidades de Producción' },
 ]

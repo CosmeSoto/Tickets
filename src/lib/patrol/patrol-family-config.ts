@@ -6,6 +6,24 @@
 import prisma from '@/lib/prisma'
 import type { patrol_family_config } from '@prisma/client'
 
+/** Valores por defecto alineados con la UI de configuración de rondas. */
+export const PATROL_FAMILY_DEFAULTS = {
+  patrolsEnabled: true,
+  qrWindowMinutes: 5,
+  geofenceRadiusMeters: 1,
+  photoRetentionDays: 90,
+  photoCompressionQuality: 0.82,
+  photoMaxWidthPx: 1280,
+  requirePhotoOnStart: false,
+  requirePhotoOnEnd: false,
+  offlineSyncToleranceMinutes: 30,
+  alertCompletionThreshold: 80,
+  gracePeriodMinutes: 5,
+  strictTimeValidation: true,
+  reminderMinutesBefore: 5,
+  patrolIncidentCategoryId: null as string | null,
+} as const
+
 /**
  * Obtiene la configuración de patrullas para una familia.
  * Si no existe (familia legacy), la crea con valores por defecto.
@@ -21,19 +39,7 @@ export async function getOrCreatePatrolFamilyConfig(
     update: {},
     create: {
       familyId,
-      patrolsEnabled: true,
-      qrWindowMinutes: 5,
-      geofenceRadiusMeters: 1,
-      photoRetentionDays: 90,
-      photoCompressionQuality: 0.82,
-      photoMaxWidthPx: 1280,
-      requirePhotoOnStart: false,
-      requirePhotoOnEnd: false,
-      offlineSyncToleranceMinutes: 30,
-      alertCompletionThreshold: 80,
-      gracePeriodMinutes: 15,
-      strictTimeValidation: true,
-      patrolIncidentCategoryId: null,
+      ...PATROL_FAMILY_DEFAULTS,
     },
   })
 }

@@ -102,7 +102,8 @@ export function LicenseAssetForm({
   const [notes, setNotes] = useState('')
   const [attachments, setAttachments] = useState<File[]>([])
 
-  void familyConfig
+  const isVisible = (section: string) => familyConfig.visibleSections.includes(section as never)
+  const isRequired = (section: string) => familyConfig.requiredSections.includes(section as never)
 
   useEffect(() => {
     fetch(`/api/inventory/license-types?familyId=${familyId}`)
@@ -246,127 +247,150 @@ export function LicenseAssetForm({
         )}
       </div>
 
-      <div className='grid grid-cols-1 md:grid-cols-3 gap-3'>
-        <div className='space-y-1'>
-          <Label>Fecha de Compra</Label>
-          <Input type='date' value={purchaseDate} onChange={e => setPurchaseDate(e.target.value)} />
-        </div>
-        <div className='space-y-1'>
-          <Label>Fecha de Vencimiento</Label>
-          <Input
-            type='date'
-            value={expirationDate}
-            onChange={e => setExpirationDate(e.target.value)}
-          />
-        </div>
-        <div className='space-y-1'>
-          <Label>
-            Costo <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
-          </Label>
-          <Input
-            type='number'
-            min='0'
-            step='0.01'
-            value={cost}
-            onChange={e => setCost(e.target.value)}
-            placeholder='0.00'
-          />
-        </div>
-      </div>
-
-      <div className='grid grid-cols-1 md:grid-cols-3 gap-3'>
-        <div className='space-y-1'>
-          <Label>
-            Número de Factura{' '}
-            <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
-          </Label>
-          <Input
-            value={invoiceNumber}
-            onChange={e => setInvoiceNumber(e.target.value)}
-            placeholder='Ej: FACT-2024-001'
-          />
-        </div>
-        <div className='space-y-1'>
-          <Label>
-            Número de Orden de Compra{' '}
-            <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
-          </Label>
-          <Input
-            value={purchaseOrderNumber}
-            onChange={e => setPurchaseOrderNumber(e.target.value)}
-            placeholder='Ej: OC-2024-001'
-          />
-        </div>
-        <div className='space-y-1'>
-          <Label>
-            Fecha de Renovación{' '}
-            <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
-          </Label>
-          <Input type='date' value={renewalDate} onChange={e => setRenewalDate(e.target.value)} />
-        </div>
-      </div>
-
-      <div className='rounded-lg border border-border p-4 space-y-3'>
-        <label className='flex items-center gap-3 cursor-pointer select-none'>
-          <button
-            type='button'
-            role='switch'
-            aria-checked={hasRecurring}
-            onClick={() => setHasRecurring(v => !v)}
-            className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${hasRecurring ? 'bg-primary' : 'bg-muted'}`}
-          >
-            <span
-              className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-lg transition-transform ${hasRecurring ? 'translate-x-4' : 'translate-x-0'}`}
-            />
-          </button>
-          <div>
-            <span className='text-sm font-medium flex items-center gap-1.5'>
-              <RefreshCw className='h-3.5 w-3.5 text-muted-foreground' />
-              Tiene suscripción / pago recurrente
-            </span>
-            <p className='text-xs text-muted-foreground'>
-              Activa si el software se paga mensual o anualmente (SaaS, arrendamiento)
-            </p>
-          </div>
-        </label>
-
-        {hasRecurring ? (
-          <ContractPicker
-            value={linkedContractId}
-            onChange={setLinkedContractId}
-            supplierId={supplierId || null}
-            familyId={familyId}
-          />
-        ) : (
-          <div className='space-y-3'>
+      {isVisible('FINANCIAL') && (
+        <>
+          <div className='grid grid-cols-1 md:grid-cols-3 gap-3'>
             <div className='space-y-1'>
               <Label>
-                Número de Contrato{' '}
-                <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
+                Fecha de Compra
+                {isRequired('FINANCIAL') && <span className='text-destructive'> *</span>}
               </Label>
               <Input
-                value={contractNumber}
-                onChange={e => setContractNumber(e.target.value)}
-                placeholder='Ej: CONT-2024-001'
+                type='date'
+                value={purchaseDate}
+                onChange={e => setPurchaseDate(e.target.value)}
+                required={isRequired('FINANCIAL')}
+              />
+            </div>
+            <div className='space-y-1'>
+              <Label>Fecha de Vencimiento</Label>
+              <Input
+                type='date'
+                value={expirationDate}
+                onChange={e => setExpirationDate(e.target.value)}
               />
             </div>
             <div className='space-y-1'>
               <Label>
-                Costo de Renovación{' '}
-                <span className='text-xs font-normal text-muted-foreground'>(mensual o anual)</span>
+                Costo{' '}
+                {!isRequired('FINANCIAL') && (
+                  <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
+                )}
               </Label>
               <Input
                 type='number'
                 min='0'
                 step='0.01'
-                value={renewalCost}
-                onChange={e => setRenewalCost(e.target.value)}
+                value={cost}
+                onChange={e => setCost(e.target.value)}
                 placeholder='0.00'
               />
             </div>
           </div>
-        )}
-      </div>
+
+          <div className='grid grid-cols-1 md:grid-cols-3 gap-3'>
+            <div className='space-y-1'>
+              <Label>
+                Número de Factura{' '}
+                <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
+              </Label>
+              <Input
+                value={invoiceNumber}
+                onChange={e => setInvoiceNumber(e.target.value)}
+                placeholder='Ej: FACT-2024-001'
+              />
+            </div>
+            <div className='space-y-1'>
+              <Label>
+                Número de Orden de Compra{' '}
+                <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
+              </Label>
+              <Input
+                value={purchaseOrderNumber}
+                onChange={e => setPurchaseOrderNumber(e.target.value)}
+                placeholder='Ej: OC-2024-001'
+              />
+            </div>
+            <div className='space-y-1'>
+              <Label>
+                Fecha de Renovación{' '}
+                <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
+              </Label>
+              <Input
+                type='date'
+                value={renewalDate}
+                onChange={e => setRenewalDate(e.target.value)}
+              />
+            </div>
+          </div>
+        </>
+      )}
+
+      {isVisible('CONTRACT') && (
+        <div className='rounded-lg border border-border p-4 space-y-3'>
+          <label className='flex items-center gap-3 cursor-pointer select-none'>
+            <button
+              type='button'
+              role='switch'
+              aria-checked={hasRecurring}
+              onClick={() => setHasRecurring(v => !v)}
+              className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${hasRecurring ? 'bg-primary' : 'bg-muted'}`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-lg transition-transform ${hasRecurring ? 'translate-x-4' : 'translate-x-0'}`}
+              />
+            </button>
+            <div>
+              <span className='text-sm font-medium flex items-center gap-1.5'>
+                <RefreshCw className='h-3.5 w-3.5 text-muted-foreground' />
+                Tiene suscripción / pago recurrente
+              </span>
+              <p className='text-xs text-muted-foreground'>
+                Activa si el software se paga mensual o anualmente (SaaS, arrendamiento)
+              </p>
+            </div>
+          </label>
+
+          {hasRecurring ? (
+            <ContractPicker
+              value={linkedContractId}
+              onChange={setLinkedContractId}
+              supplierId={supplierId || null}
+              familyId={familyId}
+            />
+          ) : (
+            <div className='space-y-3'>
+              <div className='space-y-1'>
+                <Label>
+                  Número de Contrato{' '}
+                  <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
+                </Label>
+                <Input
+                  value={contractNumber}
+                  onChange={e => setContractNumber(e.target.value)}
+                  placeholder='Ej: CONT-2024-001'
+                />
+              </div>
+              <div className='space-y-1'>
+                <Label>
+                  Costo de Renovación{' '}
+                  <span className='text-xs font-normal text-muted-foreground'>
+                    (mensual o anual)
+                  </span>
+                </Label>
+                <Input
+                  type='number'
+                  min='0'
+                  step='0.01'
+                  value={renewalCost}
+                  onChange={e => setRenewalCost(e.target.value)}
+                  placeholder='0.00'
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className='space-y-1'>
         <Label>Observaciones</Label>

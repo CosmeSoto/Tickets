@@ -12,27 +12,39 @@
 
 export type DepreciationMethod = 'LINEAR' | 'DECLINING_BALANCE' | 'UNITS_OF_PRODUCTION'
 
+/** Normaliza alias legacy al enum canónico de Prisma. */
+export function normalizeDepreciationMethod(
+  method: string | null | undefined
+): DepreciationMethod | null {
+  if (!method) return null
+  if (method === 'STRAIGHT_LINE') return 'LINEAR'
+  if (method === 'LINEAR' || method === 'DECLINING_BALANCE' || method === 'UNITS_OF_PRODUCTION') {
+    return method
+  }
+  return null
+}
+
 export interface DepreciationInput {
   purchasePrice: number
   purchaseDate: Date
   usefulLifeYears: number
-  residualValue?: number          // default: 0
-  method?: DepreciationMethod     // default: LINEAR
-  referenceDate?: Date            // default: hoy
+  residualValue?: number // default: 0
+  method?: DepreciationMethod // default: LINEAR
+  referenceDate?: Date // default: hoy
   // Solo para UNITS_OF_PRODUCTION
-  totalUnits?: number             // unidades totales de vida útil (ej: horas de operación)
-  usedUnits?: number              // unidades consumidas hasta referenceDate
+  totalUnits?: number // unidades totales de vida útil (ej: horas de operación)
+  usedUnits?: number // unidades consumidas hasta referenceDate
   // Solo para DECLINING_BALANCE
-  decliningRate?: number          // tasa % anual (default: 2 / usefulLifeYears)
+  decliningRate?: number // tasa % anual (default: 2 / usefulLifeYears)
 }
 
 export interface DepreciationResult {
   method: DepreciationMethod
-  annualDepreciation: number      // depreciación del año en curso
+  annualDepreciation: number // depreciación del año en curso
   accumulatedDepreciation: number
   bookValue: number
   yearsElapsed: number
-  depreciationRate: number        // % anual efectivo
+  depreciationRate: number // % anual efectivo
 }
 
 const round2 = (x: number) => Math.round(x * 100) / 100
@@ -51,16 +63,14 @@ export function calculateDepreciation(
   method: DepreciationMethod = 'LINEAR',
   options?: { totalUnits?: number; usedUnits?: number; decliningRate?: number }
 ): DepreciationResult {
-  const yearsElapsed = round2(
-    (referenceDate.getTime() - purchaseDate.getTime()) / MS_PER_YEAR
-  )
+  const yearsElapsed = round2((referenceDate.getTime() - purchaseDate.getTime()) / MS_PER_YEAR)
   const cappedYears = Math.min(yearsElapsed, usefulLifeYears)
   const depreciableAmount = purchasePrice - residualValue
 
   switch (method) {
     case 'DECLINING_BALANCE': {
       // Doble saldo decreciente: tasa = 2 / vida_útil (o personalizada)
-      const rate = options?.decliningRate ?? (2 / usefulLifeYears)
+      const rate = options?.decliningRate ?? 2 / usefulLifeYears
       let bookVal = purchasePrice
       let accumulated = 0
       let annualDep = 0
@@ -150,7 +160,12 @@ export function getRecommendedDepreciationMethod(
   if (familyCode === 'FIXED_ASSETS' && assetTypeName) {
     const lower = assetTypeName.toLowerCase()
     // Equipos mecánicos con horas de uso medibles
-    if (lower.includes('hvac') || lower.includes('ascensor') || lower.includes('bomba') || lower.includes('generador')) {
+    if (
+      lower.includes('hvac') ||
+      lower.includes('ascensor') ||
+      lower.includes('bomba') ||
+      lower.includes('generador')
+    ) {
       return 'UNITS_OF_PRODUCTION'
     }
   }
@@ -163,14 +178,14 @@ export function getRecommendedDepreciationMethod(
  * El usuario puede sobreescribir estos valores en el formulario.
  */
 export const DEFAULT_USEFUL_LIFE_YEARS: Record<string, number> = {
-  FIXED_ASSETS: 20,    // Infraestructura: 20-50 años
-  TECHNOLOGY: 5,       // Tecnología: 3-7 años
-  SECURITY: 10,        // Seguridad: 8-15 años
-  COMMERCIAL: 10,      // Activos comerciales: 5-15 años
-  GREEN_AREAS: 5,      // Equipos de jardinería: 3-8 años
-  MAINTENANCE: 0,      // MRO: no deprecia
-  SERVICES: 0,         // Servicios: no deprecia
-  ADMINISTRATIVE: 0,   // Documentos: no deprecia
+  FIXED_ASSETS: 20, // Infraestructura: 20-50 años
+  TECHNOLOGY: 5, // Tecnología: 3-7 años
+  SECURITY: 10, // Seguridad: 8-15 años
+  COMMERCIAL: 10, // Activos comerciales: 5-15 años
+  GREEN_AREAS: 5, // Equipos de jardinería: 3-8 años
+  MAINTENANCE: 0, // MRO: no deprecia
+  SERVICES: 0, // Servicios: no deprecia
+  ADMINISTRATIVE: 0, // Documentos: no deprecia
 }
 
 /**

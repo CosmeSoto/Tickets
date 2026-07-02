@@ -5,7 +5,7 @@
 
 'use client'
 
-import { Suspense } from 'react'
+import { Suspense, useState } from 'react'
 import { Save, RefreshCw, Layers, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -15,6 +15,7 @@ import { InventoryAreasTab } from '@/components/settings/inventory/inventory-are
 import { InventoryGlobalTab } from '@/components/settings/inventory/inventory-global-tab'
 
 function InventorySettingsContent() {
+  const [activeTab, setActiveTab] = useState('areas')
   const {
     isSuperAdmin,
     families,
@@ -24,6 +25,7 @@ function InventorySettingsContent() {
     globalRules,
     loadingFamilies,
     loadingConfig,
+    loadingGlobal,
     saving,
     savingGlobal,
     residualError,
@@ -31,7 +33,7 @@ function InventorySettingsContent() {
     setActiveModeTab,
     useModeConfig,
     setUseModeConfig,
-    loadFamilies,
+    handleReload,
     handleSelectFamily,
     handleToggleInventory,
     handleSave,
@@ -47,24 +49,30 @@ function InventorySettingsContent() {
     validateResidual,
   } = useInventorySettings()
 
+  const isReloading = loadingFamilies || loadingConfig || loadingGlobal
+
   return (
     <ModuleLayout
       title='Configuración de Inventario'
       subtitle='Configura el comportamiento del módulo de inventario por área'
       headerActions={
         <div className='flex items-center gap-2'>
-          <Button variant='outline' size='sm' onClick={loadFamilies} disabled={loadingFamilies}>
-            <RefreshCw className={`h-4 w-4 ${loadingFamilies ? 'animate-spin' : ''} sm:mr-2`} />
+          <Button variant='outline' size='sm' onClick={handleReload} disabled={isReloading}>
+            <RefreshCw className={`h-4 w-4 ${isReloading ? 'animate-spin' : ''} sm:mr-2`} />
             <span className='hidden sm:inline'>Recargar</span>
           </Button>
-          <Button onClick={handleSave} disabled={saving || !selectedFamilyId || !!residualError}>
-            <Save className={`h-4 w-4 ${saving ? 'animate-spin' : ''} sm:mr-2`} />
-            <span className='hidden sm:inline'>{saving ? 'Guardando...' : 'Guardar cambios'}</span>
-          </Button>
+          {activeTab === 'areas' && (
+            <Button onClick={handleSave} disabled={saving || !selectedFamilyId || !!residualError}>
+              <Save className={`h-4 w-4 ${saving ? 'animate-spin' : ''} sm:mr-2`} />
+              <span className='hidden sm:inline'>
+                {saving ? 'Guardando...' : 'Guardar cambios'}
+              </span>
+            </Button>
+          )}
         </div>
       }
     >
-      <Tabs defaultValue='areas' className='space-y-6'>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className='space-y-6'>
         <TabsList className='w-full sm:w-auto'>
           <TabsTrigger value='areas' className='flex-1 sm:flex-none flex items-center gap-2'>
             <Layers className='h-4 w-4' />

@@ -6,6 +6,10 @@ import { InventoryNotificationService } from './inventory-notification.service'
 import type { DeliveryAct, UserInfo } from '@/types/inventory/delivery-act'
 import { buildActReceiverInfo, buildGeneralActSnapshot } from '@/lib/inventory/general-delivery-act'
 import { db as prisma } from '@/lib/server'
+import {
+  addActExpirationDays,
+  getInventoryActExpirationDays,
+} from '@/lib/settings/runtime-settings'
 
 /**
  * Servicio para gestión de actas de entrega digitales
@@ -92,9 +96,9 @@ export class DeliveryActService {
       // Generar token de aceptación
       const acceptanceToken = DigitalSignatureService.generateAcceptanceToken()
 
-      // Fecha de expiración: 7 días desde ahora
-      const expirationDate = new Date()
-      expirationDate.setDate(expirationDate.getDate() + 7)
+      // Fecha de expiración según configuración global de inventario
+      const actExpirationDays = await getInventoryActExpirationDays()
+      const expirationDate = addActExpirationDays(new Date(), actExpirationDays)
 
       // Crear snapshot del equipo (incluye campos financieros si existen)
       const eq = assignment.equipment as any
@@ -574,8 +578,8 @@ export class DeliveryActService {
 
     const folio = await FolioService.generateDeliveryActFolio()
     const acceptanceToken = DigitalSignatureService.generateAcceptanceToken()
-    const expirationDate = new Date()
-    expirationDate.setDate(expirationDate.getDate() + 7)
+    const actExpirationDays = await getInventoryActExpirationDays()
+    const expirationDate = addActExpirationDays(new Date(), actExpirationDays)
 
     const act = await (prisma.delivery_acts.create as any)({
       data: {

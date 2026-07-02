@@ -17,12 +17,14 @@ function PatrolSettingsContent() {
     loadingFamilies,
     loadingConfig,
     saving,
-    loadFamilies,
+    handleReload,
     handleSelectFamily,
     handleTogglePatrols,
     handleSave,
     setField,
   } = usePatrolSettings()
+
+  const isReloading = loadingFamilies || loadingConfig
 
   return (
     <ModuleLayout
@@ -30,8 +32,8 @@ function PatrolSettingsContent() {
       subtitle='Configura los parámetros del módulo de patrullaje por área'
       headerActions={
         <div className='flex items-center gap-2'>
-          <Button variant='outline' size='sm' onClick={loadFamilies} disabled={loadingFamilies}>
-            <RefreshCw className={`h-4 w-4 ${loadingFamilies ? 'animate-spin' : ''} sm:mr-2`} />
+          <Button variant='outline' size='sm' onClick={handleReload} disabled={isReloading}>
+            <RefreshCw className={`h-4 w-4 ${isReloading ? 'animate-spin' : ''} sm:mr-2`} />
             <span className='hidden sm:inline'>Recargar</span>
           </Button>
           <Button onClick={handleSave} disabled={saving || !selectedFamilyId}>

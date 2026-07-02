@@ -10,6 +10,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { useToast } from '@/hooks/use-toast'
 import { DEFAULT_FAMILY_CONFIG, DEFAULT_MODE_CONFIG } from '@/lib/inventory/family-config-types'
+import { normalizeDepreciationMethod } from '@/lib/inventory/depreciation'
 import type {
   AssetSubtype,
   FormSection,
@@ -72,9 +73,61 @@ export interface GlobalRules {
   contractAlertDays: number
 }
 
+const DEFAULT_GLOBAL_RULES: GlobalRules = {
+  actExpirationDays: 7,
+  lowStockAlertEnabled: true,
+  licenseAlertEnabled: true,
+  licenseAlertDaysFirst: 30,
+  licenseAlertDaysSecond: 7,
+  warrantyAlertEnabled: true,
+  warrantyAlertDays: 30,
+  contractAlertDays: 30,
+}
+
+/** Normaliza alias legacy del método de depreciación al enum de Prisma. */
+function apiSettingsToGlobalRules(settings: Record<string, unknown>): GlobalRules {
+  return {
+    actExpirationDays:
+      Number(settings.act_expiration_days) || DEFAULT_GLOBAL_RULES.actExpirationDays,
+    lowStockAlertEnabled:
+      settings.low_stock_alert_enabled !== undefined
+        ? settings.low_stock_alert_enabled === true
+        : DEFAULT_GLOBAL_RULES.lowStockAlertEnabled,
+    licenseAlertEnabled:
+      settings.license_alert_enabled !== undefined
+        ? settings.license_alert_enabled === true
+        : DEFAULT_GLOBAL_RULES.licenseAlertEnabled,
+    licenseAlertDaysFirst:
+      Number(settings.license_alert_days_first) || DEFAULT_GLOBAL_RULES.licenseAlertDaysFirst,
+    licenseAlertDaysSecond:
+      Number(settings.license_alert_days_second) || DEFAULT_GLOBAL_RULES.licenseAlertDaysSecond,
+    warrantyAlertEnabled:
+      settings.warranty_alert_enabled !== undefined
+        ? settings.warranty_alert_enabled === true
+        : DEFAULT_GLOBAL_RULES.warrantyAlertEnabled,
+    warrantyAlertDays:
+      Number(settings.warranty_alert_days) || DEFAULT_GLOBAL_RULES.warrantyAlertDays,
+    contractAlertDays:
+      Number(settings.contract_alert_days) || DEFAULT_GLOBAL_RULES.contractAlertDays,
+  }
+}
+
+function globalRulesToApiPayload(rules: GlobalRules): Record<string, number | boolean> {
+  return {
+    act_expiration_days: rules.actExpirationDays,
+    low_stock_alert_enabled: rules.lowStockAlertEnabled,
+    license_alert_enabled: rules.licenseAlertEnabled,
+    license_alert_days_first: rules.licenseAlertDaysFirst,
+    license_alert_days_second: rules.licenseAlertDaysSecond,
+    warranty_alert_enabled: rules.warrantyAlertEnabled,
+    warranty_alert_days: rules.warrantyAlertDays,
+    contract_alert_days: rules.contractAlertDays,
+  }
+}
+
 // ── Helper ─────────────────────────────────────────────────────────────────
 
-function buildForm(cfg: RawConfig | null): FormState {
+function buildForm(cfg: RawConfig | null, assetRequestsEnabled = false): FormState {
   const sectionsByMode: Partial<Record<AcquisitionMode, ModeSectionConfig>> = {}
   if (cfg?.sectionsByMode && typeof cfg.sectionsByMode === 'object') {
     for (const mode of ['FIXED_ASSET', 'RENTAL', 'LOAN'] as AcquisitionMode[]) {
@@ -90,7 +143,7 @@ function buildForm(cfg: RawConfig | null): FormState {
   }
   return {
     inventoryEnabled: cfg?.inventoryEnabled ?? true,
-    assetRequestsEnabled: (cfg as any)?.assetRequestsEnabled ?? false,
+    assetRequestsEnabled,
     allowedSubtypes:
       (cfg?.allowedSubtypes as AssetSubtype[]) ?? DEFAULT_FAMILY_CONFIG.allowedSubtypes,
     visibleSections:
@@ -99,7 +152,7 @@ function buildForm(cfg: RawConfig | null): FormState {
       (cfg?.requiredSections as FormSection[]) ?? DEFAULT_FAMILY_CONFIG.requiredSections,
     requireFinancialForNew: cfg?.requireFinancialForNew ?? true,
     sectionsByMode,
-    defaultDepreciationMethod: cfg?.defaultDepreciationMethod ?? null,
+    defaultDepreciationMethod: normalizeDepreciationMethod(cfg?.defaultDepreciationMethod),
     defaultUsefulLifeYears:
       cfg?.defaultUsefulLifeYears != null ? String(cfg.defaultUsefulLifeYears) : '',
     defaultResidualValuePct:
@@ -132,17 +185,9 @@ export function useInventorySettings() {
   const [activeModeTab, setActiveModeTab] = useState<AcquisitionMode>('FIXED_ASSET')
   const [useModeConfig, setUseModeConfig] = useState(false)
 
-  const [globalRules, setGlobalRules] = useState<GlobalRules>({
-    actExpirationDays: 7,
-    lowStockAlertEnabled: true,
-    licenseAlertEnabled: true,
-    licenseAlertDaysFirst: 30,
-    licenseAlertDaysSecond: 7,
-    warrantyAlertEnabled: true,
-    warrantyAlertDays: 30,
-    contractAlertDays: 30,
-  })
+  const [globalRules, setGlobalRules] = useState<GlobalRules>(DEFAULT_GLOBAL_RULES)
   const [savingGlobal, setSavingGlobal] = useState(false)
+  const [loadingGlobal, setLoadingGlobal] = useState(false)
 
   // ── Load families ──
   const loadFamilies = useCallback(async () => {
@@ -176,10 +221,15 @@ export function useInventorySettings() {
     async (familyId: string) => {
       setLoadingConfig(true)
       try {
-        const res = await fetch(`/api/inventory/family-config/${familyId}`)
-        const data = await res.json()
+        const [configRes, assetRequestsRes] = await Promise.all([
+          fetch(`/api/inventory/family-config/${familyId}`),
+          fetch(`/api/inventory/asset-requests/family-config/${familyId}`),
+        ])
+        const data = await configRes.json()
+        const assetRequestsData = assetRequestsRes.ok ? await assetRequestsRes.json() : null
+
         if (data.success) {
-          setForm(buildForm(data.data))
+          setForm(buildForm(data.data, assetRequestsData?.assetRequestsEnabled === true))
           setUseModeConfig(
             !!data.data.sectionsByMode && Object.keys(data.data.sectionsByMode).length > 0
           )
@@ -198,14 +248,28 @@ export function useInventorySettings() {
   )
 
   // ── Load global settings ──
-  useEffect(() => {
-    fetch('/api/settings/inventory')
-      .then(r => (r.ok ? r.json() : null))
-      .then(data => {
-        if (data?.settings) setGlobalRules(prev => ({ ...prev, ...data.settings }))
+  const loadGlobalRules = useCallback(async () => {
+    setLoadingGlobal(true)
+    try {
+      const res = await fetch('/api/settings/inventory')
+      if (res.ok) {
+        const data = await res.json()
+        if (data?.settings) setGlobalRules(apiSettingsToGlobalRules(data.settings))
+      }
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Error al cargar reglas generales',
+        variant: 'destructive',
       })
-      .catch(() => {})
-  }, [])
+    } finally {
+      setLoadingGlobal(false)
+    }
+  }, [toast])
+
+  useEffect(() => {
+    loadGlobalRules()
+  }, [loadGlobalRules])
 
   useEffect(() => {
     loadFamilies()
@@ -275,7 +339,7 @@ export function useInventorySettings() {
         requiredSections: form.requiredSections,
         requireFinancialForNew: form.requireFinancialForNew,
         sectionsByMode: useModeConfig ? form.sectionsByMode : null,
-        defaultDepreciationMethod: form.defaultDepreciationMethod || null,
+        defaultDepreciationMethod: normalizeDepreciationMethod(form.defaultDepreciationMethod),
         defaultUsefulLifeYears: form.defaultUsefulLifeYears
           ? parseFloat(form.defaultUsefulLifeYears)
           : null,
@@ -285,20 +349,40 @@ export function useInventorySettings() {
         codePrefix: form.codePrefix || null,
         autoApproveDecommission: form.autoApproveDecommission,
         requireDeliveryAct: form.requireDeliveryAct,
-        assetRequestsEnabled: form.assetRequestsEnabled,
       }
-      const res = await fetch(`/api/inventory/family-config/${selectedFamilyId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      const data = await res.json()
-      if (data.success) {
+
+      const requests: Promise<Response>[] = [
+        fetch(`/api/inventory/family-config/${selectedFamilyId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }),
+      ]
+
+      if (isSuperAdmin) {
+        requests.push(
+          fetch(`/api/inventory/asset-requests/family-config/${selectedFamilyId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ assetRequestsEnabled: form.assetRequestsEnabled }),
+          })
+        )
+      }
+
+      const [configRes, assetRequestsRes] = await Promise.all(requests)
+      const data = await configRes.json()
+
+      if (data.success && (!assetRequestsRes || assetRequestsRes.ok)) {
+        await loadConfig(selectedFamilyId)
         toast({ title: 'Guardado', description: 'Configuración actualizada correctamente' })
       } else {
+        const assetError =
+          assetRequestsRes && !assetRequestsRes.ok
+            ? await assetRequestsRes.json().catch(() => ({}))
+            : null
         toast({
           title: 'Error',
-          description: data.error || 'Error al guardar',
+          description: data.error || assetError?.error || 'Error al guardar',
           variant: 'destructive',
         })
       }
@@ -307,7 +391,7 @@ export function useInventorySettings() {
     } finally {
       setSaving(false)
     }
-  }, [selectedFamilyId, residualError, form, useModeConfig, toast])
+  }, [selectedFamilyId, residualError, form, useModeConfig, toast, isSuperAdmin, loadConfig])
 
   // ── Save global rules ──
   const handleSaveGlobal = useCallback(async () => {
@@ -316,9 +400,10 @@ export function useInventorySettings() {
       const res = await fetch('/api/settings/inventory', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(globalRules),
+        body: JSON.stringify(globalRulesToApiPayload(globalRules)),
       })
       if (res.ok) {
+        await loadGlobalRules()
         toast({ title: 'Guardado', description: 'Reglas globales actualizadas' })
       } else {
         const data = await res.json().catch(() => ({}))
@@ -333,7 +418,13 @@ export function useInventorySettings() {
     } finally {
       setSavingGlobal(false)
     }
-  }, [globalRules, toast])
+  }, [globalRules, toast, loadGlobalRules])
+
+  const handleReload = useCallback(async () => {
+    await loadFamilies()
+    await loadGlobalRules()
+    if (selectedFamilyId) await loadConfig(selectedFamilyId)
+  }, [loadFamilies, loadGlobalRules, loadConfig, selectedFamilyId])
 
   // ── Form helpers ──
   const setField = useCallback(<K extends keyof FormState>(key: K, value: FormState[K]) => {
@@ -458,6 +549,7 @@ export function useInventorySettings() {
     // State
     loadingFamilies,
     loadingConfig,
+    loadingGlobal,
     saving,
     savingGlobal,
     residualError,
@@ -468,6 +560,8 @@ export function useInventorySettings() {
 
     // Actions
     loadFamilies,
+    loadGlobalRules,
+    handleReload,
     handleSelectFamily,
     handleToggleInventory,
     handleSave,

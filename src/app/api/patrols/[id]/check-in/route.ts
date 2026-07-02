@@ -14,6 +14,7 @@ import { PatrolQRService } from '@/lib/services/patrol-qr.service'
 import { PatrolGeofenceService } from '@/lib/services/patrol-geofence.service'
 import { PatrolPhotoService } from '@/lib/services/patrol-photo.service'
 import { calculateCompletionPercentage } from '@/lib/patrol/patrol-completion'
+import { PATROL_FAMILY_DEFAULTS } from '@/lib/patrol/patrol-family-config'
 import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
 
 const checkInSchema = z.object({
@@ -123,8 +124,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           })
         : Promise.resolve(null),
     ])
-    const qrWindowMinutes = familyConfig?.qrWindowMinutes ?? 5
-    const familyRadius = familyConfig?.geofenceRadiusMeters ?? 50
+    const qrWindowMinutes = familyConfig?.qrWindowMinutes ?? PATROL_FAMILY_DEFAULTS.qrWindowMinutes
+    const familyRadius =
+      familyConfig?.geofenceRadiusMeters ?? PATROL_FAMILY_DEFAULTS.geofenceRadiusMeters
 
     // ── Validar intervalo mínimo entre check-ins ───────────────────────────
     // Evita que un agente escanee todos los checkpoints en segundos (fraude).
@@ -163,7 +165,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     if (strictTimeValidation) {
       const now = new Date()
-      const gracePeriodMinutes = familyConfig?.gracePeriodMinutes ?? 15
+      const gracePeriodMinutes =
+        familyConfig?.gracePeriodMinutes ?? PATROL_FAMILY_DEFAULTS.gracePeriodMinutes
 
       // No permitir escanear ANTES de la hora de inicio (con gracia)
       const earliestScan = new Date(

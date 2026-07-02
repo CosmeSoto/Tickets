@@ -35,6 +35,7 @@ import {
   familySupportsDepreciation,
   getRecommendedDepreciationMethod,
   DEFAULT_USEFUL_LIFE_YEARS,
+  normalizeDepreciationMethod,
   type DepreciationMethod,
 } from '@/lib/inventory/depreciation'
 import { useActiveDepartments } from '@/contexts/departments-context'
@@ -350,12 +351,15 @@ export function EquipmentAssetForm({
   useEffect(() => {
     fetch(`/api/inventory/family-config/${familyId}`)
       .then(r => (r.ok ? r.json() : null))
-      .then((data: (FamilyDepreciationConfig & Record<string, unknown>) | null) => {
-        if (!data) return
+      .then(json => {
+        if (!json) return
+        const raw = (json.data ?? json) as FamilyDepreciationConfig & Record<string, unknown>
         const cfg: FamilyDepreciationConfig = {
-          defaultDepreciationMethod: data.defaultDepreciationMethod ?? null,
-          defaultUsefulLifeYears: data.defaultUsefulLifeYears ?? null,
-          defaultResidualValuePct: data.defaultResidualValuePct ?? null,
+          defaultDepreciationMethod: normalizeDepreciationMethod(
+            raw.defaultDepreciationMethod as string | null | undefined
+          ),
+          defaultUsefulLifeYears: raw.defaultUsefulLifeYears ?? null,
+          defaultResidualValuePct: raw.defaultResidualValuePct ?? null,
         }
         setFamilyDepConfig(cfg)
 

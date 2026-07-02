@@ -9,6 +9,7 @@ import {
   toTicketAccessUser,
 } from '@/lib/tickets/ticket-access'
 import { assertTechnicianActiveInFamily } from '@/lib/tickets/assignee-validation'
+import { getAutoAssignmentEnabled } from '@/lib/settings/runtime-settings'
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -194,6 +195,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const mode = url.searchParams.get('mode')
 
     if (mode === 'auto') {
+      const autoAssignmentEnabled = await getAutoAssignmentEnabled()
+      if (!autoAssignmentEnabled) {
+        return NextResponse.json(
+          { error: 'La asignación automática está deshabilitada en la configuración del sistema' },
+          { status: 403 }
+        )
+      }
+
       try {
         await assertTicketAccessById(toTicketAccessUser(session.user), ticketId, 'assign')
       } catch (err) {

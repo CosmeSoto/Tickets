@@ -34,9 +34,10 @@ const updateConfigSchema = z.object({
     .nullable()
     .optional(),
   defaultDepreciationMethod: z
-    .enum(['STRAIGHT_LINE', 'DECLINING_BALANCE', 'UNITS_OF_PRODUCTION'])
+    .enum(['LINEAR', 'STRAIGHT_LINE', 'DECLINING_BALANCE', 'UNITS_OF_PRODUCTION'])
     .nullable()
-    .optional(),
+    .optional()
+    .transform(v => (v === 'STRAIGHT_LINE' ? 'LINEAR' : v)),
   defaultUsefulLifeYears: z.number().positive().nullable().optional(),
   defaultResidualValuePct: z.number().min(0).max(100).nullable().optional(),
   codePrefix: z.string().max(10).nullable().optional(),
@@ -95,7 +96,13 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ fami
   const { role, id: userId } = session.user as { role: string; id: string }
   const isSuperAdmin = (session.user as any).isSuperAdmin === true
 
-  const canWrite = await canWriteModuleFamilyConfig(userId, role, isSuperAdmin, familyId, 'inventory')
+  const canWrite = await canWriteModuleFamilyConfig(
+    userId,
+    role,
+    isSuperAdmin,
+    familyId,
+    'inventory'
+  )
   if (!canWrite) {
     return NextResponse.json(
       { error: 'No tienes permiso para modificar la configuración de esta familia' },

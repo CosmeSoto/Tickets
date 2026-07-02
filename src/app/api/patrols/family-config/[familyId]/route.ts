@@ -6,9 +6,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { getOrCreatePatrolFamilyConfig } from '@/lib/patrol/patrol-family-config'
+import {
+  getOrCreatePatrolFamilyConfig,
+  PATROL_FAMILY_DEFAULTS,
+} from '@/lib/patrol/patrol-family-config'
 import { validatePatrolFamilyConfig } from '@/lib/patrol/patrol-config-validator'
-import { sanitizePatrolConfigBody } from '@/lib/auth/module-config-access'
+import {
+  sanitizePatrolConfigBody,
+  canReadModuleFamilyConfig,
+} from '@/lib/auth/module-config-access'
 import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
 import prisma from '@/lib/prisma'
 
@@ -23,6 +29,17 @@ export async function GET(
     if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
     const { familyId } = await params
+    const { role, id: userId } = session.user as { role: string; id: string }
+    const isSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
+
+    const canRead = await canReadModuleFamilyConfig(userId, role, isSuperAdmin, familyId, 'patrols')
+    if (!canRead) {
+      return NextResponse.json(
+        { error: 'No tienes permiso para ver la configuración de esta familia' },
+        { status: 403 }
+      )
+    }
+
     const config = await getOrCreatePatrolFamilyConfig(familyId)
 
     // Nunca exponer patrolIncidentCategoryId como dato sensible — es solo un FK

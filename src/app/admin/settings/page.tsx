@@ -60,6 +60,9 @@ interface SystemSettings {
   maxFileSize: number
   allowedFileTypes: string[]
 
+  // Solo lectura desde API
+  smtpPasswordConfigured?: boolean
+
   // Configuración de backups
   backupEnabled: boolean
   backupFrequency: 'daily' | 'weekly' | 'monthly'
@@ -99,7 +102,10 @@ function SettingsPage() {
       const response = await fetch('/api/admin/settings')
       if (response.ok) {
         const data = await response.json()
-        setSettings(data)
+        setSettings({
+          ...data,
+          smtpPassword: '',
+        })
       } else {
         toast({
           title: 'Error',
@@ -125,12 +131,18 @@ function SettingsPage() {
 
     setSaving(true)
     try {
+      const { smtpPassword, ...rest } = settings
+      const payload: Record<string, unknown> = { ...rest }
+      if (smtpPassword?.trim()) {
+        payload.smtpPassword = smtpPassword
+      }
+
       const response = await fetch('/api/admin/settings', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(settings),
+        body: JSON.stringify(payload),
       })
 
       if (response.ok) {
@@ -138,7 +150,7 @@ function SettingsPage() {
           title: 'Éxito',
           description: 'Configuración guardada correctamente',
         })
-        // Notificar a componentes que escuchan cambios de configuración (ej: session timeout monitor)
+        await loadSettings()
         window.dispatchEvent(new CustomEvent('settings-updated'))
       } else {
         const error = await response.json()
@@ -456,8 +468,17 @@ function SettingsPage() {
                           type='password'
                           value={settings.smtpPassword}
                           onChange={e => setSettings({ ...settings, smtpPassword: e.target.value })}
-                          placeholder='••••••••'
+                          placeholder={
+                            settings.smtpPasswordConfigured
+                              ? 'Dejar vacío para mantener la actual'
+                              : '••••••••'
+                          }
                         />
+                        {settings.smtpPasswordConfigured && !settings.smtpPassword && (
+                          <p className='text-xs text-muted-foreground mt-1'>
+                            Hay una contraseña guardada. Escribe una nueva solo si deseas cambiarla.
+                          </p>
+                        )}
                       </div>
                     </div>
 

@@ -58,9 +58,23 @@ export function AutoAssignment({
 }: AutoAssignmentProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [configLoading, setConfigLoading] = useState(true)
+  const [autoAssignmentEnabled, setAutoAssignmentEnabled] = useState(true)
   const [result, setResult] = useState<AssignmentResult | null>(null)
   const [error, setError] = useState('')
   const { toast } = useToast()
+
+  useEffect(() => {
+    fetch('/api/config/tickets')
+      .then(r => (r.ok ? r.json() : null))
+      .then(data => {
+        if (data && typeof data.autoAssignmentEnabled === 'boolean') {
+          setAutoAssignmentEnabled(data.autoAssignmentEnabled)
+        }
+      })
+      .catch(() => {})
+      .finally(() => setConfigLoading(false))
+  }, [])
 
   const handleAutoAssign = async () => {
     setLoading(true)
@@ -121,6 +135,10 @@ export function AutoAssignment({
       onAssignmentComplete?.(result.assignedTechnician)
     }
     resetDialog()
+  }
+
+  if (configLoading || !autoAssignmentEnabled) {
+    return null
   }
 
   return (
