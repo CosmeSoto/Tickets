@@ -340,6 +340,8 @@ export function useEquipmentDetail({
 
   // ── Valores calculados ──
   const equipment = data?.equipment
+  const batch = data?.batch
+  const batchMetrics = data?.batchMetrics
   const currentAssignment = data?.currentAssignment
   const history = data?.history || []
   const maintenanceRecords = data?.maintenanceRecords || []
@@ -381,6 +383,8 @@ export function useEquipmentDetail({
     // Datos
     data,
     equipment,
+    batch,
+    batchMetrics,
     currentAssignment,
     history,
     maintenanceRecords,

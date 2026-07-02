@@ -9,7 +9,7 @@ import {
   sanitizeInventoryConfigBody,
 } from '@/lib/auth/module-config-access'
 import { z } from 'zod'
-import { DEFAULT_FAMILY_CONFIG } from '@/lib/inventory/family-config'
+import { DEFAULT_FAMILY_CONFIG, normalizeSectionsByMode } from '@/lib/inventory/family-config'
 
 const updateConfigSchema = z.object({
   allowedSubtypes: z.array(z.enum(['EQUIPMENT', 'MRO', 'LICENSE'])).optional(),
@@ -76,9 +76,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ fami
       })
     }
 
+    const normalizedSectionsByMode = normalizeSectionsByMode(
+      config.sectionsByMode as Parameters<typeof normalizeSectionsByMode>[0]
+    )
+
     return NextResponse.json({
       success: true,
-      data: { ...config, inventoryEnabled: config.inventoryEnabled ?? true },
+      data: {
+        ...config,
+        sectionsByMode: normalizedSectionsByMode ?? null,
+        inventoryEnabled: config.inventoryEnabled ?? true,
+      },
     })
   } catch (error) {
     console.error('Error al obtener configuración:', error)

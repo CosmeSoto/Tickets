@@ -41,11 +41,13 @@ import { AccessoriesSection } from '@/components/inventory/shared/AccessoriesSec
 import { TypeAttributesInput } from '@/components/inventory/custom-fields/type-attributes-input'
 import { WarehouseInlineForm } from '@/components/inventory/asset-forms/WarehouseInlineForm'
 import { ModelSelector } from '@/components/inventory/models/ModelSelector'
+import { ContractPicker } from '@/components/contracts/contract-picker'
+import { toast } from 'sonner'
 import {
   calculateDepreciation,
-  familySupportsDepreciation,
   getRecommendedDepreciationMethod,
   DEFAULT_USEFUL_LIFE_YEARS,
+  normalizeDepreciationMethod,
   type DepreciationMethod,
 } from '@/lib/inventory/depreciation'
 import {
@@ -53,6 +55,7 @@ import {
   type FamilyConfig,
   type AssetSubtype,
   type AcquisitionMode,
+  type FormSection,
 } from '@/lib/inventory/family-config-types'
 
 export interface BulkEquipmentFormProps {
@@ -131,6 +134,7 @@ export function BulkEquipmentForm({
   // ── Datos Comunes (igual que EquipmentAssetForm) ───────────────────────────
   const [acquisitionMode, setAcquisitionMode] = useState<AcquisitionMode>('FIXED_ASSET')
   const [supplierId, setSupplierId] = useState('')
+  const [linkedContractId, setLinkedContractId] = useState<string | null>(null)
   const [purchaseDate, setPurchaseDate] = useState('')
   const [purchasePrice, setPurchasePrice] = useState('')
   const [invoiceNumber, setInvoiceNumber] = useState('')
@@ -171,7 +175,7 @@ export function BulkEquipmentForm({
       model: prefillData?.model || '',
       typeId: prefillData?.typeId || '',
       departmentId: prefillData?.departmentId || '',
-      condition: prefillData?.condition || 'USED',
+      condition: prefillData?.condition || 'NEW',
       ownershipType: 'FIXED_ASSET',
       ...prefillData,
     },
@@ -189,11 +193,20 @@ export function BulkEquipmentForm({
   // ── Secciones visibles ─────────────────────────────────────────────────────
   const resolvedSections = familyConfig
     ? resolveSectionsForMode(familyConfig, acquisitionMode)
-    : { visible: ['FINANCIAL', 'DEPRECIATION', 'WAREHOUSE'] as any[], required: [] }
+    : {
+        visible: ['FINANCIAL', 'DEPRECIATION', 'WAREHOUSE'] as FormSection[],
+        required: [] as FormSection[],
+      }
   const isVisible = (s: string) => resolvedSections.visible.includes(s as any)
-  const supportsDepreciation = selectedFamilyCode
-    ? familySupportsDepreciation(selectedFamilyCode)
-    : true
+  const isRequired = (s: string) => resolvedSections.required.includes(s as any)
+  const selectedCondition = watch('condition') as 'NEW' | 'USED' | 'DAMAGED'
+  const requireFinancialForNew = familyConfig?.requireFinancialForNew ?? true
+  const showFinancial =
+    isVisible('FINANCIAL') && acquisitionMode === 'FIXED_ASSET' && selectedCondition !== 'DAMAGED'
+  const financialRequired =
+    showFinancial &&
+    (isRequired('FINANCIAL') || (requireFinancialForNew && selectedCondition === 'NEW'))
+  const showDepreciation = isVisible('DEPRECIATION') && acquisitionMode === 'FIXED_ASSET'
 
   // ── Valor residual sugerido ────────────────────────────────────────────────
   const suggestedResidualValue = useMemo(() => {
@@ -248,7 +261,7 @@ export function BulkEquipmentForm({
         const config: FamilyConfig = json.data ?? json
         setFamilyConfig(config)
         const depCfg: FamilyDepreciationConfig = {
-          defaultDepreciationMethod: config.defaultDepreciationMethod ?? null,
+          defaultDepreciationMethod: normalizeDepreciationMethod(config.defaultDepreciationMethod),
           defaultUsefulLifeYears: config.defaultUsefulLifeYears ?? null,
           defaultResidualValuePct: config.defaultResidualValuePct ?? null,
         }
@@ -354,6 +367,64 @@ export function BulkEquipmentForm({
       setError('Debes seleccionar un modelo del catálogo')
       return
     }
+    if (!data.departmentId) {
+      setError('Selecciona el departamento responsable del lote')
+      return
+    }
+    if (!manualCodesValid) {
+      setError(`Debes ingresar exactamente ${quantity} códigos en modo manual`)
+      return
+    }
+    if (!serialNumbersValid) {
+      setError(`Los números de serie deben ser 0 o exactamente ${quantity}`)
+      return
+    }
+    if ((acquisitionMode === 'RENTAL' || acquisitionMode === 'LOAN') && !supplierId) {
+      setError(
+        acquisitionMode === 'RENTAL'
+          ? 'Selecciona el proveedor del arrendamiento'
+          : 'Selecciona el propietario del bien'
+      )
+      return
+    }
+    if (financialRequired && !purchasePrice) {
+      setError('El precio unitario es obligatorio')
+      return
+    }
+    if (isRequired('DEPRECIATION') && showDepreciation) {
+      if (!depreciationMethod) {
+        setError('Selecciona el método de depreciación')
+        return
+      }
+      if (!usefulLifeYears || parseFloat(usefulLifeYears) <= 0) {
+        setError('Ingresa la vida útil en años')
+        return
+      }
+    }
+    if (isRequired('WAREHOUSE') && isVisible('WAREHOUSE') && !warehouseId) {
+      setError('Selecciona la bodega de almacenamiento')
+      return
+    }
+    if (
+      isRequired('CONTRACT') &&
+      isVisible('CONTRACT') &&
+      acquisitionMode === 'RENTAL' &&
+      !linkedContractId
+    ) {
+      setError('Selecciona el contrato de arrendamiento')
+      return
+    }
+
+    const brandName =
+      typeof selectedModelData?.brand === 'string'
+        ? selectedModelData.brand
+        : selectedModelData?.brand?.name || data.brand
+    const modelName = selectedModelData?.model || data.model
+    if (!brandName || !modelName) {
+      setError('El modelo seleccionado no tiene marca o nombre válido')
+      return
+    }
+
     setIsSubmitting(true)
     setError(null)
     try {
@@ -384,8 +455,8 @@ export function BulkEquipmentForm({
           serialNumbers,
           familyId: selectedFamilyId,
           // Datos del equipo (del modelo seleccionado)
-          brand: selectedModelData?.brand || data.brand,
-          model: selectedModelData?.model || data.model,
+          brand: brandName,
+          model: modelName,
           typeId: selectedModelData?.type?.id || data.typeId,
           departmentId: data.departmentId || undefined,
           condition: data.condition,
@@ -397,6 +468,7 @@ export function BulkEquipmentForm({
           acquisitionMode,
           ownershipType: acquisitionMode,
           supplierId: supplierId || undefined,
+          contractId: linkedContractId || undefined,
           purchaseDate: purchaseDate || undefined,
           purchasePrice: purchasePrice ? parseFloat(purchasePrice) : undefined,
           invoiceNumber: invoiceNumber || undefined,
@@ -419,8 +491,14 @@ export function BulkEquipmentForm({
         }),
       })
       const result = await response.json()
-      if (!response.ok) throw new Error(result.message || 'Error al crear equipos por lote')
+      if (!response.ok) {
+        const detail = result.details?.[0]?.message
+        throw new Error(
+          result.error || detail || result.message || 'Error al crear equipos por lote'
+        )
+      }
       setSuccessResult(result)
+      toast.success(result.summary?.message || 'Lote creado exitosamente')
       if (onSuccess) onSuccess(result)
     } catch (err: any) {
       setError(err.message || 'Error desconocido')
@@ -689,11 +767,14 @@ export function BulkEquipmentForm({
           </Label>
           <ModelSelector
             value={selectedModelId}
+            familyId={selectedFamilyId ?? undefined}
             onValueChange={(modelId, model) => {
               setSelectedModelId(modelId)
               setSelectedModelData(model)
               if (model) {
-                setValue('brand', model.brand)
+                const brand =
+                  typeof model.brand === 'string' ? model.brand : ((model as any).brand?.name ?? '')
+                setValue('brand', brand)
                 setValue('model', model.model)
                 setValue('typeId', model.type.id, { shouldValidate: true })
                 if (model.standardPrice && !purchasePrice) {
@@ -788,7 +869,10 @@ export function BulkEquipmentForm({
           </div>
           {isVisible('WAREHOUSE') && (
             <div className='space-y-1.5'>
-              <Label>Bodega</Label>
+              <Label>
+                Bodega
+                {isRequired('WAREHOUSE') && <span className='text-destructive'> *</span>}
+              </Label>
               <InlineCreateSelect
                 options={warehouses}
                 value={warehouseId}
@@ -857,13 +941,34 @@ export function BulkEquipmentForm({
           />
         </div>
 
+        {isVisible('CONTRACT') && acquisitionMode === 'RENTAL' && (
+          <div className='rounded-md border border-border p-4 space-y-3'>
+            <p className='text-sm font-medium'>
+              Contrato de arrendamiento
+              {isRequired('CONTRACT') && <span className='text-destructive'> *</span>}
+            </p>
+            <ContractPicker
+              value={linkedContractId}
+              onChange={setLinkedContractId}
+              supplierId={supplierId || null}
+              familyId={selectedFamilyId ?? undefined}
+            />
+          </div>
+        )}
+
         {/* Financiero */}
-        {isVisible('FINANCIAL') && (
+        {showFinancial && (
           <fieldset className='rounded-lg border border-border p-4 space-y-3'>
-            <legend className='px-2 text-sm font-semibold'>Información Financiera</legend>
+            <legend className='px-2 text-sm font-semibold'>
+              Información Financiera
+              {financialRequired && <span className='text-destructive'> *</span>}
+            </legend>
             <div className='grid grid-cols-2 gap-3'>
               <div className='space-y-1'>
-                <Label>Precio Unitario</Label>
+                <Label>
+                  Precio Unitario
+                  {financialRequired && <span className='text-destructive'> *</span>}
+                </Label>
                 <Input
                   type='number'
                   min='0'
@@ -910,10 +1015,13 @@ export function BulkEquipmentForm({
       </div>
 
       {/* ── SECCIÓN 4: Depreciación ───────────────────────────────────────── */}
-      {isVisible('DEPRECIATION') && supportsDepreciation && acquisitionMode === 'FIXED_ASSET' && (
+      {showDepreciation && (
         <div className='rounded-lg border bg-card p-5 space-y-4'>
           <div>
-            <h3 className='font-semibold mb-1'>Depreciación</h3>
+            <h3 className='font-semibold mb-1'>
+              Depreciación
+              {isRequired('DEPRECIATION') && <span className='text-destructive'> *</span>}
+            </h3>
             <p className='text-xs text-muted-foreground'>
               Aplica a todos los equipos del lote por igual
             </p>
@@ -1050,7 +1158,7 @@ export function BulkEquipmentForm({
         </div>
       )}
 
-      {isVisible('DEPRECIATION') && supportsDepreciation && acquisitionMode !== 'FIXED_ASSET' && (
+      {isVisible('DEPRECIATION') && acquisitionMode !== 'FIXED_ASSET' && (
         <div className='rounded-md border border-border bg-muted/40 px-4 py-3'>
           <p className='text-sm font-medium'>Sin depreciación</p>
           <p className='text-xs text-muted-foreground mt-1'>
@@ -1070,7 +1178,13 @@ export function BulkEquipmentForm({
         )}
         <Button
           type='submit'
-          disabled={isSubmitting || !manualCodesValid || !serialNumbersValid || !selectedModelId}
+          disabled={
+            isSubmitting ||
+            !manualCodesValid ||
+            !serialNumbersValid ||
+            !selectedModelId ||
+            !selectedDepartmentId
+          }
           className='flex-1'
         >
           {isSubmitting ? (

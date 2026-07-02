@@ -91,17 +91,27 @@ export class ValidationService {
   static async validateBatchDeletion(
     batchId: string
   ): Promise<{ canDelete: boolean; message?: string; assignedCount?: number }> {
-    const assignedCount = await prisma.equipment.count({
-      where: { batchId, status: 'ASSIGNED' },
-    })
+    const [assignedCount, maintenanceCount] = await Promise.all([
+      prisma.equipment.count({ where: { batchId, status: 'ASSIGNED' } }),
+      prisma.equipment.count({ where: { batchId, status: 'MAINTENANCE' } }),
+    ])
 
     if (assignedCount > 0) {
       return {
         canDelete: false,
-        message: `No se puede eliminar el lote porque tiene ${assignedCount} equipo(s) asignado(s)`,
+        message: `No se puede eliminar: ${assignedCount} equipo(s) aún asignado(s). Devuélvelos primero.`,
         assignedCount,
       }
     }
+
+    if (maintenanceCount > 0) {
+      return {
+        canDelete: false,
+        message: `No se puede eliminar: ${maintenanceCount} equipo(s) en mantenimiento.`,
+        assignedCount: maintenanceCount,
+      }
+    }
+
     return { canDelete: true }
   }
 }

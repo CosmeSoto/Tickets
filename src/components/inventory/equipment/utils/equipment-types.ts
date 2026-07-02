@@ -2,12 +2,22 @@
  * Types and interfaces for Equipment Detail module
  */
 
+import type { BatchMetrics } from '@/types/inventory/batch-inventory'
+
 export interface EquipmentDetailResponse {
   equipment: Equipment
   currentAssignment?: Assignment
   history: HistoryEvent[]
   maintenanceRecords?: MaintenanceRecord[]
   canManageInventory?: boolean
+  batch?: {
+    id: string
+    batchCode: string
+    quantity: number
+    purchaseDate: string | Date
+    unitPrice?: number | null
+  }
+  batchMetrics?: BatchMetrics
 }
 
 export interface Equipment {
@@ -37,6 +47,7 @@ export interface Equipment {
   usefulLifeYears?: number
   residualValue?: number
   depreciation?: any
+  batchId?: string | null
   supplierId?: string
   invoiceNumber?: string
   purchaseOrderNumber?: string

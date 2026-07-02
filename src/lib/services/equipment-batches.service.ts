@@ -4,8 +4,12 @@
  */
 
 import prisma from '@/lib/prisma'
-import { EquipmentStatus, Prisma } from '@prisma/client'
+import { EquipmentStatus, EquipmentCondition, Prisma } from '@prisma/client'
+import { randomUUID } from 'crypto'
 import { generateSequentialCodes, validateManualCodes } from './code-generator.service'
+import { syncEquipmentContractLink } from '@/lib/inventory/equipment-contract'
+import { getEquipmentDisplayName, resolveBrandName } from '@/lib/utils/equipment-display'
+import { normalizeDepreciationMethod } from '@/lib/inventory/depreciation'
 
 function ownershipToCodeMode(o: string): 'OWNED' | 'LEASED' | 'RENTED' | 'DONATED' {
   if (o === 'FIXED_ASSET') return 'OWNED'
@@ -46,6 +50,7 @@ export interface CreateBatchInput {
   residualValue?: number
   totalUnits?: number
   usedUnits?: number
+  contractId?: string
   // Familia
   familyId?: string
 }
@@ -125,6 +130,19 @@ export async function createBatch(input: CreateBatchInput): Promise<BatchCreateR
   try {
     // ── Validaciones básicas ───────────────────────────────────────────────
     const codeMode = input.codeMode || 'auto'
+    const acquisitionMode = input.ownershipType || 'FIXED_ASSET'
+    const condition = (input.condition || EquipmentCondition.NEW) as EquipmentCondition
+
+    if (codeMode === 'manual') {
+      if (!input.manualCodes?.length) {
+        throw new Error('Debes proporcionar los códigos manuales del lote')
+      }
+      if (input.manualCodes.length !== input.quantity) {
+        throw new Error(
+          `Debes proporcionar exactamente ${input.quantity} códigos (recibidos: ${input.manualCodes.length})`
+        )
+      }
+    }
 
     // Seriales: si se proporcionan deben coincidir con la cantidad
     const serialNumbers = (input.serialNumbers || []).filter(s => s.trim().length > 0)
@@ -159,7 +177,19 @@ export async function createBatch(input: CreateBatchInput): Promise<BatchCreateR
     if (!model) throw new Error('Modelo no encontrado')
     if (!model.type.family) throw new Error('El tipo de equipo debe tener una familia asignada')
 
-    // ── Validar proveedor si se proporciona ────────────────────────────────
+    if (input.familyId && model.type.familyId !== input.familyId) {
+      throw new Error('El modelo seleccionado no pertenece al área indicada')
+    }
+
+    if (acquisitionMode === 'RENTAL' || acquisitionMode === 'LOAN') {
+      if (!input.supplierId) {
+        throw new Error(
+          acquisitionMode === 'RENTAL'
+            ? 'El proveedor del arrendamiento es obligatorio'
+            : 'El propietario del bien es obligatorio'
+        )
+      }
+    }
     if (input.supplierId) {
       const supplierExists = await prisma.suppliers.findUnique({ where: { id: input.supplierId } })
       if (!supplierExists) throw new Error('Proveedor no encontrado')
@@ -228,13 +258,14 @@ export async function createBatch(input: CreateBatchInput): Promise<BatchCreateR
           // Campos del formulario unificado
           customValues: input.customValues ? JSON.parse(JSON.stringify(input.customValues)) : null,
           accessories: input.accessories || [],
-          condition: input.condition || 'GOOD',
-          propertyType: input.ownershipType,
+          condition,
+          propertyType: acquisitionMode,
           departmentId: input.departmentId || null,
         },
       })
 
       // 2. Crear los equipos con todos los campos
+      const normalizedDepMethod = normalizeDepreciationMethod(input.depreciationMethod)
       const equipmentData = codes.map((code, index) => {
         const qrCode = `EQ-${code}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
         return {
@@ -245,9 +276,9 @@ export async function createBatch(input: CreateBatchInput): Promise<BatchCreateR
           typeId: input.typeId || model.typeId,
           departmentId: input.departmentId || null,
           status: EquipmentStatus.AVAILABLE,
-          condition: (input.condition || 'GOOD') as any,
-          ownershipType: input.ownershipType as any,
-          acquisitionMode: input.ownershipType as any,
+          condition,
+          ownershipType: acquisitionMode as any,
+          acquisitionMode: acquisitionMode as any,
           purchasePrice: input.unitPrice || null,
           supplierId: input.supplierId || null,
           purchaseDate: input.purchaseDate || null,
@@ -259,15 +290,13 @@ export async function createBatch(input: CreateBatchInput): Promise<BatchCreateR
           notes: input.notes || null,
           // Depreciación
           depreciationMethod:
-            input.ownershipType === 'FIXED_ASSET' && input.depreciationMethod
-              ? (input.depreciationMethod as any)
-              : null,
+            acquisitionMode === 'FIXED_ASSET' && normalizedDepMethod ? normalizedDepMethod : null,
           usefulLifeYears:
-            input.ownershipType === 'FIXED_ASSET' && input.usefulLifeYears
+            acquisitionMode === 'FIXED_ASSET' && input.usefulLifeYears
               ? input.usefulLifeYears
               : null,
           residualValue:
-            input.ownershipType === 'FIXED_ASSET' && input.residualValue != null
+            acquisitionMode === 'FIXED_ASSET' && input.residualValue != null
               ? input.residualValue
               : 0,
           totalUnits: input.totalUnits || null,
@@ -295,6 +324,7 @@ export async function createBatch(input: CreateBatchInput): Promise<BatchCreateR
         await tx.equipment_custom_values.createMany({
           data: createdEquipment.flatMap(eq =>
             input.customValues!.map(cv => ({
+              id: randomUUID(),
               equipmentId: eq.id,
               fieldName: cv.fieldName,
               fieldValue: cv.fieldValue,
@@ -306,6 +336,23 @@ export async function createBatch(input: CreateBatchInput): Promise<BatchCreateR
 
       return { batch, equipment: createdEquipment }
     })
+
+    // Vincular contrato de arrendamiento a cada equipo del lote
+    if (acquisitionMode === 'RENTAL' && input.contractId) {
+      await Promise.all(
+        result.equipment.map(eq =>
+          syncEquipmentContractLink(
+            eq.id,
+            input.contractId!,
+            getEquipmentDisplayName({
+              equipmentCode: eq.code,
+              equipmentBrandName: model.brand?.name,
+              equipmentModelName: model.model,
+            })
+          )
+        )
+      )
+    }
 
     const summary = {
       batchCode: result.batch.batchCode,
@@ -337,6 +384,7 @@ export async function getBatchById(id: string) {
       include: {
         model: {
           include: {
+            brand: { select: { id: true, name: true } },
             type: {
               select: {
                 id: true,
@@ -346,6 +394,7 @@ export async function getBatchById(id: string) {
             },
           },
         },
+        department: { select: { id: true, name: true } },
         supplier: {
           select: {
             id: true,
@@ -481,13 +530,14 @@ export async function listBatches(params: {
           model: {
             select: {
               id: true,
-              brand: true,
+              brand: { select: { id: true, name: true } },
               model: true,
               sku: true,
               type: { select: { id: true, name: true, familyId: true } },
             },
           },
           supplier: { select: { id: true, name: true } },
+          department: { select: { id: true, name: true } },
           warehouse: { select: { id: true, name: true } },
         },
         orderBy: { purchaseDate: 'desc' },
@@ -549,6 +599,10 @@ export async function listBatches(params: {
       }
       return {
         ...batch,
+        model: {
+          ...batch.model,
+          brand: resolveBrandName(batch.model.brand as { name?: string } | string | null),
+        },
         metrics: {
           ...m,
           utilizationRate: m.total > 0 ? (m.assigned / m.total) * 100 : 0,
@@ -582,10 +636,10 @@ export async function getBatchEquipment(batchId: string) {
         location: true,
         physicalLocation: true,
         createdAt: true,
+        warehouse: { select: { name: true } },
+        department: { select: { name: true } },
       },
-      orderBy: {
-        code: 'asc',
-      },
+      orderBy: { code: 'asc' },
     })
 
     return equipment

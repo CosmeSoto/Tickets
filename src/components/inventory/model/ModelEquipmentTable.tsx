@@ -34,6 +34,7 @@ interface Equipment {
   status: string
   location?: string | null
   batchId?: string | null
+  batch?: { id: string; batchCode: string } | null
   department?: { name: string } | null
   warehouse?: { name: string } | null
 }
@@ -57,6 +58,12 @@ export function ModelEquipmentTable({ equipment }: ModelEquipmentTableProps) {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
   // Lotes únicos para el filtro
+  const batchLabelById = new Map<string, string>()
+  for (const e of equipment) {
+    if (e.batchId && e.batch?.batchCode) {
+      batchLabelById.set(e.batchId, e.batch.batchCode)
+    }
+  }
   const uniqueBatches = Array.from(new Set(equipment.filter(e => e.batchId).map(e => e.batchId!)))
 
   const filtered = equipment
@@ -107,7 +114,7 @@ export function ModelEquipmentTable({ equipment }: ModelEquipmentTableProps) {
         e.code,
         e.serialNumber || '',
         STATUS_LABELS[e.status]?.label || e.status,
-        e.batchId || 'Individual',
+        e.batch?.batchCode || e.batchId || 'Individual',
         e.location || '',
         e.warehouse?.name || '',
         e.department?.name || '',
@@ -160,7 +167,7 @@ export function ModelEquipmentTable({ equipment }: ModelEquipmentTableProps) {
               <SelectItem value='none'>Sin lote</SelectItem>
               {uniqueBatches.map(id => (
                 <SelectItem key={id} value={id}>
-                  Lote {id.slice(0, 8)}…
+                  {batchLabelById.get(id) ?? `Lote ${id.slice(0, 8)}…`}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -238,7 +245,7 @@ export function ModelEquipmentTable({ equipment }: ModelEquipmentTableProps) {
                     </TableCell>
                     <TableCell>
                       {eq.batchId ? (
-                        <BatchBadge batchId={eq.batchId} />
+                        <BatchBadge batchId={eq.batchId} batchCode={eq.batch?.batchCode} />
                       ) : (
                         <span className='text-xs text-muted-foreground'>Individual</span>
                       )}

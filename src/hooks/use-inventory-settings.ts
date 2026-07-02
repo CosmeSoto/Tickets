@@ -9,7 +9,11 @@ import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { useToast } from '@/hooks/use-toast'
-import { DEFAULT_FAMILY_CONFIG, DEFAULT_MODE_CONFIG } from '@/lib/inventory/family-config-types'
+import {
+  DEFAULT_FAMILY_CONFIG,
+  DEFAULT_MODE_CONFIG,
+  normalizeSectionsByMode,
+} from '@/lib/inventory/family-config-types'
 import { normalizeDepreciationMethod } from '@/lib/inventory/depreciation'
 import type {
   AssetSubtype,
@@ -129,16 +133,13 @@ function globalRulesToApiPayload(rules: GlobalRules): Record<string, number | bo
 
 function buildForm(cfg: RawConfig | null, assetRequestsEnabled = false): FormState {
   const sectionsByMode: Partial<Record<AcquisitionMode, ModeSectionConfig>> = {}
-  if (cfg?.sectionsByMode && typeof cfg.sectionsByMode === 'object') {
+  const normalizedByMode = normalizeSectionsByMode(
+    cfg?.sectionsByMode as Parameters<typeof normalizeSectionsByMode>[0]
+  )
+  if (normalizedByMode) {
     for (const mode of ['FIXED_ASSET', 'RENTAL', 'LOAN'] as AcquisitionMode[]) {
-      const raw = (cfg.sectionsByMode as Record<string, unknown>)[mode]
-      if (raw && typeof raw === 'object') {
-        const r = raw as Record<string, unknown>
-        sectionsByMode[mode] = {
-          visible: Array.isArray(r.visible) ? (r.visible as FormSection[]) : [],
-          required: Array.isArray(r.required) ? (r.required as FormSection[]) : [],
-        }
-      }
+      const modeConfig = normalizedByMode[mode]
+      if (modeConfig) sectionsByMode[mode] = modeConfig
     }
   }
   return {
@@ -230,9 +231,8 @@ export function useInventorySettings() {
 
         if (data.success) {
           setForm(buildForm(data.data, assetRequestsData?.assetRequestsEnabled === true))
-          setUseModeConfig(
-            !!data.data.sectionsByMode && Object.keys(data.data.sectionsByMode).length > 0
-          )
+          const modeConfig = normalizeSectionsByMode(data.data?.sectionsByMode)
+          setUseModeConfig(!!modeConfig && Object.keys(modeConfig).length > 0)
         }
       } catch {
         toast({

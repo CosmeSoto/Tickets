@@ -30,12 +30,17 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     const query = searchParams.get('q') || ''
     const limit = parseInt(searchParams.get('limit') || '20', 10)
+    const familyId = searchParams.get('familyId') || undefined
+    const typeId = searchParams.get('typeId') || undefined
 
     if (!query || query.trim().length === 0) {
       return NextResponse.json({ models: [] })
     }
 
-    const models = await searchModels(query, limit)
+    let models = await searchModels(query, limit, familyId)
+    if (typeId) {
+      models = models.filter(m => m.typeId === typeId)
+    }
 
     return NextResponse.json({ models })
   } catch (error: any) {

@@ -2,7 +2,8 @@
 // SOLO constantes y funciones puras — sin dependencias de servidor
 // Importable tanto en cliente como en servidor
 
-import type { FamilyConfig, AssetSubtype, FormSection } from './family-config-types'
+import type { FamilyConfig, AssetSubtype, FormSection, SectionsByMode } from './family-config-types'
+import { normalizeSectionsByMode } from './family-config-types'
 
 export const DEFAULT_FAMILY_CONFIG: Omit<FamilyConfig, 'familyId'> = {
   allowedSubtypes: ['EQUIPMENT', 'MRO', 'LICENSE'],
@@ -52,7 +53,7 @@ export async function getFamilyConfig(familyId: string | null | undefined): Prom
     visibleSections: config.visibleSections as FormSection[],
     requiredSections: config.requiredSections as FormSection[],
     requireFinancialForNew: config.requireFinancialForNew,
-    sectionsByMode: config.sectionsByMode as any,
+    sectionsByMode: normalizeSectionsByMode(config.sectionsByMode as SectionsByMode | null),
     defaultDepreciationMethod: config.defaultDepreciationMethod,
     defaultUsefulLifeYears: config.defaultUsefulLifeYears,
     defaultResidualValuePct: config.defaultResidualValuePct,

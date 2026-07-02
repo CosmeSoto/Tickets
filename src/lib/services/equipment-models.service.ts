@@ -317,11 +317,12 @@ export async function deleteModel(id: string) {
 /**
  * Busca modelos por texto
  */
-export async function searchModels(query: string, limit = 20) {
+export async function searchModels(query: string, limit = 20, familyId?: string) {
   try {
     const models = await prisma.equipment_models.findMany({
       where: {
         isActive: true,
+        ...(familyId ? { type: { familyId } } : {}),
         OR: [
           { brand: { name: { contains: query, mode: 'insensitive' } } },
           { model: { contains: query, mode: 'insensitive' } },
@@ -340,6 +341,7 @@ export async function searchModels(query: string, limit = 20) {
             id: true,
             name: true,
             code: true,
+            familyId: true,
           },
         },
       },
@@ -347,7 +349,10 @@ export async function searchModels(query: string, limit = 20) {
       take: limit,
     })
 
-    return models
+    return models.map(m => ({
+      ...m,
+      brand: m.brand?.name ?? '',
+    }))
   } catch (error: any) {
     console.error('Error buscando modelos:', error)
     throw error

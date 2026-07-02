@@ -137,8 +137,8 @@ export function calculateDepreciation(
 }
 
 /**
- * Determina si una familia de inventario soporta depreciación.
- * MRO (MAINTENANCE) y SERVICES son gastos operativos — no se deprecian.
+ * Indica si una familia tiene valores de depreciación sugeridos por defecto.
+ * No controla visibilidad de formularios — eso lo define la configuración del área.
  */
 export function familySupportsDepreciation(familyCode: string): boolean {
   const NON_DEPRECIABLE = ['MAINTENANCE', 'SERVICES', 'ADMINISTRATIVE']

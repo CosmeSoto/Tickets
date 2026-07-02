@@ -22,6 +22,7 @@ import { UnitOfMeasureInlineForm } from '@/components/inventory/asset-forms/Unit
 import { WarehouseInlineForm } from '@/components/inventory/asset-forms/WarehouseInlineForm'
 import { StepHeader } from '@/components/inventory/shared/StepHeader'
 import type { FamilyConfig } from '@/lib/inventory/family-config-types'
+import { toast } from 'sonner'
 
 interface BulkMROFormProps {
   familyId: string
@@ -59,6 +60,7 @@ export function BulkMROForm({
 }: BulkMROFormProps) {
   const router = useRouter()
   const isVisible = (s: string) => familyConfig.visibleSections.includes(s as never)
+  const isRequired = (s: string) => familyConfig.requiredSections.includes(s as never)
 
   // Estado del formulario
   const [name, setName] = useState('')
@@ -103,6 +105,22 @@ export function BulkMROForm({
     e.preventDefault()
     if (!name.trim()) {
       setError('El nombre del material es requerido')
+      return
+    }
+    if (isRequired('STOCK_MRO') && isVisible('STOCK_MRO') && !quantity) {
+      toast.error('Ingresa la cantidad del lote')
+      return
+    }
+    if (isRequired('FINANCIAL') && isVisible('FINANCIAL') && !costPerUnit) {
+      toast.error('Ingresa el precio por unidad')
+      return
+    }
+    if (isRequired('WAREHOUSE') && isVisible('WAREHOUSE') && !warehouseId) {
+      toast.error('Selecciona la bodega de almacenamiento')
+      return
+    }
+    if (acquisitionMode === 'RENTAL' && !supplierId) {
+      setError('Selecciona el proveedor del suministro')
       return
     }
     setSubmitting(true)
@@ -300,7 +318,10 @@ export function BulkMROForm({
       {isVisible('STOCK_MRO') && (
         <div className='rounded-lg border bg-card p-5 space-y-4'>
           <div>
-            <h3 className='font-semibold mb-1'>Cantidad del Lote</h3>
+            <h3 className='font-semibold mb-1'>
+              Cantidad del Lote
+              {isRequired('STOCK_MRO') && <span className='text-destructive'> *</span>}
+            </h3>
             <p className='text-xs text-muted-foreground'>Unidades que ingresan al inventario</p>
           </div>
           <div className='grid grid-cols-3 gap-4'>
@@ -374,8 +395,12 @@ export function BulkMROForm({
         {isVisible('FINANCIAL') && (
           <div className='space-y-1.5'>
             <Label>
-              Precio por unidad{' '}
-              <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
+              Precio por unidad
+              {isRequired('FINANCIAL') ? (
+                <span className='text-destructive'> *</span>
+              ) : (
+                <span className='text-xs font-normal text-muted-foreground'> (opcional)</span>
+              )}
             </Label>
             <Input
               type='number'
@@ -396,7 +421,10 @@ export function BulkMROForm({
 
         {isVisible('WAREHOUSE') && (
           <div className='space-y-1.5'>
-            <Label>Bodega</Label>
+            <Label>
+              Bodega
+              {isRequired('WAREHOUSE') && <span className='text-destructive'> *</span>}
+            </Label>
             <InlineCreateSelect
               options={warehouses}
               value={warehouseId}

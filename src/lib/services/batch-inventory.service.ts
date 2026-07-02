@@ -1,8 +1,21 @@
 import { prisma } from '@/lib/prisma'
 import { ValidationService } from './validation-inventory.service'
 import { BatchCreationInput } from '../schemas/equipment-inventory.schema'
-import { BatchFilters, BatchMetrics } from '@/types/inventory/batch-inventory'
-import { Prisma } from '@prisma/client'
+import {
+  BatchFilters,
+  BatchMetrics,
+  BatchHistoryEvent,
+  BatchDepreciationSummary,
+} from '@/types/inventory/batch-inventory'
+import { Prisma, EquipmentCondition } from '@prisma/client'
+import { resolveBrandName } from '@/lib/utils/equipment-display'
+import { calculateDepreciation, type DepreciationMethod } from '@/lib/inventory/depreciation'
+
+const DEPRECIATION_METHOD_LABELS: Record<string, string> = {
+  LINEAR: 'Línea recta',
+  DECLINING_BALANCE: 'Saldo decreciente',
+  UNITS_OF_PRODUCTION: 'Por uso',
+}
 
 /** Tipo de lote con relaciones y métricas calculadas */
 export type BatchWithMetrics = Prisma.equipment_batchesGetPayload<{
@@ -98,7 +111,7 @@ export class BatchService {
               departmentId: commonData.departmentId,
               warehouseId: item.warehouseId || commonData.warehouseId,
               location: item.physicalLocation,
-              condition: (commonData.condition || 'GOOD') as any,
+              condition: (commonData.condition || EquipmentCondition.NEW) as EquipmentCondition,
               ownershipType: (commonData.propertyType || 'FIXED_ASSET') as any,
               purchaseDate: commonData.purchaseDate ? new Date(commonData.purchaseDate) : null,
               purchasePrice: commonData.unitPrice,
@@ -131,11 +144,13 @@ export class BatchService {
       include: {
         model: {
           include: {
+            brand: { select: { id: true, name: true } },
             type: true,
           },
         },
         department: true,
         supplier: true,
+        warehouse: true,
         receiver: true,
       },
     })
@@ -147,6 +162,11 @@ export class BatchService {
     // Calcular métricas
     const equipment = await prisma.equipment.findMany({
       where: { batchId },
+      include: {
+        warehouse: { select: { name: true } },
+        department: { select: { name: true } },
+      },
+      orderBy: { code: 'asc' },
     })
 
     const metrics: BatchMetrics = {
@@ -161,11 +181,154 @@ export class BatchService {
           : 0,
     }
 
+    const depreciationSummary = BatchService.computeDepreciationSummary(
+      equipment,
+      batch.propertyType
+    )
+
     return {
       ...batch,
+      model: {
+        ...batch.model,
+        brand: resolveBrandName(batch.model.brand as { name?: string } | string | null),
+      },
       metrics,
       equipment,
+      depreciationSummary,
     }
+  }
+
+  /**
+   * Resumen de depreciación agregada del lote (activos fijos con datos completos).
+   */
+  static computeDepreciationSummary(
+    equipment: Array<{
+      purchasePrice: number | null
+      purchaseDate: Date | null
+      usefulLifeYears: number | null
+      residualValue: number | null
+      depreciationMethod: string | null
+      acquisitionMode: string | null
+      totalUnits: number | null
+      usedUnits: number | null
+    }>,
+    propertyType: string | null | undefined
+  ): BatchDepreciationSummary | null {
+    const mode = propertyType ?? equipment[0]?.acquisitionMode
+    if (mode !== 'FIXED_ASSET') return null
+
+    const sample = equipment.find(
+      e => e.depreciationMethod && e.usefulLifeYears != null && e.purchasePrice != null
+    )
+    if (!sample?.depreciationMethod || sample.usefulLifeYears == null) return null
+
+    let totalBookValue = 0
+    let totalAccumulated = 0
+    let totalPurchase = 0
+    let withDepreciation = 0
+
+    for (const eq of equipment) {
+      if (!eq.purchasePrice || !eq.usefulLifeYears || !eq.purchaseDate) continue
+      const method = (eq.depreciationMethod ?? sample.depreciationMethod) as DepreciationMethod
+      const result = calculateDepreciation(
+        eq.purchasePrice,
+        new Date(eq.purchaseDate),
+        eq.usefulLifeYears,
+        eq.residualValue ?? 0,
+        new Date(),
+        method,
+        { totalUnits: eq.totalUnits ?? undefined, usedUnits: eq.usedUnits ?? undefined }
+      )
+      totalBookValue += result.bookValue
+      totalAccumulated += result.accumulatedDepreciation
+      totalPurchase += eq.purchasePrice
+      withDepreciation++
+    }
+
+    if (withDepreciation === 0) return null
+
+    return {
+      method: sample.depreciationMethod,
+      methodLabel:
+        DEPRECIATION_METHOD_LABELS[sample.depreciationMethod] ?? sample.depreciationMethod,
+      usefulLifeYears: sample.usefulLifeYears,
+      residualValuePerUnit: sample.residualValue ?? 0,
+      equipmentWithDepreciation: withDepreciation,
+      totalUnits: equipment.length,
+      totalPurchaseValue: totalPurchase,
+      totalBookValue,
+      totalAccumulatedDepreciation: totalAccumulated,
+    }
+  }
+
+  /**
+   * Obtener historial de un lote (creación, asignaciones y devoluciones).
+   */
+  static async getHistory(batchId: string): Promise<BatchHistoryEvent[]> {
+    const batch = await prisma.equipment_batches.findUnique({
+      where: { id: batchId },
+      include: { receiver: { select: { name: true } } },
+    })
+
+    if (!batch) {
+      throw new Error('Lote no encontrado')
+    }
+
+    const events: BatchHistoryEvent[] = [
+      {
+        type: 'created',
+        date: batch.receivedAt ?? batch.createdAt,
+        user: batch.receiver,
+        description: `Lote ${batch.batchCode} recibido con ${batch.quantity} equipos`,
+      },
+    ]
+
+    const assignments = await prisma.equipment_assignments.findMany({
+      where: { equipment: { batchId } },
+      include: {
+        receiver: { select: { name: true } },
+        deliverer: { select: { name: true } },
+        equipment: { select: { code: true } },
+      },
+      orderBy: { startDate: 'desc' },
+      take: 40,
+    })
+
+    for (const a of assignments) {
+      events.push({
+        type: 'assigned',
+        date: a.startDate,
+        user: a.deliverer,
+        equipmentCode: a.equipment.code,
+        description: `Asignación: ${a.equipment.code} → ${a.receiver.name ?? 'usuario'}`,
+      })
+      if (!a.isActive && (a.actualEndDate || a.endDate)) {
+        events.push({
+          type: 'returned',
+          date: (a.actualEndDate ?? a.endDate)!,
+          user: a.deliverer,
+          equipmentCode: a.equipment.code,
+          description: `Devolución: ${a.equipment.code}`,
+        })
+      }
+    }
+
+    const retired = await prisma.equipment.findMany({
+      where: { batchId, status: 'RETIRED' },
+      select: { code: true, updatedAt: true },
+      orderBy: { updatedAt: 'desc' },
+      take: 10,
+    })
+    for (const eq of retired) {
+      events.push({
+        type: 'retired',
+        date: eq.updatedAt,
+        description: `Equipo ${eq.code} dado de baja`,
+        equipmentCode: eq.code,
+      })
+    }
+
+    return events.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
   }
 
   /**
@@ -187,11 +350,10 @@ export class BatchService {
       if (filters.dateTo) where.purchaseDate.lte = filters.dateTo
     }
 
-    // 1 query: lotes con relaciones
     const batches = await prisma.equipment_batches.findMany({
       where,
       include: {
-        model: { include: { type: true } },
+        model: { include: { brand: { select: { id: true, name: true } }, type: true } },
         department: true,
         supplier: true,
       },
@@ -202,14 +364,12 @@ export class BatchService {
 
     const batchIds = batches.map(b => b.id)
 
-    // 1 query agregada: conteo por batchId + status (en lugar de N queries)
     const statusCounts = await prisma.equipment.groupBy({
       by: ['batchId', 'status'],
       where: { batchId: { in: batchIds } },
       _count: { id: true },
     })
 
-    // Construir mapa batchId → métricas
     const metricsMap = new Map<string, BatchMetrics>()
 
     for (const row of statusCounts) {
@@ -243,57 +403,32 @@ export class BatchService {
         utilizationRate: 0,
       }
       metrics.utilizationRate = metrics.total > 0 ? (metrics.assigned / metrics.total) * 100 : 0
-      return { ...batch, metrics }
+      return {
+        ...batch,
+        model: {
+          ...batch.model,
+          brand: resolveBrandName(batch.model.brand as { name?: string } | string | null),
+        },
+        metrics,
+      }
     })
-  }
-
-  /**
-   * Obtener historial de un lote
-   */
-  static async getHistory(batchId: string) {
-    const batch = await prisma.equipment_batches.findUnique({
-      where: { id: batchId },
-      include: {
-        receiver: true,
-      },
-    })
-
-    if (!batch) {
-      throw new Error('Lote no encontrado')
-    }
-
-    // Por ahora solo retornamos evento de creación
-    const history = [
-      {
-        type: 'created',
-        date: batch.createdAt,
-        user: batch.receiver,
-        description: `Lote creado con ${batch.quantity} equipos`,
-      },
-    ]
-
-    return history
   }
 
   /**
    * Eliminar lote
    */
   static async delete(batchId: string) {
-    // Validar que se puede eliminar
     const validation = await ValidationService.validateBatchDeletion(batchId)
     if (!validation.canDelete) {
       throw new Error(validation.message)
     }
 
-    // Transacción: soft delete equipos y hard delete lote
     const result = await prisma.$transaction(async tx => {
-      // 1. Marcar equipos como RETIRED (no hay deletedAt en este modelo)
       const equipmentUpdate = await tx.equipment.updateMany({
         where: { batchId },
         data: { status: 'RETIRED' as any },
       })
 
-      // 2. Hard delete del lote
       await tx.equipment_batches.delete({
         where: { id: batchId },
       })

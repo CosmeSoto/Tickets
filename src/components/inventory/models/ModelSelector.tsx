@@ -38,16 +38,31 @@ interface ModelSelectorProps {
   value?: string
   onValueChange: (modelId: string, model: EquipmentModel | null) => void
   typeId?: string
+  familyId?: string
   disabled?: boolean
   placeholder?: string
   showStock?: boolean
   onCreateNew?: () => void
 }
 
+function normalizeModel(model: Record<string, unknown>): EquipmentModel {
+  const brand = model.brand
+  const type = model.type as EquipmentModel['type'] | undefined
+  return {
+    id: String(model.id),
+    brand: typeof brand === 'string' ? brand : ((brand as { name?: string })?.name ?? ''),
+    model: String(model.model ?? ''),
+    sku: (model.sku as string | null) ?? null,
+    type: type ?? { id: String(model.typeId ?? ''), name: '', code: '' },
+    standardPrice: (model.standardPrice as number | null) ?? null,
+  }
+}
+
 export function ModelSelector({
   value,
   onValueChange,
   typeId,
+  familyId,
   disabled = false,
   placeholder = 'Seleccionar modelo...',
   showStock = false,
@@ -75,13 +90,14 @@ export function ModelSelector({
           q: query,
           limit: '20',
           ...(typeId && { typeId }),
+          ...(familyId && { familyId }),
         })
 
         const response = await fetch(`/api/inventory/models/search?${params}`)
         if (!response.ok) throw new Error('Error al buscar modelos')
 
         const data = await response.json()
-        setModels(data.models || [])
+        setModels((data.models || []).map((m: Record<string, unknown>) => normalizeModel(m)))
       } catch (error) {
         console.error('Error fetching models:', error)
         setModels([])
@@ -89,7 +105,7 @@ export function ModelSelector({
         setLoading(false)
       }
     },
-    [typeId]
+    [typeId, familyId]
   )
 
   // Fetch selected model details
@@ -99,7 +115,7 @@ export function ModelSelector({
       if (!response.ok) throw new Error('Error al obtener modelo')
 
       const model = await response.json()
-      setSelectedModel(model)
+      setSelectedModel(normalizeModel(model))
     } catch (error) {
       console.error('Error fetching model details:', error)
     }

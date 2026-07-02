@@ -14,6 +14,7 @@ import { UnitOfMeasureInlineForm } from '@/components/inventory/asset-forms/Unit
 import { WarehouseInlineForm } from '@/components/inventory/asset-forms/WarehouseInlineForm'
 import { TypeAttributesInput } from '@/components/inventory/custom-fields/type-attributes-input'
 import type { FamilyConfig } from '@/lib/inventory/family-config-types'
+import { toast } from 'sonner'
 
 interface MROAssetFormProps {
   familyId: string
@@ -93,6 +94,7 @@ export function MROAssetForm({
   const [attachments, setAttachments] = useState<File[]>([])
 
   const isVisible = (s: string) => familyConfig.visibleSections.includes(s as never)
+  const isRequired = (s: string) => familyConfig.requiredSections.includes(s as never)
 
   useEffect(() => {
     fetch(`/api/inventory/consumable-types?familyId=${familyId}`)
@@ -116,6 +118,18 @@ export function MROAssetForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    if (isRequired('STOCK_MRO') && isVisible('STOCK_MRO') && !initialStock) {
+      toast.error('Ingresa la cantidad inicial en stock')
+      return
+    }
+    if (isRequired('FINANCIAL') && isVisible('FINANCIAL') && !costPerUnit) {
+      toast.error('Ingresa el precio por unidad')
+      return
+    }
+    if (isRequired('WAREHOUSE') && isVisible('WAREHOUSE') && !warehouseId) {
+      toast.error('Selecciona la bodega de almacenamiento')
+      return
+    }
     onSubmit({
       name,
       typeId: consumableTypeId || undefined,
@@ -263,6 +277,7 @@ export function MROAssetForm({
         <fieldset className='rounded-lg border border-border p-4 space-y-3'>
           <legend className='px-2 text-sm font-semibold text-foreground'>
             Cantidades en stock
+            {isRequired('STOCK_MRO') && <span className='text-destructive'> *</span>}
           </legend>
           <div className='grid grid-cols-3 gap-3'>
             <div className='space-y-1'>
@@ -303,8 +318,12 @@ export function MROAssetForm({
       {isVisible('FINANCIAL') && (
         <div className='space-y-1'>
           <Label>
-            Precio por unidad{' '}
-            <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
+            Precio por unidad
+            {isRequired('FINANCIAL') ? (
+              <span className='text-destructive'> *</span>
+            ) : (
+              <span className='text-xs font-normal text-muted-foreground'> (opcional)</span>
+            )}
           </Label>
           <Input
             type='number'
@@ -320,7 +339,10 @@ export function MROAssetForm({
       {/* ── 6. BODEGA ─────────────────────────────────────────────── */}
       {isVisible('WAREHOUSE') && (
         <div className='space-y-1'>
-          <Label>Bodega</Label>
+          <Label>
+            Bodega
+            {isRequired('WAREHOUSE') && <span className='text-destructive'> *</span>}
+          </Label>
           <InlineCreateSelect
             options={warehouses}
             value={warehouseId}

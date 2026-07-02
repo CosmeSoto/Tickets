@@ -1,24 +1,19 @@
-import { PackagePlus, UserCheck, Wrench, Archive, Clock } from 'lucide-react'
+import { PackagePlus, UserCheck, Wrench, Archive, Clock, Undo2 } from 'lucide-react'
 import { formatDistanceToNow, format } from 'date-fns'
 import { es } from 'date-fns/locale'
-
-interface BatchEvent {
-  type: string
-  date: Date
-  user?: { name?: string | null } | null
-  description: string
-}
+import type { BatchHistoryEvent } from '@/types/inventory/batch-inventory'
 
 interface BatchHistoryProps {
-  history: BatchEvent[]
+  history: BatchHistoryEvent[]
 }
 
 const EVENT_ICONS: Record<string, { icon: React.ElementType; color: string }> = {
-  created: { icon: PackagePlus, color: 'text-green-600 bg-green-100' },
-  assigned: { icon: UserCheck, color: 'text-blue-600 bg-blue-100' },
-  maintenance: { icon: Wrench, color: 'text-yellow-600 bg-yellow-100' },
-  retired: { icon: Archive, color: 'text-red-600 bg-red-100' },
-  default: { icon: Clock, color: 'text-gray-600 bg-gray-100' },
+  created: { icon: PackagePlus, color: 'text-green-600 bg-green-100 dark:bg-green-950' },
+  assigned: { icon: UserCheck, color: 'text-blue-600 bg-blue-100 dark:bg-blue-950' },
+  returned: { icon: Undo2, color: 'text-indigo-600 bg-indigo-100 dark:bg-indigo-950' },
+  maintenance: { icon: Wrench, color: 'text-yellow-600 bg-yellow-100 dark:bg-yellow-950' },
+  retired: { icon: Archive, color: 'text-red-600 bg-red-100 dark:bg-red-950' },
+  default: { icon: Clock, color: 'text-gray-600 bg-gray-100 dark:bg-gray-900' },
 }
 
 export function BatchHistory({ history }: BatchHistoryProps) {
@@ -52,6 +47,11 @@ export function BatchHistory({ history }: BatchHistoryProps) {
               {/* Contenido */}
               <div className='flex-1 bg-muted/30 rounded-lg p-4'>
                 <p className='font-medium text-sm'>{event.description}</p>
+                {event.equipmentCode && (
+                  <p className='text-xs font-mono text-muted-foreground mt-0.5'>
+                    {event.equipmentCode}
+                  </p>
+                )}
                 <div className='flex items-center gap-3 mt-1 text-xs text-muted-foreground'>
                   {event.user?.name && <span>por {event.user.name}</span>}
                   <span title={format(eventDate, 'PPpp', { locale: es })}>

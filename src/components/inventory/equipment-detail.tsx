@@ -21,6 +21,7 @@ import { EquipmentQRCard } from './equipment/equipment-qr-card'
 import { EquipmentAssignmentCard } from './equipment/equipment-assignment-card'
 import { EquipmentHistoryCard } from './equipment/equipment-history-card'
 import { EquipmentMaintenanceCard } from './equipment/equipment-maintenance-card'
+import { EquipmentBatchCard } from './equipment/EquipmentBatchCard'
 import { EquipmentAttachments } from './equipment-attachments'
 import { DepreciationCard } from './equipment/DepreciationCard'
 import { FinancialInfoSection } from './shared/FinancialInfoSection'
@@ -57,6 +58,8 @@ export function EquipmentDetail({
   const {
     // Data
     equipment,
+    batch,
+    batchMetrics,
     currentAssignment,
     history,
     maintenanceRecords,
@@ -222,6 +225,8 @@ export function EquipmentDetail({
         <div className='lg:col-span-2 space-y-6'>
           {/* 1. Información principal del activo */}
           <EquipmentInfoCard equipment={equipment} />
+
+          {batch && <EquipmentBatchCard batch={batch} batchMetrics={batchMetrics} />}
 
           {/* 2. Adjuntos — fotos y documentos (visible de inmediato para ver la imagen) */}
           <EquipmentAttachments

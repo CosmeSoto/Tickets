@@ -6,7 +6,9 @@ import { updateEquipmentSchema, equipmentIdSchema } from '@/lib/validations/inve
 import { ZodError } from 'zod'
 import { canManageInventory, canManageAsset, inventoryForbidden } from '@/lib/inventory-access'
 import { prisma } from '@/lib/prisma'
-import { calculateDepreciation, familySupportsDepreciation } from '@/lib/inventory/depreciation'
+import { calculateDepreciation } from '@/lib/inventory/depreciation'
+import { getFamilyConfig } from '@/lib/inventory/family-config'
+import { resolveSectionsForMode } from '@/lib/inventory/family-config-types'
 import {
   syncEquipmentContractLink,
   getLinkedBusinessContractId,
@@ -50,8 +52,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const eq = equipmentDetail.equipment as any
     let depreciation: ReturnType<typeof calculateDepreciation> | null = null
 
-    const familyCode = eq.type?.family?.code ?? null
-    const canDepreciate = familyCode ? familySupportsDepreciation(familyCode) : true
+    const familyId = eq.type?.familyId ?? null
+    const acquisitionMode = (eq.acquisitionMode ?? 'FIXED_ASSET') as
+      | 'FIXED_ASSET'
+      | 'RENTAL'
+      | 'LOAN'
+    const familyConfig = await getFamilyConfig(familyId)
+    const canDepreciate =
+      acquisitionMode === 'FIXED_ASSET' &&
+      resolveSectionsForMode(familyConfig, acquisitionMode).visible.includes('DEPRECIATION')
 
     if (
       canDepreciate &&
@@ -266,12 +275,21 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     // Campos de depreciación solo si la familia del activo los soporta
     const currentEquipment = await prisma.equipment.findUnique({
       where: { id },
-      select: { type: { include: { family: true } } },
+      select: {
+        acquisitionMode: true,
+        type: { include: { family: true } },
+      },
     })
-    const currentFamilyCode = (currentEquipment?.type as any)?.family?.code ?? null
-    const depreciationAllowed = currentFamilyCode
-      ? familySupportsDepreciation(currentFamilyCode)
-      : true
+    const currentFamilyId = currentEquipment?.type?.familyId ?? null
+    const effectiveAcquisitionMode = (acquisitionMode ??
+      currentEquipment?.acquisitionMode ??
+      'FIXED_ASSET') as 'FIXED_ASSET' | 'RENTAL' | 'LOAN'
+    const familyConfig = await getFamilyConfig(currentFamilyId)
+    const depreciationAllowed =
+      effectiveAcquisitionMode === 'FIXED_ASSET' &&
+      resolveSectionsForMode(familyConfig, effectiveAcquisitionMode).visible.includes(
+        'DEPRECIATION'
+      )
 
     if (depreciationAllowed) {
       if ('depreciationRate' in body) financialFields.depreciationRate = depreciationRate ?? null

@@ -13,59 +13,86 @@ import {
   listBatches,
   type CreateBatchInput,
 } from '@/lib/services/equipment-batches.service'
-import { canManageInventory } from '@/lib/inventory-access'
+import { canManageInventory, canManageAsset } from '@/lib/inventory-access'
 import { getInventorySessionContext } from '@/lib/inventory/inventory-session'
 import { invalidateCache } from '@/lib/api-cache'
 import { z } from 'zod'
+import { EquipmentCondition } from '@prisma/client'
+
+const equipmentConditionSchema = z.nativeEnum(EquipmentCondition)
 
 // Validation schema — acepta todos los campos del BulkEquipmentForm
-const createBatchSchema = z.object({
-  // Identificación del lote
-  batchCode: z.string().max(50).optional(),
-  description: z.string().optional(),
-  modelId: z.string().uuid(),
-  quantity: z.number().int().min(1).max(100),
+const createBatchSchema = z
+  .object({
+    // Identificación del lote
+    batchCode: z.string().max(50).optional(),
+    description: z.string().optional(),
+    modelId: z.string().uuid(),
+    quantity: z.number().int().min(1).max(100),
 
-  // Códigos y seriales
-  codeMode: z.enum(['auto', 'manual']).default('auto'),
-  manualCodes: z.array(z.string().min(1)).optional(),
-  serialNumbers: z.array(z.string()).optional().default([]),
+    // Códigos y seriales
+    codeMode: z.enum(['auto', 'manual']).default('auto'),
+    manualCodes: z.array(z.string().min(1)).optional(),
+    serialNumbers: z.array(z.string()).optional().default([]),
 
-  // Datos comunes del equipo
-  brand: z.string().min(1),
-  model: z.string().min(1),
-  typeId: z.string().uuid(),
-  departmentId: z.string().uuid().optional().or(z.literal('')),
-  condition: z.string().optional().default('GOOD'),
-  warehouseId: z.string().uuid().optional().or(z.literal('')),
-  accessories: z.array(z.string()).optional().default([]),
-  customValues: z.array(z.object({ fieldName: z.string(), fieldValue: z.string() })).optional(),
-  notes: z.string().optional(),
-  photoUrl: z.string().url().optional().or(z.literal('')),
+    // Datos comunes del equipo
+    brand: z.string().min(1),
+    model: z.string().min(1),
+    typeId: z.string().uuid(),
+    departmentId: z.string().uuid().optional().or(z.literal('')),
+    condition: equipmentConditionSchema.optional().default(EquipmentCondition.NEW),
+    warehouseId: z.string().uuid().optional().or(z.literal('')),
+    accessories: z.array(z.string()).optional().default([]),
+    customValues: z.array(z.object({ fieldName: z.string(), fieldValue: z.string() })).optional(),
+    notes: z.string().optional(),
+    photoUrl: z.string().url().optional().or(z.literal('')),
 
-  // Adquisición
-  acquisitionMode: z.enum(['FIXED_ASSET', 'RENTAL', 'LOAN']).default('FIXED_ASSET'),
-  ownershipType: z.string().optional(), // alias de acquisitionMode para compatibilidad
-  supplierId: z.string().uuid().optional().or(z.literal('')),
-  purchaseDate: z
-    .string()
-    .optional()
-    .or(z.date())
-    .transform(val => (val ? new Date(val) : undefined)),
-  purchasePrice: z.number().positive().optional().or(z.literal(0)),
-  invoiceNumber: z.string().max(100).optional(),
-  purchaseOrderNumber: z.string().max(100).optional(),
+    // Adquisición
+    acquisitionMode: z.enum(['FIXED_ASSET', 'RENTAL', 'LOAN']).default('FIXED_ASSET'),
+    ownershipType: z.string().optional(), // alias de acquisitionMode para compatibilidad
+    supplierId: z.string().uuid().optional().or(z.literal('')),
+    purchaseDate: z
+      .union([z.string(), z.date()])
+      .optional()
+      .transform(val => {
+        if (!val) return undefined
+        const d = val instanceof Date ? val : new Date(val)
+        return isNaN(d.getTime()) ? undefined : d
+      }),
+    purchasePrice: z.number().positive().optional().or(z.literal(0)),
+    invoiceNumber: z.string().max(100).optional(),
+    purchaseOrderNumber: z.string().max(100).optional(),
+    contractId: z.string().uuid().optional().or(z.literal('')),
 
-  // Depreciación (solo FIXED_ASSET)
-  depreciationMethod: z.string().optional(),
-  usefulLifeYears: z.number().positive().optional(),
-  residualValue: z.number().min(0).optional(),
-  totalUnits: z.number().positive().optional(),
-  usedUnits: z.number().min(0).optional(),
+    // Depreciación (solo FIXED_ASSET)
+    depreciationMethod: z.string().optional(),
+    usefulLifeYears: z.number().positive().optional(),
+    residualValue: z.number().min(0).optional(),
+    totalUnits: z.number().positive().optional(),
+    usedUnits: z.number().min(0).optional(),
 
-  // Familia (informativo)
-  familyId: z.string().uuid().optional(),
-})
+    // Familia (informativo / validación de acceso)
+    familyId: z.string().uuid().optional(),
+  })
+  .refine(
+    data =>
+      data.codeMode !== 'manual' ||
+      (Array.isArray(data.manualCodes) && data.manualCodes.length === data.quantity),
+    {
+      message: 'Debes proporcionar exactamente un código por unidad en modo manual',
+      path: ['manualCodes'],
+    }
+  )
+  .refine(
+    data => {
+      const serials = (data.serialNumbers ?? []).filter(s => s.trim().length > 0)
+      return serials.length === 0 || serials.length === data.quantity
+    },
+    {
+      message: 'La cantidad de números de serie debe coincidir con la cantidad del lote',
+      path: ['serialNumbers'],
+    }
+  )
 
 /**
  * GET /api/inventory/batches
@@ -189,7 +216,30 @@ export async function POST(request: NextRequest) {
       unitPrice: validationResult.data.purchasePrice || 0,
       // serialNumbers puede ser vacío en el nuevo formulario
       serialNumbers: validationResult.data.serialNumbers || [],
+      contractId: validationResult.data.contractId || undefined,
       receivedBy: session.user.id,
+    }
+
+    // Verificar acceso a la familia del lote
+    const model = await prisma.equipment_models.findUnique({
+      where: { id: data.modelId },
+      select: { type: { select: { familyId: true } } },
+    })
+    const assetFamilyId = model?.type?.familyId ?? data.familyId ?? null
+    const isSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
+    if (session.user.role !== 'ADMIN' || !isSuperAdmin) {
+      const allowed = await canManageAsset(
+        session.user.id,
+        session.user.role,
+        isSuperAdmin,
+        assetFamilyId
+      )
+      if (!allowed) {
+        return NextResponse.json(
+          { error: 'No tienes permiso para crear lotes en esta área' },
+          { status: 403 }
+        )
+      }
     }
 
     const result = await createBatch(data)
@@ -198,7 +248,7 @@ export async function POST(request: NextRequest) {
     await invalidateCache('equipment:*')
     await invalidateCache(`model:${data.modelId}:*`)
 
-    return NextResponse.json(result, { status: 201 })
+    return NextResponse.json({ ...result, message: result.summary.message }, { status: 201 })
   } catch (error: any) {
     console.error('Error creating batch:', error)
 

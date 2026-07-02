@@ -46,6 +46,23 @@ export const DEFAULT_FAMILY_CONFIG: Omit<FamilyConfig, 'familyId'> = {
   sectionsByMode: undefined,
 }
 
+export function normalizeSectionsByMode(
+  sectionsByMode: SectionsByMode | null | undefined
+): SectionsByMode | undefined {
+  if (!sectionsByMode || typeof sectionsByMode !== 'object') return undefined
+  const normalized: SectionsByMode = {}
+  for (const mode of ['FIXED_ASSET', 'RENTAL', 'LOAN'] as AcquisitionMode[]) {
+    const cfg = sectionsByMode[mode]
+    if (!cfg || typeof cfg !== 'object') continue
+    const visible = Array.isArray(cfg.visible) ? cfg.visible : []
+    const required = Array.isArray(cfg.required) ? cfg.required : []
+    if (visible.length > 0 || required.length > 0) {
+      normalized[mode] = { visible, required }
+    }
+  }
+  return Object.keys(normalized).length > 0 ? normalized : undefined
+}
+
 /**
  * Resuelve qué secciones son visibles/obligatorias para un equipo
  * según la modalidad de adquisición activa.
@@ -55,7 +72,8 @@ export function resolveSectionsForMode(
   config: FamilyConfig,
   mode: AcquisitionMode
 ): ModeSectionConfig {
-  const byMode = config.sectionsByMode?.[mode]
+  const sectionsByMode = normalizeSectionsByMode(config.sectionsByMode)
+  const byMode = sectionsByMode?.[mode]
   if (byMode) return byMode
   return {
     visible: config.visibleSections,

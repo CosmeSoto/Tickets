@@ -32,7 +32,6 @@ import type { FamilyConfig } from '@/lib/inventory/family-config-types'
 import { resolveSectionsForMode } from '@/lib/inventory/family-config-types'
 import {
   calculateDepreciation,
-  familySupportsDepreciation,
   getRecommendedDepreciationMethod,
   DEFAULT_USEFUL_LIFE_YEARS,
   normalizeDepreciationMethod,
@@ -276,12 +275,13 @@ export function EquipmentAssetForm({
   // Resolver secciones según modalidad activa (sectionsByMode tiene prioridad sobre global)
   const resolvedSections = resolveSectionsForMode(familyConfig, acquisitionMode)
   const isVisible = (s: string) => resolvedSections.visible.includes(s as never)
+  const isRequired = (s: string) => resolvedSections.required.includes(s as never)
 
   // Bodega: solo cuando el equipo está físicamente almacenado (AVAILABLE o DAMAGED)
   const showWarehouse = isVisible('WAREHOUSE') && showWarehouseSelector(equipmentStatus)
 
-  // Task 19.1: determine if family supports depreciation
-  const supportsDepreciation = familyCode ? familySupportsDepreciation(familyCode) : true
+  // La visibilidad la define la configuración del área — no bloquear por código de familia legacy
+  const showDepreciation = isVisible('DEPRECIATION') && acquisitionMode === 'FIXED_ASSET'
 
   useEffect(() => {
     Promise.all([
@@ -518,11 +518,14 @@ export function EquipmentAssetForm({
     DAMAGED: 'Se puede vender como piezas, dar de baja o marcar como dañado.',
   }
 
-  // Lógica de campos visibles
+  // Lógica de campos visibles — respeta visibleSections / sectionsByMode de la configuración
   const showFinancial =
-    (isVisible('FINANCIAL') || (requireFinancialForNew && condition === 'NEW')) &&
     acquisitionMode === 'FIXED_ASSET' &&
-    condition === 'NEW'
+    ((isVisible('FINANCIAL') && (condition === 'NEW' || isEditMode)) ||
+      (requireFinancialForNew && condition === 'NEW'))
+
+  const financialRequired =
+    (isRequired('FINANCIAL') || (requireFinancialForNew && condition === 'NEW')) && showFinancial
 
   const showEstimatedPrice =
     (condition === 'USED' || condition === 'DAMAGED') && acquisitionMode === 'FIXED_ASSET'
@@ -555,9 +558,32 @@ export function EquipmentAssetForm({
       toast.error('Ingresa el número de serie')
       return
     }
-    if (requireFinancialForNew && condition === 'NEW' && !purchasePrice) {
-      setPriceError('El precio de compra es obligatorio para activos nuevos')
-      toast.error('El precio de compra es obligatorio para activos nuevos')
+    if (financialRequired && !purchasePrice) {
+      setPriceError('El precio de compra es obligatorio')
+      toast.error('El precio de compra es obligatorio')
+      return
+    }
+    if (isRequired('DEPRECIATION') && showDepreciation) {
+      if (!depreciationMethod) {
+        toast.error('Selecciona el método de depreciación')
+        return
+      }
+      if (!usefulLifeYears || parseFloat(usefulLifeYears) <= 0) {
+        toast.error('Ingresa la vida útil en años')
+        return
+      }
+    }
+    if (isRequired('WAREHOUSE') && showWarehouse && !warehouseId) {
+      toast.error('Selecciona la bodega de almacenamiento')
+      return
+    }
+    if (
+      isRequired('CONTRACT') &&
+      isVisible('CONTRACT') &&
+      acquisitionMode === 'RENTAL' &&
+      !linkedContractId
+    ) {
+      toast.error('Selecciona el contrato de arrendamiento')
       return
     }
     const selectedModel = equipmentModels.find(m => m.id === selectedModelId)
@@ -1057,10 +1083,13 @@ export function EquipmentAssetForm({
             />
           </div>
 
-          {/* Contrato — SOLO RENTAL (NO para LOAN) */}
-          {acquisitionMode === 'RENTAL' && (
+          {/* Contrato — arrendamiento */}
+          {isVisible('CONTRACT') && acquisitionMode === 'RENTAL' && (
             <div className='rounded-md border border-border p-4 space-y-3'>
-              <p className='text-sm font-medium'>Contrato de arrendamiento</p>
+              <p className='text-sm font-medium'>
+                Contrato de arrendamiento
+                {isRequired('CONTRACT') && <span className='text-destructive'> *</span>}
+              </p>
               <ContractPicker
                 value={linkedContractId}
                 onChange={setLinkedContractId}
@@ -1076,18 +1105,14 @@ export function EquipmentAssetForm({
       {showFinancial && (
         <fieldset className='rounded-lg border border-border p-4 space-y-3'>
           <legend className='px-2 text-sm font-semibold text-foreground'>
-            Información Financiera{' '}
-            {requireFinancialForNew && condition === 'NEW' && (
-              <span className='text-destructive'>*</span>
-            )}
+            Información Financiera
+            {financialRequired && <span className='text-destructive'> *</span>}
           </legend>
           <div className='grid grid-cols-2 gap-3'>
             <div className='space-y-1'>
               <Label>
-                Precio de Compra{' '}
-                {requireFinancialForNew && condition === 'NEW' && (
-                  <span className='text-destructive'>*</span>
-                )}
+                Precio de Compra
+                {financialRequired && <span className='text-destructive'> *</span>}
               </Label>
               <Input
                 type='number'
@@ -1130,250 +1155,249 @@ export function EquipmentAssetForm({
         </fieldset>
       )}
 
-      {isVisible('DEPRECIATION') &&
-        supportsDepreciation &&
-        acquisitionMode === 'FIXED_ASSET' &&
-        condition === 'NEW' && (
-          <fieldset className='rounded-lg border border-border p-4 space-y-3'>
-            <legend className='px-2 text-sm font-semibold text-foreground'>Depreciación</legend>
-            <div className='grid grid-cols-2 gap-3'>
-              {/* Método */}
-              <div className='space-y-1 col-span-2'>
-                <Label>Método de Depreciación</Label>
-                <SimpleSelect
-                  value={depreciationMethod}
-                  onChange={e => setDepreciationMethod(e.target.value)}
-                  options={DEPRECIATION_METHODS}
-                />
-                {/* Descripción corta */}
-                {DEPRECIATION_METHOD_HELP[depreciationMethod] && (
-                  <p className='text-xs text-muted-foreground'>
-                    {DEPRECIATION_METHOD_HELP[depreciationMethod]}
-                  </p>
-                )}
-                {/* Ejemplo concreto */}
-                {DEPRECIATION_METHOD_EXAMPLE[depreciationMethod] && (
-                  <p className='text-xs text-muted-foreground italic'>
-                    {DEPRECIATION_METHOD_EXAMPLE[depreciationMethod]}
-                  </p>
-                )}
-              </div>
-
-              {/* Vida útil */}
-              <div className='space-y-1'>
-                <Label>
-                  {depreciationMethod === 'UNITS_OF_PRODUCTION'
-                    ? 'Vida útil estimada (años)'
-                    : 'Vida Útil (años)'}
-                </Label>
-                <Input
-                  type='number'
-                  min='1'
-                  value={usefulLifeYears}
-                  onChange={e => setUsefulLifeYears(e.target.value)}
-                />
+      {showDepreciation && (
+        <fieldset className='rounded-lg border border-border p-4 space-y-3'>
+          <legend className='px-2 text-sm font-semibold text-foreground'>
+            Depreciación
+            {isRequired('DEPRECIATION') && <span className='text-destructive'> *</span>}
+          </legend>
+          <div className='grid grid-cols-2 gap-3'>
+            {/* Método */}
+            <div className='space-y-1 col-span-2'>
+              <Label>Método de Depreciación</Label>
+              <SimpleSelect
+                value={depreciationMethod}
+                onChange={e => setDepreciationMethod(e.target.value)}
+                options={DEPRECIATION_METHODS}
+              />
+              {/* Descripción corta */}
+              {DEPRECIATION_METHOD_HELP[depreciationMethod] && (
                 <p className='text-xs text-muted-foreground'>
-                  Ej: laptops 3-5 años, servidores 5-7 años, mobiliario 10 años.
+                  {DEPRECIATION_METHOD_HELP[depreciationMethod]}
                 </p>
-              </div>
-
-              {/* Valor residual */}
-              <div className='space-y-1'>
-                <Label>Valor Residual</Label>
-                <Input
-                  type='number'
-                  min='0'
-                  step='0.01'
-                  value={residualValue}
-                  onChange={e => setResidualValue(e.target.value)}
-                  placeholder='0.00'
-                />
-                <p className='text-xs text-muted-foreground'>
-                  Valor estimado del activo al final de su vida útil.
+              )}
+              {/* Ejemplo concreto */}
+              {DEPRECIATION_METHOD_EXAMPLE[depreciationMethod] && (
+                <p className='text-xs text-muted-foreground italic'>
+                  {DEPRECIATION_METHOD_EXAMPLE[depreciationMethod]}
                 </p>
-                {suggestedResidualValue != null && !residualValue && (
-                  <button
-                    type='button'
-                    className='text-xs text-primary hover:underline'
-                    onClick={() => setResidualValue(String(suggestedResidualValue))}
-                  >
-                    Sugerido: ${suggestedResidualValue.toLocaleString('es-CL')} (
-                    {familyDepConfig?.defaultResidualValuePct}% del precio)
-                  </button>
-                )}
-              </div>
-
-              {/* ── Campos extra para "Por Uso" ── */}
-              {depreciationMethod === 'UNITS_OF_PRODUCTION' && (
-                <>
-                  {/* Unidad de medida */}
-                  <div className='space-y-1 col-span-2'>
-                    <Label>¿Qué unidad mide el uso de este equipo?</Label>
-                    <div className='flex gap-2'>
-                      {['horas', 'km', 'ciclos', 'horas de vuelo'].map(u => (
-                        <button
-                          key={u}
-                          type='button'
-                          onClick={() => setUnitLabel(u)}
-                          className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
-                            unitLabel === u
-                              ? 'bg-primary text-primary-foreground border-primary'
-                              : 'bg-muted border-border hover:border-primary/50'
-                          }`}
-                        >
-                          {u}
-                        </button>
-                      ))}
-                      <Input
-                        value={
-                          ['horas', 'km', 'ciclos', 'horas de vuelo'].includes(unitLabel)
-                            ? ''
-                            : unitLabel
-                        }
-                        onChange={e => setUnitLabel(e.target.value || 'horas')}
-                        placeholder='Otra unidad...'
-                        className='h-7 text-xs flex-1'
-                      />
-                    </div>
-                    <p className='text-xs text-muted-foreground'>
-                      Ej: un generador usa &ldquo;horas&rdquo;, un vehículo usa &ldquo;km&rdquo;,
-                      una prensa usa &ldquo;ciclos&rdquo;.
-                    </p>
-                  </div>
-
-                  {/* Capacidad total */}
-                  <div className='space-y-1'>
-                    <Label>
-                      Capacidad total de vida ({unitLabel})
-                      <span className='text-destructive ml-1'>*</span>
-                    </Label>
-                    <Input
-                      type='number'
-                      min='1'
-                      value={totalUnits}
-                      onChange={e => setTotalUnits(e.target.value)}
-                      placeholder={`Ej: 10000 ${unitLabel}`}
-                    />
-                    <p className='text-xs text-muted-foreground'>
-                      Total de {unitLabel} que el equipo puede operar en toda su vida útil.
-                    </p>
-                  </div>
-
-                  {/* Unidades ya usadas */}
-                  <div className='space-y-1'>
-                    <Label>
-                      {unitLabel.charAt(0).toUpperCase() + unitLabel.slice(1)} ya utilizados
-                    </Label>
-                    <Input
-                      type='number'
-                      min='0'
-                      value={usedUnits}
-                      onChange={e => setUsedUnits(e.target.value)}
-                      placeholder={`Ej: 1500 ${unitLabel}`}
-                    />
-                    <p className='text-xs text-muted-foreground'>
-                      Cuántos {unitLabel} lleva acumulados hasta hoy (0 si es nuevo).
-                    </p>
-                  </div>
-
-                  {/* Indicador visual de uso */}
-                  {totalUnits && usedUnits && parseFloat(totalUnits) > 0 && (
-                    <div className='col-span-2 space-y-1'>
-                      <div className='flex justify-between text-xs text-muted-foreground'>
-                        <span>Uso acumulado</span>
-                        <span>
-                          {Math.min(
-                            100,
-                            Math.round((parseFloat(usedUnits) / parseFloat(totalUnits)) * 100)
-                          )}
-                          % &nbsp;({usedUnits} / {totalUnits} {unitLabel})
-                        </span>
-                      </div>
-                      <div className='h-2 rounded-full bg-muted overflow-hidden'>
-                        <div
-                          className='h-full rounded-full bg-primary transition-all'
-                          style={{
-                            width: `${Math.min(100, (parseFloat(usedUnits) / parseFloat(totalUnits)) * 100)}%`,
-                          }}
-                        />
-                      </div>
-                    </div>
-                  )}
-                </>
               )}
             </div>
 
-            {/* ── Vista previa enrollable ── */}
-            {depreciationPreview && depreciationPreview.length > 0 && (
-              <div className='mt-2 rounded-md border border-border bg-muted/30'>
+            {/* Vida útil */}
+            <div className='space-y-1'>
+              <Label>
+                {depreciationMethod === 'UNITS_OF_PRODUCTION'
+                  ? 'Vida útil estimada (años)'
+                  : 'Vida Útil (años)'}
+              </Label>
+              <Input
+                type='number'
+                min='1'
+                value={usefulLifeYears}
+                onChange={e => setUsefulLifeYears(e.target.value)}
+              />
+              <p className='text-xs text-muted-foreground'>
+                Ej: laptops 3-5 años, servidores 5-7 años, mobiliario 10 años.
+              </p>
+            </div>
+
+            {/* Valor residual */}
+            <div className='space-y-1'>
+              <Label>Valor Residual</Label>
+              <Input
+                type='number'
+                min='0'
+                step='0.01'
+                value={residualValue}
+                onChange={e => setResidualValue(e.target.value)}
+                placeholder='0.00'
+              />
+              <p className='text-xs text-muted-foreground'>
+                Valor estimado del activo al final de su vida útil.
+              </p>
+              {suggestedResidualValue != null && !residualValue && (
                 <button
                   type='button'
-                  className='flex w-full items-center justify-between px-3 py-2 text-sm font-medium'
-                  onClick={() => setDepreciationPreviewOpen(p => !p)}
+                  className='text-xs text-primary hover:underline'
+                  onClick={() => setResidualValue(String(suggestedResidualValue))}
                 >
-                  <span>Vista previa de depreciación</span>
-                  {depreciationPreviewOpen ? (
-                    <ChevronUp className='h-4 w-4' />
-                  ) : (
-                    <ChevronDown className='h-4 w-4' />
-                  )}
+                  Sugerido: ${suggestedResidualValue.toLocaleString('es-CL')} (
+                  {familyDepConfig?.defaultResidualValuePct}% del precio)
                 </button>
-                {depreciationPreviewOpen && (
-                  <div className='border-t border-border px-3 py-2 space-y-2'>
-                    {/* Fórmula del método seleccionado */}
-                    <div className='rounded-md bg-muted/60 px-3 py-2 text-xs font-mono text-muted-foreground'>
-                      {depreciationMethod === 'LINEAR' && (
-                        <span>Depreciación anual = (Precio − Valor residual) ÷ Vida útil</span>
-                      )}
-                      {depreciationMethod === 'DECLINING_BALANCE' && (
-                        <span>Depreciación año N = Valor libro × (2 ÷ Vida útil)</span>
-                      )}
-                      {depreciationMethod === 'UNITS_OF_PRODUCTION' && (
-                        <span>
-                          Depreciación = (Precio − Residual) ÷ Total {unitLabel} × {unitLabel}{' '}
-                          usados
-                        </span>
-                      )}
+              )}
+            </div>
+
+            {/* ── Campos extra para "Por Uso" ── */}
+            {depreciationMethod === 'UNITS_OF_PRODUCTION' && (
+              <>
+                {/* Unidad de medida */}
+                <div className='space-y-1 col-span-2'>
+                  <Label>¿Qué unidad mide el uso de este equipo?</Label>
+                  <div className='flex gap-2'>
+                    {['horas', 'km', 'ciclos', 'horas de vuelo'].map(u => (
+                      <button
+                        key={u}
+                        type='button'
+                        onClick={() => setUnitLabel(u)}
+                        className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                          unitLabel === u
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'bg-muted border-border hover:border-primary/50'
+                        }`}
+                      >
+                        {u}
+                      </button>
+                    ))}
+                    <Input
+                      value={
+                        ['horas', 'km', 'ciclos', 'horas de vuelo'].includes(unitLabel)
+                          ? ''
+                          : unitLabel
+                      }
+                      onChange={e => setUnitLabel(e.target.value || 'horas')}
+                      placeholder='Otra unidad...'
+                      className='h-7 text-xs flex-1'
+                    />
+                  </div>
+                  <p className='text-xs text-muted-foreground'>
+                    Ej: un generador usa &ldquo;horas&rdquo;, un vehículo usa &ldquo;km&rdquo;, una
+                    prensa usa &ldquo;ciclos&rdquo;.
+                  </p>
+                </div>
+
+                {/* Capacidad total */}
+                <div className='space-y-1'>
+                  <Label>
+                    Capacidad total de vida ({unitLabel})
+                    <span className='text-destructive ml-1'>*</span>
+                  </Label>
+                  <Input
+                    type='number'
+                    min='1'
+                    value={totalUnits}
+                    onChange={e => setTotalUnits(e.target.value)}
+                    placeholder={`Ej: 10000 ${unitLabel}`}
+                  />
+                  <p className='text-xs text-muted-foreground'>
+                    Total de {unitLabel} que el equipo puede operar en toda su vida útil.
+                  </p>
+                </div>
+
+                {/* Unidades ya usadas */}
+                <div className='space-y-1'>
+                  <Label>
+                    {unitLabel.charAt(0).toUpperCase() + unitLabel.slice(1)} ya utilizados
+                  </Label>
+                  <Input
+                    type='number'
+                    min='0'
+                    value={usedUnits}
+                    onChange={e => setUsedUnits(e.target.value)}
+                    placeholder={`Ej: 1500 ${unitLabel}`}
+                  />
+                  <p className='text-xs text-muted-foreground'>
+                    Cuántos {unitLabel} lleva acumulados hasta hoy (0 si es nuevo).
+                  </p>
+                </div>
+
+                {/* Indicador visual de uso */}
+                {totalUnits && usedUnits && parseFloat(totalUnits) > 0 && (
+                  <div className='col-span-2 space-y-1'>
+                    <div className='flex justify-between text-xs text-muted-foreground'>
+                      <span>Uso acumulado</span>
+                      <span>
+                        {Math.min(
+                          100,
+                          Math.round((parseFloat(usedUnits) / parseFloat(totalUnits)) * 100)
+                        )}
+                        % &nbsp;({usedUnits} / {totalUnits} {unitLabel})
+                      </span>
                     </div>
-                    <p className='text-xs text-muted-foreground'>
-                      Valor libro estimado (solo informativo
-                      {!purchaseDate && depreciationMethod !== 'UNITS_OF_PRODUCTION'
-                        ? ' — simulado desde hoy'
-                        : ''}
-                      ):
-                    </p>
-                    <div className='grid grid-cols-3 gap-2'>
-                      {depreciationPreview.map(({ year, bookValue }) => (
-                        <div
-                          key={year}
-                          className='rounded-md bg-background border border-border p-2 text-center'
-                        >
-                          <p className='text-xs text-muted-foreground'>Año {year}</p>
-                          <p className='text-sm font-semibold'>
-                            $
-                            {bookValue.toLocaleString('es-CL', {
-                              minimumFractionDigits: 0,
-                              maximumFractionDigits: 0,
-                            })}
-                          </p>
-                        </div>
-                      ))}
+                    <div className='h-2 rounded-full bg-muted overflow-hidden'>
+                      <div
+                        className='h-full rounded-full bg-primary transition-all'
+                        style={{
+                          width: `${Math.min(100, (parseFloat(usedUnits) / parseFloat(totalUnits)) * 100)}%`,
+                        }}
+                      />
                     </div>
-                    {depreciationMethod === 'UNITS_OF_PRODUCTION' && (
-                      <p className='text-xs text-muted-foreground italic'>
-                        * Simulado con uso uniforme anual. El valor real depende de los {unitLabel}{' '}
-                        registrados cada año.
-                      </p>
-                    )}
                   </div>
                 )}
-              </div>
+              </>
             )}
-          </fieldset>
-        )}
+          </div>
 
-      {/* Nota: RENTAL y LOAN no deprecian — el activo no es propiedad de la empresa */}
-      {isVisible('DEPRECIATION') && supportsDepreciation && acquisitionMode !== 'FIXED_ASSET' && (
+          {/* ── Vista previa enrollable ── */}
+          {depreciationPreview && depreciationPreview.length > 0 && (
+            <div className='mt-2 rounded-md border border-border bg-muted/30'>
+              <button
+                type='button'
+                className='flex w-full items-center justify-between px-3 py-2 text-sm font-medium'
+                onClick={() => setDepreciationPreviewOpen(p => !p)}
+              >
+                <span>Vista previa de depreciación</span>
+                {depreciationPreviewOpen ? (
+                  <ChevronUp className='h-4 w-4' />
+                ) : (
+                  <ChevronDown className='h-4 w-4' />
+                )}
+              </button>
+              {depreciationPreviewOpen && (
+                <div className='border-t border-border px-3 py-2 space-y-2'>
+                  {/* Fórmula del método seleccionado */}
+                  <div className='rounded-md bg-muted/60 px-3 py-2 text-xs font-mono text-muted-foreground'>
+                    {depreciationMethod === 'LINEAR' && (
+                      <span>Depreciación anual = (Precio − Valor residual) ÷ Vida útil</span>
+                    )}
+                    {depreciationMethod === 'DECLINING_BALANCE' && (
+                      <span>Depreciación año N = Valor libro × (2 ÷ Vida útil)</span>
+                    )}
+                    {depreciationMethod === 'UNITS_OF_PRODUCTION' && (
+                      <span>
+                        Depreciación = (Precio − Residual) ÷ Total {unitLabel} × {unitLabel} usados
+                      </span>
+                    )}
+                  </div>
+                  <p className='text-xs text-muted-foreground'>
+                    Valor libro estimado (solo informativo
+                    {!purchaseDate && depreciationMethod !== 'UNITS_OF_PRODUCTION'
+                      ? ' — simulado desde hoy'
+                      : ''}
+                    ):
+                  </p>
+                  <div className='grid grid-cols-3 gap-2'>
+                    {depreciationPreview.map(({ year, bookValue }) => (
+                      <div
+                        key={year}
+                        className='rounded-md bg-background border border-border p-2 text-center'
+                      >
+                        <p className='text-xs text-muted-foreground'>Año {year}</p>
+                        <p className='text-sm font-semibold'>
+                          $
+                          {bookValue.toLocaleString('es-CL', {
+                            minimumFractionDigits: 0,
+                            maximumFractionDigits: 0,
+                          })}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                  {depreciationMethod === 'UNITS_OF_PRODUCTION' && (
+                    <p className='text-xs text-muted-foreground italic'>
+                      * Simulado con uso uniforme anual. El valor real depende de los {unitLabel}{' '}
+                      registrados cada año.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </fieldset>
+      )}
+
+      {/* Nota informativa: arrendamiento / activo de tercero no deprecia contablemente */}
+      {isVisible('DEPRECIATION') && acquisitionMode !== 'FIXED_ASSET' && (
         <div className='rounded-md border border-border bg-muted/40 px-4 py-3 space-y-1'>
           <p className='text-sm font-medium text-foreground'>Sin depreciación</p>
           <p className='text-xs text-muted-foreground'>

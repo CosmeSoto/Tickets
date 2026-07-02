@@ -64,6 +64,26 @@ export interface BatchFilters {
   dateTo?: Date
 }
 
+export interface BatchHistoryEvent {
+  type: 'created' | 'assigned' | 'returned' | 'maintenance' | 'retired' | string
+  date: Date
+  user?: { name?: string | null } | null
+  description: string
+  equipmentCode?: string
+}
+
+export interface BatchDepreciationSummary {
+  method: string
+  methodLabel: string
+  usefulLifeYears: number
+  residualValuePerUnit: number
+  equipmentWithDepreciation: number
+  totalUnits: number
+  totalPurchaseValue: number
+  totalBookValue: number
+  totalAccumulatedDepreciation: number
+}
+
 export interface BatchWithMetrics extends BatchSummary {
   metrics: BatchMetrics
 }

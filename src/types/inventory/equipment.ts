@@ -137,6 +137,14 @@ export interface EquipmentDetailResponse {
   currentAssignment?: any
   history: EquipmentHistoryEvent[]
   maintenanceRecords: any[]
+  batch?: {
+    id: string
+    batchCode: string
+    quantity: number
+    purchaseDate: string | Date
+    unitPrice?: number | null
+  }
+  batchMetrics?: import('./batch-inventory').BatchMetrics
 }
 
 // Equipment history event

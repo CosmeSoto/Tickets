@@ -188,6 +188,9 @@ export class ModelAggregationService {
         model: true,
         department: true,
         warehouse: true,
+        batch: {
+          select: { id: true, batchCode: true },
+        },
       },
       orderBy: { createdAt: 'desc' },
     })

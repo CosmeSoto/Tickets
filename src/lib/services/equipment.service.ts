@@ -10,6 +10,7 @@ import type {
   EquipmentHistoryEvent,
   EquipmentSummary,
 } from '@/types/inventory/equipment'
+import type { BatchMetrics } from '@/types/inventory/batch-inventory'
 import { db as prisma } from '@/lib/server'
 import { getLinkedBusinessContractId } from '@/lib/inventory/equipment-contract'
 
@@ -145,6 +146,15 @@ export class EquipmentService {
           attachments: {
             orderBy: { createdAt: 'desc' },
           },
+          batch: {
+            select: {
+              id: true,
+              batchCode: true,
+              quantity: true,
+              purchaseDate: true,
+              unitPrice: true,
+            },
+          },
         },
       })
 
@@ -169,11 +179,34 @@ export class EquipmentService {
       // Construir historial
       const history = await this.buildEquipmentHistory(id)
 
+      let batchMetrics: BatchMetrics | undefined
+      if (equipment.batchId) {
+        const batchEquipment = await prisma.equipment.findMany({
+          where: { batchId: equipment.batchId },
+          select: { status: true },
+        })
+        const total = batchEquipment.length
+        const available = batchEquipment.filter(e => e.status === 'AVAILABLE').length
+        const assigned = batchEquipment.filter(e => e.status === 'ASSIGNED').length
+        const maintenance = batchEquipment.filter(e => e.status === 'MAINTENANCE').length
+        const retired = batchEquipment.filter(e => e.status === 'RETIRED').length
+        batchMetrics = {
+          total,
+          available,
+          assigned,
+          maintenance,
+          retired,
+          utilizationRate: total > 0 ? (assigned / total) * 100 : 0,
+        }
+      }
+
       return {
         equipment: { ...(equipment as any), businessContractId },
         currentAssignment,
         history,
         maintenanceRecords: (equipment as any).maintenanceRecords,
+        batch: (equipment as any).batch ?? undefined,
+        batchMetrics,
       }
     } catch (error) {
       console.error('Error obteniendo detalle de equipo:', error)

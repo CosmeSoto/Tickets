@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import {
   Table,
   TableBody,
@@ -30,6 +31,7 @@ interface Equipment {
   serialNumber?: string | null
   status: string
   location?: string | null
+  physicalLocation?: string | null
   warehouse?: { name: string } | null
   department?: { name: string } | null
   assignments?: Array<{ receiver?: { name: string } | null; returnedAt?: Date | null }>
@@ -66,8 +68,8 @@ export function BatchEquipmentList({ equipment }: BatchEquipmentListProps) {
         valB = b.status
       }
       if (sortField === 'location') {
-        valA = a.location || ''
-        valB = b.location || ''
+        valA = a.physicalLocation || a.location || ''
+        valB = b.physicalLocation || b.location || ''
       }
       return sortDir === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA)
     })
@@ -88,7 +90,7 @@ export function BatchEquipmentList({ equipment }: BatchEquipmentListProps) {
         e.code,
         e.serialNumber || '',
         STATUS_LABELS[e.status]?.label || e.status,
-        e.location || '',
+        e.physicalLocation || e.location || '',
         e.warehouse?.name || '',
         e.department?.name || '',
       ]),
@@ -178,16 +180,25 @@ export function BatchEquipmentList({ equipment }: BatchEquipmentListProps) {
               </TableRow>
             ) : (
               filtered.map(eq => {
+                const location = eq.physicalLocation || eq.location
                 return (
                   <TableRow key={eq.id} className='hover:bg-muted/50'>
-                    <TableCell className='font-mono font-medium'>{eq.code}</TableCell>
+                    <TableCell className='font-mono font-medium'>
+                      <Link
+                        href={`/inventory/equipment/${eq.id}`}
+                        className='text-primary hover:underline'
+                        onClick={e => e.stopPropagation()}
+                      >
+                        {eq.code}
+                      </Link>
+                    </TableCell>
                     <TableCell className='font-mono text-sm text-muted-foreground'>
                       {eq.serialNumber || '—'}
                     </TableCell>
                     <TableCell>
                       <EquipmentStatusBadge status={eq.status} />
                     </TableCell>
-                    <TableCell>{eq.location || '—'}</TableCell>
+                    <TableCell>{location || '—'}</TableCell>
                     <TableCell>{eq.warehouse?.name || '—'}</TableCell>
                     <TableCell>{eq.department?.name || '—'}</TableCell>
                   </TableRow>

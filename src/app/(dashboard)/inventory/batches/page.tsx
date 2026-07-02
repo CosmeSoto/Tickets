@@ -15,6 +15,7 @@ import {
   loginPathWithReturnTo,
   canAccessInventory,
 } from '@/lib/navigation/role-home-path'
+import { resolveBrandName } from '@/lib/utils/equipment-display'
 
 interface SearchParams {
   search?: string
@@ -35,7 +36,7 @@ async function getBatchesData(filters: SearchParams) {
   const filtered = filters.search
     ? batches.filter(
         b =>
-          ((b.model as any).brand?.name ?? '')
+          resolveBrandName(b.model.brand as string | { name?: string })
             .toLowerCase()
             .includes(filters.search!.toLowerCase()) ||
           b.model.model.toLowerCase().includes(filters.search!.toLowerCase()) ||
@@ -69,7 +70,7 @@ async function BatchesContent({ searchParams }: { searchParams: SearchParams }) 
     id: b.id,
     batchCode: b.batchCode,
     description: b.description,
-    modelBrand: (b.model as any).brand?.name ?? '',
+    modelBrand: resolveBrandName(b.model.brand as string | { name?: string }),
     modelName: b.model.model,
     quantity: b.quantity,
     supplierName: b.supplier?.name || '—',
