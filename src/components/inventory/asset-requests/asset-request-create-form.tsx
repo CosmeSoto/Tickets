@@ -28,6 +28,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { toast } from 'sonner'
 import { AssetType } from '@prisma/client'
 
+const ASSET_TYPE_OPTIONS: { value: AssetType; label: string }[] = [
+  { value: 'EQUIPMENT', label: 'Equipo' },
+  { value: 'LICENSE', label: 'Licencia' },
+  { value: 'OTHER', label: 'Otro (consumible / general)' },
+]
+
 const formSchema = z.object({
   assetType: z.nativeEnum(AssetType),
   familyId: z.string().min(1, 'Selecciona una familia'),
@@ -76,6 +82,11 @@ export function AssetRequestCreateForm({ onSuccess, onCancel }: AssetRequestCrea
         if (response.ok) {
           const data = await response.json()
           setFamilies(data.families || [])
+          if ((data.families || []).length === 0) {
+            toast.info(
+              'No hay áreas habilitadas para solicitudes. Un administrador puede activarlas en Configuración → Inventario.'
+            )
+          }
         }
       } catch (error) {
         console.error('Error cargando familias:', error)
@@ -137,9 +148,11 @@ export function AssetRequestCreateForm({ onSuccess, onCancel }: AssetRequestCrea
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value='EQUIPMENT'>Equipo</SelectItem>
-                      <SelectItem value='LICENSE'>Licencia</SelectItem>
-                      <SelectItem value='MAINTENANCE'>Mantenimiento</SelectItem>
+                      {ASSET_TYPE_OPTIONS.map(opt => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -165,11 +178,17 @@ export function AssetRequestCreateForm({ onSuccess, onCancel }: AssetRequestCrea
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {families.map(family => (
-                        <SelectItem key={family.id} value={family.id}>
-                          {family.name}
-                        </SelectItem>
-                      ))}
+                      {families.length === 0 ? (
+                        <div className='px-3 py-4 text-sm text-muted-foreground text-center'>
+                          No hay áreas disponibles. Contacta al administrador.
+                        </div>
+                      ) : (
+                        families.map(family => (
+                          <SelectItem key={family.id} value={family.id}>
+                            {family.name}
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                   <FormMessage />

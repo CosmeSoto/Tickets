@@ -53,9 +53,11 @@ interface BatchItem {
 
 interface BatchesTabProps {
   canCreate?: boolean
+  /** En pestaña de inventario: el CTA principal vive en el header de la página */
+  embedded?: boolean
 }
 
-export function BatchesTab({ canCreate = false }: BatchesTabProps) {
+export function BatchesTab({ canCreate = false, embedded = false }: BatchesTabProps) {
   const router = useRouter()
   const [batches, setBatches] = useState<BatchItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -111,9 +113,9 @@ export function BatchesTab({ canCreate = false }: BatchesTabProps) {
               <Link href='/inventory/batches'>Ver todos</Link>
             </Button>
           )}
-          {canCreate && (
+          {canCreate && !embedded && (
             <Button size='sm' asChild className='gap-1.5'>
-              <Link href='/inventory/equipment/bulk/new'>
+              <Link href='/inventory/new?mode=bulk'>
                 <Plus className='h-3.5 w-3.5' />
                 Nuevo lote
               </Link>
@@ -163,15 +165,10 @@ export function BatchesTab({ canCreate = false }: BatchesTabProps) {
           <div className='space-y-3'>
             <Layers className='h-12 w-12 mx-auto opacity-30' />
             <p className='font-medium'>No hay lotes registrados</p>
-            <p className='text-sm'>Los lotes agrupan múltiples equipos de la misma compra.</p>
-            {canCreate && (
-              <Button asChild className='mt-2'>
-                <Link href='/inventory/equipment/bulk/new'>
-                  <Plus className='h-4 w-4 mr-2' />
-                  Crear primer lote
-                </Link>
-              </Button>
-            )}
+            <p className='text-sm'>
+              Los lotes agrupan múltiples equipos de la misma compra.
+              {canCreate && embedded && ' Usa el botón «Nuevo Lote» en la parte superior.'}
+            </p>
           </div>
         </div>
       ) : (

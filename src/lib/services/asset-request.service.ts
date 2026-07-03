@@ -364,8 +364,8 @@ export class AssetRequestService {
     ipAddress?: string
   ): Promise<AssetRequestDetail> {
     // 1. Verificar que el módulo está habilitado para la familia
-    const enabled = await getSetting(`asset_requests_enabled_${data.familyId}`, 600, 'false')
-    if (enabled !== 'true') {
+    const enabled = await this.isAssetRequestsEnabledForFamily(data.familyId)
+    if (!enabled) {
       throw new Error('ASSET_REQUESTS_DISABLED')
     }
 
@@ -456,13 +456,32 @@ export class AssetRequestService {
 
   /**
    * Familias con solicitud de activos habilitada y accesibles para el usuario.
+   * Sin setting explícito: habilitada si el inventario está activo para la familia.
    */
+  static async isAssetRequestsEnabledForFamily(familyId: string): Promise<boolean> {
+    const explicit = await getSetting(`asset_requests_enabled_${familyId}`, 600, '')
+    if (explicit === 'true') return true
+    if (explicit === 'false') return false
+
+    const cfg = await prisma.inventory_family_config.findUnique({
+      where: { familyId },
+      select: { inventoryEnabled: true },
+    })
+    return cfg?.inventoryEnabled !== false
+  }
+
   static async getEnabledFamilies(
     userId: string,
     userRole: UserRole,
-    isSuperAdmin: boolean
+    isSuperAdmin: boolean,
+    canManageInventory = false
   ): Promise<Array<{ id: string; name: string; color: string | null }>> {
-    const accessibleIds = await getAccessibleFamilyIds(userId, userRole, isSuperAdmin, false)
+    const accessibleIds = await getAccessibleFamilyIds(
+      userId,
+      userRole,
+      isSuperAdmin,
+      canManageInventory
+    )
 
     const families = await prisma.families.findMany({
       where: {
@@ -481,13 +500,30 @@ export class AssetRequestService {
       },
       select: { key: true, value: true },
     })
-    const enabledIds = new Set(
+    const explicitEnabled = new Set(
       settings
         .filter(s => s.value === 'true')
         .map(s => s.key.replace('asset_requests_enabled_', ''))
     )
+    const explicitDisabled = new Set(
+      settings
+        .filter(s => s.value === 'false')
+        .map(s => s.key.replace('asset_requests_enabled_', ''))
+    )
 
-    return families.filter(f => enabledIds.has(f.id))
+    const invConfigs = await prisma.inventory_family_config.findMany({
+      where: { familyId: { in: families.map(f => f.id) } },
+      select: { familyId: true, inventoryEnabled: true },
+    })
+    const inventoryEnabledIds = new Set(
+      invConfigs.filter(c => c.inventoryEnabled !== false).map(c => c.familyId)
+    )
+
+    return families.filter(f => {
+      if (explicitDisabled.has(f.id)) return false
+      if (explicitEnabled.has(f.id)) return true
+      return inventoryEnabledIds.has(f.id)
+    })
   }
 
   private static async resolveAssetName(

@@ -129,7 +129,7 @@ function InventoryContent() {
 
         {/* Tab: Lotes — visible para ADMIN y gestores */}
         {tab === 'batches' && canSeeBatches ? (
-          <BatchesTab canCreate={isAdmin || canManageInventory} />
+          <BatchesTab canCreate={isAdmin || canManageInventory} embedded />
         ) : (
           <UnifiedInventoryList
             initialFamilyId={tab !== 'mine' ? familyId : undefined}

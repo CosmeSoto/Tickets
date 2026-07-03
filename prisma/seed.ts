@@ -52,6 +52,7 @@ async function main() {
 
   // 3. CONFIGURACIONES DE INVENTARIO POR FAMILIA
   await seedInventoryFamilyConfigs(familyMap)
+  await seedAssetRequestsFamilySettings(familyMap)
 
   // 4. DEPARTAMENTOS (con familyId directo)
   const deptMap = await seedDepartments(familyMap)
@@ -243,6 +244,25 @@ async function seedInventoryFamilyConfigs(familyMap: Map<string, string>) {
     })
   }
   console.log('✅ Configuraciones de inventario por familia')
+}
+
+/** Habilita solicitud de activos por familia (requerido para el formulario de compras) */
+async function seedAssetRequestsFamilySettings(familyMap: Map<string, string>) {
+  for (const familyId of familyMap.values()) {
+    const key = `asset_requests_enabled_${familyId}`
+    await prisma.system_settings.upsert({
+      where: { key },
+      update: { value: 'true' },
+      create: {
+        id: randomUUID(),
+        key,
+        value: 'true',
+        description: 'Solicitud de activos habilitada para esta familia',
+        updatedAt: now,
+      },
+    })
+  }
+  console.log(`✅ Solicitud de activos habilitada en ${familyMap.size} familias`)
 }
 
 // ============================================
@@ -458,15 +478,26 @@ async function seedDepartments(familyMap: Map<string, string>): Promise<Map<stri
 
 /** Sincroniza categories.family_id desde el departamento asociado */
 async function syncCategoryFamilies() {
-  const result = await prisma.$executeRaw`
-    UPDATE categories c
-    SET family_id = d.family_id, updated_at = NOW()
-    FROM departments d
-    WHERE c.department_id = d.id
-      AND d.family_id IS NOT NULL
-      AND (c.family_id IS NULL OR c.family_id IS DISTINCT FROM d.family_id)
-  `
-  console.log(`✅ Categorías sincronizadas con familia del departamento (${result} filas)`)
+  const categories = await prisma.categories.findMany({
+    where: { departmentId: { not: null } },
+    select: { id: true, departmentId: true, familyId: true },
+  })
+
+  let updated = 0
+  for (const cat of categories) {
+    if (!cat.departmentId) continue
+    const dept = await prisma.departments.findUnique({
+      where: { id: cat.departmentId },
+      select: { familyId: true },
+    })
+    if (!dept?.familyId || dept.familyId === cat.familyId) continue
+    await prisma.categories.update({
+      where: { id: cat.id },
+      data: { familyId: dept.familyId, updatedAt: now },
+    })
+    updated++
+  }
+  console.log(`✅ Categorías sincronizadas con familia del departamento (${updated} filas)`)
 }
 
 // ============================================

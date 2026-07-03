@@ -98,7 +98,7 @@ async function BatchesContent({ searchParams }: { searchParams: SearchParams }) 
             {batches.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <Link href='/inventory/equipment/bulk/new'>
+        <Link href='/inventory/new?mode=bulk'>
           <Button className='flex items-center gap-2'>
             <Plus className='w-4 h-4' />
             Nuevo Lote
