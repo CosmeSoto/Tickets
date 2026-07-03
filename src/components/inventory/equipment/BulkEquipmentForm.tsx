@@ -58,11 +58,15 @@ import {
   type FormSection,
 } from '@/lib/inventory/family-config-types'
 
+import type { BatchCloneTemplate } from '@/types/inventory/batch-inventory'
+
 export interface BulkEquipmentFormProps {
   onSuccess?: (result: any) => void
   onCancel?: () => void
   prefillData?: Partial<z.infer<typeof bulkEquipmentInputSchema>>
   defaultFamilyId?: string
+  /** ID de lote origen — carga plantilla para recompra */
+  cloneBatchId?: string
 }
 
 interface FamilyDepreciationConfig {
@@ -108,6 +112,7 @@ export function BulkEquipmentForm({
   onCancel,
   prefillData,
   defaultFamilyId,
+  cloneBatchId,
 }: BulkEquipmentFormProps) {
   const router = useRouter()
 
@@ -159,6 +164,8 @@ export function BulkEquipmentForm({
 
   const { departments: allDepartments } = useActiveDepartments()
   const initialized = useRef(false)
+  const cloneApplied = useRef(false)
+  const [cloneSourceLabel, setCloneSourceLabel] = useState<string | null>(null)
 
   const {
     register,
@@ -317,11 +324,62 @@ export function BulkEquipmentForm({
   }
 
   useEffect(() => {
-    if (!initialized.current && defaultFamilyId) {
+    if (!initialized.current && defaultFamilyId && !cloneBatchId) {
       initialized.current = true
       handleFamilySelect(defaultFamilyId)
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Clonar desde lote existente ────────────────────────────────────────────
+  useEffect(() => {
+    if (!cloneBatchId || cloneApplied.current) return
+    cloneApplied.current = true
+    ;(async () => {
+      try {
+        const res = await fetch(`/api/inventory/batches/${cloneBatchId}/clone-template`)
+        if (!res.ok) return
+        const template: BatchCloneTemplate = await res.json()
+        setCloneSourceLabel(template.sourceBatchCode)
+
+        await handleFamilySelect(template.familyId)
+        setSelectedSubtype('EQUIPMENT')
+        setStep(3)
+
+        const mode = (template.ownershipType || 'FIXED_ASSET') as AcquisitionMode
+        setAcquisitionMode(mode)
+        setSupplierId(template.supplierId || '')
+        setPurchaseDate(template.purchaseDate ? template.purchaseDate.split('T')[0] : '')
+        setPurchasePrice(template.unitPrice != null ? String(template.unitPrice) : '')
+        setInvoiceNumber(template.invoiceNumber || '')
+        setPurchaseOrderNumber(template.purchaseOrderNumber || '')
+        setWarehouseId(template.warehouseId || '')
+        setAccessories(template.accessories ?? [])
+        setSelectedModelId(template.modelId)
+        setSelectedModelData({
+          id: template.modelId,
+          brand: { name: template.brand },
+          model: template.model,
+          typeId: template.typeId,
+        })
+
+        setValue('quantity', template.quantity)
+        setValue('codeMode', 'auto')
+        setValue('modelId', template.modelId)
+        setValue('brand', template.brand)
+        setValue('model', template.model)
+        setValue('typeId', template.typeId)
+        setValue('departmentId', template.departmentId || '')
+        setValue('condition', template.condition as 'NEW' | 'USED' | 'DAMAGED')
+        setValue('ownershipType', template.ownershipType as any)
+        if (template.unitPrice != null) setValue('purchasePrice', template.unitPrice)
+        if (template.supplierId) setValue('supplierId', template.supplierId)
+        if (template.warehouseId) setValue('warehouseId', template.warehouseId)
+        if (template.notes) setValue('notes', template.notes)
+      } catch {
+        toast.error('No se pudo cargar la plantilla del lote')
+      }
+    })()
+  }, [cloneBatchId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Cargar bodegas filtradas por familia ───────────────────────────────────
   useEffect(() => {
@@ -656,6 +714,16 @@ export function BulkEquipmentForm({
         <Alert variant='destructive'>
           <AlertCircle className='h-4 w-4' />
           <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {cloneSourceLabel && (
+        <Alert>
+          <Package className='h-4 w-4' />
+          <AlertDescription>
+            Basado en el lote <strong className='font-mono'>{cloneSourceLabel}</strong>. Revisa
+            cantidad, precios y códigos antes de guardar.
+          </AlertDescription>
         </Alert>
       )}
 

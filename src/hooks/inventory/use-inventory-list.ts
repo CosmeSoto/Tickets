@@ -67,6 +67,7 @@ const ALL_EXPORT_COLUMNS = [
   { key: 'purchaseOrderNumber', label: 'N° Orden de Compra', format: (v: any) => v ?? '' },
   { key: 'attributes', label: 'Atributos', format: (v: any) => v ?? '' },
   { key: 'accessories', label: 'Accesorios', format: (v: any) => v ?? '' },
+  { key: 'batchCode', label: 'Lote', format: (v: any) => v ?? 'Individual' },
 ]
 
 interface UseInventoryListProps {
@@ -83,6 +84,8 @@ export function useInventoryList({ initialFamilyId, personalOnly = false }: UseI
   const [selectedSubtype, setSelectedSubtype] = useState<AssetSubtype | ''>('')
   const [selectedStatus, setSelectedStatus] = useState('')
   const [selectedCondition, setSelectedCondition] = useState('')
+  const [selectedBatchFilter, setSelectedBatchFilter] = useState('')
+  const [batchOptions, setBatchOptions] = useState<{ id: string; batchCode: string }[]>([])
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
 
@@ -122,6 +125,23 @@ export function useInventoryList({ initialFamilyId, personalOnly = false }: UseI
     return () => clearTimeout(t)
   }, [search])
 
+  // ── Opciones de lote para filtro ─────────────────────────────────────────
+  useEffect(() => {
+    if (personalOnly || status !== 'authenticated') return
+    fetch('/api/inventory/batches?limit=200')
+      .then(r => (r.ok ? r.json() : null))
+      .then(data => {
+        const list = Array.isArray(data) ? data : (data?.batches ?? [])
+        setBatchOptions(
+          list.map((b: { id: string; batchCode: string }) => ({
+            id: b.id,
+            batchCode: b.batchCode,
+          }))
+        )
+      })
+      .catch(() => setBatchOptions([]))
+  }, [personalOnly, status])
+
   // ── Fetch ─────────────────────────────────────────────────────────────────
   const fetchAssets = useCallback(
     async (
@@ -130,7 +150,8 @@ export function useInventoryList({ initialFamilyId, personalOnly = false }: UseI
       q: string,
       currentPage: number,
       statusVal: string,
-      conditionVal: string
+      conditionVal: string,
+      batchVal: string
     ) => {
       setLoading(true)
       try {
@@ -144,6 +165,7 @@ export function useInventoryList({ initialFamilyId, personalOnly = false }: UseI
         if (personalOnly) params.set('personalOnly', 'true')
         if (statusVal) params.set('status', statusVal)
         if (conditionVal) params.set('condition', conditionVal)
+        if (batchVal) params.set('batchFilter', batchVal)
         const res = await safeFetch(`/api/inventory/assets?${params.toString()}`)
         if (!res?.ok) return
         const data: UnifiedAssetsResponse = await res.json()
@@ -165,7 +187,8 @@ export function useInventoryList({ initialFamilyId, personalOnly = false }: UseI
       debouncedSearch,
       page,
       selectedStatus,
-      selectedCondition
+      selectedCondition,
+      selectedBatchFilter
     )
   }, [
     selectedFamilyId,
@@ -176,6 +199,7 @@ export function useInventoryList({ initialFamilyId, personalOnly = false }: UseI
     status,
     selectedStatus,
     selectedCondition,
+    selectedBatchFilter,
   ])
 
   // ── Handlers ──────────────────────────────────────────────────────────────
@@ -197,6 +221,10 @@ export function useInventoryList({ initialFamilyId, personalOnly = false }: UseI
   }
   const handleConditionChange = (c: string) => {
     setSelectedCondition(c)
+    setPage(1)
+  }
+  const handleBatchFilterChange = (b: string) => {
+    setSelectedBatchFilter(b)
     setPage(1)
   }
 
@@ -251,6 +279,8 @@ export function useInventoryList({ initialFamilyId, personalOnly = false }: UseI
     selectedSubtype,
     selectedStatus,
     selectedCondition,
+    selectedBatchFilter,
+    batchOptions,
     search,
     page,
     setPage,
@@ -259,6 +289,7 @@ export function useInventoryList({ initialFamilyId, personalOnly = false }: UseI
     handleSearchChange,
     handleStatusChange,
     handleConditionChange,
+    handleBatchFilterChange,
     // Columns
     visibleColumns,
     showColumnPicker,

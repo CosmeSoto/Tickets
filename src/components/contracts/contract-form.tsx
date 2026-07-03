@@ -82,7 +82,7 @@ export function ContractForm({ contract, onSuccess, onCancel }: Props) {
   // Recargar adjuntos cuando se edita un contrato existente
   useEffect(() => {
     if (!contract?.id) return
-    fetch(`/api/contracts/${contract.id}`)
+    fetch(`/api/inventory/contracts/${contract.id}`)
       .then(r => (r.ok ? r.json() : null))
       .then(d => {
         if (d?.attachments) setExistingAttachments(d.attachments)
@@ -94,7 +94,7 @@ export function ContractForm({ contract, onSuccess, onCancel }: Props) {
     setDeletingAttachmentId(attachmentId)
     try {
       const res = await fetch(
-        `/api/contracts/${contract!.id}/attachments?attachmentId=${attachmentId}`,
+        `/api/inventory/contracts/${contract!.id}/attachments?attachmentId=${attachmentId}`,
         { method: 'DELETE' }
       )
       if (!res.ok) throw new Error((await res.json()).error)
@@ -249,7 +249,9 @@ export function ContractForm({ contract, onSuccess, onCancel }: Props) {
         })),
       }
 
-      const url = isEditing ? `/api/contracts/${contract!.id}` : '/api/contracts'
+      const url = isEditing
+        ? `/api/inventory/contracts/${contract!.id}`
+        : '/api/inventory/contracts'
       const method = isEditing ? 'PUT' : 'POST'
 
       const res = await fetch(url, {
@@ -271,7 +273,10 @@ export function ContractForm({ contract, onSuccess, onCancel }: Props) {
           try {
             const fd = new FormData()
             fd.append('file', file)
-            await fetch(`/api/contracts/${saved.id}/attachments`, { method: 'POST', body: fd })
+            await fetch(`/api/inventory/contracts/${saved.id}/attachments`, {
+              method: 'POST',
+              body: fd,
+            })
           } catch {
             // No bloquear si falla un adjunto individual
           }
@@ -383,7 +388,9 @@ export function ContractForm({ contract, onSuccess, onCancel }: Props) {
             <Label>Ciclo de facturación</Label>
             <Select
               value={watch('billingCycle')}
-              onValueChange={v => { if (v) setValue('billingCycle', v as any) }}
+              onValueChange={v => {
+                if (v) setValue('billingCycle', v as any)
+              }}
             >
               <SelectTrigger>
                 <SelectValue />

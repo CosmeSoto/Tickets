@@ -106,12 +106,24 @@ function DeliveryActsTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
       try {
         const params = new URLSearchParams({ page: String(page), limit: '20', status })
         const res = await fetch(`/api/inventory/acts?${params}`, { cache: 'no-store' })
-        if (!res.ok) return
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          toast({
+            title: 'Error al cargar actas',
+            description: err.error ?? 'No se pudieron cargar las actas de entrega',
+            variant: 'destructive',
+          })
+          return
+        }
         const data = await res.json()
         setActs(data.acts ?? [])
         setPagination(data.pagination)
       } catch {
-        /* silencioso */
+        toast({
+          title: 'Error al cargar actas',
+          description: 'No se pudieron cargar las actas de entrega',
+          variant: 'destructive',
+        })
       } finally {
         setLoading(false)
       }
@@ -244,12 +256,24 @@ function ReturnActsTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
       try {
         const params = new URLSearchParams({ page: String(page), limit: '20', status })
         const res = await fetch(`/api/inventory/return-acts?${params}`, { cache: 'no-store' })
-        if (!res.ok) return
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          toast({
+            title: 'Error al cargar actas',
+            description: err.error ?? 'No se pudieron cargar las actas de devolución',
+            variant: 'destructive',
+          })
+          return
+        }
         const data = await res.json()
         setActs(data.acts ?? [])
         setPagination(data.pagination)
       } catch {
-        /* silencioso */
+        toast({
+          title: 'Error al cargar actas',
+          description: 'No se pudieron cargar las actas de devolución',
+          variant: 'destructive',
+        })
       } finally {
         setLoading(false)
       }
@@ -412,12 +436,24 @@ function DecommissionActsTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
         const params = new URLSearchParams({ page: String(page), limit: '20' })
         if (status !== 'all') params.set('status', status)
         const res = await fetch(`/api/inventory/decommission-acts?${params}`, { cache: 'no-store' })
-        if (!res.ok) return
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          toast({
+            title: 'Error al cargar solicitudes',
+            description: err.error ?? 'No se pudieron cargar las actas de baja',
+            variant: 'destructive',
+          })
+          return
+        }
         const data = await res.json()
         setActs(data.requests ?? [])
         setPagination({ page, total: data.total ?? 0, pages: Math.ceil((data.total ?? 0) / 20) })
       } catch {
-        /* silencioso */
+        toast({
+          title: 'Error al cargar solicitudes',
+          description: 'No se pudieron cargar las actas de baja',
+          variant: 'destructive',
+        })
       } finally {
         setLoading(false)
       }

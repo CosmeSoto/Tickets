@@ -38,11 +38,14 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     const supplier = await prisma.suppliers.findUnique({
       where: { id },
       include: {
+        supplierType: { select: { id: true, name: true } },
+        family: { select: { id: true, name: true, color: true, code: true } },
         _count: {
           select: {
             equipment: true,
             consumables: true,
             software_licenses: true,
+            maintenances: true,
           },
         },
       },

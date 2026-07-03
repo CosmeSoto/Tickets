@@ -15,6 +15,7 @@ export interface AssetsQueryParams {
   personalOnly: boolean
   statusFilter: string
   conditionFilter: string
+  batchFilter: string
   page: number
   pageSize: number
 }
@@ -37,6 +38,8 @@ export interface UnifiedAssetItem {
   purchaseOrderNumber?: string
   attributes?: string
   accessories?: string
+  batchId?: string | null
+  batchCode?: string | null
 }
 
 export interface AssetsQueryResult {
@@ -59,6 +62,7 @@ export async function queryAssets(params: AssetsQueryParams): Promise<AssetsQuer
     personalOnly,
     statusFilter,
     conditionFilter,
+    batchFilter,
     page,
     pageSize,
   } = params
@@ -82,6 +86,7 @@ export async function queryAssets(params: AssetsQueryParams): Promise<AssetsQuer
           },
         },
         model: { select: { brand: true, model: true } },
+        batch: { select: { id: true, batchCode: true } },
         customValues: { select: { fieldName: true, fieldValue: true } },
       },
       orderBy: { createdAt: 'desc' },
@@ -91,7 +96,8 @@ export async function queryAssets(params: AssetsQueryParams): Promise<AssetsQuer
       ? mapped.filter(
           i =>
             i.name.toLowerCase().includes(searchQuery) ||
-            (i.code ?? '').toLowerCase().includes(searchQuery)
+            (i.code ?? '').toLowerCase().includes(searchQuery) ||
+            (i.batchCode ?? '').toLowerCase().includes(searchQuery)
         )
       : mapped
     return paginate(filtered, page, pageSize)
@@ -132,6 +138,9 @@ export async function queryAssets(params: AssetsQueryParams): Promise<AssetsQuer
     const extra: Record<string, any> = {}
     if (statusFilter) extra.status = statusFilter
     if (conditionFilter) extra.condition = conditionFilter
+    if (batchFilter === 'with_batch') extra.batchId = { not: null }
+    else if (batchFilter === 'without_batch') extra.batchId = null
+    else if (batchFilter && batchFilter !== 'all') extra.batchId = batchFilter
 
     if (restrictToAssignedOnly) return { id: { in: personalEquipmentIds }, ...extra }
     if (effectiveFamilyIds !== undefined) {
@@ -155,6 +164,7 @@ export async function queryAssets(params: AssetsQueryParams): Promise<AssetsQuer
               include: { family: { include: { customFields: { orderBy: { order: 'asc' } } } } },
             },
             model: { select: { brand: true, model: true } },
+            batch: { select: { id: true, batchCode: true } },
             customValues: { select: { fieldName: true, fieldValue: true } },
           },
           orderBy: { createdAt: 'desc' },
@@ -220,7 +230,8 @@ export async function queryAssets(params: AssetsQueryParams): Promise<AssetsQuer
     ? mapped.filter(
         i =>
           i.name.toLowerCase().includes(searchQuery) ||
-          (i.code ?? '').toLowerCase().includes(searchQuery)
+          (i.code ?? '').toLowerCase().includes(searchQuery) ||
+          (i.batchCode ?? '').toLowerCase().includes(searchQuery)
       )
     : mapped
 
@@ -288,6 +299,8 @@ function mapEquipmentItem(item: any): UnifiedAssetItem {
     purchaseOrderNumber: item.purchaseOrderNumber ?? undefined,
     attributes: attributesStr,
     accessories: item.accessories?.length ? item.accessories.join(', ') : undefined,
+    batchId: item.batchId ?? item.batch?.id ?? null,
+    batchCode: item.batch?.batchCode ?? null,
   }
 }
 

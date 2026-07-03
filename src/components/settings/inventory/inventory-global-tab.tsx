@@ -42,8 +42,8 @@ export function InventoryGlobalTab({
             </>
           ) : (
             <>
-              Estas reglas aplican a <strong>todo el módulo de inventario</strong>. La
-              configuración específica por área se gestiona en la pestaña &quot;Por área&quot;.
+              Estas reglas aplican a <strong>todo el módulo de inventario</strong>. La configuración
+              específica por área se gestiona en la pestaña &quot;Por área&quot;.
             </>
           )}
         </p>
@@ -181,6 +181,71 @@ export function InventoryGlobalTab({
                     disabled={readOnly}
                   />
                   <span className='text-xs text-muted-foreground'>días antes del vencimiento</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <Separator />
+
+          {/* Lotes de equipos */}
+          <div className='space-y-3'>
+            <div className='flex items-center justify-between p-3 border rounded-lg'>
+              <div>
+                <p className='text-sm font-medium'>Alertas de utilización de lotes</p>
+                <p className='text-xs text-muted-foreground'>
+                  Notificar cuando un lote tenga stock bajo o alta utilización. Los valores por
+                  defecto; cada área puede personalizarlos en &quot;Por área&quot;.
+                </p>
+              </div>
+              <Switch
+                checked={globalRules.batchUtilizationAlertEnabled}
+                onCheckedChange={v => onSetGlobal('batchUtilizationAlertEnabled', v)}
+                disabled={readOnly}
+              />
+            </div>
+            {globalRules.batchUtilizationAlertEnabled && (
+              <div className='space-y-3 pl-4 border-l-2 border-muted'>
+                <div className='flex items-center justify-between p-3 border rounded-lg'>
+                  <div>
+                    <p className='text-sm font-medium'>Email en alertas críticas</p>
+                    <p className='text-xs text-muted-foreground'>Sin stock o utilización ≥ 95 %</p>
+                  </div>
+                  <Switch
+                    checked={globalRules.batchUtilizationEmailCritical}
+                    onCheckedChange={v => onSetGlobal('batchUtilizationEmailCritical', v)}
+                    disabled={readOnly}
+                  />
+                </div>
+                <div className='flex items-center justify-between p-3 border rounded-lg'>
+                  <div>
+                    <p className='text-sm font-medium'>Email en alertas de advertencia</p>
+                    <p className='text-xs text-muted-foreground'>Stock bajo o utilización ≥ 80 %</p>
+                  </div>
+                  <Switch
+                    checked={globalRules.batchUtilizationEmailWarning}
+                    onCheckedChange={v => onSetGlobal('batchUtilizationEmailWarning', v)}
+                    disabled={readOnly}
+                  />
+                </div>
+                <div>
+                  <Label className='text-xs'>Umbral de stock bajo (% del lote)</Label>
+                  <div className='flex items-center gap-2 mt-1'>
+                    <Input
+                      type='number'
+                      min='5'
+                      max='50'
+                      value={globalRules.batchLowStockThresholdPct}
+                      onChange={e =>
+                        onSetGlobal('batchLowStockThresholdPct', parseInt(e.target.value) || 15)
+                      }
+                      className='w-24 h-8 text-sm font-mono'
+                      disabled={readOnly}
+                    />
+                    <span className='text-xs text-muted-foreground'>
+                      % disponibles antes de alertar
+                    </span>
+                  </div>
                 </div>
               </div>
             )}

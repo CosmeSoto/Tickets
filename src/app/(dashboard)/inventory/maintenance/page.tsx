@@ -98,6 +98,9 @@ export default function MaintenanceListPage() {
   const [records, setRecords] = useState<MaintenanceItem[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [searchInput, setSearchInput] = useState('')
+  const [page, setPage] = useState(1)
+  const [pagination, setPagination] = useState({ page: 1, total: 0, pages: 1, limit: 20 })
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [typeFilter, setTypeFilter] = useState('ALL')
   const [familyFilter, setFamilyFilter] = useState('all')
@@ -125,37 +128,40 @@ export default function MaintenanceListPage() {
   const fetchRecords = useCallback(async () => {
     setLoading(true)
     try {
-      const params = new URLSearchParams()
+      const params = new URLSearchParams({ page: String(page), limit: '20' })
       if (statusFilter !== 'ALL') params.set('status', statusFilter)
       if (typeFilter !== 'ALL') params.set('type', typeFilter)
       if (activeTab === 'mine') params.set('personalOnly', 'true')
       if (familyFilter !== 'all') params.set('familyId', familyFilter)
       if (supplierIdFilter) params.set('supplierId', supplierIdFilter)
+      if (search.trim()) params.set('search', search.trim())
       const res = await fetch(`/api/inventory/maintenance?${params}`, { cache: 'no-store' })
-      if (res.ok) setRecords(await res.json())
+      if (res.ok) {
+        const data = await res.json()
+        setRecords(data.records ?? data)
+        if (data.pagination) setPagination(data.pagination)
+      }
     } finally {
       setLoading(false)
     }
-  }, [statusFilter, typeFilter, activeTab, familyFilter, supplierIdFilter])
+  }, [statusFilter, typeFilter, activeTab, familyFilter, supplierIdFilter, page, search])
+
+  useEffect(() => {
+    setPage(1)
+  }, [statusFilter, typeFilter, activeTab, familyFilter, supplierIdFilter, search])
+
+  useEffect(() => {
+    const timer = setTimeout(() => setSearch(searchInput), 350)
+    return () => clearTimeout(timer)
+  }, [searchInput])
 
   useEffect(() => {
     fetchRecords()
   }, [fetchRecords])
 
-  const filtered = records.filter(r => {
-    if (!search) return true
-    const q = search.toLowerCase()
-    return (
-      r.equipment.code.toLowerCase().includes(q) ||
-      r.equipment.brand.toLowerCase().includes(q) ||
-      r.equipment.model.toLowerCase().includes(q) ||
-      r.description.toLowerCase().includes(q) ||
-      r.technician?.name.toLowerCase().includes(q) ||
-      r.requestedBy?.name.toLowerCase().includes(q)
-    )
-  })
+  const filtered = records
 
-  // Contadores por estado para el cliente (acciones pendientes)
+  // Contadores por estado (página actual; el total viene de pagination.total)
   const pendingAction = isClient
     ? records.filter(r => r.status === 'SCHEDULED').length
     : records.filter(r => r.status === 'REQUESTED').length
@@ -300,8 +306,8 @@ export default function MaintenanceListPage() {
             <Search className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
             <Input
               placeholder='Buscar por equipo, técnico, descripción...'
-              value={search}
-              onChange={e => setSearch(e.target.value)}
+              value={searchInput}
+              onChange={e => setSearchInput(e.target.value)}
               className='pl-9'
             />
           </div>
@@ -384,7 +390,7 @@ export default function MaintenanceListPage() {
           <div className='text-center py-20 space-y-2'>
             <Wrench className='h-10 w-10 text-muted-foreground mx-auto' />
             <p className='text-muted-foreground'>
-              {search || statusFilter !== 'ALL' || typeFilter !== 'ALL'
+              {searchInput || statusFilter !== 'ALL' || typeFilter !== 'ALL'
                 ? 'No hay mantenimientos que coincidan con los filtros.'
                 : isClient
                   ? 'No tienes mantenimientos registrados. Puedes solicitar uno desde un equipo asignado.'
@@ -468,6 +474,35 @@ export default function MaintenanceListPage() {
                 </Card>
               )
             })}
+          </div>
+        )}
+
+        {pagination.pages > 1 && (
+          <div className='flex items-center justify-between pt-4'>
+            <p className='text-sm text-muted-foreground'>
+              {pagination.total} mantenimiento{pagination.total !== 1 ? 's' : ''} en total
+            </p>
+            <div className='flex items-center gap-2'>
+              <Button
+                variant='outline'
+                size='sm'
+                disabled={page <= 1 || loading}
+                onClick={() => setPage(p => p - 1)}
+              >
+                Anterior
+              </Button>
+              <span className='text-sm text-muted-foreground'>
+                Página {page} de {pagination.pages}
+              </span>
+              <Button
+                variant='outline'
+                size='sm'
+                disabled={page >= pagination.pages || loading}
+                onClick={() => setPage(p => p + 1)}
+              >
+                Siguiente
+              </Button>
+            </div>
           </div>
         )}
       </div>

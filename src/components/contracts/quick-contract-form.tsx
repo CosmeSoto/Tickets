@@ -61,7 +61,7 @@ export function QuickContractForm({
 
     setSubmitting(true)
     try {
-      const res = await fetch('/api/contracts', {
+      const res = await fetch('/api/inventory/contracts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

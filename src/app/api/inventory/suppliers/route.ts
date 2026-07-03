@@ -62,18 +62,34 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const suppliers = await (prisma.suppliers.findMany as any)({
-      where,
-      include: {
-        supplierType: { select: { id: true, name: true } },
-        family: { select: { id: true, name: true, color: true } },
-        _count: { select: { maintenances: true } },
-      },
-      orderBy: { name: 'asc' },
-      take: 500,
-    })
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10))
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20', 10)))
+    const skip = (page - 1) * limit
 
-    return NextResponse.json(suppliers)
+    const [suppliers, total] = await Promise.all([
+      (prisma.suppliers.findMany as any)({
+        where,
+        include: {
+          supplierType: { select: { id: true, name: true } },
+          family: { select: { id: true, name: true, color: true } },
+          _count: { select: { maintenances: true } },
+        },
+        orderBy: { name: 'asc' },
+        skip,
+        take: limit,
+      }),
+      prisma.suppliers.count({ where }),
+    ])
+
+    return NextResponse.json({
+      suppliers,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit) || 1,
+      },
+    })
   } catch (error) {
     console.error('[GET /api/inventory/suppliers]', error)
     return NextResponse.json({ error: 'Error al obtener proveedores' }, { status: 500 })

@@ -45,7 +45,7 @@ export function ContractPicker({ value, onChange, supplierId, familyId, disabled
   const [tab, setTab] = useState<'link' | 'create'>('link')
 
   // Contratos activos o borradores vinculables desde creación de activos
-  const { data: contracts, reload } = useFetch<Contract>('/api/contracts', {
+  const { data: contracts, reload } = useFetch<Contract>('/api/inventory/contracts', {
     params: {
       pageSize: 200,
       ...(supplierId ? { supplierId } : {}),
@@ -60,7 +60,7 @@ export function ContractPicker({ value, onChange, supplierId, familyId, disabled
 
   // Contrato actualmente seleccionado (para mostrar el badge)
   const { data: selectedContracts } = useFetch<Contract>(
-    value ? `/api/contracts/${value}` : '/api/contracts',
+    value ? `/api/inventory/contracts/${value}` : '/api/inventory/contracts',
     {
       enabled: !!value,
       transform: d => (d.id ? [d] : []),

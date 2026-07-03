@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { AssetRequestService } from '@/lib/services/asset-request.service'
 import { updateStatusSchema } from '@/lib/validations/inventory/asset-request'
+import { canManageAssetRequests, canViewAssetRequests } from '@/lib/inventory/asset-request-access'
 import { ZodError } from 'zod'
 
 /**
@@ -18,12 +19,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    // Verificar que el usuario tenga acceso al inventario
-    if (!session.user.inventoryEnabled) {
-      return NextResponse.json(
-        { error: 'No tienes acceso al módulo de inventario' },
-        { status: 403 }
-      )
+    if (!(await canViewAssetRequests(session.user))) {
+      return NextResponse.json({ error: 'Sin permiso para ver solicitudes' }, { status: 403 })
     }
 
     // Obtener detalle (el servicio verifica acceso automáticamente)
@@ -61,10 +58,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    // Verificar que el usuario tenga acceso al inventario
-    if (!session.user.inventoryEnabled) {
+    if (!(await canViewAssetRequests(session.user))) {
       return NextResponse.json(
-        { error: 'No tienes acceso al módulo de inventario' },
+        { error: 'Sin permiso para actualizar solicitudes' },
         { status: 403 }
       )
     }

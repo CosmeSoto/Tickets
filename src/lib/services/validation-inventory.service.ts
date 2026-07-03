@@ -114,4 +114,37 @@ export class ValidationService {
 
     return { canDelete: true }
   }
+
+  /** Verifica que la cantidad registrada del lote coincida con equipos en BD */
+  static async validateBatchIntegrity(batchId: string): Promise<{
+    isConsistent: boolean
+    recordedQuantity: number
+    actualEquipmentCount: number
+    message?: string
+  }> {
+    const batch = await prisma.equipment_batches.findUnique({
+      where: { id: batchId },
+      select: { quantity: true, batchCode: true },
+    })
+    if (!batch) {
+      return {
+        isConsistent: false,
+        recordedQuantity: 0,
+        actualEquipmentCount: 0,
+        message: 'Lote no encontrado',
+      }
+    }
+
+    const actualEquipmentCount = await prisma.equipment.count({ where: { batchId } })
+    const isConsistent = batch.quantity === actualEquipmentCount
+
+    return {
+      isConsistent,
+      recordedQuantity: batch.quantity,
+      actualEquipmentCount,
+      message: isConsistent
+        ? undefined
+        : `El lote ${batch.batchCode} registra ${batch.quantity} unidad(es) pero hay ${actualEquipmentCount} equipo(s) vinculado(s).`,
+    }
+  }
 }

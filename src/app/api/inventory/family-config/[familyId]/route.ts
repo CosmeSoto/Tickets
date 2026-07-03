@@ -44,6 +44,10 @@ const updateConfigSchema = z.object({
   autoApproveDecommission: z.boolean().optional(),
   requireDeliveryAct: z.boolean().optional(),
   inventoryEnabled: z.boolean().optional(),
+  batchUtilizationAlertEnabled: z.boolean().nullable().optional(),
+  batchUtilizationEmailCritical: z.boolean().nullable().optional(),
+  batchUtilizationEmailWarning: z.boolean().nullable().optional(),
+  batchLowStockThresholdPct: z.number().min(1).max(100).nullable().optional(),
 })
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ familyId: string }> }) {
@@ -161,7 +165,10 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ fami
     // Invalidar caché de módulos — inventoryEnabled cambió
     try {
       const { invalidateCache } = await import('@/lib/api-cache')
+      const { invalidateBatchAlertSettingsCache } =
+        await import('@/lib/inventory/batch-alert-settings')
       await Promise.all([invalidateCache('user:modules:*'), invalidateCache('dashboard:*')])
+      invalidateBatchAlertSettingsCache(familyId)
     } catch {
       /* Redis no disponible */
     }

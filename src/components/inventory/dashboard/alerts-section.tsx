@@ -11,6 +11,7 @@ import {
   ClipboardList,
   Wrench,
   Key,
+  Layers,
 } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -23,6 +24,8 @@ interface DashboardAlerts {
   expiringLicenses: number
   pendingActs: number
   pendingRequests: number
+  batchCriticalBatches: number
+  batchWarningBatches: number
 }
 
 export function AlertsSection() {
@@ -65,6 +68,43 @@ export function AlertsSection() {
 
   return (
     <div className='space-y-3'>
+      {alerts.batchCriticalBatches > 0 && (
+        <Alert variant='destructive'>
+          <Layers className='h-4 w-4' />
+          <AlertTitle>Lotes con alerta crítica</AlertTitle>
+          <AlertDescription className='flex items-center justify-between'>
+            <span>
+              {alerts.batchCriticalBatches} lote{alerts.batchCriticalBatches !== 1 ? 's' : ''} sin
+              stock o con utilización crítica
+              {alerts.batchWarningBatches > 0 && ` · ${alerts.batchWarningBatches} en advertencia`}
+            </span>
+            <Link href='/inventory?tab=batches'>
+              <Button variant='outline' size='sm'>
+                Ver lotes
+              </Button>
+            </Link>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {alerts.batchCriticalBatches === 0 && alerts.batchWarningBatches > 0 && (
+        <Alert>
+          <Layers className='h-4 w-4' />
+          <AlertTitle>Lotes con stock bajo</AlertTitle>
+          <AlertDescription className='flex items-center justify-between'>
+            <span>
+              {alerts.batchWarningBatches} lote{alerts.batchWarningBatches !== 1 ? 's' : ''} con
+              alta utilización o poco stock
+            </span>
+            <Link href='/inventory?tab=batches'>
+              <Button variant='outline' size='sm'>
+                Ver lotes
+              </Button>
+            </Link>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {alerts.lowStockConsumables > 0 && (
         <Alert variant='destructive'>
           <AlertTriangle className='h-4 w-4' />
@@ -197,6 +237,8 @@ export function AlertsSection() {
 
 function hasAlerts(alerts: DashboardAlerts): boolean {
   return (
+    alerts.batchCriticalBatches > 0 ||
+    alerts.batchWarningBatches > 0 ||
     alerts.lowStockConsumables > 0 ||
     alerts.maintenanceDue > 0 ||
     alerts.expiringContracts > 0 ||

@@ -16,6 +16,7 @@ export default function NewBulkEquipmentPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const defaultFamilyId = searchParams.get('familyId') ?? undefined
+  const cloneFrom = searchParams.get('cloneFrom') ?? undefined
 
   const canManageInventory = (session?.user as any)?.canManageInventory === true
 
@@ -41,9 +42,11 @@ export default function NewBulkEquipmentPage() {
 
   if (!session?.user || (session.user.role === 'CLIENT' && !canManageInventory)) return null
 
-  const subtitle = defaultFamilyId
-    ? 'Selecciona el tipo de activo y completa los datos del lote'
-    : 'Selecciona la familia y completa los datos del lote'
+  const subtitle = cloneFrom
+    ? 'Recompra basada en un lote existente — revisa y ajusta los datos'
+    : defaultFamilyId
+      ? 'Selecciona el tipo de activo y completa los datos del lote'
+      : 'Selecciona la familia y completa los datos del lote'
 
   return (
     <div className='max-w-5xl mx-auto px-4 py-6 space-y-4'>
@@ -65,8 +68,9 @@ export default function NewBulkEquipmentPage() {
         <CardContent className='pt-6'>
           <BulkEquipmentForm
             defaultFamilyId={defaultFamilyId}
+            cloneBatchId={cloneFrom}
             onSuccess={() => {
-              setTimeout(() => router.push('/inventory'), 3000)
+              setTimeout(() => router.push('/inventory?tab=batches'), 3000)
             }}
             onCancel={() => router.push('/inventory/new')}
           />

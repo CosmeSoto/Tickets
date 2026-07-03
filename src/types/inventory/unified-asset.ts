@@ -21,6 +21,8 @@ export interface UnifiedAsset {
   // Atributos personalizados y accesorios (solo equipos, como strings planos)
   attributes?: string
   accessories?: string
+  batchId?: string | null
+  batchCode?: string | null
 }
 
 export interface UnifiedAssetsResponse {
@@ -74,6 +76,7 @@ export type ColumnKey =
   | 'precio'
   | 'atributos'
   | 'accesorios'
+  | 'lote'
 
 export const OPTIONAL_COLUMNS: { key: ColumnKey; label: string }[] = [
   { key: 'area', label: 'Área' },
@@ -81,6 +84,7 @@ export const OPTIONAL_COLUMNS: { key: ColumnKey; label: string }[] = [
   { key: 'estado', label: 'Estado' },
   { key: 'condicion', label: 'Condición' },
   { key: 'propiedad', label: 'Propiedad' },
+  { key: 'lote', label: 'Lote' },
   { key: 'creado', label: 'Fecha Creación' },
   { key: 'fechaCompra', label: 'Fecha de Compra' },
   { key: 'factura', label: 'N° Factura' },
@@ -95,6 +99,7 @@ export const DEFAULT_VISIBLE_COLUMNS: ColumnKey[] = [
   'codigo',
   'estado',
   'condicion',
+  'lote',
   'propiedad',
   'creado',
 ]
@@ -113,4 +118,5 @@ export const COLUMN_KEY_TO_ASSET_KEY: Record<ColumnKey, string> = {
   precio: 'purchasePrice',
   atributos: 'attributes',
   accesorios: 'accessories',
+  lote: 'batchCode',
 }

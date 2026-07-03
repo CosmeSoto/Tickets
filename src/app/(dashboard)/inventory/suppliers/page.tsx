@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { Plus, Pencil, PowerOff, RefreshCw, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -45,6 +46,7 @@ import { FamilyCombobox } from '@/components/ui/family-combobox'
 import { useFamilyOptions } from '@/hooks/use-family-options'
 
 export default function SuppliersPage() {
+  const router = useRouter()
   const { toast } = useToast()
   const { data: session } = useSession()
   const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
@@ -52,6 +54,9 @@ export default function SuppliersPage() {
   const [suppliers, setSuppliers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [searchInput, setSearchInput] = useState('')
+  const [page, setPage] = useState(1)
+  const [pagination, setPagination] = useState({ page: 1, total: 0, pages: 1, limit: 20 })
   const [activeFilter, setActiveFilter] = useState('true')
   const [familyFilter, setFamilyFilter] = useState('all')
   const [formOpen, setFormOpen] = useState(false)
@@ -66,7 +71,7 @@ export default function SuppliersPage() {
 
   const fetchSuppliers = useCallback(async () => {
     setLoading(true)
-    const params = new URLSearchParams()
+    const params = new URLSearchParams({ page: String(page), limit: '20' })
     if (search) params.set('search', search)
     if (activeFilter !== 'all') params.set('active', activeFilter)
     if (familyFilter !== 'all') params.set('familyId', familyFilter)
@@ -75,6 +80,7 @@ export default function SuppliersPage() {
       if (!res.ok) throw new Error('Error al cargar')
       const data = await res.json()
       setSuppliers(Array.isArray(data) ? data : (data.suppliers ?? []))
+      if (data.pagination) setPagination(data.pagination)
     } catch {
       toast({
         title: 'Error',
@@ -84,7 +90,16 @@ export default function SuppliersPage() {
     } finally {
       setLoading(false)
     }
-  }, [search, activeFilter, familyFilter, toast])
+  }, [search, activeFilter, familyFilter, page, toast])
+
+  useEffect(() => {
+    const timer = setTimeout(() => setSearch(searchInput), 350)
+    return () => clearTimeout(timer)
+  }, [searchInput])
+
+  useEffect(() => {
+    setPage(1)
+  }, [search, activeFilter, familyFilter])
 
   useEffect(() => {
     fetchSuppliers()
@@ -216,8 +231,8 @@ export default function SuppliersPage() {
           <div className='flex flex-wrap gap-3'>
             <Input
               placeholder='Buscar por nombre o RUC/NIT...'
-              value={search}
-              onChange={e => setSearch(e.target.value)}
+              value={searchInput}
+              onChange={e => setSearchInput(e.target.value)}
               className='flex-1 min-w-[200px]'
             />
             {families.length > 1 && (
@@ -332,10 +347,7 @@ export default function SuppliersPage() {
                     <TableRow
                       key={s.id}
                       className='cursor-pointer hover:bg-muted/50'
-                      onClick={() => {
-                        setEditingSupplier(s)
-                        setFormOpen(true)
-                      }}
+                      onClick={() => router.push(`/inventory/suppliers/${s.id}`)}
                     >
                       <TableCell className='font-medium'>{s.name}</TableCell>
                       <TableCell className='text-sm text-muted-foreground hidden md:table-cell'>
@@ -420,6 +432,35 @@ export default function SuppliersPage() {
               </TableBody>
             </Table>
           </div>
+
+          {pagination.pages > 1 && (
+            <div className='flex items-center justify-between pt-4'>
+              <p className='text-sm text-muted-foreground'>
+                {pagination.total} proveedor{pagination.total !== 1 ? 'es' : ''} en total
+              </p>
+              <div className='flex items-center gap-2'>
+                <Button
+                  variant='outline'
+                  size='sm'
+                  disabled={page <= 1 || loading}
+                  onClick={() => setPage(p => p - 1)}
+                >
+                  Anterior
+                </Button>
+                <span className='text-sm text-muted-foreground'>
+                  Página {page} de {pagination.pages}
+                </span>
+                <Button
+                  variant='outline'
+                  size='sm'
+                  disabled={page >= pagination.pages || loading}
+                  onClick={() => setPage(p => p + 1)}
+                >
+                  Siguiente
+                </Button>
+              </div>
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value='types'>

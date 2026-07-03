@@ -2,13 +2,36 @@ import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import { NotificationService } from './notification-service'
 import { getFamilyScopedAdmins } from '@/lib/notifications/family-recipients'
+import { getSetting } from '@/lib/api-cache'
+
+type AlertFlag = 'alert60DaysSent' | 'alert30DaysSent' | 'alert15DaysSent'
 
 export class ContractAlertService {
+  /**
+   * Umbrales de alerta derivados de contract_alert_days (config global).
+   * Ej. 30 días → alertas a 60, 30 y 15 días antes del vencimiento.
+   */
+  private static async getAlertThresholds(): Promise<
+    Array<{ days: number; upper: number; flag: AlertFlag }>
+  > {
+    const raw = await getSetting('contract_alert_days', 600, '30')
+    const base = Math.max(7, parseInt(raw ?? '30', 10) || 30)
+    const urgent = Math.max(7, Math.round(base / 2))
+    const early = Math.min(365, base * 2)
+
+    return [
+      { days: early, upper: base + 1, flag: 'alert60DaysSent' },
+      { days: base, upper: urgent + 1, flag: 'alert30DaysSent' },
+      { days: urgent, upper: 1, flag: 'alert15DaysSent' },
+    ]
+  }
+
   /**
    * Verifica contratos próximos a vencer y envía alertas
    */
   static async checkExpirations() {
     const now = new Date()
+    const thresholds = await this.getAlertThresholds()
     const alerts = {
       sent60Days: 0,
       sent30Days: 0,
@@ -40,43 +63,25 @@ export class ContractAlertService {
         (contract.endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
       )
 
-      // Alerta 60 días
-      if (daysUntilExpiry <= 60 && daysUntilExpiry > 30 && !contract.alert60DaysSent) {
-        await this.sendExpirationAlert(contract, 60, daysUntilExpiry)
-        await prisma.contracts.update({
-          where: { id: contract.id },
-          data: {
-            alert60DaysSent: true,
-            lastAlertSentAt: now,
-          },
-        })
-        alerts.sent60Days++
-      }
-
-      // Alerta 30 días
-      if (daysUntilExpiry <= 30 && daysUntilExpiry > 15 && !contract.alert30DaysSent) {
-        await this.sendExpirationAlert(contract, 30, daysUntilExpiry)
-        await prisma.contracts.update({
-          where: { id: contract.id },
-          data: {
-            alert30DaysSent: true,
-            lastAlertSentAt: now,
-          },
-        })
-        alerts.sent30Days++
-      }
-
-      // Alerta 15 días
-      if (daysUntilExpiry <= 15 && daysUntilExpiry > 0 && !contract.alert15DaysSent) {
-        await this.sendExpirationAlert(contract, 15, daysUntilExpiry)
-        await prisma.contracts.update({
-          where: { id: contract.id },
-          data: {
-            alert15DaysSent: true,
-            lastAlertSentAt: now,
-          },
-        })
-        alerts.sent15Days++
+      for (const threshold of thresholds) {
+        const alreadySent = contract[threshold.flag] as boolean
+        if (
+          daysUntilExpiry <= threshold.days &&
+          daysUntilExpiry >= threshold.upper &&
+          !alreadySent
+        ) {
+          await this.sendExpirationAlert(contract, threshold.days, daysUntilExpiry)
+          await prisma.contracts.update({
+            where: { id: contract.id },
+            data: {
+              [threshold.flag]: true,
+              lastAlertSentAt: now,
+            },
+          })
+          if (threshold.flag === 'alert60DaysSent') alerts.sent60Days++
+          else if (threshold.flag === 'alert30DaysSent') alerts.sent30Days++
+          else alerts.sent15Days++
+        }
       }
 
       // Marcar como expirado si ya venció
@@ -176,16 +181,7 @@ Por favor, revise el contrato y considere su renovación.
       where.familyId = familyId
     }
 
-    const [total, expiring15, expiring30, expiring60] = await Promise.all([
-      prisma.contracts.count({
-        where: {
-          ...where,
-          endDate: {
-            gte: now,
-            lte: in60Days,
-          },
-        },
-      }),
+    const [expiring15, expiring30, expiring60, active] = await Promise.all([
       prisma.contracts.count({
         where: {
           ...where,
@@ -213,9 +209,13 @@ Por favor, revise el contrato y considere su renovación.
           },
         },
       }),
+      prisma.contracts.count({
+        where: familyId ? { status: 'ACTIVE', familyId } : { status: 'ACTIVE' },
+      }),
     ])
 
     return {
+      active,
       total: expiring60,
       in15Days: expiring15,
       in30Days: expiring30,

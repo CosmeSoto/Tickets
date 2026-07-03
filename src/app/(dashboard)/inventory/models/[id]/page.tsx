@@ -128,7 +128,7 @@ async function ModelDetailContent({ modelId }: { modelId: string }) {
             <Clock className='w-4 h-4' />
             Adquisiciones ({modelData.acquisitionHistory.length})
           </TabsTrigger>
-          {batchIds.length > 0 && (
+          {batchIds.length > 1 && (
             <TabsTrigger value='comparison' className='flex items-center gap-2'>
               <BarChart3 className='w-4 h-4' />
               Comparar Lotes ({batchIds.length})
@@ -144,7 +144,7 @@ async function ModelDetailContent({ modelId }: { modelId: string }) {
           <AcquisitionTimeline acquisitions={enrichedHistory} />
         </TabsContent>
 
-        {batchIds.length > 0 && (
+        {batchIds.length > 1 && (
           <TabsContent value='comparison' className='mt-4'>
             <ModelBatchComparison batches={batchComparisons} />
           </TabsContent>
@@ -154,10 +154,11 @@ async function ModelDetailContent({ modelId }: { modelId: string }) {
   )
 }
 
-export default function ModelDetailPage({ params }: { params: { id: string } }) {
+export default async function ModelDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   return (
     <Suspense fallback={<LoadingSkeleton />}>
-      <ModelDetailContent modelId={params.id} />
+      <ModelDetailContent modelId={id} />
     </Suspense>
   )
 }

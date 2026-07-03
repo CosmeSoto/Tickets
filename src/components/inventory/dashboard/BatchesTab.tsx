@@ -25,6 +25,7 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { resolveBrandName } from '@/lib/utils/equipment-display'
 import { BatchUtilizationAlerts } from '@/components/inventory/batch/BatchUtilizationAlerts'
+import { BatchUtilizationDashboard } from '@/components/inventory/batch/BatchUtilizationDashboard'
 
 interface BatchMetrics {
   total: number
@@ -153,6 +154,8 @@ export function BatchesTab({ canCreate = false }: BatchesTabProps) {
           </div>
         </div>
       )}
+
+      <BatchUtilizationDashboard />
 
       {/* Lista de lotes */}
       {batches.length === 0 ? (

@@ -28,6 +28,9 @@ import { BatchHistory } from '@/components/inventory/batch/BatchHistory'
 import { DeleteBatchButton } from '@/components/inventory/batch/DeleteBatchButton'
 import { BatchDepreciationSummary } from '@/components/inventory/batch/BatchDepreciationSummary'
 import { BatchUtilizationAlerts } from '@/components/inventory/batch/BatchUtilizationAlerts'
+import { CloneSimilarBatchButton } from '@/components/inventory/batch/CloneSimilarBatchButton'
+import { BatchIntegrityAlert } from '@/components/inventory/batch/BatchIntegrityAlert'
+import { BatchReportExport } from '@/components/inventory/batch/BatchReportExport'
 import {
   getHomePathForRole,
   loginPathWithReturnTo,
@@ -109,8 +112,48 @@ async function BatchDetailContent({ batchId }: { batchId: string }) {
             {brandName} {batch.model.model} · {batch.model.type?.name}
           </p>
         </div>
-        <DeleteBatchButton batchId={batch.id} batchCode={batch.batchCode} />
+        <div className='flex items-center gap-2 shrink-0 flex-wrap justify-end'>
+          <BatchReportExport
+            summary={{
+              batchCode: batch.batchCode,
+              brandModel: `${brandName} ${batch.model.model}`,
+              typeName: batch.model.type?.name,
+              quantity: batch.quantity,
+              purchaseDate: batch.purchaseDate,
+              unitPrice: batch.unitPrice,
+              totalPrice: batch.totalPrice,
+              supplierName: batch.supplier?.name,
+              departmentName: batch.department?.name,
+              warehouseName: batch.warehouse?.name,
+              condition: batch.condition ?? undefined,
+              propertyType: batch.propertyType ?? undefined,
+              metrics: batch.metrics,
+            }}
+            equipment={batch.equipment.map((e: any) => ({
+              code: e.code,
+              serialNumber: e.serialNumber,
+              status: e.status,
+              location: e.location,
+              physicalLocation: e.physicalLocation,
+              warehouse: e.warehouse,
+              department: e.department,
+            }))}
+            history={history.map(h => ({ date: h.date, description: h.description }))}
+          />
+          <CloneSimilarBatchButton
+            batchId={batch.id}
+            batchCode={batch.batchCode}
+            highlight={batch.metrics.utilizationRate >= 80 || batch.metrics.available === 0}
+          />
+          <DeleteBatchButton batchId={batch.id} batchCode={batch.batchCode} />
+        </div>
       </div>
+
+      {(batch as any).integrity && (
+        <div className='mb-4'>
+          <BatchIntegrityAlert integrity={(batch as any).integrity} />
+        </div>
+      )}
 
       {/* Métricas */}
       <div className='mb-6 space-y-4'>

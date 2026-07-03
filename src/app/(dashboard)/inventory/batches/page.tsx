@@ -9,6 +9,7 @@ import { ArrowLeft, Plus } from 'lucide-react'
 import Link from 'next/link'
 import { Skeleton } from '@/components/ui/skeleton'
 import { BatchList } from '@/components/inventory/dashboard/BatchList'
+import { BatchUtilizationDashboard } from '@/components/inventory/batch/BatchUtilizationDashboard'
 import { InventoryFiltersClient } from '@/components/inventory/filters/InventoryFiltersClient'
 import {
   getHomePathForRole,
@@ -112,6 +113,10 @@ async function BatchesContent({ searchParams }: { searchParams: SearchParams }) 
         initialType={searchParams.typeId}
         initialDepartment={searchParams.departmentId}
       />
+
+      <div className='mb-6'>
+        <BatchUtilizationDashboard />
+      </div>
 
       <BatchList batches={batchData} />
     </div>

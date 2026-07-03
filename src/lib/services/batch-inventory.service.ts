@@ -6,7 +6,11 @@ import {
   BatchMetrics,
   BatchHistoryEvent,
   BatchDepreciationSummary,
+  BatchCloneTemplate,
+  BatchUtilizationOverview,
 } from '@/types/inventory/batch-inventory'
+import { getBatchUtilizationAlerts } from '@/lib/inventory/batch-alerts'
+import { getBatchAlertSettings } from '@/lib/inventory/batch-alert-settings'
 import { Prisma, EquipmentCondition } from '@prisma/client'
 import { resolveBrandName } from '@/lib/utils/equipment-display'
 import { calculateDepreciation, type DepreciationMethod } from '@/lib/inventory/depreciation'
@@ -186,6 +190,8 @@ export class BatchService {
       batch.propertyType
     )
 
+    const integrity = await ValidationService.validateBatchIntegrity(batchId)
+
     return {
       ...batch,
       model: {
@@ -195,6 +201,55 @@ export class BatchService {
       metrics,
       equipment,
       depreciationSummary,
+      integrity,
+    }
+  }
+
+  /**
+   * Plantilla para duplicar configuración de un lote (nueva compra / recompra).
+   */
+  static async buildCloneTemplate(batchId: string): Promise<BatchCloneTemplate> {
+    const batch = await prisma.equipment_batches.findUnique({
+      where: { id: batchId },
+      include: {
+        model: {
+          include: {
+            brand: { select: { name: true } },
+            type: { include: { family: { select: { id: true, code: true } } } },
+          },
+        },
+      },
+    })
+
+    if (!batch) throw new Error('Lote no encontrado')
+
+    const accessories = Array.isArray(batch.accessories)
+      ? (batch.accessories as Array<{ name?: string } | string>)
+          .map(a => (typeof a === 'string' ? a : (a.name ?? '')))
+          .filter(Boolean)
+      : []
+
+    return {
+      sourceBatchId: batch.id,
+      sourceBatchCode: batch.batchCode,
+      familyId: batch.model.type?.family?.id ?? '',
+      familyCode: batch.model.type?.family?.code ?? undefined,
+      modelId: batch.modelId,
+      typeId: batch.model.typeId ?? '',
+      brand: batch.model.brand?.name ?? '',
+      model: batch.model.model,
+      quantity: batch.quantity,
+      condition: batch.condition ?? 'NEW',
+      ownershipType: batch.propertyType ?? 'FIXED_ASSET',
+      departmentId: batch.departmentId ?? undefined,
+      supplierId: batch.supplierId ?? undefined,
+      unitPrice: batch.unitPrice ?? undefined,
+      purchaseDate: batch.purchaseDate?.toISOString(),
+      invoiceNumber: batch.invoiceNumber ?? undefined,
+      purchaseOrderNumber: batch.purchaseOrderNumber ?? undefined,
+      warehouseId: batch.warehouseId || undefined,
+      notes: batch.notes ?? undefined,
+      accessories,
     }
   }
 
@@ -439,5 +494,115 @@ export class BatchService {
     })
 
     return result
+  }
+
+  /**
+   * Panorama de utilización de lotes — para dashboard y alertas agregadas.
+   */
+  static async getUtilizationOverview(): Promise<BatchUtilizationOverview> {
+    const batches = await BatchService.getAll()
+
+    let criticalCount = 0
+    let warningCount = 0
+    let totalAvailable = 0
+    let totalAssigned = 0
+    let totalUnits = 0
+    let utilizationSum = 0
+
+    const criticalBatches: BatchUtilizationOverview['criticalBatches'] = []
+    const modelMap = new Map<
+      string,
+      BatchUtilizationOverview['byModel'][0] & { utilizationSum: number }
+    >()
+
+    for (const batch of batches) {
+      const m = batch.metrics
+      if (m.total === 0) continue
+
+      totalAvailable += m.available
+      totalAssigned += m.assigned
+      totalUnits += m.total
+      utilizationSum += m.utilizationRate
+
+      const modelBrand = resolveBrandName(
+        (batch.model as { brand?: string | { name?: string } | null }).brand ?? null
+      )
+
+      const familyId = batch.model.type?.familyId ?? null
+      const alertSettings = await getBatchAlertSettings(familyId)
+      if (!alertSettings.enabled) continue
+
+      const alerts = getBatchUtilizationAlerts(m, {
+        lowStockThresholdPct: alertSettings.lowStockThresholdPct,
+      }).filter(a => a.level === 'critical' || a.level === 'warning')
+
+      if (alerts.length > 0) {
+        const hasCritical = alerts.some(a => a.level === 'critical')
+        if (hasCritical) criticalCount++
+        else warningCount++
+
+        criticalBatches.push({
+          id: batch.id,
+          batchCode: batch.batchCode,
+          brandModel: `${modelBrand} ${batch.model.model}`,
+          typeName: batch.model.type?.name,
+          metrics: m,
+          topAlert: alerts[0].title,
+          alertLevel: hasCritical ? 'critical' : 'warning',
+        })
+      }
+
+      const modelId = batch.modelId
+      const brandName = modelBrand
+      if (!modelMap.has(modelId)) {
+        modelMap.set(modelId, {
+          modelId,
+          brand: brandName,
+          model: batch.model.model,
+          typeName: batch.model.type?.name,
+          batchCount: 0,
+          totalUnits: 0,
+          available: 0,
+          assigned: 0,
+          utilizationRate: 0,
+          utilizationSum: 0,
+        })
+      }
+      const row = modelMap.get(modelId)!
+      row.batchCount++
+      row.totalUnits += m.total
+      row.available += m.available
+      row.assigned += m.assigned
+      row.utilizationSum += m.utilizationRate
+    }
+
+    const byModel = [...modelMap.values()]
+      .map(({ utilizationSum: us, ...rest }) => ({
+        ...rest,
+        utilizationRate: rest.batchCount > 0 ? us / rest.batchCount : 0,
+      }))
+      .sort((a, b) => b.utilizationRate - a.utilizationRate)
+      .slice(0, 10)
+
+    criticalBatches.sort((a, b) => {
+      if (a.alertLevel !== b.alertLevel) return a.alertLevel === 'critical' ? -1 : 1
+      return b.metrics.utilizationRate - a.metrics.utilizationRate
+    })
+
+    const activeBatches = batches.filter(b => b.metrics.total > 0).length
+
+    return {
+      summary: {
+        totalBatches: batches.length,
+        criticalCount,
+        warningCount,
+        avgUtilization: activeBatches > 0 ? utilizationSum / activeBatches : 0,
+        totalAvailable,
+        totalAssigned,
+        totalUnits,
+      },
+      criticalBatches: criticalBatches.slice(0, 8),
+      byModel,
+    }
   }
 }

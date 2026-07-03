@@ -473,6 +473,81 @@ export function InventoryAreasTab({
                   </CardContent>
                 </Card>
 
+                {/* Batch alert overrides */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className='text-base'>Alertas de lotes</CardTitle>
+                    <CardDescription>
+                      Personalizar alertas de utilización para esta área. Si no se configura, se
+                      usan las reglas globales.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className='space-y-3'>
+                    <div className='flex items-center justify-between p-3 border rounded-lg'>
+                      <div>
+                        <p className='text-sm font-medium'>Usar reglas globales</p>
+                        <p className='text-xs text-muted-foreground'>
+                          Heredar configuración de la pestaña Reglas generales
+                        </p>
+                      </div>
+                      <Switch
+                        checked={form.useGlobalBatchAlerts}
+                        onCheckedChange={v => onSetField('useGlobalBatchAlerts', v)}
+                        disabled={saving}
+                      />
+                    </div>
+                    {!form.useGlobalBatchAlerts && (
+                      <div className='space-y-3 pl-4 border-l-2 border-muted'>
+                        <div className='flex items-center justify-between p-3 border rounded-lg'>
+                          <p className='text-sm font-medium'>Alertas habilitadas</p>
+                          <Switch
+                            checked={form.batchUtilizationAlertEnabled}
+                            onCheckedChange={v => onSetField('batchUtilizationAlertEnabled', v)}
+                            disabled={saving}
+                          />
+                        </div>
+                        {form.batchUtilizationAlertEnabled && (
+                          <>
+                            <div className='flex items-center justify-between p-3 border rounded-lg'>
+                              <p className='text-sm font-medium'>Email en alertas críticas</p>
+                              <Switch
+                                checked={form.batchUtilizationEmailCritical}
+                                onCheckedChange={v =>
+                                  onSetField('batchUtilizationEmailCritical', v)
+                                }
+                                disabled={saving}
+                              />
+                            </div>
+                            <div className='flex items-center justify-between p-3 border rounded-lg'>
+                              <p className='text-sm font-medium'>Email en advertencias</p>
+                              <Switch
+                                checked={form.batchUtilizationEmailWarning}
+                                onCheckedChange={v => onSetField('batchUtilizationEmailWarning', v)}
+                                disabled={saving}
+                              />
+                            </div>
+                            <div className='space-y-2'>
+                              <Label htmlFor='batch-threshold'>Umbral stock bajo (%)</Label>
+                              <Input
+                                id='batch-threshold'
+                                type='number'
+                                min={1}
+                                max={100}
+                                value={form.batchLowStockThresholdPct}
+                                onChange={e =>
+                                  onSetField('batchLowStockThresholdPct', e.target.value)
+                                }
+                                disabled={saving}
+                                className='w-32'
+                              />
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
                 {/* Default depreciation */}
                 <Card>
                   <CardHeader>

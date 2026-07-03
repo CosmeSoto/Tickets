@@ -31,6 +31,7 @@ export async function GET(req: NextRequest) {
       personalOnly: searchParams.get('personalOnly') === 'true',
       statusFilter: searchParams.get('status') ?? '',
       conditionFilter: searchParams.get('condition') ?? '',
+      batchFilter: searchParams.get('batchFilter') ?? '',
       page: Math.max(1, parseInt(searchParams.get('page') ?? '1', 10) || 1),
       pageSize,
     })

@@ -84,6 +84,63 @@ export interface BatchDepreciationSummary {
   totalAccumulatedDepreciation: number
 }
 
+/** Plantilla para crear un lote similar a uno existente */
+export interface BatchCloneTemplate {
+  sourceBatchId: string
+  sourceBatchCode: string
+  familyId: string
+  familyCode?: string
+  modelId: string
+  typeId: string
+  brand: string
+  model: string
+  quantity: number
+  condition: string
+  ownershipType: string
+  departmentId?: string
+  supplierId?: string
+  unitPrice?: number
+  purchaseDate?: string
+  invoiceNumber?: string
+  purchaseOrderNumber?: string
+  warehouseId?: string
+  notes?: string
+  accessories?: string[]
+}
+
+/** Resumen de utilización de lotes para dashboard */
+export interface BatchUtilizationOverview {
+  summary: {
+    totalBatches: number
+    criticalCount: number
+    warningCount: number
+    avgUtilization: number
+    totalAvailable: number
+    totalAssigned: number
+    totalUnits: number
+  }
+  criticalBatches: Array<{
+    id: string
+    batchCode: string
+    brandModel: string
+    typeName?: string
+    metrics: BatchMetrics
+    topAlert: string
+    alertLevel: 'critical' | 'warning'
+  }>
+  byModel: Array<{
+    modelId: string
+    brand: string
+    model: string
+    typeName?: string
+    batchCount: number
+    totalUnits: number
+    available: number
+    assigned: number
+    utilizationRate: number
+  }>
+}
+
 export interface BatchWithMetrics extends BatchSummary {
   metrics: BatchMetrics
 }

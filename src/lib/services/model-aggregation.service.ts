@@ -43,6 +43,11 @@ export interface BatchComparison {
   condition: string
   accessories: any[]
   customValues: any
+  available: number
+  assigned: number
+  maintenance: number
+  retired: number
+  utilizationRate: number
 }
 
 export class ModelAggregationService {
@@ -280,18 +285,33 @@ export class ModelAggregationService {
       }),
     ])
 
-    // Mapa batchId → conteos
-    const countMap = new Map<string, { total: number; maintenance: number }>()
+    // Mapa batchId → conteos por estado
+    const countMap = new Map<
+      string,
+      { total: number; available: number; assigned: number; maintenance: number; retired: number }
+    >()
     for (const g of statusCounts) {
       if (!g.batchId) continue
-      if (!countMap.has(g.batchId)) countMap.set(g.batchId, { total: 0, maintenance: 0 })
+      if (!countMap.has(g.batchId)) {
+        countMap.set(g.batchId, { total: 0, available: 0, assigned: 0, maintenance: 0, retired: 0 })
+      }
       const c = countMap.get(g.batchId)!
-      c.total += g._count.id
-      if (g.status === 'MAINTENANCE') c.maintenance = g._count.id
+      const n = g._count.id
+      c.total += n
+      if (g.status === 'AVAILABLE') c.available = n
+      if (g.status === 'ASSIGNED') c.assigned = n
+      if (g.status === 'MAINTENANCE') c.maintenance = n
+      if (g.status === 'RETIRED') c.retired = n
     }
 
     return batches.map(batch => {
-      const counts = countMap.get(batch.id) ?? { total: 0, maintenance: 0 }
+      const counts = countMap.get(batch.id) ?? {
+        total: 0,
+        available: 0,
+        assigned: 0,
+        maintenance: 0,
+        retired: 0,
+      }
       return {
         batchId: batch.id,
         batchCode: batch.batchCode,
@@ -303,6 +323,11 @@ export class ModelAggregationService {
         condition: batch.condition ?? 'N/A',
         accessories: (batch.accessories as any[]) ?? [],
         customValues: batch.customValues ?? {},
+        available: counts.available,
+        assigned: counts.assigned,
+        maintenance: counts.maintenance,
+        retired: counts.retired,
+        utilizationRate: counts.total > 0 ? (counts.assigned / counts.total) * 100 : 0,
       }
     })
   }

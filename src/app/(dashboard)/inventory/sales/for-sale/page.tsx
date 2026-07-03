@@ -74,6 +74,27 @@ interface ForSaleEquipment {
   }
 }
 
+function mapForSaleEquipment(raw: any): ForSaleEquipment {
+  const brandName = raw.model?.brand
+    ? typeof raw.model.brand === 'object'
+      ? (raw.model.brand.name ?? '')
+      : String(raw.model.brand)
+    : (raw.brand ?? '')
+  const modelName = raw.model?.model ?? raw.modelDeprecated ?? ''
+  return {
+    id: raw.id,
+    code: raw.code,
+    brand: brandName,
+    model: modelName,
+    status: raw.status,
+    condition: raw.condition,
+    saleListingPrice: raw.saleListingPrice ?? null,
+    updatedAt: raw.updatedAt,
+    createdAt: raw.createdAt,
+    type: raw.type,
+  }
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const CONDITION_LABELS: Record<string, string> = {
@@ -509,7 +530,8 @@ export default function ForSalePage() {
 
   const role = session?.user?.role
   const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
-  const canAccess = role === 'ADMIN' || isSuperAdmin
+  const canManageInventory = (session?.user as any)?.canManageInventory === true
+  const canAccess = role === 'ADMIN' || isSuperAdmin || canManageInventory
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login')
@@ -519,10 +541,17 @@ export default function ForSalePage() {
   const loadEquipment = useCallback(async () => {
     try {
       setLoading(true)
-      const res = await fetch('/api/inventory/equipment?status=FOR_SALE&limit=200')
+      const res = await fetch('/api/inventory/sales/for-sale?pageSize=200')
       if (res.ok) {
         const data = await res.json()
-        setEquipment(data.equipment ?? [])
+        setEquipment((data.equipment ?? []).map(mapForSaleEquipment))
+      } else {
+        const err = await res.json().catch(() => ({}))
+        toast({
+          title: 'Error al cargar equipos',
+          description: err.error ?? 'No se pudieron cargar los equipos en venta',
+          variant: 'destructive',
+        })
       }
     } catch {
       toast({ title: 'Error al cargar equipos', variant: 'destructive' })

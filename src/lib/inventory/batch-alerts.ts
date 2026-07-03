@@ -11,11 +11,15 @@ export interface BatchUtilizationAlert {
 /**
  * Genera alertas operativas para un lote según métricas en tiempo real.
  */
-export function getBatchUtilizationAlerts(metrics: BatchMetrics): BatchUtilizationAlert[] {
+export function getBatchUtilizationAlerts(
+  metrics: BatchMetrics,
+  options?: { lowStockThresholdPct?: number }
+): BatchUtilizationAlert[] {
   const alerts: BatchUtilizationAlert[] = []
   if (metrics.total <= 0) return alerts
 
-  const lowStockThreshold = Math.max(1, Math.ceil(metrics.total * 0.15))
+  const pct = options?.lowStockThresholdPct ?? 15
+  const lowStockThreshold = Math.max(1, Math.ceil(metrics.total * (pct / 100)))
 
   if (metrics.available === 0) {
     alerts.push({

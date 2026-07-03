@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { AssetRequestService } from '@/lib/services/asset-request.service'
 import { addCommentSchema } from '@/lib/validations/inventory/asset-request'
+import { canManageAssetRequests } from '@/lib/inventory/asset-request-access'
 import { ZodError } from 'zod'
 
 /**
@@ -18,10 +19,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    // Verificar que el usuario tenga acceso al inventario
-    if (!session.user.inventoryEnabled) {
+    if (!(await canManageAssetRequests(session.user))) {
       return NextResponse.json(
-        { error: 'No tienes acceso al módulo de inventario' },
+        { error: 'No tienes permiso para comentar solicitudes' },
         { status: 403 }
       )
     }

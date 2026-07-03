@@ -388,7 +388,8 @@ export default function SalesPage() {
 
   const role = session?.user?.role
   const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
-  const canAccess = role === 'ADMIN' || isSuperAdmin
+  const canManageInventory = (session?.user as any)?.canManageInventory === true
+  const canAccess = role === 'ADMIN' || isSuperAdmin || canManageInventory
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login')
@@ -425,7 +426,11 @@ export default function SalesPage() {
   })
 
   // Ordenamiento con el hook estándar
-  const { sortedData: sorted, requestSort, getSortIcon } = useTableSort(filtered, { key: 'createdAt', direction: 'desc' })
+  const {
+    sortedData: sorted,
+    requestSort,
+    getSortIcon,
+  } = useTableSort(filtered, { key: 'createdAt', direction: 'desc' })
 
   // Exportación
   const { exportCSV, exportExcel, exportPDF, exporting } = useExport({

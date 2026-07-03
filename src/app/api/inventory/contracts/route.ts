@@ -1,150 +1,105 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { ContractService } from '@/lib/services/contract-service'
+import { canManageInventory, inventoryForbidden } from '@/lib/inventory-access'
+import { createContractSchema } from '@/lib/validations/contracts'
+import { ZodError } from 'zod'
 
-const EXPIRING_DAYS = 30 // alerta si vence en menos de 30 días
-
-function contractStatus(endDate?: Date | null): {
-  status: 'ACTIVE' | 'EXPIRING' | 'EXPIRED'
-  daysUntilExpiry?: number
-} {
-  if (!endDate) return { status: 'ACTIVE' }
-  const now = new Date()
-  const diff = Math.floor((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-  if (diff < 0) return { status: 'EXPIRED', daysUntilExpiry: 0 }
-  if (diff <= EXPIRING_DAYS) return { status: 'EXPIRING', daysUntilExpiry: diff }
-  return { status: 'ACTIVE', daysUntilExpiry: diff }
-}
-
+// GET /api/inventory/contracts — listar contratos
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
-  if (!session?.user) {
-    return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-  }
+  if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+
+  const hasAccess =
+    session.user.role === 'ADMIN' || (await canManageInventory(session.user.id, session.user.role))
+  if (!hasAccess) return inventoryForbidden()
 
   const { searchParams } = new URL(req.url)
-  const familyId = searchParams.get('familyId') || undefined
+  try {
+    const isSuperAdmin = (session.user as any).isSuperAdmin === true
+    const result = await ContractService.list({
+      page: Number(searchParams.get('page') ?? 1),
+      pageSize: Number(searchParams.get('pageSize') ?? 20),
+      search: searchParams.get('search') ?? undefined,
+      status: searchParams.get('status') ?? undefined,
+      category: searchParams.get('category') ?? undefined,
+      familyId: searchParams.get('familyId') ?? undefined,
+      supplierId: searchParams.get('supplierId') ?? undefined,
+      userId: session.user.id,
+      userRole: session.user.role,
+      isSuperAdmin,
+    })
+    return NextResponse.json(result)
+  } catch (err) {
+    console.error('[GET /api/inventory/contracts]', err)
+    return NextResponse.json({ error: 'Error al obtener contratos' }, { status: 500 })
+  }
+}
 
-  // Admin Normal: resolver scope de inventario si no se pasa familyId explícito
-  let scopeFamilyIds: string[] | undefined = undefined
-  if (!familyId && session.user.role === 'ADMIN' && !(session.user as any).isSuperAdmin) {
-    const { getInventorySessionContext } = await import('@/lib/inventory/inventory-session')
-    scopeFamilyIds = (await getInventorySessionContext(session.user)).scope.familyIds
+// POST /api/inventory/contracts — crear contrato
+export async function POST(req: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+
+  if (!(await canManageInventory(session.user.id, session.user.role))) {
+    return inventoryForbidden()
   }
 
-  // Construir filtro de familia para equipment (a través de type)
-  const equipFamilyFilter = familyId
-    ? { type: { familyId } }
-    : scopeFamilyIds
-      ? { type: { familyId: { in: scopeFamilyIds } } }
-      : {}
+  try {
+    const raw = await req.json()
+    if (!raw.category || raw.category === '') raw.category = 'SERVICE'
 
-  // Construir filtro de familia para licenses (a través de licenseType)
-  const licenseFamilyFilter = familyId
-    ? { licenseType: { familyId } }
-    : scopeFamilyIds
-      ? { licenseType: { familyId: { in: scopeFamilyIds } } }
-      : {}
+    const p = createContractSchema.parse(raw)
 
-  // Equipos en arrendamiento o activo de tercero (tienen contrato)
-  const [equipmentContracts, licenseContracts] = await Promise.all([
-    prisma.equipment.findMany({
-      where: {
-        ownershipType: { in: ['RENTAL', 'LOAN'] },
-        status: { not: 'RETIRED' },
-        ...equipFamilyFilter,
-      },
-      select: {
-        id: true,
-        brand: true,
-        model: true,
-        rentalContractNumber: true,
-        rentalEndDate: true,
-        rentalMonthlyCost: true,
-        contractEndDate: true,
-        contractRenewalCost: true,
-        contractId: true,
-        ownershipType: true,
-        supplier: { select: { name: true } },
-        type: {
-          select: {
-            family: { select: { name: true } },
-          },
+    const contract = await ContractService.create({
+      contractNumber: p.contractNumber ?? undefined,
+      name: p.name,
+      description: p.description ?? undefined,
+      category: p.category,
+      supplierId: p.supplierId ?? undefined,
+      familyId: p.familyId ?? undefined,
+      modelId: p.modelId ?? undefined,
+      batchId: p.batchId ?? undefined,
+      startDate: p.startDate ?? undefined,
+      endDate: p.endDate ?? undefined,
+      autoRenew: p.autoRenew,
+      renewalNoticeDays: p.renewalNoticeDays,
+      billingCycle: p.billingCycle,
+      totalValue: p.totalValue ?? undefined,
+      monthlyCost: p.monthlyCost ?? undefined,
+      currency: p.currency,
+      contactName: p.contactName ?? undefined,
+      contactEmail: p.contactEmail || undefined,
+      contactPhone: p.contactPhone ?? undefined,
+      notes: p.notes ?? undefined,
+      termsUrl: p.termsUrl || undefined,
+      lines: p.lines.map(l => ({
+        type: l.type,
+        description: l.description,
+        quantity: l.quantity,
+        unitPrice: l.unitPrice ?? undefined,
+        equipmentId: l.equipmentId ?? undefined,
+        licenseId: l.licenseId ?? undefined,
+        notes: l.notes ?? undefined,
+        order: l.order,
+      })),
+      createdBy: session.user.id,
+    })
+    return NextResponse.json(contract, { status: 201 })
+  } catch (err: any) {
+    if (err instanceof ZodError) {
+      const first = err.errors[0]
+      return NextResponse.json(
+        {
+          error: first?.message ?? 'Datos inválidos',
+          field: first?.path?.join('.'),
+          details: err.errors,
         },
-      },
-      orderBy: { rentalEndDate: 'asc' },
-      take: 500,
-    }),
-
-    prisma.software_licenses.findMany({
-      where: {
-        OR: [{ expirationDate: { not: null } }, { renewalCost: { not: null } }],
-        ...licenseFamilyFilter,
-      },
-      select: {
-        id: true,
-        name: true,
-        expirationDate: true,
-        renewalCost: true,
-        vendor: true,
-        supplier: { select: { name: true } },
-        licenseType: {
-          select: {
-            family: { select: { name: true } },
-          },
-        },
-      },
-      orderBy: { expirationDate: 'asc' },
-      take: 500,
-    }),
-  ])
-
-  // Mapear equipos
-  const equipmentItems = equipmentContracts.map(eq => {
-    const endDate = eq.rentalEndDate ?? eq.contractEndDate
-    const { status, daysUntilExpiry } = contractStatus(endDate)
-    const supplierName = eq.supplier?.name ?? undefined
-    return {
-      id: eq.id,
-      name: `${eq.brand} ${eq.model}`,
-      type: 'EQUIPMENT' as const,
-      contractNumber: eq.rentalContractNumber ?? undefined,
-      supplier: supplierName,
-      endDate: endDate?.toISOString(),
-      monthlyCost: eq.rentalMonthlyCost ?? eq.contractRenewalCost ?? undefined,
-      status,
-      daysUntilExpiry,
-      familyName: eq.type?.family?.name,
+        { status: 422 }
+      )
     }
-  })
-
-  // Mapear licencias
-  const licenseItems = licenseContracts.map(lic => {
-    const { status, daysUntilExpiry } = contractStatus(lic.expirationDate)
-    const supplierName = lic.supplier?.name ?? lic.vendor ?? undefined
-    return {
-      id: lic.id,
-      name: lic.name,
-      type: 'LICENSE' as const,
-      supplier: supplierName,
-      endDate: lic.expirationDate?.toISOString(),
-      monthlyCost: lic.renewalCost ?? undefined,
-      status,
-      daysUntilExpiry,
-      familyName: lic.licenseType?.family?.name,
-    }
-  })
-
-  // Ordenar: vencidos primero, luego por vencer, luego vigentes
-  const ORDER = { EXPIRED: 0, EXPIRING: 1, ACTIVE: 2 }
-  const items = [...equipmentItems, ...licenseItems].sort((a, b) => {
-    const diff = ORDER[a.status] - ORDER[b.status]
-    if (diff !== 0) return diff
-    // Dentro del mismo estado, ordenar por fecha de vencimiento más próxima
-    if (a.endDate && b.endDate) return new Date(a.endDate).getTime() - new Date(b.endDate).getTime()
-    return 0
-  })
-
-  return NextResponse.json({ items, total: items.length })
+    console.error('[POST /api/inventory/contracts]', err)
+    return NextResponse.json({ error: err.message ?? 'Error al crear contrato' }, { status: 500 })
+  }
 }

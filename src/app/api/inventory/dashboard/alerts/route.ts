@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 import { getInventorySessionContext } from '@/lib/inventory/inventory-session'
+import { BatchService } from '@/lib/services/batch-inventory.service'
 
 /**
  * GET /api/inventory/dashboard/alerts
@@ -33,6 +34,8 @@ export async function GET(request: NextRequest) {
           expiringLicenses: 0,
           pendingActs: 0,
           pendingRequests: 0,
+          batchCriticalBatches: 0,
+          batchWarningBatches: 0,
         })
       }
       if (user.familyId) {
@@ -56,6 +59,7 @@ export async function GET(request: NextRequest) {
       expiringLicenses,
       pendingActs,
       pendingRequests,
+      batchOverview,
     ] = await Promise.all([
       // Consumibles con stock bajo - usar queryRaw para comparar campos
       (async () => {
@@ -131,6 +135,10 @@ export async function GET(request: NextRequest) {
       prisma.asset_requests.count({
         where: { ...familyScope, status: 'PENDING' },
       }),
+
+      role === 'ADMIN' || canManageFromDb
+        ? BatchService.getUtilizationOverview().catch(() => null)
+        : Promise.resolve(null),
     ])
 
     return NextResponse.json({
@@ -141,6 +149,8 @@ export async function GET(request: NextRequest) {
       expiringLicenses,
       pendingActs,
       pendingRequests,
+      batchCriticalBatches: batchOverview?.summary.criticalCount ?? 0,
+      batchWarningBatches: batchOverview?.summary.warningCount ?? 0,
     })
   } catch (error) {
     console.error('Error obteniendo alertas del dashboard:', error)

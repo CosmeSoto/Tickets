@@ -48,6 +48,10 @@ export interface RawConfig {
   autoApproveDecommission?: boolean
   requireDeliveryAct?: boolean
   inventoryEnabled?: boolean
+  batchUtilizationAlertEnabled?: boolean | null
+  batchUtilizationEmailCritical?: boolean | null
+  batchUtilizationEmailWarning?: boolean | null
+  batchLowStockThresholdPct?: number | null
 }
 
 export interface FormState {
@@ -64,6 +68,11 @@ export interface FormState {
   codePrefix: string
   autoApproveDecommission: boolean
   requireDeliveryAct: boolean
+  useGlobalBatchAlerts: boolean
+  batchUtilizationAlertEnabled: boolean
+  batchUtilizationEmailCritical: boolean
+  batchUtilizationEmailWarning: boolean
+  batchLowStockThresholdPct: string
 }
 
 export interface GlobalRules {
@@ -75,6 +84,10 @@ export interface GlobalRules {
   warrantyAlertEnabled: boolean
   warrantyAlertDays: number
   contractAlertDays: number
+  batchUtilizationAlertEnabled: boolean
+  batchUtilizationEmailCritical: boolean
+  batchUtilizationEmailWarning: boolean
+  batchLowStockThresholdPct: number
 }
 
 const DEFAULT_GLOBAL_RULES: GlobalRules = {
@@ -86,6 +99,10 @@ const DEFAULT_GLOBAL_RULES: GlobalRules = {
   warrantyAlertEnabled: true,
   warrantyAlertDays: 30,
   contractAlertDays: 30,
+  batchUtilizationAlertEnabled: true,
+  batchUtilizationEmailCritical: true,
+  batchUtilizationEmailWarning: false,
+  batchLowStockThresholdPct: 15,
 }
 
 /** Normaliza alias legacy del método de depreciación al enum de Prisma. */
@@ -113,6 +130,21 @@ function apiSettingsToGlobalRules(settings: Record<string, unknown>): GlobalRule
       Number(settings.warranty_alert_days) || DEFAULT_GLOBAL_RULES.warrantyAlertDays,
     contractAlertDays:
       Number(settings.contract_alert_days) || DEFAULT_GLOBAL_RULES.contractAlertDays,
+    batchUtilizationAlertEnabled:
+      settings.batch_utilization_alert_enabled !== undefined
+        ? settings.batch_utilization_alert_enabled === true
+        : DEFAULT_GLOBAL_RULES.batchUtilizationAlertEnabled,
+    batchUtilizationEmailCritical:
+      settings.batch_utilization_email_critical !== undefined
+        ? settings.batch_utilization_email_critical === true
+        : DEFAULT_GLOBAL_RULES.batchUtilizationEmailCritical,
+    batchUtilizationEmailWarning:
+      settings.batch_utilization_email_warning !== undefined
+        ? settings.batch_utilization_email_warning === true
+        : DEFAULT_GLOBAL_RULES.batchUtilizationEmailWarning,
+    batchLowStockThresholdPct:
+      Number(settings.batch_low_stock_threshold_pct) ||
+      DEFAULT_GLOBAL_RULES.batchLowStockThresholdPct,
   }
 }
 
@@ -126,6 +158,10 @@ function globalRulesToApiPayload(rules: GlobalRules): Record<string, number | bo
     warranty_alert_enabled: rules.warrantyAlertEnabled,
     warranty_alert_days: rules.warrantyAlertDays,
     contract_alert_days: rules.contractAlertDays,
+    batch_utilization_alert_enabled: rules.batchUtilizationAlertEnabled,
+    batch_utilization_email_critical: rules.batchUtilizationEmailCritical,
+    batch_utilization_email_warning: rules.batchUtilizationEmailWarning,
+    batch_low_stock_threshold_pct: rules.batchLowStockThresholdPct,
   }
 }
 
@@ -161,6 +197,17 @@ function buildForm(cfg: RawConfig | null, assetRequestsEnabled = false): FormSta
     codePrefix: cfg?.codePrefix ?? '',
     autoApproveDecommission: cfg?.autoApproveDecommission ?? false,
     requireDeliveryAct: cfg?.requireDeliveryAct ?? true,
+    useGlobalBatchAlerts:
+      !cfg ||
+      (cfg.batchUtilizationAlertEnabled === null &&
+        cfg.batchUtilizationEmailCritical === null &&
+        cfg.batchUtilizationEmailWarning === null &&
+        cfg.batchLowStockThresholdPct === null),
+    batchUtilizationAlertEnabled: cfg?.batchUtilizationAlertEnabled ?? true,
+    batchUtilizationEmailCritical: cfg?.batchUtilizationEmailCritical ?? true,
+    batchUtilizationEmailWarning: cfg?.batchUtilizationEmailWarning ?? false,
+    batchLowStockThresholdPct:
+      cfg?.batchLowStockThresholdPct != null ? String(cfg.batchLowStockThresholdPct) : '15',
   }
 }
 
@@ -349,6 +396,21 @@ export function useInventorySettings() {
         codePrefix: form.codePrefix || null,
         autoApproveDecommission: form.autoApproveDecommission,
         requireDeliveryAct: form.requireDeliveryAct,
+        ...(form.useGlobalBatchAlerts
+          ? {
+              batchUtilizationAlertEnabled: null,
+              batchUtilizationEmailCritical: null,
+              batchUtilizationEmailWarning: null,
+              batchLowStockThresholdPct: null,
+            }
+          : {
+              batchUtilizationAlertEnabled: form.batchUtilizationAlertEnabled,
+              batchUtilizationEmailCritical: form.batchUtilizationEmailCritical,
+              batchUtilizationEmailWarning: form.batchUtilizationEmailWarning,
+              batchLowStockThresholdPct: form.batchLowStockThresholdPct
+                ? parseFloat(form.batchLowStockThresholdPct)
+                : null,
+            }),
       }
 
       const requests: Promise<Response>[] = [

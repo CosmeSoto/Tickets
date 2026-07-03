@@ -69,26 +69,53 @@ export function SupplierSelect({
   const [open, setOpen] = useState(false)
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [loading, setLoading] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
   const [formOpen, setFormOpen] = useState(false)
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null)
   const [confirm, setConfirm] = useState<ConfirmAction | null>(null)
   const [actionLoading, setActionLoading] = useState(false)
 
-  const loadSuppliers = useCallback(() => {
-    setLoading(true)
-    const url = familyId
-      ? `/api/inventory/suppliers?active=true&familyId=${familyId}`
-      : '/api/inventory/suppliers?active=true'
-    fetch(url)
-      .then(r => r.json())
-      .then(d => setSuppliers(Array.isArray(d) ? d : []))
-      .catch(() => {})
-      .finally(() => setLoading(false))
-  }, [familyId])
+  const loadSuppliers = useCallback(
+    async (search?: string) => {
+      setLoading(true)
+      try {
+        const params = new URLSearchParams({ active: 'true', limit: '50', page: '1' })
+        if (familyId) params.set('familyId', familyId)
+        if (search?.trim()) params.set('search', search.trim())
+        const res = await fetch(`/api/inventory/suppliers?${params}`)
+        if (!res.ok) return
+        const data = await res.json()
+        setSuppliers(Array.isArray(data) ? data : (data.suppliers ?? []))
+      } catch {
+        /* silencioso */
+      } finally {
+        setLoading(false)
+      }
+    },
+    [familyId]
+  )
 
   useEffect(() => {
     loadSuppliers()
   }, [loadSuppliers])
+
+  // Búsqueda server-side con debounce (no depender del cap de listado paginado)
+  useEffect(() => {
+    const timer = setTimeout(() => loadSuppliers(searchQuery), 300)
+    return () => clearTimeout(timer)
+  }, [searchQuery, loadSuppliers])
+
+  // Asegurar que el proveedor seleccionado aparezca aunque no esté en la página actual
+  useEffect(() => {
+    if (!value) return
+    fetch(`/api/inventory/suppliers/${value}`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(data => {
+        if (!data?.id) return
+        setSuppliers(prev => (prev.some(s => s.id === data.id) ? prev : [data, ...prev]))
+      })
+      .catch(() => {})
+  }, [value])
 
   const selected = suppliers.find(s => s.id === value)
 
@@ -155,7 +182,11 @@ export function SupplierSelect({
         loadSuppliers()
       }
     } catch (err) {
-      toast({ title: 'Error', description: extractCatchError(err, 'No se pudo completar la acción'), variant: 'destructive' })
+      toast({
+        title: 'Error',
+        description: extractCatchError(err, 'No se pudo completar la acción'),
+        variant: 'destructive',
+      })
     } finally {
       setActionLoading(false)
       setConfirm(null)
@@ -190,8 +221,12 @@ export function SupplierSelect({
             </Button>
           </PopoverTrigger>
           <PopoverContent className='w-[460px] p-0' align='start'>
-            <Command>
-              <CommandInput placeholder='Buscar proveedor...' />
+            <Command shouldFilter={false}>
+              <CommandInput
+                placeholder='Buscar proveedor...'
+                value={searchQuery}
+                onValueChange={setSearchQuery}
+              />
               <CommandList>
                 {canEdit && (
                   <CommandGroup>

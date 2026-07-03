@@ -45,19 +45,21 @@ export async function GET(request: NextRequest) {
     // Filtrar por familia a través del equipo
     if (familyId) {
       where.equipment = { type: { familyId } }
-    } else if (
-      !isClient &&
-      !personalOnly &&
-      session.user.role === 'ADMIN' &&
-      !(session.user as any).isSuperAdmin
-    ) {
-      // Admin Normal sin familyId explícito: aplicar scope de inventario
-      const { getInventorySessionContext } = await import('@/lib/inventory/inventory-session')
-      const scope = (await getInventorySessionContext(session.user)).scope
-      if (scope.familyIds && scope.familyIds.length > 0) {
-        where.equipment = { type: { familyId: { in: scope.familyIds } } }
-      } else if (scope.noAccess) {
-        where.id = '__NONE__'
+    } else if (!isClient && !personalOnly) {
+      const isSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
+      const needsScope =
+        (session.user.role === 'ADMIN' && !isSuperAdmin) ||
+        session.user.role === 'TECHNICIAN' ||
+        (session.user as { canManageInventory?: boolean }).canManageInventory === true
+
+      if (needsScope) {
+        const { getInventorySessionContext } = await import('@/lib/inventory/inventory-session')
+        const scope = (await getInventorySessionContext(session.user)).scope
+        if (scope.familyIds && scope.familyIds.length > 0) {
+          where.equipment = { type: { familyId: { in: scope.familyIds } } }
+        } else if (scope.noAccess) {
+          where.id = '__NONE__'
+        }
       }
     }
 
@@ -71,29 +73,60 @@ export async function GET(request: NextRequest) {
       where.OR = [{ equipmentId: { in: myEquipmentIds } }, { requestedById: session.user.id }]
     }
 
-    const records = await prisma.maintenance_records.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      take: 200, // cap razonable — si necesitan más, usar paginación
-      include: {
-        equipment: {
-          select: {
-            id: true,
-            code: true,
-            brand: true,
-            modelDeprecated: true,
-            status: true,
-            model: { select: { brand: true, model: true } },
-            type: { select: { name: true } },
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10))
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20', 10)))
+    const skip = (page - 1) * limit
+    const search = searchParams.get('search')?.trim() || undefined
+
+    if (search) {
+      const searchFilter = {
+        OR: [
+          { description: { contains: search, mode: 'insensitive' as const } },
+          { equipment: { code: { contains: search, mode: 'insensitive' as const } } },
+          { equipment: { brand: { contains: search, mode: 'insensitive' as const } } },
+          { equipment: { modelDeprecated: { contains: search, mode: 'insensitive' as const } } },
+          { technician: { name: { contains: search, mode: 'insensitive' as const } } },
+          { requestedBy: { name: { contains: search, mode: 'insensitive' as const } } },
+        ],
+      }
+      where.AND = [...((where.AND as any[]) ?? []), searchFilter]
+    }
+
+    const [records, total] = await Promise.all([
+      prisma.maintenance_records.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+        include: {
+          equipment: {
+            select: {
+              id: true,
+              code: true,
+              brand: true,
+              modelDeprecated: true,
+              status: true,
+              model: { select: { brand: true, model: true } },
+              type: { select: { name: true } },
+            },
           },
+          technician: { select: { id: true, name: true } },
+          supplier: { select: { id: true, name: true } },
+          requestedBy: { select: { id: true, name: true } },
         },
-        technician: { select: { id: true, name: true } },
-        supplier: { select: { id: true, name: true } },
-        requestedBy: { select: { id: true, name: true } },
+      }),
+      prisma.maintenance_records.count({ where }),
+    ])
+
+    return NextResponse.json({
+      records,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit) || 1,
       },
     })
-
-    return NextResponse.json(records)
   } catch (error) {
     return NextResponse.json({ error: 'Error al obtener mantenimientos' }, { status: 500 })
   }

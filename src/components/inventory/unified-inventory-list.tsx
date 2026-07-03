@@ -33,6 +33,7 @@ import {
 } from '@/types/inventory/unified-asset'
 import type { AssetSubtype } from '@/lib/inventory/family-config'
 import { QRBulkPrintDialog } from '@/components/inventory/qr-bulk-print-dialog'
+import { BatchBadge } from '@/components/inventory/dashboard/BatchBadge'
 
 interface UnifiedInventoryListProps {
   initialFamilyId?: string
@@ -86,6 +87,8 @@ export function UnifiedInventoryList({
     selectedSubtype,
     selectedStatus,
     selectedCondition,
+    selectedBatchFilter,
+    batchOptions,
     search,
     page,
     setPage,
@@ -94,6 +97,7 @@ export function UnifiedInventoryList({
     handleSearchChange,
     handleStatusChange,
     handleConditionChange,
+    handleBatchFilterChange,
     visibleColumns,
     showColumnPicker,
     setShowColumnPicker,
@@ -211,6 +215,23 @@ export function UnifiedInventoryList({
             </option>
           ))}
         </select>
+
+        {!personalOnly && (
+          <select
+            value={selectedBatchFilter}
+            onChange={e => handleBatchFilterChange(e.target.value)}
+            className='flex h-9 rounded-md border border-border bg-card px-3 py-2 text-sm sm:w-48'
+          >
+            <option value=''>Todos los lotes</option>
+            <option value='with_batch'>Con lote</option>
+            <option value='without_batch'>Sin lote (individual)</option>
+            {batchOptions.map(b => (
+              <option key={b.id} value={b.id}>
+                {b.batchCode}
+              </option>
+            ))}
+          </select>
+        )}
 
         <div className='relative flex-1 min-w-[160px]'>
           <Search className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none' />
@@ -395,6 +416,11 @@ export function UnifiedInventoryList({
                   Propiedad {renderSortIcon('acquisitionMode')}
                 </th>
               )}
+              {col('lote') && (
+                <th className='px-4 py-3 text-left font-medium text-muted-foreground select-none whitespace-nowrap'>
+                  Lote
+                </th>
+              )}
               {col('creado') && (
                 <th
                   className='px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap'
@@ -510,6 +536,18 @@ export function UnifiedInventoryList({
                       {asset.acquisitionMode ? getAcquisitionModeLabel(asset.acquisitionMode) : '—'}
                     </td>
                   )}
+                  {col('lote') && (
+                    <td className='px-4 py-3' onClick={e => e.stopPropagation()}>
+                      {asset.subtype === 'EQUIPMENT' && asset.batchId ? (
+                        <BatchBadge
+                          batchId={asset.batchId}
+                          batchCode={asset.batchCode ?? undefined}
+                        />
+                      ) : (
+                        <span className='text-xs text-muted-foreground'>—</span>
+                      )}
+                    </td>
+                  )}
                   {col('creado') && (
                     <td className='px-4 py-3 text-muted-foreground text-xs'>
                       {formatDate(asset.createdAt)}
@@ -533,7 +571,11 @@ export function UnifiedInventoryList({
                   {col('precio') && (
                     <td className='px-4 py-3 text-right text-sm tabular-nums text-muted-foreground'>
                       {asset.purchasePrice != null
-                        ? new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(asset.purchasePrice)
+                        ? new Intl.NumberFormat('es-CL', {
+                            style: 'currency',
+                            currency: 'USD',
+                            minimumFractionDigits: 0,
+                          }).format(asset.purchasePrice)
                         : '—'}
                     </td>
                   )}

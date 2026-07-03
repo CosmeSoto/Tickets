@@ -40,9 +40,15 @@ interface RenewContractDialogProps {
   }
   open: boolean
   onOpenChange: (open: boolean) => void
+  onRenewed?: () => void
 }
 
-export function RenewContractDialog({ contract, open, onOpenChange }: RenewContractDialogProps) {
+export function RenewContractDialog({
+  contract,
+  open,
+  onOpenChange,
+  onRenewed,
+}: RenewContractDialogProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [updateTerms, setUpdateTerms] = useState(false)
@@ -107,9 +113,7 @@ export function RenewContractDialog({ contract, open, onOpenChange }: RenewContr
 
       onOpenChange(false)
       router.refresh()
-
-      // Navegar al nuevo contrato
-      router.push(`/inventory/contracts/${renewedContract.id}`)
+      onRenewed?.()
     } catch (error) {
       console.error('Error renovando contrato:', error)
       toast.error(error instanceof Error ? error.message : 'Error al renovar contrato')

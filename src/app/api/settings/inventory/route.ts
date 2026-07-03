@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { z } from 'zod'
 import { requireSuperAdmin } from '@/lib/auth/require-super-admin'
+import { invalidateBatchAlertSettingsCache } from '@/lib/inventory/batch-alert-settings'
 
 const inventorySettingsSchema = z.object({
   manager_ids: z.array(z.string()).optional().default([]),
@@ -12,12 +13,16 @@ const inventorySettingsSchema = z.object({
   license_alert_enabled: z.boolean(),
   license_alert_days_first: z.number().min(1).max(90),
   license_alert_days_second: z.number().min(1).max(90),
-  mro_expiry_alert_days:        z.number().min(1).max(365).optional(),
+  mro_expiry_alert_days: z.number().min(1).max(365).optional(),
   mro_expiry_alert_days_urgent: z.number().min(1).max(365).optional(),
-  warranty_alert_days:          z.number().min(1).max(365).optional(),
-  contract_alert_days:          z.number().min(1).max(365).optional(),
-  mro_expiry_alert_enabled:     z.boolean().optional(),
-  warranty_alert_enabled:       z.boolean().optional(),
+  warranty_alert_days: z.number().min(1).max(365).optional(),
+  contract_alert_days: z.number().min(1).max(365).optional(),
+  mro_expiry_alert_enabled: z.boolean().optional(),
+  warranty_alert_enabled: z.boolean().optional(),
+  batch_utilization_alert_enabled: z.boolean().optional(),
+  batch_utilization_email_critical: z.boolean().optional(),
+  batch_utilization_email_warning: z.boolean().optional(),
+  batch_low_stock_threshold_pct: z.number().min(5).max(50).optional(),
 })
 
 const DEFAULT_SETTINGS: Record<string, string> = {
@@ -27,23 +32,45 @@ const DEFAULT_SETTINGS: Record<string, string> = {
   license_alert_enabled: 'true',
   license_alert_days_first: '30',
   license_alert_days_second: '7',
-  mro_expiry_alert_days:        '30',
+  mro_expiry_alert_days: '30',
   mro_expiry_alert_days_urgent: '7',
-  warranty_alert_days:          '30',
-  contract_alert_days:          '30',
-  mro_expiry_alert_enabled:     'true',
-  warranty_alert_enabled:       'true',
+  warranty_alert_days: '30',
+  contract_alert_days: '30',
+  mro_expiry_alert_enabled: 'true',
+  warranty_alert_enabled: 'true',
+  batch_utilization_alert_enabled: 'true',
+  batch_utilization_email_critical: 'true',
+  batch_utilization_email_warning: 'false',
+  batch_low_stock_threshold_pct: '15',
 }
 
 const JSON_FIELDS = ['manager_ids']
-const BOOLEAN_FIELDS = ['low_stock_alert_enabled', 'license_alert_enabled', 'mro_expiry_alert_enabled', 'warranty_alert_enabled']
-const NUMBER_FIELDS = ['act_expiration_days', 'license_alert_days_first', 'license_alert_days_second', 'mro_expiry_alert_days', 'mro_expiry_alert_days_urgent', 'warranty_alert_days', 'contract_alert_days']
+const BOOLEAN_FIELDS = [
+  'low_stock_alert_enabled',
+  'license_alert_enabled',
+  'mro_expiry_alert_enabled',
+  'warranty_alert_enabled',
+  'batch_utilization_alert_enabled',
+  'batch_utilization_email_critical',
+  'batch_utilization_email_warning',
+]
+const NUMBER_FIELDS = [
+  'act_expiration_days',
+  'license_alert_days_first',
+  'license_alert_days_second',
+  'mro_expiry_alert_days',
+  'mro_expiry_alert_days_urgent',
+  'warranty_alert_days',
+  'contract_alert_days',
+  'batch_low_stock_threshold_pct',
+]
 
 export async function GET(_request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-    if (session.user.role !== 'ADMIN') return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+    if (session.user.role !== 'ADMIN')
+      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
 
     const settingsKeys = Object.keys(DEFAULT_SETTINGS)
     const dbSettings = await prisma.system_settings.findMany({
@@ -56,7 +83,11 @@ export async function GET(_request: NextRequest) {
       const raw = dbRow?.value ?? defaultValue
 
       if (JSON_FIELDS.includes(key)) {
-        try { settings[key] = JSON.parse(raw) } catch { settings[key] = JSON.parse(defaultValue) }
+        try {
+          settings[key] = JSON.parse(raw)
+        } catch {
+          settings[key] = JSON.parse(defaultValue)
+        }
       } else if (BOOLEAN_FIELDS.includes(key)) {
         settings[key] = raw === 'true'
       } else if (NUMBER_FIELDS.includes(key)) {
@@ -101,6 +132,8 @@ export async function PUT(request: NextRequest) {
       })
     }
 
+    invalidateBatchAlertSettingsCache()
+
     return NextResponse.json({ success: true, message: 'Configuración actualizada exitosamente' })
   } catch (error) {
     console.error('Error actualizando configuración de inventario:', error)
@@ -119,12 +152,16 @@ function getSettingDescription(key: string): string {
     license_alert_enabled: 'Habilita alertas de vencimiento de licencias',
     license_alert_days_first: 'Días antes para primera alerta de licencias',
     license_alert_days_second: 'Días antes para segunda alerta de licencias',
-    mro_expiry_alert_days:        'Días antes de caducidad MRO para primera alerta',
+    mro_expiry_alert_days: 'Días antes de caducidad MRO para primera alerta',
     mro_expiry_alert_days_urgent: 'Días antes de caducidad MRO para alerta urgente',
-    warranty_alert_days:          'Días antes de vencimiento de garantía para alerta',
-    contract_alert_days:          'Días antes de vencimiento de contrato para alerta',
-    mro_expiry_alert_enabled:     'Habilita alertas de caducidad MRO',
-    warranty_alert_enabled:       'Habilita alertas de garantía de equipos',
+    warranty_alert_days: 'Días antes de vencimiento de garantía para alerta',
+    contract_alert_days: 'Días antes de vencimiento de contrato para alerta',
+    mro_expiry_alert_enabled: 'Habilita alertas de caducidad MRO',
+    warranty_alert_enabled: 'Habilita alertas de garantía de equipos',
+    batch_utilization_alert_enabled: 'Habilita alertas de utilización y stock en lotes',
+    batch_utilization_email_critical: 'Envía email en alertas críticas de lotes',
+    batch_utilization_email_warning: 'Envía email en alertas de advertencia de lotes',
+    batch_low_stock_threshold_pct: 'Porcentaje mínimo de stock disponible antes de alertar',
   }
   return descriptions[key] || ''
 }

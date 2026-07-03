@@ -24,7 +24,10 @@ import { NotificationService } from './notification-service'
 import { getFamilyScopedAdmins, getNativeFamilyAdmins } from '@/lib/notifications/family-recipients'
 import { EmailService } from '@/lib/services/email/email-service'
 import { createModuleCache, getSetting } from '@/lib/api-cache'
-import { getAccessibleFamilyIds, checkInventoryRequestFamilyAccess } from '@/lib/inventory/family-access'
+import {
+  getAccessibleFamilyIds,
+  checkInventoryRequestFamilyAccess,
+} from '@/lib/inventory/family-access'
 import { validateReviewerComment } from '@/lib/validations/inventory/asset-request'
 import { SLAService } from './sla-service'
 
@@ -452,6 +455,67 @@ export class AssetRequestService {
   }
 
   /**
+   * Familias con solicitud de activos habilitada y accesibles para el usuario.
+   */
+  static async getEnabledFamilies(
+    userId: string,
+    userRole: UserRole,
+    isSuperAdmin: boolean
+  ): Promise<Array<{ id: string; name: string; color: string | null }>> {
+    const accessibleIds = await getAccessibleFamilyIds(userId, userRole, isSuperAdmin, false)
+
+    const families = await prisma.families.findMany({
+      where: {
+        isActive: true,
+        ...(accessibleIds !== undefined ? { id: { in: accessibleIds } } : {}),
+      },
+      select: { id: true, name: true, color: true },
+      orderBy: { name: 'asc' },
+    })
+
+    if (families.length === 0) return []
+
+    const settings = await prisma.system_settings.findMany({
+      where: {
+        key: { in: families.map(f => `asset_requests_enabled_${f.id}`) },
+      },
+      select: { key: true, value: true },
+    })
+    const enabledIds = new Set(
+      settings
+        .filter(s => s.value === 'true')
+        .map(s => s.key.replace('asset_requests_enabled_', ''))
+    )
+
+    return families.filter(f => enabledIds.has(f.id))
+  }
+
+  private static async resolveAssetName(
+    assetType: AssetType,
+    assetId: string | null
+  ): Promise<string | null> {
+    if (!assetId) return null
+
+    if (assetType === 'EQUIPMENT') {
+      const equipmentType = await prisma.equipment_types.findUnique({
+        where: { id: assetId },
+        select: { name: true },
+      })
+      return equipmentType?.name ?? null
+    }
+
+    if (assetType === 'LICENSE') {
+      const licenseType = await prisma.license_types.findUnique({
+        where: { id: assetId },
+        select: { name: true },
+      })
+      return licenseType?.name ?? null
+    }
+
+    return null
+  }
+
+  /**
    * Obtiene el detalle completo de una solicitud.
    *
    * Verifica acceso del usuario a la familia de la solicitud.
@@ -501,6 +565,8 @@ export class AssetRequestService {
       ? (request.reviewComments as unknown as ReviewComment[])
       : []
 
+    const assetName = await this.resolveAssetName(request.assetType, request.assetId)
+
     return {
       id: request.id,
       code: request.code,
@@ -513,7 +579,7 @@ export class AssetRequestService {
       requesterId: request.requesterId,
       requesterName: request.requester.name,
       assetId: request.assetId,
-      assetName: null, // TODO: resolver nombre del activo si assetId está presente
+      assetName,
       quantity: request.quantity,
       neededBy: request.neededBy?.toISOString() || null,
       reviewerComment: request.reviewerComment,

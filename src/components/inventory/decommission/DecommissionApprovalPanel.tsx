@@ -297,7 +297,7 @@ export function DecommissionApprovalPanel({
         const json = await res.json()
         if (!res.ok) throw new Error(json.error || 'Error al cerrar el contrato')
       } else {
-        const res = await fetch(`/api/contracts/${lastContractDialog.contractId}`, {
+        const res = await fetch(`/api/inventory/contracts/${lastContractDialog.contractId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ status: 'TERMINATED' }),

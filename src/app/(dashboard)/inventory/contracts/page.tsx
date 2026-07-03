@@ -16,6 +16,7 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
+  History,
 } from 'lucide-react'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { Button } from '@/components/ui/button'
@@ -45,6 +46,8 @@ import { useFamilyOptions } from '@/hooks/use-family-options'
 import { useFetch } from '@/hooks/common/use-fetch'
 import { useToast } from '@/hooks/use-toast'
 import { ContractForm } from '@/components/contracts/contract-form'
+import { RenewContractDialog } from '@/components/inventory/contracts/renew-contract-dialog'
+import { ContractHistoryTimeline } from '@/components/inventory/contracts/contract-history-timeline'
 import { useTableSort } from '@/hooks/common/use-table-sort'
 import {
   CONTRACT_STATUS_LABELS,
@@ -122,6 +125,8 @@ export default function ContractsPage() {
   const [editingContract, setEditingContract] = useState<Contract | null>(null)
   const [deletingContract, setDeletingContract] = useState<Contract | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [historyContract, setHistoryContract] = useState<Contract | null>(null)
+  const [renewContract, setRenewContract] = useState<Contract | null>(null)
 
   const { families } = useFamilyOptions()
 
@@ -132,7 +137,7 @@ export default function ContractsPage() {
     if (categoryFilter !== 'ALL') p.set('category', categoryFilter)
     if (familyFilter !== 'all') p.set('familyId', familyFilter)
     p.set('pageSize', '200')
-    return `/api/contracts?${p}`
+    return `/api/inventory/contracts?${p}`
   }, [statusFilter, categoryFilter, familyFilter])
 
   const {
@@ -214,7 +219,9 @@ export default function ContractsPage() {
     if (!deletingContract) return
     setDeleting(true)
     try {
-      const res = await fetch(`/api/contracts/${deletingContract.id}`, { method: 'DELETE' })
+      const res = await fetch(`/api/inventory/contracts/${deletingContract.id}`, {
+        method: 'DELETE',
+      })
       if (!res.ok) throw new Error((await res.json()).error)
       toast({ title: 'Contrato eliminado' })
       setDeletingContract(null)
@@ -460,6 +467,26 @@ export default function ContractsPage() {
                                 variant='ghost'
                                 size='sm'
                                 className='h-7 w-7 p-0'
+                                title='Historial de renovaciones'
+                                onClick={() => setHistoryContract(c)}
+                              >
+                                <History className='h-3.5 w-3.5' />
+                              </Button>
+                              {(c.status === 'ACTIVE' || c.status === 'EXPIRING') && (
+                                <Button
+                                  variant='ghost'
+                                  size='sm'
+                                  className='h-7 w-7 p-0'
+                                  title='Renovar contrato'
+                                  onClick={() => setRenewContract(c)}
+                                >
+                                  <RefreshCw className='h-3.5 w-3.5' />
+                                </Button>
+                              )}
+                              <Button
+                                variant='ghost'
+                                size='sm'
+                                className='h-7 w-7 p-0'
                                 onClick={() => {
                                   setEditingContract(c)
                                   setFormOpen(true)
@@ -549,6 +576,47 @@ export default function ContractsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* ── Historial de renovaciones ─────────────────────────────────────── */}
+      <Dialog
+        open={!!historyContract}
+        onOpenChange={open => {
+          if (!open) setHistoryContract(null)
+        }}
+      >
+        <DialogContent className='max-w-2xl max-h-[90vh] overflow-y-auto'>
+          <DialogHeader>
+            <DialogTitle>Historial — {historyContract?.name}</DialogTitle>
+          </DialogHeader>
+          {historyContract && <ContractHistoryTimeline contractId={historyContract.id} />}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Renovar contrato ──────────────────────────────────────────────── */}
+      {renewContract && (
+        <RenewContractDialog
+          contract={{
+            id: renewContract.id,
+            name: renewContract.name,
+            startDate: renewContract.startDate ? new Date(renewContract.startDate) : null,
+            endDate: renewContract.endDate ? new Date(renewContract.endDate) : null,
+            totalValue: renewContract.totalValue ?? null,
+            monthlyCost: renewContract.monthlyCost ?? null,
+            billingCycle: renewContract.billingCycle,
+            autoRenew: renewContract.autoRenew,
+            renewalNoticeDays: renewContract.renewalNoticeDays,
+            notes: renewContract.notes ?? null,
+          }}
+          open={!!renewContract}
+          onOpenChange={open => {
+            if (!open) setRenewContract(null)
+          }}
+          onRenewed={() => {
+            setRenewContract(null)
+            reload()
+          }}
+        />
+      )}
     </ModuleLayout>
   )
 }
