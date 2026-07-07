@@ -36,7 +36,13 @@ export function PlanFormDialog({
   const estimatedHours = calculateEstimatedHours()
 
   return (
-    <div className='space-y-4'>
+    <form
+      className='space-y-4'
+      onSubmit={e => {
+        e.preventDefault()
+        onSubmit()
+      }}
+    >
       <h3 className='font-medium text-foreground'>
         {mode === 'create' ? 'Nuevo Plan de Resolución' : 'Editar Plan de Resolución'}
       </h3>
@@ -132,12 +138,12 @@ export function PlanFormDialog({
           ))}
 
         <div className='flex items-center space-x-2 pt-2'>
-          <Button onClick={onSubmit}>{mode === 'create' ? 'Crear Plan' : 'Actualizar Plan'}</Button>
-          <Button variant='outline' onClick={onCancel}>
+          <Button type='submit'>{mode === 'create' ? 'Crear Plan' : 'Actualizar Plan'}</Button>
+          <Button type='button' variant='outline' onClick={onCancel}>
             Cancelar
           </Button>
         </div>
       </div>
-    </div>
+    </form>
   )
 }

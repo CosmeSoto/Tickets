@@ -174,143 +174,153 @@ export function NewMaintenanceDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className='space-y-4'>
-          {preselectedEquipmentId ? (
-            <div>
-              <Label>Equipo</Label>
-              <Input value={preselectedEquipmentLabel || preselectedEquipmentId} disabled />
-            </div>
-          ) : (
-            <div className='space-y-3'>
-              {/* Paso 1: Familia — solo admin/técnico */}
-              {!isClient && (
+        <form
+          onSubmit={e => {
+            e.preventDefault()
+            void handleSubmit()
+          }}
+          className='space-y-4'
+        >
+          <div className='space-y-4'>
+            {preselectedEquipmentId ? (
+              <div>
+                <Label>Equipo</Label>
+                <Input value={preselectedEquipmentLabel || preselectedEquipmentId} disabled />
+              </div>
+            ) : (
+              <div className='space-y-3'>
+                {/* Paso 1: Familia — solo admin/técnico */}
+                {!isClient && (
+                  <div>
+                    <Label>
+                      Familia
+                      <span className='ml-1 text-xs font-normal text-muted-foreground'>
+                        — filtra los equipos
+                      </span>
+                    </Label>
+                    {loadingFamilies ? (
+                      <div className='flex items-center gap-2 text-sm text-muted-foreground py-1.5'>
+                        <Loader2 className='h-3.5 w-3.5 animate-spin' /> Cargando familias...
+                      </div>
+                    ) : (
+                      <SearchableSelect
+                        options={[{ id: '_all', name: 'Todas las familias' }, ...familyList]}
+                        value={selectedFamilyId}
+                        onChange={setSelectedFamilyId}
+                        placeholder='Buscar familia...'
+                      />
+                    )}
+                  </div>
+                )}
+
+                {/* Paso 2: Equipo */}
                 <div>
-                  <Label>
-                    Familia
-                    <span className='ml-1 text-xs font-normal text-muted-foreground'>
-                      — filtra los equipos
-                    </span>
-                  </Label>
-                  {loadingFamilies ? (
-                    <div className='flex items-center gap-2 text-sm text-muted-foreground py-1.5'>
-                      <Loader2 className='h-3.5 w-3.5 animate-spin' /> Cargando familias...
+                  <Label>Equipo *</Label>
+                  {loadingEquipment ? (
+                    <div className='flex items-center gap-2 text-sm text-muted-foreground py-2'>
+                      <Loader2 className='h-4 w-4 animate-spin' /> Cargando equipos...
                     </div>
                   ) : (
                     <SearchableSelect
-                      options={[{ id: '_all', name: 'Todas las familias' }, ...familyList]}
-                      value={selectedFamilyId}
-                      onChange={setSelectedFamilyId}
-                      placeholder='Buscar familia...'
+                      options={equipmentList.map(e => ({
+                        id: e.id,
+                        name: `${e.code} — ${e.brand} ${e.model}`,
+                      }))}
+                      value={equipmentId}
+                      onChange={setEquipmentId}
+                      placeholder={
+                        isClient ? 'Buscar tu equipo...' : 'Buscar por código, marca o modelo...'
+                      }
                     />
                   )}
                 </div>
-              )}
-
-              {/* Paso 2: Equipo */}
-              <div>
-                <Label>Equipo *</Label>
-                {loadingEquipment ? (
-                  <div className='flex items-center gap-2 text-sm text-muted-foreground py-2'>
-                    <Loader2 className='h-4 w-4 animate-spin' /> Cargando equipos...
-                  </div>
-                ) : (
-                  <SearchableSelect
-                    options={equipmentList.map(e => ({
-                      id: e.id,
-                      name: `${e.code} — ${e.brand} ${e.model}`,
-                    }))}
-                    value={equipmentId}
-                    onChange={setEquipmentId}
-                    placeholder={
-                      isClient ? 'Buscar tu equipo...' : 'Buscar por código, marca o modelo...'
-                    }
-                  />
-                )}
               </div>
-            </div>
-          )}
-
-          {/* Tipo */}
-          <div>
-            <Label>Tipo de mantenimiento *</Label>
-            <Select value={type} onValueChange={setType}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value='PREVENTIVE'>
-                  <div>
-                    <p className='font-medium'>Preventivo</p>
-                    <p className='text-xs text-muted-foreground'>
-                      Revisión rutinaria para evitar fallas
-                    </p>
-                  </div>
-                </SelectItem>
-                <SelectItem value='CORRECTIVE'>
-                  <div>
-                    <p className='font-medium'>Correctivo</p>
-                    <p className='text-xs text-muted-foreground'>
-                      Reparación de una falla existente
-                    </p>
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Descripción */}
-          <div>
-            <Label>{isClient ? 'Motivo de la solicitud *' : 'Descripción del trabajo *'}</Label>
-            <Textarea
-              value={description}
-              onChange={e => setDescription(e.target.value)}
-              rows={3}
-              placeholder={
-                isClient ? 'Describe el problema o motivo...' : 'Describe el trabajo a realizar...'
-              }
-            />
-          </div>
-
-          {/* Fecha */}
-          <div>
-            <Label>{isClient ? 'Fecha sugerida *' : 'Fecha programada *'}</Label>
-            <Input
-              type='date'
-              value={scheduledDate}
-              min={minDate}
-              onChange={e => setScheduledDate(e.target.value)}
-            />
-            {isClient && (
-              <p className='text-xs text-muted-foreground mt-1'>
-                El técnico puede ajustar la fecha al aprobar tu solicitud.
-              </p>
             )}
+
+            {/* Tipo */}
+            <div>
+              <Label>Tipo de mantenimiento *</Label>
+              <Select value={type} onValueChange={setType}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='PREVENTIVE'>
+                    <div>
+                      <p className='font-medium'>Preventivo</p>
+                      <p className='text-xs text-muted-foreground'>
+                        Revisión rutinaria para evitar fallas
+                      </p>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value='CORRECTIVE'>
+                    <div>
+                      <p className='font-medium'>Correctivo</p>
+                      <p className='text-xs text-muted-foreground'>
+                        Reparación de una falla existente
+                      </p>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Descripción */}
+            <div>
+              <Label>{isClient ? 'Motivo de la solicitud *' : 'Descripción del trabajo *'}</Label>
+              <Textarea
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                rows={3}
+                placeholder={
+                  isClient
+                    ? 'Describe el problema o motivo...'
+                    : 'Describe el trabajo a realizar...'
+                }
+              />
+            </div>
+
+            {/* Fecha */}
+            <div>
+              <Label>{isClient ? 'Fecha sugerida *' : 'Fecha programada *'}</Label>
+              <Input
+                type='date'
+                value={scheduledDate}
+                min={minDate}
+                onChange={e => setScheduledDate(e.target.value)}
+              />
+              {isClient && (
+                <p className='text-xs text-muted-foreground mt-1'>
+                  El técnico puede ajustar la fecha al aprobar tu solicitud.
+                </p>
+              )}
+            </div>
+
+            {/* Notas */}
+            <div>
+              <Label>Notas adicionales (opcional)</Label>
+              <Textarea
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                rows={2}
+                placeholder='Información adicional relevante...'
+              />
+            </div>
           </div>
 
-          {/* Notas */}
-          <div>
-            <Label>Notas adicionales (opcional)</Label>
-            <Textarea
-              value={notes}
-              onChange={e => setNotes(e.target.value)}
-              rows={2}
-              placeholder='Información adicional relevante...'
-            />
-          </div>
-        </div>
-
-        <DialogFooter>
-          <Button variant='outline' onClick={handleClose} disabled={loading}>
-            Cancelar
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={loading || !equipmentId || !description || !scheduledDate}
-          >
-            {loading && <Loader2 className='mr-2 h-4 w-4 animate-spin' />}
-            {isClient ? 'Enviar Solicitud' : 'Programar Mantenimiento'}
-          </Button>
-        </DialogFooter>
+          <DialogFooter>
+            <Button type='button' variant='outline' onClick={handleClose} disabled={loading}>
+              Cancelar
+            </Button>
+            <Button
+              type='submit'
+              disabled={loading || !equipmentId || !description || !scheduledDate}
+            >
+              {loading && <Loader2 className='mr-2 h-4 w-4 animate-spin' />}
+              {isClient ? 'Enviar Solicitud' : 'Programar Mantenimiento'}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   )

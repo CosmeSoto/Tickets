@@ -176,189 +176,201 @@ export function TypeFormDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className='space-y-4 py-4 overflow-y-auto max-h-[calc(90vh-120px)]'>
-          {/* Basic fields */}
-          <div className='space-y-2'>
-            <Label htmlFor='name'>
-              Nombre <span className='text-destructive'>*</span>
-            </Label>
-            <Input
-              id='name'
-              value={formData.name}
-              onChange={e => updateField('name', e.target.value)}
-              placeholder={`Ej: ${typeKind === 'equipment' ? 'Laptop' : typeKind === 'license' ? 'Microsoft Office' : 'Tóner'}`}
-              className={errors.name ? 'border-destructive' : ''}
-              disabled={saving}
-            />
-            {errors.name && <p className='text-xs text-destructive'>{errors.name}</p>}
-          </div>
-
-          <div className='space-y-2'>
-            <Label htmlFor='description'>Descripción</Label>
-            <Textarea
-              id='description'
-              value={formData.description}
-              onChange={e => updateField('description', e.target.value)}
-              placeholder='Descripción opcional del tipo'
-              rows={3}
-              disabled={saving}
-            />
-          </div>
-
-          <div className='flex items-center gap-2'>
-            <Switch
-              id='isActive'
-              checked={formData.isActive}
-              onCheckedChange={v => updateField('isActive', v)}
-              disabled={saving}
-            />
-            <Label htmlFor='isActive' className='cursor-pointer'>
-              Activo
-            </Label>
-          </div>
-
-          <Separator />
-
-          {/* Equipment specific fields */}
-          {typeKind === 'equipment' && (
-            <div className='space-y-3'>
-              <h4 className='font-semibold text-sm'>Configuración de Equipos</h4>
-
-              <div className='flex items-center justify-between p-3 border rounded-lg'>
-                <div>
-                  <p className='text-sm font-medium'>Rastrear mantenimiento</p>
-                  <p className='text-xs text-muted-foreground'>
-                    Habilita el registro de mantenimientos preventivos
-                  </p>
-                </div>
-                <Switch
-                  checked={formData.trackMaintenance}
-                  onCheckedChange={v => updateField('trackMaintenance', v)}
-                  disabled={saving}
-                />
-              </div>
+        <form
+          onSubmit={e => {
+            e.preventDefault()
+            void handleSubmit()
+          }}
+        >
+          <div className='space-y-4 py-4 overflow-y-auto max-h-[calc(90vh-120px)]'>
+            {/* Basic fields */}
+            <div className='space-y-2'>
+              <Label htmlFor='name'>
+                Nombre <span className='text-destructive'>*</span>
+              </Label>
+              <Input
+                id='name'
+                value={formData.name}
+                onChange={e => updateField('name', e.target.value)}
+                placeholder={`Ej: ${typeKind === 'equipment' ? 'Laptop' : typeKind === 'license' ? 'Microsoft Office' : 'Tóner'}`}
+                className={errors.name ? 'border-destructive' : ''}
+                disabled={saving}
+              />
+              {errors.name && <p className='text-xs text-destructive'>{errors.name}</p>}
             </div>
-          )}
 
-          {/* License specific fields */}
-          {typeKind === 'license' && (
-            <div className='space-y-3'>
-              <h4 className='font-semibold text-sm'>Configuración por defecto</h4>
-
-              <div className='flex items-center justify-between p-3 border rounded-lg'>
-                <div>
-                  <p className='text-sm font-medium'>Requiere clave</p>
-                  <p className='text-xs text-muted-foreground'>
-                    Por defecto, este tipo de licencia requiere clave
-                  </p>
-                </div>
-                <Switch
-                  checked={formData.requiresKey || false}
-                  onCheckedChange={v => updateField('requiresKey', v)}
-                  disabled={saving}
-                />
-              </div>
-
-              <div className='flex items-center justify-between p-3 border rounded-lg'>
-                <div className='flex-1'>
-                  <p className='text-sm font-medium'>Permitir asignaciones múltiples</p>
-                  <p className='text-xs text-muted-foreground'>
-                    Por defecto, este tipo de licencia permite múltiples usuarios
-                  </p>
-                </div>
-                <Switch
-                  checked={formData.allowMultipleAssignments || false}
-                  onCheckedChange={v => updateField('allowMultipleAssignments', v)}
-                  disabled={saving}
-                />
-              </div>
+            <div className='space-y-2'>
+              <Label htmlFor='description'>Descripción</Label>
+              <Textarea
+                id='description'
+                value={formData.description}
+                onChange={e => updateField('description', e.target.value)}
+                placeholder='Descripción opcional del tipo'
+                rows={3}
+                disabled={saving}
+              />
             </div>
-          )}
 
-          {/* Consumable specific fields */}
-          {typeKind === 'consumable' && (
-            <div className='space-y-3'>
-              <h4 className='font-semibold text-sm'>Configuración de Consumibles</h4>
+            <div className='flex items-center gap-2'>
+              <Switch
+                id='isActive'
+                checked={formData.isActive}
+                onCheckedChange={v => updateField('isActive', v)}
+                disabled={saving}
+              />
+              <Label htmlFor='isActive' className='cursor-pointer'>
+                Activo
+              </Label>
+            </div>
 
-              <div className='flex items-center justify-between p-3 border rounded-lg'>
-                <div>
-                  <p className='text-sm font-medium'>Rastrear inventario</p>
-                  <p className='text-xs text-muted-foreground'>
-                    Controla el stock disponible y movimientos
-                  </p>
-                </div>
-                <Switch
-                  checked={formData.trackStock}
-                  onCheckedChange={v => updateField('trackStock', v)}
-                  disabled={saving}
-                />
-              </div>
+            <Separator />
 
-              {formData.trackStock && (
-                <>
-                  <div className='space-y-2'>
-                    <Label htmlFor='minStockLevel'>Nivel mínimo de stock</Label>
-                    <Input
-                      id='minStockLevel'
-                      type='number'
-                      min={0}
-                      value={formData.minStockLevel || ''}
-                      onChange={e =>
-                        updateField(
-                          'minStockLevel',
-                          e.target.value ? parseInt(e.target.value) : null
-                        )
-                      }
-                      placeholder='Ej: 10'
-                      className={errors.minStockLevel ? 'border-destructive' : ''}
-                      disabled={saving}
-                    />
-                    {errors.minStockLevel && (
-                      <p className='text-xs text-destructive'>{errors.minStockLevel}</p>
-                    )}
+            {/* Equipment specific fields */}
+            {typeKind === 'equipment' && (
+              <div className='space-y-3'>
+                <h4 className='font-semibold text-sm'>Configuración de Equipos</h4>
+
+                <div className='flex items-center justify-between p-3 border rounded-lg'>
+                  <div>
+                    <p className='text-sm font-medium'>Rastrear mantenimiento</p>
                     <p className='text-xs text-muted-foreground'>
-                      Se generará una alerta cuando el stock esté por debajo de este nivel
+                      Habilita el registro de mantenimientos preventivos
                     </p>
                   </div>
+                  <Switch
+                    checked={formData.trackMaintenance}
+                    onCheckedChange={v => updateField('trackMaintenance', v)}
+                    disabled={saving}
+                  />
+                </div>
+              </div>
+            )}
 
-                  <div className='space-y-2'>
-                    <Label htmlFor='reorderPoint'>Punto de reorden</Label>
-                    <Input
-                      id='reorderPoint'
-                      type='number'
-                      min={0}
-                      value={formData.reorderPoint || ''}
-                      onChange={e =>
-                        updateField(
-                          'reorderPoint',
-                          e.target.value ? parseInt(e.target.value) : null
-                        )
-                      }
-                      placeholder='Ej: 20'
-                      className={errors.reorderPoint ? 'border-destructive' : ''}
-                      disabled={saving}
-                    />
-                    {errors.reorderPoint && (
-                      <p className='text-xs text-destructive'>{errors.reorderPoint}</p>
-                    )}
+            {/* License specific fields */}
+            {typeKind === 'license' && (
+              <div className='space-y-3'>
+                <h4 className='font-semibold text-sm'>Configuración por defecto</h4>
+
+                <div className='flex items-center justify-between p-3 border rounded-lg'>
+                  <div>
+                    <p className='text-sm font-medium'>Requiere clave</p>
                     <p className='text-xs text-muted-foreground'>
-                      Nivel sugerido para realizar un nuevo pedido
+                      Por defecto, este tipo de licencia requiere clave
                     </p>
                   </div>
-                </>
-              )}
-            </div>
-          )}
-        </div>
+                  <Switch
+                    checked={formData.requiresKey || false}
+                    onCheckedChange={v => updateField('requiresKey', v)}
+                    disabled={saving}
+                  />
+                </div>
 
-        <DialogFooter>
-          <Button variant='outline' onClick={() => onOpenChange(false)} disabled={saving}>
-            Cancelar
-          </Button>
-          <Button onClick={handleSubmit} disabled={saving}>
-            {saving ? 'Guardando...' : mode === 'create' ? 'Crear' : 'Guardar cambios'}
-          </Button>
-        </DialogFooter>
+                <div className='flex items-center justify-between p-3 border rounded-lg'>
+                  <div className='flex-1'>
+                    <p className='text-sm font-medium'>Permitir asignaciones múltiples</p>
+                    <p className='text-xs text-muted-foreground'>
+                      Por defecto, este tipo de licencia permite múltiples usuarios
+                    </p>
+                  </div>
+                  <Switch
+                    checked={formData.allowMultipleAssignments || false}
+                    onCheckedChange={v => updateField('allowMultipleAssignments', v)}
+                    disabled={saving}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Consumable specific fields */}
+            {typeKind === 'consumable' && (
+              <div className='space-y-3'>
+                <h4 className='font-semibold text-sm'>Configuración de Consumibles</h4>
+
+                <div className='flex items-center justify-between p-3 border rounded-lg'>
+                  <div>
+                    <p className='text-sm font-medium'>Rastrear inventario</p>
+                    <p className='text-xs text-muted-foreground'>
+                      Controla el stock disponible y movimientos
+                    </p>
+                  </div>
+                  <Switch
+                    checked={formData.trackStock}
+                    onCheckedChange={v => updateField('trackStock', v)}
+                    disabled={saving}
+                  />
+                </div>
+
+                {formData.trackStock && (
+                  <>
+                    <div className='space-y-2'>
+                      <Label htmlFor='minStockLevel'>Nivel mínimo de stock</Label>
+                      <Input
+                        id='minStockLevel'
+                        type='number'
+                        min={0}
+                        value={formData.minStockLevel || ''}
+                        onChange={e =>
+                          updateField(
+                            'minStockLevel',
+                            e.target.value ? parseInt(e.target.value) : null
+                          )
+                        }
+                        placeholder='Ej: 10'
+                        className={errors.minStockLevel ? 'border-destructive' : ''}
+                        disabled={saving}
+                      />
+                      {errors.minStockLevel && (
+                        <p className='text-xs text-destructive'>{errors.minStockLevel}</p>
+                      )}
+                      <p className='text-xs text-muted-foreground'>
+                        Se generará una alerta cuando el stock esté por debajo de este nivel
+                      </p>
+                    </div>
+
+                    <div className='space-y-2'>
+                      <Label htmlFor='reorderPoint'>Punto de reorden</Label>
+                      <Input
+                        id='reorderPoint'
+                        type='number'
+                        min={0}
+                        value={formData.reorderPoint || ''}
+                        onChange={e =>
+                          updateField(
+                            'reorderPoint',
+                            e.target.value ? parseInt(e.target.value) : null
+                          )
+                        }
+                        placeholder='Ej: 20'
+                        className={errors.reorderPoint ? 'border-destructive' : ''}
+                        disabled={saving}
+                      />
+                      {errors.reorderPoint && (
+                        <p className='text-xs text-destructive'>{errors.reorderPoint}</p>
+                      )}
+                      <p className='text-xs text-muted-foreground'>
+                        Nivel sugerido para realizar un nuevo pedido
+                      </p>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              type='button'
+              variant='outline'
+              onClick={() => onOpenChange(false)}
+              disabled={saving}
+            >
+              Cancelar
+            </Button>
+            <Button type='submit' disabled={saving}>
+              {saving ? 'Guardando...' : mode === 'create' ? 'Crear' : 'Guardar cambios'}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   )

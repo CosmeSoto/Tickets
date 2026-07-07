@@ -377,117 +377,122 @@ export function EditUserModal({
             </DialogTitle>
           </DialogHeader>
 
-          <div className='space-y-6 overflow-y-auto max-h-[calc(90vh-80px)]'>
-            <UserHeaderCard
-              user={user}
-              avatarPreview={avatarPreview}
-              role={formData.role}
-              isSuperAdmin={formData.isSuperAdmin}
-              isCurrentUser={isCurrentUser}
-              isLocked={isLocked}
-              hasNewAvatar={!!formData.avatar}
-              onAvatarChange={e => handleAvatarChange(e, onAvatarFileSelect, onAvatarPreviewUpdate)}
-              onDeleteAvatar={handleDeleteAvatar}
-              onResetAvatar={() => {
-                setFormData(p => ({ ...p, avatar: undefined }))
-                setAvatarPreview(user.avatar || null)
-              }}
-            />
+          <form
+            onSubmit={e => {
+              e.preventDefault()
+              void handleSubmit()
+            }}
+          >
+            <div className='space-y-6 overflow-y-auto max-h-[calc(90vh-80px)]'>
+              <UserHeaderCard
+                user={user}
+                avatarPreview={avatarPreview}
+                role={formData.role}
+                isSuperAdmin={formData.isSuperAdmin}
+                isCurrentUser={isCurrentUser}
+                isLocked={isLocked}
+                hasNewAvatar={!!formData.avatar}
+                onAvatarChange={e =>
+                  handleAvatarChange(e, onAvatarFileSelect, onAvatarPreviewUpdate)
+                }
+                onDeleteAvatar={handleDeleteAvatar}
+                onResetAvatar={() => {
+                  setFormData(p => ({ ...p, avatar: undefined }))
+                  setAvatarPreview(user.avatar || null)
+                }}
+              />
 
-            {isCurrentUser && (
-              <div className='flex items-start gap-2 rounded-lg bg-muted/50 border px-3 py-2 text-sm text-muted-foreground'>
-                <AlertTriangle className='h-4 w-4 mt-0.5 shrink-0' />
-                <span>
-                  Estás editando tu propia cuenta. No puedes cambiar tu rol ni desactivarla.
-                </span>
+              {isCurrentUser && (
+                <div className='flex items-start gap-2 rounded-lg bg-muted/50 border px-3 py-2 text-sm text-muted-foreground'>
+                  <AlertTriangle className='h-4 w-4 mt-0.5 shrink-0' />
+                  <span>
+                    Estás editando tu propia cuenta. No puedes cambiar tu rol ni desactivarla.
+                  </span>
+                </div>
+              )}
+
+              <UserPersonalDataSection
+                name={formData.name}
+                email={formData.email}
+                phone={formData.phone}
+                errors={errors}
+                onChange={handlePersonalDataChange}
+              />
+
+              <Separator />
+
+              <RoleAndDeptSection
+                role={formData.role}
+                departmentId={formData.departmentId}
+                isCurrentUser={isCurrentUser}
+                errors={errors}
+                departments={departments}
+                onChange={handleRoleDeptChange}
+              />
+
+              <Separator />
+
+              <PermissionsAndModulesSection
+                user={user}
+                isCurrentUser={isCurrentUser}
+                formData={formData}
+                loading={loading}
+                loadingFamilies={loadingFamilies}
+                ticketFamilies={ticketFamilies}
+                inventoryFamilies={inventoryFamilies}
+                patrolFamilies={patrolFamilies}
+                technicianFamilyIds={technicianFamilyIds}
+                clientFamilyIds={clientFamilyIds}
+                inventoryFamilyIds={inventoryFamilyIds}
+                patrolFamilyIds={patrolFamilyIds}
+                adminFamilyIds={adminFamilyIds}
+                ticketReadOnlyIds={ticketReadOnlyIds}
+                inventoryReadOnlyIds={inventoryReadOnlyIds}
+                patrolReadOnlyIds={patrolReadOnlyIds}
+                adminScopeReadOnlyIds={adminScopeReadOnlyIds}
+                onToggle={handleToggle}
+                handlers={{
+                  handleAssignTechnicianFamily,
+                  handleUnassignTechnicianFamily,
+                  handleAssignClientFamily,
+                  handleUnassignClientFamily,
+                  handleAssignInventoryFamily,
+                  handleUnassignInventoryFamily,
+                  handleAssignPatrolFamily,
+                  handleUnassignPatrolFamily,
+                  handleAssignAdminFamily,
+                  handleUnassignAdminFamily,
+                }}
+              />
+
+              <Separator />
+
+              <UserSecuritySection
+                isLocked={isLocked}
+                onResetPassword={handleResetPassword}
+                onUnlock={handleUnlockAccess}
+              />
+
+              <div className='flex justify-end gap-2 pt-2'>
+                <Button type='button' variant='outline' onClick={handleClose} disabled={loading}>
+                  Cancelar
+                </Button>
+                <Button type='submit' disabled={loading || !formData.name || !formData.email}>
+                  {loading ? (
+                    <>
+                      <Save className='h-4 w-4 mr-2 animate-spin' />
+                      Guardando...
+                    </>
+                  ) : (
+                    <>
+                      <Save className='h-4 w-4 mr-2' />
+                      Guardar cambios
+                    </>
+                  )}
+                </Button>
               </div>
-            )}
-
-            <UserPersonalDataSection
-              name={formData.name}
-              email={formData.email}
-              phone={formData.phone}
-              errors={errors}
-              onChange={handlePersonalDataChange}
-            />
-
-            <Separator />
-
-            <RoleAndDeptSection
-              role={formData.role}
-              departmentId={formData.departmentId}
-              isCurrentUser={isCurrentUser}
-              errors={errors}
-              departments={departments}
-              onChange={handleRoleDeptChange}
-            />
-
-            <Separator />
-
-            <PermissionsAndModulesSection
-              user={user}
-              isCurrentUser={isCurrentUser}
-              formData={formData}
-              loading={loading}
-              loadingFamilies={loadingFamilies}
-              ticketFamilies={ticketFamilies}
-              inventoryFamilies={inventoryFamilies}
-              patrolFamilies={patrolFamilies}
-              technicianFamilyIds={technicianFamilyIds}
-              clientFamilyIds={clientFamilyIds}
-              inventoryFamilyIds={inventoryFamilyIds}
-              patrolFamilyIds={patrolFamilyIds}
-              adminFamilyIds={adminFamilyIds}
-              ticketReadOnlyIds={ticketReadOnlyIds}
-              inventoryReadOnlyIds={inventoryReadOnlyIds}
-              patrolReadOnlyIds={patrolReadOnlyIds}
-              adminScopeReadOnlyIds={adminScopeReadOnlyIds}
-              onToggle={handleToggle}
-              handlers={{
-                handleAssignTechnicianFamily,
-                handleUnassignTechnicianFamily,
-                handleAssignClientFamily,
-                handleUnassignClientFamily,
-                handleAssignInventoryFamily,
-                handleUnassignInventoryFamily,
-                handleAssignPatrolFamily,
-                handleUnassignPatrolFamily,
-                handleAssignAdminFamily,
-                handleUnassignAdminFamily,
-              }}
-            />
-
-            <Separator />
-
-            <UserSecuritySection
-              isLocked={isLocked}
-              onResetPassword={handleResetPassword}
-              onUnlock={handleUnlockAccess}
-            />
-
-            <div className='flex justify-end gap-2 pt-2'>
-              <Button type='button' variant='outline' onClick={handleClose} disabled={loading}>
-                Cancelar
-              </Button>
-              <Button
-                type='button'
-                onClick={handleSubmit}
-                disabled={loading || !formData.name || !formData.email}
-              >
-                {loading ? (
-                  <>
-                    <Save className='h-4 w-4 mr-2 animate-spin' />
-                    Guardando...
-                  </>
-                ) : (
-                  <>
-                    <Save className='h-4 w-4 mr-2' />
-                    Guardar cambios
-                  </>
-                )}
-              </Button>
             </div>
-          </div>
+          </form>
         </DialogContent>
       </Dialog>
 

@@ -110,7 +110,7 @@ export function EquipmentTypeInlineForm({ familyId, item, onSuccess, onCancel }:
         <Button type='button' variant='outline' onClick={onCancel} disabled={loading}>
           Cancelar
         </Button>
-        <Button type='button' onClick={() => void handleSubmit()} disabled={loading}>
+        <Button type='submit' disabled={loading}>
           {loading && <Loader2 className='mr-2 h-4 w-4 animate-spin' />}
           {isEdit ? 'Guardar cambios' : 'Crear tipo'}
         </Button>

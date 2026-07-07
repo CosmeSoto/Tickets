@@ -74,51 +74,63 @@ export function ReturnDialog({
             )}
           </DialogDescription>
         </DialogHeader>
-        <div className='space-y-4 py-2'>
-          <div className='space-y-2'>
-            <Label>Fecha de Devolución *</Label>
-            <Input
-              type='date'
-              value={form.returnDate}
-              onChange={e => onFormChange({ ...form, returnDate: e.target.value })}
-            />
+        <form
+          onSubmit={e => {
+            e.preventDefault()
+            onSubmit()
+          }}
+        >
+          <div className='space-y-4 py-2'>
+            <div className='space-y-2'>
+              <Label>Fecha de Devolución *</Label>
+              <Input
+                type='date'
+                value={form.returnDate}
+                onChange={e => onFormChange({ ...form, returnDate: e.target.value })}
+              />
+            </div>
+            <div className='space-y-2'>
+              <Label>Condición al Devolver</Label>
+              <Select
+                value={form.condition}
+                onValueChange={v => onFormChange({ ...form, condition: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder='Sin cambio de condición...' />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='NEW'>Nuevo</SelectItem>
+                  <SelectItem value='LIKE_NEW'>Como Nuevo</SelectItem>
+                  <SelectItem value='GOOD'>Bueno</SelectItem>
+                  <SelectItem value='FAIR'>Regular</SelectItem>
+                  <SelectItem value='POOR'>Malo</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className='space-y-2'>
+              <Label>Observaciones</Label>
+              <Textarea
+                value={form.observations}
+                onChange={e => onFormChange({ ...form, observations: e.target.value })}
+                placeholder='Estado del equipo al momento de la devolución...'
+              />
+            </div>
           </div>
-          <div className='space-y-2'>
-            <Label>Condición al Devolver</Label>
-            <Select
-              value={form.condition}
-              onValueChange={v => onFormChange({ ...form, condition: v })}
+          <DialogFooter>
+            <Button
+              type='button'
+              variant='outline'
+              onClick={() => onOpenChange(false)}
+              disabled={submitting}
             >
-              <SelectTrigger>
-                <SelectValue placeholder='Sin cambio de condición...' />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value='NEW'>Nuevo</SelectItem>
-                <SelectItem value='LIKE_NEW'>Como Nuevo</SelectItem>
-                <SelectItem value='GOOD'>Bueno</SelectItem>
-                <SelectItem value='FAIR'>Regular</SelectItem>
-                <SelectItem value='POOR'>Malo</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className='space-y-2'>
-            <Label>Observaciones</Label>
-            <Textarea
-              value={form.observations}
-              onChange={e => onFormChange({ ...form, observations: e.target.value })}
-              placeholder='Estado del equipo al momento de la devolución...'
-            />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant='outline' onClick={() => onOpenChange(false)} disabled={submitting}>
-            Cancelar
-          </Button>
-          <Button onClick={onSubmit} disabled={submitting}>
-            {submitting && <Loader2 className='mr-2 h-4 w-4 animate-spin' />}
-            Confirmar Devolución
-          </Button>
-        </DialogFooter>
+              Cancelar
+            </Button>
+            <Button type='submit' disabled={submitting}>
+              {submitting && <Loader2 className='mr-2 h-4 w-4 animate-spin' />}
+              Confirmar Devolución
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   )

@@ -1,7 +1,17 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, Edit2, Trash2, Eye, EyeOff, Download, CheckCircle, XCircle, Copy } from 'lucide-react'
+import {
+  Plus,
+  Edit2,
+  Trash2,
+  Eye,
+  EyeOff,
+  Download,
+  CheckCircle,
+  XCircle,
+  Copy,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DataTable, type Column } from '@/components/ui/data-table'
 import {
@@ -275,13 +285,15 @@ export function BrandSection({
           <DialogHeader>
             <DialogTitle>{brandFormMode === 'create' ? 'Nueva Marca' : 'Editar Marca'}</DialogTitle>
           </DialogHeader>
-          <EquipmentBrandInlineForm
-            familyId={familyId || undefined}
-            adminApi
-            item={selectedBrand ? { id: selectedBrand.id, name: selectedBrand.name } : undefined}
-            onSuccess={handleBrandFormSuccess}
-            onCancel={() => setBrandFormOpen(false)}
-          />
+          <div onSubmit={e => e.stopPropagation()}>
+            <EquipmentBrandInlineForm
+              familyId={familyId || undefined}
+              adminApi
+              item={selectedBrand ? { id: selectedBrand.id, name: selectedBrand.name } : undefined}
+              onSuccess={handleBrandFormSuccess}
+              onCancel={() => setBrandFormOpen(false)}
+            />
+          </div>
         </DialogContent>
       </Dialog>
 

@@ -534,93 +534,100 @@ export default function FamiliesPage() {
                 : 'Crea una nueva familia para agrupar departamentos y configuraciones'}
             </DialogDescription>
           </DialogHeader>
-          <div className='space-y-4 py-2'>
-            <div className='grid grid-cols-2 gap-4'>
-              <div className='col-span-2'>
-                <Label htmlFor='family-name'>Nombre *</Label>
-                <Input
-                  id='family-name'
-                  value={formData.name}
-                  onChange={e => setFormData({ ...formData, name: e.target.value })}
-                  placeholder='Ej: Tecnología'
-                />
-              </div>
-              <div>
-                <Label htmlFor='family-code'>
-                  Código * <span className='text-xs text-muted-foreground'>(máx. 10 chars)</span>
-                </Label>
-                <Input
-                  id='family-code'
-                  value={formData.code}
-                  onChange={e =>
-                    setFormData({ ...formData, code: e.target.value.toUpperCase().slice(0, 10) })
-                  }
-                  placeholder='Ej: TECH'
-                  disabled={!!editingFamily}
-                  maxLength={10}
-                />
-              </div>
-              <div>
-                <Label htmlFor='family-color'>Color</Label>
-                <div className='flex gap-2'>
+          <form
+            onSubmit={e => {
+              e.preventDefault()
+              void handleSubmit()
+            }}
+          >
+            <div className='space-y-4 py-2'>
+              <div className='grid grid-cols-2 gap-4'>
+                <div className='col-span-2'>
+                  <Label htmlFor='family-name'>Nombre *</Label>
                   <Input
-                    id='family-color'
-                    type='color'
-                    value={formData.color}
-                    onChange={e => setFormData({ ...formData, color: e.target.value })}
-                    className='w-12 h-9 p-1 cursor-pointer'
-                  />
-                  <Input
-                    value={formData.color}
-                    onChange={e => setFormData({ ...formData, color: e.target.value })}
-                    placeholder='#6B7280'
-                    className='flex-1'
+                    id='family-name'
+                    value={formData.name}
+                    onChange={e => setFormData({ ...formData, name: e.target.value })}
+                    placeholder='Ej: Tecnología'
                   />
                 </div>
-              </div>
-              <div className='col-span-2'>
-                <IconPicker
-                  value={formData.icon}
-                  onChange={v => setFormData({ ...formData, icon: v })}
-                />
-              </div>
-              <div className='col-span-2'>
-                <Label htmlFor='family-description'>Descripción</Label>
-                <Textarea
-                  id='family-description'
-                  value={formData.description}
-                  onChange={e => setFormData({ ...formData, description: e.target.value })}
-                  placeholder='Descripción opcional de la familia'
-                  rows={3}
-                />
-              </div>
-              <div className='col-span-2'>
-                <Label htmlFor='family-whatsapp'>
-                  WhatsApp de contacto{' '}
-                  <span className='text-xs text-muted-foreground'>(opcional)</span>
-                </Label>
-                <Input
-                  id='family-whatsapp'
-                  value={formData.contactWhatsapp}
-                  onChange={e => setFormData({ ...formData, contactWhatsapp: e.target.value })}
-                  placeholder='Ej: 593987654321 (sin + ni espacios)'
-                  maxLength={30}
-                />
-                <p className='text-xs text-muted-foreground mt-1'>
-                  Número de WhatsApp para contacto de activos en venta de esta familia. Lo pueden
-                  editar el admin y los gestores asignados a esta familia.
-                </p>
+                <div>
+                  <Label htmlFor='family-code'>
+                    Código * <span className='text-xs text-muted-foreground'>(máx. 10 chars)</span>
+                  </Label>
+                  <Input
+                    id='family-code'
+                    value={formData.code}
+                    onChange={e =>
+                      setFormData({ ...formData, code: e.target.value.toUpperCase().slice(0, 10) })
+                    }
+                    placeholder='Ej: TECH'
+                    disabled={!!editingFamily}
+                    maxLength={10}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor='family-color'>Color</Label>
+                  <div className='flex gap-2'>
+                    <Input
+                      id='family-color'
+                      type='color'
+                      value={formData.color}
+                      onChange={e => setFormData({ ...formData, color: e.target.value })}
+                      className='w-12 h-9 p-1 cursor-pointer'
+                    />
+                    <Input
+                      value={formData.color}
+                      onChange={e => setFormData({ ...formData, color: e.target.value })}
+                      placeholder='#6B7280'
+                      className='flex-1'
+                    />
+                  </div>
+                </div>
+                <div className='col-span-2'>
+                  <IconPicker
+                    value={formData.icon}
+                    onChange={v => setFormData({ ...formData, icon: v })}
+                  />
+                </div>
+                <div className='col-span-2'>
+                  <Label htmlFor='family-description'>Descripción</Label>
+                  <Textarea
+                    id='family-description'
+                    value={formData.description}
+                    onChange={e => setFormData({ ...formData, description: e.target.value })}
+                    placeholder='Descripción opcional de la familia'
+                    rows={3}
+                  />
+                </div>
+                <div className='col-span-2'>
+                  <Label htmlFor='family-whatsapp'>
+                    WhatsApp de contacto{' '}
+                    <span className='text-xs text-muted-foreground'>(opcional)</span>
+                  </Label>
+                  <Input
+                    id='family-whatsapp'
+                    value={formData.contactWhatsapp}
+                    onChange={e => setFormData({ ...formData, contactWhatsapp: e.target.value })}
+                    placeholder='Ej: 593987654321 (sin + ni espacios)'
+                    maxLength={30}
+                  />
+                  <p className='text-xs text-muted-foreground mt-1'>
+                    Número de WhatsApp para contacto de activos en venta de esta familia. Lo pueden
+                    editar el admin y los gestores asignados a esta familia.
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
-          <DialogFooter>
-            <Button variant='outline' onClick={() => setShowFormDialog(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleSubmit} disabled={submitting}>
-              {submitting ? 'Guardando...' : editingFamily ? 'Guardar cambios' : 'Crear familia'}
-            </Button>
-          </DialogFooter>
+            <DialogFooter>
+              <Button type='button' variant='outline' onClick={() => setShowFormDialog(false)}>
+                Cancelar
+              </Button>
+              <Button type='submit' disabled={submitting}>
+                {submitting ? 'Guardando...' : editingFamily ? 'Guardar cambios' : 'Crear familia'}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 

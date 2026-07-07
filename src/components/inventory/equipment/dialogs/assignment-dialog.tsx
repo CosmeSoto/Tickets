@@ -70,107 +70,119 @@ export function AssignmentDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className='space-y-4 py-2'>
-          {/* Selector de usuario con departamento auto-rellenado */}
-          <AssignableUserSelect
-            familyId={familyId}
-            value={form.receiverId}
-            onChange={userId => onFormChange({ ...form, receiverId: userId })}
-            required
-          />
-
-          {/* Tipo de asignación */}
-          <div className='space-y-2'>
-            <Label>
-              Tipo de Asignación <span className='text-destructive'>*</span>
-            </Label>
-            <Select
-              value={form.assignmentType}
-              onValueChange={v => onFormChange({ ...form, assignmentType: v as any })}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value='PERMANENT'>
-                  <div className='flex flex-col'>
-                    <span>Permanente</span>
-                    <span className='text-xs text-muted-foreground font-normal'>
-                      Herramienta de trabajo habitual — sin fecha de devolución
-                    </span>
-                  </div>
-                </SelectItem>
-                <SelectItem value='TEMPORARY'>
-                  <div className='flex flex-col'>
-                    <span>Temporal</span>
-                    <span className='text-xs text-muted-foreground font-normal'>
-                      Uso por período definido — fecha de devolución
-                    </span>
-                  </div>
-                </SelectItem>
-                <SelectItem value='LOAN'>
-                  <div className='flex flex-col'>
-                    <span>Préstamo externo</span>
-                    <span className='text-xs text-muted-foreground font-normal'>
-                      Equipo prestado a tercero o de tercero — fecha de devolución
-                    </span>
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Fecha de inicio */}
-          <div className='space-y-2'>
-            <Label>
-              Fecha de Inicio <span className='text-destructive'>*</span>
-            </Label>
-            <Input
-              type='date'
-              value={form.startDate}
-              onChange={e => onFormChange({ ...form, startDate: e.target.value })}
+        <form
+          onSubmit={e => {
+            e.preventDefault()
+            onSubmit()
+          }}
+        >
+          <div className='space-y-4 py-2'>
+            {/* Selector de usuario con departamento auto-rellenado */}
+            <AssignableUserSelect
+              familyId={familyId}
+              value={form.receiverId}
+              onChange={userId => onFormChange({ ...form, receiverId: userId })}
+              required
             />
-          </div>
 
-          {/* Fecha de fin — solo temporal y préstamo, opcional */}
-          {(form.assignmentType === 'TEMPORARY' || form.assignmentType === 'LOAN') && (
+            {/* Tipo de asignación */}
             <div className='space-y-2'>
               <Label>
-                Fecha de Devolución{' '}
-                <span className='text-xs text-muted-foreground font-normal'>(opcional)</span>
+                Tipo de Asignación <span className='text-destructive'>*</span>
+              </Label>
+              <Select
+                value={form.assignmentType}
+                onValueChange={v => onFormChange({ ...form, assignmentType: v as any })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='PERMANENT'>
+                    <div className='flex flex-col'>
+                      <span>Permanente</span>
+                      <span className='text-xs text-muted-foreground font-normal'>
+                        Herramienta de trabajo habitual — sin fecha de devolución
+                      </span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value='TEMPORARY'>
+                    <div className='flex flex-col'>
+                      <span>Temporal</span>
+                      <span className='text-xs text-muted-foreground font-normal'>
+                        Uso por período definido — fecha de devolución
+                      </span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value='LOAN'>
+                    <div className='flex flex-col'>
+                      <span>Préstamo externo</span>
+                      <span className='text-xs text-muted-foreground font-normal'>
+                        Equipo prestado a tercero o de tercero — fecha de devolución
+                      </span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Fecha de inicio */}
+            <div className='space-y-2'>
+              <Label>
+                Fecha de Inicio <span className='text-destructive'>*</span>
               </Label>
               <Input
                 type='date'
-                value={form.endDate}
-                onChange={e => onFormChange({ ...form, endDate: e.target.value })}
+                value={form.startDate}
+                onChange={e => onFormChange({ ...form, startDate: e.target.value })}
               />
-              <p className='text-xs text-muted-foreground'>
-                Si no se conoce la fecha, puede dejarse vacía y actualizarse después.
-              </p>
             </div>
-          )}
 
-          {/* Observaciones */}
-          <div className='space-y-2'>
-            <Label>Observaciones</Label>
-            <Textarea
-              value={form.observations}
-              onChange={e => onFormChange({ ...form, observations: e.target.value })}
-              placeholder='Observaciones adicionales...'
-              rows={3}
-            />
+            {/* Fecha de fin — solo temporal y préstamo, opcional */}
+            {(form.assignmentType === 'TEMPORARY' || form.assignmentType === 'LOAN') && (
+              <div className='space-y-2'>
+                <Label>
+                  Fecha de Devolución{' '}
+                  <span className='text-xs text-muted-foreground font-normal'>(opcional)</span>
+                </Label>
+                <Input
+                  type='date'
+                  value={form.endDate}
+                  onChange={e => onFormChange({ ...form, endDate: e.target.value })}
+                />
+                <p className='text-xs text-muted-foreground'>
+                  Si no se conoce la fecha, puede dejarse vacía y actualizarse después.
+                </p>
+              </div>
+            )}
+
+            {/* Observaciones */}
+            <div className='space-y-2'>
+              <Label>Observaciones</Label>
+              <Textarea
+                value={form.observations}
+                onChange={e => onFormChange({ ...form, observations: e.target.value })}
+                placeholder='Observaciones adicionales...'
+                rows={3}
+              />
+            </div>
           </div>
-        </div>
 
-        <DialogFooter>
-          <Button variant='outline' onClick={() => onOpenChange(false)} disabled={submitting}>
-            Cancelar
-          </Button>
-          <Button onClick={onSubmit} disabled={submitting || !form.receiverId}>
-            {submitting && <Loader2 className='mr-2 h-4 w-4 animate-spin' />}
-            Asignar
-          </Button>
-        </DialogFooter>
+          <DialogFooter>
+            <Button
+              type='button'
+              variant='outline'
+              onClick={() => onOpenChange(false)}
+              disabled={submitting}
+            >
+              Cancelar
+            </Button>
+            <Button type='submit' disabled={submitting || !form.receiverId}>
+              {submitting && <Loader2 className='mr-2 h-4 w-4 animate-spin' />}
+              Asignar
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   )

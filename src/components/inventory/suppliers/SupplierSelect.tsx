@@ -386,7 +386,7 @@ export function SupplierSelect({
           <DialogHeader>
             <DialogTitle>{editingSupplier ? 'Editar proveedor' : 'Nuevo proveedor'}</DialogTitle>
           </DialogHeader>
-          <div onSubmitCapture={e => e.stopPropagation()}>
+          <div onSubmit={e => e.stopPropagation()}>
             <SupplierForm
               supplier={editingSupplier}
               defaultFamilyId={familyId}

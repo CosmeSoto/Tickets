@@ -197,90 +197,96 @@ export function CreateUserModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className='space-y-6 overflow-y-auto max-h-[calc(90vh-120px)]'>
-          <CreateUserHeader
-            name={formData.name}
-            email={formData.email}
-            role={formData.role}
-            isSuperAdmin={formData.isSuperAdmin}
-            avatarPreview={avatarPreview}
-            selectedDepartment={selectedDepartment}
-            onAvatarClick={onAvatarClick}
-            onRemoveAvatar={onRemoveAvatar}
-            hasAvatar={!!formData.avatar}
-          />
+        <form
+          onSubmit={e => {
+            e.preventDefault()
+            void handleSubmit()
+          }}
+        >
+          <div className='space-y-6 overflow-y-auto max-h-[calc(90vh-120px)]'>
+            <CreateUserHeader
+              name={formData.name}
+              email={formData.email}
+              role={formData.role}
+              isSuperAdmin={formData.isSuperAdmin}
+              avatarPreview={avatarPreview}
+              selectedDepartment={selectedDepartment}
+              onAvatarClick={onAvatarClick}
+              onRemoveAvatar={onRemoveAvatar}
+              hasAvatar={!!formData.avatar}
+            />
 
-          <input
-            id='create-avatar-input'
-            type='file'
-            accept='image/*'
-            onChange={e => handleAvatarChange(e, onAvatarFileSelect, onAvatarPreviewUpdate)}
-            className='hidden'
-          />
+            <input
+              id='create-avatar-input'
+              type='file'
+              accept='image/*'
+              onChange={e => handleAvatarChange(e, onAvatarFileSelect, onAvatarPreviewUpdate)}
+              className='hidden'
+            />
 
-          {suggestedRole && (
-            <div className='flex items-center gap-2 rounded-lg bg-muted/50 border px-3 py-2 text-sm text-muted-foreground'>
-              <Info className='h-4 w-4 shrink-0' />
-              <span>
-                Rol sugerido basado en el filtro activo. Puedes cambiarlo si lo necesitas.
-              </span>
+            {suggestedRole && (
+              <div className='flex items-center gap-2 rounded-lg bg-muted/50 border px-3 py-2 text-sm text-muted-foreground'>
+                <Info className='h-4 w-4 shrink-0' />
+                <span>
+                  Rol sugerido basado en el filtro activo. Puedes cambiarlo si lo necesitas.
+                </span>
+              </div>
+            )}
+
+            <CreateUserPersonalSection
+              name={formData.name}
+              email={formData.email}
+              password={formData.password}
+              phone={formData.phone}
+              showPassword={showPassword}
+              errors={errors}
+              onNameChange={value => setFormData(p => ({ ...p, name: value }))}
+              onEmailChange={value => setFormData(p => ({ ...p, email: value }))}
+              onPasswordChange={value => setFormData(p => ({ ...p, password: value }))}
+              onPhoneChange={value => setFormData(p => ({ ...p, phone: value }))}
+              onTogglePassword={() => setShowPassword(p => !p)}
+            />
+
+            <Separator />
+
+            <CreateUserRoleSection
+              role={formData.role}
+              departmentId={formData.departmentId}
+              isSuperAdmin={formData.isSuperAdmin}
+              isSuperAdminSession={isSuperAdminSession}
+              departments={departments}
+              errors={errors}
+              onRoleChange={r => {
+                setFormData(p => ({ ...p, role: r, isSuperAdmin: false }))
+                if (r === 'ADMIN') setErrors(p => ({ ...p, departmentId: '' }))
+              }}
+              onDepartmentChange={val => setFormData(p => ({ ...p, departmentId: val }))}
+              onSuperAdminChange={v => setFormData(p => ({ ...p, isSuperAdmin: v }))}
+            />
+
+            <div className='flex justify-end gap-2 pt-2'>
+              <Button type='button' variant='outline' onClick={handleClose} disabled={loading}>
+                Cancelar
+              </Button>
+              <Button
+                type='submit'
+                disabled={loading || !formData.name || !formData.email || !formData.password}
+              >
+                {loading ? (
+                  <>
+                    <Save className='h-4 w-4 mr-2 animate-spin' />
+                    Creando...
+                  </>
+                ) : (
+                  <>
+                    <UserPlus className='h-4 w-4 mr-2' />
+                    Crear Usuario
+                  </>
+                )}
+              </Button>
             </div>
-          )}
-
-          <CreateUserPersonalSection
-            name={formData.name}
-            email={formData.email}
-            password={formData.password}
-            phone={formData.phone}
-            showPassword={showPassword}
-            errors={errors}
-            onNameChange={value => setFormData(p => ({ ...p, name: value }))}
-            onEmailChange={value => setFormData(p => ({ ...p, email: value }))}
-            onPasswordChange={value => setFormData(p => ({ ...p, password: value }))}
-            onPhoneChange={value => setFormData(p => ({ ...p, phone: value }))}
-            onTogglePassword={() => setShowPassword(p => !p)}
-          />
-
-          <Separator />
-
-          <CreateUserRoleSection
-            role={formData.role}
-            departmentId={formData.departmentId}
-            isSuperAdmin={formData.isSuperAdmin}
-            isSuperAdminSession={isSuperAdminSession}
-            departments={departments}
-            errors={errors}
-            onRoleChange={r => {
-              setFormData(p => ({ ...p, role: r, isSuperAdmin: false }))
-              if (r === 'ADMIN') setErrors(p => ({ ...p, departmentId: '' }))
-            }}
-            onDepartmentChange={val => setFormData(p => ({ ...p, departmentId: val }))}
-            onSuperAdminChange={v => setFormData(p => ({ ...p, isSuperAdmin: v }))}
-          />
-
-          <div className='flex justify-end gap-2 pt-2'>
-            <Button type='button' variant='outline' onClick={handleClose} disabled={loading}>
-              Cancelar
-            </Button>
-            <Button
-              type='button'
-              onClick={handleSubmit}
-              disabled={loading || !formData.name || !formData.email || !formData.password}
-            >
-              {loading ? (
-                <>
-                  <Save className='h-4 w-4 mr-2 animate-spin' />
-                  Creando...
-                </>
-              ) : (
-                <>
-                  <UserPlus className='h-4 w-4 mr-2' />
-                  Crear Usuario
-                </>
-              )}
-            </Button>
           </div>
-        </div>
+        </form>
       </DialogContent>
     </Dialog>
   )

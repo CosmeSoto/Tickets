@@ -132,126 +132,133 @@ export function BulkForSaleModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className='space-y-6 overflow-y-auto max-h-[calc(90vh-120px)]'>
-          {/* Precio Común */}
-          <div className='space-y-2'>
-            <div className='flex items-center gap-2'>
-              <input
-                type='checkbox'
-                id='useCommonPrice'
-                checked={!useIndividualPrices}
-                onChange={e => setUseIndividualPrices(!e.target.checked)}
-                className='h-4 w-4'
-              />
-              <Label htmlFor='useCommonPrice'>Usar precio común para todos</Label>
-            </div>
-
-            {!useIndividualPrices && (
-              <div className='flex items-center gap-2'>
-                <DollarSign className='h-5 w-5 text-gray-400' />
-                <Input
-                  type='number'
-                  step='0.01'
-                  min={0}
-                  value={commonPrice || ''}
-                  onChange={e => setCommonPrice(parseFloat(e.target.value) || 0)}
-                  placeholder='Ej: 1500.00'
-                  className='flex-1'
-                />
-              </div>
-            )}
-          </div>
-
-          {/* Precios Individuales */}
-          {useIndividualPrices && (
+        <form
+          onSubmit={e => {
+            e.preventDefault()
+            void handleSubmit()
+          }}
+        >
+          <div className='space-y-6 overflow-y-auto max-h-[calc(90vh-120px)]'>
+            {/* Precio Común */}
             <div className='space-y-2'>
-              <Label>Precios Individuales</Label>
-              <div className='border rounded-md max-h-96 overflow-y-auto'>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Código</TableHead>
-                      <TableHead>Marca / Modelo</TableHead>
-                      <TableHead>Serial</TableHead>
-                      <TableHead className='w-48'>Precio</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {equipment.map(eq => (
-                      <TableRow key={eq.id}>
-                        <TableCell className='font-mono text-sm'>{eq.code}</TableCell>
-                        <TableCell>
-                          {eq.brand} {eq.model}
-                        </TableCell>
-                        <TableCell className='text-sm text-gray-600'>{eq.serialNumber}</TableCell>
-                        <TableCell>
-                          <Input
-                            type='number'
-                            step='0.01'
-                            min={0}
-                            value={individualPrices[eq.id] || ''}
-                            onChange={e =>
-                              setIndividualPrices(prev => ({
-                                ...prev,
-                                [eq.id]: parseFloat(e.target.value) || 0,
-                              }))
-                            }
-                            placeholder='0.00'
-                          />
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+              <div className='flex items-center gap-2'>
+                <input
+                  type='checkbox'
+                  id='useCommonPrice'
+                  checked={!useIndividualPrices}
+                  onChange={e => setUseIndividualPrices(!e.target.checked)}
+                  className='h-4 w-4'
+                />
+                <Label htmlFor='useCommonPrice'>Usar precio común para todos</Label>
               </div>
+
+              {!useIndividualPrices && (
+                <div className='flex items-center gap-2'>
+                  <DollarSign className='h-5 w-5 text-gray-400' />
+                  <Input
+                    type='number'
+                    step='0.01'
+                    min={0}
+                    value={commonPrice || ''}
+                    onChange={e => setCommonPrice(parseFloat(e.target.value) || 0)}
+                    placeholder='Ej: 1500.00'
+                    className='flex-1'
+                  />
+                </div>
+              )}
             </div>
-          )}
 
-          {/* Resumen */}
-          <div className='bg-gray-50 p-4 rounded-md'>
-            <h4 className='font-semibold mb-2'>Resumen</h4>
-            <ul className='text-sm space-y-1'>
-              <li>Equipos seleccionados: {equipment.length}</li>
-              {!useIndividualPrices && commonPrice > 0 && (
-                <>
-                  <li>Precio unitario: ${commonPrice.toLocaleString()}</li>
-                  <li>
-                    Valor total estimado: ${(commonPrice * equipment.length).toLocaleString()}
-                  </li>
-                </>
-              )}
-              {useIndividualPrices && (
-                <li>
-                  Valor total estimado: $
-                  {Object.values(individualPrices)
-                    .reduce((sum, price) => sum + price, 0)
-                    .toLocaleString()}
-                </li>
-              )}
-            </ul>
-          </div>
-        </div>
-
-        <DialogFooter>
-          <Button
-            type='button'
-            variant='outline'
-            onClick={() => onOpenChange(false)}
-            disabled={submitting}
-          >
-            Cancelar
-          </Button>
-          <Button type='button' onClick={handleSubmit} disabled={submitting}>
-            {submitting ? (
-              <>
-                <Loader2 className='h-4 w-4 mr-2 animate-spin' />
-                Procesando...
-              </>
-            ) : (
-              'Marcar en Venta'
+            {/* Precios Individuales */}
+            {useIndividualPrices && (
+              <div className='space-y-2'>
+                <Label>Precios Individuales</Label>
+                <div className='border rounded-md max-h-96 overflow-y-auto'>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Código</TableHead>
+                        <TableHead>Marca / Modelo</TableHead>
+                        <TableHead>Serial</TableHead>
+                        <TableHead className='w-48'>Precio</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {equipment.map(eq => (
+                        <TableRow key={eq.id}>
+                          <TableCell className='font-mono text-sm'>{eq.code}</TableCell>
+                          <TableCell>
+                            {eq.brand} {eq.model}
+                          </TableCell>
+                          <TableCell className='text-sm text-gray-600'>{eq.serialNumber}</TableCell>
+                          <TableCell>
+                            <Input
+                              type='number'
+                              step='0.01'
+                              min={0}
+                              value={individualPrices[eq.id] || ''}
+                              onChange={e =>
+                                setIndividualPrices(prev => ({
+                                  ...prev,
+                                  [eq.id]: parseFloat(e.target.value) || 0,
+                                }))
+                              }
+                              placeholder='0.00'
+                            />
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
             )}
-          </Button>
-        </DialogFooter>
+
+            {/* Resumen */}
+            <div className='bg-gray-50 p-4 rounded-md'>
+              <h4 className='font-semibold mb-2'>Resumen</h4>
+              <ul className='text-sm space-y-1'>
+                <li>Equipos seleccionados: {equipment.length}</li>
+                {!useIndividualPrices && commonPrice > 0 && (
+                  <>
+                    <li>Precio unitario: ${commonPrice.toLocaleString()}</li>
+                    <li>
+                      Valor total estimado: ${(commonPrice * equipment.length).toLocaleString()}
+                    </li>
+                  </>
+                )}
+                {useIndividualPrices && (
+                  <li>
+                    Valor total estimado: $
+                    {Object.values(individualPrices)
+                      .reduce((sum, price) => sum + price, 0)
+                      .toLocaleString()}
+                  </li>
+                )}
+              </ul>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              type='button'
+              variant='outline'
+              onClick={() => onOpenChange(false)}
+              disabled={submitting}
+            >
+              Cancelar
+            </Button>
+            <Button type='submit' disabled={submitting}>
+              {submitting ? (
+                <>
+                  <Loader2 className='h-4 w-4 mr-2 animate-spin' />
+                  Procesando...
+                </>
+              ) : (
+                'Marcar en Venta'
+              )}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   )

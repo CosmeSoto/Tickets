@@ -92,89 +92,102 @@ export function MaintenanceDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className='space-y-4 py-2'>
-          <div className='space-y-2'>
-            <Label>Tipo de Mantenimiento *</Label>
-            <Select
-              value={form.type}
-              onValueChange={v => onFormChange({ ...form, type: v as any })}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value='PREVENTIVE'>Preventivo</SelectItem>
-                <SelectItem value='CORRECTIVE'>Correctivo</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className='space-y-2'>
-            <Label>Descripción *</Label>
-            <Textarea
-              value={form.description}
-              onChange={e => onFormChange({ ...form, description: e.target.value })}
-              placeholder='Describe el mantenimiento a realizar...'
-            />
-          </div>
-
-          <div className='space-y-2'>
-            <Label>Fecha Programada *</Label>
-            <Input
-              type='date'
-              value={form.scheduledDate}
-              onChange={e => onFormChange({ ...form, scheduledDate: e.target.value })}
-            />
-          </div>
-
-          {/* Proveedor externo — solo para ADMIN/TECHNICIAN */}
-          {userRole !== 'CLIENT' && (
+        <form
+          onSubmit={e => {
+            e.preventDefault()
+            onSubmit()
+          }}
+        >
+          <div className='space-y-4 py-2'>
             <div className='space-y-2'>
-              <Label>
-                Proveedor Externo{' '}
-                <span className='text-xs text-muted-foreground font-normal'>(opcional)</span>
-              </Label>
-              <SupplierSelect
-                value={form.externalProviderId ?? null}
-                onChange={supplierId =>
-                  onFormChange({ ...form, externalProviderId: supplierId ?? undefined })
-                }
-                familyId={familyId}
-                placeholder='Seleccionar proveedor externo...'
-                allowCreate={true}
-              />
-              <p className='text-xs text-muted-foreground'>
-                Si el mantenimiento lo realiza un proveedor externo en lugar de un técnico interno.
-              </p>
+              <Label>Tipo de Mantenimiento *</Label>
+              <Select
+                value={form.type}
+                onValueChange={v => onFormChange({ ...form, type: v as any })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='PREVENTIVE'>Preventivo</SelectItem>
+                  <SelectItem value='CORRECTIVE'>Correctivo</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          )}
 
-          {/* Notas adicionales — solo para ADMIN/TECHNICIAN */}
-          {userRole !== 'CLIENT' && (
             <div className='space-y-2'>
-              <Label>
-                Notas Internas{' '}
-                <span className='text-xs text-muted-foreground font-normal'>(opcional)</span>
-              </Label>
+              <Label>Descripción *</Label>
               <Textarea
-                value={form.notes ?? ''}
-                onChange={e => onFormChange({ ...form, notes: e.target.value || undefined })}
-                placeholder='Notas internas del técnico...'
-                rows={2}
+                value={form.description}
+                onChange={e => onFormChange({ ...form, description: e.target.value })}
+                placeholder='Describe el mantenimiento a realizar...'
               />
             </div>
-          )}
-        </div>
 
-        <DialogFooter>
-          <Button variant='outline' onClick={() => onOpenChange(false)} disabled={submitting}>
-            Cancelar
-          </Button>
-          <Button onClick={onSubmit} disabled={submitting}>
-            {submitting && <Loader2 className='mr-2 h-4 w-4 animate-spin' />}
-            Registrar
-          </Button>
-        </DialogFooter>
+            <div className='space-y-2'>
+              <Label>Fecha Programada *</Label>
+              <Input
+                type='date'
+                value={form.scheduledDate}
+                onChange={e => onFormChange({ ...form, scheduledDate: e.target.value })}
+              />
+            </div>
+
+            {/* Proveedor externo — solo para ADMIN/TECHNICIAN */}
+            {userRole !== 'CLIENT' && (
+              <div className='space-y-2'>
+                <Label>
+                  Proveedor Externo{' '}
+                  <span className='text-xs text-muted-foreground font-normal'>(opcional)</span>
+                </Label>
+                <SupplierSelect
+                  value={form.externalProviderId ?? null}
+                  onChange={supplierId =>
+                    onFormChange({ ...form, externalProviderId: supplierId ?? undefined })
+                  }
+                  familyId={familyId}
+                  placeholder='Seleccionar proveedor externo...'
+                  allowCreate={true}
+                />
+                <p className='text-xs text-muted-foreground'>
+                  Si el mantenimiento lo realiza un proveedor externo en lugar de un técnico
+                  interno.
+                </p>
+              </div>
+            )}
+
+            {/* Notas adicionales — solo para ADMIN/TECHNICIAN */}
+            {userRole !== 'CLIENT' && (
+              <div className='space-y-2'>
+                <Label>
+                  Notas Internas{' '}
+                  <span className='text-xs text-muted-foreground font-normal'>(opcional)</span>
+                </Label>
+                <Textarea
+                  value={form.notes ?? ''}
+                  onChange={e => onFormChange({ ...form, notes: e.target.value || undefined })}
+                  placeholder='Notas internas del técnico...'
+                  rows={2}
+                />
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              type='button'
+              variant='outline'
+              onClick={() => onOpenChange(false)}
+              disabled={submitting}
+            >
+              Cancelar
+            </Button>
+            <Button type='submit' disabled={submitting}>
+              {submitting && <Loader2 className='mr-2 h-4 w-4 animate-spin' />}
+              Registrar
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   )

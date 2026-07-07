@@ -140,159 +140,162 @@ export function BulkDecommissionModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className='space-y-6 overflow-y-auto max-h-[calc(90vh-120px)]'>
-          {/* Advertencia */}
-          <Alert variant='destructive'>
-            <AlertTriangle className='h-4 w-4' />
-            <AlertDescription>
-              <strong>Advertencia:</strong> Esta acción es permanente. Los equipos dados de baja no
-              podrán ser asignados ni vendidos. Se generará un registro de auditoría.
-            </AlertDescription>
-          </Alert>
+        <form
+          onSubmit={e => {
+            e.preventDefault()
+            void handleSubmit()
+          }}
+        >
+          <div className='space-y-6 overflow-y-auto max-h-[calc(90vh-120px)]'>
+            {/* Advertencia */}
+            <Alert variant='destructive'>
+              <AlertTriangle className='h-4 w-4' />
+              <AlertDescription>
+                <strong>Advertencia:</strong> Esta acción es permanente. Los equipos dados de baja
+                no podrán ser asignados ni vendidos. Se generará un registro de auditoría.
+              </AlertDescription>
+            </Alert>
 
-          {/* Razón de Baja */}
-          <div className='space-y-2'>
-            <Label htmlFor='decommissionReason'>
-              Razón de Baja <span className='text-red-500'>*</span>
-            </Label>
-            <select
-              id='decommissionReason'
-              value={decommissionReason}
-              onChange={e => setDecommissionReason(e.target.value)}
-              className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
-            >
-              {DECOMMISSION_REASONS.map(reason => (
-                <option key={reason.value} value={reason.value}>
-                  {reason.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Notas Comunes */}
-          <div className='space-y-2'>
-            <div className='flex items-center gap-2'>
-              <input
-                type='checkbox'
-                id='useCommonNotes'
-                checked={!useIndividualNotes}
-                onChange={e => setUseIndividualNotes(!e.target.checked)}
-                className='h-4 w-4'
-              />
-              <Label htmlFor='useCommonNotes'>Usar notas comunes para todos</Label>
+            {/* Razón de Baja */}
+            <div className='space-y-2'>
+              <Label htmlFor='decommissionReason'>
+                Razón de Baja <span className='text-red-500'>*</span>
+              </Label>
+              <select
+                id='decommissionReason'
+                value={decommissionReason}
+                onChange={e => setDecommissionReason(e.target.value)}
+                className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
+              >
+                {DECOMMISSION_REASONS.map(reason => (
+                  <option key={reason.value} value={reason.value}>
+                    {reason.label}
+                  </option>
+                ))}
+              </select>
             </div>
 
-            {!useIndividualNotes && (
-              <Textarea
-                value={commonNotes}
-                onChange={e => setCommonNotes(e.target.value)}
-                placeholder='Detalles sobre la baja...'
-                rows={3}
-              />
-            )}
-          </div>
-
-          {/* Notas Individuales */}
-          {useIndividualNotes && (
+            {/* Notas Comunes */}
             <div className='space-y-2'>
-              <Label>Notas Individuales</Label>
-              <div className='border rounded-md max-h-96 overflow-y-auto'>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Código</TableHead>
-                      <TableHead>Marca / Modelo</TableHead>
-                      <TableHead>Serial</TableHead>
-                      <TableHead className='w-64'>Notas</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {equipment.map(eq => (
-                      <TableRow key={eq.id}>
-                        <TableCell className='font-mono text-sm'>{eq.code}</TableCell>
-                        <TableCell>
-                          {eq.brand} {eq.model}
-                        </TableCell>
-                        <TableCell className='text-sm text-gray-600'>{eq.serialNumber}</TableCell>
-                        <TableCell>
-                          <Textarea
-                            value={individualNotes[eq.id] || ''}
-                            onChange={e =>
-                              setIndividualNotes(prev => ({
-                                ...prev,
-                                [eq.id]: e.target.value,
-                              }))
-                            }
-                            placeholder='Detalles...'
-                            rows={2}
-                          />
-                        </TableCell>
+              <div className='flex items-center gap-2'>
+                <input
+                  type='checkbox'
+                  id='useCommonNotes'
+                  checked={!useIndividualNotes}
+                  onChange={e => setUseIndividualNotes(!e.target.checked)}
+                  className='h-4 w-4'
+                />
+                <Label htmlFor='useCommonNotes'>Usar notas comunes para todos</Label>
+              </div>
+
+              {!useIndividualNotes && (
+                <Textarea
+                  value={commonNotes}
+                  onChange={e => setCommonNotes(e.target.value)}
+                  placeholder='Detalles sobre la baja...'
+                  rows={3}
+                />
+              )}
+            </div>
+
+            {/* Notas Individuales */}
+            {useIndividualNotes && (
+              <div className='space-y-2'>
+                <Label>Notas Individuales</Label>
+                <div className='border rounded-md max-h-96 overflow-y-auto'>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Código</TableHead>
+                        <TableHead>Marca / Modelo</TableHead>
+                        <TableHead>Serial</TableHead>
+                        <TableHead className='w-64'>Notas</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {equipment.map(eq => (
+                        <TableRow key={eq.id}>
+                          <TableCell className='font-mono text-sm'>{eq.code}</TableCell>
+                          <TableCell>
+                            {eq.brand} {eq.model}
+                          </TableCell>
+                          <TableCell className='text-sm text-gray-600'>{eq.serialNumber}</TableCell>
+                          <TableCell>
+                            <Textarea
+                              value={individualNotes[eq.id] || ''}
+                              onChange={e =>
+                                setIndividualNotes(prev => ({
+                                  ...prev,
+                                  [eq.id]: e.target.value,
+                                }))
+                              }
+                              placeholder='Detalles...'
+                              rows={2}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            )}
+
+            {/* Confirmación */}
+            <div className='space-y-2'>
+              <div className='flex items-center gap-2'>
+                <input
+                  type='checkbox'
+                  id='confirmDecommission'
+                  checked={confirmed}
+                  onChange={e => setConfirmed(e.target.checked)}
+                  className='h-4 w-4'
+                />
+                <Label htmlFor='confirmDecommission' className='font-semibold'>
+                  Confirmo que deseo dar de baja estos {equipment.length} equipos de forma
+                  permanente
+                </Label>
               </div>
             </div>
-          )}
 
-          {/* Confirmación */}
-          <div className='space-y-2'>
-            <div className='flex items-center gap-2'>
-              <input
-                type='checkbox'
-                id='confirmDecommission'
-                checked={confirmed}
-                onChange={e => setConfirmed(e.target.checked)}
-                className='h-4 w-4'
-              />
-              <Label htmlFor='confirmDecommission' className='font-semibold'>
-                Confirmo que deseo dar de baja estos {equipment.length} equipos de forma permanente
-              </Label>
+            {/* Resumen */}
+            <div className='bg-gray-50 p-4 rounded-md'>
+              <h4 className='font-semibold mb-2'>Resumen</h4>
+              <ul className='text-sm space-y-1'>
+                <li>Equipos a dar de baja: {equipment.length}</li>
+                <li>
+                  Razón: {DECOMMISSION_REASONS.find(r => r.value === decommissionReason)?.label}
+                </li>
+                <li>Estado resultante: RETIRED</li>
+                <li>Se generará acta de baja automáticamente</li>
+              </ul>
             </div>
           </div>
 
-          {/* Resumen */}
-          <div className='bg-gray-50 p-4 rounded-md'>
-            <h4 className='font-semibold mb-2'>Resumen</h4>
-            <ul className='text-sm space-y-1'>
-              <li>Equipos a dar de baja: {equipment.length}</li>
-              <li>
-                Razón: {DECOMMISSION_REASONS.find(r => r.value === decommissionReason)?.label}
-              </li>
-              <li>Estado resultante: RETIRED</li>
-              <li>Se generará acta de baja automáticamente</li>
-            </ul>
-          </div>
-        </div>
-
-        <DialogFooter>
-          <Button
-            type='button'
-            variant='outline'
-            onClick={() => onOpenChange(false)}
-            disabled={submitting}
-          >
-            Cancelar
-          </Button>
-          <Button
-            type='button'
-            variant='destructive'
-            onClick={handleSubmit}
-            disabled={submitting || !confirmed}
-          >
-            {submitting ? (
-              <>
-                <Loader2 className='h-4 w-4 mr-2 animate-spin' />
-                Procesando...
-              </>
-            ) : (
-              <>
-                <XCircle className='h-4 w-4 mr-2' />
-                Dar de Baja
-              </>
-            )}
-          </Button>
-        </DialogFooter>
+          <DialogFooter>
+            <Button
+              type='button'
+              variant='outline'
+              onClick={() => onOpenChange(false)}
+              disabled={submitting}
+            >
+              Cancelar
+            </Button>
+            <Button type='submit' variant='destructive' disabled={submitting || !confirmed}>
+              {submitting ? (
+                <>
+                  <Loader2 className='h-4 w-4 mr-2 animate-spin' />
+                  Procesando...
+                </>
+              ) : (
+                <>
+                  <XCircle className='h-4 w-4 mr-2' />
+                  Dar de Baja
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   )

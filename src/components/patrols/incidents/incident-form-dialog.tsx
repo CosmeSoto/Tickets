@@ -162,102 +162,109 @@ export function IncidentFormDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className='space-y-4 py-2'>
-          {/* Descripción */}
-          <div className='space-y-1.5'>
-            <Label htmlFor='incident-desc' className='text-sm'>
-              Descripción <span className='text-destructive'>*</span>
-            </Label>
-            <Textarea
-              id='incident-desc'
-              value={description}
-              onChange={e => setDescription(e.target.value)}
-              placeholder='Describe la novedad encontrada (mín. 10 caracteres)...'
-              disabled={saving}
-              rows={4}
-            />
-            <p className='text-xs text-muted-foreground text-right'>
-              {description.length} caracteres{' '}
-              {description.length > 0 && description.length < 10 && '(mínimo 10)'}
-            </p>
-          </div>
+        <form
+          onSubmit={e => {
+            e.preventDefault()
+            void handleSubmit()
+          }}
+        >
+          <div className='space-y-4 py-2'>
+            {/* Descripción */}
+            <div className='space-y-1.5'>
+              <Label htmlFor='incident-desc' className='text-sm'>
+                Descripción <span className='text-destructive'>*</span>
+              </Label>
+              <Textarea
+                id='incident-desc'
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                placeholder='Describe la novedad encontrada (mín. 10 caracteres)...'
+                disabled={saving}
+                rows={4}
+              />
+              <p className='text-xs text-muted-foreground text-right'>
+                {description.length} caracteres{' '}
+                {description.length > 0 && description.length < 10 && '(mínimo 10)'}
+              </p>
+            </div>
 
-          {/* Severidad */}
-          <div className='space-y-1.5'>
-            <Label htmlFor='incident-severity' className='text-sm'>
-              Severidad <span className='text-destructive'>*</span>
-            </Label>
-            <Select value={severity} onValueChange={setSeverity} disabled={saving}>
-              <SelectTrigger id='incident-severity' className='h-9'>
-                <SelectValue placeholder='Selecciona severidad' />
-              </SelectTrigger>
-              <SelectContent>
-                {SEVERITY_OPTIONS.map(opt => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+            {/* Severidad */}
+            <div className='space-y-1.5'>
+              <Label htmlFor='incident-severity' className='text-sm'>
+                Severidad <span className='text-destructive'>*</span>
+              </Label>
+              <Select value={severity} onValueChange={setSeverity} disabled={saving}>
+                <SelectTrigger id='incident-severity' className='h-9'>
+                  <SelectValue placeholder='Selecciona severidad' />
+                </SelectTrigger>
+                <SelectContent>
+                  {SEVERITY_OPTIONS.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-          {/* Foto */}
-          <div className='space-y-1.5'>
-            <Label htmlFor='incident-photo' className='text-sm'>
-              Foto (opcional)
-            </Label>
-            <FileInputWithCamera accept='image/jpeg,image/png' onChange={handlePhotoChange}>
-              {({ openFile, openCamera, showCamera }) => (
-                <div className='flex items-center gap-2 flex-wrap'>
-                  {showCamera && (
+            {/* Foto */}
+            <div className='space-y-1.5'>
+              <Label htmlFor='incident-photo' className='text-sm'>
+                Foto (opcional)
+              </Label>
+              <FileInputWithCamera accept='image/jpeg,image/png' onChange={handlePhotoChange}>
+                {({ openFile, openCamera, showCamera }) => (
+                  <div className='flex items-center gap-2 flex-wrap'>
+                    {showCamera && (
+                      <Button
+                        type='button'
+                        variant='outline'
+                        size='sm'
+                        onClick={() => openCamera()}
+                        disabled={saving}
+                      >
+                        <Camera className='h-3.5 w-3.5 mr-1.5' />
+                        Cámara
+                      </Button>
+                    )}
                     <Button
                       type='button'
                       variant='outline'
                       size='sm'
-                      onClick={() => openCamera()}
+                      onClick={openFile}
                       disabled={saving}
                     >
-                      <Camera className='h-3.5 w-3.5 mr-1.5' />
-                      Cámara
+                      <Paperclip className='h-3.5 w-3.5 mr-1.5' />
+                      {showCamera ? 'Galería' : 'Seleccionar'}
                     </Button>
-                  )}
-                  <Button
-                    type='button'
-                    variant='outline'
-                    size='sm'
-                    onClick={openFile}
-                    disabled={saving}
-                  >
-                    <Paperclip className='h-3.5 w-3.5 mr-1.5' />
-                    {showCamera ? 'Galería' : 'Seleccionar'}
-                  </Button>
-                </div>
+                  </div>
+                )}
+              </FileInputWithCamera>
+              {photoPreview && (
+                <img
+                  src={photoPreview}
+                  alt='Vista previa'
+                  className='mt-2 rounded-md max-h-40 object-contain border'
+                />
               )}
-            </FileInputWithCamera>
-            {photoPreview && (
-              <img
-                src={photoPreview}
-                alt='Vista previa'
-                className='mt-2 rounded-md max-h-40 object-contain border'
-              />
-            )}
+            </div>
           </div>
-        </div>
 
-        <DialogFooter>
-          <Button
-            type='button'
-            variant='outline'
-            onClick={() => onOpenChange(false)}
-            disabled={saving}
-          >
-            Cancelar
-          </Button>
-          <Button type='button' onClick={handleSubmit} disabled={saving || !isValid}>
-            {saving && <Loader2 className='h-4 w-4 mr-2 animate-spin' />}
-            {mode === 'create' ? 'Reportar Novedad' : 'Guardar cambios'}
-          </Button>
-        </DialogFooter>
+          <DialogFooter>
+            <Button
+              type='button'
+              variant='outline'
+              onClick={() => onOpenChange(false)}
+              disabled={saving}
+            >
+              Cancelar
+            </Button>
+            <Button type='submit' disabled={saving || !isValid}>
+              {saving && <Loader2 className='h-4 w-4 mr-2 animate-spin' />}
+              {mode === 'create' ? 'Reportar Novedad' : 'Guardar cambios'}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   )

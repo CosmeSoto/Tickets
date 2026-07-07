@@ -142,126 +142,133 @@ export function CreateByModelDialog({ open, onClose, onCreated }: CreateByModelD
           </DialogDescription>
         </DialogHeader>
 
-        <div className='space-y-4 overflow-y-auto max-h-[calc(90vh-120px)]'>
-          {/* Modelo */}
-          <div className='space-y-2'>
-            <Label>
-              Modelo <span className='text-destructive'>*</span>
-            </Label>
-            <ModelCombobox value={modelId} onValueChange={setModelId} />
-          </div>
-
-          {/* Tipo */}
-          <div className='space-y-2'>
-            <Label>
-              Tipo de Mantenimiento <span className='text-destructive'>*</span>
-            </Label>
-            <Select value={type} onValueChange={(v: any) => setType(v)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value='PREVENTIVE'>Preventivo</SelectItem>
-                <SelectItem value='CORRECTIVE'>Correctivo</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Descripción */}
-          <div className='space-y-2'>
-            <Label>
-              Descripción <span className='text-destructive'>*</span>
-            </Label>
-            <Textarea
-              placeholder='Describe el mantenimiento a realizar...'
-              value={description}
-              onChange={e => setDescription(e.target.value)}
-              rows={3}
-            />
-          </div>
-
-          {/* Fecha */}
-          <div className='space-y-2'>
-            <Label>
-              Fecha Programada <span className='text-destructive'>*</span>
-            </Label>
-            <DatePicker date={scheduledDate} onDateChange={d => d && setScheduledDate(d)} />
-          </div>
-
-          {/* Técnico */}
-          <div className='space-y-2'>
-            <Label>Técnico Asignado</Label>
-            <TechnicianCombobox value={technicianId} onValueChange={setTechnicianId} allowNull />
-          </div>
-
-          {/* Filtros */}
-          <div className='border-t pt-4 space-y-4'>
-            <h4 className='font-medium text-sm'>Filtros de Equipos</h4>
-
-            {/* Familia */}
+        <form
+          onSubmit={e => {
+            e.preventDefault()
+            void handleSubmit()
+          }}
+        >
+          <div className='space-y-4 overflow-y-auto max-h-[calc(90vh-120px)]'>
+            {/* Modelo */}
             <div className='space-y-2'>
-              <Label>Área/Familia</Label>
-              <FamilyCombobox
-                families={families}
-                value={familyId}
-                onValueChange={v => setFamilyId(v || 'all')}
-                allowNull
-                nullLabel='Todas las áreas'
-              />
+              <Label>
+                Modelo <span className='text-destructive'>*</span>
+              </Label>
+              <ModelCombobox value={modelId} onValueChange={setModelId} />
             </div>
 
-            {/* Estados */}
+            {/* Tipo */}
             <div className='space-y-2'>
-              <Label>Estados de Equipos</Label>
-              <Select
-                value={statusFilter.join(',')}
-                onValueChange={v => setStatusFilter(v ? v.split(',') : [])}
-              >
+              <Label>
+                Tipo de Mantenimiento <span className='text-destructive'>*</span>
+              </Label>
+              <Select value={type} onValueChange={(v: any) => setType(v)}>
                 <SelectTrigger>
-                  <SelectValue placeholder='Selecciona estados' />
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value='AVAILABLE,ASSIGNED'>Disponibles y Asignados</SelectItem>
-                  <SelectItem value='AVAILABLE'>Solo Disponibles</SelectItem>
-                  <SelectItem value='ASSIGNED'>Solo Asignados</SelectItem>
-                  <SelectItem value='AVAILABLE,ASSIGNED,DAMAGED'>Incluir Dañados</SelectItem>
+                  <SelectItem value='PREVENTIVE'>Preventivo</SelectItem>
+                  <SelectItem value='CORRECTIVE'>Correctivo</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Descripción */}
+            <div className='space-y-2'>
+              <Label>
+                Descripción <span className='text-destructive'>*</span>
+              </Label>
+              <Textarea
+                placeholder='Describe el mantenimiento a realizar...'
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                rows={3}
+              />
+            </div>
+
+            {/* Fecha */}
+            <div className='space-y-2'>
+              <Label>
+                Fecha Programada <span className='text-destructive'>*</span>
+              </Label>
+              <DatePicker date={scheduledDate} onDateChange={d => d && setScheduledDate(d)} />
+            </div>
+
+            {/* Técnico */}
+            <div className='space-y-2'>
+              <Label>Técnico Asignado</Label>
+              <TechnicianCombobox value={technicianId} onValueChange={setTechnicianId} allowNull />
+            </div>
+
+            {/* Filtros */}
+            <div className='border-t pt-4 space-y-4'>
+              <h4 className='font-medium text-sm'>Filtros de Equipos</h4>
+
+              {/* Familia */}
+              <div className='space-y-2'>
+                <Label>Área/Familia</Label>
+                <FamilyCombobox
+                  families={families}
+                  value={familyId}
+                  onValueChange={v => setFamilyId(v || 'all')}
+                  allowNull
+                  nullLabel='Todas las áreas'
+                />
+              </div>
+
+              {/* Estados */}
+              <div className='space-y-2'>
+                <Label>Estados de Equipos</Label>
+                <Select
+                  value={statusFilter.join(',')}
+                  onValueChange={v => setStatusFilter(v ? v.split(',') : [])}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder='Selecciona estados' />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value='AVAILABLE,ASSIGNED'>Disponibles y Asignados</SelectItem>
+                    <SelectItem value='AVAILABLE'>Solo Disponibles</SelectItem>
+                    <SelectItem value='ASSIGNED'>Solo Asignados</SelectItem>
+                    <SelectItem value='AVAILABLE,ASSIGNED,DAMAGED'>Incluir Dañados</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Contador de equipos */}
+            {modelId && (
+              <Alert>
+                <Package className='h-4 w-4' />
+                <AlertDescription>
+                  Se creará mantenimiento para{' '}
+                  <span className='font-semibold'>{equipmentCount}</span> equipo
+                  {equipmentCount !== 1 ? 's' : ''}
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {equipmentCount === 0 && modelId && (
+              <Alert variant='destructive'>
+                <AlertCircle className='h-4 w-4' />
+                <AlertDescription>
+                  No hay equipos disponibles para este modelo con los filtros seleccionados
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {/* Botones */}
+            <div className='flex justify-end gap-2 pt-4'>
+              <Button type='button' variant='outline' onClick={onClose} disabled={loading}>
+                Cancelar
+              </Button>
+              <Button type='submit' disabled={loading || equipmentCount === 0}>
+                {loading && <Loader2 className='h-4 w-4 mr-2 animate-spin' />}
+                Crear Mantenimiento{equipmentCount > 0 ? `s (${equipmentCount})` : ''}
+              </Button>
+            </div>
           </div>
-
-          {/* Contador de equipos */}
-          {modelId && (
-            <Alert>
-              <Package className='h-4 w-4' />
-              <AlertDescription>
-                Se creará mantenimiento para <span className='font-semibold'>{equipmentCount}</span>{' '}
-                equipo
-                {equipmentCount !== 1 ? 's' : ''}
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {equipmentCount === 0 && modelId && (
-            <Alert variant='destructive'>
-              <AlertCircle className='h-4 w-4' />
-              <AlertDescription>
-                No hay equipos disponibles para este modelo con los filtros seleccionados
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {/* Botones */}
-          <div className='flex justify-end gap-2 pt-4'>
-            <Button variant='outline' onClick={onClose} disabled={loading}>
-              Cancelar
-            </Button>
-            <Button onClick={handleSubmit} disabled={loading || equipmentCount === 0}>
-              {loading && <Loader2 className='h-4 w-4 mr-2 animate-spin' />}
-              Crear Mantenimiento{equipmentCount > 0 ? `s (${equipmentCount})` : ''}
-            </Button>
-          </div>
-        </div>
+        </form>
       </DialogContent>
     </Dialog>
   )

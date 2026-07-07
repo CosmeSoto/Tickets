@@ -223,7 +223,8 @@ function NewArticleContent() {
           </Button>
 
           <Button
-            onClick={handleSubmit}
+            type='submit'
+            form='knowledge-article-form'
             disabled={isSaving || loading || loadingSuggestions || !sourceTicketId}
           >
             {isSaving ? (
@@ -261,147 +262,155 @@ function NewArticleContent() {
       )}
 
       {/* Formulario */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Información del Artículo</CardTitle>
-        </CardHeader>
-        <CardContent className='space-y-6'>
-          {/* Título */}
-          <div className='space-y-2'>
-            <Label htmlFor='title'>
-              Título <span className='text-red-500'>*</span>
-            </Label>
-            <Input
-              id='title'
-              value={title}
-              onChange={e => setTitle(e.target.value)}
-              placeholder='Ej: Cómo solucionar problemas de conexión'
-              maxLength={200}
-            />
-            <p className='text-xs text-muted-foreground'>
-              {title.length}/200 caracteres (mínimo 10)
-            </p>
-          </div>
-
-          {/* Resumen */}
-          <div className='space-y-2'>
-            <Label htmlFor='summary'>Resumen</Label>
-            <Textarea
-              id='summary'
-              value={summary}
-              onChange={e => setSummary(e.target.value)}
-              placeholder='Breve descripción del artículo (opcional)'
-              rows={2}
-              maxLength={300}
-            />
-            <p className='text-xs text-muted-foreground'>{summary.length}/300 caracteres</p>
-          </div>
-
-          {/* Categoría */}
-          <div className='space-y-2'>
-            <Label htmlFor='category'>
-              Categoría <span className='text-red-500'>*</span>
-            </Label>
-            <Select value={categoryId} onValueChange={setCategoryId}>
-              <SelectTrigger>
-                <SelectValue placeholder='Selecciona una categoría' />
-              </SelectTrigger>
-              <SelectContent>
-                {categories.map(category => (
-                  <SelectItem key={category.id} value={category.id}>
-                    <div className='flex items-center gap-2'>
-                      <div
-                        className='w-3 h-3 rounded-full'
-                        style={{ backgroundColor: category.color }}
-                      />
-                      {category.name}
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Contenido */}
-          <div className='space-y-2'>
-            <Label>
-              Contenido <span className='text-red-500'>*</span>
-            </Label>
-            <Textarea
-              value={content}
-              onChange={e => setContent(e.target.value)}
-              placeholder='Escribe el contenido en Markdown...'
-              rows={16}
-              className='font-mono text-sm'
-            />
-            <p className='text-xs text-muted-foreground'>
-              {content.length} caracteres (mínimo 50). Soporta Markdown.
-            </p>
-          </div>
-
-          {/* Tags */}
-          <div className='space-y-2'>
-            <Label htmlFor='tags'>
-              Tags <span className='text-red-500'>*</span>
-            </Label>
-            <div className='flex gap-2'>
+      <form
+        id='knowledge-article-form'
+        onSubmit={e => {
+          e.preventDefault()
+          void handleSubmit()
+        }}
+      >
+        <Card>
+          <CardHeader>
+            <CardTitle>Información del Artículo</CardTitle>
+          </CardHeader>
+          <CardContent className='space-y-6'>
+            {/* Título */}
+            <div className='space-y-2'>
+              <Label htmlFor='title'>
+                Título <span className='text-red-500'>*</span>
+              </Label>
               <Input
-                id='tags'
-                value={tagInput}
-                onChange={e => setTagInput(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    handleAddTag()
-                  }
-                }}
-                placeholder='Escribe un tag y presiona Enter'
-                maxLength={30}
+                id='title'
+                value={title}
+                onChange={e => setTitle(e.target.value)}
+                placeholder='Ej: Cómo solucionar problemas de conexión'
+                maxLength={200}
               />
-              <Button
-                type='button'
-                variant='outline'
-                size='icon'
-                onClick={handleAddTag}
-                disabled={!tagInput.trim() || tags.length >= 10}
-              >
-                <Plus className='h-4 w-4' />
-              </Button>
-            </div>
-
-            {tags.length > 0 && (
-              <div className='flex flex-wrap gap-2'>
-                {tags.map(tag => (
-                  <Badge key={tag} variant='secondary'>
-                    {tag}
-                    <button
-                      onClick={() => handleRemoveTag(tag)}
-                      className='ml-2 hover:text-destructive'
-                    >
-                      <X className='h-3 w-3' />
-                    </button>
-                  </Badge>
-                ))}
-              </div>
-            )}
-
-            <p className='text-xs text-muted-foreground'>
-              {tags.length}/10 tags. Presiona Enter para agregar.
-            </p>
-          </div>
-
-          {/* Publicar */}
-          <div className='flex items-center justify-between p-4 border rounded-lg'>
-            <div className='space-y-0.5'>
-              <Label htmlFor='publish'>Publicar artículo</Label>
-              <p className='text-sm text-muted-foreground'>
-                El artículo será visible para todos los usuarios
+              <p className='text-xs text-muted-foreground'>
+                {title.length}/200 caracteres (mínimo 10)
               </p>
             </div>
-            <Switch id='publish' checked={isPublished} onCheckedChange={setIsPublished} />
-          </div>
-        </CardContent>
-      </Card>
+
+            {/* Resumen */}
+            <div className='space-y-2'>
+              <Label htmlFor='summary'>Resumen</Label>
+              <Textarea
+                id='summary'
+                value={summary}
+                onChange={e => setSummary(e.target.value)}
+                placeholder='Breve descripción del artículo (opcional)'
+                rows={2}
+                maxLength={300}
+              />
+              <p className='text-xs text-muted-foreground'>{summary.length}/300 caracteres</p>
+            </div>
+
+            {/* Categoría */}
+            <div className='space-y-2'>
+              <Label htmlFor='category'>
+                Categoría <span className='text-red-500'>*</span>
+              </Label>
+              <Select value={categoryId} onValueChange={setCategoryId}>
+                <SelectTrigger>
+                  <SelectValue placeholder='Selecciona una categoría' />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map(category => (
+                    <SelectItem key={category.id} value={category.id}>
+                      <div className='flex items-center gap-2'>
+                        <div
+                          className='w-3 h-3 rounded-full'
+                          style={{ backgroundColor: category.color }}
+                        />
+                        {category.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Contenido */}
+            <div className='space-y-2'>
+              <Label>
+                Contenido <span className='text-red-500'>*</span>
+              </Label>
+              <Textarea
+                value={content}
+                onChange={e => setContent(e.target.value)}
+                placeholder='Escribe el contenido en Markdown...'
+                rows={16}
+                className='font-mono text-sm'
+              />
+              <p className='text-xs text-muted-foreground'>
+                {content.length} caracteres (mínimo 50). Soporta Markdown.
+              </p>
+            </div>
+
+            {/* Tags */}
+            <div className='space-y-2'>
+              <Label htmlFor='tags'>
+                Tags <span className='text-red-500'>*</span>
+              </Label>
+              <div className='flex gap-2'>
+                <Input
+                  id='tags'
+                  value={tagInput}
+                  onChange={e => setTagInput(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      handleAddTag()
+                    }
+                  }}
+                  placeholder='Escribe un tag y presiona Enter'
+                  maxLength={30}
+                />
+                <Button
+                  type='button'
+                  variant='outline'
+                  size='icon'
+                  onClick={handleAddTag}
+                  disabled={!tagInput.trim() || tags.length >= 10}
+                >
+                  <Plus className='h-4 w-4' />
+                </Button>
+              </div>
+
+              {tags.length > 0 && (
+                <div className='flex flex-wrap gap-2'>
+                  {tags.map(tag => (
+                    <Badge key={tag} variant='secondary'>
+                      {tag}
+                      <button
+                        onClick={() => handleRemoveTag(tag)}
+                        className='ml-2 hover:text-destructive'
+                      >
+                        <X className='h-3 w-3' />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+
+              <p className='text-xs text-muted-foreground'>
+                {tags.length}/10 tags. Presiona Enter para agregar.
+              </p>
+            </div>
+
+            {/* Publicar */}
+            <div className='flex items-center justify-between p-4 border rounded-lg'>
+              <div className='space-y-0.5'>
+                <Label htmlFor='publish'>Publicar artículo</Label>
+                <p className='text-sm text-muted-foreground'>
+                  El artículo será visible para todos los usuarios
+                </p>
+              </div>
+              <Switch id='publish' checked={isPublished} onCheckedChange={setIsPublished} />
+            </div>
+          </CardContent>
+        </Card>
+      </form>
     </div>
   )
 }

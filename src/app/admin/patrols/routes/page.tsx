@@ -516,231 +516,238 @@ export default function RoutesPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className='space-y-4 py-2 max-h-[65vh] overflow-y-auto pr-1'>
-            <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
-              {/* Área */}
-              <div className='space-y-1.5'>
-                <Label className='text-sm'>
-                  Área <span className='text-destructive'>*</span>
-                </Label>
-                <Select
-                  value={form.familyId}
-                  onValueChange={v => setForm(f => ({ ...f, familyId: v }))}
-                  disabled={saving || !!editingId}
-                >
-                  <SelectTrigger className='h-9'>
-                    <SelectValue placeholder='Selecciona un área' />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {families.map(f => (
-                      <SelectItem key={f.id} value={f.id}>
-                        {f.name} ({f.code})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Duración */}
-              <div className='space-y-1.5'>
-                <Label className='text-sm'>
-                  Duración estimada <span className='text-destructive'>*</span>
-                </Label>
-                <div className='flex items-center gap-2'>
-                  <Input
-                    type='number'
-                    min={1}
-                    max={1440}
-                    value={form.estimatedDurationMinutes}
-                    onChange={e =>
-                      setForm(f => ({ ...f, estimatedDurationMinutes: e.target.value }))
-                    }
-                    disabled={saving}
-                    className='h-9'
-                    placeholder='60'
-                  />
-                  <span className='text-sm text-muted-foreground whitespace-nowrap'>min</span>
-                </div>
-                {(() => {
-                  const mins = parseInt(form.estimatedDurationMinutes)
-                  if (!mins || mins <= 0) return null
-                  const totalLabel = formatDurationMinutes(mins)
-                  const cpCount = routeCheckpoints.length
-                  const perCp = cpCount > 0 ? Math.round(mins / cpCount) : null
-                  return (
-                    <div className='space-y-0.5'>
-                      <p className='text-xs text-muted-foreground'>≈ {totalLabel} total</p>
-                      {perCp !== null && (
-                        <p className='text-xs text-muted-foreground'>
-                          ≈ <span className='font-medium text-foreground'>{perCp} min</span> por
-                          checkpoint
-                          <span className='text-muted-foreground'> ({cpCount} checkpoints)</span>
-                        </p>
-                      )}
-                    </div>
-                  )
-                })()}
-              </div>
-            </div>
-
-            {/* Nombre */}
-            <div className='space-y-1.5'>
-              <Label className='text-sm'>
-                Nombre <span className='text-destructive'>*</span>
-              </Label>
-              <Input
-                value={form.name}
-                onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                placeholder='Ej: Ronda Nocturna Planta Baja'
-                disabled={saving}
-                maxLength={200}
-              />
-            </div>
-
-            {/* Descripción */}
-            <div className='space-y-1.5'>
-              <Label className='text-sm'>Descripción (opcional)</Label>
-              <Textarea
-                value={form.description}
-                onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-                placeholder='Notas sobre esta ruta...'
-                disabled={saving}
-                rows={2}
-              />
-            </div>
-
-            {/* Checkpoints de la ruta */}
-            <div className='space-y-2'>
-              <Label className='text-sm font-medium'>
-                Checkpoints en la ruta ({routeCheckpoints.length})
-              </Label>
-
-              {hasInactiveCheckpoints && (
-                <div className='flex items-center gap-2 p-2 rounded-lg bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 text-xs text-orange-700 dark:text-orange-400'>
-                  <AlertTriangle className='h-3.5 w-3.5 flex-shrink-0' />
-                  Esta ruta contiene checkpoints inactivos. No podrá programarse hasta
-                  reemplazarlos.
-                </div>
-              )}
-
-              {routeCheckpoints.length === 0 ? (
-                <div className='p-4 rounded-lg border border-dashed text-center text-xs text-muted-foreground'>
-                  Agrega checkpoints desde la lista de abajo
-                </div>
-              ) : (
-                <div className='space-y-1.5 max-h-48 overflow-y-auto'>
-                  {routeCheckpoints.map((rc, i) => (
-                    <div
-                      key={rc.checkpointId}
-                      className={`flex items-center gap-2 p-2 rounded-lg border text-sm ${!rc.isActive ? 'border-orange-300 dark:border-orange-700 bg-orange-50/50 dark:bg-orange-950/10' : 'bg-muted/30'}`}
-                    >
-                      <GripVertical className='h-4 w-4 text-muted-foreground flex-shrink-0' />
-                      <span className='w-5 text-xs text-muted-foreground font-mono'>
-                        {rc.order}.
-                      </span>
-                      <div className='flex-1 min-w-0'>
-                        <p className='truncate font-medium text-xs'>{rc.name}</p>
-                        <p className='truncate text-xs text-muted-foreground'>{rc.location}</p>
-                      </div>
-                      <div className='flex items-center gap-1 flex-shrink-0'>
-                        <button
-                          type='button'
-                          onClick={() => toggleRequired(rc.checkpointId)}
-                          className={`text-xs px-1.5 py-0.5 rounded border transition-colors ${rc.isRequired ? 'bg-primary/10 border-primary/30 text-primary' : 'border-border text-muted-foreground'}`}
-                          title={
-                            rc.isRequired
-                              ? 'Requerido (click para hacer opcional)'
-                              : 'Opcional (click para hacer requerido)'
-                          }
-                        >
-                          {rc.isRequired ? 'Req' : 'Opt'}
-                        </button>
-                        <Button
-                          size='sm'
-                          variant='ghost'
-                          className='h-6 w-6 p-0'
-                          onClick={() => moveCheckpoint(i, 'up')}
-                          disabled={i === 0}
-                        >
-                          <ChevronUp className='h-3 w-3' />
-                        </Button>
-                        <Button
-                          size='sm'
-                          variant='ghost'
-                          className='h-6 w-6 p-0'
-                          onClick={() => moveCheckpoint(i, 'down')}
-                          disabled={i === routeCheckpoints.length - 1}
-                        >
-                          <ChevronDown className='h-3 w-3' />
-                        </Button>
-                        <Button
-                          size='sm'
-                          variant='ghost'
-                          className='h-6 w-6 p-0 text-destructive hover:text-destructive'
-                          onClick={() => removeCheckpoint(rc.checkpointId)}
-                        >
-                          <X className='h-3 w-3' />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Selector de checkpoints disponibles */}
-            {form.familyId && (
-              <div className='space-y-2'>
-                <Label className='text-sm font-medium'>Agregar checkpoints</Label>
-                {availableCheckpoints.length === 0 ? (
-                  <p className='text-xs text-muted-foreground'>
-                    No hay checkpoints activos en esta área
-                  </p>
-                ) : (
-                  <div className='max-h-36 overflow-y-auto space-y-1 border rounded-lg p-2'>
-                    {availableCheckpoints
-                      .filter(cp => !routeCheckpoints.some(rc => rc.checkpointId === cp.id))
-                      .map(cp => (
-                        <button
-                          key={cp.id}
-                          type='button'
-                          onClick={() => addCheckpoint(cp)}
-                          className='w-full text-left p-2 rounded hover:bg-muted/50 transition-colors text-xs flex items-center gap-2'
-                        >
-                          <Plus className='h-3 w-3 text-muted-foreground flex-shrink-0' />
-                          <div className='min-w-0'>
-                            <p className='font-medium truncate'>{cp.name}</p>
-                            <p className='text-muted-foreground truncate'>{cp.location}</p>
-                          </div>
-                        </button>
+          <form
+            onSubmit={e => {
+              e.preventDefault()
+              void handleSave()
+            }}
+          >
+            <div className='space-y-4 py-2 max-h-[65vh] overflow-y-auto pr-1'>
+              <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
+                {/* Área */}
+                <div className='space-y-1.5'>
+                  <Label className='text-sm'>
+                    Área <span className='text-destructive'>*</span>
+                  </Label>
+                  <Select
+                    value={form.familyId}
+                    onValueChange={v => setForm(f => ({ ...f, familyId: v }))}
+                    disabled={saving || !!editingId}
+                  >
+                    <SelectTrigger className='h-9'>
+                      <SelectValue placeholder='Selecciona un área' />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {families.map(f => (
+                        <SelectItem key={f.id} value={f.id}>
+                          {f.name} ({f.code})
+                        </SelectItem>
                       ))}
-                    {availableCheckpoints.filter(
-                      cp => !routeCheckpoints.some(rc => rc.checkpointId === cp.id)
-                    ).length === 0 && (
-                      <p className='text-xs text-muted-foreground text-center py-2'>
-                        Todos los checkpoints ya están en la ruta
-                      </p>
-                    )}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Duración */}
+                <div className='space-y-1.5'>
+                  <Label className='text-sm'>
+                    Duración estimada <span className='text-destructive'>*</span>
+                  </Label>
+                  <div className='flex items-center gap-2'>
+                    <Input
+                      type='number'
+                      min={1}
+                      max={1440}
+                      value={form.estimatedDurationMinutes}
+                      onChange={e =>
+                        setForm(f => ({ ...f, estimatedDurationMinutes: e.target.value }))
+                      }
+                      disabled={saving}
+                      className='h-9'
+                      placeholder='60'
+                    />
+                    <span className='text-sm text-muted-foreground whitespace-nowrap'>min</span>
+                  </div>
+                  {(() => {
+                    const mins = parseInt(form.estimatedDurationMinutes)
+                    if (!mins || mins <= 0) return null
+                    const totalLabel = formatDurationMinutes(mins)
+                    const cpCount = routeCheckpoints.length
+                    const perCp = cpCount > 0 ? Math.round(mins / cpCount) : null
+                    return (
+                      <div className='space-y-0.5'>
+                        <p className='text-xs text-muted-foreground'>≈ {totalLabel} total</p>
+                        {perCp !== null && (
+                          <p className='text-xs text-muted-foreground'>
+                            ≈ <span className='font-medium text-foreground'>{perCp} min</span> por
+                            checkpoint
+                            <span className='text-muted-foreground'> ({cpCount} checkpoints)</span>
+                          </p>
+                        )}
+                      </div>
+                    )
+                  })()}
+                </div>
+              </div>
+
+              {/* Nombre */}
+              <div className='space-y-1.5'>
+                <Label className='text-sm'>
+                  Nombre <span className='text-destructive'>*</span>
+                </Label>
+                <Input
+                  value={form.name}
+                  onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                  placeholder='Ej: Ronda Nocturna Planta Baja'
+                  disabled={saving}
+                  maxLength={200}
+                />
+              </div>
+
+              {/* Descripción */}
+              <div className='space-y-1.5'>
+                <Label className='text-sm'>Descripción (opcional)</Label>
+                <Textarea
+                  value={form.description}
+                  onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                  placeholder='Notas sobre esta ruta...'
+                  disabled={saving}
+                  rows={2}
+                />
+              </div>
+
+              {/* Checkpoints de la ruta */}
+              <div className='space-y-2'>
+                <Label className='text-sm font-medium'>
+                  Checkpoints en la ruta ({routeCheckpoints.length})
+                </Label>
+
+                {hasInactiveCheckpoints && (
+                  <div className='flex items-center gap-2 p-2 rounded-lg bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 text-xs text-orange-700 dark:text-orange-400'>
+                    <AlertTriangle className='h-3.5 w-3.5 flex-shrink-0' />
+                    Esta ruta contiene checkpoints inactivos. No podrá programarse hasta
+                    reemplazarlos.
+                  </div>
+                )}
+
+                {routeCheckpoints.length === 0 ? (
+                  <div className='p-4 rounded-lg border border-dashed text-center text-xs text-muted-foreground'>
+                    Agrega checkpoints desde la lista de abajo
+                  </div>
+                ) : (
+                  <div className='space-y-1.5 max-h-48 overflow-y-auto'>
+                    {routeCheckpoints.map((rc, i) => (
+                      <div
+                        key={rc.checkpointId}
+                        className={`flex items-center gap-2 p-2 rounded-lg border text-sm ${!rc.isActive ? 'border-orange-300 dark:border-orange-700 bg-orange-50/50 dark:bg-orange-950/10' : 'bg-muted/30'}`}
+                      >
+                        <GripVertical className='h-4 w-4 text-muted-foreground flex-shrink-0' />
+                        <span className='w-5 text-xs text-muted-foreground font-mono'>
+                          {rc.order}.
+                        </span>
+                        <div className='flex-1 min-w-0'>
+                          <p className='truncate font-medium text-xs'>{rc.name}</p>
+                          <p className='truncate text-xs text-muted-foreground'>{rc.location}</p>
+                        </div>
+                        <div className='flex items-center gap-1 flex-shrink-0'>
+                          <button
+                            type='button'
+                            onClick={() => toggleRequired(rc.checkpointId)}
+                            className={`text-xs px-1.5 py-0.5 rounded border transition-colors ${rc.isRequired ? 'bg-primary/10 border-primary/30 text-primary' : 'border-border text-muted-foreground'}`}
+                            title={
+                              rc.isRequired
+                                ? 'Requerido (click para hacer opcional)'
+                                : 'Opcional (click para hacer requerido)'
+                            }
+                          >
+                            {rc.isRequired ? 'Req' : 'Opt'}
+                          </button>
+                          <Button
+                            size='sm'
+                            variant='ghost'
+                            className='h-6 w-6 p-0'
+                            onClick={() => moveCheckpoint(i, 'up')}
+                            disabled={i === 0}
+                          >
+                            <ChevronUp className='h-3 w-3' />
+                          </Button>
+                          <Button
+                            size='sm'
+                            variant='ghost'
+                            className='h-6 w-6 p-0'
+                            onClick={() => moveCheckpoint(i, 'down')}
+                            disabled={i === routeCheckpoints.length - 1}
+                          >
+                            <ChevronDown className='h-3 w-3' />
+                          </Button>
+                          <Button
+                            size='sm'
+                            variant='ghost'
+                            className='h-6 w-6 p-0 text-destructive hover:text-destructive'
+                            onClick={() => removeCheckpoint(rc.checkpointId)}
+                          >
+                            <X className='h-3 w-3' />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
-            )}
-          </div>
 
-          <DialogFooter>
-            <Button
-              type='button'
-              variant='outline'
-              onClick={() => setDialogOpen(false)}
-              disabled={saving}
-            >
-              Cancelar
-            </Button>
-            <Button type='button' onClick={handleSave} disabled={saving}>
-              {saving ? <Loader2 className='h-4 w-4 mr-2 animate-spin' /> : null}
-              {editingId ? 'Guardar cambios' : 'Crear ruta'}
-            </Button>
-          </DialogFooter>
+              {/* Selector de checkpoints disponibles */}
+              {form.familyId && (
+                <div className='space-y-2'>
+                  <Label className='text-sm font-medium'>Agregar checkpoints</Label>
+                  {availableCheckpoints.length === 0 ? (
+                    <p className='text-xs text-muted-foreground'>
+                      No hay checkpoints activos en esta área
+                    </p>
+                  ) : (
+                    <div className='max-h-36 overflow-y-auto space-y-1 border rounded-lg p-2'>
+                      {availableCheckpoints
+                        .filter(cp => !routeCheckpoints.some(rc => rc.checkpointId === cp.id))
+                        .map(cp => (
+                          <button
+                            key={cp.id}
+                            type='button'
+                            onClick={() => addCheckpoint(cp)}
+                            className='w-full text-left p-2 rounded hover:bg-muted/50 transition-colors text-xs flex items-center gap-2'
+                          >
+                            <Plus className='h-3 w-3 text-muted-foreground flex-shrink-0' />
+                            <div className='min-w-0'>
+                              <p className='font-medium truncate'>{cp.name}</p>
+                              <p className='text-muted-foreground truncate'>{cp.location}</p>
+                            </div>
+                          </button>
+                        ))}
+                      {availableCheckpoints.filter(
+                        cp => !routeCheckpoints.some(rc => rc.checkpointId === cp.id)
+                      ).length === 0 && (
+                        <p className='text-xs text-muted-foreground text-center py-2'>
+                          Todos los checkpoints ya están en la ruta
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <DialogFooter>
+              <Button
+                type='button'
+                variant='outline'
+                onClick={() => setDialogOpen(false)}
+                disabled={saving}
+              >
+                Cancelar
+              </Button>
+              <Button type='submit' disabled={saving}>
+                {saving ? <Loader2 className='h-4 w-4 mr-2 animate-spin' /> : null}
+                {editingId ? 'Guardar cambios' : 'Crear ruta'}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 

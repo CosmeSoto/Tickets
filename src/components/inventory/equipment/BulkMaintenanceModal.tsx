@@ -129,129 +129,136 @@ export function BulkMaintenanceModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className='space-y-6 overflow-y-auto max-h-[calc(90vh-120px)]'>
-          {/* Tipo de Mantenimiento */}
-          <div className='space-y-2'>
-            <Label htmlFor='maintenanceType'>
-              Tipo de Mantenimiento <span className='text-red-500'>*</span>
-            </Label>
-            <select
-              id='maintenanceType'
-              value={maintenanceType}
-              onChange={e => setMaintenanceType(e.target.value)}
-              className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
-            >
-              {MAINTENANCE_TYPES.map(type => (
-                <option key={type.value} value={type.value}>
-                  {type.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Notas Comunes */}
-          <div className='space-y-2'>
-            <div className='flex items-center gap-2'>
-              <input
-                type='checkbox'
-                id='useCommonNotes'
-                checked={!useIndividualNotes}
-                onChange={e => setUseIndividualNotes(!e.target.checked)}
-                className='h-4 w-4'
-              />
-              <Label htmlFor='useCommonNotes'>Usar notas comunes para todos</Label>
-            </div>
-
-            {!useIndividualNotes && (
-              <Textarea
-                value={commonNotes}
-                onChange={e => setCommonNotes(e.target.value)}
-                placeholder='Notas sobre el mantenimiento...'
-                rows={3}
-              />
-            )}
-          </div>
-
-          {/* Notas Individuales */}
-          {useIndividualNotes && (
+        <form
+          onSubmit={e => {
+            e.preventDefault()
+            void handleSubmit()
+          }}
+        >
+          <div className='space-y-6 overflow-y-auto max-h-[calc(90vh-120px)]'>
+            {/* Tipo de Mantenimiento */}
             <div className='space-y-2'>
-              <Label>Notas Individuales</Label>
-              <div className='border rounded-md max-h-96 overflow-y-auto'>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Código</TableHead>
-                      <TableHead>Marca / Modelo</TableHead>
-                      <TableHead>Serial</TableHead>
-                      <TableHead className='w-64'>Notas</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {equipment.map(eq => (
-                      <TableRow key={eq.id}>
-                        <TableCell className='font-mono text-sm'>{eq.code}</TableCell>
-                        <TableCell>
-                          {eq.brand} {eq.model}
-                        </TableCell>
-                        <TableCell className='text-sm text-gray-600'>{eq.serialNumber}</TableCell>
-                        <TableCell>
-                          <Textarea
-                            value={individualNotes[eq.id] || ''}
-                            onChange={e =>
-                              setIndividualNotes(prev => ({
-                                ...prev,
-                                [eq.id]: e.target.value,
-                              }))
-                            }
-                            placeholder='Notas...'
-                            rows={2}
-                          />
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+              <Label htmlFor='maintenanceType'>
+                Tipo de Mantenimiento <span className='text-red-500'>*</span>
+              </Label>
+              <select
+                id='maintenanceType'
+                value={maintenanceType}
+                onChange={e => setMaintenanceType(e.target.value)}
+                className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
+              >
+                {MAINTENANCE_TYPES.map(type => (
+                  <option key={type.value} value={type.value}>
+                    {type.label}
+                  </option>
+                ))}
+              </select>
             </div>
-          )}
 
-          {/* Resumen */}
-          <div className='bg-gray-50 p-4 rounded-md'>
-            <h4 className='font-semibold mb-2'>Resumen</h4>
-            <ul className='text-sm space-y-1'>
-              <li>Equipos seleccionados: {equipment.length}</li>
-              <li>
-                Tipo de mantenimiento:{' '}
-                {MAINTENANCE_TYPES.find(t => t.value === maintenanceType)?.label}
-              </li>
-              <li>Estado resultante: MAINTENANCE</li>
-            </ul>
-          </div>
-        </div>
+            {/* Notas Comunes */}
+            <div className='space-y-2'>
+              <div className='flex items-center gap-2'>
+                <input
+                  type='checkbox'
+                  id='useCommonNotes'
+                  checked={!useIndividualNotes}
+                  onChange={e => setUseIndividualNotes(!e.target.checked)}
+                  className='h-4 w-4'
+                />
+                <Label htmlFor='useCommonNotes'>Usar notas comunes para todos</Label>
+              </div>
 
-        <DialogFooter>
-          <Button
-            type='button'
-            variant='outline'
-            onClick={() => onOpenChange(false)}
-            disabled={submitting}
-          >
-            Cancelar
-          </Button>
-          <Button type='button' onClick={handleSubmit} disabled={submitting}>
-            {submitting ? (
-              <>
-                <Loader2 className='h-4 w-4 mr-2 animate-spin' />
-                Procesando...
-              </>
-            ) : (
-              <>
-                <Wrench className='h-4 w-4 mr-2' />
-                Enviar a Mantenimiento
-              </>
+              {!useIndividualNotes && (
+                <Textarea
+                  value={commonNotes}
+                  onChange={e => setCommonNotes(e.target.value)}
+                  placeholder='Notas sobre el mantenimiento...'
+                  rows={3}
+                />
+              )}
+            </div>
+
+            {/* Notas Individuales */}
+            {useIndividualNotes && (
+              <div className='space-y-2'>
+                <Label>Notas Individuales</Label>
+                <div className='border rounded-md max-h-96 overflow-y-auto'>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Código</TableHead>
+                        <TableHead>Marca / Modelo</TableHead>
+                        <TableHead>Serial</TableHead>
+                        <TableHead className='w-64'>Notas</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {equipment.map(eq => (
+                        <TableRow key={eq.id}>
+                          <TableCell className='font-mono text-sm'>{eq.code}</TableCell>
+                          <TableCell>
+                            {eq.brand} {eq.model}
+                          </TableCell>
+                          <TableCell className='text-sm text-gray-600'>{eq.serialNumber}</TableCell>
+                          <TableCell>
+                            <Textarea
+                              value={individualNotes[eq.id] || ''}
+                              onChange={e =>
+                                setIndividualNotes(prev => ({
+                                  ...prev,
+                                  [eq.id]: e.target.value,
+                                }))
+                              }
+                              placeholder='Notas...'
+                              rows={2}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
             )}
-          </Button>
-        </DialogFooter>
+
+            {/* Resumen */}
+            <div className='bg-gray-50 p-4 rounded-md'>
+              <h4 className='font-semibold mb-2'>Resumen</h4>
+              <ul className='text-sm space-y-1'>
+                <li>Equipos seleccionados: {equipment.length}</li>
+                <li>
+                  Tipo de mantenimiento:{' '}
+                  {MAINTENANCE_TYPES.find(t => t.value === maintenanceType)?.label}
+                </li>
+                <li>Estado resultante: MAINTENANCE</li>
+              </ul>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              type='button'
+              variant='outline'
+              onClick={() => onOpenChange(false)}
+              disabled={submitting}
+            >
+              Cancelar
+            </Button>
+            <Button type='submit' disabled={submitting}>
+              {submitting ? (
+                <>
+                  <Loader2 className='h-4 w-4 mr-2 animate-spin' />
+                  Procesando...
+                </>
+              ) : (
+                <>
+                  <Wrench className='h-4 w-4 mr-2' />
+                  Enviar a Mantenimiento
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   )
