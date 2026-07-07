@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { ContractService } from '@/lib/services/contract-service'
+import { requireContractAccess } from '@/lib/inventory/require-inventory-api'
 
 /**
  * POST /api/inventory/contracts/[id]/renew
@@ -14,6 +15,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!session?.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
+
+    const accessDenied = await requireContractAccess(session.user, id, 'write')
+    if (accessDenied) return accessDenied
 
     const body = await request.json()
     const { newStartDate, newEndDate, updateTerms } = body

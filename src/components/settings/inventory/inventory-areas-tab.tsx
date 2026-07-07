@@ -35,7 +35,7 @@ import { FamilyIcon } from '@/components/inventory/family-badge'
 import { SectionTable } from '@/components/families/section-table'
 import { CatalogsTab } from './catalogs-tab'
 import { WarehousesTab } from './warehouses-tab'
-import { useToast } from '@/hooks/use-toast'
+import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 import type {
   AcquisitionMode,
   FormSection,
@@ -130,7 +130,6 @@ export function InventoryAreasTab({
   const [activeSubTab, setActiveSubTab] = useState<
     'config' | 'catalogs' | 'warehouses' | 'custom-fields'
   >('config')
-  const { toast } = useToast()
 
   const handleToggleAssetRequests = (checked: boolean) => {
     onSetField('assetRequestsEnabled', checked)

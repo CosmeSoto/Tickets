@@ -7,8 +7,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { InlineCreateSelect, type InlineSelectOption } from '@/components/ui/inline-create-select'
 import { EquipmentBrandInlineForm } from './EquipmentBrandInlineForm'
-import { useToast } from '@/hooks/use-toast'
-
 interface Props {
   typeId: string
   familyId?: string
@@ -26,7 +24,6 @@ export function EquipmentModelInlineForm({
   onCancel,
   initialBrandId,
 }: Props) {
-  const { toast } = useToast()
   const isEdit = !!item
   const [brandId, setBrandId] = useState<string>(item?.brandId ?? initialBrandId ?? '')
   const isBrandLocked = !isEdit && !!initialBrandId
@@ -53,6 +50,7 @@ export function EquipmentModelInlineForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    e.stopPropagation()
     setError('')
     if (!brandId) {
       setError('La marca es obligatoria')
@@ -82,11 +80,6 @@ export function EquipmentModelInlineForm({
       if (!res.ok) throw new Error(data.error || 'Error al guardar')
       const brandName = brands.find(b => b.id === brandId)?.name ?? ''
 
-      toast({
-        title: isEdit ? 'Modelo actualizado' : 'Modelo creado',
-        description: `El modelo ${brandName} ${data.model} fue ${isEdit ? 'actualizado' : 'creado'} exitosamente`,
-      })
-
       onSuccess({
         id: data.id,
         name: `${brandName} ${data.model}`,
@@ -94,13 +87,7 @@ export function EquipmentModelInlineForm({
         model: data.model,
       })
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
-      setError(errorMessage)
-      toast({
-        title: 'Error',
-        description: errorMessage,
-        variant: 'destructive',
-      })
+      setError(err instanceof Error ? err.message : 'Error desconocido')
     } finally {
       setLoading(false)
     }

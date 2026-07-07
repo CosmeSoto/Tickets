@@ -63,7 +63,8 @@ export default function EditEquipmentPage({ params }: EditEquipmentPageProps) {
         }
       }
     } catch (error) {
-      console.error('Error cargando datos:', error)
+      const msg = error instanceof Error ? error.message : 'No se pudo cargar el equipo'
+      toast.error(msg)
     } finally {
       setLoading(false)
     }

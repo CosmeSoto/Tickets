@@ -40,7 +40,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { useToast } from '@/hooks/use-toast'
+import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
@@ -97,7 +97,6 @@ export default function ReturnActDetailPage({ params: paramsPromise }: PageProps
   const params = use(paramsPromise)
   const { data: session, status } = useSession()
   const router = useRouter()
-  const { toast } = useToast()
 
   const [act, setAct] = useState<any>(null)
   const [canAccept, setCanAccept] = useState(false)

@@ -40,7 +40,7 @@ import { ExportButton } from '@/components/common/export-button'
 import { useExport } from '@/hooks/common/use-export'
 import { useTableSort } from '@/hooks/common/use-table-sort'
 import { SortableTableHead } from '@/components/ui/sortable-table-head'
-import { useToast } from '@/hooks/use-toast'
+import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
 
@@ -127,7 +127,6 @@ function calcBookValue(sale: SaleRecord): number | null {
 // ── Fila expandible ───────────────────────────────────────────────────────────
 
 function SaleRow({ sale, onAction }: { sale: SaleRecord; onAction: () => void }) {
-  const { toast } = useToast()
   const [expanded, setExpanded] = useState(false)
   const [acting, setActing] = useState(false)
   const [rejectionReason, setRejectionReason] = useState('')

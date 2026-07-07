@@ -21,7 +21,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { TransferFamilyDialog } from './transfer-family-dialog'
-import { useToast } from '@/hooks/use-toast'
+import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -105,7 +105,6 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
 
 export function LicenseDetail({ licenseId, userRole, isSuperAdmin = false }: Props) {
   const router = useRouter()
-  const { toast } = useToast()
 
   const [license, setLicense] = useState<LicenseData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -132,7 +131,9 @@ export function LicenseDetail({ licenseId, userRole, isSuperAdmin = false }: Pro
   }, [licenseId])
 
   // Cargar al montar
-  useEffect(() => { loadLicense() }, [loadLicense])
+  useEffect(() => {
+    loadLicense()
+  }, [loadLicense])
 
   // ── Loading / error states ─────────────────────────────────────────────────
   if (loading) {
@@ -180,11 +181,15 @@ export function LicenseDetail({ licenseId, userRole, isSuperAdmin = false }: Pro
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className='space-y-6 max-w-4xl mx-auto'>
-
       {/* Header */}
       <div className='flex items-start justify-between gap-4'>
         <div className='flex items-start gap-3'>
-          <Button variant='ghost' size='icon' onClick={() => router.back()} className='shrink-0 mt-0.5'>
+          <Button
+            variant='ghost'
+            size='icon'
+            onClick={() => router.back()}
+            className='shrink-0 mt-0.5'
+          >
             <ArrowLeft className='h-4 w-4' />
           </Button>
           <div>
@@ -260,7 +265,6 @@ export function LicenseDetail({ licenseId, userRole, isSuperAdmin = false }: Pro
 
       {/* Cards de información */}
       <div className='grid gap-4 md:grid-cols-2'>
-
         {/* Datos principales */}
         <div className='rounded-lg border border-border p-4 space-y-4'>
           <h3 className='text-sm font-semibold flex items-center gap-2'>
@@ -269,7 +273,14 @@ export function LicenseDetail({ licenseId, userRole, isSuperAdmin = false }: Pro
           </h3>
           <div className='grid grid-cols-2 gap-4'>
             <InfoRow label='Tipo contrato' value={license.contractType ?? '—'} />
-            <InfoRow label='Alcance' value={license.licenseScope ? (SCOPE_LABELS[license.licenseScope] ?? license.licenseScope) : '—'} />
+            <InfoRow
+              label='Alcance'
+              value={
+                license.licenseScope
+                  ? (SCOPE_LABELS[license.licenseScope] ?? license.licenseScope)
+                  : '—'
+              }
+            />
             <InfoRow label='Proveedor' value={license.supplier?.name} />
             <InfoRow label='N° Factura' value={license.invoiceNumber} />
             <InfoRow label='N° Orden compra' value={license.purchaseOrderNumber} />
@@ -327,15 +338,10 @@ export function LicenseDetail({ licenseId, userRole, isSuperAdmin = false }: Pro
             <InfoRow
               label='Equipo'
               value={
-                license.equipment
-                  ? `${license.equipment.brand} (${license.equipment.code})`
-                  : '—'
+                license.equipment ? `${license.equipment.brand} (${license.equipment.code})` : '—'
               }
             />
-            <InfoRow
-              label='Departamento'
-              value={license.department?.name}
-            />
+            <InfoRow label='Departamento' value={license.department?.name} />
           </div>
         </div>
 

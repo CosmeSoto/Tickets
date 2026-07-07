@@ -45,7 +45,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { useToast } from '@/hooks/use-toast'
+import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 
 interface MaintenanceDetail {
   id: string
@@ -114,7 +114,6 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
   const { id } = use(params)
   const { data: session } = useSession()
   const router = useRouter()
-  const { toast } = useToast()
 
   const [maintenance, setMaintenance] = useState<MaintenanceDetail | null>(null)
   const [loading, setLoading] = useState(true)

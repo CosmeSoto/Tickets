@@ -30,7 +30,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { useToast } from '@/hooks/use-toast'
+import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 import { PdfPreviewModal } from '@/components/ui/pdf-preview-modal'
 
 // ── Constantes ────────────────────────────────────────────────────────────────
@@ -101,7 +101,6 @@ export function DecommissionApprovalPanel({
   userContext,
   onActionComplete,
 }: DecommissionApprovalPanelProps) {
-  const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
 

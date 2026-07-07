@@ -12,6 +12,7 @@ import { SupplierSelect } from '@/components/inventory/suppliers/SupplierSelect'
 import { CatalogTypeInlineForm } from '@/components/inventory/asset-forms/CatalogTypeInlineForm'
 import { UnitOfMeasureInlineForm } from '@/components/inventory/asset-forms/UnitOfMeasureInlineForm'
 import { WarehouseInlineForm } from '@/components/inventory/asset-forms/WarehouseInlineForm'
+import { inlineSelectFeedback } from '@/lib/utils/inline-select-feedback'
 import { TypeAttributesInput } from '@/components/inventory/custom-fields/type-attributes-input'
 import type { FamilyConfig } from '@/lib/inventory/family-config-types'
 import { toast } from 'sonner'
@@ -177,6 +178,7 @@ export function MROAssetForm({
             createTitle='Nueva categoría de material'
             editTitle='Editar categoría'
             deleteConfirmMessage='¿Eliminar esta categoría? Solo es posible si no tiene materiales asociados.'
+            {...inlineSelectFeedback('Categoría')}
             createForm={({ item, onSuccess, onCancel }) => (
               <CatalogTypeInlineForm
                 apiEndpoint='/api/inventory/consumable-types'
@@ -216,6 +218,7 @@ export function MROAssetForm({
             createTitle='Nueva unidad de medida'
             editTitle='Editar unidad de medida'
             deleteConfirmMessage='¿Eliminar esta unidad de medida? Solo es posible si no tiene materiales asociados.'
+            {...inlineSelectFeedback('Unidad de medida')}
             createForm={({ item, onSuccess, onCancel }) => (
               <UnitOfMeasureInlineForm
                 item={item}
@@ -351,6 +354,7 @@ export function MROAssetForm({
             allowClear
             createLabel='Crear bodega'
             createTitle='Nueva bodega'
+            {...inlineSelectFeedback('Bodega')}
             createForm={({ onSuccess, onCancel }) => (
               <WarehouseInlineForm
                 defaultFamilyId={familyId}

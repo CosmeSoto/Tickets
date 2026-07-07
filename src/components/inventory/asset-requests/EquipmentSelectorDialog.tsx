@@ -32,7 +32,7 @@ import {
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Loader2, AlertCircle, CheckCircle2, Package } from 'lucide-react'
-import { useToast } from '@/hooks/use-toast'
+import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 
 export interface EquipmentSelectorDialogProps {
   open: boolean
@@ -69,8 +69,6 @@ export function EquipmentSelectorDialog({
   quantity,
   onConfirm,
 }: EquipmentSelectorDialogProps) {
-  const { toast } = useToast()
-
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [equipment, setEquipment] = useState<AvailableEquipment[]>([])

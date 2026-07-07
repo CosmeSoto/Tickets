@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { useToast } from '@/hooks/use-toast'
 import type { InlineSelectOption } from '@/components/ui/inline-create-select'
 
 interface Props {
@@ -16,7 +15,6 @@ interface Props {
 }
 
 export function FormCategoryInlineForm({ item, onSuccess, onCancel }: Props) {
-  const { toast } = useToast()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [loading, setLoading] = useState(false)
@@ -69,11 +67,6 @@ export function FormCategoryInlineForm({ item, onSuccess, onCancel }: Props) {
         id: saved.id,
         name: saved.name,
         description: saved.description ?? undefined,
-      })
-
-      toast({
-        title: item ? 'Categoría actualizada' : 'Categoría creada',
-        description: 'La categoría se guardó correctamente',
       })
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Error desconocido')

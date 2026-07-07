@@ -8,7 +8,7 @@
 import { useState, useCallback, useEffect, useMemo } from 'react'
 import { useDebounce } from '@/hooks/common/use-debounce'
 import { useExport } from '@/hooks/common/use-export'
-import { useToast } from '@/hooks/use-toast'
+import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 import { ASSET_REQUEST_EXPORT_COLUMNS } from '@/lib/utils/asset-request-utils'
 import type { AssetRequestStatus, AssetType } from '@prisma/client'
 
@@ -133,7 +133,6 @@ export interface UseAssetRequestsReturn {
 
 export function useAssetRequests(options: UseAssetRequestsOptions = {}): UseAssetRequestsReturn {
   const { initialFilters = {}, pageSize: initialPageSize = 20, refreshInterval } = options
-  const { toast } = useToast()
 
   // ── State ──────────────────────────────────────────────────────────────────
 

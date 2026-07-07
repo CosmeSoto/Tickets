@@ -26,8 +26,10 @@ import {
 } from '@/components/ui/alert-dialog'
 import { cn } from '@/lib/utils'
 import { SupplierForm } from './SupplierForm'
-import { useToast } from '@/hooks/use-toast'
 import { extractCatchError } from '@/lib/utils/api-error'
+import { toast } from 'sonner'
+
+const PAGE_SIZE = 30
 
 interface Supplier {
   id: string
@@ -56,7 +58,6 @@ export function SupplierSelect({
   familyId,
   allowCreate = true,
 }: SupplierSelectProps) {
-  const { toast } = useToast()
   const { data: session } = useSession()
 
   // Permisos: crear/editar → canManageInventory; desactivar/eliminar → solo ADMIN
@@ -74,34 +75,50 @@ export function SupplierSelect({
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null)
   const [confirm, setConfirm] = useState<ConfirmAction | null>(null)
   const [actionLoading, setActionLoading] = useState(false)
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [loadingMore, setLoadingMore] = useState(false)
 
   const loadSuppliers = useCallback(
-    async (search?: string) => {
-      setLoading(true)
+    async (search?: string, pageNum = 1, append = false) => {
+      if (append) setLoadingMore(true)
+      else setLoading(true)
       try {
-        const params = new URLSearchParams({ active: 'true', limit: '50', page: '1' })
+        const params = new URLSearchParams({
+          active: 'true',
+          limit: String(PAGE_SIZE),
+          page: String(pageNum),
+        })
         if (familyId) params.set('familyId', familyId)
         if (search?.trim()) params.set('search', search.trim())
         const res = await fetch(`/api/inventory/suppliers?${params}`)
         if (!res.ok) return
         const data = await res.json()
-        setSuppliers(Array.isArray(data) ? data : (data.suppliers ?? []))
+        const list: Supplier[] = Array.isArray(data) ? data : (data.suppliers ?? [])
+        const pages = data.pagination?.pages ?? 1
+        setPage(pageNum)
+        setTotalPages(pages)
+        setSuppliers(prev => {
+          if (!append) return list
+          const merged = [...prev]
+          for (const s of list) {
+            if (!merged.some(x => x.id === s.id)) merged.push(s)
+          }
+          return merged
+        })
       } catch {
         /* silencioso */
       } finally {
         setLoading(false)
+        setLoadingMore(false)
       }
     },
     [familyId]
   )
 
+  // Búsqueda server-side con debounce (reinicia a página 1)
   useEffect(() => {
-    loadSuppliers()
-  }, [loadSuppliers])
-
-  // Búsqueda server-side con debounce (no depender del cap de listado paginado)
-  useEffect(() => {
-    const timer = setTimeout(() => loadSuppliers(searchQuery), 300)
+    const timer = setTimeout(() => loadSuppliers(searchQuery, 1, false), 300)
     return () => clearTimeout(timer)
   }, [searchQuery, loadSuppliers])
 
@@ -132,10 +149,28 @@ export function SupplierSelect({
   }
 
   const handleSaved = (supplier: Supplier) => {
+    const wasEdit = !!editingSupplier
     setFormOpen(false)
     setEditingSupplier(null)
-    loadSuppliers()
-    if (!editingSupplier) onChange(supplier.id)
+    loadSuppliers(searchQuery, 1, false)
+    if (!wasEdit) {
+      onChange(supplier.id)
+      toast.success('Proveedor creado', {
+        description: `${supplier.name} fue creado y seleccionado`,
+      })
+    } else {
+      toast.success('Proveedor actualizado', {
+        description: `${supplier.name} fue actualizado exitosamente`,
+      })
+    }
+  }
+
+  const handleListScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget
+    if (loadingMore || loading || page >= totalPages) return
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 48) {
+      loadSuppliers(searchQuery, page + 1, true)
+    }
   }
 
   const handleConfirmAction = async () => {
@@ -152,10 +187,8 @@ export function SupplierSelect({
             (data._count?.consumables ?? 0) +
             (data._count?.software_licenses ?? 0)
           if (total > 0) {
-            toast({
-              title: 'No se puede desactivar',
+            toast.error('No se puede desactivar', {
               description: `Este proveedor tiene ${total} activo(s) asociado(s). Reasígnalos antes de desactivarlo.`,
-              variant: 'destructive',
             })
             return
           }
@@ -164,9 +197,9 @@ export function SupplierSelect({
           method: 'PATCH',
         })
         if (!res.ok) throw new Error()
-        toast({ title: 'Proveedor desactivado', description: confirm.supplier.name })
+        toast.success('Proveedor desactivado', { description: confirm.supplier.name })
         if (value === confirm.supplier.id) onChange(null)
-        loadSuppliers()
+        loadSuppliers(searchQuery, 1, false)
       } else {
         // Eliminar permanente
         const res = await fetch(`/api/inventory/suppliers/${confirm.supplier.id}`, {
@@ -174,18 +207,16 @@ export function SupplierSelect({
         })
         const data = await res.json()
         if (!res.ok) {
-          toast({ title: 'No se puede eliminar', description: data.error, variant: 'destructive' })
+          toast.error('No se puede eliminar', { description: data.error })
           return
         }
-        toast({ title: 'Proveedor eliminado', description: confirm.supplier.name })
+        toast.success('Proveedor eliminado', { description: confirm.supplier.name })
         if (value === confirm.supplier.id) onChange(null)
-        loadSuppliers()
+        loadSuppliers(searchQuery, 1, false)
       }
     } catch (err) {
-      toast({
-        title: 'Error',
+      toast.error('Error', {
         description: extractCatchError(err, 'No se pudo completar la acción'),
-        variant: 'destructive',
       })
     } finally {
       setActionLoading(false)
@@ -227,7 +258,7 @@ export function SupplierSelect({
                 value={searchQuery}
                 onValueChange={setSearchQuery}
               />
-              <CommandList>
+              <CommandList className='max-h-[300px] overflow-y-auto' onScroll={handleListScroll}>
                 {canEdit && (
                   <CommandGroup>
                     <CommandItem
@@ -257,7 +288,12 @@ export function SupplierSelect({
                       key={s.id}
                       value={`${s.name} ${s.taxId || ''}`}
                       onSelect={() => {
-                        onChange(s.id === value ? null : s.id)
+                        const nextId = s.id === value ? null : s.id
+                        const isNewSelection = nextId !== null && nextId !== value
+                        onChange(nextId)
+                        if (isNewSelection) {
+                          toast.success('Proveedor seleccionado', { description: s.name })
+                        }
                         setOpen(false)
                       }}
                     >
@@ -320,6 +356,12 @@ export function SupplierSelect({
                     </CommandItem>
                   ))}
                 </CommandGroup>
+                {loadingMore && (
+                  <div className='flex items-center justify-center gap-2 py-2 text-xs text-muted-foreground'>
+                    <Loader2 className='h-3.5 w-3.5 animate-spin' />
+                    Cargando más...
+                  </div>
+                )}
               </CommandList>
             </Command>
           </PopoverContent>
@@ -344,15 +386,18 @@ export function SupplierSelect({
           <DialogHeader>
             <DialogTitle>{editingSupplier ? 'Editar proveedor' : 'Nuevo proveedor'}</DialogTitle>
           </DialogHeader>
-          <SupplierForm
-            supplier={editingSupplier}
-            defaultFamilyId={familyId}
-            onSuccess={handleSaved}
-            onCancel={() => {
-              setFormOpen(false)
-              setEditingSupplier(null)
-            }}
-          />
+          <div onSubmitCapture={e => e.stopPropagation()}>
+            <SupplierForm
+              supplier={editingSupplier}
+              defaultFamilyId={familyId}
+              embedded
+              onSuccess={handleSaved}
+              onCancel={() => {
+                setFormOpen(false)
+                setEditingSupplier(null)
+              }}
+            />
+          </div>
         </DialogContent>
       </Dialog>
 

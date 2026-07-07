@@ -23,7 +23,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { useToast } from '@/hooks/use-toast'
+import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 import { getEquipmentDisplayName } from '@/lib/utils/equipment-display'
 
 const DEPRECIATION_OPTIONS = [
@@ -56,7 +56,6 @@ export function ConvertToPurchaseDialog({
   currentOwnershipType,
   onSuccess,
 }: ConvertToPurchaseDialogProps) {
-  const { toast } = useToast()
   const [loading, setLoading] = useState(false)
 
   // Campos obligatorios

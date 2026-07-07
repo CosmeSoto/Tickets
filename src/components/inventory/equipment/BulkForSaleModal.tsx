@@ -27,7 +27,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Loader2, DollarSign } from 'lucide-react'
-import { useToast } from '@/hooks/use-toast'
+import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 
 interface Equipment {
   id: string
@@ -50,7 +50,6 @@ export function BulkForSaleModal({
   equipment,
   onSuccess,
 }: BulkForSaleModalProps) {
-  const { toast } = useToast()
   const [submitting, setSubmitting] = useState(false)
   const [commonPrice, setCommonPrice] = useState<number>(0)
   const [individualPrices, setIndividualPrices] = useState<Record<string, number>>({})

@@ -14,6 +14,10 @@ import { seedWarehouses } from './seeds/warehouses.seed'
 import { seedCustomFields } from './seeds/custom-fields.seed'
 import { seedAttributes } from './seeds/attributes.seed'
 import { seedSupplierTypes } from './seeds/supplier-types.seed'
+import { seedAssetRequestsFamilySettings } from './seeds/asset-requests-settings.seed'
+import { seedInventoryFamilyConfigs } from './seeds/inventory-family-config.seed'
+import { seedUnitsOfMeasure } from './seeds/units-of-measure.seed'
+import { seedInventorySettings, seedFolioCounters } from './seeds/inventory-settings.seed'
 
 async function buildFamilyMap(prisma: PrismaClient): Promise<Map<string, string>> {
   const map = new Map<string, string>()
@@ -31,6 +35,7 @@ export async function ensureInventoryCatalogs(prisma: PrismaClient) {
   }
 
   console.log('📦 Asegurando catálogos de inventario...')
+  await seedInventoryFamilyConfigs(prisma, familyMap)
   await seedInventoryTypes(prisma, familyMap)
   await seedEquipmentBrands(prisma, familyMap)
   await syncBrandFamilies(prisma, familyMap)
@@ -38,6 +43,10 @@ export async function ensureInventoryCatalogs(prisma: PrismaClient) {
   await seedCustomFields(prisma, familyMap)
   await seedAttributes(prisma, familyMap)
   await seedSupplierTypes(prisma, familyMap)
+  await seedAssetRequestsFamilySettings(prisma, familyMap)
+  await seedUnitsOfMeasure(prisma)
+  await seedInventorySettings(prisma)
+  await seedFolioCounters(prisma)
   console.log('✅ Catálogos de inventario listos')
 }
 

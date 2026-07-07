@@ -43,6 +43,7 @@ import { WarehouseInlineForm } from '@/components/inventory/asset-forms/Warehous
 import { ModelSelector } from '@/components/inventory/models/ModelSelector'
 import { ContractPicker } from '@/components/contracts/contract-picker'
 import { toast } from 'sonner'
+import { inlineSelectFeedback } from '@/lib/utils/inline-select-feedback'
 import {
   calculateDepreciation,
   getRecommendedDepreciationMethod,
@@ -949,6 +950,7 @@ export function BulkEquipmentForm({
                 allowClear
                 createLabel='Crear bodega'
                 createTitle='Nueva bodega'
+                {...inlineSelectFeedback('Bodega')}
                 createForm={({ onSuccess: onWS, onCancel: onWC }) => (
                   <WarehouseInlineForm
                     defaultFamilyId={selectedFamilyId ?? undefined}

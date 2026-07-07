@@ -14,7 +14,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { useToast } from '@/hooks/use-toast'
+import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 import { FileInputWithCamera } from '@/components/common/file-input-with-camera'
 import { extractCatchError } from '@/lib/utils/api-error'
 
@@ -55,7 +55,6 @@ const ACCEPTED = [
 ].join(',')
 
 export function LicenseAttachments({ licenseId, canManage }: LicenseAttachmentsProps) {
-  const { toast } = useToast()
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)

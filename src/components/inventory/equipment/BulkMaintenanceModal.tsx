@@ -28,7 +28,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Loader2, Wrench } from 'lucide-react'
-import { useToast } from '@/hooks/use-toast'
+import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 
 interface Equipment {
   id: string
@@ -60,7 +60,6 @@ export function BulkMaintenanceModal({
   equipment,
   onSuccess,
 }: BulkMaintenanceModalProps) {
-  const { toast } = useToast()
   const [submitting, setSubmitting] = useState(false)
   const [maintenanceType, setMaintenanceType] = useState<string>('PREVENTIVE')
   const [commonNotes, setCommonNotes] = useState<string>('')

@@ -16,8 +16,11 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { useToast } from '@/hooks/use-toast'
-import { createAssignmentSchema, type CreateAssignmentInput } from '@/lib/validations/inventory/assignment'
+import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
+import {
+  createAssignmentSchema,
+  type CreateAssignmentInput,
+} from '@/lib/validations/inventory/assignment'
 import type { AssignmentFormData } from '@/types/inventory/assignment'
 import { useUsers } from '@/contexts/users-context'
 
@@ -42,7 +45,6 @@ export function AssignmentForm({
   onSuccess,
   onCancel,
 }: AssignmentFormProps) {
-  const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [accessories, setAccessories] = useState<string[]>(defaultAccessories)
   const [newAccessory, setNewAccessory] = useState('')
@@ -123,41 +125,37 @@ export function AssignmentForm({
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+    <form onSubmit={handleSubmit(onSubmit)} className='space-y-6'>
       {/* Información de Asignación */}
       <Card>
         <CardHeader>
           <CardTitle>Información de Asignación</CardTitle>
-          <CardDescription>
-            Selecciona el usuario y tipo de asignación
-          </CardDescription>
+          <CardDescription>Selecciona el usuario y tipo de asignación</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="receiverId">
-              Usuario Receptor <span className="text-destructive">*</span>
+        <CardContent className='space-y-4'>
+          <div className='space-y-2'>
+            <Label htmlFor='receiverId'>
+              Usuario Receptor <span className='text-destructive'>*</span>
             </Label>
             {loadingUsers ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
+              <div className='flex items-center gap-2 text-sm text-muted-foreground'>
+                <Loader2 className='h-4 w-4 animate-spin' />
                 Cargando usuarios...
               </div>
             ) : (
               <Select
                 value={watch('receiverId')}
-                onValueChange={(value) => setValue('receiverId', value)}
+                onValueChange={value => setValue('receiverId', value)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecciona un usuario" />
+                  <SelectValue placeholder='Selecciona un usuario' />
                 </SelectTrigger>
                 <SelectContent>
-                  {assignableUsers.map((user) => (
+                  {assignableUsers.map(user => (
                     <SelectItem key={user.id} value={user.id}>
-                      <div className="flex flex-col">
+                      <div className='flex flex-col'>
                         <span>{user.name}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {user.email}
-                        </span>
+                        <span className='text-xs text-muted-foreground'>{user.email}</span>
                       </div>
                     </SelectItem>
                   ))}
@@ -165,36 +163,34 @@ export function AssignmentForm({
               </Select>
             )}
             {errors.receiverId && (
-              <p className="text-sm text-destructive">{errors.receiverId.message}</p>
+              <p className='text-sm text-destructive'>{errors.receiverId.message}</p>
             )}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="assignmentType">
-              Tipo de Asignación <span className="text-destructive">*</span>
+          <div className='space-y-2'>
+            <Label htmlFor='assignmentType'>
+              Tipo de Asignación <span className='text-destructive'>*</span>
             </Label>
             <Select
               value={watch('assignmentType')}
-              onValueChange={(value) => setValue('assignmentType', value as any)}
+              onValueChange={value => setValue('assignmentType', value as any)}
             >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {ASSIGNMENT_TYPE_OPTIONS.map((option) => (
+                {ASSIGNMENT_TYPE_OPTIONS.map(option => (
                   <SelectItem key={option.value} value={option.value}>
-                    <div className="flex flex-col">
+                    <div className='flex flex-col'>
                       <span>{option.label}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {option.description}
-                      </span>
+                      <span className='text-xs text-muted-foreground'>{option.description}</span>
                     </div>
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             {errors.assignmentType && (
-              <p className="text-sm text-destructive">{errors.assignmentType.message}</p>
+              <p className='text-sm text-destructive'>{errors.assignmentType.message}</p>
             )}
           </div>
         </CardContent>
@@ -204,41 +200,35 @@ export function AssignmentForm({
       <Card>
         <CardHeader>
           <CardTitle>Fechas</CardTitle>
-          <CardDescription>
-            Define el período de la asignación
-          </CardDescription>
+          <CardDescription>Define el período de la asignación</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="startDate">
-                Fecha de Inicio <span className="text-destructive">*</span>
+        <CardContent className='space-y-4'>
+          <div className='grid gap-4 md:grid-cols-2'>
+            <div className='space-y-2'>
+              <Label htmlFor='startDate'>
+                Fecha de Inicio <span className='text-destructive'>*</span>
               </Label>
-              <Input
-                id="startDate"
-                type="date"
-                {...register('startDate')}
-              />
+              <Input id='startDate' type='date' {...register('startDate')} />
               {errors.startDate && (
-                <p className="text-sm text-destructive">{errors.startDate.message}</p>
+                <p className='text-sm text-destructive'>{errors.startDate.message}</p>
               )}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="endDate">
-                Fecha de Fin {requiresEndDate && <span className="text-destructive">*</span>}
+            <div className='space-y-2'>
+              <Label htmlFor='endDate'>
+                Fecha de Fin {requiresEndDate && <span className='text-destructive'>*</span>}
               </Label>
               <Input
-                id="endDate"
-                type="date"
+                id='endDate'
+                type='date'
                 {...register('endDate')}
                 disabled={!requiresEndDate}
               />
               {errors.endDate && (
-                <p className="text-sm text-destructive">{errors.endDate.message}</p>
+                <p className='text-sm text-destructive'>{errors.endDate.message}</p>
               )}
               {requiresEndDate && (
-                <p className="text-xs text-muted-foreground">
+                <p className='text-xs text-muted-foreground'>
                   Requerida para asignaciones temporales y préstamos
                 </p>
               )}
@@ -251,36 +241,34 @@ export function AssignmentForm({
       <Card>
         <CardHeader>
           <CardTitle>Accesorios</CardTitle>
-          <CardDescription>
-            Lista de accesorios incluidos en la asignación
-          </CardDescription>
+          <CardDescription>Lista de accesorios incluidos en la asignación</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-2">
+        <CardContent className='space-y-4'>
+          <div className='flex gap-2'>
             <Input
               value={newAccessory}
-              onChange={(e) => setNewAccessory(e.target.value)}
-              placeholder="Ej: Cargador, Mouse, Cable HDMI"
-              onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addAccessory())}
+              onChange={e => setNewAccessory(e.target.value)}
+              placeholder='Ej: Cargador, Mouse, Cable HDMI'
+              onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addAccessory())}
             />
-            <Button type="button" onClick={addAccessory} size="icon">
-              <Plus className="h-4 w-4" />
+            <Button type='button' onClick={addAccessory} size='icon'>
+              <Plus className='h-4 w-4' />
             </Button>
           </div>
           {accessories.length > 0 && (
-            <div className="flex flex-wrap gap-2">
+            <div className='flex flex-wrap gap-2'>
               {accessories.map((accessory, index) => (
                 <div
                   key={index}
-                  className="flex items-center gap-1 rounded-md bg-secondary px-3 py-1 text-sm"
+                  className='flex items-center gap-1 rounded-md bg-secondary px-3 py-1 text-sm'
                 >
                   {accessory}
                   <button
-                    type="button"
+                    type='button'
                     onClick={() => removeAccessory(index)}
-                    className="ml-1 hover:text-destructive"
+                    className='ml-1 hover:text-destructive'
                   >
-                    <X className="h-3 w-3" />
+                    <X className='h-3 w-3' />
                   </button>
                 </div>
               ))}
@@ -293,31 +281,29 @@ export function AssignmentForm({
       <Card>
         <CardHeader>
           <CardTitle>Observaciones</CardTitle>
-          <CardDescription>
-            Notas adicionales sobre la asignación
-          </CardDescription>
+          <CardDescription>Notas adicionales sobre la asignación</CardDescription>
         </CardHeader>
         <CardContent>
           <Textarea
             {...register('observations')}
-            placeholder="Motivo de la asignación, condiciones especiales, etc..."
+            placeholder='Motivo de la asignación, condiciones especiales, etc...'
             rows={4}
           />
           {errors.observations && (
-            <p className="mt-2 text-sm text-destructive">{errors.observations.message}</p>
+            <p className='mt-2 text-sm text-destructive'>{errors.observations.message}</p>
           )}
         </CardContent>
       </Card>
 
       {/* Botones */}
-      <div className="flex justify-end gap-2">
+      <div className='flex justify-end gap-2'>
         {onCancel && (
-          <Button type="button" variant="outline" onClick={onCancel} disabled={loading}>
+          <Button type='button' variant='outline' onClick={onCancel} disabled={loading}>
             Cancelar
           </Button>
         )}
-        <Button type="submit" disabled={loading || loadingUsers}>
-          {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        <Button type='submit' disabled={loading || loadingUsers}>
+          {loading && <Loader2 className='mr-2 h-4 w-4 animate-spin' />}
           Crear Asignación
         </Button>
       </div>

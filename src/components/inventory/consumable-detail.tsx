@@ -19,7 +19,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { TransferFamilyDialog } from './transfer-family-dialog'
-import { useToast } from '@/hooks/use-toast'
+import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -145,8 +145,12 @@ function StockGauge({
         />
       </div>
       <div className='flex justify-between text-xs text-muted-foreground'>
-        <span>Mín: {min} {unit}</span>
-        <span>Máx: {max} {unit}</span>
+        <span>
+          Mín: {min} {unit}
+        </span>
+        <span>
+          Máx: {max} {unit}
+        </span>
       </div>
     </div>
   )
@@ -156,7 +160,6 @@ function StockGauge({
 
 export function ConsumableDetail({ consumableId, userRole, isSuperAdmin = false }: Props) {
   const router = useRouter()
-  const { toast } = useToast()
 
   const [consumable, setConsumable] = useState<ConsumableData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -183,7 +186,9 @@ export function ConsumableDetail({ consumableId, userRole, isSuperAdmin = false 
   }, [consumableId])
 
   // Cargar al montar
-  useEffect(() => { loadConsumable() }, [loadConsumable])
+  useEffect(() => {
+    loadConsumable()
+  }, [loadConsumable])
 
   // ── Loading / error ────────────────────────────────────────────────────────
   if (loading) {
@@ -231,11 +236,15 @@ export function ConsumableDetail({ consumableId, userRole, isSuperAdmin = false 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className='space-y-6 max-w-4xl mx-auto'>
-
       {/* Header */}
       <div className='flex items-start justify-between gap-4'>
         <div className='flex items-start gap-3'>
-          <Button variant='ghost' size='icon' onClick={() => router.back()} className='shrink-0 mt-0.5'>
+          <Button
+            variant='ghost'
+            size='icon'
+            onClick={() => router.back()}
+            className='shrink-0 mt-0.5'
+          >
             <ArrowLeft className='h-4 w-4' />
           </Button>
           <div>
@@ -316,7 +325,6 @@ export function ConsumableDetail({ consumableId, userRole, isSuperAdmin = false 
 
       {/* Cards de información */}
       <div className='grid gap-4 md:grid-cols-2'>
-
         {/* Datos generales */}
         <div className='rounded-lg border border-border p-4 space-y-4'>
           <h3 className='text-sm font-semibold'>Información general</h3>
@@ -374,18 +382,21 @@ export function ConsumableDetail({ consumableId, userRole, isSuperAdmin = false 
                   {m.type === 'ENTRY' || m.type === 'RETURN' ? (
                     <TrendingUp className={`h-4 w-4 shrink-0 ${MOVEMENT_COLORS[m.type]}`} />
                   ) : (
-                    <TrendingDown className={`h-4 w-4 shrink-0 ${MOVEMENT_COLORS[m.type] ?? 'text-muted-foreground'}`} />
+                    <TrendingDown
+                      className={`h-4 w-4 shrink-0 ${MOVEMENT_COLORS[m.type] ?? 'text-muted-foreground'}`}
+                    />
                   )}
                   <div>
                     <p className='font-medium'>
                       {MOVEMENT_LABELS[m.type] ?? m.type}
-                      <span className={`ml-2 font-semibold tabular-nums ${MOVEMENT_COLORS[m.type]}`}>
-                        {m.type === 'EXIT' ? '-' : '+'}{m.quantity} {unit}
+                      <span
+                        className={`ml-2 font-semibold tabular-nums ${MOVEMENT_COLORS[m.type]}`}
+                      >
+                        {m.type === 'EXIT' ? '-' : '+'}
+                        {m.quantity} {unit}
                       </span>
                     </p>
-                    {m.reason && (
-                      <p className='text-xs text-muted-foreground'>{m.reason}</p>
-                    )}
+                    {m.reason && <p className='text-xs text-muted-foreground'>{m.reason}</p>}
                   </div>
                 </div>
                 <div className='text-right text-xs text-muted-foreground'>

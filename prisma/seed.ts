@@ -16,6 +16,10 @@ import { seedAttributes } from './seeds/attributes.seed'
 import { seedWarehouses } from './seeds/warehouses.seed'
 import { ORGANIGRAM_FAMILIES } from './seeds/family-map'
 import { seedSupplierTypes } from './seeds/supplier-types.seed'
+import { seedAssetRequestsFamilySettings } from './seeds/asset-requests-settings.seed'
+import { seedInventoryFamilyConfigs } from './seeds/inventory-family-config.seed'
+import { seedUnitsOfMeasure } from './seeds/units-of-measure.seed'
+import { seedInventorySettings, seedFolioCounters } from './seeds/inventory-settings.seed'
 
 const prisma = new PrismaClient()
 const now = new Date()
@@ -51,8 +55,8 @@ async function main() {
   await seedTicketFamilyConfigs(familyMap)
 
   // 3. CONFIGURACIONES DE INVENTARIO POR FAMILIA
-  await seedInventoryFamilyConfigs(familyMap)
-  await seedAssetRequestsFamilySettings(familyMap)
+  await seedInventoryFamilyConfigs(prisma, familyMap)
+  await seedAssetRequestsFamilySettings(prisma, familyMap)
 
   // 4. DEPARTAMENTOS (con familyId directo)
   const deptMap = await seedDepartments(familyMap)
@@ -85,7 +89,7 @@ async function main() {
   await syncBrandFamilies(prisma, familyMap)
 
   // 13. UNIDADES DE MEDIDA
-  await seedUnitsOfMeasure()
+  await seedUnitsOfMeasure(prisma)
 
   // 13b. TIPOS DE PROVEEDOR
   await seedSupplierTypes(prisma, familyMap)
@@ -100,10 +104,10 @@ async function main() {
   await seedWarehouses(prisma, familyMap)
 
   // 14. CONFIGURACIONES DE INVENTARIO (system_settings)
-  await seedInventorySettings()
+  await seedInventorySettings(prisma)
 
   // 15. CONTADORES DE FOLIO
-  await seedFolioCounters()
+  await seedFolioCounters(prisma)
 
   // 16. CONTADORES DE CÓDIGO DE TICKET
   await seedTicketCodeCounters(familyMap)
@@ -180,89 +184,6 @@ async function seedTicketFamilyConfigs(familyMap: Map<string, string>) {
     })
   }
   console.log('✅ Configuraciones de tickets por familia')
-}
-
-// ============================================
-// 3. CONFIGURACIONES DE INVENTARIO POR FAMILIA
-// ============================================
-
-async function seedInventoryFamilyConfigs(familyMap: Map<string, string>) {
-  const configs: Record<
-    string,
-    { allowedSubtypes: any[]; visibleSections: any[]; requiredSections: any[] }
-  > = {
-    ADMINISTRATIVE: {
-      allowedSubtypes: ['EQUIPMENT', 'LICENSE'],
-      visibleSections: ['FINANCIAL', 'CONTRACT'],
-      requiredSections: [],
-    },
-    COMMERCIAL: {
-      allowedSubtypes: ['EQUIPMENT', 'LICENSE'],
-      visibleSections: ['FINANCIAL', 'DEPRECIATION', 'CONTRACT'],
-      requiredSections: ['FINANCIAL'],
-    },
-    MARKETING: {
-      allowedSubtypes: ['EQUIPMENT', 'LICENSE'],
-      visibleSections: ['FINANCIAL', 'DEPRECIATION', 'CONTRACT'],
-      requiredSections: ['FINANCIAL'],
-    },
-    ARCHITECTURE: {
-      allowedSubtypes: ['EQUIPMENT', 'LICENSE', 'MRO'],
-      visibleSections: ['FINANCIAL', 'DEPRECIATION', 'CONTRACT', 'WAREHOUSE'],
-      requiredSections: ['FINANCIAL', 'DEPRECIATION'],
-    },
-    OPERATIONS: {
-      allowedSubtypes: ['EQUIPMENT', 'MRO', 'LICENSE'],
-      visibleSections: ['FINANCIAL', 'DEPRECIATION', 'CONTRACT', 'STOCK_MRO', 'WAREHOUSE'],
-      requiredSections: ['FINANCIAL'],
-    },
-    TECHNOLOGY: {
-      allowedSubtypes: ['EQUIPMENT', 'LICENSE', 'MRO'],
-      visibleSections: ['FINANCIAL', 'DEPRECIATION', 'CONTRACT', 'WAREHOUSE'],
-      requiredSections: ['FINANCIAL'],
-    },
-  }
-  for (const [code, cfg] of Object.entries(configs)) {
-    const familyId = familyMap.get(code)!
-    await prisma.inventory_family_config.upsert({
-      where: { familyId },
-      update: {
-        allowedSubtypes: cfg.allowedSubtypes as any,
-        visibleSections: cfg.visibleSections as any,
-        requiredSections: cfg.requiredSections as any,
-      },
-      create: {
-        id: randomUUID(),
-        familyId,
-        allowedSubtypes: cfg.allowedSubtypes as any,
-        visibleSections: cfg.visibleSections as any,
-        requiredSections: cfg.requiredSections as any,
-        requireFinancialForNew: true,
-        autoApproveDecommission: false,
-        requireDeliveryAct: true,
-      },
-    })
-  }
-  console.log('✅ Configuraciones de inventario por familia')
-}
-
-/** Habilita solicitud de activos por familia (requerido para el formulario de compras) */
-async function seedAssetRequestsFamilySettings(familyMap: Map<string, string>) {
-  for (const familyId of familyMap.values()) {
-    const key = `asset_requests_enabled_${familyId}`
-    await prisma.system_settings.upsert({
-      where: { key },
-      update: { value: 'true' },
-      create: {
-        id: randomUUID(),
-        key,
-        value: 'true',
-        description: 'Solicitud de activos habilitada para esta familia',
-        updatedAt: now,
-      },
-    })
-  }
-  console.log(`✅ Solicitud de activos habilitada en ${familyMap.size} familias`)
 }
 
 // ============================================
@@ -721,101 +642,6 @@ async function seedSLAPolicies(familyMap: Map<string, string>) {
 // ============================================
 // 9. CATEGORÍAS (todas bajo TECHNOLOGY)
 // ============================================
-
-async function seedUnitsOfMeasure() {
-  const units = [
-    { code: 'UNIT', name: 'Unidad', symbol: 'ud', order: 1 },
-    { code: 'BOX', name: 'Caja', symbol: 'caja', order: 2 },
-    { code: 'PACK', name: 'Paquete', symbol: 'paq', order: 3 },
-    { code: 'REAM', name: 'Resma', symbol: 'resma', order: 4 },
-    { code: 'METER', name: 'Metro', symbol: 'm', order: 5 },
-    { code: 'LITER', name: 'Litro', symbol: 'L', order: 6 },
-    { code: 'KG', name: 'Kilogramo', symbol: 'kg', order: 7 },
-    { code: 'SET', name: 'Juego', symbol: 'juego', order: 8 },
-  ]
-  for (const u of units) {
-    await prisma.units_of_measure.upsert({
-      where: { code: u.code },
-      update: { name: u.name, symbol: u.symbol, order: u.order },
-      create: { id: randomUUID(), ...u, isActive: true },
-    })
-  }
-  console.log(`✅ ${units.length} unidades de medida`)
-}
-
-// ============================================
-// 14. CONFIGURACIONES DE INVENTARIO
-// ============================================
-
-async function seedInventorySettings() {
-  const settings = [
-    {
-      key: 'inventory.act_expiration_days',
-      value: '7',
-      description: 'Días de expiración para actas',
-    },
-    {
-      key: 'inventory.low_stock_alert_enabled',
-      value: 'true',
-      description: 'Habilitar alertas de stock bajo',
-    },
-    {
-      key: 'inventory.license_alert_enabled',
-      value: 'true',
-      description: 'Habilitar alertas de vencimiento de licencias',
-    },
-    {
-      key: 'inventory.license_alert_days_first',
-      value: '30',
-      description: 'Días antes para primera alerta de licencias',
-    },
-    {
-      key: 'inventory.license_alert_days_second',
-      value: '7',
-      description: 'Días antes para segunda alerta de licencias',
-    },
-    {
-      key: 'inventory.warranty_alert_days',
-      value: '30',
-      description: 'Días antes de vencimiento de garantía',
-    },
-    {
-      key: 'inventory.mro_expiry_alert_enabled',
-      value: 'true',
-      description: 'Habilita alertas de caducidad MRO',
-    },
-    {
-      key: 'inventory.warranty_alert_enabled',
-      value: 'true',
-      description: 'Habilita alertas de garantía de equipos',
-    },
-    { key: 'inventory.default_warehouse_id', value: '', description: 'ID de bodega por defecto' },
-  ]
-  for (const s of settings) {
-    await prisma.system_settings.upsert({
-      where: { key: s.key },
-      update: { description: s.description },
-      create: { id: randomUUID(), ...s, updatedAt: now },
-    })
-  }
-  console.log(`✅ ${settings.length} configuraciones de inventario`)
-}
-
-// ============================================
-// 15. CONTADORES DE FOLIO
-// ============================================
-
-async function seedFolioCounters() {
-  const types = ['ACT', 'DEV', 'BAJ']
-  for (const type of types) {
-    await prisma.folio_counters.upsert({
-      where: { year_type: { year, type } },
-      update: {},
-      create: { id: randomUUID(), year, type, lastNumber: 0 },
-    })
-  }
-  console.log(`✅ Contadores de folio (ACT, DEV, BAJ) para ${year}`)
-}
 
 // ============================================
 // 16. CONTADORES DE CÓDIGO DE TICKET

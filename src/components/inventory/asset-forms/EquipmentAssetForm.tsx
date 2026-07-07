@@ -21,6 +21,7 @@ import { TypeAttributesInput } from '@/components/inventory/custom-fields/type-a
 import { AttachmentsField } from '@/components/inventory/shared/AttachmentsField'
 import { AccessoriesSection } from '@/components/inventory/shared/AccessoriesSection'
 import { toast } from 'sonner'
+import { inlineSelectFeedback } from '@/lib/utils/inline-select-feedback'
 import {
   showDepartmentSelector,
   showWarehouseSelector,
@@ -681,6 +682,7 @@ export function EquipmentAssetForm({
             createTitle='Nuevo tipo de equipo'
             editTitle='Editar tipo de equipo'
             deleteConfirmMessage='¿Eliminar este tipo de equipo? Solo es posible si no tiene activos asociados.'
+            {...inlineSelectFeedback('Tipo de equipo')}
             createForm={({ item, onSuccess, onCancel }) => (
               <EquipmentTypeInlineForm
                 familyId={familyId}
@@ -730,6 +732,7 @@ export function EquipmentAssetForm({
               createTitle='Nueva marca'
               editTitle='Editar marca'
               deleteConfirmMessage='¿Eliminar esta marca? Solo es posible si no tiene activos asociados.'
+              {...inlineSelectFeedback('Marca')}
               createForm={({ item, onSuccess, onCancel }) => (
                 <EquipmentBrandInlineForm
                   familyId={familyId}
@@ -778,6 +781,7 @@ export function EquipmentAssetForm({
               createTitle='Nuevo modelo de equipo'
               editTitle='Editar modelo de equipo'
               deleteConfirmMessage='¿Eliminar este modelo? Solo es posible si no tiene activos asociados.'
+              {...inlineSelectFeedback('Modelo')}
               createForm={({ item, onSuccess, onCancel }) => (
                 <EquipmentModelInlineForm
                   typeId={equipmentTypeId}
@@ -912,6 +916,7 @@ export function EquipmentAssetForm({
               createTitle='Nueva bodega'
               editTitle='Editar bodega'
               deleteConfirmMessage='¿Eliminar esta bodega? Solo es posible si no tiene activos asociados.'
+              {...inlineSelectFeedback('Bodega')}
               createForm={({ onSuccess, onCancel }) => (
                 <WarehouseInlineForm
                   defaultFamilyId={familyId}

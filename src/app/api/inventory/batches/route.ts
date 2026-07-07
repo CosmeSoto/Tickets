@@ -16,6 +16,7 @@ import {
 import { canManageInventory, canManageAsset } from '@/lib/inventory-access'
 import { getInventorySessionContext } from '@/lib/inventory/inventory-session'
 import { invalidateCache } from '@/lib/api-cache'
+import { createAuditLog } from '@/lib/audit'
 import { z } from 'zod'
 import { EquipmentCondition } from '@prisma/client'
 
@@ -243,6 +244,22 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await createBatch(data)
+
+    const ipAddress =
+      request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || undefined
+    await createAuditLog({
+      entityType: 'inventory',
+      entityId: result.batch.id,
+      action: 'batch_created',
+      userId: session.user.id,
+      changes: {
+        batchCode: result.batch.batchCode,
+        quantity: result.batch.quantity,
+        modelId: data.modelId,
+        equipmentCount: result.equipment.length,
+      },
+      ipAddress,
+    })
 
     // Invalidate relevant caches
     await invalidateCache('equipment:*')

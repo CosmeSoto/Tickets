@@ -13,8 +13,12 @@ import { randomUUID } from 'crypto'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import { z } from 'zod'
-import { EquipmentStatus, MaintenanceStatus, MaintenanceType } from '@prisma/client'
+import { canManageInventory, inventoryForbidden } from '@/lib/inventory-access'
+import {
+  assertInventoryManageByFamily,
+  InventoryAccessError,
+  toInventoryAccessUser,
+} from '@/lib/inventory/inventory-resource-access'
 
 // Schema de validación para acciones masivas
 const bulkActionSchema = z.object({
@@ -54,6 +58,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
+    if (!(await canManageInventory(session.user.id, session.user.role))) {
+      return inventoryForbidden()
+    }
+
+    const accessUser = toInventoryAccessUser({
+      id: session.user.id,
+      role: session.user.role,
+      isSuperAdmin: (session.user as any).isSuperAdmin,
+    })
+
     // 2. Parsear y validar body
     const body = await request.json()
     const validatedData = bulkActionSchema.parse(body)
@@ -91,11 +105,23 @@ export async function POST(request: NextRequest) {
         id: true,
         code: true,
         status: true,
+        type: { select: { familyId: true } },
       },
     })
 
     if (equipment.length !== validatedData.equipmentIds.length) {
       return NextResponse.json({ error: 'Algunos equipos no fueron encontrados' }, { status: 404 })
+    }
+
+    for (const eq of equipment) {
+      try {
+        await assertInventoryManageByFamily(accessUser, eq.type?.familyId ?? null)
+      } catch (error) {
+        if (error instanceof InventoryAccessError) {
+          return NextResponse.json({ error: error.message }, { status: error.statusCode })
+        }
+        throw error
+      }
     }
 
     // 5. Validar estados según la acción

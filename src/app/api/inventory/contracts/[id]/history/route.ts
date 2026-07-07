@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { ContractService } from '@/lib/services/contract-service'
+import { requireContractAccess } from '@/lib/inventory/require-inventory-api'
 
 /**
  * GET /api/inventory/contracts/[id]/history
@@ -15,6 +16,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (!session?.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
+
+    const accessDenied = await requireContractAccess(session.user, id, 'read')
+    if (accessDenied) return accessDenied
 
     const history = await ContractService.getRenewalHistory(id)
 

@@ -7,6 +7,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { updateBatchStatus } from '@/lib/services/equipment-batches.service'
+import { createAuditLog } from '@/lib/audit'
+import prisma from '@/lib/prisma'
 import { z } from 'zod'
 import {
   assertInventoryResourceManage,
@@ -44,7 +46,30 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       )
     }
 
+    const existing = await prisma.equipment_batches.findUnique({
+      where: { id },
+      select: { status: true, batchCode: true },
+    })
+    if (!existing) {
+      return NextResponse.json({ error: 'Lote no encontrado' }, { status: 404 })
+    }
+
     const batch = await updateBatchStatus(id, validationResult.data.status)
+
+    const ipAddress =
+      request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || undefined
+    await createAuditLog({
+      entityType: 'inventory',
+      entityId: id,
+      action: 'batch_status_updated',
+      userId: session.user.id,
+      changes: {
+        batchCode: existing.batchCode,
+        status: { from: existing.status, to: validationResult.data.status },
+      },
+      ipAddress,
+    })
+
     return NextResponse.json(batch)
   } catch (error: any) {
     console.error('Error updating batch status:', error)

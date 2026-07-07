@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label'
 import { InlineCreateSelect } from '@/components/ui/inline-create-select'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { CatalogTypeInlineForm } from '@/components/inventory/asset-forms/CatalogTypeInlineForm'
+import { inlineSelectFeedback } from '@/lib/utils/inline-select-feedback'
 import { useFormSubmit } from '@/hooks/common/use-form-submit'
 import { useFetch } from '@/hooks/common/use-fetch'
 import { useInventoryFamilies } from '@/contexts/families-context'
@@ -44,6 +45,8 @@ interface SupplierFormProps {
   supplier?: any
   /** Si se pasa, pre-selecciona la familia y filtra tipos de proveedor */
   defaultFamilyId?: string
+  /** Dentro de SupplierSelect: el padre muestra el toast contextual */
+  embedded?: boolean
   onSuccess?: (supplier: any) => void
   onCancel?: () => void
 }
@@ -51,6 +54,7 @@ interface SupplierFormProps {
 export function SupplierForm({
   supplier,
   defaultFamilyId,
+  embedded = false,
   onSuccess,
   onCancel,
 }: SupplierFormProps) {
@@ -72,6 +76,7 @@ export function SupplierForm({
     {
       method: isEdit ? 'PUT' : 'POST',
       successMessage: isEdit ? 'Proveedor actualizado' : 'Proveedor creado',
+      silentSuccess: embedded,
       onSuccess,
     }
   )
@@ -99,7 +104,13 @@ export function SupplierForm({
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className='space-y-4'>
+    <form
+      onSubmit={e => {
+        e.stopPropagation()
+        handleSubmit(onSubmit)(e)
+      }}
+      className='space-y-4'
+    >
       <div className='grid grid-cols-1 gap-4 sm:grid-cols-2'>
         <div className='sm:col-span-2'>
           <Label htmlFor='name'>Nombre *</Label>
@@ -138,6 +149,7 @@ export function SupplierForm({
             createTitle='Nuevo tipo de proveedor'
             editTitle='Editar tipo de proveedor'
             deleteConfirmMessage='¿Eliminar este tipo? Si tiene proveedores asociados, se desactivará.'
+            {...inlineSelectFeedback('Tipo de proveedor')}
             createForm={({ item, onSuccess: onTypeSuccess, onCancel: onTypeCancel }) => (
               <CatalogTypeInlineForm
                 apiEndpoint='/api/inventory/supplier-types'

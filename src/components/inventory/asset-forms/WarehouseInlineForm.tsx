@@ -27,6 +27,7 @@ export function WarehouseInlineForm({ defaultFamilyId, onSuccess, onCancel }: Pr
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    e.stopPropagation()
     setError('')
     if (!name.trim()) {
       setError('El nombre es obligatorio')

@@ -32,7 +32,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { useToast } from '@/hooks/use-toast'
+import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 import { FileInputWithCamera } from '@/components/common/file-input-with-camera'
 import { extractCatchError } from '@/lib/utils/api-error'
 
@@ -329,7 +329,6 @@ function PreviewModal({
 // ── Componente principal ─────────────────────────────────────────────────────
 
 export function EquipmentAttachments({ equipmentId, canManage }: EquipmentAttachmentsProps) {
-  const { toast } = useToast()
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)

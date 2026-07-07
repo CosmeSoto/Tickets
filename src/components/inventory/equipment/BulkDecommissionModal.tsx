@@ -28,7 +28,7 @@ import {
 } from '@/components/ui/table'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Loader2, AlertTriangle, XCircle } from 'lucide-react'
-import { useToast } from '@/hooks/use-toast'
+import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 
 interface Equipment {
   id: string
@@ -61,7 +61,6 @@ export function BulkDecommissionModal({
   equipment,
   onSuccess,
 }: BulkDecommissionModalProps) {
-  const { toast } = useToast()
   const [submitting, setSubmitting] = useState(false)
   const [decommissionReason, setDecommissionReason] = useState<string>('OBSOLETE')
   const [commonNotes, setCommonNotes] = useState<string>('')

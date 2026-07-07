@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useMemo } from 'react'
-import { useToast } from '@/hooks/use-toast'
+import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 
 export interface EquipmentBrand {
   id: string
@@ -21,7 +21,6 @@ interface UseBrandManagementOptions {
 }
 
 export function useBrandManagement({ familyId }: UseBrandManagementOptions = {}) {
-  const { toast } = useToast()
   const [brands, setBrands] = useState<EquipmentBrand[]>([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)

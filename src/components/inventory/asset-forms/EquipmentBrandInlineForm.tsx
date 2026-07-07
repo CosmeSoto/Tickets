@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { useToast } from '@/hooks/use-toast'
 import type { InlineSelectOption } from '@/components/ui/inline-create-select'
 
 interface Props {
@@ -25,7 +24,6 @@ export function EquipmentBrandInlineForm({
   onCancel,
   adminApi = false,
 }: Props) {
-  const { toast } = useToast()
   const isEdit = !!item
   const [name, setName] = useState(item?.name ?? '')
   const [code, setCode] = useState('')
@@ -48,6 +46,7 @@ export function EquipmentBrandInlineForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    e.stopPropagation()
     setError('')
     if (!name.trim()) {
       setError('El nombre es obligatorio')

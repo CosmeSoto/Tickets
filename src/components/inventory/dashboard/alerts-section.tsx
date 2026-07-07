@@ -6,7 +6,6 @@ import {
   AlertTriangle,
   Clock,
   Package,
-  CreditCard,
   FileText,
   ClipboardList,
   Wrench,
@@ -15,6 +14,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
+import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 
 interface DashboardAlerts {
   lowStockConsumables: number
@@ -44,9 +44,19 @@ export function AlertsSection() {
       if (res.ok) {
         const data = await res.json()
         setAlerts(data)
+      } else {
+        toast({
+          title: 'No se pudieron cargar las alertas',
+          description: 'Intenta recargar la página',
+          variant: 'destructive',
+        })
       }
     } catch (err) {
-      console.error('Error fetching alerts:', err)
+      toast({
+        title: 'Error de conexión',
+        description: 'No se pudieron cargar las alertas del inventario',
+        variant: 'destructive',
+      })
     } finally {
       setLoading(false)
     }

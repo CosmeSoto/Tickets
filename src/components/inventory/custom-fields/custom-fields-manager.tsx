@@ -21,7 +21,7 @@ import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Plus, Edit, Trash2, MoveUp, MoveDown, AlertTriangle } from 'lucide-react'
 import { CustomFieldForm, CustomFieldFormData, FieldType } from './custom-field-form'
-import { useToast } from '@/hooks/use-toast'
+import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 
 interface CustomField {
   id: string
@@ -44,7 +44,6 @@ export function CustomFieldsManager({ familyId }: CustomFieldsManagerProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingField, setEditingField] = useState<CustomField | null>(null)
-  const { toast } = useToast()
 
   useEffect(() => {
     loadFields()

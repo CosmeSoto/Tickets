@@ -12,6 +12,7 @@ import { FileUploadZone } from '@/components/ui/file-upload-zone'
 import { ContractPicker } from '@/components/contracts/contract-picker'
 import { SupplierSelect } from '@/components/inventory/suppliers/SupplierSelect'
 import { CatalogTypeInlineForm } from '@/components/inventory/asset-forms/CatalogTypeInlineForm'
+import { inlineSelectFeedback } from '@/lib/utils/inline-select-feedback'
 import { TypeAttributesInput } from '@/components/inventory/custom-fields/type-attributes-input'
 import type { FamilyConfig } from '@/lib/inventory/family-config-types'
 import { useFetch } from '@/hooks/common/use-fetch'
@@ -169,6 +170,7 @@ export function LicenseAssetForm({
             placeholder='Buscar tipo...'
             createLabel='Crear tipo de licencia'
             createTitle='Nuevo tipo de licencia'
+            {...inlineSelectFeedback('Tipo de licencia')}
             createForm={({ onSuccess, onCancel }) => (
               <CatalogTypeInlineForm
                 apiEndpoint='/api/inventory/license-types'

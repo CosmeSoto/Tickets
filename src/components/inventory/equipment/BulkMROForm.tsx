@@ -23,6 +23,7 @@ import { WarehouseInlineForm } from '@/components/inventory/asset-forms/Warehous
 import { StepHeader } from '@/components/inventory/shared/StepHeader'
 import type { FamilyConfig } from '@/lib/inventory/family-config-types'
 import { toast } from 'sonner'
+import { inlineSelectFeedback } from '@/lib/utils/inline-select-feedback'
 
 interface BulkMROFormProps {
   familyId: string
@@ -248,6 +249,7 @@ export function BulkMROForm({
               allowClear
               createLabel='Crear categoría'
               createTitle='Nueva categoría'
+              {...inlineSelectFeedback('Categoría')}
               createForm={({ item, onSuccess: onS, onCancel: onC }) => (
                 <CatalogTypeInlineForm
                   apiEndpoint='/api/inventory/consumable-types'
@@ -287,6 +289,7 @@ export function BulkMROForm({
               allowClear
               createLabel='Crear unidad'
               createTitle='Nueva unidad'
+              {...inlineSelectFeedback('Unidad de medida')}
               createForm={({ item, onSuccess: onS, onCancel: onC }) => (
                 <UnitOfMeasureInlineForm
                   item={item}
@@ -433,6 +436,7 @@ export function BulkMROForm({
               allowClear
               createLabel='Crear bodega'
               createTitle='Nueva bodega'
+              {...inlineSelectFeedback('Bodega')}
               createForm={({ onSuccess: onS, onCancel: onC }) => (
                 <WarehouseInlineForm
                   defaultFamilyId={familyId}

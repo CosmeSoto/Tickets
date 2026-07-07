@@ -8,7 +8,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { useToast } from '@/hooks/use-toast'
+import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 import {
   DEFAULT_FAMILY_CONFIG,
   DEFAULT_MODE_CONFIG,
@@ -216,7 +216,6 @@ function buildForm(cfg: RawConfig | null, assetRequestsEnabled = false): FormSta
 export function useInventorySettings() {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const { toast } = useToast()
   const { data: session } = useSession()
   const isSuperAdmin = (session?.user as { isSuperAdmin?: boolean })?.isSuperAdmin === true
 

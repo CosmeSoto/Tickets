@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { AssetRequestDetail } from '@/components/inventory/asset-requests/asset-request-detail'
-import { AssetRequestReviewDialog } from '@/components/inventory/asset-requests/asset-request-review-dialog'
+import { ApproveRejectDialog } from '@/components/inventory/asset-requests/approve-reject-dialog'
 import { ArrowLeft, RefreshCw, CheckCircle, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { AssetRequestStatus, AssetType } from '@prisma/client'
@@ -52,9 +52,11 @@ export default function AdminAssetRequestDetailPage({ params }: { params: { id: 
   const [request, setRequest] = useState<AssetRequestDetailData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
-  // Diálogos
-  const [approveDialog, setApproveDialog] = useState(false)
-  const [rejectDialog, setRejectDialog] = useState(false)
+  // Diálogo unificado aprobar/rechazar (flujo con equipos y state machine)
+  const [approveRejectDialog, setApproveRejectDialog] = useState<{
+    open: boolean
+    action: 'APPROVED' | 'REJECTED'
+  }>({ open: false, action: 'APPROVED' })
 
   const loadRequest = async () => {
     setIsLoading(true)
@@ -139,13 +141,16 @@ export default function AdminAssetRequestDetailPage({ params }: { params: { id: 
             Actualizar
           </Button>
           {canReject && (
-            <Button variant='destructive' onClick={() => setRejectDialog(true)}>
+            <Button
+              variant='destructive'
+              onClick={() => setApproveRejectDialog({ open: true, action: 'REJECTED' })}
+            >
               <XCircle className='mr-2 h-4 w-4' />
               Rechazar
             </Button>
           )}
           {canApprove && (
-            <Button onClick={() => setApproveDialog(true)}>
+            <Button onClick={() => setApproveRejectDialog({ open: true, action: 'APPROVED' })}>
               <CheckCircle className='mr-2 h-4 w-4' />
               Aprobar
             </Button>
@@ -157,21 +162,15 @@ export default function AdminAssetRequestDetailPage({ params }: { params: { id: 
       <AssetRequestDetail request={request} />
 
       {/* Diálogos */}
-      <AssetRequestReviewDialog
-        open={approveDialog}
-        onOpenChange={setApproveDialog}
+      <ApproveRejectDialog
+        open={approveRejectDialog.open}
+        onOpenChange={open => setApproveRejectDialog(prev => ({ ...prev, open }))}
         requestId={request.id}
         requestCode={request.code}
-        action='approve'
-        onSuccess={handleReviewSuccess}
-      />
-
-      <AssetRequestReviewDialog
-        open={rejectDialog}
-        onOpenChange={setRejectDialog}
-        requestId={request.id}
-        requestCode={request.code}
-        action='reject'
+        action={approveRejectDialog.action}
+        quantity={request.quantity}
+        assetTypeId={request.assetId || undefined}
+        assetType={request.assetType}
         onSuccess={handleReviewSuccess}
       />
     </div>

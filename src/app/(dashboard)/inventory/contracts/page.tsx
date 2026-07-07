@@ -44,7 +44,7 @@ import { ExportButton } from '@/components/common/export-button'
 import { useExport } from '@/hooks/common/use-export'
 import { useFamilyOptions } from '@/hooks/use-family-options'
 import { useFetch } from '@/hooks/common/use-fetch'
-import { useToast } from '@/hooks/use-toast'
+import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 import { ContractForm } from '@/components/contracts/contract-form'
 import { RenewContractDialog } from '@/components/inventory/contracts/renew-contract-dialog'
 import { ContractHistoryTimeline } from '@/components/inventory/contracts/contract-history-timeline'
@@ -115,7 +115,6 @@ const STATUS_CONFIG: Record<ContractStatus, { label: string; icon: any; cls: str
 
 export default function ContractsPage() {
   const { data: session } = useSession()
-  const { toast } = useToast()
 
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('ALL')

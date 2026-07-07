@@ -6,7 +6,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { useToast } from '@/hooks/use-toast'
+import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -51,8 +51,6 @@ export interface UpdateAttributeData {
 // ── Hook ───────────────────────────────────────────────────────────────────
 
 export function useAttributeManagement(typeKind: TypeKind, typeId: string | null) {
-  const { toast } = useToast()
-
   const [attributes, setAttributes] = useState<Attribute[]>([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -66,9 +64,7 @@ export function useAttributeManagement(typeKind: TypeKind, typeId: string | null
 
     setLoading(true)
     try {
-      const res = await fetch(
-        `/api/admin/inventory/${typeKind}-types/${typeId}/attributes`
-      )
+      const res = await fetch(`/api/admin/inventory/${typeKind}-types/${typeId}/attributes`)
       const data = await res.json()
 
       if (res.ok && data.attributes) {
@@ -98,14 +94,11 @@ export function useAttributeManagement(typeKind: TypeKind, typeId: string | null
 
       setSaving(true)
       try {
-        const res = await fetch(
-          `/api/admin/inventory/${typeKind}-types/${typeId}/attributes`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data),
-          }
-        )
+        const res = await fetch(`/api/admin/inventory/${typeKind}-types/${typeId}/attributes`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        })
         const result = await res.json()
 
         if (res.ok && result.attribute) {

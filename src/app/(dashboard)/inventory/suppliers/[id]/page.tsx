@@ -20,7 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { SupplierForm } from '@/components/inventory/suppliers/SupplierForm'
-import { useToast } from '@/hooks/use-toast'
+import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 
 interface SupplierDetail {
   id: string
@@ -49,7 +49,6 @@ export default function SupplierDetailPage({
 }) {
   const params = use(paramsPromise)
   const router = useRouter()
-  const { toast } = useToast()
   const [supplier, setSupplier] = useState<SupplierDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [formOpen, setFormOpen] = useState(false)

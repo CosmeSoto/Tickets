@@ -38,7 +38,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { useToast } from '@/hooks/use-toast'
+import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 import { cn } from '@/lib/utils'
 import { useTableSort } from '@/hooks/common/use-table-sort'
 import { SortableTableHead } from '@/components/ui/sortable-table-head'
@@ -85,7 +85,6 @@ export function DecommissionRequestList({
   refreshTrigger,
   isSuperAdmin = false,
 }: DecommissionRequestListProps) {
-  const { toast } = useToast()
   const [requests, setRequests] = useState<any[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)

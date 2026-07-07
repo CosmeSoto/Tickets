@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { ContractAlertService } from '@/lib/services/contract-alert.service'
+import { requireInventoryModuleAccess } from '@/lib/inventory/require-inventory-api'
 
 /**
  * GET /api/inventory/contracts/stats
@@ -13,6 +14,9 @@ export async function GET(request: NextRequest) {
     if (!session?.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
+
+    const denied = await requireInventoryModuleAccess(session.user)
+    if (denied) return denied
 
     const { searchParams } = new URL(request.url)
     const familyId = searchParams.get('familyId') || undefined

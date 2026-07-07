@@ -40,7 +40,7 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
-import { useToast } from '@/hooks/use-toast'
+import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 import { PdfPreviewModal } from '@/components/ui/pdf-preview-modal'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -113,7 +113,6 @@ export default function ActDetailPage({ params: paramsPromise }: PageProps) {
   const params = use(paramsPromise)
   const { data: session, status } = useSession()
   const router = useRouter()
-  const { toast } = useToast()
 
   const [act, setAct] = useState<any>(null)
   const [canAccept, setCanAccept] = useState(false)
@@ -468,7 +467,10 @@ export default function ActDetailPage({ params: paramsPromise }: PageProps) {
                 ['Número de Serie', act.equipmentSnapshot?.serialNumber || '—'],
                 [
                   'Tipo',
-                  act.equipmentSnapshot?.typeName || EQUIPMENT_TYPE_LABELS[act.equipmentSnapshot?.type] || act.equipmentSnapshot?.type || '—',
+                  act.equipmentSnapshot?.typeName ||
+                    EQUIPMENT_TYPE_LABELS[act.equipmentSnapshot?.type] ||
+                    act.equipmentSnapshot?.type ||
+                    '—',
                 ],
                 ['Marca', act.equipmentSnapshot?.brand],
                 ['Modelo', act.equipmentSnapshot?.model],

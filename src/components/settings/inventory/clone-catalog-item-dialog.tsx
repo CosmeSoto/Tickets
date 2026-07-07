@@ -13,7 +13,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { SearchableSelect } from '@/components/ui/searchable-select'
-import { useToast } from '@/hooks/use-toast'
+import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 import { useFamilyOptions } from '@/hooks/use-family-options'
 
 type CatalogKind = 'brand' | 'warehouse'
@@ -37,16 +37,13 @@ export function CloneCatalogItemDialog({
   currentFamilyId,
   onSuccess,
 }: Props) {
-  const { toast } = useToast()
   const { families, loading: loadingFamilies } = useFamilyOptions()
   const [targetFamilyId, setTargetFamilyId] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
   const targetFamilies = families.filter(f => f.id !== currentFamilyId)
   const endpoint =
-    kind === 'brand'
-      ? '/api/admin/inventory/brands/clone'
-      : '/api/admin/inventory/warehouses/clone'
+    kind === 'brand' ? '/api/admin/inventory/brands/clone' : '/api/admin/inventory/warehouses/clone'
 
   useEffect(() => {
     if (open) setTargetFamilyId('')
@@ -150,7 +147,12 @@ export function CloneCatalogItemDialog({
         </div>
 
         <DialogFooter className='gap-2'>
-          <Button type='button' variant='outline' onClick={() => onOpenChange(false)} disabled={submitting}>
+          <Button
+            type='button'
+            variant='outline'
+            onClick={() => onOpenChange(false)}
+            disabled={submitting}
+          >
             Cancelar
           </Button>
           <Button
@@ -159,7 +161,11 @@ export function CloneCatalogItemDialog({
             disabled={!targetFamilyId || submitting}
             className='gap-1.5'
           >
-            {submitting ? <Loader2 className='h-3.5 w-3.5 animate-spin' /> : <Copy className='h-3.5 w-3.5' />}
+            {submitting ? (
+              <Loader2 className='h-3.5 w-3.5 animate-spin' />
+            ) : (
+              <Copy className='h-3.5 w-3.5' />
+            )}
             {submitting ? 'Copiando...' : 'Copiar'}
           </Button>
         </DialogFooter>

@@ -6,7 +6,7 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
-import { useToast } from '@/hooks/use-toast'
+import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -86,8 +86,6 @@ export function useTypeManagement<T extends AnyType = AnyType>(
   typeKind: TypeKind,
   familyId: string | null
 ) {
-  const { toast } = useToast()
-
   const [types, setTypes] = useState<T[]>([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)

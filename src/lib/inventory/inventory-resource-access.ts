@@ -240,7 +240,7 @@ export async function assertInventoryResourceManage(
   return familyId
 }
 
-/** Contratos bajo /api/inventory/contracts — mismo criterio que /api/contracts/[id] */
+/** Contratos bajo /api/inventory/contracts */
 export async function assertContractPaymentAccess(
   user: InventoryAccessUser,
   paymentId: string,

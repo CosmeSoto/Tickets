@@ -28,7 +28,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { useToast } from '@/hooks/use-toast'
+import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 import { AssetRequestStatusBadge } from './asset-request-status-badge'
 import { ApproveRejectDialog } from './approve-reject-dialog'
 import {
@@ -90,7 +90,6 @@ export function AssetRequestDetailSheet({
   onSuccess,
 }: AssetRequestDetailSheetProps) {
   const { data: session } = useSession()
-  const { toast } = useToast()
 
   // ── State ──────────────────────────────────────────────────────────────────
 

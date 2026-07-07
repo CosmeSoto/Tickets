@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { useToast } from '@/hooks/use-toast'
+import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 
 interface ActAcceptanceFormProps {
   actId: string
@@ -48,7 +48,6 @@ Al aceptar esta acta de entrega, usted declara que:
 
 export function ActAcceptanceForm({ actId, token, onSuccess }: ActAcceptanceFormProps) {
   const router = useRouter()
-  const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [acceptedTerms, setAcceptedTerms] = useState(false)
   const [showRejectForm, setShowRejectForm] = useState(false)
@@ -89,7 +88,7 @@ export function ActAcceptanceForm({ actId, token, onSuccess }: ActAcceptanceForm
       })
 
       onSuccess?.()
-      
+
       // Recargar la página para mostrar el estado actualizado
       router.refresh()
     } catch (error) {
@@ -139,7 +138,7 @@ export function ActAcceptanceForm({ actId, token, onSuccess }: ActAcceptanceForm
       })
 
       onSuccess?.()
-      
+
       // Recargar la página para mostrar el estado actualizado
       router.refresh()
     } catch (error) {
@@ -156,30 +155,30 @@ export function ActAcceptanceForm({ actId, token, onSuccess }: ActAcceptanceForm
 
   if (showRejectForm) {
     return (
-      <Card className="border-destructive">
+      <Card className='border-destructive'>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-destructive">
-            <XCircle className="h-5 w-5" />
+          <CardTitle className='flex items-center gap-2 text-destructive'>
+            <XCircle className='h-5 w-5' />
             Rechazar Acta de Entrega
           </CardTitle>
           <CardDescription>
             Por favor, proporciona una razón detallada para el rechazo
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="rejectionReason">
-              Razón del Rechazo <span className="text-destructive">*</span>
+        <CardContent className='space-y-4'>
+          <div className='space-y-2'>
+            <Label htmlFor='rejectionReason'>
+              Razón del Rechazo <span className='text-destructive'>*</span>
             </Label>
             <Textarea
-              id="rejectionReason"
+              id='rejectionReason'
               value={rejectionReason}
-              onChange={(e) => setRejectionReason(e.target.value)}
-              placeholder="Explica por qué rechazas esta acta de entrega (mínimo 10 caracteres)..."
+              onChange={e => setRejectionReason(e.target.value)}
+              placeholder='Explica por qué rechazas esta acta de entrega (mínimo 10 caracteres)...'
               rows={4}
               disabled={loading}
             />
-            <p className="text-xs text-muted-foreground">
+            <p className='text-xs text-muted-foreground'>
               {rejectionReason.length} / 10 caracteres mínimo
             </p>
           </div>
@@ -187,26 +186,27 @@ export function ActAcceptanceForm({ actId, token, onSuccess }: ActAcceptanceForm
           <Alert>
             <AlertTitle>Importante</AlertTitle>
             <AlertDescription>
-              Al rechazar esta acta, la asignación del equipo será cancelada y el equipo quedará disponible nuevamente.
+              Al rechazar esta acta, la asignación del equipo será cancelada y el equipo quedará
+              disponible nuevamente.
             </AlertDescription>
           </Alert>
 
-          <div className="flex gap-2">
+          <div className='flex gap-2'>
             <Button
-              type="button"
-              variant="outline"
+              type='button'
+              variant='outline'
               onClick={() => setShowRejectForm(false)}
               disabled={loading}
             >
               Cancelar
             </Button>
             <Button
-              type="button"
-              variant="destructive"
+              type='button'
+              variant='destructive'
               onClick={handleReject}
               disabled={loading || rejectionReason.trim().length < 10}
             >
-              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {loading && <Loader2 className='mr-2 h-4 w-4 animate-spin' />}
               Confirmar Rechazo
             </Button>
           </div>
@@ -218,40 +218,41 @@ export function ActAcceptanceForm({ actId, token, onSuccess }: ActAcceptanceForm
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <CheckCircle className="h-5 w-5" />
+        <CardTitle className='flex items-center gap-2'>
+          <CheckCircle className='h-5 w-5' />
           Aceptación de Acta de Entrega
         </CardTitle>
         <CardDescription>
           Lee cuidadosamente los términos y condiciones antes de aceptar
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className='space-y-6'>
         {/* Términos y Condiciones */}
-        <div className="space-y-2">
-          <Label className="text-base font-semibold">Términos y Condiciones</Label>
-          <div className="rounded-md border p-4 max-h-96 overflow-y-auto bg-muted/50">
-            <pre className="text-sm whitespace-pre-wrap font-sans">{TERMS_AND_CONDITIONS}</pre>
+        <div className='space-y-2'>
+          <Label className='text-base font-semibold'>Términos y Condiciones</Label>
+          <div className='rounded-md border p-4 max-h-96 overflow-y-auto bg-muted/50'>
+            <pre className='text-sm whitespace-pre-wrap font-sans'>{TERMS_AND_CONDITIONS}</pre>
           </div>
         </div>
 
         {/* Checkbox de Aceptación */}
-        <div className="flex items-start space-x-3 space-y-0">
+        <div className='flex items-start space-x-3 space-y-0'>
           <Checkbox
-            id="acceptTerms"
+            id='acceptTerms'
             checked={acceptedTerms}
-            onCheckedChange={(checked) => setAcceptedTerms(checked as boolean)}
+            onCheckedChange={checked => setAcceptedTerms(checked as boolean)}
             disabled={loading}
           />
-          <div className="space-y-1 leading-none">
+          <div className='space-y-1 leading-none'>
             <Label
-              htmlFor="acceptTerms"
-              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+              htmlFor='acceptTerms'
+              className='text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer'
             >
               He leído y acepto los términos y condiciones
             </Label>
-            <p className="text-xs text-muted-foreground">
-              Al marcar esta casilla, confirmas que has recibido el equipo y aceptas las condiciones descritas
+            <p className='text-xs text-muted-foreground'>
+              Al marcar esta casilla, confirmas que has recibido el equipo y aceptas las condiciones
+              descritas
             </p>
           </div>
         </div>
@@ -260,27 +261,28 @@ export function ActAcceptanceForm({ actId, token, onSuccess }: ActAcceptanceForm
         <Alert>
           <AlertTitle>Firma Digital</AlertTitle>
           <AlertDescription>
-            Al aceptar, se registrará tu dirección IP, fecha, hora y navegador como firma digital para garantizar la autenticidad de esta aceptación.
+            Al aceptar, se registrará tu dirección IP, fecha, hora y navegador como firma digital
+            para garantizar la autenticidad de esta aceptación.
           </AlertDescription>
         </Alert>
 
         {/* Botones */}
-        <div className="flex flex-col sm:flex-row gap-2">
+        <div className='flex flex-col sm:flex-row gap-2'>
           <Button
-            type="button"
+            type='button'
             onClick={handleAccept}
             disabled={!acceptedTerms || loading}
-            className="flex-1"
+            className='flex-1'
           >
-            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {loading && <Loader2 className='mr-2 h-4 w-4 animate-spin' />}
             Aceptar Acta de Entrega
           </Button>
           <Button
-            type="button"
-            variant="outline"
+            type='button'
+            variant='outline'
             onClick={() => setShowRejectForm(true)}
             disabled={loading}
-            className="flex-1 sm:flex-initial"
+            className='flex-1 sm:flex-initial'
           >
             Rechazar
           </Button>

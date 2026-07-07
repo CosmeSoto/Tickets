@@ -49,7 +49,7 @@ import { ExportButton } from '@/components/common/export-button'
 import { useExport } from '@/hooks/common/use-export'
 import { useTableSort } from '@/hooks/common/use-table-sort'
 import { SortableTableHead } from '@/components/ui/sortable-table-head'
-import { useToast } from '@/hooks/use-toast'
+import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 import { cn } from '@/lib/utils'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -135,7 +135,6 @@ function InlinePriceEditor({
   currentPrice: number | null
   onSaved: (newPrice: number | null) => void
 }) {
-  const { toast } = useToast()
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState(currentPrice != null ? String(currentPrice) : '')
   const [saving, setSaving] = useState(false)
@@ -247,7 +246,6 @@ interface SaleFormModalProps {
 }
 
 function SaleFormModal({ equipment, open, onClose, onSuccess }: SaleFormModalProps) {
-  const { toast } = useToast()
   const [submitting, setSubmitting] = useState(false)
 
   // Form state
@@ -518,7 +516,6 @@ function SaleFormModal({ equipment, open, onClose, onSuccess }: SaleFormModalPro
 export default function ForSalePage() {
   const { data: session, status } = useSession()
   const router = useRouter()
-  const { toast } = useToast()
 
   const [equipment, setEquipment] = useState<ForSaleEquipment[]>([])
   const [loading, setLoading] = useState(true)

@@ -58,6 +58,8 @@ interface InlineCreateSelectProps {
   deleteConfirmMessage?: string
   /** Callback después de crear o editar un item (útil para recargar la lista) */
   onAfterSave?: (item: InlineSelectOption, isEdit: boolean) => void
+  /** Callback al elegir un item existente de la lista (no al crear) */
+  onSelected?: (item: InlineSelectOption) => void
 }
 
 export function InlineCreateSelect({
@@ -74,6 +76,7 @@ export function InlineCreateSelect({
   onDelete,
   deleteConfirmMessage = '¿Eliminar este elemento? Esta acción no se puede deshacer.',
   onAfterSave,
+  onSelected,
 }: InlineCreateSelectProps) {
   const [open, setOpen] = useState(false)
   const [formOpen, setFormOpen] = useState(false)
@@ -178,7 +181,9 @@ export function InlineCreateSelect({
                       key={opt.id}
                       value={opt.name}
                       onSelect={() => {
+                        const isNewSelection = opt.id !== value
                         onChange(opt.id)
+                        if (isNewSelection) onSelected?.(opt)
                         setOpen(false)
                       }}
                       className='group'
@@ -254,14 +259,16 @@ export function InlineCreateSelect({
             <DialogHeader>
               <DialogTitle>{editingItem ? editTitle : createTitle}</DialogTitle>
             </DialogHeader>
-            {createForm({
-              item: editingItem,
-              onSuccess: handleSaved,
-              onCancel: () => {
-                setFormOpen(false)
-                setEditingItem(undefined)
-              },
-            })}
+            <div onSubmitCapture={e => e.stopPropagation()}>
+              {createForm({
+                item: editingItem,
+                onSuccess: handleSaved,
+                onCancel: () => {
+                  setFormOpen(false)
+                  setEditingItem(undefined)
+                },
+              })}
+            </div>
           </DialogContent>
         </Dialog>
       )}

@@ -28,6 +28,7 @@ import {
   getAccessibleFamilyIds,
   checkInventoryRequestFamilyAccess,
 } from '@/lib/inventory/family-access'
+import { canManageInventory } from '@/lib/inventory-access'
 import { validateReviewerComment } from '@/lib/validations/inventory/asset-request'
 import { SLAService } from './sla-service'
 
@@ -134,12 +135,13 @@ const VALID_TRANSITIONS: Record<
   Partial<Record<AssetRequestStatus, string[]>>
 > = {
   PENDING: {
-    UNDER_REVIEW: ['FAMILY_ADMIN', 'SUPER_ADMIN'],
-    REJECTED: ['SUPER_ADMIN', 'REQUESTER_CANCEL'],
+    UNDER_REVIEW: ['FAMILY_ADMIN', 'SUPER_ADMIN', 'INVENTORY_MANAGER'],
+    APPROVED: ['SUPER_ADMIN', 'INVENTORY_MANAGER'],
+    REJECTED: ['SUPER_ADMIN', 'INVENTORY_MANAGER', 'REQUESTER_CANCEL'],
   },
   UNDER_REVIEW: {
-    APPROVED: ['SUPER_ADMIN'],
-    REJECTED: ['SUPER_ADMIN'],
+    APPROVED: ['SUPER_ADMIN', 'INVENTORY_MANAGER'],
+    REJECTED: ['SUPER_ADMIN', 'INVENTORY_MANAGER'],
   },
   APPROVED: {
     FULFILLED: ['SUPER_ADMIN', 'FAMILY_ADMIN'],
@@ -155,30 +157,60 @@ const cache = createModuleCache('asset-requests', 30) // TTL 30s
 // ── Servicio principal ────────────────────────────────────────────────────────
 
 export class AssetRequestService {
+  private static async userCanManageInventory(
+    userId: string,
+    userRole: UserRole
+  ): Promise<boolean> {
+    return canManageInventory(userId, userRole)
+  }
+
+  private static async canAccessRequest(
+    userId: string,
+    userRole: UserRole,
+    isSuperAdmin: boolean,
+    familyId: string,
+    requesterId: string
+  ): Promise<boolean> {
+    if (userRole === 'ADMIN' && isSuperAdmin) return true
+    if (requesterId === userId) return true
+    const canManage = await this.userCanManageInventory(userId, userRole)
+    const accessibleFamilyIds = await getAccessibleFamilyIds(
+      userId,
+      userRole,
+      isSuperAdmin,
+      canManage
+    )
+    if (accessibleFamilyIds === undefined) return true
+    return accessibleFamilyIds.includes(familyId)
+  }
+
   /**
    * Construye el filtro de scope según el rol del usuario.
    *
-   * - CLIENT/TECHNICIAN: solo sus propias solicitudes
-   * - Family Admin: solicitudes de sus familias asignadas
    * - Super Admin: sin restricción
+   * - Admin de familia: solicitudes de sus familias asignadas
+   * - Gestor de inventario: propias + familias operativas
+   * - Solicitante: solo las propias
    */
   private static buildScopeFilter(
     userId: string,
     userRole: UserRole,
     isSuperAdmin: boolean,
-    assignedFamilyIds: string[] | undefined
+    assignedFamilyIds: string[] | undefined,
+    canManageInventoryUser: boolean
   ): any {
-    // Super Admin: sin restricción
-    if (userRole === 'ADMIN' && isSuperAdmin) {
-      return {}
-    }
+    if (userRole === 'ADMIN' && isSuperAdmin) return {}
 
-    // Family Admin: solo sus familias asignadas
     if (userRole === 'ADMIN' && assignedFamilyIds !== undefined) {
       return { familyId: { in: assignedFamilyIds } }
     }
 
-    // CLIENT/TECHNICIAN: solo sus propias solicitudes
+    if (canManageInventoryUser && assignedFamilyIds !== undefined && assignedFamilyIds.length > 0) {
+      return {
+        OR: [{ requesterId: userId }, { familyId: { in: assignedFamilyIds } }],
+      }
+    }
+
     return { requesterId: userId }
   }
 
@@ -193,7 +225,8 @@ export class AssetRequestService {
     newStatus: AssetRequestStatus,
     actorRole: UserRole,
     isSuperAdmin: boolean,
-    isRequesterCancel: boolean = false
+    isRequesterCancel: boolean = false,
+    canManageInventoryUser: boolean = false
   ): TransitionValidation {
     // Estados terminales no pueden cambiar
     if (currentStatus === 'REJECTED' || currentStatus === 'FULFILLED') {
@@ -227,6 +260,10 @@ export class AssetRequestService {
       return { valid: true }
     }
 
+    if (canManageInventoryUser && allowedRoles.includes('INVENTORY_MANAGER')) {
+      return { valid: true }
+    }
+
     return {
       valid: false,
       error: 'No tienes permiso para realizar esta transición de estado',
@@ -248,15 +285,22 @@ export class AssetRequestService {
     const skip = (page - 1) * limit
 
     // Obtener familias accesibles
+    const canManage = await this.userCanManageInventory(userId, userRole)
+
     const assignedFamilyIds = await getAccessibleFamilyIds(
       userId,
       userRole,
       isSuperAdmin,
-      false // canManageInventory no aplica aquí
+      canManage
     )
 
-    // Construir filtro de scope
-    const scopeFilter = this.buildScopeFilter(userId, userRole, isSuperAdmin, assignedFamilyIds)
+    const scopeFilter = this.buildScopeFilter(
+      userId,
+      userRole,
+      isSuperAdmin,
+      assignedFamilyIds,
+      canManage
+    )
 
     // Construir WHERE completo
     const where: any = { ...scopeFilter }
@@ -576,25 +620,14 @@ export class AssetRequestService {
 
     if (!request) return null
 
-    // Verificar acceso según rol
-    const accessibleFamilyIds = await getAccessibleFamilyIds(userId, userRole, isSuperAdmin, false)
-
-    // Super Admin: acceso total
-    if (userRole === 'ADMIN' && isSuperAdmin) {
-      // OK
-    }
-    // Family Admin: solo sus familias
-    else if (userRole === 'ADMIN' && accessibleFamilyIds !== undefined) {
-      if (!accessibleFamilyIds.includes(request.familyId)) {
-        return null
-      }
-    }
-    // CLIENT/TECHNICIAN: solo sus propias solicitudes
-    else {
-      if (request.requesterId !== userId) {
-        return null
-      }
-    }
+    const hasAccess = await this.canAccessRequest(
+      userId,
+      userRole,
+      isSuperAdmin,
+      request.familyId,
+      request.requesterId
+    )
+    if (!hasAccess) return null
 
     // Parsear reviewComments (JSON array)
     const reviewComments = Array.isArray(request.reviewComments)
@@ -677,12 +710,19 @@ export class AssetRequestService {
       throw new Error('REQUEST_NOT_FOUND')
     }
 
-    // 2. Verificar acceso del usuario a la familia
-    const accessibleFamilyIds = await getAccessibleFamilyIds(userId, userRole, isSuperAdmin, false)
-
-    if (accessibleFamilyIds !== undefined && !accessibleFamilyIds.includes(request.familyId)) {
+    // 2. Verificar acceso del usuario a la solicitud
+    const hasAccess = await this.canAccessRequest(
+      userId,
+      userRole,
+      isSuperAdmin,
+      request.familyId,
+      request.requesterId
+    )
+    if (!hasAccess) {
       throw new Error('FAMILY_ACCESS_DENIED')
     }
+
+    const canManage = await this.userCanManageInventory(userId, userRole)
 
     // 3. Determinar si es cancelación por requester
     const isRequesterCancel =
@@ -694,7 +734,8 @@ export class AssetRequestService {
       newStatus,
       userRole,
       isSuperAdmin,
-      isRequesterCancel
+      isRequesterCancel,
+      canManage
     )
 
     if (!validation.valid) {
@@ -819,11 +860,18 @@ export class AssetRequestService {
     }
 
     // 2. Verificar acceso del usuario a la familia
-    const accessibleFamilyIds = await getAccessibleFamilyIds(userId, userRole, isSuperAdmin, false)
-
-    if (accessibleFamilyIds !== undefined && !accessibleFamilyIds.includes(request.familyId)) {
+    const hasAccess = await this.canAccessRequest(
+      userId,
+      userRole,
+      isSuperAdmin,
+      request.familyId,
+      request.requesterId
+    )
+    if (!hasAccess) {
       throw new Error('FAMILY_ACCESS_DENIED')
     }
+
+    const canManage = await this.userCanManageInventory(userId, userRole)
 
     // 3. Validar que el usuario tenga permisos para aprobar
     const validation = this.validateTransition(
@@ -831,7 +879,8 @@ export class AssetRequestService {
       'APPROVED',
       userRole,
       isSuperAdmin,
-      false
+      false,
+      canManage
     )
 
     if (!validation.valid) {
@@ -1010,9 +1059,14 @@ export class AssetRequestService {
     }
 
     // 2. Verificar acceso del usuario a la familia
-    const accessibleFamilyIds = await getAccessibleFamilyIds(userId, userRole, isSuperAdmin, false)
-
-    if (accessibleFamilyIds !== undefined && !accessibleFamilyIds.includes(request.familyId)) {
+    const hasAccess = await this.canAccessRequest(
+      userId,
+      userRole,
+      isSuperAdmin,
+      request.familyId,
+      request.requesterId
+    )
+    if (!hasAccess) {
       throw new Error('FAMILY_ACCESS_DENIED')
     }
 

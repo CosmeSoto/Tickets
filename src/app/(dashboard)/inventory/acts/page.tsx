@@ -33,7 +33,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { useToast } from '@/hooks/use-toast'
+import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
@@ -92,7 +92,6 @@ function fmtDate(d: string | Date) {
 
 function DeliveryActsTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
   const router = useRouter()
-  const { toast } = useToast()
   const [acts, setActs] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('all')
@@ -242,7 +241,6 @@ function DeliveryActsTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 
 function ReturnActsTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
   const router = useRouter()
-  const { toast } = useToast()
   const [acts, setActs] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('all')
@@ -403,7 +401,6 @@ function ReturnActsTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 
 function DecommissionActsTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
   const router = useRouter()
-  const { toast } = useToast()
   const [acts, setActs] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('all')

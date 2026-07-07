@@ -28,7 +28,7 @@ import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Label } from '@/components/ui/label'
 import { SearchableSelect } from '@/components/ui/searchable-select'
-import { useToast } from '@/hooks/use-toast'
+import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 import { useFamilyOptions } from '@/hooks/use-family-options'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -86,7 +86,6 @@ export function TransferFamilyDialog({
   currentFamilyName,
   onSuccess,
 }: Props) {
-  const { toast } = useToast()
   const { families, loading: loadingFamilies } = useFamilyOptions()
 
   // Pasos del wizard
@@ -264,7 +263,11 @@ export function TransferFamilyDialog({
 
   // Etiquetas de tipo según subtipo
   const typeLabel =
-    assetKind === 'EQUIPMENT' ? 'Tipo de equipo' : assetKind === 'LICENSE' ? 'Tipo de licencia' : 'Tipo de consumible'
+    assetKind === 'EQUIPMENT'
+      ? 'Tipo de equipo'
+      : assetKind === 'LICENSE'
+        ? 'Tipo de licencia'
+        : 'Tipo de consumible'
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -275,17 +278,18 @@ export function TransferFamilyDialog({
             Transferir a otra área
           </DialogTitle>
           <DialogDescription>
-            Mueve <span className='font-medium text-foreground'>"{assetLabel}"</span> desde{' '}
-            <span className='font-medium text-foreground'>{currentFamilyName ?? '—'}</span> a otra
-            área. Los atributos compatibles se conservarán.
+            Mueve <span className='font-medium text-foreground'>&ldquo;{assetLabel}&rdquo;</span>{' '}
+            desde <span className='font-medium text-foreground'>{currentFamilyName ?? '—'}</span> a
+            otra área. Los atributos compatibles se conservarán.
           </DialogDescription>
         </DialogHeader>
 
         <div className='space-y-5 py-2'>
-
           {/* Bloque de origen — informativo */}
           <div className='flex items-center gap-2 text-sm text-muted-foreground bg-muted/40 rounded-md px-3 py-2'>
-            <span className='font-medium text-foreground'>{currentFamilyName ?? 'Área actual'}</span>
+            <span className='font-medium text-foreground'>
+              {currentFamilyName ?? 'Área actual'}
+            </span>
             <ArrowRightLeft className='h-3.5 w-3.5 shrink-0' />
             <span className='text-muted-foreground italic'>
               {targetFamilyId
@@ -427,14 +431,12 @@ export function TransferFamilyDialog({
                   )}
 
                   {/* Sin atributos en ninguno de los dos lados */}
-                  {impact.impact.preserved.length === 0 &&
-                    !hasLost &&
-                    !hasNewEmpty && (
-                      <div className='flex items-center gap-2 text-sm text-muted-foreground bg-muted/40 rounded-md px-3 py-2'>
-                        <CheckCircle className='h-3.5 w-3.5' />
-                        Sin atributos personalizados en ninguno de los tipos
-                      </div>
-                    )}
+                  {impact.impact.preserved.length === 0 && !hasLost && !hasNewEmpty && (
+                    <div className='flex items-center gap-2 text-sm text-muted-foreground bg-muted/40 rounded-md px-3 py-2'>
+                      <CheckCircle className='h-3.5 w-3.5' />
+                      Sin atributos personalizados en ninguno de los tipos
+                    </div>
+                  )}
 
                   {/* Advertencia asignación activa */}
                   {impact.hasActiveAssignment && (
@@ -442,8 +444,8 @@ export function TransferFamilyDialog({
                       <AlertTriangle className='h-4 w-4' />
                       <AlertDescription className='text-xs'>
                         Este equipo tiene una{' '}
-                        <span className='font-semibold'>asignación activa</span>. Debes
-                        terminarla antes de transferirlo.
+                        <span className='font-semibold'>asignación activa</span>. Debes terminarla
+                        antes de transferirlo.
                       </AlertDescription>
                     </Alert>
                   )}
@@ -463,7 +465,8 @@ export function TransferFamilyDialog({
               </Badge>
               {assetKind === 'EQUIPMENT' && targetWarehouseId && (
                 <Badge variant='outline' className='text-xs font-normal'>
-                  Bodega: {warehouses.find(w => w.id === targetWarehouseId)?.name ?? targetWarehouseId}
+                  Bodega:{' '}
+                  {warehouses.find(w => w.id === targetWarehouseId)?.name ?? targetWarehouseId}
                 </Badge>
               )}
             </div>

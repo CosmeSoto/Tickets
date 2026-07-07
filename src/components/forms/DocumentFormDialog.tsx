@@ -27,6 +27,7 @@ import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
 import { InlineCreateSelect } from '@/components/ui/inline-create-select'
 import { FormCategoryInlineForm } from '@/components/forms/FormCategoryInlineForm'
+import { inlineSelectFeedback } from '@/lib/utils/inline-select-feedback'
 import { FileDropZone } from '@/components/common/file-drop-zone'
 import type { PendingFile } from '@/components/common/file-drop-zone'
 import { MediaUrlInput } from '@/components/common/media-url-input'
@@ -130,6 +131,7 @@ export function DocumentFormDialog({
   usersHint,
 }: DocumentFormDialogProps) {
   const [showAdvanced, setShowAdvanced] = useState(false)
+  const categoryFeedback = inlineSelectFeedback('Categoría')
 
   // Si el formulario ya tiene summary o version (modo edición), abrir el acordeón automáticamente
   useEffect(() => {
@@ -158,7 +160,14 @@ export function DocumentFormDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={onSubmit} onClick={e => e.stopPropagation()} className='space-y-4'>
+        <form
+          onSubmit={e => {
+            e.stopPropagation()
+            onSubmit(e)
+          }}
+          onClick={e => e.stopPropagation()}
+          className='space-y-4'
+        >
           <div className='space-y-4'>
             {/* Título */}
             <div className='space-y-2'>
@@ -265,7 +274,11 @@ export function DocumentFormDialog({
                 createForm={FormCategoryInlineForm}
                 onDelete={onDeleteCategory}
                 deleteConfirmMessage='¿Eliminar esta categoría? Los documentos asociados quedarán sin categoría.'
-                onAfterSave={onLoadCategories}
+                onSelected={categoryFeedback.onSelected}
+                onAfterSave={(item, isEdit) => {
+                  categoryFeedback.onAfterSave(item, isEdit)
+                  onLoadCategories()
+                }}
               />
             </div>
 

@@ -14,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { useToast } from '@/hooks/use-toast'
+import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 import { getEquipmentDisplayName } from '@/lib/utils/equipment-display'
 
 interface SaleDialogProps {
@@ -56,7 +56,6 @@ export function SaleDialog({
     equipmentBrandName,
     equipmentModelName,
   })
-  const { toast } = useToast()
   const [submitting, setSubmitting] = useState(false)
 
   const [buyerName, setBuyerName] = useState('')

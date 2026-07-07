@@ -22,7 +22,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { SearchableSelect } from '@/components/ui/searchable-select'
-import { useToast } from '@/hooks/use-toast'
+import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 import { useFamilyOptions } from '@/hooks/use-family-options'
 import type { TypeKind, AnyType } from '@/hooks/inventory/use-type-management'
 
@@ -50,7 +50,6 @@ export function CloneTypeDialog({
   currentFamilyId,
   onSuccess,
 }: Props) {
-  const { toast } = useToast()
   const { families, loading: loadingFamilies } = useFamilyOptions()
 
   const [targetFamilyId, setTargetFamilyId] = useState('')
@@ -86,7 +85,9 @@ export function CloneTypeDialog({
 
     fetch(endpoint)
       .then(r => r.json())
-      .then(d => setAttrCount(Array.isArray(d) ? d.length : (d.attributes?.length ?? d.length ?? 0)))
+      .then(d =>
+        setAttrCount(Array.isArray(d) ? d.length : (d.attributes?.length ?? d.length ?? 0))
+      )
       .catch(() => setAttrCount(0))
   }, [open, sourceType.id, typeKind])
 
@@ -147,13 +148,12 @@ export function CloneTypeDialog({
           </DialogTitle>
           <DialogDescription>
             Copia el tipo de {typeKindLabel}{' '}
-            <span className='font-medium text-foreground'>"{sourceType.name}"</span> a otra área,
-            incluyendo todos sus atributos personalizados.
+            <span className='font-medium text-foreground'>&ldquo;{sourceType.name}&rdquo;</span> a
+            otra área, incluyendo todos sus atributos personalizados.
           </DialogDescription>
         </DialogHeader>
 
         <div className='space-y-4 py-2'>
-
           {/* Preview de atributos */}
           {attrCount !== null && (
             <div className='flex items-start gap-2 text-sm rounded-md bg-muted/40 px-3 py-2.5'>
@@ -187,9 +187,7 @@ export function CloneTypeDialog({
               disabled={loadingFamilies}
             />
             {targetFamilies.length === 0 && !loadingFamilies && (
-              <p className='text-xs text-muted-foreground'>
-                No hay otras áreas disponibles.
-              </p>
+              <p className='text-xs text-muted-foreground'>No hay otras áreas disponibles.</p>
             )}
           </div>
 
@@ -198,7 +196,7 @@ export function CloneTypeDialog({
             <Label htmlFor='clone-name'>
               Nombre en el destino{' '}
               <span className='text-xs text-muted-foreground font-normal'>
-                (deja vacío para usar "{sourceType.name}")
+                (deja vacío para usar &ldquo;{sourceType.name}&rdquo;)
               </span>
             </Label>
             <Input
@@ -244,8 +242,8 @@ export function CloneTypeDialog({
               <CheckCircle className='h-4 w-4 mt-0.5 shrink-0' />
               <div>
                 <p className='font-medium'>
-                  Se creará "{newName.trim() || sourceType.name}" en{' '}
-                  "{families.find(f => f.id === targetFamilyId)?.name ?? '...'}"
+                  Se creará &ldquo;{newName.trim() || sourceType.name}&rdquo; en &ldquo;
+                  {families.find(f => f.id === targetFamilyId)?.name ?? '...'}&rdquo;
                 </p>
                 {copyAttributes && attrCount ? (
                   <p className='text-xs text-green-600 mt-0.5'>
@@ -258,7 +256,12 @@ export function CloneTypeDialog({
         </div>
 
         <DialogFooter className='gap-2'>
-          <Button type='button' variant='outline' onClick={() => onOpenChange(false)} disabled={submitting}>
+          <Button
+            type='button'
+            variant='outline'
+            onClick={() => onOpenChange(false)}
+            disabled={submitting}
+          >
             Cancelar
           </Button>
           <Button

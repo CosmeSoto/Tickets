@@ -17,7 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { useToast } from '@/hooks/use-toast'
+import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -33,7 +33,6 @@ export default function DecommissionDetailPage({ params }: PageProps) {
   const [error, setError] = useState<string | null>(null)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [deleting, setDeleting] = useState(false)
-  const { toast } = useToast()
 
   const role = session?.user?.role ?? ''
   const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
@@ -85,7 +84,10 @@ export default function DecommissionDetailPage({ params }: PageProps) {
       const res = await fetch(`/api/inventory/decommission-acts/${id}`, { method: 'DELETE' })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Error al eliminar')
-      toast({ title: 'Solicitud eliminada', description: 'La solicitud de baja fue eliminada permanentemente.' })
+      toast({
+        title: 'Solicitud eliminada',
+        description: 'La solicitud de baja fue eliminada permanentemente.',
+      })
       setShowDeleteDialog(false)
       router.push('/inventory/decommission')
     } catch (err: any) {
@@ -119,7 +121,11 @@ export default function DecommissionDetailPage({ params }: PageProps) {
               Eliminar
             </Button>
           )}
-          <Button variant='outline' size='sm' onClick={() => router.push('/inventory/decommission')}>
+          <Button
+            variant='outline'
+            size='sm'
+            onClick={() => router.push('/inventory/decommission')}
+          >
             <ArrowLeft className='h-4 w-4 mr-1.5' />
             Volver a bajas
           </Button>
@@ -154,8 +160,8 @@ export default function DecommissionDetailPage({ params }: PageProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Eliminar solicitud de baja</AlertDialogTitle>
             <AlertDialogDescription>
-              Estás a punto de eliminar esta solicitud de baja permanentemente. La auditoría
-              quedará registrada. Esta acción no se puede deshacer.
+              Estás a punto de eliminar esta solicitud de baja permanentemente. La auditoría quedará
+              registrada. Esta acción no se puede deshacer.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

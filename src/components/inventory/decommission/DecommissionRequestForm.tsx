@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { useToast } from '@/hooks/use-toast'
+import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 
 const CONDITION_OPTIONS = [
   { value: 'NEW', label: 'Nuevo' },
@@ -65,7 +65,6 @@ export function DecommissionRequestForm({
   onSuccess,
   onCancel,
 }: DecommissionRequestFormProps) {
-  const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [reason, setReason] = useState('')
   const [condition, setCondition] = useState('')

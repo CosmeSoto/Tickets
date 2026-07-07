@@ -33,7 +33,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { useToast } from '@/hooks/use-toast'
+import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 import { useSession } from 'next-auth/react'
 import { useTableSort } from '@/hooks/common/use-table-sort'
 import { SortableTableHead } from '@/components/ui/sortable-table-head'
@@ -47,7 +47,6 @@ import { useFamilyOptions } from '@/hooks/use-family-options'
 
 export default function SuppliersPage() {
   const router = useRouter()
-  const { toast } = useToast()
   const { data: session } = useSession()
   const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
 

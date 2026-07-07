@@ -6,7 +6,7 @@ import { useSession } from 'next-auth/react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Loader2, Settings } from 'lucide-react'
-import { useToast } from '@/hooks/use-toast'
+import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 import { CustomFieldsManager } from '@/components/inventory/custom-fields/custom-fields-manager'
 import {
   Select,
@@ -26,7 +26,6 @@ interface Family {
 
 export default function CustomFieldsPage() {
   const { data: session, status } = useSession()
-  const { toast } = useToast()
   const [families, setFamilies] = useState<Family[]>([])
   const [selectedFamilyId, setSelectedFamilyId] = useState<string>('')
   const [loading, setLoading] = useState(true)

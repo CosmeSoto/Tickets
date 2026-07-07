@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { AssetRequestService } from '@/lib/services/asset-request.service'
 import { updateStatusSchema } from '@/lib/validations/inventory/asset-request'
 import { canManageAssetRequests, canViewAssetRequests } from '@/lib/inventory/asset-request-access'
+import prisma from '@/lib/prisma'
 import { ZodError } from 'zod'
 
 /**
@@ -65,9 +66,28 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       )
     }
 
-    // Parsear y validar body
     const body = await request.json()
     const validatedData = updateStatusSchema.parse(body)
+
+    const canManage = await canManageAssetRequests(session.user)
+    if (!canManage) {
+      if (validatedData.status !== 'REJECTED') {
+        return NextResponse.json(
+          { error: 'Sin permiso para gestionar solicitudes' },
+          { status: 403 }
+        )
+      }
+      const existing = await prisma.asset_requests.findUnique({
+        where: { id: requestId },
+        select: { requesterId: true, status: true },
+      })
+      if (!existing || existing.requesterId !== session.user.id || existing.status !== 'PENDING') {
+        return NextResponse.json(
+          { error: 'Solo puedes cancelar tus solicitudes pendientes' },
+          { status: 403 }
+        )
+      }
+    }
 
     // Obtener IP del cliente
     const ipAddress =
