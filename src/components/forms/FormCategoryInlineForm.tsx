@@ -30,9 +30,9 @@ export function FormCategoryInlineForm({ item, onSuccess, onCancel }: Props) {
     }
   }, [item])
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    e.stopPropagation() // Evita que el submit burbujee al form padre (cuando está en un Dialog anidado)
+  const handleSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault()
+    e?.stopPropagation()
     setError('')
 
     if (!name.trim()) {
@@ -76,7 +76,7 @@ export function FormCategoryInlineForm({ item, onSuccess, onCancel }: Props) {
   }
 
   return (
-    <form onSubmit={handleSubmit} onClick={e => e.stopPropagation()} className='space-y-4'>
+    <form data-inline-create-form onSubmit={handleSubmit} className='space-y-4'>
       <div className='space-y-1'>
         <Label>
           Nombre <span className='text-destructive'>*</span>
@@ -102,7 +102,7 @@ export function FormCategoryInlineForm({ item, onSuccess, onCancel }: Props) {
         <Button type='button' variant='outline' onClick={onCancel} disabled={loading}>
           Cancelar
         </Button>
-        <Button type='submit' disabled={loading}>
+        <Button type='button' onClick={() => void handleSubmit()} disabled={loading}>
           {loading && <Loader2 className='mr-2 h-4 w-4 animate-spin' />}
           {item ? 'Actualizar' : 'Crear'}
         </Button>

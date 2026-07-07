@@ -28,6 +28,7 @@ import { Separator } from '@/components/ui/separator'
 import { InlineCreateSelect } from '@/components/ui/inline-create-select'
 import { FormCategoryInlineForm } from '@/components/forms/FormCategoryInlineForm'
 import { inlineSelectFeedback } from '@/lib/utils/inline-select-feedback'
+import { isDirectFormSubmit } from '@/lib/utils/inline-form-guard'
 import { FileDropZone } from '@/components/common/file-drop-zone'
 import type { PendingFile } from '@/components/common/file-drop-zone'
 import { MediaUrlInput } from '@/components/common/media-url-input'
@@ -162,6 +163,7 @@ export function DocumentFormDialog({
 
         <form
           onSubmit={e => {
+            if (!isDirectFormSubmit(e)) return
             e.stopPropagation()
             onSubmit(e)
           }}

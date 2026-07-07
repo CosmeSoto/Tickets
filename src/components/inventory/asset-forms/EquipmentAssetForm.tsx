@@ -22,6 +22,7 @@ import { AttachmentsField } from '@/components/inventory/shared/AttachmentsField
 import { AccessoriesSection } from '@/components/inventory/shared/AccessoriesSection'
 import { toast } from 'sonner'
 import { inlineSelectFeedback } from '@/lib/utils/inline-select-feedback'
+import { isDirectFormSubmit } from '@/lib/utils/inline-form-guard'
 import {
   showDepartmentSelector,
   showWarehouseSelector,
@@ -542,7 +543,7 @@ export function EquipmentAssetForm({
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     // El modal inline vive en portal: el submit burbujea por el árbol React al form padre
-    if (e.target !== e.currentTarget) return
+    if (!isDirectFormSubmit(e)) return
     setPriceError('')
     if (!equipmentTypeId) {
       toast.error('Selecciona el tipo de equipo')

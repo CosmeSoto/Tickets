@@ -23,6 +23,7 @@ import { WarehouseInlineForm } from '@/components/inventory/asset-forms/Warehous
 import { StepHeader } from '@/components/inventory/shared/StepHeader'
 import type { FamilyConfig } from '@/lib/inventory/family-config-types'
 import { toast } from 'sonner'
+import { isDirectFormSubmit } from '@/lib/utils/inline-form-guard'
 import { inlineSelectFeedback } from '@/lib/utils/inline-select-feedback'
 
 interface BulkMROFormProps {
@@ -102,8 +103,9 @@ export function BulkMROForm({
       .then(d => setWarehouses(d.warehouses ?? d ?? []))
   }, [familyId])
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+    if (!isDirectFormSubmit(e)) return
     if (!name.trim()) {
       setError('El nombre del material es requerido')
       return

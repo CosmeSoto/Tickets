@@ -12,6 +12,7 @@ import { InlineCreateSelect } from '@/components/ui/inline-create-select'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { CatalogTypeInlineForm } from '@/components/inventory/asset-forms/CatalogTypeInlineForm'
 import { inlineSelectFeedback } from '@/lib/utils/inline-select-feedback'
+import { isDirectFormSubmit } from '@/lib/utils/inline-form-guard'
 import { useFormSubmit } from '@/hooks/common/use-form-submit'
 import { useFetch } from '@/hooks/common/use-fetch'
 import { useInventoryFamilies } from '@/contexts/families-context'
@@ -106,6 +107,7 @@ export function SupplierForm({
   return (
     <form
       onSubmit={e => {
+        if (!isDirectFormSubmit(e)) return
         e.stopPropagation()
         handleSubmit(onSubmit)(e)
       }}

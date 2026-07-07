@@ -44,6 +44,7 @@ import { ModelSelector } from '@/components/inventory/models/ModelSelector'
 import { ContractPicker } from '@/components/contracts/contract-picker'
 import { toast } from 'sonner'
 import { inlineSelectFeedback } from '@/lib/utils/inline-select-feedback'
+import { isDirectFormSubmit } from '@/lib/utils/inline-form-guard'
 import {
   calculateDepreciation,
   getRecommendedDepreciationMethod,
@@ -688,7 +689,13 @@ export function BulkEquipmentForm({
 
   // Para EQUIPMENT: formulario completo de lote de equipos
   return (
-    <form onSubmit={(handleSubmit as any)(onSubmit)} className='space-y-6'>
+    <form
+      onSubmit={e => {
+        if (!isDirectFormSubmit(e)) return
+        ;(handleSubmit as any)(onSubmit)(e)
+      }}
+      className='space-y-6'
+    >
       {/* Header estandarizado + contador de equipos */}
       <div className='flex items-start justify-between gap-4'>
         <div className='flex-1 min-w-0'>

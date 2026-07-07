@@ -13,6 +13,7 @@ import { CatalogTypeInlineForm } from '@/components/inventory/asset-forms/Catalo
 import { UnitOfMeasureInlineForm } from '@/components/inventory/asset-forms/UnitOfMeasureInlineForm'
 import { WarehouseInlineForm } from '@/components/inventory/asset-forms/WarehouseInlineForm'
 import { inlineSelectFeedback } from '@/lib/utils/inline-select-feedback'
+import { isDirectFormSubmit } from '@/lib/utils/inline-form-guard'
 import { TypeAttributesInput } from '@/components/inventory/custom-fields/type-attributes-input'
 import type { FamilyConfig } from '@/lib/inventory/family-config-types'
 import { toast } from 'sonner'
@@ -119,7 +120,7 @@ export function MROAssetForm({
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    if (e.target !== e.currentTarget) return
+    if (!isDirectFormSubmit(e)) return
     if (isRequired('STOCK_MRO') && isVisible('STOCK_MRO') && !initialStock) {
       toast.error('Ingresa la cantidad inicial en stock')
       return

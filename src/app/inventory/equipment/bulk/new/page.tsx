@@ -2,7 +2,7 @@
 
 import { useSession } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { BulkEquipmentForm } from '@/components/inventory/equipment/BulkEquipmentForm'
 import { Card, CardContent } from '@/components/ui/card'
 import { ArrowLeft, Loader2 } from 'lucide-react'
@@ -19,6 +19,11 @@ export default function NewBulkEquipmentPage() {
   const cloneFrom = searchParams.get('cloneFrom') ?? undefined
 
   const canManageInventory = (session?.user as any)?.canManageInventory === true
+  const hasAuthenticated = useRef(false)
+
+  useEffect(() => {
+    if (status === 'authenticated') hasAuthenticated.current = true
+  }, [status])
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login')
@@ -31,7 +36,7 @@ export default function NewBulkEquipmentPage() {
     }
   }, [status, session, router, canManageInventory])
 
-  if (status === 'loading') {
+  if (status === 'loading' && !hasAuthenticated.current) {
     return (
       <div className='max-w-5xl mx-auto px-4 py-8 flex flex-col items-center justify-center min-h-[40vh] gap-3'>
         <Loader2 className='h-10 w-10 animate-spin text-primary' />

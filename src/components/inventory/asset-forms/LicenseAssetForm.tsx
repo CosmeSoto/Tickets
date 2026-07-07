@@ -13,6 +13,7 @@ import { ContractPicker } from '@/components/contracts/contract-picker'
 import { SupplierSelect } from '@/components/inventory/suppliers/SupplierSelect'
 import { CatalogTypeInlineForm } from '@/components/inventory/asset-forms/CatalogTypeInlineForm'
 import { inlineSelectFeedback } from '@/lib/utils/inline-select-feedback'
+import { isDirectFormSubmit } from '@/lib/utils/inline-form-guard'
 import { TypeAttributesInput } from '@/components/inventory/custom-fields/type-attributes-input'
 import type { FamilyConfig } from '@/lib/inventory/family-config-types'
 import { useFetch } from '@/hooks/common/use-fetch'
@@ -114,7 +115,7 @@ export function LicenseAssetForm({
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    if (e.target !== e.currentTarget) return
+    if (!isDirectFormSubmit(e)) return
     const payload: Record<string, unknown> = {
       name,
       licenseTypeId: licenseTypeId || undefined,
