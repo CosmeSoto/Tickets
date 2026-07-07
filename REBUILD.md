@@ -155,8 +155,8 @@ docker compose -f docker-compose.prod.yml --env-file .env.production down -v
 Al reconstruir contenedores, `entrypoint.sh` ejecuta `prisma db push` automáticamente.
 Los siguientes cambios se aplican solos al hacer el próximo rebuild:
 
-| Campo | Tabla | Tipo | Descripción |
-|-------|-------|------|-------------|
+| Campo           | Tabla               | Tipo    | Descripción                                   |
+| --------------- | ------------------- | ------- | --------------------------------------------- |
 | `custom_values` | `software_licenses` | `Json?` | Atributos personalizados de tipos de licencia |
 
 Si necesitas aplicarlo manualmente sin reconstruir:
@@ -180,6 +180,7 @@ Permite a admins con acceso a ambas familias reasignar un equipo, licencia o MRO
 - **MRO** → Ficha de detalle → botón "Transferir área"
 
 Reglas:
+
 - Equipo con asignación activa: bloqueado
 - Atributos compatibles se conservan, los incompatibles se muestran en preview
 - Queda registrado en el historial del equipo y en `audit_logs`
@@ -191,8 +192,6 @@ Desde `Configuración → Área → Catálogos`, cada tipo de equipo/licencia/co
 Selecciona el área destino, nombre opcional y si copiar los atributos personalizados. El tipo se crea en la familia destino sin afectar el origen.
 
 ---
-
-
 
 ### Desarrollo (Docker)
 
@@ -309,18 +308,19 @@ Si cambia tu IP: ejecutar `sudo ./start-production.sh` y actualizar hosts en los
 
 ### Acciones de inventario por nivel
 
-| Acción | Admin normal (con familia) | Super Admin |
-|--------|---------------------------|-------------|
-| Crear / editar equipo | ✅ | ✅ |
-| Asignar equipo | ✅ | ✅ |
-| **Devolver equipo a bodega** | ✅ | ✅ |
-| Crear acta de devolución | ✅ | ✅ |
-| Retirar equipo (baja) | ✅ | ✅ |
-| Aprobar / rechazar bajas | ✅ (familias asignadas) | ✅ |
-| Transferir activo entre áreas | ✅ (acceso a ambas familias) | ✅ |
-| Copiar tipos entre áreas | ✅ | ✅ |
-| **Eliminar equipo permanentemente** | ❌ | ✅ |
-| **Eliminar actas** | ❌ | ✅ |
+| Acción                              | Admin normal (con familia)   | Super Admin |
+| ----------------------------------- | ---------------------------- | ----------- |
+| Crear / editar equipo               | ✅                           | ✅          |
+| Asignar equipo                      | ✅                           | ✅          |
+| **Devolver equipo a bodega**        | ✅                           | ✅          |
+| Crear acta de devolución            | ✅                           | ✅          |
+| Retirar equipo (baja)               | ✅                           | ✅          |
+| Aprobar / rechazar bajas            | ✅ (familias asignadas)      | ✅          |
+| Transferir activo entre áreas       | ✅ (acceso a ambas familias) | ✅          |
+| Copiar tipos entre áreas            | ✅                           | ✅          |
+| **Importar equipos (CSV/Excel)**    | ✅ (familias asignadas)      | ✅          |
+| **Eliminar equipo permanentemente** | ❌                           | ✅          |
+| **Eliminar actas**                  | ❌                           | ✅          |
 
 ### Cómo se resuelve el scope de inventario para Admin normal
 
@@ -335,6 +335,31 @@ El sistema usa `inventory_manager_families` (no `admin_family_assignments`) para
 | Inventario        | `inventory_manager_families`    | Admin / Super Admin |
 | Rondas            | `patrol_family_assignments`     | Admin / Super Admin |
 | Scope de Admin    | `admin_family_assignments`      | Solo Super Admin    |
+
+### Importación masiva de equipos (CSV / Excel)
+
+Ruta UI: `/inventory/import` (botón **Importar** en el listado de inventario).
+
+1. **Catálogo fijo (wizard):** familia, tipo, marca, modelo y modo de adquisición. No van en el archivo.
+2. **Plantilla dinámica:** columnas fijas + atributos del tipo seleccionado (nombre o etiqueta del atributo).
+3. **Límite:** máximo **100** filas por importación (`MAX_IMPORT_ROWS`).
+4. **Validación:** `POST /api/inventory/equipment/import` con `dryRun=true` antes de confirmar.
+5. **Modos de importación** (`mode` en multipart):
+   - **`add` (solo agregar):** crea equipos nuevos; series ya existentes se **omiten** (no error).
+   - **`update` (agregar y actualizar):** crea nuevos y **fusiona metadatos** de existentes (condición, bodega, notas, atributos dinámicos). No cambia código, serie, tipo, modelo ni estado.
+   - Equipos en estado `ASSIGNED`, `MAINTENANCE`, `RETIRED`, `FOR_SALE` o `SOLD` **no se actualizan** por importación.
+   - **No hay modo `replace`** (a diferencia de categorías): eliminar/reemplazar equipos masivamente sería riesgoso por asignaciones, actas e historial.
+6. **Condiciones válidas:** `NEW`, `USED`, `DAMAGED` (aliases `LIKE_NEW`, `GOOD`, `USADO`, etc. → `USED`).
+7. **Auth:** `assertInventoryManageByFamily` — mismo scope que crear equipo manual.
+
+API:
+
+- `GET /api/inventory/equipment/import/template?familyId&typeId&brandId&modelId&acquisitionMode&format=xlsx|csv`
+- `POST /api/inventory/equipment/import` — multipart: `file`, `dryRun`, `mode` (`add`|`update`), catálogo fijo
+
+Módulo: `src/lib/inventory/equipment-import/`
+
+**UX profesional:** cada error incluye mensaje + solución sugerida (`hint`). La plantilla Excel trae hoja "Instrucciones" con bodegas, modos y reglas.
 
 ---
 

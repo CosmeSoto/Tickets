@@ -8,7 +8,7 @@ import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { UnifiedInventoryList } from '@/components/inventory/unified-inventory-list'
 import { BatchesTab } from '@/components/inventory/dashboard/BatchesTab'
 import { Button } from '@/components/ui/button'
-import { Plus, Package, User, Layers } from 'lucide-react'
+import { Plus, Package, User, Layers, Upload } from 'lucide-react'
 import Link from 'next/link'
 
 function InventoryContent() {
@@ -70,6 +70,12 @@ function InventoryContent() {
         headerActions={
           canCreate && tab !== 'mine' ? (
             <div className='flex items-center gap-2'>
+              <Button size='sm' variant='outline' asChild>
+                <Link href='/inventory/import'>
+                  <Upload className='mr-2 h-4 w-4' />
+                  Importar
+                </Link>
+              </Button>
               <Button size='sm' asChild>
                 <Link
                   href={

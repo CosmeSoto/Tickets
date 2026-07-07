@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowLeft, Layers, Package } from 'lucide-react'
+import { ArrowLeft, Layers, Package, Upload } from 'lucide-react'
+import Link from 'next/link'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { FamilySelector } from '@/components/inventory/family-selector'
@@ -87,6 +88,16 @@ export default function NewInventoryPage() {
           </CardHeader>
 
           <CardContent className='space-y-4'>
+            <p className='text-sm text-muted-foreground'>
+              ¿Tienes muchos equipos del mismo modelo?{' '}
+              <Link
+                href='/inventory/import'
+                className='text-primary hover:underline inline-flex items-center gap-1'
+              >
+                <Upload className='h-3.5 w-3.5' />
+                Importar desde CSV o Excel
+              </Link>
+            </p>
             <p className='text-sm font-medium'>Selecciona una familia</p>
             {loading ? (
               <p className='text-sm text-muted-foreground'>Cargando familias...</p>
