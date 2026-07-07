@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useEffect } from 'react'
+import { Suspense, useEffect, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
@@ -15,6 +15,11 @@ function NewEquipmentPageContent() {
   const defaultFamilyId = searchParams.get('familyId') ?? undefined
 
   const canManageInventory = (session?.user as any)?.canManageInventory === true
+  const hasAuthenticated = useRef(false)
+
+  useEffect(() => {
+    if (status === 'authenticated') hasAuthenticated.current = true
+  }, [status])
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login')
@@ -27,7 +32,7 @@ function NewEquipmentPageContent() {
     }
   }, [status, session, router, canManageInventory])
 
-  if (status === 'loading') {
+  if (status === 'loading' && !hasAuthenticated.current) {
     return (
       <ModuleLayout title='Nuevo Activo Individual' subtitle='Cargando...'>
         <div className='flex items-center justify-center h-64'>

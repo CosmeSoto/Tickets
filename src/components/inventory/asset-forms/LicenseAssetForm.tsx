@@ -112,8 +112,9 @@ export function LicenseAssetForm({
       .then(d => setLicenseTypes(d.types ?? d ?? []))
   }, [familyId])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+    if (e.target !== e.currentTarget) return
     const payload: Record<string, unknown> = {
       name,
       licenseTypeId: licenseTypeId || undefined,

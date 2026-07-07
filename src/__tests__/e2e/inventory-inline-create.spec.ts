@@ -11,15 +11,10 @@ test.describe('Inventario — creación inline sin validación fantasma', () => 
   })
 
   test('crear modelo inline no dispara error de número de serie', async ({ page }) => {
-    await page.goto('/inventory/new')
-    await expect(page.getByText('¿A qué familia pertenece el activo?')).toBeVisible({
+    await page.goto('/inventory/equipment/new?familyId=a800efa1-6ab4-4f46-84e2-34d0d94cda9f')
+    await expect(page.getByText('Completa la información')).toBeVisible({
       timeout: 15_000,
     })
-
-    // Seleccionar la primera familia del grid
-    await page.locator('.grid.grid-cols-2 button[type="button"]').first().click()
-
-    await expect(page.getByText('Nuevo Activo Individual')).toBeVisible({ timeout: 15_000 })
 
     // Tipo de equipo — primer combobox del formulario
     const typeCombo = page.getByRole('combobox').first()

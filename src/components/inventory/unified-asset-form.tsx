@@ -24,7 +24,7 @@ export function UnifiedAssetForm({
   defaultFamilyId,
   onStepChange,
 }: UnifiedAssetFormProps) {
-  const [step, setStep] = useState<1 | 2 | 3>(1)
+  const [step, setStep] = useState<1 | 2 | 3>(defaultFamilyId ? 2 : 1)
 
   // Notificar al padre cuando cambia el paso
   const goToStep = (s: 1 | 2 | 3) => {
@@ -174,7 +174,7 @@ export function UnifiedAssetForm({
   return (
     <div className='space-y-5'>
       {/* ── Paso 1: Selección de familia ─────────────────────────────────── */}
-      {step === 1 && (
+      {step === 1 && !defaultFamilyId && (
         <div className='space-y-4'>
           <StepHeader
             mode='individual'

@@ -117,8 +117,9 @@ export function MROAssetForm({
       .then(d => setWarehouses(d.warehouses ?? d ?? []))
   }, [familyId])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+    if (e.target !== e.currentTarget) return
     if (isRequired('STOCK_MRO') && isVisible('STOCK_MRO') && !initialStock) {
       toast.error('Ingresa la cantidad inicial en stock')
       return

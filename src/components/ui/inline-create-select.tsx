@@ -259,7 +259,7 @@ export function InlineCreateSelect({
             <DialogHeader>
               <DialogTitle>{editingItem ? editTitle : createTitle}</DialogTitle>
             </DialogHeader>
-            <div onSubmitCapture={e => e.stopPropagation()}>
+            <div data-inline-create-dialog onSubmitCapture={e => e.stopPropagation()}>
               {createForm({
                 item: editingItem,
                 onSuccess: handleSaved,

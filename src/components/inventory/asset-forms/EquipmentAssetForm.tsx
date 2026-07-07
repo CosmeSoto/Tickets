@@ -539,8 +539,10 @@ export function EquipmentAssetForm({
     }
   }, [condition])
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+    // El modal inline vive en portal: el submit burbujea por el árbol React al form padre
+    if (e.target !== e.currentTarget) return
     setPriceError('')
     if (!equipmentTypeId) {
       toast.error('Selecciona el tipo de equipo')

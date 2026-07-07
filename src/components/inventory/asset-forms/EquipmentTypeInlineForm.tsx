@@ -34,9 +34,9 @@ export function EquipmentTypeInlineForm({ familyId, item, onSuccess, onCancel }:
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
+  const handleSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault()
+    e?.stopPropagation()
     setError('')
     if (!name.trim()) {
       setError('El nombre es obligatorio')
@@ -70,7 +70,7 @@ export function EquipmentTypeInlineForm({ familyId, item, onSuccess, onCancel }:
   }
 
   return (
-    <form onSubmit={handleSubmit} className='space-y-4'>
+    <form data-inline-create-form onSubmit={handleSubmit} className='space-y-4'>
       <div className='space-y-1'>
         <Label>
           Nombre <span className='text-destructive'>*</span>
@@ -110,7 +110,7 @@ export function EquipmentTypeInlineForm({ familyId, item, onSuccess, onCancel }:
         <Button type='button' variant='outline' onClick={onCancel} disabled={loading}>
           Cancelar
         </Button>
-        <Button type='submit' disabled={loading}>
+        <Button type='button' onClick={() => void handleSubmit()} disabled={loading}>
           {loading && <Loader2 className='mr-2 h-4 w-4 animate-spin' />}
           {isEdit ? 'Guardar cambios' : 'Crear tipo'}
         </Button>
