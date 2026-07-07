@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -49,32 +49,39 @@ export function CheckpointFormDialog({
 }: CheckpointFormDialogProps) {
   const [form, setForm] = useState<CheckpointFormData>(EMPTY_CHECKPOINT_FORM)
 
+  // Evitar reset accidental cuando el padre recarga checkpoints/families (búsqueda, filtros)
+  const familiesRef = useRef(families)
+  familiesRef.current = families
+  const checkpointsRef = useRef(checkpoints)
+  checkpointsRef.current = checkpoints
+
   useEffect(() => {
-    if (open) {
-      if (editingId) {
-        const cp = checkpoints.find(c => c.id === editingId)
-        if (cp) {
-          setForm({
-            familyId: cp.familyId,
-            name: cp.name,
-            description: cp.description ?? '',
-            location: cp.location,
-            latitude: cp.latitude != null ? String(cp.latitude) : '',
-            longitude: cp.longitude != null ? String(cp.longitude) : '',
-            geofenceRadiusMeters:
-              cp.geofenceRadiusMeters != null ? String(cp.geofenceRadiusMeters) : '',
-            hasConnectivity: cp.hasConnectivity,
-            isSensitive: cp.isSensitive,
-          })
-        }
-      } else {
-        setForm({ ...EMPTY_CHECKPOINT_FORM, familyId: families[0]?.id ?? '' })
+    if (!open) return
+    if (editingId) {
+      const cp = checkpointsRef.current.find(c => c.id === editingId)
+      if (cp) {
+        setForm({
+          familyId: cp.familyId,
+          name: cp.name,
+          description: cp.description ?? '',
+          location: cp.location,
+          latitude: cp.latitude != null ? String(cp.latitude) : '',
+          longitude: cp.longitude != null ? String(cp.longitude) : '',
+          geofenceRadiusMeters:
+            cp.geofenceRadiusMeters != null ? String(cp.geofenceRadiusMeters) : '',
+          hasConnectivity: cp.hasConnectivity,
+          isSensitive: cp.isSensitive,
+        })
       }
+    } else {
+      setForm({ ...EMPTY_CHECKPOINT_FORM, familyId: familiesRef.current[0]?.id ?? '' })
     }
-  }, [open, editingId, checkpoints, families])
+    // Solo al abrir o cambiar registro en edición — NO al recargar la lista
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, editingId])
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={v => !saving && onOpenChange(v)}>
       <DialogContent className='sm:max-w-lg'>
         <DialogHeader>
           <DialogTitle>{editingId ? 'Editar Checkpoint' : 'Nuevo Checkpoint'}</DialogTitle>
@@ -291,10 +298,15 @@ export function CheckpointFormDialog({
         </div>
 
         <DialogFooter>
-          <Button variant='outline' onClick={() => onOpenChange(false)} disabled={saving}>
+          <Button
+            type='button'
+            variant='outline'
+            onClick={() => onOpenChange(false)}
+            disabled={saving}
+          >
             Cancelar
           </Button>
-          <Button onClick={() => onSave(form, families)} disabled={saving}>
+          <Button type='button' onClick={() => onSave(form, families)} disabled={saving}>
             {saving ? <Loader2 className='h-4 w-4 mr-2 animate-spin' /> : null}
             {editingId ? 'Guardar cambios' : 'Crear checkpoint'}
           </Button>

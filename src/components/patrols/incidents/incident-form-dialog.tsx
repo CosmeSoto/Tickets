@@ -245,10 +245,15 @@ export function IncidentFormDialog({
         </div>
 
         <DialogFooter>
-          <Button variant='outline' onClick={() => onOpenChange(false)} disabled={saving}>
+          <Button
+            type='button'
+            variant='outline'
+            onClick={() => onOpenChange(false)}
+            disabled={saving}
+          >
             Cancelar
           </Button>
-          <Button onClick={handleSubmit} disabled={saving || !isValid}>
+          <Button type='button' onClick={handleSubmit} disabled={saving || !isValid}>
             {saving && <Loader2 className='h-4 w-4 mr-2 animate-spin' />}
             {mode === 'create' ? 'Reportar Novedad' : 'Guardar cambios'}
           </Button>

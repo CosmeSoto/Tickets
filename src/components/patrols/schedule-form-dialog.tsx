@@ -56,21 +56,22 @@ export function ScheduleFormDialog({
   const { toast } = useToast()
   const [form, setForm] = useState<FormData>(EMPTY_FORM)
 
-  // Solo resetear el formulario cuando el diálogo se abre (open pasa a true)
-  // o cuando initialForm cambia (edición). NO depender de families para evitar
-  // resets accidentales causados por re-fetch de datos del padre.
   const familiesRef = useRef(families)
   familiesRef.current = families
+  const initialFormRef = useRef(initialForm)
+  initialFormRef.current = initialForm
 
+  // Solo resetear al abrir o al cambiar de registro en edición (no cuando initialForm
+  // se recrea por re-render del padre con los mismos datos)
   useEffect(() => {
     if (!open) return
-    if (initialForm) {
-      setForm(initialForm)
-    } else {
+    if (editingId && initialFormRef.current) {
+      setForm(initialFormRef.current)
+    } else if (!editingId) {
       setForm({ ...EMPTY_FORM, familyId: familiesRef.current[0]?.id ?? '' })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, initialForm])
+  }, [open, editingId])
 
   const toggleDay = useCallback(
     (localDay: number) => {
@@ -175,7 +176,7 @@ export function ScheduleFormDialog({
   }, [form, editingId, onSave, toast])
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={v => !saving && onOpenChange(v)}>
       <DialogContent className='sm:max-w-2xl'>
         <DialogHeader>
           <DialogTitle className='text-xl'>
@@ -706,10 +707,15 @@ export function ScheduleFormDialog({
         </div>
 
         <DialogFooter className='gap-2 pt-2'>
-          <Button variant='outline' onClick={() => onOpenChange(false)} disabled={saving}>
+          <Button
+            type='button'
+            variant='outline'
+            onClick={() => onOpenChange(false)}
+            disabled={saving}
+          >
             Cancelar
           </Button>
-          <Button onClick={handleSubmit} disabled={saving}>
+          <Button type='button' onClick={handleSubmit} disabled={saving}>
             {saving && <Loader2 className='h-4 w-4 mr-2 animate-spin' />}
             {editingId ? 'Guardar cambios' : 'Crear programación'}
           </Button>

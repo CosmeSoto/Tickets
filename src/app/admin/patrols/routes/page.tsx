@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import {
@@ -109,6 +109,11 @@ export default function RoutesPage() {
   const { toast } = useToast()
 
   const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
+  const hasAuthenticated = useRef(false)
+
+  useEffect(() => {
+    if (status === 'authenticated') hasAuthenticated.current = true
+  }, [status])
 
   const [families, setFamilies] = useState<Family[]>([])
   const [searchTerm, setSearchTerm] = useState('')
@@ -191,14 +196,18 @@ export default function RoutesPage() {
     }
   }, [])
 
+  const hasFetchedRef = useRef(false)
+
   useEffect(() => {
     if (status === 'loading') return
     if (!session) {
       router.push('/login')
       return
     }
+    if (hasFetchedRef.current) return
+    hasFetchedRef.current = true
     fetchFamilies()
-  }, [session, status, router, fetchFamilies])
+  }, [status]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (form.familyId) fetchCheckpointsForFamily(form.familyId)
@@ -382,7 +391,8 @@ export default function RoutesPage() {
 
   const hasInactiveCheckpoints = routeCheckpoints.some(rc => !rc.isActive)
 
-  if (status === 'loading' || !session) return null
+  if (status === 'loading' && !hasAuthenticated.current) return null
+  if (!session) return null
 
   const columns = createRouteColumns({
     onEdit: openEdit,
@@ -497,7 +507,7 @@ export default function RoutesPage() {
       />
 
       {/* ── Dialog crear/editar ── */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Dialog open={dialogOpen} onOpenChange={v => !saving && setDialogOpen(v)}>
         <DialogContent className='sm:max-w-2xl'>
           <DialogHeader>
             <DialogTitle>{editingId ? 'Editar Ruta' : 'Nueva Ruta'}</DialogTitle>
@@ -718,10 +728,15 @@ export default function RoutesPage() {
           </div>
 
           <DialogFooter>
-            <Button variant='outline' onClick={() => setDialogOpen(false)} disabled={saving}>
+            <Button
+              type='button'
+              variant='outline'
+              onClick={() => setDialogOpen(false)}
+              disabled={saving}
+            >
               Cancelar
             </Button>
-            <Button onClick={handleSave} disabled={saving}>
+            <Button type='button' onClick={handleSave} disabled={saving}>
               {saving ? <Loader2 className='h-4 w-4 mr-2 animate-spin' /> : null}
               {editingId ? 'Guardar cambios' : 'Crear ruta'}
             </Button>

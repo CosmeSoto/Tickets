@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import {
@@ -51,6 +51,11 @@ export default function CheckpointsPage() {
   const router = useRouter()
 
   const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
+  const hasAuthenticated = useRef(false)
+
+  useEffect(() => {
+    if (status === 'authenticated') hasAuthenticated.current = true
+  }, [status])
 
   const [families, setFamilies] = useState<Family[]>([])
   const [includeInactive, setIncludeInactive] = useState(false)
@@ -147,16 +152,21 @@ export default function CheckpointsPage() {
     }
   }, [])
 
+  const hasFetchedRef = useRef(false)
+
   useEffect(() => {
     if (status === 'loading') return
     if (!session) {
       router.push('/login')
       return
     }
+    if (hasFetchedRef.current) return
+    hasFetchedRef.current = true
     fetchFamilies()
-  }, [session, status, router, fetchFamilies])
+  }, [status]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (status === 'loading' || !session) return null
+  if (status === 'loading' && !hasAuthenticated.current) return null
+  if (!session) return null
 
   // Create columns with callbacks
   const columns = createCheckpointColumns({

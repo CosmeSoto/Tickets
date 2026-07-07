@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Plus, CalendarClock, Pencil, PowerOff, Power, Trash2 } from 'lucide-react'
@@ -52,6 +52,11 @@ export default function SchedulesPage() {
   const { toast } = useToast()
 
   const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
+  const hasAuthenticated = useRef(false)
+
+  useEffect(() => {
+    if (status === 'authenticated') hasAuthenticated.current = true
+  }, [status])
 
   const [families, setFamilies] = useState<Family[]>([])
   const [routes, setRoutes] = useState<PatrolRoute[]>([])
@@ -351,7 +356,8 @@ export default function SchedulesPage() {
     }
   }
 
-  if (status === 'loading' || !session) return null
+  if (status === 'loading' && !hasAuthenticated.current) return null
+  if (!session) return null
 
   const columns = createScheduleColumns({
     onEdit: openEdit,
