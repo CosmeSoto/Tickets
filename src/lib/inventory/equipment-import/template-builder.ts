@@ -1,11 +1,11 @@
 import * as XLSX from 'xlsx'
 import type { TypeAttributeDef } from './types'
-import { VALID_CONDITIONS } from './constants'
+import { VALID_CONDITIONS, getConditionGuideText } from './constants'
 import { getAcquisitionModeLabel } from '@/lib/utils/inventory-utils'
 
 const FIXED_HEADERS: Array<{ key: string; label: string; example: string }> = [
   { key: 'serialNumber', label: 'N° de Serie *', example: 'SN-LAP-2026-001' },
-  { key: 'condition', label: 'Condición', example: 'NEW' },
+  { key: 'condition', label: 'Condición', example: 'Nuevo' },
   { key: 'warehouse', label: 'Bodega', example: 'Bodega Principal' },
   { key: 'physicalLocation', label: 'Ubicación física', example: 'Piso 2 - Rack A' },
   { key: 'purchaseDate', label: 'Fecha de compra', example: '2026-01-15' },
@@ -32,7 +32,7 @@ export function buildTemplateExampleRows(attributes: TypeAttributeDef[]): string
   const row1 = [...FIXED_HEADERS.map(h => h.example), ...attributes.map(a => attributeExample(a))]
   const row2 = [
     'SN-MON-2026-002',
-    'USED',
+    'Usado',
     '',
     'Recepción',
     '15/02/2026',
@@ -80,10 +80,11 @@ export function buildTemplateWorkbook(meta: {
     ['', ''],
     ['Reglas importantes', ''],
     ['N° de Serie', 'Obligatorio y único por equipo. No repita series en el archivo.'],
-    ['Condición válida', `${VALID_CONDITIONS.join(', ')} (alias: NUEVO, USADO, LIKE_NEW)`],
+    ['Condición válida', `${getConditionGuideText()} (también: NUEVO, USADO, DAÑADO, LIKE_NEW)`],
     ['Fecha de compra', 'YYYY-MM-DD o DD/MM/YYYY'],
     ['Bodega', 'Nombre o código exacto. Deje vacío para bodega por defecto.'],
-    ['Máximo por archivo', '100 equipos'],
+    ['Accesorios', 'Separados por coma (ej. Cargador, Mouse). Columna opcional.'],
+    ['Máximo por archivo', '100 equipos por importación'],
     ['Equipos asignados', 'No se actualizan por importación. Devuélvalos a bodega primero.'],
     ['', ''],
     ['Bodegas disponibles en esta familia', ''],
@@ -122,7 +123,7 @@ export function buildTemplateCsv(meta: {
     : 'sin bodegas activas'
   const lines = [
     `# Familia: ${meta.familyName} | Tipo: ${meta.typeName} | Marca: ${meta.brandName} | Modelo: ${meta.modelName}`,
-    `# Modo adquisición: ${getAcquisitionModeLabel(meta.acquisitionMode)} | Condición: ${VALID_CONDITIONS.join('/')}`,
+    `# Modo adquisición: ${getAcquisitionModeLabel(meta.acquisitionMode)} | ${getConditionGuideText()} | Máx. 100 equipos`,
     `# Bodegas: ${warehouseHint}`,
     headers.map(escape).join(','),
     ...examples.map(row => row.map(escape).join(',')),

@@ -17,6 +17,23 @@ import {
  * GET /api/inventory/equipment/import/template
  * Query: familyId, typeId, brandId, modelId, acquisitionMode?, format=csv|xlsx
  */
+export const dynamic = 'force-dynamic'
+
+function fileResponse(body: Buffer | Uint8Array | string, contentType: string, filename: string) {
+  const payload =
+    typeof body === 'string' ? body : body instanceof Uint8Array ? body : new Uint8Array(body)
+
+  return new NextResponse(payload, {
+    status: 200,
+    headers: {
+      'Content-Type': contentType,
+      'Content-Disposition': `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
+      'Cache-Control': 'no-store, no-cache, must-revalidate',
+      'X-Content-Type-Options': 'nosniff',
+    },
+  })
+}
+
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user) {
@@ -101,21 +118,15 @@ export async function GET(request: NextRequest) {
 
     if (format === 'csv') {
       const csv = buildTemplateCsv(meta)
-      return new NextResponse(csv, {
-        headers: {
-          'Content-Type': 'text/csv; charset=utf-8',
-          'Content-Disposition': 'attachment; filename="plantilla-equipos.csv"',
-        },
-      })
+      return fileResponse(csv, 'text/csv; charset=utf-8', 'plantilla-equipos.csv')
     }
 
     const buf = buildTemplateWorkbook(meta)
-    return new NextResponse(buf, {
-      headers: {
-        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'Content-Disposition': 'attachment; filename="plantilla-equipos.xlsx"',
-      },
-    })
+    return fileResponse(
+      buf,
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'plantilla-equipos.xlsx'
+    )
   } catch (error) {
     if (error instanceof InventoryAccessError) {
       return NextResponse.json({ error: error.message }, { status: error.statusCode })

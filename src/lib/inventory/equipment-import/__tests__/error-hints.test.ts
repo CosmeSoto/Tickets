@@ -23,6 +23,6 @@ describe('error-hints', () => {
       message: 'Condición inválida. Use: NEW, USED, DAMAGED',
     })
     expect(enriched.fieldLabel).toBe('Condición')
-    expect(enriched.hint).toContain('NEW')
+    expect(enriched.hint).toContain('Nuevo')
   })
 })

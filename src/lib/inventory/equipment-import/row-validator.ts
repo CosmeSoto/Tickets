@@ -11,6 +11,7 @@ import {
   MAX_IMPORT_ROWS,
   VALID_ACQUISITION_MODES,
   VALID_CONDITIONS,
+  getConditionGuideText,
 } from './constants'
 import {
   buildColumnIndexMap,
@@ -115,7 +116,7 @@ function parseRowFields(
       error: {
         row: rowNumber,
         field: 'condition',
-        message: `Condición inválida. Use: ${VALID_CONDITIONS.join(', ')}`,
+        message: `Condición inválida. Use: ${getConditionGuideText()}`,
       },
     }
   }

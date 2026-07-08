@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ArrowLeft,
@@ -35,7 +35,16 @@ import { EquipmentBrandInlineForm } from '@/components/inventory/asset-forms/Equ
 import { EquipmentModelInlineForm } from '@/components/inventory/asset-forms/EquipmentModelInlineForm'
 import { useFamilyOptions } from '@/hooks/use-family-options'
 import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
-import { getAcquisitionModeLabel, ACQUISITION_MODE_HELP } from '@/lib/utils/inventory-utils'
+import {
+  getAcquisitionModeLabel,
+  ACQUISITION_MODE_HELP,
+  getAssetConditionLabel,
+} from '@/lib/utils/inventory-utils'
+import {
+  getConditionGuideText,
+  CONDITION_ACCEPTED_ALIASES,
+} from '@/lib/inventory/equipment-import/constants'
+import { downloadFileFromApi } from '@/lib/utils/download-file-from-api'
 import { cn } from '@/lib/utils'
 
 const ACQUISITION_MODES = ['FIXED_ASSET', 'RENTAL', 'LOAN'] as const
@@ -114,7 +123,11 @@ export default function InventoryImportPage() {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<ImportResponse | null>(null)
   const [maxFileSizeMB, setMaxFileSizeMB] = useState(10)
+  const [downloadingTemplate, setDownloadingTemplate] = useState<'xlsx' | 'csv' | null>(null)
   const [warehouses, setWarehouses] = useState<Array<{ name: string; code?: string | null }>>([])
+  const [typeAttributes, setTypeAttributes] = useState<
+    Array<{ attributeLabel: string; isRequired: boolean; attributeType: string }>
+  >([])
 
   const catalogReady = !!(familyId && typeId && brandId && modelId && acquisitionMode)
 
@@ -129,6 +142,28 @@ export default function InventoryImportPage() {
       .then(d => setMaxFileSizeMB(d.maxFileSizeMB ?? 10))
       .catch(() => {})
   }, [])
+
+  useEffect(() => {
+    if (!typeId) {
+      setTypeAttributes([])
+      return
+    }
+    fetch(`/api/inventory/equipment-types/${typeId}/attributes`)
+      .then(r => r.json())
+      .then(data => {
+        const list = data.attributes ?? data.data ?? data ?? []
+        setTypeAttributes(
+          (Array.isArray(list) ? list : []).map(
+            (a: { attributeLabel: string; isRequired: boolean; attributeType: string }) => ({
+              attributeLabel: a.attributeLabel,
+              isRequired: a.isRequired,
+              attributeType: a.attributeType,
+            })
+          )
+        )
+      })
+      .catch(() => setTypeAttributes([]))
+  }, [typeId])
 
   useEffect(() => {
     if (!familyId) {
@@ -195,18 +230,41 @@ export default function InventoryImportPage() {
       .catch(() => setModels([]))
   }, [typeId, brandId])
 
-  const templateUrl = useMemo(() => {
-    if (!catalogReady) return ''
-    const params = new URLSearchParams({
-      familyId,
-      typeId,
-      brandId,
-      modelId,
-      acquisitionMode,
-      format: 'xlsx',
-    })
-    return `/api/inventory/equipment/import/template?${params.toString()}`
-  }, [catalogReady, familyId, typeId, brandId, modelId, acquisitionMode])
+  const buildTemplateDownloadUrl = useCallback(
+    (format: 'xlsx' | 'csv') => {
+      const params = new URLSearchParams({
+        familyId,
+        typeId,
+        brandId,
+        modelId,
+        acquisitionMode,
+        format,
+      })
+      return `/api/inventory/equipment/import/template?${params.toString()}`
+    },
+    [familyId, typeId, brandId, modelId, acquisitionMode]
+  )
+
+  const handleDownloadTemplate = async (format: 'xlsx' | 'csv') => {
+    if (!catalogReady) {
+      toast.error('Complete el catálogo del paso 1 antes de descargar la plantilla')
+      return
+    }
+    setDownloadingTemplate(format)
+    try {
+      const fallback = format === 'csv' ? 'plantilla-equipos.csv' : 'plantilla-equipos.xlsx'
+      const result = await downloadFileFromApi(buildTemplateDownloadUrl(format), fallback)
+      if (!result.ok) {
+        toast.error(result.error)
+        return
+      }
+      toast.success(format === 'csv' ? 'Plantilla CSV descargada' : 'Plantilla Excel descargada')
+    } catch {
+      toast.error('Error de conexión al descargar la plantilla')
+    } finally {
+      setDownloadingTemplate(null)
+    }
+  }
 
   const buildFormData = useCallback(
     (dryRun: boolean) => {
@@ -564,22 +622,46 @@ export default function InventoryImportPage() {
                 </div>
               </div>
 
-              <div className='flex items-center justify-between p-3 bg-muted/50 rounded-lg border'>
-                <div className='flex items-center gap-2'>
-                  <FileText className='h-4 w-4 text-muted-foreground' />
-                  <div>
-                    <p className='text-sm font-medium'>Plantilla Excel</p>
+              <div className='flex items-center justify-between p-3 bg-muted/50 rounded-lg border gap-3'>
+                <div className='flex items-center gap-2 min-w-0'>
+                  <FileText className='h-4 w-4 text-muted-foreground shrink-0' />
+                  <div className='min-w-0'>
+                    <p className='text-sm font-medium'>Plantillas de importación</p>
                     <p className='text-xs text-muted-foreground'>
-                      Incluye ejemplos y hoja &quot;Instrucciones&quot;
+                      Excel (recomendado) o CSV · incluye hoja Instrucciones
                     </p>
                   </div>
                 </div>
-                <Button type='button' variant='outline' size='sm' asChild>
-                  <a href={templateUrl} download>
-                    <Download className='mr-2 h-4 w-4' />
-                    Descargar
-                  </a>
-                </Button>
+                <div className='flex gap-2 shrink-0'>
+                  <Button
+                    type='button'
+                    variant='outline'
+                    size='sm'
+                    disabled={!catalogReady || downloadingTemplate !== null}
+                    onClick={() => handleDownloadTemplate('xlsx')}
+                  >
+                    {downloadingTemplate === 'xlsx' ? (
+                      <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                    ) : (
+                      <Download className='mr-2 h-4 w-4' />
+                    )}
+                    Excel
+                  </Button>
+                  <Button
+                    type='button'
+                    variant='ghost'
+                    size='sm'
+                    disabled={!catalogReady || downloadingTemplate !== null}
+                    onClick={() => handleDownloadTemplate('csv')}
+                  >
+                    {downloadingTemplate === 'csv' ? (
+                      <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                    ) : (
+                      <Download className='mr-2 h-4 w-4' />
+                    )}
+                    CSV
+                  </Button>
+                </div>
               </div>
 
               <details className='rounded-lg border bg-muted/20 p-3 text-sm'>
@@ -594,13 +676,31 @@ export default function InventoryImportPage() {
                   </p>
                   <p>
                     <span className='text-foreground font-medium'>Opcionales:</span> Condición,
-                    Bodega, Ubicación, Fecha/Precio compra, Factura, Accesorios, Notas + atributos
-                    del tipo.
+                    Bodega, Ubicación física, Fecha de compra, Precio de compra, N° Factura,
+                    Accesorios y Notas.
                   </p>
                   <p>
-                    <span className='text-foreground font-medium'>Condición:</span> NEW, USED o
-                    DAMAGED.
+                    <span className='text-foreground font-medium'>Accesorios:</span> sepárelos con
+                    coma (ej. Cargador, Mouse, Cable HDMI). Se guardan como lista en cada equipo.
                   </p>
+                  <p>
+                    <span className='text-foreground font-medium'>Condición:</span>{' '}
+                    {getConditionGuideText()}. También acepta: {CONDITION_ACCEPTED_ALIASES}.
+                  </p>
+                  {typeId && typeAttributes.length > 0 ? (
+                    <p>
+                      <span className='text-foreground font-medium'>
+                        Atributos del tipo (columnas en plantilla):
+                      </span>{' '}
+                      {typeAttributes
+                        .map(a => (a.isRequired ? `${a.attributeLabel} *` : a.attributeLabel))
+                        .join(' · ')}
+                    </p>
+                  ) : typeId ? (
+                    <p>Este tipo no tiene atributos personalizados adicionales.</p>
+                  ) : (
+                    <p>Seleccione un tipo de equipo para ver sus atributos en la plantilla.</p>
+                  )}
                   {warehouses.length > 0 ? (
                     <p>
                       <span className='text-foreground font-medium'>Bodegas válidas:</span>{' '}
@@ -816,7 +916,13 @@ export default function InventoryImportPage() {
                               </span>
                             </td>
                             <td className='px-3 py-2'>{row.serialNumber}</td>
-                            <td className='px-3 py-2'>{row.condition || row.reason || '—'}</td>
+                            <td className='px-3 py-2'>
+                              {row.action === 'skip'
+                                ? row.reason || '—'
+                                : row.condition
+                                  ? getAssetConditionLabel(row.condition)
+                                  : '—'}
+                            </td>
                           </tr>
                         ))}
                       </tbody>

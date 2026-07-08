@@ -1,5 +1,5 @@
 import type { ImportRowError } from './types'
-import { VALID_CONDITIONS } from './constants'
+import { getConditionGuideText, CONDITION_ACCEPTED_ALIASES } from './constants'
 
 const FIELD_LABELS: Record<string, string> = {
   serialNumber: 'N° de Serie',
@@ -50,7 +50,7 @@ export function resolveImportErrorHint(
   }
 
   if (field === 'condition') {
-    return `Use uno de estos valores: ${VALID_CONDITIONS.join(', ')}. También acepta alias como NUEVO, USADO, LIKE_NEW.`
+    return `Use: ${getConditionGuideText()}. También acepta: ${CONDITION_ACCEPTED_ALIASES}.`
   }
 
   if (field === 'warehouse') {
@@ -61,11 +61,15 @@ export function resolveImportErrorHint(
   }
 
   if (field === 'purchaseDate') {
-    return 'Use formato YYYY-MM-DD (ej. 2026-01-15) o DD/MM/YYYY (ej. 15/01/2026). Deje vacío si no aplica.'
+    return 'Use formato AAAA-MM-DD (ej. 2026-01-15) o DD/MM/AAAA (ej. 15/01/2026). Deje vacío si no aplica.'
   }
 
   if (field === 'purchasePrice') {
-    return 'Ingrese solo números. Use punto o coma decimal (ej. 1200.50). Deje vacío si no aplica.'
+    return 'Ingrese solo números. Use punto o coma decimal (ej. 1200,50). Deje vacío si no aplica.'
+  }
+
+  if (field === 'accessories') {
+    return 'Liste los accesorios separados por coma (ej. Cargador, Mouse, Cable HDMI). Deje vacío si no aplica.'
   }
 
   if (field === 'file') {
