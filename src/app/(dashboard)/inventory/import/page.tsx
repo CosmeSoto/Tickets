@@ -35,7 +35,7 @@ import { EquipmentBrandInlineForm } from '@/components/inventory/asset-forms/Equ
 import { EquipmentModelInlineForm } from '@/components/inventory/asset-forms/EquipmentModelInlineForm'
 import { useFamilyOptions } from '@/hooks/use-family-options'
 import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
-import { getAcquisitionModeLabel } from '@/lib/utils/inventory-utils'
+import { getAcquisitionModeLabel, ACQUISITION_MODE_HELP } from '@/lib/utils/inventory-utils'
 import { cn } from '@/lib/utils'
 
 const ACQUISITION_MODES = ['FIXED_ASSET', 'RENTAL', 'LOAN'] as const
@@ -452,6 +452,9 @@ export default function InventoryImportPage() {
                       ))}
                     </SelectContent>
                   </Select>
+                  <p className='text-xs text-muted-foreground mt-1.5'>
+                    {ACQUISITION_MODE_HELP[acquisitionMode]}
+                  </p>
                 </div>
               </div>
 

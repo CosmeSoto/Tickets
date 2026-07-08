@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx'
 import type { TypeAttributeDef } from './types'
 import { VALID_CONDITIONS } from './constants'
+import { getAcquisitionModeLabel } from '@/lib/utils/inventory-utils'
 
 const FIXED_HEADERS: Array<{ key: string; label: string; example: string }> = [
   { key: 'serialNumber', label: 'N° de Serie *', example: 'SN-LAP-2026-001' },
@@ -68,7 +69,7 @@ export function buildTemplateWorkbook(meta: {
     ['Tipo', meta.typeName],
     ['Marca', meta.brandName],
     ['Modelo', meta.modelName],
-    ['Modo de adquisición', meta.acquisitionMode],
+    ['Modo de adquisición', getAcquisitionModeLabel(meta.acquisitionMode)],
     ['', ''],
     ['Modos de importación en el asistente', ''],
     ['Solo agregar', 'Crea nuevos. Series existentes se omiten.'],
@@ -121,7 +122,7 @@ export function buildTemplateCsv(meta: {
     : 'sin bodegas activas'
   const lines = [
     `# Familia: ${meta.familyName} | Tipo: ${meta.typeName} | Marca: ${meta.brandName} | Modelo: ${meta.modelName}`,
-    `# Modo adquisición: ${meta.acquisitionMode} | Condición: ${VALID_CONDITIONS.join('/')}`,
+    `# Modo adquisición: ${getAcquisitionModeLabel(meta.acquisitionMode)} | Condición: ${VALID_CONDITIONS.join('/')}`,
     `# Bodegas: ${warehouseHint}`,
     headers.map(escape).join(','),
     ...examples.map(row => row.map(escape).join(',')),

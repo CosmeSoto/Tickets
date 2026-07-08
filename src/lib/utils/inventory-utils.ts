@@ -129,7 +129,15 @@ export function getAssetConditionLabel(condition: string): string {
 const ACQUISITION_MODE_LABELS: Record<string, string> = {
   FIXED_ASSET: 'Activo Propio',
   RENTAL: 'Arrendamiento',
+  LOAN: 'Activo de Tercero',
   LEASE: 'Arrendamiento Financiero',
+}
+
+/** Texto de ayuda corto para formularios (misma nomenclatura que Configuración → Inventario) */
+export const ACQUISITION_MODE_HELP: Record<string, string> = {
+  FIXED_ASSET: 'Compra directa — es propiedad de la empresa',
+  RENTAL: 'Pago mensual al proveedor — el proveedor sigue siendo el dueño',
+  LOAN: 'Préstamo sin costo — el propietario conserva la titularidad',
 }
 
 export function getAcquisitionModeLabel(mode: string): string {
