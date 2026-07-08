@@ -20,33 +20,10 @@ export function getConditionGuideText(): string {
 
 export const VALID_ACQUISITION_MODES = ['FIXED_ASSET', 'RENTAL', 'LOAN'] as const
 
+import { getImportFixedColumnDefs } from '@/lib/inventory/equipment-field-definitions'
+
 /** Columnas fijas de la plantilla (clave técnica → alias en español/inglés) */
-export const FIXED_COLUMNS = [
-  {
-    key: 'serialNumber',
-    aliases: ['serialnumber', 'n° de serie', 'n° de serie *', 'n° serie', 'serie', 'serial'],
-  },
-  { key: 'condition', aliases: ['condición', 'condicion', 'condition'] },
-  { key: 'warehouse', aliases: ['bodega', 'warehouse', 'ubicación bodega', 'ubicacion bodega'] },
-  {
-    key: 'physicalLocation',
-    aliases: ['ubicación física', 'ubicacion fisica', 'physical location', 'ubicación'],
-  },
-  {
-    key: 'purchaseDate',
-    aliases: ['fecha de compra', 'fecha compra', 'purchase date', 'purchasedate'],
-  },
-  {
-    key: 'purchasePrice',
-    aliases: ['precio de compra', 'precio', 'purchase price', 'purchaseprice'],
-  },
-  {
-    key: 'invoiceNumber',
-    aliases: ['n° factura', 'n° de factura', 'factura', 'invoice', 'invoicenumber'],
-  },
-  { key: 'accessories', aliases: ['accesorios', 'accessories'] },
-  { key: 'notes', aliases: ['notas', 'notes'] },
-] as const
+export const FIXED_COLUMNS = getImportFixedColumnDefs()
 
 export const CONDITION_ALIASES: Record<string, ValidCondition> = {
   NEW: 'NEW',

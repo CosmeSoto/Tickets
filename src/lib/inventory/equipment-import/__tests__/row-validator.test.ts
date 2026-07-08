@@ -153,6 +153,33 @@ describe('validateAndParseImportRows', () => {
     expect(errors[0].message).toMatch(/ASSIGNED/)
   })
 
+  it('parses attributes from export Atributos column', () => {
+    const attributes: TypeAttributeDef[] = [
+      {
+        attributeName: 'ram_gb',
+        attributeLabel: 'RAM (GB)',
+        attributeType: 'number',
+        isRequired: false,
+        options: null,
+      },
+    ]
+
+    const headerWithAttr = [...header, 'Atributos']
+    const rowsWithAttr = [headerWithAttr, ['SN-001', 'NEW', '', '', '', 'RAM (GB): 16']]
+
+    const { errors, parsed } = validateAndParseImportRows({
+      rows: rowsWithAttr,
+      context: baseContext,
+      mode: 'add',
+      attributes,
+      warehouses,
+      existingBySerial: new Map(),
+    })
+
+    expect(errors).toHaveLength(0)
+    expect(parsed[0].customValues).toEqual([{ fieldName: 'ram_gb', fieldValue: '16' }])
+  })
+
   it('validates required dynamic attributes', () => {
     const attributes: TypeAttributeDef[] = [
       {

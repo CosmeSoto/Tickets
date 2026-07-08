@@ -1,5 +1,6 @@
 import type { TypeAttributeDef } from './types'
 import { FIXED_COLUMNS } from './constants'
+import { EQUIPMENT_ATTRIBUTES_COMBINED_ALIASES } from '@/lib/inventory/equipment-field-definitions'
 
 export interface ColumnIndexMap {
   serialNumber: number
@@ -11,6 +12,7 @@ export interface ColumnIndexMap {
   invoiceNumber: number
   accessories: number
   notes: number
+  attributesCombined: number
   attributes: Record<string, number>
 }
 
@@ -54,12 +56,18 @@ export function buildColumnIndexMap(
     invoiceNumber: -1,
     accessories: -1,
     notes: -1,
+    attributesCombined: -1,
     attributes: {},
   }
 
   for (const col of FIXED_COLUMNS) {
-    map[col.key as keyof Omit<ColumnIndexMap, 'attributes'>] = findCol(headerRow, col.aliases)
+    map[col.key as keyof Omit<ColumnIndexMap, 'attributes' | 'attributesCombined'>] = findCol(
+      headerRow,
+      col.aliases
+    )
   }
+
+  map.attributesCombined = findCol(headerRow, EQUIPMENT_ATTRIBUTES_COMBINED_ALIASES)
 
   for (const attr of attributes) {
     const byName = findCol(headerRow, [attr.attributeName])
@@ -83,26 +91,6 @@ export function parseAccessories(raw?: string): string[] {
     .split(',')
     .map(s => s.trim())
     .filter(Boolean)
-}
-
-export function parsePurchaseDate(raw?: string): Date | undefined {
-  if (!raw?.trim()) return undefined
-  const trimmed = raw.trim()
-
-  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
-    const d = new Date(`${trimmed}T12:00:00`)
-    return Number.isNaN(d.getTime()) ? undefined : d
-  }
-
-  const slash = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
-  if (slash) {
-    const [, dd, mm, yyyy] = slash
-    const d = new Date(`${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}T12:00:00`)
-    return Number.isNaN(d.getTime()) ? undefined : d
-  }
-
-  const d = new Date(trimmed)
-  return Number.isNaN(d.getTime()) ? undefined : d
 }
 
 export function splitDataRows(rows: string[][]): {

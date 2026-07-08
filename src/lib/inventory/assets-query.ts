@@ -47,6 +47,10 @@ export interface UnifiedAssetItem {
   purchaseOrderNumber?: string
   attributes?: string
   accessories?: string
+  serialNumber?: string
+  warehouseName?: string
+  physicalLocation?: string
+  notes?: string
   batchId?: string | null
   batchCode?: string | null
 }
@@ -91,6 +95,7 @@ export async function queryAssets(params: AssetsQueryParams): Promise<AssetsQuer
         type: { include: EQUIPMENT_TYPE_INCLUDE },
         model: { select: { brand: true, model: true } },
         batch: { select: { id: true, batchCode: true } },
+        warehouse: { select: { name: true } },
         customValues: { select: { fieldName: true, fieldValue: true } },
       },
       orderBy: { createdAt: 'desc' },
@@ -101,6 +106,7 @@ export async function queryAssets(params: AssetsQueryParams): Promise<AssetsQuer
           i =>
             i.name.toLowerCase().includes(searchQuery) ||
             (i.code ?? '').toLowerCase().includes(searchQuery) ||
+            (i.serialNumber ?? '').toLowerCase().includes(searchQuery) ||
             (i.batchCode ?? '').toLowerCase().includes(searchQuery)
         )
       : mapped
@@ -167,6 +173,7 @@ export async function queryAssets(params: AssetsQueryParams): Promise<AssetsQuer
             type: { include: EQUIPMENT_TYPE_INCLUDE },
             model: { select: { brand: true, model: true } },
             batch: { select: { id: true, batchCode: true } },
+            warehouse: { select: { name: true } },
             customValues: { select: { fieldName: true, fieldValue: true } },
           },
           orderBy: { createdAt: 'desc' },
@@ -233,6 +240,7 @@ export async function queryAssets(params: AssetsQueryParams): Promise<AssetsQuer
         i =>
           i.name.toLowerCase().includes(searchQuery) ||
           (i.code ?? '').toLowerCase().includes(searchQuery) ||
+          (i.serialNumber ?? '').toLowerCase().includes(searchQuery) ||
           (i.batchCode ?? '').toLowerCase().includes(searchQuery)
       )
     : mapped
@@ -275,6 +283,10 @@ function mapEquipmentItem(item: any): UnifiedAssetItem {
     purchaseOrderNumber: item.purchaseOrderNumber ?? undefined,
     attributes: attributesStr,
     accessories: item.accessories?.length ? item.accessories.join(', ') : undefined,
+    serialNumber: item.serialNumber ?? undefined,
+    warehouseName: item.warehouse?.name ?? undefined,
+    physicalLocation: item.physicalLocation ?? undefined,
+    notes: item.notes ?? undefined,
     batchId: item.batchId ?? item.batch?.id ?? null,
     batchCode: item.batch?.batchCode ?? null,
   }

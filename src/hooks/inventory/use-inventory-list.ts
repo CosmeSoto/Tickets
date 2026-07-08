@@ -22,8 +22,29 @@ import {
   OPTIONAL_COLUMNS,
   COLUMN_KEY_TO_ASSET_KEY,
 } from '@/types/inventory/unified-asset'
+import { EQUIPMENT_SHARED_FIELDS } from '@/lib/inventory/equipment-field-definitions'
 
 const PAGE_SIZE = 20
+
+function formatImportCompatibleDate(v: unknown): string {
+  if (!v) return ''
+  const d = new Date(v as string)
+  if (Number.isNaN(d.getTime())) return ''
+  const dd = String(d.getDate()).padStart(2, '0')
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const yyyy = d.getFullYear()
+  return `${dd}/${mm}/${yyyy}`
+}
+
+function formatImportCompatiblePrice(v: unknown): string {
+  if (v == null || v === '') return ''
+  const n = Number(v)
+  return Number.isNaN(n) ? '' : n.toFixed(2)
+}
+
+const sharedFieldExportMap = Object.fromEntries(
+  EQUIPMENT_SHARED_FIELDS.map(f => [f.key, f.exportLabel])
+) as Record<string, string>
 
 // Todas las columnas disponibles para el export con su formato
 const ALL_EXPORT_COLUMNS = [
@@ -37,10 +58,15 @@ const ALL_EXPORT_COLUMNS = [
   { key: 'family', label: 'Área', format: (v: any) => v?.name ?? '' },
   { key: 'name', label: 'Nombre' },
   { key: 'code', label: 'Código', format: (v: any, r: any) => v ?? r.id.slice(0, 8) },
+  {
+    key: 'serialNumber',
+    label: sharedFieldExportMap.serialNumber,
+    format: (v: any) => v ?? '',
+  },
   { key: 'status', label: 'Estado', format: (v: string) => getAssetStatusLabel(v) },
   {
     key: 'condition',
-    label: 'Condición',
+    label: sharedFieldExportMap.condition,
     format: (v: string) => (v ? getAssetConditionLabel(v) : ''),
   },
   {
@@ -49,24 +75,35 @@ const ALL_EXPORT_COLUMNS = [
     format: (v: string) => (v ? getAcquisitionModeLabel(v) : ''),
   },
   {
+    key: 'warehouseName',
+    label: sharedFieldExportMap.warehouse,
+    format: (v: any) => v ?? '',
+  },
+  {
+    key: 'physicalLocation',
+    label: sharedFieldExportMap.physicalLocation,
+    format: (v: any) => v ?? '',
+  },
+  {
     key: 'createdAt',
     label: 'Fecha Creación',
     format: (v: any) => (v ? new Date(v).toLocaleDateString('es-ES') : ''),
   },
   {
     key: 'purchaseDate',
-    label: 'Fecha de Compra',
-    format: (v: any) => (v ? new Date(v).toLocaleDateString('es-ES') : ''),
+    label: sharedFieldExportMap.purchaseDate,
+    format: (v: any) => formatImportCompatibleDate(v),
   },
   {
     key: 'purchasePrice',
-    label: 'Costo Adquisición',
-    format: (v: any) => (v != null ? `$${Number(v).toFixed(2)}` : ''),
+    label: sharedFieldExportMap.purchasePrice,
+    format: (v: any) => formatImportCompatiblePrice(v),
   },
-  { key: 'invoiceNumber', label: 'N° Factura', format: (v: any) => v ?? '' },
+  { key: 'invoiceNumber', label: sharedFieldExportMap.invoiceNumber, format: (v: any) => v ?? '' },
   { key: 'purchaseOrderNumber', label: 'N° Orden de Compra', format: (v: any) => v ?? '' },
   { key: 'attributes', label: 'Atributos', format: (v: any) => v ?? '' },
-  { key: 'accessories', label: 'Accesorios', format: (v: any) => v ?? '' },
+  { key: 'accessories', label: sharedFieldExportMap.accessories, format: (v: any) => v ?? '' },
+  { key: 'notes', label: sharedFieldExportMap.notes, format: (v: any) => v ?? '' },
   { key: 'batchCode', label: 'Lote', format: (v: any) => v ?? 'Individual' },
 ]
 

@@ -361,6 +361,30 @@ Módulo: `src/lib/inventory/equipment-import/`
 
 **UX profesional:** cada error incluye mensaje + solución sugerida (`hint`). La plantilla Excel trae hoja "Instrucciones" con bodegas, modos y reglas.
 
+### Coordinación importación ↔ exportación
+
+Definiciones compartidas en `src/lib/inventory/equipment-field-definitions.ts` (etiquetas y alias de columnas).
+
+| Campo                                      | Import (plantilla)             | Export (listado)                                                                |
+| ------------------------------------------ | ------------------------------ | ------------------------------------------------------------------------------- |
+| N° de Serie                                | Obligatorio                    | Incluido                                                                        |
+| Condición, Bodega, Ubicación física, Notas | Columnas fijas                 | Mismas etiquetas                                                                |
+| Precio de compra                           | Numérico (`1200.00`)           | Mismo formato (sin `$`)                                                         |
+| Fecha de compra                            | `YYYY-MM-DD` o `DD/MM/YYYY`    | `DD/MM/YYYY`                                                                    |
+| Accesorios                                 | Separados por coma             | Join con coma                                                                   |
+| Atributos                                  | Columnas por atributo del tipo | Columna `Atributos` legible (`Etiqueta: Valor`); import la acepta como respaldo |
+| Catálogo (familia/tipo/marca/modelo)       | Wizard (no va en archivo)      | Columnas del informe (solo lectura)                                             |
+
+**Flujos recomendados:**
+
+1. **Edición masiva confiable:** Import → catálogo → **Equipos existentes** → editar → reimportar con `update`.
+2. **Desde listado general:** Export CSV del inventario (filtro por familia/tipo) → editar columnas alineadas → import con mismo catálogo.
+3. **Alta masiva:** Plantilla vacía → completar filas → import con `add`.
+
+API plantilla con datos existentes:
+
+- `GET .../import/template?...&prefill=true` — exporta hasta 100 equipos del catálogo seleccionado en formato importable.
+
 ---
 
 ## Checklist de Verificación Post-Despliegue

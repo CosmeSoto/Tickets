@@ -21,6 +21,10 @@ export interface UnifiedAsset {
   // Atributos personalizados y accesorios (solo equipos, como strings planos)
   attributes?: string
   accessories?: string
+  serialNumber?: string
+  warehouseName?: string
+  physicalLocation?: string
+  notes?: string
   batchId?: string | null
   batchCode?: string | null
 }

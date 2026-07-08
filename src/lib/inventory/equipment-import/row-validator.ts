@@ -17,10 +17,14 @@ import {
   buildColumnIndexMap,
   getCell,
   parseAccessories,
-  parsePurchaseDate,
   splitDataRows,
   type ColumnIndexMap,
 } from './parse-rows'
+import {
+  parsePurchaseDate,
+  parsePurchasePrice,
+  parseEquipmentAttributesFromExportString,
+} from '@/lib/inventory/parse-import-values'
 
 interface WarehouseOption {
   id: string
@@ -148,8 +152,8 @@ function parseRowFields(
   const purchasePriceRaw = getCell(row, colMap.purchasePrice)
   let purchasePrice: number | undefined
   if (purchasePriceRaw) {
-    const n = Number(purchasePriceRaw.replace(',', '.'))
-    if (Number.isNaN(n) || n < 0) {
+    purchasePrice = parsePurchasePrice(purchasePriceRaw)
+    if (purchasePrice === undefined) {
       return {
         error: {
           row: rowNumber,
@@ -158,10 +162,10 @@ function parseRowFields(
         },
       }
     }
-    purchasePrice = n
   }
 
   const customValues: Array<{ fieldName: string; fieldValue: string }> = []
+  const filledFieldNames = new Set<string>()
 
   for (const attr of attributes) {
     const colIdx = colMap.attributes[attr.attributeName]
@@ -172,6 +176,24 @@ function parseRowFields(
     }
     if (rawValue?.trim()) {
       customValues.push({ fieldName: attr.attributeName, fieldValue: rawValue.trim() })
+      filledFieldNames.add(attr.attributeName)
+    }
+  }
+
+  const combinedAttributesRaw =
+    colMap.attributesCombined >= 0 ? getCell(row, colMap.attributesCombined) : undefined
+  if (combinedAttributesRaw) {
+    const fromExport = parseEquipmentAttributesFromExportString(combinedAttributesRaw, attributes)
+    for (const entry of fromExport) {
+      if (filledFieldNames.has(entry.fieldName)) continue
+      const attr = attributes.find(a => a.attributeName === entry.fieldName)
+      if (!attr) continue
+      const msg = validateAttributeValue(attr, entry.fieldValue)
+      if (msg) {
+        return { error: { row: rowNumber, field: attr.attributeName, message: msg } }
+      }
+      customValues.push(entry)
+      filledFieldNames.add(entry.fieldName)
     }
   }
 

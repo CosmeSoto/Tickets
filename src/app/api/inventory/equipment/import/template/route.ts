@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
+import type { OwnershipType } from '@prisma/client'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import {
@@ -10,12 +11,14 @@ import {
 import {
   buildTemplateCsv,
   buildTemplateWorkbook,
+  buildPrefilledDataRows,
+  MAX_IMPORT_ROWS,
   VALID_ACQUISITION_MODES,
 } from '@/lib/inventory/equipment-import'
 
 /**
  * GET /api/inventory/equipment/import/template
- * Query: familyId, typeId, brandId, modelId, acquisitionMode?, format=csv|xlsx
+ * Query: familyId, typeId, brandId, modelId, acquisitionMode?, format=csv|xlsx, prefill=true
  */
 export const dynamic = 'force-dynamic'
 
@@ -48,6 +51,7 @@ export async function GET(request: NextRequest) {
     const modelId = searchParams.get('modelId')?.trim()
     const acquisitionMode = (searchParams.get('acquisitionMode') ?? 'FIXED_ASSET').trim()
     const format = (searchParams.get('format') ?? 'xlsx').toLowerCase()
+    const prefill = searchParams.get('prefill') === 'true'
 
     if (!familyId || !typeId || !brandId || !modelId) {
       return NextResponse.json(
@@ -116,16 +120,57 @@ export async function GET(request: NextRequest) {
       warehouses,
     }
 
-    if (format === 'csv') {
-      const csv = buildTemplateCsv(meta)
-      return fileResponse(csv, 'text/csv; charset=utf-8', 'plantilla-equipos.csv')
+    const equipmentWhere = {
+      modelId,
+      typeId,
+      acquisitionMode: acquisitionMode as OwnershipType,
     }
 
-    const buf = buildTemplateWorkbook(meta)
+    let fileOptions: { dataRows?: string[][]; prefillNote?: string } | undefined
+
+    if (prefill) {
+      const [equipment, totalCount] = await Promise.all([
+        prisma.equipment.findMany({
+          where: equipmentWhere,
+          include: {
+            warehouse: { select: { name: true } },
+            customValues: { select: { fieldName: true, fieldValue: true } },
+          },
+          orderBy: { serialNumber: 'asc' },
+          take: MAX_IMPORT_ROWS,
+        }),
+        prisma.equipment.count({ where: equipmentWhere }),
+      ])
+
+      if (equipment.length === 0) {
+        return NextResponse.json(
+          { error: 'No hay equipos con este catálogo para exportar' },
+          { status: 404 }
+        )
+      }
+
+      const dataRows = buildPrefilledDataRows(equipment, attributes)
+      const truncated = totalCount > MAX_IMPORT_ROWS
+      fileOptions = {
+        dataRows,
+        prefillNote: truncated
+          ? `Exportados ${MAX_IMPORT_ROWS} de ${totalCount} equipos (límite por archivo). Divida en lotes si necesita más.`
+          : `Exportados ${equipment.length} equipo(s) existentes del inventario.`,
+      }
+    }
+
+    if (format === 'csv') {
+      const csv = buildTemplateCsv(meta, fileOptions)
+      const filename = prefill ? 'equipos-existentes.csv' : 'plantilla-equipos.csv'
+      return fileResponse(csv, 'text/csv; charset=utf-8', filename)
+    }
+
+    const buf = buildTemplateWorkbook(meta, fileOptions)
+    const filename = prefill ? 'equipos-existentes.xlsx' : 'plantilla-equipos.xlsx'
     return fileResponse(
       buf,
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'plantilla-equipos.xlsx'
+      filename
     )
   } catch (error) {
     if (error instanceof InventoryAccessError) {

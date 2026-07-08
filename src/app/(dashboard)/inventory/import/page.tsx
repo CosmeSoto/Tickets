@@ -123,7 +123,9 @@ export default function InventoryImportPage() {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<ImportResponse | null>(null)
   const [maxFileSizeMB, setMaxFileSizeMB] = useState(10)
-  const [downloadingTemplate, setDownloadingTemplate] = useState<'xlsx' | 'csv' | null>(null)
+  const [downloadingTemplate, setDownloadingTemplate] = useState<
+    'blank-xlsx' | 'blank-csv' | 'prefill-xlsx' | 'prefill-csv' | null
+  >(null)
   const [warehouses, setWarehouses] = useState<Array<{ name: string; location?: string | null }>>(
     []
   )
@@ -236,7 +238,7 @@ export default function InventoryImportPage() {
   }, [typeId, brandId])
 
   const buildTemplateDownloadUrl = useCallback(
-    (format: 'xlsx' | 'csv') => {
+    (format: 'xlsx' | 'csv', prefill = false) => {
       const params = new URLSearchParams({
         familyId,
         typeId,
@@ -245,25 +247,45 @@ export default function InventoryImportPage() {
         acquisitionMode,
         format,
       })
+      if (prefill) params.set('prefill', 'true')
       return `/api/inventory/equipment/import/template?${params.toString()}`
     },
     [familyId, typeId, brandId, modelId, acquisitionMode]
   )
 
-  const handleDownloadTemplate = async (format: 'xlsx' | 'csv') => {
+  const handleDownloadTemplate = async (format: 'xlsx' | 'csv', prefill = false) => {
     if (!catalogReady) {
       toast.error('Complete el catálogo del paso 1 antes de descargar la plantilla')
       return
     }
-    setDownloadingTemplate(format)
+    const downloadKey = `${prefill ? 'prefill' : 'blank'}-${format}` as
+      | 'blank-xlsx'
+      | 'blank-csv'
+      | 'prefill-xlsx'
+      | 'prefill-csv'
+    setDownloadingTemplate(downloadKey)
     try {
-      const fallback = format === 'csv' ? 'plantilla-equipos.csv' : 'plantilla-equipos.xlsx'
-      const result = await downloadFileFromApi(buildTemplateDownloadUrl(format), fallback)
+      const fallback = prefill
+        ? format === 'csv'
+          ? 'equipos-existentes.csv'
+          : 'equipos-existentes.xlsx'
+        : format === 'csv'
+          ? 'plantilla-equipos.csv'
+          : 'plantilla-equipos.xlsx'
+      const result = await downloadFileFromApi(buildTemplateDownloadUrl(format, prefill), fallback)
       if (!result.ok) {
         toast.error(result.error)
         return
       }
-      toast.success(format === 'csv' ? 'Plantilla CSV descargada' : 'Plantilla Excel descargada')
+      if (prefill) {
+        toast.success(
+          format === 'csv'
+            ? 'Equipos existentes exportados (CSV)'
+            : 'Equipos existentes exportados (Excel)'
+        )
+      } else {
+        toast.success(format === 'csv' ? 'Plantilla CSV descargada' : 'Plantilla Excel descargada')
+      }
     } catch {
       toast.error('Error de conexión al descargar la plantilla')
     } finally {
@@ -625,47 +647,110 @@ export default function InventoryImportPage() {
                 </div>
               </div>
 
-              <div className='flex items-center justify-between p-3 bg-muted/50 rounded-lg border gap-3'>
-                <div className='flex items-center gap-2 min-w-0'>
-                  <FileText className='h-4 w-4 text-muted-foreground shrink-0' />
-                  <div className='min-w-0'>
-                    <p className='text-sm font-medium'>Plantillas de importación</p>
-                    <p className='text-xs text-muted-foreground'>
-                      Excel (recomendado) o CSV · incluye hoja Instrucciones
-                    </p>
+              <div className='space-y-3'>
+                <div className='flex items-center justify-between p-3 bg-muted/50 rounded-lg border gap-3'>
+                  <div className='flex items-center gap-2 min-w-0'>
+                    <FileText className='h-4 w-4 text-muted-foreground shrink-0' />
+                    <div className='min-w-0'>
+                      <p className='text-sm font-medium'>Plantilla vacía</p>
+                      <p className='text-xs text-muted-foreground'>
+                        Excel (recomendado) o CSV · incluye hoja Instrucciones y ejemplos
+                      </p>
+                    </div>
+                  </div>
+                  <div className='flex gap-2 shrink-0'>
+                    <Button
+                      type='button'
+                      variant='outline'
+                      size='sm'
+                      disabled={!catalogReady || downloadingTemplate !== null}
+                      onClick={() => handleDownloadTemplate('xlsx')}
+                    >
+                      {downloadingTemplate === 'blank-xlsx' ? (
+                        <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                      ) : (
+                        <Download className='mr-2 h-4 w-4' />
+                      )}
+                      Excel
+                    </Button>
+                    <Button
+                      type='button'
+                      variant='ghost'
+                      size='sm'
+                      disabled={!catalogReady || downloadingTemplate !== null}
+                      onClick={() => handleDownloadTemplate('csv')}
+                    >
+                      {downloadingTemplate === 'blank-csv' ? (
+                        <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                      ) : (
+                        <Download className='mr-2 h-4 w-4' />
+                      )}
+                      CSV
+                    </Button>
                   </div>
                 </div>
-                <div className='flex gap-2 shrink-0'>
-                  <Button
-                    type='button'
-                    variant='outline'
-                    size='sm'
-                    disabled={!catalogReady || downloadingTemplate !== null}
-                    onClick={() => handleDownloadTemplate('xlsx')}
-                  >
-                    {downloadingTemplate === 'xlsx' ? (
-                      <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                    ) : (
-                      <Download className='mr-2 h-4 w-4' />
-                    )}
-                    Excel
-                  </Button>
-                  <Button
-                    type='button'
-                    variant='ghost'
-                    size='sm'
-                    disabled={!catalogReady || downloadingTemplate !== null}
-                    onClick={() => handleDownloadTemplate('csv')}
-                  >
-                    {downloadingTemplate === 'csv' ? (
-                      <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                    ) : (
-                      <Download className='mr-2 h-4 w-4' />
-                    )}
-                    CSV
-                  </Button>
+
+                <div className='flex items-center justify-between p-3 bg-primary/5 rounded-lg border border-primary/20 gap-3'>
+                  <div className='flex items-center gap-2 min-w-0'>
+                    <RefreshCw className='h-4 w-4 text-primary shrink-0' />
+                    <div className='min-w-0'>
+                      <p className='text-sm font-medium'>Equipos existentes</p>
+                      <p className='text-xs text-muted-foreground'>
+                        Mismo formato de importación, prellenado desde inventario (máx. 100). Use
+                        modo <span className='font-medium'>Agregar y actualizar</span> al
+                        reimportar.
+                      </p>
+                    </div>
+                  </div>
+                  <div className='flex gap-2 shrink-0'>
+                    <Button
+                      type='button'
+                      variant='outline'
+                      size='sm'
+                      disabled={!catalogReady || downloadingTemplate !== null}
+                      onClick={() => handleDownloadTemplate('xlsx', true)}
+                    >
+                      {downloadingTemplate === 'prefill-xlsx' ? (
+                        <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                      ) : (
+                        <Download className='mr-2 h-4 w-4' />
+                      )}
+                      Excel
+                    </Button>
+                    <Button
+                      type='button'
+                      variant='ghost'
+                      size='sm'
+                      disabled={!catalogReady || downloadingTemplate !== null}
+                      onClick={() => handleDownloadTemplate('csv', true)}
+                    >
+                      {downloadingTemplate === 'prefill-csv' ? (
+                        <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                      ) : (
+                        <Download className='mr-2 h-4 w-4' />
+                      )}
+                      CSV
+                    </Button>
+                  </div>
                 </div>
               </div>
+
+              <Alert>
+                <Info className='h-4 w-4' />
+                <AlertTitle>Coordinación con el listado de inventario</AlertTitle>
+                <AlertDescription className='text-sm space-y-1'>
+                  <p>
+                    El export del listado usa las mismas etiquetas en español (N° de Serie, Precio
+                    de compra, Bodega, etc.). Puede editar ese CSV y reimportarlo; la columna
+                    Atributos también se acepta como respaldo.
+                  </p>
+                  <p>
+                    Para edición masiva confiable, prefiera{' '}
+                    <span className='font-medium'>Equipos existentes</span> o la plantilla vacía con
+                    columnas dinámicas por atributo.
+                  </p>
+                </AlertDescription>
+              </Alert>
 
               <details className='rounded-lg border bg-muted/20 p-3 text-sm'>
                 <summary className='cursor-pointer font-medium flex items-center gap-2'>
