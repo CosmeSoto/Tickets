@@ -52,7 +52,7 @@ export function buildTemplateWorkbook(meta: {
   modelName: string
   acquisitionMode: string
   attributes: TypeAttributeDef[]
-  warehouses?: Array<{ name: string; code?: string | null }>
+  warehouses?: Array<{ name: string; location?: string | null }>
 }): Buffer {
   const wb = XLSX.utils.book_new()
   const headers = buildTemplateHeaders(meta.attributes)
@@ -82,14 +82,14 @@ export function buildTemplateWorkbook(meta: {
     ['N° de Serie', 'Obligatorio y único por equipo. No repita series en el archivo.'],
     ['Condición válida', `${getConditionGuideText()} (también: NUEVO, USADO, DAÑADO, LIKE_NEW)`],
     ['Fecha de compra', 'YYYY-MM-DD o DD/MM/YYYY'],
-    ['Bodega', 'Nombre o código exacto. Deje vacío para bodega por defecto.'],
+    ['Bodega', 'Nombre exacto de la bodega. Deje vacío para bodega por defecto.'],
     ['Accesorios', 'Separados por coma (ej. Cargador, Mouse). Columna opcional.'],
     ['Máximo por archivo', '100 equipos por importación'],
     ['Equipos asignados', 'No se actualizan por importación. Devuélvalos a bodega primero.'],
     ['', ''],
     ['Bodegas disponibles en esta familia', ''],
     ...(meta.warehouses?.length
-      ? meta.warehouses.map(w => [w.name, w.code ?? '—'])
+      ? meta.warehouses.map(w => [w.name, w.location ?? '—'])
       : [['(ninguna activa)', 'Cree bodegas en Inventario → Bodegas']]),
     ['', ''],
     ['Atributos del tipo (columnas dinámicas)', ''],
@@ -112,14 +112,14 @@ export function buildTemplateCsv(meta: {
   modelName: string
   acquisitionMode: string
   attributes: TypeAttributeDef[]
-  warehouses?: Array<{ name: string; code?: string | null }>
+  warehouses?: Array<{ name: string; location?: string | null }>
 }): string {
   const headers = buildTemplateHeaders(meta.attributes)
   const examples = buildTemplateExampleRows(meta.attributes)
   const escape = (v: string) =>
     v.includes(',') || v.includes('"') ? `"${v.replace(/"/g, '""')}"` : v
   const warehouseHint = meta.warehouses?.length
-    ? meta.warehouses.map(w => (w.code ? `${w.name} (${w.code})` : w.name)).join('; ')
+    ? meta.warehouses.map(w => (w.location ? `${w.name} (${w.location})` : w.name)).join('; ')
     : 'sin bodegas activas'
   const lines = [
     `# Familia: ${meta.familyName} | Tipo: ${meta.typeName} | Marca: ${meta.brandName} | Modelo: ${meta.modelName}`,

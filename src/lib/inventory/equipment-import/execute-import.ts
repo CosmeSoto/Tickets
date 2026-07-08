@@ -35,7 +35,7 @@ export async function loadImportDependencies(context: ImportCatalogContext) {
     }),
     prisma.warehouses.findMany({
       where: { familyId: context.familyId, isActive: true },
-      select: { id: true, name: true, code: true },
+      select: { id: true, name: true, location: true },
     }),
     prisma.equipment.findMany({
       select: {

@@ -124,7 +124,9 @@ export default function InventoryImportPage() {
   const [result, setResult] = useState<ImportResponse | null>(null)
   const [maxFileSizeMB, setMaxFileSizeMB] = useState(10)
   const [downloadingTemplate, setDownloadingTemplate] = useState<'xlsx' | 'csv' | null>(null)
-  const [warehouses, setWarehouses] = useState<Array<{ name: string; code?: string | null }>>([])
+  const [warehouses, setWarehouses] = useState<Array<{ name: string; location?: string | null }>>(
+    []
+  )
   const [typeAttributes, setTypeAttributes] = useState<
     Array<{ attributeLabel: string; isRequired: boolean; attributeType: string }>
   >([])
@@ -175,7 +177,10 @@ export default function InventoryImportPage() {
       .then(data => {
         const list = data.warehouses ?? data.data ?? []
         setWarehouses(
-          list.map((w: { name: string; code?: string }) => ({ name: w.name, code: w.code }))
+          list.map((w: { name: string; location?: string | null }) => ({
+            name: w.name,
+            location: w.location,
+          }))
         )
       })
       .catch(() => setWarehouses([]))
@@ -403,7 +408,7 @@ export default function InventoryImportPage() {
             {getAcquisitionModeLabel(acquisitionMode)}
           </span>
           <span>
-            <span className='text-foreground font-medium'>Modo:</span>{' '}
+            <span className='text-foreground font-medium'>Importación:</span>{' '}
             {importMode === 'add' ? 'Solo agregar' : 'Agregar y actualizar'}
           </span>
         </div>
@@ -472,48 +477,27 @@ export default function InventoryImportPage() {
                 />
               </div>
 
-              <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
-                <div>
-                  <Label>Tipo de equipo *</Label>
-                  <Select
-                    value={typeId}
-                    onValueChange={v => {
-                      setTypeId(v)
-                      setModelId('')
-                    }}
-                    disabled={!familyId}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder='Selecciona tipo' />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {equipmentTypes.map(t => (
-                        <SelectItem key={t.id} value={t.id}>
-                          {t.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label>Modo de adquisición *</Label>
-                  <Select value={acquisitionMode} onValueChange={setAcquisitionMode}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ACQUISITION_MODES.map(mode => (
-                        <SelectItem key={mode} value={mode}>
-                          {getAcquisitionModeLabel(mode)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className='text-xs text-muted-foreground mt-1.5'>
-                    {ACQUISITION_MODE_HELP[acquisitionMode]}
-                  </p>
-                </div>
+              <div>
+                <Label>Tipo de equipo *</Label>
+                <Select
+                  value={typeId}
+                  onValueChange={v => {
+                    setTypeId(v)
+                    setModelId('')
+                  }}
+                  disabled={!familyId}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder='Selecciona tipo' />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {equipmentTypes.map(t => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
@@ -565,6 +549,25 @@ export default function InventoryImportPage() {
                     )}
                   />
                 </div>
+              </div>
+
+              <div>
+                <Label>¿Cómo se adquirió este equipo? *</Label>
+                <Select value={acquisitionMode} onValueChange={setAcquisitionMode}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ACQUISITION_MODES.map(mode => (
+                      <SelectItem key={mode} value={mode}>
+                        {getAcquisitionModeLabel(mode)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className='text-xs text-muted-foreground mt-1.5'>
+                  {ACQUISITION_MODE_HELP[acquisitionMode]}
+                </p>
               </div>
 
               <Alert>
@@ -704,7 +707,9 @@ export default function InventoryImportPage() {
                   {warehouses.length > 0 ? (
                     <p>
                       <span className='text-foreground font-medium'>Bodegas válidas:</span>{' '}
-                      {warehouses.map(w => (w.code ? `${w.name} (${w.code})` : w.name)).join(' · ')}
+                      {warehouses
+                        .map(w => (w.location ? `${w.name} (${w.location})` : w.name))
+                        .join(' · ')}
                     </p>
                   ) : (
                     <p className='text-amber-700 dark:text-amber-400'>

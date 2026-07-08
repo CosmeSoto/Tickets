@@ -27,10 +27,7 @@ export const FIXED_COLUMNS = [
     aliases: ['serialnumber', 'n° de serie', 'n° de serie *', 'n° serie', 'serie', 'serial'],
   },
   { key: 'condition', aliases: ['condición', 'condicion', 'condition'] },
-  {
-    key: 'warehouse',
-    aliases: ['bodega', 'warehouse', 'código bodega', 'codigo bodega', 'warehousecode'],
-  },
+  { key: 'warehouse', aliases: ['bodega', 'warehouse', 'ubicación bodega', 'ubicacion bodega'] },
   {
     key: 'physicalLocation',
     aliases: ['ubicación física', 'ubicacion fisica', 'physical location', 'ubicación'],

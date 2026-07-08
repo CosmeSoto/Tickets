@@ -3,6 +3,15 @@
  * Extraído de /api/inventory/assets/route.ts para mantener ese archivo manejable.
  */
 import { prisma } from '@/lib/prisma'
+import { formatEquipmentAttributesString } from '@/lib/inventory/format-equipment-attributes'
+
+const EQUIPMENT_TYPE_INCLUDE = {
+  family: { include: { customFields: { orderBy: { order: 'asc' as const } } } },
+  attributes: {
+    orderBy: { order: 'asc' as const },
+    select: { attributeName: true, attributeLabel: true, order: true },
+  },
+} as const
 
 export interface AssetsQueryParams {
   userId: string
@@ -79,12 +88,7 @@ export async function queryAssets(params: AssetsQueryParams): Promise<AssetsQuer
     const items = await prisma.equipment.findMany({
       where: { id: { in: personalEquipmentIds } },
       include: {
-        type: {
-          include: {
-            family: { include: { customFields: { orderBy: { order: 'asc' } } } },
-            attributes: { orderBy: { order: 'asc' } },
-          },
-        },
+        type: { include: EQUIPMENT_TYPE_INCLUDE },
         model: { select: { brand: true, model: true } },
         batch: { select: { id: true, batchCode: true } },
         customValues: { select: { fieldName: true, fieldValue: true } },
@@ -160,9 +164,7 @@ export async function queryAssets(params: AssetsQueryParams): Promise<AssetsQuer
       : prisma.equipment.findMany({
           where: buildEquipmentWhere(),
           include: {
-            type: {
-              include: { family: { include: { customFields: { orderBy: { order: 'asc' } } } } },
-            },
+            type: { include: EQUIPMENT_TYPE_INCLUDE },
             model: { select: { brand: true, model: true } },
             batch: { select: { id: true, batchCode: true } },
             customValues: { select: { fieldName: true, fieldValue: true } },
@@ -243,37 +245,11 @@ export async function queryAssets(params: AssetsQueryParams): Promise<AssetsQuer
 }
 
 function mapEquipmentItem(item: any): UnifiedAssetItem {
-  // Catálogo de campos: primero del tipo de equipo (equipment_type_attributes), fallback a familia (legacy)
-  const typeAttrs: Array<{ attributeName: string; attributeLabel: string; order: number }> =
-    item.type?.attributes ?? []
-  const familyFields: Array<{ fieldName: string; fieldLabel: string; order: number }> =
+  const attributesStr = formatEquipmentAttributesString(
+    item.customValues,
+    item.type?.attributes ?? [],
     item.type?.family?.customFields ?? []
-
-  // Construir mapa de metadata: type attributes tienen prioridad sobre family fields
-  const fieldMeta = new Map<string, { label: string; order: number }>()
-  // Primero agregar family fields (legacy)
-  familyFields.forEach(f => fieldMeta.set(f.fieldName, { label: f.fieldLabel, order: f.order }))
-  // Luego sobreescribir con type attributes (nuevos, tienen prioridad)
-  typeAttrs.forEach(a =>
-    fieldMeta.set(a.attributeName, { label: a.attributeLabel, order: a.order })
   )
-
-  // Ordenar customValues según el catálogo de la familia
-  const sortedValues = [...(item.customValues ?? [])].sort((a, b) => {
-    const oA = fieldMeta.get(a.fieldName)?.order ?? 999
-    const oB = fieldMeta.get(b.fieldName)?.order ?? 999
-    return oA - oB
-  })
-
-  // Formatear como "Label: Valor" usando el fieldLabel del catálogo (no el fieldName snake_case)
-  const attributesStr = sortedValues.length
-    ? sortedValues
-        .map(cv => {
-          const label = fieldMeta.get(cv.fieldName)?.label ?? cv.fieldName
-          return `${label}: ${cv.fieldValue}`
-        })
-        .join(', ')
-    : undefined
 
   return {
     id: item.id,

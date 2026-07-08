@@ -56,8 +56,8 @@ export function resolveImportErrorHint(
   if (field === 'warehouse') {
     const list = context.warehouseNames?.slice(0, 5).join(', ')
     return list
-      ? `Escriba el nombre o código exacto. Bodegas disponibles: ${list}${(context.warehouseNames?.length ?? 0) > 5 ? '…' : ''}. Deje vacío para usar la bodega por defecto.`
-      : 'Verifique el nombre o código de bodega en Inventario → Bodegas. Deje vacío para usar la bodega por defecto.'
+      ? `Escriba el nombre exacto de la bodega. Disponibles: ${list}${(context.warehouseNames?.length ?? 0) > 5 ? '…' : ''}. Deje vacío para usar la bodega por defecto.`
+      : 'Verifique el nombre de la bodega en Inventario → Bodegas. Deje vacío para usar la bodega por defecto.'
   }
 
   if (field === 'purchaseDate') {

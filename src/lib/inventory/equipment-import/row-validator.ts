@@ -25,7 +25,7 @@ import {
 interface WarehouseOption {
   id: string
   name: string
-  code?: string | null
+  location?: string | null
 }
 
 export interface ExistingEquipmentRef {
@@ -67,7 +67,7 @@ function resolveWarehouseId(
   if (!raw?.trim()) return undefined
   const needle = raw.trim().toLowerCase()
   const match = warehouses.find(
-    w => w.name.toLowerCase() === needle || (w.code && w.code.toLowerCase() === needle)
+    w => w.name.toLowerCase() === needle || (w.location && w.location.toLowerCase() === needle)
   )
   return match?.id
 }

@@ -13,7 +13,7 @@ const baseContext: ImportCatalogContext = {
   acquisitionMode: 'FIXED_ASSET',
 }
 
-const warehouses = [{ id: 'wh-1', name: 'Bodega Central', code: 'BC' }]
+const warehouses = [{ id: 'wh-1', name: 'Bodega Central', location: 'Piso 1' }]
 
 const header = ['N° de Serie', 'Condición', 'Bodega', 'Fecha de compra', 'Precio de compra']
 
@@ -46,9 +46,9 @@ describe('validateImportContext', () => {
 })
 
 describe('validateAndParseImportRows', () => {
-  it('parses valid rows with condition aliases and warehouse by code', () => {
+  it('parses valid rows with condition aliases and warehouse by name', () => {
     const rows = makeRows([
-      ['SN-001', 'LIKE_NEW', 'BC', '2024-01-15', '1500.50'],
+      ['SN-001', 'LIKE_NEW', 'Bodega Central', '2024-01-15', '1500.50'],
       ['SN-002', 'USADO', 'Bodega Central', '15/01/2024', ''],
     ])
 
@@ -96,7 +96,7 @@ describe('validateAndParseImportRows', () => {
   })
 
   it('updates existing serials in update mode', () => {
-    const rows = makeRows([['SN-OLD', 'USED', 'BC', '', '']])
+    const rows = makeRows([['SN-OLD', 'USED', 'Bodega Central', '', '']])
 
     const { errors, parsed } = validateAndParseImportRows({
       rows,

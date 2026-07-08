@@ -120,7 +120,9 @@ export async function POST(request: NextRequest) {
       existingBySerial: deps.existingBySerial,
     })
 
-    const warehouseNames = deps.warehouses.map(w => (w.code ? `${w.name} (${w.code})` : w.name))
+    const warehouseNames = deps.warehouses.map(w =>
+      w.location ? `${w.name} — ${w.location}` : w.name
+    )
     const enrichedErrors = errors.map(err =>
       enrichImportError(err, {
         warehouseNames,

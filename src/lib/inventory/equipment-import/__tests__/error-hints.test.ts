@@ -3,7 +3,7 @@ import { enrichImportError, resolveImportErrorHint } from '../error-hints'
 describe('error-hints', () => {
   it('suggests warehouse names when bodega not found', () => {
     const hint = resolveImportErrorHint('warehouse', 'Bodega no encontrada: XYZ', {
-      warehouseNames: ['Bodega Central (BC)', 'Recepción'],
+      warehouseNames: ['Bodega Central — Piso 1', 'Recepción'],
     })
     expect(hint).toContain('Bodega Central')
   })

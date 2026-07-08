@@ -91,7 +91,7 @@ export async function GET(request: NextRequest) {
       }),
       prisma.warehouses.findMany({
         where: { familyId, isActive: true },
-        select: { name: true, code: true },
+        select: { name: true, location: true },
         orderBy: { name: 'asc' },
       }),
     ])
