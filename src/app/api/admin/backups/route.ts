@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { BackupService } from '@/lib/services/backup-service'
-import { isBackupModuleId, type BackupModuleId } from '@/lib/services/backup-modules'
+import type { BackupCreateMode, BackupKind } from '@/lib/services/backup/backup-types'
 
 export async function GET() {
   try {
@@ -29,21 +29,19 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { type = 'manual', module: rawModule } = body
+    const { type = 'manual', mode = 'infrastructure', backupKind } = body
 
-    let moduleOpt: BackupModuleId | undefined
-    if (rawModule === undefined || rawModule === null || rawModule === '') {
-      moduleOpt = undefined
-    } else if (isBackupModuleId(rawModule)) {
-      moduleOpt = rawModule
-    } else {
-      return NextResponse.json(
-        { error: `Módulo de backup no soportado: ${String(rawModule)}` },
-        { status: 400 }
-      )
-    }
+    const validModes: BackupCreateMode[] = ['infrastructure', 'export']
+    const createMode: BackupCreateMode = validModes.includes(mode) ? mode : 'infrastructure'
 
-    const backup = await BackupService.createBackup(type, { module: moduleOpt ?? null })
+    const validKinds: BackupKind[] = ['full', 'diff', 'incr', 'export']
+    const kind: BackupKind | undefined =
+      backupKind && validKinds.includes(backupKind) ? backupKind : undefined
+
+    const backup = await BackupService.createBackup(type, {
+      mode: createMode,
+      backupKind: kind,
+    })
     return NextResponse.json(backup)
   } catch (error) {
     console.error('Error al crear backup:', error)

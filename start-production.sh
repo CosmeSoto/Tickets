@@ -76,6 +76,35 @@ if command -v dscacheutil &>/dev/null; then
 fi
 
 # ── 3. Actualizar NEXTAUTH_URL en .env.production ─────────────────────────────
+ensure_backup_env() {
+  if [ ! -f "$ENV_FILE" ]; then
+    return
+  fi
+  local changed=false
+  if ! grep -q "^BACKUP_WORKER_SECRET=" "$ENV_FILE"; then
+    local secret
+    secret=$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | xxd -p -c 64)
+    echo "BACKUP_WORKER_SECRET=$secret" >> "$ENV_FILE"
+    echo "✅ BACKUP_WORKER_SECRET generado en .env.production"
+    changed=true
+  fi
+  if ! grep -q "^BACKUP_WORKER_URL=" "$ENV_FILE"; then
+    echo "BACKUP_WORKER_URL=http://backup-worker:8080" >> "$ENV_FILE"
+    changed=true
+  fi
+  if ! grep -q "^PGBACKREST_STANZA=" "$ENV_FILE"; then
+    echo "PGBACKREST_STANZA=main" >> "$ENV_FILE"
+    changed=true
+  fi
+  if ! grep -q "^BACKUP_ALLOW_RESTORE=" "$ENV_FILE"; then
+    echo "BACKUP_ALLOW_RESTORE=false" >> "$ENV_FILE"
+    changed=true
+  fi
+  if [ "$changed" = true ]; then
+    echo "✅ Variables pgBackRest añadidas a .env.production"
+  fi
+}
+
 # Usamos la IP directa para que funcione sin necesidad de configurar /etc/hosts
 # en cada cliente. Si en el futuro se quiere usar dominio, cambiar NEXTAUTH_URL
 # manualmente a https://gestion.local y asegurarse de que los clientes tengan
@@ -94,6 +123,8 @@ if [ -f "$ENV_FILE" ]; then
 else
   echo "⚠️  No se encontró $ENV_FILE — crea uno desde .env.example"
 fi
+
+ensure_backup_env
 
 # También actualizar .env.local.production si existe (legacy)
 ENV_LOCAL_PROD="$SCRIPT_DIR/.env.local.production"
@@ -173,21 +204,44 @@ fi
 echo "🐳 Levantando servicios con Docker Compose..."
 echo ""
 
+COMPOSE=(docker compose --env-file "$SCRIPT_DIR/.env.production" -f "$SCRIPT_DIR/docker-compose.prod.yml")
+SERVICES=(postgres backup-worker app)
+
 if [ "$CLEAN_BUILD" = true ]; then
-  # ── Rebuild total (primera vez o cuando algo está roto) ──────────────────────
-  echo "🧹 Modo --clean: reconstrucción total sin caché..."
-  COMPOSE_PROJECT=$(basename "$SCRIPT_DIR" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]//g')
-  docker rmi "${COMPOSE_PROJECT}-app" 2>/dev/null || true
-  docker rmi "tickets-app" 2>/dev/null || true
+  echo "🧹 Modo --clean: deteniendo servicios y borrando volúmenes (BD + pgBackRest)..."
+  "${COMPOSE[@]}" down -v --remove-orphans 2>/dev/null || true
   docker builder prune -f --filter "until=1h" 2>/dev/null || true
-  docker compose --env-file "$SCRIPT_DIR/.env.production" -f "$SCRIPT_DIR/docker-compose.prod.yml" build --no-cache app
+  echo "🔨 Rebuild total sin caché (postgres, backup-worker, app)..."
+  "${COMPOSE[@]}" build --no-cache "${SERVICES[@]}"
 else
-  # ── Rebuild incremental (detecta cambios en archivos automáticamente) ────────
-  echo "🔨 Rebuild incremental (detecta cambios en código)..."
-  docker compose --env-file "$SCRIPT_DIR/.env.production" -f "$SCRIPT_DIR/docker-compose.prod.yml" build app
+  echo "🔨 Rebuild incremental (postgres, backup-worker, app)..."
+  "${COMPOSE[@]}" build "${SERVICES[@]}"
 fi
 
-docker compose --env-file "$SCRIPT_DIR/.env.production" -f "$SCRIPT_DIR/docker-compose.prod.yml" up -d
+"${COMPOSE[@]}" up -d
+
+echo ""
+echo "⏳ Esperando servicios críticos..."
+for i in $(seq 1 60); do
+  if "${COMPOSE[@]}" ps backup-worker 2>/dev/null | grep -q "healthy"; then
+    echo "✅ backup-worker listo"
+    break
+  fi
+  if [ "$i" -eq 60 ]; then
+    echo "⚠️  backup-worker aún no healthy — revisa: docker compose -f docker-compose.prod.yml logs backup-worker"
+  fi
+  sleep 3
+done
+
+if [ -x "$SCRIPT_DIR/docker/scripts/disaster-recovery.sh" ]; then
+  echo "🔍 Verificando stanza pgBackRest..."
+  if COMPOSE_FILE="$SCRIPT_DIR/docker-compose.prod.yml" ENV_FILE="$SCRIPT_DIR/.env.production" \
+    "$SCRIPT_DIR/docker/scripts/disaster-recovery.sh" check 2>/dev/null; then
+    echo "✅ pgBackRest stanza OK"
+  else
+    echo "⚠️  pgBackRest check pendiente — normal en primer arranque; reintenta en 1 min"
+  fi
+fi
 
 echo ""
 echo "╔══════════════════════════════════════════════════════════════╗"
@@ -197,6 +251,11 @@ echo "║                                                              ║"
 echo "║  🌐 URL:  https://$CURRENT_IP                       ║"
 echo "║                                                              ║"
 echo "║  Accede desde cualquier equipo de la red con esa URL.        ║"
+echo "║                                                              ║"
+echo "║  📦 Backups: Admin → Sistema de Backups (/admin/backups)   ║"
+echo "║     · Respaldo pgBackRest = infraestructura (DR)             ║"
+echo "║     · Exportar .dump = archivo portable                      ║"
+echo "║     · Monitoreo = pestaña pgBackRest                         ║"
 echo "║                                                              ║"
 echo "║  Opcional — usar dominio amigable (requiere /etc/hosts):     ║"
 echo "║    $CURRENT_IP    $DOMAIN $DOMAIN_WWW    ║"

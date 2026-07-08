@@ -26,7 +26,9 @@ interface BackupInfo {
   createdAt: string
   type: 'manual' | 'automatic'
   status: 'completed' | 'failed' | 'in_progress'
-  /** null = backup completo */
+  engine?: 'pgbackrest' | 'export' | 'import'
+  backupKind?: string
+  label?: string | null
   module?: string | null
 }
 
@@ -338,7 +340,8 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
   }
 
   // Determinar si el backup seleccionado es parcial (solo un módulo) — no permite selección de scope
-  const isPartialBackup = !!selectedBackup?.module
+  const isPgBackRestBackup = selectedBackup?.engine === 'pgbackrest'
+  const isPartialBackup = !!selectedBackup?.module && !isPgBackRestBackup
 
   return (
     <div className='space-y-6'>
@@ -463,11 +466,13 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
         <AlertTriangle className='h-4 w-4 text-destructive' />
         <AlertDescription className='text-destructive'>
           <strong>¡Advertencia!</strong>{' '}
-          {selectedModules.length === 0 && !selectedBackup?.module
-            ? 'La restauración completa reemplazará todos los datos actuales de la base de datos. Esta acción no se puede deshacer.'
-            : restoreMode === 'merge'
-              ? `El modo fusión agregará los registros del backup sin eliminar los existentes en: ${getSelectedModulesLabel()}. Los duplicados (mismo ID) se ignorarán.`
-              : `La restauración selectiva reemplazará únicamente los datos de: ${getSelectedModulesLabel()}. Las demás tablas no se verán afectadas.`}{' '}
+          {isPgBackRestBackup
+            ? 'Restauración pgBackRest: reemplaza el cluster PostgreSQL completo. Requiere BACKUP_ALLOW_RESTORE=true y detiene la app. Usa ./docker/scripts/disaster-recovery.sh en producción.'
+            : selectedModules.length === 0 && !selectedBackup?.module
+              ? 'La restauración completa reemplazará todos los datos actuales de la base de datos. Esta acción no se puede deshacer.'
+              : restoreMode === 'merge'
+                ? `El modo fusión agregará los registros del backup sin eliminar los existentes en: ${getSelectedModulesLabel()}. Los duplicados (mismo ID) se ignorarán.`
+                : `La restauración selectiva reemplazará únicamente los datos de: ${getSelectedModulesLabel()}. Las demás tablas no se verán afectadas.`}{' '}
           Se recomienda crear un backup actual antes de proceder.
         </AlertDescription>
       </Alert>
@@ -587,6 +592,22 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
                         . Se restaurará únicamente ese módulo.
                       </p>
                     </div>
+                  ) : isPgBackRestBackup ? (
+                    <div className='p-3 bg-muted/50 rounded-lg border border-border'>
+                      <p className='text-sm text-muted-foreground'>
+                        Respaldo de infraestructura pgBackRest
+                        {selectedBackup.label ? (
+                          <>
+                            {' '}
+                            — etiqueta{' '}
+                            <span className='font-mono text-foreground'>
+                              {selectedBackup.label}
+                            </span>
+                          </>
+                        ) : null}
+                        . Restauración completa del cluster (sin selección por módulo).
+                      </p>
+                    </div>
                   ) : (
                     <div className='space-y-2'>
                       <div className='flex items-center justify-between'>
@@ -643,66 +664,70 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
                   )}
                 </div>
 
-                {/* Selector de Modo de Restauración */}
-                <div className='space-y-2'>
-                  <label className='text-sm font-medium text-foreground'>
-                    Modo de restauración
-                  </label>
-                  <div className='grid grid-cols-1 gap-2'>
-                    <label
-                      className={`flex items-start gap-3 p-3 rounded-md border cursor-pointer transition-colors text-xs ${
-                        restoreMode === 'merge'
-                          ? 'border-primary bg-primary/5 text-foreground'
-                          : 'border-border hover:bg-muted text-muted-foreground'
-                      }`}
-                    >
-                      <input
-                        type='radio'
-                        name='restoreMode'
-                        value='merge'
-                        checked={restoreMode === 'merge'}
-                        onChange={() => setRestoreMode('merge')}
-                        className='mt-0.5'
-                      />
-                      <div>
-                        <p className='font-medium text-foreground'>Fusionar</p>
-                        <p className='text-muted-foreground mt-0.5'>
-                          Agrega los registros del backup sin borrar los que ya existen. Úsalo para
-                          combinar usuarios o datos de dos backups distintos.
-                        </p>
-                      </div>
+                {/* Selector de Modo de Restauración — solo exportaciones */}
+                {!isPgBackRestBackup && (
+                  <div className='space-y-2'>
+                    <label className='text-sm font-medium text-foreground'>
+                      Modo de restauración
                     </label>
-                    <label
-                      className={`flex items-start gap-3 p-3 rounded-md border cursor-pointer transition-colors text-xs ${
-                        restoreMode === 'replace'
-                          ? 'border-destructive/60 bg-destructive/5 text-foreground'
-                          : 'border-border hover:bg-muted text-muted-foreground'
-                      }`}
-                    >
-                      <input
-                        type='radio'
-                        name='restoreMode'
-                        value='replace'
-                        checked={restoreMode === 'replace'}
-                        onChange={() => setRestoreMode('replace')}
-                        className='mt-0.5'
-                      />
-                      <div>
-                        <p className='font-medium text-foreground'>Reemplazar</p>
-                        <p className='text-muted-foreground mt-0.5'>
-                          Borra los datos actuales del módulo y los reemplaza con los del backup.
-                          Úsalo para volver a un estado anterior exacto.
+                    <div className='grid grid-cols-1 gap-2'>
+                      <label
+                        className={`flex items-start gap-3 p-3 rounded-md border cursor-pointer transition-colors text-xs ${
+                          restoreMode === 'merge'
+                            ? 'border-primary bg-primary/5 text-foreground'
+                            : 'border-border hover:bg-muted text-muted-foreground'
+                        }`}
+                      >
+                        <input
+                          type='radio'
+                          name='restoreMode'
+                          value='merge'
+                          checked={restoreMode === 'merge'}
+                          onChange={() => setRestoreMode('merge')}
+                          className='mt-0.5'
+                        />
+                        <div>
+                          <p className='font-medium text-foreground'>Fusionar</p>
+                          <p className='text-muted-foreground mt-0.5'>
+                            Agrega los registros del backup sin borrar los que ya existen. Úsalo
+                            para combinar usuarios o datos de dos backups distintos.
+                          </p>
+                        </div>
+                      </label>
+                      <label
+                        className={`flex items-start gap-3 p-3 rounded-md border cursor-pointer transition-colors text-xs ${
+                          restoreMode === 'replace'
+                            ? 'border-destructive/60 bg-destructive/5 text-foreground'
+                            : 'border-border hover:bg-muted text-muted-foreground'
+                        }`}
+                      >
+                        <input
+                          type='radio'
+                          name='restoreMode'
+                          value='replace'
+                          checked={restoreMode === 'replace'}
+                          onChange={() => setRestoreMode('replace')}
+                          className='mt-0.5'
+                        />
+                        <div>
+                          <p className='font-medium text-foreground'>Reemplazar</p>
+                          <p className='text-muted-foreground mt-0.5'>
+                            Borra los datos actuales del módulo y los reemplaza con los del backup.
+                            Úsalo para volver a un estado anterior exacto.
+                          </p>
+                        </div>
+                      </label>
+                    </div>
+                    {restoreMode === 'merge' &&
+                      selectedModules.length === 0 &&
+                      !isPartialBackup && (
+                        <p className='text-xs text-amber-600 dark:text-amber-400'>
+                          ⚠ El modo fusión en restauración completa puede causar conflictos.
+                          Selecciona módulos específicos para mejores resultados.
                         </p>
-                      </div>
-                    </label>
+                      )}
                   </div>
-                  {restoreMode === 'merge' && selectedModules.length === 0 && !isPartialBackup && (
-                    <p className='text-xs text-amber-600 dark:text-amber-400'>
-                      ⚠ El modo fusión en restauración completa puede causar conflictos. Selecciona
-                      módulos específicos para mejores resultados.
-                    </p>
-                  )}
-                </div>
+                )}
 
                 {/* Tablas */}
                 <div className='space-y-3'>

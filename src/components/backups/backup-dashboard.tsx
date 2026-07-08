@@ -25,6 +25,8 @@ interface BackupDashboardProps {
   loading: boolean
   onRefresh: () => void
   onCreateBackup: () => void
+  onCreateExport?: () => void
+  creating?: boolean
 }
 
 export function BackupDashboard({
@@ -33,6 +35,8 @@ export function BackupDashboard({
   loading,
   onRefresh,
   onCreateBackup,
+  onCreateExport,
+  creating = false,
 }: BackupDashboardProps) {
   // Análisis de backups
   const analysis = useMemo(() => {
@@ -119,7 +123,33 @@ export function BackupDashboard({
           <h2 className='text-xl sm:text-2xl font-bold text-foreground break-words'>
             Dashboard de Backups
           </h2>
-          <p className='text-muted-foreground break-words'>Monitoreo y gestión de respaldos</p>
+          <p className='text-muted-foreground break-words'>
+            pgBackRest + exportaciones portátiles
+            {stats?.pgbackrestAvailable === false && (
+              <span className='text-amber-600 dark:text-amber-400'>
+                {' '}
+                — pgBackRest no disponible
+              </span>
+            )}
+          </p>
+        </div>
+
+        <div className='flex flex-wrap gap-2 w-full sm:w-auto'>
+          <Button onClick={onCreateBackup} disabled={creating || loading} size='sm'>
+            <Database className={`h-4 w-4 mr-2 ${creating ? 'animate-spin' : ''}`} />
+            Respaldo pgBackRest
+          </Button>
+          {onCreateExport && (
+            <Button
+              variant='outline'
+              onClick={onCreateExport}
+              disabled={creating || loading}
+              size='sm'
+            >
+              <HardDrive className='h-4 w-4 mr-2' />
+              Exportar .dump
+            </Button>
+          )}
         </div>
 
         <div

@@ -8,18 +8,35 @@
 ##############################################################################
 
 services:
-  # ── Base de datos ───────────────────────────────────────────────────────────
+  # ── Base de datos (PostgreSQL + pgBackRest) ─────────────────────────────────
   postgres:
-    image: postgres:17-alpine
+    build:
+      context: ./docker/postgres
     container_name: tickets-postgres-dev
     environment:
       POSTGRES_DB: tickets_db
       POSTGRES_USER: tickets_user
       POSTGRES_PASSWORD: tickets_password_2024
+      PGBACKREST_STANZA: main
+    command:
+      - postgres
+      - -c
+      - archive_mode=on
+      - -c
+      - archive_command=pgbackrest --config=/etc/pgbackrest/pgbackrest-local.conf --stanza=main archive-push %p
+      - -c
+      - wal_level=replica
+      - -c
+      - max_wal_senders=3
+      - -c
+      - archive_timeout=60
     ports:
       - '5432:5432'
     volumes:
       - postgres_data_dev:/var/lib/postgresql/data
+      - pgbackrest_repo_dev:/var/lib/pgbackrest
+      - ./docker/pgbackrest/pgbackrest.conf:/etc/pgbackrest/pgbackrest.conf:ro
+      - ./docker/pgbackrest/pgbackrest-local.conf:/etc/pgbackrest/pgbackrest-local.conf:ro
     networks:
       - tickets-network
     restart: unless-stopped
@@ -29,6 +46,26 @@ services:
       timeout: 3s
       retries: 10
       start_period: 10s
+
+  backup-worker:
+    build:
+      context: ./docker/backup-worker
+    container_name: tickets-backup-worker-dev
+    environment:
+      BACKUP_WORKER_SECRET: ${BACKUP_WORKER_SECRET:-dev-backup-worker-secret}
+      PGBACKREST_STANZA: main
+      BACKUP_ALLOW_RESTORE: ${BACKUP_ALLOW_RESTORE:-true}
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data:ro
+      - pgbackrest_repo_dev:/var/lib/pgbackrest
+      - ./docker/pgbackrest/pgbackrest.conf:/etc/pgbackrest/pgbackrest.conf:ro
+      - ./docker/pgbackrest/pgbackrest-local.conf:/etc/pgbackrest/pgbackrest-local.conf:ro
+    networks:
+      - tickets-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
 
   # ── Redis ───────────────────────────────────────────────────────────────────
   redis:
@@ -61,6 +98,10 @@ services:
       UPLOAD_DIR: /app/public/uploads
       LOG_LEVEL: DEBUG
       BACKUP_DIR: /app/backups
+      BACKUP_WORKER_URL: http://backup-worker:8080
+      BACKUP_WORKER_SECRET: ${BACKUP_WORKER_SECRET:-dev-backup-worker-secret}
+      PGBACKREST_STANZA: main
+      BACKUP_ALLOW_RESTORE: ${BACKUP_ALLOW_RESTORE:-true}
       # Turbopack — hot-reload más rápido
       TURBOPACK: 1
     volumes:
@@ -80,6 +121,8 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      backup-worker:
         condition: service_healthy
     restart: unless-stopped
     # Sin healthcheck en dev — evita que nginx espere y bloquee el arranque
@@ -105,6 +148,7 @@ services:
 # ── Volúmenes ──────────────────────────────────────────────────────────────────
 volumes:
   postgres_data_dev:
+  pgbackrest_repo_dev:
   dev_node_modules:
   dev_next_cache:
   dev_backups:

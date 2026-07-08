@@ -297,7 +297,7 @@ export function BackupConfiguration({ onConfigChange }: BackupConfigurationProps
               <div className='space-y-1'>
                 <Label className='text-sm font-medium'>Backups Automáticos</Label>
                 <p className='text-xs text-muted-foreground'>
-                  Habilitar creación automática de backups
+                  Habilitar respaldos pgBackRest automáticos (DIFF diario, FULL los domingos)
                 </p>
               </div>
               <Switch
@@ -333,7 +333,7 @@ export function BackupConfiguration({ onConfigChange }: BackupConfigurationProps
                 className='w-full'
               />
               <p className='text-xs text-muted-foreground'>
-                Hora en la que se ejecutarán los backups automáticos
+                Ventana horaria del cron (±30 min). Motor: pgBackRest vía backup-worker
               </p>
             </div>
 

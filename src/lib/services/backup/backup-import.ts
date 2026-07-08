@@ -136,6 +136,8 @@ export async function importBackupFromFile(
       size: fileStats.size,
       type: 'manual',
       status: 'completed',
+      engine: 'import',
+      backupKind: 'export',
       module: detectedModule,
       compressed,
       encrypted,

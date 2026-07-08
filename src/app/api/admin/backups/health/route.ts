@@ -6,6 +6,7 @@ import { exec } from 'child_process'
 import { promisify } from 'util'
 import { access, readdir, stat } from 'fs/promises'
 import { join } from 'path'
+import { getBackupWorkerHealth } from '@/lib/services/backup/backup-engine'
 
 const execAsync = promisify(exec)
 
@@ -182,7 +183,7 @@ async function checkBackupServiceHealth() {
       nextScheduled = next.toISOString()
     }
 
-    // Verificar si pg_dump está disponible
+    // Verificar pgBackRest / backup-worker
     let pgDumpAvailable = false
     try {
       await execAsync('which pg_dump')
@@ -191,15 +192,20 @@ async function checkBackupServiceHealth() {
       pgDumpAvailable = false
     }
 
+    const workerHealth = await getBackupWorkerHealth()
+    const pgBackRestAvailable = workerHealth.status === 'healthy' && workerHealth.stanzaOk
+
     return {
-      status: 'running',
+      status: pgBackRestAvailable ? 'running' : 'degraded',
       backupEnabled,
       frequency,
       scheduleTime,
       lastBackup: lastBackup?.createdAt.toISOString() ?? null,
       nextScheduled,
-      pgDumpAvailable,
-      alternativeMethodAvailable: true,
+      pgBackRestAvailable,
+      pgBackRestStanza: workerHealth.stanza,
+      allowRestore: workerHealth.allowRestore,
+      exportAvailable: pgDumpAvailable,
     }
   } catch (error) {
     return {

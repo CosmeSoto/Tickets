@@ -13,16 +13,33 @@
 ##############################################################################
 
 services:
-  # ── Base de datos ───────────────────────────────────────────────────────────
+  # ── Base de datos (PostgreSQL + pgBackRest WAL archiving) ───────────────────
   postgres:
-    image: postgres:17-alpine
+    build:
+      context: ./docker/postgres
     container_name: tickets-postgres
     environment:
       POSTGRES_DB: tickets_db
       POSTGRES_USER: tickets_user
       POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD requerida}
+      PGBACKREST_STANZA: main
+    command:
+      - postgres
+      - -c
+      - archive_mode=on
+      - -c
+      - archive_command=pgbackrest --config=/etc/pgbackrest/pgbackrest-local.conf --stanza=main archive-push %p
+      - -c
+      - wal_level=replica
+      - -c
+      - max_wal_senders=3
+      - -c
+      - archive_timeout=60
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - pgbackrest_repo:/var/lib/pgbackrest
+      - ./docker/pgbackrest/pgbackrest.conf:/etc/pgbackrest/pgbackrest.conf:ro
+      - ./docker/pgbackrest/pgbackrest-local.conf:/etc/pgbackrest/pgbackrest-local.conf:ro
     networks:
       - tickets-network
     restart: unless-stopped
@@ -32,6 +49,27 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
+
+  # ── Backup Worker (pgBackRest — respaldos de infraestructura) ───────────────
+  backup-worker:
+    build:
+      context: ./docker/backup-worker
+    container_name: tickets-backup-worker
+    environment:
+      BACKUP_WORKER_SECRET: ${BACKUP_WORKER_SECRET:?BACKUP_WORKER_SECRET requerida}
+      PGBACKREST_STANZA: main
+      BACKUP_ALLOW_RESTORE: ${BACKUP_ALLOW_RESTORE:-false}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data:ro
+      - pgbackrest_repo:/var/lib/pgbackrest
+      - ./docker/pgbackrest/pgbackrest.conf:/etc/pgbackrest/pgbackrest.conf:ro
+      - ./docker/pgbackrest/pgbackrest-local.conf:/etc/pgbackrest/pgbackrest-local.conf:ro
+    networks:
+      - tickets-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
 
   # ── Redis ───────────────────────────────────────────────────────────────────
   redis:
@@ -70,6 +108,10 @@ services:
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY requerida}
       BACKUP_ENCRYPTION_KEY: ${BACKUP_ENCRYPTION_KEY:-}
       BACKUP_DIR: /app/backups
+      BACKUP_WORKER_URL: http://backup-worker:8080
+      BACKUP_WORKER_SECRET: ${BACKUP_WORKER_SECRET:?BACKUP_WORKER_SECRET requerida}
+      PGBACKREST_STANZA: main
+      BACKUP_ALLOW_RESTORE: ${BACKUP_ALLOW_RESTORE:-false}
       CRON_SECRET: ${CRON_SECRET:-}
       UPLOAD_DIR: /app/public/uploads
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
@@ -95,6 +137,8 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      backup-worker:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
@@ -126,6 +170,7 @@ services:
 # ── Volúmenes ──────────────────────────────────────────────────────────────────
 volumes:
   postgres_data:
+  pgbackrest_repo:
   redis_data:
   app_uploads:
   app_logs:

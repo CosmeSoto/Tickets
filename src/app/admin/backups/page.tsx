@@ -41,8 +41,10 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { BackupDashboard } from '@/components/backups/backup-dashboard'
+import { BackupGuideCard } from '@/components/backups/backup-guide-card'
 import { BackupConfiguration } from '@/components/backups/backup-configuration'
 import { BackupRestore } from '@/components/backups/backup-restore'
+import { BackupMonitoring } from '@/components/backups/backup-monitoring'
 import { ExportButton } from '@/components/common/export-button'
 import { useExport } from '@/hooks/common/use-export'
 import {
@@ -51,6 +53,8 @@ import {
   formatBackupDate,
   getStatusColor,
   getStatusLabel,
+  getEngineLabel,
+  getKindLabel,
 } from '@/hooks/use-backups'
 
 export default function BackupsPage() {
@@ -154,9 +158,22 @@ export default function BackupsPage() {
             Limpiar Fallidos ({failedCount})
           </Button>
         )}
-        <Button onClick={createBackup} disabled={creating} size='sm'>
+        <Button
+          onClick={() => createBackup({ mode: 'infrastructure', backupKind: 'full' })}
+          disabled={creating}
+          size='sm'
+        >
           <Plus className={`h-4 w-4 mr-2 ${creating ? 'animate-spin' : ''}`} />
-          {creating ? 'Creando...' : 'Crear Backup'}
+          {creating ? 'Creando...' : 'Respaldo pgBackRest'}
+        </Button>
+        <Button
+          variant='outline'
+          onClick={() => createBackup({ mode: 'export' })}
+          disabled={creating}
+          size='sm'
+        >
+          <Download className='h-4 w-4 mr-2' />
+          Exportar .dump
         </Button>
       </div>
     ),
@@ -225,12 +242,15 @@ export default function BackupsPage() {
           </TabsList>
 
           <TabsContent value='dashboard' className='space-y-6'>
+            <BackupGuideCard />
             <BackupDashboard
               backups={backups}
               stats={stats}
               loading={loading}
               onRefresh={refreshData}
-              onCreateBackup={createBackup}
+              onCreateBackup={() => createBackup({ mode: 'infrastructure', backupKind: 'full' })}
+              onCreateExport={() => createBackup({ mode: 'export' })}
+              creating={creating}
             />
           </TabsContent>
 
@@ -310,7 +330,7 @@ export default function BackupsPage() {
                             </div>
                           </div>
                           <div className='flex items-center gap-2 flex-shrink-0'>
-                            {backup.status === 'completed' && (
+                            {backup.status === 'completed' && backup.engine !== 'pgbackrest' && (
                               <Button
                                 variant='outline'
                                 size='sm'
@@ -337,19 +357,13 @@ export default function BackupsPage() {
                           <Badge variant='outline'>
                             {backup.type === 'manual' ? 'Manual' : 'Automático'}
                           </Badge>
-                          {backup.module ? (
-                            <Badge variant='secondary' className='text-xs'>
-                              {backup.module === 'tickets' && 'Módulo tickets'}
-                              {backup.module === 'news' && 'Módulo noticias'}
-                              {backup.module === 'patrols' && 'Módulo rondas'}
-                              {backup.module === 'families' && 'Módulo familias'}
-                              {backup.module === 'users' && 'Módulo usuarios'}
-                              {backup.module === 'audits' && 'Módulo auditorías'}
-                              {backup.module === 'configurations' && 'Módulo configuraciones'}
-                            </Badge>
-                          ) : (
-                            <Badge variant='outline' className='text-xs text-muted-foreground'>
-                              Completo
+                          <Badge variant='outline'>{getEngineLabel(backup.engine)}</Badge>
+                          <Badge variant='secondary' className='text-xs'>
+                            {getKindLabel(backup.backupKind, backup.engine)}
+                          </Badge>
+                          {backup.label && (
+                            <Badge variant='outline' className='text-xs font-mono'>
+                              {backup.label}
                             </Badge>
                           )}
                         </div>
@@ -394,91 +408,7 @@ export default function BackupsPage() {
           </TabsContent>
 
           <TabsContent value='monitoring' className='space-y-6'>
-            <div className='grid grid-cols-1 lg:grid-cols-2 gap-6'>
-              {/* System status */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className='flex items-center space-x-2'>
-                    <Shield className='h-5 w-5 text-primary' />
-                    <span>Estado del Sistema</span>
-                  </CardTitle>
-                  <CardDescription>Monitoreo en tiempo real del sistema de backups</CardDescription>
-                </CardHeader>
-                <CardContent className='space-y-4'>
-                  <div className='grid grid-cols-2 gap-4'>
-                    <div className='p-3 bg-primary/5 rounded-lg border border-primary/20'>
-                      <div className='flex items-center space-x-2 mb-1'>
-                        <CheckCircle className='h-4 w-4 text-primary' />
-                        <span className='text-sm font-medium text-foreground'>Sistema Activo</span>
-                      </div>
-                      <p className='text-xs text-muted-foreground'>Funcionando correctamente</p>
-                    </div>
-                    <div className='p-3 bg-muted rounded-lg border border-border'>
-                      <div className='flex items-center space-x-2 mb-1'>
-                        <Clock className='h-4 w-4 text-muted-foreground' />
-                        <span className='text-sm font-medium text-foreground'>Próximo Backup</span>
-                      </div>
-                      <p className='text-xs text-muted-foreground'>Programado automáticamente</p>
-                    </div>
-                  </div>
-                  <div className='space-y-3'>
-                    {[
-                      { label: 'Espacio en disco', value: 'Suficiente' },
-                      { label: 'Conectividad BD', value: 'Conectado' },
-                      { label: 'Integridad de datos', value: 'Verificado' },
-                    ].map(item => (
-                      <div key={item.label} className='flex justify-between items-center text-sm'>
-                        <span className='text-muted-foreground'>{item.label}</span>
-                        <Badge variant='outline'>{item.value}</Badge>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Performance metrics */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className='flex items-center space-x-2'>
-                    <HardDrive className='h-5 w-5 text-primary' />
-                    <span>Métricas de Rendimiento</span>
-                  </CardTitle>
-                  <CardDescription>Estadísticas de rendimiento y eficiencia</CardDescription>
-                </CardHeader>
-                <CardContent className='space-y-4'>
-                  {stats && (
-                    <>
-                      <div className='grid grid-cols-2 gap-4'>
-                        <div className='text-center p-3 bg-muted rounded-lg'>
-                          <div className='text-lg font-bold text-foreground'>
-                            {stats.successRate?.toFixed(1) || 0}%
-                          </div>
-                          <div className='text-xs text-muted-foreground'>Tasa de Éxito</div>
-                        </div>
-                        <div className='text-center p-3 bg-muted rounded-lg'>
-                          <div className='text-lg font-bold text-foreground'>
-                            {formatFileSize(stats.avgSize || 0)}
-                          </div>
-                          <div className='text-xs text-muted-foreground'>Tamaño Promedio</div>
-                        </div>
-                      </div>
-                      <div className='space-y-2'>
-                        <div className='flex justify-between text-sm'>
-                          <span className='text-muted-foreground'>Eficiencia de compresión</span>
-                          <span className='font-medium'>
-                            {stats.compressionRatio ? `${stats.compressionRatio}%` : 'N/A'}
-                          </span>
-                        </div>
-                        <div className='flex justify-between text-sm'>
-                          <span className='text-muted-foreground'>Tiempo promedio</span>
-                          <span className='font-medium'>~2-5 min</span>
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
+            <BackupMonitoring />
           </TabsContent>
         </Tabs>
       </div>

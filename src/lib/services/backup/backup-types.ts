@@ -1,3 +1,7 @@
+export type BackupEngine = 'pgbackrest' | 'export' | 'import'
+export type BackupKind = 'full' | 'diff' | 'incr' | 'export'
+export type BackupCreateMode = 'infrastructure' | 'export'
+
 export interface BackupInfo {
   id: string
   filename: string
@@ -8,6 +12,10 @@ export interface BackupInfo {
   checksum?: string
   compressed?: boolean
   encrypted?: boolean
+  engine: BackupEngine
+  backupKind: BackupKind
+  label?: string | null
+  /** @deprecated legacy */
   module?: string | null
 }
 
@@ -19,6 +27,9 @@ export interface BackupStats {
   successRate: number
   avgSize: number
   compressionRatio?: number
+  pgbackrestAvailable?: boolean
+  lastFullBackup?: Date
+  lastDiffBackup?: Date
 }
 
 export interface BackupMetadata {
@@ -27,11 +38,16 @@ export interface BackupMetadata {
   tableCounts: Record<string, number>
   totalRecords: number
   fileSize: number
-  // Campos opcionales para trazabilidad
   importedFrom?: string
   dumpFormat?: 'pg_dump_custom' | 'sql' | 'json'
   modules?: string[]
   dbVersion?: string
+  pgbackrest?: {
+    stanza: string
+    label: string
+    type: string
+    timestamp?: number
+  }
 }
 
 export interface DatabaseConfig {
@@ -55,7 +71,31 @@ export interface BackupConfig {
   emailNotifications: string[]
   verifyIntegrity: boolean
   scheduleTime: string
-  cronScope: 'tickets' | 'full'
+  weeklyFullDay: number
+}
+
+export interface PgBackRestBackupSet {
+  label?: string
+  type?: string
+  timestamp?: number
+  size?: number
+  info?: { size?: number }
+}
+
+export interface PgBackRestInfo {
+  name?: string
+  stanza?: string
+  status?: { code?: number; message?: string }
+  backup?: PgBackRestBackupSet[]
+  archive?: { max?: string; min?: string }[]
+}
+
+export interface BackupWorkerHealth {
+  status: 'healthy' | 'degraded' | 'unavailable'
+  pgbackrestOk: boolean
+  stanzaOk: boolean
+  stanza: string
+  allowRestore: boolean
 }
 
 export type BackupModuleId =

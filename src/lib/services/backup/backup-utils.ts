@@ -61,7 +61,7 @@ export async function getBackupConfig(): Promise<BackupConfig> {
             'backupEmailNotifications',
             'backupVerifyIntegrity',
             'backupScheduleTime',
-            'backupCronScope',
+            'backupWeeklyFullDay',
           ],
         },
       },
@@ -99,7 +99,8 @@ export async function getBackupConfig(): Promise<BackupConfig> {
       verifyIntegrity:
         raw.backupVerifyIntegrity !== undefined ? raw.backupVerifyIntegrity === 'true' : true,
       scheduleTime: raw.backupScheduleTime ?? '02:00',
-      cronScope: raw.backupCronScope === 'tickets' ? 'tickets' : 'full',
+      weeklyFullDay:
+        raw.backupWeeklyFullDay !== undefined ? parseInt(raw.backupWeeklyFullDay, 10) : 0,
     }
   } catch (error) {
     console.error('Error loading backup config:', error)
@@ -116,7 +117,7 @@ export async function getBackupConfig(): Promise<BackupConfig> {
       emailNotifications: [],
       verifyIntegrity: true,
       scheduleTime: '02:00',
-      cronScope: 'full' as const,
+      weeklyFullDay: 0,
     }
   }
 }
@@ -236,10 +237,7 @@ export async function decryptFile(encryptedPath: string): Promise<string> {
   decipher.setAuthTag(authTag)
 
   const decryptedPath = encryptedPath.replace(/\.enc$/, '')
-  const decryptedData = Buffer.concat([
-    decipher.update(encryptedData),
-    decipher.final(),
-  ])
+  const decryptedData = Buffer.concat([decipher.update(encryptedData), decipher.final()])
 
   const { writeFile: fsWriteFile } = await import('fs/promises')
   await fsWriteFile(decryptedPath, decryptedData)

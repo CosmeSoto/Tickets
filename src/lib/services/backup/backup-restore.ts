@@ -5,6 +5,7 @@ import { randomUUID } from 'crypto'
 import prisma from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 import { hasPgTools, parseDatabaseUrl, decryptFile, calculateChecksum } from './backup-utils'
+import { inferEngineFromRecord, restorePgBackRest, parsePgBackRestFileRef } from './backup-engine'
 import {
   TICKETS_MODULE_RESTORE_ORDER,
   NEWS_MODULE_RESTORE_ORDER,
@@ -22,7 +23,8 @@ export type RestoreMode = 'replace' | 'merge'
 export async function restoreBackup(
   backupId: string,
   restoreModules?: string[],
-  mode: RestoreMode = 'replace'
+  mode: RestoreMode = 'replace',
+  options?: { pitrTarget?: string }
 ): Promise<void> {
   try {
     const backup = await prisma.backups.findUnique({ where: { id: backupId } })
@@ -31,6 +33,37 @@ export async function restoreBackup(
     }
     if (backup.status !== 'completed') {
       throw new Error('El respaldo no está completo')
+    }
+
+    const engine = inferEngineFromRecord(backup)
+
+    if (engine === 'pgbackrest') {
+      if (restoreModules?.length) {
+        throw new Error(
+          'La restauración selectiva por módulo solo está disponible en exportaciones (.dump). Para pgBackRest usa restauración completa o PITR.'
+        )
+      }
+      const label = backup.label || parsePgBackRestFileRef(backup.filepath)?.label || undefined
+      if (!label && !options?.pitrTarget) {
+        throw new Error('Etiqueta pgBackRest no encontrada en el respaldo')
+      }
+      await restorePgBackRest({ label, target: options?.pitrTarget })
+      await prisma.audit_logs.create({
+        data: {
+          id: randomUUID(),
+          action: 'backup_restored',
+          entityType: 'System',
+          entityId: backupId,
+          createdAt: new Date(),
+          details: {
+            engine: 'pgbackrest',
+            label: label ?? null,
+            pitrTarget: options?.pitrTarget ?? null,
+            mode: 'full',
+          },
+        },
+      })
+      return
     }
 
     await stat(backup.filepath)

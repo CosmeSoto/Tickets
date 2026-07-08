@@ -21,7 +21,10 @@ export interface BackupInfo {
   status: 'completed' | 'failed' | 'in_progress'
   compressed?: boolean
   encrypted?: boolean
-  /** null = backup completo */
+  engine?: 'pgbackrest' | 'export' | 'import'
+  backupKind?: 'full' | 'diff' | 'incr' | 'export'
+  label?: string | null
+  /** @deprecated legacy */
   module?: string | null
 }
 
@@ -33,6 +36,36 @@ export interface BackupStats {
   successRate?: number
   avgSize?: number
   compressionRatio?: number
+  pgbackrestAvailable?: boolean
+  lastFullBackup?: string
+  lastDiffBackup?: string
+}
+
+export function getEngineLabel(engine?: string): string {
+  switch (engine) {
+    case 'pgbackrest':
+      return 'pgBackRest'
+    case 'export':
+      return 'Exportación'
+    case 'import':
+      return 'Importado'
+    default:
+      return 'Legacy'
+  }
+}
+
+export function getKindLabel(kind?: string, engine?: string): string {
+  if (engine === 'export' || engine === 'import') return 'Portable'
+  switch (kind) {
+    case 'full':
+      return 'Completo'
+    case 'diff':
+      return 'Diferencial'
+    case 'incr':
+      return 'Incremental'
+    default:
+      return kind || '—'
+  }
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -174,38 +207,41 @@ export function useBackups() {
   }, [loadBackups, loadStats])
 
   // ── Create backup ──
-  const createBackup = useCallback(async () => {
-    setCreating(true)
-    try {
-      const response = await fetch('/api/admin/backups', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'manual' }),
-      })
-      if (response.ok) {
-        toast({ title: 'Éxito', description: 'Backup completo creado correctamente' })
-        loadBackups(false)
-        loadStats()
-      } else {
-        let message = 'Error al crear backup'
-        try {
-          const error = await response.json()
-          message = error.error || message
-        } catch {
-          /* cuerpo no JSON */
-        }
-        toast({
-          title: 'Error al crear backup',
-          description: message,
-          variant: 'destructive',
+  const createBackup = useCallback(
+    async (options?: { mode?: 'infrastructure' | 'export'; backupKind?: string }) => {
+      setCreating(true)
+      try {
+        const response = await fetch('/api/admin/backups', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'manual',
+            mode: options?.mode ?? 'infrastructure',
+            backupKind: options?.backupKind,
+          }),
         })
+        if (response.ok) {
+          const label =
+            options?.mode === 'export' ? 'Exportación creada' : 'Respaldo pgBackRest iniciado'
+          toast({ title: 'Éxito', description: label })
+          loadBackups(false)
+          loadStats()
+        } else {
+          let message = 'Error al crear backup'
+          try {
+            const error = await response.json()
+            message = error.error || message
+          } catch {}
+          toast({ title: 'Error al crear backup', description: message, variant: 'destructive' })
+        }
+      } catch {
+        toast({ title: 'Error', description: 'Error al crear backup', variant: 'destructive' })
+      } finally {
+        setCreating(false)
       }
-    } catch {
-      toast({ title: 'Error', description: 'Error al crear backup', variant: 'destructive' })
-    } finally {
-      setCreating(false)
-    }
-  }, [toast, loadBackups, loadStats])
+    },
+    [toast, loadBackups, loadStats]
+  )
 
   // ── Delete backup ──
   const deleteBackup = useCallback(async () => {

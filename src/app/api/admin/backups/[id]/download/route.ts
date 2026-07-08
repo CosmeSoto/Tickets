@@ -4,11 +4,9 @@ import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { readFile, stat } from 'fs/promises'
 import { randomUUID } from 'crypto'
+import { inferEngineFromRecord } from '@/lib/services/backup/backup-engine'
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
 
@@ -17,7 +15,7 @@ export async function GET(
     }
 
     const backupId = (await params).id
-    
+
     if (!backupId) {
       return NextResponse.json({ error: 'ID de backup requerido' }, { status: 400 })
     }
@@ -35,19 +33,29 @@ export async function GET(
       return NextResponse.json({ error: 'El backup no está completado' }, { status: 400 })
     }
 
+    if (inferEngineFromRecord(backup) === 'pgbackrest') {
+      return NextResponse.json(
+        {
+          error:
+            'Los respaldos pgBackRest están en el repositorio de infraestructura. Crea una Exportación (.dump) para descargar un archivo portable.',
+        },
+        { status: 400 }
+      )
+    }
+
     try {
       // Verificar que el archivo existe
       const fileStats = await stat(backup.filepath)
-      
+
       // Leer el archivo
       const fileBuffer = await readFile(backup.filepath)
-      
+
       // Determinar el tipo de contenido
-      const contentType = backup.filepath.endsWith('.json') 
+      const contentType = backup.filepath.endsWith('.json')
         ? 'application/json'
         : backup.filepath.endsWith('.sql')
-        ? 'application/sql'
-        : 'application/octet-stream'
+          ? 'application/sql'
+          : 'application/octet-stream'
 
       // Registrar descarga en auditoría
       try {
@@ -73,7 +81,7 @@ export async function GET(
 
       // Crear respuesta con el archivo
       const response = new NextResponse(fileBuffer)
-      
+
       response.headers.set('Content-Type', contentType)
       response.headers.set('Content-Disposition', `attachment; filename="${backup.filename}"`)
       response.headers.set('Content-Length', fileStats.size.toString())
@@ -82,7 +90,6 @@ export async function GET(
       response.headers.set('Expires', '0')
 
       return response
-
     } catch (fileError) {
       console.error('Error accessing backup file:', fileError)
       return NextResponse.json(
@@ -90,12 +97,11 @@ export async function GET(
         { status: 404 }
       )
     }
-
   } catch (error) {
     console.error('Error downloading backup:', error)
-    
+
     return NextResponse.json(
-      { 
+      {
         error: error instanceof Error ? error.message : 'Error al descargar backup',
       },
       { status: 500 }

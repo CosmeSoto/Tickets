@@ -2,28 +2,41 @@ import { unlink, access } from 'fs/promises'
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import { getBackupConfig } from './backup-utils'
+import { inferEngineFromRecord } from './backup-engine'
 
 export async function cleanOldBackups() {
   try {
     const config = await getBackupConfig()
-    const completedBackups = await prisma.backups.findMany({
-      where: { status: 'completed' },
+    const cutoff = new Date()
+    cutoff.setDate(cutoff.getDate() - config.retentionDays)
+
+    // Limpiar registros pgBackRest antiguos (retención real la maneja pgBackRest)
+    await prisma.backups.deleteMany({
+      where: {
+        engine: 'pgbackrest',
+        createdAt: { lt: cutoff },
+      },
+    })
+
+    // Exports: límite por cantidad + retención por días
+    const exportBackups = await prisma.backups.findMany({
+      where: { status: 'completed', engine: { in: ['export', 'import'] } },
       orderBy: { createdAt: 'desc' },
     })
 
-    if (completedBackups.length <= config.maxBackups) {
-      return
-    }
+    const exportsToDelete = exportBackups
+      .filter(b => b.createdAt < cutoff)
+      .concat(exportBackups.slice(config.maxBackups))
 
-    const backupsToDelete = completedBackups.slice(config.maxBackups)
-
-    for (const backup of backupsToDelete) {
+    const seen = new Set<string>()
+    for (const backup of exportsToDelete) {
+      if (seen.has(backup.id)) continue
+      seen.add(backup.id)
       try {
         await deleteBackupFiles(backup.filepath)
         await prisma.backups.delete({ where: { id: backup.id } })
-        console.log(`Respaldo antiguo eliminado: ${backup.filename}`)
       } catch (error) {
-        console.warn(`Error eliminando respaldo ${backup.filename}:`, error)
+        console.warn(`Error eliminando export ${backup.filename}:`, error)
       }
     }
   } catch (error) {
@@ -32,58 +45,39 @@ export async function cleanOldBackups() {
 }
 
 async function deleteBackupFiles(filepath: string) {
+  if (filepath.startsWith('pgbackrest://')) return
+
   try {
     await access(filepath)
     await unlink(filepath)
-  } catch {
-    // Ignorar si el archivo no existe
-  }
+  } catch {}
 
   try {
     const metadataPath = `${filepath}.meta.json`
     await access(metadataPath)
     await unlink(metadataPath)
-  } catch {
-    // Ignorar si el archivo no existe
-  }
+  } catch {}
 }
 
 export async function deleteBackup(backupId: string): Promise<void> {
   try {
-    const backup = await prisma.backups.findUnique({
-      where: { id: backupId },
-    })
+    const backup = await prisma.backups.findUnique({ where: { id: backupId } })
+    if (!backup) return
 
-    if (!backup) {
-      console.log(`Backup ${backupId} no encontrado en la base de datos`)
-      return
-    }
+    const engine = inferEngineFromRecord(backup)
 
-    try {
+    if (engine === 'pgbackrest') {
+      await prisma.backups.delete({ where: { id: backupId } })
+      console.log(
+        `[BACKUP] Registro pgBackRest eliminado de UI (repo intacto): ${backup.label || backup.filename}`
+      )
+    } else {
       await deleteBackupFiles(backup.filepath)
-      console.log(`Archivos de respaldo eliminados: ${backup.filepath}`)
-    } catch (error) {
-      console.warn(`No se pudo eliminar los archivos de respaldo: ${backup.filepath}`, error)
+      await prisma.backups.delete({ where: { id: backupId } })
     }
 
-    try {
-      await prisma.backups.delete({
-        where: { id: backupId },
-      })
-      console.log(`Registro de respaldo eliminado: ${backupId}`)
-    } catch (dbError) {
-      if (
-        dbError instanceof Error &&
-        dbError.message.includes('Record to delete does not exist')
-      ) {
-        console.log(`Registro de respaldo ${backupId} ya no existe`)
-        return
-      }
-      throw dbError
-    }
-
-    try {
-      await prisma.audit_logs.create({
+    await prisma.audit_logs
+      .create({
         data: {
           id: randomUUID(),
           action: 'backup_deleted',
@@ -92,13 +86,12 @@ export async function deleteBackup(backupId: string): Promise<void> {
           createdAt: new Date(),
           details: {
             filename: backup.filename,
+            engine,
             deletedAt: new Date(),
           },
         },
       })
-    } catch (auditError) {
-      console.warn('No se pudo registrar eliminación en auditoría:', auditError)
-    }
+      .catch(() => {})
   } catch (error) {
     console.error('Error al eliminar respaldo:', error)
     throw error

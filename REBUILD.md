@@ -27,8 +27,14 @@ docker compose -f docker-compose.dev.yml restart redis
 # Ver logs de la app:
 docker compose -f docker-compose.dev.yml logs -f app
 
-# Ver logs de Redis:
-docker compose -f docker-compose.dev.yml logs -f redis
+# Ver logs del backup worker (pgBackRest):
+docker compose -f docker-compose.dev.yml logs -f backup-worker
+
+# Ver logs de PostgreSQL:
+docker compose -f docker-compose.dev.yml logs -f postgres
+
+# Estado pgBackRest en dev:
+docker compose -f docker-compose.dev.yml exec backup-worker pgbackrest info --stanza=main
 
 # Ver logs de todos los servicios:
 docker compose -f docker-compose.dev.yml logs -f
@@ -75,13 +81,14 @@ npm run dev
 
 ```bash
 # ═══════════════════════════════════════════════════════════════════════════════
-# PRIMERA VEZ o cuando algo está roto (rebuild total ~5-10 min):
+# PRIMERA VEZ, migración pgBackRest o BD no importa (rebuild total ~8-12 min):
+# Borra volúmenes (BD, pgBackRest, Redis) y reconstruye postgres + backup-worker + app
 # ═══════════════════════════════════════════════════════════════════════════════
 sudo ./start-production.sh --clean
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# DESPUÉS DE HACER CAMBIOS DE CÓDIGO (rebuild incremental ~2-3 min):
-# Solo recompila lo que cambió. NO borra datos ni volúmenes.
+# DESPUÉS DE CAMBIOS DE CÓDIGO (rebuild incremental ~2-4 min):
+# Recompila postgres/backup-worker/app si cambiaron; NO borra volúmenes
 # ═══════════════════════════════════════════════════════════════════════════════
 sudo ./start-production.sh
 
@@ -93,15 +100,14 @@ sudo ./start-production.sh
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # Aplicar cambios de código (rebuild incremental, NO borra datos):
-docker compose -f docker-compose.prod.yml --env-file .env.production build app
-docker compose -f docker-compose.prod.yml --env-file .env.production up -d app
+docker compose -f docker-compose.prod.yml --env-file .env.production build postgres backup-worker app
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d
 
-# Rebuild total sin caché (si lo anterior no refleja cambios):
-docker compose -f docker-compose.prod.yml --env-file .env.production build --no-cache app
-docker compose -f docker-compose.prod.yml --env-file .env.production up -d app
+# Rebuild total sin caché:
+docker compose -f docker-compose.prod.yml --env-file .env.production build --no-cache postgres backup-worker app
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d
 
-# Reconstruir desde cero (⚠️ BORRA DATOS de BD, Redis, uploads):
-docker compose -f docker-compose.prod.yml --env-file .env.production down -v
+# Reconstruir desde cero (⚠️ BORRA DATOS — equivalente a --clean):
 sudo ./start-production.sh --clean
 
 # Reconstruir solo Redis:
@@ -239,17 +245,54 @@ docker compose -f docker-compose.prod.yml --env-file .env.production exec postgr
 
 ---
 
-## Backups
+## Backups (pgBackRest)
+
+Documentación completa: [docs/BACKUP-SYSTEM.md](docs/BACKUP-SYSTEM.md)
+
+### Operación diaria (automático)
+
+El cron llama `POST /api/admin/cron/backup` (protegido con `CRON_SECRET`):
+
+- **Domingo:** backup FULL
+- **Resto de días:** backup DIFF
+
+### Comandos manuales
 
 ```bash
-# Crear backup:
-docker compose -f docker-compose.prod.yml --env-file .env.production exec postgres \
-  pg_dump -U tickets_user tickets_db | gzip > backup-$(date +%Y%m%d).sql.gz
+# Estado del repositorio pgBackRest
+./docker/scripts/disaster-recovery.sh info
 
-# Restaurar:
-gunzip -c backup-YYYYMMDD.sql.gz | \
-  docker compose -f docker-compose.prod.yml --env-file .env.production exec -T postgres \
-  psql -U tickets_user -d tickets_db
+# Backup completo manual
+./docker/scripts/disaster-recovery.sh backup-full
+
+# Backup diferencial
+./docker/scripts/disaster-recovery.sh backup-diff
+
+# Verificar integridad del repositorio
+./docker/scripts/disaster-recovery.sh verify
+```
+
+### Recuperación ante desastre
+
+```bash
+# Restaurar último backup disponible
+./docker/scripts/disaster-recovery.sh restore --latest
+
+# Restaurar backup específico por etiqueta
+./docker/scripts/disaster-recovery.sh restore --set 20260708-120000F
+
+# PITR — punto en el tiempo (UTC)
+./docker/scripts/disaster-recovery.sh pitr "2026-07-08 14:30:00"
+```
+
+### Exportación portable (migración)
+
+Desde UI: **Exportar .dump** o API `POST /api/admin/backups` con `{ "mode": "export" }`.
+
+```bash
+# Restaurar export manualmente
+docker compose -f docker-compose.prod.yml --env-file .env.production exec -T app \
+  pg_restore -h postgres -U tickets_user -d tickets_db --clean --if-exists /app/backups/export-XXXX.dump
 ```
 
 ---
@@ -288,10 +331,16 @@ Si cambia tu IP: ejecutar `sudo ./start-production.sh` y actualizar hosts en los
 │  - Cron jobs (llamados externamente)            │
 └───────┬──────────────────────────┬──────────────┘
         │ :5432                    │ :6379
-┌───────▼───────┐          ┌──────▼───────┐
-│  PostgreSQL   │          │    Redis     │
-│  (datos)      │          │  (caché/SSE) │
-└───────────────┘          └──────────────┘
+┌───────▼───────────────┐  ┌──────▼───────┐
+│  PostgreSQL + WAL     │  │    Redis     │
+│  (pgBackRest archive) │  │  (caché/SSE) │
+└───────┬───────────────┘  └──────────────┘
+        │ volúmenes compartidos
+┌───────▼───────────────────────────────────┐
+│  backup-worker (pgBackRest)               │
+│  - Respaldos FULL/DIFF automáticos        │
+│  - Repositorio: pgbackrest_repo         │
+└───────────────────────────────────────────┘
 ```
 
 ---
@@ -432,16 +481,17 @@ SELECT table_name FROM information_schema.tables WHERE table_name = 'patrol_fami
 
 ## Solución de Problemas
 
-| Problema                                     | Solución                                                                                                                                                                                             |
-| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| App no arranca                               | `docker logs tickets-app` — verificar DATABASE_URL                                                                                                                                                   |
-| No accede a gestion.local                    | Verificar `/etc/hosts` y que nginx esté corriendo                                                                                                                                                    |
-| Certificado SSL no confiable                 | Aceptar excepción o instalar CA de mkcert en clientes                                                                                                                                                |
-| **404 en `/api/admin/news` u otros módulos** | **Imagen Docker desactualizada.** Aplicar cambios con: `sudo ./start-production.sh`. Si persiste, reconstruir sin caché: `sudo ./start-production.sh --clean`. Los datos (BD, uploads) NO se borran. |
-| Módulo carga vacío tras restaurar backup     | Igual que arriba — si se reconstruyó sin `start-production.sh`, el `NEXTAUTH_URL` puede quedar con dominio errado                                                                                    |
-| Dashboard rondas vacío                       | Verificar que hay patrullas programadas para hoy (UTC-5)                                                                                                                                             |
-| Técnico no aparece en categorías             | Verificar `technician_family_assignments` para esa familia                                                                                                                                           |
-| Agente no aparece en programación            | Verificar `patrol_family_assignments` + `patrolsEnabled=true`                                                                                                                                        |
+| Problema                                     | Solución                                                                                                          |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| App no arranca                               | `docker logs tickets-app` — verificar DATABASE_URL                                                                |
+| No accede a gestion.local                    | Verificar `/etc/hosts` y que nginx esté corriendo                                                                 |
+| Certificado SSL no confiable                 | Aceptar excepción o instalar CA de mkcert en clientes                                                             |
+| **404 en `/api/admin/news` u otros módulos** | `sudo ./start-production.sh`. Si persiste: `sudo ./start-production.sh --clean` (⚠️ borra BD)                     |
+| pgBackRest no disponible en UI               | `docker logs tickets-backup-worker` y `./docker/scripts/disaster-recovery.sh check`                               |
+| Módulo carga vacío tras restaurar backup     | Igual que arriba — si se reconstruyó sin `start-production.sh`, el `NEXTAUTH_URL` puede quedar con dominio errado |
+| Dashboard rondas vacío                       | Verificar que hay patrullas programadas para hoy (UTC-5)                                                          |
+| Técnico no aparece en categorías             | Verificar `technician_family_assignments` para esa familia                                                        |
+| Agente no aparece en programación            | Verificar `patrol_family_assignments` + `patrolsEnabled=true`                                                     |
 
 ---
 

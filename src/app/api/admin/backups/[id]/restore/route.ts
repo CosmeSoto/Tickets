@@ -22,6 +22,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // Leer el body para obtener los módulos opcionales y el modo de restauración
     let restoreModules: string[] | undefined
     let mode: RestoreMode = 'replace'
+    let pitrTarget: string | undefined
 
     try {
       const body = await request.json()
@@ -42,12 +43,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       if (body.mode === 'merge') {
         mode = 'merge'
       }
+
+      pitrTarget = typeof body.pitrTarget === 'string' ? body.pitrTarget : undefined
     } catch {
-      // Body vacío o no JSON — restauración completa en modo replace
+      // Body vacío — restauración completa
     }
 
-    // Ejecutar restauración
-    await BackupService.restoreBackup(backupId, restoreModules, mode)
+    await BackupService.restoreBackup(backupId, restoreModules, mode, { pitrTarget })
 
     const scopeLabel = restoreModules ? `módulo(s): ${restoreModules.join(', ')}` : 'completa'
     const modeLabel = mode === 'merge' ? ' (modo fusión)' : ''

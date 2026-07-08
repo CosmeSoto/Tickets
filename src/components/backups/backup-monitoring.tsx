@@ -33,13 +33,16 @@ interface SystemHealth {
     status: 'healthy' | 'warning' | 'critical'
   }
   backupService: {
-    status: 'running' | 'stopped' | 'error'
+    status: 'running' | 'stopped' | 'error' | 'degraded'
     backupEnabled?: boolean
     frequency?: string
     scheduleTime?: string
     lastBackup: string | null
     nextScheduled: string | null
-    pgDumpAvailable?: boolean
+    pgBackRestAvailable?: boolean
+    pgBackRestStanza?: string
+    allowRestore?: boolean
+    exportAvailable?: boolean
   }
   performance: {
     avgBackupTime: number | null
@@ -348,21 +351,17 @@ export function BackupMonitoring() {
               {getStatusIcon(health.backupService.status)}
             </div>
             <div className='space-y-2'>
-              <div className='text-lg font-bold text-foreground'>Servicio Backup</div>
+              <div className='text-lg font-bold text-foreground'>pgBackRest</div>
               <div
-                className={`text-sm px-2 py-1 rounded border ${getStatusColor(health.backupService.status)}`}
+                className={`text-sm px-2 py-1 rounded border ${getStatusColor(health.backupService.pgBackRestAvailable ? 'running' : 'error')}`}
               >
-                {health.backupService.status === 'running' ? 'Activo' : 'Inactivo'}
+                {health.backupService.pgBackRestAvailable
+                  ? `Stanza ${health.backupService.pgBackRestStanza || 'main'} OK`
+                  : 'No disponible'}
               </div>
               <div className='text-xs text-muted-foreground'>
-                {health.backupService.lastBackup
-                  ? `Último: ${new Date(health.backupService.lastBackup).toLocaleString('es-ES', {
-                      month: 'short',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}`
-                  : 'Sin backups recientes'}
+                Exportaciones:{' '}
+                {health.backupService.exportAvailable ? 'pg_dump OK' : 'No disponible'}
               </div>
             </div>
           </CardContent>

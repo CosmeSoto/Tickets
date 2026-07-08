@@ -29,7 +29,7 @@ export async function GET() {
             'backupEmailNotifications',
             'backupVerifyIntegrity',
             'backupScheduleTime',
-            'backupCronScope',
+            'backupWeeklyFullDay',
           ],
         },
       },
@@ -50,7 +50,11 @@ export async function GET() {
           setting.key === 'backupVerifyIntegrity'
         ) {
           value = setting.value === 'true'
-        } else if (setting.key === 'backupRetention' || setting.key === 'backupMaxCount') {
+        } else if (
+          setting.key === 'backupRetention' ||
+          setting.key === 'backupMaxCount' ||
+          setting.key === 'backupWeeklyFullDay'
+        ) {
           value = parseInt(setting.value)
         } else if (setting.key === 'backupEmailNotifications') {
           value = setting.value ? JSON.parse(setting.value) : []
@@ -70,7 +74,7 @@ export async function GET() {
           backupEmailNotifications: 'emailNotifications',
           backupVerifyIntegrity: 'verifyIntegrity',
           backupScheduleTime: 'scheduleTime',
-          backupCronScope: 'cronScope',
+          backupWeeklyFullDay: 'weeklyFullDay',
         }
 
         const mappedKey = keyMap[setting.key] || setting.key
@@ -94,7 +98,7 @@ export async function GET() {
       emailNotifications: [],
       verifyIntegrity: true,
       scheduleTime: '02:00',
-      cronScope: 'full',
+      weeklyFullDay: 0,
     }
 
     // Informar al frontend si la clave de encriptación está configurada en el servidor.
@@ -135,8 +139,8 @@ export async function POST(request: NextRequest) {
       { key: 'backupVerifyIntegrity', value: config.verifyIntegrity?.toString() || 'true' },
       { key: 'backupScheduleTime', value: config.scheduleTime || '02:00' },
       {
-        key: 'backupCronScope',
-        value: config.cronScope === 'tickets' ? 'tickets' : 'full',
+        key: 'backupWeeklyFullDay',
+        value: String(config.weeklyFullDay ?? 0),
       },
     ]
 

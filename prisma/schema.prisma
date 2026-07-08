@@ -70,15 +70,22 @@ model backups {
   checksum   String?
   compressed Boolean  @default(false)
   encrypted  Boolean  @default(false)
-  /// null = respaldo completo de BD; "tickets" = solo datos del módulo de tickets (extensible a más módulos).
+  /// Motor: pgbackrest | export | import
+  engine     String   @default("pgbackrest")
+  /// Tipo: full | diff | incr | export
+  backupKind String   @default("full")
+  /// Etiqueta pgBackRest (ej. 20260708-120000F)
+  label      String?
+  /// @deprecated — solo respaldos legacy; usar export + restore selectivo
   module     String?
-  /// JSON con metadata del backup (conteo de tablas, etc.)
+  /// JSON con metadata del backup (conteo de tablas, pgBackRest info, etc.)
   metadata   String?
   createdAt  DateTime @default(now())
 
   @@index([status, createdAt(sort: Desc)])
   @@index([type, status])
-  @@index([module, createdAt(sort: Desc)])
+  @@index([engine, backupKind, createdAt(sort: Desc)])
+  @@index([label])
 }
 
 model categories {
