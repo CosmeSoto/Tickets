@@ -74,6 +74,12 @@ services:
       postgres:
         condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -fsS http://127.0.0.1:8080/health | grep -q "\\"stanzaOk\\":true"']
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 600s
 
   # ── Redis ───────────────────────────────────────────────────────────────────
   redis:
@@ -143,7 +149,7 @@ services:
       redis:
         condition: service_healthy
       backup-worker:
-        condition: service_healthy
+        condition: service_started
     restart: unless-stopped
     healthcheck:
       test: ['CMD', 'curl', '-fsS', 'http://127.0.0.1:3000/api/health']

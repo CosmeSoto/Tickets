@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# Repara pgBackRest cuando PostgreSQL entra en bucle "recovery mode"
+# Repara pgBackRest cuando PostgreSQL entra en bucle "recovery mode" o falta la stanza
 # Uso: ./docker/scripts/fix-pgbackrest.sh
 set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}"
 ENV_FILE="${ENV_FILE:-.env.production}"
@@ -20,30 +22,14 @@ compose exec -u root postgres bash -c '
   chmod -R 750 /var/lib/pgbackrest /var/log/pgbackrest
 '
 
-echo "==> 3. Creando/verificando stanza pgBackRest..."
-compose exec -u postgres postgres pgbackrest \
-  --config=/etc/pgbackrest/pgbackrest-local.conf \
-  stanza-create --stanza=main 2>/dev/null || true
+echo "==> 3. Levantando backup-worker para inicialización..."
+compose up -d backup-worker
+sleep 10
 
-compose exec -u postgres postgres pgbackrest \
-  --config=/etc/pgbackrest/pgbackrest-local.conf \
-  check --stanza=main
+echo "==> 4. Inicializando stanza pgBackRest..."
+COMPOSE_FILE="$COMPOSE_FILE" ENV_FILE="$ENV_FILE" "$SCRIPT_DIR/init-pgbackrest.sh"
 
-echo "==> 4. Reiniciando PostgreSQL..."
-compose restart postgres
-
-echo "==> 5. Esperando PostgreSQL estable (sin recovery)..."
-for i in $(seq 1 30); do
-  if compose exec -T postgres psql -U tickets_user -d tickets_db -tAc \
-    "SELECT NOT pg_is_in_recovery()" 2>/dev/null | grep -q t; then
-    echo "✅ PostgreSQL estable"
-    break
-  fi
-  echo "   intento $i/30..."
-  sleep 3
-done
-
-echo "==> 6. Levantando servicios..."
+echo "==> 5. Levantando servicios..."
 compose up -d
 
 echo ""

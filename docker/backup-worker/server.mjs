@@ -8,11 +8,25 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 
 const exec = promisify(execFile)
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 
 const PORT = Number(process.env.PORT || 8080)
 const SECRET = process.env.BACKUP_WORKER_SECRET || ''
 const STANZA = process.env.PGBACKREST_STANZA || 'main'
 const ALLOW_RESTORE = process.env.BACKUP_ALLOW_RESTORE === 'true'
+
+let stanzaReady = false
+let initPromise = null
+
+function startInit() {
+  if (!initPromise) {
+    initPromise = ensureStanzaReady().then(ok => {
+      stanzaReady = ok
+      return ok
+    })
+  }
+  return initPromise
+}
 
 function json(res, status, body) {
   res.writeHead(status, { 'Content-Type': 'application/json' })
@@ -49,20 +63,89 @@ async function readBody(req) {
   }
 }
 
+async function waitPostgresReady(maxAttempts = 60) {
+  for (let i = 1; i <= maxAttempts; i++) {
+    try {
+      await exec('pg_isready', ['-h', 'postgres', '-U', 'tickets_user', '-d', 'tickets_db'], {
+        timeout: 5000,
+      })
+      return
+    } catch {
+      console.log(`[backup-worker] Esperando PostgreSQL (${i}/${maxAttempts})...`)
+      await sleep(3000)
+    }
+  }
+  throw new Error('PostgreSQL no disponible tras esperar 3 minutos')
+}
+
+async function hasExistingBackups() {
+  try {
+    const { stdout } = await runPgBackRest(['info', `--stanza=${STANZA}`, '--output=json'], 30_000)
+    const info = JSON.parse(stdout || '[]')
+    const backups = info[0]?.backup
+    return Array.isArray(backups) && backups.length > 0
+  } catch {
+    return false
+  }
+}
+
+async function ensureStanzaReady() {
+  await waitPostgresReady()
+
+  for (let attempt = 1; attempt <= 12; attempt++) {
+    try {
+      console.log(`[backup-worker] Inicializando stanza (intento ${attempt}/12)...`)
+      await runPgBackRest(['stanza-create', `--stanza=${STANZA}`], 120_000)
+
+      try {
+        await runPgBackRest(['check', `--stanza=${STANZA}`], 120_000)
+      } catch (checkErr) {
+        if (!(await hasExistingBackups())) {
+          console.log('[backup-worker] Primer arranque — ejecutando backup FULL inicial...')
+          await runPgBackRest(
+            ['backup', `--stanza=${STANZA}`, '--type=full', '--no-archive-check'],
+            3_600_000
+          )
+          await runPgBackRest(['check', `--stanza=${STANZA}`], 120_000)
+        } else {
+          throw checkErr
+        }
+      }
+
+      stanzaReady = true
+      console.log('[backup-worker] Stanza lista')
+      return true
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error)
+      const stderr = error?.stderr?.toString?.() || ''
+      console.warn(`[backup-worker] init falló: ${msg}`)
+      if (stderr) console.warn(stderr.slice(0, 800))
+      await sleep(5000)
+    }
+  }
+
+  stanzaReady = false
+  console.error('[backup-worker] Stanza NO inicializada — servicio en modo degradado')
+  return false
+}
+
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url || '/', `http://127.0.0.1:${PORT}`)
 
     if (url.pathname === '/health' && req.method === 'GET') {
       let pgbackrestOk = false
-      let stanzaOk = false
+      let stanzaOk = stanzaReady
       try {
         await runPgBackRest(['version'], 10_000)
         pgbackrestOk = true
-        await runPgBackRest(['check', `--stanza=${STANZA}`], 120_000)
-        stanzaOk = true
+        if (!stanzaOk) {
+          await runPgBackRest(['check', `--stanza=${STANZA}`], 120_000)
+          stanzaOk = true
+          stanzaReady = true
+        }
       } catch {
-        /* health parcial */
+        stanzaOk = false
       }
       return json(res, 200, {
         status: pgbackrestOk && stanzaOk ? 'healthy' : 'degraded',
@@ -76,6 +159,13 @@ const server = http.createServer(async (req, res) => {
 
     if (!checkAuth(req)) return unauthorized(res)
 
+    if (url.pathname === '/init' && req.method === 'POST') {
+      stanzaReady = false
+      initPromise = null
+      const ok = await startInit()
+      return json(res, ok ? 200 : 503, { success: ok, stanzaOk: stanzaReady })
+    }
+
     if (url.pathname === '/info' && req.method === 'GET') {
       const { stdout } = await runPgBackRest(['info', `--stanza=${STANZA}`, '--output=json'])
       const parsed = JSON.parse(stdout || '[]')
@@ -83,6 +173,15 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (url.pathname === '/backup' && req.method === 'POST') {
+      if (!stanzaReady) {
+        const ok = await startInit()
+        if (!ok) {
+          return json(res, 503, {
+            error:
+              'pgBackRest no inicializado. Revisa logs del backup-worker o ejecuta fix-pgbackrest.sh',
+          })
+        }
+      }
       const body = await readBody(req)
       const type = ['full', 'diff', 'incr'].includes(body.type) ? body.type : 'diff'
       const start = Date.now()
@@ -130,12 +229,9 @@ const server = http.createServer(async (req, res) => {
   }
 })
 
-server.listen(PORT, '0.0.0.0', async () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`[backup-worker] Escuchando en :${PORT} stanza=${STANZA}`)
-  try {
-    await runPgBackRest(['stanza-create', `--stanza=${STANZA}`], 60_000)
-    console.log('[backup-worker] Stanza lista')
-  } catch (e) {
-    console.warn('[backup-worker] stanza-create:', e instanceof Error ? e.message : e)
-  }
+  startInit().then(ok => {
+    console.log(`[backup-worker] Inicialización ${ok ? 'completada' : 'fallida'}`)
+  })
 })

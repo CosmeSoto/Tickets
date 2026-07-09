@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { PgBackRestStatusCard } from '@/components/backups/pgbackrest-status-card'
 import {
   Settings,
   Clock,
@@ -27,6 +28,16 @@ import {
   RotateCcw,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+
+const WEEKDAYS = [
+  { value: 0, label: 'Domingo' },
+  { value: 1, label: 'Lunes' },
+  { value: 2, label: 'Martes' },
+  { value: 3, label: 'Miércoles' },
+  { value: 4, label: 'Jueves' },
+  { value: 5, label: 'Viernes' },
+  { value: 6, label: 'Sábado' },
+] as const
 
 interface BackupConfig {
   enabled: boolean
@@ -41,6 +52,7 @@ interface BackupConfig {
   emailNotifications: string[]
   verifyIntegrity: boolean
   scheduleTime: string
+  weeklyFullDay: number
   /** Solo lectura — indica si BACKUP_ENCRYPTION_KEY está configurada en el servidor */
   encryptionKeyConfigured?: boolean
 }
@@ -62,6 +74,7 @@ export function BackupConfiguration({ onConfigChange }: BackupConfigurationProps
     emailNotifications: [],
     verifyIntegrity: true,
     scheduleTime: '02:00',
+    weeklyFullDay: 0,
   })
 
   const [loading, setLoading] = useState(false)
@@ -223,6 +236,7 @@ export function BackupConfiguration({ onConfigChange }: BackupConfigurationProps
       emailNotifications: [],
       verifyIntegrity: true,
       scheduleTime: '02:00',
+      weeklyFullDay: 0,
     })
   }
 
@@ -260,6 +274,8 @@ export function BackupConfiguration({ onConfigChange }: BackupConfigurationProps
 
   return (
     <div className='space-y-6'>
+      <PgBackRestStatusCard onInitialized={onConfigChange} />
+
       {/* Header */}
       <div className='flex justify-between items-center'>
         <div>
@@ -297,7 +313,8 @@ export function BackupConfiguration({ onConfigChange }: BackupConfigurationProps
               <div className='space-y-1'>
                 <Label className='text-sm font-medium'>Backups Automáticos</Label>
                 <p className='text-xs text-muted-foreground'>
-                  Habilitar respaldos pgBackRest automáticos (DIFF diario, FULL los domingos)
+                  Respaldos pgBackRest automáticos: FULL el día configurado abajo, DIFF el resto de
+                  días
                 </p>
               </div>
               <Switch
@@ -322,6 +339,29 @@ export function BackupConfiguration({ onConfigChange }: BackupConfigurationProps
                   <SelectItem value='monthly'>Mensual</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className='space-y-2'>
+              <Label className='text-sm font-medium'>Día del respaldo FULL</Label>
+              <Select
+                value={String(config.weeklyFullDay ?? 0)}
+                onValueChange={value => updateConfig('weeklyFullDay', parseInt(value, 10))}
+                disabled={!config.enabled}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder='Seleccionar día' />
+                </SelectTrigger>
+                <SelectContent>
+                  {WEEKDAYS.map(day => (
+                    <SelectItem key={day.value} value={String(day.value)}>
+                      {day.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className='text-xs text-muted-foreground'>
+                Los demás días se ejecuta un respaldo DIFF. Por defecto: domingo = FULL.
+              </p>
             </div>
 
             <div className='space-y-2'>

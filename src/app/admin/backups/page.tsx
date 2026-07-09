@@ -181,10 +181,20 @@ export default function BackupsPage() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align='end'>
             <DropdownMenuItem
-              onClick={() => createBackup({ mode: 'infrastructure', backupKind: 'full' })}
+              disabled={stats?.pgbackrestAvailable === false}
+              onClick={() => {
+                if (stats?.pgbackrestAvailable === false) {
+                  setActiveTab('config')
+                  return
+                }
+                createBackup({ mode: 'infrastructure', backupKind: 'full' })
+              }}
             >
               <Database className='h-4 w-4 mr-2' />
               pgBackRest (completo)
+              {stats?.pgbackrestAvailable === false && (
+                <span className='ml-auto text-xs text-muted-foreground'>→ Config</span>
+              )}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => createBackup({ mode: 'export' })}>
               <Download className='h-4 w-4 mr-2' />
@@ -194,7 +204,16 @@ export default function BackupsPage() {
         </DropdownMenu>
       </div>
     ),
-    [loading, creating, failedCount, refreshData, cleanupFailedBackups, createBackup]
+    [
+      loading,
+      creating,
+      failedCount,
+      refreshData,
+      cleanupFailedBackups,
+      createBackup,
+      stats,
+      setActiveTab,
+    ]
   )
 
   useSyncDashboardPageMeta({

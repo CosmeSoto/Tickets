@@ -80,6 +80,14 @@ export async function isPgBackRestAvailable(): Promise<boolean> {
   return health.status === 'healthy' && health.stanzaOk
 }
 
+export async function initPgBackRestWorker(): Promise<{ success: boolean }> {
+  const data = await workerFetch<{ success: boolean; stanzaOk?: boolean }>('/init', {
+    method: 'POST',
+    timeoutMs: 3_600_000,
+  })
+  return { success: Boolean(data.success) }
+}
+
 export async function fetchPgBackRestInfo(): Promise<PgBackRestInfo[]> {
   const data = await workerFetch<{ info: PgBackRestInfo[] }>('/info')
   return data.info || []

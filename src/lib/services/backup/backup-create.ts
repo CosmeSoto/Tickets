@@ -64,7 +64,7 @@ async function createInfrastructureBackup(
 ): Promise<BackupInfo> {
   if (!(await isPgBackRestAvailable())) {
     throw new Error(
-      'pgBackRest no está disponible. Verifica el servicio backup-worker y la configuración Docker.'
+      'pgBackRest no está disponible. En el servidor ejecuta: ./docker/scripts/fix-pgbackrest.sh — o revisa logs de backup-worker y postgres.'
     )
   }
 

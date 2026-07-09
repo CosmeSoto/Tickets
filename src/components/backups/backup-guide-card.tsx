@@ -10,11 +10,9 @@ export function BackupGuideCard() {
       <CardHeader className='pb-3'>
         <CardTitle className='text-base flex items-center gap-2'>
           <Shield className='h-5 w-5 text-primary' />
-          ¿Cómo funciona el nuevo sistema de respaldos?
+          ¿Cómo funciona el sistema de respaldos?
         </CardTitle>
-        <CardDescription>
-          Dos capas complementarias — como en sistemas empresariales
-        </CardDescription>
+        <CardDescription>Dos capas complementarias — infraestructura y exportación</CardDescription>
       </CardHeader>
       <CardContent className='grid gap-4 md:grid-cols-2 text-sm'>
         <div className='space-y-2 rounded-lg border bg-background p-4'>
@@ -24,9 +22,10 @@ export function BackupGuideCard() {
             <Badge variant='secondary'>automático</Badge>
           </div>
           <p className='text-muted-foreground text-xs leading-relaxed'>
-            Respaldos completos y diferenciales en el repositorio interno. El cron crea{' '}
-            <strong>FULL los domingos</strong> y <strong>DIFF el resto de días</strong>. Sirve para
-            recuperación ante desastre y PITR. No genera un archivo descargable.
+            Respaldos completos (FULL) y diferenciales (DIFF) en el repositorio interno. La
+            programación — día del FULL, hora y retención — se configura en la pestaña{' '}
+            <strong>Config</strong>. Sirve para recuperación ante desastre y PITR. No genera un
+            archivo descargable.
           </p>
         </div>
         <div className='space-y-2 rounded-lg border bg-background p-4'>
@@ -45,7 +44,7 @@ export function BackupGuideCard() {
             <Activity className='h-3 w-3' />
             Monitoreo → estado pgBackRest en tiempo real
           </Badge>
-          <Badge variant='outline'>Config → horario y retención</Badge>
+          <Badge variant='outline'>Config → horario, día FULL y retención</Badge>
           <Badge variant='outline'>Backups → historial con etiquetas pgBackRest</Badge>
         </div>
       </CardContent>

@@ -105,6 +105,11 @@ export function BackupDashboard({ backups, stats, loading }: BackupDashboardProp
         >
           Estado: {healthStatus.message}
         </Badge>
+        {stats?.pgbackrestAvailable === false && (
+          <Badge variant='outline' className='text-xs text-amber-600 border-amber-500/40'>
+            pgBackRest pendiente — ve a Config
+          </Badge>
+        )}
         {stats?.pgbackrestAvailable && (
           <Badge variant='outline' className='text-xs text-primary border-primary/30'>
             pgBackRest activo

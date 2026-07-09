@@ -3,12 +3,16 @@
 set -e
 
 echo "[pgBackRest] Creando stanza en primer arranque..."
-gosu postgres pgbackrest \
+if ! gosu postgres pgbackrest \
   --config=/etc/pgbackrest/pgbackrest-local.conf \
-  stanza-create --stanza=main 2>/dev/null || true
+  stanza-create --stanza=main; then
+  echo "[pgBackRest] ADVERTENCIA: stanza-create falló en initdb (se reintentará vía backup-worker)"
+fi
 
-gosu postgres pgbackrest \
+if gosu postgres pgbackrest \
   --config=/etc/pgbackrest/pgbackrest-local.conf \
-  check --stanza=main 2>/dev/null || true
-
-echo "[pgBackRest] Stanza inicializada"
+  check --stanza=main; then
+  echo "[pgBackRest] Stanza inicializada"
+else
+  echo "[pgBackRest] check pendiente — backup-worker completará la inicialización"
+fi

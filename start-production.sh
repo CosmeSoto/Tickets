@@ -218,30 +218,66 @@ else
   "${COMPOSE[@]}" build "${SERVICES[@]}"
 fi
 
-"${COMPOSE[@]}" up -d
+"${COMPOSE[@]}" up -d postgres redis
+
+wait_for_healthy() {
+  local service="$1"
+  local max_attempts="${2:-120}"
+  local label="${3:-$service}"
+  for i in $(seq 1 "$max_attempts"); do
+    if "${COMPOSE[@]}" ps "$service" 2>/dev/null | grep -qE "healthy"; then
+      echo "✅ $label listo"
+      return 0
+    fi
+    if [ $((i % 12)) -eq 0 ]; then
+      echo "   … esperando $label ($i/$max_attempts)"
+    fi
+    sleep 5
+  done
+  return 1
+}
 
 echo ""
-echo "⏳ Esperando servicios críticos..."
-for i in $(seq 1 60); do
-  if "${COMPOSE[@]}" ps backup-worker 2>/dev/null | grep -q "healthy"; then
-    echo "✅ backup-worker listo"
-    break
-  fi
-  if [ "$i" -eq 60 ]; then
-    echo "⚠️  backup-worker aún no healthy — revisa: docker compose -f docker-compose.prod.yml logs backup-worker"
-  fi
-  sleep 3
-done
+echo "⏳ Esperando PostgreSQL..."
+if ! wait_for_healthy postgres 60 "PostgreSQL"; then
+  echo "❌ PostgreSQL no alcanzó estado healthy"
+  exit 1
+fi
+
+echo ""
+echo "🐳 Levantando backup-worker..."
+"${COMPOSE[@]}" up -d backup-worker
+
+echo ""
+echo "⏳ Esperando backup-worker (primer arranque puede tardar varios minutos)..."
+if ! wait_for_healthy backup-worker 120 "backup-worker"; then
+  echo "⚠️  backup-worker aún no healthy"
+fi
 
 if [ -x "$SCRIPT_DIR/docker/scripts/disaster-recovery.sh" ]; then
-  echo "🔍 Verificando stanza pgBackRest..."
+  PG_OK=false
   if COMPOSE_FILE="$SCRIPT_DIR/docker-compose.prod.yml" ENV_FILE="$SCRIPT_DIR/.env.production" \
     "$SCRIPT_DIR/docker/scripts/disaster-recovery.sh" check 2>/dev/null; then
+    PG_OK=true
     echo "✅ pgBackRest stanza OK"
-  else
-    echo "⚠️  pgBackRest check pendiente — normal en primer arranque; reintenta en 1 min"
+  fi
+
+  if [ "$PG_OK" = false ] && [ -x "$SCRIPT_DIR/docker/scripts/init-pgbackrest.sh" ]; then
+    echo "⚙️  Inicializando pgBackRest..."
+    if COMPOSE_FILE="$SCRIPT_DIR/docker-compose.prod.yml" ENV_FILE="$SCRIPT_DIR/.env.production" \
+      "$SCRIPT_DIR/docker/scripts/init-pgbackrest.sh"; then
+      echo "✅ pgBackRest inicializado"
+      "${COMPOSE[@]}" restart backup-worker
+      wait_for_healthy backup-worker 60 "backup-worker" || true
+    else
+      echo "⚠️  pgBackRest pendiente — Admin → Backups → Config → Inicializar pgBackRest"
+    fi
   fi
 fi
+
+echo ""
+echo "🐳 Levantando app y nginx..."
+"${COMPOSE[@]}" up -d app nginx
 
 echo ""
 echo "╔══════════════════════════════════════════════════════════════╗"

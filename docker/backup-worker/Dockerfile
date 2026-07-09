@@ -15,7 +15,7 @@ ENV PORT=8080
 USER postgres
 EXPOSE 8080
 
-HEALTHCHECK --interval=30s --timeout=10s --retries=5 --start-period=40s \
-  CMD curl -fsS http://127.0.0.1:8080/health || exit 1
+HEALTHCHECK --interval=15s --timeout=10s --retries=10 --start-period=300s \
+  CMD curl -fsS http://127.0.0.1:8080/health | grep -q '"stanzaOk":true' || exit 1
 
 CMD ["node", "server.mjs"]
