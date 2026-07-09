@@ -60,6 +60,7 @@ services:
     build:
       context: ./docker/backup-worker
     container_name: tickets-backup-worker
+    user: '999:999'
     environment:
       BACKUP_WORKER_SECRET: ${BACKUP_WORKER_SECRET:?BACKUP_WORKER_SECRET requerida}
       PGBACKREST_STANZA: main

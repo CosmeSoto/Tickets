@@ -7,8 +7,9 @@
 # y levanta todos los servicios con docker compose.
 #
 # Uso:
-#   sudo ./start-production.sh            # rebuild normal (detecta cambios)
-#   sudo ./start-production.sh --clean    # rebuild total sin caché (primera vez o errores)
+#   sudo ./start-production.sh                 # rebuild normal
+#   sudo ./start-production.sh --clean         # borra volúmenes + rebuild con caché (~rápido)
+#   sudo ./start-production.sh --clean --no-cache  # rebuild total sin caché (~lento)
 #
 # Requisitos:
 #   - Docker y Docker Compose instalados
@@ -20,9 +21,13 @@ set -e
 
 # ── Parámetros ─────────────────────────────────────────────────────────────────
 CLEAN_BUILD=false
-if [ "$1" = "--clean" ] || [ "$1" = "--no-cache" ]; then
-  CLEAN_BUILD=true
-fi
+NO_CACHE=false
+for arg in "$@"; do
+  case "$arg" in
+    --clean) CLEAN_BUILD=true ;;
+    --no-cache) NO_CACHE=true ;;
+  esac
+done
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DOMAIN="gestion.local"
@@ -210,9 +215,13 @@ SERVICES=(postgres backup-worker app)
 if [ "$CLEAN_BUILD" = true ]; then
   echo "🧹 Modo --clean: deteniendo servicios y borrando volúmenes (BD + pgBackRest)..."
   "${COMPOSE[@]}" down -v --remove-orphans 2>/dev/null || true
-  docker builder prune -f --filter "until=1h" 2>/dev/null || true
-  echo "🔨 Rebuild total sin caché (postgres, backup-worker, app)..."
-  "${COMPOSE[@]}" build --no-cache "${SERVICES[@]}"
+  if [ "$NO_CACHE" = true ]; then
+    echo "🔨 Rebuild sin caché (postgres, backup-worker, app)..."
+    "${COMPOSE[@]}" build --no-cache "${SERVICES[@]}"
+  else
+    echo "🔨 Rebuild con caché (postgres, backup-worker, app)..."
+    "${COMPOSE[@]}" build "${SERVICES[@]}"
+  fi
 else
   echo "🔨 Rebuild incremental (postgres, backup-worker, app)..."
   "${COMPOSE[@]}" build "${SERVICES[@]}"
@@ -244,42 +253,37 @@ if ! wait_for_healthy postgres 60 "PostgreSQL"; then
   exit 1
 fi
 
-echo ""
-echo "🐳 Levantando backup-worker..."
-"${COMPOSE[@]}" up -d backup-worker
-
-echo ""
-echo "⏳ Esperando backup-worker (puede tardar 2–5 min en primer arranque)..."
-if ! wait_for_healthy backup-worker 36 "backup-worker"; then
-  echo "⚠️  backup-worker aún no healthy — la app arrancará igual; pgBackRest se completará en segundo plano"
+# pgBackRest se inicializa desde el contenedor postgres (UID 999 correcto)
+PG_OK=false
+if [ -x "$SCRIPT_DIR/docker/scripts/disaster-recovery.sh" ] && \
+  COMPOSE_FILE="$SCRIPT_DIR/docker-compose.prod.yml" ENV_FILE="$SCRIPT_DIR/.env.production" \
+  "$SCRIPT_DIR/docker/scripts/disaster-recovery.sh" check 2>/dev/null; then
+  PG_OK=true
+  echo "✅ pgBackRest stanza OK"
 fi
 
-if [ -x "$SCRIPT_DIR/docker/scripts/disaster-recovery.sh" ]; then
-  PG_OK=false
-  if COMPOSE_FILE="$SCRIPT_DIR/docker-compose.prod.yml" ENV_FILE="$SCRIPT_DIR/.env.production" \
-    "$SCRIPT_DIR/docker/scripts/disaster-recovery.sh" check 2>/dev/null; then
+if [ "$PG_OK" = false ] && [ -x "$SCRIPT_DIR/docker/scripts/init-pgbackrest.sh" ]; then
+  echo "⚙️  Inicializando pgBackRest desde postgres..."
+  if timeout 600 env COMPOSE_FILE="$SCRIPT_DIR/docker-compose.prod.yml" ENV_FILE="$SCRIPT_DIR/.env.production" \
+    "$SCRIPT_DIR/docker/scripts/init-pgbackrest.sh"; then
+    echo "✅ pgBackRest inicializado"
     PG_OK=true
-    echo "✅ pgBackRest stanza OK"
-  fi
-
-  if [ "$PG_OK" = false ] && [ -x "$SCRIPT_DIR/docker/scripts/init-pgbackrest.sh" ]; then
-    echo "⚙️  Inicializando pgBackRest (timeout 15 min)..."
-    if timeout 900 env COMPOSE_FILE="$SCRIPT_DIR/docker-compose.prod.yml" ENV_FILE="$SCRIPT_DIR/.env.production" \
-      "$SCRIPT_DIR/docker/scripts/init-pgbackrest.sh"; then
-      echo "✅ pgBackRest inicializado"
-    else
-      echo "⚠️  pgBackRest pendiente — la app arrancará; completa desde Admin → Backups → Config"
-    fi
+  else
+    echo "⚠️  pgBackRest pendiente — completa desde Admin → Backups → Config"
   fi
 fi
 
 echo ""
-echo "🐳 Levantando app y nginx..."
-"${COMPOSE[@]}" up -d app nginx
+echo "🐳 Levantando backup-worker, app y nginx..."
+"${COMPOSE[@]}" up -d backup-worker app nginx
 
 echo ""
-echo "⏳ Esperando app..."
-wait_for_healthy app 60 "app" || echo "⚠️  App aún iniciando (seed/migraciones pueden tardar ~2 min)"
+echo "⏳ Esperando app (seed/migraciones ~1–2 min)..."
+wait_for_healthy app 72 "app" || echo "⚠️  App aún iniciando — revisa logs si no responde en 3 min"
+
+if [ "$PG_OK" = true ]; then
+  echo "ℹ️  backup-worker sincroniza pgBackRest en segundo plano"
+fi
 
 echo ""
 echo "╔══════════════════════════════════════════════════════════════╗"

@@ -41,7 +41,7 @@ cmd="${1:-help}"
 
 case "$cmd" in
   check)
-    compose exec -u postgres backup-worker pgbackrest \
+    compose exec -u postgres postgres pgbackrest \
       --config=/etc/pgbackrest/pgbackrest-local.conf check --stanza="$STANZA"
     ;;
   info)
