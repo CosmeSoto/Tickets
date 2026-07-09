@@ -225,7 +225,7 @@ wait_for_healthy() {
   local max_attempts="${2:-120}"
   local label="${3:-$service}"
   for i in $(seq 1 "$max_attempts"); do
-    if "${COMPOSE[@]}" ps "$service" 2>/dev/null | grep -qE "healthy"; then
+    if "${COMPOSE[@]}" ps "$service" 2>/dev/null | grep -q "(healthy)"; then
       echo "✅ $label listo"
       return 0
     fi
@@ -249,9 +249,9 @@ echo "🐳 Levantando backup-worker..."
 "${COMPOSE[@]}" up -d backup-worker
 
 echo ""
-echo "⏳ Esperando backup-worker (primer arranque puede tardar varios minutos)..."
-if ! wait_for_healthy backup-worker 120 "backup-worker"; then
-  echo "⚠️  backup-worker aún no healthy"
+echo "⏳ Esperando backup-worker (puede tardar 2–5 min en primer arranque)..."
+if ! wait_for_healthy backup-worker 36 "backup-worker"; then
+  echo "⚠️  backup-worker aún no healthy — la app arrancará igual; pgBackRest se completará en segundo plano"
 fi
 
 if [ -x "$SCRIPT_DIR/docker/scripts/disaster-recovery.sh" ]; then
@@ -263,14 +263,12 @@ if [ -x "$SCRIPT_DIR/docker/scripts/disaster-recovery.sh" ]; then
   fi
 
   if [ "$PG_OK" = false ] && [ -x "$SCRIPT_DIR/docker/scripts/init-pgbackrest.sh" ]; then
-    echo "⚙️  Inicializando pgBackRest..."
-    if COMPOSE_FILE="$SCRIPT_DIR/docker-compose.prod.yml" ENV_FILE="$SCRIPT_DIR/.env.production" \
+    echo "⚙️  Inicializando pgBackRest (timeout 15 min)..."
+    if timeout 900 env COMPOSE_FILE="$SCRIPT_DIR/docker-compose.prod.yml" ENV_FILE="$SCRIPT_DIR/.env.production" \
       "$SCRIPT_DIR/docker/scripts/init-pgbackrest.sh"; then
       echo "✅ pgBackRest inicializado"
-      "${COMPOSE[@]}" restart backup-worker
-      wait_for_healthy backup-worker 60 "backup-worker" || true
     else
-      echo "⚠️  pgBackRest pendiente — Admin → Backups → Config → Inicializar pgBackRest"
+      echo "⚠️  pgBackRest pendiente — la app arrancará; completa desde Admin → Backups → Config"
     fi
   fi
 fi
@@ -278,6 +276,10 @@ fi
 echo ""
 echo "🐳 Levantando app y nginx..."
 "${COMPOSE[@]}" up -d app nginx
+
+echo ""
+echo "⏳ Esperando app..."
+wait_for_healthy app 60 "app" || echo "⚠️  App aún iniciando (seed/migraciones pueden tardar ~2 min)"
 
 echo ""
 echo "╔══════════════════════════════════════════════════════════════╗"

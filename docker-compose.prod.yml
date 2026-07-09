@@ -38,6 +38,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - pgbackrest_repo:/var/lib/pgbackrest
+      - pg_socket:/var/run/postgresql
       - ./docker/pgbackrest/pgbackrest.conf:/etc/pgbackrest/pgbackrest.conf:ro
       - ./docker/pgbackrest/pgbackrest-local.conf:/etc/pgbackrest/pgbackrest-local.conf:ro
     networks:
@@ -63,9 +64,11 @@ services:
       BACKUP_WORKER_SECRET: ${BACKUP_WORKER_SECRET:?BACKUP_WORKER_SECRET requerida}
       PGBACKREST_STANZA: main
       BACKUP_ALLOW_RESTORE: ${BACKUP_ALLOW_RESTORE:-false}
+      PGPASSWORD: ${DB_PASSWORD:?DB_PASSWORD requerida}
     volumes:
       - postgres_data:/var/lib/postgresql/data:ro
       - pgbackrest_repo:/var/lib/pgbackrest
+      - pg_socket:/var/run/postgresql:ro
       - ./docker/pgbackrest/pgbackrest.conf:/etc/pgbackrest/pgbackrest.conf:ro
       - ./docker/pgbackrest/pgbackrest-local.conf:/etc/pgbackrest/pgbackrest-local.conf:ro
     networks:
@@ -74,6 +77,7 @@ services:
       postgres:
         condition: service_healthy
     restart: unless-stopped
+    stop_grace_period: 15s
     healthcheck:
       test: ['CMD-SHELL', 'curl -fsS http://127.0.0.1:8080/health | grep -q "\\"stanzaOk\\":true"']
       interval: 15s
@@ -181,6 +185,7 @@ services:
 volumes:
   postgres_data:
   pgbackrest_repo:
+  pg_socket:
   redis_data:
   app_uploads:
   app_logs:

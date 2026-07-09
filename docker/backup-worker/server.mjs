@@ -14,6 +14,7 @@ const PORT = Number(process.env.PORT || 8080)
 const SECRET = process.env.BACKUP_WORKER_SECRET || ''
 const STANZA = process.env.PGBACKREST_STANZA || 'main'
 const ALLOW_RESTORE = process.env.BACKUP_ALLOW_RESTORE === 'true'
+const PGBR_CONFIG = '/etc/pgbackrest/pgbackrest-local.conf'
 
 let stanzaReady = false
 let initPromise = null
@@ -47,7 +48,7 @@ async function runPgBackRest(args, timeoutMs = 3_600_000) {
   const { stdout, stderr } = await exec('pgbackrest', args, {
     timeout: timeoutMs,
     maxBuffer: 50 * 1024 * 1024,
-    env: { ...process.env, PGBACKREST_CONFIG: '/etc/pgbackrest/pgbackrest.conf' },
+    env: { ...process.env, PGBACKREST_CONFIG: PGBR_CONFIG },
   })
   return { stdout: stdout?.toString() || '', stderr: stderr?.toString() || '' }
 }
@@ -230,8 +231,14 @@ const server = http.createServer(async (req, res) => {
 })
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`[backup-worker] Escuchando en :${PORT} stanza=${STANZA}`)
+  console.log(`[backup-worker] Escuchando en :${PORT} stanza=${STANZA} config=${PGBR_CONFIG}`)
   startInit().then(ok => {
     console.log(`[backup-worker] Inicialización ${ok ? 'completada' : 'fallida'}`)
   })
+})
+
+process.on('SIGTERM', () => {
+  console.log('[backup-worker] SIGTERM — cerrando')
+  server.close(() => process.exit(0))
+  setTimeout(() => process.exit(1), 10_000).unref()
 })

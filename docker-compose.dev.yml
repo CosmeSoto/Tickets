@@ -35,6 +35,7 @@ services:
     volumes:
       - postgres_data_dev:/var/lib/postgresql/data
       - pgbackrest_repo_dev:/var/lib/pgbackrest
+      - pg_socket_dev:/var/run/postgresql
       - ./docker/pgbackrest/pgbackrest.conf:/etc/pgbackrest/pgbackrest.conf:ro
       - ./docker/pgbackrest/pgbackrest-local.conf:/etc/pgbackrest/pgbackrest-local.conf:ro
     networks:
@@ -59,9 +60,11 @@ services:
       BACKUP_WORKER_SECRET: ${BACKUP_WORKER_SECRET:-dev-backup-worker-secret}
       PGBACKREST_STANZA: main
       BACKUP_ALLOW_RESTORE: ${BACKUP_ALLOW_RESTORE:-true}
+      PGPASSWORD: tickets_password_2024
     volumes:
       - postgres_data_dev:/var/lib/postgresql/data:ro
       - pgbackrest_repo_dev:/var/lib/pgbackrest
+      - pg_socket_dev:/var/run/postgresql:ro
       - ./docker/pgbackrest/pgbackrest.conf:/etc/pgbackrest/pgbackrest.conf:ro
       - ./docker/pgbackrest/pgbackrest-local.conf:/etc/pgbackrest/pgbackrest-local.conf:ro
     networks:
@@ -159,6 +162,7 @@ services:
 volumes:
   postgres_data_dev:
   pgbackrest_repo_dev:
+  pg_socket_dev:
   dev_node_modules:
   dev_next_cache:
   dev_backups:
