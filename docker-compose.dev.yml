@@ -41,11 +41,15 @@ services:
       - tickets-network
     restart: unless-stopped
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U tickets_user -d tickets_db']
+      test:
+        [
+          'CMD-SHELL',
+          'pg_isready -U tickets_user -d tickets_db && psql -U tickets_user -d tickets_db -tAc "SELECT NOT pg_is_in_recovery()" | grep -q t',
+        ]
       interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 40s
 
   backup-worker:
     build:

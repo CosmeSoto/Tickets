@@ -1,44 +1,26 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useMemo } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import {
   Database,
   HardDrive,
   Clock,
-  Shield,
   TrendingUp,
   AlertTriangle,
   CheckCircle,
-  Activity,
   Zap,
-  Calendar,
-  Server,
 } from 'lucide-react'
 
 interface BackupDashboardProps {
   backups: any[]
   stats: any
   loading: boolean
-  onRefresh: () => void
-  onCreateBackup: () => void
-  onCreateExport?: () => void
-  creating?: boolean
 }
 
-export function BackupDashboard({
-  backups,
-  stats,
-  loading,
-  onRefresh,
-  onCreateBackup,
-  onCreateExport,
-  creating = false,
-}: BackupDashboardProps) {
-  // Análisis de backups
+export function BackupDashboard({ backups, stats, loading }: BackupDashboardProps) {
   const analysis = useMemo(() => {
     if (!backups.length) return null
 
@@ -49,19 +31,15 @@ export function BackupDashboard({
 
     const successRate = backups.length > 0 ? (completedBackups.length / backups.length) * 100 : 0
 
-    // Análisis de tendencias (últimos 7 días)
     const last7Days = new Date()
     last7Days.setDate(last7Days.getDate() - 7)
-
     const recentBackups = backups.filter(b => new Date(b.createdAt) >= last7Days)
 
-    // Calcular tamaño promedio
     const avgSize =
       completedBackups.length > 0
         ? completedBackups.reduce((sum, b) => sum + b.size, 0) / completedBackups.length
         : 0
 
-    // Tiempo desde último backup
     const lastBackup = completedBackups[0]
     const timeSinceLastBackup = lastBackup
       ? Date.now() - new Date(lastBackup.createdAt).getTime()
@@ -90,79 +68,55 @@ export function BackupDashboard({
   const formatTimeSince = (ms: number) => {
     const hours = Math.floor(ms / (1000 * 60 * 60))
     const days = Math.floor(hours / 24)
-
     if (days > 0) return `${days} día${days > 1 ? 's' : ''}`
     if (hours > 0) return `${hours} hora${hours > 1 ? 's' : ''}`
     return 'Hace poco'
   }
 
   const getHealthStatus = () => {
-    if (!analysis) return { status: 'unknown', color: 'gray', message: 'Sin datos' }
+    if (stats?.pgbackrestAvailable === false) {
+      return { status: 'warning', message: 'pgBackRest no disponible' }
+    }
+    if (!analysis) return { status: 'unknown', message: 'Sin datos' }
 
     const { successRate, timeSinceLastBackup } = analysis
     const hoursAgo = timeSinceLastBackup ? timeSinceLastBackup / (1000 * 60 * 60) : Infinity
 
-    if (successRate >= 95 && hoursAgo <= 24) {
-      return { status: 'excellent', color: 'green', message: 'Excelente' }
-    } else if (successRate >= 80 && hoursAgo <= 48) {
-      return { status: 'good', color: 'blue', message: 'Bueno' }
-    } else if (successRate >= 60 && hoursAgo <= 72) {
-      return { status: 'warning', color: 'yellow', message: 'Atención' }
-    } else {
-      return { status: 'critical', color: 'red', message: 'Crítico' }
+    if (successRate >= 95 && hoursAgo <= 48) {
+      return { status: 'excellent', message: 'Excelente' }
     }
+    if (successRate >= 80 && hoursAgo <= 72) {
+      return { status: 'good', message: 'Bueno' }
+    }
+    if (successRate >= 60) {
+      return { status: 'warning', message: 'Atención' }
+    }
+    return { status: 'critical', message: 'Crítico' }
   }
 
   const healthStatus = getHealthStatus()
 
   return (
     <div className='space-y-6'>
-      {/* Header con estado general */}
-      <div className='flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4'>
-        <div className='min-w-0 flex-1'>
-          <h2 className='text-xl sm:text-2xl font-bold text-foreground break-words'>
-            Dashboard de Backups
-          </h2>
-          <p className='text-muted-foreground break-words'>
-            pgBackRest + exportaciones portátiles
-            {stats?.pgbackrestAvailable === false && (
-              <span className='text-amber-600 dark:text-amber-400'>
-                {' '}
-                — pgBackRest no disponible
-              </span>
-            )}
-          </p>
-        </div>
-
-        <div className='flex flex-wrap gap-2 w-full sm:w-auto'>
-          <Button onClick={onCreateBackup} disabled={creating || loading} size='sm'>
-            <Database className={`h-4 w-4 mr-2 ${creating ? 'animate-spin' : ''}`} />
-            Respaldo pgBackRest
-          </Button>
-          {onCreateExport && (
-            <Button
-              variant='outline'
-              onClick={onCreateExport}
-              disabled={creating || loading}
-              size='sm'
-            >
-              <HardDrive className='h-4 w-4 mr-2' />
-              Exportar .dump
-            </Button>
-          )}
-        </div>
-
-        <div
-          className={`flex items-center space-x-2 px-3 py-1.5 rounded-full bg-${healthStatus.color}-50 border border-${healthStatus.color}-200 w-full sm:w-auto`}
+      <div className='flex flex-wrap items-center gap-2'>
+        <Badge
+          variant={healthStatus.status === 'excellent' ? 'default' : 'secondary'}
+          className='text-xs'
         >
-          <div className={`w-2 h-2 rounded-full bg-${healthStatus.color}-500 flex-shrink-0`}></div>
-          <span className={`text-sm font-medium text-${healthStatus.color}-700 break-words`}>
-            Estado: {healthStatus.message}
-          </span>
-        </div>
+          Estado: {healthStatus.message}
+        </Badge>
+        {stats?.pgbackrestAvailable && (
+          <Badge variant='outline' className='text-xs text-primary border-primary/30'>
+            pgBackRest activo
+          </Badge>
+        )}
+        {loading && (
+          <Badge variant='outline' className='text-xs'>
+            Actualizando…
+          </Badge>
+        )}
       </div>
 
-      {/* KPI Cards */}
       <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6'>
         <Card className='relative overflow-hidden'>
           <CardContent className='p-6'>
@@ -172,10 +126,9 @@ export function BackupDashboard({
               </div>
               <div className='text-right'>
                 <div className='text-2xl font-bold text-foreground'>{stats?.totalBackups || 0}</div>
-                <div className='text-sm text-muted-foreground'>Total Backups</div>
+                <div className='text-sm text-muted-foreground'>Total respaldos</div>
               </div>
             </div>
-
             {analysis && (
               <div className='space-y-2'>
                 <div className='flex justify-between text-xs text-muted-foreground'>
@@ -198,15 +151,14 @@ export function BackupDashboard({
                 <div className='text-2xl font-bold text-foreground'>
                   {formatFileSize(stats?.totalSize || 0)}
                 </div>
-                <div className='text-sm text-muted-foreground'>Espacio Total</div>
+                <div className='text-sm text-muted-foreground'>Espacio total</div>
               </div>
             </div>
-
             {analysis && (
               <div className='text-xs text-muted-foreground'>
                 <div>Promedio: {formatFileSize(analysis.avgSize)}</div>
                 <div className='mt-1'>
-                  {analysis.manualCount} manuales • {analysis.automaticCount} automáticos
+                  {analysis.manualCount} manuales · {analysis.automaticCount} automáticos
                 </div>
               </div>
             )}
@@ -225,18 +177,12 @@ export function BackupDashboard({
                     ? formatTimeSince(analysis.timeSinceLastBackup)
                     : 'Nunca'}
                 </div>
-                <div className='text-sm text-muted-foreground'>Último Backup</div>
+                <div className='text-sm text-muted-foreground'>Último respaldo</div>
               </div>
             </div>
-
-            {stats?.lastBackup && (
-              <div className='text-xs text-muted-foreground'>
-                {new Date(stats.lastBackup).toLocaleDateString('es-ES', {
-                  month: 'short',
-                  day: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
+            {analysis?.lastBackup && (
+              <div className='text-xs text-muted-foreground truncate'>
+                {analysis.lastBackup.filename}
               </div>
             )}
           </CardContent>
@@ -246,7 +192,7 @@ export function BackupDashboard({
           <CardContent className='p-6'>
             <div className='flex items-center justify-between mb-4'>
               <div className='p-3 rounded-lg bg-muted border border-border'>
-                <Shield className='h-6 w-6 text-muted-foreground' />
+                <TrendingUp className='h-6 w-6 text-muted-foreground' />
               </div>
               <div className='text-right'>
                 <div className='text-2xl font-bold text-foreground'>
@@ -255,7 +201,6 @@ export function BackupDashboard({
                 <div className='text-sm text-muted-foreground'>Últimos 7 días</div>
               </div>
             </div>
-
             {analysis && analysis.failedCount > 0 && (
               <div className='flex items-center space-x-1 text-xs text-destructive'>
                 <AlertTriangle className='h-3 w-3' />
@@ -266,72 +211,40 @@ export function BackupDashboard({
         </Card>
       </div>
 
-      {/* Análisis de tendencias */}
       <div className='grid grid-cols-1 lg:grid-cols-3 gap-6'>
         <Card className='lg:col-span-2'>
           <CardHeader>
             <CardTitle className='flex items-center space-x-2'>
               <TrendingUp className='h-5 w-5 text-primary' />
-              <span>Análisis de Rendimiento</span>
+              <span>Rendimiento</span>
             </CardTitle>
-            <CardDescription>
-              Métricas de calidad y confiabilidad del sistema de backups
-            </CardDescription>
+            <CardDescription>Métricas de los respaldos registrados</CardDescription>
           </CardHeader>
           <CardContent>
             {analysis ? (
-              <div className='space-y-6'>
-                <div className='grid grid-cols-2 gap-6'>
-                  <div className='space-y-3'>
-                    <div className='flex justify-between items-center'>
-                      <span className='text-sm font-medium text-foreground'>Tasa de Éxito</span>
-                      <span className='text-sm font-bold text-primary'>
-                        {analysis.successRate.toFixed(1)}%
-                      </span>
-                    </div>
-                    <Progress value={analysis.successRate} className='h-3' />
-
-                    <div className='flex justify-between items-center'>
-                      <span className='text-sm font-medium text-foreground'>Cobertura Semanal</span>
-                      <span className='text-sm font-bold text-foreground'>
-                        {analysis.recentCount} backups
-                      </span>
-                    </div>
-                    <Progress
-                      value={Math.min((analysis.recentCount / 7) * 100, 100)}
-                      className='h-3'
-                    />
+              <div className='grid grid-cols-2 gap-6'>
+                <div className='space-y-3'>
+                  <div className='flex justify-between items-center'>
+                    <span className='text-sm font-medium'>Tasa de éxito</span>
+                    <span className='text-sm font-bold text-primary'>
+                      {analysis.successRate.toFixed(1)}%
+                    </span>
                   </div>
-
-                  <div className='space-y-4'>
-                    <div className='flex items-center justify-between p-3 bg-primary/5 rounded-lg border border-primary/20'>
-                      <div className='flex items-center space-x-2'>
-                        <CheckCircle className='h-4 w-4 text-primary' />
-                        <span className='text-sm font-medium text-foreground'>Completados</span>
-                      </div>
-                      <span className='text-lg font-bold text-foreground'>
-                        {backups.filter(b => b.status === 'completed').length}
-                      </span>
-                    </div>
-
-                    {analysis.failedCount > 0 && (
-                      <div className='flex items-center justify-between p-3 bg-destructive/10 rounded-lg border border-destructive/20'>
-                        <div className='flex items-center space-x-2'>
-                          <AlertTriangle className='h-4 w-4 text-destructive' />
-                          <span className='text-sm font-medium text-destructive'>Fallidos</span>
-                        </div>
-                        <span className='text-lg font-bold text-destructive'>
-                          {analysis.failedCount}
-                        </span>
-                      </div>
-                    )}
+                  <Progress value={analysis.successRate} className='h-3' />
+                </div>
+                <div className='flex items-center justify-between p-3 bg-primary/5 rounded-lg border border-primary/20'>
+                  <div className='flex items-center space-x-2'>
+                    <CheckCircle className='h-4 w-4 text-primary' />
+                    <span className='text-sm font-medium'>Completados</span>
                   </div>
+                  <span className='text-lg font-bold'>
+                    {backups.filter(b => b.status === 'completed').length}
+                  </span>
                 </div>
               </div>
             ) : (
-              <div className='text-center py-8 text-muted-foreground'>
-                <Database className='h-8 w-8 mx-auto mb-2 text-muted-foreground' />
-                <p className='text-sm'>No hay datos suficientes para el análisis</p>
+              <div className='text-center py-8 text-muted-foreground text-sm'>
+                Sin datos suficientes
               </div>
             )}
           </CardContent>
@@ -341,69 +254,36 @@ export function BackupDashboard({
           <CardHeader>
             <CardTitle className='flex items-center space-x-2'>
               <Zap className='h-5 w-5 text-primary' />
-              <span>Estado del Sistema</span>
+              <span>Infraestructura</span>
             </CardTitle>
-            <CardDescription>Monitoreo en tiempo real</CardDescription>
+            <CardDescription>Estado pgBackRest</CardDescription>
           </CardHeader>
-          <CardContent className='space-y-4'>
-            <div
-              className={`p-4 rounded-lg border-2 ${
-                healthStatus.status === 'excellent'
-                  ? 'bg-primary/5 border-primary/30'
-                  : healthStatus.status === 'good'
-                    ? 'bg-muted/50 border-border'
-                    : healthStatus.status === 'warning'
-                      ? 'bg-destructive/10 border-destructive/20'
-                      : 'bg-destructive/20 border-destructive/40'
-              }`}
-            >
-              <div className='flex items-center space-x-2 mb-2'>
-                <div
-                  className={`w-3 h-3 rounded-full ${
-                    healthStatus.status === 'excellent'
-                      ? 'bg-primary'
-                      : healthStatus.status === 'good'
-                        ? 'bg-muted-foreground'
-                        : healthStatus.status === 'warning'
-                          ? 'bg-destructive'
-                          : 'bg-destructive'
-                  }`}
-                ></div>
-                <span className='font-medium text-foreground'>{healthStatus.message}</span>
-              </div>
-              <p className='text-sm text-muted-foreground'>
-                {healthStatus.status === 'excellent' && 'Sistema funcionando perfectamente'}
-                {healthStatus.status === 'good' && 'Sistema funcionando correctamente'}
-                {healthStatus.status === 'warning' && 'Requiere atención'}
-                {healthStatus.status === 'critical' && 'Acción inmediata requerida'}
-              </p>
+          <CardContent className='space-y-3 text-sm'>
+            <div className='flex justify-between'>
+              <span className='text-muted-foreground'>pgBackRest</span>
+              <Badge variant={stats?.pgbackrestAvailable ? 'default' : 'destructive'}>
+                {stats?.pgbackrestAvailable ? 'Disponible' : 'No disponible'}
+              </Badge>
             </div>
-
-            <div className='space-y-3'>
-              <div className='flex items-center justify-between text-sm'>
-                <span className='text-muted-foreground'>Próximo backup automático</span>
-                <Badge variant='outline' className='text-xs'>
-                  <Calendar className='h-3 w-3 mr-1' />
-                  Programado
-                </Badge>
-              </div>
-
-              <div className='flex items-center justify-between text-sm'>
-                <span className='text-muted-foreground'>Espacio disponible</span>
-                <Badge variant='outline' className='text-xs'>
-                  <Server className='h-3 w-3 mr-1' />
-                  Suficiente
-                </Badge>
-              </div>
-
-              <div className='flex items-center justify-between text-sm'>
-                <span className='text-muted-foreground'>Integridad de datos</span>
-                <Badge variant='outline' className='text-xs'>
-                  <CheckCircle className='h-3 w-3 mr-1' />
-                  Verificado
-                </Badge>
-              </div>
+            <div className='flex justify-between'>
+              <span className='text-muted-foreground'>Último FULL</span>
+              <span className='text-xs font-medium'>
+                {stats?.lastFullBackup
+                  ? new Date(stats.lastFullBackup).toLocaleDateString('es-EC')
+                  : '—'}
+              </span>
             </div>
+            <div className='flex justify-between'>
+              <span className='text-muted-foreground'>Último DIFF</span>
+              <span className='text-xs font-medium'>
+                {stats?.lastDiffBackup
+                  ? new Date(stats.lastDiffBackup).toLocaleDateString('es-EC')
+                  : '—'}
+              </span>
+            </div>
+            <p className='text-xs text-muted-foreground pt-2'>
+              Detalle en vivo en la pestaña Monitoreo.
+            </p>
           </CardContent>
         </Card>
       </div>

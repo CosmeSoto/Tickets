@@ -268,8 +268,8 @@ El cron llama `POST /api/admin/cron/backup` (protegido con `CRON_SECRET`):
 # Backup diferencial
 ./docker/scripts/disaster-recovery.sh backup-diff
 
-# Verificar integridad del repositorio
-./docker/scripts/disaster-recovery.sh verify
+# Reparar pgBackRest / recovery mode (sin borrar datos):
+./docker/scripts/fix-pgbackrest.sh
 ```
 
 ### Recuperación ante desastre
@@ -487,7 +487,8 @@ SELECT table_name FROM information_schema.tables WHERE table_name = 'patrol_fami
 | No accede a gestion.local                    | Verificar `/etc/hosts` y que nginx esté corriendo                                                                 |
 | Certificado SSL no confiable                 | Aceptar excepción o instalar CA de mkcert en clientes                                                             |
 | **404 en `/api/admin/news` u otros módulos** | `sudo ./start-production.sh`. Si persiste: `sudo ./start-production.sh --clean` (⚠️ borra BD)                     |
-| pgBackRest no disponible en UI               | `docker logs tickets-backup-worker` y `./docker/scripts/disaster-recovery.sh check`                               |
+| pgBackRest no disponible / recovery mode     | `./docker/scripts/fix-pgbackrest.sh`                                                                              |
+| PostgreSQL bucle recovery / P1017 en app     | `archive-push` falló — ejecutar fix script y rebuild `postgres`                                                   |
 | Módulo carga vacío tras restaurar backup     | Igual que arriba — si se reconstruyó sin `start-production.sh`, el `NEXTAUTH_URL` puede quedar con dominio errado |
 | Dashboard rondas vacío                       | Verificar que hay patrullas programadas para hoy (UTC-5)                                                          |
 | Técnico no aparece en categorías             | Verificar `technician_family_assignments` para esa familia                                                        |

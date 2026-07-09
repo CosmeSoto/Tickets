@@ -16,7 +16,6 @@ import {
   AlertTriangle,
   CheckCircle,
   Clock,
-  HardDrive,
   Settings,
   RotateCcw,
   BarChart3,
@@ -24,11 +23,17 @@ import {
   ArrowLeft,
   Activity,
 } from 'lucide-react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useSyncDashboardPageMeta } from '@/contexts/dashboard-shell-context'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { useRouter } from 'next/navigation'
 import {
   AlertDialog,
@@ -94,7 +99,9 @@ export default function BackupsPage() {
       b =>
         b.filename.toLowerCase().includes(q) ||
         getStatusLabel(b.status).toLowerCase().includes(q) ||
-        (b.module ?? 'completo').toLowerCase().includes(q) ||
+        getEngineLabel(b.engine).toLowerCase().includes(q) ||
+        getKindLabel(b.backupKind, b.engine).toLowerCase().includes(q) ||
+        (b.label ?? '').toLowerCase().includes(q) ||
         (b.type === 'manual' ? 'manual' : 'automático').includes(q)
     )
   }, [backups, backupSearch])
@@ -116,13 +123,20 @@ export default function BackupsPage() {
         label: 'Tipo',
         format: (v: string) => (v === 'manual' ? 'Manual' : 'Automático'),
       },
-      { key: 'module', label: 'Módulo', format: (v: any) => v ?? 'Completo' },
+      { key: 'engineLabel', label: 'Motor' },
+      { key: 'kindLabel', label: 'Tipo' },
+      { key: 'label', label: 'Etiqueta', format: (v: string) => v ?? '—' },
       { key: 'size', label: 'Tamaño', format: (v: number) => formatFileSize(v) },
       { key: 'compressed', label: 'Comprimido', format: (v: boolean) => (v ? 'Sí' : 'No') },
       { key: 'encrypted', label: 'Encriptado', format: (v: boolean) => (v ? 'Sí' : 'No') },
       { key: 'createdAt', label: 'Fecha', format: (v: string) => formatBackupDate(v) },
     ],
-    getData: () => filteredBackups,
+    getData: () =>
+      filteredBackups.map(b => ({
+        ...b,
+        engineLabel: getEngineLabel(b.engine),
+        kindLabel: getKindLabel(b.backupKind, b.engine),
+      })),
   })
 
   const subtitleLink = useMemo(
@@ -158,23 +172,26 @@ export default function BackupsPage() {
             Limpiar Fallidos ({failedCount})
           </Button>
         )}
-        <Button
-          onClick={() => createBackup({ mode: 'infrastructure', backupKind: 'full' })}
-          disabled={creating}
-          size='sm'
-        >
-          <Plus className={`h-4 w-4 mr-2 ${creating ? 'animate-spin' : ''}`} />
-          {creating ? 'Creando...' : 'Respaldo pgBackRest'}
-        </Button>
-        <Button
-          variant='outline'
-          onClick={() => createBackup({ mode: 'export' })}
-          disabled={creating}
-          size='sm'
-        >
-          <Download className='h-4 w-4 mr-2' />
-          Exportar .dump
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button disabled={creating} size='sm'>
+              <Plus className={`h-4 w-4 mr-2 ${creating ? 'animate-spin' : ''}`} />
+              {creating ? 'Creando...' : 'Crear respaldo'}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align='end'>
+            <DropdownMenuItem
+              onClick={() => createBackup({ mode: 'infrastructure', backupKind: 'full' })}
+            >
+              <Database className='h-4 w-4 mr-2' />
+              pgBackRest (completo)
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => createBackup({ mode: 'export' })}>
+              <Download className='h-4 w-4 mr-2' />
+              Exportar .dump portable
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     ),
     [loading, creating, failedCount, refreshData, cleanupFailedBackups, createBackup]
@@ -243,15 +260,7 @@ export default function BackupsPage() {
 
           <TabsContent value='dashboard' className='space-y-6'>
             <BackupGuideCard />
-            <BackupDashboard
-              backups={backups}
-              stats={stats}
-              loading={loading}
-              onRefresh={refreshData}
-              onCreateBackup={() => createBackup({ mode: 'infrastructure', backupKind: 'full' })}
-              onCreateExport={() => createBackup({ mode: 'export' })}
-              creating={creating}
-            />
+            <BackupDashboard backups={backups} stats={stats} loading={loading} />
           </TabsContent>
 
           <TabsContent value='backups' className='space-y-6'>

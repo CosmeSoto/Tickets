@@ -30,16 +30,29 @@ echo "==> Verificando bodegas huérfanas (sin familia)..."
 node ./docker/fix-orphan-warehouses.js || true
 
 # ── 1. Sincronizar schema de base de datos ───────────────────────────────────
-echo "==> Esperando a que PostgreSQL esté listo..."
-# pg_isready es más fiable que confiar solo en el healthcheck de Compose
-for i in $(seq 1 30); do
+echo "==> Esperando a que PostgreSQL esté listo y fuera de recovery..."
+POSTGRES_READY=false
+for i in $(seq 1 60); do
   if pg_isready -h postgres -p 5432 -U tickets_user -d tickets_db -q 2>/dev/null; then
-    echo "==> PostgreSQL listo."
-    break
+    RECOVERY=""
+    if [ -n "${DATABASE_URL:-}" ]; then
+      RECOVERY=$(psql "${DATABASE_URL}" -tAc "SELECT pg_is_in_recovery()" 2>/dev/null | tr -d '[:space:]')
+    fi
+    if [ "$RECOVERY" = "f" ] || [ "$RECOVERY" = "false" ]; then
+      echo "==> PostgreSQL listo y estable."
+      POSTGRES_READY=true
+      break
+    fi
+    echo "==> PostgreSQL en recovery mode (intento ${i}/60)..."
+  else
+    echo "==> Esperando PostgreSQL (intento ${i}/60)..."
   fi
-  echo "==> Esperando PostgreSQL (intento ${i}/30)..."
-  sleep 2
+  sleep 3
 done
+
+if [ "$POSTGRES_READY" != "true" ]; then
+  echo "==> ADVERTENCIA: PostgreSQL no estabilizó — revisa logs de postgres y ejecuta docker/scripts/fix-pgbackrest.sh"
+fi
 
 echo "==> Sincronizando schema de base de datos..."
 DB_PUSH_OK=false
