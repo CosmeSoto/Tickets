@@ -253,24 +253,31 @@ if ! wait_for_healthy postgres 60 "PostgreSQL"; then
   exit 1
 fi
 
-# pgBackRest se inicializa desde el contenedor postgres (UID 999 correcto)
+# pgBackRest: bootstrap en arranque limpio o si falta el marcador
 PG_OK=false
-if [ -x "$SCRIPT_DIR/docker/scripts/disaster-recovery.sh" ] && \
+if [ "$CLEAN_BUILD" = true ]; then
+  echo "⚙️  Arranque limpio — bootstrap pgBackRest..."
+  NEEDS_PGBR_INIT=true
+else
+  NEEDS_PGBR_INIT=false
+  if ! "${COMPOSE[@]}" exec -T postgres test -f /var/lib/pgbackrest/.bootstrap_done 2>/dev/null; then
+    NEEDS_PGBR_INIT=true
+  fi
+fi
+
+if [ "$NEEDS_PGBR_INIT" = true ] && [ -x "$SCRIPT_DIR/docker/scripts/init-pgbackrest.sh" ]; then
+  if timeout 600 env COMPOSE_FILE="$SCRIPT_DIR/docker-compose.prod.yml" ENV_FILE="$SCRIPT_DIR/.env.production" \
+    "$SCRIPT_DIR/docker/scripts/init-pgbackrest.sh"; then
+    echo "✅ pgBackRest bootstrap OK"
+    PG_OK=true
+  else
+    echo "⚠️  pgBackRest bootstrap falló — la app arrancará igual (Admin → Backups → Config)"
+  fi
+elif [ -x "$SCRIPT_DIR/docker/scripts/disaster-recovery.sh" ] && \
   COMPOSE_FILE="$SCRIPT_DIR/docker-compose.prod.yml" ENV_FILE="$SCRIPT_DIR/.env.production" \
   "$SCRIPT_DIR/docker/scripts/disaster-recovery.sh" check 2>/dev/null; then
   PG_OK=true
-  echo "✅ pgBackRest stanza OK"
-fi
-
-if [ "$PG_OK" = false ] && [ -x "$SCRIPT_DIR/docker/scripts/init-pgbackrest.sh" ]; then
-  echo "⚙️  Inicializando pgBackRest desde postgres..."
-  if timeout 600 env COMPOSE_FILE="$SCRIPT_DIR/docker-compose.prod.yml" ENV_FILE="$SCRIPT_DIR/.env.production" \
-    "$SCRIPT_DIR/docker/scripts/init-pgbackrest.sh"; then
-    echo "✅ pgBackRest inicializado"
-    PG_OK=true
-  else
-    echo "⚠️  pgBackRest pendiente — completa desde Admin → Backups → Config"
-  fi
+  echo "✅ pgBackRest ya configurado"
 fi
 
 echo ""

@@ -1,38 +1,27 @@
 #!/usr/bin/env bash
-# Repara pgBackRest cuando PostgreSQL entra en bucle "recovery mode" o falta la stanza
+# Repara pgBackRest — re-ejecuta bootstrap completo
 # Uso: ./docker/scripts/fix-pgbackrest.sh
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}"
-ENV_FILE="${ENV_FILE:-.env.production}"
+COMPOSE_FILE="${COMPOSE_FILE:-$PROJECT_DIR/docker-compose.prod.yml}"
+ENV_FILE="${ENV_FILE:-$PROJECT_DIR/.env.production}"
 
 compose() {
   docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" "$@"
 }
 
-echo "==> 1. Deteniendo app y backup-worker (postgres sigue activo)..."
+echo "==> 1. Deteniendo app, worker y nginx..."
 compose stop app backup-worker nginx 2>/dev/null || true
 
-echo "==> 2. Arreglando permisos del repositorio pgBackRest..."
-compose exec -u root postgres bash -c '
-  mkdir -p /var/lib/pgbackrest /var/log/pgbackrest /var/spool/pgbackrest
-  chown -R postgres:postgres /var/lib/pgbackrest /var/log/pgbackrest /var/spool/pgbackrest
-  chmod -R 750 /var/lib/pgbackrest /var/log/pgbackrest
-'
-
-echo "==> 3. Levantando backup-worker para inicialización..."
-compose up -d backup-worker
-sleep 10
-
-echo "==> 4. Inicializando stanza pgBackRest..."
+echo "==> 2. Bootstrap pgBackRest..."
 COMPOSE_FILE="$COMPOSE_FILE" ENV_FILE="$ENV_FILE" "$SCRIPT_DIR/init-pgbackrest.sh"
 
-echo "==> 5. Levantando servicios..."
+echo "==> 3. Levantando servicios..."
 compose up -d
 
 echo ""
 echo "✅ Reparación completada."
-echo "   Verifica: docker compose -f $COMPOSE_FILE logs postgres --tail 30"
-echo "   pgBackRest: ./docker/scripts/disaster-recovery.sh check"
+echo "   ./docker/scripts/disaster-recovery.sh check"

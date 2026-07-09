@@ -23,18 +23,6 @@ services:
       POSTGRES_USER: tickets_user
       POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD requerida}
       PGBACKREST_STANZA: main
-    command:
-      - postgres
-      - -c
-      - archive_mode=on
-      - -c
-      - archive_command=pgbackrest --config=/etc/pgbackrest/pgbackrest-local.conf --stanza=main archive-push %p
-      - -c
-      - wal_level=replica
-      - -c
-      - max_wal_senders=3
-      - -c
-      - archive_timeout=60
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - pgbackrest_repo:/var/lib/pgbackrest
