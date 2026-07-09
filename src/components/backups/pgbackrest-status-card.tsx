@@ -56,8 +56,13 @@ export function PgBackRestStatusCard({ onInitialized }: PgBackRestStatusCardProp
 
       setHealth(data.health)
       toast({
-        title: data.alreadyInitialized ? 'pgBackRest ya estaba listo' : 'pgBackRest inicializado',
+        title: data.needsPostgresRestart
+          ? 'Bootstrap completado — reinicia PostgreSQL'
+          : data.alreadyInitialized
+            ? 'pgBackRest ya estaba listo'
+            : 'pgBackRest inicializado',
         description: data.message,
+        variant: data.needsPostgresRestart ? 'default' : undefined,
       })
       onInitialized?.()
     } catch (error) {
@@ -125,10 +130,9 @@ export function PgBackRestStatusCard({ onInitialized }: PgBackRestStatusCardProp
 
         {!isReady && !loading && (
           <p className='text-xs text-muted-foreground leading-relaxed'>
-            Tras un despliegue limpio (<code className='text-[11px]'>--clean</code>), la stanza y el
-            primer backup FULL pueden tardar unos minutos. Si persiste el error, usa{' '}
-            <strong>Inicializar pgBackRest</strong> o ejecuta{' '}
-            <code className='text-[11px]'>./docker/scripts/fix-pgbackrest.sh</code> en el servidor.
+            Tras un despliegue limpio (<code className='text-[11px]'>--clean</code>), pgBackRest se
+            configura solo durante el arranque (1–3 min). Si la tarjeta sigue en pendiente, pulsa{' '}
+            <strong>Inicializar pgBackRest</strong> — no hace falta usar la consola del servidor.
           </p>
         )}
 

@@ -80,12 +80,22 @@ export async function isPgBackRestAvailable(): Promise<boolean> {
   return health.status === 'healthy' && health.stanzaOk
 }
 
-export async function initPgBackRestWorker(): Promise<{ success: boolean }> {
-  const data = await workerFetch<{ success: boolean; stanzaOk?: boolean }>('/init', {
+export async function initPgBackRestWorker(): Promise<{
+  success: boolean
+  needsPostgresRestart?: boolean
+}> {
+  const data = await workerFetch<{
+    success: boolean
+    stanzaOk?: boolean
+    needsPostgresRestart?: boolean
+  }>('/init', {
     method: 'POST',
     timeoutMs: 3_600_000,
   })
-  return { success: Boolean(data.success) }
+  return {
+    success: Boolean(data.success),
+    needsPostgresRestart: Boolean(data.needsPostgresRestart),
+  }
 }
 
 export async function fetchPgBackRestInfo(): Promise<PgBackRestInfo[]> {

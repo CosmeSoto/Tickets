@@ -6,6 +6,7 @@
 import http from 'node:http'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
+import { access, writeFile } from 'fs/promises'
 
 const exec = promisify(execFile)
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
@@ -15,15 +16,18 @@ const SECRET = process.env.BACKUP_WORKER_SECRET || ''
 const STANZA = process.env.PGBACKREST_STANZA || 'main'
 const ALLOW_RESTORE = process.env.BACKUP_ALLOW_RESTORE === 'true'
 const PGBR_CONFIG = '/etc/pgbackrest/pgbackrest-local.conf'
+const BOOTSTRAP_MARKER = '/var/lib/pgbackrest/.bootstrap_done'
+const DOCKER_SOCKET = process.env.DOCKER_SOCKET || '/var/run/docker.sock'
+const POSTGRES_CONTAINER = process.env.POSTGRES_CONTAINER_NAME || 'tickets-postgres'
 
 let stanzaReady = false
 let initPromise = null
 
 function startInit() {
   if (!initPromise) {
-    initPromise = ensureStanzaReady().then(ok => {
-      stanzaReady = ok
-      return ok
+    initPromise = ensureStanzaReady().then(result => {
+      stanzaReady = result.ok && !result.needsPostgresRestart
+      return result
     })
   }
   return initPromise
@@ -42,6 +46,64 @@ function checkAuth(req) {
   if (!SECRET) return false
   const header = req.headers.authorization || ''
   return header === `Bearer ${SECRET}`
+}
+
+async function isBootstrapComplete() {
+  try {
+    await access(BOOTSTRAP_MARKER)
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function markBootstrapComplete() {
+  await writeFile(BOOTSTRAP_MARKER, `completed ${new Date().toISOString()}\n`, { mode: 0o640 })
+}
+
+async function restartPostgresContainer() {
+  return new Promise((resolve, reject) => {
+    const req = http.request(
+      {
+        socketPath: DOCKER_SOCKET,
+        path: `/containers/${POSTGRES_CONTAINER}/restart?t=20`,
+        method: 'POST',
+      },
+      res => {
+        let body = ''
+        res.on('data', chunk => {
+          body += chunk
+        })
+        res.on('end', () => {
+          if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+            resolve()
+            return
+          }
+          reject(new Error(`Docker restart HTTP ${res.statusCode}: ${body.slice(0, 200)}`))
+        })
+      }
+    )
+    req.on('error', reject)
+    req.setTimeout(120_000, () => req.destroy(new Error('Timeout reiniciando postgres')))
+    req.end()
+  })
+}
+
+async function finalizeBootstrap() {
+  await markBootstrapComplete()
+  try {
+    console.log(`[backup-worker] Reiniciando ${POSTGRES_CONTAINER} para activar archive_mode...`)
+    await restartPostgresContainer()
+    await waitPostgresReady(90)
+    await runPgBackRest(['check', `--stanza=${STANZA}`], 120_000)
+    stanzaReady = true
+    console.log('[backup-worker] Bootstrap completado — stanza operativa')
+    return { ok: true, needsPostgresRestart: false }
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error)
+    console.warn(`[backup-worker] Bootstrap OK pero reinicio manual necesario: ${msg}`)
+    return { ok: true, needsPostgresRestart: true }
+  }
 }
 
 async function runPgBackRest(args, timeoutMs = 3_600_000) {
@@ -95,14 +157,26 @@ async function ensureStanzaReady() {
 
   for (let attempt = 1; attempt <= 12; attempt++) {
     try {
-      console.log(`[backup-worker] Inicializando stanza (intento ${attempt}/12)...`)
+      const bootstrapped = await isBootstrapComplete()
+      console.log(`[backup-worker] Sync stanza (intento ${attempt}/12, bootstrap=${bootstrapped})...`)
+
+      if (!bootstrapped) {
+        console.log('[backup-worker] Bootstrap — stanza-create + backup FULL...')
+        await runPgBackRest(['stanza-create', `--stanza=${STANZA}`], 120_000)
+        await runPgBackRest(
+          ['backup', `--stanza=${STANZA}`, '--type=full', '--no-archive-check'],
+          3_600_000
+        )
+        return finalizeBootstrap()
+      }
+
       await runPgBackRest(['stanza-create', `--stanza=${STANZA}`], 120_000)
 
       try {
         await runPgBackRest(['check', `--stanza=${STANZA}`], 120_000)
       } catch (checkErr) {
         if (!(await hasExistingBackups())) {
-          console.log('[backup-worker] Primer arranque — ejecutando backup FULL inicial...')
+          console.log('[backup-worker] Sin backups — ejecutando FULL...')
           await runPgBackRest(
             ['backup', `--stanza=${STANZA}`, '--type=full', '--no-archive-check'],
             3_600_000
@@ -115,7 +189,7 @@ async function ensureStanzaReady() {
 
       stanzaReady = true
       console.log('[backup-worker] Stanza lista')
-      return true
+      return { ok: true, needsPostgresRestart: false }
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error)
       const stderr = error?.stderr?.toString?.() || ''
@@ -127,7 +201,7 @@ async function ensureStanzaReady() {
 
   stanzaReady = false
   console.error('[backup-worker] Stanza NO inicializada — servicio en modo degradado')
-  return false
+  return { ok: false, needsPostgresRestart: false }
 }
 
 const server = http.createServer(async (req, res) => {
@@ -163,8 +237,13 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === '/init' && req.method === 'POST') {
       stanzaReady = false
       initPromise = null
-      const ok = await startInit()
-      return json(res, ok ? 200 : 503, { success: ok, stanzaOk: stanzaReady })
+      const result = await startInit()
+      const status = result.ok ? 200 : 503
+      return json(res, status, {
+        success: result.ok,
+        stanzaOk: stanzaReady,
+        needsPostgresRestart: result.needsPostgresRestart,
+      })
     }
 
     if (url.pathname === '/info' && req.method === 'GET') {
@@ -175,11 +254,17 @@ const server = http.createServer(async (req, res) => {
 
     if (url.pathname === '/backup' && req.method === 'POST') {
       if (!stanzaReady) {
-        const ok = await startInit()
-        if (!ok) {
+        const result = await startInit()
+        if (!result.ok) {
           return json(res, 503, {
             error:
-              'pgBackRest no inicializado. Revisa logs del backup-worker o ejecuta fix-pgbackrest.sh',
+              'pgBackRest no inicializado. Ejecuta ./docker/scripts/init-pgbackrest.sh en el servidor.',
+          })
+        }
+        if (result.needsPostgresRestart) {
+          return json(res, 503, {
+            error:
+              'Bootstrap completado — pulsa Inicializar de nuevo o reinicia postgres desde el servidor',
           })
         }
       }
@@ -232,8 +317,12 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`[backup-worker] Escuchando en :${PORT} stanza=${STANZA} config=${PGBR_CONFIG}`)
-  startInit().then(ok => {
-    console.log(`[backup-worker] Inicialización ${ok ? 'completada' : 'fallida'}`)
+  startInit().then(result => {
+    if (result.needsPostgresRestart) {
+      console.log('[backup-worker] Bootstrap OK — pendiente: docker compose restart postgres')
+    } else {
+      console.log(`[backup-worker] Inicialización ${result.ok ? 'completada' : 'fallida'}`)
+    }
   })
 })
 

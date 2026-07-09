@@ -83,6 +83,8 @@ npm run dev
 # ═══════════════════════════════════════════════════════════════════════════════
 # PRIMERA VEZ, migración pgBackRest o BD no importa (rebuild total ~8-12 min):
 # Borra volúmenes (BD, pgBackRest, Redis) y reconstruye postgres + backup-worker + app
+# pgBackRest se configura SOLO durante el arranque — no hace falta consola ni botón UI.
+# Si tras 3 min la tarjeta sigue en "Pendiente": Admin → Backups → Config → Inicializar.
 # ═══════════════════════════════════════════════════════════════════════════════
 sudo ./start-production.sh --clean
 
@@ -248,6 +250,13 @@ docker compose -f docker-compose.prod.yml --env-file .env.production exec postgr
 ## Backups (pgBackRest)
 
 Documentación completa: [docs/BACKUP-SYSTEM.md](docs/BACKUP-SYSTEM.md)
+
+### Arranque limpio (`--clean`)
+
+1. `start-production.sh` ejecuta automáticamente `init-pgbackrest.sh` (stanza + FULL + archivado WAL).
+2. El **backup-worker** usa la misma versión de pgBackRest que PostgreSQL 17 (2.58+).
+3. **No necesitas comandos manuales** — en 1–3 min la tarjeta en Admin → Backups → Config debe mostrar **Disponible**.
+4. Si quedó en **Pendiente**, pulsa **Inicializar pgBackRest** (un clic; reinicia postgres internamente).
 
 ### Operación diaria (automático)
 
@@ -481,18 +490,20 @@ SELECT table_name FROM information_schema.tables WHERE table_name = 'patrol_fami
 
 ## Solución de Problemas
 
-| Problema                                     | Solución                                                                                                          |
-| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| App no arranca                               | `docker logs tickets-app` — verificar DATABASE_URL                                                                |
-| No accede a gestion.local                    | Verificar `/etc/hosts` y que nginx esté corriendo                                                                 |
-| Certificado SSL no confiable                 | Aceptar excepción o instalar CA de mkcert en clientes                                                             |
-| **404 en `/api/admin/news` u otros módulos** | `sudo ./start-production.sh`. Si persiste: `sudo ./start-production.sh --clean` (⚠️ borra BD)                     |
-| pgBackRest no disponible / recovery mode     | `./docker/scripts/fix-pgbackrest.sh`                                                                              |
-| PostgreSQL bucle recovery / P1017 en app     | `archive-push` falló — ejecutar fix script y rebuild `postgres`                                                   |
-| Módulo carga vacío tras restaurar backup     | Igual que arriba — si se reconstruyó sin `start-production.sh`, el `NEXTAUTH_URL` puede quedar con dominio errado |
-| Dashboard rondas vacío                       | Verificar que hay patrullas programadas para hoy (UTC-5)                                                          |
-| Técnico no aparece en categorías             | Verificar `technician_family_assignments` para esa familia                                                        |
-| Agente no aparece en programación            | Verificar `patrol_family_assignments` + `patrolsEnabled=true`                                                     |
+| Problema                                        | Solución                                                                                                                                                            |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| App no arranca                                  | `docker logs tickets-app` — verificar DATABASE_URL                                                                                                                  |
+| No accede a gestion.local                       | Verificar `/etc/hosts` y que nginx esté corriendo                                                                                                                   |
+| Certificado SSL no confiable                    | Aceptar excepción o instalar CA de mkcert en clientes                                                                                                               |
+| **404 en `/api/admin/news` u otros módulos**    | `sudo ./start-production.sh`. Si persiste: `sudo ./start-production.sh --clean` (⚠️ borra BD)                                                                       |
+| pgBackRest no disponible / recovery mode        | `./docker/scripts/fix-pgbackrest.sh`                                                                                                                                |
+| `VersionNotSupportedError` control version 1700 | Reconstruir **backup-worker** (pgBackRest 2.50+ para PG 17): `docker compose -f docker-compose.prod.yml build backup-worker && ./docker/scripts/init-pgbackrest.sh` |
+| `archive_mode must be enabled`                  | Bootstrap incompleto — `./docker/scripts/init-pgbackrest.sh` y reinicia postgres                                                                                    |
+| PostgreSQL bucle recovery / P1017 en app        | `archive-push` falló — ejecutar fix script y rebuild `postgres`                                                                                                     |
+| Módulo carga vacío tras restaurar backup        | Igual que arriba — si se reconstruyó sin `start-production.sh`, el `NEXTAUTH_URL` puede quedar con dominio errado                                                   |
+| Dashboard rondas vacío                          | Verificar que hay patrullas programadas para hoy (UTC-5)                                                                                                            |
+| Técnico no aparece en categorías                | Verificar `technician_family_assignments` para esa familia                                                                                                          |
+| Agente no aparece en programación               | Verificar `patrol_family_assignments` + `patrolsEnabled=true`                                                                                                       |
 
 ---
 

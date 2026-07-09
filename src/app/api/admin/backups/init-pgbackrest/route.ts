@@ -21,15 +21,33 @@ export async function POST() {
     }
 
     const result = await initPgBackRestWorker()
-    const after = await getBackupWorkerHealth()
+
+    let after = await getBackupWorkerHealth()
+    if (result.success && !after.stanzaOk) {
+      for (let i = 0; i < 18; i++) {
+        await new Promise(resolve => setTimeout(resolve, 5000))
+        after = await getBackupWorkerHealth()
+        if (after.stanzaOk) break
+      }
+    }
+
+    let message: string
+    if (after.stanzaOk) {
+      message = result.needsPostgresRestart
+        ? 'Bootstrap completado — pulsa Inicializar de nuevo en unos segundos'
+        : 'pgBackRest inicializado correctamente'
+    } else if (result.needsPostgresRestart) {
+      message = 'Bootstrap parcial — espera 30 s y pulsa Inicializar de nuevo'
+    } else {
+      message = 'Inicialización incompleta — revisa logs del backup-worker'
+    }
 
     return NextResponse.json({
       success: result.success,
+      needsPostgresRestart: result.needsPostgresRestart,
       stanzaOk: after.stanzaOk,
       health: after,
-      message: after.stanzaOk
-        ? 'pgBackRest inicializado correctamente'
-        : 'Inicialización incompleta — revisa logs del backup-worker',
+      message,
     })
   } catch (error) {
     console.error('Error al inicializar pgBackRest:', error)

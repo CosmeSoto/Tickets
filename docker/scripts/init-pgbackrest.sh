@@ -37,13 +37,19 @@ wait_postgres() {
 }
 
 echo "==> 1/5 Permisos pgBackRest..."
-compose exec -T -u root postgres bash -c "
+if ! compose exec -T -u root postgres bash -c "
   mkdir -p /var/lib/pgbackrest /var/log/pgbackrest /var/spool/pgbackrest /var/run/postgresql
   chown -R postgres:postgres /var/lib/pgbackrest /var/log/pgbackrest /var/spool/pgbackrest /var/run/postgresql
   chmod -R 750 /var/lib/pgbackrest /var/log/pgbackrest
   chmod 775 /var/run/postgresql
   rm -f ${MARKER}
-"
+"; then
+  echo "   ERROR: no se pudieron ajustar permisos pgBackRest (¿postgres en ejecución?)"
+  exit 1
+fi
+
+echo "   pgBackRest postgres: $(compose exec -T postgres pgbackrest version 2>/dev/null | head -1 || echo 'N/A')"
+echo "   pgBackRest worker:    $(compose exec -T backup-worker pgbackrest version 2>/dev/null | head -1 || echo 'reconstruye backup-worker')"
 
 wait_postgres
 
