@@ -219,8 +219,10 @@ if [ "$CLEAN_BUILD" = true ]; then
     echo "🔨 Rebuild sin caché (postgres, backup-worker, app)..."
     "${COMPOSE[@]}" build --no-cache "${SERVICES[@]}"
   else
-    echo "🔨 Rebuild con caché (postgres, backup-worker, app)..."
-    "${COMPOSE[@]}" build "${SERVICES[@]}"
+    echo "🔨 Rebuild backup-worker sin caché (pgBackRest compatible PG17)..."
+    "${COMPOSE[@]}" build --no-cache backup-worker
+    echo "🔨 Rebuild postgres y app (con caché)..."
+    "${COMPOSE[@]}" build postgres app
   fi
 else
   echo "🔨 Rebuild incremental (postgres, backup-worker, app)..."
@@ -266,7 +268,8 @@ else
 fi
 
 if [ "$NEEDS_PGBR_INIT" = true ] && [ -x "$SCRIPT_DIR/docker/scripts/init-pgbackrest.sh" ]; then
-  if timeout 600 env COMPOSE_FILE="$SCRIPT_DIR/docker-compose.prod.yml" ENV_FILE="$SCRIPT_DIR/.env.production" \
+  echo "   (bootstrap: stanza + FULL + archivado — no interrumpir, ~2–10 min)"
+  if timeout 1800 env COMPOSE_FILE="$SCRIPT_DIR/docker-compose.prod.yml" ENV_FILE="$SCRIPT_DIR/.env.production" \
     "$SCRIPT_DIR/docker/scripts/init-pgbackrest.sh"; then
     echo "✅ pgBackRest bootstrap OK"
     PG_OK=true
