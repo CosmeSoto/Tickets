@@ -1,15 +1,11 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { getBackupWorkerHealth, initPgBackRestWorker } from '@/lib/services/backup/backup-engine'
+import { requireBackupSuperAdmin } from '../_auth'
 
 export async function POST() {
   try {
-    const session = await getServerSession(authOptions)
-
-    if (!session || session.user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    }
+    const { errorResponse } = await requireBackupSuperAdmin()
+    if (errorResponse) return errorResponse
 
     const before = await getBackupWorkerHealth()
     if (before.status === 'healthy' && before.stanzaOk) {
@@ -63,11 +59,8 @@ export async function POST() {
 
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions)
-
-    if (!session || session.user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    }
+    const { errorResponse } = await requireBackupSuperAdmin()
+    if (errorResponse) return errorResponse
 
     const health = await getBackupWorkerHealth()
     return NextResponse.json({ health })

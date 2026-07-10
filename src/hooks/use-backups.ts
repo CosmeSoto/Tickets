@@ -139,8 +139,14 @@ export function useBackups() {
       router.push('/login')
       return
     }
-    if (session.user.role !== 'ADMIN') {
-      router.push('/login')
+    const isSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
+    if (session.user.role !== 'ADMIN' || !isSuperAdmin) {
+      toast({
+        title: 'Acceso restringido',
+        description: 'Solo el Super Administrador puede gestionar respaldos y restauraciones.',
+        variant: 'destructive',
+      })
+      router.push('/admin')
       return
     }
     loadBackups()

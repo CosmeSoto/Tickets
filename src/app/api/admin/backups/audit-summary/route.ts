@@ -1,14 +1,11 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { buildBackupAuditSummary } from '@/lib/services/backup/backup-audit'
+import { requireBackupSuperAdmin } from '../_auth'
 
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session || session.user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    }
+    const { errorResponse } = await requireBackupSuperAdmin()
+    if (errorResponse) return errorResponse
 
     const summary = await buildBackupAuditSummary()
     return NextResponse.json(summary)

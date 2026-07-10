@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { exec } from 'child_process'
 import { promisify } from 'util'
@@ -12,16 +10,14 @@ import {
   computeSuccessRate,
   countPgBackRestBackups,
 } from '@/lib/services/backup/backup-health-utils'
+import { requireBackupSuperAdmin } from '../_auth'
 
 const execAsync = promisify(exec)
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
-
-    if (!session || session.user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    }
+    const { errorResponse } = await requireBackupSuperAdmin()
+    if (errorResponse) return errorResponse
 
     await ensureBackupCatalogSynced()
 

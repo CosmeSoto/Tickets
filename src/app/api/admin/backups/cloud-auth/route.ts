@@ -10,11 +10,10 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { getOAuthCredentials } from '@/lib/oauth-config'
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
+import { requireBackupSuperAdmin } from '../_auth'
 
 const REDIRECT_URI_BASE = process.env.NEXTAUTH_URL ?? 'http://localhost:3000'
 const REDIRECT_URI = `${REDIRECT_URI_BASE}/api/admin/backups/cloud-auth/callback`
@@ -22,10 +21,8 @@ const REDIRECT_URI = `${REDIRECT_URI_BASE}/api/admin/backups/cloud-auth/callback
 // ── GET — generar URL de autorización ────────────────────────────────────────
 
 export async function GET(request: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user || session.user.role !== 'ADMIN') {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-  }
+  const { session, errorResponse } = await requireBackupSuperAdmin()
+  if (errorResponse) return errorResponse
 
   const provider = request.nextUrl.searchParams.get('provider') as
     | 'google-drive'
@@ -105,10 +102,8 @@ export async function GET(request: NextRequest) {
 // ── DELETE — revocar autorización ─────────────────────────────────────────────
 
 export async function DELETE(request: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user || session.user.role !== 'ADMIN') {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-  }
+  const { errorResponse } = await requireBackupSuperAdmin()
+  if (errorResponse) return errorResponse
 
   const provider = request.nextUrl.searchParams.get('provider') as string
   const tokenKey =

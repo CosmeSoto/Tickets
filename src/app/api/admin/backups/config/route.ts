@@ -1,16 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
+import { requireBackupSuperAdmin } from '../_auth'
 
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions)
-
-    if (!session || session.user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    }
+    const { errorResponse } = await requireBackupSuperAdmin()
+    if (errorResponse) return errorResponse
 
     // Obtener configuraciones de backup
     const settings = await prisma.system_settings.findMany({
@@ -120,11 +116,8 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
-
-    if (!session || session.user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    }
+    const { errorResponse } = await requireBackupSuperAdmin()
+    if (errorResponse) return errorResponse
 
     const config = await request.json()
 

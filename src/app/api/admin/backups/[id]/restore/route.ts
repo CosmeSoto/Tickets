@@ -1,17 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { BackupService } from '@/lib/services/backup-service'
 import { isBackupModuleId } from '@/lib/services/backup-modules'
 import type { RestoreMode } from '@/lib/services/backup/backup-restore'
+import { requireBackupSuperAdmin } from '../../_auth'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const session = await getServerSession(authOptions)
-
-    if (!session || session.user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    }
+    const { errorResponse } = await requireBackupSuperAdmin()
+    if (errorResponse) return errorResponse
 
     const backupId = (await params).id
 

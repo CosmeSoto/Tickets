@@ -1,16 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { BackupService } from '@/lib/services/backup-service'
 import type { BackupCreateMode, BackupKind } from '@/lib/services/backup/backup-types'
+import { requireBackupSuperAdmin } from './_auth'
 
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions)
-
-    if (!session || session.user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    }
+    const { errorResponse } = await requireBackupSuperAdmin()
+    if (errorResponse) return errorResponse
 
     const backups = await BackupService.listBackups()
     return NextResponse.json(backups)
@@ -22,11 +18,8 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
-
-    if (!session || session.user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    }
+    const { errorResponse } = await requireBackupSuperAdmin()
+    if (errorResponse) return errorResponse
 
     const body = await request.json()
     const { type = 'manual', mode = 'infrastructure', backupKind } = body

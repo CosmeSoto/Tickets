@@ -33,7 +33,17 @@ export async function GET(request: NextRequest) {
   }
 
   // El state tiene formato "provider:userId"
-  const [provider] = state.split(':')
+  const [provider, userId] = state.split(':')
+
+  if (userId) {
+    const requester = await prisma.users.findUnique({
+      where: { id: userId },
+      select: { isSuperAdmin: true },
+    })
+    if (!requester?.isSuperAdmin) {
+      return NextResponse.redirect(`${ERROR_REDIRECT}&reason=not_super_admin`)
+    }
+  }
 
   try {
     if (provider === 'google-drive') {
