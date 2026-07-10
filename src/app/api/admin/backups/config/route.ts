@@ -116,7 +116,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const { errorResponse } = await requireBackupSuperAdmin()
+    const { session, errorResponse } = await requireBackupSuperAdmin()
     if (errorResponse) return errorResponse
 
     const config = await request.json()
@@ -171,7 +171,7 @@ export async function POST(request: NextRequest) {
         action: 'backup_config_updated',
         entityType: 'System',
         entityId: 'backup_config',
-        userId: session.user.id,
+        userId: session!.user.id,
         details: {
           updatedSettings: settingsToUpdate.map(s => s.key),
           timestamp: new Date(),

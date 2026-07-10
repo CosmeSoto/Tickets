@@ -44,7 +44,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { errorResponse } = await requireBackupSuperAdmin()
+    const { session, errorResponse } = await requireBackupSuperAdmin()
     if (errorResponse) return errorResponse
 
     const backupId = (await params).id
@@ -79,7 +79,7 @@ export async function DELETE(
         action: AuditActionsComplete.SYSTEM_BACKUP,
         entityType: 'backup',
         entityId: backupId,
-        userId: session.user.id,
+        userId: session!.user.id,
         details: {
           operation: 'delete',
           filename: existingBackup.filename,

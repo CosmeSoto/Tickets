@@ -7,7 +7,7 @@ import { requireBackupSuperAdmin } from '../../_auth'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { errorResponse } = await requireBackupSuperAdmin()
+    const { session, errorResponse } = await requireBackupSuperAdmin()
     if (errorResponse) return errorResponse
 
     const backupId = (await params).id
@@ -61,12 +61,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             action: 'backup_downloaded',
             entityType: 'System',
             entityId: backup.id,
-            userId: session.user.id,
+            userId: session!.user.id,
             details: {
               filename: backup.filename,
               size: fileStats.size,
               downloadedAt: new Date(),
-              userEmail: session.user.email,
+              userEmail: session!.user.email,
             },
             createdAt: new Date(),
           },
