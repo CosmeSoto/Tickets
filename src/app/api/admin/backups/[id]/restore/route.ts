@@ -63,12 +63,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const errorMessage =
       error instanceof Error ? error.message : 'Error desconocido al restaurar backup'
 
+    const isRestoreDisabled =
+      errorMessage.includes('Restauración pgBackRest deshabilitada') ||
+      errorMessage.includes('Restauración bloqueada')
+
     return NextResponse.json(
       {
         error: errorMessage,
         details: error instanceof Error ? error.stack : undefined,
       },
-      { status: 500 }
+      { status: isRestoreDisabled ? 403 : 500 }
     )
   }
 }

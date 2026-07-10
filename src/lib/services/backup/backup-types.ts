@@ -72,6 +72,8 @@ export interface BackupConfig {
   verifyIntegrity: boolean
   scheduleTime: string
   weeklyFullDay: number
+  /** Restauración pgBackRest desde UI (Config) */
+  allowRestore: boolean
 }
 
 export interface PgBackRestBackupSet {

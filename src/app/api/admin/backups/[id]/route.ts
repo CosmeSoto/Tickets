@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { BackupService } from '@/lib/services/backup-service'
 import prisma from '@/lib/prisma'
+import { inferEngineFromRecord } from '@/lib/services/backup/backup-engine'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -75,6 +76,8 @@ export async function DELETE(
 
     await BackupService.deleteBackup(backupId)
 
+    const isPgBackRest = inferEngineFromRecord(existingBackup) === 'pgbackrest'
+
     // Auditoría de eliminación
     try {
       const { AuditServiceComplete, AuditActionsComplete } =
@@ -97,7 +100,10 @@ export async function DELETE(
 
     return NextResponse.json({
       success: true,
-      message: 'Backup eliminado correctamente',
+      message: isPgBackRest
+        ? 'Entrada oculta del historial. El repositorio pgBackRest no se modificó — usa Export .dump para archivos descargables.'
+        : 'Backup eliminado correctamente',
+      pgBackRestCatalogOnly: isPgBackRest,
     })
   } catch (error) {
     console.error('Error al eliminar backup:', error)

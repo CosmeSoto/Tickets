@@ -146,14 +146,14 @@ pgBackRest restaura el **cluster completo**. Para restauración parcial:
 
 ## Variables de entorno
 
-| Variable                | Descripción                                              |
-| ----------------------- | -------------------------------------------------------- |
-| `BACKUP_WORKER_URL`     | URL interna del worker (ej. `http://backup-worker:8080`) |
-| `BACKUP_WORKER_SECRET`  | Token Bearer para API del worker                         |
-| `PGBACKREST_STANZA`     | Nombre del stanza (default: `main`)                      |
-| `BACKUP_DIR`            | Exports portátiles (`/app/backups`)                      |
-| `BACKUP_ENCRYPTION_KEY` | Cifrado AES de exports (opcional)                        |
-| `BACKUP_ALLOW_RESTORE`  | `true` para permitir restore pgBackRest desde UI         |
+| Variable                | Descripción                                                                       |
+| ----------------------- | --------------------------------------------------------------------------------- |
+| `BACKUP_WORKER_URL`     | URL interna del worker (ej. `http://backup-worker:8080`)                          |
+| `BACKUP_WORKER_SECRET`  | Token Bearer para API del worker                                                  |
+| `PGBACKREST_STANZA`     | Nombre del stanza (default: `main`)                                               |
+| `BACKUP_DIR`            | Exports portátiles (`/app/backups`)                                               |
+| `BACKUP_ENCRYPTION_KEY` | Cifrado AES de exports (opcional)                                                 |
+| `BACKUP_ALLOW_RESTORE`  | Legacy/informativo en worker health — usar Config → Restauración pgBackRest en UI |
 
 ## Desarrollo local
 

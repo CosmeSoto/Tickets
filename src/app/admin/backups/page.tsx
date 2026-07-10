@@ -465,7 +465,9 @@ export default function BackupsPage() {
                   </div>
                 )}
                 <p className='mt-2 text-destructive font-medium'>
-                  Esta acción no se puede deshacer.
+                  {deletingBackup?.engine === 'pgbackrest'
+                    ? 'Se ocultará del historial. El repositorio pgBackRest no se borra — los respaldos de infraestructura siguen en el servidor para DR.'
+                    : 'Esta acción no se puede deshacer.'}
                 </p>
               </div>
             </AlertDialogDescription>

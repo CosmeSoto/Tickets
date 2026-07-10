@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import { getBackupConfig } from './backup-utils'
 import { inferEngineFromRecord } from './backup-engine'
+import { hidePgBackRestLabel } from './backup-settings'
 
 export async function cleanOldBackups() {
   try {
@@ -67,9 +68,13 @@ export async function deleteBackup(backupId: string): Promise<void> {
     const engine = inferEngineFromRecord(backup)
 
     if (engine === 'pgbackrest') {
+      const label = backup.label || backup.filename.replace(/\.pgbackrest$/, '')
+      if (label) {
+        await hidePgBackRestLabel(label)
+      }
       await prisma.backups.delete({ where: { id: backupId } })
       console.log(
-        `[BACKUP] Registro pgBackRest eliminado de UI (repo intacto): ${backup.label || backup.filename}`
+        `[BACKUP] Registro pgBackRest oculto del historial (repo intacto): ${label || backup.filename}`
       )
     } else {
       await deleteBackupFiles(backup.filepath)

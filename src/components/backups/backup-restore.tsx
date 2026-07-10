@@ -84,10 +84,22 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
   const [selectedModules, setSelectedModules] = useState<RestoreModuleId[]>([])
   /** Modo de restauración: replace (reemplazar) o merge (fusionar/agregar) */
   const [restoreMode, setRestoreMode] = useState<RestoreMode>('merge')
+  const [allowPgBackRestRestore, setAllowPgBackRestRestore] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
 
   const completedBackups = backups.filter(b => b.status === 'completed')
+
+  useEffect(() => {
+    fetch('/api/admin/backups/config')
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => {
+        if (data && typeof data.allowRestore === 'boolean') {
+          setAllowPgBackRestRestore(data.allowRestore)
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     if (selectedBackup && !completedBackups.find(b => b.id === selectedBackup.id)) {
@@ -342,6 +354,7 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
   // Determinar si el backup seleccionado es parcial (solo un módulo) — no permite selección de scope
   const isPgBackRestBackup = selectedBackup?.engine === 'pgbackrest'
   const isPartialBackup = !!selectedBackup?.module && !isPgBackRestBackup
+  const pgRestoreBlocked = isPgBackRestBackup && !allowPgBackRestRestore
 
   return (
     <div className='space-y-6'>
@@ -467,7 +480,9 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
         <AlertDescription className='text-destructive'>
           <strong>¡Advertencia!</strong>{' '}
           {isPgBackRestBackup
-            ? 'Restauración pgBackRest: reemplaza el cluster PostgreSQL completo. Requiere BACKUP_ALLOW_RESTORE=true y detiene la app. Usa ./docker/scripts/disaster-recovery.sh en producción.'
+            ? allowPgBackRestRestore
+              ? 'Restauración pgBackRest: reemplaza el cluster PostgreSQL completo. Desactívala en Config cuando termines. Para DR en servidor también puedes usar ./docker/scripts/disaster-recovery.sh.'
+              : 'Restauración pgBackRest deshabilitada. Actívala en Admin → Backups → Config → Permitir restauración pgBackRest.'
             : selectedModules.length === 0 && !selectedBackup?.module
               ? 'La restauración completa reemplazará todos los datos actuales de la base de datos. Esta acción no se puede deshacer.'
               : restoreMode === 'merge'
@@ -762,21 +777,37 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
 
                 {/* Botones de Acción */}
                 <div className='flex items-center space-x-3 pt-4 border-t'>
-                  <Button
-                    variant='outline'
-                    size='sm'
-                    onClick={() => {
-                      const link = document.createElement('a')
-                      link.href = `/api/admin/backups/${selectedBackup.id}/download`
-                      link.download = selectedBackup.filename
-                      link.click()
-                    }}
-                  >
-                    <Download className='h-4 w-4 mr-2' />
-                    Descargar
-                  </Button>
+                  {!isPgBackRestBackup && (
+                    <Button
+                      variant='outline'
+                      size='sm'
+                      onClick={() => {
+                        const link = document.createElement('a')
+                        link.href = `/api/admin/backups/${selectedBackup.id}/download`
+                        link.download = selectedBackup.filename
+                        link.click()
+                      }}
+                    >
+                      <Download className='h-4 w-4 mr-2' />
+                      Descargar
+                    </Button>
+                  )}
 
-                  <Button onClick={initiateRestore} disabled={restoring} variant='destructive'>
+                  {isPgBackRestBackup && (
+                    <p className='text-xs text-muted-foreground flex-1'>
+                      Los respaldos pgBackRest viven en el repositorio de infraestructura — crea una
+                      Exportación (.dump) para descargar un archivo portable.
+                    </p>
+                  )}
+
+                  <Button
+                    onClick={initiateRestore}
+                    disabled={restoring || pgRestoreBlocked}
+                    variant='destructive'
+                    title={
+                      pgRestoreBlocked ? 'Activa la restauración pgBackRest en Config' : undefined
+                    }
+                  >
                     <RotateCcw className='h-4 w-4 mr-2' />
                     {isPartialBackup
                       ? `Restaurar ${selectedBackup.module}`

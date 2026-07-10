@@ -30,6 +30,7 @@ export async function GET() {
             'backupVerifyIntegrity',
             'backupScheduleTime',
             'backupWeeklyFullDay',
+            'backupAllowRestore',
           ],
         },
       },
@@ -47,7 +48,8 @@ export async function GET() {
           setting.key === 'backupEncryption' ||
           setting.key === 'backupCloudStorage' ||
           setting.key === 'backupNotifications' ||
-          setting.key === 'backupVerifyIntegrity'
+          setting.key === 'backupVerifyIntegrity' ||
+          setting.key === 'backupAllowRestore'
         ) {
           value = setting.value === 'true'
         } else if (
@@ -75,6 +77,7 @@ export async function GET() {
           backupVerifyIntegrity: 'verifyIntegrity',
           backupScheduleTime: 'scheduleTime',
           backupWeeklyFullDay: 'weeklyFullDay',
+          backupAllowRestore: 'allowRestore',
         }
 
         const mappedKey = keyMap[setting.key] || setting.key
@@ -99,6 +102,7 @@ export async function GET() {
       verifyIntegrity: true,
       scheduleTime: '02:00',
       weeklyFullDay: 0,
+      allowRestore: false,
     }
 
     // Informar al frontend si la clave de encriptación está configurada en el servidor.
@@ -141,6 +145,10 @@ export async function POST(request: NextRequest) {
       {
         key: 'backupWeeklyFullDay',
         value: String(config.weeklyFullDay ?? 0),
+      },
+      {
+        key: 'backupAllowRestore',
+        value: config.allowRestore?.toString() || 'false',
       },
     ]
 

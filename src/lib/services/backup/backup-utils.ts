@@ -62,6 +62,7 @@ export async function getBackupConfig(): Promise<BackupConfig> {
             'backupVerifyIntegrity',
             'backupScheduleTime',
             'backupWeeklyFullDay',
+            'backupAllowRestore',
           ],
         },
       },
@@ -101,6 +102,8 @@ export async function getBackupConfig(): Promise<BackupConfig> {
       scheduleTime: raw.backupScheduleTime ?? '02:00',
       weeklyFullDay:
         raw.backupWeeklyFullDay !== undefined ? parseInt(raw.backupWeeklyFullDay, 10) : 0,
+      allowRestore:
+        raw.backupAllowRestore !== undefined ? raw.backupAllowRestore === 'true' : false,
     }
   } catch (error) {
     console.error('Error loading backup config:', error)
@@ -118,6 +121,7 @@ export async function getBackupConfig(): Promise<BackupConfig> {
       verifyIntegrity: true,
       scheduleTime: '02:00',
       weeklyFullDay: 0,
+      allowRestore: false,
     }
   }
 }

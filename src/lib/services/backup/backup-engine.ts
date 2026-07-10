@@ -1,4 +1,5 @@
 import { BackupEngine, BackupKind, BackupWorkerHealth, PgBackRestInfo } from './backup-types'
+import { getHiddenPgBackRestLabels, isPgBackRestRestoreAllowed } from './backup-settings'
 
 const WORKER_URL = process.env.BACKUP_WORKER_URL || ''
 const WORKER_SECRET = process.env.BACKUP_WORKER_SECRET || ''
@@ -66,13 +67,15 @@ async function workerFetch<T>(
 }
 
 export async function getBackupWorkerHealth(): Promise<BackupWorkerHealth> {
+  const allowRestore = await isPgBackRestRestoreAllowed()
+
   if (!workerConfigured()) {
     return {
       status: 'unavailable',
       pgbackrestOk: false,
       stanzaOk: false,
       stanza: STANZA,
-      allowRestore: process.env.BACKUP_ALLOW_RESTORE === 'true',
+      allowRestore,
     }
   }
 
@@ -85,7 +88,7 @@ export async function getBackupWorkerHealth(): Promise<BackupWorkerHealth> {
       pgbackrestOk: Boolean(data.pgbackrestOk),
       stanzaOk: Boolean(data.stanzaOk),
       stanza: data.stanza || STANZA,
-      allowRestore: Boolean(data.allowRestore),
+      allowRestore,
     }
   } catch {
     return {
@@ -93,7 +96,7 @@ export async function getBackupWorkerHealth(): Promise<BackupWorkerHealth> {
       pgbackrestOk: false,
       stanzaOk: false,
       stanza: STANZA,
-      allowRestore: process.env.BACKUP_ALLOW_RESTORE === 'true',
+      allowRestore,
     }
   }
 }
@@ -163,12 +166,18 @@ export async function restorePgBackRest(options: {
   label?: string
   target?: string
 }): Promise<void> {
-  if (process.env.BACKUP_ALLOW_RESTORE !== 'true') {
+  const allowed = await isPgBackRestRestoreAllowed()
+  if (!allowed) {
     throw new Error(
-      'Restauración pgBackRest deshabilitada. Establece BACKUP_ALLOW_RESTORE=true y detén la app en producción.'
+      'Restauración pgBackRest deshabilitada. Actívala en Admin → Backups → Config → Restauración pgBackRest.'
     )
   }
-  await workerFetch('/restore', { method: 'POST', body: options, timeoutMs: 3_600_000 })
+
+  await workerFetch('/restore', {
+    method: 'POST',
+    body: { ...options, set: options.label, uiAuthorized: true },
+    timeoutMs: 3_600_000,
+  })
 }
 
 export function buildPgBackRestFileRef(label: string): string {
@@ -213,13 +222,14 @@ export async function syncPgBackRestToDatabase(): Promise<number> {
 
   const prisma = (await import('@/lib/prisma')).default
   const { randomUUID } = await import('crypto')
+  const hiddenLabels = await getHiddenPgBackRestLabels()
   const info = await fetchPgBackRestInfo()
   const stanzaInfo = info.find(s => s.name === STANZA || s.stanza === STANZA) || info[0]
   const sets = stanzaInfo?.backup || []
   let synced = 0
 
   for (const set of sets) {
-    if (!set.label) continue
+    if (!set.label || hiddenLabels.has(set.label)) continue
     const existing = await prisma.backups.findFirst({ where: { label: set.label } })
     if (existing) continue
 

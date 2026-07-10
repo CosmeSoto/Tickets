@@ -55,6 +55,7 @@ interface BackupConfig {
   weeklyFullDay: number
   /** Solo lectura — indica si BACKUP_ENCRYPTION_KEY está configurada en el servidor */
   encryptionKeyConfigured?: boolean
+  allowRestore: boolean
 }
 
 interface BackupConfigurationProps {
@@ -75,6 +76,7 @@ export function BackupConfiguration({ onConfigChange }: BackupConfigurationProps
     verifyIntegrity: true,
     scheduleTime: '02:00',
     weeklyFullDay: 0,
+    allowRestore: false,
   })
 
   const [loading, setLoading] = useState(false)
@@ -237,6 +239,7 @@ export function BackupConfiguration({ onConfigChange }: BackupConfigurationProps
       verifyIntegrity: true,
       scheduleTime: '02:00',
       weeklyFullDay: 0,
+      allowRestore: false,
     })
   }
 
@@ -275,6 +278,47 @@ export function BackupConfiguration({ onConfigChange }: BackupConfigurationProps
   return (
     <div className='space-y-6'>
       <PgBackRestStatusCard onInitialized={onConfigChange} />
+
+      <Card className='border-amber-500/30 bg-amber-500/5'>
+        <CardHeader className='pb-3'>
+          <CardTitle className='text-base flex items-center gap-2'>
+            <Shield className='h-5 w-5 text-amber-600' />
+            Restauración pgBackRest (cluster completo)
+          </CardTitle>
+          <CardDescription>
+            Control desde la UI — no requiere editar variables de entorno en producción
+          </CardDescription>
+        </CardHeader>
+        <CardContent className='space-y-4'>
+          <div className='flex items-center justify-between gap-4'>
+            <div className='space-y-1'>
+              <Label className='text-sm font-medium'>Permitir restauración pgBackRest</Label>
+              <p className='text-xs text-muted-foreground max-w-xl'>
+                Reemplaza todo el cluster PostgreSQL. Desactívalo cuando no estés restaurando. Para
+                restauración por módulo usa Export .dump en la pestaña Restaurar.
+              </p>
+            </div>
+            <Switch
+              checked={config.allowRestore}
+              onCheckedChange={checked => updateConfig('allowRestore', checked)}
+            />
+          </div>
+          {config.allowRestore ? (
+            <div className='rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-muted-foreground'>
+              <strong className='text-foreground'>Activo:</strong> la pestaña Restaurar podrá
+              ejecutar pgBackRest. Crea un respaldo actual antes de restaurar.
+            </div>
+          ) : (
+            <div className='rounded-md border bg-muted/50 px-3 py-2 text-xs text-muted-foreground'>
+              Deshabilitado — intentos de restaurar pgBackRest mostrarán un mensaje claro en la UI.
+            </div>
+          )}
+          <p className='text-xs text-muted-foreground'>
+            Pulsa <strong className='text-foreground'>Guardar</strong> arriba para aplicar este
+            cambio.
+          </p>
+        </CardContent>
+      </Card>
 
       {/* Header */}
       <div className='flex justify-between items-center'>

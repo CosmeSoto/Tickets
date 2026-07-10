@@ -294,12 +294,15 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (url.pathname === '/restore' && req.method === 'POST') {
-      if (!ALLOW_RESTORE) {
+      const body = await readBody(req)
+
+      if (!body.uiAuthorized) {
         return json(res, 403, {
-          error: 'Restauración pgBackRest deshabilitada. Establece BACKUP_ALLOW_RESTORE=true',
+          error:
+            'Restauración no autorizada. Actívala en Admin → Backups → Config y vuelve a intentar.',
         })
       }
-      const body = await readBody(req)
+
       const args = ['restore', `--stanza=${STANZA}`, '--type=default', '--delta']
       if (body.set) args.push(`--set=${body.set}`)
       if (body.target) {
