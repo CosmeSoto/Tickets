@@ -49,17 +49,23 @@ services:
       context: ./docker/backup-worker
     container_name: tickets-backup-worker
     user: '999:999'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - pgbackrest_repo:/var/lib/pgbackrest
+      - pg_socket:/var/run/postgresql:ro
+      - ./docker/pgbackrest/pgbackrest.conf:/etc/pgbackrest/pgbackrest.conf:ro
+      - ./docker/pgbackrest/pgbackrest-local.conf:/etc/pgbackrest/pgbackrest-local.conf:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
+      - ${DOCKER_GID:?DOCKER_GID requerida para restauración pgBackRest — ver REBUILD.md}
     environment:
       BACKUP_WORKER_SECRET: ${BACKUP_WORKER_SECRET:?BACKUP_WORKER_SECRET requerida}
       PGBACKREST_STANZA: main
       BACKUP_ALLOW_RESTORE: ${BACKUP_ALLOW_RESTORE:-false}
       PGPASSWORD: ${DB_PASSWORD:?DB_PASSWORD requerida}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data:ro
-      - pgbackrest_repo:/var/lib/pgbackrest
-      - pg_socket:/var/run/postgresql:ro
-      - ./docker/pgbackrest/pgbackrest.conf:/etc/pgbackrest/pgbackrest.conf:ro
-      - ./docker/pgbackrest/pgbackrest-local.conf:/etc/pgbackrest/pgbackrest-local.conf:ro
+      CONTAINER_POSTGRES: tickets-postgres
+      CONTAINER_APP: tickets-app
+      CONTAINER_NGINX: tickets-nginx
     networks:
       - tickets-network
     depends_on:

@@ -57,8 +57,9 @@ case "$cmd" in
     worker_curl POST /backup '{"type":"diff"}'
     ;;
   restore)
-    echo "⚠️  MODO MANTENIMIENTO — deteniendo app y nginx"
+    echo "⚠️  MODO MANTENIMIENTO — deteniendo app, nginx y postgres"
     compose stop app nginx
+    compose stop postgres
     shift
     set_arg=""
     if [ "${1:-}" = "--latest" ]; then
@@ -74,10 +75,8 @@ case "$cmd" in
       payload="{\"set\":\"$set_arg\"}"
     fi
     worker_curl POST /restore "$payload"
-    echo "==> Reiniciando postgres y app..."
-    compose restart postgres
-    sleep 5
-    compose up -d app nginx
+    echo "==> Reiniciando servicios..."
+    compose up -d postgres backup-worker app nginx
     ;;
   pitr)
     target="${2:-}"
@@ -85,12 +84,12 @@ case "$cmd" in
       echo "Uso: pitr \"YYYY-MM-DD HH:MM:SS\""
       exit 1
     fi
-    echo "⚠️  PITR a $target — deteniendo app"
+    echo "⚠️  PITR a $target — deteniendo app, nginx y postgres"
     compose stop app nginx
+    compose stop postgres
     worker_curl POST /restore "{\"target\":\"$target\"}"
-    compose restart postgres
-    sleep 5
-    compose up -d app nginx
+    echo "==> Reiniciando servicios..."
+    compose up -d postgres backup-worker app nginx
     ;;
   verify)
     worker_curl POST /verify

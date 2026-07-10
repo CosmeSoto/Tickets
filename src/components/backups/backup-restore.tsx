@@ -845,11 +845,13 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
                   ¡Esta acción no se puede deshacer!
                 </p>
                 <p className='text-sm text-muted-foreground mt-2'>
-                  {selectedModules.length === 0 && !isPartialBackup
-                    ? `Se restaurará el backup "${selectedBackup.filename}" y se reemplazarán TODOS los datos actuales de la base de datos.`
-                    : restoreMode === 'merge'
-                      ? `Se FUSIONARÁN los módulos: ${isPartialBackup ? selectedBackup.module : getSelectedModulesLabel()} del backup "${selectedBackup.filename}". Los registros existentes se conservan; solo se agregan los nuevos.`
-                      : `Se REEMPLAZARÁN los módulos: ${isPartialBackup ? selectedBackup.module : getSelectedModulesLabel()} del backup "${selectedBackup.filename}". Las demás tablas no se verán afectadas.`}
+                  {isPgBackRestBackup
+                    ? `Se restaurará el cluster PostgreSQL completo desde "${selectedBackup.filename}". El sitio quedará fuera de servicio ~5–15 min mientras se detienen app, nginx y postgres.`
+                    : selectedModules.length === 0 && !isPartialBackup
+                      ? `Se restaurará el backup "${selectedBackup.filename}" y se reemplazarán TODOS los datos actuales de la base de datos.`
+                      : restoreMode === 'merge'
+                        ? `Se FUSIONARÁN los módulos: ${isPartialBackup ? selectedBackup.module : getSelectedModulesLabel()} del backup "${selectedBackup.filename}". Los registros existentes se conservan; solo se agregan los nuevos.`
+                        : `Se REEMPLAZARÁN los módulos: ${isPartialBackup ? selectedBackup.module : getSelectedModulesLabel()} del backup "${selectedBackup.filename}". Las demás tablas no se verán afectadas.`}
                 </p>
               </div>
 
@@ -878,7 +880,11 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
             <CardHeader>
               <CardTitle className='flex items-center space-x-2'>
                 <Activity className='h-5 w-5 text-primary animate-spin' />
-                <span>Restaurando Base de Datos</span>
+                <span>
+                  {isPgBackRestBackup
+                    ? 'Restaurando cluster PostgreSQL (modo mantenimiento)'
+                    : 'Restaurando Base de Datos'}
+                </span>
               </CardTitle>
             </CardHeader>
             <CardContent className='space-y-4'>

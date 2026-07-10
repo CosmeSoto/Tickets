@@ -112,6 +112,13 @@ ensure_backup_env() {
     echo "✅ CRON_SECRET generado — instala cron: ./docker/scripts/setup-backup-cron.sh"
     changed=true
   fi
+  if ! grep -q "^DOCKER_GID=" "$ENV_FILE"; then
+    local docker_gid
+    docker_gid=$(getent group docker 2>/dev/null | cut -d: -f3 || echo "999")
+    echo "DOCKER_GID=$docker_gid" >> "$ENV_FILE"
+    echo "✅ DOCKER_GID=$docker_gid (restauración pgBackRest desde UI)"
+    changed=true
+  fi
   if [ "$changed" = true ]; then
     echo "✅ Variables pgBackRest añadidas a .env.production"
   fi

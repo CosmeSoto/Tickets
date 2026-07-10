@@ -17,6 +17,11 @@ const STANZA = process.env.PGBACKREST_STANZA || 'main'
 const ALLOW_RESTORE = process.env.BACKUP_ALLOW_RESTORE === 'true'
 const PGBR_CONFIG = '/etc/pgbackrest/pgbackrest-local.conf'
 const BOOTSTRAP_MARKER = '/var/lib/pgbackrest/.bootstrap_done'
+const PG_DATA_DIR = '/var/lib/postgresql/data'
+const DOCKER_SOCKET = process.env.DOCKER_HOST || '/var/run/docker.sock'
+const CONTAINER_POSTGRES = process.env.CONTAINER_POSTGRES || 'tickets-postgres'
+const CONTAINER_APP = process.env.CONTAINER_APP || 'tickets-app'
+const CONTAINER_NGINX = process.env.CONTAINER_NGINX || 'tickets-nginx'
 
 let stanzaReady = false
 let initPromise = null
@@ -96,12 +101,81 @@ async function finalizeBootstrap() {
 }
 
 async function runPgBackRest(args, timeoutMs = 3_600_000) {
-  const { stdout, stderr } = await exec('pgbackrest', args, {
-    timeout: timeoutMs,
-    maxBuffer: 50 * 1024 * 1024,
-    env: { ...process.env, PGBACKREST_CONFIG: PGBR_CONFIG },
+  try {
+    const { stdout, stderr } = await exec('pgbackrest', args, {
+      timeout: timeoutMs,
+      maxBuffer: 50 * 1024 * 1024,
+      env: { ...process.env, PGBACKREST_CONFIG: PGBR_CONFIG },
+    })
+    return { stdout: stdout?.toString() || '', stderr: stderr?.toString() || '' }
+  } catch (error) {
+    const stdout = error?.stdout?.toString?.() || ''
+    const stderr = error?.stderr?.toString?.() || ''
+    const combined = `${stdout}\n${stderr}`
+    if (combined.includes('unable to restore while PostgreSQL is running')) {
+      throw new Error(
+        'PostgreSQL debe estar detenido para restaurar pgBackRest. El worker reintentará detener los contenedores automáticamente.'
+      )
+    }
+    const match = combined.match(/ERROR:\s*\[[^\]]+\]:\s*(.+)/)
+    throw new Error(match?.[1]?.trim() || error.message || 'Error pgBackRest')
+  }
+}
+
+async function dockerAvailable() {
+  try {
+    await access(DOCKER_SOCKET)
+    await exec('docker', ['info'], { timeout: 15_000, env: process.env })
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function dockerStopContainers(names) {
+  if (!(await dockerAvailable())) {
+    throw new Error(
+      'Docker socket no disponible en backup-worker. Añade DOCKER_GID y /var/run/docker.sock en docker-compose.prod.yml'
+    )
+  }
+  console.log(`[backup-worker] Deteniendo contenedores: ${names.join(', ')}`)
+  await exec('docker', ['stop', '-t', '60', ...names], {
+    timeout: 180_000,
+    env: process.env,
   })
-  return { stdout: stdout?.toString() || '', stderr: stderr?.toString() || '' }
+}
+
+async function dockerStartContainers(names) {
+  console.log(`[backup-worker] Iniciando contenedores: ${names.join(', ')}`)
+  await exec('docker', ['start', ...names], {
+    timeout: 120_000,
+    env: process.env,
+  })
+}
+
+async function waitForPostmasterGone(maxAttempts = 90) {
+  for (let i = 1; i <= maxAttempts; i++) {
+    try {
+      await access(`${PG_DATA_DIR}/postmaster.pid`)
+      await sleep(1000)
+    } catch {
+      return
+    }
+  }
+  throw new Error('postmaster.pid sigue presente — PostgreSQL no se detuvo correctamente')
+}
+
+async function prepareStackForRestore() {
+  console.log('[backup-worker] Modo mantenimiento — deteniendo app, nginx y postgres...')
+  await dockerStopContainers([CONTAINER_APP, CONTAINER_NGINX, CONTAINER_POSTGRES])
+  await waitForPostmasterGone()
+}
+
+async function finalizeStackAfterRestore() {
+  console.log('[backup-worker] Reiniciando servicios tras restauración...')
+  await dockerStartContainers([CONTAINER_POSTGRES])
+  await waitPostgresReady(90)
+  await dockerStartContainers([CONTAINER_APP, CONTAINER_NGINX])
 }
 
 async function readBody(req) {
@@ -308,8 +382,43 @@ const server = http.createServer(async (req, res) => {
       if (body.target) {
         args.push(`--type=time`, `--target="${body.target}"`, '--target-action=promote')
       }
-      await runPgBackRest(args, 3_600_000)
-      return json(res, 200, { success: true, message: 'Restauración pgBackRest completada' })
+
+      let restoreOk = false
+      let restoreError = null
+
+      try {
+        await prepareStackForRestore()
+        await runPgBackRest(args, 3_600_000)
+        restoreOk = true
+      } catch (error) {
+        restoreError = error
+        console.error('[backup-worker] restore error:', error)
+      } finally {
+        try {
+          await finalizeStackAfterRestore()
+        } catch (restartErr) {
+          console.error('[backup-worker] Error reiniciando stack:', restartErr)
+          if (restoreOk) {
+            console.error(
+              '[backup-worker] Restauración OK pero reinicio falló — ejecuta: docker compose up -d'
+            )
+          }
+        }
+      }
+
+      if (restoreOk) {
+        return json(res, 200, {
+          success: true,
+          message: 'Restauración pgBackRest completada — servicios reiniciados',
+        })
+      }
+
+      return json(res, 500, {
+        error:
+          restoreError instanceof Error
+            ? restoreError.message
+            : 'Error en restauración pgBackRest',
+      })
     }
 
     json(res, 404, { error: 'Ruta no encontrada' })

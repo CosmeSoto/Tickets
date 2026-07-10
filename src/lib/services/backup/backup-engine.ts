@@ -176,7 +176,7 @@ export async function restorePgBackRest(options: {
   await workerFetch('/restore', {
     method: 'POST',
     body: { ...options, set: options.label, uiAuthorized: true },
-    timeoutMs: 3_600_000,
+    timeoutMs: 7_200_000,
   })
 }
 

@@ -258,6 +258,22 @@ Documentación completa: [docs/BACKUP-SYSTEM.md](docs/BACKUP-SYSTEM.md)
 3. **No necesitas comandos manuales** — en 1–3 min la tarjeta en Admin → Backups → Config debe mostrar **Disponible**.
 4. Si quedó en **Pendiente**, pulsa **Inicializar pgBackRest** (un clic; reinicia postgres internamente).
 
+### Restauración pgBackRest desde UI
+
+Requiere `DOCKER_GID` en `.env.production` (lo añade `start-production.sh` automáticamente):
+
+```bash
+# Verificar en el servidor:
+grep DOCKER_GID .env.production
+# Si falta:
+echo "DOCKER_GID=$(getent group docker | cut -d: -f3)" >> .env.production
+```
+
+En UI: **Config → Permitir restauración pgBackRest → Guardar**, luego **Restaurar**.  
+El worker detiene app/nginx/postgres, restaura y reinicia todo (~5–15 min de downtime).
+
+Para restauración por módulo usa **Export .dump**, no pgBackRest.
+
 ### Operación diaria (automático)
 
 El cron del **servidor Debian** llama `POST /api/admin/cron/backup` (protegido con `CRON_SECRET`):

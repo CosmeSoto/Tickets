@@ -10,7 +10,7 @@ FROM node:20-bookworm-slim
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        curl postgresql-client \
+        curl postgresql-client docker.io \
         libpq5 libxml2 libyaml-0-2 libssh-4 libssl3 \
         libzstd1 liblz4-1 libbz2-1.0 zlib1g \
     && rm -rf /var/lib/apt/lists/* \
