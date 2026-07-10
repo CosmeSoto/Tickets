@@ -71,107 +71,70 @@ export function BackupMonitoring() {
   const { toast } = useToast()
 
   useEffect(() => {
-    loadSystemHealth()
-    loadAlerts()
+    void refreshMonitoring(false)
 
-    // Actualizar cada 30 segundos
     const interval = setInterval(() => {
-      loadSystemHealth()
-      loadAlerts()
+      void refreshMonitoring(false)
     }, 30000)
 
     return () => clearInterval(interval)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const loadSystemHealth = async () => {
-    try {
-      const response = await fetch('/api/admin/backups/health')
-      if (response.ok) {
-        const data = await response.json()
-        setHealth(data)
-        setLastUpdate(new Date())
+  const refreshMonitoring = async (showToast: boolean) => {
+    setLoading(true)
+    let healthOk = false
+    let criticalCount = 0
 
-        toast({
-          title: 'Estado actualizado',
-          description: 'Información del sistema cargada correctamente',
-          variant: 'success',
-        })
+    try {
+      const healthRes = await fetch('/api/admin/backups/health')
+      if (healthRes.ok) {
+        setHealth(await healthRes.json())
+        setLastUpdate(new Date())
+        healthOk = true
       } else {
-        throw new Error('Error al cargar estado del sistema')
+        setHealth(null)
       }
     } catch (error) {
       console.error('Error loading system health:', error)
-
-      toast({
-        title: 'Error de conexión',
-        description:
-          'No se pudo conectar con el servicio de monitoreo. Mostrando datos de ejemplo.',
-        variant: 'warning',
-      })
-
-      // Si la API falla, mostrar estado de error sin datos inventados
-      setHealth({
-        database: {
-          status: 'error',
-          responseTime: 0,
-          lastCheck: new Date().toISOString(),
-        },
-        storage: {
-          available: 0,
-          used: 0,
-          total: 0,
-          status: 'healthy',
-        },
-        backupService: {
-          status: 'error',
-          lastBackup: null,
-          nextScheduled: null,
-        },
-        performance: {
-          avgBackupTime: null,
-          successRate: 0,
-          compressionRatio: null,
-          totalBackups: 0,
-          completedBackups: 0,
-          failedBackups: 0,
-        },
-      })
-    } finally {
-      setLoading(false)
+      setHealth(null)
+      if (showToast) {
+        toast({
+          title: 'Error de conexión',
+          description: 'No se pudo cargar el estado del sistema',
+          variant: 'destructive',
+        })
+      }
     }
-  }
 
-  const loadAlerts = async () => {
     try {
-      const response = await fetch('/api/admin/backups/alerts')
-      if (response.ok) {
-        const data = await response.json()
+      const alertsRes = await fetch('/api/admin/backups/alerts')
+      if (alertsRes.ok) {
+        const data = await alertsRes.json()
         setAlerts(data)
-
-        // Notificar sobre alertas críticas
-        const criticalAlerts = data.filter(
+        criticalCount = data.filter(
           (alert: BackupAlert) => alert.type === 'error' && !alert.resolved
-        )
-
-        if (criticalAlerts.length > 0) {
-          toast({
-            title: 'Alertas críticas detectadas',
-            description: `${criticalAlerts.length} alerta(s) requieren atención inmediata`,
-            variant: 'destructive',
-          })
-        }
+        ).length
       }
     } catch (error) {
       console.error('Error loading alerts:', error)
-
-      toast({
-        title: 'Error al cargar alertas',
-        description: 'No se pudieron cargar las alertas del sistema. Mostrando datos de ejemplo.',
-        variant: 'warning',
-      })
-
-      // Si la API de alertas falla, mostrar lista vacía — no inventar datos
       setAlerts([])
+    }
+
+    setLoading(false)
+
+    if (!showToast || !healthOk) return
+
+    if (criticalCount > 0) {
+      toast({
+        title: 'Alertas críticas',
+        description: `${criticalCount} alerta(s) requieren atención — revisa el panel inferior`,
+        variant: 'destructive',
+      })
+    } else {
+      toast({
+        title: 'Monitoreo actualizado',
+        description: 'Estado del sistema cargado correctamente',
+      })
     }
   }
 
@@ -262,7 +225,9 @@ export function BackupMonitoring() {
     )
   }
 
-  const storageUsagePercent = (health.storage.used / health.storage.total) * 100
+  const activeAlerts = alerts.filter(alert => !alert.resolved)
+  const storageUsagePercent =
+    health.storage.total > 0 ? (health.storage.used / health.storage.total) * 100 : 0
 
   return (
     <div className='space-y-6'>
@@ -277,15 +242,9 @@ export function BackupMonitoring() {
 
         <Button
           variant='outline'
-          onClick={() => {
-            loadSystemHealth()
-            toast({
-              title: 'Actualizando...',
-              description: 'Obteniendo el estado más reciente del sistema',
-              variant: 'info',
-            })
-          }}
+          onClick={() => void refreshMonitoring(true)}
           size='sm'
+          disabled={loading}
         >
           <Activity className='h-4 w-4 mr-2' />
           Actualizar
@@ -373,7 +332,11 @@ export function BackupMonitoring() {
               <div className='p-3 rounded-lg bg-muted border border-border'>
                 <TrendingUp className='h-6 w-6 text-muted-foreground' />
               </div>
-              <CheckCircle className='h-4 w-4 text-primary' />
+              {health.performance.successRate >= 80 ? (
+                <CheckCircle className='h-4 w-4 text-primary' />
+              ) : (
+                <AlertTriangle className='h-4 w-4 text-destructive' />
+              )}
             </div>
             <div className='space-y-2'>
               <div className='text-lg font-bold text-foreground'>Rendimiento</div>
@@ -464,7 +427,7 @@ export function BackupMonitoring() {
             <CardDescription>Notificaciones y eventos recientes</CardDescription>
           </CardHeader>
           <CardContent>
-            {alerts.length === 0 ? (
+            {activeAlerts.length === 0 ? (
               <div className='text-center py-8 text-muted-foreground'>
                 <CheckCircle className='h-8 w-8 mx-auto mb-2 text-primary' />
                 <p className='text-sm'>No hay alertas activas</p>
@@ -472,7 +435,7 @@ export function BackupMonitoring() {
               </div>
             ) : (
               <div className='space-y-3 max-h-64 overflow-y-auto'>
-                {alerts.map(alert => (
+                {activeAlerts.map(alert => (
                   <div
                     key={alert.id}
                     className={`p-3 rounded-lg border ${

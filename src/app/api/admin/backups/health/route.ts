@@ -7,6 +7,11 @@ import { promisify } from 'util'
 import { access, readdir, stat } from 'fs/promises'
 import { join } from 'path'
 import { getBackupWorkerHealth } from '@/lib/services/backup/backup-engine'
+import {
+  ensureBackupCatalogSynced,
+  computeSuccessRate,
+  countPgBackRestBackups,
+} from '@/lib/services/backup/backup-health-utils'
 
 const execAsync = promisify(exec)
 
@@ -17,6 +22,8 @@ export async function GET(request: NextRequest) {
     if (!session || session.user.role !== 'ADMIN') {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
+
+    await ensureBackupCatalogSynced()
 
     const [databaseHealth, storageHealth, backupServiceHealth, performanceMetrics] =
       await Promise.all([
@@ -232,8 +239,11 @@ async function calculatePerformanceMetrics() {
     const completedBackups = recentBackups.filter(b => b.status === 'completed')
     const failedBackups = recentBackups.filter(b => b.status === 'failed')
 
-    const successRate =
-      recentBackups.length > 0 ? (completedBackups.length / recentBackups.length) * 100 : 0
+    let successRate = computeSuccessRate(completedBackups.length, failedBackups.length)
+    if (successRate === null) {
+      const pgCount = await countPgBackRestBackups()
+      successRate = pgCount > 0 ? 100 : 0
+    }
 
     // Ratio de compresión real: comparar tamaño en BD vs tamaño real en disco
     // Los backups comprimidos tienen .gz — si el archivo en disco es más pequeño que el
@@ -306,7 +316,7 @@ async function calculatePerformanceMetrics() {
 
     return {
       avgBackupTime, // null si no hay suficientes datos
-      successRate: Math.round(successRate * 100) / 100,
+      successRate,
       compressionRatio, // null si no hay datos comparables
       totalBackups: recentBackups.length,
       completedBackups: completedBackups.length,

@@ -105,6 +105,13 @@ ensure_backup_env() {
     echo "BACKUP_ALLOW_RESTORE=false" >> "$ENV_FILE"
     changed=true
   fi
+  if ! grep -q "^CRON_SECRET=" "$ENV_FILE"; then
+    local cron_secret
+    cron_secret=$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | xxd -p -c 64)
+    echo "CRON_SECRET=$cron_secret" >> "$ENV_FILE"
+    echo "✅ CRON_SECRET generado — instala cron: ./docker/scripts/setup-backup-cron.sh"
+    changed=true
+  fi
   if [ "$changed" = true ]; then
     echo "✅ Variables pgBackRest añadidas a .env.production"
   fi

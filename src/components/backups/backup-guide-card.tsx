@@ -46,6 +46,7 @@ export function BackupGuideCard() {
           </Badge>
           <Badge variant='outline'>Config → horario, día FULL y retención</Badge>
           <Badge variant='outline'>Backups → historial con etiquetas pgBackRest</Badge>
+          <Badge variant='outline'>Dashboard → guía de auditoría e informe JSON</Badge>
         </div>
       </CardContent>
     </Card>

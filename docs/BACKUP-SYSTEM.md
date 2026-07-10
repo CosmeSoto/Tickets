@@ -126,17 +126,22 @@ pgBackRest restaura el **cluster completo**. Para restauración parcial:
 
 ### Diario (automático)
 
-- [ ] Cron llama `POST /api/admin/cron/backup` (full semanal, diff resto de días)
+- [ ] Cron del servidor llama `POST /api/admin/cron/backup` (`./docker/scripts/setup-backup-cron.sh`)
 - [ ] Revisar pestaña **Monitoreo** — estado pgBackRest verde
+- [ ] Dashboard → **Guía de auditoría** — checklist en verde
 
 ### Semanal
 
 - [ ] Verificar espacio en `pgbackrest_repo` y `app_backups`
 - [ ] Ejecutar `pgbackrest verify --stanza=main` (via script o UI health)
+- [ ] Exportar informe JSON desde Admin → Backups → Dashboard
 
-### Mensual (prueba de DR)
+### Mensual (prueba de DR y auditoría)
 
+- [ ] Crear **Export .dump**, descargarlo y guardarlo fuera del servidor
+- [ ] Ejecutar `disaster-recovery.sh check` y archivar salida
 - [ ] Restaurar export a entorno de prueba
+- [ ] Copia off-site del volumen `pgbackrest_repo` (rsync/NAS)
 - [ ] Documentar tiempo de recuperación (RTO/RPO)
 
 ## Variables de entorno

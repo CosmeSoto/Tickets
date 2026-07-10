@@ -47,6 +47,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { BackupDashboard } from '@/components/backups/backup-dashboard'
 import { BackupGuideCard } from '@/components/backups/backup-guide-card'
+import { BackupAuditGuideCard } from '@/components/backups/backup-audit-guide-card'
 import { BackupConfiguration } from '@/components/backups/backup-configuration'
 import { BackupRestore } from '@/components/backups/backup-restore'
 import { BackupMonitoring } from '@/components/backups/backup-monitoring'
@@ -279,6 +280,7 @@ export default function BackupsPage() {
 
           <TabsContent value='dashboard' className='space-y-6'>
             <BackupGuideCard />
+            <BackupAuditGuideCard />
             <BackupDashboard backups={backups} stats={stats} loading={loading} />
           </TabsContent>
 

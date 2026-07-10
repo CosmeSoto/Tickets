@@ -260,10 +260,44 @@ Documentación completa: [docs/BACKUP-SYSTEM.md](docs/BACKUP-SYSTEM.md)
 
 ### Operación diaria (automático)
 
-El cron llama `POST /api/admin/cron/backup` (protegido con `CRON_SECRET`):
+El cron del **servidor Debian** llama `POST /api/admin/cron/backup` (protegido con `CRON_SECRET`):
 
-- **Domingo:** backup FULL
-- **Resto de días:** backup DIFF
+- **Día configurado en UI (Config):** backup FULL (por defecto domingo)
+- **Resto de días (frecuencia daily):** backup DIFF
+- **Ventana horaria:** hora en Config ±30 min
+
+#### Instalar cron en Debian (una sola vez)
+
+```bash
+cd ~/projects/Tickets
+git pull
+chmod +x ./docker/scripts/setup-backup-cron.sh
+
+# Genera CRON_SECRET si falta, registra crontab horario y log en logs/backup-cron.log
+./docker/scripts/setup-backup-cron.sh
+
+# Reinicia app si se acaba de crear CRON_SECRET
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d app
+
+# Probar manualmente (debe devolver JSON con ran/reason)
+source .env.production 2>/dev/null || export $(grep -E '^CRON_SECRET=' .env.production | xargs)
+curl -fsS -X POST "${NEXTAUTH_URL%/}/api/admin/cron/backup" \
+  -H "Authorization: Bearer $CRON_SECRET"
+```
+
+Ver log del cron: `tail -f logs/backup-cron.log`
+
+### Auditoría y cumplimiento
+
+- **UI:** Admin → Backups → **Dashboard** → tarjeta _Guía de auditoría_ (checklist en vivo + **Exportar informe** JSON)
+- **CLI evidencia:**
+
+```bash
+./docker/scripts/disaster-recovery.sh check
+./docker/scripts/disaster-recovery.sh info
+```
+
+- **Mensual recomendado:** Export .dump desde UI + guardar informe JSON + copia off-site de volumen `pgbackrest_repo`
 
 ### Comandos manuales
 
