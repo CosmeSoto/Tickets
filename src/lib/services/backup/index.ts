@@ -86,7 +86,7 @@ export class BackupService {
     restoreModules?: string[],
     mode: 'replace' | 'merge' = 'replace',
     options?: { pitrTarget?: string }
-  ): Promise<void> {
+  ) {
     return restoreBackup(backupId, restoreModules, mode, options)
   }
 

@@ -178,6 +178,61 @@ async function finalizeStackAfterRestore() {
   await dockerStartContainers([CONTAINER_APP, CONTAINER_NGINX])
 }
 
+/** Estado de la última restauración pgBackRest (consultable tras reinicio de servicios). */
+let restoreJob = {
+  status: 'idle',
+  message: null,
+  label: null,
+  startedAt: null,
+  finishedAt: null,
+}
+
+async function runRestoreJob(body) {
+  const args = ['restore', `--stanza=${STANZA}`, '--type=default', '--delta']
+  if (body.set) args.push(`--set=${body.set}`)
+  if (body.target) {
+    args.push(`--type=time`, `--target="${body.target}"`, '--target-action=promote')
+  }
+
+  restoreJob = {
+    status: 'running',
+    message: 'Deteniendo servicios y restaurando cluster…',
+    label: body.set || null,
+    startedAt: new Date().toISOString(),
+    finishedAt: null,
+  }
+
+  let restoreOk = false
+
+  try {
+    await prepareStackForRestore()
+    console.log(`[backup-worker] Ejecutando: pgbackrest ${args.join(' ')}`)
+    restoreJob.message = 'Ejecutando pgbackrest restore (puede tardar varios minutos)…'
+    await runPgBackRest(args, 3_600_000)
+    console.log('[backup-worker] pgbackrest restore completado')
+    restoreOk = true
+    restoreJob.status = 'success'
+    restoreJob.message = 'Restauración pgBackRest completada'
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error)
+    console.error('[backup-worker] restore error:', error)
+    restoreJob.status = 'failed'
+    restoreJob.message = msg
+  } finally {
+    restoreJob.finishedAt = new Date().toISOString()
+    try {
+      await finalizeStackAfterRestore()
+      console.log('[backup-worker] Servicios reiniciados tras restauración')
+    } catch (restartErr) {
+      console.error('[backup-worker] Error reiniciando stack:', restartErr)
+      if (restoreOk) {
+        restoreJob.message =
+          'Restauración OK pero reinicio parcial — ejecuta: docker compose up -d'
+      }
+    }
+  }
+}
+
 async function readBody(req) {
   const chunks = []
   for await (const chunk of req) chunks.push(chunk)
@@ -377,48 +432,33 @@ const server = http.createServer(async (req, res) => {
         })
       }
 
-      const args = ['restore', `--stanza=${STANZA}`, '--type=default', '--delta']
-      if (body.set) args.push(`--set=${body.set}`)
-      if (body.target) {
-        args.push(`--type=time`, `--target="${body.target}"`, '--target-action=promote')
-      }
-
-      let restoreOk = false
-      let restoreError = null
-
-      try {
-        await prepareStackForRestore()
-        await runPgBackRest(args, 3_600_000)
-        restoreOk = true
-      } catch (error) {
-        restoreError = error
-        console.error('[backup-worker] restore error:', error)
-      } finally {
-        try {
-          await finalizeStackAfterRestore()
-        } catch (restartErr) {
-          console.error('[backup-worker] Error reiniciando stack:', restartErr)
-          if (restoreOk) {
-            console.error(
-              '[backup-worker] Restauración OK pero reinicio falló — ejecuta: docker compose up -d'
-            )
-          }
-        }
-      }
-
-      if (restoreOk) {
-        return json(res, 200, {
-          success: true,
-          message: 'Restauración pgBackRest completada — servicios reiniciados',
+      if (restoreJob.status === 'running') {
+        return json(res, 409, {
+          error: 'Ya hay una restauración pgBackRest en curso',
+          job: restoreJob,
         })
       }
 
-      return json(res, 500, {
-        error:
-          restoreError instanceof Error
-            ? restoreError.message
-            : 'Error en restauración pgBackRest',
+      console.log(
+        `[backup-worker] Restauración aceptada (async)${body.set ? ` set=${body.set}` : ''}`
+      )
+      setImmediate(() => {
+        runRestoreJob(body).catch(err => {
+          console.error('[backup-worker] runRestoreJob no capturado:', err)
+        })
       })
+
+      return json(res, 202, {
+        accepted: true,
+        async: true,
+        message:
+          'Restauración iniciada. El sitio quedará fuera de línea unos minutos mientras se restaura el cluster.',
+        job: { status: 'running', label: body.set || null, startedAt: new Date().toISOString() },
+      })
+    }
+
+    if (url.pathname === '/restore/status' && req.method === 'GET') {
+      return json(res, 200, { job: restoreJob })
     }
 
     json(res, 404, { error: 'Ruta no encontrada' })

@@ -85,6 +85,7 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
   /** Modo de restauración: replace (reemplazar) o merge (fusionar/agregar) */
   const [restoreMode, setRestoreMode] = useState<RestoreMode>('merge')
   const [allowPgBackRestRestore, setAllowPgBackRestRestore] = useState(false)
+  const [maintenanceMessage, setMaintenanceMessage] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
 
@@ -178,23 +179,69 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
 
   const initiateRestore = () => setShowConfirmation(true)
 
+  const parseJsonResponse = async (response: Response) => {
+    const text = await response.text()
+    if (!text) return {}
+    try {
+      return JSON.parse(text) as Record<string, unknown>
+    } catch {
+      throw new Error(
+        response.status >= 500
+          ? 'El servidor dejó de responder durante la operación. Revisa los logs del backup-worker en el servidor.'
+          : 'Respuesta inválida del servidor (se esperaba JSON)'
+      )
+    }
+  }
+
+  const waitForSiteRecovery = async (maxMs = 20 * 60 * 1000) => {
+    const start = Date.now()
+    while (Date.now() - start < maxMs) {
+      await new Promise(resolve => setTimeout(resolve, 5000))
+      try {
+        const res = await fetch('/api/auth/session', { cache: 'no-store' })
+        if (res.ok) return true
+      } catch {
+        // sitio aún fuera de línea
+      }
+    }
+    return false
+  }
+
+  const checkPgBackRestRestoreOutcome = async () => {
+    const res = await fetch('/api/admin/backups/restore-status', { cache: 'no-store' })
+    const data = await parseJsonResponse(res)
+    if (!res.ok) {
+      throw new Error(String(data.error || 'No se pudo verificar el estado de la restauración'))
+    }
+    const job = data.job as
+      | { status?: string; message?: string | null; label?: string | null }
+      | undefined
+    if (job?.status === 'failed') {
+      throw new Error(job.message || 'La restauración pgBackRest falló')
+    }
+    if (job?.status === 'running') {
+      throw new Error('La restauración sigue en curso. Espera unos minutos y recarga la página.')
+    }
+    return job
+  }
+
   const confirmRestore = async () => {
     if (!selectedBackup) return
     setRestoring(true)
     setRestoreProgress(0)
     setShowConfirmation(false)
 
-    try {
-      const progressInterval = setInterval(() => {
-        setRestoreProgress(prev => {
-          if (prev >= 90) {
-            clearInterval(progressInterval)
-            return prev
-          }
-          return prev + Math.random() * 10
-        })
-      }, 500)
+    const progressInterval = setInterval(() => {
+      setRestoreProgress(prev => {
+        if (prev >= 90) {
+          clearInterval(progressInterval)
+          return prev
+        }
+        return prev + Math.random() * 10
+      })
+    }, 500)
 
+    try {
       const body: Record<string, unknown> = {}
       if (selectedModules.length > 0) {
         body.modules = selectedModules
@@ -206,6 +253,47 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
+
+      const data = await parseJsonResponse(response)
+
+      if (response.status === 202 || data.async) {
+        clearInterval(progressInterval)
+        setRestoreProgress(35)
+        setMaintenanceMessage(
+          String(
+            data.message ||
+              'Restauración pgBackRest en curso. El sitio quedará fuera de línea unos minutos…'
+          )
+        )
+
+        const recovered = await waitForSiteRecovery()
+        if (!recovered) {
+          throw new Error(
+            'Tiempo de espera agotado. Verifica en el servidor: docker compose logs backup-worker'
+          )
+        }
+
+        setRestoreProgress(85)
+        await checkPgBackRestRestoreOutcome()
+        setRestoreProgress(100)
+
+        toast({
+          title: 'Restauración pgBackRest completada',
+          description:
+            'El cluster PostgreSQL fue restaurado y los servicios están activos de nuevo.',
+        })
+        setTimeout(() => {
+          setRestoring(false)
+          setRestoreProgress(0)
+          setMaintenanceMessage(null)
+          setSelectedBackup(null)
+          setRestorePreview(null)
+          setSelectedModules([])
+          setRestoreMode('merge')
+          onRefresh()
+        }, 2000)
+        return
+      }
 
       clearInterval(progressInterval)
       setRestoreProgress(100)
@@ -228,10 +316,10 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
           onRefresh()
         }, 2000)
       } else {
-        const error = await response.json()
-        throw new Error(error.error || 'Error en la restauración')
+        throw new Error(String(data.error || 'Error en la restauración'))
       }
     } catch (error) {
+      clearInterval(progressInterval)
       toast({
         title: 'Error en la Restauración',
         description: error instanceof Error ? error.message : 'Error desconocido',
@@ -239,6 +327,7 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
       })
       setRestoring(false)
       setRestoreProgress(0)
+      setMaintenanceMessage(null)
     }
   }
 
@@ -896,8 +985,20 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
                 <Progress value={restoreProgress} className='h-3' />
               </div>
               <div className='text-center text-sm text-muted-foreground'>
-                <p>Por favor, no cierres esta ventana...</p>
-                <p className='text-xs mt-1'>La restauración puede tomar varios minutos</p>
+                {maintenanceMessage ? (
+                  <>
+                    <p className='text-foreground font-medium'>{maintenanceMessage}</p>
+                    <p className='text-xs mt-2'>
+                      La página puede dejar de responder unos minutos. Este diálogo esperará a que
+                      el sitio vuelva y verificará el resultado automáticamente.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p>Por favor, no cierres esta ventana...</p>
+                    <p className='text-xs mt-1'>La restauración puede tomar varios minutos</p>
+                  </>
+                )}
               </div>
             </CardContent>
           </Card>

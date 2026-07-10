@@ -20,12 +20,14 @@ const execAsync = promisify(exec)
 
 export type RestoreMode = 'replace' | 'merge'
 
+export type RestoreResult = { async?: boolean; message?: string }
+
 export async function restoreBackup(
   backupId: string,
   restoreModules?: string[],
   mode: RestoreMode = 'replace',
   options?: { pitrTarget?: string }
-): Promise<void> {
+): Promise<RestoreResult> {
   try {
     const backup = await prisma.backups.findUnique({ where: { id: backupId } })
     if (!backup) {
@@ -51,7 +53,7 @@ export async function restoreBackup(
       await prisma.audit_logs.create({
         data: {
           id: randomUUID(),
-          action: 'backup_restored',
+          action: 'backup_restore_started',
           entityType: 'System',
           entityId: backupId,
           createdAt: new Date(),
@@ -60,10 +62,14 @@ export async function restoreBackup(
             label: label ?? null,
             pitrTarget: options?.pitrTarget ?? null,
             mode: 'full',
+            async: true,
           },
         },
       })
-      return
+      return {
+        async: true,
+        message: 'Restauración pgBackRest iniciada. El sitio quedará fuera de línea unos minutos.',
+      }
     }
 
     await stat(backup.filepath)
@@ -176,6 +182,7 @@ export async function restoreBackup(
     })
 
     console.log('[RESTORE] Restauración completada exitosamente')
+    return {}
   } catch (error) {
     console.error('[RESTORE] Error:', error)
     throw error

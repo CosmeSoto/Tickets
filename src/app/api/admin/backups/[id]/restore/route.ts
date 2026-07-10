@@ -49,7 +49,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       // Body vacío — restauración completa
     }
 
-    await BackupService.restoreBackup(backupId, restoreModules, mode, { pitrTarget })
+    const result = await BackupService.restoreBackup(backupId, restoreModules, mode, { pitrTarget })
+
+    if (result.async) {
+      return NextResponse.json(
+        {
+          success: true,
+          async: true,
+          message:
+            result.message ||
+            'Restauración pgBackRest iniciada. El sitio quedará fuera de línea unos minutos.',
+        },
+        { status: 202 }
+      )
+    }
 
     const scopeLabel = restoreModules ? `módulo(s): ${restoreModules.join(', ')}` : 'completa'
     const modeLabel = mode === 'merge' ? ' (modo fusión)' : ''

@@ -57,6 +57,9 @@ async function workerFetch<T>(
     })
 
     const data = await res.json().catch(() => ({}))
+    if (res.status === 202) {
+      return data as T
+    }
     if (!res.ok) {
       throw new Error(data.error || `Backup worker error ${res.status}`)
     }
@@ -165,7 +168,7 @@ export async function verifyPgBackRestRepo(): Promise<void> {
 export async function restorePgBackRest(options: {
   label?: string
   target?: string
-}): Promise<void> {
+}): Promise<{ async: true }> {
   const allowed = await isPgBackRestRestoreAllowed()
   if (!allowed) {
     throw new Error(
@@ -173,11 +176,25 @@ export async function restorePgBackRest(options: {
     )
   }
 
-  await workerFetch('/restore', {
+  await workerFetch<{ accepted?: boolean }>('/restore', {
     method: 'POST',
     body: { ...options, set: options.label, uiAuthorized: true },
-    timeoutMs: 7_200_000,
+    timeoutMs: 30_000,
   })
+
+  return { async: true }
+}
+
+export type PgBackRestRestoreJob = {
+  status: 'idle' | 'running' | 'success' | 'failed'
+  message: string | null
+  label: string | null
+  startedAt: string | null
+  finishedAt: string | null
+}
+
+export async function getPgBackRestRestoreStatus(): Promise<{ job: PgBackRestRestoreJob }> {
+  return workerFetch('/restore/status', { timeoutMs: 15_000 })
 }
 
 export function buildPgBackRestFileRef(label: string): string {
