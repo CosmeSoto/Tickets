@@ -492,10 +492,13 @@ export default function BackupsPage() {
       <AlertDialog open={showCleanupDialog} onOpenChange={setShowCleanupDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Limpiar backups fallidos?</AlertDialogTitle>
+            <AlertDialogTitle>¿Limpiar registros fallidos?</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div>
-                <p>¿Estás seguro de que quieres eliminar todos los backups fallidos?</p>
+                <p>
+                  Quita de la lista respaldos marcados como fallidos (error al crear o archivo ya
+                  eliminado). No borra backups pgBackRest válidos del repositorio.
+                </p>
                 <div className='mt-3 p-3 bg-muted border border-border rounded text-sm'>
                   <div className='font-medium mb-2 text-foreground'>Se eliminarán:</div>
                   <div className='text-muted-foreground'>• {failedCount} backup(s) fallido(s)</div>

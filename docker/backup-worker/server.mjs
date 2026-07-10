@@ -130,6 +130,21 @@ async function waitPostgresReady(maxAttempts = 60) {
   throw new Error('PostgreSQL no disponible tras esperar 3 minutos')
 }
 
+function normalizeBackupEntry(entry) {
+  if (!entry) return null
+  let ts = entry.timestamp
+  if (ts && typeof ts === 'object') {
+    ts = ts.stop ?? ts.start ?? null
+  }
+  const info = entry.info || {}
+  return {
+    label: entry.label,
+    type: entry.type,
+    timestamp: typeof ts === 'number' ? ts : undefined,
+    size: info.size ?? info['repository-size'] ?? entry.size ?? 0,
+  }
+}
+
 async function hasExistingBackups() {
   try {
     const { stdout } = await runPgBackRest(['info', `--stanza=${STANZA}`, '--output=json'], 30_000)
@@ -264,7 +279,7 @@ const server = http.createServer(async (req, res) => {
       const { stdout } = await runPgBackRest(['info', `--stanza=${STANZA}`, '--output=json'])
       const info = JSON.parse(stdout || '[]')
       const stanzaInfo = info[0] || {}
-      const lastBackup = stanzaInfo['backup']?.slice(-1)[0] || null
+      const lastBackup = normalizeBackupEntry(stanzaInfo['backup']?.slice(-1)[0] || null)
       return json(res, 200, {
         success: true,
         type,

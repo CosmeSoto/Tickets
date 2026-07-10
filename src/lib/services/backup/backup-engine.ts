@@ -4,6 +4,29 @@ const WORKER_URL = process.env.BACKUP_WORKER_URL || ''
 const WORKER_SECRET = process.env.BACKUP_WORKER_SECRET || ''
 const STANZA = process.env.PGBACKREST_STANZA || 'main'
 
+/** pgBackRest 2.58 devuelve timestamp como epoch o como { start, stop }. */
+export function parsePgBackRestTimestamp(value: unknown): Date | null {
+  if (value == null) return null
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    const ms = value > 1e12 ? value : value * 1000
+    const date = new Date(ms)
+    return Number.isNaN(date.getTime()) ? null : date
+  }
+  if (typeof value === 'object') {
+    const obj = value as { start?: number; stop?: number }
+    if (typeof obj.stop === 'number') return parsePgBackRestTimestamp(obj.stop)
+    if (typeof obj.start === 'number') return parsePgBackRestTimestamp(obj.start)
+  }
+  return null
+}
+
+export function pgBackRestBackupSize(set: {
+  size?: number
+  info?: { size?: number; 'repository-size'?: number }
+}): number {
+  return set.info?.size ?? set.info?.['repository-size'] ?? set.size ?? 0
+}
+
 function workerConfigured(): boolean {
   return Boolean(WORKER_URL && WORKER_SECRET)
 }
@@ -114,7 +137,8 @@ export async function runPgBackRestBackup(
 
   const backup = result.backup
   const label = backup?.label || null
-  const size = backup?.size || 0
+  const size = backup?.size ?? 0
+  const backupDate = parsePgBackRestTimestamp(backup?.timestamp)
 
   return {
     label,
@@ -124,7 +148,7 @@ export async function runPgBackRestBackup(
         stanza: STANZA,
         label,
         type: result.type,
-        timestamp: backup?.timestamp,
+        timestamp: backupDate?.toISOString(),
         durationMs: result.durationMs,
       },
     },
@@ -200,7 +224,8 @@ export async function syncPgBackRestToDatabase(): Promise<number> {
     if (existing) continue
 
     const kind = mapPgBackRestType(set.type)
-    const size = set.info?.size || set.size || 0
+    const size = pgBackRestBackupSize(set)
+    const createdAt = parsePgBackRestTimestamp(set.timestamp) ?? new Date()
     await prisma.backups.create({
       data: {
         id: randomUUID(),
@@ -216,12 +241,10 @@ export async function syncPgBackRestToDatabase(): Promise<number> {
         label: set.label,
         metadata: JSON.stringify({
           version: '3.0',
-          createdAt: set.timestamp
-            ? new Date(set.timestamp * 1000).toISOString()
-            : new Date().toISOString(),
+          createdAt: createdAt.toISOString(),
           pgbackrest: { stanza: STANZA, label: set.label, type: set.type },
         }),
-        createdAt: set.timestamp ? new Date(set.timestamp * 1000) : new Date(),
+        createdAt,
       },
     })
     synced++

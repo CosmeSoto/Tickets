@@ -132,7 +132,11 @@ async function createInfrastructureBackup(
       },
     })
 
-    await syncPgBackRestToDatabase()
+    try {
+      await syncPgBackRestToDatabase()
+    } catch (syncError) {
+      console.warn('[BACKUP] sync pgBackRest (no crítico):', syncError)
+    }
     await cleanOldBackups()
 
     if (config.notifications) {

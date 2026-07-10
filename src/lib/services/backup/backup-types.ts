@@ -77,9 +77,10 @@ export interface BackupConfig {
 export interface PgBackRestBackupSet {
   label?: string
   type?: string
-  timestamp?: number
+  /** pgBackRest 2.58+: number (epoch s) or { start, stop } */
+  timestamp?: number | { start?: number; stop?: number }
   size?: number
-  info?: { size?: number }
+  info?: { size?: number; 'repository-size'?: number }
 }
 
 export interface PgBackRestInfo {
