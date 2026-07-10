@@ -225,6 +225,45 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
     return job
   }
 
+  const isFetchNetworkError = (error: unknown) =>
+    error instanceof TypeError ||
+    (error instanceof Error &&
+      /failed to fetch|network error|load failed|networkrequestfailed|aborted/i.test(error.message))
+
+  const waitForPgBackRestMaintenance = async (clearProgressInterval: () => void) => {
+    clearProgressInterval()
+    setRestoreProgress(35)
+    setMaintenanceMessage(
+      'Restauración pgBackRest en curso. El sitio quedará fuera de línea unos minutos…'
+    )
+
+    const recovered = await waitForSiteRecovery()
+    if (!recovered) {
+      throw new Error(
+        'Tiempo de espera agotado. Verifica en el servidor: docker compose logs backup-worker'
+      )
+    }
+
+    setRestoreProgress(85)
+    await checkPgBackRestRestoreOutcome()
+    setRestoreProgress(100)
+
+    toast({
+      title: 'Restauración pgBackRest completada',
+      description: 'El cluster PostgreSQL fue restaurado y los servicios están activos de nuevo.',
+    })
+    setTimeout(() => {
+      setRestoring(false)
+      setRestoreProgress(0)
+      setMaintenanceMessage(null)
+      setSelectedBackup(null)
+      setRestorePreview(null)
+      setSelectedModules([])
+      setRestoreMode('merge')
+      onRefresh()
+    }, 2000)
+  }
+
   const confirmRestore = async () => {
     if (!selectedBackup) return
     setRestoring(true)
@@ -240,6 +279,10 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
         return prev + Math.random() * 10
       })
     }, 500)
+    const clearProgressInterval = () => clearInterval(progressInterval)
+
+    const pgBackRestFullRestore =
+      selectedBackup.engine === 'pgbackrest' && selectedModules.length === 0
 
     try {
       const body: Record<string, unknown> = {}
@@ -257,45 +300,11 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
       const data = await parseJsonResponse(response)
 
       if (response.status === 202 || data.async) {
-        clearInterval(progressInterval)
-        setRestoreProgress(35)
-        setMaintenanceMessage(
-          String(
-            data.message ||
-              'Restauración pgBackRest en curso. El sitio quedará fuera de línea unos minutos…'
-          )
-        )
-
-        const recovered = await waitForSiteRecovery()
-        if (!recovered) {
-          throw new Error(
-            'Tiempo de espera agotado. Verifica en el servidor: docker compose logs backup-worker'
-          )
-        }
-
-        setRestoreProgress(85)
-        await checkPgBackRestRestoreOutcome()
-        setRestoreProgress(100)
-
-        toast({
-          title: 'Restauración pgBackRest completada',
-          description:
-            'El cluster PostgreSQL fue restaurado y los servicios están activos de nuevo.',
-        })
-        setTimeout(() => {
-          setRestoring(false)
-          setRestoreProgress(0)
-          setMaintenanceMessage(null)
-          setSelectedBackup(null)
-          setRestorePreview(null)
-          setSelectedModules([])
-          setRestoreMode('merge')
-          onRefresh()
-        }, 2000)
+        await waitForPgBackRestMaintenance(clearProgressInterval)
         return
       }
 
-      clearInterval(progressInterval)
+      clearProgressInterval()
       setRestoreProgress(100)
 
       if (response.ok) {
@@ -319,7 +328,28 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
         throw new Error(String(data.error || 'Error en la restauración'))
       }
     } catch (error) {
-      clearInterval(progressInterval)
+      if (pgBackRestFullRestore && isFetchNetworkError(error)) {
+        try {
+          await waitForPgBackRestMaintenance(clearProgressInterval)
+          return
+        } catch (maintenanceError) {
+          clearProgressInterval()
+          toast({
+            title: 'Error en la Restauración',
+            description:
+              maintenanceError instanceof Error
+                ? maintenanceError.message
+                : 'Error desconocido tras mantenimiento',
+            variant: 'destructive',
+          })
+          setRestoring(false)
+          setRestoreProgress(0)
+          setMaintenanceMessage(null)
+          return
+        }
+      }
+
+      clearProgressInterval()
       toast({
         title: 'Error en la Restauración',
         description: error instanceof Error ? error.message : 'Error desconocido',

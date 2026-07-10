@@ -361,6 +361,7 @@ const server = http.createServer(async (req, res) => {
         stanzaOk,
         stanza: STANZA,
         allowRestore: ALLOW_RESTORE,
+        asyncRestore: true,
         timestamp: new Date().toISOString(),
       })
     }
@@ -473,6 +474,7 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`[backup-worker] Escuchando en :${PORT} stanza=${STANZA} config=${PGBR_CONFIG}`)
+  console.log('[backup-worker] Restauración pgBackRest: modo asíncrono (HTTP 202)')
   startInit().then(result => {
     if (result.needsPostgresRestart) {
       console.log('[backup-worker] Bootstrap OK — pendiente: docker compose restart postgres')
