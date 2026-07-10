@@ -31,6 +31,8 @@ if [ "${1:-}" = "postgres" ]; then
     echo "[pgBackRest] Bootstrap pendiente — archive_mode=off"
     PG_ARGS+=(-c archive_mode=off)
   fi
+  nohup /usr/local/bin/pgbackrest-bootstrap-watcher.sh >/proc/1/fd/1 2>/proc/1/fd/2 &
+  disown 2>/dev/null || true
   exec /usr/local/bin/docker-entrypoint.sh postgres "${PG_ARGS[@]}" "$@"
 fi
 

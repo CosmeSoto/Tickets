@@ -17,8 +17,6 @@ const STANZA = process.env.PGBACKREST_STANZA || 'main'
 const ALLOW_RESTORE = process.env.BACKUP_ALLOW_RESTORE === 'true'
 const PGBR_CONFIG = '/etc/pgbackrest/pgbackrest-local.conf'
 const BOOTSTRAP_MARKER = '/var/lib/pgbackrest/.bootstrap_done'
-const DOCKER_SOCKET = process.env.DOCKER_SOCKET || '/var/run/docker.sock'
-const POSTGRES_CONTAINER = process.env.POSTGRES_CONTAINER_NAME || 'tickets-postgres'
 
 let stanzaReady = false
 let initPromise = null
@@ -61,49 +59,40 @@ async function markBootstrapComplete() {
   await writeFile(BOOTSTRAP_MARKER, `completed ${new Date().toISOString()}\n`, { mode: 0o640 })
 }
 
-async function restartPostgresContainer() {
-  return new Promise((resolve, reject) => {
-    const req = http.request(
-      {
-        socketPath: DOCKER_SOCKET,
-        path: `/containers/${POSTGRES_CONTAINER}/restart?t=20`,
-        method: 'POST',
-      },
-      res => {
-        let body = ''
-        res.on('data', chunk => {
-          body += chunk
-        })
-        res.on('end', () => {
-          if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
-            resolve()
-            return
-          }
-          reject(new Error(`Docker restart HTTP ${res.statusCode}: ${body.slice(0, 200)}`))
-        })
-      }
-    )
-    req.on('error', reject)
-    req.setTimeout(120_000, () => req.destroy(new Error('Timeout reiniciando postgres')))
-    req.end()
-  })
+async function waitForArchiveModeOn(maxAttempts = 90) {
+  const pgpass = process.env.PGPASSWORD || ''
+  for (let i = 1; i <= maxAttempts; i++) {
+    try {
+      const { stdout } = await exec(
+        'psql',
+        ['-h', 'postgres', '-U', 'tickets_user', '-d', 'tickets_db', '-tAc', 'SHOW archive_mode'],
+        { timeout: 5000, env: { ...process.env, PGPASSWORD: pgpass } }
+      )
+      if (stdout?.toString().trim() === 'on') return true
+    } catch {
+      // postgres puede estar reiniciando
+    }
+    if (i === 1 || i % 6 === 0) {
+      console.log(`[backup-worker] Esperando archive_mode=on (${i}/${maxAttempts})...`)
+    }
+    await sleep(5000)
+  }
+  return false
 }
 
 async function finalizeBootstrap() {
   await markBootstrapComplete()
-  try {
-    console.log(`[backup-worker] Reiniciando ${POSTGRES_CONTAINER} para activar archive_mode...`)
-    await restartPostgresContainer()
-    await waitPostgresReady(90)
-    await runPgBackRest(['check', `--stanza=${STANZA}`], 120_000)
-    stanzaReady = true
-    console.log('[backup-worker] Bootstrap completado — stanza operativa')
-    return { ok: true, needsPostgresRestart: false }
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error)
-    console.warn(`[backup-worker] Bootstrap OK pero reinicio manual necesario: ${msg}`)
+  console.log('[backup-worker] Marcador creado — postgres se reiniciará solo para activar archive_mode')
+  const enabled = await waitForArchiveModeOn(90)
+  if (!enabled) {
+    console.warn('[backup-worker] archive_mode sigue off — pulsa Inicializar de nuevo en unos segundos')
     return { ok: true, needsPostgresRestart: true }
   }
+  await waitPostgresReady(30)
+  await runPgBackRest(['check', `--stanza=${STANZA}`], 120_000)
+  stanzaReady = true
+  console.log('[backup-worker] Bootstrap completado — stanza operativa')
+  return { ok: true, needsPostgresRestart: false }
 }
 
 async function runPgBackRest(args, timeoutMs = 3_600_000) {
