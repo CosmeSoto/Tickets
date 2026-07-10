@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { BackupService } from '@/lib/services/backup-service'
 import prisma from '@/lib/prisma'
 import { inferEngineFromRecord } from '@/lib/services/backup/backup-engine'
-import { requireBackupSuperAdmin } from '../../_auth'
+import { requireBackupSuperAdmin } from '../_auth'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
