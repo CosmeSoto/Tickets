@@ -28,6 +28,7 @@ export interface AuditLogData {
     | 'news'
     | 'form'
     | 'backup'
+    | 'sla'
   entityId?: string
   userId: string
   details?: Record<string, any>
@@ -56,6 +57,10 @@ export interface AuditLogFilter {
   offset?: number
   search?: string
   familyId?: string
+  configModule?: string
+  /** Preset de acciones: critical | security */
+  actionPreset?: string
+  days?: number
 }
 
 export interface AuditExportOptions {
@@ -86,6 +91,41 @@ export class AuditServiceComplete {
             errorMessage: data.errorMessage,
           })
 
+      const { enrichDetailsWithConfigDiff, toAuditSnapshot } =
+        await import('@/lib/services/config-audit')
+
+      const baseDetails: Record<string, unknown> = {
+        ...(data.details ?? {}),
+        metadata: data.metadata,
+      }
+
+      const hasPrebuiltDiff =
+        baseDetails.changes &&
+        typeof baseDetails.changes === 'object' &&
+        !Array.isArray(baseDetails.changes) &&
+        Object.values(baseDetails.changes as Record<string, unknown>).some(
+          entry =>
+            entry &&
+            typeof entry === 'object' &&
+            ('antes' in (entry as object) || 'despues' in (entry as object))
+        )
+
+      const oldSnap = data.oldValues
+        ? toAuditSnapshot(data.oldValues as Record<string, unknown>)
+        : null
+      const newSnap = data.newValues
+        ? toAuditSnapshot(data.newValues as Record<string, unknown>)
+        : null
+
+      const auditDetails =
+        !hasPrebuiltDiff && oldSnap && newSnap
+          ? enrichDetailsWithConfigDiff(data.action, baseDetails, oldSnap, newSnap)
+          : {
+              ...baseDetails,
+              oldValues: data.oldValues,
+              newValues: data.newValues,
+            }
+
       await prisma.audit_logs.create({
         data: {
           id: randomUUID(),
@@ -94,11 +134,7 @@ export class AuditServiceComplete {
           entityId: data.entityId || '',
           userId: data.userId,
           details: {
-            // Datos originales
-            ...data.details,
-            oldValues: data.oldValues,
-            newValues: data.newValues,
-            metadata: data.metadata,
+            ...auditDetails,
 
             // NUEVO: Contexto enriquecido
             context: {
@@ -147,51 +183,10 @@ export class AuditServiceComplete {
    */
   static async getLogs(filter: AuditLogFilter = {}) {
     try {
-      const {
-        userId,
-        entityType,
-        entityId,
-        action,
-        startDate,
-        endDate,
-        limit = 50,
-        offset = 0,
-        search,
-        familyId,
-      } = filter
+      const { limit = 50, offset = 0 } = filter
 
-      const where: any = {}
-
-      if (userId) where.userId = userId
-      if (entityType) where.entityType = entityType
-      if (entityId) where.entityId = entityId
-      if (action) where.action = { contains: action, mode: 'insensitive' }
-      if (search) {
-        where.OR = [
-          { action: { contains: search, mode: 'insensitive' } },
-          { entityType: { contains: search, mode: 'insensitive' } },
-          { users: { name: { contains: search, mode: 'insensitive' } } },
-          { users: { email: { contains: search, mode: 'insensitive' } } },
-        ]
-      }
-
-      if (startDate || endDate) {
-        where.createdAt = {}
-        if (startDate) where.createdAt.gte = startDate
-        if (endDate) where.createdAt.lte = endDate
-      }
-
-      if (familyId) {
-        where.AND = [
-          ...(where.AND ?? []),
-          {
-            OR: [
-              { details: { path: ['familyId'], equals: familyId } },
-              { entityId: familyId },
-            ],
-          },
-        ]
-      }
+      const { buildAuditLogWhere } = await import('@/lib/services/audit-query-builder')
+      const where = await buildAuditLogWhere(filter)
 
       const logs = await prisma.audit_logs.findMany({
         where,
@@ -591,18 +586,18 @@ export class AuditServiceComplete {
   /**
    * Obtener estadísticas de auditoría avanzadas
    */
-  static async getStats(days: number = 30) {
+  static async getStats(filter: AuditLogFilter = {}) {
+    const days = filter.days ?? 30
     const startDate = new Date()
     startDate.setDate(startDate.getDate() - days)
+
+    const { buildAuditLogWhere } = await import('@/lib/services/audit-query-builder')
+    const dateWhere = await buildAuditLogWhere({ ...filter, startDate })
 
     // Estadísticas por acción y entidad
     const actionStats = await prisma.audit_logs.groupBy({
       by: ['action', 'entityType'],
-      where: {
-        createdAt: {
-          gte: startDate,
-        },
-      },
+      where: dateWhere,
       _count: {
         id: true,
       },
@@ -615,21 +610,13 @@ export class AuditServiceComplete {
 
     // Total de logs
     const totalLogs = await prisma.audit_logs.count({
-      where: {
-        createdAt: {
-          gte: startDate,
-        },
-      },
+      where: dateWhere,
     })
 
     // Actividad por usuario
     const userActivity = await prisma.audit_logs.groupBy({
       by: ['userId'],
-      where: {
-        createdAt: {
-          gte: startDate,
-        },
-      },
+      where: dateWhere,
       _count: {
         id: true,
       },
@@ -644,11 +631,7 @@ export class AuditServiceComplete {
     // Estadísticas por módulo
     const moduleStats = await prisma.audit_logs.groupBy({
       by: ['entityType'],
-      where: {
-        createdAt: {
-          gte: startDate,
-        },
-      },
+      where: dateWhere,
       _count: {
         id: true,
       },
@@ -704,7 +687,11 @@ export class AuditServiceComplete {
       'user_role_changed',
       'system_config_changed',
       'backup_created',
+      'backup_imported',
+      'backup_deleted',
+      'backup_restore_started',
       'backup_restored',
+      'backup_restore_failed',
       'security_breach',
     ]
 

@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma'
 import { z } from 'zod'
 import { requireSuperAdmin } from '@/lib/auth/require-super-admin'
 import { invalidateBatchAlertSettingsCache } from '@/lib/inventory/batch-alert-settings'
+import { logConfigAudit } from '@/lib/services/config-audit'
 
 const inventorySettingsSchema = z.object({
   manager_ids: z.array(z.string()).optional().default([]),
@@ -65,6 +66,35 @@ const NUMBER_FIELDS = [
   'batch_low_stock_threshold_pct',
 ]
 
+async function loadInventorySettings(): Promise<Record<string, unknown>> {
+  const settingsKeys = Object.keys(DEFAULT_SETTINGS)
+  const dbSettings = await prisma.system_settings.findMany({
+    where: { key: { in: settingsKeys.map(k => `inventory.${k}`) } },
+  })
+
+  const settings: Record<string, unknown> = {}
+  for (const [key, defaultValue] of Object.entries(DEFAULT_SETTINGS)) {
+    const dbRow = dbSettings.find(s => s.key === `inventory.${key}`)
+    const raw = dbRow?.value ?? defaultValue
+
+    if (JSON_FIELDS.includes(key)) {
+      try {
+        settings[key] = JSON.parse(raw)
+      } catch {
+        settings[key] = JSON.parse(defaultValue)
+      }
+    } else if (BOOLEAN_FIELDS.includes(key)) {
+      settings[key] = raw === 'true'
+    } else if (NUMBER_FIELDS.includes(key)) {
+      settings[key] = parseInt(raw) || parseInt(defaultValue)
+    } else {
+      settings[key] = raw
+    }
+  }
+
+  return settings
+}
+
 export async function GET(_request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -72,30 +102,7 @@ export async function GET(_request: NextRequest) {
     if (session.user.role !== 'ADMIN')
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
 
-    const settingsKeys = Object.keys(DEFAULT_SETTINGS)
-    const dbSettings = await prisma.system_settings.findMany({
-      where: { key: { in: settingsKeys.map(k => `inventory.${k}`) } },
-    })
-
-    const settings: Record<string, any> = {}
-    for (const [key, defaultValue] of Object.entries(DEFAULT_SETTINGS)) {
-      const dbRow = dbSettings.find(s => s.key === `inventory.${key}`)
-      const raw = dbRow?.value ?? defaultValue
-
-      if (JSON_FIELDS.includes(key)) {
-        try {
-          settings[key] = JSON.parse(raw)
-        } catch {
-          settings[key] = JSON.parse(defaultValue)
-        }
-      } else if (BOOLEAN_FIELDS.includes(key)) {
-        settings[key] = raw === 'true'
-      } else if (NUMBER_FIELDS.includes(key)) {
-        settings[key] = parseInt(raw) || parseInt(defaultValue)
-      } else {
-        settings[key] = raw
-      }
-    }
+    const settings = await loadInventorySettings()
 
     return NextResponse.json({ settings })
   } catch (error) {
@@ -114,6 +121,7 @@ export async function PUT(request: NextRequest) {
 
     const body = await request.json()
     const settings = inventorySettingsSchema.parse(body)
+    const oldValues = await loadInventorySettings()
 
     for (const [key, value] of Object.entries(settings)) {
       const serialized = JSON_FIELDS.includes(key) ? JSON.stringify(value) : String(value)
@@ -133,6 +141,16 @@ export async function PUT(request: NextRequest) {
     }
 
     invalidateBatchAlertSettingsCache()
+
+    await logConfigAudit({
+      action: 'inventory_settings_updated',
+      entityType: 'inventory',
+      entityId: 'global',
+      userId: session!.user.id,
+      userEmail: session!.user.email ?? null,
+      oldValues,
+      newValues: settings as Record<string, unknown>,
+    })
 
     return NextResponse.json({ success: true, message: 'Configuración actualizada exitosamente' })
   } catch (error) {

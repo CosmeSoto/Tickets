@@ -67,6 +67,11 @@ export class CheckLicenseExpirationJob {
               metadata: { link: `/inventory/licenses` },
             })
 
+            if (!admin.email) {
+              notificationsSent++
+              continue
+            }
+
             // Crear email en cola
             await prisma.email_queue.create({
               data: {
@@ -76,7 +81,12 @@ export class CheckLicenseExpirationJob {
                   daysRemaining <= 7
                     ? `¡URGENTE! Licencia por Expirar - ${license.name}`
                     : `Licencia Próxima a Expirar - ${license.name}`,
-                body: this.generateEmailBody(license, daysRemaining, admin.name, assignedTo),
+                body: this.generateEmailBody(
+                  license,
+                  daysRemaining,
+                  admin.name ?? 'Administrador',
+                  assignedTo
+                ),
                 status: 'pending',
                 attempts: 0,
                 maxAttempts: 3,

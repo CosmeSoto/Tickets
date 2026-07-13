@@ -1,14 +1,19 @@
 import { NextResponse } from 'next/server'
 import { getPgBackRestRestoreStatus } from '@/lib/services/backup/backup-engine'
+import { syncPgBackRestRestoreAudit } from '@/lib/services/backup/backup-restore-events'
 import { requireBackupSuperAdmin } from '../_auth'
 
 export async function GET() {
   try {
-    const { errorResponse } = await requireBackupSuperAdmin()
+    const { session, errorResponse } = await requireBackupSuperAdmin()
     if (errorResponse) return errorResponse
 
     const status = await getPgBackRestRestoreStatus()
-    return NextResponse.json(status)
+    const auditResult = await syncPgBackRestRestoreAudit(status.job, {
+      userId: session?.user?.id,
+      userEmail: session?.user?.email ?? null,
+    })
+    return NextResponse.json({ ...status, auditSynced: auditResult })
   } catch (error) {
     console.error('Error fetching restore status:', error)
     return NextResponse.json(

@@ -57,7 +57,12 @@ function mapBackupRecord(backup: {
 export class BackupService {
   static async createBackup(
     type: 'manual' | 'automatic' = 'manual',
-    options?: { mode?: BackupCreateMode; backupKind?: BackupKind }
+    options?: {
+      mode?: BackupCreateMode
+      backupKind?: BackupKind
+      userId?: string | null
+      userEmail?: string | null
+    }
   ): Promise<BackupInfo> {
     return createBackup(type, options)
   }
@@ -85,7 +90,7 @@ export class BackupService {
     backupId: string,
     restoreModules?: string[],
     mode: 'replace' | 'merge' = 'replace',
-    options?: { pitrTarget?: string }
+    options?: { pitrTarget?: string; userId?: string | null; userEmail?: string | null }
   ) {
     return restoreBackup(backupId, restoreModules, mode, options)
   }

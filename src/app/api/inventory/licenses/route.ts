@@ -12,6 +12,7 @@ import { NotificationService } from '@/lib/services/notification-service'
 import { getFamilyScopedAdmins } from '@/lib/notifications/family-recipients'
 import { getRenewalAlertStatus } from '@/lib/inventory/renewal-alert'
 import { withCache, invalidateCache, buildCacheKey } from '@/lib/api-cache'
+import { resolveInventoryListScope } from '@/lib/inventory/inventory-session'
 
 /**
  * GET /api/inventory/licenses
@@ -63,14 +64,13 @@ export async function GET(request: NextRequest) {
 
     if (familyId) {
       where.licenseType = { familyId }
-    } else if (session.user.role === 'ADMIN' && !(session.user as any).isSuperAdmin) {
-      // Admin Normal sin familyId explícito: aplicar scope de inventario
-      const { getInventorySessionContext } = await import('@/lib/inventory/inventory-session')
-      const scope = (await getInventorySessionContext(session.user)).scope
-      if (scope.familyIds && scope.familyIds.length > 0) {
-        where.licenseType = { familyId: { in: scope.familyIds } }
-      } else if (scope.noAccess) {
-        return NextResponse.json({ items: [], total: 0, page: 1, limit: 10 })
+    } else {
+      const scopeResult = await resolveInventoryListScope(session.user)
+      if (scopeResult.noAccess) {
+        return NextResponse.json({ licenses: [], total: 0, page: 1, limit: 10 })
+      }
+      if (scopeResult.scopeFamilyIds?.length) {
+        where.licenseType = { familyId: { in: scopeResult.scopeFamilyIds } }
       }
     }
 

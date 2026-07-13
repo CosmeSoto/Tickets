@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto'
 import prisma from '@/lib/prisma'
 import { calculateConsumableStatus } from '@/lib/inventory/consumable-status'
+import { buildConsumableFamilyWhere } from '@/lib/inventory/scope-filter'
 import type {
   Consumable,
   StockMovement,
@@ -206,13 +207,27 @@ export class ConsumableService {
 
     if (filters.familyId) {
       where.consumableType = { familyId: filters.familyId }
+    } else if (filters.scopeFamilyIds?.length) {
+      Object.assign(where, buildConsumableFamilyWhere(filters.scopeFamilyIds))
+    } else if (filters.scopeFamilyIds && filters.scopeFamilyIds.length === 0) {
+      where.id = '__NONE__'
     }
 
     if (filters.lowStock) {
-      const lowStockIds = await prisma.$queryRaw<Array<{ id: string }>>`
-        SELECT id FROM consumables WHERE current_stock <= min_stock
-      `
-      where.id = { in: lowStockIds.map(r => r.id) }
+      const scopeWhere = filters.familyId
+        ? { consumableType: { familyId: filters.familyId } }
+        : filters.scopeFamilyIds?.length
+          ? buildConsumableFamilyWhere(filters.scopeFamilyIds)
+          : filters.scopeFamilyIds && filters.scopeFamilyIds.length === 0
+            ? { id: '__NONE__' }
+            : {}
+
+      const candidates = await prisma.consumables.findMany({
+        where: scopeWhere,
+        select: { id: true, currentStock: true, minStock: true },
+      })
+      const lowStockIds = candidates.filter(c => c.currentStock <= c.minStock).map(c => c.id)
+      where.id = lowStockIds.length > 0 ? { in: lowStockIds } : '__NONE__'
     }
 
     const [consumables, total] = await Promise.all([
@@ -229,22 +244,45 @@ export class ConsumableService {
     return { consumables: consumables as unknown as Consumable[], total }
   }
 
-  static async getConsumableSummary(): Promise<ConsumableSummary> {
-    const [total, lowStock, outOfStock, byType, totalValueResult, recentMovements] =
+  static async getConsumableSummary(familyIds?: string[]): Promise<ConsumableSummary> {
+    const scopeWhere = buildConsumableFamilyWhere(familyIds)
+
+    const [total, scopedForLowStock, outOfStock, byType, totalValueResult, recentMovements] =
       await Promise.all([
-        prisma.consumables.count(),
-        prisma.$queryRaw<
-          Array<{ count: bigint }>
-        >`SELECT COUNT(*) as count FROM consumables WHERE current_stock <= min_stock`,
-        prisma.consumables.count({ where: { currentStock: 0 } }),
-        prisma.consumables.groupBy({ by: ['typeId'], _count: true }),
-        prisma.$queryRaw<
-          Array<{ total: number }>
-        >`SELECT SUM(current_stock * COALESCE(cost_per_unit, 0)) as total FROM consumables`,
+        prisma.consumables.count({ where: scopeWhere }),
+        prisma.consumables.findMany({
+          where: scopeWhere,
+          select: { id: true, currentStock: true, minStock: true },
+        }),
+        prisma.consumables.count({ where: { ...scopeWhere, currentStock: 0 } }),
+        prisma.consumables.groupBy({ by: ['typeId'], where: scopeWhere, _count: true }),
+        familyIds === undefined
+          ? prisma.$queryRaw<Array<{ total: number }>>`
+              SELECT SUM(current_stock * COALESCE(cost_per_unit, 0)) as total FROM consumables
+            `
+          : prisma.consumables
+              .findMany({
+                where: scopeWhere,
+                select: { currentStock: true, costPerUnit: true },
+              })
+              .then(rows => [
+                { total: rows.reduce((s, r) => s + r.currentStock * (r.costPerUnit ?? 0), 0) },
+              ]),
         prisma.stock_movements.count({
-          where: { createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } },
+          where: {
+            createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
+            ...(familyIds?.length
+              ? { consumable: buildConsumableFamilyWhere(familyIds) }
+              : familyIds && familyIds.length === 0
+                ? { consumableId: '__NONE__' }
+                : {}),
+          },
         }),
       ])
+
+    const lowStock = scopedForLowStock.filter(
+      c => c.currentStock <= c.minStock && c.currentStock > 0
+    ).length
 
     const typeIds = byType.map(t => t.typeId).filter((id): id is string => id !== null)
     const types =
@@ -263,7 +301,7 @@ export class ConsumableService {
 
     return {
       total,
-      lowStock: Number(lowStock[0]?.count || 0),
+      lowStock,
       outOfStock,
       byType: byTypeMap,
       totalValue: totalValueResult[0]?.total || 0,

@@ -114,6 +114,66 @@ export async function GET() {
   }
 }
 
+// Etiquetas legibles para los campos de configuración de backup
+const BACKUP_CONFIG_LABELS: Record<string, string> = {
+  backupEnabled: 'Sistema de Backups',
+  backupFrequency: 'Frecuencia',
+  backupRetention: 'Retención (días)',
+  backupMaxCount: 'Máximo de Backups',
+  backupCompression: 'Compresión',
+  backupEncryption: 'Encriptación',
+  backupCloudStorage: 'Almacenamiento en Nube',
+  backupCloudProvider: 'Proveedor de Nube',
+  backupNotifications: 'Notificaciones',
+  backupEmailNotifications: 'Emails de Notificación',
+  backupVerifyIntegrity: 'Verificar Integridad',
+  backupScheduleTime: 'Hora Programada',
+  backupWeeklyFullDay: 'Día de Backup Full Semanal',
+  backupAllowRestore: 'Permitir Restauración',
+}
+
+// Formatea un valor de configuración de backup para mostrarlo de forma legible
+function formatBackupConfigValue(key: string, raw: string): string {
+  switch (key) {
+    case 'backupEnabled':
+    case 'backupCompression':
+    case 'backupEncryption':
+    case 'backupCloudStorage':
+    case 'backupNotifications':
+    case 'backupVerifyIntegrity':
+    case 'backupAllowRestore':
+      return raw === 'true' ? 'Habilitado' : 'Deshabilitado'
+    case 'backupFrequency': {
+      const freq: Record<string, string> = {
+        hourly: 'Cada hora',
+        daily: 'Diario',
+        weekly: 'Semanal',
+        monthly: 'Mensual',
+      }
+      return freq[raw] ?? raw
+    }
+    case 'backupRetention':
+      return `${raw} días`
+    case 'backupMaxCount':
+      return `${raw} backups`
+    case 'backupWeeklyFullDay': {
+      const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
+      return days[parseInt(raw, 10)] ?? raw
+    }
+    case 'backupEmailNotifications':
+      try {
+        const arr = JSON.parse(raw)
+        return Array.isArray(arr) && arr.length > 0 ? arr.join(', ') : 'Ninguno'
+      } catch {
+        return raw || 'Ninguno'
+      }
+    case 'backupCloudProvider':
+      return raw || 'No configurado'
+    default:
+      return raw || '—'
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { session, errorResponse } = await requireBackupSuperAdmin()
@@ -145,6 +205,32 @@ export async function POST(request: NextRequest) {
       },
     ]
 
+    // Leer valores actuales ANTES de actualizar para registrar el diff
+    const currentSettings = await prisma.system_settings.findMany({
+      where: { key: { in: settingsToUpdate.map(s => s.key) } },
+    })
+    const currentMap = Object.fromEntries(currentSettings.map(s => [s.key, s.value]))
+
+    // Construir diff: solo los campos que realmente cambiaron
+    const changes: Record<string, { label: string; antes: string; despues: string }> = {}
+    for (const setting of settingsToUpdate) {
+      const oldRaw = currentMap[setting.key] ?? null
+      if (oldRaw !== setting.value) {
+        changes[setting.key] = {
+          label: BACKUP_CONFIG_LABELS[setting.key] ?? setting.key,
+          antes: oldRaw !== null ? formatBackupConfigValue(setting.key, oldRaw) : 'No configurado',
+          despues: formatBackupConfigValue(setting.key, setting.value),
+        }
+      }
+    }
+
+    const summary =
+      Object.keys(changes).length > 0
+        ? Object.values(changes)
+            .map(c => `${c.label}: ${c.antes} → ${c.despues}`)
+            .join(' · ')
+        : 'Sin cambios detectados (configuración re-guardada)'
+
     // Actualizar o crear configuraciones
     for (const setting of settingsToUpdate) {
       await prisma.system_settings.upsert({
@@ -164,7 +250,7 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Registrar cambio en auditoría
+    // Registrar cambio en auditoría con diff completo (antes / después)
     await prisma.audit_logs.create({
       data: {
         id: randomUUID(),
@@ -173,8 +259,9 @@ export async function POST(request: NextRequest) {
         entityId: 'backup_config',
         userId: session!.user.id,
         details: {
-          updatedSettings: settingsToUpdate.map(s => s.key),
-          timestamp: new Date(),
+          changes,
+          totalChanges: Object.keys(changes).length,
+          summary,
         },
         createdAt: new Date(),
       },

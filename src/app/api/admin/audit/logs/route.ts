@@ -21,18 +21,31 @@ export async function GET(request: NextRequest) {
       action: searchParams.get('action') || undefined,
       userId: searchParams.get('userId') || undefined,
       familyId: searchParams.get('familyId') || undefined,
+      configModule:
+        searchParams.get('configModule') === 'all'
+          ? undefined
+          : searchParams.get('configModule') || undefined,
+      actionPreset: searchParams.get('actionPreset') || undefined,
       limit: Math.min(parseInt(searchParams.get('limit') || '50'), 500),
       offset: Math.max(0, parseInt(searchParams.get('offset') || '0')),
     }
     const days = parseInt(searchParams.get('days') || '30')
 
-    // No cachear búsquedas activas — solo listados sin filtro de texto
-    const shouldCache = !filters.search
+    const shouldCache =
+      !filters.search &&
+      !filters.action &&
+      !filters.userId &&
+      !filters.familyId &&
+      !filters.configModule &&
+      !filters.actionPreset &&
+      !filters.entityType
     const cacheKey = buildCacheKey('audit:logs', {
       entityType: filters.entityType,
       action: filters.action,
       userId: filters.userId,
       familyId: filters.familyId,
+      configModule: filters.configModule,
+      actionPreset: filters.actionPreset,
       limit: filters.limit,
       offset: filters.offset,
       days,

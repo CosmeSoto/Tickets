@@ -135,7 +135,7 @@ async function dockerAvailable() {
 async function dockerStopContainers(names) {
   if (!(await dockerAvailable())) {
     throw new Error(
-      'Docker socket no disponible en backup-worker. Añade DOCKER_GID y /var/run/docker.sock en docker-compose.prod.yml'
+      'Docker socket no disponible en backup-worker. Monta /var/run/docker.sock, define DOCKER_GID (Mac: 1, Linux: getent group docker) y group_add en docker-compose.'
     )
   }
   console.log(`[backup-worker] Deteniendo contenedores: ${names.join(', ')}`)
@@ -362,6 +362,12 @@ const server = http.createServer(async (req, res) => {
         stanza: STANZA,
         allowRestore: ALLOW_RESTORE,
         asyncRestore: true,
+        dockerOk: await dockerAvailable(),
+        containers: {
+          postgres: CONTAINER_POSTGRES,
+          app: CONTAINER_APP,
+          nginx: CONTAINER_NGINX,
+        },
         timestamp: new Date().toISOString(),
       })
     }
@@ -406,6 +412,12 @@ const server = http.createServer(async (req, res) => {
       const type = ['full', 'diff', 'incr'].includes(body.type) ? body.type : 'diff'
       const start = Date.now()
       await runPgBackRest(['backup', `--stanza=${STANZA}`, `--type=${type}`])
+      try {
+        await runPgBackRest(['expire', `--stanza=${STANZA}`])
+        console.log('[backup-worker] expire completado tras backup')
+      } catch (expireErr) {
+        console.warn('[backup-worker] expire falló (backup OK):', expireErr)
+      }
       const { stdout } = await runPgBackRest(['info', `--stanza=${STANZA}`, '--output=json'])
       const info = JSON.parse(stdout || '[]')
       const stanzaInfo = info[0] || {}
@@ -460,6 +472,45 @@ const server = http.createServer(async (req, res) => {
 
     if (url.pathname === '/restore/status' && req.method === 'GET') {
       return json(res, 200, { job: restoreJob })
+    }
+
+    if (url.pathname === '/disk-usage' && req.method === 'GET') {
+      try {
+        // Medir espacio del disco donde está el repo de pgBackRest
+        const repoPath = '/var/lib/pgbackrest'
+        const { stdout } = await exec('df', ['-k', repoPath], { timeout: 10_000, env: process.env })
+        // Formato: Filesystem 1K-blocks Used Available Use% Mounted
+        const lines = stdout.toString().trim().split('\n')
+        const parts = lines[lines.length - 1].trim().split(/\s+/)
+        const totalBytes     = parseInt(parts[1], 10) * 1024
+        const usedTotal      = parseInt(parts[2], 10) * 1024
+        const availableBytes = parseInt(parts[3], 10) * 1024
+        const usagePercent   = totalBytes > 0 ? Math.round((usedTotal / totalBytes) * 10000) / 100 : 0
+
+        // Espacio usado SOLO por el repo de pgBackRest (los backups en sí)
+        let repoUsedBytes = 0
+        try {
+          const { stdout: duOut } = await exec('du', ['-sk', repoPath], { timeout: 30_000, env: process.env })
+          repoUsedBytes = parseInt(duOut.toString().trim().split(/\s+/)[0], 10) * 1024
+        } catch {
+          // du no disponible — usar el valor total del df como referencia
+          repoUsedBytes = usedTotal
+        }
+
+        return json(res, 200, {
+          repoPath,
+          totalBytes,
+          usedBytes: usedTotal,
+          availableBytes,
+          repoUsedBytes,
+          usagePercent,
+          status: usagePercent >= 90 ? 'critical' : usagePercent >= 75 ? 'warning' : 'healthy',
+        })
+      } catch (error) {
+        return json(res, 500, {
+          error: error instanceof Error ? error.message : 'Error obteniendo uso de disco',
+        })
+      }
     }
 
     json(res, 404, { error: 'Ruta no encontrada' })

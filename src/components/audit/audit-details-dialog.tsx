@@ -128,7 +128,7 @@ export function AuditDetailsDialog({ log, isOpen, onClose }: AuditDetailsDialogP
           {/* Detalles formateados */}
           {log.details && (
             <div className='border-t pt-4'>
-              <AuditDetailsResolver details={log.details} />
+              <AuditDetailsResolver details={log.details} action={log.action} />
             </div>
           )}
         </div>

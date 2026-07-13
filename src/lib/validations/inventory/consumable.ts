@@ -55,6 +55,8 @@ export const consumableFiltersSchema = z.object({
   search: z.string().optional(),
   typeId: z.array(z.string()).optional(),
   lowStock: z.boolean().optional(),
+  familyId: z.string().optional(),
+  scopeFamilyIds: z.array(z.string()).optional(),
   page: z.coerce.number().int().positive().optional().default(1),
   limit: z.coerce.number().int().positive().max(100).optional().default(10),
 })

@@ -98,6 +98,11 @@ export class CheckRentalExpirationJob {
               metadata: { link: `/inventory/equipment/${rental.id}` },
             })
 
+            if (!admin.email) {
+              notificationsSent++
+              continue
+            }
+
             // Crear email en cola
             await prisma.email_queue.create({
               data: {
@@ -107,7 +112,7 @@ export class CheckRentalExpirationJob {
                   daysRemaining === 1
                     ? `¡URGENTE! Contrato de Renta por Vencer - ${rental.code}`
                     : `Contrato de Renta Próximo a Vencer - ${rental.code}`,
-                body: this.generateEmailBody(rental, daysRemaining, admin.name),
+                body: this.generateEmailBody(rental, daysRemaining, admin.name ?? 'Administrador'),
                 status: 'pending',
                 attempts: 0,
                 maxAttempts: 3,

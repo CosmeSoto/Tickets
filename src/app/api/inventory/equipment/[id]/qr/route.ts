@@ -5,6 +5,12 @@ import { EquipmentService } from '@/lib/services/equipment.service'
 import { QRCodeService } from '@/lib/services/qr-code.service'
 import { equipmentIdSchema } from '@/lib/validations/inventory/equipment'
 import { ZodError } from 'zod'
+import {
+  assertInventoryResourceRead,
+  InventoryAccessError,
+  inventoryAccessToResponse,
+  toInventoryAccessUser,
+} from '@/lib/inventory/inventory-resource-access'
 
 /**
  * GET /api/inventory/equipment/[id]/qr
@@ -31,13 +37,20 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'Equipo no encontrado' }, { status: 404 })
     }
 
-    // Si es CLIENT, verificar que sea su equipo
+    // Si es CLIENT, verificar que sea su equipo; resto: scope de inventario
     if (session.user.role === 'CLIENT') {
       const detail = await EquipmentService.getEquipmentDetail(id)
       const isAssignedToUser = detail.currentAssignment?.receiverId === session.user.id
 
       if (!isAssignedToUser) {
         return NextResponse.json({ error: 'No tienes acceso a este equipo' }, { status: 403 })
+      }
+    } else {
+      try {
+        await assertInventoryResourceRead(toInventoryAccessUser(session.user), 'EQUIPMENT', id)
+      } catch (err) {
+        if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+        throw err
       }
     }
 

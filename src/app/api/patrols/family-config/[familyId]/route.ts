@@ -101,6 +101,10 @@ export async function PUT(
     await getOrCreatePatrolFamilyConfig(familyId)
 
     const oldConfig = await prisma.patrol_family_config.findUnique({ where: { familyId } })
+    const family = await prisma.families.findUnique({
+      where: { id: familyId },
+      select: { name: true },
+    })
 
     // Campos permitidos para actualización
     const allowedFields = [
@@ -139,6 +143,7 @@ export async function PUT(
       userId: session.user.id,
       oldValues: oldConfig ?? undefined,
       newValues: updated,
+      details: { familyId, familyName: family?.name },
       request,
     })
 

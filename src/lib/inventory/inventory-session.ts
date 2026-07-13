@@ -34,3 +34,45 @@ export async function getInventorySessionContext(sessionUser: {
 export function hasInventoryModuleAccess(ctx: InventorySessionContext): boolean {
   return ctx.user.role === 'ADMIN' || ctx.user.isSuperAdmin || ctx.canManageInventory
 }
+
+export type InventoryListScopeResult =
+  | { noAccess: true }
+  | { noAccess: false; scopeFamilyIds: string[] | undefined; familyId?: string }
+
+/**
+ * Resuelve scope de listados: super admin sin restricción; resto por familias accesibles.
+ */
+export async function resolveInventoryListScope(
+  sessionUser: { id: string; role: string; isSuperAdmin?: boolean },
+  requestedFamilyId?: string
+): Promise<InventoryListScopeResult> {
+  const ctx = await getInventorySessionContext(sessionUser)
+
+  if (ctx.user.isSuperAdmin) {
+    return {
+      noAccess: false,
+      scopeFamilyIds: undefined,
+      familyId: requestedFamilyId,
+    }
+  }
+
+  if (ctx.scope.noAccess) {
+    return { noAccess: true }
+  }
+
+  if (requestedFamilyId) {
+    if (ctx.scope.familyIds && !ctx.scope.familyIds.includes(requestedFamilyId)) {
+      return { noAccess: true }
+    }
+    return {
+      noAccess: false,
+      scopeFamilyIds: ctx.scope.familyIds,
+      familyId: requestedFamilyId,
+    }
+  }
+
+  return {
+    noAccess: false,
+    scopeFamilyIds: ctx.scope.familyIds,
+  }
+}

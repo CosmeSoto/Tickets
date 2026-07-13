@@ -89,9 +89,14 @@ export async function GET() {
 export async function PUT(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    const superCheck = await (await import('@/lib/auth/require-super-admin')).requireSuperAdmin(session)
+    const superCheck = await (
+      await import('@/lib/auth/require-super-admin')
+    ).requireSuperAdmin(session)
     if (!superCheck.ok) {
       return NextResponse.json({ error: superCheck.error }, { status: superCheck.status })
+    }
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
     const body = await request.json()

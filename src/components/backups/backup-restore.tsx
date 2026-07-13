@@ -18,6 +18,16 @@ import {
   X,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { BackupOperationsHistory } from '@/components/backups/backup-restore-history'
+
+const PENDING_PG_RESTORE_KEY = 'tickets-pgbackrest-restore-pending'
+
+type PendingPgRestore = {
+  backupId: string
+  filename: string
+  label?: string | null
+  startedAt: string
+}
 
 interface BackupInfo {
   id: string
@@ -86,6 +96,7 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
   const [restoreMode, setRestoreMode] = useState<RestoreMode>('merge')
   const [allowPgBackRestRestore, setAllowPgBackRestRestore] = useState(false)
   const [maintenanceMessage, setMaintenanceMessage] = useState<string | null>(null)
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
 
@@ -101,6 +112,60 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
       })
       .catch(() => {})
   }, [])
+
+  const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+
+  const savePendingPgRestore = (pending: PendingPgRestore) => {
+    try {
+      sessionStorage.setItem(PENDING_PG_RESTORE_KEY, JSON.stringify(pending))
+    } catch {
+      // sessionStorage no disponible
+    }
+  }
+
+  const clearPendingPgRestore = () => {
+    try {
+      sessionStorage.removeItem(PENDING_PG_RESTORE_KEY)
+    } catch {
+      // ignore
+    }
+  }
+
+  const readPendingPgRestore = (): PendingPgRestore | null => {
+    try {
+      const raw = sessionStorage.getItem(PENDING_PG_RESTORE_KEY)
+      if (!raw) return null
+      return JSON.parse(raw) as PendingPgRestore
+    } catch {
+      return null
+    }
+  }
+
+  const showPgRestoreSuccessToast = (label?: string | null) => {
+    toast({
+      title: 'Restauración pgBackRest completada',
+      description: label
+        ? `El cluster PostgreSQL fue restaurado desde ${label} y los servicios están activos.`
+        : 'El cluster PostgreSQL fue restaurado y los servicios están activos de nuevo.',
+      variant: 'success',
+      duration: 12000,
+    })
+  }
+
+  const finalizePgRestoreUi = () => {
+    clearPendingPgRestore()
+    setHistoryRefreshKey(k => k + 1)
+    setTimeout(() => {
+      setRestoring(false)
+      setRestoreProgress(0)
+      setMaintenanceMessage(null)
+      setSelectedBackup(null)
+      setRestorePreview(null)
+      setSelectedModules([])
+      setRestoreMode('merge')
+      onRefresh()
+    }, 1500)
+  }
 
   useEffect(() => {
     if (selectedBackup && !completedBackups.find(b => b.id === selectedBackup.id)) {
@@ -193,20 +258,6 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
     }
   }
 
-  const waitForSiteRecovery = async (maxMs = 20 * 60 * 1000) => {
-    const start = Date.now()
-    while (Date.now() - start < maxMs) {
-      await new Promise(resolve => setTimeout(resolve, 5000))
-      try {
-        const res = await fetch('/api/auth/session', { cache: 'no-store' })
-        if (res.ok) return true
-      } catch {
-        // sitio aún fuera de línea
-      }
-    }
-    return false
-  }
-
   const checkPgBackRestRestoreOutcome = async () => {
     const res = await fetch('/api/admin/backups/restore-status', { cache: 'no-store' })
     const data = await parseJsonResponse(res)
@@ -219,11 +270,78 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
     if (job?.status === 'failed') {
       throw new Error(job.message || 'La restauración pgBackRest falló')
     }
+    if (job?.status === 'success') {
+      return job
+    }
     if (job?.status === 'running') {
-      throw new Error('La restauración sigue en curso. Espera unos minutos y recarga la página.')
+      return null
     }
     return job
   }
+
+  const pollPgBackRestRestoreOutcome = async (maxMs = 20 * 60 * 1000) => {
+    const start = Date.now()
+    while (Date.now() - start < maxMs) {
+      try {
+        const job = await checkPgBackRestRestoreOutcome()
+        if (job?.status === 'success') {
+          return job
+        }
+      } catch (error) {
+        if (!isFetchNetworkError(error)) {
+          throw error
+        }
+      }
+
+      try {
+        const sessionRes = await fetch('/api/auth/session', { cache: 'no-store' })
+        if (sessionRes.ok) {
+          setRestoreProgress(prev => Math.min(Math.max(prev, 55), 90))
+        }
+      } catch {
+        // sitio aún fuera de línea
+      }
+
+      await sleep(5000)
+    }
+    throw new Error(
+      'Tiempo de espera agotado. Revisa el historial de restauraciones o los logs: docker compose logs backup-worker'
+    )
+  }
+
+  useEffect(() => {
+    const pending = readPendingPgRestore()
+    if (!pending) return
+
+    setRestoring(true)
+    setRestoreProgress(60)
+    setMaintenanceMessage(
+      'Restauración pgBackRest detectada. Verificando resultado tras el reinicio de servicios…'
+    )
+
+    void (async () => {
+      try {
+        const job = await pollPgBackRestRestoreOutcome()
+        setRestoreProgress(100)
+        showPgRestoreSuccessToast(job?.label ?? pending.label)
+        finalizePgRestoreUi()
+      } catch (error) {
+        clearPendingPgRestore()
+        toast({
+          title: 'Error en la Restauración',
+          description: error instanceof Error ? error.message : 'Error desconocido',
+          variant: 'destructive',
+          duration: 12000,
+        })
+        setRestoring(false)
+        setRestoreProgress(0)
+        setMaintenanceMessage(null)
+        setHistoryRefreshKey(k => k + 1)
+      }
+    })()
+    // Solo al montar: recuperar restauraciones interrumpidas por recarga durante mantenimiento
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const isFetchNetworkError = (error: unknown) =>
     error instanceof TypeError ||
@@ -237,31 +355,10 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
       'Restauración pgBackRest en curso. El sitio quedará fuera de línea unos minutos…'
     )
 
-    const recovered = await waitForSiteRecovery()
-    if (!recovered) {
-      throw new Error(
-        'Tiempo de espera agotado. Verifica en el servidor: docker compose logs backup-worker'
-      )
-    }
-
-    setRestoreProgress(85)
-    await checkPgBackRestRestoreOutcome()
+    const job = await pollPgBackRestRestoreOutcome()
     setRestoreProgress(100)
-
-    toast({
-      title: 'Restauración pgBackRest completada',
-      description: 'El cluster PostgreSQL fue restaurado y los servicios están activos de nuevo.',
-    })
-    setTimeout(() => {
-      setRestoring(false)
-      setRestoreProgress(0)
-      setMaintenanceMessage(null)
-      setSelectedBackup(null)
-      setRestorePreview(null)
-      setSelectedModules([])
-      setRestoreMode('merge')
-      onRefresh()
-    }, 2000)
+    showPgRestoreSuccessToast(job?.label)
+    finalizePgRestoreUi()
   }
 
   const confirmRestore = async () => {
@@ -283,6 +380,15 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
 
     const pgBackRestFullRestore =
       selectedBackup.engine === 'pgbackrest' && selectedModules.length === 0
+
+    if (pgBackRestFullRestore) {
+      savePendingPgRestore({
+        backupId: selectedBackup.id,
+        filename: selectedBackup.filename,
+        label: selectedBackup.label,
+        startedAt: new Date().toISOString(),
+      })
+    }
 
     try {
       const body: Record<string, unknown> = {}
@@ -314,7 +420,10 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
         toast({
           title: 'Restauración Exitosa',
           description: `Restauración ${scopeLabel}${modeLabel} completada correctamente`,
+          variant: 'success',
+          duration: 8000,
         })
+        setHistoryRefreshKey(k => k + 1)
         setTimeout(() => {
           setRestoring(false)
           setRestoreProgress(0)
@@ -334,6 +443,7 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
           return
         } catch (maintenanceError) {
           clearProgressInterval()
+          clearPendingPgRestore()
           toast({
             title: 'Error en la Restauración',
             description:
@@ -345,11 +455,13 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
           setRestoring(false)
           setRestoreProgress(0)
           setMaintenanceMessage(null)
+          setHistoryRefreshKey(k => k + 1)
           return
         }
       }
 
       clearProgressInterval()
+      clearPendingPgRestore()
       toast({
         title: 'Error en la Restauración',
         description: error instanceof Error ? error.message : 'Error desconocido',
@@ -358,6 +470,7 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
       setRestoring(false)
       setRestoreProgress(0)
       setMaintenanceMessage(null)
+      setHistoryRefreshKey(k => k + 1)
     }
   }
 
@@ -1034,6 +1147,8 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
           </Card>
         </div>
       )}
+
+      <BackupOperationsHistory refreshKey={historyRefreshKey} />
     </div>
   )
 }

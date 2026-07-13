@@ -50,12 +50,22 @@ services:
       PGBACKREST_STANZA: main
       BACKUP_ALLOW_RESTORE: ${BACKUP_ALLOW_RESTORE:-true}
       PGPASSWORD: tickets_password_2024
+      CONTAINER_POSTGRES: tickets-postgres-dev
+      CONTAINER_APP: tickets-app-dev
+      CONTAINER_NGINX: tickets-nginx-dev
     volumes:
-      - postgres_data_dev:/var/lib/postgresql/data:ro
+      # RW: pgbackrest restore escribe en postgres_data
+      - postgres_data_dev:/var/lib/postgresql/data
       - pgbackrest_repo_dev:/var/lib/pgbackrest
       - pg_socket_dev:/var/run/postgresql:ro
       - ./docker/pgbackrest/pgbackrest.conf:/etc/pgbackrest/pgbackrest.conf:ro
       - ./docker/pgbackrest/pgbackrest-local.conf:/etc/pgbackrest/pgbackrest-local.conf:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
+      # Linux: DOCKER_GID=$(getent group docker | cut -d: -f3)
+      # Mac Docker Desktop: socket montado como root:root — requiere gid 0 además de daemon
+      - ${DOCKER_GID:-1}
+      - 0
     networks:
       - tickets-network
     depends_on:
@@ -63,11 +73,11 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ['CMD-SHELL', 'curl -fsS http://127.0.0.1:8080/health | grep -q "\\"stanzaOk\\":true"']
+      test: ['CMD-SHELL', 'curl -fsS http://127.0.0.1:8080/health | grep -qF "stanzaOk\":true"']
       interval: 15s
       timeout: 10s
       retries: 10
-      start_period: 600s
+      start_period: 180s
 
   # ── Redis ───────────────────────────────────────────────────────────────────
   redis:

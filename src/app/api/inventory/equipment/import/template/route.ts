@@ -26,7 +26,7 @@ function fileResponse(body: Buffer | Uint8Array | string, contentType: string, f
   const payload =
     typeof body === 'string' ? body : body instanceof Uint8Array ? body : new Uint8Array(body)
 
-  return new NextResponse(payload, {
+  return new NextResponse(payload as BodyInit, {
     status: 200,
     headers: {
       'Content-Type': contentType,

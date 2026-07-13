@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { z } from 'zod'
+import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
+import { toAuditSnapshot } from '@/lib/services/config-audit'
 
 const updateSchema = z.object({
   name: z.string().min(1).max(100).optional(),
@@ -10,27 +12,27 @@ const updateSchema = z.object({
   responseTimeHours: z.number().min(1).optional(),
   resolutionTimeHours: z.number().min(1).optional(),
   businessHoursOnly: z.boolean().optional(),
-  businessHoursStart: z.string().regex(/^\d{2}:\d{2}:\d{2}$/).optional(),
-  businessHoursEnd: z.string().regex(/^\d{2}:\d{2}:\d{2}$/).optional(),
+  businessHoursStart: z
+    .string()
+    .regex(/^\d{2}:\d{2}:\d{2}$/)
+    .optional(),
+  businessHoursEnd: z
+    .string()
+    .regex(/^\d{2}:\d{2}:\d{2}$/)
+    .optional(),
   businessDays: z.string().optional(),
-  isActive: z.boolean().optional()
+  isActive: z.boolean().optional(),
 })
 
 /**
  * PUT /api/admin/sla/policies/[id]
  * Actualizar política SLA
  */
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
     if (!session || session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { success: false, message: 'No autorizado' },
-        { status: 403 }
-      )
+      return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 403 })
     }
 
     const { id } = await params
@@ -42,9 +44,17 @@ export async function PUT(
         {
           success: false,
           message: 'Datos inválidos',
-          errors: validation.error.errors
+          errors: validation.error.errors,
         },
         { status: 400 }
+      )
+    }
+
+    const oldPolicy = await prisma.sla_policies.findUnique({ where: { id } })
+    if (!oldPolicy) {
+      return NextResponse.json(
+        { success: false, message: 'Política no encontrada' },
+        { status: 404 }
       )
     }
 
@@ -52,22 +62,33 @@ export async function PUT(
       where: { id },
       data: {
         ...validation.data,
-        updatedAt: new Date()
+        updatedAt: new Date(),
       },
       include: {
         category: {
           select: {
             id: true,
-            name: true
-          }
-        }
-      }
+            name: true,
+          },
+        },
+      },
+    })
+
+    await AuditServiceComplete.log({
+      action: 'sla_policy_updated',
+      entityType: 'sla',
+      entityId: id,
+      userId: session.user.id,
+      oldValues: toAuditSnapshot(oldPolicy as Record<string, unknown>),
+      newValues: toAuditSnapshot(policy as Record<string, unknown>),
+      details: { policyName: policy.name },
+      request,
     })
 
     return NextResponse.json({
       success: true,
       data: policy,
-      message: 'Política SLA actualizada exitosamente'
+      message: 'Política SLA actualizada exitosamente',
     })
   } catch (error) {
     console.error('[SLA] Error actualizando política:', error)
@@ -75,7 +96,7 @@ export async function PUT(
       {
         success: false,
         message: 'Error al actualizar política SLA',
-        error: error instanceof Error ? error.message : 'Error desconocido'
+        error: error instanceof Error ? error.message : 'Error desconocido',
       },
       { status: 500 }
     )
@@ -93,21 +114,43 @@ export async function DELETE(
   try {
     const session = await getServerSession(authOptions)
     if (!session || session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { success: false, message: 'No autorizado' },
-        { status: 403 }
-      )
+      return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 403 })
     }
 
     const { id } = await params
 
+    const oldPolicy = await prisma.sla_policies.findUnique({
+      where: { id },
+      include: {
+        category: { select: { id: true, name: true } },
+      },
+    })
+
+    if (!oldPolicy) {
+      return NextResponse.json(
+        { success: false, message: 'Política no encontrada' },
+        { status: 404 }
+      )
+    }
+
     await prisma.sla_policies.delete({
-      where: { id }
+      where: { id },
+    })
+
+    await AuditServiceComplete.log({
+      action: 'sla_policy_deleted',
+      entityType: 'sla',
+      entityId: id,
+      userId: session.user.id,
+      oldValues: toAuditSnapshot(oldPolicy as Record<string, unknown>),
+      newValues: {},
+      details: { policyName: oldPolicy.name },
+      request,
     })
 
     return NextResponse.json({
       success: true,
-      message: 'Política SLA eliminada exitosamente'
+      message: 'Política SLA eliminada exitosamente',
     })
   } catch (error) {
     console.error('[SLA] Error eliminando política:', error)
@@ -115,7 +158,7 @@ export async function DELETE(
       {
         success: false,
         message: 'Error al eliminar política SLA',
-        error: error instanceof Error ? error.message : 'Error desconocido'
+        error: error instanceof Error ? error.message : 'Error desconocido',
       },
       { status: 500 }
     )

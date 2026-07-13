@@ -101,6 +101,17 @@ export interface BackupWorkerHealth {
   allowRestore: boolean
 }
 
+export interface BackupDiskUsage {
+  repoPath: string
+  totalBytes: number
+  usedBytes: number
+  availableBytes: number
+  /** Bytes usados específicamente por el repo de pgBackRest */
+  repoUsedBytes: number
+  usagePercent: number
+  status: 'healthy' | 'warning' | 'critical'
+}
+
 export type BackupModuleId =
   | 'tickets'
   | 'news'

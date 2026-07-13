@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -277,7 +278,7 @@ export function BackupConfiguration({ onConfigChange }: BackupConfigurationProps
 
   return (
     <div className='space-y-6'>
-      <PgBackRestStatusCard onInitialized={onConfigChange} />
+      <PgBackRestStatusCard onInitialized={() => void loadConfiguration()} />
 
       <Card className='border-amber-500/30 bg-amber-500/5'>
         <CardHeader className='pb-3'>
@@ -443,9 +444,24 @@ export function BackupConfiguration({ onConfigChange }: BackupConfigurationProps
               <HardDrive className='h-5 w-5 text-primary' />
               <span>Retención y Almacenamiento</span>
             </CardTitle>
-            <CardDescription>Configuración de almacenamiento y limpieza automática</CardDescription>
+            <CardDescription>
+              Límites para exportaciones .dump en disco. Los respaldos pgBackRest (infraestructura)
+              usan retención propia en el servidor.
+            </CardDescription>
           </CardHeader>
           <CardContent className='space-y-6'>
+            <Alert className='border-primary/30 bg-primary/5'>
+              <HardDrive className='h-4 w-4 text-primary' />
+              <AlertDescription className='text-sm'>
+                <strong>pgBackRest (automático):</strong> retiene{' '}
+                <span className='font-mono'>2 FULL</span> +{' '}
+                <span className='font-mono'>7 DIFF</span> en el repositorio — pgBackRest elimina
+                copias antiguas al crear nuevas. Los incrementales dependen del FULL/DIFF vigente.
+                <br />
+                <strong>Exports .dump:</strong> los valores de abajo aplican solo a archivos
+                portables en <span className='font-mono'>/app/backups</span>.
+              </AlertDescription>
+            </Alert>
             <div className='space-y-2'>
               <Label className='text-sm font-medium'>Días de Retención</Label>
               <Input

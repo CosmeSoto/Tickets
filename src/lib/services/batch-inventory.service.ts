@@ -24,7 +24,12 @@ const DEPRECIATION_METHOD_LABELS: Record<string, string> = {
 /** Tipo de lote con relaciones y métricas calculadas */
 export type BatchWithMetrics = Prisma.equipment_batchesGetPayload<{
   include: {
-    model: { include: { type: true } }
+    model: {
+      include: {
+        brand: { select: { id: true; name: true } }
+        type: true
+      }
+    }
     department: true
     supplier: true
   }
@@ -460,10 +465,6 @@ export class BatchService {
       metrics.utilizationRate = metrics.total > 0 ? (metrics.assigned / metrics.total) * 100 : 0
       return {
         ...batch,
-        model: {
-          ...batch.model,
-          brand: resolveBrandName(batch.model.brand as { name?: string } | string | null),
-        },
         metrics,
       }
     })

@@ -4,6 +4,8 @@ import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import { z } from 'zod'
+import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
+import { toAuditSnapshot } from '@/lib/services/config-audit'
 
 const policySchema = z.object({
   name: z.string().min(1, 'El nombre es requerido').max(100),
@@ -13,9 +15,15 @@ const policySchema = z.object({
   responseTimeHours: z.number().min(1, 'Debe ser al menos 1 hora'),
   resolutionTimeHours: z.number().min(1, 'Debe ser al menos 1 hora'),
   businessHoursOnly: z.boolean().default(false),
-  businessHoursStart: z.string().regex(/^\d{2}:\d{2}:\d{2}$/).default('09:00:00'),
-  businessHoursEnd: z.string().regex(/^\d{2}:\d{2}:\d{2}$/).default('18:00:00'),
-  businessDays: z.string().default('MON,TUE,WED,THU,FRI')
+  businessHoursStart: z
+    .string()
+    .regex(/^\d{2}:\d{2}:\d{2}$/)
+    .default('09:00:00'),
+  businessHoursEnd: z
+    .string()
+    .regex(/^\d{2}:\d{2}:\d{2}$/)
+    .default('18:00:00'),
+  businessDays: z.string().default('MON,TUE,WED,THU,FRI'),
 })
 
 /**
@@ -26,10 +34,7 @@ export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session || session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { success: false, message: 'No autorizado' },
-        { status: 403 }
-      )
+      return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 403 })
     }
 
     const policies = await prisma.sla_policies.findMany({
@@ -38,15 +43,15 @@ export async function GET(request: NextRequest) {
         category: {
           select: {
             id: true,
-            name: true
-          }
-        }
-      }
+            name: true,
+          },
+        },
+      },
     })
 
     return NextResponse.json({
       success: true,
-      data: policies
+      data: policies,
     })
   } catch (error) {
     console.error('[SLA] Error obteniendo políticas:', error)
@@ -54,7 +59,7 @@ export async function GET(request: NextRequest) {
       {
         success: false,
         message: 'Error al obtener políticas SLA',
-        error: error instanceof Error ? error.message : 'Error desconocido'
+        error: error instanceof Error ? error.message : 'Error desconocido',
       },
       { status: 500 }
     )
@@ -69,10 +74,7 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session || session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { success: false, message: 'No autorizado' },
-        { status: 403 }
-      )
+      return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 403 })
     }
 
     const body = await request.json()
@@ -83,7 +85,7 @@ export async function POST(request: NextRequest) {
         {
           success: false,
           message: 'Datos inválidos',
-          errors: validation.error.errors
+          errors: validation.error.errors,
         },
         { status: 400 }
       )
@@ -96,15 +98,15 @@ export async function POST(request: NextRequest) {
       where: {
         categoryId: data.categoryId || null,
         priority: data.priority,
-        isActive: true
-      }
+        isActive: true,
+      },
     })
 
     if (existing) {
       return NextResponse.json(
         {
           success: false,
-          message: 'Ya existe una política activa para esta categoría y prioridad'
+          message: 'Ya existe una política activa para esta categoría y prioridad',
         },
         { status: 400 }
       )
@@ -125,22 +127,33 @@ export async function POST(request: NextRequest) {
         businessDays: data.businessDays,
         isActive: true,
         createdAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
       },
       include: {
         category: {
           select: {
             id: true,
-            name: true
-          }
-        }
-      }
+            name: true,
+          },
+        },
+      },
+    })
+
+    await AuditServiceComplete.log({
+      action: 'sla_policy_created',
+      entityType: 'sla',
+      entityId: policy.id,
+      userId: session.user.id,
+      oldValues: {},
+      newValues: toAuditSnapshot(policy as Record<string, unknown>),
+      details: { policyName: policy.name },
+      request,
     })
 
     return NextResponse.json({
       success: true,
       data: policy,
-      message: 'Política SLA creada exitosamente'
+      message: 'Política SLA creada exitosamente',
     })
   } catch (error) {
     console.error('[SLA] Error creando política:', error)
@@ -148,7 +161,7 @@ export async function POST(request: NextRequest) {
       {
         success: false,
         message: 'Error al crear política SLA',
-        error: error instanceof Error ? error.message : 'Error desconocido'
+        error: error instanceof Error ? error.message : 'Error desconocido',
       },
       { status: 500 }
     )

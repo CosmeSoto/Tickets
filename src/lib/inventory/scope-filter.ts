@@ -86,3 +86,28 @@ export async function buildEquipmentTypeFilter(
 
   return { typeId: { in: typeIds } }
 }
+
+/** Filtro Prisma para equipos por familias (vía equipment_types). */
+export function buildEquipmentFamilyWhere(
+  familyIds: string[] | undefined
+): Record<string, unknown> {
+  if (familyIds === undefined) return {}
+  if (familyIds.length === 0) return { id: '__NONE__' }
+  return { type: { familyId: { in: familyIds } } }
+}
+
+/** Filtro Prisma para consumibles por familias (vía consumable_types). */
+export function buildConsumableFamilyWhere(
+  familyIds: string[] | undefined
+): Record<string, unknown> {
+  if (familyIds === undefined) return {}
+  if (familyIds.length === 0) return { id: '__NONE__' }
+  return { consumableType: { familyId: { in: familyIds } } }
+}
+
+/** Filtro Prisma para licencias por familias (vía license_types). */
+export function buildLicenseFamilyWhere(familyIds: string[] | undefined): Record<string, unknown> {
+  if (familyIds === undefined) return {}
+  if (familyIds.length === 0) return { id: '__NONE__' }
+  return { licenseType: { familyId: { in: familyIds } } }
+}

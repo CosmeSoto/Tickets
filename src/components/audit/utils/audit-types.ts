@@ -48,10 +48,22 @@ export interface AuditFilters {
   userId: string
   days: string
   familyId: string
+  configModule: string
+  actionPreset: string
 }
 
 export interface ResolvedDetails {
-  type: 'changes' | 'resolved' | 'unresolved' | 'error' | 'metadata' | 'generic' | 'raw'
+  type:
+    | 'changes'
+    | 'resolved'
+    | 'unresolved'
+    | 'error'
+    | 'metadata'
+    | 'generic'
+    | 'raw'
+    | 'backup_config_diff'
+    | 'config_diff'
+    | 'backup_config_legacy'
   data: any
 }
 

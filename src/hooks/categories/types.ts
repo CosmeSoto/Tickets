@@ -28,6 +28,8 @@ export interface CategoryData {
     family?: { id: string; name: string; code: string; color?: string | null }
   }
   parentId?: string
+  familyId?: string
+  family?: { id: string; name: string; code: string; color?: string | null }
   categories?: {
     id: string
     name: string

@@ -6,6 +6,13 @@ import {
   getInventorySessionContext,
   hasInventoryModuleAccess,
 } from '@/lib/inventory/inventory-session'
+import prisma from '@/lib/prisma'
+import {
+  assertInventoryManageByFamily,
+  InventoryAccessError,
+  inventoryAccessToResponse,
+  toInventoryAccessUser,
+} from '@/lib/inventory/inventory-resource-access'
 
 /**
  * POST /api/inventory/sales/activate
@@ -36,6 +43,23 @@ export async function POST(request: NextRequest) {
 
     if (!salePrice || salePrice <= 0) {
       return NextResponse.json({ error: 'El precio de venta debe ser mayor a 0' }, { status: 400 })
+    }
+
+    const accessUser = toInventoryAccessUser(session.user)
+    const equipmentRows = await prisma.equipment.findMany({
+      where: { id: { in: equipmentIds } },
+      select: { id: true, type: { select: { familyId: true } } },
+    })
+    if (equipmentRows.length !== equipmentIds.length) {
+      return NextResponse.json({ error: 'Algunos equipos no fueron encontrados' }, { status: 404 })
+    }
+    for (const eq of equipmentRows) {
+      try {
+        await assertInventoryManageByFamily(accessUser, eq.type?.familyId ?? null)
+      } catch (err) {
+        if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+        throw err
+      }
     }
 
     const result = await SalesManagerService.activateForSale({

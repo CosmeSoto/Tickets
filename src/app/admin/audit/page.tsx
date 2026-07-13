@@ -12,6 +12,7 @@
 
 'use client'
 
+import { Suspense } from 'react'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { useAudit } from '@/hooks/use-audit'
 import { useExport } from '@/hooks/common/use-export'
@@ -23,6 +24,24 @@ import { AuditDetailsDialog } from '@/components/audit/audit-details-dialog'
 import { AUDIT_EXPORT_COLUMNS } from '@/components/audit/utils/audit-export-columns'
 
 export default function AuditPage() {
+  return (
+    <Suspense
+      fallback={
+        <ModuleLayout
+          title='Sistema de Auditoría'
+          subtitle='Monitoreo y logs de actividad del sistema'
+          loading
+        >
+          {null}
+        </ModuleLayout>
+      }
+    >
+      <AuditPageContent />
+    </Suspense>
+  )
+}
+
+function AuditPageContent() {
   const {
     // Session
     session,
@@ -40,13 +59,13 @@ export default function AuditPage() {
     pagination,
     filters,
     hasActiveFilters,
-
-    // Computed
+    activePresetId,
     criticalActionsCount,
 
     // Actions
     updateFilter,
     clearFilters,
+    applyPreset,
     openLogDetails,
     closeLogDetails,
     handlePageChange,
@@ -107,15 +126,22 @@ export default function AuditPage() {
     >
       <div className='space-y-6'>
         {/* Estadísticas de Auditoría */}
-        <AuditStatsCards stats={stats} criticalActionsCount={criticalActionsCount} />
+        <AuditStatsCards
+          stats={stats}
+          criticalActionsCount={criticalActionsCount}
+          hasActiveFilters={hasActiveFilters}
+          filteredTotal={pagination.total}
+        />
 
         {/* Filtros de Auditoría */}
         <AuditFiltersComponent
           filters={filters}
           families={families.map(f => ({ ...f, color: f.color ?? null }))}
           hasActiveFilters={hasActiveFilters}
+          activePresetId={activePresetId}
           loading={loading}
           onFilterChange={updateFilter}
+          onApplyPreset={applyPreset}
           onClearFilters={clearFilters}
           onExportCSV={onExportCSV}
           onExportJSON={onExportJSON}

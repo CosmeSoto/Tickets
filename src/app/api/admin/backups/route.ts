@@ -18,7 +18,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const { errorResponse } = await requireBackupSuperAdmin()
+    const { session, errorResponse } = await requireBackupSuperAdmin()
     if (errorResponse) return errorResponse
 
     const body = await request.json()
@@ -34,6 +34,8 @@ export async function POST(request: NextRequest) {
     const backup = await BackupService.createBackup(type, {
       mode: createMode,
       backupKind: kind,
+      userId: session?.user?.id,
+      userEmail: session?.user?.email ?? null,
     })
     return NextResponse.json(backup)
   } catch (error) {

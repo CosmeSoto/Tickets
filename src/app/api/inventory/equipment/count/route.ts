@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
+import { getInventorySessionContext } from '@/lib/inventory/inventory-session'
+import { buildEquipmentFamilyWhere } from '@/lib/inventory/scope-filter'
 
 /**
  * GET /api/inventory/equipment/count
@@ -14,18 +16,35 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
+    const ctx = await getInventorySessionContext(session.user)
+    if (ctx.scope.noAccess) {
+      return NextResponse.json({ count: 0 })
+    }
+
     const { searchParams } = new URL(request.url)
     const modelId = searchParams.get('modelId')
     const batchId = searchParams.get('batchId')
-    const familyId = searchParams.get('familyId')
+    const familyIdParam = searchParams.get('familyId')
     const status = searchParams.get('status')?.split(',')
 
-    const where: any = {}
+    const where: Record<string, unknown> = {}
 
     if (modelId) where.modelId = modelId
     if (batchId) where.batchId = batchId
-    if (familyId && familyId !== 'all') where.familyId = familyId
     if (status && status.length > 0) where.status = { in: status }
+
+    if (familyIdParam && familyIdParam !== 'all') {
+      if (
+        !ctx.user.isSuperAdmin &&
+        ctx.scope.familyIds &&
+        !ctx.scope.familyIds.includes(familyIdParam)
+      ) {
+        return NextResponse.json({ count: 0 })
+      }
+      where.type = { familyId: familyIdParam }
+    } else if (!ctx.user.isSuperAdmin && ctx.scope.familyIds) {
+      Object.assign(where, buildEquipmentFamilyWhere(ctx.scope.familyIds))
+    }
 
     const count = await prisma.equipment.count({ where })
 

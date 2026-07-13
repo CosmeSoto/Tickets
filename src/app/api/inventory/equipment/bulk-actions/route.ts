@@ -14,12 +14,14 @@ import { z } from 'zod'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
+import { EquipmentStatus, MaintenanceStatus, MaintenanceType } from '@prisma/client'
 import { canManageInventory, inventoryForbidden } from '@/lib/inventory-access'
 import {
   assertInventoryManageByFamily,
   InventoryAccessError,
   toInventoryAccessUser,
 } from '@/lib/inventory/inventory-resource-access'
+import { FolioService } from '@/lib/services/folio.service'
 
 // Schema de validación para acciones masivas
 const bulkActionSchema = z.object({
@@ -157,8 +159,24 @@ export async function POST(request: NextRequest) {
     }
 
     // 6. Ejecutar la acción en transacción
+    const familyIds = [
+      ...new Set(equipment.map(eq => eq.type?.familyId).filter((id): id is string => !!id)),
+    ]
+    const familyConfigs =
+      validatedData.action === 'DECOMMISSION' && familyIds.length > 0
+        ? await prisma.inventory_family_config.findMany({
+            where: { familyId: { in: familyIds } },
+            select: { familyId: true, autoApproveDecommission: true },
+          })
+        : []
+    const autoApproveByFamily = Object.fromEntries(
+      familyConfigs.map(c => [c.familyId, c.autoApproveDecommission])
+    )
+
     const result = await prisma.$transaction(async tx => {
       let updatedCount = 0
+      let decommissionApproved = 0
+      let decommissionPending = 0
 
       switch (validatedData.action) {
         case 'FOR_SALE':
@@ -212,40 +230,96 @@ export async function POST(request: NextRequest) {
           })
           break
 
-        case 'DECOMMISSION':
-          // Actualizar equipos a RETIRED
-          const decommissionResult = await tx.equipment.updateMany({
-            where: {
-              id: {
-                in: validatedData.equipmentIds,
-              },
-            },
-            data: {
-              status: EquipmentStatus.RETIRED,
-              notes: validatedData.decommissionNotes || validatedData.notes || null,
-            },
-          })
-          updatedCount = decommissionResult.count
+        case 'DECOMMISSION': {
+          const reason = validatedData.decommissionReason || 'Baja masiva de inventario'
+          const notes = validatedData.decommissionNotes || validatedData.notes || null
 
-          // Crear registros de auditoría para baja
-          await tx.audit_logs.createMany({
-            data: validatedData.equipmentIds.map(equipmentId => ({
-              id: randomUUID(),
-              userId: session.user.id,
-              action: 'DECOMMISSION',
-              entityType: 'equipment',
-              entityId: equipmentId,
-              details: {
-                reason: validatedData.decommissionReason,
-                notes: validatedData.decommissionNotes,
+          for (const eq of equipment) {
+            const familyId = eq.type?.familyId
+            const autoApprove = familyId ? (autoApproveByFamily[familyId] ?? false) : false
+            const requestId = randomUUID()
+
+            if (autoApprove) {
+              const folio = await FolioService.generateDecommissionActFolio()
+              const actId = randomUUID()
+
+              await tx.decommission_requests.create({
+                data: {
+                  id: requestId,
+                  assetType: 'EQUIPMENT',
+                  equipmentId: eq.id,
+                  requestedById: session.user.id,
+                  reason,
+                  status: 'APPROVED',
+                  reviewedById: session.user.id,
+                  reviewedAt: new Date(),
+                },
+              })
+
+              await tx.decommission_acts.create({
+                data: {
+                  id: actId,
+                  folio,
+                  requestId,
+                  approvedById: session.user.id,
+                  approvedAt: new Date(),
+                },
+              })
+
+              await tx.equipment.update({
+                where: { id: eq.id },
+                data: { status: EquipmentStatus.RETIRED, notes },
+              })
+              decommissionApproved++
+            } else {
+              await tx.decommission_requests.create({
+                data: {
+                  id: requestId,
+                  assetType: 'EQUIPMENT',
+                  equipmentId: eq.id,
+                  requestedById: session.user.id,
+                  reason,
+                  status: 'PENDING',
+                },
+              })
+              decommissionPending++
+            }
+
+            await tx.audit_logs.create({
+              data: {
+                id: randomUUID(),
+                userId: session.user.id,
+                action: 'DECOMMISSION',
+                entityType: 'equipment',
+                entityId: eq.id,
+                details: {
+                  reason,
+                  notes,
+                  autoApproved: autoApprove,
+                  bulk: true,
+                },
               },
-            })),
-          })
+            })
+          }
+
+          updatedCount = equipment.length
           break
+        }
       }
 
-      return { updatedCount }
+      return {
+        updatedCount,
+        decommissionApproved: decommissionApproved ?? 0,
+        decommissionPending: decommissionPending ?? 0,
+      }
     })
+
+    const responseMessage =
+      validatedData.action === 'DECOMMISSION'
+        ? (result.decommissionPending ?? 0) > 0
+          ? `${result.decommissionApproved ?? 0} equipos dados de baja; ${result.decommissionPending} solicitudes pendientes de aprobación`
+          : `Se dieron de baja ${result.updatedCount} equipos exitosamente`
+        : `Se actualizaron ${result.updatedCount} equipos exitosamente`
 
     // 7. Retornar resultado
     return NextResponse.json(
@@ -253,7 +327,9 @@ export async function POST(request: NextRequest) {
         success: true,
         action: validatedData.action,
         updatedCount: result.updatedCount,
-        message: `Se actualizaron ${result.updatedCount} equipos exitosamente`,
+        decommissionApproved: result.decommissionApproved,
+        decommissionPending: result.decommissionPending,
+        message: responseMessage,
       },
       { status: 200 }
     )

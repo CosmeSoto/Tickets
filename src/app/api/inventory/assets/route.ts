@@ -4,6 +4,12 @@ import { authOptions } from '@/lib/auth'
 import { canManageInventory } from '@/lib/inventory-access'
 import { queryAssets } from '@/lib/inventory/assets-query'
 import { createAsset } from '@/lib/inventory/assets-create'
+import {
+  assertInventoryManageByFamily,
+  InventoryAccessError,
+  inventoryAccessToResponse,
+  toInventoryAccessUser,
+} from '@/lib/inventory/inventory-resource-access'
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
@@ -63,6 +69,13 @@ export async function POST(req: NextRequest) {
   console.log('[POST /api/inventory/assets] subtype:', body.subtype, 'familyId:', body.familyId)
 
   try {
+    try {
+      await assertInventoryManageByFamily(toInventoryAccessUser(session.user), body.familyId)
+    } catch (err) {
+      if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+      throw err
+    }
+
     const result = await createAsset(body, userId)
 
     // Resultado de validación (tiene .error y .status)

@@ -5,9 +5,9 @@
 
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSession } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useFamilies } from '@/contexts/families-context'
 import type {
   AuditLog,
@@ -16,11 +16,44 @@ import type {
   AuditFilters,
 } from '@/components/audit/utils/audit-types'
 import { exportAuditReport } from '@/components/audit/utils/audit-exporters'
+import {
+  DEFAULT_AUDIT_FILTERS,
+  auditFiltersToUrlParams,
+  loadStoredAuditFilters,
+  saveAuditFilters,
+  getPresetFilters,
+  type AuditQuickPresetId,
+} from '@/components/audit/utils/audit-filter-presets'
+
+function mergeAuditFilters(
+  base: AuditFilters,
+  partial?: Partial<AuditFilters> | null
+): AuditFilters {
+  if (!partial) return base
+  return { ...base, ...partial }
+}
+
+function buildLogsQuery(filters: AuditFilters, page: number, limit: number): string {
+  const params = auditFiltersToUrlParams(filters)
+  params.set('limit', String(limit))
+  params.set('offset', String((page - 1) * limit))
+  const qs = params.toString()
+  return qs ? `?${qs}` : ''
+}
+
+function buildStatsQuery(filters: AuditFilters): string {
+  const params = auditFiltersToUrlParams(filters)
+  if (filters.days) params.set('days', filters.days)
+  const qs = params.toString()
+  return qs ? `?${qs}` : ''
+}
 
 export function useAudit() {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { families } = useFamilies()
+  const initializedRef = useRef(false)
 
   // ── State ──
   const [logs, setLogs] = useState<AuditLog[]>([])
@@ -28,6 +61,7 @@ export function useAudit() {
   const [loading, setLoading] = useState(true)
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [activePresetId, setActivePresetId] = useState<AuditQuickPresetId | null>(null)
 
   const [pagination, setPagination] = useState<AuditPagination>({
     page: 1,
@@ -36,14 +70,49 @@ export function useAudit() {
     hasMore: false,
   })
 
-  const [filters, setFilters] = useState<AuditFilters>({
-    search: '',
-    entityType: 'all',
-    action: '',
-    userId: '',
-    days: '30',
-    familyId: '',
-  })
+  const [filters, setFilters] = useState<AuditFilters>(DEFAULT_AUDIT_FILTERS)
+
+  // ── Init filters from URL or localStorage ──
+  useEffect(() => {
+    if (initializedRef.current) return
+    initializedRef.current = true
+
+    const fromUrl: Partial<AuditFilters> = {}
+    const urlKeys: (keyof AuditFilters)[] = [
+      'search',
+      'entityType',
+      'action',
+      'userId',
+      'days',
+      'familyId',
+      'configModule',
+      'actionPreset',
+    ]
+    let hasUrlFilters = false
+    for (const key of urlKeys) {
+      const v = searchParams.get(key)
+      if (v) {
+        fromUrl[key] = v
+        hasUrlFilters = true
+      }
+    }
+
+    const initial = hasUrlFilters
+      ? mergeAuditFilters(DEFAULT_AUDIT_FILTERS, fromUrl)
+      : mergeAuditFilters(DEFAULT_AUDIT_FILTERS, loadStoredAuditFilters())
+
+    setFilters(initial)
+  }, [searchParams])
+
+  // ── Sync URL + localStorage when filters change ──
+  useEffect(() => {
+    if (!initializedRef.current) return
+
+    saveAuditFilters(filters)
+    const params = auditFiltersToUrlParams(filters)
+    const qs = params.toString()
+    router.replace(qs ? `/admin/audit?${qs}` : '/admin/audit', { scroll: false })
+  }, [filters, router])
 
   // ── Authorization check ──
   useEffect(() => {
@@ -59,27 +128,21 @@ export function useAudit() {
       return
     }
 
-    // Solo Super Admin puede ver auditorías
-    if (!(session.user as any).isSuperAdmin) {
+    if (!(session.user as { isSuperAdmin?: boolean }).isSuperAdmin) {
       router.push('/unauthorized')
-      return
     }
   }, [session, status, router])
 
   // ── Load audit data ──
   const loadAuditData = useCallback(
     async (page = 1, limit = 20) => {
+      if (!initializedRef.current) return
+
       try {
         setLoading(true)
 
-        // Cargar logs con paginación
         const logsResponse = await fetch(
-          '/api/admin/audit/logs?' +
-            new URLSearchParams({
-              ...filters,
-              limit: limit.toString(),
-              offset: ((page - 1) * limit).toString(),
-            })
+          `/api/admin/audit/logs${buildLogsQuery(filters, page, limit)}`
         )
 
         if (logsResponse.ok) {
@@ -93,10 +156,8 @@ export function useAudit() {
           })
         }
 
-        // Cargar estadísticas solo en la primera página
         if (page === 1) {
-          const statsResponse = await fetch(`/api/admin/audit/stats?days=${filters.days}`)
-
+          const statsResponse = await fetch(`/api/admin/audit/stats${buildStatsQuery(filters)}`)
           if (statsResponse.ok) {
             const statsData = await statsResponse.json()
             setStats(statsData)
@@ -111,14 +172,12 @@ export function useAudit() {
     [filters]
   )
 
-  // ── Load data when filters change ──
   useEffect(() => {
-    if (status === 'authenticated' && session?.user.role === 'ADMIN') {
+    if (status === 'authenticated' && session?.user.role === 'ADMIN' && initializedRef.current) {
       loadAuditData()
     }
   }, [filters, status, session, loadAuditData])
 
-  // ── Export handlers ──
   const handleExportCSV = useCallback(
     (onSuccess: (message: string) => void, onError: (error: string) => void) => {
       void exportAuditReport('csv', filters, onSuccess, onError)
@@ -133,24 +192,21 @@ export function useAudit() {
     [filters]
   )
 
-  // ── Clear filters ──
   const clearFilters = useCallback(() => {
-    setFilters({
-      search: '',
-      entityType: 'all',
-      action: '',
-      userId: '',
-      days: '30',
-      familyId: '',
-    })
+    setActivePresetId(null)
+    setFilters({ ...DEFAULT_AUDIT_FILTERS })
   }, [])
 
-  // ── Update filter ──
   const updateFilter = useCallback((key: keyof AuditFilters, value: string) => {
+    setActivePresetId(null)
     setFilters(prev => ({ ...prev, [key]: value }))
   }, [])
 
-  // ── Dialog handlers ──
+  const applyPreset = useCallback((presetId: AuditQuickPresetId) => {
+    setActivePresetId(presetId)
+    setFilters(getPresetFilters(presetId))
+  }, [])
+
   const openLogDetails = useCallback((log: AuditLog) => {
     setSelectedLog(log)
     setIsDialogOpen(true)
@@ -161,7 +217,6 @@ export function useAudit() {
     setSelectedLog(null)
   }, [])
 
-  // ── Pagination handlers ──
   const handlePageChange = useCallback(
     (page: number) => {
       loadAuditData(page, pagination.limit)
@@ -176,14 +231,16 @@ export function useAudit() {
     [loadAuditData]
   )
 
-  // ── Computed values ──
-  const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
+  const isSuperAdmin = (session?.user as { isSuperAdmin?: boolean })?.isSuperAdmin === true
+
   const hasActiveFilters =
     filters.search !== '' ||
     filters.entityType !== 'all' ||
     filters.action !== '' ||
     filters.days !== '30' ||
-    filters.familyId !== ''
+    filters.familyId !== '' ||
+    filters.configModule !== 'all' ||
+    Boolean(filters.actionPreset)
 
   const criticalActionsCount =
     stats?.actionStats
@@ -196,31 +253,24 @@ export function useAudit() {
       .reduce((acc, s) => acc + s._count.id, 0) || 0
 
   return {
-    // Session
     session,
     status,
     isSuperAdmin,
-
-    // Data
     logs,
     stats,
     families,
     selectedLog,
-
-    // State
     loading,
     isDialogOpen,
     pagination,
     filters,
     hasActiveFilters,
-
-    // Computed
+    activePresetId,
     criticalActionsCount,
-
-    // Actions
     loadAuditData,
     updateFilter,
     clearFilters,
+    applyPreset,
     openLogDetails,
     closeLogDetails,
     handlePageChange,

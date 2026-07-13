@@ -4,7 +4,7 @@ import { exec } from 'child_process'
 import { promisify } from 'util'
 import { access, readdir, stat } from 'fs/promises'
 import { join } from 'path'
-import { getBackupWorkerHealth } from '@/lib/services/backup/backup-engine'
+import { getBackupWorkerHealth, getPgBackRestDiskUsage } from '@/lib/services/backup/backup-engine'
 import {
   ensureBackupCatalogSynced,
   computeSuccessRate,
@@ -21,12 +21,13 @@ export async function GET(request: NextRequest) {
 
     await ensureBackupCatalogSynced()
 
-    const [databaseHealth, storageHealth, backupServiceHealth, performanceMetrics] =
+    const [databaseHealth, storageHealth, backupServiceHealth, performanceMetrics, diskUsage] =
       await Promise.all([
         checkDatabaseHealth(),
         checkStorageHealth(),
         checkBackupServiceHealth(),
         calculatePerformanceMetrics(),
+        getPgBackRestDiskUsage(),
       ])
 
     return NextResponse.json({
@@ -34,6 +35,7 @@ export async function GET(request: NextRequest) {
       storage: storageHealth,
       backupService: backupServiceHealth,
       performance: performanceMetrics,
+      diskUsage,
       timestamp: new Date().toISOString(),
     })
   } catch (error) {

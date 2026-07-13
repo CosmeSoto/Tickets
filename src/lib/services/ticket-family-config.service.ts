@@ -60,7 +60,7 @@ export class TicketFamilyConfigService {
     data: UpdateTicketFamilyConfigData,
     userId = 'system'
   ): Promise<ticket_family_config> {
-    return prisma.$transaction(async (tx) => {
+    return prisma.$transaction(async tx => {
       // Si se está marcando como default, desmarcar la anterior
       if (data.isDefault === true) {
         await tx.ticket_family_config.updateMany({
@@ -71,6 +71,11 @@ export class TicketFamilyConfigService {
 
       const previous = await tx.ticket_family_config.findUnique({
         where: { familyId },
+      })
+
+      const family = await tx.families.findUnique({
+        where: { id: familyId },
+        select: { name: true },
       })
 
       const updated = await tx.ticket_family_config.update({
@@ -90,7 +95,9 @@ export class TicketFamilyConfigService {
           }),
           ...(data.businessHoursEnd !== undefined && { businessHoursEnd: data.businessHoursEnd }),
           ...(data.businessDays !== undefined && { businessDays: data.businessDays }),
-          ...(data.allowedFromFamilies !== undefined && { allowedFromFamilies: data.allowedFromFamilies }),
+          ...(data.allowedFromFamilies !== undefined && {
+            allowedFromFamilies: data.allowedFromFamilies,
+          }),
         },
       })
 
@@ -101,10 +108,10 @@ export class TicketFamilyConfigService {
         entityType: 'settings',
         entityId: updated.id,
         userId,
-        details: { familyId },
+        details: { familyId, familyName: family?.name },
         oldValues: previous ?? undefined,
         newValues: updated,
-      }).catch((err) => console.error('[TicketFamilyConfigService] Audit log error:', err))
+      }).catch(err => console.error('[TicketFamilyConfigService] Audit log error:', err))
 
       return updated
     })

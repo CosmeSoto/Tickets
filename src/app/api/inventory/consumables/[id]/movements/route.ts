@@ -150,17 +150,18 @@ async function checkLowStockAndNotify(consumableId: string) {
       type: isOutOfStock ? 'ERROR' : 'WARNING',
       title,
       message,
-      metadata: { link: '/inventory/consumables' },
+      metadata: { link: '/inventory?subtype=MRO' },
     }).catch(() => {})
 
     // Email en cola
+    if (!admin.email) continue
     await prisma.email_queue
       .create({
         data: {
           id: randomUUID(),
           toEmail: admin.email,
           subject: title,
-          body: generateLowStockEmail(consumable, admin.name, isOutOfStock),
+          body: generateLowStockEmail(consumable, admin.name ?? 'Administrador', isOutOfStock),
           status: 'pending',
           attempts: 0,
           maxAttempts: 3,
@@ -209,7 +210,7 @@ function generateLowStockEmail(consumable: any, adminName: string, isOutOfStock:
         ${consumable.costPerUnit ? `<p><strong>Costo por unidad:</strong> $${consumable.costPerUnit}</p>` : ''}
       </div>
       <p style="text-align: center;">
-        <a href="${process.env.NEXTAUTH_URL}/inventory/consumables" class="button">Ver Consumibles</a>
+        <a href="${process.env.NEXTAUTH_URL}/inventory?subtype=MRO" class="button">Ver Consumibles</a>
       </p>
     </div>
     <div class="footer"><p>Mensaje automático del Sistema de Gestión de Inventario</p></div>

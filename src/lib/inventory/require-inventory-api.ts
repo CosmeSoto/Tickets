@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { canManageInventory, inventoryForbidden } from '@/lib/inventory-access'
+import { canManageInventory } from '@/lib/inventory-access'
 import {
   assertContractAccess,
   InventoryAccessError,
@@ -14,7 +14,10 @@ export async function requireInventoryModuleAccess(user: {
 }): Promise<NextResponse | null> {
   if (user.role === 'ADMIN') return null
   if (!(await canManageInventory(user.id, user.role))) {
-    return inventoryForbidden()
+    return NextResponse.json(
+      { error: 'No tienes permiso para gestionar el inventario' },
+      { status: 403 }
+    )
   }
   return null
 }

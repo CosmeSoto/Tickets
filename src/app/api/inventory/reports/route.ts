@@ -50,6 +50,7 @@ export async function GET(request: NextRequest) {
       endDate: endDate?.toISOString(),
       departmentId,
       days,
+      familyIds: scopeFamilyIds,
     }
 
     switch (reportType) {
@@ -58,7 +59,12 @@ export async function GET(request: NextRequest) {
           'inventory:equipment-summary',
           reportParams,
           () =>
-            InventoryReportService.getEquipmentSummaryReport({ startDate, endDate, departmentId }),
+            InventoryReportService.getEquipmentSummaryReport({
+              startDate,
+              endDate,
+              departmentId,
+              familyIds: scopeFamilyIds,
+            }),
           600
         )
         break
@@ -66,15 +72,20 @@ export async function GET(request: NextRequest) {
         data = await withReportCache(
           'inventory:assignments',
           reportParams,
-          () => InventoryReportService.getAssignmentsReport({ startDate, endDate }),
+          () =>
+            InventoryReportService.getAssignmentsReport({
+              startDate,
+              endDate,
+              familyIds: scopeFamilyIds,
+            }),
           300
         )
         break
       case 'pending-acts':
         data = await withReportCache(
           'inventory:pending-acts',
-          {},
-          () => InventoryReportService.getPendingActsReport(),
+          reportParams,
+          () => InventoryReportService.getPendingActsReport(scopeFamilyIds),
           120
         )
         break
@@ -82,7 +93,12 @@ export async function GET(request: NextRequest) {
         data = await withReportCache(
           'inventory:maintenance-costs',
           reportParams,
-          () => InventoryReportService.getMaintenanceCostsReport({ startDate, endDate }),
+          () =>
+            InventoryReportService.getMaintenanceCostsReport({
+              startDate,
+              endDate,
+              familyIds: scopeFamilyIds,
+            }),
           600
         )
         break
@@ -90,31 +106,36 @@ export async function GET(request: NextRequest) {
         data = await withReportCache(
           'inventory:consumable-usage',
           reportParams,
-          () => InventoryReportService.getConsumableUsageReport({ startDate, endDate }),
+          () =>
+            InventoryReportService.getConsumableUsageReport({
+              startDate,
+              endDate,
+              familyIds: scopeFamilyIds,
+            }),
           300
         )
         break
       case 'license-expiration':
         data = await withReportCache(
           'inventory:license-expiration',
-          { days },
-          () => InventoryReportService.getLicenseExpirationReport(days),
+          reportParams,
+          () => InventoryReportService.getLicenseExpirationReport(days, scopeFamilyIds),
           600
         )
         break
       case 'inventory-value':
         data = await withReportCache(
           'inventory:inventory-value',
-          {},
-          () => InventoryReportService.getInventoryValueReport(),
+          reportParams,
+          () => InventoryReportService.getInventoryValueReport(scopeFamilyIds),
           900
         )
         break
       case 'rental-equipment':
         data = await withReportCache(
           'inventory:rental-equipment',
-          {},
-          () => InventoryReportService.getRentalEquipmentReport(),
+          reportParams,
+          () => InventoryReportService.getRentalEquipmentReport(scopeFamilyIds),
           600
         )
         break
@@ -122,7 +143,7 @@ export async function GET(request: NextRequest) {
         data = await withReportCache(
           'inventory:acts-history',
           reportParams,
-          () => getActsHistoryReport({ startDate, endDate }),
+          () => getActsHistoryReport({ startDate, endDate, familyIds: scopeFamilyIds }),
           300
         )
         break
@@ -146,7 +167,15 @@ export async function GET(request: NextRequest) {
   }
 }
 
-async function getActsHistoryReport({ startDate, endDate }: { startDate?: Date; endDate?: Date }) {
+async function getActsHistoryReport({
+  startDate,
+  endDate,
+  familyIds,
+}: {
+  startDate?: Date
+  endDate?: Date
+  familyIds?: string[]
+}) {
   const dateFilter =
     startDate || endDate
       ? {
@@ -157,9 +186,18 @@ async function getActsHistoryReport({ startDate, endDate }: { startDate?: Date; 
         }
       : {}
 
+  const equipmentScope = familyIds?.length
+    ? { type: { familyId: { in: familyIds } } }
+    : familyIds && familyIds.length === 0
+      ? { id: '__NONE__' }
+      : undefined
+
   const [deliveryActs, returnActs, decommissionRequests] = await Promise.all([
     prisma.delivery_acts.findMany({
-      where: dateFilter,
+      where: {
+        ...dateFilter,
+        ...(equipmentScope ? { assignment: { equipment: equipmentScope } } : {}),
+      },
       include: {
         assignment: {
           include: {
@@ -171,7 +209,10 @@ async function getActsHistoryReport({ startDate, endDate }: { startDate?: Date; 
       orderBy: { createdAt: 'desc' },
     }),
     prisma.return_acts.findMany({
-      where: dateFilter,
+      where: {
+        ...dateFilter,
+        ...(equipmentScope ? { assignment: { equipment: equipmentScope } } : {}),
+      },
       include: {
         assignment: {
           include: {
@@ -183,7 +224,10 @@ async function getActsHistoryReport({ startDate, endDate }: { startDate?: Date; 
       orderBy: { createdAt: 'desc' },
     }),
     prisma.decommission_requests.findMany({
-      where: dateFilter,
+      where: {
+        ...dateFilter,
+        ...(equipmentScope ? { equipment: equipmentScope } : {}),
+      },
       include: {
         equipment: { select: { id: true, brand: true, model: true, code: true } },
         requester: { select: { name: true } },

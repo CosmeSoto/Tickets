@@ -32,6 +32,14 @@ interface SystemHealth {
     total: number
     status: 'healthy' | 'warning' | 'critical'
   }
+  diskUsage?: {
+    repoPath: string
+    repoUsedBytes: number
+    availableBytes: number
+    totalBytes: number
+    usagePercent: number
+    status: 'healthy' | 'warning' | 'critical'
+  } | null
   backupService: {
     status: 'running' | 'stopped' | 'error' | 'degraded'
     backupEnabled?: boolean
@@ -251,6 +259,32 @@ export function BackupMonitoring() {
         </Button>
       </div>
 
+      {health.diskUsage && (
+        <Alert
+          className={
+            health.diskUsage.status === 'critical'
+              ? 'border-destructive/50 bg-destructive/10'
+              : health.diskUsage.status === 'warning'
+                ? 'border-amber-500/40 bg-amber-500/10'
+                : 'border-primary/30 bg-primary/5'
+          }
+        >
+          <HardDrive className='h-4 w-4' />
+          <AlertDescription className='text-sm space-y-1'>
+            <div>
+              <strong>Repositorio pgBackRest</strong> ({health.diskUsage.repoPath}):{' '}
+              {formatFileSize(health.diskUsage.repoUsedBytes)} en backups ·{' '}
+              {health.diskUsage.usagePercent.toFixed(1)}% del disco ·{' '}
+              {formatFileSize(health.diskUsage.availableBytes)} libres
+            </div>
+            <div className='text-xs text-muted-foreground'>
+              Retención activa: 2 FULL + 7 DIFF — pgBackRest purga automáticamente al crear nuevos
+              respaldos. Monitorea aquí si el disco supera 75%.
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Estado general del sistema */}
       <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6'>
         <Card>
@@ -284,18 +318,23 @@ export function BackupMonitoring() {
               {getStatusIcon(health.storage.status)}
             </div>
             <div className='space-y-2'>
-              <div className='text-lg font-bold text-foreground'>Almacenamiento</div>
+              <div className='text-lg font-bold text-foreground'>Exports .dump</div>
               <div
                 className={`text-sm px-2 py-1 rounded border ${getStatusColor(health.storage.status)}`}
               >
-                {formatFileSize(health.storage.available)} disponible
+                {formatFileSize(health.storage.available)} libres en disco
               </div>
               <div className='space-y-1'>
                 <div className='flex justify-between text-xs text-muted-foreground'>
-                  <span>Usado: {storageUsagePercent.toFixed(1)}%</span>
-                  <span>{formatFileSize(health.storage.used)}</span>
+                  <span>Archivos export: {formatFileSize(health.storage.used)}</span>
+                  {health.diskUsage && (
+                    <span>pgBackRest: {formatFileSize(health.diskUsage.repoUsedBytes)}</span>
+                  )}
                 </div>
                 <Progress value={storageUsagePercent} className='h-2' />
+                <div className='text-xs text-muted-foreground'>
+                  Barra: uso de exports vs espacio total del volumen
+                </div>
               </div>
             </div>
           </CardContent>

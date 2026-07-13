@@ -1,6 +1,6 @@
 /**
  * Health Check System
- * 
+ *
  * Comprehensive health monitoring for all system components
  */
 
@@ -23,7 +23,7 @@ export enum HealthStatus {
   HEALTHY = 'healthy',
   DEGRADED = 'degraded',
   UNHEALTHY = 'unhealthy',
-  UNKNOWN = 'unknown'
+  UNKNOWN = 'unknown',
 }
 
 export interface HealthCheckConfig {
@@ -74,8 +74,8 @@ const DEFAULT_CONFIG: HealthCheckConfig = {
     externalServices: true,
     filesystem: true,
     memory: true,
-    disk: true
-  }
+    disk: true,
+  },
 }
 
 export class HealthChecker {
@@ -90,17 +90,17 @@ export class HealthChecker {
    */
   static initialize(config?: Partial<HealthCheckConfig>): void {
     this.config = { ...DEFAULT_CONFIG, ...config }
-    
+
     if (this.config.enabled) {
       this.startHealthChecks()
-      
+
       ApplicationLogger.businessOperation('initialize_health_checker', 'health-checker', 'system', {
-        metadata: { 
+        metadata: {
           checkInterval: this.config.checkInterval,
           enabledChecks: Object.entries(this.config.checks)
             .filter(([_, enabled]) => enabled)
-            .map(([check]) => check)
-        }
+            .map(([check]) => check),
+        },
       })
     }
   }
@@ -114,9 +114,9 @@ export class HealthChecker {
     checkFunction: () => Promise<HealthCheck>
   ): void {
     this.customChecks.set(`${component}_${name}`, checkFunction)
-    
+
     ApplicationLogger.businessOperation('register_health_check', 'health-checker', 'config', {
-      metadata: { name, component }
+      metadata: { name, component },
     })
   }
 
@@ -125,7 +125,7 @@ export class HealthChecker {
    */
   static async performHealthChecks(): Promise<SystemHealth> {
     const timer = ApplicationLogger.timer('perform_health_checks', {
-      component: 'health-checker'
+      component: 'health-checker',
     })
 
     try {
@@ -170,7 +170,7 @@ export class HealthChecker {
             status: HealthStatus.UNHEALTHY,
             responseTime: 0,
             timestamp: new Date(),
-            message: `Custom check failed: ${err.message}`
+            message: `Custom check failed: ${err.message}`,
           })
         }
       }
@@ -178,7 +178,7 @@ export class HealthChecker {
       // Update health check storage
       for (const check of checks) {
         this.healthChecks.set(`${check.component}_${check.name}`, check)
-        
+
         // Track performance if enabled
         if (this.config.enablePerformanceTracking) {
           PerformanceMonitor.recordMetric({
@@ -192,15 +192,15 @@ export class HealthChecker {
               metadata: {
                 status: check.status,
                 checkName: check.name,
-                checkComponent: check.component
-              }
-            }
+                checkComponent: check.component,
+              },
+            },
           })
         }
       }
 
       const systemHealth = this.calculateSystemHealth(checks)
-      
+
       // Alert on failures if enabled
       if (this.config.alertOnFailure) {
         await this.handleHealthAlerts(checks)
@@ -208,12 +208,11 @@ export class HealthChecker {
 
       timer.end('Health checks completed successfully')
       return systemHealth
-
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error))
       ApplicationLogger.systemHealth('health-checker', 'unhealthy', {
         error: err.message,
-        operation: 'perform_health_checks'
+        operation: 'perform_health_checks',
       })
       timer.end('Health checks failed')
       throw error
@@ -231,8 +230,7 @@ export class HealthChecker {
    * Get health check for specific component
    */
   static getComponentHealth(component: string): HealthCheck[] {
-    return Array.from(this.healthChecks.values())
-      .filter(check => check.component === component)
+    return Array.from(this.healthChecks.values()).filter(check => check.component === component)
   }
 
   /**
@@ -247,13 +245,13 @@ export class HealthChecker {
 
       await db.$queryRaw`SELECT 1`
 
-      const connectionInfo = await db.$queryRaw`
+      const connectionInfo = (await db.$queryRaw`
         SELECT
           count(*) as total_connections,
           count(*) FILTER (WHERE state = 'active') as active_connections
         FROM pg_stat_activity
         WHERE datname = current_database()
-      ` as any[]
+      `) as any[]
 
       const responseTime = performance.now() - startTime
 
@@ -289,31 +287,31 @@ export class HealthChecker {
    */
   private static async checkRedis(): Promise<HealthCheck> {
     const startTime = performance.now()
-    
+
     try {
       // Import Redis client dynamically
       const { createClient } = await import('redis')
       const client = createClient({
-        url: process.env.REDIS_URL
+        url: process.env.REDIS_URL,
       })
-      
+
       await client.connect()
-      
+
       // Test basic operations
       const testKey = `health_check_${Date.now()}`
       await client.set(testKey, 'test_value', { EX: 10 })
       const value = await client.get(testKey)
       await client.del(testKey)
-      
+
       // Get Redis info
       const info = await client.info('memory')
       const memoryMatch = info.match(/used_memory:(\d+)/)
       const usedMemory = memoryMatch ? parseInt(memoryMatch[1]) : 0
-      
+
       await client.disconnect()
-      
+
       const responseTime = performance.now() - startTime
-      
+
       return {
         name: 'connectivity',
         component: 'redis',
@@ -323,21 +321,20 @@ export class HealthChecker {
         message: 'Redis connection successful',
         metadata: {
           usedMemory,
-          testResult: value === 'test_value'
-        }
+          testResult: value === 'test_value',
+        },
       }
-
     } catch (error) {
       const responseTime = performance.now() - startTime
       const err = error instanceof Error ? error : new Error(String(error))
-      
+
       return {
         name: 'connectivity',
         component: 'redis',
         status: HealthStatus.UNHEALTHY,
         responseTime,
         timestamp: new Date(),
-        message: `Redis check failed: ${err.message}`
+        message: `Redis check failed: ${err.message}`,
       }
     }
   }
@@ -347,34 +344,34 @@ export class HealthChecker {
    */
   private static async checkFilesystem(): Promise<HealthCheck> {
     const startTime = performance.now()
-    
+
     try {
       const fs = await import('fs/promises')
       const path = await import('path')
-      
+
       // Test write/read/delete operations
       const testDir = path.join(process.cwd(), 'temp')
       const testFile = path.join(testDir, `health_check_${Date.now()}.txt`)
       const testContent = 'health check test'
-      
+
       // Ensure temp directory exists
       try {
         await fs.mkdir(testDir, { recursive: true })
       } catch (error) {
         // Directory might already exist
       }
-      
+
       // Write test file
       await fs.writeFile(testFile, testContent)
-      
+
       // Read test file
       const readContent = await fs.readFile(testFile, 'utf-8')
-      
+
       // Delete test file
       await fs.unlink(testFile)
-      
+
       const responseTime = performance.now() - startTime
-      
+
       return {
         name: 'operations',
         component: 'filesystem',
@@ -385,21 +382,20 @@ export class HealthChecker {
         metadata: {
           testPassed: readContent === testContent,
           testDir,
-          operationsCount: 3
-        }
+          operationsCount: 3,
+        },
       }
-
     } catch (error) {
       const responseTime = performance.now() - startTime
       const err = error instanceof Error ? error : new Error(String(error))
-      
+
       return {
         name: 'operations',
         component: 'filesystem',
         status: HealthStatus.UNHEALTHY,
         responseTime,
         timestamp: new Date(),
-        message: `Filesystem check failed: ${err.message}`
+        message: `Filesystem check failed: ${err.message}`,
       }
     }
   }
@@ -409,22 +405,22 @@ export class HealthChecker {
    */
   private static async checkMemory(): Promise<HealthCheck> {
     const startTime = performance.now()
-    
+
     try {
       const memUsage = process.memoryUsage()
       const totalMemory = memUsage.heapTotal
       const usedMemory = memUsage.heapUsed
       const memoryUsagePercent = (usedMemory / totalMemory) * 100
-      
+
       let status = HealthStatus.HEALTHY
       if (memoryUsagePercent > 90) {
         status = HealthStatus.UNHEALTHY
       } else if (memoryUsagePercent > 75) {
         status = HealthStatus.DEGRADED
       }
-      
+
       const responseTime = performance.now() - startTime
-      
+
       return {
         name: 'usage',
         component: 'memory',
@@ -437,67 +433,98 @@ export class HealthChecker {
           heapTotal: totalMemory,
           external: memUsage.external,
           rss: memUsage.rss,
-          usagePercent: memoryUsagePercent
-        }
+          usagePercent: memoryUsagePercent,
+        },
       }
-
     } catch (error) {
       const responseTime = performance.now() - startTime
       const err = error instanceof Error ? error : new Error(String(error))
-      
+
       return {
         name: 'usage',
         component: 'memory',
         status: HealthStatus.UNHEALTHY,
         responseTime,
         timestamp: new Date(),
-        message: `Memory check failed: ${err.message}`
+        message: `Memory check failed: ${err.message}`,
       }
     }
   }
 
   /**
-   * Check disk usage
+   * Check disk usage — uses `df -k` for real free/used/total bytes.
+   * Thresholds: ≥90% used → UNHEALTHY, ≥75% → DEGRADED, otherwise HEALTHY.
    */
   private static async checkDisk(): Promise<HealthCheck> {
     const startTime = performance.now()
-    
+    const checkPath = process.cwd()
+
     try {
-      const fs = await import('fs/promises')
-      const path = process.cwd()
-      
-      // Get disk stats
-      const stats = await fs.stat(path)
-      
-      // For a more comprehensive disk check, we'd use statvfs on Unix systems
-      // For now, we'll do a basic check
+      const { exec } = await import('child_process')
+      const { promisify } = await import('util')
+      const execAsync = promisify(exec)
+
+      let totalBytes = 0
+      let availableBytes = 0
+
+      try {
+        // df -k outputs 1K-blocks; last data line has: Filesystem 1K-blocks Used Available Use% Mounted
+        const { stdout } = await execAsync(`df -k "${checkPath}"`, { timeout: 5000 })
+        const lines = stdout.trim().split('\n')
+        const parts = lines[lines.length - 1].trim().split(/\s+/)
+        if (parts.length >= 4) {
+          totalBytes = parseInt(parts[1], 10) * 1024
+          availableBytes = parseInt(parts[3], 10) * 1024
+        }
+      } catch {
+        // df not available (Windows CI, restricted containers) — fall back to fs.stat
+        const fs = await import('fs/promises')
+        await fs.stat(checkPath) // confirms accessibility; sizes remain 0
+      }
+
+      const usedBytes = totalBytes > 0 ? totalBytes - availableBytes : 0
+      const usagePercent = totalBytes > 0 ? (usedBytes / totalBytes) * 100 : 0
+
+      let status = HealthStatus.HEALTHY
+      if (usagePercent >= 90) {
+        status = HealthStatus.UNHEALTHY
+      } else if (usagePercent >= 75) {
+        status = HealthStatus.DEGRADED
+      }
+
       const responseTime = performance.now() - startTime
-      
+
+      const message =
+        totalBytes > 0
+          ? `Disk usage: ${usagePercent.toFixed(1)}% (${(usedBytes / 1024 ** 3).toFixed(2)} GB used of ${(totalBytes / 1024 ** 3).toFixed(2)} GB)`
+          : 'Disk accessible (size data unavailable)'
+
       return {
         name: 'usage',
         component: 'disk',
-        status: HealthStatus.HEALTHY,
+        status,
         responseTime,
         timestamp: new Date(),
-        message: 'Disk access successful',
+        message,
         metadata: {
-          path,
-          accessible: true,
-          lastModified: stats.mtime
-        }
+          path: checkPath,
+          totalBytes,
+          usedBytes,
+          availableBytes,
+          usagePercent: Math.round(usagePercent * 100) / 100,
+        },
       }
-
     } catch (error) {
       const responseTime = performance.now() - startTime
       const err = error instanceof Error ? error : new Error(String(error))
-      
+
       return {
         name: 'usage',
         component: 'disk',
         status: HealthStatus.UNHEALTHY,
         responseTime,
         timestamp: new Date(),
-        message: `Disk check failed: ${err.message}`
+        message: `Disk check failed: ${err.message}`,
       }
     }
   }
@@ -506,28 +533,28 @@ export class HealthChecker {
    */
   private static async checkExternalServices(): Promise<HealthCheck[]> {
     const checks: HealthCheck[] = []
-    
+
     // Define external services to check
     const services = [
       { name: 'google_dns', url: 'https://8.8.8.8', timeout: 3000 },
-      { name: 'cloudflare_dns', url: 'https://1.1.1.1', timeout: 3000 }
+      { name: 'cloudflare_dns', url: 'https://1.1.1.1', timeout: 3000 },
     ]
 
     for (const service of services) {
       const startTime = performance.now()
-      
+
       try {
         const controller = new AbortController()
         const timeoutId = setTimeout(() => controller.abort(), service.timeout)
-        
+
         const response = await fetch(service.url, {
           signal: controller.signal,
-          method: 'HEAD'
+          method: 'HEAD',
         })
-        
+
         clearTimeout(timeoutId)
         const responseTime = performance.now() - startTime
-        
+
         checks.push({
           name: service.name,
           component: 'external_service',
@@ -538,14 +565,13 @@ export class HealthChecker {
           metadata: {
             url: service.url,
             status: response.status,
-            statusText: response.statusText
-          }
+            statusText: response.statusText,
+          },
         })
-
       } catch (error) {
         const responseTime = performance.now() - startTime
         const err = error instanceof Error ? error : new Error(String(error))
-        
+
         checks.push({
           name: service.name,
           component: 'external_service',
@@ -555,8 +581,8 @@ export class HealthChecker {
           message: `External service ${service.name} failed: ${err.message}`,
           metadata: {
             url: service.url,
-            error: err.message
-          }
+            error: err.message,
+          },
         })
       }
     }
@@ -573,14 +599,14 @@ export class HealthChecker {
       degraded: 0,
       unhealthy: 0,
       unknown: 0,
-      total: checks.length
+      total: checks.length,
     }
 
     const components: Record<string, HealthCheck> = {}
 
     for (const check of checks) {
       components[`${check.component}_${check.name}`] = check
-      
+
       switch (check.status) {
         case HealthStatus.HEALTHY:
           summary.healthy++
@@ -611,7 +637,7 @@ export class HealthChecker {
       components,
       summary,
       lastCheck: new Date(),
-      uptime: Date.now() - this.startTime
+      uptime: Date.now() - this.startTime,
     }
   }
 
@@ -631,8 +657,8 @@ export class HealthChecker {
               checkComponent: check.component,
               responseTime: check.responseTime,
               message: check.message,
-              ...check.metadata
-            }
+              ...check.metadata,
+            },
           },
           ErrorType.SYSTEM,
           ErrorSeverity.HIGH
@@ -642,7 +668,7 @@ export class HealthChecker {
           component: check.component,
           check: check.name,
           responseTime: check.responseTime,
-          message: check.message
+          message: check.message,
         })
       }
     }
@@ -651,9 +677,7 @@ export class HealthChecker {
   /**
    * Execute health check with timeout
    */
-  private static async executeWithTimeout<T>(
-    checkFunction: () => Promise<T>
-  ): Promise<T> {
+  private static async executeWithTimeout<T>(checkFunction: () => Promise<T>): Promise<T> {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         reject(new Error(`Health check timed out after ${this.config.timeout}ms`))
@@ -679,7 +703,7 @@ export class HealthChecker {
     this.performHealthChecks().catch(error => {
       ApplicationLogger.systemHealth('health-checker', 'unhealthy', {
         error: error instanceof Error ? error.message : String(error),
-        operation: 'initial_health_check'
+        operation: 'initial_health_check',
       })
     })
 
@@ -690,7 +714,7 @@ export class HealthChecker {
       } catch (error) {
         ApplicationLogger.systemHealth('health-checker', 'unhealthy', {
           error: error instanceof Error ? error.message : String(error),
-          operation: 'periodic_health_check'
+          operation: 'periodic_health_check',
         })
       }
     }, this.config.checkInterval * 1000)
@@ -704,9 +728,9 @@ export class HealthChecker {
       clearInterval(this.checkInterval)
       this.checkInterval = undefined
     }
-    
+
     ApplicationLogger.businessOperation('stop_health_checker', 'health-checker', 'system', {
-      metadata: { uptime: Date.now() - this.startTime }
+      metadata: { uptime: Date.now() - this.startTime },
     })
   }
 
@@ -723,7 +747,7 @@ export class HealthChecker {
   static updateConfig(newConfig: Partial<HealthCheckConfig>): void {
     const oldConfig = { ...this.config }
     this.config = { ...this.config, ...newConfig }
-    
+
     // Restart health checks if interval changed
     if (newConfig.checkInterval && newConfig.checkInterval !== oldConfig.checkInterval) {
       this.stop()
@@ -731,9 +755,9 @@ export class HealthChecker {
         this.startHealthChecks()
       }
     }
-    
+
     ApplicationLogger.businessOperation('config_updated', 'health-checker', 'config', {
-      metadata: { updatedFields: Object.keys(newConfig) }
+      metadata: { updatedFields: Object.keys(newConfig) },
     })
   }
 
@@ -748,7 +772,8 @@ export class HealthChecker {
    * Get health check history
    */
   static getHealthHistory(): HealthCheck[] {
-    return Array.from(this.healthChecks.values())
-      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+    return Array.from(this.healthChecks.values()).sort(
+      (a, b) => b.timestamp.getTime() - a.timestamp.getTime()
+    )
   }
 }

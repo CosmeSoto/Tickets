@@ -5,6 +5,7 @@ import {
   countPgBackRestBackups,
   isPgBackRestInfrastructureOk,
 } from '@/lib/services/backup/backup-health-utils'
+import { getPgBackRestDiskUsage } from '@/lib/services/backup/backup-engine'
 import { requireBackupSuperAdmin } from '../_auth'
 
 export async function GET() {
@@ -139,6 +140,29 @@ export async function GET() {
         timestamp: lastSuccessfulBackup.createdAt.toISOString(),
         resolved: true,
       })
+    }
+
+    const diskUsage = await getPgBackRestDiskUsage()
+    if (diskUsage) {
+      if (diskUsage.status === 'critical') {
+        alerts.push({
+          id: 'disk-critical',
+          type: 'error',
+          title: 'Disco casi lleno (pgBackRest)',
+          message: `${diskUsage.usagePercent.toFixed(1)}% usado — ${Math.round(diskUsage.repoUsedBytes / (1024 * 1024 * 1024))} GB en repo · libera espacio o ajusta retención`,
+          timestamp: new Date().toISOString(),
+          resolved: false,
+        })
+      } else if (diskUsage.status === 'warning') {
+        alerts.push({
+          id: 'disk-warning',
+          type: 'warning',
+          title: 'Disco en nivel de advertencia',
+          message: `Repo pgBackRest: ${diskUsage.usagePercent.toFixed(1)}% del disco · ${Math.round(diskUsage.availableBytes / (1024 * 1024 * 1024))} GB libres`,
+          timestamp: new Date().toISOString(),
+          resolved: false,
+        })
+      }
     }
 
     return NextResponse.json(alerts)

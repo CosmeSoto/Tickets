@@ -16,9 +16,14 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
 
-    const superCheck = await (await import('@/lib/auth/require-super-admin')).requireSuperAdmin(session)
+    const superCheck = await (
+      await import('@/lib/auth/require-super-admin')
+    ).requireSuperAdmin(session)
     if (!superCheck.ok) {
       return NextResponse.json({ error: superCheck.error }, { status: superCheck.status })
+    }
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
     const body = await request.json()
@@ -88,7 +93,11 @@ export async function POST(request: NextRequest) {
     let errorMessage = 'Error desconocido al conectar con el servidor SMTP'
 
     if (error instanceof Error) {
-      if (error.message.includes('EAUTH') || error.message.includes('535') || error.message.includes('534')) {
+      if (
+        error.message.includes('EAUTH') ||
+        error.message.includes('535') ||
+        error.message.includes('534')
+      ) {
         errorMessage = 'Error de autenticación. Verifica usuario y contraseña.'
       } else if (error.message.includes('ECONNREFUSED')) {
         errorMessage = 'No se pudo conectar al servidor SMTP. Verifica host y puerto.'
@@ -96,8 +105,13 @@ export async function POST(request: NextRequest) {
         errorMessage = 'Tiempo de conexión agotado. Verifica host, puerto y firewall.'
       } else if (error.message.includes('ENOTFOUND')) {
         errorMessage = 'Servidor SMTP no encontrado. Verifica el nombre del host.'
-      } else if (error.message.includes('certificate') || error.message.includes('SSL') || error.message.includes('TLS')) {
-        errorMessage = 'Error de certificado SSL/TLS. Intenta cambiar el puerto o la configuración de seguridad.'
+      } else if (
+        error.message.includes('certificate') ||
+        error.message.includes('SSL') ||
+        error.message.includes('TLS')
+      ) {
+        errorMessage =
+          'Error de certificado SSL/TLS. Intenta cambiar el puerto o la configuración de seguridad.'
       } else if (error.message.includes('ZodError') || error.message.includes('invalid')) {
         errorMessage = 'Datos de configuración inválidos. Completa todos los campos.'
       } else {

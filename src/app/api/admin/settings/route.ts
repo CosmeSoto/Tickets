@@ -4,35 +4,35 @@ import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { z } from 'zod'
 import { randomUUID } from 'crypto'
+import { logConfigAudit } from '@/lib/services/config-audit'
 
-const settingsSchema = z
-  .object({
-    systemName: z.string().max(100).optional(),
-    systemDescription: z.string().max(500).optional(),
-    supportEmail: z.string().email().optional().or(z.literal('')),
-    maxTicketsPerUser: z.coerce.number().min(1).max(100).optional(),
-    autoAssignmentEnabled: z.boolean().optional(),
-    emailEnabled: z.boolean().optional(),
-    smtpHost: z.string().optional(),
-    smtpPort: z.coerce.number().optional(),
-    smtpUser: z.string().optional(),
-    smtpPassword: z.string().optional(),
-    smtpSecure: z.boolean().optional(),
-    emailFrom: z.string().email().optional().or(z.literal('')),
-    notificationsEnabled: z.boolean().optional(),
-    emailNotifications: z.boolean().optional(),
-    browserNotifications: z.boolean().optional(),
-    sessionTimeout: z.coerce.number().min(5).max(1440).optional(),
-    maxLoginAttempts: z.coerce.number().min(3).max(10).optional(),
-    passwordMinLength: z.coerce.number().min(6).max(20).optional(),
-    requirePasswordChange: z.boolean().optional(),
-    maxFileSize: z.coerce.number().min(1).max(100).optional(),
-    autoCloseDays: z.coerce.number().min(1).max(30).optional(),
-    allowedFileTypes: z.array(z.string()).optional(),
-    backupEnabled: z.boolean().optional(),
-    backupFrequency: z.enum(['daily', 'weekly', 'monthly']).optional(),
-    backupRetention: z.coerce.number().min(7).max(365).optional(),
-  })
+const settingsSchema = z.object({
+  systemName: z.string().max(100).optional(),
+  systemDescription: z.string().max(500).optional(),
+  supportEmail: z.string().email().optional().or(z.literal('')),
+  maxTicketsPerUser: z.coerce.number().min(1).max(100).optional(),
+  autoAssignmentEnabled: z.boolean().optional(),
+  emailEnabled: z.boolean().optional(),
+  smtpHost: z.string().optional(),
+  smtpPort: z.coerce.number().optional(),
+  smtpUser: z.string().optional(),
+  smtpPassword: z.string().optional(),
+  smtpSecure: z.boolean().optional(),
+  emailFrom: z.string().email().optional().or(z.literal('')),
+  notificationsEnabled: z.boolean().optional(),
+  emailNotifications: z.boolean().optional(),
+  browserNotifications: z.boolean().optional(),
+  sessionTimeout: z.coerce.number().min(5).max(1440).optional(),
+  maxLoginAttempts: z.coerce.number().min(3).max(10).optional(),
+  passwordMinLength: z.coerce.number().min(6).max(20).optional(),
+  requirePasswordChange: z.boolean().optional(),
+  maxFileSize: z.coerce.number().min(1).max(100).optional(),
+  autoCloseDays: z.coerce.number().min(1).max(30).optional(),
+  allowedFileTypes: z.array(z.string()).optional(),
+  backupEnabled: z.boolean().optional(),
+  backupFrequency: z.enum(['daily', 'weekly', 'monthly']).optional(),
+  backupRetention: z.coerce.number().min(7).max(365).optional(),
+})
 
 const SENSITIVE_SETTING_KEYS = new Set(['smtpPassword'])
 
@@ -71,6 +71,54 @@ const defaultSettings = {
   backupEnabled: false,
   backupFrequency: 'daily' as const,
   backupRetention: 30,
+}
+
+function parseSystemSettingsFromRows(
+  rows: Array<{ key: string; value: string }>
+): Record<string, unknown> {
+  const result = { ...defaultSettings } as Record<string, unknown>
+
+  rows.forEach(setting => {
+    const value = setting.value
+    if (
+      [
+        'maxTicketsPerUser',
+        'smtpPort',
+        'sessionTimeout',
+        'maxLoginAttempts',
+        'passwordMinLength',
+        'maxFileSize',
+        'backupRetention',
+        'autoCloseDays',
+      ].includes(setting.key)
+    ) {
+      result[setting.key] = parseInt(value)
+    } else if (
+      [
+        'autoAssignmentEnabled',
+        'emailEnabled',
+        'smtpSecure',
+        'notificationsEnabled',
+        'emailNotifications',
+        'browserNotifications',
+        'requirePasswordChange',
+        'backupEnabled',
+      ].includes(setting.key)
+    ) {
+      result[setting.key] = value === 'true'
+    } else if (setting.key === 'allowedFileTypes') {
+      result[setting.key] = JSON.parse(value)
+    } else {
+      result[setting.key] = value
+    }
+  })
+
+  return result
+}
+
+async function loadCurrentSystemSettings(): Promise<Record<string, unknown>> {
+  const existingSettings = await prisma.system_settings.findMany()
+  return parseSystemSettingsFromRows(existingSettings)
 }
 
 export async function GET() {
@@ -181,6 +229,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const validatedData = validation.data
+    const oldValues = await loadCurrentSystemSettings()
 
     // Actualizar configuraciones en la base de datos
     const updatePromises = Object.entries(validatedData)
@@ -300,19 +349,17 @@ export async function PUT(request: NextRequest) {
       console.warn('No se pudo limpiar caché de seguridad:', error)
     }
 
-    // Crear entrada en el historial de auditoría
-    await prisma.audit_logs.create({
-      data: {
-        id: randomUUID(),
-        action: 'settings_updated',
-        entityType: 'SystemSettings',
-        entityId: 'system',
-        userId: session.user.id,
-        details: {
-          updatedSettings: Object.keys(validatedData),
-        },
-        createdAt: new Date(),
-      },
+    // Crear entrada en el historial de auditoría con diff detallado
+    const newValues = { ...oldValues, ...validatedData }
+    await logConfigAudit({
+      action: 'settings_updated',
+      entityType: 'SystemSettings',
+      entityId: 'system',
+      userId: session.user.id,
+      userEmail: session.user.email,
+      oldValues,
+      newValues,
+      details: { updatedKeys: Object.keys(validatedData) },
     })
 
     // Invalidar caché de settings afectados

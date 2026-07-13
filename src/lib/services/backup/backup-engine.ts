@@ -1,4 +1,10 @@
-import { BackupEngine, BackupKind, BackupWorkerHealth, PgBackRestInfo } from './backup-types'
+import {
+  BackupEngine,
+  BackupKind,
+  BackupWorkerHealth,
+  BackupDiskUsage,
+  PgBackRestInfo,
+} from './backup-types'
 import { getHiddenPgBackRestLabels, isPgBackRestRestoreAllowed } from './backup-settings'
 
 const WORKER_URL = process.env.BACKUP_WORKER_URL || ''
@@ -278,6 +284,20 @@ export async function syncPgBackRestToDatabase(): Promise<number> {
   }
 
   return synced
+}
+
+/**
+ * Obtiene el uso de disco del repositorio pgBackRest desde el backup-worker.
+ * Devuelve null si el worker no está configurado o no responde.
+ */
+export async function getPgBackRestDiskUsage(): Promise<BackupDiskUsage | null> {
+  if (!workerConfigured()) return null
+  try {
+    const data = await workerFetch<BackupDiskUsage>('/disk-usage', { timeoutMs: 20_000 })
+    return data
+  } catch {
+    return null
+  }
 }
 
 function mapPgBackRestType(type?: string): BackupKind {

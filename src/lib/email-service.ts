@@ -532,7 +532,9 @@ export async function sendTicketCreatedToAdminEmail(ticketId: string) {
 
     if (admins.length === 0) return false
 
-    const adminEmails = admins.map(admin => admin.email).filter(Boolean)
+    const adminEmails = admins
+      .map(admin => admin.email)
+      .filter((email): email is string => Boolean(email))
     if (adminEmails.length === 0) return false
 
     const html = `
@@ -876,7 +878,9 @@ export async function sendTicketResolvedToAdminEmail(ticketId: string) {
 
     if (admins.length === 0) return false
 
-    const adminEmails = admins.map(admin => admin.email).filter(Boolean)
+    const adminEmails = admins
+      .map(admin => admin.email)
+      .filter((email): email is string => Boolean(email))
     if (adminEmails.length === 0) return false
 
     // Calcular tiempo de resolución
@@ -1010,7 +1014,9 @@ export async function sendRatingToAdminEmail(ticketId: string, rating: number) {
 
     if (admins.length === 0) return false
 
-    const adminEmails = admins.map(admin => admin.email).filter(Boolean)
+    const adminEmails = admins
+      .map(admin => admin.email)
+      .filter((email): email is string => Boolean(email))
     if (adminEmails.length === 0) return false
 
     const stars = '⭐'.repeat(rating)

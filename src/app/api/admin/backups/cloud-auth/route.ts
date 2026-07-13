@@ -23,6 +23,9 @@ const REDIRECT_URI = `${REDIRECT_URI_BASE}/api/admin/backups/cloud-auth/callback
 export async function GET(request: NextRequest) {
   const { session, errorResponse } = await requireBackupSuperAdmin()
   if (errorResponse) return errorResponse
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  }
 
   const provider = request.nextUrl.searchParams.get('provider') as
     | 'google-drive'

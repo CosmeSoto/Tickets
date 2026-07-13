@@ -15,66 +15,28 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const {
-      format = 'csv',
-      includeHeaders = true,
-      includeMetadata = true,
-      filters = {}
-    } = body
+    const { format = 'csv', includeHeaders = true, includeMetadata = true, filters = {} } = body
 
     console.log(`📤 Iniciando exportación de auditoría - Formato: ${format}`)
     console.log(`🔍 Filtros aplicados:`, filters)
 
-    // Construir query con filtros
-    const where: any = {}
+    const days = parseInt(filters.days || '30', 10)
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - days)
 
-    // Filtro de búsqueda
-    if (filters.search) {
-      where.OR = [
-        { action: { contains: filters.search, mode: 'insensitive' } },
-        { entityType: { contains: filters.search, mode: 'insensitive' } },
-        { entityId: { contains: filters.search, mode: 'insensitive' } },
-        { users: { name: { contains: filters.search, mode: 'insensitive' } } },
-        { users: { email: { contains: filters.search, mode: 'insensitive' } } }
-      ]
-    }
+    const { buildAuditLogWhere } = await import('@/lib/services/audit-query-builder')
+    const where = await buildAuditLogWhere({
+      search: filters.search || undefined,
+      entityType: filters.entityType !== 'all' ? filters.entityType : undefined,
+      action: filters.action || undefined,
+      userId: filters.userId || undefined,
+      familyId: filters.familyId || undefined,
+      configModule: filters.configModule !== 'all' ? filters.configModule : undefined,
+      actionPreset: filters.actionPreset || undefined,
+      startDate,
+    })
 
-    // Filtro de tipo de entidad
-    if (filters.entityType && filters.entityType !== 'all') {
-      where.entityType = filters.entityType
-    }
-
-    // Filtro de acción
-    if (filters.action) {
-      where.action = { contains: filters.action, mode: 'insensitive' }
-    }
-
-    // Filtro de usuario
-    if (filters.userId) {
-      where.userId = filters.userId
-    }
-
-    if (filters.familyId) {
-      where.AND = [
-        ...(where.AND ?? []),
-        {
-          OR: [
-            { details: { path: ['familyId'], equals: filters.familyId } },
-            { entityId: filters.familyId },
-          ],
-        },
-      ]
-    }
-
-    // Filtro de fecha (días)
-    if (filters.days) {
-      const daysAgo = new Date()
-      daysAgo.setDate(daysAgo.getDate() - parseInt(filters.days))
-      where.createdAt = { gte: daysAgo }
-    }
-
-    // Obtener logs con límite de seguridad
-    const limit = parseInt(filters.limit || '50000') // Máximo 50K por defecto
+    const limit = parseInt(filters.limit || '50000')
     const offset = parseInt(filters.offset || '0')
 
     console.log(`📊 Consultando base de datos - Límite: ${limit}, Offset: ${offset}`)
@@ -88,32 +50,30 @@ export async function POST(request: NextRequest) {
               id: true,
               name: true,
               email: true,
-              role: true
-            }
-          }
+              role: true,
+            },
+          },
         },
         orderBy: { createdAt: 'desc' },
         take: Math.min(limit, 100000), // Máximo absoluto 100K
-        skip: offset
+        skip: offset,
       }),
-      prisma.audit_logs.count({ where })
+      prisma.audit_logs.count({ where }),
     ])
 
     console.log(`✅ Logs obtenidos: ${logs.length} de ${total} total`)
 
     // Exportar usando el servicio
-    const result = await AuditExportService.exportAuditLogs(
-      logs,
-      filters,
-      {
-        format: format as 'csv' | 'json',
-        includeHeaders,
-        includeMetadata,
-        filename: filters.filename
-      }
-    )
+    const result = await AuditExportService.exportAuditLogs(logs, filters, {
+      format: format as 'csv' | 'json',
+      includeHeaders,
+      includeMetadata,
+      filename: filters.filename,
+    })
 
-    console.log(`✅ Exportación completada - Tamaño: ${(result.content.length / 1024).toFixed(2)}KB`)
+    console.log(
+      `✅ Exportación completada - Tamaño: ${(result.content.length / 1024).toFixed(2)}KB`
+    )
 
     // Si hay advertencias, incluirlas en la respuesta
     if (result.warnings && result.warnings.length > 0) {
@@ -128,16 +88,15 @@ export async function POST(request: NextRequest) {
         'Content-Disposition': `attachment; filename="${result.filename}"`,
         'X-Total-Records': total.toString(),
         'X-Exported-Records': logs.length.toString(),
-        'X-Warnings': result.warnings ? JSON.stringify(result.warnings) : '[]'
-      }
+        'X-Warnings': result.warnings ? JSON.stringify(result.warnings) : '[]',
+      },
     })
-
   } catch (error) {
     console.error('❌ Error en exportación de auditoría:', error)
     return NextResponse.json(
-      { 
+      {
         error: 'Error al exportar logs de auditoría',
-        details: error instanceof Error ? error.message : 'Error desconocido'
+        details: error instanceof Error ? error.message : 'Error desconocido',
       },
       { status: 500 }
     )

@@ -10,6 +10,8 @@ import {
 } from '@/lib/auth/module-config-access'
 import { z } from 'zod'
 import { DEFAULT_FAMILY_CONFIG, normalizeSectionsByMode } from '@/lib/inventory/family-config'
+import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
+import { toAuditSnapshot } from '@/lib/services/config-audit'
 
 const updateConfigSchema = z.object({
   allowedSubtypes: z.array(z.enum(['EQUIPMENT', 'MRO', 'LICENSE'])).optional(),
@@ -132,6 +134,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ fami
       return NextResponse.json({ error: 'Familia no encontrada' }, { status: 404 })
     }
 
+    const oldConfig = await prisma.inventory_family_config.findUnique({ where: { familyId } })
+
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { inventoryEnabled: _inv, sectionsByMode, ...restConfigData } = validated
 
@@ -172,6 +176,17 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ fami
     } catch {
       /* Redis no disponible */
     }
+
+    await AuditServiceComplete.log({
+      action: 'INVENTORY_FAMILY_CONFIG_UPDATED',
+      entityType: 'inventory',
+      entityId: familyId,
+      userId: session.user.id,
+      oldValues: oldConfig ? toAuditSnapshot(oldConfig as Record<string, unknown>) : {},
+      newValues: toAuditSnapshot(config as Record<string, unknown>),
+      details: { familyId, familyName: family.name },
+      request: req,
+    })
 
     return NextResponse.json({
       success: true,

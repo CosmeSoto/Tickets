@@ -6,7 +6,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Settings } from 'lucide-react'
 import type { ResolvedDetails, AuditChange } from './utils/audit-types'
 import {
   getFieldDisplayName,
@@ -14,20 +14,40 @@ import {
   getFieldLabel,
   shouldHideField,
 } from './utils/audit-formatters'
+import { getConfigModuleName } from '@/lib/services/config-audit-labels'
 
 interface AuditDetailsResolverProps {
   details: any
+  /** Acción del log; permite activar vistas especializadas (ej. backup_config_updated) */
+  action?: string
 }
 
-export function AuditDetailsResolver({ details }: AuditDetailsResolverProps) {
+export function AuditDetailsResolver({ details, action }: AuditDetailsResolverProps) {
   const [resolvedDetails, setResolvedDetails] = useState<ResolvedDetails | null>(null)
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     const resolveIds = async () => {
-      // PRIORIDAD 1: Si ya tiene cambios resueltos del servidor, usarlos directamente
-      if (details.changes && typeof details.changes === 'object') {
+      // PRIORIDAD 1: Nuevo formato de diff de configuración de backups
+      // Estructura: details.changes = { key: { label, antes, despues } }
+      if (
+        details.changes &&
+        typeof details.changes === 'object' &&
+        !Array.isArray(details.changes)
+      ) {
+        const firstEntry = Object.values(details.changes)[0] as any
+        if (firstEntry && ('antes' in firstEntry || 'despues' in firstEntry)) {
+          setResolvedDetails({ type: 'config_diff', data: details.changes })
+          return
+        }
+        // Formato antiguo: { field, old, new }
         setResolvedDetails({ type: 'changes', data: details.changes })
+        return
+      }
+
+      // Formato legado: solo lista de claves tocadas (sin valores antes/después)
+      if (Array.isArray(details.updatedSettings) && details.updatedSettings.length > 0) {
+        setResolvedDetails({ type: 'backup_config_legacy', data: details.updatedSettings })
         return
       }
 
@@ -120,7 +140,7 @@ export function AuditDetailsResolver({ details }: AuditDetailsResolverProps) {
     }
 
     void resolveIds()
-  }, [details])
+  }, [details, action])
 
   if (loading) {
     return (
@@ -133,6 +153,90 @@ export function AuditDetailsResolver({ details }: AuditDetailsResolverProps) {
 
   if (!resolvedDetails) {
     return <div className='text-sm text-muted-foreground'>Cargando detalles...</div>
+  }
+
+  // Vista especializada: diff de configuración (Antes / Después)
+  if (resolvedDetails.type === 'config_diff' || resolvedDetails.type === 'backup_config_diff') {
+    const entries = Object.entries(resolvedDetails.data) as [
+      string,
+      { label: string; antes: string; despues: string },
+    ][]
+
+    const moduleName =
+      (typeof details?.module === 'string' && details.module) ||
+      (action ? getConfigModuleName(action) : 'Configuración')
+
+    if (entries.length === 0) {
+      return (
+        <div className='flex items-center gap-2 text-sm text-muted-foreground py-2'>
+          <Settings className='h-4 w-4' />
+          La configuración se guardó sin cambios detectados.
+        </div>
+      )
+    }
+
+    return (
+      <div className='space-y-3'>
+        <div className='font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-2'>
+          <Settings className='h-4 w-4' />
+          Cambios en {moduleName} ({entries.length})
+        </div>
+        <div className='grid gap-2'>
+          {entries.map(([key, change]) => (
+            <div key={key} className='rounded-lg border border-border bg-muted/30 overflow-hidden'>
+              {/* Cabecera del campo */}
+              <div className='px-3 py-1.5 bg-muted/60 border-b border-border'>
+                <span className='text-xs font-semibold uppercase tracking-wide text-foreground/70'>
+                  {change.label}
+                </span>
+              </div>
+              {/* Antes / Después en dos columnas */}
+              <div className='grid grid-cols-2 divide-x divide-border text-sm'>
+                <div className='px-3 py-2 space-y-0.5'>
+                  <div className='text-xs font-medium text-red-500 dark:text-red-400 uppercase tracking-wide'>
+                    Antes
+                  </div>
+                  <div className='text-red-700 dark:text-red-300 font-medium'>
+                    {change.antes || '—'}
+                  </div>
+                </div>
+                <div className='px-3 py-2 space-y-0.5'>
+                  <div className='text-xs font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wide'>
+                    Después
+                  </div>
+                  <div className='text-emerald-700 dark:text-emerald-300 font-medium'>
+                    {change.despues || '—'}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  if (resolvedDetails.type === 'backup_config_legacy') {
+    const keys = resolvedDetails.data as string[]
+    return (
+      <div className='space-y-3'>
+        <div className='font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-2'>
+          <Settings className='h-4 w-4' />
+          Registro antiguo — solo nombres de campos
+        </div>
+        <p className='text-sm text-muted-foreground'>
+          Este evento se guardó antes del diff detallado. A partir de ahora verás valor anterior y
+          nuevo en cada cambio.
+        </p>
+        <ul className='text-sm list-disc list-inside space-y-1 bg-muted/40 rounded-lg p-3'>
+          {keys.map(key => (
+            <li key={key} className='font-mono text-xs'>
+              {key}
+            </li>
+          ))}
+        </ul>
+      </div>
+    )
   }
 
   // Renderizar según el tipo

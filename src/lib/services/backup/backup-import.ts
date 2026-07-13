@@ -175,5 +175,7 @@ export async function importBackupFromFile(
     module: detectedModule,
     compressed,
     encrypted,
+    engine: 'import',
+    backupKind: 'export',
   }
 }

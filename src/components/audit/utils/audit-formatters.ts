@@ -133,7 +133,12 @@ export function getActionLabel(action: string): string {
     // Backups
     backup_created: 'Respaldo Creado',
     backup_deleted: 'Respaldo Eliminado',
+    backup_imported: 'Backup Importado',
+    backup_uploaded_cloud: 'Backup Subido a Nube',
+    backup_restore_started: 'Restauración Iniciada',
     backup_restored: 'Respaldo Restaurado',
+    backup_restore_failed: 'Restauración Fallida',
+    backup_config_updated: 'Config. Backups Actualizada',
     // Usuarios
     user_created: 'Usuario Creado',
     user_updated: 'Usuario Actualizado',
@@ -164,8 +169,15 @@ export function getActionLabel(action: string): string {
     knowledge_article_published: 'Artículo Publicado',
     knowledge_article_unpublished: 'Artículo Despublicado',
     // Configuración
-    settings_updated: 'Configuración Actualizada',
+    settings_updated: 'Config. Sistema Actualizada',
     settings_viewed: 'Configuración Visualizada',
+    TICKET_FAMILY_CONFIG_UPDATED: 'Config. Tickets (Área) Actualizada',
+    PATROL_FAMILY_CONFIG_UPDATED: 'Config. Rondas (Área) Actualizada',
+    INVENTORY_FAMILY_CONFIG_UPDATED: 'Config. Inventario (Área) Actualizada',
+    inventory_settings_updated: 'Config. Inventario Global Actualizada',
+    sla_policy_created: 'Política SLA Creada',
+    sla_policy_updated: 'Política SLA Actualizada',
+    sla_policy_deleted: 'Política SLA Eliminada',
     // Autenticación
     login: 'Inicio de Sesión',
     logout: 'Cierre de Sesión',
@@ -527,6 +539,8 @@ export function getFieldLabel(key: string): string {
     generatedPatrols: 'Patrullas Generadas',
     completionPct: 'Completitud',
     missedCount: 'Checkpoints Omitidos',
+    summary: 'Resumen de cambios',
+    updatedSettings: 'Campos actualizados (formato antiguo)',
     // Campos de creación en nombre de otro
     createdOnBehalf: 'Creado en nombre de otro',
     createdByRole: 'Rol del creador',
@@ -561,6 +575,7 @@ export function shouldHideField(key: string, value: any): boolean {
     return true
   // Ocultar campos internos de auditoría
   if (key === 'oldValues' || key === 'newValues' || key === 'changes') return true
+  if (key === 'totalChanges') return true
   if (key === 'userAgent') return true
   if (key === 'ip' && value === 'Unknown') return true
   return false

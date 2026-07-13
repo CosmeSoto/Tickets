@@ -555,23 +555,30 @@ export class EquipmentService {
   /**
    * Obtiene el resumen de equipos para el dashboard
    */
-  static async getEquipmentSummary(): Promise<EquipmentSummary> {
+  static async getEquipmentSummary(familyIds?: string[]): Promise<EquipmentSummary> {
     try {
+      const { buildEquipmentFamilyWhere } = await import('@/lib/inventory/scope-filter')
+      const scopeWhere = buildEquipmentFamilyWhere(familyIds)
+
       const [total, byStatus, byType, byCondition, totalValue] = await Promise.all([
-        prisma.equipment.count(),
+        prisma.equipment.count({ where: scopeWhere }),
         prisma.equipment.groupBy({
           by: ['status'],
+          where: scopeWhere,
           _count: true,
         }),
         prisma.equipment.groupBy({
           by: ['typeId'],
+          where: scopeWhere,
           _count: true,
         }),
         prisma.equipment.groupBy({
           by: ['condition'],
+          where: scopeWhere,
           _count: true,
         }),
         prisma.equipment.aggregate({
+          where: scopeWhere,
           _sum: { purchasePrice: true },
         }),
       ])

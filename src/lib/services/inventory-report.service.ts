@@ -1,5 +1,10 @@
 import prisma from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
+import {
+  buildConsumableFamilyWhere,
+  buildEquipmentFamilyWhere,
+  buildLicenseFamilyWhere,
+} from '@/lib/inventory/scope-filter'
 
 /**
  * Servicio para generación de reportes de inventario
@@ -71,10 +76,10 @@ export class InventoryReportService {
     endDate?: Date
   }) {
     try {
-      const where: any = {
+      const where: Prisma.maintenance_recordsWhereInput = {
         equipment: {
-          ...(params.familyId && { familyId: params.familyId }),
-          ...(params.modelId && { modelId: params.modelId }),
+          ...(params.modelId ? { modelId: params.modelId } : {}),
+          ...(params.familyId ? { type: { familyId: params.familyId } } : {}),
         },
       }
 
@@ -209,9 +214,12 @@ export class InventoryReportService {
     startDate?: Date
     endDate?: Date
     departmentId?: string
+    familyIds?: string[]
   }) {
     try {
-      const where: any = {}
+      const where: Prisma.equipmentWhereInput = {
+        ...buildEquipmentFamilyWhere(filters?.familyIds),
+      }
 
       if (filters?.startDate || filters?.endDate) {
         where.createdAt = {}
@@ -292,9 +300,14 @@ export class InventoryReportService {
     userId?: string
     equipmentId?: string
     isActive?: boolean
+    familyIds?: string[]
   }) {
     try {
-      const where: any = {}
+      const where: Prisma.equipment_assignmentsWhereInput = {}
+
+      if (filters?.familyIds) {
+        where.equipment = buildEquipmentFamilyWhere(filters.familyIds)
+      }
 
       if (filters?.startDate || filters?.endDate) {
         where.startDate = {}
@@ -367,14 +380,16 @@ export class InventoryReportService {
   /**
    * Reporte de actas pendientes y expiradas
    */
-  static async getPendingActsReport() {
+  static async getPendingActsReport(familyIds?: string[]) {
     try {
       const now = new Date()
+      const equipmentScope = familyIds ? buildEquipmentFamilyWhere(familyIds) : {}
 
       const [deliveryActs, returnActs] = await Promise.all([
         prisma.delivery_acts.findMany({
           where: {
             status: { in: ['PENDING', 'EXPIRED'] },
+            ...(familyIds ? { assignment: { equipment: equipmentScope } } : {}),
           },
           include: {
             assignment: {
@@ -391,6 +406,7 @@ export class InventoryReportService {
         prisma.return_acts.findMany({
           where: {
             status: { in: ['PENDING', 'EXPIRED'] },
+            ...(familyIds ? { assignment: { equipment: equipmentScope } } : {}),
           },
           include: {
             assignment: {
@@ -442,9 +458,14 @@ export class InventoryReportService {
     endDate?: Date
     equipmentId?: string
     type?: 'PREVENTIVE' | 'CORRECTIVE'
+    familyIds?: string[]
   }) {
     try {
-      const where: any = {}
+      const where: Prisma.maintenance_recordsWhereInput = {}
+
+      if (filters?.familyIds) {
+        where.equipment = buildEquipmentFamilyWhere(filters.familyIds)
+      }
 
       if (filters?.startDate || filters?.endDate) {
         where.date = {}
@@ -523,9 +544,14 @@ export class InventoryReportService {
     startDate?: Date
     endDate?: Date
     consumableId?: string
+    familyIds?: string[]
   }) {
     try {
-      const where: any = {}
+      const where: Prisma.stock_movementsWhereInput = {}
+
+      if (filters?.familyIds) {
+        where.consumable = buildConsumableFamilyWhere(filters.familyIds)
+      }
 
       if (filters?.startDate || filters?.endDate) {
         where.createdAt = {}
@@ -590,14 +616,16 @@ export class InventoryReportService {
   /**
    * Reporte de licencias próximas a expirar
    */
-  static async getLicenseExpirationReport(days: number = 30) {
+  static async getLicenseExpirationReport(days: number = 30, familyIds?: string[]) {
     try {
       const targetDate = new Date()
       targetDate.setDate(targetDate.getDate() + days)
+      const licenseScope = buildLicenseFamilyWhere(familyIds)
 
       const [expiring, expired, byType] = await Promise.all([
         prisma.software_licenses.findMany({
           where: {
+            ...licenseScope,
             expirationDate: {
               gte: new Date(),
               lte: targetDate,
@@ -631,6 +659,7 @@ export class InventoryReportService {
         }),
         prisma.software_licenses.findMany({
           where: {
+            ...licenseScope,
             expirationDate: {
               lt: new Date(),
             },
@@ -654,6 +683,7 @@ export class InventoryReportService {
         prisma.software_licenses.groupBy({
           by: ['typeId'],
           where: {
+            ...licenseScope,
             expirationDate: {
               gte: new Date(),
               lte: targetDate,
@@ -688,8 +718,12 @@ export class InventoryReportService {
   /**
    * Reporte de valor de inventario y depreciación
    */
-  static async getInventoryValueReport() {
+  static async getInventoryValueReport(familyIds?: string[]) {
     try {
+      const equipmentScope = buildEquipmentFamilyWhere(familyIds)
+      const consumableScope = buildConsumableFamilyWhere(familyIds)
+      const licenseScope = buildLicenseFamilyWhere(familyIds)
+
       const [
         totalPurchaseValue,
         rentalMonthlyCost,
@@ -698,21 +732,36 @@ export class InventoryReportService {
         equipmentByOwnership,
       ] = await Promise.all([
         prisma.equipment.aggregate({
-          where: { ownershipType: 'FIXED_ASSET' },
+          where: { ...equipmentScope, ownershipType: 'FIXED_ASSET' },
           _sum: { purchasePrice: true },
         }),
         prisma.equipment.aggregate({
-          where: { ownershipType: 'RENTAL', status: { not: 'RETIRED' } },
+          where: {
+            ...equipmentScope,
+            ownershipType: 'RENTAL',
+            status: { not: 'RETIRED' },
+          },
           _sum: { rentalMonthlyCost: true },
         }),
         prisma.software_licenses.aggregate({
+          where: licenseScope,
           _sum: { cost: true },
         }),
-        prisma.$queryRaw<Array<{ total: number }>>`
-          SELECT SUM(current_stock * COALESCE(cost_per_unit, 0)) as total FROM consumables
-        `,
+        familyIds === undefined
+          ? prisma.$queryRaw<Array<{ total: number }>>`
+              SELECT SUM(current_stock * COALESCE(cost_per_unit, 0)) as total FROM consumables
+            `
+          : prisma.consumables
+              .findMany({
+                where: consumableScope,
+                select: { currentStock: true, costPerUnit: true },
+              })
+              .then(rows => [
+                { total: rows.reduce((s, r) => s + r.currentStock * (r.costPerUnit ?? 0), 0) },
+              ]),
         prisma.equipment.groupBy({
           by: ['ownershipType'],
+          where: equipmentScope,
           _count: true,
           _sum: { purchasePrice: true },
         }),
@@ -753,10 +802,11 @@ export class InventoryReportService {
   /**
    * Reporte consolidado de equipos rentados
    */
-  static async getRentalEquipmentReport() {
+  static async getRentalEquipmentReport(familyIds?: string[]) {
     try {
       const rentals = await prisma.equipment.findMany({
         where: {
+          ...buildEquipmentFamilyWhere(familyIds),
           ownershipType: 'RENTAL',
           status: { not: 'RETIRED' },
         },

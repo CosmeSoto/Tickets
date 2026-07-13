@@ -1050,6 +1050,7 @@ export class AssetRequestService {
         code: true,
         status: true,
         familyId: true,
+        requesterId: true,
         reviewComments: true,
       },
     })

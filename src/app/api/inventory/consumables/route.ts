@@ -10,6 +10,14 @@ import { canManageInventory, inventoryForbidden } from '@/lib/inventory-access'
 import { ZodError } from 'zod'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 import { withCache, invalidateCache, buildCacheKey } from '@/lib/api-cache'
+import { resolveInventoryListScope } from '@/lib/inventory/inventory-session'
+import prisma from '@/lib/prisma'
+import {
+  assertInventoryManageByFamily,
+  InventoryAccessError,
+  inventoryAccessToResponse,
+  toInventoryAccessUser,
+} from '@/lib/inventory/inventory-resource-access'
 
 /**
  * GET /api/inventory/consumables
@@ -33,17 +41,20 @@ export async function GET(request: NextRequest) {
     }
 
     const validatedFilters = consumableFiltersSchema.parse(filters)
-    const familyIdFilter = searchParams.get('familyId') || undefined
 
-    // Admin Normal sin familyId explícito: aplicar scope de inventario
-    if (!familyIdFilter && session.user.role === 'ADMIN' && !(session.user as any).isSuperAdmin) {
-      const { getInventorySessionContext } = await import('@/lib/inventory/inventory-session')
-      const scope = (await getInventorySessionContext(session.user)).scope
-      if (scope.familyIds && scope.familyIds.length > 0) {
-        ;(validatedFilters as any).scopeFamilyIds = scope.familyIds
-      } else if (scope.noAccess) {
-        return NextResponse.json({ items: [], total: 0, page: 1, limit: 10 })
-      }
+    const scopeResult = await resolveInventoryListScope(session.user, filters.familyId)
+    if (scopeResult.noAccess) {
+      return NextResponse.json({
+        consumables: [],
+        total: 0,
+        page: validatedFilters.page,
+        limit: validatedFilters.limit,
+      })
+    }
+    if (scopeResult.familyId) {
+      validatedFilters.familyId = scopeResult.familyId
+    } else if (scopeResult.scopeFamilyIds) {
+      validatedFilters.scopeFamilyIds = scopeResult.scopeFamilyIds
     }
 
     const cacheKey = buildCacheKey('inventory:consumables', {
@@ -84,6 +95,23 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const validatedData = createConsumableSchema.parse(body)
+
+    if (validatedData.typeId) {
+      const consumableType = await prisma.consumable_types.findUnique({
+        where: { id: validatedData.typeId },
+        select: { familyId: true },
+      })
+      try {
+        await assertInventoryManageByFamily(
+          toInventoryAccessUser(session.user),
+          consumableType?.familyId ?? null
+        )
+      } catch (err) {
+        if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+        throw err
+      }
+    }
+
     const consumable = await ConsumableService.createConsumable(
       validatedData as any,
       session.user.id

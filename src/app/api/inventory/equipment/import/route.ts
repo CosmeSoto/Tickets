@@ -67,10 +67,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: contextResult.error }, { status: 400 })
     }
 
-    const modeResult = parseMode(formData)
-    if ('error' in modeResult) {
-      return NextResponse.json({ error: modeResult.error }, { status: 400 })
+    const modeParsed = parseMode(formData)
+    if (typeof modeParsed === 'object') {
+      return NextResponse.json({ error: modeParsed.error }, { status: 400 })
     }
+    const mode = modeParsed
 
     const user = toInventoryAccessUser(
       session.user as { id: string; role: string; isSuperAdmin?: boolean }
@@ -114,7 +115,7 @@ export async function POST(request: NextRequest) {
     const { errors, parsed, skipped, total } = validateAndParseImportRows({
       rows,
       context: contextResult,
-      mode: modeResult,
+      mode: mode,
       attributes: deps.attributes,
       warehouses: deps.warehouses,
       existingBySerial: deps.existingBySerial,
@@ -144,13 +145,14 @@ export async function POST(request: NextRequest) {
       invoiceNumber: -1,
       accessories: -1,
       notes: -1,
+      attributesCombined: -1,
       attributes: {},
     })
 
     if (enrichedErrors.length > 0) {
       return NextResponse.json({
         valid: false,
-        mode: modeResult,
+        mode: mode,
         total,
         created: 0,
         updated: 0,
@@ -165,7 +167,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           valid: false,
-          mode: modeResult,
+          mode: mode,
           total,
           created: 0,
           updated: 0,
@@ -180,7 +182,7 @@ export async function POST(request: NextRequest) {
     if (dryRun) {
       return NextResponse.json({
         valid: true,
-        mode: modeResult,
+        mode: mode,
         total,
         created: parsed.filter(r => r.action === 'create').length,
         updated: parsed.filter(r => r.action === 'update').length,
@@ -195,13 +197,13 @@ export async function POST(request: NextRequest) {
       context: contextResult,
       rows: parsed,
       userId: session.user.id,
-      mode: modeResult,
+      mode: mode,
       skippedCount: skipped.length,
     })
 
     await invalidateCache(['inventory:equipment:*']).catch(() => {})
 
-    return NextResponse.json({ ...result, mode: modeResult, preview, skippedRows: skipped })
+    return NextResponse.json({ ...result, mode: mode, preview, skippedRows: skipped })
   } catch (error) {
     if (error instanceof InventoryAccessError) {
       return NextResponse.json({ error: error.message }, { status: error.statusCode })

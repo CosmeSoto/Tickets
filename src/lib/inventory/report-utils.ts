@@ -24,6 +24,9 @@ export const EQUIPMENT_STATUS_ES: Record<string, string> = {
   MAINTENANCE: 'En mantenimiento',
   DAMAGED: 'Dañado',
   RETIRED: 'Dado de baja',
+  LOST: 'Perdido',
+  FOR_SALE: 'En venta',
+  SOLD: 'Vendido',
 }
 
 /** Mapeo de estados de consumible a español */
@@ -102,9 +105,8 @@ export async function getAccessibleFamilyIds(
   isSuperAdmin = false,
   canManageInventory = false
 ): Promise<string[] | null> {
-  const { getAccessibleFamilyIds: getInventoryFamilies } = await import(
-    '@/lib/inventory/family-access'
-  )
+  const { getAccessibleFamilyIds: getInventoryFamilies } =
+    await import('@/lib/inventory/family-access')
   const ids = await getInventoryFamilies(userId, role, isSuperAdmin, canManageInventory)
   if (ids === undefined) return null
   return ids
@@ -137,9 +139,9 @@ export function toCSV(rows: Record<string, unknown>[]): string {
   const headers = Object.keys(rows[0])
   const lines = [
     headers.join(','),
-    ...rows.map((row) =>
+    ...rows.map(row =>
       headers
-        .map((h) => {
+        .map(h => {
           const val = row[h]
           if (val == null) return ''
           const str = String(val)
@@ -181,14 +183,17 @@ export async function generateReportPDF(
 
     // Encabezado
     doc.fontSize(18).font('Helvetica-Bold').text(title, { align: 'center' })
-    doc.fontSize(10).font('Helvetica').text(`Generado: ${formatDate(new Date())}`, { align: 'center' })
+    doc
+      .fontSize(10)
+      .font('Helvetica')
+      .text(`Generado: ${formatDate(new Date())}`, { align: 'center' })
     doc.moveDown()
 
     // Resumen ejecutivo
     if (summary.length > 0) {
       doc.fontSize(12).font('Helvetica-Bold').text('Resumen Ejecutivo')
       doc.moveDown(0.3)
-      summary.forEach((item) => {
+      summary.forEach(item => {
         doc
           .fontSize(10)
           .font('Helvetica-Bold')
@@ -215,7 +220,7 @@ export async function generateReportPDF(
 
       // Filas
       doc.font('Helvetica').fontSize(8)
-      rows.forEach((row) => {
+      rows.forEach(row => {
         const y = doc.y
         row.forEach((cell, i) => {
           doc.text(String(cell ?? ''), 40 + i * colWidth, y, { width: colWidth, lineBreak: false })
@@ -228,7 +233,10 @@ export async function generateReportPDF(
         }
       })
     } else {
-      doc.fontSize(10).font('Helvetica').text('No hay datos para mostrar con los filtros aplicados.')
+      doc
+        .fontSize(10)
+        .font('Helvetica')
+        .text('No hay datos para mostrar con los filtros aplicados.')
     }
 
     doc.end()

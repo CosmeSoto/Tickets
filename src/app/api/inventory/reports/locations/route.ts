@@ -42,13 +42,15 @@ export async function GET(request: NextRequest) {
       user.id,
       user.role,
       (user as any).isSuperAdmin === true,
-      isAdmin ? false : await canManageInventory(user.id, user.role)
+      user.role === 'ADMIN' ? false : await canManageInventory(user.id, user.role)
     )
 
     let familyFilter: string[] | undefined
     if (accessibleFamilyIds !== null) {
       familyFilter = familyId
-        ? accessibleFamilyIds.includes(familyId) ? [familyId] : []
+        ? accessibleFamilyIds.includes(familyId)
+          ? [familyId]
+          : []
         : accessibleFamilyIds
     } else if (familyId) {
       familyFilter = [familyId]
@@ -125,7 +127,7 @@ export async function GET(request: NextRequest) {
       {
         title: 'Con ubicación registrada',
         value: conUbicacion,
-        description: `${Math.round((conUbicacion / rows.length) * 100) || 0}% tienen ubicación física registrada`,
+        description: `${rows.length > 0 ? Math.round((conUbicacion / rows.length) * 100) : 0}% tienen ubicación física registrada`,
       },
       {
         title: 'Sin ubicación registrada',
@@ -148,17 +150,19 @@ export async function GET(request: NextRequest) {
     }
 
     if (format === 'csv') {
-      const csv = toCSV(rows.map(r => ({
-        Código: r.equipmentCode,
-        Equipo: r.equipmentName,
-        Familia: r.familia,
-        Estado: r.estado,
-        'Ubicación Física': r.ubicacionFisica,
-        Bodega: r.bodega,
-        'Usuario Asignado': r.usuarioAsignado,
-        Departamento: r.departamento,
-        'Fecha Asignación': r.fechaAsignacion,
-      })))
+      const csv = toCSV(
+        rows.map(r => ({
+          Código: r.equipmentCode,
+          Equipo: r.equipmentName,
+          Familia: r.familia,
+          Estado: r.estado,
+          'Ubicación Física': r.ubicacionFisica,
+          Bodega: r.bodega,
+          'Usuario Asignado': r.usuarioAsignado,
+          Departamento: r.departamento,
+          'Fecha Asignación': r.fechaAsignacion,
+        }))
+      )
       return new NextResponse(csv, {
         headers: {
           'Content-Type': 'text/csv; charset=utf-8',
@@ -168,12 +172,30 @@ export async function GET(request: NextRequest) {
     }
 
     if (format === 'pdf') {
-      const headers = ['Código', 'Equipo', 'Familia', 'Estado', 'Ubicación Física', 'Usuario', 'Departamento']
+      const headers = [
+        'Código',
+        'Equipo',
+        'Familia',
+        'Estado',
+        'Ubicación Física',
+        'Usuario',
+        'Departamento',
+      ]
       const pdfRows = rows.map(r => [
-        r.equipmentCode, r.equipmentName, r.familia, r.estado,
-        r.ubicacionFisica, r.usuarioAsignado, r.departamento,
+        r.equipmentCode,
+        r.equipmentName,
+        r.familia,
+        r.estado,
+        r.ubicacionFisica,
+        r.usuarioAsignado,
+        r.departamento,
       ])
-      const pdfBuffer = await generateReportPDF('¿Dónde están los equipos?', summary, headers, pdfRows)
+      const pdfBuffer = await generateReportPDF(
+        '¿Dónde están los equipos?',
+        summary,
+        headers,
+        pdfRows
+      )
       return new NextResponse(pdfBuffer, {
         headers: {
           'Content-Type': 'application/pdf',

@@ -42,7 +42,12 @@ function resolveInfrastructureKind(
 
 export async function createBackup(
   type: 'manual' | 'automatic' = 'manual',
-  options?: { mode?: BackupCreateMode; backupKind?: BackupKind }
+  options?: {
+    mode?: BackupCreateMode
+    backupKind?: BackupKind
+    userId?: string | null
+    userEmail?: string | null
+  }
 ): Promise<BackupInfo> {
   if (type !== 'manual' && type !== 'automatic') {
     throw new Error('Tipo de respaldo inválido. Debe ser "manual" o "automatic"')
@@ -52,15 +57,16 @@ export async function createBackup(
   const backupKind = options?.backupKind ?? resolveInfrastructureKind(mode, type)
 
   if (mode === 'export') {
-    return createExportBackup(type)
+    return createExportBackup(type, options)
   }
 
-  return createInfrastructureBackup(type, backupKind)
+  return createInfrastructureBackup(type, backupKind, options)
 }
 
 async function createInfrastructureBackup(
   type: 'manual' | 'automatic',
-  backupKind: BackupKind
+  backupKind: BackupKind,
+  actor?: { userId?: string | null; userEmail?: string | null }
 ): Promise<BackupInfo> {
   if (!(await isPgBackRestAvailable())) {
     throw new Error(
@@ -154,11 +160,14 @@ async function createInfrastructureBackup(
           action: 'backup_created',
           entityType: 'System',
           entityId: backupRecord.id,
+          userId: actor?.userId ?? null,
+          userEmail: actor?.userEmail ?? null,
           createdAt: new Date(),
           details: {
             engine: 'pgbackrest',
             backupKind,
             label: result.label,
+            filename: `${result.label}.pgbackrest`,
             size: result.size,
             type,
           },
@@ -201,7 +210,10 @@ async function createInfrastructureBackup(
   }
 }
 
-async function createExportBackup(type: 'manual' | 'automatic'): Promise<BackupInfo> {
+async function createExportBackup(
+  type: 'manual' | 'automatic',
+  actor?: { userId?: string | null; userEmail?: string | null }
+): Promise<BackupInfo> {
   await ensureBackupDirectory()
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
@@ -284,6 +296,29 @@ async function createExportBackup(type: 'manual' | 'automatic'): Promise<BackupI
         type,
       }).catch(() => {})
     }
+
+    await prisma.audit_logs
+      .create({
+        data: {
+          id: randomUUID(),
+          action: 'backup_created',
+          entityType: 'System',
+          entityId: backupRecord.id,
+          userId: actor?.userId ?? null,
+          userEmail: actor?.userEmail ?? null,
+          createdAt: new Date(),
+          details: {
+            engine: 'export',
+            backupKind: 'export',
+            filename: finalFilename,
+            size: finalStats.size,
+            type,
+            encrypted,
+            format: 'pg_dump_custom',
+          },
+        },
+      })
+      .catch(() => {})
 
     return {
       id: backupRecord.id,

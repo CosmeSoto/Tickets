@@ -15,6 +15,11 @@ import {
   getRoleLabel,
   formatRelativeTime,
 } from './utils/audit-formatters'
+import {
+  getConfigModuleName,
+  getConfigAuditSummary,
+  isConfigAuditAction,
+} from '@/lib/services/config-audit-labels'
 
 export function getAuditColumns(onViewDetails: (log: AuditLog) => void) {
   return [
@@ -315,6 +320,40 @@ export function getAuditColumns(onViewDetails: (log: AuditLog) => void) {
           } else if (action.includes('missed')) {
             mainDescription = 'Omitió una patrulla'
             icon = '⚠️'
+          }
+        } else if (isConfigAuditAction(action)) {
+          icon = '⚙️'
+          mainDescription = `Actualizó configuración de ${getConfigModuleName(action).toLowerCase()}`
+          if (details?.familyName) {
+            subDescription = String(details.familyName)
+          } else if (details?.policyName) {
+            subDescription = String(details.policyName)
+          }
+          const summary = getConfigAuditSummary(details)
+          if (summary) {
+            subDescription = subDescription ? `${subDescription} · ${summary}` : summary
+          }
+        } else if (action.startsWith('backup_')) {
+          icon = '💾'
+          if (action === 'backup_created') {
+            mainDescription =
+              details?.engine === 'export' ? 'Creó export .dump' : 'Creó respaldo pgBackRest'
+            subDescription = details?.filename || details?.label || ''
+          } else if (action === 'backup_restored') {
+            mainDescription = 'Restauró un respaldo'
+            subDescription = details?.filename || details?.label || ''
+          } else if (action === 'backup_restore_started') {
+            mainDescription = 'Inició restauración'
+            subDescription = details?.filename || details?.label || ''
+          } else if (action === 'backup_restore_failed') {
+            mainDescription = 'Falló una restauración'
+            subDescription = details?.message || details?.error || ''
+          } else if (action === 'backup_imported') {
+            mainDescription = 'Importó un backup'
+            subDescription = details?.filename || ''
+          } else if (action === 'backup_deleted') {
+            mainDescription = 'Eliminó un backup'
+            subDescription = details?.filename || ''
           }
         } else if (action.includes('login')) {
           icon = '🔐'

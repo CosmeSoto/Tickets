@@ -16,13 +16,19 @@ import {
 } from '@/components/ui/select'
 import type { AuditFilters } from './utils/audit-types'
 import type { Family } from '@/components/reports/utils/report-types'
+import { AUDIT_CONFIG_MODULE_OPTIONS } from '@/lib/services/config-audit-filters'
+import { AUDIT_QUICK_PRESETS } from '@/components/audit/utils/audit-filter-presets'
 
 interface AuditFiltersProps {
   filters: AuditFilters
   families: Family[]
   hasActiveFilters: boolean
+  activePresetId?: string | null
   loading: boolean
   onFilterChange: (key: keyof AuditFilters, value: string) => void
+  onApplyPreset: (
+    presetId: import('@/lib/services/config-audit-filters').AuditQuickPresetId
+  ) => void
   onClearFilters: () => void
   onExportCSV: () => void
   onExportJSON: () => void | Promise<void>
@@ -33,8 +39,10 @@ export function AuditFiltersComponent({
   filters,
   families,
   hasActiveFilters,
+  activePresetId,
   loading,
   onFilterChange,
+  onApplyPreset,
   onClearFilters,
   onExportCSV,
   onExportJSON,
@@ -52,8 +60,28 @@ export function AuditFiltersComponent({
           exportación.
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4'>
+      <CardContent className='space-y-4'>
+        {/* Accesos rápidos */}
+        <div className='space-y-2'>
+          <label className='text-sm font-medium text-muted-foreground'>Accesos rápidos</label>
+          <div className='flex flex-wrap gap-2'>
+            {AUDIT_QUICK_PRESETS.map(preset => (
+              <Button
+                key={preset.id}
+                type='button'
+                variant={activePresetId === preset.id ? 'default' : 'outline'}
+                size='sm'
+                className='h-8 text-xs'
+                title={preset.description}
+                onClick={() => onApplyPreset(preset.id)}
+              >
+                {preset.label}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4'>
           {/* Búsqueda */}
           <div className='space-y-2'>
             <label className='text-sm font-medium'>Búsqueda</label>
@@ -88,6 +116,30 @@ export function AuditFiltersComponent({
                 <SelectItem value='system'>⚙️ Sistema</SelectItem>
                 <SelectItem value='report'>📊 Reportes</SelectItem>
                 <SelectItem value='settings'>🛠️ Configuración</SelectItem>
+                <SelectItem value='inventory'>📦 Inventario</SelectItem>
+                <SelectItem value='patrol'>🚶 Rondas</SelectItem>
+                <SelectItem value='backup'>💾 Backups</SelectItem>
+                <SelectItem value='sla'>⏱️ SLA</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Configuración por módulo */}
+          <div className='space-y-2'>
+            <label className='text-sm font-medium'>Config. por módulo</label>
+            <Select
+              value={filters.configModule || 'all'}
+              onValueChange={value => onFilterChange('configModule', value)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {AUDIT_CONFIG_MODULE_OPTIONS.map(opt => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -207,6 +259,10 @@ export function AuditFiltersComponent({
               <strong>Filtros activos:</strong>
               {filters.search && ` Búsqueda: "${filters.search}"`}
               {filters.entityType !== 'all' && ` | Módulo: ${filters.entityType}`}
+              {filters.configModule !== 'all' &&
+                ` | Config: ${AUDIT_CONFIG_MODULE_OPTIONS.find(o => o.value === filters.configModule)?.label ?? filters.configModule}`}
+              {filters.actionPreset &&
+                ` | Preset: ${filters.actionPreset === 'critical' ? 'Críticas' : filters.actionPreset === 'security' ? 'Seguridad' : filters.actionPreset}`}
               {filters.action && ` | Acción: "${filters.action}"`}
               {filters.familyId && ` | Familia filtrada`}
               {filters.days !== '30' && ` | Período: ${filters.days} días`}

@@ -26,7 +26,7 @@ export async function restoreBackup(
   backupId: string,
   restoreModules?: string[],
   mode: RestoreMode = 'replace',
-  options?: { pitrTarget?: string }
+  options?: { pitrTarget?: string; userId?: string | null; userEmail?: string | null }
 ): Promise<RestoreResult> {
   try {
     const backup = await prisma.backups.findUnique({ where: { id: backupId } })
@@ -56,10 +56,13 @@ export async function restoreBackup(
           action: 'backup_restore_started',
           entityType: 'System',
           entityId: backupId,
+          userId: options?.userId ?? null,
+          userEmail: options?.userEmail ?? null,
           createdAt: new Date(),
           details: {
             engine: 'pgbackrest',
             label: label ?? null,
+            filename: backup.filename,
             pitrTarget: options?.pitrTarget ?? null,
             mode: 'full',
             async: true,
@@ -81,6 +84,26 @@ export async function restoreBackup(
     } catch (error) {
       console.warn('[RESTORE] No se pudo verificar integridad:', error)
     }
+
+    await prisma.audit_logs.create({
+      data: {
+        id: randomUUID(),
+        action: 'backup_restore_started',
+        entityType: 'System',
+        entityId: backupId,
+        userId: options?.userId ?? null,
+        userEmail: options?.userEmail ?? null,
+        createdAt: new Date(),
+        details: {
+          engine: inferEngineFromRecord(backup),
+          filename: backup.filename,
+          label: backup.label ?? null,
+          mode,
+          restoreModules: restoreModules?.join(', ') || 'full',
+          async: false,
+        },
+      },
+    })
 
     let workingFilepath = backup.filepath
     let decryptedTempPath: string | null = null
@@ -168,15 +191,20 @@ export async function restoreBackup(
         id: randomUUID(),
         action: 'backup_restored',
         entityType: 'System',
-        entityId: 'backup',
+        entityId: backup.id,
+        userId: options?.userId ?? null,
+        userEmail: options?.userEmail ?? null,
         createdAt: new Date(),
         details: {
+          engine: inferEngineFromRecord(backup),
           backupId: backup.id,
           filename: backup.filename,
+          label: backup.label ?? null,
           method: format,
           mode,
           restoreModules: restoreModules?.join(', ') || 'full',
           restoredAt: new Date(),
+          async: false,
         },
       },
     })

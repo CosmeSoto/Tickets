@@ -6,7 +6,7 @@ import { requireBackupSuperAdmin } from '../../_auth'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { errorResponse } = await requireBackupSuperAdmin()
+    const { session, errorResponse } = await requireBackupSuperAdmin()
     if (errorResponse) return errorResponse
 
     const backupId = (await params).id
@@ -45,7 +45,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       // Body vacío — restauración completa
     }
 
-    const result = await BackupService.restoreBackup(backupId, restoreModules, mode, { pitrTarget })
+    const result = await BackupService.restoreBackup(backupId, restoreModules, mode, {
+      pitrTarget,
+      userId: session?.user?.id,
+      userEmail: session?.user?.email ?? null,
+    })
 
     if (result.async) {
       return NextResponse.json(
