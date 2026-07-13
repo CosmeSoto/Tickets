@@ -107,21 +107,24 @@ interface UseSystemStatusReturn {
   lastUpdated: Date | null
 }
 
+/** En dev Docker la primera compilación de la ruta puede tardar >30s (webpack on-demand). */
+const SYSTEM_STATUS_FETCH_TIMEOUT_MS = 45_000
+
 /**
  * Hook para obtener el estado real del sistema
  * Solo disponible para administradores
- * 
+ *
  * @example
  * ```tsx
  * function SystemStatusPanel() {
  *   const { systemStatus, isLoading, error, refetch } = useSystemStatus()
- *   
+ *
  *   if (isLoading) return <Loading />
  *   if (error) return <Error onRetry={refetch} />
- *   
+ *
  *   return (
  *     <div>
- *       <StatusCard 
+ *       <StatusCard
  *         title="Base de Datos"
  *         status={systemStatus.database.status}
  *         details={systemStatus.database}
@@ -143,13 +146,13 @@ export function useSystemStatus(): UseSystemStatusReturn {
 
     try {
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 10000) // 10s timeout
+      const timeoutId = setTimeout(() => controller.abort(), SYSTEM_STATUS_FETCH_TIMEOUT_MS)
 
       const response = await fetch('/api/system/status', {
         signal: controller.signal,
         headers: {
-          'Cache-Control': 'no-cache' // Siempre obtener datos frescos
-        }
+          'Cache-Control': 'no-cache', // Siempre obtener datos frescos
+        },
       })
 
       clearTimeout(timeoutId)
@@ -178,10 +181,10 @@ export function useSystemStatus(): UseSystemStatusReturn {
 
   useEffect(() => {
     loadSystemStatus()
-    
+
     // Auto-refresh cada 2 minutos para datos del sistema
     const interval = setInterval(loadSystemStatus, 2 * 60 * 1000)
-    
+
     return () => clearInterval(interval)
   }, [loadSystemStatus])
 
@@ -190,7 +193,7 @@ export function useSystemStatus(): UseSystemStatusReturn {
     isLoading,
     error,
     refetch: loadSystemStatus,
-    lastUpdated
+    lastUpdated,
   }
 }
 
@@ -199,21 +202,21 @@ export function useSystemStatus(): UseSystemStatusReturn {
  */
 export function useSystemHealth() {
   const { systemStatus, isLoading, error } = useSystemStatus()
-  
+
   const getOverallHealth = useCallback(() => {
     if (!systemStatus) return 'unknown'
-    
+
     const statuses = [
       systemStatus.database.status,
       systemStatus.cache.status,
       systemStatus.email.status,
-      systemStatus.server.status
+      systemStatus.server.status,
     ]
-    
+
     if (statuses.some(status => status === 'error')) return 'error'
     if (statuses.some(status => status === 'maintenance')) return 'maintenance'
     if (statuses.every(status => status === 'active' || status === 'running')) return 'healthy'
-    
+
     return 'warning'
   }, [systemStatus])
 
@@ -221,6 +224,6 @@ export function useSystemHealth() {
     health: getOverallHealth(),
     isLoading,
     error,
-    systemStatus
+    systemStatus,
   }
 }

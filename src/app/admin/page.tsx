@@ -89,16 +89,11 @@ export default function AdminDashboard() {
     direction: 'desc',
   })
 
-  const {
-    systemStatus,
-    isLoading: systemLoading,
-    error: systemError,
-    refetch: refetchSystem,
-  } = useSystemStatus()
+  const { systemStatus, error: systemError, refetch: refetchSystem } = useSystemStatus()
 
-  // Combinar estados de carga
-  const isLoading = dashboardLoading || systemLoading
-  const error = dashboardError || systemError
+  // El estado del sistema es secundario: no bloquea el dashboard principal
+  const isLoading = dashboardLoading
+  const error = dashboardError
 
   // Función de refresh combinada
   const handleRefresh = () => {
@@ -132,7 +127,7 @@ export default function AdminDashboard() {
       }}
     >
       {/* Error adicional de sistema */}
-      {systemError && !dashboardError && (
+      {systemError && (
         <Alert variant='destructive' className='mb-6'>
           <AlertTriangle className='h-4 w-4' />
           <AlertDescription className='flex items-center justify-between'>
@@ -747,6 +742,15 @@ export default function AdminDashboard() {
                     </p>
                   )}
                 </div>
+              </div>
+            ) : systemError ? (
+              <div className='text-center py-8'>
+                <AlertTriangle className='h-8 w-8 mx-auto mb-2 text-destructive opacity-80' />
+                <p className='text-sm text-muted-foreground mb-3'>{systemError}</p>
+                <Button variant='outline' size='sm' onClick={refetchSystem}>
+                  <RefreshCw className='h-4 w-4 mr-2' />
+                  Reintentar
+                </Button>
               </div>
             ) : (
               <div className='text-center py-8'>
