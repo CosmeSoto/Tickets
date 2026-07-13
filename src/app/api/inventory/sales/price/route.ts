@@ -6,6 +6,12 @@ import {
   getInventorySessionContext,
   hasInventoryModuleAccess,
 } from '@/lib/inventory/inventory-session'
+import {
+  assertEquipmentIdsManage,
+  InventoryAccessError,
+  inventoryAccessToResponse,
+  toInventoryAccessUser,
+} from '@/lib/inventory/inventory-resource-access'
 
 /**
  * PATCH /api/inventory/sales/price
@@ -36,6 +42,13 @@ export async function PATCH(request: NextRequest) {
 
     if (!newPrice || newPrice <= 0) {
       return NextResponse.json({ error: 'El precio debe ser mayor a 0' }, { status: 400 })
+    }
+
+    try {
+      await assertEquipmentIdsManage(toInventoryAccessUser(session.user), equipmentIds)
+    } catch (err) {
+      if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+      throw err
     }
 
     const result = await SalesManagerService.updateSalePrice({

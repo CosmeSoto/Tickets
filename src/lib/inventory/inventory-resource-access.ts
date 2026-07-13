@@ -282,3 +282,35 @@ export async function assertContractAccess(
 export function inventoryAccessToResponse(err: InventoryAccessError) {
   return NextResponse.json({ error: err.message }, { status: err.statusCode })
 }
+
+/** Verifica acceso de lectura al tipo de equipo (familia del typeId). */
+export async function assertEquipmentTypeRead(
+  user: InventoryAccessUser,
+  typeId: string
+): Promise<void> {
+  const equipmentType = await prisma.equipment_types.findUnique({
+    where: { id: typeId },
+    select: { familyId: true },
+  })
+  if (!equipmentType) {
+    throw new InventoryAccessError('Tipo de equipo no encontrado', 404)
+  }
+  await assertInventoryReadByFamily(user, equipmentType.familyId)
+}
+
+/** Verifica permiso de gestión para una lista de equipos. */
+export async function assertEquipmentIdsManage(
+  user: InventoryAccessUser,
+  equipmentIds: string[]
+): Promise<void> {
+  const equipment = await prisma.equipment.findMany({
+    where: { id: { in: equipmentIds } },
+    select: { id: true, type: { select: { familyId: true } } },
+  })
+  if (equipment.length !== equipmentIds.length) {
+    throw new InventoryAccessError('Algunos equipos no fueron encontrados', 404)
+  }
+  for (const eq of equipment) {
+    await assertInventoryManageByFamily(user, eq.type?.familyId ?? null)
+  }
+}

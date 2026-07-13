@@ -19,8 +19,8 @@ EXPOSE 3000
 # Entrypoint de desarrollo:
 #   1. db push  — sincroniza el schema sin historial de migraciones (dev only)
 #   2. db:seed  — datos iniciales idempotentes (upsert)
-#   3. next dev — servidor con hot-reload + Turbopack
+#   3. next dev — webpack en Docker (Turbopack + PostCSS suele hacer timeout en contenedor)
 CMD ["sh", "-c", \
   "npx prisma db push --accept-data-loss && \
    npm run db:seed && \
-   npm run dev"]
+   npm run dev:docker"]

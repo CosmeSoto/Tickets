@@ -581,6 +581,10 @@ export function EquipmentAssetForm({
       toast.error('Selecciona la bodega de almacenamiento')
       return
     }
+    if (equipmentStatus === 'ASSIGNED' && !assignedUserId) {
+      toast.error('Selecciona el usuario al que se asignará el equipo')
+      return
+    }
     if (
       isRequired('CONTRACT') &&
       isVisible('CONTRACT') &&

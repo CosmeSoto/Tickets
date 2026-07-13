@@ -6,6 +6,12 @@ import {
   getInventorySessionContext,
   hasInventoryModuleAccess,
 } from '@/lib/inventory/inventory-session'
+import {
+  assertInventoryResourceManage,
+  InventoryAccessError,
+  inventoryAccessToResponse,
+  toInventoryAccessUser,
+} from '@/lib/inventory/inventory-resource-access'
 
 /**
  * POST /api/inventory/sales/batch/[id]/activate
@@ -33,6 +39,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // Validaciones
     if (!salePrice || salePrice <= 0) {
       return NextResponse.json({ error: 'El precio de venta debe ser mayor a 0' }, { status: 400 })
+    }
+
+    try {
+      await assertInventoryResourceManage(toInventoryAccessUser(session.user), 'BATCH', id)
+    } catch (err) {
+      if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+      throw err
     }
 
     const result = await SalesManagerService.activateBatchForSale({

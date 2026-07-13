@@ -57,8 +57,7 @@ export function ApproveRejectDialog({
 
   const isApprove = action === 'APPROVED'
   const isValid = validateReviewerComment(comment)
-  const needsEquipmentSelection =
-    isApprove && quantity > 1 && assetType === 'EQUIPMENT' && assetTypeId
+  const needsEquipmentSelection = isApprove && assetType === 'EQUIPMENT' && assetTypeId
 
   // Reset state when dialog opens/closes
   useEffect(() => {

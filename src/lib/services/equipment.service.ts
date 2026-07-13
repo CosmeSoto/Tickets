@@ -121,6 +121,9 @@ export class EquipmentService {
             include: {
               receiver: { select: { id: true, name: true, email: true } },
               deliverer: { select: { id: true, name: true, email: true } },
+              deliveryAct: {
+                select: { id: true, status: true, folio: true, expirationDate: true },
+              },
             },
             orderBy: { createdAt: 'desc' },
           },

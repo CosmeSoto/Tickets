@@ -42,6 +42,7 @@ export interface AssignmentFilters {
   isActive?: boolean
   startDate?: Date
   endDate?: Date
+  scopeFamilyIds?: string[]
 }
 
 // Assignment list response

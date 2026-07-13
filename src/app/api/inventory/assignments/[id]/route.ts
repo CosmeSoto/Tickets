@@ -11,6 +11,7 @@ import {
 } from '@/lib/inventory/inventory-resource-access'
 import { hasAccessToEquipment } from '@/lib/middleware/family-filter'
 import { UserRole } from '@prisma/client'
+import { prisma } from '@/lib/prisma'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -39,6 +40,33 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
       throw err
     }
+
+    const assignmentRecord = await prisma.equipment_assignments.findUnique({
+      where: { id },
+      include: { deliveryAct: { select: { id: true, status: true } } },
+    })
+    if (!assignmentRecord) {
+      return NextResponse.json({ error: 'Asignación no encontrada' }, { status: 404 })
+    }
+    if (assignmentRecord.deliveryAct) {
+      if (assignmentRecord.deliveryAct.status !== 'ACCEPTED') {
+        return NextResponse.json(
+          {
+            error:
+              'El acta de entrega aún no está aceptada. Espera la firma antes de registrar la devolución.',
+          },
+          { status: 422 }
+        )
+      }
+      return NextResponse.json(
+        {
+          error:
+            'Esta asignación requiere acta de devolución. Usa el flujo formal de devolución desde el detalle del equipo.',
+        },
+        { status: 422 }
+      )
+    }
+
     const body = await request.json()
     const { returnDate, observations, condition } = body
 

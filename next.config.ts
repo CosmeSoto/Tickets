@@ -4,9 +4,9 @@ const nextConfig: NextConfig = {
   // Excluir paquetes server-only del bundling del client
   serverExternalPackages: ['pdfkit', 'fontkit', 'ioredis'],
 
-  // Performance optimizations
+  // Performance optimizations (optimizeCss solo en producción — rompe Turbopack/PostCSS en dev Docker)
   experimental: {
-    optimizeCss: true,
+    ...(process.env.NODE_ENV === 'production' ? { optimizeCss: true } : {}),
     optimizePackageImports: ['lucide-react', '@radix-ui/react-icons', 'recharts', 'date-fns'],
   },
 

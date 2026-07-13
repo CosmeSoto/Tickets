@@ -5,9 +5,11 @@ import { AssignmentService } from '@/lib/services/assignment.service'
 import { DeliveryActService } from '@/lib/services/delivery-act.service'
 import { InventoryDepartmentService } from '@/lib/services/inventory-department.service'
 import { createAssignmentSchema } from '@/lib/validations/inventory/assignment'
+import type { AssignmentFilters } from '@/types/inventory/assignment'
 import { ZodError } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { canManageAsset } from '@/lib/inventory-access'
+import { getInventorySessionContext } from '@/lib/inventory/inventory-session'
 
 /**
  * POST /api/inventory/assignments
@@ -76,39 +78,47 @@ export async function POST(request: NextRequest) {
     }
 
     // Crear asignación
-    const assignment = await AssignmentService.createAssignment(validatedData, session.user.id)
+    let assignment
+    try {
+      assignment = await AssignmentService.createAssignment(validatedData, session.user.id)
 
-    // Generar acta de entrega si la familia lo requiere
-    let deliveryAct = null
-    let acceptanceUrl: string | null = null
+      // Generar acta de entrega si la familia lo requiere
+      let deliveryAct = null
+      let acceptanceUrl: string | null = null
 
-    const equipment = await prisma.equipment.findUnique({
-      where: { id: validatedData.equipmentId },
-      select: { typeId: true },
-    })
-    const familyConfig = equipment?.typeId
-      ? await prisma.inventory_family_config.findFirst({
-          where: { family: { equipmentTypes: { some: { id: equipment.typeId } } } },
-          select: { requireDeliveryAct: true },
-        })
-      : null
+      const equipment = await prisma.equipment.findUnique({
+        where: { id: validatedData.equipmentId },
+        select: { typeId: true },
+      })
+      const familyConfig = equipment?.typeId
+        ? await prisma.inventory_family_config.findFirst({
+            where: { family: { equipmentTypes: { some: { id: equipment.typeId } } } },
+            select: { requireDeliveryAct: true },
+          })
+        : null
 
-    if (familyConfig?.requireDeliveryAct !== false) {
-      deliveryAct = await DeliveryActService.generateDeliveryAct(assignment.id)
-      const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
-      acceptanceUrl = `${baseUrl}/acts/${deliveryAct.id}/accept?token=${deliveryAct.acceptanceToken}`
+      if (familyConfig?.requireDeliveryAct !== false) {
+        deliveryAct = await DeliveryActService.generateDeliveryAct(assignment.id)
+        const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
+        acceptanceUrl = `${baseUrl}/acts/${deliveryAct.id}/accept?token=${deliveryAct.acceptanceToken}`
+      }
+
+      return NextResponse.json(
+        {
+          assignment,
+          deliveryAct,
+          acceptanceUrl,
+        },
+        { status: 201 }
+      )
+    } catch (actError) {
+      if (assignment) {
+        await AssignmentService.rollbackAssignment(assignment.id).catch(err =>
+          console.error('[assignments] Error en rollback:', err)
+        )
+      }
+      throw actError
     }
-
-    // Auditoría ya se registra en AssignmentService.createAssignment
-
-    return NextResponse.json(
-      {
-        assignment,
-        deliveryAct,
-        acceptanceUrl,
-      },
-      { status: 201 }
-    )
   } catch (error) {
     console.error('Error en POST /api/inventory/assignments:', error)
 
@@ -137,7 +147,7 @@ export async function GET(request: NextRequest) {
     }
 
     const searchParams = request.nextUrl.searchParams
-    const filters = {
+    const filters: AssignmentFilters = {
       equipmentId: searchParams.get('equipmentId') || undefined,
       receiverId: searchParams.get('receiverId') || undefined,
       delivererId: searchParams.get('delivererId') || undefined,
@@ -152,7 +162,21 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '10')
 
-    const result = await AssignmentService.listAssignments(filters, page, limit)
+    const ctx = await getInventorySessionContext(session.user)
+    const scopedFilters = { ...filters }
+
+    if (session.user.role === 'CLIENT') {
+      scopedFilters.receiverId = session.user.id
+    } else if (!ctx.user.isSuperAdmin) {
+      if (ctx.scope.noAccess) {
+        return NextResponse.json({ assignments: [], total: 0, page, limit })
+      }
+      if (ctx.scope.familyIds) {
+        scopedFilters.scopeFamilyIds = ctx.scope.familyIds
+      }
+    }
+
+    const result = await AssignmentService.listAssignments(scopedFilters, page, limit)
 
     return NextResponse.json(result)
   } catch (error) {

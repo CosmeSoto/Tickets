@@ -3,8 +3,6 @@
  *
  * Consulta la cantidad de equipos disponibles de un tipo específico
  * Usado para validación de disponibilidad en solicitudes de activos
- *
- * Optimización: Caché Redis con TTL 30s para reducir carga en DB
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -12,12 +10,16 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { withCache, buildCacheKey } from '@/lib/api-cache'
+import { getInventorySessionContext } from '@/lib/inventory/inventory-session'
+import {
+  assertEquipmentTypeRead,
+  InventoryAccessError,
+  inventoryAccessToResponse,
+  toInventoryAccessUser,
+} from '@/lib/inventory/inventory-resource-access'
 
 /**
  * GET /api/inventory/equipment/stock/available?typeId={typeId}
- *
- * Retorna la cantidad de equipos disponibles de un tipo específico
- * Implementa caché para consultas frecuentes durante creación de solicitudes
  */
 export async function GET(request: NextRequest) {
   try {
@@ -27,12 +29,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    // Verificar que el usuario tenga acceso al inventario
-    if (!session.user.inventoryEnabled) {
-      return NextResponse.json(
-        { error: 'No tienes acceso al módulo de inventario' },
-        { status: 403 }
-      )
+    const ctx = await getInventorySessionContext(session.user)
+    if (ctx.scope.noAccess) {
+      return NextResponse.json({ available: 0 })
     }
 
     const { searchParams } = new URL(request.url)
@@ -42,8 +41,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'typeId es requerido' }, { status: 400 })
     }
 
-    // Usar caché para reducir consultas repetidas
-    const cacheKey = buildCacheKey('equipment-stock-available', { typeId })
+    try {
+      await assertEquipmentTypeRead(toInventoryAccessUser(session.user), typeId)
+    } catch (err) {
+      if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+      throw err
+    }
+
+    const cacheKey = buildCacheKey('equipment-stock-available', {
+      uid: session.user.id,
+      typeId,
+      families: ctx.scope.familyIds?.join(',') ?? 'all',
+    })
     const { available } = await withCache(cacheKey, 30, async () => {
       const available = await prisma.equipment.count({
         where: {

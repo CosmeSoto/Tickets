@@ -205,7 +205,12 @@ export function useEquipmentDetail({
         throw new Error(error.error || 'Error al asignar equipo')
       }
 
-      toast.success('Equipo asignado exitosamente')
+      const result = await response.json()
+      if (result.acceptanceUrl) {
+        toast.success('Equipo asignado. Se generó el acta de entrega para firma del receptor.')
+      } else {
+        toast.success('Equipo asignado exitosamente')
+      }
 
       setShowAssignDialog(false)
       loadEquipmentDetail()
@@ -223,24 +228,71 @@ export function useEquipmentDetail({
       setShowReturnDialog(false)
       return
     }
+
+    const deliveryAct = (activeAssignment as { deliveryAct?: { status?: string } }).deliveryAct
+    const useFormalReturn = !!deliveryAct
+
+    if (useFormalReturn && deliveryAct?.status !== 'ACCEPTED') {
+      toast.error('El acta de entrega debe estar aceptada antes de registrar la devolución')
+      return
+    }
+
+    const conditionMap: Record<string, string> = {
+      NEW: 'EXCELLENT',
+      LIKE_NEW: 'GOOD',
+      GOOD: 'GOOD',
+      FAIR: 'FAIR',
+      POOR: 'POOR',
+      DAMAGED: 'DAMAGED',
+      EXCELLENT: 'EXCELLENT',
+    }
+    const returnCondition = returnForm.condition
+      ? conditionMap[returnForm.condition] || returnForm.condition
+      : 'GOOD'
+
     setReturning(true)
     try {
-      const response = await fetch(`/api/inventory/assignments/${activeAssignment.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          returnDate: returnForm.returnDate,
-          observations: returnForm.observations || undefined,
-          condition: returnForm.condition || undefined,
-        }),
-      })
+      const response = useFormalReturn
+        ? await fetch(`/api/inventory/assignments/${activeAssignment.id}/return`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              returnCondition,
+              inspectionNotes: returnForm.observations || undefined,
+              returnDate: returnForm.returnDate,
+            }),
+          })
+        : await fetch(`/api/inventory/assignments/${activeAssignment.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              returnDate: returnForm.returnDate,
+              observations: returnForm.observations || undefined,
+              condition: returnForm.condition || undefined,
+            }),
+          })
 
       if (!response.ok) {
         const error = await response.json()
         throw new Error(error.error || 'Error al devolver equipo')
       }
 
-      toast.success('Equipo devuelto al inventario')
+      if (useFormalReturn) {
+        toast.success(
+          'Acta de devolución generada. El receptor debe firmarla para completar la devolución.'
+        )
+      } else {
+        toast.success('Equipo devuelto al inventario')
+        setData(prev =>
+          prev
+            ? {
+                ...prev,
+                currentAssignment: undefined,
+                equipment: { ...prev.equipment, status: 'AVAILABLE' as any },
+              }
+            : prev
+        )
+      }
 
       setShowReturnDialog(false)
       setReturnForm({
@@ -248,15 +300,6 @@ export function useEquipmentDetail({
         observations: '',
         condition: '',
       })
-      setData(prev =>
-        prev
-          ? {
-              ...prev,
-              currentAssignment: undefined,
-              equipment: { ...prev.equipment, status: 'AVAILABLE' as any },
-            }
-          : prev
-      )
       await loadEquipmentDetail()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'No se pudo devolver el equipo')
@@ -354,7 +397,9 @@ export function useEquipmentDetail({
   const canManage = userRole === 'ADMIN' || userRole === 'TECHNICIAN' || data?.canManageInventory
   const canEdit = canManage && !isRetired
   const canAssign = canManage && equipment?.status === 'AVAILABLE'
-  const canReturn = canManage && isAssigned
+  const deliveryAct = (currentAssignment as { deliveryAct?: { status?: string } } | undefined)
+    ?.deliveryAct
+  const canReturn = canManage && isAssigned && (!deliveryAct || deliveryAct.status === 'ACCEPTED')
   const canMaintenance =
     canManage &&
     !isRetired &&

@@ -9,6 +9,8 @@ import { existsSync } from 'fs'
 import { getUploadDir } from '@/lib/upload-path'
 import { FolioService } from '@/lib/services/folio.service'
 import { notifyFamilyScopedAdmins } from '@/lib/api/notify'
+import { getInventorySessionContext } from '@/lib/inventory/inventory-session'
+import { buildLicenseFamilyWhere, buildEquipmentFamilyWhere } from '@/lib/inventory/scope-filter'
 
 const decommissionInclude = {
   requester: { select: { id: true, name: true, email: true } },
@@ -44,10 +46,26 @@ export async function GET(request: NextRequest) {
   const page = parseInt(sp.get('page') || '1')
   const limit = parseInt(sp.get('limit') || '20')
 
-  const where: any = {}
-  if (!isAdmin) where.requestedById = session.user.id
+  const ctx = await getInventorySessionContext(session.user)
+  const where: Record<string, unknown> = {}
   if (status) where.status = status
   if (assetType) where.assetType = assetType
+
+  if (ctx.user.isSuperAdmin) {
+    // Sin restricción
+  } else if (isAdmin || canManage) {
+    if (ctx.scope.noAccess) {
+      return NextResponse.json({ requests: [], total: 0, page, limit })
+    }
+    if (ctx.scope.familyIds?.length) {
+      where.OR = [
+        { equipment: buildEquipmentFamilyWhere(ctx.scope.familyIds) },
+        { license: buildLicenseFamilyWhere(ctx.scope.familyIds) },
+      ]
+    }
+  } else {
+    where.requestedById = session.user.id
+  }
 
   const [requests, total] = await Promise.all([
     prisma.decommission_requests.findMany({

@@ -46,19 +46,14 @@ export async function GET(request: NextRequest) {
     if (familyId) {
       where.equipment = { type: { familyId } }
     } else if (!isClient && !personalOnly) {
-      const isSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
-      const needsScope =
-        (session.user.role === 'ADMIN' && !isSuperAdmin) ||
-        session.user.role === 'TECHNICIAN' ||
-        (session.user as { canManageInventory?: boolean }).canManageInventory === true
-
-      if (needsScope) {
-        const { getInventorySessionContext } = await import('@/lib/inventory/inventory-session')
-        const scope = (await getInventorySessionContext(session.user)).scope
-        if (scope.familyIds && scope.familyIds.length > 0) {
-          where.equipment = { type: { familyId: { in: scope.familyIds } } }
-        } else if (scope.noAccess) {
+      const { getInventorySessionContext } = await import('@/lib/inventory/inventory-session')
+      const { buildEquipmentFamilyWhere } = await import('@/lib/inventory/scope-filter')
+      const ctx = await getInventorySessionContext(session.user)
+      if (!ctx.user.isSuperAdmin) {
+        if (ctx.scope.noAccess) {
           where.id = '__NONE__'
+        } else if (ctx.scope.familyIds) {
+          where.equipment = buildEquipmentFamilyWhere(ctx.scope.familyIds)
         }
       }
     }

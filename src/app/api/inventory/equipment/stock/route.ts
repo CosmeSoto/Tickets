@@ -11,6 +11,13 @@ import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { withCache, buildCacheKey } from '@/lib/api-cache'
 import type { StockInfo } from '@/types/equipment-grouping'
+import { getInventorySessionContext } from '@/lib/inventory/inventory-session'
+import {
+  assertEquipmentTypeRead,
+  InventoryAccessError,
+  inventoryAccessToResponse,
+  toInventoryAccessUser,
+} from '@/lib/inventory/inventory-resource-access'
 
 export const dynamic = 'force-dynamic'
 
@@ -52,8 +59,39 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    try {
+      await assertEquipmentTypeRead(toInventoryAccessUser(session.user), typeId)
+    } catch (err) {
+      if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+      throw err
+    }
+
+    const ctx = await getInventorySessionContext(session.user)
+    if (ctx.scope.noAccess) {
+      return NextResponse.json({
+        brand,
+        model,
+        typeId,
+        total: 0,
+        available: 0,
+        assigned: 0,
+        maintenance: 0,
+        forSale: 0,
+        sold: 0,
+        retired: 0,
+        isNewModel: true,
+        lastUpdated: new Date(),
+      } satisfies StockInfo)
+    }
+
     // 4. Generar cache key y obtener datos con caché
-    const cacheKey = buildCacheKey('inventory:equipment:stock', { brand, model, typeId })
+    const cacheKey = buildCacheKey('inventory:equipment:stock', {
+      uid: session.user.id,
+      brand,
+      model,
+      typeId,
+      families: ctx.scope.familyIds?.join(',') ?? 'all',
+    })
 
     const stockInfo = await withCache(cacheKey, 30, async () => {
       // Buscar equipos que coincidan con brand, model y typeId (catálogo o legacy)

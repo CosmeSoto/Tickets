@@ -334,8 +334,14 @@ export class SalesManagerService {
 
   // ── Obtener estadísticas de ventas ─────────────────────────────────────────
 
-  static async getSalesStats(familyId?: string): Promise<SalesStats> {
-    const typeFamilyFilter = familyId ? { type: { familyId } } : {}
+  static async getSalesStats(familyId?: string, scopeFamilyIds?: string[]): Promise<SalesStats> {
+    const typeFamilyFilter = familyId
+      ? { type: { familyId } }
+      : scopeFamilyIds?.length
+        ? { type: { familyId: { in: scopeFamilyIds } } }
+        : scopeFamilyIds && scopeFamilyIds.length === 0
+          ? { id: '__NONE__' }
+          : {}
     const whereForSale: any = { status: 'FOR_SALE', ...typeFamilyFilter }
     const whereAvailable: any = { status: 'AVAILABLE', ...typeFamilyFilter }
 

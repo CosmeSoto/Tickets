@@ -223,7 +223,10 @@ export class LicenseService {
   /**
    * Obtiene resumen de licencias
    */
-  static async getLicenseSummary(): Promise<LicenseSummary> {
+  static async getLicenseSummary(familyIds?: string[]): Promise<LicenseSummary> {
+    const { buildLicenseFamilyWhere } = await import('@/lib/inventory/scope-filter')
+    const scopeWhere = buildLicenseFamilyWhere(familyIds)
+
     const now = new Date()
     const thirtyDays = new Date()
     thirtyDays.setDate(thirtyDays.getDate() + 30)
@@ -231,24 +234,26 @@ export class LicenseService {
 
     const [total, expired, expiringSoon, expiringThisMonth, unassigned, totalCostAgg, byType] =
       await Promise.all([
-        prisma.software_licenses.count(),
-        prisma.software_licenses.count({ where: { expirationDate: { lt: now } } }),
+        prisma.software_licenses.count({ where: scopeWhere }),
+        prisma.software_licenses.count({ where: { ...scopeWhere, expirationDate: { lt: now } } }),
         prisma.software_licenses.count({
-          where: { expirationDate: { gte: now, lte: thirtyDays } },
+          where: { ...scopeWhere, expirationDate: { gte: now, lte: thirtyDays } },
         }),
         prisma.software_licenses.count({
-          where: { expirationDate: { gte: now, lte: endOfMonth } },
+          where: { ...scopeWhere, expirationDate: { gte: now, lte: endOfMonth } },
         }),
         prisma.software_licenses.count({
           where: {
+            ...scopeWhere,
             assignedToEquipment: null,
             assignedToUser: null,
             assignedToDepartment: null,
           },
         }),
-        prisma.software_licenses.aggregate({ _sum: { cost: true } }),
+        prisma.software_licenses.aggregate({ where: scopeWhere, _sum: { cost: true } }),
         prisma.software_licenses.groupBy({
           by: ['typeId'],
+          where: scopeWhere,
           _count: true,
         }),
       ])

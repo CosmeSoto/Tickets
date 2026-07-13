@@ -16,6 +16,8 @@ import { linkLicenseToBusinessContract, mapLicenseScope } from '@/lib/inventory/
 import { DeliveryActService } from '@/lib/services/delivery-act.service'
 import { ConsumableService } from '@/lib/services/consumable.service'
 import { LicenseService } from '@/lib/services/license.service'
+import { InventoryDepartmentService } from '@/lib/services/inventory-department.service'
+import { AssignmentService } from '@/lib/services/assignment.service'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type CreateAssetBody = Record<string, any>
@@ -117,6 +119,25 @@ export async function createAsset(
     if (!brandId) return { error: 'La marca es obligatoria', status: 400 }
     if (!modelId) return { error: 'El modelo es obligatorio', status: 400 }
 
+    const equipmentType = await prisma.equipment_types.findUnique({
+      where: { id: typeId },
+      select: { familyId: true },
+    })
+    if (!equipmentType) return { error: 'El tipo de equipo no existe', status: 404 }
+    if (equipmentType.familyId !== familyId) {
+      return { error: 'El tipo de equipo no pertenece al área seleccionada', status: 422 }
+    }
+
+    if (serialNumber && String(serialNumber).trim()) {
+      const duplicateSerial = await prisma.equipment.findFirst({
+        where: { serialNumber: String(serialNumber).trim() },
+        select: { id: true },
+      })
+      if (duplicateSerial) {
+        return { error: 'Ya existe un equipo con ese número de serie', status: 409 }
+      }
+    }
+
     const resolvedWarehouseId = warehouseId ?? defaultWarehouseId
     const {
       status,
@@ -142,6 +163,22 @@ export async function createAsset(
     const notes = body.notes ? String(body.notes) : undefined
     const customValues = Array.isArray(body.customValues) ? body.customValues : []
     const resolvedDepartmentId = body.departmentId ? String(body.departmentId) : undefined
+    const equipmentStatus = status ?? 'AVAILABLE'
+
+    if (equipmentStatus === 'ASSIGNED' && !assignedUserId) {
+      return {
+        error: 'Debes seleccionar un usuario cuando el estado es Asignado',
+        status: 422,
+      }
+    }
+
+    if (equipmentStatus === 'ASSIGNED' && assignedUserId) {
+      const receiver = await prisma.users.findUnique({
+        where: { id: assignedUserId },
+        select: { id: true },
+      })
+      if (!receiver) return { error: 'Usuario asignado no encontrado', status: 404 }
+    }
 
     const equipmentModel = await prisma.equipment_models.findUnique({
       where: { id: modelId },
@@ -163,7 +200,7 @@ export async function createAsset(
           modelId,
           typeId,
           departmentId: resolvedDepartmentId,
-          status: status ?? 'AVAILABLE',
+          status: equipmentStatus,
           condition: condition ?? 'NEW',
           ownershipType: acquisitionMode ?? 'FIXED_ASSET',
           acquisitionMode: acquisitionMode ?? undefined,
@@ -197,7 +234,7 @@ export async function createAsset(
         },
       })
 
-      if (status === 'ASSIGNED' && assignedUserId) {
+      if (equipmentStatus === 'ASSIGNED' && assignedUserId) {
         const receiver = await tx.users.findUnique({
           where: { id: assignedUserId },
           select: { departmentId: true },
@@ -252,6 +289,18 @@ export async function createAsset(
     }
 
     if (createdAssignmentId) {
+      const deptValidation = await InventoryDepartmentService.validateAssignmentDepartment(
+        equipmentId,
+        assignedUserId
+      )
+      if (deptValidation.valid === false) {
+        await AssignmentService.rollbackAssignment(createdAssignmentId)
+        return {
+          error: `El receptor pertenece al departamento '${deptValidation.receiverDeptName}' pero el equipo pertenece al departamento '${deptValidation.requiredDeptName}'`,
+          status: 422,
+        }
+      }
+
       const familyConfig = await prisma.inventory_family_config.findFirst({
         where: { family: { equipmentTypes: { some: { id: typeId } } } },
         select: { requireDeliveryAct: true },
@@ -260,7 +309,13 @@ export async function createAsset(
         try {
           await DeliveryActService.generateDeliveryAct(createdAssignmentId)
         } catch (err) {
+          await AssignmentService.rollbackAssignment(createdAssignmentId)
           console.error('[createAsset] Error generando acta de entrega:', err)
+          return {
+            error:
+              'El equipo se creó pero falló la generación del acta de entrega. Operación revertida.',
+            status: 500,
+          }
         }
       }
     }

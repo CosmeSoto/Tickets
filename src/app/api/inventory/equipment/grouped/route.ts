@@ -13,6 +13,8 @@ import type { Prisma } from '@prisma/client'
 import { canManageInventory } from '@/lib/inventory-access'
 import { withCache, buildCacheKey } from '@/lib/api-cache'
 import type { GroupedInventoryRow, EquipmentSummary } from '@/types/equipment-grouping'
+import { resolveInventoryListScope } from '@/lib/inventory/inventory-session'
+import { buildEquipmentFamilyWhere } from '@/lib/inventory/scope-filter'
 
 export const dynamic = 'force-dynamic'
 
@@ -60,10 +62,23 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1', 10)
     const limit = parseInt(searchParams.get('limit') || '20', 10)
 
+    const scopeResult = await resolveInventoryListScope(session.user, familyId)
+    if (scopeResult.noAccess) {
+      return NextResponse.json({
+        groups: [],
+        pagination: { page, limit, total: 0, totalPages: 0 },
+      })
+    }
+
+    const effectiveFamilyId = scopeResult.familyId
+    const scopeFamilyIds = scopeResult.scopeFamilyIds
+
     // 4. Generar cache key
     const cacheKey = buildCacheKey('inventory:equipment:grouped', {
+      uid: session.user.id,
       search: search || 'all',
-      familyId: familyId || 'all',
+      familyId: effectiveFamilyId || 'all',
+      scope: scopeFamilyIds?.join(',') ?? 'all',
       typeId: typeId || 'all',
       page,
       limit,
@@ -73,7 +88,11 @@ export async function GET(request: NextRequest) {
     const response = await withCache(cacheKey, 30, async () => {
       const andParts: Prisma.equipmentWhereInput[] = []
       if (typeId) andParts.push({ typeId })
-      if (familyId) andParts.push({ type: { familyId } })
+      if (effectiveFamilyId) {
+        andParts.push({ type: { familyId: effectiveFamilyId } })
+      } else if (scopeFamilyIds) {
+        andParts.push(buildEquipmentFamilyWhere(scopeFamilyIds))
+      }
       if (search) {
         andParts.push({
           OR: [

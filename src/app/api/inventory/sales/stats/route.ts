@@ -29,7 +29,18 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const familyId = searchParams.get('familyId') || undefined
 
-    const stats = await SalesManagerService.getSalesStats(familyId)
+    const scopeFamilyIds = ctx.user.isSuperAdmin ? undefined : ctx.scope.familyIds
+    if (!familyId && ctx.scope.noAccess) {
+      return NextResponse.json({
+        totalForSale: 0,
+        totalAvailable: 0,
+        totalValue: 0,
+        byFamily: [],
+        byModel: [],
+      })
+    }
+
+    const stats = await SalesManagerService.getSalesStats(familyId, scopeFamilyIds)
 
     return NextResponse.json(stats, { status: 200 })
   } catch (error) {

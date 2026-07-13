@@ -904,11 +904,19 @@ export class AssetRequestService {
         code: true,
         status: true,
         typeId: true,
+        type: { select: { familyId: true } },
       },
     })
 
     if (equipment.length !== equipmentIds.length) {
       throw new Error('Uno o más equipos no existen')
+    }
+
+    const wrongFamilyEquipment = equipment.filter(eq => eq.type?.familyId !== request.familyId)
+    if (wrongFamilyEquipment.length > 0) {
+      throw new Error(
+        `El equipo ${wrongFamilyEquipment[0].code} no pertenece al área de la solicitud`
+      )
     }
 
     // Verificar que todos estén disponibles
@@ -978,6 +986,40 @@ export class AssetRequestService {
       return assignments
     })
 
+    const requester = await prisma.users.findUnique({
+      where: { id: request.requesterId },
+      select: { departmentId: true },
+    })
+
+    if (requester?.departmentId) {
+      await prisma.equipment.updateMany({
+        where: { id: { in: equipmentIds } },
+        data: { departmentId: requester.departmentId },
+      })
+    }
+
+    const familyConfig = await prisma.inventory_family_config.findUnique({
+      where: { familyId: request.familyId },
+      select: { requireDeliveryAct: true },
+    })
+
+    if (familyConfig?.requireDeliveryAct !== false) {
+      const { DeliveryActService } = await import('./delivery-act.service')
+      for (const assignment of result) {
+        await DeliveryActService.generateDeliveryAct(assignment.id)
+      }
+    }
+
+    await prisma.asset_requests.update({
+      where: { id: requestId },
+      data: {
+        status: 'FULFILLED',
+        fulfilledById: userId,
+        fulfilledAt: new Date(),
+        updatedAt: new Date(),
+      },
+    })
+
     // 7. Registrar en audit_logs
     await AuditServiceComplete.log({
       action: 'asset_request_approved_with_equipment',
@@ -986,7 +1028,7 @@ export class AssetRequestService {
       userId,
       ipAddress,
       oldValues: { status: request.status },
-      newValues: { status: 'APPROVED' },
+      newValues: { status: 'FULFILLED' },
       details: {
         code: request.code,
         familyId: request.familyId,

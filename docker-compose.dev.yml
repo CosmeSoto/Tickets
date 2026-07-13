@@ -114,8 +114,7 @@ services:
       BACKUP_WORKER_SECRET: ${BACKUP_WORKER_SECRET:-dev-backup-worker-secret}
       PGBACKREST_STANZA: main
       BACKUP_ALLOW_RESTORE: ${BACKUP_ALLOW_RESTORE:-true}
-      # Turbopack — hot-reload más rápido
-      TURBOPACK: 1
+      # Webpack en dev (ver dev:docker) — Turbopack + PostCSS hace timeout en Docker
     volumes:
       # Código fuente montado — cualquier cambio se refleja al instante
       - .:/app

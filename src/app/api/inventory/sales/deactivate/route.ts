@@ -6,6 +6,12 @@ import {
   getInventorySessionContext,
   hasInventoryModuleAccess,
 } from '@/lib/inventory/inventory-session'
+import {
+  assertEquipmentIdsManage,
+  InventoryAccessError,
+  inventoryAccessToResponse,
+  toInventoryAccessUser,
+} from '@/lib/inventory/inventory-resource-access'
 
 /**
  * POST /api/inventory/sales/deactivate
@@ -39,6 +45,13 @@ export async function POST(request: NextRequest) {
         { error: 'Debe proporcionar una razón (mínimo 5 caracteres)' },
         { status: 400 }
       )
+    }
+
+    try {
+      await assertEquipmentIdsManage(toInventoryAccessUser(session.user), equipmentIds)
+    } catch (err) {
+      if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+      throw err
     }
 
     const result = await SalesManagerService.deactivateFromSale({

@@ -5,6 +5,12 @@ import { ReturnActService } from '@/lib/services/return-act.service'
 import { canManageInventory } from '@/lib/inventory-access'
 import prisma from '@/lib/prisma'
 import { notifyUser } from '@/lib/api/notify'
+import {
+  assertInventoryResourceManage,
+  InventoryAccessError,
+  inventoryAccessToResponse,
+  toInventoryAccessUser,
+} from '@/lib/inventory/inventory-resource-access'
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -33,18 +39,28 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     const { id: assignmentId } = await params
+
+    try {
+      await assertInventoryResourceManage(
+        toInventoryAccessUser(session.user),
+        'ASSIGNMENT',
+        assignmentId
+      )
+    } catch (err) {
+      if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+      throw err
+    }
+
     const body = await request.json()
 
-    const {
-      returnCondition,
-      inspectionNotes,
-      missingAccessories,
-      damageDescription,
-      returnDate,
-    } = body
+    const { returnCondition, inspectionNotes, missingAccessories, damageDescription, returnDate } =
+      body
 
     if (!returnCondition) {
-      return NextResponse.json({ error: 'La condición de devolución es requerida' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'La condición de devolución es requerida' },
+        { status: 400 }
+      )
     }
 
     const validConditions = ['EXCELLENT', 'GOOD', 'FAIR', 'POOR', 'DAMAGED']
@@ -52,7 +68,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Condición de devolución inválida' }, { status: 400 })
     }
 
-    if ((returnCondition === 'DAMAGED' || returnCondition === 'POOR') && !damageDescription?.trim()) {
+    if (
+      (returnCondition === 'DAMAGED' || returnCondition === 'POOR') &&
+      !damageDescription?.trim()
+    ) {
       return NextResponse.json(
         { error: 'La descripción de daños es requerida cuando la condición es Malo o Dañado' },
         { status: 400 }
@@ -79,7 +98,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     if (!assignment.deliveryAct || assignment.deliveryAct.status !== 'ACCEPTED') {
       return NextResponse.json(
-        { error: 'La asignación no tiene un acta de entrega aceptada. No se puede registrar la devolución.' },
+        {
+          error:
+            'La asignación no tiene un acta de entrega aceptada. No se puede registrar la devolución.',
+        },
         { status: 422 }
       )
     }

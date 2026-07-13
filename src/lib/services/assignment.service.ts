@@ -1,11 +1,11 @@
 import { Prisma } from '@prisma/client'
 import { randomUUID } from 'crypto'
-import type { 
-  Assignment, 
-  AssignmentFormData, 
+import type {
+  Assignment,
+  AssignmentFormData,
   AssignmentFilters,
   AssignmentListResponse,
-  AssignmentDetailResponse
+  AssignmentDetailResponse,
 } from '@/types/inventory/assignment'
 
 import { db as prisma } from '@/lib/server'
@@ -25,7 +25,7 @@ export class AssignmentService {
     try {
       // Verificar que el equipo existe y está disponible
       const equipment = await prisma.equipment.findUnique({
-        where: { id: data.equipmentId }
+        where: { id: data.equipmentId },
       })
 
       if (!equipment) {
@@ -33,15 +33,17 @@ export class AssignmentService {
       }
 
       if (equipment.status !== 'AVAILABLE') {
-        throw new Error(`El equipo no está disponible para asignación (estado actual: ${equipment.status})`)
+        throw new Error(
+          `El equipo no está disponible para asignación (estado actual: ${equipment.status})`
+        )
       }
 
       // Verificar que no haya asignación activa
       const activeAssignment = await prisma.equipment_assignments.findFirst({
         where: {
           equipmentId: data.equipmentId,
-          isActive: true
-        }
+          isActive: true,
+        },
       })
 
       if (activeAssignment) {
@@ -50,7 +52,7 @@ export class AssignmentService {
 
       // Verificar que el receptor existe
       const receiver = await prisma.users.findUnique({
-        where: { id: data.receiverId }
+        where: { id: data.receiverId },
       })
 
       if (!receiver) {
@@ -65,7 +67,7 @@ export class AssignmentService {
       const requireDeliveryAct = familyConfig?.requireDeliveryAct ?? true
 
       // Crear asignación en transacción
-      const assignment = await prisma.$transaction(async (tx) => {
+      const assignment = await prisma.$transaction(async tx => {
         // Crear asignación
         const newAssignment = await tx.equipment_assignments.create({
           data: {
@@ -83,7 +85,7 @@ export class AssignmentService {
             equipment: true,
             receiver: true,
             deliverer: true,
-          }
+          },
         })
 
         // Actualizar estado del equipo a ASSIGNED y sincronizar departmentId
@@ -93,7 +95,7 @@ export class AssignmentService {
             status: 'ASSIGNED',
             // Desnormalizar el departamento del receptor para filtros rápidos
             departmentId: (receiver as any).departmentId ?? null,
-          }
+          },
         })
 
         // Registrar en auditoría con información de requireDeliveryAct
@@ -110,8 +112,8 @@ export class AssignmentService {
               receiverName: receiver.name,
               assignmentType: data.assignmentType,
               deliveryActSkipped: !requireDeliveryAct,
-            }
-          }
+            },
+          },
         })
 
         return newAssignment
@@ -122,6 +124,27 @@ export class AssignmentService {
       console.error('Error creando asignación:', error)
       throw error
     }
+  }
+
+  /**
+   * Revierte una asignación recién creada (equipo vuelve a AVAILABLE).
+   * Usado cuando falla la generación del acta de entrega u otra validación posterior.
+   */
+  static async rollbackAssignment(assignmentId: string): Promise<void> {
+    await prisma.$transaction(async tx => {
+      const assignment = await tx.equipment_assignments.findUnique({
+        where: { id: assignmentId },
+        select: { equipmentId: true },
+      })
+      if (!assignment) return
+
+      await tx.delivery_acts.deleteMany({ where: { assignmentId } })
+      await tx.equipment_assignments.delete({ where: { id: assignmentId } })
+      await tx.equipment.update({
+        where: { id: assignment.equipmentId },
+        data: { status: 'AVAILABLE', departmentId: null },
+      })
+    })
   }
 
   /**
@@ -137,7 +160,7 @@ export class AssignmentService {
           deliverer: true,
           deliveryAct: true,
           returnAct: true,
-        }
+        },
       })
 
       return assignment as Assignment | null
@@ -214,6 +237,12 @@ export class AssignmentService {
         where.endDate = { lte: filters.endDate }
       }
 
+      if (filters.scopeFamilyIds?.length) {
+        where.equipment = { type: { familyId: { in: filters.scopeFamilyIds } } }
+      } else if (filters.scopeFamilyIds && filters.scopeFamilyIds.length === 0) {
+        where.id = '__NONE__'
+      }
+
       // Obtener total y asignaciones
       const [total, assignments] = await Promise.all([
         prisma.equipment_assignments.count({ where }),
@@ -226,15 +255,15 @@ export class AssignmentService {
             receiver: true,
             deliverer: true,
           },
-          orderBy: { createdAt: 'desc' }
-        })
+          orderBy: { createdAt: 'desc' },
+        }),
       ])
 
       return {
         assignments: assignments as Assignment[],
         total,
         page,
-        limit
+        limit,
       }
     } catch (error) {
       console.error('Error listando asignaciones:', error)
@@ -253,7 +282,7 @@ export class AssignmentService {
     try {
       const assignment = await prisma.equipment_assignments.findUnique({
         where: { id },
-        include: { equipment: true }
+        include: { equipment: true },
       })
 
       if (!assignment) {
@@ -265,7 +294,7 @@ export class AssignmentService {
       }
 
       // Completar asignación en transacción
-      const updated = await prisma.$transaction(async (tx) => {
+      const updated = await prisma.$transaction(async tx => {
         // Actualizar asignación
         const updatedAssignment = await tx.equipment_assignments.update({
           where: { id },
@@ -277,7 +306,7 @@ export class AssignmentService {
             equipment: true,
             receiver: true,
             deliverer: true,
-          }
+          },
         })
 
         // Registrar en auditoría
@@ -292,8 +321,8 @@ export class AssignmentService {
               assignmentId: id,
               receiverId: assignment.receiverId,
               actualEndDate: actualEndDate.toISOString(),
-            }
-          }
+            },
+          },
         })
 
         return updatedAssignment
@@ -319,7 +348,7 @@ export class AssignmentService {
     try {
       const assignment = await prisma.equipment_assignments.findUnique({
         where: { id: assignmentId },
-        include: { equipment: true, receiver: true }
+        include: { equipment: true, receiver: true },
       })
 
       if (!assignment) {
@@ -330,7 +359,7 @@ export class AssignmentService {
         throw new Error('La asignación ya está completada')
       }
 
-      const updated = await prisma.$transaction(async (tx) => {
+      const updated = await prisma.$transaction(async tx => {
         // Cerrar asignación
         const updatedAssignment = await tx.equipment_assignments.update({
           where: { id: assignmentId },
@@ -339,7 +368,7 @@ export class AssignmentService {
             actualEndDate: returnDate,
             ...(observations && { observations }),
           },
-          include: { equipment: true, receiver: true, deliverer: true }
+          include: { equipment: true, receiver: true, deliverer: true },
         })
 
         // Restaurar estado del equipo a AVAILABLE y limpiar departmentId
@@ -347,9 +376,9 @@ export class AssignmentService {
           where: { id: assignment.equipmentId },
           data: {
             status: 'AVAILABLE',
-            departmentId: null,  // Limpiar departamento al devolver
+            departmentId: null, // Limpiar departamento al devolver
             ...(condition && { condition: condition as any }),
-          }
+          },
         })
 
         // Registrar en auditoría
@@ -367,8 +396,8 @@ export class AssignmentService {
               actualEndDate: returnDate.toISOString(),
               observations: observations || null,
               condition: condition || null,
-            }
-          }
+            },
+          },
         })
 
         return updatedAssignment
@@ -384,15 +413,11 @@ export class AssignmentService {
   /**
    * Cancela una asignación (cuando se rechaza el acta)
    */
-  static async cancelAssignment(
-    id: string,
-    reason: string,
-    userId: string
-  ): Promise<void> {
+  static async cancelAssignment(id: string, reason: string, userId: string): Promise<void> {
     try {
       const assignment = await prisma.equipment_assignments.findUnique({
         where: { id },
-        include: { equipment: true }
+        include: { equipment: true },
       })
 
       if (!assignment) {
@@ -400,20 +425,20 @@ export class AssignmentService {
       }
 
       // Cancelar asignación en transacción
-      await prisma.$transaction(async (tx) => {
+      await prisma.$transaction(async tx => {
         // Marcar asignación como inactiva
         await tx.equipment_assignments.update({
           where: { id },
           data: {
             isActive: false,
             actualEndDate: new Date(),
-          }
+          },
         })
 
         // Restaurar estado del equipo a AVAILABLE y limpiar departmentId
         await (tx.equipment.update as any)({
           where: { id: assignment.equipmentId },
-          data: { status: 'AVAILABLE', departmentId: null }
+          data: { status: 'AVAILABLE', departmentId: null },
         })
 
         // Registrar en auditoría
@@ -427,8 +452,8 @@ export class AssignmentService {
             details: {
               equipmentId: assignment.equipmentId,
               reason,
-            }
-          }
+            },
+          },
         })
       })
     } catch (error) {
@@ -450,7 +475,7 @@ export class AssignmentService {
           deliveryAct: true,
           returnAct: true,
         },
-        orderBy: { createdAt: 'desc' }
+        orderBy: { createdAt: 'desc' },
       })
 
       return assignments as Assignment[]
@@ -468,14 +493,14 @@ export class AssignmentService {
       const assignments = await prisma.equipment_assignments.findMany({
         where: {
           receiverId: userId,
-          isActive: true
+          isActive: true,
         },
         include: {
           equipment: true,
           deliverer: true,
           deliveryAct: true,
         },
-        orderBy: { createdAt: 'desc' }
+        orderBy: { createdAt: 'desc' },
       })
 
       return assignments as Assignment[]

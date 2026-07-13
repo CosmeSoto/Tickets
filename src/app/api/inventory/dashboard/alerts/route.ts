@@ -2,55 +2,58 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import { Prisma } from '@prisma/client'
 import { getInventorySessionContext } from '@/lib/inventory/inventory-session'
 import { BatchService } from '@/lib/services/batch-inventory.service'
+import {
+  buildConsumableFamilyWhere,
+  buildEquipmentFamilyWhere,
+  buildInventoryFamilyWhere,
+  buildLicenseFamilyWhere,
+} from '@/lib/inventory/scope-filter'
+
+const EMPTY_ALERTS = {
+  lowStockConsumables: 0,
+  maintenanceDue: 0,
+  expiringContracts: 0,
+  expiringRentals: 0,
+  expiringLicenses: 0,
+  pendingActs: 0,
+  pendingRequests: 0,
+  batchCriticalBatches: 0,
+  batchWarningBatches: 0,
+}
 
 /**
  * GET /api/inventory/dashboard/alerts
  * Obtiene alertas importantes del dashboard de inventario
  */
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    const user = session.user as any
-    const role = user.role
-    const canManageFromDb = (await getInventorySessionContext(session.user)).canManageInventory
+    const ctx = await getInventorySessionContext(session.user)
+    const role = session.user.role
 
-    // Construir scope de familias según rol del usuario
-    const familyScope: any = {}
-
-    if (role === 'CLIENT') {
-      if (!canManageFromDb) {
-        return NextResponse.json({
-          lowStockConsumables: 0,
-          maintenanceDue: 0,
-          expiringContracts: 0,
-          expiringRentals: 0,
-          expiringLicenses: 0,
-          pendingActs: 0,
-          pendingRequests: 0,
-          batchCriticalBatches: 0,
-          batchWarningBatches: 0,
-        })
-      }
-      if (user.familyId) {
-        familyScope.familyId = user.familyId
-      }
-    } else if (role === 'TECHNICIAN') {
-      if (user.familyId) {
-        familyScope.familyId = user.familyId
-      }
+    if (role === 'CLIENT' && !ctx.canManageInventory) {
+      return NextResponse.json(EMPTY_ALERTS)
     }
+
+    if (ctx.scope.noAccess) {
+      return NextResponse.json(EMPTY_ALERTS)
+    }
+
+    const familyIds = ctx.user.isSuperAdmin ? undefined : ctx.scope.familyIds
+    const consumableScope = buildConsumableFamilyWhere(familyIds)
+    const equipmentScope = buildEquipmentFamilyWhere(familyIds)
+    const licenseScope = buildLicenseFamilyWhere(familyIds)
+    const directFamilyScope = buildInventoryFamilyWhere(familyIds)
 
     const now = new Date()
     const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
 
-    // Obtener alertas en paralelo
     const [
       lowStockConsumables,
       maintenanceDue,
@@ -61,82 +64,61 @@ export async function GET(request: NextRequest) {
       pendingRequests,
       batchOverview,
     ] = await Promise.all([
-      // Consumibles con stock bajo - usar queryRaw para comparar campos
       (async () => {
-        if (familyScope.familyId) {
-          const result = await prisma.$queryRaw<Array<{ count: bigint }>>`
-            SELECT COUNT(*) as count
-            FROM consumables
-            WHERE family_id = ${familyScope.familyId}
-            AND current_stock <= min_stock
-          `
-          return Number(result[0]?.count || 0)
-        } else {
-          const result = await prisma.$queryRaw<Array<{ count: bigint }>>`
-            SELECT COUNT(*) as count
-            FROM consumables
-            WHERE current_stock <= min_stock
-          `
-          return Number(result[0]?.count || 0)
-        }
+        const candidates = await prisma.consumables.findMany({
+          where: consumableScope,
+          select: { currentStock: true, minStock: true },
+        })
+        return candidates.filter(c => c.currentStock <= c.minStock && c.currentStock > 0).length
       })(),
 
-      // Mantenimientos vencidos o próximos
       prisma.maintenance_records.count({
         where: {
-          ...(familyScope.familyId && { equipment: { familyId: familyScope.familyId } }),
+          equipment: equipmentScope,
           status: 'SCHEDULED',
           date: { lte: thirtyDaysFromNow },
         },
       }),
 
-      // Contratos próximos a vencer
       prisma.contracts.count({
         where: {
-          ...familyScope,
+          ...directFamilyScope,
           status: 'ACTIVE',
-          endDate: {
-            lte: thirtyDaysFromNow,
-            gte: now,
-          },
+          endDate: { lte: thirtyDaysFromNow, gte: now },
         },
       }),
 
-      // Arrendamientos próximos a vencer
       prisma.equipment.count({
         where: {
-          ...familyScope,
+          ...equipmentScope,
           ownershipType: 'RENTAL',
           status: { not: 'RETIRED' },
-          rentalEndDate: {
-            lte: thirtyDaysFromNow,
-            gte: now,
-          },
+          rentalEndDate: { lte: thirtyDaysFromNow, gte: now },
         },
       }),
 
-      // Licencias próximas a expirar
       prisma.software_licenses.count({
         where: {
-          ...familyScope,
-          expirationDate: {
-            lte: thirtyDaysFromNow,
-            gte: now,
-          },
+          ...licenseScope,
+          expirationDate: { lte: thirtyDaysFromNow, gte: now },
         },
       }),
 
-      // Actas pendientes de firma
       prisma.delivery_acts.count({
-        where: { ...familyScope, status: 'PENDING' },
+        where: {
+          ...directFamilyScope,
+          status: 'PENDING',
+        },
       }),
 
-      // Solicitudes pendientes de aprobación
       prisma.asset_requests.count({
-        where: { ...familyScope, status: 'PENDING' },
+        where: {
+          ...directFamilyScope,
+          status: 'PENDING',
+        },
       }),
 
-      role === 'ADMIN' || canManageFromDb
+      role === 'ADMIN' || ctx.canManageInventory
         ? BatchService.getUtilizationOverview().catch(() => null)
         : Promise.resolve(null),
     ])
