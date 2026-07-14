@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { useSession } from 'next-auth/react'
 import {
   Plus,
   Search,
@@ -17,6 +16,8 @@ import {
   ArrowUp,
   ArrowDown,
   History,
+  Eye,
+  Info,
 } from 'lucide-react'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { Button } from '@/components/ui/button'
@@ -49,6 +50,7 @@ import { ContractForm } from '@/components/contracts/contract-form'
 import { RenewContractDialog } from '@/components/inventory/contracts/renew-contract-dialog'
 import { ContractHistoryTimeline } from '@/components/inventory/contracts/contract-history-timeline'
 import { useTableSort } from '@/hooks/common/use-table-sort'
+import { useInventoryPermissions } from '@/hooks/use-inventory-permissions'
 import {
   CONTRACT_STATUS_LABELS,
   CONTRACT_CATEGORY_LABELS,
@@ -114,7 +116,13 @@ const STATUS_CONFIG: Record<ContractStatus, { label: string; icon: any; cls: str
 // ── Página ────────────────────────────────────────────────────────────────────
 
 export default function ContractsPage() {
-  const { data: session } = useSession()
+  const {
+    canManageContracts,
+    canViewOwnContracts,
+    isClient,
+    isSuperAdmin,
+  } = useInventoryPermissions()
+  const isClientOnly = isClient && !canManageContracts
 
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('ALL')
@@ -144,6 +152,14 @@ export default function ContractsPage() {
     loading,
     reload,
   } = useFetch<Contract>(buildUrl(), { transform: d => d.contracts ?? [] })
+
+  const {
+    data: atRiskItems,
+    reload: reloadAtRisk,
+  } = useFetch<{ id: string; name: string; risks: string[]; riskLevel: string }>(
+    '/api/inventory/contracts/at-risk',
+    { transform: d => d.items ?? [], enabled: canManageContracts }
+  )
 
   // Filtro de búsqueda en cliente
   const contracts = contractsRaw.filter(c => {
@@ -196,9 +212,17 @@ export default function ContractsPage() {
     ],
   })
 
-  const isAdmin = (session?.user as any)?.role === 'ADMIN'
-  const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
-  const canManage = isAdmin || (session?.user as any)?.canManageInventory
+  const canManage = canManageContracts
+
+  if (!canViewOwnContracts) {
+    return (
+      <ModuleLayout title='Contratos' subtitle='Sin acceso a este módulo'>
+        <p className='text-sm text-muted-foreground'>
+          Tu rol no tiene permisos para ver contratos o suscripciones.
+        </p>
+      </ModuleLayout>
+    )
+  }
 
   const {
     sortedData: sortedContracts,
@@ -234,8 +258,12 @@ export default function ContractsPage() {
 
   return (
     <ModuleLayout
-      title='Contratos'
-      subtitle='Gestión centralizada de contratos, arrendamientos y suscripciones'
+      title={isClientOnly ? 'Mis suscripciones' : 'Contratos'}
+      subtitle={
+        isClientOnly
+          ? 'Servicios y suscripciones asignados a tu cuenta. Puedes firmar actas de entrega y retiro.'
+          : 'Gestión centralizada de contratos, arrendamientos y suscripciones'
+      }
       loading={loading && contractsRaw.length === 0}
       headerActions={
         canManage ? (
@@ -252,6 +280,21 @@ export default function ContractsPage() {
       }
     >
       <div className='space-y-5'>
+        {canManage && (
+          <div className='rounded-lg border bg-muted/30 px-4 py-3 text-xs text-muted-foreground space-y-2'>
+            <div className='flex items-center gap-2 font-medium text-foreground'>
+              <Info className='h-3.5 w-3.5' />
+              Permisos por rol
+            </div>
+            <div className='grid sm:grid-cols-2 lg:grid-cols-4 gap-2'>
+              <p><strong>Super Admin / Admin:</strong> CRUD en sus familias, asignar clientes, actas, alertas.</p>
+              <p><strong>Gestor:</strong> Igual que admin en familias asignadas (canManageInventory).</p>
+              <p><strong>Cliente:</strong> Solo lectura de suscripciones asignadas; firma actas vía enlace.</p>
+              <p><strong>Técnico:</strong> Sin acceso al listado de contratos (solo actas de equipos).</p>
+            </div>
+          </div>
+        )}
+
         {/* ── Stats ─────────────────────────────────────────────────────── */}
         <div className='grid grid-cols-2 sm:grid-cols-5 gap-3'>
           {[
@@ -271,6 +314,45 @@ export default function ContractsPage() {
             </div>
           ))}
         </div>
+
+        {canManage && atRiskItems.length > 0 && (
+          <div className='rounded-lg border border-amber-200 bg-amber-50/80 dark:bg-amber-500/10 px-4 py-3'>
+            <div className='flex items-start gap-2'>
+              <AlertTriangle className='h-4 w-4 text-amber-600 shrink-0 mt-0.5' />
+              <div className='flex-1 min-w-0'>
+                <p className='text-sm font-medium text-amber-900 dark:text-amber-200'>
+                  {atRiskItems.length} suscripción{atRiskItems.length !== 1 ? 'es' : ''} en riesgo
+                </p>
+                <p className='text-xs text-amber-800/90 dark:text-amber-300/90 mt-0.5'>
+                  Sin custodio, datos de pago incompletos o sin cliente asignado. Complete facturación
+                  y asignación para evitar cobros huérfanos.
+                </p>
+                <ul className='mt-2 space-y-1 text-xs'>
+                  {atRiskItems.slice(0, 5).map(item => (
+                    <li key={item.id} className='flex flex-wrap gap-x-2'>
+                      <button
+                        type='button'
+                        className='font-medium text-amber-900 dark:text-amber-100 hover:underline'
+                        onClick={() => {
+                          const c = contractsRaw.find(x => x.id === item.id)
+                          if (c) {
+                            setEditingContract(c)
+                            setFormOpen(true)
+                          }
+                        }}
+                      >
+                        {item.name}
+                      </button>
+                      <span className='text-amber-700/80 dark:text-amber-400'>
+                        {item.risks.join(' · ')}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ── Filtros ───────────────────────────────────────────────────── */}
         <div className='flex flex-col sm:flex-row gap-2 flex-wrap'>
@@ -402,7 +484,7 @@ export default function ContractsPage() {
                     >
                       Estado {renderSortIcon('status')}
                     </th>
-                    {canManage && <th className='px-4 py-3' />}
+                    {(canManage || isClientOnly) && <th className='px-4 py-3' />}
                   </tr>
                 </thead>
                 <tbody className='divide-y'>
@@ -459,9 +541,24 @@ export default function ContractsPage() {
                             {sc.label}
                           </span>
                         </td>
-                        {canManage && (
+                        {(canManage || isClientOnly) && (
                           <td className='px-4 py-3'>
                             <div className='flex items-center gap-1 justify-end'>
+                              {isClientOnly ? (
+                                <Button
+                                  variant='ghost'
+                                  size='sm'
+                                  className='h-7 w-7 p-0'
+                                  title='Ver suscripción'
+                                  onClick={() => {
+                                    setEditingContract(c)
+                                    setFormOpen(true)
+                                  }}
+                                >
+                                  <Eye className='h-3.5 w-3.5' />
+                                </Button>
+                              ) : (
+                                <>
                               <Button
                                 variant='ghost'
                                 size='sm'
@@ -504,6 +601,8 @@ export default function ContractsPage() {
                                   <Trash2 className='h-3.5 w-3.5' />
                                 </Button>
                               )}
+                                </>
+                              )}
                             </div>
                           </td>
                         )}
@@ -529,11 +628,18 @@ export default function ContractsPage() {
       >
         <DialogContent className='max-w-3xl max-h-[90vh]'>
           <DialogHeader>
-            <DialogTitle>{editingContract ? 'Editar contrato' : 'Nuevo contrato'}</DialogTitle>
+            <DialogTitle>
+              {isClientOnly
+                ? `Ver suscripción — ${editingContract?.name ?? ''}`
+                : editingContract
+                  ? 'Editar contrato'
+                  : 'Nuevo contrato'}
+            </DialogTitle>
           </DialogHeader>
           <div className='overflow-y-auto max-h-[calc(90vh-80px)]'>
             <ContractForm
               contract={editingContract}
+              readOnly={isClientOnly}
               onSuccess={() => {
                 setFormOpen(false)
                 setEditingContract(null)

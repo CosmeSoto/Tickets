@@ -1,0 +1,1 @@
+ALTER TYPE "SubscriptionServiceType" ADD VALUE IF NOT EXISTS 'DIGITAL_ADS';

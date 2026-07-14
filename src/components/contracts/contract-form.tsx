@@ -23,10 +23,15 @@ import { useInventoryFamilies } from '@/contexts/families-context'
 import { useFetch } from '@/hooks/common/use-fetch'
 import { FileUploadZone } from '@/components/ui/file-upload-zone'
 import { ContractPaymentsPanel } from '@/components/contracts/contract-payments-panel'
+import { ContractAssignmentsPanel } from '@/components/contracts/contract-assignments-panel'
 import {
   CONTRACT_CATEGORY_LABELS,
   CONTRACT_LINE_TYPE_LABELS,
   BILLING_CYCLE_LABELS,
+  SUBSCRIPTION_USAGE_STATUS_LABELS,
+  PAYMENT_CARD_BRAND_LABELS,
+  PAYMENT_METHOD_TYPE_LABELS,
+  SUBSCRIPTION_SERVICE_TYPE_LABELS,
   type Contract,
   type ContractFormData,
 } from '@/types/contracts'
@@ -44,6 +49,7 @@ interface Props {
   contract?: Contract | null
   onSuccess: (contract: Contract) => void
   onCancel: () => void
+  readOnly?: boolean
 }
 
 const EMPTY_LINE = {
@@ -57,7 +63,7 @@ const EMPTY_LINE = {
   order: 0,
 }
 
-export function ContractForm({ contract, onSuccess, onCancel }: Props) {
+export function ContractForm({ contract, onSuccess, onCancel, readOnly = false }: Props) {
   const { toast } = useToast()
   const [submitting, setSubmitting] = useState(false)
   const isEditing = !!contract
@@ -151,6 +157,28 @@ export function ContractForm({ contract, onSuccess, onCancel }: Props) {
     [suppliers]
   )
 
+  const { data: assignableUsers } = useFetch<{
+    id: string
+    name: string
+    email: string
+    role: string
+  }>('/api/inventory/assignable-users', {
+    transform: d => d.users ?? [],
+  })
+
+  const custodianOptions = useMemo(
+    () => [
+      { value: '', label: 'Sin custodio' },
+      ...assignableUsers
+        .filter(u => u.role === 'ADMIN' || u.role === 'TECHNICIAN')
+        .map(u => ({
+          value: u.id,
+          label: `${u.name} (${u.email})`,
+        })),
+    ],
+    [assignableUsers]
+  )
+
   const categoryOptions = useMemo(
     () =>
       Object.entries(CONTRACT_CATEGORY_LABELS).map(([k, v]) => ({
@@ -173,6 +201,7 @@ export function ContractForm({ contract, onSuccess, onCancel }: Props) {
       name: contract?.name ?? '',
       description: contract?.description ?? '',
       category: contract?.category ?? 'SERVICE',
+      serviceSubtype: contract?.serviceSubtype ?? '',
       supplierId: contract?.supplierId ?? '',
       familyId: contract?.familyId ?? '',
       startDate: contract?.startDate ? contract.startDate.slice(0, 10) : '',
@@ -188,6 +217,25 @@ export function ContractForm({ contract, onSuccess, onCancel }: Props) {
       contactPhone: contract?.contactPhone ?? '',
       notes: contract?.notes ?? '',
       termsUrl: contract?.termsUrl ?? '',
+      paymentMethodType: contract?.paymentMethodType ?? 'CORPORATE_CARD',
+      paymentAccountRef: contract?.paymentAccountRef ?? '',
+      custodianUserId: contract?.custodianUserId ?? '',
+      backupCustodianUserId: contract?.backupCustodianUserId ?? '',
+      billingAccountEmail: contract?.billingAccountEmail ?? '',
+      billingPortalUrl: contract?.billingPortalUrl ?? '',
+      vendorAccountId: contract?.vendorAccountId ?? '',
+      paymentCardBrand: (contract?.paymentCardBrand as ContractFormData['paymentCardBrand']) ?? '',
+      paymentCardLast4: contract?.paymentCardLast4 ?? '',
+      paymentCardBank: contract?.paymentCardBank ?? '',
+      paymentCardExpiry: contract?.paymentCardExpiry ?? '',
+      corporateCardLabel: contract?.corporateCardLabel ?? '',
+      lastChargeDate: contract?.lastChargeDate ? contract.lastChargeDate.slice(0, 10) : '',
+      lastChargeAmount:
+        contract?.lastChargeAmount != null ? String(contract.lastChargeAmount) : '',
+      lastTransactionRef: contract?.lastTransactionRef ?? '',
+      subscriptionUsageStatus: contract?.subscriptionUsageStatus ?? 'ACTIVE',
+      cancellationNoticeDays:
+        contract?.cancellationNoticeDays != null ? String(contract.cancellationNoticeDays) : '',
       lines:
         contract?.lines?.map(l => ({
           id: l.id,
@@ -205,7 +253,30 @@ export function ContractForm({ contract, onSuccess, onCancel }: Props) {
 
   const { fields, append, remove } = useFieldArray({ control, name: 'lines' })
   const autoRenew = watch('autoRenew')
+  const selectedCategory = watch('category')
+  const familyId = watch('familyId')
+  const paymentMethodType = watch('paymentMethodType')
   const selectedSupplierId = watch('supplierId')
+
+  const { data: licenses } = useFetch<{ id: string; name: string; vendor?: string | null }>(
+    '/api/inventory/licenses',
+    {
+      params: { familyId: familyId || undefined, limit: 300 },
+      transform: d => d.licenses ?? [],
+      enabled: !!familyId,
+    }
+  )
+
+  const licenseOptions = useMemo(
+    () => [
+      { value: '', label: 'Sin licencia vinculada' },
+      ...licenses.map(l => ({
+        value: l.id,
+        label: l.vendor ? `${l.name} (${l.vendor})` : l.name,
+      })),
+    ],
+    [licenses]
+  )
   const contactName = watch('contactName')
   const contactEmail = watch('contactEmail')
   const contactPhone = watch('contactPhone')
@@ -234,6 +305,7 @@ export function ContractForm({ contract, onSuccess, onCancel }: Props) {
   }, [selectedSupplierId, suppliers, contactName, contactEmail, contactPhone, termsUrl, setValue])
 
   const onSubmit = async (data: ContractFormData) => {
+    if (readOnly) return
     setSubmitting(true)
     try {
       const payload = {
@@ -241,6 +313,17 @@ export function ContractForm({ contract, onSuccess, onCancel }: Props) {
         totalValue: data.totalValue ? parseFloat(data.totalValue) : undefined,
         monthlyCost: data.monthlyCost ? parseFloat(data.monthlyCost) : undefined,
         renewalNoticeDays: Number(data.renewalNoticeDays),
+        lastChargeAmount: data.lastChargeAmount ? parseFloat(data.lastChargeAmount) : undefined,
+        cancellationNoticeDays: data.cancellationNoticeDays
+          ? Number(data.cancellationNoticeDays)
+          : undefined,
+        serviceSubtype: data.serviceSubtype || null,
+        paymentMethodType: data.paymentMethodType,
+        paymentAccountRef: data.paymentAccountRef || null,
+        custodianUserId: data.custodianUserId || null,
+        backupCustodianUserId: data.backupCustodianUserId || null,
+        paymentCardBrand: data.paymentCardBrand || null,
+        paymentCardLast4: data.paymentCardLast4 || null,
         lines: data.lines.map((l, i) => ({
           ...l,
           quantity: parseFloat(l.quantity) || 1,
@@ -295,6 +378,7 @@ export function ContractForm({ contract, onSuccess, onCancel }: Props) {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className='space-y-6'>
+      <fieldset disabled={readOnly} className={readOnly ? 'space-y-6' : 'contents'}>
       {/* ── Datos generales ─────────────────────────────────────────────── */}
       <Card>
         <CardHeader>
@@ -332,6 +416,35 @@ export function ContractForm({ contract, onSuccess, onCancel }: Props) {
               searchPlaceholder='Buscar categoría...'
             />
           </div>
+
+          {(selectedCategory === 'SERVICE' ||
+            selectedCategory === 'SOFTWARE_LICENSE' ||
+            selectedCategory === 'SUPPORT') && (
+            <div className='space-y-1'>
+              <Label>Tipo de servicio</Label>
+              <Select
+                value={watch('serviceSubtype') || 'none'}
+                onValueChange={v =>
+                  setValue(
+                    'serviceSubtype',
+                    v === 'none' ? '' : (v as ContractFormData['serviceSubtype'])
+                  )
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder='Ej: Redes, IA, Canvas...' />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='none'>Sin especificar</SelectItem>
+                  {Object.entries(SUBSCRIPTION_SERVICE_TYPE_LABELS).map(([k, v]) => (
+                    <SelectItem key={k} value={k}>
+                      {v}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className='space-y-1'>
             <Label>Área / Familia</Label>
@@ -495,6 +608,183 @@ export function ContractForm({ contract, onSuccess, onCancel }: Props) {
         </CardContent>
       </Card>
 
+      {/* ── Facturación y responsables ──────────────────────────────────── */}
+      <Card>
+        <CardHeader>
+          <CardTitle className='text-base'>Facturación y responsables</CardTitle>
+          <p className='text-xs text-muted-foreground mt-1'>
+            Datos para cancelación, trazabilidad de cargos y custodia operativa. Evita suscripciones
+            huérfanas cuando el personal deja la empresa.
+          </p>
+        </CardHeader>
+        <CardContent className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
+          <div className='space-y-1 sm:col-span-2'>
+            <Label>Método de pago</Label>
+            <Select
+              value={paymentMethodType}
+              onValueChange={v =>
+                setValue('paymentMethodType', v as ContractFormData['paymentMethodType'])
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(PAYMENT_METHOD_TYPE_LABELS).map(([k, v]) => (
+                  <SelectItem key={k} value={k}>
+                    {v}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {(paymentMethodType === 'PAYPAL' ||
+            paymentMethodType === 'CRYPTO' ||
+            paymentMethodType === 'BANK_TRANSFER' ||
+            paymentMethodType === 'OTHER') && (
+            <div className='space-y-1 sm:col-span-2'>
+              <Label>
+                {paymentMethodType === 'CRYPTO'
+                  ? 'Dirección wallet / red'
+                  : paymentMethodType === 'PAYPAL'
+                    ? 'Email o ID PayPal'
+                    : 'Cuenta / referencia de pago'}
+              </Label>
+              <Input
+                {...register('paymentAccountRef')}
+                placeholder={
+                  paymentMethodType === 'CRYPTO'
+                    ? '0x… o dirección + red (ETH, BTC…)'
+                    : paymentMethodType === 'PAYPAL'
+                      ? 'cuenta@empresa.com'
+                      : 'N° cuenta, IBAN o alias'
+                }
+              />
+            </div>
+          )}
+
+          <div className='space-y-1'>
+            <Label>Custodio principal</Label>
+            <Combobox
+              options={custodianOptions}
+              value={watch('custodianUserId')}
+              onValueChange={v => setValue('custodianUserId', v)}
+              placeholder='Responsable del servicio...'
+            />
+          </div>
+          <div className='space-y-1'>
+            <Label>Custodio de respaldo</Label>
+            <Combobox
+              options={custodianOptions}
+              value={watch('backupCustodianUserId')}
+              onValueChange={v => setValue('backupCustodianUserId', v)}
+              placeholder='Respaldo para offboarding...'
+            />
+          </div>
+          <div className='space-y-1'>
+            <Label>Email cuenta de facturación</Label>
+            <Input
+              type='email'
+              {...register('billingAccountEmail')}
+              placeholder='portal@proveedor.com'
+            />
+          </div>
+          <div className='space-y-1'>
+            <Label>URL portal de facturación</Label>
+            <Input {...register('billingPortalUrl')} placeholder='https://billing...' />
+          </div>
+          <div className='space-y-1'>
+            <Label>ID cuenta en proveedor</Label>
+            <Input {...register('vendorAccountId')} placeholder='Opcional' />
+          </div>
+
+          {paymentMethodType === 'CORPORATE_CARD' && (
+            <>
+              <div className='space-y-1'>
+                <Label>Etiqueta tarjeta corporativa</Label>
+                <Input {...register('corporateCardLabel')} placeholder='Ej: Marketing Corp' />
+              </div>
+              <div className='space-y-1'>
+                <Label>Marca de tarjeta</Label>
+                <Select
+                  value={watch('paymentCardBrand') || 'none'}
+                  onValueChange={v =>
+                    setValue(
+                      'paymentCardBrand',
+                      v === 'none' ? '' : (v as ContractFormData['paymentCardBrand'])
+                    )
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder='Seleccionar' />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value='none'>Sin especificar</SelectItem>
+                    {Object.entries(PAYMENT_CARD_BRAND_LABELS).map(([k, v]) => (
+                      <SelectItem key={k} value={k}>
+                        {v}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className='space-y-1'>
+                <Label>Últimos 4 dígitos</Label>
+                <Input {...register('paymentCardLast4')} maxLength={4} placeholder='1234' />
+              </div>
+              <div className='space-y-1'>
+                <Label>Banco / entidad</Label>
+                <Input {...register('paymentCardBank')} placeholder='Ej: Banco Estado' />
+              </div>
+              <div className='space-y-1'>
+                <Label>Vencimiento tarjeta (MM/YYYY)</Label>
+                <Input {...register('paymentCardExpiry')} placeholder='12/2027' />
+              </div>
+            </>
+          )}
+          <div className='space-y-1'>
+            <Label>Estado de uso</Label>
+            <Select
+              value={watch('subscriptionUsageStatus')}
+              onValueChange={v => setValue('subscriptionUsageStatus', v as ContractFormData['subscriptionUsageStatus'])}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(SUBSCRIPTION_USAGE_STATUS_LABELS).map(([k, v]) => (
+                  <SelectItem key={k} value={k}>
+                    {v}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className='space-y-1'>
+            <Label>Días aviso de cancelación</Label>
+            <Input
+              type='number'
+              min='0'
+              {...register('cancellationNoticeDays')}
+              placeholder='30'
+            />
+          </div>
+          <div className='space-y-1'>
+            <Label>Último cargo (fecha)</Label>
+            <Input type='date' {...register('lastChargeDate')} />
+          </div>
+          <div className='space-y-1'>
+            <Label>Último cargo (monto)</Label>
+            <Input type='number' min='0' step='0.01' {...register('lastChargeAmount')} />
+          </div>
+          <div className='sm:col-span-2 space-y-1'>
+            <Label>Referencia última transacción</Label>
+            <Input {...register('lastTransactionRef')} placeholder='ID transacción bancaria' />
+          </div>
+        </CardContent>
+      </Card>
+
       {/* ── Líneas del contrato ─────────────────────────────────────────── */}
       <Card>
         <CardHeader>
@@ -505,6 +795,7 @@ export function ContractForm({ contract, onSuccess, onCancel }: Props) {
               variant='outline'
               size='sm'
               onClick={() => append({ ...EMPTY_LINE, order: fields.length })}
+              disabled={readOnly}
             >
               <Plus className='h-4 w-4 mr-1' /> Agregar línea
             </Button>
@@ -525,6 +816,7 @@ export function ContractForm({ contract, onSuccess, onCancel }: Props) {
                   variant='ghost'
                   size='sm'
                   onClick={() => remove(i)}
+                  disabled={readOnly}
                   className='h-7 w-7 p-0 text-destructive hover:text-destructive'
                 >
                   <Trash2 className='h-3.5 w-3.5' />
@@ -589,6 +881,23 @@ export function ContractForm({ contract, onSuccess, onCancel }: Props) {
                     placeholder='Opcional'
                   />
                 </div>
+                {watch(`lines.${i}.type`) === 'SOFTWARE' && (
+                  <div className='sm:col-span-3 space-y-1'>
+                    <Label className='text-xs'>Licencia vinculada</Label>
+                    <Combobox
+                      value={watch(`lines.${i}.licenseId`) || ''}
+                      onValueChange={v => setValue(`lines.${i}.licenseId`, v || '')}
+                      options={licenseOptions}
+                      placeholder={familyId ? 'Seleccionar licencia' : 'Asigna un área primero'}
+                      searchPlaceholder='Buscar licencia...'
+                      emptyText={familyId ? 'No hay licencias en esta área' : 'Selecciona un área'}
+                      disabled={!familyId}
+                    />
+                    <p className='text-[10px] text-muted-foreground'>
+                      Al guardar, sincroniza vigencia y costo de renovación con el contrato.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           ))}
@@ -671,15 +980,22 @@ export function ContractForm({ contract, onSuccess, onCancel }: Props) {
           )}
         </CardContent>
       </Card>
+      </fieldset>
 
       {isEditing && contract?.id && (
-        <ContractPaymentsPanel
-          contractId={contract.id}
-          hasBillingDates={!!(contract.startDate && contract.endDate)}
-        />
+        <>
+          <ContractAssignmentsPanel contract={contract} canManage={!readOnly} />
+          {!readOnly && (
+            <ContractPaymentsPanel
+              contractId={contract.id}
+              hasBillingDates={!!(contract.startDate && contract.endDate)}
+            />
+          )}
+        </>
       )}
 
       {/* ── Notas ───────────────────────────────────────────────────────── */}
+      <fieldset disabled={readOnly} className={readOnly ? 'block' : 'contents'}>
       <div className='space-y-1'>
         <Label>Notas internas</Label>
         <Textarea
@@ -688,16 +1004,19 @@ export function ContractForm({ contract, onSuccess, onCancel }: Props) {
           placeholder='Observaciones, condiciones especiales...'
         />
       </div>
+      </fieldset>
 
       {/* ── Acciones ────────────────────────────────────────────────────── */}
       <div className='flex justify-end gap-3 pt-2'>
         <Button type='button' variant='outline' onClick={onCancel} disabled={submitting}>
-          Cancelar
+          {readOnly ? 'Cerrar' : 'Cancelar'}
         </Button>
-        <Button type='submit' disabled={submitting}>
-          {submitting && <RefreshCw className='h-4 w-4 mr-2 animate-spin' />}
-          {isEditing ? 'Guardar cambios' : 'Crear contrato'}
-        </Button>
+        {!readOnly && (
+          <Button type='submit' disabled={submitting}>
+            {submitting && <RefreshCw className='h-4 w-4 mr-2 animate-spin' />}
+            {isEditing ? 'Guardar cambios' : 'Crear contrato'}
+          </Button>
+        )}
       </div>
     </form>
   )

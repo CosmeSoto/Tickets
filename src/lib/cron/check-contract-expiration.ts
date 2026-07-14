@@ -4,7 +4,10 @@ export async function checkContractExpiration() {
   console.log('[CRON] Verificando vencimiento de contratos...')
 
   try {
-    const result = await ContractAlertService.checkExpirations()
+    const expiration = await ContractAlertService.checkExpirations()
+    const governance = await ContractAlertService.checkSubscriptionGovernance()
+
+    const result = { ...expiration, subscriptionGovernance: governance }
 
     console.log('[CRON] Verificación completada:', result)
 

@@ -539,6 +539,10 @@ model users {
   incidentsAsAgent                                  patrol_incidents[]              @relation("IncidentAgent")
   incidentsAsResolver                               patrol_incidents[]              @relation("IncidentResolver")
   pushSubscriptions                                 push_subscriptions[]
+  contractsAsCustodian                            contracts[]                     @relation("ContractCustodian")
+  contractsAsBackupCustodian                        contracts[]                     @relation("ContractBackupCustodian")
+  contractAssignmentsAsClient                       contract_assignments[]          @relation("ContractAssignmentClient")
+  contractAssignmentsDelivered                      contract_assignments[]          @relation("ContractAssignmentDeliverer")
 
   @@index([departmentId])
   @@index([name, email])
@@ -1179,11 +1183,14 @@ model delivery_acts {
   referenceType      String?                @map("reference_type")
   createdAt          DateTime               @default(now()) @map("created_at")
   updatedAt          DateTime               @updatedAt @map("updated_at")
-  assignment         equipment_assignments? @relation(fields: [assignmentId], references: [id])
+  contractAssignmentId String?               @unique @map("contract_assignment_id")
+  assignment           equipment_assignments? @relation(fields: [assignmentId], references: [id])
+  contractAssignment   contract_assignments?  @relation(fields: [contractAssignmentId], references: [id])
 
   @@index([folio])
   @@index([status, expirationDate])
   @@index([acceptanceToken])
+  @@index([actType])
   @@map("delivery_acts")
 }
 
@@ -1637,6 +1644,7 @@ model families {
   ticketFamilyConfig          ticket_family_config?
   tickets                     tickets[]
   contracts                   contracts[]
+  contractAssignments         contract_assignments[]
   assetRequests               asset_requests[]
   customFields                family_custom_fields[]
   patrolFamilyConfig          patrol_family_config?
@@ -1978,6 +1986,36 @@ enum DeliveryActType {
   SERVICE_COMPLETION
   ASSET_TRANSFER
   CONTRACT_RENEWAL
+  SUBSCRIPTION_ASSIGNMENT
+}
+
+enum SubscriptionUsageStatus {
+  ACTIVE
+  UNUSED
+  PENDING_CANCEL
+  CANCELLED
+}
+
+enum PaymentMethodType {
+  CORPORATE_CARD
+  PAYPAL
+  CRYPTO
+  BANK_TRANSFER
+  PROVIDER_INVOICE
+  OTHER
+}
+
+enum SubscriptionServiceType {
+  SOCIAL_MEDIA
+  CONTENT
+  AUDIOVISUAL
+  ARTIFICIAL_INTELLIGENCE
+  EDUCATION_LMS
+  CLOUD_SERVICES
+  DESIGN
+  COMMUNICATIONS
+  DIGITAL_ADS
+  OTHER
 }
 
 enum AssetSubtype {
@@ -2064,6 +2102,7 @@ model contracts {
   name              String           @db.VarChar(200)
   description       String?
   category          ContractCategory @default(SERVICE)
+  serviceSubtype    SubscriptionServiceType? @map("service_subtype")
   status            ContractStatus   @default(DRAFT)
   supplierId        String?          @map("supplier_id")
   familyId          String?          @map("family_id")
@@ -2095,13 +2134,34 @@ model contracts {
   renewedToId   String? @map("renewed_to_id")
   renewalCount  Int     @default(0) @map("renewal_count")
 
+  // Gobernanza de suscripciones / facturación recurrente
+  custodianUserId         String?                  @map("custodian_user_id")
+  backupCustodianUserId   String?                  @map("backup_custodian_user_id")
+  billingAccountEmail     String?                  @map("billing_account_email") @db.VarChar(200)
+  billingPortalUrl        String?                  @map("billing_portal_url") @db.VarChar(500)
+  vendorAccountId         String?                  @map("vendor_account_id") @db.VarChar(200)
+  paymentMethodType       PaymentMethodType        @default(CORPORATE_CARD) @map("payment_method_type")
+  paymentAccountRef       String?                  @map("payment_account_ref") @db.VarChar(300)
+  paymentCardBrand        String?                  @map("payment_card_brand") @db.VarChar(50)
+  paymentCardLast4        String?                  @map("payment_card_last4") @db.VarChar(4)
+  paymentCardBank         String?                  @map("payment_card_bank") @db.VarChar(100)
+  paymentCardExpiry       String?                  @map("payment_card_expiry") @db.VarChar(7)
+  corporateCardLabel      String?                  @map("corporate_card_label") @db.VarChar(100)
+  lastChargeDate          DateTime?                @map("last_charge_date")
+  lastChargeAmount        Float?                   @map("last_charge_amount")
+  lastTransactionRef      String?                  @map("last_transaction_ref") @db.VarChar(200)
+  subscriptionUsageStatus SubscriptionUsageStatus  @default(ACTIVE) @map("subscription_usage_status")
+  cancellationNoticeDays  Int?                     @map("cancellation_notice_days")
+
   createdBy String   @map("created_by")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  creator      users                  @relation("ContractCreator", fields: [createdBy], references: [id])
-  supplier     suppliers?             @relation(fields: [supplierId], references: [id])
-  family       families?              @relation(fields: [familyId], references: [id])
+  creator            users                  @relation("ContractCreator", fields: [createdBy], references: [id])
+  custodian          users?                 @relation("ContractCustodian", fields: [custodianUserId], references: [id], onDelete: SetNull)
+  backupCustodian    users?                 @relation("ContractBackupCustodian", fields: [backupCustodianUserId], references: [id], onDelete: SetNull)
+  supplier           suppliers?             @relation(fields: [supplierId], references: [id])
+  family             families?              @relation(fields: [familyId], references: [id])
   model        equipment_models?      @relation("ContractModel", fields: [modelId], references: [id], onDelete: SetNull)
   batch        equipment_batches?     @relation("ContractBatch", fields: [batchId], references: [id], onDelete: SetNull)
   renewedFrom  contracts?             @relation("ContractRenewalFrom", fields: [renewedFromId], references: [id], onDelete: SetNull)
@@ -2111,10 +2171,15 @@ model contracts {
   lines        contract_lines[]
   attachments  contract_attachments[]
   payments     contract_payments[]    @relation("ContractPayments")
+  assignments  contract_assignments[]
 
   @@index([status, endDate])
   @@index([supplierId])
   @@index([familyId])
+  @@index([custodianUserId])
+  @@index([subscriptionUsageStatus])
+  @@index([paymentMethodType])
+  @@index([serviceSubtype])
   @@index([modelId])
   @@index([batchId])
   @@index([createdBy])
@@ -2188,6 +2253,12 @@ model contract_payments {
   paymentMethod   String?       @map("payment_method") @db.VarChar(100)
   referenceNumber String?       @map("reference_number") @db.VarChar(200)
   notes           String?
+  cardLast4       String?       @map("card_last4") @db.VarChar(4)
+  cardBrand       String?       @map("card_brand") @db.VarChar(50)
+  bankEntity      String?       @map("bank_entity") @db.VarChar(100)
+  statementPeriod DateTime?     @map("statement_period")
+  transactionId   String?       @map("transaction_id") @db.VarChar(200)
+  chargeSource    String?       @map("charge_source") @db.VarChar(50)
 
   // Alertas de pago próximo
   alert7DaysSent   Boolean   @default(false) @map("alert_7_days_sent")
@@ -2207,6 +2278,67 @@ model contract_payments {
   @@index([createdBy])
   @@index([dueDate])
   @@map("contract_payments")
+}
+
+model contract_assignments {
+  id            String    @id @default(uuid())
+  contractId    String    @map("contract_id")
+  clientId      String    @map("client_id")
+  delivererId   String    @map("deliverer_id")
+  familyId      String    @map("family_id")
+  startDate     DateTime  @map("start_date")
+  plannedEndDate DateTime? @map("planned_end_date")
+  actualEndDate DateTime? @map("actual_end_date")
+  isActive      Boolean   @default(true) @map("is_active")
+  changeReason  String?   @map("change_reason")
+  notes         String?
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  contract    contracts            @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  client      users                @relation("ContractAssignmentClient", fields: [clientId], references: [id])
+  deliverer   users                @relation("ContractAssignmentDeliverer", fields: [delivererId], references: [id])
+  family      families             @relation(fields: [familyId], references: [id])
+  deliveryAct delivery_acts?
+  returnAct   contract_return_acts?
+
+  @@index([contractId, isActive])
+  @@index([clientId, isActive])
+  @@index([familyId])
+  @@map("contract_assignments")
+}
+
+model contract_return_acts {
+  id                   String             @id @default(uuid())
+  folio                String             @unique
+  contractAssignmentId String             @unique @map("contract_assignment_id")
+  deliveryActId        String             @map("delivery_act_id")
+  contractSnapshot     Json               @map("contract_snapshot")
+  withdrawalReason     String?            @map("withdrawal_reason")
+  handoverNotes        String?            @map("handover_notes")
+  returnDate           DateTime           @map("return_date")
+  receiverInfo         Json               @map("receiver_info")
+  delivererInfo        Json               @map("deliverer_info")
+  status               ActStatus          @default(PENDING)
+  acceptanceToken      String             @unique @map("acceptance_token")
+  expirationDate       DateTime           @map("expiration_date")
+  acceptedAt           DateTime?          @map("accepted_at")
+  rejectedAt           DateTime?          @map("rejected_at")
+  rejectionReason      String?            @map("rejection_reason")
+  signatureTimestamp   DateTime?          @map("signature_timestamp")
+  signatureIp          String?            @map("signature_ip")
+  signatureUserAgent   String?            @map("signature_user_agent")
+  verificationHash     String?            @map("verification_hash")
+  pdfPath              String?            @map("pdf_path")
+  createdAt            DateTime           @default(now()) @map("created_at")
+  updatedAt            DateTime           @updatedAt @map("updated_at")
+
+  contractAssignment contract_assignments @relation(fields: [contractAssignmentId], references: [id])
+
+  @@index([folio])
+  @@index([status, expirationDate])
+  @@index([acceptanceToken])
+  @@map("contract_return_acts")
 }
 
 // ── Ventas de activos ─────────────────────────────────────────────────────────

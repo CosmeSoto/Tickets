@@ -43,6 +43,71 @@ export const BILLING_CYCLE_LABELS: Record<BillingCycle, string> = {
   ONE_TIME:   'Pago único',
 }
 
+export type SubscriptionUsageStatus = 'ACTIVE' | 'UNUSED' | 'PENDING_CANCEL' | 'CANCELLED'
+export type PaymentCardBrand = 'VISA' | 'MASTERCARD' | 'AMEX' | 'OTHER'
+export type PaymentMethodType =
+  | 'CORPORATE_CARD'
+  | 'PAYPAL'
+  | 'CRYPTO'
+  | 'BANK_TRANSFER'
+  | 'PROVIDER_INVOICE'
+  | 'OTHER'
+export type SubscriptionServiceType =
+  | 'SOCIAL_MEDIA'
+  | 'CONTENT'
+  | 'AUDIOVISUAL'
+  | 'ARTIFICIAL_INTELLIGENCE'
+  | 'EDUCATION_LMS'
+  | 'CLOUD_SERVICES'
+  | 'DESIGN'
+  | 'COMMUNICATIONS'
+  | 'DIGITAL_ADS'
+  | 'OTHER'
+
+export const PAYMENT_METHOD_TYPE_LABELS: Record<PaymentMethodType, string> = {
+  CORPORATE_CARD: 'Tarjeta corporativa',
+  PAYPAL: 'PayPal',
+  CRYPTO: 'Criptomonedas',
+  BANK_TRANSFER: 'Transferencia bancaria',
+  PROVIDER_INVOICE: 'Factura del proveedor',
+  OTHER: 'Otro método',
+}
+
+export const SUBSCRIPTION_SERVICE_TYPE_LABELS: Record<SubscriptionServiceType, string> = {
+  SOCIAL_MEDIA: 'Redes sociales',
+  CONTENT: 'Contenido / editorial',
+  AUDIOVISUAL: 'Servicios audiovisuales',
+  ARTIFICIAL_INTELLIGENCE: 'Inteligencia artificial',
+  EDUCATION_LMS: 'Educación / LMS (Canvas, etc.)',
+  CLOUD_SERVICES: 'Servicios en la nube',
+  DESIGN: 'Diseño y creatividad',
+  COMMUNICATIONS: 'Comunicaciones / internet',
+  DIGITAL_ADS: 'Publicidad digital / Ads',
+  OTHER: 'Otro servicio',
+}
+
+export const SUBSCRIPTION_USAGE_STATUS_LABELS: Record<SubscriptionUsageStatus, string> = {
+  ACTIVE: 'En uso',
+  UNUSED: 'Sin uso',
+  PENDING_CANCEL: 'Pendiente de cancelación',
+  CANCELLED: 'Cancelada',
+}
+
+export const PAYMENT_CARD_BRAND_LABELS: Record<PaymentCardBrand, string> = {
+  VISA: 'Visa',
+  MASTERCARD: 'Mastercard',
+  AMEX: 'American Express',
+  OTHER: 'Otra',
+}
+
+/** Categorías con gobernanza de suscripción recurrente */
+export const SUBSCRIPTION_GOVERNANCE_CATEGORIES: ContractCategory[] = [
+  'SERVICE',
+  'SOFTWARE_LICENSE',
+  'SUPPORT',
+  'MAINTENANCE',
+]
+
 export const EXPIRING_DAYS = 30 // días antes del vencimiento para alertar
 
 // ── Interfaces ────────────────────────────────────────────────────────────────
@@ -84,6 +149,7 @@ export interface Contract {
   name: string
   description?: string | null
   category: ContractCategory
+  serviceSubtype?: SubscriptionServiceType | null
   status: ContractStatus
   supplierId?: string | null
   familyId?: string | null
@@ -101,6 +167,24 @@ export interface Contract {
   notes?: string | null
   termsUrl?: string | null
   expiryAlertSentAt?: string | null
+  // Gobernanza de suscripción
+  custodianUserId?: string | null
+  backupCustodianUserId?: string | null
+  billingAccountEmail?: string | null
+  billingPortalUrl?: string | null
+  vendorAccountId?: string | null
+  paymentMethodType?: PaymentMethodType
+  paymentAccountRef?: string | null
+  paymentCardBrand?: string | null
+  paymentCardLast4?: string | null
+  paymentCardBank?: string | null
+  paymentCardExpiry?: string | null
+  corporateCardLabel?: string | null
+  lastChargeDate?: string | null
+  lastChargeAmount?: number | null
+  lastTransactionRef?: string | null
+  subscriptionUsageStatus?: SubscriptionUsageStatus
+  cancellationNoticeDays?: number | null
   createdBy: string
   createdAt: string
   updatedAt: string
@@ -108,6 +192,8 @@ export interface Contract {
   supplier?: { id: string; name: string } | null
   family?: { id: string; name: string; color?: string | null; code: string } | null
   creator?: { id: string; name: string; email: string } | null
+  custodian?: { id: string; name: string; email: string; role?: string } | null
+  backupCustodian?: { id: string; name: string; email: string; role?: string } | null
   lines?: ContractLine[]
   attachments?: ContractAttachment[]
   // Calculados
@@ -121,6 +207,7 @@ export interface ContractFormData {
   name: string
   description: string
   category: ContractCategory
+  serviceSubtype: SubscriptionServiceType | ''
   supplierId: string
   familyId: string
   startDate: string
@@ -137,6 +224,24 @@ export interface ContractFormData {
   notes: string
   termsUrl: string
   lines: ContractLineFormData[]
+  // Facturación y responsables
+  paymentMethodType: PaymentMethodType
+  paymentAccountRef: string
+  custodianUserId: string
+  backupCustodianUserId: string
+  billingAccountEmail: string
+  billingPortalUrl: string
+  vendorAccountId: string
+  paymentCardBrand: PaymentCardBrand | ''
+  paymentCardLast4: string
+  paymentCardBank: string
+  paymentCardExpiry: string
+  corporateCardLabel: string
+  lastChargeDate: string
+  lastChargeAmount: string
+  lastTransactionRef: string
+  subscriptionUsageStatus: SubscriptionUsageStatus
+  cancellationNoticeDays: string
 }
 
 export interface ContractLineFormData {

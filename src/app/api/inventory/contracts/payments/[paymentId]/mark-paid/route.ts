@@ -32,7 +32,18 @@ export async function POST(
     }
 
     const body = await request.json()
-    const { paidDate, paymentMethod, referenceNumber, notes } = body
+    const {
+      paidDate,
+      paymentMethod,
+      referenceNumber,
+      notes,
+      cardLast4,
+      cardBrand,
+      bankEntity,
+      statementPeriod,
+      transactionId,
+      chargeSource,
+    } = body
 
     if (!paidDate) {
       return NextResponse.json({ error: 'Fecha de pago requerida' }, { status: 400 })
@@ -45,6 +56,12 @@ export async function POST(
         paymentMethod,
         referenceNumber,
         notes,
+        cardLast4,
+        cardBrand,
+        bankEntity,
+        statementPeriod: statementPeriod ? new Date(statementPeriod) : undefined,
+        transactionId,
+        chargeSource,
       },
       session.user.id
     )

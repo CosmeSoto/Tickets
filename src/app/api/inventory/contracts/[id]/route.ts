@@ -3,7 +3,9 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { ContractService } from '@/lib/services/contract-service'
 import { canManageInventory, canManageAsset, inventoryForbidden } from '@/lib/inventory-access'
+import { assertContractViewAccess } from '@/lib/contracts/access'
 import { updateContractSchema } from '@/lib/validations/contracts'
+import { extractBillingPayload } from '@/lib/contracts/billing-payload'
 import { ZodError } from 'zod'
 
 // GET /api/inventory/contracts/[id]
@@ -14,14 +16,36 @@ export async function GET(_req: NextRequest, context: { params: Promise<{ id: st
   const params = await context.params
 
   const hasAccess =
-    session.user.role === 'ADMIN' || (await canManageInventory(session.user.id, session.user.role))
+    session.user.role === 'ADMIN' ||
+    session.user.role === 'CLIENT' ||
+    (await canManageInventory(session.user.id, session.user.role))
   if (!hasAccess) return inventoryForbidden()
+
+  try {
+    await assertContractViewAccess(
+      {
+        id: session.user.id,
+        role: session.user.role,
+        isSuperAdmin: (session.user as { isSuperAdmin?: boolean }).isSuperAdmin,
+      },
+      params.id
+    )
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : 'Sin permiso' },
+      { status: 403 }
+    )
+  }
 
   const contract = await ContractService.getById(params.id)
   if (!contract) return NextResponse.json({ error: 'Contrato no encontrado' }, { status: 404 })
 
   const isSuperAdmin = (session.user as any).isSuperAdmin === true
-  if (!isSuperAdmin && contract.familyId) {
+  if (
+    session.user.role !== 'CLIENT' &&
+    !isSuperAdmin &&
+    contract.familyId
+  ) {
     const allowed = await canManageAsset(
       session.user.id,
       session.user.role,
@@ -89,6 +113,7 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
     if (p.notes !== undefined) updateData.notes = p.notes ?? undefined
     if (p.termsUrl !== undefined) updateData.termsUrl = p.termsUrl || undefined
     if (raw.status !== undefined) updateData.status = raw.status
+    Object.assign(updateData, extractBillingPayload(p))
 
     await ContractService.update(params.id, updateData, session.user.id)
 

@@ -15,6 +15,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
+import { PAYMENT_METHOD_TYPE_LABELS, type PaymentMethodType } from '@/types/contracts'
 
 interface ContractPayment {
   id: string
@@ -87,6 +88,11 @@ export function ContractPaymentsPanel({ contractId, hasBillingDates }: Props) {
   const [paidDate, setPaidDate] = useState(todayISO())
   const [paymentMethod, setPaymentMethod] = useState('')
   const [referenceNumber, setReferenceNumber] = useState('')
+  const [transactionId, setTransactionId] = useState('')
+  const [cardLast4, setCardLast4] = useState('')
+  const [cardBrand, setCardBrand] = useState('')
+  const [bankEntity, setBankEntity] = useState('')
+  const [chargeSource, setChargeSource] = useState<PaymentMethodType>('CORPORATE_CARD')
   const [marking, setMarking] = useState(false)
 
   const load = useCallback(async () => {
@@ -165,6 +171,11 @@ export function ContractPaymentsPanel({ contractId, hasBillingDates }: Props) {
     setPaidDate(todayISO())
     setPaymentMethod('')
     setReferenceNumber('')
+    setTransactionId('')
+    setCardLast4('')
+    setCardBrand('')
+    setBankEntity('')
+    setChargeSource('CORPORATE_CARD')
   }
 
   const handleMarkAsPaid = async () => {
@@ -187,6 +198,11 @@ export function ContractPaymentsPanel({ contractId, hasBillingDates }: Props) {
           paidDate,
           paymentMethod: paymentMethod || undefined,
           referenceNumber: referenceNumber || undefined,
+          transactionId: transactionId || undefined,
+          cardLast4: cardLast4 || undefined,
+          cardBrand: cardBrand || undefined,
+          bankEntity: bankEntity || undefined,
+          chargeSource,
         }),
       })
       const json = await res.json().catch(() => ({}))
@@ -376,6 +392,63 @@ export function ContractPaymentsPanel({ contractId, hasBillingDates }: Props) {
                   onChange={e => setReferenceNumber(e.target.value)}
                   placeholder='Ej: TRF-20260622-001'
                 />
+              </div>
+
+              <div className='space-y-1'>
+                <Label htmlFor='transaction-id'>ID transacción bancaria</Label>
+                <Input
+                  id='transaction-id'
+                  value={transactionId}
+                  onChange={e => setTransactionId(e.target.value)}
+                  placeholder='Para kit de cancelación'
+                />
+              </div>
+
+              <div className='space-y-1'>
+                <Label htmlFor='charge-source'>Método de cobro</Label>
+                <select
+                  id='charge-source'
+                  className='flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm'
+                  value={chargeSource}
+                  onChange={e => setChargeSource(e.target.value as PaymentMethodType)}
+                >
+                  {Object.entries(PAYMENT_METHOD_TYPE_LABELS).map(([k, v]) => (
+                    <option key={k} value={k}>
+                      {v}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className='grid grid-cols-3 gap-2'>
+                <div className='space-y-1'>
+                  <Label htmlFor='card-last4'>Tarjeta ·4</Label>
+                  <Input
+                    id='card-last4'
+                    maxLength={4}
+                    value={cardLast4}
+                    onChange={e => setCardLast4(e.target.value)}
+                    placeholder='1234'
+                  />
+                </div>
+                <div className='space-y-1'>
+                  <Label htmlFor='card-brand'>Marca</Label>
+                  <Input
+                    id='card-brand'
+                    value={cardBrand}
+                    onChange={e => setCardBrand(e.target.value)}
+                    placeholder='VISA'
+                  />
+                </div>
+                <div className='space-y-1'>
+                  <Label htmlFor='bank-entity'>Banco</Label>
+                  <Input
+                    id='bank-entity'
+                    value={bankEntity}
+                    onChange={e => setBankEntity(e.target.value)}
+                    placeholder='Entidad'
+                  />
+                </div>
               </div>
             </div>
           )}

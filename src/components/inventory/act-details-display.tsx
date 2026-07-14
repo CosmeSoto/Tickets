@@ -7,6 +7,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import type { DeliveryAct } from '@/types/inventory/delivery-act'
+import {
+  PAYMENT_METHOD_TYPE_LABELS,
+  SUBSCRIPTION_SERVICE_TYPE_LABELS,
+  type PaymentMethodType,
+  type SubscriptionServiceType,
+} from '@/types/contracts'
 
 interface ActDetailsDisplayProps {
   act: DeliveryAct
@@ -49,6 +55,8 @@ const EQUIPMENT_CONDITION_LABELS: Record<string, string> = {
 export function ActDetailsDisplay({ act, showStatus = true }: ActDetailsDisplayProps) {
   const statusConfig = STATUS_CONFIG[act.status as keyof typeof STATUS_CONFIG]
   const StatusIcon = statusConfig.icon
+  const isSubscription = (act as { actType?: string }).actType === 'SUBSCRIPTION_ASSIGNMENT'
+  const snap = act.equipmentSnapshot as Record<string, unknown>
 
   const formatDate = (date: Date | string) => {
     return format(new Date(date), "d 'de' MMMM 'de' yyyy", { locale: es })
@@ -65,7 +73,9 @@ export function ActDetailsDisplay({ act, showStatus = true }: ActDetailsDisplayP
         <CardHeader>
           <div className="flex items-start justify-between">
             <div>
-              <CardTitle className="text-2xl">Acta de Entrega</CardTitle>
+              <CardTitle className="text-2xl">
+                {isSubscription ? 'Acta de entrega — Suscripción' : 'Acta de Entrega'}
+              </CardTitle>
               <CardDescription className="text-lg font-mono mt-1">
                 {act.folio}
               </CardDescription>
@@ -80,7 +90,62 @@ export function ActDetailsDisplay({ act, showStatus = true }: ActDetailsDisplayP
         </CardHeader>
       </Card>
 
-      {/* Información del Equipo */}
+      {/* Suscripción / contrato */}
+      {isSubscription ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Servicio / Suscripción
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-4 md:grid-cols-2">
+            <div>
+              <p className="text-sm text-muted-foreground">Contrato</p>
+              <p className="font-medium">{String(snap.name ?? '—')}</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Proveedor</p>
+              <p className="font-medium">{String((snap.supplier as { name?: string })?.name ?? '—')}</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Tipo de servicio</p>
+              <p className="font-medium">
+                {snap.serviceSubtype
+                  ? SUBSCRIPTION_SERVICE_TYPE_LABELS[snap.serviceSubtype as SubscriptionServiceType]
+                  : '—'}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Método de pago</p>
+              <p className="font-medium">
+                {snap.paymentMethodType
+                  ? PAYMENT_METHOD_TYPE_LABELS[snap.paymentMethodType as PaymentMethodType]
+                  : '—'}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Costo mensual</p>
+              <p className="font-medium">
+                {snap.monthlyCost != null
+                  ? `${snap.monthlyCost} ${String(snap.currency ?? '')}`
+                  : '—'}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Custodio</p>
+              <p className="font-medium">
+                {String((snap.custodian as { name?: string })?.name ?? '—')}
+              </p>
+            </div>
+            <div className="md:col-span-2">
+              <p className="text-sm text-muted-foreground">Email facturación</p>
+              <p className="font-medium">{String(snap.billingAccountEmail ?? '—')}</p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+      /* Información del Equipo */
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -92,7 +157,7 @@ export function ActDetailsDisplay({ act, showStatus = true }: ActDetailsDisplayP
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <p className="text-sm text-muted-foreground">Código</p>
-              <p className="font-medium">{act.equipmentSnapshot.code}</p>
+              <p className="font-medium">{act.equipmentSnapshot?.code ?? '—'}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Número de Serie</p>
@@ -138,6 +203,7 @@ export function ActDetailsDisplay({ act, showStatus = true }: ActDetailsDisplayP
           )}
         </CardContent>
       </Card>
+      )}
 
       {/* Accesorios */}
       {act.accessories && act.accessories.length > 0 && (

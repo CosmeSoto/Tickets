@@ -181,6 +181,12 @@ export class ContractPaymentService {
       paymentMethod: string
       referenceNumber: string
       notes: string
+      cardLast4: string
+      cardBrand: string
+      bankEntity: string
+      statementPeriod: Date
+      transactionId: string
+      chargeSource: string
     }>,
     updatedBy: string
   ) {
@@ -211,6 +217,12 @@ export class ContractPaymentService {
           referenceNumber: data.referenceNumber || null,
         }),
         ...(data.notes !== undefined && { notes: data.notes || null }),
+        ...(data.cardLast4 !== undefined && { cardLast4: data.cardLast4 || null }),
+        ...(data.cardBrand !== undefined && { cardBrand: data.cardBrand || null }),
+        ...(data.bankEntity !== undefined && { bankEntity: data.bankEntity || null }),
+        ...(data.statementPeriod !== undefined && { statementPeriod: data.statementPeriod || null }),
+        ...(data.transactionId !== undefined && { transactionId: data.transactionId || null }),
+        ...(data.chargeSource !== undefined && { chargeSource: data.chargeSource || null }),
       },
       include: {
         contract: {
@@ -242,10 +254,16 @@ export class ContractPaymentService {
       paymentMethod?: string
       referenceNumber?: string
       notes?: string
+      cardLast4?: string
+      cardBrand?: string
+      bankEntity?: string
+      statementPeriod?: Date
+      transactionId?: string
+      chargeSource?: string
     },
     updatedBy: string
   ) {
-    return await this.update(
+    const payment = await this.update(
       id,
       {
         paidDate: data.paidDate,
@@ -253,9 +271,45 @@ export class ContractPaymentService {
         paymentMethod: data.paymentMethod,
         referenceNumber: data.referenceNumber,
         notes: data.notes,
+        cardLast4: data.cardLast4,
+        cardBrand: data.cardBrand,
+        bankEntity: data.bankEntity,
+        statementPeriod: data.statementPeriod,
+        transactionId: data.transactionId,
+        chargeSource: data.chargeSource,
       },
       updatedBy
     )
+
+    // Sincronizar último cargo en el contrato para kit de cancelación
+    const paymentMethodTypes = [
+      'CORPORATE_CARD',
+      'PAYPAL',
+      'CRYPTO',
+      'BANK_TRANSFER',
+      'PROVIDER_INVOICE',
+      'OTHER',
+    ] as const
+    const chargeAsMethod =
+      data.chargeSource &&
+      (paymentMethodTypes as readonly string[]).includes(data.chargeSource)
+        ? data.chargeSource
+        : undefined
+
+    await prisma.contracts.update({
+      where: { id: payment.contractId },
+      data: {
+        lastChargeDate: data.paidDate,
+        lastChargeAmount: payment.amount,
+        lastTransactionRef: data.transactionId || data.referenceNumber || null,
+        ...(data.cardLast4 && { paymentCardLast4: data.cardLast4 }),
+        ...(data.cardBrand && { paymentCardBrand: data.cardBrand }),
+        ...(data.bankEntity && { paymentCardBank: data.bankEntity }),
+        ...(chargeAsMethod && { paymentMethodType: chargeAsMethod as (typeof paymentMethodTypes)[number] }),
+      },
+    })
+
+    return payment
   }
 
   // ── Eliminar pago ───────────────────────────────────────────────────────────

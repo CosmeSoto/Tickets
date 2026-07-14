@@ -3,7 +3,9 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { ContractService } from '@/lib/services/contract-service'
 import { canManageInventory, inventoryForbidden } from '@/lib/inventory-access'
+import { assertContractViewAccess } from '@/lib/contracts/access'
 import { createContractSchema } from '@/lib/validations/contracts'
+import { extractBillingPayload } from '@/lib/contracts/billing-payload'
 import { ZodError } from 'zod'
 
 // GET /api/inventory/contracts — listar contratos
@@ -12,7 +14,9 @@ export async function GET(req: NextRequest) {
   if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
   const hasAccess =
-    session.user.role === 'ADMIN' || (await canManageInventory(session.user.id, session.user.role))
+    session.user.role === 'ADMIN' ||
+    session.user.role === 'CLIENT' ||
+    (await canManageInventory(session.user.id, session.user.role))
   if (!hasAccess) return inventoryForbidden()
 
   const { searchParams } = new URL(req.url)
@@ -74,6 +78,7 @@ export async function POST(req: NextRequest) {
       contactPhone: p.contactPhone ?? undefined,
       notes: p.notes ?? undefined,
       termsUrl: p.termsUrl || undefined,
+      ...extractBillingPayload(p),
       lines: p.lines.map(l => ({
         type: l.type,
         description: l.description,

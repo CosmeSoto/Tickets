@@ -19,6 +19,8 @@ import {
   CONTRACT_BILLING_CYCLE_VALUES,
   CONTRACT_LINE_TYPE_VALUES,
 } from '@/lib/validations/contracts'
+import { getBillingCompletenessIssues, methodNeedsPortal } from '@/lib/contracts/billing-completeness'
+import { syncContractLicenseLines } from '@/lib/contracts/license-sync'
 
 // ── Guard helpers ─────────────────────────────────────────────────────────────
 
@@ -83,6 +85,8 @@ const CONTRACT_INCLUDE = {
     },
   },
   creator: { select: { id: true, name: true, email: true } },
+  custodian: { select: { id: true, name: true, email: true, role: true } },
+  backupCustodian: { select: { id: true, name: true, email: true, role: true } },
   lines: {
     orderBy: { order: 'asc' as const },
     include: {
@@ -92,6 +96,64 @@ const CONTRACT_INCLUDE = {
   },
   attachments: { orderBy: { createdAt: 'asc' as const } },
 } as const
+
+type BillingGovernanceInput = {
+  serviceSubtype?: string | null
+  paymentMethodType?: string
+  paymentAccountRef?: string | null
+  custodianUserId?: string | null
+  backupCustodianUserId?: string | null
+  billingAccountEmail?: string | null
+  billingPortalUrl?: string | null
+  vendorAccountId?: string | null
+  paymentCardBrand?: string | null
+  paymentCardLast4?: string | null
+  paymentCardBank?: string | null
+  paymentCardExpiry?: string | null
+  corporateCardLabel?: string | null
+  lastChargeDate?: string | null
+  lastChargeAmount?: number | null
+  lastTransactionRef?: string | null
+  subscriptionUsageStatus?: string
+  cancellationNoticeDays?: number | null
+}
+
+function mapBillingFields(data: BillingGovernanceInput) {
+  const mapped: Record<string, unknown> = {}
+  if (data.serviceSubtype !== undefined) mapped.serviceSubtype = data.serviceSubtype || null
+  if (data.paymentMethodType !== undefined) mapped.paymentMethodType = data.paymentMethodType
+  if (data.paymentAccountRef !== undefined) mapped.paymentAccountRef = data.paymentAccountRef || null
+  if (data.custodianUserId !== undefined) mapped.custodianUserId = data.custodianUserId || null
+  if (data.backupCustodianUserId !== undefined) {
+    mapped.backupCustodianUserId = data.backupCustodianUserId || null
+  }
+  if (data.billingAccountEmail !== undefined) {
+    mapped.billingAccountEmail = data.billingAccountEmail || null
+  }
+  if (data.billingPortalUrl !== undefined) mapped.billingPortalUrl = data.billingPortalUrl || null
+  if (data.vendorAccountId !== undefined) mapped.vendorAccountId = data.vendorAccountId || null
+  if (data.paymentCardBrand !== undefined) mapped.paymentCardBrand = data.paymentCardBrand || null
+  if (data.paymentCardLast4 !== undefined) mapped.paymentCardLast4 = data.paymentCardLast4 || null
+  if (data.paymentCardBank !== undefined) mapped.paymentCardBank = data.paymentCardBank || null
+  if (data.paymentCardExpiry !== undefined) mapped.paymentCardExpiry = data.paymentCardExpiry || null
+  if (data.corporateCardLabel !== undefined) {
+    mapped.corporateCardLabel = data.corporateCardLabel || null
+  }
+  if (data.lastChargeDate !== undefined) {
+    mapped.lastChargeDate = data.lastChargeDate ? new Date(data.lastChargeDate) : null
+  }
+  if (data.lastChargeAmount !== undefined) mapped.lastChargeAmount = data.lastChargeAmount ?? null
+  if (data.lastTransactionRef !== undefined) {
+    mapped.lastTransactionRef = data.lastTransactionRef || null
+  }
+  if (data.subscriptionUsageStatus !== undefined) {
+    mapped.subscriptionUsageStatus = data.subscriptionUsageStatus
+  }
+  if (data.cancellationNoticeDays !== undefined) {
+    mapped.cancellationNoticeDays = data.cancellationNoticeDays ?? null
+  }
+  return mapped
+}
 
 // ── Servicio ──────────────────────────────────────────────────────────────────
 
@@ -133,7 +195,9 @@ export class ContractService {
     // Admin normal: ve contratos de sus familias asignadas (si tiene asignaciones)
     // Gestor (canManageInventory): ve solo contratos de sus familias en inventory_manager_families
     if (userId && userRole && !isSuperAdmin) {
-      if (userRole === 'ADMIN') {
+      if (userRole === 'CLIENT') {
+        where.assignments = { some: { clientId: userId } }
+      } else if (userRole === 'ADMIN') {
         // Admin normal: filtrar por sus familias (asignadas + nativa)
         const { getAdminFamilyScope } = await import('@/lib/auth/admin-scope')
         const scope = await getAdminFamilyScope(userId, false)
@@ -262,7 +326,7 @@ export class ContractService {
       order?: number
     }>
     createdBy: string
-  }) {
+  } & BillingGovernanceInput) {
     const { lines = [], createdBy, ...contractData } = data
 
     const contract = await prisma.contracts.create({
@@ -290,6 +354,7 @@ export class ContractService {
         contactPhone: contractData.contactPhone || null,
         notes: contractData.notes || null,
         termsUrl: contractData.termsUrl || null,
+        ...mapBillingFields(contractData),
         createdBy,
         lines:
           lines.length > 0
@@ -327,10 +392,12 @@ export class ContractService {
       },
     })
 
+    await syncContractLicenseLines(contract.id).catch(err =>
+      console.error('[contract] sync licenses on create:', err)
+    )
+
     return contract
   }
-
-  // ── Actualizar ──────────────────────────────────────────────────────────────
 
   static async update(
     id: string,
@@ -357,7 +424,7 @@ export class ContractService {
       notes: string
       termsUrl: string
       status: string
-    }>,
+    } & BillingGovernanceInput>,
     updatedBy: string
   ) {
     const before = await prisma.contracts.findUnique({
@@ -397,6 +464,7 @@ export class ContractService {
         ...(data.notes !== undefined && { notes: data.notes || null }),
         ...(data.termsUrl !== undefined && { termsUrl: data.termsUrl || null }),
         ...(data.status !== undefined && { status: data.status as any }), // status tiene su propio enum con más valores, mantenemos as any para flexibilidad
+        ...mapBillingFields(data),
       },
       include: CONTRACT_INCLUDE,
     })
@@ -421,6 +489,10 @@ export class ContractService {
         },
       },
     })
+
+    await syncContractLicenseLines(id).catch(err =>
+      console.error('[contract] sync licenses on update:', err)
+    )
 
     return contract
   }
@@ -490,6 +562,10 @@ export class ContractService {
       userId: updatedBy,
       changes: { linesCount: lines.length },
     })
+
+    await syncContractLicenseLines(contractId).catch(err =>
+      console.error('[contract] sync licenses on lines:', err)
+    )
   }
 
   // ── Job: alertas de vencimiento ─────────────────────────────────────────────
@@ -862,5 +938,92 @@ export class ContractService {
     })
 
     return chainWithDiffs
+  }
+
+  /**
+   * Suscripciones en riesgo: sin custodio, datos de pago incompletos o sin cliente asignado.
+   */
+  static async listAtRisk(params: {
+    familyId?: string
+    userId?: string
+    userRole?: string
+    isSuperAdmin?: boolean
+  }) {
+    const { familyId, userId, userRole, isSuperAdmin } = params
+    const where: any = {
+      category: { in: ['SERVICE', 'SOFTWARE_LICENSE', 'SUPPORT', 'MAINTENANCE'] },
+      subscriptionUsageStatus: { in: ['ACTIVE', 'UNUSED', 'PENDING_CANCEL'] },
+      status: { in: ['ACTIVE', 'EXPIRING', 'DRAFT'] },
+    }
+
+    if (familyId) where.familyId = familyId
+
+    if (userId && userRole && !isSuperAdmin) {
+      if (userRole === 'ADMIN') {
+        const { getAdminFamilyScope } = await import('@/lib/auth/admin-scope')
+        const scope = await getAdminFamilyScope(userId, false)
+        if (scope.familyIds?.length) where.familyId = { in: scope.familyIds }
+      } else {
+        const managerFamilies = await prisma.inventory_manager_families.findMany({
+          where: { managerId: userId },
+          select: { familyId: true },
+        })
+        if (managerFamilies.length > 0) {
+          where.familyId = { in: managerFamilies.map(f => f.familyId) }
+        }
+      }
+    }
+
+    const contracts = await prisma.contracts.findMany({
+      where,
+      include: {
+        supplier: { select: { name: true } },
+        family: { select: { id: true, name: true, color: true } },
+        custodian: { select: { id: true, name: true, email: true, isActive: true } },
+        assignments: {
+          where: { isActive: true },
+          include: {
+            client: { select: { id: true, name: true, email: true, isActive: true } },
+            deliveryAct: { select: { status: true } },
+          },
+          take: 1,
+        },
+      },
+      orderBy: { name: 'asc' },
+      take: 200,
+    })
+
+    return contracts
+      .map(c => {
+        const risks: string[] = []
+        if (!c.custodianUserId || !c.custodian?.isActive) {
+          risks.push('Sin custodio activo')
+        }
+        const billingIssues = getBillingCompletenessIssues({
+          paymentMethodType: c.paymentMethodType,
+          paymentCardLast4: c.paymentCardLast4,
+          paymentCardBank: c.paymentCardBank,
+          paymentAccountRef: c.paymentAccountRef,
+          billingAccountEmail: c.billingAccountEmail,
+          vendorAccountId: c.vendorAccountId,
+          billingPortalUrl: c.billingPortalUrl,
+        })
+        if (billingIssues.length > 0) {
+          risks.push(billingIssues[0])
+        }
+        if (!c.billingPortalUrl && !c.billingAccountEmail && methodNeedsPortal(c.paymentMethodType)) {
+          risks.push('Sin acceso al portal de facturación')
+        }
+        if (!c.assignments.length) {
+          risks.push('Sin cliente asignado')
+        } else if (c.assignments[0].deliveryAct?.status !== 'ACCEPTED') {
+          risks.push('Acta de entrega pendiente')
+        }
+        if (c.subscriptionUsageStatus === 'PENDING_CANCEL' && !c.lastTransactionRef) {
+          risks.push('Cancelación sin referencia de transacción')
+        }
+        return { ...c, risks, riskLevel: risks.length >= 3 ? 'high' : risks.length >= 1 ? 'medium' : 'low' }
+      })
+      .filter(c => c.risks.length > 0)
   }
 }

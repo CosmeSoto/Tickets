@@ -271,4 +271,42 @@ Por favor, revise el contrato y considere su renovación.
     }
     return labels[category] || category
   }
+
+  /**
+   * Alerta administradores sobre suscripciones con custodio, pago o cliente incompletos.
+   */
+  static async checkSubscriptionGovernance() {
+    const { ContractService } = await import('./contract-service')
+    const atRisk = await ContractService.listAtRisk({})
+    let alertsSent = 0
+
+    for (const contract of atRisk) {
+      if (!contract.familyId || contract.risks.length === 0) continue
+
+      const admins = await getFamilyScopedAdmins(contract.familyId, {
+        id: true,
+        name: true,
+        email: true,
+      })
+
+      const riskList = contract.risks.join(' · ')
+      for (const admin of admins) {
+        await NotificationService.createNotification({
+          userId: admin.id,
+          type: 'INVENTORY',
+          title: `Suscripción en riesgo: ${contract.name}`,
+          message: `${riskList}. Revise facturación, custodio y asignación al cliente.`,
+          metadata: {
+            kind: 'CONTRACT_SUBSCRIPTION_RISK',
+            contractId: contract.id,
+            risks: contract.risks,
+            riskLevel: contract.riskLevel,
+          },
+        })
+        alertsSent++
+      }
+    }
+
+    return { contractsAtRisk: atRisk.length, alertsSent }
+  }
 }

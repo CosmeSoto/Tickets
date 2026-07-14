@@ -606,6 +606,220 @@ export class InventoryNotificationService {
   }
 
   /**
+   * Notificación al crear acta de entrega de suscripción/contrato (no equipo).
+   */
+  static async sendSubscriptionDeliveryActNotification(actId: string): Promise<void> {
+    try {
+      const act = await prisma.delivery_acts.findUnique({
+        where: { id: actId },
+        include: {
+          contractAssignment: {
+            include: {
+              contract: { select: { id: true, name: true, familyId: true } },
+            },
+          },
+        },
+      })
+
+      if (!act || act.actType !== 'SUBSCRIPTION_ASSIGNMENT') {
+        throw new Error('Acta de suscripción no encontrada')
+      }
+
+      const snapshot = parseJsonField<Record<string, unknown>>(act.equipmentSnapshot)
+      const receiverInfo = parseJsonField<{ id: string; name: string; email: string }>(
+        act.receiverInfo
+      )
+      const delivererInfo = parseJsonField<{ id: string; name: string; email: string }>(
+        act.delivererInfo
+      )
+
+      const contractName = String(snapshot.name ?? 'Suscripción')
+      const contractRef = snapshot.contractNumber
+        ? `${snapshot.contractNumber} — ${contractName}`
+        : contractName
+
+      const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
+      const acceptanceUrl = `${baseUrl}/acts/${act.id}/accept?token=${act.acceptanceToken}`
+      const expirationStr = new Date(act.expirationDate).toLocaleDateString('es-ES')
+
+      const emailData = generateDeliveryActCreatedEmail({
+        act: { ...act, equipmentSnapshot: snapshot, receiverInfo, delivererInfo } as DeliveryAct,
+        acceptanceUrl,
+        receiverName: receiverInfo.name,
+        delivererName: delivererInfo.name,
+        equipmentCode: contractName,
+        equipmentDescription: contractRef,
+        expirationDate: act.expirationDate,
+      })
+
+      await prisma.email_queue.create({
+        data: {
+          id: randomUUID(),
+          toEmail: receiverInfo.email,
+          subject: emailData.subject.replace('Entrega', 'Asignación de suscripción'),
+          body: emailData.html
+            .replace(/equipo/gi, 'suscripción')
+            .replace(/Equipo/g, 'Suscripción'),
+          status: 'pending',
+          templateName: 'subscription_delivery_act_created',
+          templateData: JSON.stringify({
+            type: 'subscription_delivery_act_created',
+            actId: act.id,
+            folio: act.folio,
+            contractId: act.contractAssignment?.contract.id,
+          }),
+        },
+      })
+
+      const actLink = `/acts/${act.id}/accept?token=${act.acceptanceToken}`
+
+      await Promise.all([
+        NotificationService.push({
+          userId: receiverInfo.id,
+          type: 'INVENTORY',
+          title: `Acta de asignación pendiente — ${contractName}`,
+          message: `Debes firmar el acta ${act.folio} para la suscripción ${contractRef} antes del ${expirationStr}.`,
+          metadata: {
+            type: 'subscription_delivery_act_created',
+            actId: act.id,
+            folio: act.folio,
+            contractId: act.contractAssignment?.contract.id,
+            link: actLink,
+          },
+        }),
+        NotificationService.push({
+          userId: delivererInfo.id,
+          type: 'INVENTORY',
+          title: `Acta generada — ${contractName}`,
+          message: `Se generó el acta ${act.folio} para asignar ${contractRef} a ${receiverInfo.name}. Pendiente de firma.`,
+          metadata: {
+            type: 'subscription_delivery_act_created',
+            actId: act.id,
+            folio: act.folio,
+            contractId: act.contractAssignment?.contract.id,
+            link: `/inventory/acts/${act.id}`,
+          },
+        }),
+      ])
+
+      const familyId = act.contractAssignment?.contract.familyId
+      await notifyDeliveryActFamilyAdmins(familyId, [delivererInfo.id], {
+        type: 'INFO',
+        title: `Nueva asignación — ${contractName}`,
+        message: `Acta ${act.folio} generada para ${receiverInfo.name}. Suscripción: ${contractRef}.`,
+        metadata: {
+          type: 'subscription_delivery_act_created',
+          actId: act.id,
+          folio: act.folio,
+          contractId: act.contractAssignment?.contract.id,
+          link: `/inventory/acts/${act.id}`,
+        },
+      })
+    } catch (error) {
+      console.error('Error enviando notificación de acta de suscripción:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Notificación al crear acta de retiro de suscripción/contrato.
+   */
+  static async sendSubscriptionReturnActNotification(actId: string): Promise<void> {
+    try {
+      const act = await prisma.contract_return_acts.findUnique({
+        where: { id: actId },
+        include: {
+          contractAssignment: {
+            include: {
+              contract: { select: { id: true, name: true, familyId: true } },
+            },
+          },
+        },
+      })
+
+      if (!act) throw new Error('Acta de retiro no encontrada')
+
+      const snapshot = parseJsonField<Record<string, unknown>>(act.contractSnapshot)
+      const receiverInfo = parseJsonField<{ id: string; name: string; email: string }>(
+        act.receiverInfo
+      )
+      const delivererInfo = parseJsonField<{ id: string; name: string; email: string }>(
+        act.delivererInfo
+      )
+
+      const contractName = String(snapshot.name ?? 'Suscripción')
+      const contractRef = snapshot.contractNumber
+        ? `${snapshot.contractNumber} — ${contractName}`
+        : contractName
+
+      const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
+      const acceptanceUrl = `${baseUrl}/acts/contract-return/${act.id}/accept?token=${act.acceptanceToken}`
+      const expirationStr = new Date(act.expirationDate).toLocaleDateString('es-ES')
+
+      await prisma.email_queue.create({
+        data: {
+          id: randomUUID(),
+          toEmail: receiverInfo.email,
+          subject: `Acta de retiro de suscripción — ${act.folio}`,
+          body: `<p>Hola ${receiverInfo.name},</p><p>Debes firmar el acta de retiro ${act.folio} para la suscripción <strong>${contractRef}</strong> antes del ${expirationStr}.</p><p><a href="${acceptanceUrl}">Revisar y firmar acta</a></p>`,
+          status: 'pending',
+          templateName: 'subscription_return_act_created',
+          templateData: JSON.stringify({
+            type: 'subscription_return_act_created',
+            actId: act.id,
+            folio: act.folio,
+          }),
+        },
+      })
+
+      await Promise.all([
+        NotificationService.push({
+          userId: receiverInfo.id,
+          type: 'INVENTORY',
+          title: `Acta de retiro pendiente — ${contractName}`,
+          message: `Debes firmar el acta ${act.folio} para el retiro de ${contractRef} antes del ${expirationStr}.`,
+          metadata: {
+            type: 'subscription_return_act_created',
+            actId: act.id,
+            folio: act.folio,
+            contractId: act.contractAssignment?.contract.id,
+            link: acceptanceUrl,
+          },
+        }),
+        NotificationService.push({
+          userId: delivererInfo.id,
+          type: 'INVENTORY',
+          title: `Acta de retiro generada — ${contractName}`,
+          message: `Se generó el acta ${act.folio} para el retiro de ${contractRef} de ${receiverInfo.name}.`,
+          metadata: {
+            type: 'subscription_return_act_created',
+            actId: act.id,
+            folio: act.folio,
+            contractId: act.contractAssignment?.contract.id,
+            link: `/acts/contract-return/${act.id}/accept`,
+          },
+        }),
+      ])
+
+      const familyId = act.contractAssignment?.contract.familyId
+      await notifyDeliveryActFamilyAdmins(familyId, [delivererInfo.id], {
+        type: 'INFO',
+        title: `Retiro de suscripción — ${contractName}`,
+        message: `Acta de retiro ${act.folio} para ${receiverInfo.name}. Suscripción: ${contractRef}.`,
+        metadata: {
+          type: 'subscription_return_act_created',
+          actId: act.id,
+          folio: act.folio,
+          contractId: act.contractAssignment?.contract.id,
+        },
+      })
+    } catch (error) {
+      console.error('Error enviando notificación de retiro de suscripción:', error)
+      throw error
+    }
+  }
+
+  /**
    * Obtiene actas que necesitan recordatorios
    */
   static async getActsNeedingReminders(daysBeforeExpiration: number): Promise<string[]> {

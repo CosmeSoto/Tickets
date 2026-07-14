@@ -10,7 +10,7 @@ import { useSession } from 'next-auth/react'
  *   Admin       → puede gestionar activos (sus familias o todas si no tiene asignadas)
  *   Gestor      → puede gestionar activos de sus familias (canManageInventory=true)
  *   Técnico     → puede crear/editar (sin gestión de familias)
- *   Cliente     → solo lectura de sus equipos asignados
+ *   Cliente     → solo lectura de sus equipos y suscripciones asignadas
  */
 export function useInventoryPermissions() {
   const { data: session } = useSession()
@@ -47,6 +47,11 @@ export function useInventoryPermissions() {
   // Cliente puede solicitar mantenimiento de sus equipos asignados
   const canRequestMaintenance = isClient
 
+  // Contratos / suscripciones
+  const canManageContracts = isAdmin || canManageInventory
+  const canViewOwnContracts = isClient || canManageContracts
+  const canDeleteContracts = isAdmin
+
   return {
     role,
     isSuperAdmin,
@@ -62,5 +67,8 @@ export function useInventoryPermissions() {
     canReturn,
     canManageMaintenance,
     canRequestMaintenance,
+    canManageContracts,
+    canViewOwnContracts,
+    canDeleteContracts,
   }
 }

@@ -18,6 +18,68 @@ export const CONTRACT_BILLING_CYCLE_VALUES = [
   'ONE_TIME',
 ] as const
 
+export const SUBSCRIPTION_USAGE_STATUS_VALUES = [
+  'ACTIVE',
+  'UNUSED',
+  'PENDING_CANCEL',
+  'CANCELLED',
+] as const
+
+export const PAYMENT_CARD_BRAND_VALUES = ['VISA', 'MASTERCARD', 'AMEX', 'OTHER'] as const
+
+export const PAYMENT_METHOD_TYPE_VALUES = [
+  'CORPORATE_CARD',
+  'PAYPAL',
+  'CRYPTO',
+  'BANK_TRANSFER',
+  'PROVIDER_INVOICE',
+  'OTHER',
+] as const
+
+export const SUBSCRIPTION_SERVICE_TYPE_VALUES = [
+  'SOCIAL_MEDIA',
+  'CONTENT',
+  'AUDIOVISUAL',
+  'ARTIFICIAL_INTELLIGENCE',
+  'EDUCATION_LMS',
+  'CLOUD_SERVICES',
+  'DESIGN',
+  'COMMUNICATIONS',
+  'DIGITAL_ADS',
+  'OTHER',
+] as const
+
+const billingFieldsSchema = {
+  serviceSubtype: z.enum(SUBSCRIPTION_SERVICE_TYPE_VALUES).optional().nullable(),
+  paymentMethodType: z.enum(PAYMENT_METHOD_TYPE_VALUES).default('CORPORATE_CARD'),
+  paymentAccountRef: z.string().max(300).optional().nullable(),
+  custodianUserId: z.string().uuid().optional().nullable(),
+  backupCustodianUserId: z.string().uuid().optional().nullable(),
+  billingAccountEmail: z.string().email().max(200).optional().nullable().or(z.literal('')),
+  billingPortalUrl: z.string().url().max(500).optional().nullable().or(z.literal('')),
+  vendorAccountId: z.string().max(200).optional().nullable(),
+  paymentCardBrand: z.enum(PAYMENT_CARD_BRAND_VALUES).optional().nullable(),
+  paymentCardLast4: z
+    .string()
+    .regex(/^\d{4}$/, 'Últimos 4 dígitos inválidos')
+    .optional()
+    .nullable()
+    .or(z.literal('')),
+  paymentCardBank: z.string().max(100).optional().nullable(),
+  paymentCardExpiry: z
+    .string()
+    .regex(/^\d{2}\/\d{4}$/, 'Formato MM/YYYY')
+    .optional()
+    .nullable()
+    .or(z.literal('')),
+  corporateCardLabel: z.string().max(100).optional().nullable(),
+  lastChargeDate: z.string().optional().nullable(),
+  lastChargeAmount: z.number({ coerce: true }).min(0).optional().nullable(),
+  lastTransactionRef: z.string().max(200).optional().nullable(),
+  subscriptionUsageStatus: z.enum(SUBSCRIPTION_USAGE_STATUS_VALUES).default('ACTIVE'),
+  cancellationNoticeDays: z.number({ coerce: true }).int().min(0).max(365).optional().nullable(),
+}
+
 export const CONTRACT_LINE_TYPE_VALUES = [
   'EQUIPMENT',
   'SOFTWARE',
@@ -72,6 +134,7 @@ export const createContractSchema = z.object({
   notes: z.string().max(5000).optional().nullable(),
   termsUrl: z.string().url().max(500).optional().nullable().or(z.literal('')),
   lines: z.array(contractLineSchema).default([]),
+  ...billingFieldsSchema,
 })
 
 export const updateContractSchema = createContractSchema.partial().extend({
