@@ -21,6 +21,7 @@ import {
   REPORT_CATEGORIES,
   getVisibleTemplates,
   getVisibleDatasets,
+  hasInventoryReportsAccess,
   resolveUserReportRole,
 } from '@/lib/inventory/reports/catalog'
 import type { ReportTemplateDef } from '@/lib/inventory/reports/types'
@@ -28,6 +29,7 @@ import { getReportIcon } from '@/components/inventory/reports/report-icon-map'
 import { SavedReportsPanel } from '@/components/inventory/reports/saved-reports-panel'
 import { PinnedReportWidgets } from '@/components/inventory/reports/pinned-report-widgets'
 import { ScheduledReportsPanel } from '@/components/inventory/reports/scheduled-reports-panel'
+import { ReportRoleInfo } from '@/components/inventory/reports/report-role-info'
 
 function getSubtitle(role: string, isSuperAdmin: boolean, canManage: boolean): string {
   if (isSuperAdmin) return 'Vista global — plantillas ejecutivas y explorador de datos'
@@ -49,8 +51,17 @@ export default function InventoryReportsPage() {
   const { families } = useFamilyOptions()
 
   useEffect(() => {
-    if (status === 'unauthenticated') router.push('/login')
-  }, [status, router])
+    if (status === 'unauthenticated') {
+      router.push('/login')
+      return
+    }
+    if (
+      status === 'authenticated' &&
+      !hasInventoryReportsAccess(role, isSuperAdmin, canManageInventory)
+    ) {
+      router.push('/unauthorized')
+    }
+  }, [status, router, role, isSuperAdmin, canManageInventory])
 
   const userReportRole = useMemo(
     () => resolveUserReportRole(role, isSuperAdmin, canManageInventory),
@@ -79,6 +90,8 @@ export default function InventoryReportsPage() {
   }
   if (!session?.user) return null
 
+  if (!hasInventoryReportsAccess(role, isSuperAdmin, canManageInventory)) return null
+
   const navigateWithFamily = (path: string) => {
     const params = new URLSearchParams()
     if (selectedFamilyId) params.set('familyId', selectedFamilyId)
@@ -96,6 +109,8 @@ export default function InventoryReportsPage() {
       subtitle={getSubtitle(role, isSuperAdmin, canManageInventory)}
     >
       <div className='space-y-8'>
+        <ReportRoleInfo userRole={userReportRole} />
+
         {/* Hero: Explorador */}
         <Card className='border-primary/30 bg-gradient-to-br from-primary/5 via-background to-background'>
           <CardContent className='pt-6'>

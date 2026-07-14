@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { generateReportPDF, toCSV } from '@/lib/inventory/report-utils'
+import { exportReportXlsx } from './engine'
 import { getTemplateBySlug } from './catalog'
 import type { ReportResponse } from './types'
 
@@ -298,6 +299,21 @@ export async function respondWithReportFormat(
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="${exportCfg?.pdfFilename ?? DEFAULT_EXPORT.pdfFilename}"`,
+      },
+    })
+  }
+
+  if (format === 'xlsx') {
+    const exportCfg = TEMPLATE_EXPORT[slug]
+    const template = getTemplateBySlug(slug)
+    const rows = response.data.map(row => exportCfg?.csvRowMapper(row) ?? row)
+    const title = exportCfg?.pdfTitle ?? template?.name ?? slug
+    const buffer = exportReportXlsx(rows, title)
+    const baseName = (exportCfg?.csvFilename ?? DEFAULT_EXPORT.csvFilename).replace(/\.csv$/i, '')
+    return new NextResponse(new Uint8Array(buffer), {
+      headers: {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': `attachment; filename="${baseName}.xlsx"`,
       },
     })
   }

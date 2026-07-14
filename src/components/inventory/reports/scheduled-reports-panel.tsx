@@ -1,7 +1,18 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { CalendarClock, Loader2, Mail, Pause, Play, Trash2 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import {
+  ArrowRight,
+  Bookmark,
+  CalendarClock,
+  Loader2,
+  Mail,
+  Pause,
+  Play,
+  Sparkles,
+  Trash2,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -25,6 +36,10 @@ import {
 import type { InventorySavedReport, InventoryScheduledReport } from '@/lib/inventory/reports/types'
 import { exportFormatLabel, frequencyLabel, WEEKDAY_OPTIONS } from '@/lib/inventory/reports/schedule-utils'
 
+function scrollToSavedReports() {
+  document.getElementById('saved-reports-panel')?.scrollIntoView({ behavior: 'smooth' })
+}
+
 export function ScheduledReportsPanel({
   openCreateForReportId,
   onCreateDialogClose,
@@ -32,6 +47,7 @@ export function ScheduledReportsPanel({
   openCreateForReportId?: string | null
   onCreateDialogClose?: () => void
 }) {
+  const router = useRouter()
   const [schedules, setSchedules] = useState<InventoryScheduledReport[]>([])
   const [savedReports, setSavedReports] = useState<InventorySavedReport[]>([])
   const [loading, setLoading] = useState(true)
@@ -156,6 +172,9 @@ export function ScheduledReportsPanel({
     )
   }
 
+  const hasSavedReports = savedReports.length > 0
+  const showSetupGuide = !hasSavedReports || schedules.length === 0
+
   return (
     <>
       <Card>
@@ -169,64 +188,114 @@ export function ScheduledReportsPanel({
               Recibe reportes guardados por email — CSV, PDF o ambos
             </CardDescription>
           </div>
-          <Button
-            size='sm'
-            variant='outline'
-            disabled={savedReports.length === 0}
-            onClick={() => openCreate()}
-          >
+          <Button size='sm' variant='outline' onClick={() => openCreate()}>
             <Mail className='h-4 w-4 mr-1.5' />
             Programar
           </Button>
         </CardHeader>
-        {schedules.length > 0 && (
-          <CardContent className='space-y-3'>
-            {schedules.map(schedule => (
-              <div
-                key={schedule.id}
-                className='rounded-lg border p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3'
-              >
-                <div className='min-w-0'>
-                  <p className='font-medium truncate'>{schedule.savedReportName}</p>
-                  <p className='text-xs text-muted-foreground'>
-                    {frequencyLabel(schedule.frequency)} · {schedule.scheduleTime}
-                    {` · ${exportFormatLabel(schedule.exportFormat)}`}
-                    {schedule.nextRunAt &&
-                      ` · Próximo: ${new Date(schedule.nextRunAt).toLocaleString('es-EC')}`}
-                  </p>
-                  {schedule.recipients.length > 0 && (
-                    <p className='text-xs text-muted-foreground truncate'>
-                      → {schedule.recipients.join(', ')}
-                    </p>
-                  )}
-                  {schedule.lastStatus === 'failed' && schedule.lastError && (
-                    <p className='text-xs text-destructive mt-1'>{schedule.lastError}</p>
-                  )}
-                </div>
-                <div className='flex items-center gap-2 shrink-0'>
-                  <Badge variant={schedule.enabled ? 'default' : 'secondary'}>
-                    {schedule.enabled ? 'Activo' : 'Pausado'}
-                  </Badge>
-                  <Button variant='ghost' size='icon' onClick={() => toggleEnabled(schedule)}>
-                    {schedule.enabled ? (
-                      <Pause className='h-4 w-4' />
-                    ) : (
-                      <Play className='h-4 w-4' />
-                    )}
-                  </Button>
+        <CardContent className='space-y-4'>
+          {showSetupGuide && (
+            <div className='rounded-lg border bg-muted/30 p-4 space-y-3'>
+              <p className='text-sm font-medium'>¿Cómo programar un envío?</p>
+              <ol className='text-sm text-muted-foreground space-y-2 list-decimal list-inside'>
+                <li>
+                  <span className='inline-flex items-center gap-1'>
+                    <Sparkles className='h-3.5 w-3.5 inline' />
+                    Abre el explorador y configura filtros / columnas
+                  </span>
+                </li>
+                <li>
+                  <span className='inline-flex items-center gap-1'>
+                    <Bookmark className='h-3.5 w-3.5 inline' />
+                    Guarda la consulta con un nombre
+                  </span>
+                </li>
+                <li>
+                  <span className='inline-flex items-center gap-1'>
+                    <Mail className='h-3.5 w-3.5 inline' />
+                    Pulsa Programar y elige frecuencia y destinatarios
+                  </span>
+                </li>
+              </ol>
+              <div className='flex flex-wrap gap-2 pt-1'>
+                {!hasSavedReports ? (
                   <Button
-                    variant='ghost'
-                    size='icon'
-                    className='text-muted-foreground hover:text-destructive'
-                    onClick={() => handleDelete(schedule.id)}
+                    size='sm'
+                    onClick={() => router.push('/inventory/reports/explore')}
                   >
-                    <Trash2 className='h-4 w-4' />
+                    Ir al explorador
+                    <ArrowRight className='h-4 w-4 ml-1.5' />
                   </Button>
-                </div>
+                ) : (
+                  <>
+                    <Button size='sm' onClick={() => openCreate()}>
+                      Programar ahora
+                    </Button>
+                    <Button size='sm' variant='outline' onClick={scrollToSavedReports}>
+                      Ver reportes guardados
+                    </Button>
+                  </>
+                )}
               </div>
-            ))}
-          </CardContent>
-        )}
+            </div>
+          )}
+
+          {schedules.length > 0 ? (
+            <div className='space-y-3'>
+              {schedules.map(schedule => (
+                <div
+                  key={schedule.id}
+                  className='rounded-lg border p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3'
+                >
+                  <div className='min-w-0'>
+                    <p className='font-medium truncate'>{schedule.savedReportName}</p>
+                    <p className='text-xs text-muted-foreground'>
+                      {frequencyLabel(schedule.frequency)} · {schedule.scheduleTime}
+                      {` · ${exportFormatLabel(schedule.exportFormat)}`}
+                      {schedule.nextRunAt &&
+                        ` · Próximo: ${new Date(schedule.nextRunAt).toLocaleString('es-EC')}`}
+                    </p>
+                    {schedule.recipients.length > 0 && (
+                      <p className='text-xs text-muted-foreground truncate'>
+                        → {schedule.recipients.join(', ')}
+                      </p>
+                    )}
+                    {schedule.lastStatus === 'failed' && schedule.lastError && (
+                      <p className='text-xs text-destructive mt-1'>{schedule.lastError}</p>
+                    )}
+                  </div>
+                  <div className='flex items-center gap-2 shrink-0'>
+                    <Badge variant={schedule.enabled ? 'default' : 'secondary'}>
+                      {schedule.enabled ? 'Activo' : 'Pausado'}
+                    </Badge>
+                    <Button variant='ghost' size='icon' onClick={() => toggleEnabled(schedule)}>
+                      {schedule.enabled ? (
+                        <Pause className='h-4 w-4' />
+                      ) : (
+                        <Play className='h-4 w-4' />
+                      )}
+                    </Button>
+                    <Button
+                      variant='ghost'
+                      size='icon'
+                      className='text-muted-foreground hover:text-destructive'
+                      onClick={() => handleDelete(schedule.id)}
+                    >
+                      <Trash2 className='h-4 w-4' />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            hasSavedReports && (
+              <p className='text-sm text-muted-foreground text-center py-2'>
+                Tienes {savedReports.length} consulta(s) guardada(s). Pulsa{' '}
+                <strong className='text-foreground'>Programar</strong> para crear tu primer envío.
+              </p>
+            )
+          )}
+        </CardContent>
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={handleDialogChange}>
@@ -237,116 +306,142 @@ export function ScheduledReportsPanel({
               Elige el formato de adjunto. Si dejas destinatarios vacío, se usa tu email.
             </DialogDescription>
           </DialogHeader>
-          <div className='space-y-3'>
-            <div className='space-y-1'>
-              <Label>Reporte guardado</Label>
-              <Select value={savedReportId} onValueChange={setSavedReportId}>
-                <SelectTrigger>
-                  <SelectValue placeholder='Seleccionar reporte' />
-                </SelectTrigger>
-                <SelectContent>
-                  {savedReports.map(r => (
-                    <SelectItem key={r.id} value={r.id}>
-                      {r.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+
+          {!hasSavedReports ? (
+            <div className='space-y-4 py-2'>
+              <p className='text-sm text-muted-foreground'>
+                Primero necesitas guardar una consulta desde el explorador. Allí configuras filtros,
+                columnas y luego usas <strong className='text-foreground'>Guardar consulta</strong>.
+              </p>
+              <Button
+                className='w-full sm:w-auto'
+                onClick={() => {
+                  handleDialogChange(false)
+                  router.push('/inventory/reports/explore')
+                }}
+              >
+                Ir al explorador
+                <ArrowRight className='h-4 w-4 ml-1.5' />
+              </Button>
             </div>
-            <div className='grid grid-cols-2 gap-3'>
+          ) : (
+            <div className='space-y-3'>
               <div className='space-y-1'>
-                <Label>Frecuencia</Label>
+                <Label>Reporte guardado</Label>
+                <Select value={savedReportId} onValueChange={setSavedReportId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder='Seleccionar reporte' />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {savedReports.map(r => (
+                      <SelectItem key={r.id} value={r.id}>
+                        {r.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className='text-xs text-muted-foreground'>
+                  También puedes programar desde el icono de calendario en cada reporte guardado.
+                </p>
+              </div>
+              <div className='grid grid-cols-2 gap-3'>
+                <div className='space-y-1'>
+                  <Label>Frecuencia</Label>
+                  <Select
+                    value={frequency}
+                    onValueChange={v => setFrequency(v as typeof frequency)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value='DAILY'>Diario</SelectItem>
+                      <SelectItem value='WEEKLY'>Semanal</SelectItem>
+                      <SelectItem value='MONTHLY'>Mensual</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className='space-y-1'>
+                  <Label>Hora</Label>
+                  <Input
+                    type='time'
+                    value={scheduleTime}
+                    onChange={e => setScheduleTime(e.target.value)}
+                  />
+                </div>
+              </div>
+              {frequency === 'WEEKLY' && (
+                <div className='space-y-1'>
+                  <Label>Día de la semana</Label>
+                  <Select value={dayOfWeek} onValueChange={setDayOfWeek}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {WEEKDAY_OPTIONS.map(d => (
+                        <SelectItem key={d.value} value={String(d.value)}>
+                          {d.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              {frequency === 'MONTHLY' && (
+                <div className='space-y-1'>
+                  <Label>Día del mes</Label>
+                  <Select value={dayOfMonth} onValueChange={setDayOfMonth}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 28 }, (_, i) => i + 1).map(d => (
+                        <SelectItem key={d} value={String(d)}>
+                          Día {d}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              <div className='space-y-1'>
+                <Label>Formato de envío</Label>
                 <Select
-                  value={frequency}
-                  onValueChange={v => setFrequency(v as typeof frequency)}
+                  value={exportFormat}
+                  onValueChange={v => setExportFormat(v as typeof exportFormat)}
                 >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value='DAILY'>Diario</SelectItem>
-                    <SelectItem value='WEEKLY'>Semanal</SelectItem>
-                    <SelectItem value='MONTHLY'>Mensual</SelectItem>
+                    <SelectItem value='BOTH'>CSV + PDF</SelectItem>
+                    <SelectItem value='CSV'>Solo CSV</SelectItem>
+                    <SelectItem value='PDF'>Solo PDF</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className='space-y-1'>
-                <Label>Hora</Label>
+                <Label>Destinatarios (opcional, separados por coma)</Label>
                 <Input
-                  type='time'
-                  value={scheduleTime}
-                  onChange={e => setScheduleTime(e.target.value)}
+                  placeholder='email1@empresa.com, email2@empresa.com'
+                  value={recipients}
+                  onChange={e => setRecipients(e.target.value)}
                 />
               </div>
+              {error && <p className='text-sm text-destructive'>{error}</p>}
             </div>
-            {frequency === 'WEEKLY' && (
-              <div className='space-y-1'>
-                <Label>Día de la semana</Label>
-                <Select value={dayOfWeek} onValueChange={setDayOfWeek}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {WEEKDAY_OPTIONS.map(d => (
-                      <SelectItem key={d.value} value={String(d.value)}>
-                        {d.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            {frequency === 'MONTHLY' && (
-              <div className='space-y-1'>
-                <Label>Día del mes</Label>
-                <Select value={dayOfMonth} onValueChange={setDayOfMonth}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.from({ length: 28 }, (_, i) => i + 1).map(d => (
-                      <SelectItem key={d} value={String(d)}>
-                        Día {d}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            <div className='space-y-1'>
-              <Label>Formato de envío</Label>
-              <Select
-                value={exportFormat}
-                onValueChange={v => setExportFormat(v as typeof exportFormat)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value='BOTH'>CSV + PDF</SelectItem>
-                  <SelectItem value='CSV'>Solo CSV</SelectItem>
-                  <SelectItem value='PDF'>Solo PDF</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className='space-y-1'>
-              <Label>Destinatarios (opcional, separados por coma)</Label>
-              <Input
-                placeholder='email1@empresa.com, email2@empresa.com'
-                value={recipients}
-                onChange={e => setRecipients(e.target.value)}
-              />
-            </div>
-            {error && <p className='text-sm text-destructive'>{error}</p>}
-          </div>
+          )}
+
           <DialogFooter>
             <Button variant='outline' onClick={() => handleDialogChange(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleCreate} disabled={saving || !savedReportId}>
-              {saving && <Loader2 className='h-4 w-4 animate-spin mr-1.5' />}
-              Crear programación
-            </Button>
+            {hasSavedReports && (
+              <Button onClick={handleCreate} disabled={saving || !savedReportId}>
+                {saving && <Loader2 className='h-4 w-4 animate-spin mr-1.5' />}
+                Crear programación
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

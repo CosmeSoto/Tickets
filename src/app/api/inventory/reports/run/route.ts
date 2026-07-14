@@ -7,7 +7,7 @@ import {
   getTemplateBySlug,
   resolveUserReportRole,
 } from '@/lib/inventory/reports/catalog'
-import { exportReportCsv, runInventoryReportDataset } from '@/lib/inventory/reports/engine'
+import { exportReportCsv, exportReportXlsx, runInventoryReportDataset } from '@/lib/inventory/reports/engine'
 import { handleInventoryReportRequest } from '@/lib/inventory/reports/handle-report-request'
 import { resolveReportScope } from '@/lib/inventory/reports/scope'
 import { resolveCanManageInventory } from '@/lib/inventory/inventory-session'
@@ -91,6 +91,16 @@ export async function GET(request: NextRequest) {
         headers: {
           'Content-Type': 'text/csv; charset=utf-8',
           'Content-Disposition': `attachment; filename="reporte-${datasetId}.csv"`,
+        },
+      })
+    }
+
+    if (format === 'xlsx') {
+      const buffer = exportReportXlsx(result.data, dataset.name)
+      return new NextResponse(new Uint8Array(buffer), {
+        headers: {
+          'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'Content-Disposition': `attachment; filename="reporte-${datasetId}.xlsx"`,
         },
       })
     }

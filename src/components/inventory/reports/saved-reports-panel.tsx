@@ -73,7 +73,7 @@ export function SavedReportsPanel({
 
   if (loading) {
     return (
-      <Card>
+      <Card id='saved-reports-panel'>
         <CardContent className='py-8 flex justify-center'>
           <Loader2 className='h-6 w-6 animate-spin text-muted-foreground' />
         </CardContent>
@@ -81,99 +81,114 @@ export function SavedReportsPanel({
     )
   }
 
-  if (savedReports.length === 0) return null
-
   return (
-    <Card>
+    <Card id='saved-reports-panel'>
       <CardHeader>
         <CardTitle className='text-base flex items-center gap-2'>
           <Bookmark className='h-4 w-4' />
           Mis reportes guardados
         </CardTitle>
         <CardDescription>
-          Consultas personalizadas con filtros y columnas que guardaste desde el explorador
+          Consultas personalizadas con filtros y columnas — necesarias para programar envíos por
+          email
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className='grid gap-3 sm:grid-cols-2 lg:grid-cols-3'>
-          {savedReports.map(report => {
-            const label =
-              report.kind === 'DATASET'
-                ? getDatasetById(report.targetId)?.name ?? report.targetId
-                : getTemplateBySlug(report.targetId)?.name ?? report.targetId
+        {savedReports.length === 0 ? (
+          <div className='rounded-lg border border-dashed p-6 text-center space-y-3'>
+            <p className='text-sm text-muted-foreground'>
+              Aún no tienes consultas guardadas. Abre el explorador, configura filtros y columnas, y
+              usa <strong className='text-foreground'>Guardar consulta</strong>.
+            </p>
+            <Button
+              variant='outline'
+              size='sm'
+              onClick={() => router.push('/inventory/reports/explore')}
+            >
+              Ir al explorador
+            </Button>
+          </div>
+        ) : (
+          <div className='grid gap-3 sm:grid-cols-2 lg:grid-cols-3'>
+            {savedReports.map(report => {
+              const label =
+                report.kind === 'DATASET'
+                  ? getDatasetById(report.targetId)?.name ?? report.targetId
+                  : getTemplateBySlug(report.targetId)?.name ?? report.targetId
 
-            return (
-              <div
-                key={report.id}
-                className='rounded-lg border p-3 flex flex-col gap-2 hover:bg-muted/30 transition-colors'
-              >
-                <div className='flex items-start justify-between gap-2'>
-                  <button
-                    type='button'
-                    className='text-left flex-1 min-w-0'
-                    onClick={() => handleOpen(report)}
-                  >
-                    <p className='font-medium truncate'>{report.name}</p>
-                    <p className='text-xs text-muted-foreground truncate'>{label}</p>
-                  </button>
-                  <Button
-                    variant='ghost'
-                    size='icon'
-                    className='h-8 w-8 shrink-0 text-muted-foreground'
-                    onClick={() => handleTogglePin(report)}
-                    title={report.pinned ? 'Desanclar del panel' : 'Anclar al panel'}
-                  >
-                    {report.pinned ? (
-                      <PinOff className='h-4 w-4 text-primary' />
-                    ) : (
-                      <Pin className='h-4 w-4' />
-                    )}
-                  </Button>
-                  {onScheduleReport && (
+              return (
+                <div
+                  key={report.id}
+                  className='rounded-lg border p-3 flex flex-col gap-2 hover:bg-muted/30 transition-colors'
+                >
+                  <div className='flex items-start justify-between gap-2'>
+                    <button
+                      type='button'
+                      className='text-left flex-1 min-w-0'
+                      onClick={() => handleOpen(report)}
+                    >
+                      <p className='font-medium truncate'>{report.name}</p>
+                      <p className='text-xs text-muted-foreground truncate'>{label}</p>
+                    </button>
                     <Button
                       variant='ghost'
                       size='icon'
                       className='h-8 w-8 shrink-0 text-muted-foreground'
-                      onClick={() => onScheduleReport(report.id)}
-                      title='Programar envío por email'
+                      onClick={() => handleTogglePin(report)}
+                      title={report.pinned ? 'Desanclar del panel' : 'Anclar al panel'}
                     >
-                      <CalendarClock className='h-4 w-4' />
+                      {report.pinned ? (
+                        <PinOff className='h-4 w-4 text-primary' />
+                      ) : (
+                        <Pin className='h-4 w-4' />
+                      )}
                     </Button>
-                  )}
-                  <Button
-                    variant='ghost'
-                    size='icon'
-                    className='h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive'
-                    disabled={deletingId === report.id}
-                    onClick={() => handleDelete(report.id)}
-                  >
-                    {deletingId === report.id ? (
-                      <Loader2 className='h-4 w-4 animate-spin' />
-                    ) : (
-                      <Trash2 className='h-4 w-4' />
+                    {onScheduleReport && (
+                      <Button
+                        variant='ghost'
+                        size='icon'
+                        className='h-8 w-8 shrink-0 text-muted-foreground'
+                        onClick={() => onScheduleReport(report.id)}
+                        title='Programar envío por email'
+                      >
+                        <CalendarClock className='h-4 w-4' />
+                      </Button>
                     )}
-                  </Button>
-                </div>
-                <div className='flex flex-wrap gap-1.5'>
-                  <Badge variant='secondary' className='text-xs'>
-                    {report.kind === 'DATASET' ? 'Explorador' : 'Plantilla'}
-                  </Badge>
-                  {report.pinned && (
-                    <Badge variant='default' className='text-xs gap-1'>
-                      <Pin className='h-3 w-3' />
-                      Anclado
+                    <Button
+                      variant='ghost'
+                      size='icon'
+                      className='h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive'
+                      disabled={deletingId === report.id}
+                      onClick={() => handleDelete(report.id)}
+                    >
+                      {deletingId === report.id ? (
+                        <Loader2 className='h-4 w-4 animate-spin' />
+                      ) : (
+                        <Trash2 className='h-4 w-4' />
+                      )}
+                    </Button>
+                  </div>
+                  <div className='flex flex-wrap gap-1.5'>
+                    <Badge variant='secondary' className='text-xs'>
+                      {report.kind === 'DATASET' ? 'Explorador' : 'Plantilla'}
                     </Badge>
-                  )}
-                  {report.family?.name && (
-                    <Badge variant='outline' className='text-xs'>
-                      {report.family.name}
-                    </Badge>
-                  )}
+                    {report.pinned && (
+                      <Badge variant='default' className='text-xs gap-1'>
+                        <Pin className='h-3 w-3' />
+                        Anclado
+                      </Badge>
+                    )}
+                    {report.family?.name && (
+                      <Badge variant='outline' className='text-xs'>
+                        {report.family.name}
+                      </Badge>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )
-          })}
-        </div>
+              )
+            })}
+          </div>
+        )}
       </CardContent>
     </Card>
   )

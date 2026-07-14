@@ -7,6 +7,7 @@ import {
   MAINTENANCE_STATUS_ES,
   toCSV,
 } from '@/lib/inventory/report-utils'
+import { ExcelGenerator } from '@/lib/services/export/excel-generator'
 import { ALL_FILTER } from './catalog'
 import type { ReportResponse, ReportRunParams, ReportSummaryItem } from './types'
 import {
@@ -962,4 +963,15 @@ function buildDatasetResponse(
 export function exportReportCsv(data: Record<string, unknown>[]): string {
   if (!data.length) return ''
   return toCSV(data)
+}
+
+export function exportReportXlsx(
+  data: Record<string, unknown>[],
+  sheetName = 'Reporte'
+): Buffer {
+  const safeName = sheetName.slice(0, 31) || 'Reporte'
+  return ExcelGenerator.generate([{ name: safeName, data }], {
+    title: safeName,
+    subject: 'Centro de Reportes — Inventario',
+  })
 }

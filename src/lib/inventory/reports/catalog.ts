@@ -631,6 +631,64 @@ export const REPORT_DATASETS: ReportDatasetDef[] = [
   },
 ]
 
+export interface ReportRoleCapabilities {
+  label: string
+  description: string
+  dataScope: string
+  templateAccess: string
+  canSaveReports: boolean
+  canScheduleEmail: boolean
+  canPinWidgets: boolean
+}
+
+/** Quién puede entrar al módulo de reportes (debe coincidir con scope.ts). */
+export function hasInventoryReportsAccess(
+  role: string,
+  isSuperAdmin: boolean,
+  canManageInventory: boolean
+): boolean {
+  return isSuperAdmin || role === 'ADMIN' || canManageInventory
+}
+
+export function getReportRoleCapabilities(
+  userRole: InventoryReportRole
+): ReportRoleCapabilities {
+  switch (userRole) {
+    case 'SUPER_ADMIN':
+      return {
+        label: 'Super Administrador',
+        description:
+          'Acceso global a todas las familias, plantillas ejecutivas y resumen financiero.',
+        dataScope: 'Todas las familias',
+        templateAccess: 'Todas (incl. resumen financiero global)',
+        canSaveReports: true,
+        canScheduleEmail: true,
+        canPinWidgets: true,
+      }
+    case 'ADMIN':
+      return {
+        label: 'Administrador',
+        description:
+          'Plantillas y explorador sobre todas las familias de la organización.',
+        dataScope: 'Todas las familias',
+        templateAccess: 'Todas excepto resumen financiero global',
+        canSaveReports: true,
+        canScheduleEmail: true,
+        canPinWidgets: true,
+      }
+    case 'MANAGER':
+      return {
+        label: 'Gestor de inventario',
+        description: 'Reportes operativos limitados a las familias que tienes asignadas.',
+        dataScope: 'Familias asignadas',
+        templateAccess: 'Plantillas operativas y datasets explorables',
+        canSaveReports: true,
+        canScheduleEmail: true,
+        canPinWidgets: true,
+      }
+  }
+}
+
 export function resolveUserReportRole(
   role: string,
   isSuperAdmin: boolean,

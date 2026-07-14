@@ -31,6 +31,12 @@ import {
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -233,9 +239,9 @@ export function ReportExplorer({
     }
   }, [selectedDatasetId, page, catalogLoading, familyId, filterValues, visibleColumns])
 
-  const handleExportCsv = () => {
+  const handleExport = (format: 'csv' | 'xlsx') => {
     const params = buildParams()
-    params.set('format', 'csv')
+    params.set('format', format)
     window.open(`/api/inventory/reports/run?${params}`, '_blank')
   }
 
@@ -501,10 +507,26 @@ export function ReportExplorer({
                     <Play className='h-4 w-4 mr-1.5' />
                     Ejecutar
                   </Button>
-                  <Button variant='outline' size='sm' onClick={handleExportCsv} disabled={!reportData?.data.length}>
-                    <Download className='h-4 w-4 mr-1.5' />
-                    CSV
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant='outline'
+                        size='sm'
+                        disabled={!reportData?.data.length}
+                      >
+                        <Download className='h-4 w-4 mr-1.5' />
+                        Exportar
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align='end'>
+                      <DropdownMenuItem onClick={() => handleExport('csv')}>
+                        CSV
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleExport('xlsx')}>
+                        Excel (.xlsx)
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
 

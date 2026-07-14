@@ -1,4 +1,4 @@
-import { formatCurrency } from '@/lib/inventory/report-utils'
+import { formatCurrency } from '@/lib/inventory/report-format'
 import type { ReportColumnDef, ReportRunParams } from './types'
 
 const ALL_GROUP = 'all'

@@ -386,7 +386,7 @@ function ReportSlugContent({ slug }: { slug: string }) {
   const [reportData, setReportData] = useState<ReportData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [exporting, setExporting] = useState<'csv' | 'pdf' | null>(null)
+  const [exporting, setExporting] = useState<'csv' | 'pdf' | 'xlsx' | null>(null)
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login')
@@ -423,18 +423,16 @@ function ReportSlugContent({ slug }: { slug: string }) {
     if (status === 'authenticated') fetchReport()
   }, [fetchReport, status])
 
-  const handleExport = (format: 'csv' | 'pdf') => {
+  const handleExport = (format: 'csv' | 'pdf' | 'xlsx') => {
     setExporting(format)
     const params = buildParams()
     params.set('format', format)
-    // Descarga directa via link — evita blob: URLs y el warning de HTTP/HTTPS
     const a = document.createElement('a')
     a.href = `/api/inventory/reports/${slug}?${params}`
-    a.download = `reporte-${slug}-${new Date().toISOString().split('T')[0]}.${format}`
+    a.download = `reporte-${slug}-${new Date().toISOString().split('T')[0]}.${format === 'xlsx' ? 'xlsx' : format}`
     document.body.appendChild(a)
     a.click()
     if (a && a.parentNode) a.parentNode.removeChild(a)
-    // Limpiar estado de exportación tras un breve delay
     setTimeout(() => setExporting(null), 1500)
   }
 
@@ -636,6 +634,19 @@ function ReportSlugContent({ slug }: { slug: string }) {
                     <Download className='h-4 w-4 mr-1.5' />
                   )}
                   Exportar CSV
+                </Button>
+                <Button
+                  variant='outline'
+                  size='sm'
+                  onClick={() => handleExport('xlsx')}
+                  disabled={!!exporting}
+                >
+                  {exporting === 'xlsx' ? (
+                    <Loader2 className='h-4 w-4 mr-1.5 animate-spin' />
+                  ) : (
+                    <Download className='h-4 w-4 mr-1.5' />
+                  )}
+                  Exportar Excel
                 </Button>
                 <Button
                   variant='outline'

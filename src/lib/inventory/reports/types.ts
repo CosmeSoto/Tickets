@@ -86,7 +86,7 @@ export type ReportRunParams = {
   page?: number
   limit?: number
   columns?: string[]
-  format?: 'json' | 'csv'
+  format?: 'json' | 'csv' | 'pdf' | 'xlsx'
 } & Record<string, string | number | undefined>
 
 export interface InventorySavedReport {
