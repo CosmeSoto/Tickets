@@ -5,6 +5,7 @@ import { SalesManagerService } from '@/lib/services/sales-manager.service'
 import {
   getInventorySessionContext,
   hasInventoryModuleAccess,
+  resolveInventoryListScope,
 } from '@/lib/inventory/inventory-session'
 
 /**
@@ -27,10 +28,10 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
-    const familyId = searchParams.get('familyId') || undefined
+    const requestedFamilyId = searchParams.get('familyId') || undefined
 
-    const scopeFamilyIds = ctx.user.isSuperAdmin ? undefined : ctx.scope.familyIds
-    if (!familyId && ctx.scope.noAccess) {
+    const listScope = await resolveInventoryListScope(session.user, requestedFamilyId)
+    if (listScope.noAccess) {
       return NextResponse.json({
         totalForSale: 0,
         totalAvailable: 0,
@@ -39,6 +40,13 @@ export async function GET(request: NextRequest) {
         byModel: [],
       })
     }
+
+    const familyId = listScope.familyId
+    const scopeFamilyIds = ctx.user.isSuperAdmin
+      ? undefined
+      : listScope.familyId
+        ? [listScope.familyId]
+        : listScope.scopeFamilyIds
 
     const stats = await SalesManagerService.getSalesStats(familyId, scopeFamilyIds)
 

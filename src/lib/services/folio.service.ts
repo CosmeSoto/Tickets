@@ -48,12 +48,17 @@ export class FolioService {
     return this.generateFolio('SRT')
   }
 
+  /** Adendum / modificación contractual — ADN-YYYY-NNNNN */
+  static async generateAmendmentFolio(): Promise<string> {
+    return this.generateFolio('ADN')
+  }
+
   /**
    * Genera un folio secuencial único
    * Thread-safe usando transacciones de Prisma
    */
   private static async generateFolio(
-    type: 'ACT' | 'DEV' | 'BAJ' | 'AR' | 'SUB' | 'SRT'
+    type: 'ACT' | 'DEV' | 'BAJ' | 'AR' | 'SUB' | 'SRT' | 'ADN'
   ): Promise<string> {
     const currentYear = new Date().getFullYear()
 
@@ -136,7 +141,7 @@ export class FolioService {
    */
   static async getLastFolioNumber(
     year: number,
-    type: 'ACT' | 'DEV' | 'BAJ' | 'AR' | 'SUB' | 'SRT'
+    type: 'ACT' | 'DEV' | 'BAJ' | 'AR' | 'SUB' | 'SRT' | 'ADN'
   ): Promise<number> {
     try {
       const counter = await prisma.folio_counters.findUnique({
@@ -160,7 +165,7 @@ export class FolioService {
    */
   static async resetCounter(
     year: number,
-    type: 'ACT' | 'DEV' | 'BAJ' | 'AR' | 'SUB' | 'SRT'
+    type: 'ACT' | 'DEV' | 'BAJ' | 'AR' | 'SUB' | 'SRT' | 'ADN'
   ): Promise<void> {
     try {
       await prisma.folio_counters.upsert({

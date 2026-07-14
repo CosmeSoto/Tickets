@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import {
   ArrowLeft,
   Key,
@@ -105,13 +106,17 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
 
 export function LicenseDetail({ licenseId, userRole, isSuperAdmin = false }: Props) {
   const router = useRouter()
+  const { data: session } = useSession()
 
   const [license, setLicense] = useState<LicenseData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showTransferDialog, setShowTransferDialog] = useState(false)
 
+  const canManageInventory = (session?.user as { canManageInventory?: boolean })?.canManageInventory === true
   const isAdmin = userRole === 'ADMIN' || isSuperAdmin
+  const canEdit = isAdmin || userRole === 'TECHNICIAN' || canManageInventory
+  const canDelete = isAdmin || canManageInventory
 
   const loadLicense = useCallback(async () => {
     setLoading(true)
@@ -231,34 +236,40 @@ export function LicenseDetail({ licenseId, userRole, isSuperAdmin = false }: Pro
           </div>
         </div>
 
-        {/* Acciones admin */}
-        {isAdmin && (
+        {/* Acciones de gestión */}
+        {(canEdit || canDelete) && (
           <div className='flex items-center gap-2 shrink-0'>
-            <Button
-              variant='outline'
-              size='sm'
-              onClick={() => router.push(`/inventory/license/${licenseId}/edit`)}
-            >
-              <Pencil className='h-3.5 w-3.5 mr-1.5' />
-              Editar
-            </Button>
-            <Button
-              variant='outline'
-              size='sm'
-              onClick={() => setShowTransferDialog(true)}
-              className='gap-1.5'
-            >
-              <ArrowRightLeft className='h-3.5 w-3.5' />
-              Transferir área
-            </Button>
-            <Button
-              variant='outline'
-              size='sm'
-              onClick={handleDelete}
-              className='text-destructive hover:text-destructive'
-            >
-              <Trash2 className='h-3.5 w-3.5' />
-            </Button>
+            {canEdit && (
+              <Button
+                variant='outline'
+                size='sm'
+                onClick={() => router.push(`/inventory/license/${licenseId}/edit`)}
+              >
+                <Pencil className='h-3.5 w-3.5 mr-1.5' />
+                Editar
+              </Button>
+            )}
+            {canEdit && (
+              <Button
+                variant='outline'
+                size='sm'
+                onClick={() => setShowTransferDialog(true)}
+                className='gap-1.5'
+              >
+                <ArrowRightLeft className='h-3.5 w-3.5' />
+                Transferir área
+              </Button>
+            )}
+            {canDelete && (
+              <Button
+                variant='outline'
+                size='sm'
+                onClick={handleDelete}
+                className='text-destructive hover:text-destructive'
+              >
+                <Trash2 className='h-3.5 w-3.5' />
+              </Button>
+            )}
           </div>
         )}
       </div>

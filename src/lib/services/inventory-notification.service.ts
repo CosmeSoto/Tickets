@@ -643,7 +643,12 @@ export class InventoryNotificationService {
       const expirationStr = new Date(act.expirationDate).toLocaleDateString('es-ES')
 
       const emailData = generateDeliveryActCreatedEmail({
-        act: { ...act, equipmentSnapshot: snapshot, receiverInfo, delivererInfo } as DeliveryAct,
+        act: {
+          ...act,
+          equipmentSnapshot: snapshot,
+          receiverInfo: { ...receiverInfo, role: 'CLIENT' },
+          delivererInfo: { ...delivererInfo, role: 'ADMIN' },
+        } as DeliveryAct,
         acceptanceUrl,
         receiverName: receiverInfo.name,
         delivererName: delivererInfo.name,

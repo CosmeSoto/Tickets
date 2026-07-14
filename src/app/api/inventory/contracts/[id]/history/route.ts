@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { ContractService } from '@/lib/services/contract-service'
+import { ContractAmendmentService } from '@/lib/services/contract-amendment.service'
 import { requireContractAccess } from '@/lib/inventory/require-inventory-api'
 
 /**
@@ -20,12 +21,17 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const accessDenied = await requireContractAccess(session.user, id, 'read')
     if (accessDenied) return accessDenied
 
-    const history = await ContractService.getRenewalHistory(id)
+    const [history, amendments] = await Promise.all([
+      ContractService.getRenewalHistory(id),
+      ContractAmendmentService.listByContract(id),
+    ])
 
     return NextResponse.json({
       success: true,
       chain: history,
-      totalRenewals: history.length - 1, // -1 porque incluye el original
+      amendments,
+      totalRenewals: history.length - 1,
+      totalAmendments: amendments.length,
     })
   } catch (error) {
     console.error('Error obteniendo historial de renovaciones:', error)

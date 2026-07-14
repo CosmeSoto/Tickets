@@ -10,6 +10,12 @@ import { SearchableSelect, type SearchableSelectOption } from '@/components/ui/s
 import { InlineCreateSelect } from '@/components/ui/inline-create-select'
 import { SimpleSelect } from '@/components/ui/simple-select'
 import { ContractPicker } from '@/components/contracts/contract-picker'
+import {
+  formatContractAmount,
+  resolveRentalFinancialFromContract,
+} from '@/lib/contracts/rental-financial-from-contract'
+import type { Contract } from '@/types/contracts'
+import { useFetch } from '@/hooks/common/use-fetch'
 import { SupplierSelect } from '@/components/inventory/suppliers/SupplierSelect'
 import { EquipmentTypeInlineForm } from '@/components/inventory/asset-forms/EquipmentTypeInlineForm'
 import { EquipmentModelInlineForm } from '@/components/inventory/asset-forms/EquipmentModelInlineForm'
@@ -247,6 +253,60 @@ export function EquipmentAssetForm({
   const [saleListingPrice, setSaleListingPrice] = useState(
     initialEquipment?.saleListingPrice != null ? String(initialEquipment.saleListingPrice) : ''
   )
+
+  const { data: linkedContracts } = useFetch<Contract>(
+    linkedContractId ? `/api/inventory/contracts/${linkedContractId}` : '/api/inventory/contracts',
+    {
+      enabled: !!linkedContractId && acquisitionMode === 'RENTAL',
+      transform: d => (d.id ? [d] : []),
+    }
+  )
+  const linkedContract = linkedContracts[0] ?? null
+
+  const contractFinancial = useMemo(
+    () => (linkedContract ? resolveRentalFinancialFromContract(linkedContract) : null),
+    [linkedContract]
+  )
+
+  const contractPrefill = useMemo(
+    () => ({
+      familyId,
+      supplierId: supplierId || null,
+      startDate:
+        initialEquipment?.rentalStartDate
+          ? new Date(initialEquipment.rentalStartDate).toISOString().slice(0, 10)
+          : purchaseDate || undefined,
+      endDate: initialEquipment?.rentalEndDate
+        ? new Date(initialEquipment.rentalEndDate).toISOString().slice(0, 10)
+        : undefined,
+      monthlyCost:
+        initialEquipment?.rentalMonthlyCost != null
+          ? String(initialEquipment.rentalMonthlyCost)
+          : purchasePrice || undefined,
+      hasRecurring: true,
+      suggestedLineDescription: serialNumber.trim()
+        ? `Equipo ${serialNumber.trim()}`
+        : code.trim()
+          ? `Equipo ${code.trim()}`
+          : 'Equipo en arrendamiento',
+      category: 'EQUIPMENT_RENTAL' as const,
+    }),
+    [
+      familyId,
+      supplierId,
+      initialEquipment?.rentalStartDate,
+      initialEquipment?.rentalEndDate,
+      initialEquipment?.rentalMonthlyCost,
+      purchaseDate,
+      purchasePrice,
+      serialNumber,
+      code,
+    ]
+  )
+
+  const handleContractChange = (contractId: string | null) => {
+    setLinkedContractId(contractId)
+  }
 
   // Mantenimiento
   const [maintenanceDate, setMaintenanceDate] = useState(
@@ -1104,10 +1164,38 @@ export function EquipmentAssetForm({
               </p>
               <ContractPicker
                 value={linkedContractId}
-                onChange={setLinkedContractId}
+                onChange={handleContractChange}
                 supplierId={supplierId || null}
                 familyId={familyId}
+                context='equipment'
+                prefill={contractPrefill}
               />
+              {linkedContract && contractFinancial ? (
+                <div className='rounded-md border bg-muted/30 px-3 py-2.5 space-y-1'>
+                  <p className='text-xs text-muted-foreground'>{contractFinancial.amountLabel}</p>
+                  <p className='text-sm font-medium font-mono'>
+                    {formatContractAmount(
+                      contractFinancial.displayAmount,
+                      contractFinancial.currency
+                    )}
+                  </p>
+                  {(contractFinancial.startDate || contractFinancial.endDate) && (
+                    <p className='text-[11px] text-muted-foreground'>
+                      Vigencia: {contractFinancial.startDate ?? '—'} →{' '}
+                      {contractFinancial.endDate ?? '—'}
+                    </p>
+                  )}
+                  <p className='text-[11px] text-muted-foreground'>
+                    Tomado automáticamente del contrato vinculado. El costo y las fechas se
+                    sincronizan al guardar.
+                  </p>
+                </div>
+              ) : (
+                <p className='text-xs text-muted-foreground rounded-md bg-muted/40 px-3 py-2'>
+                  Vincula un contrato de arrendamiento para cargar costo mensual y vigencia
+                  automáticamente.
+                </p>
+              )}
             </div>
           )}
         </>

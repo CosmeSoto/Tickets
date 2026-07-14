@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { canManageInventory } from '@/lib/inventory-access'
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
+import { getInventorySessionContext } from '@/lib/inventory/inventory-session'
 
 const decommissionInclude = {
   requester: { select: { id: true, name: true, email: true, department: true } },
@@ -20,7 +21,14 @@ const decommissionInclude = {
       type: { select: { familyId: true, family: { select: { id: true, name: true } } } },
     },
   },
-  license: { select: { id: true, name: true, vendor: true } },
+  license: {
+    select: {
+      id: true,
+      name: true,
+      vendor: true,
+      licenseType: { select: { familyId: true, family: { select: { id: true, name: true } } } },
+    },
+  },
   attachments: true,
   act: {
     include: {
@@ -37,6 +45,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
   const { id } = await params
+  const isSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
   const isAdmin = session.user.role === 'ADMIN'
   const canManage = await canManageInventory(session.user.id, session.user.role)
 
@@ -47,22 +56,35 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 
   if (!request) return NextResponse.json({ error: 'Solicitud no encontrada' }, { status: 404 })
 
-  // Gestor/Técnico solo puede ver sus propias solicitudes
-  if (!isAdmin && !canManage && request.requestedById !== session.user.id) {
-    return NextResponse.json(
-      { error: 'No tienes permiso para ver esta solicitud' },
-      { status: 403 }
-    )
-  }
-  if (canManage && !isAdmin && request.requestedById !== session.user.id) {
+  if (!isSuperAdmin && !isAdmin && !canManage && request.requestedById !== session.user.id) {
     return NextResponse.json(
       { error: 'No tienes permiso para ver esta solicitud' },
       { status: 403 }
     )
   }
 
-  // Agregar URLs públicas a los adjuntos
-  const attachmentsWithUrls = request.attachments.map((att: any) => ({
+  if (canManage && !isSuperAdmin && !isAdmin) {
+    const familyId =
+      request.assetType === 'EQUIPMENT'
+        ? request.equipment?.type?.familyId ?? null
+        : request.license?.licenseType?.familyId ?? null
+
+    const ctx = await getInventorySessionContext(session.user)
+    if (ctx.scope.noAccess) {
+      return NextResponse.json(
+        { error: 'No tienes permiso para ver esta solicitud' },
+        { status: 403 }
+      )
+    }
+    if (ctx.scope.familyIds?.length && familyId && !ctx.scope.familyIds.includes(familyId)) {
+      return NextResponse.json(
+        { error: 'No tienes permiso para ver solicitudes fuera de tus familias' },
+        { status: 403 }
+      )
+    }
+  }
+
+  const attachmentsWithUrls = request.attachments.map((att: { filename: string }) => ({
     ...att,
     url: `/api/uploads/decommission/${request.id}/${att.filename}`,
   }))
@@ -100,7 +122,6 @@ export async function DELETE(
   if (!request) return NextResponse.json({ error: 'Solicitud no encontrada' }, { status: 404 })
 
   try {
-    // Registrar auditoría ANTES de eliminar
     await prisma.audit_logs.create({
       data: {
         id: randomUUID(),
@@ -118,7 +139,6 @@ export async function DELETE(
       },
     })
 
-    // Si tiene acta aprobada, eliminarla también
     if ((request as any).act) {
       await prisma.decommission_acts.delete({ where: { requestId: id } })
     }

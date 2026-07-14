@@ -8,8 +8,8 @@ import { withReportCache } from '@/lib/api-cache'
 
 /**
  * GET /api/inventory/reports
- * Genera reportes de inventario según el tipo solicitado
- * Solo ADMIN puede acceder
+ * @deprecated Usar /api/inventory/reports/run?template=... o rutas /api/inventory/reports/{slug}
+ * Legacy: reportes vía InventoryReportService (solo ADMIN).
  */
 export async function GET(request: NextRequest) {
   try {

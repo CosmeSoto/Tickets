@@ -110,6 +110,48 @@ export const SUBSCRIPTION_GOVERNANCE_CATEGORIES: ContractCategory[] = [
 
 export const EXPIRING_DAYS = 30 // días antes del vencimiento para alertar
 
+export type ContractAmendmentType =
+  | 'PRICE_CHANGE'
+  | 'TERM_EXTENSION'
+  | 'TERM_REDUCTION'
+  | 'SCOPE_CHANGE'
+  | 'BILLING_CHANGE'
+  | 'CANCELLATION'
+  | 'OTHER'
+
+export const CONTRACT_AMENDMENT_TYPE_LABELS: Record<ContractAmendmentType, string> = {
+  PRICE_CHANGE: 'Cambio de precio',
+  TERM_EXTENSION: 'Extensión de vigencia',
+  TERM_REDUCTION: 'Reducción de vigencia',
+  SCOPE_CHANGE: 'Cambio de alcance',
+  BILLING_CHANGE: 'Cambio de facturación',
+  CANCELLATION: 'Cancelación',
+  OTHER: 'Otro',
+}
+
+export interface ContractAmendment {
+  id: string
+  contractId: string
+  folio: string
+  amendmentNumber: number
+  title: string
+  description?: string | null
+  type: ContractAmendmentType
+  status: string
+  effectiveDate: string
+  applyToContract: boolean
+  previousMonthlyCost?: number | null
+  newMonthlyCost?: number | null
+  previousTotalValue?: number | null
+  newTotalValue?: number | null
+  previousEndDate?: string | null
+  newEndDate?: string | null
+  previousBillingCycle?: BillingCycle | null
+  newBillingCycle?: BillingCycle | null
+  createdAt: string
+  creator?: { id: string; name: string; email: string }
+}
+
 // ── Interfaces ────────────────────────────────────────────────────────────────
 
 export interface ContractLine {

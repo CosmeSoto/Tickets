@@ -14,6 +14,7 @@ import {
 } from '@/lib/inventory/inventory-resource-access'
 import prisma from '@/lib/prisma'
 import { getRenewalAlertStatus } from '@/lib/inventory/renewal-alert'
+import { getLinkedBusinessContractIdForLicense, syncLicenseContractLink, mapLicenseScope } from '@/lib/inventory/license-contract'
 
 /**
  * GET /api/inventory/licenses/[id]
@@ -54,6 +55,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       (license as any).renewalDate ? new Date((license as any).renewalDate) : null
     )
 
+    const linkedContractId = await getLinkedBusinessContractIdForLicense(id)
+
     return NextResponse.json({
       ...license,
       supplier: licenseWithExtra?.supplier ?? null,
@@ -61,6 +64,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       contractType: licenseWithExtra?.contractType ?? null,
       licenseType: licenseWithExtra?.licenseType ?? null,
       renewalAlertStatus,
+      linkedContractId,
     })
   } catch (error) {
     console.error('Error en GET /api/inventory/licenses/[id]:', error)
@@ -95,6 +99,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       purchaseOrderNumber,
       licenseScope,
       contractType,
+      contractId,
+      scope,
+      licenseTypeId,
+      customValues,
       ...rest
     } = body
 
@@ -143,6 +151,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     const validatedData = updateLicenseSchema.parse(rest)
     const updatePayload: any = { ...validatedData }
+    if (licenseTypeId !== undefined) updatePayload.typeId = licenseTypeId
+    if (scope !== undefined) updatePayload.licenseScope = mapLicenseScope(scope)
     if (supplierId !== undefined) updatePayload.supplierId = supplierId
     if (renewalCost !== undefined) updatePayload.renewalCost = renewalCost
     if (renewalDate !== undefined) updatePayload.renewalDate = renewalDate
@@ -150,8 +160,15 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (purchaseOrderNumber !== undefined) updatePayload.purchaseOrderNumber = purchaseOrderNumber
     if (licenseScope !== undefined) updatePayload.licenseScope = licenseScope
     if (contractType !== undefined) updatePayload.contractType = contractType
+    if (customValues !== undefined) {
+      updatePayload.customValues = customValues.length > 0 ? customValues : null
+    }
 
     const license = await LicenseService.updateLicense(id, updatePayload, session.user.id)
+
+    if (contractId !== undefined) {
+      await syncLicenseContractLink(id, contractId || null, license.name)
+    }
 
     await AuditServiceComplete.log({
       action: AuditActionsComplete.LICENSE_UPDATED,

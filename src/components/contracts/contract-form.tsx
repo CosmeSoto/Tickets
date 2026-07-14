@@ -24,6 +24,7 @@ import { useFetch } from '@/hooks/common/use-fetch'
 import { FileUploadZone } from '@/components/ui/file-upload-zone'
 import { ContractPaymentsPanel } from '@/components/contracts/contract-payments-panel'
 import { ContractAssignmentsPanel } from '@/components/contracts/contract-assignments-panel'
+import { ContractAmendmentsPanel } from '@/components/contracts/contract-amendments-panel'
 import {
   CONTRACT_CATEGORY_LABELS,
   CONTRACT_LINE_TYPE_LABELS,
@@ -35,6 +36,8 @@ import {
   type Contract,
   type ContractFormData,
 } from '@/types/contracts'
+import type { ContractPickerPrefill } from '@/lib/contracts/contract-picker-prefill'
+import { applyContractFormPrefill } from '@/lib/contracts/apply-contract-prefill'
 
 interface ContractAttachment {
   id: string
@@ -50,6 +53,8 @@ interface Props {
   onSuccess: (contract: Contract) => void
   onCancel: () => void
   readOnly?: boolean
+  embedMode?: boolean
+  prefill?: ContractPickerPrefill | null
 }
 
 const EMPTY_LINE = {
@@ -63,7 +68,14 @@ const EMPTY_LINE = {
   order: 0,
 }
 
-export function ContractForm({ contract, onSuccess, onCancel, readOnly = false }: Props) {
+export function ContractForm({
+  contract,
+  onSuccess,
+  onCancel,
+  readOnly = false,
+  embedMode = false,
+  prefill = null,
+}: Props) {
   const { toast } = useToast()
   const [submitting, setSubmitting] = useState(false)
   const isEditing = !!contract
@@ -252,6 +264,12 @@ export function ContractForm({ contract, onSuccess, onCancel, readOnly = false }
   })
 
   const { fields, append, remove } = useFieldArray({ control, name: 'lines' })
+
+  useEffect(() => {
+    if (contract || !prefill) return
+    applyContractFormPrefill(prefill, setValue, line => append(line), fields.length)
+  }, [contract, prefill, setValue, append, fields.length])
+
   const autoRenew = watch('autoRenew')
   const selectedCategory = watch('category')
   const familyId = watch('familyId')
@@ -788,7 +806,7 @@ export function ContractForm({ contract, onSuccess, onCancel, readOnly = false }
       {/* ── Líneas del contrato ─────────────────────────────────────────── */}
       <Card>
         <CardHeader>
-          <div className='flex items-center justify-between'>
+          <div className='flex items-center justify-between gap-2'>
             <CardTitle className='text-base'>Líneas del contrato</CardTitle>
             <Button
               type='button'
@@ -800,6 +818,10 @@ export function ContractForm({ contract, onSuccess, onCancel, readOnly = false }
               <Plus className='h-4 w-4 mr-1' /> Agregar línea
             </Button>
           </div>
+          <p className='text-xs text-muted-foreground mt-1'>
+            Cada línea vincula un activo (equipo, software, servicio). Los cambios contractuales
+            parciales se registran como adendums (folio ADN) en la sección inferior.
+          </p>
         </CardHeader>
         <CardContent className='space-y-3'>
           {fields.length === 0 && (
@@ -982,8 +1004,27 @@ export function ContractForm({ contract, onSuccess, onCancel, readOnly = false }
       </Card>
       </fieldset>
 
+      {!isEditing && embedMode && (
+        <p className='text-xs text-muted-foreground rounded-md border border-dashed px-3 py-2'>
+          Tras crear y vincular, podrá registrar adendums, asignar cliente y adjuntos desde{' '}
+          <strong>Completar</strong> o desde Contratos.
+        </p>
+      )}
+
       {isEditing && contract?.id && (
         <>
+          <ContractAmendmentsPanel
+            contractId={contract.id}
+            canManage={!readOnly}
+            onContractUpdated={() => {
+              fetch(`/api/inventory/contracts/${contract.id}`)
+                .then(r => (r.ok ? r.json() : null))
+                .then(d => {
+                  if (d) onSuccess(d)
+                })
+                .catch(() => {})
+            }}
+          />
           <ContractAssignmentsPanel contract={contract} canManage={!readOnly} />
           {!readOnly && (
             <ContractPaymentsPanel
@@ -1009,12 +1050,18 @@ export function ContractForm({ contract, onSuccess, onCancel, readOnly = false }
       {/* ── Acciones ────────────────────────────────────────────────────── */}
       <div className='flex justify-end gap-3 pt-2'>
         <Button type='button' variant='outline' onClick={onCancel} disabled={submitting}>
-          {readOnly ? 'Cerrar' : 'Cancelar'}
+          {readOnly || embedMode ? 'Volver' : 'Cancelar'}
         </Button>
         {!readOnly && (
           <Button type='submit' disabled={submitting}>
             {submitting && <RefreshCw className='h-4 w-4 mr-2 animate-spin' />}
-            {isEditing ? 'Guardar cambios' : 'Crear contrato'}
+            {embedMode
+              ? isEditing
+                ? 'Guardar y volver'
+                : 'Crear y vincular'
+              : isEditing
+                ? 'Guardar cambios'
+                : 'Crear contrato'}
           </Button>
         )}
       </div>

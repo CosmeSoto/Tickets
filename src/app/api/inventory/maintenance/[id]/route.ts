@@ -2,10 +2,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { MaintenanceService } from '@/lib/services/maintenance.service'
-import prisma from '@/lib/prisma'
-import { randomUUID } from 'crypto'
 import { canManageInventory, inventoryForbidden } from '@/lib/inventory-access'
 import { NotificationService } from '@/lib/services/notification-service'
+import {
+  assertMaintenanceClientAccept,
+  assertMaintenanceManage,
+  assertMaintenanceRead,
+  InventoryAccessError,
+  inventoryAccessToResponse,
+  toInventoryAccessUser,
+} from '@/lib/inventory/inventory-resource-access'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -13,6 +19,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
     const { id } = await params
+    const user = toInventoryAccessUser(session.user)
+
+    try {
+      await assertMaintenanceRead(user, id)
+    } catch (err) {
+      if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+      throw err
+    }
+
     const maintenance = await MaintenanceService.getById(id)
     if (!maintenance)
       return NextResponse.json({ error: 'Mantenimiento no encontrado' }, { status: 404 })
@@ -37,6 +52,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
     const { id } = await params
+    const user = toInventoryAccessUser(session.user)
     const body = await request.json()
     const {
       action,
@@ -82,6 +98,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       return NextResponse.json({ error: 'No tienes permisos para reagendar' }, { status: 403 })
     }
     if (action === 'approve') {
+      try {
+        await assertMaintenanceManage(user, id)
+      } catch (err) {
+        if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+        throw err
+      }
       if (!scheduledDate)
         return NextResponse.json({ error: 'Fecha requerida para aprobar' }, { status: 400 })
       const result = await MaintenanceService.approveMaintenance(
@@ -106,6 +128,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
 
     if (action === 'accept') {
+      try {
+        await assertMaintenanceClientAccept(user, id)
+      } catch (err) {
+        if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+        throw err
+      }
       const result = await MaintenanceService.acceptMaintenance(id, session.user.id)
 
       // Notificar al técnico asignado
@@ -124,6 +152,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
 
     if (action === 'reschedule') {
+      try {
+        await assertMaintenanceManage(user, id)
+      } catch (err) {
+        if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+        throw err
+      }
       if (!scheduledDate)
         return NextResponse.json({ error: 'Fecha requerida para reagendar' }, { status: 400 })
       const result = await MaintenanceService.reschedule(
@@ -135,6 +169,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
 
     if (action === 'complete') {
+      try {
+        await assertMaintenanceManage(user, id)
+      } catch (err) {
+        if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+        throw err
+      }
       const result = await MaintenanceService.completeMaintenance(
         id,
         {
@@ -189,10 +229,17 @@ export async function DELETE(
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-    if (session.user.role === 'CLIENT')
-      return NextResponse.json({ error: 'No tienes permisos' }, { status: 403 })
 
     const { id } = await params
+    const user = toInventoryAccessUser(session.user)
+
+    try {
+      await assertMaintenanceManage(user, id)
+    } catch (err) {
+      if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+      throw err
+    }
+
     await MaintenanceService.cancel(id, session.user.id)
 
     return NextResponse.json({ message: 'Mantenimiento cancelado' })

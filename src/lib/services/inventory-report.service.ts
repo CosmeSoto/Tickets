@@ -15,13 +15,17 @@ export class InventoryReportService {
    */
   static async getEquipmentByModel(params: {
     familyId?: string
+    familyIds?: string[]
     modelId?: string
     userId?: string
     userRole?: string
   }) {
     try {
+      const familyIds =
+        params.familyIds ?? (params.familyId ? [params.familyId] : undefined)
+      const familyWhere = buildEquipmentFamilyWhere(familyIds)
       const instancesWhere: Prisma.equipmentWhereInput = {
-        ...(params.familyId ? { type: { familyId: params.familyId } } : {}),
+        ...(Object.keys(familyWhere).length > 0 ? familyWhere : {}),
       }
 
       const models = await prisma.equipment_models.findMany({
@@ -71,15 +75,20 @@ export class InventoryReportService {
    */
   static async getMaintenanceByModel(params: {
     familyId?: string
+    familyIds?: string[]
     modelId?: string
     startDate?: Date
     endDate?: Date
   }) {
     try {
+      const familyIds =
+        params.familyIds ?? (params.familyId ? [params.familyId] : undefined)
+      const familyWhere = buildEquipmentFamilyWhere(familyIds)
+
       const where: Prisma.maintenance_recordsWhereInput = {
         equipment: {
           ...(params.modelId ? { modelId: params.modelId } : {}),
-          ...(params.familyId ? { type: { familyId: params.familyId } } : {}),
+          ...(Object.keys(familyWhere).length > 0 ? familyWhere : {}),
         },
       }
 
@@ -161,10 +170,15 @@ export class InventoryReportService {
    */
   static async getEquipmentByBatch(params: {
     familyId?: string
+    familyIds?: string[]
     batchId?: string
     supplierId?: string
   }) {
     try {
+      const familyIds =
+        params.familyIds ?? (params.familyId ? [params.familyId] : undefined)
+      const familyWhere = buildEquipmentFamilyWhere(familyIds)
+
       const where: any = {}
 
       if (params.batchId) where.id = params.batchId
@@ -176,7 +190,7 @@ export class InventoryReportService {
           model: { include: { brand: true } },
           supplier: { select: { name: true } },
           equipment: {
-            where: params.familyId ? { type: { familyId: params.familyId } } : {},
+            where: Object.keys(familyWhere).length > 0 ? familyWhere : {},
             select: {
               id: true,
               code: true,

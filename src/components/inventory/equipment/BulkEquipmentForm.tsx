@@ -217,6 +217,21 @@ export function BulkEquipmentForm({
     (isRequired('FINANCIAL') || (requireFinancialForNew && selectedCondition === 'NEW'))
   const showDepreciation = isVisible('DEPRECIATION') && acquisitionMode === 'FIXED_ASSET'
 
+  const bulkContractPrefill = useMemo(
+    () => ({
+      familyId: selectedFamilyId ?? undefined,
+      supplierId: supplierId || null,
+      startDate: purchaseDate || undefined,
+      monthlyCost: purchasePrice || undefined,
+      hasRecurring: true,
+      suggestedLineDescription: selectedModelData?.model
+        ? `Lote ${selectedModelData.model}`
+        : 'Equipo en arrendamiento',
+      category: 'EQUIPMENT_RENTAL' as const,
+    }),
+    [selectedFamilyId, supplierId, purchaseDate, purchasePrice, selectedModelData?.model]
+  )
+
   // ── Valor residual sugerido ────────────────────────────────────────────────
   const suggestedResidualValue = useMemo(() => {
     const price = parseFloat(purchasePrice)
@@ -1029,6 +1044,8 @@ export function BulkEquipmentForm({
               onChange={setLinkedContractId}
               supplierId={supplierId || null}
               familyId={selectedFamilyId ?? undefined}
+              context='equipment'
+              prefill={bulkContractPrefill}
             />
           </div>
         )}

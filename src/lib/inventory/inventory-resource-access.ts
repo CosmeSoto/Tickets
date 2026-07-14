@@ -314,3 +314,109 @@ export async function assertEquipmentIdsManage(
     await assertInventoryManageByFamily(user, eq.type?.familyId ?? null)
   }
 }
+
+async function getMaintenanceEquipmentId(maintenanceId: string): Promise<string> {
+  const record = await prisma.maintenance_records.findUnique({
+    where: { id: maintenanceId },
+    select: { equipmentId: true },
+  })
+  if (!record) {
+    throw new InventoryAccessError('Mantenimiento no encontrado', 404)
+  }
+  return record.equipmentId
+}
+
+/** Lectura de un mantenimiento: cliente (asignado o solicitante) o staff con acceso al equipo. */
+export async function assertMaintenanceRead(
+  user: InventoryAccessUser,
+  maintenanceId: string
+): Promise<void> {
+  const record = await prisma.maintenance_records.findUnique({
+    where: { id: maintenanceId },
+    select: { equipmentId: true, requestedById: true },
+  })
+  if (!record) {
+    throw new InventoryAccessError('Mantenimiento no encontrado', 404)
+  }
+
+  if (user.role === 'CLIENT') {
+    const isRequester = record.requestedById === user.id
+    const hasEquipment = await hasAccessToEquipment(
+      user.id,
+      user.role as UserRole,
+      user.isSuperAdmin,
+      record.equipmentId
+    )
+    if (!isRequester && !hasEquipment) {
+      throw new InventoryAccessError('No tienes acceso a este mantenimiento', 403)
+    }
+    return
+  }
+
+  await assertInventoryResourceRead(user, 'EQUIPMENT', record.equipmentId)
+}
+
+/** Gestión de mantenimiento: requiere permiso de gestión sobre el equipo. */
+export async function assertMaintenanceManage(
+  user: InventoryAccessUser,
+  maintenanceId: string
+): Promise<void> {
+  const equipmentId = await getMaintenanceEquipmentId(maintenanceId)
+  await assertInventoryResourceManage(user, 'EQUIPMENT', equipmentId)
+}
+
+/** Cliente acepta mantenimiento solo si tiene el equipo asignado. */
+export async function assertMaintenanceClientAccept(
+  user: InventoryAccessUser,
+  maintenanceId: string
+): Promise<void> {
+  if (user.role !== 'CLIENT') {
+    throw new InventoryAccessError('Solo el cliente puede aceptar el mantenimiento', 403)
+  }
+  const equipmentId = await getMaintenanceEquipmentId(maintenanceId)
+  const hasEquipment = await hasAccessToEquipment(
+    user.id,
+    user.role as UserRole,
+    user.isSuperAdmin,
+    equipmentId
+  )
+  if (!hasEquipment) {
+    throw new InventoryAccessError('No tienes acceso a este mantenimiento', 403)
+  }
+}
+
+/**
+ * Staff crea/programa mantenimiento: gestor con manage en familia,
+ * técnico/admin con lectura en el equipo.
+ */
+export async function assertEquipmentMaintenanceWrite(
+  user: InventoryAccessUser,
+  equipmentId: string
+): Promise<void> {
+  if (user.role === 'CLIENT') {
+    throw new InventoryAccessError('No tienes permisos para programar mantenimientos', 403)
+  }
+
+  const manages = await canManageInventory(user.id, user.role)
+  if (manages) {
+    await assertInventoryResourceManage(user, 'EQUIPMENT', equipmentId)
+  } else {
+    await assertInventoryResourceRead(user, 'EQUIPMENT', equipmentId)
+  }
+}
+
+/** Acciones masivas: valida gestión sobre todos los equipos involucrados. */
+export async function assertMaintenanceIdsManage(
+  user: InventoryAccessUser,
+  maintenanceIds: string[]
+): Promise<void> {
+  const records = await prisma.maintenance_records.findMany({
+    where: { id: { in: maintenanceIds } },
+    select: { id: true, equipmentId: true },
+  })
+  if (records.length !== maintenanceIds.length) {
+    throw new InventoryAccessError('Algunos mantenimientos no fueron encontrados', 404)
+  }
+  const equipmentIds = [...new Set(records.map(r => r.equipmentId))]
+  await assertEquipmentIdsManage(user, equipmentIds)
+}

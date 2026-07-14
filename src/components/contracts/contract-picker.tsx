@@ -1,18 +1,16 @@
 'use client'
 
 /**
- * ContractPicker — selector de contrato embebido en formularios de activos.
+ * ContractPicker — selector de contrato embebido en formularios de activos/licencias.
  *
- * Permite al usuario:
- *  1. Vincular un contrato existente (búsqueda)
- *  2. Crear un contrato nuevo directamente desde el modal
- *
- * Se usa en EquipmentAssetForm y LicenseAssetForm cuando el modo de
- * adquisición es RENTAL o LOAN.
+ * - Vincular existente (búsqueda)
+ * - Crear rápido (campos mínimos)
+ * - Formulario completo (mismo ContractForm del módulo Contratos)
+ * - Completar/editar contrato vinculado sin salir del flujo
  */
 
-import { useState } from 'react'
-import { FileSignature, Plus, X, ExternalLink } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { FileSignature, Plus, X, ExternalLink, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -26,25 +24,54 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { useFetch } from '@/hooks/common/use-fetch'
 import { QuickContractForm } from '@/components/contracts/quick-contract-form'
+import { ContractForm } from '@/components/contracts/contract-form'
 import type { Contract } from '@/types/contracts'
 import { CONTRACT_CATEGORY_LABELS } from '@/types/contracts'
+import {
+  buildContractPrefill,
+  type ContractPickerContext,
+  type ContractPickerPrefill,
+} from '@/lib/contracts/contract-picker-prefill'
 
 interface Props {
-  /** ID del contrato actualmente vinculado */
   value: string | null
   onChange: (contractId: string | null) => void
-  /** Proveedor para pre-filtrar contratos */
   supplierId?: string | null
-  /** Familia para pre-rellenar el formulario de nuevo contrato */
   familyId?: string | null
   disabled?: boolean
+  /** Origen: licencia vs equipo (define categoría y línea sugerida) */
+  context?: ContractPickerContext
+  /** Datos del formulario padre para pre-rellenar creación */
+  prefill?: ContractPickerPrefill | null
 }
 
-export function ContractPicker({ value, onChange, supplierId, familyId, disabled }: Props) {
-  const [open, setOpen] = useState(false)
-  const [tab, setTab] = useState<'link' | 'create'>('link')
+type PickerTab = 'link' | 'create-quick' | 'create-full' | 'edit'
 
-  // Contratos activos o borradores vinculables desde creación de activos
+export function ContractPicker({
+  value,
+  onChange,
+  supplierId,
+  familyId,
+  disabled,
+  context = 'license',
+  prefill = null,
+}: Props) {
+  const [open, setOpen] = useState(false)
+  const [tab, setTab] = useState<PickerTab>('link')
+
+  const resolvedPrefill = useMemo(
+    () =>
+      buildContractPrefill(
+        {
+          ...prefill,
+          supplierId: prefill?.supplierId ?? supplierId,
+          familyId: prefill?.familyId ?? familyId,
+        },
+        context
+      ),
+    [prefill, supplierId, familyId, context]
+  )
+
   const { data: contracts, reload } = useFetch<Contract>('/api/inventory/contracts', {
     params: {
       pageSize: 200,
@@ -58,8 +85,7 @@ export function ContractPicker({ value, onChange, supplierId, familyId, disabled
     enabled: open && tab === 'link',
   })
 
-  // Contrato actualmente seleccionado (para mostrar el badge)
-  const { data: selectedContracts } = useFetch<Contract>(
+  const { data: selectedContracts, reload: reloadSelected } = useFetch<Contract>(
     value ? `/api/inventory/contracts/${value}` : '/api/inventory/contracts',
     {
       enabled: !!value,
@@ -67,6 +93,11 @@ export function ContractPicker({ value, onChange, supplierId, familyId, disabled
     }
   )
   const selectedContract = selectedContracts[0] ?? null
+
+  const openPicker = (initialTab: PickerTab = 'link') => {
+    setTab(initialTab)
+    setOpen(true)
+  }
 
   const handleLink = (contractId: string) => {
     onChange(contractId)
@@ -76,20 +107,29 @@ export function ContractPicker({ value, onChange, supplierId, familyId, disabled
   const handleCreated = (contract: Contract) => {
     onChange(contract.id)
     reload()
+    reloadSelected()
+    setOpen(false)
+  }
+
+  const handleUpdated = (contract: Contract) => {
+    onChange(contract.id)
+    reload()
+    reloadSelected()
     setOpen(false)
   }
 
   const handleClear = () => onChange(null)
 
+  const contextLabel = context === 'license' ? 'licencia' : 'equipo'
+
   return (
     <div className='space-y-2'>
-      {/* Contrato vinculado */}
       {value && selectedContract ? (
         <div className='flex items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2'>
           <FileSignature className='h-4 w-4 text-muted-foreground flex-shrink-0' />
           <div className='flex-1 min-w-0'>
             <p className='text-sm font-medium truncate'>{selectedContract.name}</p>
-            <div className='flex items-center gap-2 mt-0.5'>
+            <div className='flex items-center gap-2 mt-0.5 flex-wrap'>
               {selectedContract.contractNumber && (
                 <span className='text-xs text-muted-foreground font-mono'>
                   {selectedContract.contractNumber}
@@ -105,8 +145,20 @@ export function ContractPicker({ value, onChange, supplierId, familyId, disabled
               type='button'
               variant='ghost'
               size='sm'
+              className='h-7 px-2 text-xs'
+              onClick={() => openPicker('edit')}
+              disabled={disabled}
+              title='Completar o editar contrato'
+            >
+              <Pencil className='h-3.5 w-3.5 mr-1' />
+              Completar
+            </Button>
+            <Button
+              type='button'
+              variant='ghost'
+              size='sm'
               className='h-7 w-7 p-0'
-              onClick={() => setOpen(true)}
+              onClick={() => openPicker('link')}
               disabled={disabled}
             >
               <ExternalLink className='h-3.5 w-3.5' />
@@ -129,7 +181,7 @@ export function ContractPicker({ value, onChange, supplierId, familyId, disabled
           variant='outline'
           size='sm'
           className='w-full justify-start gap-2'
-          onClick={() => setOpen(true)}
+          onClick={() => openPicker('link')}
           disabled={disabled}
         >
           <FileSignature className='h-4 w-4' />
@@ -137,103 +189,129 @@ export function ContractPicker({ value, onChange, supplierId, familyId, disabled
         </Button>
       )}
 
-      {/* Modal */}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className='max-w-3xl max-h-[90vh]'>
+        <DialogContent className='max-w-4xl max-h-[92vh]'>
           <DialogHeader>
-            <DialogTitle>Gestionar contrato</DialogTitle>
+            <DialogTitle>
+              {tab === 'edit' ? 'Completar contrato' : 'Gestionar contrato'}
+            </DialogTitle>
             <DialogDescription>
-              Vincula un contrato existente o crea uno nuevo para este activo.
+              {tab === 'edit'
+                ? 'Agrega facturación, líneas, custodio y adjuntos sin salir de la creación de la ' +
+                  contextLabel +
+                  '.'
+                : 'Vincula un contrato existente o créalo con los datos ya capturados en este formulario.'}
             </DialogDescription>
           </DialogHeader>
 
-          <div className='overflow-y-auto max-h-[calc(90vh-120px)]'>
-            <Tabs value={tab} onValueChange={v => setTab(v as any)}>
-              <TabsList className='grid w-full grid-cols-2'>
-                <TabsTrigger value='link'>Vincular existente</TabsTrigger>
-                <TabsTrigger value='create'>
-                  <Plus className='h-3.5 w-3.5 mr-1' /> Crear nuevo
-                </TabsTrigger>
-              </TabsList>
+          <div className='overflow-y-auto max-h-[calc(92vh-120px)]'>
+            {tab === 'edit' && selectedContract ? (
+              <ContractForm
+                contract={selectedContract}
+                embedMode
+                onSuccess={handleUpdated}
+                onCancel={() => setOpen(false)}
+              />
+            ) : (
+              <Tabs value={tab} onValueChange={v => setTab(v as PickerTab)}>
+                <TabsList className='grid w-full grid-cols-3'>
+                  <TabsTrigger value='link'>Vincular existente</TabsTrigger>
+                  <TabsTrigger value='create-quick'>Crear rápido</TabsTrigger>
+                  <TabsTrigger value='create-full'>Formulario completo</TabsTrigger>
+                </TabsList>
 
-              {/* ── Tab: vincular ─────────────────────────────────────── */}
-              <TabsContent value='link' className='space-y-4 pt-4'>
-                {contracts.length === 0 ? (
-                  <div className='text-center py-8 text-muted-foreground'>
-                    <FileSignature className='h-10 w-10 mx-auto mb-3 opacity-30' />
-                    <p className='text-sm'>No hay contratos activos disponibles.</p>
-                    <Button
-                      type='button'
-                      variant='outline'
-                      size='sm'
-                      className='mt-3'
-                      onClick={() => setTab('create')}
-                    >
-                      <Plus className='h-4 w-4 mr-1' /> Crear contrato nuevo
-                    </Button>
-                  </div>
-                ) : (
-                  <div className='space-y-2'>
-                    <p className='text-sm text-muted-foreground'>
-                      Selecciona el contrato al que pertenece este activo:
-                    </p>
-                    <SearchableSelect
-                      options={contracts.map(c => ({
-                        value: c.id,
-                        label: c.contractNumber ? `${c.contractNumber} — ${c.name}` : c.name,
-                      }))}
-                      value={value ?? ''}
-                      onChange={handleLink}
-                      placeholder='Buscar contrato...'
-                      emptyLabel='Sin contratos disponibles'
-                    />
-                    <div className='space-y-1 max-h-64 overflow-y-auto'>
-                      {contracts.map(c => (
-                        <button
-                          key={c.id}
+                <TabsContent value='link' className='space-y-4 pt-4'>
+                  {contracts.length === 0 ? (
+                    <div className='text-center py-8 text-muted-foreground'>
+                      <FileSignature className='h-10 w-10 mx-auto mb-3 opacity-30' />
+                      <p className='text-sm'>No hay contratos activos disponibles.</p>
+                      <div className='flex gap-2 justify-center mt-3'>
+                        <Button
                           type='button'
-                          onClick={() => handleLink(c.id)}
-                          className={`w-full text-left rounded-lg border px-3 py-2.5 hover:bg-muted/50 transition-colors ${
-                            value === c.id ? 'border-primary bg-primary/5' : ''
-                          }`}
+                          variant='outline'
+                          size='sm'
+                          onClick={() => setTab('create-quick')}
                         >
-                          <div className='flex items-center justify-between gap-2'>
-                            <div className='min-w-0'>
-                              <p className='text-sm font-medium truncate'>{c.name}</p>
-                              <div className='flex items-center gap-2 mt-0.5'>
-                                {c.contractNumber && (
-                                  <span className='text-xs text-muted-foreground font-mono'>
-                                    {c.contractNumber}
-                                  </span>
-                                )}
-                                {c.supplier && (
-                                  <span className='text-xs text-muted-foreground'>
-                                    {c.supplier.name}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                            <Badge variant='outline' className='text-xs flex-shrink-0'>
-                              {CONTRACT_CATEGORY_LABELS[c.category] ?? c.category}
-                            </Badge>
-                          </div>
-                        </button>
-                      ))}
+                          Crear rápido
+                        </Button>
+                        <Button type='button' size='sm' onClick={() => setTab('create-full')}>
+                          <Plus className='h-4 w-4 mr-1' /> Formulario completo
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                )}
-              </TabsContent>
+                  ) : (
+                    <div className='space-y-2'>
+                      <p className='text-sm text-muted-foreground'>
+                        Selecciona el contrato al que pertenece esta {contextLabel}:
+                      </p>
+                      <SearchableSelect
+                        options={contracts.map(c => ({
+                          value: c.id,
+                          label: c.contractNumber ? `${c.contractNumber} — ${c.name}` : c.name,
+                        }))}
+                        value={value ?? ''}
+                        onChange={handleLink}
+                        placeholder='Buscar contrato...'
+                        emptyLabel='Sin contratos disponibles'
+                      />
+                      <div className='space-y-1 max-h-64 overflow-y-auto'>
+                        {contracts.map(c => (
+                          <button
+                            key={c.id}
+                            type='button'
+                            onClick={() => handleLink(c.id)}
+                            className={`w-full text-left rounded-lg border px-3 py-2.5 hover:bg-muted/50 transition-colors ${
+                              value === c.id ? 'border-primary bg-primary/5' : ''
+                            }`}
+                          >
+                            <div className='flex items-center justify-between gap-2'>
+                              <div className='min-w-0'>
+                                <p className='text-sm font-medium truncate'>{c.name}</p>
+                                <div className='flex items-center gap-2 mt-0.5'>
+                                  {c.contractNumber && (
+                                    <span className='text-xs text-muted-foreground font-mono'>
+                                      {c.contractNumber}
+                                    </span>
+                                  )}
+                                  {c.supplier && (
+                                    <span className='text-xs text-muted-foreground'>
+                                      {c.supplier.name}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <Badge variant='outline' className='text-xs flex-shrink-0'>
+                                {CONTRACT_CATEGORY_LABELS[c.category] ?? c.category}
+                              </Badge>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </TabsContent>
 
-              {/* ── Tab: crear ────────────────────────────────────────── */}
-              <TabsContent value='create' className='pt-4'>
-                <QuickContractForm
-                  supplierId={supplierId}
-                  familyId={familyId}
-                  onSuccess={handleCreated}
-                  onCancel={() => setOpen(false)}
-                />
-              </TabsContent>
-            </Tabs>
+                <TabsContent value='create-quick' className='pt-4'>
+                  <QuickContractForm
+                    context={context}
+                    prefill={resolvedPrefill}
+                    supplierId={supplierId}
+                    familyId={familyId}
+                    onSuccess={handleCreated}
+                    onCancel={() => setOpen(false)}
+                  />
+                </TabsContent>
+
+                <TabsContent value='create-full' className='pt-4'>
+                  <ContractForm
+                    embedMode
+                    prefill={resolvedPrefill}
+                    onSuccess={handleCreated}
+                    onCancel={() => setTab('link')}
+                  />
+                </TabsContent>
+              </Tabs>
+            )}
           </div>
         </DialogContent>
       </Dialog>

@@ -4,6 +4,13 @@ import { authOptions } from '@/lib/auth'
 import { MaintenanceService } from '@/lib/services/maintenance.service'
 import prisma from '@/lib/prisma'
 import { notifyUser, notifyMany } from '@/lib/api/notify'
+import { hasAccessToEquipment } from '@/lib/middleware/family-filter'
+import {
+  assertEquipmentMaintenanceWrite,
+  InventoryAccessError,
+  inventoryAccessToResponse,
+  toInventoryAccessUser,
+} from '@/lib/inventory/inventory-resource-access'
 
 function equipmentDisplayLabel(eq: {
   brand: string
@@ -169,7 +176,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Equipo no encontrado' }, { status: 404 })
     }
 
+    const user = toInventoryAccessUser(session.user)
     const isClient = session.user.role === 'CLIENT'
+
+    if (isClient) {
+      const hasAccess = await hasAccessToEquipment(
+        session.user.id,
+        session.user.role,
+        session.user.isSuperAdmin || false,
+        equipmentId
+      )
+      if (!hasAccess) {
+        return NextResponse.json({ error: 'No tienes acceso a este equipo' }, { status: 403 })
+      }
+    } else {
+      try {
+        await assertEquipmentMaintenanceWrite(user, equipmentId)
+      } catch (err) {
+        if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+        throw err
+      }
+    }
 
     let maintenance
     if (isClient) {

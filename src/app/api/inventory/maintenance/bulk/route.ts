@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { MaintenanceService } from '@/lib/services/maintenance.service'
+import { resolveCanManageInventory } from '@/lib/inventory/inventory-session'
+import {
+  assertMaintenanceIdsManage,
+  InventoryAccessError,
+  inventoryAccessToResponse,
+  toInventoryAccessUser,
+} from '@/lib/inventory/inventory-resource-access'
 
 /**
  * POST /api/inventory/maintenance/bulk
@@ -18,9 +25,7 @@ export async function POST(req: NextRequest) {
     const canManage =
       role === 'ADMIN' ||
       role === 'TECHNICIAN' ||
-      (await import('@/lib/inventory/inventory-session').then(m =>
-        m.resolveCanManageInventory(session.user.id, session.user.role)
-      ))
+      (await resolveCanManageInventory(session.user.id, session.user.role))
 
     const body = await req.json()
     const { action, ids, data } = body
@@ -32,6 +37,8 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    const user = toInventoryAccessUser(session.user)
+
     switch (action) {
       case 'approve':
         if (!canManage) {
@@ -39,6 +46,13 @@ export async function POST(req: NextRequest) {
             { error: 'No tienes permisos para aprobar mantenimientos' },
             { status: 403 }
           )
+        }
+
+        try {
+          await assertMaintenanceIdsManage(user, ids)
+        } catch (err) {
+          if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+          throw err
         }
 
         if (!data?.scheduledDate) {
@@ -78,6 +92,13 @@ export async function POST(req: NextRequest) {
           )
         }
 
+        try {
+          await assertMaintenanceIdsManage(user, ids)
+        } catch (err) {
+          if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+          throw err
+        }
+
         const cancelResults = await Promise.allSettled(
           ids.map((id: string) => MaintenanceService.cancel(id, session.user.id))
         )
@@ -93,6 +114,13 @@ export async function POST(req: NextRequest) {
             { error: 'No tienes permisos para reagendar mantenimientos' },
             { status: 403 }
           )
+        }
+
+        try {
+          await assertMaintenanceIdsManage(user, ids)
+        } catch (err) {
+          if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+          throw err
         }
 
         if (!data?.scheduledDate) {
@@ -126,6 +154,13 @@ export async function POST(req: NextRequest) {
             { error: 'No tienes permisos para asignar técnicos' },
             { status: 403 }
           )
+        }
+
+        try {
+          await assertMaintenanceIdsManage(user, ids)
+        } catch (err) {
+          if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+          throw err
         }
 
         if (!data?.technicianId) {

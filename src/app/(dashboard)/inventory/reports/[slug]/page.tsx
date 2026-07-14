@@ -34,202 +34,13 @@ import {
 import { ExportButton } from '@/components/common/export-button'
 import { useExport } from '@/hooks/common/use-export'
 import Link from 'next/link'
-
-// ── Configuración de reportes ─────────────────────────────────────────────────
-
-// Valor centinela para "sin filtro" en selects — Radix no permite value=""
-const ALL = 'all'
-
-const REPORT_CONFIG: Record<
-  string,
-  {
-    name: string
-    description: string
-    filters: Array<{
-      key: string
-      label: string
-      type: 'date' | 'select'
-      options?: { value: string; label: string }[]
-    }>
-  }
-> = {
-  summary: {
-    name: '¿Qué tenemos?',
-    description: 'Inventario total por familia y subtipo',
-    filters: [
-      {
-        key: 'subtype',
-        label: 'Tipo de activo',
-        type: 'select',
-        options: [
-          { value: ALL, label: 'Todos' },
-          { value: 'EQUIPMENT', label: 'Equipos' },
-          { value: 'MRO', label: 'Materiales MRO' },
-          { value: 'LICENSE', label: 'Licencias/Contratos' },
-        ],
-      },
-    ],
-  },
-  assignments: {
-    name: '¿Quién tiene qué?',
-    description: 'Asignaciones activas de equipos',
-    filters: [
-      { key: 'dateFrom', label: 'Desde', type: 'date' },
-      { key: 'dateTo', label: 'Hasta', type: 'date' },
-    ],
-  },
-  expiring: {
-    name: '¿Qué está por vencer?',
-    description: 'Contratos, licencias y garantías próximas a caducar',
-    filters: [
-      {
-        key: 'days',
-        label: 'Horizonte',
-        type: 'select',
-        options: [
-          { value: '30', label: 'Próximos 30 días' },
-          { value: '60', label: 'Próximos 60 días' },
-          { value: '90', label: 'Próximos 90 días' },
-          { value: '180', label: 'Próximos 6 meses' },
-          { value: '365', label: 'Próximo año' },
-        ],
-      },
-    ],
-  },
-  'stock-movements': {
-    name: '¿Qué se ha consumido?',
-    description: 'Movimientos de stock MRO por período',
-    filters: [
-      { key: 'dateFrom', label: 'Desde', type: 'date' },
-      { key: 'dateTo', label: 'Hasta', type: 'date' },
-      {
-        key: 'type',
-        label: 'Tipo de movimiento',
-        type: 'select',
-        options: [
-          { value: ALL, label: 'Todos' },
-          { value: 'ENTRY', label: 'Entradas' },
-          { value: 'EXIT', label: 'Salidas' },
-          { value: 'ADJUSTMENT', label: 'Ajustes' },
-        ],
-      },
-    ],
-  },
-  decommissioned: {
-    name: '¿Qué se ha dado de baja?',
-    description: 'Activos retirados del inventario',
-    filters: [
-      { key: 'dateFrom', label: 'Desde', type: 'date' },
-      { key: 'dateTo', label: 'Hasta', type: 'date' },
-    ],
-  },
-  maintenance: {
-    name: 'Historial de mantenimientos',
-    description: 'Registros de mantenimiento con costos',
-    filters: [
-      { key: 'dateFrom', label: 'Desde', type: 'date' },
-      { key: 'dateTo', label: 'Hasta', type: 'date' },
-      {
-        key: 'status',
-        label: 'Estado',
-        type: 'select',
-        options: [
-          { value: ALL, label: 'Todos' },
-          { value: 'COMPLETED', label: 'Completados' },
-          { value: 'SCHEDULED', label: 'Programados' },
-          { value: 'REQUESTED', label: 'Solicitados' },
-          { value: 'CANCELLED', label: 'Cancelados' },
-        ],
-      },
-    ],
-  },
-  locations: {
-    name: '¿Dónde están los equipos?',
-    description: 'Ubicación física actual de cada equipo',
-    filters: [
-      {
-        key: 'onlyWithLocation',
-        label: 'Mostrar',
-        type: 'select',
-        options: [
-          { value: ALL, label: 'Todos los equipos' },
-          { value: 'true', label: 'Solo con ubicación registrada' },
-        ],
-      },
-    ],
-  },
-  'financial-summary': {
-    name: 'Resumen Financiero Global',
-    description: 'Valor total del inventario por familia',
-    filters: [],
-  },
-  sales: {
-    name: '¿Qué se ha vendido?',
-    description: 'Activos vendidos con precio, comprador y resultado financiero',
-    filters: [
-      { key: 'dateFrom', label: 'Desde', type: 'date' },
-      { key: 'dateTo', label: 'Hasta', type: 'date' },
-      {
-        key: 'status',
-        label: 'Estado',
-        type: 'select',
-        options: [
-          { value: ALL, label: 'Todos' },
-          { value: 'APPROVED', label: 'Aprobadas' },
-          { value: 'PENDING', label: 'Pendientes' },
-          { value: 'REJECTED', label: 'Rechazadas' },
-        ],
-      },
-    ],
-  },
-}
-
-// ── Acceso por rol ────────────────────────────────────────────────────────────
-
-/** Slugs accesibles para cada nivel de acceso */
-const ROLE_ACCESS: Record<string, string[]> = {
-  SUPER_ADMIN: [
-    'summary',
-    'assignments',
-    'expiring',
-    'maintenance',
-    'stock-movements',
-    'decommissioned',
-    'locations',
-    'financial-summary',
-    'sales',
-  ],
-  ADMIN: [
-    'summary',
-    'assignments',
-    'expiring',
-    'maintenance',
-    'stock-movements',
-    'decommissioned',
-    'locations',
-    'sales',
-  ],
-  MANAGER: [
-    'summary',
-    'assignments',
-    'expiring',
-    'maintenance',
-    'stock-movements',
-    'decommissioned',
-    'locations',
-  ],
-}
-
-function getUserLevel(role: string, isSuperAdmin: boolean, canManage: boolean): string {
-  if (isSuperAdmin) return 'SUPER_ADMIN'
-  if (role === 'ADMIN') return 'ADMIN'
-  if (canManage) return 'MANAGER'
-  return 'MANAGER'
-}
-
-function canAccessSlug(slug: string, level: string): boolean {
-  return (ROLE_ACCESS[level] ?? ROLE_ACCESS.MANAGER).includes(slug)
-}
+import {
+  ALL_FILTER,
+  canAccessTemplate,
+  getDefaultFilterValues,
+  getTemplateBySlug,
+  resolveUserReportRole,
+} from '@/lib/inventory/reports/catalog'
 
 const URGENCY_COLORS: Record<string, string> = {
   Crítico: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
@@ -556,24 +367,21 @@ function ReportSlugContent({ slug }: { slug: string }) {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  const config = REPORT_CONFIG[slug]
+  const config = getTemplateBySlug(slug)
   const reportName = config?.name ?? slug
   const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
   const canManageInventory = (session?.user as any)?.canManageInventory === true
-  const userLevel = getUserLevel(session?.user?.role ?? '', isSuperAdmin, canManageInventory)
+  const userLevel = resolveUserReportRole(
+    session?.user?.role ?? '',
+    isSuperAdmin,
+    canManageInventory
+  )
 
   // Filtros del reporte — defaults usan 'all' como centinela (Radix no permite value="")
   const familyId = searchParams.get('familyId') ?? undefined
-  const [filterValues, setFilterValues] = useState<Record<string, string>>(() => {
-    const defaults: Record<string, string> = {}
-    config?.filters.forEach(f => {
-      if (f.type === 'select' && f.options?.[0]) {
-        defaults[f.key] = f.options[0].value // primer option (puede ser 'all' o un valor real)
-      }
-    })
-    if (slug === 'expiring') defaults['days'] = '90'
-    return defaults
-  })
+  const [filterValues, setFilterValues] = useState<Record<string, string>>(() =>
+    getDefaultFilterValues(config?.filters ?? [])
+  )
 
   const [reportData, setReportData] = useState<ReportData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -589,7 +397,7 @@ function ReportSlugContent({ slug }: { slug: string }) {
     if (familyId) params.set('familyId', familyId)
     Object.entries(filterValues).forEach(([k, v]) => {
       // Omitir el centinela 'all' y valores vacíos — la API interpreta ausencia como "sin filtro"
-      if (v && v !== ALL) params.set(k, v)
+      if (v && v !== ALL_FILTER) params.set(k, v)
     })
     return params
   }, [familyId, filterValues])
@@ -631,7 +439,7 @@ function ReportSlugContent({ slug }: { slug: string }) {
   }
 
   // Hay filtros activos si algún select no es 'all' o alguna fecha está rellena
-  const hasActiveFilters = Object.entries(filterValues).some(([, v]) => v && v !== ALL)
+  const hasActiveFilters = Object.entries(filterValues).some(([, v]) => v && v !== ALL_FILTER)
 
   if (status === 'loading') {
     return (
@@ -644,7 +452,7 @@ function ReportSlugContent({ slug }: { slug: string }) {
   if (!session?.user) return null
 
   // Verificar acceso al slug según rol
-  if (!canAccessSlug(slug, userLevel)) {
+  if (!canAccessTemplate(slug, userLevel as 'SUPER_ADMIN' | 'ADMIN' | 'MANAGER')) {
     return (
       <ModuleLayout title='Acceso restringido' subtitle='No tienes permiso para ver este reporte'>
         <div className='flex flex-col items-center justify-center py-20 gap-3 text-center'>
@@ -711,7 +519,7 @@ function ReportSlugContent({ slug }: { slug: string }) {
                       />
                     ) : (
                       <Select
-                        value={filterValues[f.key] ?? ALL}
+                        value={filterValues[f.key] ?? ALL_FILTER}
                         onValueChange={v => setFilterValues(prev => ({ ...prev, [f.key]: v }))}
                       >
                         <SelectTrigger className='h-9 text-sm'>
@@ -850,7 +658,7 @@ function ReportSlugContent({ slug }: { slug: string }) {
               <CardContent className='p-0'>
                 <DataTable
                   rows={reportData.data}
-                  reportName={REPORT_CONFIG[slug as string]?.name}
+                  reportName={config?.name}
                 />
               </CardContent>
             </Card>

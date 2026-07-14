@@ -15,7 +15,12 @@ import {
   Minus,
   ExternalLink,
   RefreshCw,
+  FilePenLine,
 } from 'lucide-react'
+import {
+  CONTRACT_AMENDMENT_TYPE_LABELS,
+  type ContractAmendment,
+} from '@/types/contracts'
 import { cn } from '@/lib/utils'
 
 interface ContractInChain {
@@ -61,6 +66,7 @@ export function ContractHistoryTimeline({ contractId }: ContractHistoryTimelineP
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [chain, setChain] = useState<ContractInChain[]>([])
+  const [amendments, setAmendments] = useState<ContractAmendment[]>([])
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -78,7 +84,8 @@ export function ContractHistoryTimeline({ contractId }: ContractHistoryTimelineP
       }
 
       const data = await response.json()
-      setChain(data.chain)
+      setChain(data.chain ?? [])
+      setAmendments(data.amendments ?? [])
     } catch (err) {
       console.error('Error cargando historial:', err)
       setError(err instanceof Error ? err.message : 'Error desconocido')
@@ -168,18 +175,61 @@ export function ContractHistoryTimeline({ contractId }: ContractHistoryTimelineP
     )
   }
 
+  if (chain.length <= 1 && amendments.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className='flex items-center gap-2'>
+            <RefreshCw className='h-5 w-5' />
+            Historial contractual
+          </CardTitle>
+          <CardDescription>
+            Sin renovaciones ni adendums registrados para este contrato
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    )
+  }
+
+  const amendmentsBlock =
+    amendments.length > 0 ? (
+      <div className='mt-6 pt-6 border-t space-y-3'>
+        <h4 className='text-sm font-medium flex items-center gap-2'>
+          <FilePenLine className='h-4 w-4' />
+          Adendums ({amendments.length})
+        </h4>
+        <ul className='space-y-2'>
+          {amendments.map(a => (
+            <li key={a.id} className='rounded-md border px-3 py-2 text-sm'>
+              <div className='flex justify-between gap-2'>
+                <span className='font-medium'>
+                  {a.folio} — {a.title}
+                </span>
+                <Badge variant='outline' className='text-xs shrink-0'>
+                  {CONTRACT_AMENDMENT_TYPE_LABELS[a.type] ?? a.type}
+                </Badge>
+              </div>
+              <p className='text-xs text-muted-foreground mt-1'>
+                {formatDate(new Date(a.effectiveDate))}
+                {a.applyToContract ? ' · Aplicado al contrato' : ' · Solo registro'}
+              </p>
+            </li>
+          ))}
+        </ul>
+      </div>
+    ) : null
+
   if (chain.length <= 1) {
     return (
       <Card>
         <CardHeader>
           <CardTitle className='flex items-center gap-2'>
             <RefreshCw className='h-5 w-5' />
-            Historial de Renovaciones
+            Historial contractual
           </CardTitle>
-          <CardDescription>
-            Este contrato no tiene renovaciones previas ni posteriores
-          </CardDescription>
+          <CardDescription>Sin renovaciones en cadena</CardDescription>
         </CardHeader>
+        <CardContent>{amendmentsBlock}</CardContent>
       </Card>
     )
   }
@@ -381,6 +431,7 @@ export function ContractHistoryTimeline({ contractId }: ContractHistoryTimelineP
             </div>
           ))}
         </div>
+        {amendmentsBlock}
       </CardContent>
     </Card>
   )

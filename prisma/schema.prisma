@@ -513,6 +513,7 @@ model users {
   managedWarehouses                                 warehouses[]                    @relation("WarehouseManager")
   webhooks_created                                  webhooks[]                      @relation("WebhookCreator")
   contractsCreated                                  contracts[]                     @relation("ContractCreator")
+  contractAmendmentsCreated                         contract_amendments[]         @relation("ContractAmendmentCreator")
   contractAttachmentsUploaded                       contract_attachments[]          @relation("ContractAttachmentUploader")
   contractPaymentsCreated                           contract_payments[]             @relation("PaymentCreator")
   saleRequests                                      equipment_sales[]               @relation("SaleRequester")
@@ -543,6 +544,8 @@ model users {
   contractsAsBackupCustodian                        contracts[]                     @relation("ContractBackupCustodian")
   contractAssignmentsAsClient                       contract_assignments[]          @relation("ContractAssignmentClient")
   contractAssignmentsDelivered                      contract_assignments[]          @relation("ContractAssignmentDeliverer")
+  inventorySavedReports                             inventory_saved_reports[]       @relation("InventorySavedReportOwner")
+  inventoryScheduledReports                       inventory_scheduled_reports[]   @relation("InventoryScheduledReportOwner")
 
   @@index([departmentId])
   @@index([name, email])
@@ -1656,6 +1659,7 @@ model families {
   form_categories             form_categories[]
   forms                       forms[]
   form_families               form_families[]
+  inventorySavedReports       inventory_saved_reports[]
 
   @@index([isActive, order])
   @@map("families")
@@ -1738,6 +1742,73 @@ model inventory_family_config {
 
   @@index([familyId])
   @@map("inventory_family_config")
+}
+
+enum SavedReportKind {
+  DATASET
+  TEMPLATE
+}
+
+model inventory_saved_reports {
+  id              String          @id @default(uuid())
+  userId          String          @map("user_id")
+  name            String          @db.VarChar(200)
+  kind            SavedReportKind @default(DATASET)
+  targetId        String          @map("target_id") @db.VarChar(100)
+  familyId        String?         @map("family_id")
+  filterValues    Json            @default("{}") @map("filter_values")
+  visibleColumns  Json            @default("[]") @map("visible_columns")
+  pinned          Boolean         @default(false)
+  pinnedOrder     Int?            @map("pinned_order")
+  pinnedSpan      Int             @default(1) @map("pinned_span")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  owner  users     @relation("InventorySavedReportOwner", fields: [userId], references: [id], onDelete: Cascade)
+  family families? @relation(fields: [familyId], references: [id], onDelete: SetNull)
+  schedules inventory_scheduled_reports[]
+
+  @@index([userId, updatedAt(sort: Desc)])
+  @@index([userId, kind])
+  @@map("inventory_saved_reports")
+}
+
+enum ReportScheduleFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+enum ReportExportFormat {
+  CSV
+  PDF
+  BOTH
+}
+
+model inventory_scheduled_reports {
+  id            String                  @id @default(uuid())
+  userId        String                  @map("user_id")
+  savedReportId String                  @map("saved_report_id")
+  enabled       Boolean                 @default(true)
+  frequency     ReportScheduleFrequency @default(WEEKLY)
+  scheduleTime  String                  @default("08:00") @map("schedule_time") @db.VarChar(5)
+  dayOfWeek     Int?                    @map("day_of_week")
+  dayOfMonth    Int?                    @map("day_of_month")
+  recipients    Json                    @default("[]")
+  exportFormat  ReportExportFormat      @default(BOTH) @map("export_format")
+  lastRunAt     DateTime?               @map("last_run_at")
+  nextRunAt     DateTime?               @map("next_run_at")
+  lastStatus    String?                 @map("last_status") @db.VarChar(20)
+  lastError     String?                 @map("last_error")
+  createdAt     DateTime                @default(now()) @map("created_at")
+  updatedAt     DateTime                @updatedAt @map("updated_at")
+
+  owner       users                     @relation("InventoryScheduledReportOwner", fields: [userId], references: [id], onDelete: Cascade)
+  savedReport inventory_saved_reports   @relation(fields: [savedReportId], references: [id], onDelete: Cascade)
+
+  @@index([enabled, nextRunAt])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("inventory_scheduled_reports")
 }
 
 model ticket_family_config {
@@ -2096,6 +2167,21 @@ enum BillingCycle {
   ONE_TIME
 }
 
+enum ContractAmendmentType {
+  PRICE_CHANGE
+  TERM_EXTENSION
+  TERM_REDUCTION
+  SCOPE_CHANGE
+  BILLING_CHANGE
+  CANCELLATION
+  OTHER
+}
+
+enum ContractAmendmentStatus {
+  ACTIVE
+  SUPERSEDED
+}
+
 model contracts {
   id                String           @id @default(uuid())
   contractNumber    String?          @map("contract_number") @db.VarChar(100)
@@ -2172,6 +2258,7 @@ model contracts {
   attachments  contract_attachments[]
   payments     contract_payments[]    @relation("ContractPayments")
   assignments  contract_assignments[]
+  amendments   contract_amendments[]
 
   @@index([status, endDate])
   @@index([supplierId])
@@ -2212,6 +2299,38 @@ model contract_lines {
   @@index([equipmentId])
   @@index([licenseId])
   @@map("contract_lines")
+}
+
+model contract_amendments {
+  id                   String                  @id @default(uuid())
+  contractId           String                  @map("contract_id")
+  folio                String                  @unique @db.VarChar(50)
+  amendmentNumber      Int                     @map("amendment_number")
+  title                String                  @db.VarChar(200)
+  description          String?
+  type                 ContractAmendmentType   @default(OTHER)
+  status               ContractAmendmentStatus @default(ACTIVE)
+  effectiveDate        DateTime                @map("effective_date")
+  applyToContract      Boolean                 @default(true) @map("apply_to_contract")
+  previousMonthlyCost  Float?                  @map("previous_monthly_cost")
+  newMonthlyCost       Float?                  @map("new_monthly_cost")
+  previousTotalValue   Float?                  @map("previous_total_value")
+  newTotalValue        Float?                  @map("new_total_value")
+  previousEndDate      DateTime?               @map("previous_end_date")
+  newEndDate           DateTime?               @map("new_end_date")
+  previousBillingCycle BillingCycle?           @map("previous_billing_cycle")
+  newBillingCycle      BillingCycle?           @map("new_billing_cycle")
+  createdBy            String                  @map("created_by")
+  createdAt            DateTime                @default(now()) @map("created_at")
+  updatedAt            DateTime                @updatedAt @map("updated_at")
+
+  contract contracts @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  creator  users     @relation("ContractAmendmentCreator", fields: [createdBy], references: [id])
+
+  @@unique([contractId, amendmentNumber])
+  @@index([contractId, effectiveDate])
+  @@index([folio])
+  @@map("contract_amendments")
 }
 
 model contract_attachments {

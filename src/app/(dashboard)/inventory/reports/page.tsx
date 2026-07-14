@@ -1,195 +1,138 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import {
-  Package,
-  Users,
-  Clock,
-  ShoppingCart,
-  Trash2,
-  Wrench,
   BarChart3,
-  MapPin,
   Crown,
   Lock,
-  DollarSign,
+  Sparkles,
+  ArrowRight,
+  LayoutGrid,
 } from 'lucide-react'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { FamilyCombobox } from '@/components/ui/family-combobox'
 import { useFamilyOptions } from '@/hooks/use-family-options'
-
-// ── Definición completa de reportes ──────────────────────────────────────────
-
-type ReportRole = 'ADMIN' | 'SUPER_ADMIN' | 'MANAGER'
-
-interface ReportDef {
-  slug: string
-  name: string
-  description: string
-  icon: React.ElementType
-  color: string
-  bg: string
-  /** Roles que pueden ver este reporte */
-  roles: ReportRole[]
-}
-
-const ALL_REPORTS: ReportDef[] = [
-  {
-    slug: 'summary',
-    name: '¿Qué tenemos?',
-    description: 'Inventario total por familia y subtipo con conteos y valor estimado',
-    icon: Package,
-    color: 'text-blue-600',
-    bg: 'bg-blue-50 dark:bg-blue-950/30',
-    roles: ['ADMIN', 'SUPER_ADMIN', 'MANAGER'],
-  },
-  {
-    slug: 'assignments',
-    name: '¿Quién tiene qué?',
-    description: 'Lista de activos asignados con usuario, fecha de asignación y estado',
-    icon: Users,
-    color: 'text-green-600',
-    bg: 'bg-green-50 dark:bg-green-950/30',
-    roles: ['ADMIN', 'SUPER_ADMIN', 'MANAGER'],
-  },
-  {
-    slug: 'expiring',
-    name: '¿Qué está por vencer?',
-    description: 'Contratos, licencias y garantías próximas a caducar ordenados por urgencia',
-    icon: Clock,
-    color: 'text-orange-600',
-    bg: 'bg-orange-50 dark:bg-orange-950/30',
-    roles: ['ADMIN', 'SUPER_ADMIN', 'MANAGER'],
-  },
-  {
-    slug: 'maintenance',
-    name: 'Historial de mantenimientos',
-    description: 'Registros de mantenimiento por equipo y período con costos',
-    icon: Wrench,
-    color: 'text-teal-600',
-    bg: 'bg-teal-50 dark:bg-teal-950/30',
-    roles: ['ADMIN', 'SUPER_ADMIN', 'MANAGER'],
-  },
-  {
-    slug: 'stock-movements',
-    name: '¿Qué se ha consumido?',
-    description: 'Movimientos de stock MRO por período con totales por material',
-    icon: ShoppingCart,
-    color: 'text-purple-600',
-    bg: 'bg-purple-50 dark:bg-purple-950/30',
-    // Gestores de inventario también pueden ver consumibles de sus familias
-    roles: ['ADMIN', 'SUPER_ADMIN', 'MANAGER'],
-  },
-  {
-    slug: 'decommissioned',
-    name: '¿Qué se ha dado de baja?',
-    description: 'Activos retirados del inventario con motivo, fecha y responsable',
-    icon: Trash2,
-    color: 'text-red-600',
-    bg: 'bg-red-50 dark:bg-red-950/30',
-    roles: ['ADMIN', 'SUPER_ADMIN', 'MANAGER'],
-  },
-  {
-    slug: 'sales',
-    name: '¿Qué se ha vendido?',
-    description:
-      'Activos vendidos con precio, comprador, forma de pago y resultado financiero vs valor libro',
-    icon: DollarSign,
-    color: 'text-emerald-600',
-    bg: 'bg-emerald-50 dark:bg-emerald-950/30',
-    roles: ['ADMIN', 'SUPER_ADMIN'],
-  },
-  {
-    slug: 'locations',
-    name: '¿Dónde están los equipos?',
-    description: 'Ubicación física actual de cada equipo, bodega asignada y usuario responsable',
-    icon: MapPin,
-    color: 'text-indigo-600',
-    bg: 'bg-indigo-50 dark:bg-indigo-950/30',
-    roles: ['ADMIN', 'SUPER_ADMIN', 'MANAGER'],
-  },
-  {
-    slug: 'financial-summary',
-    name: 'Resumen Financiero Global',
-    description:
-      'Valor total del inventario, costos de renta y mantenimiento de todas las familias',
-    icon: BarChart3,
-    color: 'text-amber-600',
-    bg: 'bg-amber-50 dark:bg-amber-950/30',
-    // Solo Super Admin — acceso a datos financieros globales
-    roles: ['SUPER_ADMIN'],
-  },
-]
-
-// ── Subtítulos por rol ────────────────────────────────────────────────────────
+import {
+  REPORT_CATEGORIES,
+  getVisibleTemplates,
+  getVisibleDatasets,
+  resolveUserReportRole,
+} from '@/lib/inventory/reports/catalog'
+import type { ReportTemplateDef } from '@/lib/inventory/reports/types'
+import { getReportIcon } from '@/components/inventory/reports/report-icon-map'
+import { SavedReportsPanel } from '@/components/inventory/reports/saved-reports-panel'
+import { PinnedReportWidgets } from '@/components/inventory/reports/pinned-report-widgets'
+import { ScheduledReportsPanel } from '@/components/inventory/reports/scheduled-reports-panel'
 
 function getSubtitle(role: string, isSuperAdmin: boolean, canManage: boolean): string {
-  if (isSuperAdmin) return 'Vista global — todas las familias y datos financieros'
-  if (role === 'ADMIN') return 'Vista completa del inventario de todas las familias'
+  if (isSuperAdmin) return 'Vista global — plantillas ejecutivas y explorador de datos'
+  if (role === 'ADMIN') return 'Plantillas predefinidas y consultas flexibles por dataset'
   if (canManage) return 'Reportes del inventario de tus familias asignadas'
   return 'Reportes de inventario'
 }
-
-// ── Página ────────────────────────────────────────────────────────────────────
 
 export default function InventoryReportsPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
 
   const role = session?.user?.role ?? ''
-  const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
-  const canManageInventory = (session?.user as any)?.canManageInventory === true
+  const isSuperAdmin = (session?.user as { isSuperAdmin?: boolean })?.isSuperAdmin === true
+  const canManageInventory = (session?.user as { canManageInventory?: boolean })?.canManageInventory === true
 
   const [selectedFamilyId, setSelectedFamilyId] = useState<string | null>(null)
-
-  // Familias de inventario desde el contexto global (cache Redis, sin peticion extra) - memoizadas
+  const [scheduleReportId, setScheduleReportId] = useState<string | null>(null)
   const { families } = useFamilyOptions()
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login')
   }, [status, router])
 
+  const userReportRole = useMemo(
+    () => resolveUserReportRole(role, isSuperAdmin, canManageInventory),
+    [role, isSuperAdmin, canManageInventory]
+  )
+
+  const templates = useMemo(() => getVisibleTemplates(userReportRole), [userReportRole])
+  const datasets = useMemo(() => getVisibleDatasets(userReportRole), [userReportRole])
+
+  const categories = useMemo(
+    () =>
+      REPORT_CATEGORIES.map(category => ({
+        ...category,
+        templates: templates.filter(t => t.categoryId === category.id),
+        datasets: datasets.filter(d => d.categoryId === category.id),
+      })).filter(c => c.templates.length > 0 || c.datasets.length > 0),
+    [templates, datasets]
+  )
+
   if (status === 'loading') {
     return (
-      <ModuleLayout title='Reportes de Inventario' loading>
+      <ModuleLayout title='Centro de Reportes' loading>
         <div />
       </ModuleLayout>
     )
   }
   if (!session?.user) return null
 
-  // Determinar el "nivel de acceso" del usuario para filtrar reportes
-  const userReportRole: ReportRole = isSuperAdmin
-    ? 'SUPER_ADMIN'
-    : role === 'ADMIN'
-      ? 'ADMIN'
-      : canManageInventory
-        ? 'MANAGER'
-        : 'MANAGER' // fallback — la API filtra por familias de todas formas
-
-  const visibleReports = ALL_REPORTS.filter(r => r.roles.includes(userReportRole))
-
-  const handleCardClick = (slug: string) => {
+  const navigateWithFamily = (path: string) => {
     const params = new URLSearchParams()
     if (selectedFamilyId) params.set('familyId', selectedFamilyId)
     const query = params.toString()
-    router.push(`/inventory/reports/${slug}${query ? `?${query}` : ''}`)
+    router.push(`${path}${query ? `?${query}` : ''}`)
   }
 
-  const isAdmin = role === 'ADMIN'
-  const subtitle = getSubtitle(role, isSuperAdmin, canManageInventory)
+  const handleTemplateClick = (slug: string) => navigateWithFamily(`/inventory/reports/${slug}`)
+  const handleDatasetClick = (datasetId: string) =>
+    navigateWithFamily(`/inventory/reports/explore?dataset=${datasetId}`)
 
   return (
-    <ModuleLayout title='Reportes de Inventario' subtitle={subtitle}>
-      <div className='space-y-6'>
-        {/* Selector de familia — solo si hay más de una y el usuario puede ver varias */}
+    <ModuleLayout
+      title='Centro de Reportes'
+      subtitle={getSubtitle(role, isSuperAdmin, canManageInventory)}
+    >
+      <div className='space-y-8'>
+        {/* Hero: Explorador */}
+        <Card className='border-primary/30 bg-gradient-to-br from-primary/5 via-background to-background'>
+          <CardContent className='pt-6'>
+            <div className='flex flex-col md:flex-row md:items-center md:justify-between gap-4'>
+              <div className='space-y-2'>
+                <div className='flex items-center gap-2'>
+                  <Sparkles className='h-5 w-5 text-primary' />
+                  <h2 className='text-lg font-semibold'>Explorador de datos</h2>
+                  <Badge variant='secondary'>{datasets.length} fuentes</Badge>
+                </div>
+                <p className='text-sm text-muted-foreground max-w-2xl'>
+                  Más allá de las plantillas fijas: elige una fuente (equipos, contratos,
+                  licencias…), aplica filtros, selecciona columnas y exporta. Modelo similar a
+                  Snipe-IT o Freshservice.
+                </p>
+              </div>
+              <Button size='lg' onClick={() => navigateWithFamily('/inventory/reports/explore')}>
+                Abrir explorador
+                <ArrowRight className='h-4 w-4 ml-2' />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <PinnedReportWidgets />
+
+        <SavedReportsPanel onScheduleReport={id => setScheduleReportId(id)} />
+
+        <ScheduledReportsPanel
+          openCreateForReportId={scheduleReportId}
+          onCreateDialogClose={() => setScheduleReportId(null)}
+        />
+
+        {/* Filtro global de familia */}
         {families.length > 1 && (
           <div className='flex flex-wrap items-center gap-3'>
-            <p className='text-sm text-muted-foreground shrink-0'>Filtrar por área:</p>
+            <p className='text-sm text-muted-foreground shrink-0'>Área por defecto:</p>
             <FamilyCombobox
               families={families.map(f => ({
                 id: f.id,
@@ -205,77 +148,110 @@ export default function InventoryReportsPage() {
               className='w-full sm:w-56'
             />
             {isSuperAdmin && (
-              <Badge className='bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 flex items-center gap-1 shrink-0'>
+              <Badge className='bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 flex items-center gap-1'>
                 <Crown className='h-3 w-3' />
                 Vista global
               </Badge>
             )}
-            {!isAdmin && !isSuperAdmin && canManageInventory && (
-              <span className='text-xs text-muted-foreground'>
-                Solo verás datos de tus familias asignadas
-              </span>
-            )}
           </div>
         )}
 
-        {/* Tarjetas de reportes */}
-        <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4'>
-          {visibleReports.map(report => {
-            const Icon = report.icon
-            const isSuperAdminOnly = report.roles.length === 1 && report.roles[0] === 'SUPER_ADMIN'
+        {/* Categorías */}
+        {categories.map(category => (
+          <section key={category.id} className='space-y-4'>
+            <div>
+              <h3 className='text-base font-semibold flex items-center gap-2'>
+                <LayoutGrid className='h-4 w-4 text-muted-foreground' />
+                {category.name}
+              </h3>
+              <p className='text-sm text-muted-foreground'>{category.description}</p>
+            </div>
 
-            return (
-              <Card
-                key={report.slug}
-                className={`cursor-pointer hover:shadow-md hover:border-primary/40 transition-all group ${
-                  isSuperAdminOnly ? 'border-amber-200 dark:border-amber-800' : ''
-                }`}
-                onClick={() => handleCardClick(report.slug)}
-              >
-                <CardHeader className='pb-3'>
-                  <div className='flex items-start gap-3'>
-                    <div
-                      className={`p-2 rounded-lg shrink-0 ${report.bg} group-hover:scale-105 transition-transform`}
-                    >
-                      <Icon className={`h-5 w-5 ${report.color}`} />
-                    </div>
-                    <div className='flex-1 min-w-0'>
-                      <CardTitle className='text-base leading-tight'>{report.name}</CardTitle>
-                      {isSuperAdminOnly && (
-                        <Badge className='bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 text-xs mt-1 flex items-center gap-1 w-fit'>
-                          <Crown className='h-2.5 w-2.5' />
-                          Solo Super Admin
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className='pt-0'>
-                  <CardDescription className='text-sm leading-relaxed'>
-                    {report.description}
-                  </CardDescription>
-                </CardContent>
-              </Card>
-            )
-          })}
-        </div>
+            {category.templates.length > 0 && (
+              <div className='space-y-2'>
+                <p className='text-xs font-medium uppercase tracking-wide text-muted-foreground'>
+                  Plantillas ejecutivas
+                </p>
+                <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3'>
+                  {category.templates.map((report: ReportTemplateDef) => {
+                    const Icon = getReportIcon(report.icon)
+                    return (
+                      <Card
+                        key={report.slug}
+                        className={`cursor-pointer hover:shadow-md hover:border-primary/40 transition-all group ${
+                          report.superAdminOnly ? 'border-amber-200 dark:border-amber-800' : ''
+                        }`}
+                        onClick={() => handleTemplateClick(report.slug)}
+                      >
+                        <CardHeader className='pb-2'>
+                          <div className='flex items-start gap-3'>
+                            <div className='p-2 rounded-lg bg-muted group-hover:bg-primary/10 shrink-0'>
+                              <Icon className='h-4 w-4 text-primary' />
+                            </div>
+                            <div className='min-w-0'>
+                              <CardTitle className='text-sm leading-tight'>{report.name}</CardTitle>
+                              {report.superAdminOnly && (
+                                <Badge className='mt-1 text-xs' variant='outline'>
+                                  <Crown className='h-2.5 w-2.5 mr-1' />
+                                  Super Admin
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent className='pt-0'>
+                          <CardDescription className='text-xs line-clamp-2'>
+                            {report.description}
+                          </CardDescription>
+                        </CardContent>
+                      </Card>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
-        {/* Nota informativa contextual */}
+            {category.datasets.length > 0 && (
+              <div className='space-y-2'>
+                <p className='text-xs font-medium uppercase tracking-wide text-muted-foreground'>
+                  Datasets explorables
+                </p>
+                <div className='flex flex-wrap gap-2'>
+                  {category.datasets.map(ds => {
+                    const Icon = getReportIcon(ds.icon)
+                    return (
+                      <Button
+                        key={ds.id}
+                        variant='outline'
+                        size='sm'
+                        className='gap-2'
+                        onClick={() => handleDatasetClick(ds.id)}
+                      >
+                        <Icon className='h-3.5 w-3.5' />
+                        {ds.name}
+                      </Button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </section>
+        ))}
+
+        {/* Nota */}
         <div className='flex items-start gap-2 text-sm text-muted-foreground bg-muted/50 rounded-lg p-4'>
           <BarChart3 className='h-4 w-4 mt-0.5 shrink-0' />
           <div className='space-y-1'>
             <p>
-              Haz clic en cualquier reporte para ver los datos detallados con filtros por fecha.
-              Puedes exportar en CSV o PDF desde la vista individual.
+              <strong>Plantillas</strong> = reportes ejecutivos prearmados (KPIs + tabla).
+              <strong className='ml-2'>Explorador</strong> = consultas ad hoc con filtros y
+              columnas configurables.
             </p>
-            {!isAdmin && !isSuperAdmin && (
+            {!isSuperAdmin && role !== 'ADMIN' && (
               <p className='flex items-center gap-1'>
                 <Lock className='h-3 w-3' />
                 Los datos están limitados a las familias que tienes asignadas.
               </p>
-            )}
-            {selectedFamilyId && (
-              <p>Los reportes mostrarán solo los datos del área seleccionada.</p>
             )}
           </div>
         </div>

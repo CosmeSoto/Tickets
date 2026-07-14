@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { MaintenanceService } from '@/lib/services/maintenance.service'
+import { resolveCanManageInventory } from '@/lib/inventory/inventory-session'
+import {
+  assertInventoryManageByFamily,
+  assertInventoryResourceManage,
+  assertInventoryResourceRead,
+  InventoryAccessError,
+  inventoryAccessToResponse,
+  toInventoryAccessUser,
+} from '@/lib/inventory/inventory-resource-access'
 
 /**
  * POST /api/inventory/maintenance/by-model
@@ -14,15 +23,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    const role = session.user.role
-    const canManage =
-      role === 'ADMIN' ||
-      role === 'TECHNICIAN' ||
-      (await import('@/lib/inventory/inventory-session').then(m =>
-        m.resolveCanManageInventory(session.user.id, session.user.role)
-      ))
-
-    if (!canManage) {
+    const canManage = await resolveCanManageInventory(session.user.id, session.user.role)
+    if (session.user.role !== 'ADMIN' && session.user.role !== 'TECHNICIAN' && !canManage) {
       return NextResponse.json(
         { error: 'No tienes permisos para crear mantenimientos masivos' },
         { status: 403 }
@@ -47,6 +49,18 @@ export async function POST(req: NextRequest) {
         { error: 'Faltan campos requeridos: modelId, type, description, scheduledDate' },
         { status: 400 }
       )
+    }
+
+    const user = toInventoryAccessUser(session.user)
+
+    try {
+      await assertInventoryResourceManage(user, 'MODEL', modelId)
+      if (familyId) {
+        await assertInventoryManageByFamily(user, familyId)
+      }
+    } catch (err) {
+      if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+      throw err
     }
 
     const result = await MaintenanceService.createMaintenanceByModel(
@@ -98,6 +112,13 @@ export async function GET(req: NextRequest) {
 
     if (!modelId) {
       return NextResponse.json({ error: 'modelId es requerido' }, { status: 400 })
+    }
+
+    try {
+      await assertInventoryResourceRead(toInventoryAccessUser(session.user), 'MODEL', modelId)
+    } catch (err) {
+      if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+      throw err
     }
 
     const stats = await MaintenanceService.getMaintenanceStatsByModel(modelId)

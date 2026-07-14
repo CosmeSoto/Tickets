@@ -76,3 +76,12 @@ export async function resolveInventoryListScope(
     scopeFamilyIds: ctx.scope.familyIds,
   }
 }
+
+/** familyIds efectivos para reportes/listados tras resolver scope. */
+export function effectiveFamilyIdsFromListScope(
+  listScope: InventoryListScopeResult
+): string[] | undefined {
+  if (listScope.noAccess) return []
+  if (listScope.familyId) return [listScope.familyId]
+  return listScope.scopeFamilyIds
+}

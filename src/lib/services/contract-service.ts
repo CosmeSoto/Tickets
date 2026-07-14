@@ -21,6 +21,7 @@ import {
 } from '@/lib/validations/contracts'
 import { getBillingCompletenessIssues, methodNeedsPortal } from '@/lib/contracts/billing-completeness'
 import { syncContractLicenseLines } from '@/lib/contracts/license-sync'
+import { syncContractEquipmentLines } from '@/lib/contracts/equipment-sync'
 
 // ── Guard helpers ─────────────────────────────────────────────────────────────
 
@@ -395,6 +396,9 @@ export class ContractService {
     await syncContractLicenseLines(contract.id).catch(err =>
       console.error('[contract] sync licenses on create:', err)
     )
+    await syncContractEquipmentLines(contract.id).catch(err =>
+      console.error('[contract] sync equipment on create:', err)
+    )
 
     return contract
   }
@@ -493,6 +497,9 @@ export class ContractService {
     await syncContractLicenseLines(id).catch(err =>
       console.error('[contract] sync licenses on update:', err)
     )
+    await syncContractEquipmentLines(id).catch(err =>
+      console.error('[contract] sync equipment on update:', err)
+    )
 
     return contract
   }
@@ -565,6 +572,9 @@ export class ContractService {
 
     await syncContractLicenseLines(contractId).catch(err =>
       console.error('[contract] sync licenses on lines:', err)
+    )
+    await syncContractEquipmentLines(contractId).catch(err =>
+      console.error('[contract] sync equipment on lines:', err)
     )
   }
 

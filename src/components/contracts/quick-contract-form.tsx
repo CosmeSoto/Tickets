@@ -1,14 +1,10 @@
 'use client'
 
 /**
- * QuickContractForm — formulario simplificado de contrato
- *
- * Se usa dentro del ContractPicker al crear un contrato desde la creación de activos.
- * Solo pide los campos esenciales para un contrato de arrendamiento/préstamo.
- * Las líneas detalladas se pueden agregar después desde la gestión completa de contratos.
+ * QuickContractForm — creación mínima de contrato desde picker de activos/licencias.
  */
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -23,12 +19,18 @@ import {
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
 import type { Contract } from '@/types/contracts'
+import {
+  buildContractPrefill,
+  defaultCategoryForContext,
+  type ContractPickerContext,
+  type ContractPickerPrefill,
+} from '@/lib/contracts/contract-picker-prefill'
 
 interface QuickContractFormProps {
-  /** Proveedor pre-seleccionado desde el formulario de activo */
   supplierId?: string | null
-  /** Familia del activo */
   familyId?: string | null
+  context?: ContractPickerContext
+  prefill?: ContractPickerPrefill | null
   onSuccess: (contract: Contract) => void
   onCancel: () => void
 }
@@ -36,20 +38,43 @@ interface QuickContractFormProps {
 export function QuickContractForm({
   supplierId,
   familyId,
+  context = 'license',
+  prefill = null,
   onSuccess,
   onCancel,
 }: QuickContractFormProps) {
   const { toast } = useToast()
   const [submitting, setSubmitting] = useState(false)
 
-  const [name, setName] = useState('')
+  const resolved = buildContractPrefill(
+    { ...prefill, supplierId: prefill?.supplierId ?? supplierId, familyId: prefill?.familyId ?? familyId },
+    context
+  )
+
+  const [name, setName] = useState(resolved.name ?? '')
   const [contractNumber, setContractNumber] = useState('')
-  const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
-  const [monthlyCost, setMonthlyCost] = useState('')
+  const [startDate, setStartDate] = useState(resolved.startDate ?? '')
+  const [endDate, setEndDate] = useState(resolved.endDate ?? '')
+  const [monthlyCost, setMonthlyCost] = useState(
+    resolved.monthlyCost != null ? String(resolved.monthlyCost) : ''
+  )
+  const [totalValue, setTotalValue] = useState(
+    resolved.totalValue != null ? String(resolved.totalValue) : ''
+  )
   const [currency, setCurrency] = useState('USD')
-  const [billingCycle, setBillingCycle] = useState('MONTHLY')
+  const [billingCycle, setBillingCycle] = useState(resolved.billingCycle ?? 'MONTHLY')
   const [autoRenew, setAutoRenew] = useState(false)
+
+  const isRecurring = billingCycle !== 'ONE_TIME'
+
+  useEffect(() => {
+    setName(resolved.name ?? '')
+    setStartDate(resolved.startDate ?? '')
+    setEndDate(resolved.endDate ?? '')
+    setBillingCycle(resolved.billingCycle ?? 'MONTHLY')
+    if (resolved.monthlyCost != null) setMonthlyCost(String(resolved.monthlyCost))
+    if (resolved.totalValue != null) setTotalValue(String(resolved.totalValue))
+  }, [resolved])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -61,23 +86,43 @@ export function QuickContractForm({
 
     setSubmitting(true)
     try {
+      const lines =
+        resolved.suggestedLineDescription
+          ? [
+              {
+                type: resolved.suggestedLineType ?? 'SOFTWARE',
+                description: resolved.suggestedLineDescription,
+                quantity: 1,
+                unitPrice: isRecurring
+                  ? monthlyCost
+                    ? parseFloat(monthlyCost)
+                    : undefined
+                  : totalValue
+                    ? parseFloat(totalValue)
+                    : undefined,
+                order: 0,
+              },
+            ]
+          : []
+
       const res = await fetch('/api/inventory/contracts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: name.trim(),
           contractNumber: contractNumber.trim() || undefined,
-          category: 'EQUIPMENT_RENTAL',
+          category: resolved.category ?? defaultCategoryForContext(context),
           supplierId: supplierId || undefined,
           familyId: familyId || undefined,
           startDate: startDate || undefined,
           endDate: endDate || undefined,
-          monthlyCost: monthlyCost ? parseFloat(monthlyCost) : undefined,
+          monthlyCost: isRecurring && monthlyCost ? parseFloat(monthlyCost) : undefined,
+          totalValue: !isRecurring && totalValue ? parseFloat(totalValue) : undefined,
           currency,
           billingCycle,
           autoRenew,
           renewalNoticeDays: 30,
-          lines: [],
+          lines,
         }),
       })
 
@@ -89,8 +134,12 @@ export function QuickContractForm({
       const saved = await res.json()
       toast({ title: 'Contrato creado exitosamente' })
       onSuccess(saved)
-    } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' })
+    } catch (err: unknown) {
+      toast({
+        title: 'Error',
+        description: err instanceof Error ? err.message : 'Error al crear',
+        variant: 'destructive',
+      })
     } finally {
       setSubmitting(false)
     }
@@ -99,8 +148,9 @@ export function QuickContractForm({
   return (
     <form onSubmit={handleSubmit} className='space-y-4'>
       <p className='text-sm text-muted-foreground'>
-        Crea un contrato de arrendamiento rápidamente. Podrás agregar más detalles después desde la
-        sección de Contratos.
+        Creación rápida con datos heredados del formulario de{' '}
+        {context === 'license' ? 'licencia' : 'equipo'}. Para facturación, custodio, líneas
+        detalladas o adjuntos, usa la pestaña <strong>Formulario completo</strong>.
       </p>
 
       <div className='grid grid-cols-1 sm:grid-cols-2 gap-3'>
@@ -111,7 +161,11 @@ export function QuickContractForm({
           <Input
             value={name}
             onChange={e => setName(e.target.value)}
-            placeholder='Ej: Arrendamiento laptops 2026'
+            placeholder={
+              context === 'license'
+                ? 'Ej: Microsoft 365 Empresa'
+                : 'Ej: Arrendamiento laptops 2026'
+            }
             required
           />
         </div>
@@ -126,13 +180,15 @@ export function QuickContractForm({
         </div>
 
         <div className='space-y-1'>
-          <Label>Costo mensual</Label>
+          <Label>{isRecurring ? 'Costo recurrente' : 'Valor total'}</Label>
           <Input
             type='number'
             min='0'
             step='0.01'
-            value={monthlyCost}
-            onChange={e => setMonthlyCost(e.target.value)}
+            value={isRecurring ? monthlyCost : totalValue}
+            onChange={e =>
+              isRecurring ? setMonthlyCost(e.target.value) : setTotalValue(e.target.value)
+            }
             placeholder='0.00'
           />
         </div>
@@ -149,7 +205,7 @@ export function QuickContractForm({
 
         <div className='space-y-1'>
           <Label>Ciclo de facturación</Label>
-          <Select value={billingCycle} onValueChange={setBillingCycle}>
+          <Select value={billingCycle} onValueChange={v => setBillingCycle(v as typeof billingCycle)}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
@@ -158,6 +214,7 @@ export function QuickContractForm({
               <SelectItem value='QUARTERLY'>Trimestral</SelectItem>
               <SelectItem value='SEMIANNUAL'>Semestral</SelectItem>
               <SelectItem value='ANNUAL'>Anual</SelectItem>
+              <SelectItem value='ONE_TIME'>Pago único</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -193,7 +250,7 @@ export function QuickContractForm({
         </Button>
         <Button type='submit' disabled={submitting}>
           {submitting && <Loader2 className='h-4 w-4 mr-2 animate-spin' />}
-          Crear contrato
+          Crear y vincular
         </Button>
       </div>
     </form>
