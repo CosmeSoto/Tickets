@@ -57,6 +57,7 @@ interface BackupConfig {
   /** Solo lectura — indica si BACKUP_ENCRYPTION_KEY está configurada en el servidor */
   encryptionKeyConfigured?: boolean
   allowRestore: boolean
+  cronConfigured?: boolean
 }
 
 interface BackupConfigurationProps {
@@ -78,6 +79,7 @@ export function BackupConfiguration({ onConfigChange }: BackupConfigurationProps
     scheduleTime: '02:00',
     weeklyFullDay: 0,
     allowRestore: false,
+    cronConfigured: false,
   })
 
   const [loading, setLoading] = useState(false)
@@ -315,7 +317,7 @@ export function BackupConfiguration({ onConfigChange }: BackupConfigurationProps
             </div>
           )}
           <p className='text-xs text-muted-foreground'>
-            Pulsa <strong className='text-foreground'>Guardar</strong> arriba para aplicar este
+            Pulsa <strong className='text-foreground'>Guardar</strong> abajo para aplicar este
             cambio.
           </p>
         </CardContent>
@@ -356,10 +358,9 @@ export function BackupConfiguration({ onConfigChange }: BackupConfigurationProps
           <CardContent className='space-y-6'>
             <div className='flex items-center justify-between'>
               <div className='space-y-1'>
-                <Label className='text-sm font-medium'>Backups Automáticos</Label>
+                <Label className='text-sm font-medium'>Backups automáticos</Label>
                 <p className='text-xs text-muted-foreground'>
-                  Respaldos pgBackRest automáticos: FULL el día configurado abajo, DIFF el resto de
-                  días
+                  pgBackRest vía cron del servidor: FULL un día/semana, DIFF el resto
                 </p>
               </div>
               <Switch
@@ -368,22 +369,50 @@ export function BackupConfiguration({ onConfigChange }: BackupConfigurationProps
               />
             </div>
 
+            {config.enabled && !config.cronConfigured && (
+              <Alert className='border-amber-500/40 bg-amber-500/10 py-2'>
+                <AlertTriangle className='h-4 w-4 text-amber-600' />
+                <AlertDescription className='text-xs'>
+                  Los respaldos automáticos requieren cron en el servidor con{' '}
+                  <code className='text-[11px]'>CRON_SECRET</code>. En desarrollo (Docker) créalos
+                  manualmente o usa el script{' '}
+                  <code className='text-[11px]'>setup-backup-cron.sh</code> en producción.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {config.enabled && (
+              <Alert className='border-primary/30 bg-primary/5 py-2'>
+                <Clock className='h-4 w-4 text-primary' />
+                <AlertDescription className='text-xs'>
+                  <strong className='text-foreground'>Calendario:</strong> todos los días a las{' '}
+                  {config.scheduleTime} (±30 min) — el{' '}
+                  {WEEKDAYS.find(d => d.value === (config.weeklyFullDay ?? 0))?.label ?? 'domingo'}{' '}
+                  es <span className='font-medium'>FULL</span>; los demás días,{' '}
+                  <span className='font-medium'>DIFF</span> (incremental sobre el último FULL).
+                </AlertDescription>
+              </Alert>
+            )}
+
             <div className='space-y-2'>
-              <Label className='text-sm font-medium'>Frecuencia</Label>
+              <Label className='text-sm font-medium'>Intervalo mínimo entre respaldos</Label>
               <Select
                 value={config.frequency}
                 onValueChange={value => updateConfig('frequency', value)}
                 disabled={!config.enabled}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder='Seleccionar frecuencia' />
+                  <SelectValue placeholder='Seleccionar intervalo' />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value='daily'>Diario</SelectItem>
-                  <SelectItem value='weekly'>Semanal</SelectItem>
-                  <SelectItem value='monthly'>Mensual</SelectItem>
+                  <SelectItem value='daily'>Cada ~24 h (recomendado)</SelectItem>
+                  <SelectItem value='weekly'>Cada ~7 días</SelectItem>
+                  <SelectItem value='monthly'>Cada ~30 días</SelectItem>
                 </SelectContent>
               </Select>
+              <p className='text-xs text-muted-foreground'>
+                Evita duplicar respaldos si el cron se ejecuta varias veces en la ventana horaria
+              </p>
             </div>
 
             <div className='space-y-2'>
@@ -405,12 +434,12 @@ export function BackupConfiguration({ onConfigChange }: BackupConfigurationProps
                 </SelectContent>
               </Select>
               <p className='text-xs text-muted-foreground'>
-                Los demás días se ejecuta un respaldo DIFF. Por defecto: domingo = FULL.
+                El resto de días del calendario se ejecuta DIFF (no es otro FULL)
               </p>
             </div>
 
             <div className='space-y-2'>
-              <Label className='text-sm font-medium'>Hora de Ejecución</Label>
+              <Label className='text-sm font-medium'>Hora de ejecución</Label>
               <TimePicker
                 value={config.scheduleTime}
                 onChange={v => updateConfig('scheduleTime', v)}
@@ -418,7 +447,8 @@ export function BackupConfiguration({ onConfigChange }: BackupConfigurationProps
                 className='w-full'
               />
               <p className='text-xs text-muted-foreground'>
-                Ventana horaria del cron (±30 min). Motor: pgBackRest vía backup-worker
+                Aplica a FULL y DIFF. El cron del servidor corre cada hora y dispara el respaldo
+                solo dentro de esta ventana (±30 min)
               </p>
             </div>
 

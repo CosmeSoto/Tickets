@@ -6,8 +6,13 @@
 
 ```bash
 # Reconstruir desde cero (borra datos):
+./docker/scripts/reset-dev-from-scratch.sh
+
 docker compose -f docker-compose.dev.yml down -v
+docker compose -f docker-compose.dev.yml down --remove-orphans
+docker network prune -f
 docker compose -f docker-compose.dev.yml up --build
+docker compose -f docker-compose.dev.yml up -d --build
 
 # Reconstruir solo la app (limpiando caché de Next.js):
 docker compose -f docker-compose.dev.yml down app

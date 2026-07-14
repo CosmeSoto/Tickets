@@ -83,6 +83,7 @@ export interface PgBackRestBackupSet {
   timestamp?: number | { start?: number; stop?: number }
   size?: number
   info?: { size?: number; 'repository-size'?: number }
+  archive?: { start?: string; stop?: string }
 }
 
 export interface PgBackRestInfo {

@@ -290,11 +290,18 @@ async function enrichOperationEntries(
   return entries
 }
 
-export async function getBackupOperationsHistory(limit = 25): Promise<BackupOperationEntry[]> {
+export async function getBackupOperationsHistory(options?: {
+  limit?: number
+  offset?: number
+}): Promise<{ entries: BackupOperationEntry[]; hasMore: boolean }> {
+  const limit = Math.min(Math.max(options?.limit ?? 25, 1), 100)
+  const offset = Math.max(options?.offset ?? 0, 0)
+  const needCount = offset + limit + 1
+
   const audits = await prisma.audit_logs.findMany({
     where: { action: { in: [...BACKUP_OPERATION_ACTIONS] } },
     orderBy: { createdAt: 'desc' },
-    take: limit * 5,
+    take: needCount * 5,
     select: {
       id: true,
       action: true,
@@ -323,7 +330,7 @@ export async function getBackupOperationsHistory(limit = 25): Promise<BackupOper
       engine: { in: ['export', 'import', 'pgbackrest'] },
     },
     orderBy: { createdAt: 'desc' },
-    take: limit,
+    take: needCount,
     select: {
       id: true,
       filename: true,
@@ -360,14 +367,19 @@ export async function getBackupOperationsHistory(limit = 25): Promise<BackupOper
     (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
   )
 
-  return enrichOperationEntries(merged.slice(0, limit))
+  const slice = merged.slice(offset, offset + limit)
+  const hasMore = merged.length > offset + limit
+
+  return {
+    entries: await enrichOperationEntries(slice),
+    hasMore,
+  }
 }
 
 export async function getRestoreHistory(limit = 20): Promise<RestoreHistoryEntry[]> {
-  return getBackupOperationsHistory(limit).then(entries =>
-    entries.filter(
-      e => e.kind === 'restore' || e.kind === 'restore_failed' || e.status === 'running'
-    )
+  const { entries } = await getBackupOperationsHistory({ limit })
+  return entries.filter(
+    e => e.kind === 'restore' || e.kind === 'restore_failed' || e.status === 'running'
   )
 }
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -19,8 +19,11 @@ import {
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { BackupOperationsHistory } from '@/components/backups/backup-restore-history'
+import { BackupSectionToolbar } from '@/components/backups/backup-section-toolbar'
 
 const PENDING_PG_RESTORE_KEY = 'tickets-pgbackrest-restore-pending'
+/** Máximo tiempo para reanudar polling tras recarga durante mantenimiento */
+const PENDING_PG_RESTORE_MAX_MS = 25 * 60 * 1000
 
 type PendingPgRestore = {
   backupId: string
@@ -78,9 +81,10 @@ const RESTORE_MODULES: { id: RestoreModuleId; label: string }[] = [
 interface BackupRestoreProps {
   backups: BackupInfo[]
   onRefresh: () => void
+  onOpenBackupsTab?: () => void
 }
 
-export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
+export function BackupRestore({ backups, onRefresh, onOpenBackupsTab }: BackupRestoreProps) {
   const [selectedBackup, setSelectedBackup] = useState<BackupInfo | null>(null)
   const [restorePreview, setRestorePreview] = useState<RestorePreview | null>(null)
   const [restoring, setRestoring] = useState(false)
@@ -98,9 +102,25 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
   const [maintenanceMessage, setMaintenanceMessage] = useState<string | null>(null)
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  /** Evita que el toast de éxito de pgBackRest se dispare dos veces en la misma sesión */
+  const pgRestoreToastShownRef = useRef(false)
   const { toast } = useToast()
+  const [restoreSearch, setRestoreSearch] = useState('')
 
-  const completedBackups = backups.filter(b => b.status === 'completed')
+  const completedBackups = useMemo(() => backups.filter(b => b.status === 'completed'), [backups])
+
+  const filteredRestoreBackups = useMemo(() => {
+    const q = restoreSearch.trim().toLowerCase()
+    if (!q) return completedBackups
+    return completedBackups.filter(
+      b =>
+        b.filename.toLowerCase().includes(q) ||
+        (b.label ?? '').toLowerCase().includes(q) ||
+        (b.engine ?? '').toLowerCase().includes(q) ||
+        (b.module ?? '').toLowerCase().includes(q) ||
+        (b.type === 'manual' ? 'manual' : 'automático').includes(q)
+    )
+  }, [completedBackups, restoreSearch])
 
   useEffect(() => {
     fetch('/api/admin/backups/config')
@@ -142,6 +162,8 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
   }
 
   const showPgRestoreSuccessToast = (label?: string | null) => {
+    if (pgRestoreToastShownRef.current) return
+    pgRestoreToastShownRef.current = true
     toast({
       title: 'Restauración pgBackRest completada',
       description: label
@@ -154,6 +176,7 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
 
   const finalizePgRestoreUi = () => {
     clearPendingPgRestore()
+    pgRestoreToastShownRef.current = false
     setHistoryRefreshKey(k => k + 1)
     setTimeout(() => {
       setRestoring(false)
@@ -276,6 +299,10 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
     if (job?.status === 'running') {
       return null
     }
+    if (job?.status === 'idle' || !job?.status) {
+      clearPendingPgRestore()
+      throw new Error('No hay restauración pgBackRest en curso en el servidor.')
+    }
     return job
   }
 
@@ -309,33 +336,101 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
     )
   }
 
+  const dismissRestoreModal = () => {
+    clearPendingPgRestore()
+    setRestoring(false)
+    setRestoreProgress(0)
+    setMaintenanceMessage(null)
+    setShowConfirmation(false)
+  }
+
+  const reconcileRestoreUiWithWorker = async (): Promise<
+    'none' | 'running' | 'done' | 'failed'
+  > => {
+    try {
+      const res = await fetch('/api/admin/backups/restore-status', { cache: 'no-store' })
+      const data = await parseJsonResponse(res)
+      if (!res.ok) {
+        dismissRestoreModal()
+        return 'none'
+      }
+      const job = data.job as { status?: string; message?: string | null; label?: string | null }
+      const pending = readPendingPgRestore()
+
+      if (job?.status === 'running') {
+        return 'running'
+      }
+
+      if (job?.status === 'success') {
+        if (pending) {
+          showPgRestoreSuccessToast(job.label ?? pending.label)
+          finalizePgRestoreUi()
+        } else {
+          dismissRestoreModal()
+        }
+        return 'done'
+      }
+
+      if (job?.status === 'failed') {
+        clearPendingPgRestore()
+        dismissRestoreModal()
+        if (pending) {
+          toast({
+            title: 'Error en la Restauración',
+            description: job.message || 'La restauración pgBackRest falló',
+            variant: 'destructive',
+            duration: 12000,
+          })
+        }
+        return 'failed'
+      }
+
+      // idle — limpiar pending obsoleto del navegador (p. ej. tras recrear contenedores)
+      if (pending) {
+        clearPendingPgRestore()
+      }
+      dismissRestoreModal()
+      return 'none'
+    } catch {
+      clearPendingPgRestore()
+      dismissRestoreModal()
+      return 'none'
+    }
+  }
+
   useEffect(() => {
-    const pending = readPendingPgRestore()
-    if (!pending) return
-
-    setRestoring(true)
-    setRestoreProgress(60)
-    setMaintenanceMessage(
-      'Restauración pgBackRest detectada. Verificando resultado tras el reinicio de servicios…'
-    )
-
     void (async () => {
+      const pending = readPendingPgRestore()
+      if (pending) {
+        const pendingAge = Date.now() - new Date(pending.startedAt).getTime()
+        if (pendingAge > PENDING_PG_RESTORE_MAX_MS) {
+          dismissRestoreModal()
+          return
+        }
+      }
+
+      const state = await reconcileRestoreUiWithWorker()
+      if (state !== 'running') return
+
+      setRestoring(true)
+      setRestoreProgress(60)
+      setMaintenanceMessage(
+        'Restauración pgBackRest detectada. Verificando resultado tras el reinicio de servicios…'
+      )
+
       try {
-        const job = await pollPgBackRestRestoreOutcome()
+        const finished = await pollPgBackRestRestoreOutcome()
         setRestoreProgress(100)
-        showPgRestoreSuccessToast(job?.label ?? pending.label)
+        showPgRestoreSuccessToast(finished?.label ?? pending?.label)
         finalizePgRestoreUi()
       } catch (error) {
-        clearPendingPgRestore()
+        dismissRestoreModal()
         toast({
           title: 'Error en la Restauración',
           description: error instanceof Error ? error.message : 'Error desconocido',
           variant: 'destructive',
           duration: 12000,
         })
-        setRestoring(false)
-        setRestoreProgress(0)
-        setMaintenanceMessage(null)
         setHistoryRefreshKey(k => k + 1)
       }
     })()
@@ -590,10 +685,23 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
 
   return (
     <div className='space-y-6'>
-      {/* Header */}
-      <div>
-        <h2 className='text-2xl font-bold text-foreground'>Restauración de Backups</h2>
-        <p className='text-muted-foreground'>Selecciona un backup y elige qué módulo restaurar</p>
+      <div className='flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3'>
+        <div>
+          <h2 className='text-xl font-semibold text-foreground'>Restauración</h2>
+          <p className='text-sm text-muted-foreground mt-1'>
+            Elige un punto de recuperación o importa un archivo .dump
+          </p>
+        </div>
+        {onOpenBackupsTab && (
+          <Button
+            variant='ghost'
+            size='sm'
+            className='self-start sm:self-auto'
+            onClick={onOpenBackupsTab}
+          >
+            Gestionar inventario →
+          </Button>
+        )}
       </div>
 
       {/* Sección de Importación */}
@@ -713,7 +821,7 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
           <strong>¡Advertencia!</strong>{' '}
           {isPgBackRestBackup
             ? allowPgBackRestRestore
-              ? 'Restauración pgBackRest: reemplaza el cluster PostgreSQL completo. Desactívala en Config cuando termines. Para DR en servidor también puedes usar ./docker/scripts/disaster-recovery.sh.'
+              ? 'Restauración pgBackRest: revierte el cluster al instante exacto del respaldo seleccionado (no incluye cambios posteriores al backup, p. ej. eliminaciones). Para un punto intermedio entre dos backups usa PITR. Desactívala en Config cuando termines.'
               : 'Restauración pgBackRest deshabilitada. Actívala en Admin → Backups → Config → Permitir restauración pgBackRest.'
             : selectedModules.length === 0 && !selectedBackup?.module
               ? 'La restauración completa reemplazará todos los datos actuales de la base de datos. Esta acción no se puede deshacer.'
@@ -727,22 +835,33 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
       <div className='grid grid-cols-1 lg:grid-cols-2 gap-6'>
         {/* Lista de Backups Disponibles */}
         <Card>
-          <CardHeader>
-            <CardTitle className='flex items-center space-x-2'>
-              <Database className='h-5 w-5 text-primary' />
-              <span>Backups Disponibles</span>
-            </CardTitle>
-            <CardDescription>Selecciona un backup para restaurar</CardDescription>
+          <CardHeader className='space-y-3'>
+            <div>
+              <CardTitle className='flex items-center space-x-2 text-base'>
+                <Database className='h-5 w-5 text-primary' />
+                <span>Backups disponibles</span>
+              </CardTitle>
+              <CardDescription>Solo respaldos completados listos para restaurar</CardDescription>
+            </div>
+            <BackupSectionToolbar
+              search={restoreSearch}
+              onSearchChange={setRestoreSearch}
+              searchPlaceholder='Buscar backup…'
+            />
           </CardHeader>
           <CardContent>
-            {completedBackups.length === 0 ? (
+            {filteredRestoreBackups.length === 0 ? (
               <div className='text-center py-8 text-muted-foreground'>
                 <Database className='h-8 w-8 mx-auto mb-2 text-muted-foreground' />
-                <p className='text-sm'>No hay backups disponibles para restaurar</p>
+                <p className='text-sm'>
+                  {restoreSearch
+                    ? 'Sin resultados para la búsqueda'
+                    : 'No hay backups disponibles para restaurar'}
+                </p>
               </div>
             ) : (
-              <div className='space-y-3 max-h-96 overflow-y-auto'>
-                {completedBackups.map(backup => (
+              <div className='space-y-2 max-h-[28rem] overflow-y-auto pr-1'>
+                {filteredRestoreBackups.map(backup => (
                   <div
                     key={backup.id}
                     className={`p-4 border rounded-lg cursor-pointer transition-all ${
@@ -1143,6 +1262,17 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
                   </>
                 )}
               </div>
+              {maintenanceMessage && (
+                <Button variant='outline' className='w-full' onClick={dismissRestoreModal}>
+                  Salir de la espera
+                </Button>
+              )}
+              {maintenanceMessage && (
+                <p className='text-xs text-center text-muted-foreground'>
+                  Cierra esta ventana si el sitio ya respondió o si quieres revisar el estado más
+                  tarde en el historial de operaciones.
+                </p>
+              )}
             </CardContent>
           </Card>
         </div>

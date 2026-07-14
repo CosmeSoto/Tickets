@@ -14,13 +14,10 @@ RUN npm ci --prefer-offline
 COPY prisma ./prisma/
 RUN npx prisma generate
 
+# Entrypoint de desarrollo: espera recovery, db push, seed solo si vacío, next dev
+COPY docker/entrypoint-dev.sh ./docker/entrypoint-dev.sh
+RUN chmod +x ./docker/entrypoint-dev.sh
+
 EXPOSE 3000
 
-# Entrypoint de desarrollo:
-#   1. db push  — sincroniza el schema sin historial de migraciones (dev only)
-#   2. db:seed  — datos iniciales idempotentes (upsert)
-#   3. next dev — webpack en Docker (Turbopack + PostCSS suele hacer timeout en contenedor)
-CMD ["sh", "-c", \
-  "npx prisma db push --accept-data-loss && \
-   npm run db:seed && \
-   npm run dev:docker"]
+CMD ["sh", "docker/entrypoint-dev.sh"]

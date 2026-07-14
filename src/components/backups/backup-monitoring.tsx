@@ -253,9 +253,10 @@ export function BackupMonitoring() {
           onClick={() => void refreshMonitoring(true)}
           size='sm'
           disabled={loading}
+          title='Recargar estado del worker y alertas'
         >
           <Activity className='h-4 w-4 mr-2' />
-          Actualizar
+          Recargar
         </Button>
       </div>
 

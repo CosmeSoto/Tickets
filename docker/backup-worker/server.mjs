@@ -6,7 +6,7 @@
 import http from 'node:http'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { access, writeFile } from 'fs/promises'
+import { access, readFile, unlink, writeFile } from 'fs/promises'
 
 const exec = promisify(execFile)
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
@@ -85,6 +85,57 @@ async function waitForArchiveModeOn(maxAttempts = 90) {
   return false
 }
 
+async function waitForArchivePush(maxAttempts = 30) {
+  const pgpass = process.env.PGPASSWORD || ''
+  for (let i = 1; i <= maxAttempts; i++) {
+    try {
+      const { stdout } = await runPgBackRest(['info', `--stanza=${STANZA}`, '--output=json'], 30_000)
+      const archive = JSON.parse(stdout || '[]')[0]?.archive?.[0]
+      if (archive?.min && archive?.max) {
+        console.log(`[backup-worker] WAL archivado: ${archive.min} → ${archive.max}`)
+        return archive
+      }
+    } catch {
+      // reintentar
+    }
+    if (i === 1 || i % 3 === 0) {
+      try {
+        await exec(
+          'psql',
+          ['-h', 'postgres', '-U', 'tickets_user', '-d', 'tickets_db', '-c', 'SELECT pg_switch_wal()'],
+          { timeout: 10_000, env: { ...process.env, PGPASSWORD: pgpass } }
+        )
+      } catch {
+        // postgres puede estar reiniciando tras archive_mode
+      }
+    }
+    if (i === 1 || i % 5 === 0) {
+      console.log(`[backup-worker] Esperando primer WAL archivado (${i}/${maxAttempts})...`)
+    }
+    await sleep(3000)
+  }
+  throw new Error('No se archivó WAL tras activar archive_mode — reintenta Inicializar')
+}
+
+async function verifyBackupRestorable(setLabel) {
+  const { stdout } = await runPgBackRest(['info', `--stanza=${STANZA}`, '--output=json'], 30_000)
+  const stanza = JSON.parse(stdout || '[]')[0]
+  const backups = stanza?.backup || []
+  const backup = setLabel
+    ? backups.find(b => b.label === setLabel)
+    : backups[backups.length - 1]
+  if (!backup) throw new Error(setLabel ? `Backup ${setLabel} no encontrado` : 'Sin backups en el repositorio')
+
+  const needed = backup.archive?.start
+  const archiveMin = stanza?.archive?.[0]?.min
+  if (needed && archiveMin && needed < archiveMin) {
+    throw new Error(
+      `Backup ${backup.label} no es restaurable: requiere WAL ${needed} pero el archivo empieza en ${archiveMin}. Ejecuta un backup FULL nuevo desde Admin → Backups.`
+    )
+  }
+  return backup.label
+}
+
 async function finalizeBootstrap() {
   await markBootstrapComplete()
   console.log('[backup-worker] Marcador creado — postgres se reiniciará solo para activar archive_mode')
@@ -94,7 +145,16 @@ async function finalizeBootstrap() {
     return { ok: true, needsPostgresRestart: true }
   }
   await waitPostgresReady(30)
+  // El primer backup (--no-archive-check) no incluye WAL archivado → no sirve para restore.
+  console.log('[backup-worker] Creando backup FULL restaurable (con WAL archivado)...')
+  await waitForArchivePush()
   await runPgBackRest(['check', `--stanza=${STANZA}`], 120_000)
+  await runPgBackRest(['backup', `--stanza=${STANZA}`, '--type=full'], 3_600_000)
+  try {
+    await runPgBackRest(['expire', `--stanza=${STANZA}`])
+  } catch (expireErr) {
+    console.warn('[backup-worker] expire tras bootstrap:', expireErr)
+  }
   stanzaReady = true
   console.log('[backup-worker] Bootstrap completado — stanza operativa')
   return { ok: true, needsPostgresRestart: false }
@@ -165,6 +225,48 @@ async function waitForPostmasterGone(maxAttempts = 90) {
   throw new Error('postmaster.pid sigue presente — PostgreSQL no se detuvo correctamente')
 }
 
+/**
+ * Tras pgbackrest restore, backup_label / recovery.signal son necesarios para el
+ * primer arranque en recovery. Solo limpiar DESPUÉS de que Postgres esté writable.
+ */
+async function scrubPgDataForNormalStartup() {
+  const markers = ['backup_label', 'recovery.signal', 'standby.signal']
+  for (const name of markers) {
+    try {
+      await unlink(`${PG_DATA_DIR}/${name}`)
+      console.log(`[backup-worker] Eliminado ${name} de PGDATA`)
+    } catch {
+      // no existe
+    }
+  }
+
+  const autoConf = `${PG_DATA_DIR}/postgresql.auto.conf`
+  try {
+    const content = await readFile(autoConf, 'utf8')
+    const hadRecovery = content
+      .split('\n')
+      .some(l =>
+        /^(restore_command|recovery_target|recovery_target_timeline|recovery_target_action|restore_target)\s*=/.test(
+          l.trim()
+        )
+      )
+    if (!hadRecovery) return
+
+    const lines = content.split('\n').filter(line => {
+      const t = line.trim()
+      if (!t || t.startsWith('#')) return true
+      return !/^(restore_command|recovery_target|recovery_target_timeline|recovery_target_action|restore_target)\s*=/.test(
+        t
+      )
+    })
+    const cleaned = lines.join('\n').replace(/\n+$/, '')
+    await writeFile(autoConf, cleaned ? `${cleaned}\n` : '', { mode: 0o600 })
+    console.log('[backup-worker] postgresql.auto.conf — recovery limpiado')
+  } catch {
+    // sin auto.conf
+  }
+}
+
 async function prepareStackForRestore() {
   console.log('[backup-worker] Modo mantenimiento — deteniendo app, nginx y postgres...')
   await dockerStopContainers([CONTAINER_APP, CONTAINER_NGINX, CONTAINER_POSTGRES])
@@ -174,7 +276,9 @@ async function prepareStackForRestore() {
 async function finalizeStackAfterRestore() {
   console.log('[backup-worker] Reiniciando servicios tras restauración...')
   await dockerStartContainers([CONTAINER_POSTGRES])
-  await waitPostgresReady(90)
+  await waitPostgresReady(120)
+  await ensurePostgresWritable(120)
+  await scrubPgDataForNormalStartup()
   await dockerStartContainers([CONTAINER_APP, CONTAINER_NGINX])
 }
 
@@ -188,10 +292,17 @@ let restoreJob = {
 }
 
 async function runRestoreJob(body) {
-  const args = ['restore', `--stanza=${STANZA}`, '--type=default', '--delta']
-  if (body.set) args.push(`--set=${body.set}`)
+  // --delta en restore parcial dejó PGDATA inconsistente (backup_label + WAL faltante).
+  // Restore por set/PITR: reemplazo completo del cluster desde el repo (fiable en Docker dev).
+  const args = ['restore', `--stanza=${STANZA}`]
+
   if (body.target) {
-    args.push(`--type=time`, `--target="${body.target}"`, '--target-action=promote')
+    args.push('--type=time', `--target="${body.target}"`, '--target-action=promote')
+    if (body.set) args.push(`--set=${body.set}`)
+  } else if (body.set) {
+    args.push('--type=immediate', `--set=${body.set}`, '--target-action=promote')
+  } else {
+    args.push('--type=default')
   }
 
   restoreJob = {
@@ -205,6 +316,7 @@ async function runRestoreJob(body) {
   let restoreOk = false
 
   try {
+    await verifyBackupRestorable(body.set || null)
     await prepareStackForRestore()
     console.log(`[backup-worker] Ejecutando: pgbackrest ${args.join(' ')}`)
     restoreJob.message = 'Ejecutando pgbackrest restore (puede tardar varios minutos)…'
@@ -257,6 +369,63 @@ async function waitPostgresReady(maxAttempts = 60) {
     }
   }
   throw new Error('PostgreSQL no disponible tras esperar 3 minutos')
+}
+
+/** Tras restore pgBackRest, Postgres puede quedar en recovery (solo lectura) hasta pg_ctl promote. */
+async function ensurePostgresWritable(maxAttempts = 90) {
+  const pgpass = process.env.PGPASSWORD || ''
+  const psqlEnv = { ...process.env, PGPASSWORD: pgpass }
+
+  for (let i = 1; i <= maxAttempts; i++) {
+    let inRecovery = null
+    try {
+      const { stdout } = await exec(
+        'psql',
+        ['-h', 'postgres', '-U', 'tickets_user', '-d', 'tickets_db', '-tAc', 'SELECT pg_is_in_recovery()'],
+        { timeout: 8000, env: psqlEnv }
+      )
+      inRecovery = stdout?.toString().trim()
+      if (inRecovery === 'f') {
+        console.log('[backup-worker] PostgreSQL acepta escrituras (fuera de recovery)')
+        return
+      }
+    } catch {
+      console.log(`[backup-worker] PostgreSQL aún no responde (${i}/${maxAttempts})...`)
+      await sleep(3000)
+      continue
+    }
+
+    if (i === 1 || i % 5 === 0) {
+      console.log(
+        `[backup-worker] PostgreSQL en recovery (solo lectura) — promoviendo (${i}/${maxAttempts})...`
+      )
+    }
+
+    try {
+      await exec(
+        'docker',
+        [
+          'exec',
+          '-u',
+          'postgres',
+          CONTAINER_POSTGRES,
+          'pg_ctl',
+          'promote',
+          '-D',
+          '/var/lib/postgresql/data',
+        ],
+        { timeout: 30_000, env: process.env }
+      )
+    } catch {
+      // pg_ctl promote puede fallar si recovery aún no alcanzó el punto de consistencia
+    }
+
+    await sleep(3000)
+  }
+
+  throw new Error(
+    'PostgreSQL sigue en modo solo lectura tras la restauración. Ejecuta: docker exec -u postgres tickets-postgres-dev pg_ctl promote -D /var/lib/postgresql/data'
+  )
 }
 
 function normalizeBackupEntry(entry) {
@@ -471,7 +640,18 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (url.pathname === '/restore/status' && req.method === 'GET') {
-      return json(res, 200, { job: restoreJob })
+      const job = { ...restoreJob }
+      // Tras reportar éxito/fallo, limpiar para que visitas posteriores no reanuden polling fantasma
+      if (restoreJob.status === 'success' || restoreJob.status === 'failed') {
+        restoreJob = {
+          status: 'idle',
+          message: null,
+          label: null,
+          startedAt: null,
+          finishedAt: null,
+        }
+      }
+      return json(res, 200, { job })
     }
 
     if (url.pathname === '/disk-usage' && req.method === 'GET') {

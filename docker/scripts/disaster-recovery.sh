@@ -70,9 +70,9 @@ case "$cmd" in
       echo "Uso: restore --latest | restore --set LABEL"
       exit 1
     fi
-    payload="{}"
+    payload='{"uiAuthorized":true}'
     if [ -n "$set_arg" ]; then
-      payload="{\"set\":\"$set_arg\"}"
+      payload="{\"set\":\"$set_arg\",\"uiAuthorized\":true}"
     fi
     worker_curl POST /restore "$payload"
     echo "==> Reiniciando servicios..."
@@ -87,7 +87,7 @@ case "$cmd" in
     echo "⚠️  PITR a $target — deteniendo app, nginx y postgres"
     compose stop app nginx
     compose stop postgres
-    worker_curl POST /restore "{\"target\":\"$target\"}"
+    worker_curl POST /restore "{\"target\":\"$target\",\"uiAuthorized\":true}"
     echo "==> Reiniciando servicios..."
     compose up -d postgres backup-worker app nginx
     ;;

@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getPgBackRestRestoreStatus } from '@/lib/services/backup/backup-engine'
 import {
   getBackupOperationsHistory,
@@ -6,13 +6,19 @@ import {
 } from '@/lib/services/backup/backup-restore-events'
 import { requireBackupSuperAdmin } from '../_auth'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const { errorResponse } = await requireBackupSuperAdmin()
     if (errorResponse) return errorResponse
 
-    const [operations, workerStatus] = await Promise.all([
-      getBackupOperationsHistory(20),
+    const limit = Math.min(
+      Math.max(parseInt(request.nextUrl.searchParams.get('limit') || '15', 10) || 15, 1),
+      100
+    )
+    const offset = Math.max(parseInt(request.nextUrl.searchParams.get('offset') || '0', 10) || 0, 0)
+
+    const [{ entries, hasMore }, workerStatus] = await Promise.all([
+      getBackupOperationsHistory({ limit, offset }),
       getPgBackRestRestoreStatus().catch(() => ({
         job: {
           status: 'idle' as const,
@@ -24,11 +30,14 @@ export async function GET() {
       })),
     ])
 
-    const history = mergeWorkerJobIntoHistory(operations, workerStatus.job)
+    const history = mergeWorkerJobIntoHistory(entries, workerStatus.job)
 
     return NextResponse.json({
       history,
       operations: history,
+      hasMore,
+      offset,
+      limit,
       activeJob: workerStatus.job.status === 'running' ? workerStatus.job : null,
     })
   } catch (error) {

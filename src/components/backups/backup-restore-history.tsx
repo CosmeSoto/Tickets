@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -18,6 +18,15 @@ import {
   Upload,
   XCircle,
 } from 'lucide-react'
+import { BackupSectionToolbar } from '@/components/backups/backup-section-toolbar'
+import { useExport } from '@/hooks/common/use-export'
+import {
+  engineLabel,
+  formatOperationDuration,
+  matchesOperationSearch,
+  operationStatusLabel,
+  operationTitle,
+} from '@/lib/services/backup/backup-operation-ui'
 
 export type BackupOperationEntry = {
   id: string
@@ -42,6 +51,8 @@ interface BackupOperationsHistoryProps {
   refreshKey?: number
 }
 
+const PAGE_SIZE = 15
+
 function formatDate(dateString: string) {
   return new Date(dateString).toLocaleString('es-ES', {
     year: 'numeric',
@@ -49,18 +60,7 @@ function formatDate(dateString: string) {
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-    second: '2-digit',
   })
-}
-
-function formatDuration(ms: number | null) {
-  if (ms == null) return '—'
-  if (ms < 1000) return `${ms} ms`
-  const sec = Math.round(ms / 1000)
-  if (sec < 60) return `${sec} s`
-  const min = Math.floor(sec / 60)
-  const rem = sec % 60
-  return rem > 0 ? `${min} min ${rem} s` : `${min} min`
 }
 
 function formatFileSize(bytes: number | null) {
@@ -69,32 +69,6 @@ function formatFileSize(bytes: number | null) {
   const sizes = ['Bytes', 'KB', 'MB', 'GB']
   const i = Math.floor(Math.log(bytes) / Math.log(k))
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`
-}
-
-function engineLabel(engine: string | null) {
-  if (engine === 'pgbackrest') return 'pgBackRest'
-  if (engine === 'export') return 'Export .dump'
-  if (engine === 'import') return 'Importado'
-  return engine || '—'
-}
-
-function operationTitle(entry: BackupOperationEntry) {
-  switch (entry.kind) {
-    case 'created':
-      return entry.engine === 'export' ? 'Export .dump creado' : 'Respaldo pgBackRest creado'
-    case 'imported':
-      return 'Backup importado'
-    case 'deleted':
-      return 'Backup eliminado'
-    case 'uploaded':
-      return 'Subido a nube'
-    case 'restore':
-      return entry.status === 'running' ? 'Restauración en curso' : 'Restauración completada'
-    case 'restore_failed':
-      return 'Restauración fallida'
-    default:
-      return 'Operación de backup'
-  }
 }
 
 function operationIcon(entry: BackupOperationEntry) {
@@ -113,42 +87,29 @@ function operationIcon(entry: BackupOperationEntry) {
 }
 
 function statusBadge(entry: BackupOperationEntry) {
-  if (
-    entry.kind === 'deleted' ||
-    entry.kind === 'created' ||
-    entry.kind === 'imported' ||
-    entry.kind === 'uploaded'
-  ) {
+  const label = operationStatusLabel(entry)
+  if (label === 'Registrado' || label === 'Completada') {
     return (
       <Badge className='bg-emerald-600 hover:bg-emerald-600'>
         <CheckCircle className='h-3 w-3 mr-1' />
-        Registrado
+        {label}
       </Badge>
     )
   }
-  switch (entry.status) {
-    case 'success':
-      return (
-        <Badge className='bg-emerald-600 hover:bg-emerald-600'>
-          <CheckCircle className='h-3 w-3 mr-1' />
-          Completada
-        </Badge>
-      )
-    case 'failed':
-      return (
-        <Badge variant='destructive'>
-          <XCircle className='h-3 w-3 mr-1' />
-          Fallida
-        </Badge>
-      )
-    default:
-      return (
-        <Badge variant='secondary'>
-          <Loader2 className='h-3 w-3 mr-1 animate-spin' />
-          En curso
-        </Badge>
-      )
+  if (label === 'Fallida') {
+    return (
+      <Badge variant='destructive'>
+        <XCircle className='h-3 w-3 mr-1' />
+        {label}
+      </Badge>
+    )
   }
+  return (
+    <Badge variant='secondary'>
+      <Loader2 className='h-3 w-3 mr-1 animate-spin' />
+      {label}
+    </Badge>
+  )
 }
 
 export function BackupOperationsHistory({ refreshKey = 0 }: BackupOperationsHistoryProps) {
@@ -158,27 +119,44 @@ export function BackupOperationsHistory({ refreshKey = 0 }: BackupOperationsHist
     message?: string | null
   } | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(0)
+  const [hasMore, setHasMore] = useState(false)
 
-  const loadHistory = useCallback(async () => {
+  const loadHistory = useCallback(async (append = false, pageIndex = 0) => {
     try {
       setError(null)
-      const res = await fetch('/api/admin/backups/operations-history', { cache: 'no-store' })
+      if (append) setLoadingMore(true)
+      else setLoading(true)
+
+      const offset = pageIndex * PAGE_SIZE
+      const res = await fetch(
+        `/api/admin/backups/operations-history?limit=${PAGE_SIZE}&offset=${offset}`,
+        { cache: 'no-store' }
+      )
       const data = await res.json()
-      if (!res.ok) {
-        throw new Error(data.error || 'No se pudo cargar el historial')
-      }
-      setHistory(Array.isArray(data.operations) ? data.operations : (data.history ?? []))
+      if (!res.ok) throw new Error(data.error || 'No se pudo cargar el historial')
+
+      const batch: BackupOperationEntry[] = Array.isArray(data.operations)
+        ? data.operations
+        : (data.history ?? [])
+
+      setHistory(prev => (append ? [...prev, ...batch] : batch))
+      setHasMore(Boolean(data.hasMore))
       setActiveJob(data.activeJob ?? null)
+      setPage(pageIndex)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido')
     } finally {
       setLoading(false)
+      setLoadingMore(false)
     }
   }, [])
 
   useEffect(() => {
-    void loadHistory()
+    void loadHistory(false, 0)
   }, [loadHistory, refreshKey])
 
   useEffect(() => {
@@ -186,28 +164,75 @@ export function BackupOperationsHistory({ refreshKey = 0 }: BackupOperationsHist
       history.some(h => h.kind === 'restore' && h.status === 'running') || activeJob != null
     if (!hasRunning) return
     const interval = setInterval(() => {
-      void loadHistory()
+      void loadHistory(false, 0)
     }, 8000)
     return () => clearInterval(interval)
   }, [history, activeJob, loadHistory])
 
+  const filteredHistory = useMemo(
+    () => history.filter(entry => matchesOperationSearch(entry, search)),
+    [history, search]
+  )
+
+  const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
+    filename: 'operaciones-backup',
+    title: 'Historial de operaciones de backup',
+    subtitle: `Exportado el ${new Date().toLocaleDateString('es-EC')}`,
+    columns: [
+      { key: 'operacion', label: 'Operación' },
+      { key: 'archivo', label: 'Archivo / Etiqueta' },
+      { key: 'motor', label: 'Motor' },
+      { key: 'estado', label: 'Estado' },
+      { key: 'fecha', label: 'Fecha' },
+      { key: 'duracion', label: 'Duración' },
+      { key: 'usuario', label: 'Usuario' },
+    ],
+    getData: () =>
+      filteredHistory.map(entry => ({
+        operacion: operationTitle(entry),
+        archivo: entry.filename || entry.label || entry.backupId,
+        motor: engineLabel(entry.engine),
+        estado: operationStatusLabel(entry),
+        fecha: formatDate(entry.startedAt),
+        duracion: formatOperationDuration(entry.durationMs),
+        usuario: entry.userEmail || '—',
+      })),
+  })
+
   return (
     <Card>
-      <CardHeader className='flex flex-row items-start justify-between gap-4 space-y-0'>
-        <div>
-          <CardTitle className='flex items-center gap-2 text-base'>
-            <History className='h-4 w-4 text-primary' />
-            Historial de operaciones
-          </CardTitle>
-          <CardDescription>
-            Creación de exports (.dump), respaldos pgBackRest, importaciones, restauraciones y
-            eliminaciones. Todas quedan registradas en Admin → Auditoría.
-          </CardDescription>
+      <CardHeader className='space-y-3'>
+        <div className='flex flex-row items-start justify-between gap-4'>
+          <div>
+            <CardTitle className='flex items-center gap-2 text-base'>
+              <History className='h-4 w-4 text-primary' />
+              Historial de operaciones
+            </CardTitle>
+            <CardDescription>
+              Creaciones, restauraciones e importaciones. Detalle completo en Admin → Auditoría.
+            </CardDescription>
+          </div>
+          <Button
+            variant='outline'
+            size='sm'
+            onClick={() => void loadHistory(false, 0)}
+            disabled={loading}
+            title='Recargar historial'
+          >
+            <RefreshCw className={`h-4 w-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
+            Recargar
+          </Button>
         </div>
-        <Button variant='outline' size='sm' onClick={() => void loadHistory()} disabled={loading}>
-          <RefreshCw className={`h-4 w-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
-          Actualizar
-        </Button>
+        <BackupSectionToolbar
+          search={search}
+          onSearchChange={setSearch}
+          searchPlaceholder='Buscar operación, archivo, usuario…'
+          onExportCSV={exportCSV}
+          onExportExcel={exportExcel}
+          onExportPDF={exportPDF}
+          exporting={exporting}
+          exportDisabled={filteredHistory.length === 0}
+        />
       </CardHeader>
       <CardContent className='space-y-4'>
         {activeJob && (
@@ -218,10 +243,9 @@ export function BackupOperationsHistory({ refreshKey = 0 }: BackupOperationsHist
               {activeJob.label ? (
                 <>
                   {' '}
-                  — etiqueta <span className='font-mono'>{activeJob.label}</span>
+                  — <span className='font-mono'>{activeJob.label}</span>
                 </>
               ) : null}
-              .
             </AlertDescription>
           </Alert>
         )}
@@ -237,65 +261,78 @@ export function BackupOperationsHistory({ refreshKey = 0 }: BackupOperationsHist
             <Loader2 className='h-4 w-4 mr-2 animate-spin' />
             Cargando historial…
           </div>
-        ) : history.length === 0 ? (
+        ) : filteredHistory.length === 0 ? (
           <div className='text-center py-8 text-muted-foreground text-sm'>
             <History className='h-8 w-8 mx-auto mb-2 opacity-50' />
-            Aún no hay operaciones registradas
+            {search ? 'Sin resultados para la búsqueda' : 'Aún no hay operaciones registradas'}
           </div>
         ) : (
-          <div className='space-y-3 max-h-96 overflow-y-auto'>
-            {history.map(entry => {
-              const Icon = operationIcon(entry)
-              const sizeLabel = formatFileSize(entry.size)
-              return (
-                <div
-                  key={entry.id}
-                  className='rounded-lg border border-border p-3 space-y-2 bg-muted/20'
-                >
-                  <div className='flex flex-wrap items-center justify-between gap-2'>
-                    <div className='flex items-start gap-2 min-w-0'>
-                      <Icon className='h-4 w-4 text-primary mt-0.5 shrink-0' />
-                      <div className='min-w-0'>
-                        <p className='font-medium text-sm'>{operationTitle(entry)}</p>
-                        <p className='text-xs text-muted-foreground truncate'>
-                          {entry.filename || entry.label || entry.backupId}
-                        </p>
+          <>
+            <div className='space-y-2'>
+              {filteredHistory.map(entry => {
+                const Icon = operationIcon(entry)
+                const sizeLabel = formatFileSize(entry.size)
+                return (
+                  <div
+                    key={entry.id}
+                    className='rounded-lg border border-border p-3 space-y-2 bg-muted/20'
+                  >
+                    <div className='flex flex-wrap items-center justify-between gap-2'>
+                      <div className='flex items-start gap-2 min-w-0'>
+                        <Icon className='h-4 w-4 text-primary mt-0.5 shrink-0' />
+                        <div className='min-w-0'>
+                          <p className='font-medium text-sm'>{operationTitle(entry)}</p>
+                          <p className='text-xs text-muted-foreground truncate'>
+                            {entry.filename || entry.label || entry.backupId}
+                          </p>
+                        </div>
                       </div>
+                      {statusBadge(entry)}
                     </div>
-                    {statusBadge(entry)}
-                  </div>
-                  <div className='grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground'>
-                    <span className='flex items-center gap-1'>
-                      <Clock className='h-3 w-3' />
-                      {formatDate(entry.startedAt)}
-                    </span>
-                    {entry.finishedAt && entry.kind === 'restore' && (
-                      <span>Duración: {formatDuration(entry.durationMs)}</span>
+                    <div className='grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground'>
+                      <span className='flex items-center gap-1'>
+                        <Clock className='h-3 w-3' />
+                        {formatDate(entry.startedAt)}
+                      </span>
+                      {entry.finishedAt && entry.kind === 'restore' && (
+                        <span>Duración: {formatOperationDuration(entry.durationMs)}</span>
+                      )}
+                      <span>Motor: {engineLabel(entry.engine)}</span>
+                      {sizeLabel && <span>Tamaño: {sizeLabel}</span>}
+                      {entry.userEmail && (
+                        <span className='sm:col-span-2'>Por: {entry.userEmail}</span>
+                      )}
+                    </div>
+                    {entry.message && entry.status !== 'success' && entry.kind !== 'created' && (
+                      <p className='text-xs text-destructive'>{entry.message}</p>
                     )}
-                    <span>Motor: {engineLabel(entry.engine)}</span>
-                    {sizeLabel && <span>Tamaño: {sizeLabel}</span>}
-                    {entry.mode && entry.kind === 'restore' && <span>Modo: {entry.mode}</span>}
-                    {entry.userEmail && (
-                      <span className='sm:col-span-2'>Por: {entry.userEmail}</span>
-                    )}
                   </div>
-                  {entry.message && entry.status !== 'success' && entry.kind !== 'created' && (
-                    <p className='text-xs text-destructive'>{entry.message}</p>
+                )
+              })}
+            </div>
+
+            {!search && hasMore && (
+              <div className='flex justify-center pt-2'>
+                <Button
+                  variant='outline'
+                  size='sm'
+                  disabled={loadingMore}
+                  onClick={() => void loadHistory(true, page + 1)}
+                >
+                  {loadingMore ? (
+                    <>
+                      <Loader2 className='h-4 w-4 mr-2 animate-spin' />
+                      Cargando…
+                    </>
+                  ) : (
+                    'Cargar más'
                   )}
-                  {entry.message &&
-                    entry.kind === 'created' &&
-                    entry.message.includes('auditoría') && (
-                      <p className='text-xs text-muted-foreground italic'>{entry.message}</p>
-                    )}
-                </div>
-              )
-            })}
-          </div>
+                </Button>
+              </div>
+            )}
+          </>
         )}
       </CardContent>
     </Card>
   )
 }
-
-/** @deprecated use BackupOperationsHistory */
-export const BackupRestoreHistory = BackupOperationsHistory

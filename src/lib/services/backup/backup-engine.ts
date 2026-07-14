@@ -1,3 +1,4 @@
+import type { PrismaClient } from '@prisma/client'
 import {
   BackupEngine,
   BackupKind,
@@ -240,7 +241,37 @@ export function formatBackupKindLabel(kind: BackupKind, engine: BackupEngine): s
   }
 }
 
-export async function syncPgBackRestToDatabase(): Promise<number> {
+let syncPgBackRestInFlight: Promise<number> | null = null
+
+/** Elimina filas duplicadas del mismo label pgBackRest (race al sincronizar en paralelo). */
+async function dedupePgBackRestBackupRows(prisma: PrismaClient): Promise<number> {
+  const rows = await prisma.backups.findMany({
+    where: { engine: 'pgbackrest', label: { not: null } },
+    orderBy: { createdAt: 'asc' },
+    select: { id: true, label: true },
+  })
+  const seen = new Set<string>()
+  const duplicateIds: string[] = []
+  for (const row of rows) {
+    if (!row.label) continue
+    if (seen.has(row.label)) duplicateIds.push(row.id)
+    else seen.add(row.label)
+  }
+  if (duplicateIds.length === 0) return 0
+  await prisma.backups.deleteMany({ where: { id: { in: duplicateIds } } })
+  return duplicateIds.length
+}
+
+function isPgBackRestBackupRestorable(
+  set: { archive?: { start?: string } },
+  archiveMin?: string
+): boolean {
+  const needed = set.archive?.start
+  if (!needed || !archiveMin) return true
+  return needed >= archiveMin
+}
+
+async function syncPgBackRestToDatabaseInner(): Promise<number> {
   if (!(await isPgBackRestAvailable())) return 0
 
   const prisma = (await import('@/lib/prisma')).default
@@ -249,41 +280,62 @@ export async function syncPgBackRestToDatabase(): Promise<number> {
   const info = await fetchPgBackRestInfo()
   const stanzaInfo = info.find(s => s.name === STANZA || s.stanza === STANZA) || info[0]
   const sets = stanzaInfo?.backup || []
+  const archiveMin = stanzaInfo?.archive?.[0]?.min
   let synced = 0
+
+  await dedupePgBackRestBackupRows(prisma)
 
   for (const set of sets) {
     if (!set.label || hiddenLabels.has(set.label)) continue
-    const existing = await prisma.backups.findFirst({ where: { label: set.label } })
+    if (!isPgBackRestBackupRestorable(set, archiveMin)) continue
+    const existing = await prisma.backups.findFirst({
+      where: { label: set.label, engine: 'pgbackrest' },
+    })
     if (existing) continue
 
     const kind = mapPgBackRestType(set.type)
     const size = pgBackRestBackupSize(set)
     const createdAt = parsePgBackRestTimestamp(set.timestamp) ?? new Date()
-    await prisma.backups.create({
-      data: {
-        id: randomUUID(),
-        filename: `${set.label}.pgbackrest`,
-        filepath: buildPgBackRestFileRef(set.label),
-        size,
-        type: 'automatic',
-        status: 'completed',
-        compressed: true,
-        encrypted: false,
-        engine: 'pgbackrest',
-        backupKind: kind,
-        label: set.label,
-        metadata: JSON.stringify({
-          version: '3.0',
-          createdAt: createdAt.toISOString(),
-          pgbackrest: { stanza: STANZA, label: set.label, type: set.type },
-        }),
-        createdAt,
-      },
-    })
-    synced++
+    try {
+      await prisma.backups.create({
+        data: {
+          id: randomUUID(),
+          filename: `${set.label}.pgbackrest`,
+          filepath: buildPgBackRestFileRef(set.label),
+          size,
+          type: 'automatic',
+          status: 'completed',
+          compressed: true,
+          encrypted: false,
+          engine: 'pgbackrest',
+          backupKind: kind,
+          label: set.label,
+          metadata: JSON.stringify({
+            version: '3.0',
+            createdAt: createdAt.toISOString(),
+            pgbackrest: { stanza: STANZA, label: set.label, type: set.type },
+          }),
+          createdAt,
+        },
+      })
+      synced++
+    } catch (error) {
+      // Otro request pudo insertar el mismo label en paralelo (antes del mutex en instancias distintas)
+      const code = (error as { code?: string })?.code
+      if (code !== 'P2002') throw error
+    }
   }
 
+  await dedupePgBackRestBackupRows(prisma)
   return synced
+}
+
+export async function syncPgBackRestToDatabase(): Promise<number> {
+  if (syncPgBackRestInFlight) return syncPgBackRestInFlight
+  syncPgBackRestInFlight = syncPgBackRestToDatabaseInner().finally(() => {
+    syncPgBackRestInFlight = null
+  })
+  return syncPgBackRestInFlight
 }
 
 /**

@@ -5,7 +5,7 @@ import { getBackupConfig, hasPgTools, calculateChecksum, formatFileSize } from '
 import { loadBackupMetadata, extractMetadataFromDump } from './backup-metadata'
 import { createBackup } from './backup-create'
 import { restoreBackup } from './backup-restore'
-import { deleteBackup } from './backup-cleanup'
+import { deleteBackup, reconcileStaleBackupRecords } from './backup-cleanup'
 import { importBackupFromFile } from './backup-import'
 import {
   getBackupWorkerHealth,
@@ -70,7 +70,7 @@ export class BackupService {
   static async listBackups(): Promise<BackupInfo[]> {
     try {
       await syncPgBackRestToDatabase().catch(() => {})
-      await this.verifyAndFixBackupStates()
+      await reconcileStaleBackupRecords()
       const backups = await prisma.backups.findMany({
         orderBy: { createdAt: 'desc' },
         take: 100,
@@ -247,46 +247,7 @@ export class BackupService {
   }
 
   static async verifyAndFixBackupStates(): Promise<void> {
-    try {
-      const backups = await prisma.backups.findMany({
-        where: { status: 'in_progress' },
-      })
-
-      for (const backup of backups) {
-        if (inferEngineFromRecord(backup) === 'pgbackrest') {
-          const ageMs = Date.now() - backup.createdAt.getTime()
-          if (ageMs > 2 * 60 * 60 * 1000) {
-            await prisma.backups.update({
-              where: { id: backup.id },
-              data: { status: 'failed', error: 'Tiempo de espera agotado' },
-            })
-          }
-          continue
-        }
-
-        try {
-          const fileStats = await stat(backup.filepath)
-          if (fileStats.size > 0) {
-            await prisma.backups.update({
-              where: { id: backup.id },
-              data: { status: 'completed', size: fileStats.size, error: null },
-            })
-          } else {
-            await prisma.backups.update({
-              where: { id: backup.id },
-              data: { status: 'failed', error: 'Archivo vacío' },
-            })
-          }
-        } catch {
-          await prisma.backups.update({
-            where: { id: backup.id },
-            data: { status: 'failed', error: 'Archivo no encontrado' },
-          })
-        }
-      }
-    } catch (error) {
-      console.error('Error verificando estados de respaldo:', error)
-    }
+    await reconcileStaleBackupRecords()
   }
 
   static formatFileSize = formatFileSize

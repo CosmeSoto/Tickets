@@ -6,14 +6,17 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
   ClipboardCheck,
-  Download,
   RefreshCw,
   CheckCircle2,
   AlertTriangle,
   XCircle,
   Loader2,
+  FileJson,
 } from 'lucide-react'
 import type { AuditCheckItem, BackupAuditSummary } from '@/lib/services/backup/backup-audit'
+import { buildAuditExportRows } from '@/lib/services/backup/backup-audit-export'
+import { BackupSectionToolbar } from '@/components/backups/backup-section-toolbar'
+import { useExport } from '@/hooks/common/use-export'
 
 function StatusIcon({ status }: { status: AuditCheckItem['status'] }) {
   if (status === 'ok') return <CheckCircle2 className='h-4 w-4 text-emerald-600 shrink-0' />
@@ -24,6 +27,7 @@ function StatusIcon({ status }: { status: AuditCheckItem['status'] }) {
 export function BackupAuditGuideCard() {
   const [summary, setSummary] = useState<BackupAuditSummary | null>(null)
   const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -41,7 +45,31 @@ export function BackupAuditGuideCard() {
     load()
   }, [load])
 
-  const downloadReport = () => {
+  const exportRows = summary ? buildAuditExportRows(summary) : []
+  const filteredRows = search.trim()
+    ? exportRows.filter(
+        r =>
+          r.section.toLowerCase().includes(search.toLowerCase()) ||
+          r.item.toLowerCase().includes(search.toLowerCase()) ||
+          r.value.toLowerCase().includes(search.toLowerCase())
+      )
+    : exportRows
+
+  const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
+    filename: 'informe-auditoria-backups',
+    title: 'Informe de auditoría — Sistema de backups',
+    subtitle: summary
+      ? `Generado ${new Date(summary.generatedAt).toLocaleString('es-EC')}`
+      : undefined,
+    columns: [
+      { key: 'section', label: 'Sección' },
+      { key: 'item', label: 'Ítem' },
+      { key: 'value', label: 'Estado / Detalle' },
+    ],
+    getData: () => filteredRows,
+  })
+
+  const downloadJson = () => {
     if (!summary) return
     const blob = new Blob([JSON.stringify(summary, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
@@ -54,10 +82,17 @@ export function BackupAuditGuideCard() {
 
   const okCount = summary?.checklist.filter(c => c.status === 'ok').length ?? 0
   const totalChecks = summary?.checklist.length ?? 0
+  const filteredChecklist =
+    summary?.checklist.filter(
+      c =>
+        !search.trim() ||
+        c.label.toLowerCase().includes(search.toLowerCase()) ||
+        c.detail.toLowerCase().includes(search.toLowerCase())
+    ) ?? []
 
   return (
     <Card className='border-emerald-500/25 bg-emerald-500/5'>
-      <CardHeader className='pb-3'>
+      <CardHeader className='pb-3 space-y-3'>
         <div className='flex flex-wrap items-start justify-between gap-3'>
           <div>
             <CardTitle className='text-base flex items-center gap-2'>
@@ -65,7 +100,7 @@ export function BackupAuditGuideCard() {
               Guía de auditoría y cumplimiento
             </CardTitle>
             <CardDescription className='mt-1'>
-              Política de respaldos, checklist operativo y evidencias para auditorías
+              Checklist operativo y evidencias para auditorías
             </CardDescription>
           </div>
           <div className='flex gap-2'>
@@ -73,12 +108,28 @@ export function BackupAuditGuideCard() {
               <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
               Actualizar
             </Button>
-            <Button size='sm' onClick={downloadReport} disabled={!summary}>
-              <Download className='h-4 w-4 mr-2' />
-              Exportar informe
+            <Button
+              variant='outline'
+              size='sm'
+              onClick={downloadJson}
+              disabled={!summary}
+              title='JSON técnico para integraciones'
+            >
+              <FileJson className='h-4 w-4 mr-2' />
+              JSON
             </Button>
           </div>
         </div>
+        <BackupSectionToolbar
+          search={search}
+          onSearchChange={setSearch}
+          searchPlaceholder='Filtrar checklist…'
+          onExportCSV={exportCSV}
+          onExportExcel={exportExcel}
+          onExportPDF={exportPDF}
+          exporting={exporting}
+          exportDisabled={!summary || filteredRows.length === 0}
+        />
       </CardHeader>
       <CardContent className='space-y-5 text-sm'>
         {loading && !summary ? (
@@ -113,8 +164,9 @@ export function BackupAuditGuideCard() {
                   </li>
                   <li>
                     <strong className='text-foreground'>Automático:</strong>{' '}
-                    {summary.policy.automaticEnabled ? 'Sí' : 'No'} — {summary.policy.frequency},{' '}
-                    FULL los {summary.policy.weeklyFullDay} a las {summary.policy.scheduleTime}
+                    {summary.policy.automaticEnabled ? 'Sí' : 'No'} — FULL los{' '}
+                    {summary.policy.weeklyFullDay} a las {summary.policy.scheduleTime}; DIFF el
+                    resto de días (misma hora, ventana ±30 min)
                   </li>
                   <li>
                     <strong className='text-foreground'>Retención:</strong>{' '}
@@ -122,16 +174,10 @@ export function BackupAuditGuideCard() {
                     {summary.policy.compression})
                   </li>
                   <li>
-                    <strong className='text-foreground'>RPO orientativo:</strong> ~24 h (DIFF diario
-                    + WAL)
+                    <strong className='text-foreground'>Restauración parcial:</strong> Export .dump
                   </li>
                   <li>
-                    <strong className='text-foreground'>Restauración parcial:</strong> solo Export
-                    .dump (UI → Restaurar)
-                  </li>
-                  <li>
-                    <strong className='text-foreground'>DR cluster completo:</strong> pgBackRest (UI
-                    o CLI)
+                    <strong className='text-foreground'>DR cluster:</strong> pgBackRest
                   </li>
                 </ul>
               </div>
@@ -161,13 +207,7 @@ export function BackupAuditGuideCard() {
                     Último automático:{' '}
                     {summary.operations.lastAutomaticBackup
                       ? new Date(summary.operations.lastAutomaticBackup).toLocaleString('es-EC')
-                      : '— (configura cron en servidor)'}
-                  </li>
-                  <li>
-                    Último export:{' '}
-                    {summary.operations.lastExportBackup
-                      ? new Date(summary.operations.lastExportBackup).toLocaleString('es-EC')
-                      : '—'}
+                      : '— (requiere cron en servidor)'}
                   </li>
                 </ul>
               </div>
@@ -178,38 +218,30 @@ export function BackupAuditGuideCard() {
                 Checklist de auditoría
               </p>
               <ul className='space-y-2'>
-                {summary.checklist.map(item => (
-                  <li
-                    key={item.id}
-                    className='flex gap-2 items-start rounded-md border bg-background px-3 py-2 text-xs'
-                  >
-                    <StatusIcon status={item.status} />
-                    <div>
-                      <p className='font-medium text-foreground'>{item.label}</p>
-                      <p className='text-muted-foreground mt-0.5'>{item.detail}</p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div className='space-y-2'>
-              <p className='font-medium text-xs uppercase tracking-wide text-muted-foreground'>
-                Recomendaciones expertas
-              </p>
-              <ul className='list-disc pl-5 text-xs text-muted-foreground space-y-1'>
-                {summary.recommendations.map(rec => (
-                  <li key={rec}>{rec}</li>
-                ))}
+                {filteredChecklist.length === 0 ? (
+                  <li className='text-xs text-muted-foreground py-2'>Sin ítems para el filtro</li>
+                ) : (
+                  filteredChecklist.map(item => (
+                    <li
+                      key={item.id}
+                      className='flex gap-2 items-start rounded-md border bg-background px-3 py-2 text-xs'
+                    >
+                      <StatusIcon status={item.status} />
+                      <div>
+                        <p className='font-medium text-foreground'>{item.label}</p>
+                        <p className='text-muted-foreground mt-0.5'>{item.detail}</p>
+                      </div>
+                    </li>
+                  ))
+                )}
               </ul>
             </div>
 
             {!summary.cron.secretConfigured && (
               <div className='rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs'>
-                <strong className='text-foreground'>Cron en el servidor:</strong> en Debian ejecuta{' '}
-                <code className='text-[11px]'>{summary.cron.setupScript}</code> — registra una tarea
-                horaria que llama <code className='text-[11px]'>{summary.cron.endpoint}</code> con
-                tu <code className='text-[11px]'>CRON_SECRET</code>.
+                <strong className='text-foreground'>Cron en el servidor:</strong> ejecuta{' '}
+                <code className='text-[11px]'>{summary.cron.setupScript}</code> — llama al endpoint
+                horario con <code className='text-[11px]'>CRON_SECRET</code>.
               </div>
             )}
           </>

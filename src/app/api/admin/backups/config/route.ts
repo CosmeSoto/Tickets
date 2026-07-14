@@ -107,7 +107,12 @@ export async function GET() {
       typeof process.env.BACKUP_ENCRYPTION_KEY === 'string' &&
       process.env.BACKUP_ENCRYPTION_KEY.length >= 32
 
-    return NextResponse.json({ ...defaultConfig, ...config, encryptionKeyConfigured })
+    return NextResponse.json({
+      ...defaultConfig,
+      ...config,
+      encryptionKeyConfigured,
+      cronConfigured: Boolean(process.env.CRON_SECRET?.trim()),
+    })
   } catch (error) {
     console.error('Error al obtener configuración de backup:', error)
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })

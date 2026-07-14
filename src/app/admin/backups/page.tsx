@@ -51,7 +51,7 @@ import { BackupAuditGuideCard } from '@/components/backups/backup-audit-guide-ca
 import { BackupConfiguration } from '@/components/backups/backup-configuration'
 import { BackupRestore } from '@/components/backups/backup-restore'
 import { BackupMonitoring } from '@/components/backups/backup-monitoring'
-import { ExportButton } from '@/components/common/export-button'
+import { BackupSectionToolbar } from '@/components/backups/backup-section-toolbar'
 import { useExport } from '@/hooks/common/use-export'
 import {
   useBackups,
@@ -157,9 +157,15 @@ export default function BackupsPage() {
   const headerActionsMemo = useMemo(
     () => (
       <div className='flex items-center gap-2 flex-wrap'>
-        <Button variant='outline' onClick={refreshData} disabled={loading} size='sm'>
+        <Button
+          variant='outline'
+          onClick={refreshData}
+          disabled={loading}
+          size='sm'
+          title='Recargar la lista de backups y estadísticas'
+        >
           <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-          Actualizar
+          Recargar
         </Button>
         {failedCount > 0 && (
           <Button
@@ -286,34 +292,27 @@ export default function BackupsPage() {
 
           <TabsContent value='backups' className='space-y-6'>
             <Card>
-              <CardHeader>
-                <div className='flex flex-col sm:flex-row sm:items-center justify-between gap-3'>
-                  <div className='flex items-center space-x-2'>
+              <CardHeader className='space-y-3'>
+                <div>
+                  <CardTitle className='text-base flex items-center gap-2'>
                     <Database className='h-5 w-5 text-primary' />
-                    <div>
-                      <CardTitle className='text-base'>Gestión de Backups</CardTitle>
-                      <CardDescription className='text-xs mt-0.5'>
-                        Lista completa de backups con herramientas de gestión
-                      </CardDescription>
-                    </div>
-                  </div>
-                  <div className='flex items-center gap-2'>
-                    <input
-                      type='text'
-                      placeholder='Buscar backup...'
-                      value={backupSearch}
-                      onChange={e => setBackupSearch(e.target.value)}
-                      className='h-8 w-48 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring'
-                    />
-                    <ExportButton
-                      onExportCSV={exportBackupCSV}
-                      onExportExcel={exportBackupExcel}
-                      onExportPDF={exportBackupPDF}
-                      loading={exportingBackups}
-                      size='sm'
-                    />
-                  </div>
+                    Inventario de respaldos
+                  </CardTitle>
+                  <CardDescription className='text-xs mt-0.5'>
+                    Administración: eliminar, descargar exports y exportar listado. Para restaurar →
+                    pestaña Restaurar.
+                  </CardDescription>
                 </div>
+                <BackupSectionToolbar
+                  search={backupSearch}
+                  onSearchChange={setBackupSearch}
+                  searchPlaceholder='Buscar backup…'
+                  onExportCSV={exportBackupCSV}
+                  onExportExcel={exportBackupExcel}
+                  onExportPDF={exportBackupPDF}
+                  exporting={exportingBackups}
+                  exportDisabled={filteredBackups.length === 0}
+                />
               </CardHeader>
               <CardContent>
                 {loading ? (
@@ -430,7 +429,11 @@ export default function BackupsPage() {
           </TabsContent>
 
           <TabsContent value='restore' className='space-y-6'>
-            <BackupRestore backups={backups} onRefresh={refreshData} />
+            <BackupRestore
+              backups={backups}
+              onRefresh={refreshData}
+              onOpenBackupsTab={() => setActiveTab('backups')}
+            />
           </TabsContent>
 
           <TabsContent value='config' className='space-y-6'>

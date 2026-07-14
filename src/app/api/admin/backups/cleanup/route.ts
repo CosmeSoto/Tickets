@@ -3,17 +3,17 @@ import prisma from '@/lib/prisma'
 import { unlink, access } from 'fs/promises'
 import { randomUUID } from 'crypto'
 import { requireBackupSuperAdmin } from '../_auth'
+import { reconcileStaleBackupRecords } from '@/lib/services/backup/backup-cleanup'
 
 export async function POST(request: NextRequest) {
   try {
     const { errorResponse } = await requireBackupSuperAdmin()
     if (errorResponse) return errorResponse
 
-    // Buscar backups fallidos
+    await reconcileStaleBackupRecords()
+
     const failedBackups = await prisma.backups.findMany({
-      where: {
-        status: 'failed',
-      },
+      where: { status: 'failed' },
     })
 
     let cleanedCount = 0
