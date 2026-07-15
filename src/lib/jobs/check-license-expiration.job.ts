@@ -1,3 +1,4 @@
+import { getSystemBranding } from '@/lib/branding'
 import prisma from '@/lib/prisma'
 import { LicenseService } from '../services/license.service'
 import { randomUUID } from 'crypto'
@@ -27,6 +28,7 @@ export class CheckLicenseExpirationJob {
 
       // Obtener admins con scope de la familia de cada licencia
       let notificationsSent = 0
+      const { systemName } = await getSystemBranding()
 
       for (const license of expiringLicenses) {
         const familyId = (license as any).licenseType?.familyId ?? null
@@ -85,7 +87,8 @@ export class CheckLicenseExpirationJob {
                   license,
                   daysRemaining,
                   admin.name ?? 'Administrador',
-                  assignedTo
+                  assignedTo,
+                  systemName
                 ),
                 status: 'pending',
                 attempts: 0,
@@ -121,7 +124,8 @@ export class CheckLicenseExpirationJob {
     license: any,
     daysRemaining: number,
     adminName: string,
-    assignedTo: string
+    assignedTo: string,
+    systemName: string
   ): string {
     const expirationDate = new Date(license.expirationDate!).toLocaleDateString('es-ES', {
       weekday: 'long',
@@ -179,7 +183,7 @@ export class CheckLicenseExpirationJob {
       </p>
     </div>
     <div class="footer">
-      <p>Este es un mensaje automático del Sistema de Gestión de Inventario</p>
+      <p>Este es un mensaje automático del ${systemName}</p>
       <p>Por favor no responder a este correo</p>
     </div>
   </div>

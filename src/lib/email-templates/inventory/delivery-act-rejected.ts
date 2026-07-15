@@ -1,6 +1,8 @@
 import type { DeliveryAct } from '@/types/inventory/delivery-act'
+import { DEFAULT_SYSTEM_NAME } from '@/lib/branding-constants'
 
 interface DeliveryActRejectedEmailData {
+  systemName?: string
   act: DeliveryAct
   recipientName: string
   equipmentCode: string
@@ -14,7 +16,7 @@ export function generateDeliveryActRejectedEmail(data: DeliveryActRejectedEmailD
   html: string
   text: string
 } {
-  const { act, recipientName, equipmentCode, equipmentDescription, rejectionReason, rejectedAt } = data
+  const { act, recipientName, equipmentCode, equipmentDescription, rejectionReason, rejectedAt , systemName = DEFAULT_SYSTEM_NAME } = data
 
   const rejectedAtStr = new Date(rejectedAt).toLocaleString('es-ES', {
     day: 'numeric',
@@ -60,7 +62,7 @@ export function generateDeliveryActRejectedEmail(data: DeliveryActRejectedEmailD
   </div>
 
   <div style="border-top: 1px solid #e5e7eb; padding-top: 20px; margin-top: 20px; color: #6b7280; font-size: 12px;">
-    <p><strong>Sistema de Gestión de Inventario</strong></p>
+    <p><strong>${systemName}</strong></p>
   </div>
 </body>
 </html>
@@ -85,7 +87,7 @@ ${rejectionReason}
 La asignación ha sido cancelada y el equipo está nuevamente disponible. Por favor, contacta al departamento de TI para coordinar una nueva entrega si es necesario.
 
 ---
-Sistema de Gestión de Inventario
+${systemName}
   `
 
   return { subject, html, text }

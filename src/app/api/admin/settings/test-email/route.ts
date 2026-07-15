@@ -1,3 +1,4 @@
+import { getSystemBranding } from '@/lib/branding'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -66,10 +67,11 @@ export async function POST(request: NextRequest) {
     await transporter.verify()
 
     // Enviar email de prueba
+    const { systemName } = await getSystemBranding()
     await transporter.sendMail({
       from: smtpUser,
       to: session.user.email,
-      subject: 'Prueba de Configuración SMTP - Sistema de Tickets',
+      subject: `Prueba de Configuración SMTP - ${systemName}`,
       html: `
         <h2>Configuración SMTP Exitosa</h2>
         <p>Este es un email de prueba para confirmar que la configuración SMTP está funcionando correctamente.</p>
@@ -78,7 +80,7 @@ export async function POST(request: NextRequest) {
         <p><strong>Modo:</strong> ${smtpPort === 465 ? 'SSL directo' : smtpPort === 587 ? 'STARTTLS' : smtpSecure ? 'SSL/TLS' : 'Sin cifrado'}</p>
         <p><strong>Fecha:</strong> ${new Date().toLocaleString('es-ES')}</p>
         <hr>
-        <p><small>Sistema de Tickets - Configuración de Email</small></p>
+        <p><small>${systemName} - Configuración de Email</small></p>
       `,
       text: `Configuración SMTP Exitosa\n\nServidor: ${smtpHost}:${smtpPort}\nUsuario: ${smtpUser}\nFecha: ${new Date().toLocaleString('es-ES')}`,
     })

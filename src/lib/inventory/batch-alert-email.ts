@@ -1,3 +1,4 @@
+import { DEFAULT_SYSTEM_NAME } from '@/lib/branding-constants'
 import type { BatchUtilizationAlert } from '@/lib/inventory/batch-alerts'
 
 function appUrl(): string {
@@ -16,8 +17,18 @@ export function buildBatchAlertEmailHtml(params: {
     utilizationRate: number
   }
   batchId: string
+  systemName?: string
 }): string {
-  const { adminName, batchCode, brandModel, alert, metrics, batchId } = params
+  const {
+    adminName,
+    batchCode,
+    brandModel,
+    alert,
+    metrics,
+    batchId,
+    systemName = DEFAULT_SYSTEM_NAME,
+  } = params
+
   const batchUrl = `${appUrl()}/inventory/batches/${batchId}`
   const isCritical = alert.level === 'critical'
 
@@ -40,40 +51,30 @@ export function buildBatchAlertEmailHtml(params: {
 <body>
   <div class="container">
     <div class="header">
-      <h2 style="margin:0;">${isCritical ? '⚠️ Alerta crítica de lote' : 'Alerta de lote'}</h2>
-      <p style="margin:8px 0 0; opacity:0.9;">${alert.title}</p>
+      <h2 style="margin:0;">${isCritical ? '⚠️ Utilización crítica de lote' : '⚡ Alerta de utilización de lote'}</h2>
     </div>
     <div class="content">
-      <p>Hola ${adminName},</p>
-      <p>El lote <strong>${batchCode}</strong> (${brandModel}) requiere tu atención:</p>
+      <p>Hola <strong>${adminName}</strong>,</p>
+      <p>${alert.message}</p>
       <div class="info-box">
-        <p><strong>${alert.title}</strong></p>
-        <p>${alert.message}</p>
-        <p style="margin-top:12px;">
+        <p><strong>Lote:</strong> ${batchCode}</p>
+        <p><strong>Equipo:</strong> ${brandModel}</p>
+        <p>
           <span class="metric"><strong>Total:</strong> ${metrics.total}</span>
           <span class="metric"><strong>Disponibles:</strong> ${metrics.available}</span>
           <span class="metric"><strong>Asignados:</strong> ${metrics.assigned}</span>
-          <span class="metric"><strong>Utilización:</strong> ${metrics.utilizationRate.toFixed(0)}%</span>
+          <span class="metric"><strong>Utilización:</strong> ${metrics.utilizationRate}%</span>
         </p>
       </div>
-      ${
-        isCritical
-          ? `<p><strong>Acciones sugeridas:</strong></p>
-      <ul>
-        <li>Revisar disponibilidad y planificar recompra si es necesario</li>
-        <li>Usar <em>Crear lote similar</em> desde el detalle del lote</li>
-        <li>Coordinar con el área responsable del inventario</li>
-      </ul>`
-          : ''
-      }
-      <p style="text-align:center; margin-top:24px;">
-        <a href="${batchUrl}" class="button">Ver detalle del lote</a>
+      <p style="text-align:center; margin: 24px 0;">
+        <a class="button" href="${batchUrl}">Ver lote</a>
       </p>
     </div>
     <div class="footer">
-      <p>Sistema de Gestión de Inventario — mensaje automático</p>
+      <p>${systemName} — mensaje automático</p>
     </div>
   </div>
 </body>
-</html>`.trim()
+</html>
+`.trim()
 }

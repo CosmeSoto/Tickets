@@ -1,5 +1,6 @@
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
+import { DEFAULT_SYSTEM_NAME } from '@/lib/branding-constants'
 
 export interface HelpSystemConfig {
   supportEmail: string
@@ -124,7 +125,7 @@ export class ConfigService {
         low: '2-5 días',
       },
       companyName:
-        config.companyName || generalSettings.systemName || landingPage?.companyName || 'TicketPro',
+        config.companyName || generalSettings.systemName || landingPage?.companyName || DEFAULT_SYSTEM_NAME,
       companyAddress: config.companyAddress || '123 Tech Street, Silicon Valley, CA 94000',
       chatEnabled: config.chatEnabled !== undefined ? config.chatEnabled : true,
       chatUrl: config.chatUrl || 'https://chat.ticketpro.com',
@@ -154,7 +155,7 @@ export class ConfigService {
     }
 
     return {
-      name: config.name || 'TicketPro',
+      name: config.name || DEFAULT_SYSTEM_NAME,
       description: config.description || 'Sistema de gestión de tickets',
       logoUrl: config.logo_url || '/logo.png',
       faviconUrl: config.favicon_url || '/favicon.ico',

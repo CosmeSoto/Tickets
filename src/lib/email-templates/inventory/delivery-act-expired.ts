@@ -1,6 +1,8 @@
 import type { DeliveryAct } from '@/types/inventory/delivery-act'
+import { DEFAULT_SYSTEM_NAME } from '@/lib/branding-constants'
 
 interface DeliveryActExpiredEmailData {
+  systemName?: string
   act: DeliveryAct
   recipientName: string
   equipmentCode: string
@@ -13,7 +15,7 @@ export function generateDeliveryActExpiredEmail(data: DeliveryActExpiredEmailDat
   html: string
   text: string
 } {
-  const { act, recipientName, equipmentCode, equipmentDescription, expirationDate } = data
+  const { act, recipientName, equipmentCode, equipmentDescription, expirationDate , systemName = DEFAULT_SYSTEM_NAME } = data
 
   const expirationDateStr = new Date(expirationDate).toLocaleDateString('es-ES', {
     day: 'numeric',
@@ -52,7 +54,7 @@ export function generateDeliveryActExpiredEmail(data: DeliveryActExpiredEmailDat
   </div>
 
   <div style="border-top: 1px solid #e5e7eb; padding-top: 20px; margin-top: 20px; color: #6b7280; font-size: 12px;">
-    <p><strong>Sistema de Gestión de Inventario</strong></p>
+    <p><strong>${systemName}</strong></p>
   </div>
 </body>
 </html>
@@ -74,7 +76,7 @@ Expiró el: ${expirationDateStr}
 La asignación ha sido cancelada automáticamente. Por favor, contacta al departamento de TI si necesitas que se genere una nueva acta.
 
 ---
-Sistema de Gestión de Inventario
+${systemName}
   `
 
   return { subject, html, text }

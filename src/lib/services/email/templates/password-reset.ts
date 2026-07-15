@@ -2,14 +2,31 @@
  * Template de Email: Recuperación de Contraseña
  */
 
+import {
+  DEFAULT_SYSTEM_NAME,
+  DEFAULT_HERO_TITLE,
+} from '@/lib/branding-constants'
+
 interface PasswordResetData {
   userName: string
   resetUrl: string
   expiryTime: string
+  /** Nombre del sistema (Configuración General) */
+  systemName?: string
+  /** Título principal de la página pública */
+  heroTitle?: string
 }
 
 export default function passwordResetTemplate(data: PasswordResetData) {
-  const { userName, resetUrl, expiryTime } = data
+  const {
+    userName,
+    resetUrl,
+    expiryTime,
+    systemName = DEFAULT_SYSTEM_NAME,
+    heroTitle = DEFAULT_HERO_TITLE,
+  } = data
+
+  const brandLabel = `${systemName} - ${heroTitle}`
 
   const html = `
 <!DOCTYPE html>
@@ -44,7 +61,7 @@ export default function passwordResetTemplate(data: PasswordResetData) {
               </p>
               
               <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
-                Recibimos una solicitud para restablecer la contraseña de tu cuenta en el Sistema de Tickets.
+                Recibimos una solicitud para restablecer la contraseña de tu cuenta en ${systemName}.
               </p>
 
               <p style="margin: 0 0 30px; color: #374151; font-size: 16px; line-height: 1.6;">
@@ -99,7 +116,7 @@ export default function passwordResetTemplate(data: PasswordResetData) {
           <tr>
             <td style="padding: 30px 40px; background-color: #f9fafb; border-radius: 0 0 8px 8px; border-top: 1px solid #e5e7eb;">
               <p style="margin: 0 0 10px; color: #6b7280; font-size: 13px; text-align: center;">
-                Sistema de Tickets - Gestión Profesional de Soporte
+                ${brandLabel}
               </p>
               <p style="margin: 0; color: #9ca3af; font-size: 12px; text-align: center;">
                 Este es un email automático, por favor no respondas a este mensaje.
@@ -115,7 +132,7 @@ export default function passwordResetTemplate(data: PasswordResetData) {
   `
 
   const text = `
-Recuperación de Contraseña - Sistema de Tickets
+Recuperación de Contraseña - ${systemName}
 
 Hola ${userName},
 
@@ -132,7 +149,7 @@ Si no solicitaste restablecer tu contraseña, ignora este email. Tu cuenta perma
 Si tienes problemas, contacta a nuestro equipo de soporte.
 
 ---
-Sistema de Tickets - Gestión Profesional de Soporte
+${brandLabel}
 Este es un email automático, por favor no respondas a este mensaje.
   `
 

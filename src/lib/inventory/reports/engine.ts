@@ -965,12 +965,12 @@ export function exportReportCsv(data: Record<string, unknown>[]): string {
   return toCSV(data)
 }
 
-export function exportReportXlsx(
+export async function exportReportXlsx(
   data: Record<string, unknown>[],
   sheetName = 'Reporte'
-): Buffer {
+): Promise<Buffer> {
   const safeName = sheetName.slice(0, 31) || 'Reporte'
-  return ExcelGenerator.generate([{ name: safeName, data }], {
+  return ExcelGenerator.generateAsync([{ name: safeName, data }], {
     title: safeName,
     subject: 'Centro de Reportes — Inventario',
   })

@@ -253,42 +253,37 @@ async function restoreWithPgRestore(
     )
 
     if (mode === 'replace') {
-      // Modo reemplazo: TRUNCATE + insertar todo del backup
-      // Usamos session_replication_role = replica para desactivar FKs sin necesitar superuser
-      const truncateSQL = tables.map(t => `TRUNCATE TABLE "${t}" CASCADE;`).join(' ')
-      const truncateCmd =
-        `PGPASSWORD="${dbConfig.password}" psql ` +
-        `-h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d ${dbConfig.database} ` +
-        `-c "SET session_replication_role = replica; ${truncateSQL} SET session_replication_role = DEFAULT;" 2>&1`
-
-      try {
-        await execAsync(truncateCmd, { timeout: 60000, maxBuffer: 1024 * 1024 * 10 })
-        console.log('[RESTORE] Tablas truncadas correctamente')
-      } catch (truncErr) {
-        console.warn(
-          '[RESTORE] Advertencia al truncar:',
-          (truncErr as Error).message?.slice(0, 200)
-        )
-      }
+      // Modo reemplazo: TRUNCATE + reinsertar datos del backup.
+      //
+      // PROBLEMA ANTERIOR: el TRUNCATE y el INSERT se ejecutaban en dos invocaciones
+      // psql separadas. El TRUNCATE usaba CASCADE (que borraba también audit_logs y otras
+      // tablas dependientes), y el INSERT se hacía en una nueva sesión donde
+      // session_replication_role ya había vuelto a DEFAULT → las FKs volvían a estar
+      // activas → error "Foreign key constraint violated: audit_logs_userId_fkey".
+      //
+      // SOLUCIÓN: generar un único archivo SQL que incluya en orden:
+      //   1. SET session_replication_role = replica  (desactiva FKs para toda la sesión)
+      //   2. SET search_path = public
+      //   3. TRUNCATE ... CASCADE  (limpia las tablas del módulo)
+      //   4. SQL de datos del dump (COPY o INSERT)
+      //   5. SET session_replication_role = DEFAULT  (reactiva FKs)
+      // y ejecutarlo con un solo "psql -f archivo.sql" para que todo ocurra
+      // dentro de la misma sesión y las FKs estén desactivadas durante todo el proceso.
 
       const tableFlags = tables.map(t => `--table="${t}"`).join(' ')
-      // Nota: NO usamos --disable-triggers porque requiere superuser.
-      // En su lugar usamos session_replication_role = replica vía psql antes/después,
-      // pero pg_restore necesita conectarse como la misma sesión — usamos un wrapper con psql.
-      // Extraemos el SQL con pg_restore -f - y lo ejecutamos con psql (como en merge).
       const dumpSqlCmd =
-        `pg_restore --data-only --no-owner --no-privileges -f - ` + `${tableFlags} "${filepath}"`
+        `pg_restore --data-only --no-owner --no-privileges -f - ${tableFlags} "${filepath}"`
 
-      let sqlContent: string
+      let dumpSqlContent: string
       try {
         const { stdout } = await execAsync(dumpSqlCmd, {
           timeout: 300000,
           maxBuffer: 1024 * 1024 * 200,
         })
-        sqlContent = stdout
+        dumpSqlContent = stdout
       } catch (dumpErr: any) {
         if (dumpErr.stdout && dumpErr.stdout.length > 0) {
-          sqlContent = dumpErr.stdout
+          dumpSqlContent = dumpErr.stdout
         } else {
           throw new Error(
             `No se pudo extraer SQL del dump: ${(dumpErr as Error).message?.slice(0, 200)}`
@@ -296,29 +291,49 @@ async function restoreWithPgRestore(
         }
       }
 
-      if (!sqlContent || sqlContent.trim().length === 0) {
+      if (!dumpSqlContent || dumpSqlContent.trim().length === 0) {
         throw new Error('El dump no generó contenido SQL para las tablas seleccionadas')
       }
 
-      const tempReplacePath = `${filepath}.replace_temp.sql`
-      try {
-        const { writeFile: writeF } = await import('fs/promises')
-        await writeF(tempReplacePath, sqlContent, 'utf-8')
+      // Construir el script completo en un único archivo:
+      // header con FK off → TRUNCATE → datos → FK on
+      const truncateSQL = tables.map(t => `TRUNCATE TABLE "${t}" CASCADE;`).join('\n')
+      const fullScript = [
+        '-- Restauración selectiva modo replace',
+        '-- FKs desactivadas durante todo el bloque para evitar constraint violations',
+        'SET session_replication_role = replica;',
+        'SET search_path = public;',
+        '',
+        '-- Limpiar tablas del módulo (CASCADE elimina dependencias temporalmente)',
+        truncateSQL,
+        '',
+        '-- Datos del backup',
+        dumpSqlContent,
+        '',
+        '-- Reactivar FKs',
+        'SET session_replication_role = DEFAULT;',
+      ].join('\n')
 
+      const tempReplacePath = `${filepath}.replace_temp.sql`
+      const { writeFile: writeF } = await import('fs/promises')
+      try {
+        await writeF(tempReplacePath, fullScript, 'utf-8')
+
+        // Un único psql -f ejecuta todo en la misma sesión
         const replaceCmd =
           `PGPASSWORD="${dbConfig.password}" psql ` +
           `-h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d ${dbConfig.database} ` +
           `-v ON_ERROR_STOP=0 ` +
-          `-c "SET session_replication_role = replica; SET search_path = public;" ` +
-          `-f "${tempReplacePath}" ` +
-          `-c "SET session_replication_role = DEFAULT;" 2>&1 || true`
+          `-f "${tempReplacePath}" 2>&1 || true`
 
         const { stdout } = await execAsync(replaceCmd, {
           timeout: 600000,
           maxBuffer: 1024 * 1024 * 50,
         })
-        if (stdout && stdout.includes('ERROR')) {
-          const errors = stdout.split('\n').filter(l => l.includes('ERROR'))
+
+        if (stdout) {
+          const lines = stdout.split('\n')
+          const errors = lines.filter(l => l.includes('ERROR'))
           const criticalErrors = errors.filter(
             e =>
               !e.includes('does not exist') &&
@@ -327,6 +342,8 @@ async function restoreWithPgRestore(
           )
           if (criticalErrors.length > 0) {
             console.warn('[RESTORE] Errores en replace:', criticalErrors.slice(0, 5).join('\n'))
+          } else {
+            console.log('[RESTORE] Replace completado sin errores críticos')
           }
         }
       } finally {

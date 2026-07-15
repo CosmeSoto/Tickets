@@ -734,7 +734,7 @@ async function seedLandingPage() {
         servicesEnabled: true,
         companyName: 'Gestión Operaciones',
         companyTagline: 'Soporte profesional para toda la organización',
-        footerText: `© ${year} Sistema de Tickets. Todos los derechos reservados.`,
+        footerText: `© ${year} Gestión Operaciones. Todos los derechos reservados.`,
         metaTitle: 'Gestión Operaciones',
         metaDescription: 'Sistema profesional de gestión de tickets multi-área',
         showStats: false,

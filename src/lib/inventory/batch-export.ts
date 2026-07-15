@@ -3,6 +3,7 @@
  */
 
 import { EQUIPMENT_CONDITION_LABELS, ACQUISITION_MODE_LABELS } from '@/lib/utils/equipment-display'
+import { getCachedBranding } from '@/lib/branding-cache'
 
 const EQUIPMENT_STATUS_LABELS: Record<string, string> = {
   AVAILABLE: 'Disponible',
@@ -165,7 +166,7 @@ export function exportBatchReportToPDF(params: {
     <tbody>${historyRows}</tbody>
   </table>
 
-  <p class="footer">Sistema de Gestión de Inventario</p>
+  <p class="footer">${getCachedBranding().systemName}</p>
 </body>
 </html>`
 

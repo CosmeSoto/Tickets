@@ -6,6 +6,7 @@ import https from 'https'
 import http from 'http'
 import type { DeliveryAct } from '@/types/inventory/delivery-act'
 import { getUploadDir } from '@/lib/upload-path'
+import { DEFAULT_SYSTEM_NAME } from '@/lib/branding-constants'
 
 async function fetchImageBuffer(url: string): Promise<Buffer | null> {
   try {
@@ -70,7 +71,7 @@ export async function generateDeliveryActPDF(
     margins: { top: 40, bottom: 40, left: 40, right: 40 },
     info: {
       Title: `Acta de Entrega - ${act.folio}`,
-      Author: systemInfo?.companyName || 'Sistema de Gestión',
+      Author: systemInfo?.companyName || DEFAULT_SYSTEM_NAME,
       Subject: 'Acta de Entrega de Equipo',
     },
   })
@@ -83,7 +84,7 @@ export async function generateDeliveryActPDF(
   let y = 40
 
   // ── HEADER ──────────────────────────────────────────────────────────────
-  const companyName = systemInfo?.companyName || 'Sistema de Gestión'
+  const companyName = systemInfo?.companyName || DEFAULT_SYSTEM_NAME
   // Fondo blanco → usar logo claro (versión para fondos claros)
   const logoUrl = systemInfo?.logoUrl
   let logoBuffer: Buffer | null = null

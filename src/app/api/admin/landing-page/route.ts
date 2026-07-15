@@ -18,18 +18,18 @@ export async function GET() {
     if (!content) {
       // Devolver valores por defecto si no existe contenido
       return NextResponse.json({
-        heroTitle: 'Gestión Integral de Operaciones',
-        heroSubtitle: 'Tickets, inventario, rondas en una sola plataforma',
+        heroTitle: 'Soporte Multi-Área',
+        heroSubtitle: 'Gestión de tickets para todas las áreas de tu organización',
         heroCtaPrimary: 'Crear Ticket de Soporte',
         heroCtaPrimaryUrl: '/login',
         heroCtaSecondary: 'Ver Servicios',
         heroCtaSecondaryUrl: '#servicios',
         heroImageUrl: '',
         servicesTitle: 'Nuestros Servicios',
-        servicesSubtitle: 'Ofrecemos soporte técnico integral',
+        servicesSubtitle: 'Soporte técnico integral para todas las áreas',
         servicesEnabled: true,
-        companyName: 'Sistema de Tickets',
-        companyTagline: 'Gestión Integral de Operaciones',
+        companyName: 'Gestión Operaciones',
+        companyTagline: 'Soporte profesional para toda la organización',
         companyLogoLightUrl: '',
         companyLogoDarkUrl: '',
         faviconUrl: '',
@@ -42,10 +42,10 @@ export async function GET() {
         socialLinkedin: '',
         socialWhatsapp: '',
         scheduleText: '',
-        footerText: '© 2025 Sistema de Tickets',
+        footerText: `© ${new Date().getFullYear()} Gestión Operaciones`,
         footerLinksJson: '',
-        metaTitle: 'Sistema de Tickets - Soporte Técnico',
-        metaDescription: 'Sistema profesional de gestión de tickets',
+        metaTitle: 'Gestión Operaciones - Soporte Multi-Área',
+        metaDescription: 'Sistema profesional de gestión de tickets multi-área',
       })
     }
 

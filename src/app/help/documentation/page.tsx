@@ -34,7 +34,7 @@ const documentationSections = [
     color: 'bg-blue-50 text-blue-600',
     articles: [
       {
-        title: 'Introducción al Sistema de Tickets',
+        title: 'Introducción al sistema',
         description: 'Aprende los conceptos básicos y la navegación',
         type: 'guide',
         readTime: '5 min',

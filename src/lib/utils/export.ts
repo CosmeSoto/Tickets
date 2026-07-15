@@ -1,3 +1,4 @@
+import { getCachedBranding } from '@/lib/branding-cache'
 /**
  * Utilidades de exportación globales — CSV, Excel (xlsx), PDF (print)
  *
@@ -206,7 +207,7 @@ export function exportToPDF<T>(options: ExportOptions<T>): void {
     </thead>
     <tbody>${tableRows}</tbody>
   </table>
-  <div class="footer">Sistema de Tickets — ${escapeHTML(title ?? filename)} — ${date}</div>
+  <div class="footer">${escapeHTML(getCachedBranding().systemName)} — ${escapeHTML(title ?? filename)} — ${date}</div>
   <script>window.onload = function() { window.print(); window.onafterprint = function() { window.close(); }; }</script>
 </body>
 </html>`

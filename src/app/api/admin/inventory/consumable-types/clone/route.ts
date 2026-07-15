@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Sin acceso a la familia destino' }, { status: 403 })
     }
 
-    const source = await (prisma.consumable_types as any).findUnique({
+    const source = await prisma.consumable_types.findUnique({
       where: { id: sourceTypeId },
       include: { attributes: { orderBy: { order: 'asc' } } },
     })
@@ -48,50 +48,71 @@ export async function POST(request: NextRequest) {
 
     const finalName = newName?.trim() || source.name
     const baseCode = slugify(finalName)
-    const existing = await (prisma.consumable_types as any).findMany({
+    const existing = await prisma.consumable_types.findMany({
       where: { familyId: targetFamilyId, code: { startsWith: baseCode } },
       select: { code: true },
     })
-    const usedCodes = new Set(existing.map((t: { code: string }) => t.code))
+    const usedCodes = new Set(existing.map(t => t.code))
     let finalCode = baseCode; let suffix = 1
     while (usedCodes.has(finalCode)) { finalCode = `${baseCode}-${suffix++}` }
 
     const newType = await prisma.$transaction(async tx => {
-      const created = await (tx.consumable_types as any).create({
+      const created = await tx.consumable_types.create({
         data: {
-          id: randomUUID(), code: finalCode, name: finalName,
-          description: source.description, icon: source.icon,
-          familyId: targetFamilyId, isActive: source.isActive, order: source.order,
+          id: randomUUID(),
+          code: finalCode,
+          name: finalName,
+          description: source.description,
+          icon: source.icon,
+          family: { connect: { id: targetFamilyId } },
+          isActive: source.isActive,
+          order: source.order,
           trackStock: source.trackStock ?? true,
           minStockLevel: source.minStockLevel ?? null,
           reorderPoint: source.reorderPoint ?? null,
         },
       })
 
-      if (copyAttributes && source.attributes?.length > 0) {
-        await (tx as any).consumable_type_attributes.createMany({
-          data: source.attributes.map((a: any) => ({
-            id: randomUUID(), consumableTypeId: created.id,
-            attributeName: a.attributeName, attributeLabel: a.attributeLabel,
-            attributeType: a.attributeType, options: a.options,
-            isRequired: a.isRequired, isVisible: a.isVisible,
-            order: a.order, helpText: a.helpText,
+      if (copyAttributes && source.attributes.length > 0) {
+        await tx.consumable_type_attributes.createMany({
+          data: source.attributes.map(a => ({
+            id: randomUUID(),
+            consumableTypeId: created.id,
+            attributeName: a.attributeName,
+            attributeLabel: a.attributeLabel,
+            attributeType: a.attributeType,
+            options: a.options,
+            isRequired: a.isRequired,
+            isVisible: a.isVisible,
+            order: a.order,
+            helpText: a.helpText,
           })),
         })
       }
 
       await tx.audit_logs.create({
         data: {
-          id: randomUUID(), action: 'TYPE_CLONED', entityType: 'consumable_type',
-          entityId: created.id, userId: session.user.id,
-          details: { sourceTypeId, sourceTypeName: source.name, targetFamilyId,
-            attributesCopied: copyAttributes ? source.attributes?.length ?? 0 : 0 },
+          id: randomUUID(),
+          action: 'TYPE_CLONED',
+          entityType: 'consumable_type',
+          entityId: created.id,
+          userId: session.user.id,
+          details: {
+            sourceTypeId,
+            sourceTypeName: source.name,
+            targetFamilyId,
+            attributesCopied: copyAttributes ? source.attributes.length : 0,
+          },
         },
       })
       return created
     })
 
-    return NextResponse.json({ success: true, type: newType, attributesCopied: copyAttributes ? source.attributes?.length ?? 0 : 0 })
+    return NextResponse.json({
+      success: true,
+      type: newType,
+      attributesCopied: copyAttributes ? source.attributes.length : 0,
+    })
   } catch (error) {
     console.error('[POST consumable-types/clone]', error)
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Error al copiar tipo' }, { status: 500 })

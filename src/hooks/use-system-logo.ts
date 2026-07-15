@@ -1,6 +1,7 @@
 'use client'
 
 import { useLandingData } from '@/hooks/use-landing-data'
+import { DEFAULT_SYSTEM_NAME } from '@/lib/branding-constants'
 
 interface SystemLogos {
   lightUrl: string | null
@@ -19,7 +20,7 @@ export function useSystemLogo(): SystemLogos {
   return {
     lightUrl: data.companyLogoLightUrl,
     darkUrl: data.companyLogoDarkUrl,
-    companyName: data.companyName || 'Sistema de Tickets',
+    companyName: data.companyName || DEFAULT_SYSTEM_NAME,
     loading,
   }
 }

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Filter, Loader2, Package, X } from 'lucide-react'
 import { SystemLogo } from '@/components/common/system-logo'
+import { useSystemLogo } from '@/hooks/use-system-logo'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -48,6 +49,7 @@ interface FiltersData {
  * Requisitos: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7
  */
 export default function PublicForSalePage() {
+  const { companyName } = useSystemLogo()
   const [loading, setLoading] = useState(true)
   const [groups, setGroups] = useState<EquipmentGroup[]>([])
   const [filters, setFilters] = useState<FiltersData>({ families: [] })
@@ -391,7 +393,7 @@ export default function PublicForSalePage() {
         <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-4'>
           <SystemLogo size='md' showText={true} className='justify-center' />
           <p className='text-sm text-muted-foreground'>
-            © {new Date().getFullYear()} Sistema de Tickets
+            © {new Date().getFullYear()} {companyName}
           </p>
         </div>
       </footer>

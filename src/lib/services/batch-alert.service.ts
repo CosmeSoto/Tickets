@@ -10,6 +10,7 @@ import { getBatchUtilizationAlerts } from '@/lib/inventory/batch-alerts'
 import { buildBatchAlertEmailHtml } from '@/lib/inventory/batch-alert-email'
 import { getBatchAlertSettings } from '@/lib/inventory/batch-alert-settings'
 import { enqueueEmail } from '@/lib/api/notify'
+import { getSystemBranding } from '@/lib/branding'
 import type { BatchMetrics } from '@/types/inventory/batch-inventory'
 
 const DEDUP_HOURS = 24
@@ -75,6 +76,7 @@ export class BatchAlertService {
     const since = new Date(Date.now() - DEDUP_HOURS * 60 * 60 * 1000)
     let alertsSent = 0
     let emailsSent = 0
+    const { systemName } = await getSystemBranding()
 
     for (const batch of batches) {
       const metrics = metricsMap.get(batch.id)
@@ -144,6 +146,7 @@ export class BatchAlertService {
               alert: primary,
               metrics,
               batchId: batch.id,
+              systemName,
             }),
           }).catch(() => {})
           emailsSent++

@@ -1,14 +1,16 @@
 import nodemailer from 'nodemailer'
 import prisma from './prisma'
 import { getFamilyScopedAdmins } from '@/lib/notifications/family-recipients'
+import { DEFAULT_SYSTEM_NAME, getSystemBranding } from '@/lib/branding'
 
-// Configuración por defecto
+// Configuración por defecto — el campo `from` se construye dinámicamente
+// desde systemName (Configuración General) si emailFrom no está configurado.
 const DEFAULT_EMAIL_CONFIG = {
   host: 'smtp.gmail.com',
   port: 587,
-  secure: false, // true para 465, false para otros puertos
+  secure: false,
   user: 'internet.freecom@gmail.com',
-  from: 'Sistema de Tickets <internet.freecom@gmail.com>',
+  from: '', // se rellena en getEmailConfig() con el nombre dinámico
   enabled: true,
 }
 
@@ -36,12 +38,17 @@ async function getEmailConfig(): Promise<EmailConfig> {
             'smtpSecure',
             'emailFrom',
             'emailEnabled',
+            'systemName',
           ],
         },
       },
     })
 
     const config: any = { ...DEFAULT_EMAIL_CONFIG }
+
+    // Leer systemName primero para usarlo como fallback del from
+    const systemNameSetting = settings.find(s => s.key === 'systemName')
+    const systemName = systemNameSetting?.value || DEFAULT_SYSTEM_NAME
 
     settings.forEach(setting => {
       switch (setting.key) {
@@ -61,7 +68,7 @@ async function getEmailConfig(): Promise<EmailConfig> {
           config.secure = setting.value === 'true'
           break
         case 'emailFrom':
-          config.from = setting.value || DEFAULT_EMAIL_CONFIG.from
+          config.from = setting.value || ''
           break
         case 'emailEnabled':
           config.enabled = setting.value === 'true'
@@ -69,10 +76,18 @@ async function getEmailConfig(): Promise<EmailConfig> {
       }
     })
 
+    // Si emailFrom no está configurado, construir desde systemName + user
+    if (!config.from) {
+      config.from = `${systemName} <${config.user}>`
+    }
+
     return config
   } catch (error) {
     console.error('Error loading email config:', error)
-    return DEFAULT_EMAIL_CONFIG
+    return {
+      ...DEFAULT_EMAIL_CONFIG,
+      from: `${DEFAULT_SYSTEM_NAME} <${DEFAULT_EMAIL_CONFIG.user}>`,
+    }
   }
 }
 
@@ -173,6 +188,8 @@ export async function sendTicketCreatedEmail(ticketId: string) {
 
     if (recipients.length === 0) return false
 
+    const { systemName } = await getSystemBranding()
+
     const html = `
       <!DOCTYPE html>
       <html>
@@ -240,7 +257,7 @@ export async function sendTicketCreatedEmail(ticketId: string) {
             </center>
           </div>
           <div class="footer">
-            <p>Este es un mensaje automático del Sistema de Tickets</p>
+            <p>Este es un mensaje automático de ${systemName}</p>
             <p>Por favor no responda a este email</p>
           </div>
         </div>
@@ -302,6 +319,8 @@ export async function sendCommentAddedEmail(commentId: string) {
 
     if (recipients.length === 0) return false
 
+    const { systemName } = await getSystemBranding()
+
     const html = `
       <!DOCTYPE html>
       <html>
@@ -334,7 +353,7 @@ export async function sendCommentAddedEmail(commentId: string) {
             </center>
           </div>
           <div class="footer">
-            <p>Este es un mensaje automático del Sistema de Tickets</p>
+            <p>Este es un mensaje automático de ${systemName}</p>
             <p>Por favor no responda a este email</p>
           </div>
         </div>
@@ -376,6 +395,8 @@ export async function sendTicketStatusChangedEmail(ticketId: string, newStatus: 
       CLOSED: 'Cerrado',
     }
 
+    const { systemName } = await getSystemBranding()
+
     const html = `
       <!DOCTYPE html>
       <html>
@@ -415,7 +436,7 @@ export async function sendTicketStatusChangedEmail(ticketId: string, newStatus: 
             </center>
           </div>
           <div class="footer">
-            <p>Este es un mensaje automático del Sistema de Tickets</p>
+            <p>Este es un mensaje automático de ${systemName}</p>
             <p>Por favor no responda a este email</p>
           </div>
         </div>
@@ -453,6 +474,8 @@ export async function sendTicketAssignedEmail(ticketId: string) {
 
     if (!ticket || !ticket.users_tickets_assigneeIdTousers?.email) return false
 
+    const { systemName } = await getSystemBranding()
+
     const html = `
       <!DOCTYPE html>
       <html>
@@ -488,7 +511,7 @@ export async function sendTicketAssignedEmail(ticketId: string) {
             </center>
           </div>
           <div class="footer">
-            <p>Este es un mensaje automático del Sistema de Tickets</p>
+            <p>Este es un mensaje automático de ${systemName}</p>
             <p>Por favor no responda a este email</p>
           </div>
         </div>
@@ -536,6 +559,8 @@ export async function sendTicketCreatedToAdminEmail(ticketId: string) {
       .map(admin => admin.email)
       .filter((email): email is string => Boolean(email))
     if (adminEmails.length === 0) return false
+
+    const { systemName } = await getSystemBranding()
 
     const html = `
       <!DOCTYPE html>
@@ -612,7 +637,7 @@ export async function sendTicketCreatedToAdminEmail(ticketId: string) {
             </center>
           </div>
           <div class="footer">
-            <p>Este es un mensaje automático del Sistema de Tickets</p>
+            <p>Este es un mensaje automático de ${systemName}</p>
             <p>Por favor asigne este ticket lo antes posible</p>
           </div>
         </div>
@@ -650,6 +675,8 @@ export async function sendTicketAssignedToTechnicianEmail(ticketId: string) {
     })
 
     if (!ticket || !ticket.users_tickets_assigneeIdTousers?.email) return false
+
+    const { systemName } = await getSystemBranding()
 
     const html = `
       <!DOCTYPE html>
@@ -728,7 +755,7 @@ export async function sendTicketAssignedToTechnicianEmail(ticketId: string) {
             </p>
           </div>
           <div class="footer">
-            <p>Este es un mensaje automático del Sistema de Tickets</p>
+            <p>Este es un mensaje automático de ${systemName}</p>
             <p>Por favor no responda a este email</p>
           </div>
         </div>
@@ -771,6 +798,8 @@ export async function sendTicketAssignedToClientEmail(ticketId: string) {
       !ticket.users_tickets_assigneeIdTousers
     )
       return false
+
+    const { systemName } = await getSystemBranding()
 
     const html = `
       <!DOCTYPE html>
@@ -831,7 +860,7 @@ export async function sendTicketAssignedToClientEmail(ticketId: string) {
             </center>
           </div>
           <div class="footer">
-            <p>Este es un mensaje automático del Sistema de Tickets</p>
+            <p>Este es un mensaje automático de ${systemName}</p>
             <p>Por favor no responda a este email</p>
           </div>
         </div>
@@ -887,6 +916,8 @@ export async function sendTicketResolvedToAdminEmail(ticketId: string) {
     const resolutionTime = ticket.resolvedAt
       ? Math.round((ticket.resolvedAt.getTime() - ticket.createdAt.getTime()) / (1000 * 60 * 60))
       : 0
+
+    const { systemName } = await getSystemBranding()
 
     const html = `
       <!DOCTYPE html>
@@ -952,7 +983,7 @@ export async function sendTicketResolvedToAdminEmail(ticketId: string) {
             </center>
           </div>
           <div class="footer">
-            <p>Este es un mensaje automático del Sistema de Tickets</p>
+            <p>Este es un mensaje automático de ${systemName}</p>
           </div>
         </div>
       </body>
@@ -1021,6 +1052,8 @@ export async function sendRatingToAdminEmail(ticketId: string, rating: number) {
 
     const stars = '⭐'.repeat(rating)
     const ratingColor = rating >= 4 ? '#059669' : rating >= 3 ? '#f59e0b' : '#dc2626'
+
+    const { systemName } = await getSystemBranding()
 
     const html = `
       <!DOCTYPE html>
@@ -1111,7 +1144,7 @@ export async function sendRatingToAdminEmail(ticketId: string, rating: number) {
             </center>
           </div>
           <div class="footer">
-            <p>Este es un mensaje automático del Sistema de Tickets</p>
+            <p>Este es un mensaje automático de ${systemName}</p>
           </div>
         </div>
       </body>

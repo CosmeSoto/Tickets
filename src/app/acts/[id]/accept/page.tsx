@@ -5,6 +5,7 @@ import { ActDetailsDisplay } from '@/components/inventory/act-details-display'
 import { ActAcceptanceForm } from '@/components/inventory/act-acceptance-form'
 import prisma from '@/lib/prisma'
 import Image from 'next/image'
+import { DEFAULT_SYSTEM_NAME } from '@/lib/branding-constants'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -28,11 +29,11 @@ async function getSystemBranding() {
   try {
     const content = await prisma.landing_page_content.findFirst({ where: { id: 'default' } })
     return {
-      companyName: (content as any)?.companyName || 'Sistema de Gestión de Inventario',
+      companyName: (content as any)?.companyName || DEFAULT_SYSTEM_NAME,
       logoUrl: (content as any)?.companyLogoLightUrl || null,
     }
   } catch {
-    return { companyName: 'Sistema de Gestión de Inventario', logoUrl: null }
+    return { companyName: DEFAULT_SYSTEM_NAME, logoUrl: null }
   }
 }
 

@@ -38,8 +38,8 @@ const SENSITIVE_SETTING_KEYS = new Set(['smtpPassword'])
 
 // Configuración por defecto
 const defaultSettings = {
-  systemName: 'Sistema de gestión',
-  systemDescription: 'Gestión Integral de Operaciones',
+  systemName: 'Gestión Operaciones',
+  systemDescription: 'Soporte profesional para toda la organización',
   supportEmail: 'internet.freecom@gmail.com',
   maxTicketsPerUser: 10,
   autoAssignmentEnabled: true,
@@ -322,20 +322,22 @@ export async function PUT(request: NextRequest) {
         update: landingPageUpdates,
         create: {
           id: 'default',
-          heroTitle: 'Gestión Integral de Operaciones',
-          heroSubtitle: 'Tickets, inventario, rondas en una sola plataforma',
+          heroTitle: 'Soporte Multi-Área',
+          heroSubtitle: 'Gestión de tickets para todas las áreas de tu organización',
           heroCtaPrimary: 'Crear Ticket de Soporte',
           heroCtaPrimaryUrl: '/login',
           heroCtaSecondary: 'Ver Servicios',
           heroCtaSecondaryUrl: '#servicios',
           servicesTitle: 'Nuestros Servicios',
-          servicesSubtitle: 'Ofrecemos soporte técnico integral',
+          servicesSubtitle: 'Soporte técnico integral para todas las áreas',
           servicesEnabled: true,
-          companyName: landingPageUpdates.companyName || 'Sistema de Tickets',
-          companyTagline: 'Gestión Integral de Operaciones',
-          footerText: `© ${new Date().getFullYear()} ${landingPageUpdates.companyName || 'Sistema de Tickets'}`,
-          metaTitle: 'Sistema de Tickets - Soporte Técnico',
-          metaDescription: 'Sistema profesional de gestión de tickets',
+          companyName: landingPageUpdates.companyName || 'Gestión Operaciones',
+          companyTagline: 'Soporte profesional para toda la organización',
+          footerText: `© ${new Date().getFullYear()} ${landingPageUpdates.companyName || 'Gestión Operaciones'}`,
+          metaTitle: landingPageUpdates.companyName
+            ? `${landingPageUpdates.companyName} - Soporte Multi-Área`
+            : 'Gestión Operaciones - Soporte Multi-Área',
+          metaDescription: 'Sistema profesional de gestión de tickets multi-área',
           ...landingPageUpdates,
         },
       })

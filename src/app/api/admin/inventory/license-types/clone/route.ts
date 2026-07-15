@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Sin acceso a la familia destino' }, { status: 403 })
     }
 
-    const source = await (prisma.license_types as any).findUnique({
+    const source = await prisma.license_types.findUnique({
       where: { id: sourceTypeId },
       include: { attributes: { orderBy: { order: 'asc' } } },
     })
@@ -48,50 +48,71 @@ export async function POST(request: NextRequest) {
 
     const finalName = newName?.trim() || source.name
     const baseCode = slugify(finalName)
-    const existing = await (prisma.license_types as any).findMany({
+    const existing = await prisma.license_types.findMany({
       where: { familyId: targetFamilyId, code: { startsWith: baseCode } },
       select: { code: true },
     })
-    const usedCodes = new Set(existing.map((t: { code: string }) => t.code))
+    const usedCodes = new Set(existing.map(t => t.code))
     let finalCode = baseCode; let suffix = 1
     while (usedCodes.has(finalCode)) { finalCode = `${baseCode}-${suffix++}` }
 
     const newType = await prisma.$transaction(async tx => {
-      const created = await (tx.license_types as any).create({
+      const created = await tx.license_types.create({
         data: {
-          id: randomUUID(), code: finalCode, name: finalName,
-          description: source.description, icon: source.icon,
-          familyId: targetFamilyId, isActive: source.isActive, order: source.order,
+          id: randomUUID(),
+          code: finalCode,
+          name: finalName,
+          description: source.description,
+          icon: source.icon,
+          family: { connect: { id: targetFamilyId } },
+          isActive: source.isActive,
+          order: source.order,
           requiresKey: source.requiresKey ?? false,
           allowMultipleAssignments: source.allowMultipleAssignments ?? false,
           maxAssignments: source.maxAssignments ?? null,
         },
       })
 
-      if (copyAttributes && source.attributes?.length > 0) {
-        await (tx as any).license_type_attributes.createMany({
-          data: source.attributes.map((a: any) => ({
-            id: randomUUID(), licenseTypeId: created.id,
-            attributeName: a.attributeName, attributeLabel: a.attributeLabel,
-            attributeType: a.attributeType, options: a.options,
-            isRequired: a.isRequired, isVisible: a.isVisible,
-            order: a.order, helpText: a.helpText,
+      if (copyAttributes && source.attributes.length > 0) {
+        await tx.license_type_attributes.createMany({
+          data: source.attributes.map(a => ({
+            id: randomUUID(),
+            licenseTypeId: created.id,
+            attributeName: a.attributeName,
+            attributeLabel: a.attributeLabel,
+            attributeType: a.attributeType,
+            options: a.options,
+            isRequired: a.isRequired,
+            isVisible: a.isVisible,
+            order: a.order,
+            helpText: a.helpText,
           })),
         })
       }
 
       await tx.audit_logs.create({
         data: {
-          id: randomUUID(), action: 'TYPE_CLONED', entityType: 'license_type',
-          entityId: created.id, userId: session.user.id,
-          details: { sourceTypeId, sourceTypeName: source.name, targetFamilyId,
-            attributesCopied: copyAttributes ? source.attributes?.length ?? 0 : 0 },
+          id: randomUUID(),
+          action: 'TYPE_CLONED',
+          entityType: 'license_type',
+          entityId: created.id,
+          userId: session.user.id,
+          details: {
+            sourceTypeId,
+            sourceTypeName: source.name,
+            targetFamilyId,
+            attributesCopied: copyAttributes ? source.attributes.length : 0,
+          },
         },
       })
       return created
     })
 
-    return NextResponse.json({ success: true, type: newType, attributesCopied: copyAttributes ? source.attributes?.length ?? 0 : 0 })
+    return NextResponse.json({
+      success: true,
+      type: newType,
+      attributesCopied: copyAttributes ? source.attributes.length : 0,
+    })
   } catch (error) {
     console.error('[POST license-types/clone]', error)
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Error al copiar tipo' }, { status: 500 })

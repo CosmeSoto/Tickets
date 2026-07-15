@@ -11,6 +11,11 @@ import { ThemeScript } from '@/components/theme-script'
 import { SessionTimeoutMonitor } from '@/components/auth/session-timeout-monitor'
 import { GlobalFavicon } from '@/components/common/global-favicon'
 import { DynamicPageTitle } from '@/components/common/dynamic-page-title'
+import {
+  DEFAULT_PAGE_TITLE,
+  getSystemBranding,
+} from '@/lib/branding'
+import prisma from '@/lib/prisma'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -18,9 +23,32 @@ const inter = Inter({
   fallback: ['system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
 })
 
-export const metadata: Metadata = {
-  title: 'Sistema de Tickets - Soporte Técnico',
-  description: 'Sistema de gestión de tickets de soporte técnico para centro comercial',
+const DEFAULT_DESCRIPTION =
+  'Sistema profesional de gestión multi-área: tickets, inventario, rondas y más'
+
+/**
+ * Metadata dinámica desde BD:
+ * - "Nombre del sistema" (Configuración General) → systemName
+ * - "Título principal" (Página Pública) → heroTitle
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  try {
+    const branding = await getSystemBranding()
+    const landing = await prisma.landing_page_content.findFirst({
+      where: { id: 'default' },
+      select: { metaDescription: true },
+    })
+
+    return {
+      title: branding.pageTitle,
+      description: landing?.metaDescription || DEFAULT_DESCRIPTION,
+    }
+  } catch {
+    return {
+      title: DEFAULT_PAGE_TITLE,
+      description: DEFAULT_DESCRIPTION,
+    }
+  }
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -35,7 +63,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <SessionProviderWrapper>
               <AppDataProvider>
                 <GlobalFavicon />
-                <DynamicPageTitle defaultTitle='Sistema de Tickets - Soporte Técnico' />
+                <DynamicPageTitle defaultTitle={DEFAULT_PAGE_TITLE} />
                 <SessionTimeoutMonitor />
                 {children}
               </AppDataProvider>

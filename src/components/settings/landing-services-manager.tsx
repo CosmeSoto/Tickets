@@ -324,7 +324,7 @@ export function LandingServicesManager() {
               <Input
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                placeholder="Soporte Técnico"
+                placeholder="Soporte Multi-Área"
               />
             </div>
 

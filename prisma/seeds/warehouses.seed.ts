@@ -151,10 +151,12 @@ export async function seedWarehouses(prisma: PrismaClient, familyMap: Map<string
   await upsertWarehouses(prisma, operationsWarehouses)
   console.log(`  ✅ ${operationsWarehouses.length} bodegas — Operaciones`)
 
-  const inventoryFamilies = [techFamilyId, architectureFamilyId, operationsFamilyId]
+  // "Recepción Compras" debe existir en TODAS las familias del organigrama,
+  // no solo en las 3 que manejan inventario físico.
+  const allFamilyIds = [...familyMap.values()]
   let receptionCount = 0
 
-  for (const familyId of inventoryFamilies) {
+  for (const familyId of allFamilyIds) {
     const existing = await prisma.warehouses.findFirst({
       where: { name: 'Recepción Compras', familyId },
     })
@@ -175,7 +177,7 @@ export async function seedWarehouses(prisma: PrismaClient, familyMap: Map<string
   }
 
   if (receptionCount > 0) {
-    console.log(`  ✅ ${receptionCount} bodegas "Recepción Compras" creadas`)
+    console.log(`  ✅ ${receptionCount} bodegas "Recepción Compras" creadas (${allFamilyIds.length} familias)`)
   }
 
   console.log('✅ Seed de bodegas completado')

@@ -1,3 +1,4 @@
+import { getSystemBranding } from '@/lib/branding'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -104,6 +105,8 @@ export async function POST(
   const requesterEmail = decommissionRequest.requester.email
   const requesterName = decommissionRequest.requester.name || requesterEmail
 
+  const { systemName } = await getSystemBranding()
+
   await notifyUser(
     requesterId,
     'ERROR',
@@ -114,7 +117,13 @@ export async function POST(
       email: {
         to: requesterEmail,
         subject: `Solicitud de Baja Rechazada - ${assetName}`,
-        html: generateRejectionEmail(requesterName, assetName, rejectionReason.trim(), adminName),
+        html: generateRejectionEmail(
+          requesterName,
+          assetName,
+          rejectionReason.trim(),
+          adminName,
+          systemName
+        ),
       },
     }
   )
@@ -134,7 +143,7 @@ export async function POST(
   return NextResponse.json({ message: 'Solicitud rechazada correctamente' })
 }
 
-function generateRejectionEmail(requesterName: string, assetName: string, reason: string, adminName: string): string {
+function generateRejectionEmail(requesterName: string, assetName: string, reason: string, adminName: string, systemName: string): string {
   return `<!DOCTYPE html><html><head><meta charset="UTF-8">
 <style>body{font-family:Arial,sans-serif;line-height:1.6;color:#333}.container{max-width:600px;margin:0 auto;padding:20px}.header{background-color:#dc2626;color:white;padding:20px;border-radius:5px 5px 0 0}.content{background-color:#f9fafb;padding:20px;border:1px solid #e5e7eb}.info-box{background-color:white;padding:15px;margin:15px 0;border-left:4px solid #dc2626}.footer{text-align:center;margin-top:20px;color:#6b7280;font-size:12px}</style>
 </head><body><div class="container">
@@ -142,6 +151,6 @@ function generateRejectionEmail(requesterName: string, assetName: string, reason
 <div class="content"><p>Hola ${requesterName},</p><p>Tu solicitud de baja ha sido <strong>rechazada</strong> por ${adminName}.</p>
 <div class="info-box"><p><strong>Activo:</strong> ${assetName}</p><p><strong>Motivo del rechazo:</strong> ${reason}</p><p><strong>Revisado por:</strong> ${adminName}</p></div>
 <p>El activo permanece activo en el sistema. Si tienes dudas, contacta al administrador.</p></div>
-<div class="footer"><p>Mensaje automático del Sistema de Gestión de Inventario</p></div>
+<div class="footer"><p>Mensaje automático del ${systemName}</p></div>
 </div></body></html>`
 }

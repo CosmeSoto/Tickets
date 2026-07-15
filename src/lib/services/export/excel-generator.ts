@@ -4,6 +4,7 @@
  */
 
 import * as XLSX from 'xlsx'
+import { DEFAULT_SYSTEM_NAME, getSystemBranding } from '@/lib/branding'
 
 export interface ExcelSheet {
   name: string
@@ -13,7 +14,9 @@ export interface ExcelSheet {
 
 export class ExcelGenerator {
   /**
-   * Genera un archivo Excel con múltiples hojas
+   * Genera un archivo Excel con múltiples hojas.
+   * Si no se pasa author/subject, usa DEFAULT_SYSTEM_NAME como fallback síncrono.
+   * Preferir generateAsync() cuando se pueda leer el nombre desde BD.
    */
   static generate(sheets: ExcelSheet[], metadata?: Record<string, any>): Buffer {
     const workbook = XLSX.utils.book_new()
@@ -22,8 +25,8 @@ export class ExcelGenerator {
     if (metadata) {
       workbook.Props = {
         Title: metadata.title || 'Reporte',
-        Subject: metadata.subject || 'Sistema de Tickets',
-        Author: metadata.author || 'Sistema de Tickets',
+        Subject: metadata.subject || DEFAULT_SYSTEM_NAME,
+        Author: metadata.author || DEFAULT_SYSTEM_NAME,
         CreatedDate: new Date()
       }
     }
@@ -42,6 +45,21 @@ export class ExcelGenerator {
     })
 
     return buffer
+  }
+
+  /**
+   * Igual que generate(), pero rellena author/subject con el nombre del sistema desde BD.
+   */
+  static async generateAsync(
+    sheets: ExcelSheet[],
+    metadata?: Record<string, any>
+  ): Promise<Buffer> {
+    const { systemName } = await getSystemBranding()
+    return this.generate(sheets, {
+      ...metadata,
+      subject: metadata?.subject || systemName,
+      author: metadata?.author || systemName,
+    })
   }
 
   /**
@@ -153,7 +171,7 @@ export class ExcelGenerator {
   /**
    * Genera Excel para reporte de tickets
    */
-  static generateTicketsReport(tickets: any[], summary?: any): Buffer {
+  static async generateTicketsReport(tickets: any[], summary?: any): Promise<Buffer> {
     const sheets: ExcelSheet[] = []
 
     // Hoja 1: Resumen
@@ -208,17 +226,16 @@ export class ExcelGenerator {
       })
     }
 
-    return this.generate(sheets, {
+    return this.generateAsync(sheets, {
       title: 'Reporte de Tickets',
       subject: 'Análisis de Tickets del Sistema',
-      author: 'Sistema de Tickets'
     })
   }
 
   /**
    * Genera Excel para reporte de técnicos
    */
-  static generateTechniciansReport(technicians: any[]): Buffer {
+  static async generateTechniciansReport(technicians: any[]): Promise<Buffer> {
     const sheets: ExcelSheet[] = []
 
     const technicianData = technicians.map(tech => ({
@@ -240,17 +257,16 @@ export class ExcelGenerator {
       data: technicianData
     })
 
-    return this.generate(sheets, {
+    return this.generateAsync(sheets, {
       title: 'Reporte de Técnicos',
       subject: 'Rendimiento de Técnicos',
-      author: 'Sistema de Tickets'
     })
   }
 
   /**
    * Genera Excel para reporte de categorías
    */
-  static generateCategoriesReport(categories: any[]): Buffer {
+  static async generateCategoriesReport(categories: any[]): Promise<Buffer> {
     const sheets: ExcelSheet[] = []
 
     const categoryData = categories.map(cat => ({
@@ -270,10 +286,9 @@ export class ExcelGenerator {
       data: categoryData
     })
 
-    return this.generate(sheets, {
+    return this.generateAsync(sheets, {
       title: 'Reporte de Categorías',
       subject: 'Análisis por Categorías',
-      author: 'Sistema de Tickets'
     })
   }
 }

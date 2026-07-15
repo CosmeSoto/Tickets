@@ -21,8 +21,13 @@ import {
   LogIn,
 } from 'lucide-react'
 import { SystemLogo } from '@/components/common/system-logo'
+import { useLandingData } from '@/hooks/use-landing-data'
+import { DEFAULT_SYSTEM_NAME, DEFAULT_HERO_TITLE } from '@/lib/branding-constants'
 
 export default function LoginPage() {
+  const { data: landing } = useLandingData()
+  const systemName = landing.companyName || DEFAULT_SYSTEM_NAME
+  const heroTitle = landing.heroTitle || DEFAULT_HERO_TITLE
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -85,9 +90,9 @@ export default function LoginPage() {
             <SystemLogo size='xl' showText={true} className='brightness-0 invert' />
           </div>
           <div className='space-y-3'>
-            <h2 className='text-3xl font-bold text-white'>Gestión Integral de Operaciones</h2>
+            <h2 className='text-3xl font-bold text-white'>{systemName}</h2>
             <p className='text-white/60 text-base leading-relaxed'>
-              Centraliza soporte técnico, inventario y operaciones en un solo lugar.
+              {heroTitle}. Centraliza tickets, inventario y operaciones en un solo lugar.
             </p>
           </div>
           {/* Feature bullets */}

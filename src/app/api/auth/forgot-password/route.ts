@@ -68,15 +68,18 @@ export async function POST(request: NextRequest) {
 
     // Enviar email
     try {
+      const { getSystemBranding } = await import('@/lib/branding')
+      const { systemName } = await getSystemBranding()
+
       await EmailService.queueEmail({
         to: user.email,
-        subject: 'Recuperación de Contraseña - Sistema de Tickets',
+        subject: `Recuperación de Contraseña - ${systemName}`,
         template: 'password-reset',
         templateData: {
           userName: user.name,
           resetUrl,
-          expiryTime: '1 hora'
-        }
+          expiryTime: '1 hora',
+        },
       }, 'system')
 
       console.log(`[FORGOT PASSWORD] Email de recuperación enviado a: ${user.email}`)

@@ -1,9 +1,12 @@
+import { DEFAULT_SYSTEM_NAME } from '@/lib/branding-constants'
+
 /**
  * Template: Ticket Asignado
  * Se envía al técnico cuando se le asigna un ticket
  */
 
 export default function ticketAssignedTemplate(data: {
+  systemName?: string
   ticketId: string
   ticketTitle: string
   ticketNumber: string
@@ -123,7 +126,7 @@ export default function ticketAssignedTemplate(data: {
                 Este es un email automático, por favor no respondas a este mensaje.
               </p>
               <p style="color: #6b7280; font-size: 12px; margin: 10px 0 0 0;">
-                © ${new Date().getFullYear()} Sistema de Tickets. Todos los derechos reservados.
+                © ${new Date().getFullYear()} ${data.systemName || DEFAULT_SYSTEM_NAME}. Todos los derechos reservados.
               </p>
             </td>
           </tr>
@@ -158,7 +161,7 @@ Por favor, responde al cliente lo antes posible para mantener un buen nivel de s
 
 ---
 Este es un email automático, por favor no respondas a este mensaje.
-© ${new Date().getFullYear()} Sistema de Tickets
+© ${new Date().getFullYear()} ${data.systemName || DEFAULT_SYSTEM_NAME}
   `.trim()
 
   return { html, text }

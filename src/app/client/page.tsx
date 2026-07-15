@@ -30,6 +30,8 @@ import { useEffect, useState } from 'react'
 import { AssignedFamiliesPanel } from '@/components/dashboard/assigned-families-panel'
 import { NewsFeed } from '@/components/news'
 import { useUserModules } from '@/hooks/use-user-modules'
+import { useLandingData } from '@/hooks/use-landing-data'
+import { DEFAULT_HERO_TITLE } from '@/lib/branding-constants'
 
 interface SystemMetrics {
   responseTime: string
@@ -52,6 +54,8 @@ interface SystemMetrics {
 
 export default function ClientDashboard() {
   const { news: hasNews } = useUserModules()
+  const { data: landingData } = useLandingData()
+  const supportLabel = landingData.heroTitle || DEFAULT_HERO_TITLE
   const {
     userName,
     isLoading,
@@ -370,7 +374,7 @@ export default function ClientDashboard() {
             <CardTitle className='flex items-center justify-between'>
               <div className='flex items-center'>
                 <Activity className='h-5 w-5 mr-2 text-green-600 dark:text-green-400' />
-                Estado del Soporte Técnico
+                Estado del {supportLabel}
               </div>
               <div className='flex items-center space-x-2'>
                 <Calendar className='h-4 w-4 text-muted-foreground' />

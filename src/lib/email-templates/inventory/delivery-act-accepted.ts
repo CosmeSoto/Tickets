@@ -1,6 +1,8 @@
 import type { DeliveryAct } from '@/types/inventory/delivery-act'
+import { DEFAULT_SYSTEM_NAME } from '@/lib/branding-constants'
 
 interface DeliveryActAcceptedEmailData {
+  systemName?: string
   act: DeliveryAct
   recipientName: string
   recipientRole: 'deliverer' | 'receiver'
@@ -15,7 +17,7 @@ export function generateDeliveryActAcceptedEmail(data: DeliveryActAcceptedEmailD
   html: string
   text: string
 } {
-  const { act, recipientName, recipientRole, equipmentCode, equipmentDescription, acceptedAt, pdfUrl } = data
+  const { act, recipientName, recipientRole, equipmentCode, equipmentDescription, acceptedAt, pdfUrl , systemName = DEFAULT_SYSTEM_NAME } = data
 
   const acceptedAtStr = new Date(acceptedAt).toLocaleString('es-ES', {
     day: 'numeric',
@@ -85,7 +87,7 @@ export function generateDeliveryActAcceptedEmail(data: DeliveryActAcceptedEmailD
 
   <div style="border-top: 1px solid #e5e7eb; padding-top: 20px; margin-top: 20px; color: #6b7280; font-size: 12px;">
     <p>
-      <strong>Sistema de Gestión de Inventario</strong><br>
+      <strong>${systemName}</strong><br>
       Este es un correo automático, por favor no respondas a este mensaje.
     </p>
   </div>
@@ -120,7 +122,7 @@ ${recipientRole === 'receiver'
 Este acta ha sido firmada digitalmente y puede ser verificada en cualquier momento.
 
 ---
-Sistema de Gestión de Inventario
+${systemName}
 Este es un correo automático, por favor no respondas a este mensaje.
   `
 

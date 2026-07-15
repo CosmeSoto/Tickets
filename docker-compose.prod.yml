@@ -114,6 +114,10 @@ services:
       REDIS_URL: redis://redis:6379
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?NEXTAUTH_SECRET requerida}
       NEXTAUTH_URL: ${NEXTAUTH_URL}
+      # NEXTAUTH_SECURE_COOKIES: 'false'
+      # ↑ Descomentar SOLO cuando se trabaje en red local sin HTTPS (sin dominio propio).
+      # Permite que NextAuth use cookies sin el prefijo __Secure-, evitando el error de
+      # sesión sobre HTTP. Comentar o eliminar al desplegar con dominio + certificado SSL real.
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY requerida}
       BACKUP_ENCRYPTION_KEY: ${BACKUP_ENCRYPTION_KEY:-}
       BACKUP_DIR: /app/backups

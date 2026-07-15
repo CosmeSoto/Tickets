@@ -308,7 +308,7 @@ export async function respondWithReportFormat(
     const template = getTemplateBySlug(slug)
     const rows = response.data.map(row => exportCfg?.csvRowMapper(row) ?? row)
     const title = exportCfg?.pdfTitle ?? template?.name ?? slug
-    const buffer = exportReportXlsx(rows, title)
+    const buffer = await exportReportXlsx(rows, title)
     const baseName = (exportCfg?.csvFilename ?? DEFAULT_EXPORT.csvFilename).replace(/\.csv$/i, '')
     return new NextResponse(new Uint8Array(buffer), {
       headers: {

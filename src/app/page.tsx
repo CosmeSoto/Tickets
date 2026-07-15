@@ -48,19 +48,19 @@ interface Service {
 }
 
 const defaultContent: LandingContent = {
-  heroTitle: 'Gestión Integral de Operaciones',
-  heroSubtitle: 'Tickets, inventario, rondas en una sola plataforma',
+  heroTitle: 'Soporte Multi-Área',
+  heroSubtitle: 'Gestión de tickets para todas las áreas de tu organización',
   heroCtaPrimary: 'Crear Ticket de Soporte',
   heroCtaPrimaryUrl: '/login',
   heroCtaSecondary: 'Ver Servicios',
   heroCtaSecondaryUrl: '#servicios',
   heroImageUrl: '',
   servicesTitle: 'Nuestros Servicios',
-  servicesSubtitle: 'Ofrecemos soporte técnico integral',
+  servicesSubtitle: 'Soporte técnico integral para todas las áreas',
   servicesEnabled: true,
-  companyName: 'Sistema de Tickets',
-  companyTagline: 'Gestión Integral de Operaciones',
-  footerText: `© ${new Date().getFullYear()} Sistema de Tickets`,
+  companyName: 'Gestión Operaciones',
+  companyTagline: 'Soporte profesional para toda la organización',
+  footerText: `© ${new Date().getFullYear()} Gestión Operaciones`,
 }
 
 const HomePageContent = React.memo(function HomePageContent() {
@@ -221,7 +221,7 @@ const HomePageContent = React.memo(function HomePageContent() {
             {/* Badge */}
             <div className='inline-flex items-center gap-2 bg-primary/10 border border-primary/25 text-primary text-sm font-medium px-4 py-1.5 rounded-full mb-6'>
               <span className='w-2 h-2 rounded-full bg-primary animate-pulse' />
-              Gestión Integral de Operaciones
+              {d.companyTagline || d.companyName}
             </div>
 
             <h1 className='text-4xl sm:text-5xl md:text-6xl font-bold mb-5 text-foreground leading-tight'>

@@ -1,3 +1,4 @@
+import { getSystemBranding } from '@/lib/branding'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -143,6 +144,8 @@ async function checkLowStockAndNotify(consumableId: string) {
     ? `El consumible "${consumable.name}" se ha agotado (stock: 0). Se requiere reabastecimiento inmediato.`
     : `El consumible "${consumable.name}" tiene stock bajo (${consumable.currentStock}/${consumable.minStock} ${consumable.unitOfMeasure?.symbol || ''}).`
 
+  const { systemName } = await getSystemBranding()
+
   for (const admin of admins) {
     // Notificación in-app
     await NotificationService.push({
@@ -161,7 +164,12 @@ async function checkLowStockAndNotify(consumableId: string) {
           id: randomUUID(),
           toEmail: admin.email,
           subject: title,
-          body: generateLowStockEmail(consumable, admin.name ?? 'Administrador', isOutOfStock),
+          body: generateLowStockEmail(
+            consumable,
+            admin.name ?? 'Administrador',
+            isOutOfStock,
+            systemName
+          ),
           status: 'pending',
           attempts: 0,
           maxAttempts: 3,
@@ -172,7 +180,7 @@ async function checkLowStockAndNotify(consumableId: string) {
   }
 }
 
-function generateLowStockEmail(consumable: any, adminName: string, isOutOfStock: boolean): string {
+function generateLowStockEmail(consumable: any, adminName: string, isOutOfStock: boolean, systemName: string): string {
   const bgColor = isOutOfStock ? '#dc2626' : '#f59e0b'
   const icon = isOutOfStock ? '🚨' : '⚠️'
   const urgency = isOutOfStock ? 'AGOTADO' : 'STOCK BAJO'
@@ -213,7 +221,7 @@ function generateLowStockEmail(consumable: any, adminName: string, isOutOfStock:
         <a href="${process.env.NEXTAUTH_URL}/inventory?subtype=MRO" class="button">Ver Consumibles</a>
       </p>
     </div>
-    <div class="footer"><p>Mensaje automático del Sistema de Gestión de Inventario</p></div>
+    <div class="footer"><p>Mensaje automático del ${systemName}</p></div>
   </div>
 </body>
 </html>`.trim()

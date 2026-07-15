@@ -159,6 +159,9 @@ export function LandingPageCMSTab({ isSuperAdmin = false }: { isSuperAdmin?: boo
         const result = await response.json()
         console.log('✅ Save result:', result)
         setHasUnsavedChanges(false)
+        const { invalidateLandingCache } = await import('@/hooks/use-landing-data')
+        invalidateLandingCache()
+        window.dispatchEvent(new CustomEvent('landing-updated'))
         toast({
           title: 'Éxito',
           description: 'Contenido guardado correctamente',
@@ -241,7 +244,7 @@ export function LandingPageCMSTab({ isSuperAdmin = false }: { isSuperAdmin?: boo
               id='heroTitle'
               value={content.heroTitle}
               onChange={e => setContent({ ...content, heroTitle: e.target.value })}
-              placeholder='Gestión Integral de Operaciones'
+              placeholder='Soporte profesional para toda la organización'
             />
           </div>
 
@@ -918,7 +921,7 @@ export function LandingPageCMSTab({ isSuperAdmin = false }: { isSuperAdmin?: boo
               value={content.metaTitle}
               onChange={e => isSuperAdmin && setContent({ ...content, metaTitle: e.target.value })}
               disabled={!isSuperAdmin}
-              placeholder='Sistema de Tickets - Soporte Técnico'
+              placeholder='Gestión Operaciones - Soporte Multi-Área'
             />
           </div>
 

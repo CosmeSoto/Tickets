@@ -1,3 +1,4 @@
+import { getSystemBranding } from '@/lib/branding'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -270,6 +271,8 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
 
       const pdfDir = getUploadDir('decommission-acts')
       if (!existsSync(pdfDir)) await mkdir(pdfDir, { recursive: true })
+      const { systemName } = await getSystemBranding()
+
       const pdfFilename = `${act.folio.replace(/\//g, '-')}_${Date.now()}.pdf`
       const pdfPath = getUploadDir('decommission-acts', pdfFilename)
 
@@ -305,6 +308,7 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     const requesterId = decommissionRequest.requester.id
     const requesterEmail = decommissionRequest.requester.email
     const requesterName = decommissionRequest.requester.name || requesterEmail
+    const { systemName } = await getSystemBranding()
 
     await notifyUser(
       requesterId,
@@ -316,7 +320,7 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
         email: {
           to: requesterEmail,
           subject: `Solicitud de Baja Aprobada - ${act.folio}`,
-          html: buildApprovalEmail(requesterName, assetName, act.folio, adminName),
+          html: buildApprovalEmail(requesterName, assetName, act.folio, adminName, systemName),
         },
       }
     )
@@ -352,7 +356,8 @@ function buildApprovalEmail(
   requesterName: string,
   assetName: string,
   folio: string,
-  adminName: string
+  adminName: string,
+  systemName: string
 ): string {
   return `<!DOCTYPE html><html><head><meta charset="UTF-8">
 <style>body{font-family:Arial,sans-serif;line-height:1.6;color:#333}.container{max-width:600px;margin:0 auto;padding:20px}.header{background:#1E40AF;color:white;padding:20px;border-radius:5px 5px 0 0}.content{background:#f9fafb;padding:20px;border:1px solid #e5e7eb}.info-box{background:white;padding:15px;margin:15px 0;border-left:4px solid #22C55E}.footer{text-align:center;margin-top:20px;color:#6b7280;font-size:12px}</style>
@@ -361,6 +366,6 @@ function buildApprovalEmail(
 <div class="content"><p>Hola ${requesterName},</p><p>Tu solicitud de baja ha sido <strong>aprobada</strong> por ${adminName}.</p>
 <div class="info-box"><p><strong>Activo:</strong> ${assetName}</p><p><strong>Folio:</strong> ${folio}</p><p><strong>Aprobado por:</strong> ${adminName}</p></div>
 <p>El activo ha sido marcado como dado de baja en el sistema.</p></div>
-<div class="footer"><p>Mensaje automático del Sistema de Gestión de Inventario</p></div>
+<div class="footer"><p>Mensaje automático del ${systemName}</p></div>
 </div></body></html>`
 }

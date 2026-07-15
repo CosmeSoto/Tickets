@@ -326,10 +326,19 @@ export class EmailService {
     templateName: string,
     data: Record<string, any>
   ): Promise<{ html: string; text: string }> {
-    // Importar template dinámicamente
+    // Importar template dinámicamente e inyectar branding del sistema
     try {
+      const { getSystemBranding } = await import('@/lib/branding')
+      const branding = await getSystemBranding()
+      const enrichedData = {
+        ...data,
+        systemName: data.systemName || branding.systemName,
+        heroTitle: data.heroTitle || branding.heroTitle,
+        companyName: data.companyName || branding.companyName,
+      }
+
       const template = await import(`./templates/${templateName}`)
-      return template.default(data)
+      return template.default(enrichedData)
     } catch (error) {
       console.error(`[EMAIL-SERVICE] Template not found: ${templateName}`)
       // Fallback a template básico

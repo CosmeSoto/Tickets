@@ -371,6 +371,56 @@ TU_IP    gestion.local www.gestion.local
 
 Si cambia tu IP: ejecutar `sudo ./start-production.sh` y actualizar hosts en los clientes.
 
+### Confianza en el certificado SSL (mkcert)
+
+El certificado es autofirmado con mkcert. El browser muestra **"La conexión no es privada" / `NET::ERR_CERT_AUTHORITY_INVALID`** hasta que se instale la CA raíz de mkcert en cada dispositivo cliente. Esto es un paso **de una sola vez por dispositivo**.
+
+#### Mac donde corre el servidor (misma máquina)
+
+```bash
+# Instalar mkcert si no está
+brew install mkcert
+
+# Registrar la CA en el sistema (solo una vez)
+mkcert -install
+```
+
+Reiniciar Chrome completamente después (cerrar todas las ventanas, no solo la pestaña).
+
+#### Ver dónde está la CA para distribuirla
+
+```bash
+mkcert -CAROOT
+# Ejemplo: /Users/cosmesoto/Library/Application Support/mkcert
+# El archivo a distribuir es: rootCA.pem
+```
+
+#### Instalar la CA en otros dispositivos
+
+| Dispositivo | Pasos |
+|---|---|
+| **Mac** | Doble clic en `rootCA.pem` → Llavero de acceso → Confiar siempre en SSL/TLS |
+| **Windows** | Doble clic en `rootCA.pem` → Instalar certificado → Equipo local → "Entidades de certificación raíz de confianza" |
+| **Android** | Ajustes → Seguridad → Instalar certificado → desde archivo |
+| **iOS / iPadOS** | Enviar `rootCA.pem` por AirDrop o correo → Ajustes → General → VPN y gestión del dispositivo → Confiar |
+| **Linux (Chrome/Chromium)** | `certutil -d sql:$HOME/.pki/nssdb -A -t "C,," -n mkcert -i rootCA.pem` |
+
+#### Atajo temporal (solo para pruebas rápidas)
+
+En Chrome, con la pantalla de error visible, escribe **`thisisunsafe`** directamente (sin campo de texto). Chrome acepta el certificado para esa sesión. No es solución permanente.
+
+#### Regenerar certificado si cambias de IP
+
+```bash
+cd docker/certs
+
+mkcert -cert-file gestion.local.pem -key-file gestion.local-key.pem \
+  gestion.local www.gestion.local TU_IP localhost 127.0.0.1
+
+# Luego reconstruir nginx:
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d --force-recreate nginx
+```
+
 ---
 
 ## Arquitectura de Servicios
@@ -549,7 +599,7 @@ SELECT table_name FROM information_schema.tables WHERE table_name = 'patrol_fami
 | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | App no arranca                                  | `docker logs tickets-app` — verificar DATABASE_URL                                                                                                                  |
 | No accede a gestion.local                       | Verificar `/etc/hosts` y que nginx esté corriendo                                                                                                                   |
-| Certificado SSL no confiable                    | Aceptar excepción o instalar CA de mkcert en clientes                                                                                                               |
+| Certificado SSL no confiable (`NET::ERR_CERT_AUTHORITY_INVALID`) | Ver sección **Acceso desde la Red → Confianza en el certificado SSL** para instalar la CA de mkcert por dispositivo |
 | **404 en `/api/admin/news` u otros módulos**    | `sudo ./start-production.sh`. Si persiste: `sudo ./start-production.sh --clean` (⚠️ borra BD)                                                                       |
 | pgBackRest no disponible / recovery mode        | `./docker/scripts/fix-pgbackrest.sh`                                                                                                                                |
 | `VersionNotSupportedError` control version 1700 | Reconstruir **backup-worker** (pgBackRest 2.50+ para PG 17): `docker compose -f docker-compose.prod.yml build backup-worker && ./docker/scripts/init-pgbackrest.sh` |

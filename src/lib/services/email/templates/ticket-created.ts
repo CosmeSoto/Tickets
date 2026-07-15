@@ -1,9 +1,12 @@
+import { DEFAULT_SYSTEM_NAME } from '@/lib/branding-constants'
+
 /**
  * Template: Ticket Creado
  * Se envía al cliente cuando crea un nuevo ticket
  */
 
 export default function ticketCreatedTemplate(data: {
+  systemName?: string
   ticketId: string
   ticketTitle: string
   ticketNumber: string
@@ -118,7 +121,7 @@ export default function ticketCreatedTemplate(data: {
                 Este es un email automático, por favor no respondas a este mensaje.
               </p>
               <p style="color: #6b7280; font-size: 12px; margin: 10px 0 0 0;">
-                © ${new Date().getFullYear()} Sistema de Tickets. Todos los derechos reservados.
+                © ${new Date().getFullYear()} ${data.systemName || DEFAULT_SYSTEM_NAME}. Todos los derechos reservados.
               </p>
             </td>
           </tr>
@@ -152,7 +155,7 @@ Recibirás notificaciones cuando haya actualizaciones en tu ticket.
 
 ---
 Este es un email automático, por favor no respondas a este mensaje.
-© ${new Date().getFullYear()} Sistema de Tickets
+© ${new Date().getFullYear()} ${data.systemName || DEFAULT_SYSTEM_NAME}
   `.trim()
 
   return { html, text }

@@ -69,7 +69,6 @@ export async function POST(request: NextRequest) {
         familyId: sourceFamilyId,
         isActive: true,
         ...(warehouseIds?.length ? { id: { in: warehouseIds } } : {}),
-        name: { not: 'Recepción Compras' },
       },
       orderBy: { name: 'asc' },
     })

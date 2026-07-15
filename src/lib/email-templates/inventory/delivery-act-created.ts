@@ -1,6 +1,8 @@
 import type { DeliveryAct } from '@/types/inventory/delivery-act'
+import { DEFAULT_SYSTEM_NAME } from '@/lib/branding-constants'
 
 interface DeliveryActCreatedEmailData {
+  systemName?: string
   act: DeliveryAct
   acceptanceUrl: string
   receiverName: string
@@ -15,7 +17,7 @@ export function generateDeliveryActCreatedEmail(data: DeliveryActCreatedEmailDat
   html: string
   text: string
 } {
-  const { act, acceptanceUrl, receiverName, delivererName, equipmentCode, equipmentDescription, expirationDate } = data
+  const { act, acceptanceUrl, receiverName, delivererName, equipmentCode, equipmentDescription, expirationDate , systemName = DEFAULT_SYSTEM_NAME } = data
 
   const expirationDateStr = new Date(expirationDate).toLocaleDateString('es-ES', {
     day: 'numeric',
@@ -74,7 +76,7 @@ export function generateDeliveryActCreatedEmail(data: DeliveryActCreatedEmailDat
   <div style="border-top: 1px solid #e5e7eb; padding-top: 20px; margin-top: 20px; color: #6b7280; font-size: 12px;">
     <p>Si tienes alguna pregunta, contacta a ${delivererName} o al departamento de TI.</p>
     <p style="margin-top: 10px;">
-      <strong>Sistema de Gestión de Inventario</strong><br>
+      <strong>${systemName}</strong><br>
       Este es un correo automático, por favor no respondas a este mensaje.
     </p>
   </div>
@@ -107,7 +109,7 @@ Si no aceptas el acta antes de la fecha de expiración, la asignación será can
 Si tienes alguna pregunta, contacta a ${delivererName} o al departamento de TI.
 
 ---
-Sistema de Gestión de Inventario
+${systemName}
 Este es un correo automático, por favor no respondas a este mensaje.
   `
 

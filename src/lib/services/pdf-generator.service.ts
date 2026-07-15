@@ -7,6 +7,7 @@ import { generateDeliveryActPDF } from '../templates/delivery-act-pdf.template'
 import { generateReturnActPDF } from '../templates/return-act-pdf.template'
 import type { DeliveryAct } from '@/types/inventory/delivery-act'
 import { getUploadDir } from '@/lib/upload-path'
+import { DEFAULT_SYSTEM_NAME } from '@/lib/branding-constants'
 const mkdir = promisify(fs.mkdir)
 const writeFile = promisify(fs.writeFile)
 
@@ -30,10 +31,10 @@ async function getSystemBranding(): Promise<{ logoUrl: string | null; logoDarkUr
     return {
       logoUrl: normalizeLogoUrl((content as any)?.companyLogoLightUrl || null),
       logoDarkUrl: normalizeLogoUrl((content as any)?.companyLogoDarkUrl || null),
-      companyName: (content as any)?.companyName || 'Sistema de Gestión de Inventario',
+      companyName: (content as any)?.companyName || DEFAULT_SYSTEM_NAME,
     }
   } catch {
-    return { logoUrl: null, logoDarkUrl: null, companyName: 'Sistema de Gestión de Inventario' }
+    return { logoUrl: null, logoDarkUrl: null, companyName: DEFAULT_SYSTEM_NAME }
   }
 }
 

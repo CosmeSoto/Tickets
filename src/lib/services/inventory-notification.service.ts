@@ -8,6 +8,7 @@ import type { DeliveryAct } from '@/types/inventory/delivery-act'
 import { NotificationService } from './notification-service'
 import { getFamilyScopedAdmins } from '@/lib/notifications/family-recipients'
 import { db as prisma } from '@/lib/server'
+import { getSystemBranding } from '@/lib/branding'
 
 async function notifyDeliveryActFamilyAdmins(
   familyId: string | null | undefined,
@@ -88,7 +89,10 @@ export class InventoryNotificationService {
       const equipmentDescription = `${equipmentSnapshot.brand} ${equipmentSnapshot.model}`
 
       // Generar email
+      const { systemName } = await getSystemBranding()
+
       const emailData = generateDeliveryActCreatedEmail({
+        systemName,
         act: { ...act, equipmentSnapshot, receiverInfo, delivererInfo } as DeliveryAct,
         acceptanceUrl,
         receiverName: receiverInfo.name,
@@ -184,7 +188,10 @@ export class InventoryNotificationService {
       const equipmentDescription = `${equipmentSnapshot.brand} ${equipmentSnapshot.model}`
 
       // Generar email
+      const { systemName } = await getSystemBranding()
+
       const emailData = generateDeliveryActReminderEmail({
+        systemName,
         act: {
           ...act,
           equipmentSnapshot,
@@ -275,7 +282,11 @@ export class InventoryNotificationService {
       // ── Emails ────────────────────────────────────────────────────────────
       const pdfUrl = pdfPath ? `${baseUrl}${pdfPath}` : undefined
 
+      const { systemName } = await getSystemBranding()
+
+
       const receiverEmailData = generateDeliveryActAcceptedEmail({
+        systemName,
         act: { ...act, equipmentSnapshot, receiverInfo, delivererInfo } as DeliveryAct,
         recipientName: receiverInfo.name,
         recipientRole: 'receiver',
@@ -286,6 +297,7 @@ export class InventoryNotificationService {
       })
 
       const delivererEmailData = generateDeliveryActAcceptedEmail({
+        systemName,
         act: { ...act, equipmentSnapshot, receiverInfo, delivererInfo } as DeliveryAct,
         recipientName: delivererInfo.name,
         recipientRole: 'deliverer',
@@ -421,7 +433,10 @@ export class InventoryNotificationService {
       const motivo = act.rejectionReason || 'No especificado'
 
       // ── Email al entregador ───────────────────────────────────────────────
+      const { systemName } = await getSystemBranding()
+
       const emailData = generateDeliveryActRejectedEmail({
+        systemName,
         act: { ...act, equipmentSnapshot, receiverInfo, delivererInfo } as DeliveryAct,
         recipientName: delivererInfo.name,
         equipmentCode,
@@ -528,7 +543,10 @@ export class InventoryNotificationService {
       const equipmentDescription = `${equipmentSnapshot.brand} ${equipmentSnapshot.model}`
 
       // Email para ambas partes
+      const { systemName } = await getSystemBranding()
+
       const emailData = generateDeliveryActExpiredEmail({
+        systemName,
         act: { ...act, equipmentSnapshot, receiverInfo, delivererInfo } as DeliveryAct,
         recipientName: receiverInfo.name,
         equipmentCode,
@@ -642,7 +660,11 @@ export class InventoryNotificationService {
       const acceptanceUrl = `${baseUrl}/acts/${act.id}/accept?token=${act.acceptanceToken}`
       const expirationStr = new Date(act.expirationDate).toLocaleDateString('es-ES')
 
+      const { systemName } = await getSystemBranding()
+
+
       const emailData = generateDeliveryActCreatedEmail({
+        systemName,
         act: {
           ...act,
           equipmentSnapshot: snapshot,

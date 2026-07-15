@@ -96,7 +96,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (format === 'xlsx') {
-      const buffer = exportReportXlsx(result.data, dataset.name)
+      const buffer = await exportReportXlsx(result.data, dataset.name)
       return new NextResponse(new Uint8Array(buffer), {
         headers: {
           'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

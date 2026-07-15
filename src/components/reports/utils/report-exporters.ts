@@ -11,6 +11,7 @@ import type {
   SatisfactionReport,
 } from './report-types'
 import { formatMinutes, priorityLabel, getTabLabel } from './report-formatters'
+import { getCachedBranding } from '@/lib/branding-cache'
 
 // ─── CSV Export ───────────────────────────────────────────────────────────────
 
@@ -300,7 +301,7 @@ export function exportPDF(
 </head>
 <body>
   <div class="header">
-    <h1>Sistema de Tickets — ${getTabLabel(tab, granularity)} <span class="badge">${familyCode}</span></h1>
+    <h1>${getCachedBranding().systemName} — ${getTabLabel(tab, granularity)} <span class="badge">${familyCode}</span></h1>
     <p>${familyName} &nbsp;·&nbsp; Generado el ${date}</p>
   </div>
   <h2>${getTabLabel(tab, granularity)}</h2>

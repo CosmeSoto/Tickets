@@ -1,3 +1,4 @@
+import { getSystemBranding } from '@/lib/branding'
 import { randomUUID } from 'crypto'
 import { NotificationService } from '../services/notification-service'
 import { getFamilyScopedAdmins } from '@/lib/notifications/family-recipients'
@@ -70,6 +71,7 @@ export class CheckRentalExpirationJob {
       }
 
       let notificationsSent = 0
+      const { systemName } = await getSystemBranding()
 
       for (const rental of expiringRentals) {
         const admins = await getFamilyScopedAdmins(rental.type?.familyId ?? null, {
@@ -112,7 +114,12 @@ export class CheckRentalExpirationJob {
                   daysRemaining === 1
                     ? `¡URGENTE! Contrato de Renta por Vencer - ${rental.code}`
                     : `Contrato de Renta Próximo a Vencer - ${rental.code}`,
-                body: this.generateEmailBody(rental, daysRemaining, admin.name ?? 'Administrador'),
+                body: this.generateEmailBody(
+                  rental,
+                  daysRemaining,
+                  admin.name ?? 'Administrador',
+                  systemName
+                ),
                 status: 'pending',
                 attempts: 0,
                 maxAttempts: 3,
@@ -143,7 +150,12 @@ export class CheckRentalExpirationJob {
   /**
    * Genera el cuerpo del email de alerta
    */
-  private static generateEmailBody(rental: any, daysRemaining: number, adminName: string): string {
+  private static generateEmailBody(
+    rental: any,
+    daysRemaining: number,
+    adminName: string,
+    systemName: string
+  ): string {
     const equipmentDescription = `${rental.brand} ${rental.model}`
     const expirationDate = rental.rentalEndDate!.toLocaleDateString('es-ES', {
       weekday: 'long',
@@ -212,7 +224,7 @@ export class CheckRentalExpirationJob {
       </p>
     </div>
     <div class="footer">
-      <p>Este es un mensaje automático del Sistema de Gestión de Inventario</p>
+      <p>Este es un mensaje automático del ${systemName}</p>
       <p>Por favor no responder a este correo</p>
     </div>
   </div>

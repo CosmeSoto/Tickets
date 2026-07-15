@@ -5,6 +5,7 @@
 
 import { Readable } from 'stream'
 import { loadPDFKit } from '@/lib/utils/load-pdfkit'
+import { DEFAULT_SYSTEM_NAME } from '@/lib/branding-constants'
 
 export interface PDFOptions {
   title: string
@@ -31,7 +32,7 @@ export class PDFGenerator {
           margin: 50,
           info: {
             Title: options.title,
-            Author: options.author || 'Sistema de Tickets',
+            Author: options.author || DEFAULT_SYSTEM_NAME,
             Subject: options.subject || options.title
           }
         })
@@ -211,7 +212,7 @@ export class PDFGenerator {
         )
 
       doc.text(
-        `© ${new Date().getFullYear()} Sistema de Tickets`,
+        `© ${new Date().getFullYear()} ${DEFAULT_SYSTEM_NAME}`,
         50,
         doc.page.height - 30,
         { align: 'center' }

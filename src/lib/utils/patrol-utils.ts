@@ -4,6 +4,7 @@
  */
 
 import type { ExportColumn } from '@/lib/utils/export'
+import { getCachedBranding } from '@/lib/branding-cache'
 
 // Re-exportar helper de formateo para uso en componentes (client-safe)
 export { formatDurationMinutes } from '@/lib/patrol/patrol-format'
@@ -682,7 +683,7 @@ export function exportIncidentsToPDF(
     <tbody>${tableRows}</tbody>
   </table>
 
-  <div class="footer">Sistema de Tickets — Novedades de Rondas — ${date}</div>
+  <div class="footer">${getCachedBranding().systemName} — Novedades de Rondas — ${date}</div>
   <script>
     window.onload = function() {
       window.print();

@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import { headers } from 'next/headers'
 import { prisma } from '@/lib/prisma'
 import { randomUUID } from 'crypto'
+import { DEFAULT_SYSTEM_NAME } from '@/lib/branding-constants'
 import {
   Building2,
   Package,
@@ -52,11 +53,11 @@ async function getSystemBranding() {
   try {
     const content = await prisma.landing_page_content.findFirst({ where: { id: 'default' } })
     return {
-      companyName: (content as any)?.companyName || 'Sistema de Gestión de Inventario',
+      companyName: (content as any)?.companyName || DEFAULT_SYSTEM_NAME,
       logoUrl: (content as any)?.companyLogoLightUrl || null,
     }
   } catch {
-    return { companyName: 'Sistema de Gestión de Inventario', logoUrl: null }
+    return { companyName: DEFAULT_SYSTEM_NAME, logoUrl: null }
   }
 }
 

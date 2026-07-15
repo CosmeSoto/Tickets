@@ -27,6 +27,7 @@ import {
   Timer,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { invalidateLandingCache } from '@/hooks/use-landing-data'
 import { OAuthSettingsTab } from '@/components/settings/oauth-settings-tab'
 import { SLAPoliciesTab } from '@/components/settings/sla-policies-tab'
 
@@ -150,6 +151,7 @@ function SettingsPage() {
           title: 'Éxito',
           description: 'Configuración guardada correctamente',
         })
+        invalidateLandingCache()
         await loadSettings()
         window.dispatchEvent(new CustomEvent('settings-updated'))
       } else {
@@ -352,7 +354,7 @@ function SettingsPage() {
                     onChange={e =>
                       isSuperAdmin && setSettings({ ...settings, systemName: e.target.value })
                     }
-                    placeholder='Sistema de Tickets'
+                    placeholder='Gestión Operaciones'
                     disabled={!isSuperAdmin}
                   />
                   {!isSuperAdmin && (
@@ -384,7 +386,7 @@ function SettingsPage() {
                   onChange={e =>
                     isSuperAdmin && setSettings({ ...settings, systemDescription: e.target.value })
                   }
-                  placeholder='Gestión Integral de Operaciones'
+                  placeholder='Soporte profesional para toda la organización'
                   rows={3}
                   disabled={!isSuperAdmin}
                 />

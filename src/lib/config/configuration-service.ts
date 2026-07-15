@@ -5,6 +5,7 @@
  * validation, and type safety
  */
 
+import { DEFAULT_SYSTEM_NAME } from '@/lib/branding-constants';
 import { z } from 'zod';
 import { logger } from '@/lib/logging';
 
@@ -62,7 +63,7 @@ const EmailConfigSchema = z.object({
     }).optional(),
   }).optional(),
   from: z.object({
-    name: z.string().default('Sistema de Tickets'),
+    name: z.string().default(DEFAULT_SYSTEM_NAME),
     email: z.string().email('Invalid from email').optional(),
   }),
   templates: z.object({
@@ -141,9 +142,9 @@ const MonitoringConfigSchema = z.object({
 
 // Application configuration schema
 const AppConfigSchema = z.object({
-  name: z.string().optional().default('Sistema de Tickets'),
+  name: z.string().optional().default(DEFAULT_SYSTEM_NAME),
   version: z.string().optional().default('1.0.0'),
-  description: z.string().optional().default('Sistema de gestión de tickets de soporte'),
+  description: z.string().optional().default('Sistema de gestión multi-área'),
   url: z.string().url('Invalid application URL').optional(),
   timezone: z.string().optional().default('America/Guayaquil'),
   locale: z.string().optional().default('es-EC'),

@@ -1,3 +1,4 @@
+import { getSystemBranding } from '@/lib/branding'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -128,6 +129,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     })
 
     // Notificar al receptor (quien devuelve) que se generó el acta
+    const { systemName } = await getSystemBranding()
+
     const equipmentLabel = `${assignment.equipment.code} — ${assignment.equipment.brand} ${assignment.equipment.model}`
     await notifyUser(
       assignment.receiver.id,
@@ -143,7 +146,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             assignment.receiver.name,
             equipmentLabel,
             (returnAct as any).folio,
-            session.user.name || session.user.email || 'Administrador'
+            session.user.name || session.user.email || 'Administrador',
+            systemName
           ),
         },
       }
@@ -160,7 +164,8 @@ function buildReturnActEmail(
   receiverName: string,
   equipmentLabel: string,
   folio: string,
-  adminName: string
+  adminName: string,
+  systemName: string
 ): string {
   return `<!DOCTYPE html><html><head><meta charset="UTF-8">
 <style>body{font-family:Arial,sans-serif;line-height:1.6;color:#333}.container{max-width:600px;margin:0 auto;padding:20px}.header{background:#7C3AED;color:white;padding:20px;border-radius:5px 5px 0 0}.content{background:#f9fafb;padding:20px;border:1px solid #e5e7eb}.info-box{background:white;padding:15px;margin:15px 0;border-left:4px solid #7C3AED}.footer{text-align:center;margin-top:20px;color:#6b7280;font-size:12px}</style>
@@ -170,6 +175,6 @@ function buildReturnActEmail(
 <p>Se ha generado un acta de devolución para el equipo que tienes asignado.</p>
 <div class="info-box"><p><strong>Equipo:</strong> ${equipmentLabel}</p><p><strong>Folio:</strong> ${folio}</p><p><strong>Generado por:</strong> ${adminName}</p></div>
 <p>Ingresa al sistema para revisar y firmar el acta de devolución.</p></div>
-<div class="footer"><p>Mensaje automático del Sistema de Gestión de Inventario</p></div>
+<div class="footer"><p>Mensaje automático del ${systemName}</p></div>
 </div></body></html>`
 }
