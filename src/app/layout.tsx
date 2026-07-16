@@ -11,11 +11,7 @@ import { ThemeScript } from '@/components/theme-script'
 import { SessionTimeoutMonitor } from '@/components/auth/session-timeout-monitor'
 import { GlobalFavicon } from '@/components/common/global-favicon'
 import { DynamicPageTitle } from '@/components/common/dynamic-page-title'
-import {
-  DEFAULT_PAGE_TITLE,
-  getSystemBranding,
-} from '@/lib/branding'
-import prisma from '@/lib/prisma'
+import { DEFAULT_PAGE_TITLE, getSystemBranding } from '@/lib/branding'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -34,14 +30,9 @@ const DEFAULT_DESCRIPTION =
 export async function generateMetadata(): Promise<Metadata> {
   try {
     const branding = await getSystemBranding()
-    const landing = await prisma.landing_page_content.findFirst({
-      where: { id: 'default' },
-      select: { metaDescription: true },
-    })
-
     return {
       title: branding.pageTitle,
-      description: landing?.metaDescription || DEFAULT_DESCRIPTION,
+      description: branding.metaDescription,
     }
   } catch {
     return {

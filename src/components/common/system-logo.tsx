@@ -62,14 +62,24 @@ export function SystemLogo({ className = '', showText = true, size = 'md' }: Sys
   // En modo claro usar logo claro (versión oscura/color), con fallback al oscuro
   const logoUrl = isDark ? darkUrl || lightUrl : lightUrl || darkUrl
 
-  const sizeClasses = { sm: 'h-8', md: 'h-10', lg: 'h-12', xl: 'h-16' }
-  const textSizes = { sm: 'text-base', md: 'text-lg', lg: 'text-xl', xl: 'text-2xl' }
+  const sizeClasses = {
+    sm: 'h-8',
+    md: 'h-10',
+    lg: 'h-12 sm:h-14 lg:h-16',
+    xl: 'h-16 sm:h-18 lg:h-20',
+  }
+  const textSizes = {
+    sm: 'text-base',
+    md: 'text-lg',
+    lg: 'text-xl sm:text-2xl',
+    xl: 'text-2xl sm:text-3xl',
+  }
   // max-w proporcional: permite logos anchos sin que se desborden
   const maxWClasses = {
     sm: 'max-w-[160px]',
     md: 'max-w-[200px]',
-    lg: 'max-w-[240px]',
-    xl: 'max-w-[280px]',
+    lg: 'max-w-[240px] sm:max-w-[280px] lg:max-w-[320px]',
+    xl: 'max-w-[280px] sm:max-w-[340px] lg:max-w-[400px]',
   }
 
   if (loading) {
