@@ -4,9 +4,9 @@ import { useEffect } from 'react'
 import { useLandingData } from '@/hooks/use-landing-data'
 
 /**
- * Componente que actualiza el favicon dinámicamente desde la configuración del sistema.
- * Usa el hook compartido useLandingData para evitar requests duplicados.
- * Manipula solo los atributos href de links existentes o crea nuevos de forma segura.
+ * Actualiza el favicon desde la configuración del sistema.
+ * Solo modifica href de links existentes o crea uno si no hay;
+ * nunca elimina nodos del <head> (rompe el head manager de Next.js).
  */
 export function GlobalFavicon() {
   const { data, loading } = useLandingData()
@@ -16,28 +16,23 @@ export function GlobalFavicon() {
 
     const url = data.faviconUrl
 
-    // Actualizar o crear link[rel="icon"]
-    let iconLink = document.querySelector('link[rel="icon"]') as HTMLLinkElement | null
-    if (iconLink) {
-      iconLink.href = url
-    } else {
-      iconLink = document.createElement('link')
-      iconLink.rel = 'icon'
-      iconLink.href = url
-      iconLink.type = 'image/x-icon'
-      document.head.appendChild(iconLink)
+    const upsert = (rel: string, type?: string) => {
+      let link = document.querySelector(`link[rel="${rel}"]`) as HTMLLinkElement | null
+      if (link) {
+        if (link.getAttribute('href') !== url) {
+          link.setAttribute('href', url)
+        }
+        return
+      }
+      link = document.createElement('link')
+      link.rel = rel
+      link.href = url
+      if (type) link.type = type
+      document.head.appendChild(link)
     }
 
-    // Actualizar o crear link[rel="apple-touch-icon"]
-    let appleLink = document.querySelector('link[rel="apple-touch-icon"]') as HTMLLinkElement | null
-    if (appleLink) {
-      appleLink.href = url
-    } else {
-      appleLink = document.createElement('link')
-      appleLink.rel = 'apple-touch-icon'
-      appleLink.href = url
-      document.head.appendChild(appleLink)
-    }
+    upsert('icon', 'image/x-icon')
+    upsert('apple-touch-icon')
   }, [data.faviconUrl, loading])
 
   return null

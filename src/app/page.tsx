@@ -7,7 +7,6 @@ import Link from 'next/link'
 import { Loader2 } from 'lucide-react'
 import * as Icons from 'lucide-react'
 import { SystemLogo } from '@/components/common/system-logo'
-import { DynamicFavicon } from '@/components/common/dynamic-favicon'
 import { Button } from '@/components/ui/button'
 import { ForSaleSection } from '@/components/landing/ForSaleSection'
 import { PublicEquipmentItem } from '@/components/inventory/public/PublicEquipmentCard'
@@ -159,7 +158,6 @@ const HomePageContent = React.memo(function HomePageContent() {
 
   return (
     <>
-      <DynamicFavicon faviconUrl={d.faviconUrl} />
       <div className='min-h-screen bg-background flex flex-col'>
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <header className='bg-card border-b border-border sticky top-0 z-40 shadow-sm'>
