@@ -1,9 +1,13 @@
 /**
  * Branding dinámico del sistema (solo servidor — usa Prisma).
+ *
+ * Caché en 2 capas:
+ * 1. Memoria del proceso (rápida, evita DB en cada generateMetadata)
+ * 2. Redis (compartida entre instancias, si está disponible)
  */
 
 import prisma from '@/lib/prisma'
-import { getCached, setCache } from '@/lib/server'
+import { getCached, setCache, deleteCache } from '@/lib/server'
 import {
   DEFAULT_SYSTEM_NAME,
   DEFAULT_HERO_TITLE,
@@ -17,7 +21,10 @@ export {
 } from '@/lib/branding-constants'
 
 const BRANDING_CACHE_KEY = 'system:branding'
-const BRANDING_CACHE_TTL = 60 // 60 segundos
+/** Redis TTL — branding cambia poco */
+const BRANDING_REDIS_TTL_SEC = 300
+/** Caché en memoria del proceso — evita golpear DB/Redis en cada navegación */
+const BRANDING_MEMORY_TTL_MS = 60_000
 
 export interface SystemBranding {
   systemName: string
@@ -30,61 +37,100 @@ export interface SystemBranding {
 const DEFAULT_DESCRIPTION =
   'Sistema profesional de gestión multi-área: tickets, inventario, rondas y más'
 
-/**
- * Lee el branding completo del sistema desde BD con caché de 60s.
- * Consolida en una sola query a landing_page_content (antes eran dos).
- * Preferencia: systemName (settings) → companyName (landing) → default.
- */
-export async function getSystemBranding(): Promise<SystemBranding> {
-  // 1. Intentar desde caché
-  const cached = await getCached<SystemBranding>(BRANDING_CACHE_KEY)
-  if (cached) return cached
+const DEFAULT_BRANDING: SystemBranding = {
+  systemName: DEFAULT_SYSTEM_NAME,
+  heroTitle: DEFAULT_HERO_TITLE,
+  companyName: DEFAULT_SYSTEM_NAME,
+  pageTitle: DEFAULT_PAGE_TITLE,
+  metaDescription: DEFAULT_DESCRIPTION,
+}
 
-  try {
-    // 2. Una sola query a landing_page_content con todos los campos necesarios
-    const [systemNameSetting, landing] = await Promise.all([
-      prisma.system_settings.findUnique({ where: { key: 'systemName' } }),
-      prisma.landing_page_content.findFirst({
-        where: { id: 'default' },
-        select: { companyName: true, heroTitle: true, metaDescription: true },
-      }),
-    ])
+type MemoryEntry = { data: SystemBranding; expiresAt: number }
+let memoryCache: MemoryEntry | null = null
+/** Evita thundering herd si varios generateMetadata coinciden en un miss */
+let inflight: Promise<SystemBranding> | null = null
 
-    const systemName =
-      systemNameSetting?.value?.trim() || landing?.companyName?.trim() || DEFAULT_SYSTEM_NAME
-
-    const heroTitle = landing?.heroTitle?.trim() || DEFAULT_HERO_TITLE
-    const companyName = landing?.companyName?.trim() || systemName
-    const pageTitle = `${systemName} - ${heroTitle}`
-    const metaDescription = landing?.metaDescription?.trim() || DEFAULT_DESCRIPTION
-
-    const result: SystemBranding = {
-      systemName,
-      heroTitle,
-      companyName,
-      pageTitle,
-      metaDescription,
-    }
-
-    // 3. Guardar en caché para los siguientes requests
-    await setCache(BRANDING_CACHE_KEY, result, BRANDING_CACHE_TTL)
-
-    return result
-  } catch {
-    return {
-      systemName: DEFAULT_SYSTEM_NAME,
-      heroTitle: DEFAULT_HERO_TITLE,
-      companyName: DEFAULT_SYSTEM_NAME,
-      pageTitle: DEFAULT_PAGE_TITLE,
-      metaDescription: DEFAULT_DESCRIPTION,
-    }
+function readMemory(): SystemBranding | null {
+  if (!memoryCache) return null
+  if (Date.now() >= memoryCache.expiresAt) {
+    memoryCache = null
+    return null
   }
+  return memoryCache.data
+}
+
+function writeMemory(data: SystemBranding) {
+  memoryCache = { data, expiresAt: Date.now() + BRANDING_MEMORY_TTL_MS }
 }
 
 /**
- * Invalida el caché de branding. Llamar cuando se actualicen los datos en admin.
+ * Lee el branding completo del sistema.
+ * Preferencia: systemName (settings) → companyName (landing) → default.
+ */
+export async function getSystemBranding(): Promise<SystemBranding> {
+  const fromMemory = readMemory()
+  if (fromMemory) return fromMemory
+
+  if (inflight) return inflight
+
+  inflight = (async () => {
+    try {
+      const fromRedis = await getCached<SystemBranding>(BRANDING_CACHE_KEY)
+      if (fromRedis) {
+        writeMemory(fromRedis)
+        return fromRedis
+      }
+
+      const [systemNameSetting, landing] = await Promise.all([
+        prisma.system_settings.findUnique({
+          where: { key: 'systemName' },
+          select: { value: true },
+        }),
+        // id es PK → findUnique (más barato que findFirst)
+        prisma.landing_page_content.findUnique({
+          where: { id: 'default' },
+          select: { companyName: true, heroTitle: true, metaDescription: true },
+        }),
+      ])
+
+      const systemName =
+        systemNameSetting?.value?.trim() || landing?.companyName?.trim() || DEFAULT_SYSTEM_NAME
+
+      const heroTitle = landing?.heroTitle?.trim() || DEFAULT_HERO_TITLE
+      const companyName = landing?.companyName?.trim() || systemName
+
+      const result: SystemBranding = {
+        systemName,
+        heroTitle,
+        companyName,
+        pageTitle: `${systemName} - ${heroTitle}`,
+        metaDescription: landing?.metaDescription?.trim() || DEFAULT_DESCRIPTION,
+      }
+
+      writeMemory(result)
+      await setCache(BRANDING_CACHE_KEY, result, BRANDING_REDIS_TTL_SEC)
+      return result
+    } catch {
+      writeMemory(DEFAULT_BRANDING)
+      return DEFAULT_BRANDING
+    } finally {
+      inflight = null
+    }
+  })()
+
+  return inflight
+}
+
+/**
+ * Invalida caché de branding (memoria + Redis).
+ * Llamar al guardar Configuración General o Página Pública.
  */
 export async function invalidateBrandingCache(): Promise<void> {
-  const { deleteCache } = await import('@/lib/server')
-  await deleteCache(BRANDING_CACHE_KEY)
+  memoryCache = null
+  inflight = null
+  try {
+    await deleteCache(BRANDING_CACHE_KEY)
+  } catch {
+    /* silencioso */
+  }
 }

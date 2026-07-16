@@ -367,11 +367,13 @@ export async function PUT(request: NextRequest) {
     // Invalidar caché de settings afectados
     try {
       const { invalidateSettings, invalidateCache } = await import('@/lib/api-cache')
+      const { invalidateBrandingCache } = await import('@/lib/branding')
       await Promise.all([
         invalidateCache('admin:settings'),
         invalidateCache('config:session-timeout'),
         invalidateCache('landing:page'),
         invalidateSettings(Object.keys(validatedData)),
+        invalidateBrandingCache(),
       ])
     } catch {
       /* Redis no disponible */

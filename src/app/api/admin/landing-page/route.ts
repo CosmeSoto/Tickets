@@ -243,7 +243,12 @@ export async function PUT(request: NextRequest) {
     // Invalidar caché de landing page
     try {
       const { invalidateCache } = await import('@/lib/api-cache')
-      await Promise.all([invalidateCache('landing:page'), invalidateCache('admin:settings')])
+      const { invalidateBrandingCache } = await import('@/lib/branding')
+      await Promise.all([
+        invalidateCache('landing:page'),
+        invalidateCache('admin:settings'),
+        invalidateBrandingCache(),
+      ])
     } catch {
       /* Redis no disponible */
     }
