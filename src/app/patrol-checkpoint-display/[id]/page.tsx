@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import prisma from '@/lib/prisma'
+import { checkPatrolFamilyOperate } from '@/lib/patrol/patrol-access'
 import PatrolCheckpointDisplayClient from './client'
 
 interface Props {
@@ -15,8 +16,8 @@ export default async function PatrolCheckpointDisplayPage({ params }: Props) {
     redirect('/login')
   }
 
-  const userRole = (session.user as any).role
-  if (userRole !== 'ADMIN' && userRole !== 'SUPER_ADMIN') {
+  const role = session.user.role
+  if (role !== 'ADMIN' && role !== 'TECHNICIAN') {
     redirect('/unauthorized')
   }
 
@@ -43,11 +44,26 @@ export default async function PatrolCheckpointDisplayPage({ params }: Props) {
     },
   })
 
+  if (!checkpoint) {
+    redirect('/unauthorized')
+  }
+
+  const isSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
+  const hasAccess = await checkPatrolFamilyOperate(
+    session.user.id,
+    checkpoint.familyId,
+    role,
+    isSuperAdmin
+  )
+  if (!hasAccess) {
+    redirect('/unauthorized')
+  }
+
   return (
     <PatrolCheckpointDisplayClient
       checkpoint={checkpoint}
       checkpointId={id}
-      qrWindowMinutes={checkpoint?.family?.patrolFamilyConfig?.qrWindowMinutes ?? 5}
+      qrWindowMinutes={checkpoint.family?.patrolFamilyConfig?.qrWindowMinutes ?? 5}
     />
   )
 }

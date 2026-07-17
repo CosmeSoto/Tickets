@@ -13,7 +13,12 @@ import { z } from 'zod'
 import prisma from '@/lib/prisma'
 import { PatrolQRService } from '@/lib/services/patrol-qr.service'
 import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
-import { checkPatrolFamilyAccess, checkPatrolFamilyOperate, canDeletePatrolResource } from '@/lib/patrol/patrol-access'
+import {
+  checkPatrolFamilyAccess,
+  checkPatrolFamilyOperate,
+  canDeletePatrolResource,
+  canSoftDeletePatrolResource,
+} from '@/lib/patrol/patrol-access'
 
 const SAFE_CHECKPOINT_SELECT = {
   id: true,
@@ -69,6 +74,17 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 
     if (!checkpoint)
       return NextResponse.json({ error: 'Checkpoint no encontrado' }, { status: 404 })
+
+    const isSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
+    const hasAccess = await checkPatrolFamilyAccess(
+      session.user.id,
+      checkpoint.familyId,
+      session.user.role,
+      isSuperAdmin
+    )
+    if (!hasAccess) {
+      return NextResponse.json({ error: 'No tienes acceso a esta área' }, { status: 403 })
+    }
 
     return NextResponse.json({ success: true, data: checkpoint })
   } catch (error) {
@@ -180,6 +196,7 @@ export async function DELETE(
     const { id } = await params
     const { searchParams } = new URL(request.url)
     const isPermanent = searchParams.get('permanent') === 'true'
+    const removeFromRoutes = searchParams.get('removeFromRoutes') === 'true'
     const isSuperAdmin = (session.user as any).isSuperAdmin === true
 
     const existing = await prisma.patrol_checkpoints.findUnique({
@@ -188,7 +205,7 @@ export async function DELETE(
     })
     if (!existing) return NextResponse.json({ error: 'Checkpoint no encontrado' }, { status: 404 })
 
-    // Si es hard delete, solo SuperAdmin puede hacerlo
+    // Hard delete: solo SuperAdmin
     if (isPermanent && !canDeletePatrolResource(session.user.role, isSuperAdmin)) {
       return NextResponse.json(
         { error: 'Solo el Super Administrador puede eliminar permanentemente checkpoints' },
@@ -196,8 +213,11 @@ export async function DELETE(
       )
     }
 
-    // Soft delete (desactivar): ADMIN y TECHNICIAN pueden hacerlo (con acceso a la familia)
+    // Soft delete (desactivar): solo ADMIN/TECH con acceso operational
     if (!isPermanent) {
+      if (!canSoftDeletePatrolResource(session.user.role)) {
+        return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+      }
       const hasAccess = await checkPatrolFamilyOperate(
         session.user.id,
         existing.familyId,
@@ -207,37 +227,25 @@ export async function DELETE(
       if (!hasAccess) {
         return NextResponse.json({ error: 'No tienes acceso a esta área' }, { status: 403 })
       }
-    }
 
-    if (isPermanent) {
-      // Verificar si el checkpoint está en alguna ruta
-      const routeCheckpointCount = await prisma.patrol_route_checkpoints.count({
-        where: { checkpointId: id },
+      // Ciclo: no desactivar si sigue en rutas activas
+      const activeRouteLinks = await prisma.patrol_route_checkpoints.findMany({
+        where: { checkpointId: id, route: { isActive: true } },
+        select: { route: { select: { name: true } } },
       })
-      if (routeCheckpointCount > 0) {
+      if (activeRouteLinks.length > 0) {
+        const routeNames = [...new Set(activeRouteLinks.map(l => l.route.name))]
         return NextResponse.json(
-          { error: 'No se puede eliminar el checkpoint porque está en uso en rutas' },
+          {
+            error: `No se puede desactivar: está en rutas activas (${routeNames.join(', ')}). Primero desactiva o edita esas rutas.`,
+            code: 'CHECKPOINT_IN_ACTIVE_ROUTES',
+            routes: routeNames,
+            routeCount: activeRouteLinks.length,
+          },
           { status: 409 }
         )
       }
 
-      // Hard delete: eliminar permanentemente de la BD
-      await prisma.patrol_checkpoints.delete({
-        where: { id },
-      })
-
-      await AuditServiceComplete.log({
-        action: 'PATROL_CHECKPOINT_PERMANENTLY_DELETED',
-        entityType: 'patrol',
-        entityId: id,
-        userId: session.user.id,
-        details: { name: existing.name, familyId: existing.familyId },
-        request,
-      })
-
-      return NextResponse.json({ success: true, message: 'Checkpoint eliminado permanentemente' })
-    } else {
-      // Soft delete — preserva historial de check-ins
       await prisma.patrol_checkpoints.update({
         where: { id },
         data: { isActive: false },
@@ -254,6 +262,90 @@ export async function DELETE(
 
       return NextResponse.json({ success: true, message: 'Checkpoint desactivado' })
     }
+
+    // Hard delete
+    const routeLinks = await prisma.patrol_route_checkpoints.findMany({
+      where: { checkpointId: id },
+      select: {
+        routeId: true,
+        route: { select: { id: true, name: true } },
+      },
+    })
+
+    if (routeLinks.length > 0 && !removeFromRoutes) {
+      const routeNames = [...new Set(routeLinks.map(l => l.route.name))]
+      return NextResponse.json(
+        {
+          error: `No se puede eliminar: está en rutas (${routeNames.join(', ')}). Primero quítalo de Rutas o desactiva esas rutas.`,
+          code: 'CHECKPOINT_IN_USE',
+          routes: routeNames,
+          routeCount: routeLinks.length,
+        },
+        { status: 409 }
+      )
+    }
+
+    const [checkInCount, incidentCount] = await Promise.all([
+      prisma.patrol_check_ins.count({ where: { checkpointId: id } }),
+      prisma.patrol_incidents.count({ where: { checkpointId: id } }),
+    ])
+    if (checkInCount > 0 || incidentCount > 0) {
+      return NextResponse.json(
+        {
+          error:
+            'No se puede eliminar permanentemente: tiene historial. Usa desactivar en su lugar.',
+          code: 'CHECKPOINT_HAS_HISTORY',
+          checkInCount,
+          incidentCount,
+        },
+        { status: 409 }
+      )
+    }
+
+    try {
+      await prisma.$transaction(async tx => {
+        if (routeLinks.length > 0) {
+          await tx.patrol_route_checkpoints.deleteMany({
+            where: { checkpointId: id },
+          })
+        }
+        await tx.patrol_checkpoints.delete({
+          where: { id },
+        })
+      })
+    } catch (err) {
+      console.error('[patrol/checkpoints/[id]] hard delete FK:', err)
+      return NextResponse.json(
+        {
+          error:
+            'No se pudo eliminar: el checkpoint tiene dependencias. Usa desactivar en su lugar.',
+          code: 'CHECKPOINT_HAS_DEPENDENCIES',
+        },
+        { status: 409 }
+      )
+    }
+
+    await AuditServiceComplete.log({
+      action: 'PATROL_CHECKPOINT_PERMANENTLY_DELETED',
+      entityType: 'patrol',
+      entityId: id,
+      userId: session.user.id,
+      details: {
+        name: existing.name,
+        familyId: existing.familyId,
+        removedFromRoutes: routeLinks.length > 0,
+        routes: routeLinks.map(l => l.route.name),
+      },
+      request,
+    })
+
+    return NextResponse.json({
+      success: true,
+      message:
+        routeLinks.length > 0
+          ? 'Checkpoint eliminado y quitado de las rutas'
+          : 'Checkpoint eliminado permanentemente',
+    })
   } catch (error) {
     console.error('[patrol/checkpoints/[id]] DELETE:', error)
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })

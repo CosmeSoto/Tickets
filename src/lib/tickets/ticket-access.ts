@@ -2,8 +2,8 @@
  * Control de acceso centralizado para operaciones sobre tickets por ID.
  *
  * Reglas de scope (ver family-scope.ts):
- * - Admin visibility: nativa + admin_family_assignments
- * - Admin operate: solo nativa
+ * - Admin cola soporte (read/write): solo nativa
+ * - Admin puede leer tickets que él solicitó (clientId) aunque sean a otra área
  * - Técnico cola sin asignar: solo nativa; asignado/colaborador/cliente: acceso directo
  */
 
@@ -117,6 +117,8 @@ async function canReadTicket(user: TicketAccessUser, ticket: TicketAccessRecord)
   }
 
   if (user.role === 'ADMIN') {
+    // Solicitante: puede ver sus tickets a otras áreas
+    if (ticket.clientId === user.id) return true
     return adminCanViewTicketFamily(user.id, ticket.familyId, user.isSuperAdmin === true)
   }
 

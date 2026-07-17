@@ -48,7 +48,7 @@ export default function TechnicianTicketsPage() {
     error: errorAssigned,
     reload: reloadAssigned,
   } = useModuleData<TicketType>({
-    endpoint: '/api/tickets',
+    endpoint: '/api/tickets?limit=500',
     initialLoad: true,
   })
 
@@ -59,7 +59,7 @@ export default function TechnicianTicketsPage() {
     error: errorCreated,
     reload: reloadCreated,
   } = useModuleData<TicketType>({
-    endpoint: '/api/tickets?viewMode=created',
+    endpoint: '/api/tickets?viewMode=created&limit=500',
     initialLoad: true,
   })
 

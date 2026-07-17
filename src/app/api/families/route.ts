@@ -24,6 +24,7 @@ export async function GET(request: NextRequest) {
 
     // ── asClient: cualquier rol actuando como cliente ───────────────────────
     if (asClient && session.user.role !== 'CLIENT') {
+      const isSuperAdmin = !!(session.user as any).isSuperAdmin
       const targetId = session.user.role === 'ADMIN' && forClientId ? forClientId : session.user.id
 
       const targetUser = await prisma.users.findUnique({
@@ -33,18 +34,50 @@ export async function GET(request: NextRequest) {
       const targetRole = forClientId ? (targetUser?.role ?? 'CLIENT') : session.user.role
       const userFamilyId = targetUser?.departments?.familyId ?? null
 
+      // Super Admin creando ticket (propio o para otro): todas las áreas con tickets
+      // habilitados. El scope consumer del target no aplica — puede enrutar a cualquier familia.
+      if (session.user.role === 'ADMIN' && isSuperAdmin) {
+        const families = (await (prisma.families.findMany as any)({
+          where: {
+            isActive: true,
+            ticketFamilyConfig: { ticketsEnabled: true },
+          },
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            color: true,
+            icon: true,
+            description: true,
+            isActive: true,
+            ticketFamilyConfig: { select: { ticketsEnabled: true, allowedFromFamilies: true } },
+          },
+          orderBy: { order: 'asc' },
+        })) as any[]
+
+        return NextResponse.json({
+          success: true,
+          data: families.map((f: any) => ({
+            ...f,
+            isOwnFamily: f.id === userFamilyId,
+            isRestricted: (f.ticketFamilyConfig?.allowedFromFamilies ?? []).length > 0,
+          })),
+        })
+      }
+
       const { getTicketConsumerFamilyIds } = await import('@/lib/auth/family-scope')
       const consumerIds = await getTicketConsumerFamilyIds(targetId, targetRole, false)
 
-      let allowedFamilyIds = new Set(consumerIds ?? [])
+      const allowedFamilyIds = new Set(consumerIds ?? [])
 
-      // Admin Normal con forClientId: intersectar con visibilidad del admin
-      if (forClientId && session.user.role === 'ADMIN' && !(session.user as any).isSuperAdmin) {
-        const { getTicketVisibilityFamilyIds } = await import('@/lib/auth/family-scope')
-        const adminVisibility = await getTicketVisibilityFamilyIds(session.user.id, 'ADMIN', false)
-        if (adminVisibility) {
-          for (const fId of allowedFamilyIds) {
-            if (!adminVisibility.includes(fId)) allowedFamilyIds.delete(fId)
+      // Admin Normal con forClientId: intersectar con familias donde el admin puede CREAR
+      // (consumer = nativa + asignadas), no con cola operativa
+      if (forClientId && session.user.role === 'ADMIN') {
+        const { getTicketConsumerFamilyIds } = await import('@/lib/auth/family-scope')
+        const adminConsumer = await getTicketConsumerFamilyIds(session.user.id, 'ADMIN', false)
+        if (adminConsumer) {
+          for (const fId of [...allowedFamilyIds]) {
+            if (!adminConsumer.includes(fId)) allowedFamilyIds.delete(fId)
           }
         }
       }
@@ -149,7 +182,7 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // ── Técnicos: todas las familias habilitadas para tickets ────────────────
+    // ── Técnicos (y otros no-ADMIN): familias consumer de tickets ────────────
     if (session.user.role !== 'ADMIN') {
       // Excepción: usuarios con newsEnabled y scope=all pueden ver todas las familias (para gestión de noticias)
       const scopeAll = searchParams.get('scope') === 'all'
@@ -164,6 +197,17 @@ export async function GET(request: NextRequest) {
         }
       }
 
+      const { getTicketConsumerFamilyIds } = await import('@/lib/auth/family-scope')
+      const consumerIds = await getTicketConsumerFamilyIds(
+        session.user.id,
+        session.user.role,
+        false
+      )
+
+      if (!consumerIds || consumerIds.length === 0) {
+        return NextResponse.json({ success: true, data: [] })
+      }
+
       const user = await prisma.users.findUnique({
         where: { id: session.user.id },
         select: { departments: { select: { familyId: true } } },
@@ -171,7 +215,11 @@ export async function GET(request: NextRequest) {
       const userFamilyId = user?.departments?.familyId ?? null
 
       const families = (await (prisma.families.findMany as any)({
-        where: { isActive: true, ticketFamilyConfig: { ticketsEnabled: true } },
+        where: {
+          id: { in: consumerIds },
+          isActive: true,
+          ticketFamilyConfig: { ticketsEnabled: true },
+        },
         select: {
           id: true,
           name: true,
@@ -185,16 +233,9 @@ export async function GET(request: NextRequest) {
         orderBy: { order: 'asc' },
       })) as any[]
 
-      const accessible = families.filter((f: any) => {
-        const allowed = f.ticketFamilyConfig?.allowedFromFamilies ?? []
-        if (allowed.length === 0) return true
-        if (!userFamilyId) return true
-        return allowed.includes(userFamilyId)
-      })
-
       return NextResponse.json({
         success: true,
-        data: accessible.map((f: any) => ({
+        data: families.map((f: any) => ({
           ...f,
           isOwnFamily: f.id === userFamilyId,
           isRestricted: (f.ticketFamilyConfig?.allowedFromFamilies ?? []).length > 0,
@@ -261,17 +302,30 @@ export async function GET(request: NextRequest) {
           if (nativeUser?.departments?.familyId) allowedIds.add(nativeUser.departments.familyId)
           families = families.filter(f => allowedIds.has(f.id))
         } else if (moduleFilter === 'patrols') {
-          const patrolAssigns = await prisma.patrol_family_assignments.findMany({
-            where: { userId, isActive: true },
-            select: { familyId: true },
-          })
-          const nativeUser = await prisma.users.findUnique({
-            where: { id: userId },
-            select: { departments: { select: { familyId: true } } },
-          })
-          const allowedIds = new Set(patrolAssigns.map(a => a.familyId))
-          if (nativeUser?.departments?.familyId) allowedIds.add(nativeUser.departments.familyId)
-          families = families.filter(f => allowedIds.has(f.id))
+          // scope=operational → solo nativa (crear/config); default = visibility (listas/reportes)
+          const operateOnly = searchParams.get('scope') === 'operational'
+          if (operateOnly) {
+            const { getPatrolOperationalFamilyIds } = await import('@/lib/auth/family-scope')
+            const operationalIds = await getPatrolOperationalFamilyIds(userId, 'ADMIN', false)
+            if (!operationalIds || operationalIds.length === 0) {
+              families = []
+            } else {
+              const allowedIds = new Set(operationalIds)
+              families = families.filter(f => allowedIds.has(f.id))
+            }
+          } else {
+            const patrolAssigns = await prisma.patrol_family_assignments.findMany({
+              where: { userId, isActive: true },
+              select: { familyId: true },
+            })
+            const nativeUser = await prisma.users.findUnique({
+              where: { id: userId },
+              select: { departments: { select: { familyId: true } } },
+            })
+            const allowedIds = new Set(patrolAssigns.map(a => a.familyId))
+            if (nativeUser?.departments?.familyId) allowedIds.add(nativeUser.departments.familyId)
+            families = families.filter(f => allowedIds.has(f.id))
+          }
         } else if (moduleFilter === 'tickets') {
           // Módulo de tickets: usar admin_family_assignments + nativa
           const { getAdminFamilyScope } = await import('@/lib/auth/admin-scope')

@@ -1,37 +1,41 @@
 /**
  * Category Selector Wrapper
- * 
+ *
  * Intelligently switches between enhanced CategorySelector and fallback
  * based on feature flags and browser capabilities
  */
 
-'use client';
+'use client'
 
-import React, { useRef } from 'react';
-import { CategorySelector } from './CategorySelector';
-import { CategorySelectorFallback } from './CategorySelectorFallback';
-import { useCategorySelectorFeatureFlags } from '../hooks/useFeatureFlags';
-import { useCategoriesQuery } from '../hooks/useCategoriesQuery';
-import { initializeCategorySelectorFlags } from '../config/feature-flags';
-import type { Category } from '../types';
+import React, { useRef } from 'react'
+import { CategorySelector } from './CategorySelector'
+import { CategorySelectorFallback } from './CategorySelectorFallback'
+import { useCategorySelectorFeatureFlags } from '../hooks/useFeatureFlags'
+import { useCategoriesQuery } from '../hooks/useCategoriesQuery'
+import { initializeCategorySelectorFlags } from '../config/feature-flags'
+import type { Category } from '../types'
+import { AlertCircle, Layers } from 'lucide-react'
 
 export interface CategorySelectorWrapperProps {
-  value?: string;
-  onChange: (categoryId: string) => void;
-  ticketTitle?: string;
-  ticketDescription?: string;
-  clientId?: string;
-  familyId?: string;
-  error?: string;
-  disabled?: boolean;
+  value?: string
+  onChange: (categoryId: string) => void
+  ticketTitle?: string
+  ticketDescription?: string
+  clientId?: string
+  familyId?: string
+  error?: string
+  disabled?: boolean
+  /** Si true, exige familyId antes de mostrar categorías */
+  requireFamily?: boolean
+}
+
+function resolveCategoryFamilyId(c: any): string | null {
+  return c.familyId ?? c.family?.id ?? c.departments?.familyId ?? c.departments?.family?.id ?? null
 }
 
 /**
- * Wrapper component that handles feature flag initialization and
- * switches between enhanced and fallback selectors.
- * 
- * Si se pasa familyId, filtra las categorías para mostrar solo las
- * que pertenecen a esa familia (a través de departments.familyId).
+ * Wrapper: feature flags + filtro por familia.
+ * Si se pasa familyId, muestra solo categorías de esa área.
  */
 export function CategorySelectorWrapper({
   value,
@@ -42,37 +46,50 @@ export function CategorySelectorWrapper({
   familyId,
   error,
   disabled = false,
+  requireFamily = false,
 }: CategorySelectorWrapperProps) {
-  const flagsInitialized = useRef(false);
+  const flagsInitialized = useRef(false)
   if (!flagsInitialized.current) {
-    initializeCategorySelectorFlags();
-    flagsInitialized.current = true;
+    initializeCategorySelectorFlags()
+    flagsInitialized.current = true
   }
-  const flags = useCategorySelectorFeatureFlags();
-  const { categories: allCategories, isLoading } = useCategoriesQuery();
+  const flags = useCategorySelectorFeatureFlags()
+  const { categories: allCategories, isLoading, error: queryError } = useCategoriesQuery()
 
-  // Filtrar por familia si se especifica
   const categories = React.useMemo(() => {
-    if (!familyId) return allCategories;
-    return allCategories.filter((c: any) => {
-      const catFamilyId = c.departments?.familyId ?? c.departments?.family?.id;
-      return catFamilyId === familyId;
-    });
-  }, [allCategories, familyId]);
+    if (!familyId) return allCategories
+    return allCategories.filter((c: any) => resolveCategoryFamilyId(c) === familyId)
+  }, [allCategories, familyId])
 
-  // Show loading state while categories load
+  if (requireFamily && !familyId) {
+    return (
+      <div className='flex items-start gap-2 rounded-lg border border-dashed p-4 text-sm text-muted-foreground'>
+        <Layers className='h-4 w-4 mt-0.5 shrink-0' />
+        <p>Selecciona primero el área de soporte para ver sus categorías.</p>
+      </div>
+    )
+  }
+
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
-          <p className="text-sm text-muted-foreground">Cargando categorías...</p>
+      <div className='flex items-center justify-center p-8'>
+        <div className='text-center'>
+          <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2'></div>
+          <p className='text-sm text-muted-foreground'>Cargando categorías...</p>
         </div>
       </div>
-    );
+    )
   }
 
-  // Use fallback if enhanced selector is disabled or browser doesn't support it
+  if (queryError) {
+    return (
+      <div className='flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive'>
+        <AlertCircle className='h-4 w-4 mt-0.5 shrink-0' />
+        <p>{queryError.message || 'Error al cargar categorías'}</p>
+      </div>
+    )
+  }
+
   if (flags.fallbackMode || !flags.useEnhancedSelector) {
     return (
       <CategorySelectorFallback
@@ -82,10 +99,9 @@ export function CategorySelectorWrapper({
         error={error}
         disabled={disabled}
       />
-    );
+    )
   }
 
-  // Use enhanced selector
   return (
     <CategorySelector
       value={value}
@@ -96,6 +112,11 @@ export function CategorySelectorWrapper({
       categories={categories}
       error={error}
       disabled={disabled}
+      emptyMessage={
+        familyId
+          ? 'No hay categorías activas para esta área de soporte.'
+          : 'No hay categorías disponibles.'
+      }
     />
-  );
+  )
 }

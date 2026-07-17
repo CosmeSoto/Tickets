@@ -7,7 +7,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { PatrolIncidentService } from '@/lib/services/patrol-incident.service'
-import { checkPatrolFamilyAccess, checkPatrolFamilyOperate } from '@/lib/patrol/patrol-access'
+import { checkPatrolFamilyAccess } from '@/lib/patrol/patrol-access'
 
 // Acceso al modelo patrol_incidents hasta regenerar el Prisma Client
 const db = prisma as any
@@ -36,9 +36,9 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
       return NextResponse.json({ error: 'Novedad no encontrada' }, { status: 404 })
     }
 
-    // Verificar acceso a la familia de la patrulla
+    // Supervisión de novedades: visibility (áreas asignadas a rondas)
     const sessionUser = session.user as any
-    const hasAccess = await checkPatrolFamilyOperate(
+    const hasAccess = await checkPatrolFamilyAccess(
       session.user.id,
       incident.patrol.familyId,
       session.user.role,

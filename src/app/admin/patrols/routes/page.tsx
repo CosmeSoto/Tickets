@@ -48,6 +48,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { useToast } from '@/hooks/use-toast'
+import { formatPatrolLifecycleConflict } from '@/lib/patrol/patrol-lifecycle-messages'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { DataTable } from '@/components/ui/data-table'
 import { ExportButton } from '@/components/common/export-button'
@@ -174,7 +175,9 @@ export default function RoutesPage() {
 
   const fetchFamilies = useCallback(async () => {
     try {
-      const res = await fetch('/api/families?includeInactive=false&module=patrols')
+      const res = await fetch(
+        '/api/families?includeInactive=false&module=patrols&scope=operational'
+      )
       const data = await res.json()
       if (data.success) setFamilies(data.data)
     } catch {
@@ -351,13 +354,22 @@ export default function RoutesPage() {
     try {
       const res = await fetch(`/api/patrols/routes/${id}`, { method: 'DELETE' })
       const data = await res.json()
+      if (res.status === 409) {
+        const conflict = formatPatrolLifecycleConflict(data, 'desactivar')
+        toast({
+          title: conflict.title,
+          description: conflict.description,
+          variant: 'destructive',
+        })
+        return
+      }
       if (!res.ok) throw new Error(data.error ?? 'Error al desactivar')
       toast({
         title: 'Ruta desactivada',
         description:
           data.cancelledPatrols > 0
-            ? `${data.cancelledPatrols} patrulla(s) cancelada(s)`
-            : undefined,
+            ? `${data.cancelledPatrols} patrulla(s) pendiente(s) cancelada(s). Ahora puedes desactivar checkpoints si aplica.`
+            : 'Puedes continuar el ciclo desactivando checkpoints si ya no se usan.',
       })
       reload()
     } catch (err) {
@@ -375,6 +387,15 @@ export default function RoutesPage() {
     try {
       const res = await fetch(`/api/patrols/routes/${id}?permanent=true`, { method: 'DELETE' })
       const data = await res.json()
+      if (res.status === 409) {
+        const conflict = formatPatrolLifecycleConflict(data, 'eliminar')
+        toast({
+          title: conflict.title,
+          description: conflict.description,
+          variant: 'destructive',
+        })
+        return
+      }
       if (!res.ok) throw new Error(data.error ?? 'Error al eliminar permanentemente')
       toast({ title: 'Ruta eliminada permanentemente' })
       reload()
@@ -757,8 +778,8 @@ export default function RoutesPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>¿Desactivar ruta?</AlertDialogTitle>
             <AlertDialogDescription>
-              Se cancelarán todas las patrullas PENDIENTES futuras de esta ruta y se notificará a
-              los guardias asignados.
+              Primero deben estar desactivadas sus programaciones (Programación). Luego podrás
+              desactivar checkpoints. Se cancelarán patrullas PENDIENTES futuras de esta ruta.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -782,8 +803,8 @@ export default function RoutesPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar ruta PERMANENTEMENTE?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción no se puede deshacer. La ruta se eliminará completamente de la base de
-              datos.
+              Solo si no tiene programaciones ni patrullas. Ciclo: Programaciones → Rutas →
+              Checkpoints. Si tiene historial, usa Desactivar.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

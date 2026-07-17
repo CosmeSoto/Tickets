@@ -34,10 +34,14 @@ export async function GET(request: NextRequest) {
 
     let familyScope: string = 'all'
     if (!currentUser?.isSuperAdmin) {
-      const { getAdminFamilyScope } = await import('@/lib/auth/admin-scope')
-      const scope = await getAdminFamilyScope(session.user.id, false)
-      if (scope.familyIds && scope.familyIds.length > 0) {
-        familyScope = scope.familyIds.join(',')
+      const { getTicketOperationalFamilyIds } = await import('@/lib/auth/family-scope')
+      const operationalIds = await getTicketOperationalFamilyIds(session.user.id, 'ADMIN', false)
+      if (operationalIds === undefined) {
+        familyScope = 'all'
+      } else if (operationalIds.length === 0) {
+        familyScope = '__NONE__'
+      } else {
+        familyScope = operationalIds.join(',')
       }
     }
 

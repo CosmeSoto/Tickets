@@ -780,7 +780,11 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
           where: { id: processedUpdates.categoryId },
           include: { departments: { select: { familyId: true } } },
         })
-        effectiveFamilyId = newCategory?.departments?.familyId ?? existingTicket.familyId ?? null
+        effectiveFamilyId =
+          newCategory?.familyId ??
+          newCategory?.departments?.familyId ??
+          existingTicket.familyId ??
+          null
       }
 
       const finalAssigneeId =

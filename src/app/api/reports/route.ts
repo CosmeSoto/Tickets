@@ -89,13 +89,15 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Admin Normal: aplicar scope de familias al reporte
+    // Admin Normal: reportes de tickets solo de familia nativa (cola que soporta)
     const isSuperAdmin = (session.user as any).isSuperAdmin === true
     if (!isSuperAdmin) {
-      const { getUserFamilyScope, buildFamilyFilter } = await import('@/lib/auth/admin-scope')
-      const scope = await getUserFamilyScope(session.user.id, 'ADMIN', false)
-      if (scope.familyIds && scope.familyIds.length > 0) {
-        filters.familyIds = scope.familyIds
+      const { getTicketOperationalFamilyIds } = await import('@/lib/auth/family-scope')
+      const operationalIds = await getTicketOperationalFamilyIds(session.user.id, 'ADMIN', false)
+      if (operationalIds && operationalIds.length > 0) {
+        filters.familyIds = operationalIds
+      } else if (operationalIds) {
+        filters.familyIds = ['__NONE__']
       }
     }
 
@@ -307,12 +309,14 @@ export async function POST(request: NextRequest) {
       reportFilters.assigneeId = session.user.id
     }
 
-    // Admin Normal: aplicar scope de familias al reporte
+    // Admin Normal: reportes de tickets solo de familia nativa
     if (session.user.role === 'ADMIN' && !(session.user as any).isSuperAdmin) {
-      const { getUserFamilyScope } = await import('@/lib/auth/admin-scope')
-      const scope = await getUserFamilyScope(session.user.id, 'ADMIN', false)
-      if (scope.familyIds && scope.familyIds.length > 0) {
-        reportFilters.familyIds = scope.familyIds
+      const { getTicketOperationalFamilyIds } = await import('@/lib/auth/family-scope')
+      const operationalIds = await getTicketOperationalFamilyIds(session.user.id, 'ADMIN', false)
+      if (operationalIds && operationalIds.length > 0) {
+        reportFilters.familyIds = operationalIds
+      } else if (operationalIds) {
+        reportFilters.familyIds = ['__NONE__']
       }
     }
 

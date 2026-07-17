@@ -38,6 +38,8 @@ export async function GET(request: NextRequest) {
     const level = searchParams.get('level')
     const parentId = searchParams.get('parentId')
     const familyId = searchParams.get('familyId')
+    const role = session.user.role
+    const isSuperAdmin = (session.user as any).isSuperAdmin === true
 
     // Construir filtros para Prisma
     const where: any = {}
@@ -54,27 +56,43 @@ export async function GET(request: NextRequest) {
       where.parentId = parentId
     }
 
-    // Filtrar por familia a través del departamento
+    // Filtrar por familia a través del departamento / category.familyId
     if (familyId) {
-      where.departments = { familyId }
+      // Admin/Tech/Client: pueden pedir categorías de familias donde CREAN tickets (consumer)
+      if (!isSuperAdmin && (role === 'ADMIN' || role === 'TECHNICIAN' || role === 'CLIENT')) {
+        const { getTicketConsumerFamilyIds } = await import('@/lib/auth/family-scope')
+        const consumerIds = await getTicketConsumerFamilyIds(session.user.id, role, false)
+        if (consumerIds && !consumerIds.includes(familyId)) {
+          return NextResponse.json(
+            { success: false, message: 'No tienes acceso a esta familia' },
+            { status: 403 }
+          )
+        }
+      }
+      where.OR = [{ familyId }, { departments: { familyId } }]
     }
 
-    // Para ADMIN no-superadmin: visibilidad en listados
-    // Para TECHNICIAN: consumer al crear tickets; operational con scope=operational
-    // Para CLIENT: consumer (nativa + client_family_assignments)
-    const role = session.user.role
-    const isSuperAdmin = (session.user as any).isSuperAdmin === true
+    // Sin familyId:
+    // - ADMIN manage: solo nativa (operational)
+    // - TECH/CLIENT: consumer (crear) o operational si scope=operational
     const scopeMode = searchParams.get('scope') === 'operational' ? 'operational' : 'consumer'
 
     if (!familyId) {
       if (role === 'ADMIN' && !isSuperAdmin) {
         try {
-          const { getTicketVisibilityFamilyIds } = await import('@/lib/auth/family-scope')
-          const { buildFamilyFilter } = await import('@/lib/auth/admin-scope')
-          const visibilityIds = await getTicketVisibilityFamilyIds(session.user.id, 'ADMIN', false)
-          const filter = buildFamilyFilter({ familyIds: visibilityIds })
-          if (filter.familyId) {
-            where.departments = { familyId: filter.familyId }
+          const { getTicketOperationalFamilyIds } = await import('@/lib/auth/family-scope')
+          const operationalIds = await getTicketOperationalFamilyIds(
+            session.user.id,
+            'ADMIN',
+            false
+          )
+          if (operationalIds && operationalIds.length > 0) {
+            where.OR = [
+              { familyId: { in: operationalIds } },
+              { departments: { familyId: { in: operationalIds } } },
+            ]
+          } else {
+            where.id = '__NONE__'
           }
         } catch {
           /* fallback */
@@ -88,17 +106,23 @@ export async function GET(request: NextRequest) {
           scopeMode
         )
         if (scopeIds && scopeIds.length > 0) {
-          where.departments = { familyId: { in: scopeIds } }
+          where.OR = [
+            { familyId: { in: scopeIds } },
+            { departments: { familyId: { in: scopeIds } } },
+          ]
         } else {
-          where.departments = { familyId: { in: [] } }
+          where.id = '__NONE__'
         }
       } else if (role === 'CLIENT') {
         const { getTicketConsumerFamilyIds } = await import('@/lib/auth/family-scope')
         const consumerIds = await getTicketConsumerFamilyIds(session.user.id, 'CLIENT', false)
         if (consumerIds && consumerIds.length > 0) {
-          where.departments = { familyId: { in: consumerIds } }
+          where.OR = [
+            { familyId: { in: consumerIds } },
+            { departments: { familyId: { in: consumerIds } } },
+          ]
         } else {
-          where.departments = { familyId: { in: [] } }
+          where.id = '__NONE__'
         }
       }
     }

@@ -58,7 +58,7 @@ export default function AdminTicketsPage() {
     error: errorAll,
     reload: reloadAll,
   } = useModuleData<TicketType>({
-    endpoint: '/api/tickets',
+    endpoint: '/api/tickets?limit=500',
     initialLoad: true,
   })
 
@@ -69,7 +69,7 @@ export default function AdminTicketsPage() {
     error: errorCreated,
     reload: reloadCreated,
   } = useModuleData<TicketType>({
-    endpoint: '/api/tickets?viewMode=created',
+    endpoint: '/api/tickets?viewMode=created&limit=500',
     initialLoad: true,
   })
 
@@ -312,19 +312,12 @@ export default function AdminTicketsPage() {
               title: hasActiveFilters ? 'No se encontraron tickets' : 'No hay tickets',
               description: hasActiveFilters
                 ? 'Intenta ajustar los filtros de búsqueda'
-                : 'No se encontraron tickets en el sistema',
+                : 'No se encontraron tickets en el sistema. Usa «Nuevo Ticket» en la barra superior para crear uno.',
               action: hasActiveFilters ? (
                 <Button variant='outline' onClick={clearFilters}>
                   Limpiar filtros
                 </Button>
-              ) : (
-                <Button asChild>
-                  <Link href='/admin/tickets/create'>
-                    <Plus className='h-4 w-4 mr-2' />
-                    Crear primer ticket
-                  </Link>
-                </Button>
-              ),
+              ) : undefined,
             }}
           />
         </TabsContent>
@@ -430,19 +423,12 @@ export default function AdminTicketsPage() {
               title: hasActiveFilters ? 'No se encontraron solicitudes' : 'No tienes solicitudes',
               description: hasActiveFilters
                 ? 'Intenta ajustar los filtros de búsqueda'
-                : 'Aún no has creado ninguna solicitud de soporte',
+                : 'Aún no has creado ninguna solicitud. Usa «Nuevo Ticket» en la barra superior.',
               action: hasActiveFilters ? (
                 <Button variant='outline' onClick={clearFilters}>
                   Limpiar filtros
                 </Button>
-              ) : (
-                <Button asChild>
-                  <Link href='/admin/tickets/create'>
-                    <Plus className='h-4 w-4 mr-2' />
-                    Nueva Solicitud
-                  </Link>
-                </Button>
-              ),
+              ) : undefined,
             }}
           />
         </TabsContent>

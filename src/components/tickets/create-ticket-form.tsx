@@ -52,6 +52,7 @@ import { CategorySelectorWrapper } from '@/features/category-selection'
 import { FilePreviewList } from '@/components/tickets/file-preview-list'
 import { FamilyCombobox } from '@/components/ui/family-combobox'
 import { FileInputWithCamera } from '@/components/common/file-input-with-camera'
+import { Badge } from '@/components/ui/badge'
 
 interface FamilyOption {
   id: string
@@ -166,9 +167,13 @@ export function CreateTicketForm({
             isUserFamily: f.isOwnFamily ?? false,
           }))
           setAvailableFamilies(families)
-          // Pre-seleccionar la familia nativa si existe
-          const native = families.find(f => f.isUserFamily)
-          if (native) setSelectedFamilyId(native.id)
+          // Pre-seleccionar: única área disponible, o la familia nativa del usuario
+          if (families.length === 1) {
+            setSelectedFamilyId(families[0].id)
+          } else {
+            const native = families.find(f => f.isUserFamily)
+            if (native) setSelectedFamilyId(native.id)
+          }
         }
       })
       .catch(() => {})
@@ -240,11 +245,20 @@ export function CreateTicketForm({
   }
 
   const onSubmit = async (data: CreateTicketData) => {
+    if (!selectedFamilyId) {
+      toast({
+        title: 'Área requerida',
+        description: 'Selecciona el área de soporte antes de crear el ticket.',
+        variant: 'destructive',
+      })
+      return
+    }
+
     setIsSubmitting(true)
     try {
       const body: Record<string, unknown> = {
         ...data,
-        ...(selectedFamilyId ? { familyId: selectedFamilyId } : {}),
+        familyId: selectedFamilyId,
         ...(clientId ? { clientId } : {}),
         ...(extraData ?? {}),
       }
@@ -444,23 +458,34 @@ export function CreateTicketForm({
               <div className='space-y-2'>
                 <Label className='flex items-center gap-1.5 text-sm font-semibold'>
                   <Users className='h-4 w-4' />
-                  Área de soporte
-                  <span className='text-muted-foreground font-normal text-xs'>(opcional)</span>
+                  Área de soporte <span className='text-destructive'>*</span>
                 </Label>
-                {/* <p className='text-xs text-muted-foreground'>
-                  Selecciona el equipo que debe atender tu solicitud.
-                </p> */}
-                <FamilyCombobox
-                  families={availableFamilies}
-                  value={selectedFamilyId ?? ''}
-                  onValueChange={v => setSelectedFamilyId(v || null)}
-                  allowNull
-                  nullLabel='Sin preferencia'
-                  nullDescription='El sistema asignará automáticamente'
-                  allowClear
-                  popoverWidth='360px'
-                />
+                {availableFamilies.length === 1 ? (
+                  <div className='flex items-center gap-2 p-3 rounded-lg border bg-muted/30'>
+                    {availableFamilies[0].color && (
+                      <span
+                        className='w-3 h-3 rounded-full flex-shrink-0'
+                        style={{ backgroundColor: availableFamilies[0].color }}
+                      />
+                    )}
+                    <span className='text-sm font-medium'>{availableFamilies[0].name}</span>
+                    <Badge variant='outline' className='text-xs font-mono ml-auto'>
+                      {availableFamilies[0].code}
+                    </Badge>
+                  </div>
+                ) : (
+                  <FamilyCombobox
+                    families={availableFamilies}
+                    value={selectedFamilyId ?? ''}
+                    onValueChange={v => setSelectedFamilyId(v || null)}
+                    allowNull={false}
+                    allowClear={false}
+                    placeholder='Selecciona el área de soporte...'
+                    popoverWidth='360px'
+                  />
+                )}
                 {selectedFamilyId &&
+                  availableFamilies.length > 1 &&
                   (() => {
                     const f = availableFamilies.find(x => x.id === selectedFamilyId)
                     return f ? (
@@ -473,6 +498,11 @@ export function CreateTicketForm({
                       </p>
                     ) : null
                   })()}
+                {availableFamilies.length > 1 && !selectedFamilyId && (
+                  <p className='text-xs text-amber-600 dark:text-amber-400'>
+                    Selecciona el área para cargar las categorías correctas.
+                  </p>
+                )}
               </div>
             )}
 
@@ -482,10 +512,6 @@ export function CreateTicketForm({
                 <Tag className='h-4 w-4' />
                 Categoría <span className='text-destructive'>*</span>
               </Label>
-              {/* <p className='text-xs text-muted-foreground'>
-                Selecciona la categoría que mejor describa tu problema. Usa la búsqueda (Ctrl+K)
-                para encontrarla rápidamente.
-              </p> */}
               <div className='border rounded-lg p-3 bg-muted/30'>
                 <CategorySelectorWrapper
                   value={selectedCategoryId}
@@ -494,6 +520,7 @@ export function CreateTicketForm({
                   ticketDescription={ticketDescription || ''}
                   clientId={clientId || session?.user?.id || ''}
                   familyId={selectedFamilyId ?? undefined}
+                  requireFamily
                   error={errors.categoryId?.message}
                 />
               </div>

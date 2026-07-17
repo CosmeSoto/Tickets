@@ -14,7 +14,7 @@ import { PatrolQRService } from '@/lib/services/patrol-qr.service'
 import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
 import { randomUUID } from 'crypto'
 import { checkPatrolModuleAccess } from '@/lib/patrol/patrol-helpers'
-import { checkPatrolFamilyOperate } from '@/lib/patrol/patrol-access'
+import { checkPatrolFamilyOperate, resolvePatrolVisibilityFilter } from '@/lib/patrol/patrol-access'
 
 // Campos seguros para devolver en respuestas (excluye qrSecret y qrStaticToken)
 const SAFE_CHECKPOINT_SELECT = {
@@ -62,30 +62,26 @@ export async function GET(request: NextRequest) {
     const includeInactive = searchParams.get('includeInactive') === 'true'
     const sortParam = searchParams.get('sort') // e.g. "name:asc", "createdAt:desc"
 
+    const isSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
+    const scope = await resolvePatrolVisibilityFilter(
+      session.user.id,
+      session.user.role,
+      isSuperAdmin,
+      familyId
+    )
+    if (!scope.ok) {
+      return NextResponse.json({ error: scope.error }, { status: scope.status })
+    }
+
     const where = {
-      ...(familyId ? { familyId } : {}),
+      ...scope.familyWhere,
       ...(includeInactive ? {} : { isActive: true }),
       ...(search ? { name: { contains: search, mode: 'insensitive' as const } } : {}),
     }
 
-    // Admin Normal: filtrar por familias de patrullas asignadas
-    if (!familyId && session.user.role === 'ADMIN' && !(session.user as any).isSuperAdmin) {
-      const { getPatrolAccessibleFamilyIds } = await import('@/lib/patrol/patrol-access')
-      const accessibleFamilyIds = await getPatrolAccessibleFamilyIds(
-        session.user.id,
-        session.user.role,
-        false
-      )
-      if (accessibleFamilyIds !== undefined && accessibleFamilyIds.length > 0) {
-        ;(where as any).familyId = { in: accessibleFamilyIds }
-      } else if (accessibleFamilyIds !== undefined && accessibleFamilyIds.length === 0) {
-        ;(where as any).familyId = '__NONE__'
-      }
-    }
-
     // Determine sort order: use explicit sort param if provided, otherwise default to createdAt desc
     const ALLOWED_SORT_FIELDS = ['name', 'createdAt', 'updatedAt', 'location'] as const
-    type SortField = typeof ALLOWED_SORT_FIELDS[number]
+    type SortField = (typeof ALLOWED_SORT_FIELDS)[number]
     let orderBy: Record<string, 'asc' | 'desc'> = { createdAt: 'desc' }
 
     if (sortParam) {

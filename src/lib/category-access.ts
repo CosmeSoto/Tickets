@@ -1,54 +1,46 @@
-import prisma from '@/lib/prisma'
-
 /**
  * Verifica si un usuario ADMIN puede gestionar (crear/editar/eliminar)
  * una categoría que pertenece a una familia específica.
  *
  * Jerarquía:
  *   SuperAdmin  → puede gestionar cualquier categoría
- *   Admin normal → puede gestionar categorías de sus familias asignadas
- *                  (si no tiene asignaciones explícitas → acceso total, compatibilidad)
- *   Otros roles → no pueden gestionar categorías (solo ADMIN llega aquí)
- *
- * @param userId       ID del admin que intenta la acción
- * @param isSuperAdmin Si el usuario es superadmin
- * @param categoryFamilyId  ID de la familia de la categoría (via departments.familyId)
+ *   Admin normal → solo categorías de su familia NATIVA (operar/soportar)
+ *   Otros roles → no pueden gestionar categorías
  */
+
+import prisma from '@/lib/prisma'
+
 export async function canManageCategory(
   userId: string,
   isSuperAdmin: boolean,
   categoryFamilyId: string | null | undefined
 ): Promise<boolean> {
-  // SuperAdmin: acceso total
   if (isSuperAdmin) return true
 
-  // Sin familia asignada a la categoría → cualquier admin puede
-  if (!categoryFamilyId) return true
+  // Sin familia en la categoría → denegar (evitar acceso accidental)
+  if (!categoryFamilyId) return false
 
   try {
-    const { getAdminFamilyScope } = await import('@/lib/auth/admin-scope')
-    const scope = await getAdminFamilyScope(userId, false)
-    // Sin asignaciones → acceso total (compatibilidad)
-    if (!scope.familyIds || scope.familyIds.length === 0) return true
-    return scope.familyIds.includes(categoryFamilyId)
+    const { adminCanOperateTicketFamily } = await import('@/lib/auth/family-scope')
+    return adminCanOperateTicketFamily(userId, categoryFamilyId, false)
   } catch {
-    return true
+    return false
   }
 }
 
 /**
- * Obtiene la familyId de una categoría a través de su departamento.
- * Retorna null si la categoría no tiene departamento o el departamento no tiene familia.
+ * Obtiene la familyId de una categoría (category.familyId o departments.familyId).
  */
 export async function getCategoryFamilyId(categoryId: string): Promise<string | null> {
   try {
     const category = await prisma.categories.findUnique({
       where: { id: categoryId },
       select: {
+        familyId: true,
         departments: { select: { familyId: true } },
       },
     })
-    return category?.departments?.familyId ?? null
+    return category?.familyId ?? category?.departments?.familyId ?? null
   } catch {
     return null
   }

@@ -102,6 +102,8 @@ export default function CreateTicketPage() {
     Array<{ id: string; name: string; code: string; color?: string | null }>
   >([])
   const [selectedFamilyId, setSelectedFamilyId] = useState<string>('')
+  const [loadingFamilies, setLoadingFamilies] = useState(false)
+  const isSuperAdmin = !!(session?.user as any)?.isSuperAdmin
 
   // Estados para archivos
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
@@ -218,6 +220,15 @@ export default function CreateTicketPage() {
   }
 
   const onSubmit = async (data: CreateTicketData) => {
+    if (!selectedFamilyId) {
+      toast({
+        title: 'Área requerida',
+        description: 'Selecciona el área de soporte antes de crear el ticket.',
+        variant: 'destructive',
+      })
+      return
+    }
+
     setIsSubmitting(true)
 
     try {
@@ -228,7 +239,7 @@ export default function CreateTicketPage() {
         },
         body: JSON.stringify({
           ...data,
-          ...(selectedFamilyId ? { familyId: selectedFamilyId } : {}),
+          familyId: selectedFamilyId,
         }),
       })
 
@@ -279,6 +290,13 @@ export default function CreateTicketPage() {
     if (clientId !== session?.user?.id) {
       const client = clients.find(c => c.id === clientId) as unknown as User | undefined
       setSelectedClient(client || null)
+    } else if (session?.user) {
+      setSelectedClient({
+        id: session.user.id,
+        name: session.user.name || 'Administrador',
+        email: session.user.email || '',
+        role: session.user.role,
+      })
     }
     setValue('clientId', clientId)
     // Limpiar familia y categoría al cambiar cliente
@@ -286,24 +304,36 @@ export default function CreateTicketPage() {
     setValue('categoryId', '')
     setClientFamilies([])
 
-    // Cargar familias del cliente seleccionado
+    // Cargar familias del cliente / scope del admin
     if (clientId) {
+      setLoadingFamilies(true)
       try {
-        // Si es el admin mismo, usar asClient=true sin forClientId
-        // Si es otro usuario, usar forClientId
         const isOwnTicket = clientId === session?.user?.id
-        const url = isOwnTicket
-          ? '/api/families?asClient=true'
-          : `/api/families?asClient=true&forClientId=${clientId}`
+        // Super Admin: todas las áreas con tickets (igual que en edición)
+        // Admin normal: consumer del cliente (nativa + asignadas), intersectado en API
+        let url: string
+        if (isSuperAdmin) {
+          url = '/api/families?asClient=true'
+          if (!isOwnTicket) url += `&forClientId=${clientId}`
+        } else {
+          url = isOwnTicket
+            ? '/api/families?asClient=true'
+            : `/api/families?asClient=true&forClientId=${clientId}`
+        }
         const res = await fetch(url)
         if (res.ok) {
           const json = await res.json()
           const families = json.data ?? []
           setClientFamilies(families)
-          if (families.length === 1) setSelectedFamilyId(families[0].id)
+          // Auto-seleccionar solo si hay una única área (admin de una sola familia)
+          if (families.length === 1) {
+            setSelectedFamilyId(families[0].id)
+          }
         }
       } catch {
         /* silencioso */
+      } finally {
+        setLoadingFamilies(false)
       }
     }
   }
@@ -455,11 +485,19 @@ export default function CreateTicketPage() {
                             <Layers className='h-4 w-4' />
                             Área de soporte *
                           </Label>
-                          {clientFamilies.length === 0 ? (
-                            <p className='text-xs text-muted-foreground italic'>
-                              Cargando áreas disponibles para este cliente...
+                          {loadingFamilies ? (
+                            <p className='text-xs text-muted-foreground italic flex items-center gap-2'>
+                              <Loader2 className='h-3.5 w-3.5 animate-spin' />
+                              Cargando áreas disponibles...
                             </p>
-                          ) : clientFamilies.length === 1 ? (
+                          ) : clientFamilies.length === 0 ? (
+                            <Alert>
+                              <AlertCircle className='h-4 w-4' />
+                              <AlertDescription className='text-sm'>
+                                No hay áreas de soporte disponibles para este usuario.
+                              </AlertDescription>
+                            </Alert>
+                          ) : clientFamilies.length === 1 && !isSuperAdmin ? (
                             <div className='flex items-center gap-2 p-3 rounded-lg border bg-muted/30'>
                               {clientFamilies[0].color && (
                                 <span
@@ -502,6 +540,11 @@ export default function CreateTicketPage() {
                                 ))}
                               </SelectContent>
                             </Select>
+                          )}
+                          {clientFamilies.length > 1 && !selectedFamilyId && (
+                            <p className='text-xs text-amber-600 dark:text-amber-400'>
+                              Selecciona el área para cargar las categorías correctas.
+                            </p>
                           )}
                         </div>
                       )}
@@ -632,6 +675,7 @@ export default function CreateTicketPage() {
                             ticketDescription={ticketDescription || ''}
                             clientId={clientId || ''}
                             familyId={selectedFamilyId || undefined}
+                            requireFamily
                             error={errors.categoryId?.message}
                           />
                         </div>

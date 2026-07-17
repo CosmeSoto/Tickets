@@ -21,6 +21,7 @@ import {
   assertNoAgentScheduleOverlap,
   ScheduleValidationError,
 } from '@/lib/patrol/schedule-validation'
+import { resolvePatrolVisibilityFilter } from '@/lib/patrol/patrol-access'
 
 const createScheduleSchema = z.object({
   familyId: z.string().uuid(),
@@ -55,26 +56,22 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') ?? '25')))
     const includeInactive = searchParams.get('includeInactive') === 'true'
 
+    const isSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
+    const scope = await resolvePatrolVisibilityFilter(
+      session.user.id,
+      session.user.role,
+      isSuperAdmin,
+      familyId
+    )
+    if (!scope.ok) {
+      return NextResponse.json({ error: scope.error }, { status: scope.status })
+    }
+
     const where = {
-      ...(familyId ? { familyId } : {}),
+      ...scope.familyWhere,
       ...(agentId ? { agentId } : {}),
       ...(routeId ? { routeId } : {}),
       ...(includeInactive ? {} : { isActive: true }),
-    }
-
-    // Admin Normal: filtrar por familias de patrullas asignadas
-    if (!familyId && session.user.role === 'ADMIN' && !(session.user as any).isSuperAdmin) {
-      const { getPatrolAccessibleFamilyIds } = await import('@/lib/patrol/patrol-access')
-      const accessibleFamilyIds = await getPatrolAccessibleFamilyIds(
-        session.user.id,
-        session.user.role,
-        false
-      )
-      if (accessibleFamilyIds !== undefined && accessibleFamilyIds.length > 0) {
-        ;(where as any).familyId = { in: accessibleFamilyIds }
-      } else if (accessibleFamilyIds !== undefined && accessibleFamilyIds.length === 0) {
-        ;(where as any).familyId = '__NONE__'
-      }
     }
 
     const [schedules, total] = await Promise.all([

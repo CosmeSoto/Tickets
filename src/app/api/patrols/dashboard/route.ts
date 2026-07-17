@@ -37,8 +37,6 @@ export async function GET(request: NextRequest) {
       isSuperAdmin
     )
 
-    // Si se pasa familyId explícito, usarlo (validando que tenga acceso)
-    // Si no, usar todas las familias accesibles del usuario
     let familyFilter: Record<string, any> = {}
     if (familyIdParam) {
       const hasAccess = await checkPatrolFamilyAccess(
@@ -51,10 +49,14 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'No tienes acceso a esta área' }, { status: 403 })
       }
       familyFilter = { familyId: familyIdParam }
-    } else if (accessibleFamilyIds !== undefined && accessibleFamilyIds.length > 0) {
-      familyFilter = { familyId: { in: accessibleFamilyIds } }
+    } else if (accessibleFamilyIds !== undefined) {
+      if (accessibleFamilyIds.length === 0) {
+        familyFilter = { familyId: '__NONE__' }
+      } else {
+        familyFilter = { familyId: { in: accessibleFamilyIds } }
+      }
     }
-    // Si accessibleFamilyIds es undefined (super admin) o no se pasa filtro, no filtrar
+    // accessibleFamilyIds === undefined → Super Admin sin filtro
 
     const cacheKey = buildCacheKey('patrol:dashboard', {
       userId: session.user.id,
@@ -162,50 +164,51 @@ export async function GET(request: NextRequest) {
       }))
 
       // Incidentes abiertos originados en patrullas
-      const [openIncidents, inProgressIncidents, recentIncidents, recentPatrols] = await Promise.all([
-        prisma.tickets.count({
-          where: { source: 'PATROL', status: 'OPEN', ...familyFilter },
-        }),
-        prisma.tickets.count({
-          where: { source: 'PATROL', status: 'IN_PROGRESS', ...familyFilter },
-        }),
-        prisma.tickets.findMany({
-          where: { source: 'PATROL', status: { in: ['OPEN', 'IN_PROGRESS'] }, ...familyFilter },
-          select: {
-            id: true,
-            title: true,
-            status: true,
-            priority: true,
-            createdAt: true,
-            ticketCode: true,
-            users_tickets_clientIdTousers: { select: { name: true } },
-            family: { select: { name: true, color: true } },
-          },
-          orderBy: { createdAt: 'desc' },
-          take: 5,
-        }),
-        // Patrullas recientes (completadas/incompletas) para tabla del dashboard
-        prisma.patrols.findMany({
-          where: {
-            ...familyFilter,
-            status: { in: ['COMPLETED', 'INCOMPLETE', 'MISSED'] },
-            scheduledStart: { gte: last7Days },
-          },
-          select: {
-            id: true,
-            status: true,
-            scheduledStart: true,
-            startedAt: true,
-            completedAt: true,
-            completionPercentage: true,
-            agent: { select: { name: true } },
-            route: { select: { name: true } },
-            family: { select: { name: true } },
-          },
-          orderBy: { scheduledStart: 'desc' },
-          take: 10,
-        }),
-      ])
+      const [openIncidents, inProgressIncidents, recentIncidents, recentPatrols] =
+        await Promise.all([
+          prisma.tickets.count({
+            where: { source: 'PATROL', status: 'OPEN', ...familyFilter },
+          }),
+          prisma.tickets.count({
+            where: { source: 'PATROL', status: 'IN_PROGRESS', ...familyFilter },
+          }),
+          prisma.tickets.findMany({
+            where: { source: 'PATROL', status: { in: ['OPEN', 'IN_PROGRESS'] }, ...familyFilter },
+            select: {
+              id: true,
+              title: true,
+              status: true,
+              priority: true,
+              createdAt: true,
+              ticketCode: true,
+              users_tickets_clientIdTousers: { select: { name: true } },
+              family: { select: { name: true, color: true } },
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 5,
+          }),
+          // Patrullas recientes (completadas/incompletas) para tabla del dashboard
+          prisma.patrols.findMany({
+            where: {
+              ...familyFilter,
+              status: { in: ['COMPLETED', 'INCOMPLETE', 'MISSED'] },
+              scheduledStart: { gte: last7Days },
+            },
+            select: {
+              id: true,
+              status: true,
+              scheduledStart: true,
+              startedAt: true,
+              completedAt: true,
+              completionPercentage: true,
+              agent: { select: { name: true } },
+              route: { select: { name: true } },
+              family: { select: { name: true } },
+            },
+            orderBy: { scheduledStart: 'desc' },
+            take: 10,
+          }),
+        ])
 
       return {
         today: { scheduled, completed, inProgress, missed },

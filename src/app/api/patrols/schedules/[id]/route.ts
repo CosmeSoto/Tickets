@@ -10,7 +10,14 @@ import { authOptions } from '@/lib/auth'
 import { z } from 'zod'
 import prisma from '@/lib/prisma'
 import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
-import { checkPatrolFamilyAccess, checkPatrolFamilyOperate, canDeletePatrolResource } from '@/lib/patrol/patrol-access'
+import {
+  checkPatrolFamilyAccess,
+  checkPatrolFamilyOperate,
+  canDeletePatrolResource,
+  canSoftDeletePatrolResource,
+} from '@/lib/patrol/patrol-access'
+import { NotificationService } from '@/lib/services/notification-service'
+import { NotificationType } from '@prisma/client'
 import { PatrolSchedulerService } from '@/lib/services/patrol-scheduler.service'
 import {
   assertScheduleAgent,
@@ -327,7 +334,10 @@ export async function DELETE(
     })
     if (!existing) return NextResponse.json({ error: 'Schedule no encontrado' }, { status: 404 })
 
-    // Verificar acceso a la familia
+    if (!canSoftDeletePatrolResource(session.user.role) && !reactivate) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+    }
+
     const hasAccess = await checkPatrolFamilyOperate(
       session.user.id,
       existing.familyId,
@@ -335,10 +345,12 @@ export async function DELETE(
       isSuperAdmin
     )
     if (!hasAccess) {
-      return NextResponse.json({ error: 'No tienes acceso para modificar programaciones en esta área' }, { status: 403 })
+      return NextResponse.json(
+        { error: 'No tienes acceso para modificar programaciones en esta área' },
+        { status: 403 }
+      )
     }
 
-    // Reactivar
     if (reactivate) {
       await prisma.patrol_schedules.update({ where: { id }, data: { isActive: true } })
 
@@ -353,7 +365,6 @@ export async function DELETE(
       return NextResponse.json({ success: true, message: 'Programación reactivada' })
     }
 
-    // Si es hard delete, solo SuperAdmin puede hacerlo
     if (isPermanent && !canDeletePatrolResource(session.user.role, isSuperAdmin)) {
       return NextResponse.json(
         { error: 'Solo el Super Administrador puede eliminar permanentemente programaciones' },
@@ -362,43 +373,29 @@ export async function DELETE(
     }
 
     if (isPermanent) {
-      // Primero borramos todas las patrullas asociadas (con sus check-ins y fotos)
+      const patrolHistoryCount = await prisma.patrols.count({
+        where: {
+          scheduleId: id,
+          status: { not: 'PENDING' },
+        },
+      })
+      if (patrolHistoryCount > 0) {
+        return NextResponse.json(
+          {
+            error:
+              'No se puede eliminar permanentemente: la programación tiene historial de rondas. Usa desactivar en su lugar.',
+            code: 'SCHEDULE_HAS_HISTORY',
+            patrolHistoryCount,
+          },
+          { status: 409 }
+        )
+      }
+
       await prisma.$transaction(async tx => {
-        // 1. Primero obtenemos los IDs de las patrullas para este schedule
-        const patrolIds = (
-          await tx.patrols.findMany({
-            where: { scheduleId: id },
-            select: { id: true },
-          })
-        ).map(p => p.id)
-
-        if (patrolIds.length > 0) {
-          // 2. Desasignamos las fotos de las patrullas para evitar restricciones
-          await tx.patrols.updateMany({
-            where: { scheduleId: id },
-            data: { startPhotoId: null, endPhotoId: null },
-          })
-
-          // 3. Borramos check-ins
-          await tx.patrol_check_ins.deleteMany({
-            where: { patrolId: { in: patrolIds } },
-          })
-
-          // 4. Borramos fotos
-          await tx.patrol_photos.deleteMany({
-            where: { patrolId: { in: patrolIds } },
-          })
-
-          // 5. Borramos patrullas
-          await tx.patrols.deleteMany({
-            where: { id: { in: patrolIds } },
-          })
-        }
-
-        // 6. Borramos la programación
-        await tx.patrol_schedules.delete({
-          where: { id },
+        await tx.patrols.deleteMany({
+          where: { scheduleId: id, status: 'PENDING' },
         })
+        await tx.patrol_schedules.delete({ where: { id } })
       })
 
       await AuditServiceComplete.log({
@@ -410,20 +407,49 @@ export async function DELETE(
       })
 
       return NextResponse.json({ success: true, message: 'Programación eliminada permanentemente' })
-    } else {
-      // Soft delete: desactivar
-      await prisma.patrol_schedules.update({ where: { id }, data: { isActive: false } })
-
-      await AuditServiceComplete.log({
-        action: 'PATROL_SCHEDULE_DEACTIVATED',
-        entityType: 'patrol',
-        entityId: id,
-        userId: session.user.id,
-        request,
-      })
-
-      return NextResponse.json({ success: true, message: 'Programación desactivada' })
     }
+
+    // Soft delete: desactivar + cancelar PENDING futuras
+    const pendingPatrols = await prisma.patrols.findMany({
+      where: { scheduleId: id, status: 'PENDING', scheduledStart: { gt: new Date() } },
+      select: { id: true, agentId: true },
+    })
+
+    await prisma.$transaction([
+      prisma.patrol_schedules.update({ where: { id }, data: { isActive: false } }),
+      prisma.patrols.updateMany({
+        where: { scheduleId: id, status: 'PENDING', scheduledStart: { gt: new Date() } },
+        data: { status: 'MISSED' },
+      }),
+    ])
+
+    const uniqueAgentIds = [...new Set(pendingPatrols.map(p => p.agentId))]
+    await Promise.allSettled(
+      uniqueAgentIds.map(agentId =>
+        NotificationService.push({
+          userId: agentId,
+          type: NotificationType.WARNING,
+          title: 'Programación desactivada',
+          message: 'Se cancelaron rondas pendientes asociadas a una programación desactivada.',
+          link: '/patrols',
+        })
+      )
+    )
+
+    await AuditServiceComplete.log({
+      action: 'PATROL_SCHEDULE_DEACTIVATED',
+      entityType: 'patrol',
+      entityId: id,
+      userId: session.user.id,
+      details: { cancelledPending: pendingPatrols.length },
+      request,
+    })
+
+    return NextResponse.json({
+      success: true,
+      message: 'Programación desactivada',
+      cancelledPending: pendingPatrols.length,
+    })
   } catch (error) {
     console.error('[patrol/schedules/[id]] DELETE:', error)
     return NextResponse.json(

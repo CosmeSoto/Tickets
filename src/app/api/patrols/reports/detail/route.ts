@@ -81,8 +81,8 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'No tienes acceso a esta área' }, { status: 403 })
       }
       where.familyId = familyId
-    } else if (accessibleFamilyIds !== undefined && accessibleFamilyIds.length > 0) {
-      where.familyId = { in: accessibleFamilyIds }
+    } else if (accessibleFamilyIds !== undefined) {
+      where.familyId = accessibleFamilyIds.length > 0 ? { in: accessibleFamilyIds } : '__NONE__'
     }
 
     if (agentId) {

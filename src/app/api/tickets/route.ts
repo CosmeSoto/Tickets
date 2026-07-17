@@ -10,7 +10,7 @@ import { NotificationService } from '@/lib/services/notification-service'
 import { TicketService } from '@/lib/services/ticket-service'
 import {
   getTicketConsumerFamilyIds,
-  getTicketVisibilityFamilyIds,
+  getTicketOperationalFamilyIds,
   isFamilyInScope,
 } from '@/lib/auth/family-scope'
 import { buildFamilyFilter } from '@/lib/auth/admin-scope'
@@ -116,12 +116,19 @@ export async function GET(request: NextRequest) {
           ],
         })
       }
-    } else if (session.user.role === 'ADMIN' && !(session.user as any).isSuperAdmin) {
-      const visibilityIds = await getTicketVisibilityFamilyIds(session.user.id, 'ADMIN', false)
-      const familyFilter = buildFamilyFilter({ familyIds: visibilityIds })
-      if (Object.keys(familyFilter).length > 0) {
-        andParts.push(familyFilter)
+    } else if (session.user.role === 'ADMIN') {
+      // Mis Solicitudes: tickets donde el admin es el solicitante (clientId)
+      if (viewMode === 'created') {
+        where.clientId = session.user.id
+      } else if (!(session.user as any).isSuperAdmin) {
+        // Cola de soporte: solo familia nativa (asignadas = solo crear, no gestionar)
+        const operationalIds = await getTicketOperationalFamilyIds(session.user.id, 'ADMIN', false)
+        const familyFilter = buildFamilyFilter({ familyIds: operationalIds })
+        if (Object.keys(familyFilter).length > 0) {
+          andParts.push(familyFilter)
+        }
       }
+      // Super Admin + viewMode !== created → sin filtro de familia (ve todo)
     }
 
     if (andParts.length > 0) {
@@ -290,7 +297,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const categoryFamilyId = category.departments?.familyId ?? null
+    const categoryFamilyId = category.familyId ?? category.departments?.familyId ?? null
     const isPatrolSource = ticketData.source === 'PATROL'
     let effectiveFamilyId: string | null = ticketData.familyId ?? categoryFamilyId
 

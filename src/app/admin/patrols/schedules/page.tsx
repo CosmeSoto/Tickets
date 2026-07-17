@@ -26,6 +26,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { useToast } from '@/hooks/use-toast'
+import { formatPatrolLifecycleConflict } from '@/lib/patrol/patrol-lifecycle-messages'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { DataTable } from '@/components/ui/data-table'
 import { ExportButton } from '@/components/common/export-button'
@@ -116,7 +117,9 @@ export default function SchedulesPage() {
 
   const fetchFamilies = useCallback(async () => {
     try {
-      const res = await fetch('/api/families?includeInactive=false&module=patrols')
+      const res = await fetch(
+        '/api/families?includeInactive=false&module=patrols&scope=operational'
+      )
       const data = await res.json()
       if (data.success) setFamilies(data.data)
     } catch {
@@ -306,8 +309,23 @@ export default function SchedulesPage() {
     try {
       const res = await fetch(`/api/patrols/schedules/${id}`, { method: 'DELETE' })
       const data = await res.json()
+      if (res.status === 409) {
+        const conflict = formatPatrolLifecycleConflict(data, 'desactivar')
+        toast({
+          title: conflict.title,
+          description: conflict.description,
+          variant: 'destructive',
+        })
+        return
+      }
       if (!res.ok) throw new Error(data.error ?? 'Error al desactivar')
-      toast({ title: 'Programación desactivada' })
+      toast({
+        title: 'Programación desactivada',
+        description:
+          typeof data.cancelledPending === 'number' && data.cancelledPending > 0
+            ? `${data.cancelledPending} ronda(s) pendiente(s) cancelada(s). Siguiente: desactivar la ruta si ya no se usa.`
+            : 'Siguiente paso del ciclo: desactivar la ruta si ya no se usa, luego checkpoints.',
+      })
       reload()
     } catch (err) {
       toast({
@@ -342,8 +360,20 @@ export default function SchedulesPage() {
     try {
       const res = await fetch(`/api/patrols/schedules/${id}?permanent=true`, { method: 'DELETE' })
       const data = await res.json()
+      if (res.status === 409) {
+        const conflict = formatPatrolLifecycleConflict(data, 'eliminar')
+        toast({
+          title: conflict.title,
+          description: conflict.description,
+          variant: 'destructive',
+        })
+        return
+      }
       if (!res.ok) throw new Error(data.error ?? 'Error al eliminar permanentemente')
-      toast({ title: 'Programación eliminada permanentemente' })
+      toast({
+        title: 'Programación eliminada permanentemente',
+        description: 'Puedes continuar desactivando la ruta y luego los checkpoints si aplica.',
+      })
       reload()
     } catch (err) {
       toast({
@@ -518,8 +548,8 @@ export default function SchedulesPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>¿Desactivar programación?</AlertDialogTitle>
             <AlertDialogDescription>
-              No se generarán más patrullas para esta programación. Las patrullas ya generadas no se
-              cancelan.
+              Primer paso del ciclo (Programaciones → Rutas → Checkpoints). Se cancelarán rondas
+              PENDIENTES futuras. Luego podrás desactivar la ruta y después los checkpoints.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -562,8 +592,8 @@ export default function SchedulesPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar programación PERMANENTEMENTE?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción no se puede deshacer. La programación se eliminará completamente de la
-              base de datos.
+              Solo si no tiene historial de rondas. Si ya se ejecutaron, usa Desactivar. Ciclo:
+              Programaciones → Rutas → Checkpoints.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -2,12 +2,14 @@
  * Scope de familias por capas (nativa vs adicional).
  *
  * Nativa     → departamento del usuario. Rol operativo completo en el módulo.
- * Adicional  → asignaciones por módulo. Consumo cross-área (solicitar, ver), no gobernar.
+ * Adicional  → asignaciones por módulo. Solo consumo cross-área (solicitar tickets
+ *              a otras áreas); no gestionar ni dar soporte en esas colas.
  *
- * Modos:
- * - consumer:    familias donde puede SOLICITAR / crear tickets
- * - operational: familias donde puede RESOLVER / gestionar operativamente
- * - visibility:  familias visibles en listados (nativa + adicionales del rol)
+ * Modos (tickets):
+ * - consumer:    familias donde puede SOLICITAR / crear tickets (nativa + asignadas)
+ * - operational: familias donde puede RESOLVER / gestionar (solo nativa)
+ * - visibility:  cola de soporte en listados = operational para ADMIN/TECH;
+ *                CLIENT = consumer (ve sus solicitudes por clientId en la API)
  */
 
 import prisma from '@/lib/prisma'
@@ -44,7 +46,7 @@ export async function getTechnicianConsumerFamilyIds(userId: string): Promise<st
   return rows.map(r => r.familyId)
 }
 
-/** Familias adicionales de visibilidad/gestión para admins. */
+/** Familias adicionales de consumo para admins (solicitar tickets a otras áreas). */
 export async function getAdminAssignmentFamilyIds(userId: string): Promise<string[]> {
   const rows = await prisma.admin_family_assignments.findMany({
     where: { adminId: userId, isActive: true },
@@ -99,7 +101,11 @@ export async function getTicketOperationalFamilyIds(
   return []
 }
 
-/** Familias visibles en listados de tickets. */
+/**
+ * Familias visibles en listados/cola de soporte de tickets.
+ * ADMIN/TECH: solo nativa (las asignadas son consumer → "Mis solicitudes").
+ * CLIENT: nativa + client_family_assignments.
+ */
 export async function getTicketVisibilityFamilyIds(
   userId: string,
   role: string,
@@ -107,24 +113,16 @@ export async function getTicketVisibilityFamilyIds(
 ): Promise<string[] | undefined> {
   if (role === 'ADMIN' && isSuperAdmin) return undefined
 
-  const nativeId = await getNativeFamilyId(userId)
-
   if (role === 'CLIENT') {
-    return dedupeIds([nativeId, ...(await getClientAssignmentFamilyIds(userId))])
+    return getTicketConsumerFamilyIds(userId, role, isSuperAdmin)
   }
 
-  if (role === 'TECHNICIAN') {
-    return dedupeIds([
-      nativeId,
-      ...(await getTechnicianConsumerFamilyIds(userId)),
-      ...(await getClientAssignmentFamilyIds(userId)),
-    ])
+  // ADMIN y TECHNICIAN: cola de soporte = operational (nativa)
+  if (role === 'ADMIN' || role === 'TECHNICIAN') {
+    return getTicketOperationalFamilyIds(userId, role, isSuperAdmin)
   }
 
-  if (role === 'ADMIN') {
-    return dedupeIds([nativeId, ...(await getAdminAssignmentFamilyIds(userId))])
-  }
-
+  const nativeId = await getNativeFamilyId(userId)
   return nativeId ? [nativeId] : []
 }
 
@@ -154,7 +152,7 @@ export function isFamilyInScope(
   return scopeIds.includes(familyId)
 }
 
-/** Admin puede ver ticket en familia de visibilidad. */
+/** Admin puede ver cola de soporte en familia nativa (visibility = operational). */
 export async function adminCanViewTicketFamily(
   adminId: string,
   familyId: string | null,
@@ -373,4 +371,3 @@ export async function managerCanOperateInventoryFamily(
   const ids = await getInventoryOperationalFamilyIds(userId, 'TECHNICIAN', false, true)
   return isFamilyInScope(familyId, ids)
 }
-

@@ -109,19 +109,10 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Filtrar técnicos por familia: los que tienen asignación activa O cuyo departamento pertenece a esa familia
+    // Filtrar técnicos por familia NATIVA (resolutores del área).
+    // Las technician_family_assignments son solo para crear tickets a otras áreas.
     if (familyId) {
-      where.AND = [
-        ...(where.AND ?? []),
-        {
-          OR: [
-            // Asignación explícita en technician_family_assignments
-            { technicianFamilyAssignments: { some: { familyId, isActive: true } } },
-            // Técnico cuyo departamento pertenece a la familia (asignación nativa)
-            { departments: { familyId } },
-          ],
-        },
-      ]
+      where.AND = [...(where.AND ?? []), { departments: { familyId } }]
     }
 
     // Filtrar por familia de rondas: usuarios con patrol_family_assignments O departamento nativo
@@ -178,7 +169,8 @@ export async function GET(request: NextRequest) {
 
       where.AND = [...(where.AND ?? []), { departmentId: { in: deptIds } }, { isSuperAdmin: false }]
     } else if (session.user.role !== 'ADMIN') {
-      const { getUserFamilyScope, getDepartmentIdsForScope } = await import('@/lib/auth/admin-scope')
+      const { getUserFamilyScope, getDepartmentIdsForScope } =
+        await import('@/lib/auth/admin-scope')
       const scope = await getUserFamilyScope(session.user.id, session.user.role, false)
       const deptIds = await getDepartmentIdsForScope(scope)
       if (!deptIds || deptIds.length === 0) {

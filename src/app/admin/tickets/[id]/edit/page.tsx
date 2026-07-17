@@ -101,10 +101,10 @@ export default function EditTicketPage() {
 
         let url: string
         if (isAdminUser && isSuperAdmin) {
-          // Super admin: todas las familias activas
-          url = '/api/families?includeInactive=false'
+          // Super admin: todas las familias con tickets habilitados
+          url = '/api/families?asClient=true'
         } else {
-          // Admin normal: familias asignadas al cliente
+          // Admin normal: familias asignadas al cliente ∩ visibilidad del admin
           url = `/api/families?asClient=true&forClientId=${clientId}`
         }
 
@@ -471,6 +471,7 @@ export default function EditTicketPage() {
               ticketDescription={formData.description}
               clientId={ticket.client.id}
               familyId={formData.familyId || undefined}
+              requireFamily
             />
           </div>
           <div>

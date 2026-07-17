@@ -144,7 +144,9 @@ export default function CheckpointsPage() {
 
   const fetchFamilies = useCallback(async () => {
     try {
-      const res = await fetch('/api/families?includeInactive=false&module=patrols')
+      const res = await fetch(
+        '/api/families?includeInactive=false&module=patrols&scope=operational'
+      )
       const data = await res.json()
       if (data.success) setFamilies(data.data)
     } catch {
@@ -396,8 +398,8 @@ export default function CheckpointsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>¿Desactivar checkpoint?</AlertDialogTitle>
             <AlertDialogDescription>
-              El checkpoint no podrá agregarse a nuevas rutas, pero se preservará el historial de
-              check-ins.
+              Solo si ya no está en rutas activas. Orden del ciclo: primero Programaciones, luego
+              Rutas, y al final Checkpoints. Se conserva el historial de check-ins.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -442,8 +444,8 @@ export default function CheckpointsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar checkpoint PERMANENTEMENTE?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción no se puede deshacer. El checkpoint se eliminará completamente de la base
-              de datos.
+              Debes quitarlo antes de las rutas (editar/desactivar en Rutas). Si tiene historial de
+              check-ins, usa Desactivar. Ciclo: Programaciones → Rutas → Checkpoints.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -71,18 +71,12 @@ export async function GET(request: NextRequest) {
         isSuperAdmin
       )
 
-      // Si se solicita un familyId específico, verificar que está en el scope
       if (familyId) {
         if (accessibleFamilyIds !== undefined && !accessibleFamilyIds.includes(familyId)) {
           return NextResponse.json({ error: 'No autorizado para esta familia' }, { status: 403 })
         }
         filters.familyId = familyId
       } else if (accessibleFamilyIds !== undefined) {
-        // Filtrar por todas las familias accesibles
-        filters.familyId = accessibleFamilyIds.length === 1 ? accessibleFamilyIds[0] : undefined // Se manejará abajo
-
-        // Si tiene múltiples familias y no se especifica una, no filtrar por familia
-        // (PatrolIncidentService.list filtrará por familyId si se pasa)
         if (accessibleFamilyIds.length === 0) {
           return NextResponse.json({
             success: true,
@@ -90,6 +84,7 @@ export async function GET(request: NextRequest) {
             pagination: { page, limit, total: 0, totalPages: 0 },
           })
         }
+        filters.familyIds = accessibleFamilyIds
       }
       // SuperAdmin (accessibleFamilyIds === undefined): sin restricción de familia
 

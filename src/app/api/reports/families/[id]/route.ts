@@ -22,9 +22,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     })
 
     if (!currentUser?.isSuperAdmin) {
-      const { getAdminFamilyScope } = await import('@/lib/auth/admin-scope')
-      const scope = await getAdminFamilyScope(session.user.id, false)
-      if (scope.familyIds && scope.familyIds.length > 0 && !scope.familyIds.includes(id)) {
+      const { getTicketOperationalFamilyIds } = await import('@/lib/auth/family-scope')
+      const operationalIds = await getTicketOperationalFamilyIds(session.user.id, 'ADMIN', false)
+      if (
+        operationalIds !== undefined &&
+        (operationalIds.length === 0 || !operationalIds.includes(id))
+      ) {
         return NextResponse.json(
           { success: false, message: 'No tienes acceso a esta familia' },
           { status: 403 }

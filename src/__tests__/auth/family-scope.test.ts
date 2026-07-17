@@ -58,13 +58,42 @@ describe('family-scope tickets', () => {
     expect(consumer).toEqual(expect.arrayContaining([nativeFamily, extraFamily]))
   })
 
-  it('admin visibility incluye nativa y admin assignments', async () => {
+  it('admin visibility = solo nativa (asignadas son consumer, no cola)', async () => {
     ;(prisma.admin_family_assignments.findMany as jest.Mock).mockResolvedValue([
       { familyId: extraFamily },
     ])
 
     const visibility = await getTicketVisibilityFamilyIds('admin-1', 'ADMIN', false)
-    expect(visibility).toEqual(expect.arrayContaining([nativeFamily, extraFamily]))
+    expect(visibility).toEqual([nativeFamily])
+    expect(visibility).not.toContain(extraFamily)
+  })
+
+  it('tech visibility = solo nativa', async () => {
+    ;(prisma.technician_family_assignments.findMany as jest.Mock).mockResolvedValue([
+      { familyId: extraFamily },
+    ])
+
+    const visibility = await getTicketVisibilityFamilyIds('tech-1', 'TECHNICIAN', false)
+    expect(visibility).toEqual([nativeFamily])
+    expect(visibility).not.toContain(extraFamily)
+  })
+
+  it('admin consumer incluye nativa y asignadas', async () => {
+    ;(prisma.admin_family_assignments.findMany as jest.Mock).mockResolvedValue([
+      { familyId: extraFamily },
+    ])
+
+    const consumer = await getTicketConsumerFamilyIds('admin-1', 'ADMIN', false)
+    expect(consumer).toEqual(expect.arrayContaining([nativeFamily, extraFamily]))
+  })
+
+  it('client consumer incluye nativa y client assignments', async () => {
+    ;(prisma.client_family_assignments.findMany as jest.Mock).mockResolvedValue([
+      { familyId: extraFamily },
+    ])
+
+    const consumer = await getTicketConsumerFamilyIds('client-1', 'CLIENT', false)
+    expect(consumer).toEqual(expect.arrayContaining([nativeFamily, extraFamily]))
   })
 
   it('admin operational solo nativa', async () => {
@@ -123,12 +152,7 @@ describe('family-scope inventory', () => {
       { familyId: extraFamily },
     ])
 
-    const operational = await getInventoryOperationalFamilyIds(
-      'mgr-1',
-      'TECHNICIAN',
-      false,
-      true
-    )
+    const operational = await getInventoryOperationalFamilyIds('mgr-1', 'TECHNICIAN', false, true)
     expect(operational).toEqual(expect.arrayContaining([nativeFamily, extraFamily]))
   })
 

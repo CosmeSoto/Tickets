@@ -13,7 +13,12 @@ import { NotificationService } from '@/lib/services/notification-service'
 import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
 import { NotificationType } from '@prisma/client'
 import { randomUUID } from 'crypto'
-import { checkPatrolFamilyAccess, checkPatrolFamilyOperate, canDeletePatrolResource } from '@/lib/patrol/patrol-access'
+import {
+  checkPatrolFamilyAccess,
+  checkPatrolFamilyOperate,
+  canDeletePatrolResource,
+  canSoftDeletePatrolResource,
+} from '@/lib/patrol/patrol-access'
 
 const patchRouteSchema = z.object({
   name: z.string().min(1).max(200).optional(),
@@ -71,6 +76,17 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 
     if (!route) return NextResponse.json({ error: 'Ruta no encontrada' }, { status: 404 })
 
+    const isSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
+    const hasAccess = await checkPatrolFamilyAccess(
+      session.user.id,
+      route.familyId,
+      session.user.role,
+      isSuperAdmin
+    )
+    if (!hasAccess) {
+      return NextResponse.json({ error: 'No tienes acceso a esta área' }, { status: 403 })
+    }
+
     return NextResponse.json({ success: true, data: route })
   } catch (error) {
     console.error('[patrol/routes/[id]] GET:', error)
@@ -105,7 +121,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       isSuperAdmin
     )
     if (!hasAccess) {
-      return NextResponse.json({ error: 'No tienes acceso para modificar rutas en esta área' }, { status: 403 })
+      return NextResponse.json(
+        { error: 'No tienes acceso para modificar rutas en esta área' },
+        { status: 403 }
+      )
     }
 
     const body = await request.json()
@@ -119,6 +138,21 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
       // Si se envían checkpoints, reemplazar la lista completa
       if (checkpoints !== undefined) {
+        if (checkpoints.length > 0) {
+          const checkpointIds = checkpoints.map(c => c.checkpointId)
+          const validCheckpoints = await tx.patrol_checkpoints.findMany({
+            where: {
+              id: { in: checkpointIds },
+              familyId: existing.familyId,
+              isActive: true,
+            },
+            select: { id: true },
+          })
+          if (validCheckpoints.length !== checkpointIds.length) {
+            throw new Error('Uno o más checkpoints no pertenecen a esta área o están inactivos')
+          }
+        }
+
         await tx.patrol_route_checkpoints.deleteMany({ where: { routeId: id } })
         if (checkpoints.length > 0) {
           await tx.patrol_route_checkpoints.createMany({
@@ -151,6 +185,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     console.error('[patrol/routes/[id]] PATCH:', error)
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: 'Datos inválidos', details: error.errors }, { status: 400 })
+    }
+    if (error instanceof Error && error.message.includes('checkpoints')) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
     }
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
@@ -185,8 +222,10 @@ export async function DELETE(
       )
     }
 
-    // Soft delete (desactivar): ADMIN y TECHNICIAN pueden hacerlo (con acceso a la familia)
     if (!isPermanent) {
+      if (!canSoftDeletePatrolResource(session.user.role)) {
+        return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+      }
       const hasAccess = await checkPatrolFamilyOperate(
         session.user.id,
         existing.familyId,
@@ -199,18 +238,35 @@ export async function DELETE(
     }
 
     if (isPermanent) {
-      // Verificar si la ruta tiene patrullas asociadas
-      const patrolCount = await prisma.patrols.count({
-        where: { routeId: id },
-      })
-      if (patrolCount > 0) {
+      const [patrolCount, scheduleCount, activeSchedules] = await Promise.all([
+        prisma.patrols.count({ where: { routeId: id } }),
+        prisma.patrol_schedules.count({ where: { routeId: id } }),
+        prisma.patrol_schedules.findMany({
+          where: { routeId: id, isActive: true },
+          select: {
+            scheduledStart: true,
+            agent: { select: { name: true } },
+          },
+          take: 5,
+        }),
+      ])
+      if (patrolCount > 0 || scheduleCount > 0) {
+        const scheduleLabels = activeSchedules.map(
+          s => `${s.agent?.name ?? 'Agente'} (${s.scheduledStart.toLocaleString('es-EC')})`
+        )
         return NextResponse.json(
-          { error: 'No se puede eliminar la ruta porque tiene patrullas asociadas' },
+          {
+            error:
+              'No se puede eliminar la ruta: tiene programaciones o patrullas. Primero desactiva las programaciones en Programación.',
+            code: 'ROUTE_IN_USE',
+            patrolCount,
+            scheduleCount,
+            schedules: scheduleLabels,
+          },
           { status: 409 }
         )
       }
 
-      // Hard delete: eliminar permanentemente de la BD (primero los route_checkpoints)
       await prisma.$transaction([
         prisma.patrol_route_checkpoints.deleteMany({ where: { routeId: id } }),
         prisma.patrol_routes.delete({ where: { id } }),
@@ -226,50 +282,72 @@ export async function DELETE(
       })
 
       return NextResponse.json({ success: true, message: 'Ruta eliminada permanentemente' })
-    } else {
-      // Cancelar patrullas PENDING futuras y notificar agentes
-      const pendingPatrols = await prisma.patrols.findMany({
-        where: { routeId: id, status: 'PENDING', scheduledStart: { gt: new Date() } },
-        select: { id: true, agentId: true, scheduledStart: true },
-      })
-
-      await prisma.$transaction([
-        prisma.patrol_routes.update({ where: { id }, data: { isActive: false } }),
-        prisma.patrols.updateMany({
-          where: { routeId: id, status: 'PENDING', scheduledStart: { gt: new Date() } },
-          data: { status: 'MISSED' },
-        }),
-      ])
-
-      // Notificar agentes afectados
-      const uniqueAgentIds = [...new Set(pendingPatrols.map(p => p.agentId))]
-      await Promise.allSettled(
-        uniqueAgentIds.map(agentId =>
-          NotificationService.push({
-            userId: agentId,
-            type: NotificationType.WARNING,
-            title: 'Ruta desactivada',
-            message: `La ruta "${existing.name}" ha sido desactivada. Las patrullas programadas han sido canceladas.`,
-            metadata: { routeId: id },
-          })
-        )
-      )
-
-      await AuditServiceComplete.log({
-        action: 'PATROL_ROUTE_DEACTIVATED',
-        entityType: 'patrol',
-        entityId: id,
-        userId: session.user.id,
-        details: { name: existing.name, cancelledPatrols: pendingPatrols.length },
-        request,
-      })
-
-      return NextResponse.json({
-        success: true,
-        message: 'Ruta desactivada',
-        cancelledPatrols: pendingPatrols.length,
-      })
     }
+
+    // Soft delete: exigir desactivar programaciones activas primero
+    const activeSchedules = await prisma.patrol_schedules.findMany({
+      where: { routeId: id, isActive: true },
+      select: {
+        scheduledStart: true,
+        agent: { select: { name: true } },
+      },
+      take: 8,
+    })
+    if (activeSchedules.length > 0) {
+      const scheduleLabels = activeSchedules.map(
+        s => `${s.agent?.name ?? 'Agente'} (${s.scheduledStart.toLocaleString('es-EC')})`
+      )
+      return NextResponse.json(
+        {
+          error: `No se puede desactivar la ruta: tiene ${activeSchedules.length} programación(es) activa(s). Primero desactívalas en Programación.`,
+          code: 'ROUTE_HAS_ACTIVE_SCHEDULES',
+          scheduleCount: activeSchedules.length,
+          schedules: scheduleLabels,
+        },
+        { status: 409 }
+      )
+    }
+
+    const pendingPatrols = await prisma.patrols.findMany({
+      where: { routeId: id, status: 'PENDING', scheduledStart: { gt: new Date() } },
+      select: { id: true, agentId: true, scheduledStart: true },
+    })
+
+    await prisma.$transaction([
+      prisma.patrol_routes.update({ where: { id }, data: { isActive: false } }),
+      prisma.patrols.updateMany({
+        where: { routeId: id, status: 'PENDING', scheduledStart: { gt: new Date() } },
+        data: { status: 'MISSED' },
+      }),
+    ])
+
+    const uniqueAgentIds = [...new Set(pendingPatrols.map(p => p.agentId))]
+    await Promise.allSettled(
+      uniqueAgentIds.map(agentId =>
+        NotificationService.push({
+          userId: agentId,
+          type: NotificationType.WARNING,
+          title: 'Ruta desactivada',
+          message: `La ruta "${existing.name}" ha sido desactivada. Las patrullas programadas han sido canceladas.`,
+          metadata: { routeId: id },
+        })
+      )
+    )
+
+    await AuditServiceComplete.log({
+      action: 'PATROL_ROUTE_DEACTIVATED',
+      entityType: 'patrol',
+      entityId: id,
+      userId: session.user.id,
+      details: { name: existing.name, cancelledPatrols: pendingPatrols.length },
+      request,
+    })
+
+    return NextResponse.json({
+      success: true,
+      message: 'Ruta desactivada',
+      cancelledPatrols: pendingPatrols.length,
+    })
   } catch (error) {
     console.error('[patrol/routes/[id]] DELETE:', error)
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })

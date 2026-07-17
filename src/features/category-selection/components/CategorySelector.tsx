@@ -51,6 +51,8 @@ export interface CategorySelectorProps {
   className?: string
   showFrequentCategories?: boolean // Nueva prop para controlar si se muestran categorías frecuentes
   showSuggestions?: boolean // Nueva prop para controlar si se muestran sugerencias
+  /** Mensaje cuando no hay categorías (no confundir con loading) */
+  emptyMessage?: string
 }
 
 /**
@@ -128,6 +130,7 @@ export function CategorySelector({
   className,
   showFrequentCategories = true,
   showSuggestions = true,
+  emptyMessage = 'No hay categorías disponibles.',
 }: CategorySelectorProps) {
   // State management
   const [state, setState] = useState<CategorySelectorState>({
@@ -470,14 +473,12 @@ export function CategorySelector({
         </Alert>
       )}
 
-      {/* Loading indicator for initial load */}
+      {/* Empty state — NOT loading (loading is handled by the wrapper) */}
       {categories.length === 0 && !error && (
-        <div className='flex items-center justify-center p-6'>
-          <div className='flex items-center gap-2 text-muted-foreground text-sm'>
-            <div className='h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent' />
-            <span>Cargando categorías...</span>
-          </div>
-        </div>
+        <Alert className='py-3'>
+          <Info className='h-4 w-4' />
+          <AlertDescription className='text-sm'>{emptyMessage}</AlertDescription>
+        </Alert>
       )}
 
       {/* Search bar - always visible */}

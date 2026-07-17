@@ -172,15 +172,15 @@ export async function getAdminUnionDepartmentIds(
   return (await getDepartmentIdsForScope({ familyIds: Array.from(unionSet) })) ?? []
 }
 
-/** Filtro Prisma de tickets para admin no-super (visibilidad en dashboard). */
+/** Filtro Prisma de tickets para admin no-super (cola de soporte = nativa). */
 export async function getAdminTicketFamilyFilter(
   adminId: string,
   isSuperAdmin: boolean
 ): Promise<Record<string, unknown>> {
   if (isSuperAdmin) return {}
-  const { getTicketVisibilityFamilyIds } = await import('@/lib/auth/family-scope')
-  const visibilityIds = await getTicketVisibilityFamilyIds(adminId, 'ADMIN', false)
-  return buildFamilyFilter({ familyIds: visibilityIds })
+  const { getTicketOperationalFamilyIds } = await import('@/lib/auth/family-scope')
+  const operationalIds = await getTicketOperationalFamilyIds(adminId, 'ADMIN', false)
+  return buildFamilyFilter({ familyIds: operationalIds })
 }
 
 export type AdminUserScopeResult =

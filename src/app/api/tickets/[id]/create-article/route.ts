@@ -42,11 +42,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const { id: ticketId } = await params
 
-    const {
-      assertTicketAccessById,
-      TicketAccessError,
-      toTicketAccessUser,
-    } = await import('@/lib/tickets/ticket-access')
+    const { assertTicketAccessById, TicketAccessError, toTicketAccessUser } =
+      await import('@/lib/tickets/ticket-access')
 
     try {
       await assertTicketAccessById(toTicketAccessUser(session.user), ticketId, 'write')
@@ -155,9 +152,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!familyId && ticket.categoryId) {
       const cat = await prisma.categories.findUnique({
         where: { id: ticket.categoryId },
-        select: { departments: { select: { familyId: true } } },
+        select: { familyId: true, departments: { select: { familyId: true } } },
       })
-      familyId = cat?.departments?.familyId ?? null
+      familyId = cat?.familyId ?? cat?.departments?.familyId ?? null
     }
 
     // Crear artículo con familyId derivado del ticket

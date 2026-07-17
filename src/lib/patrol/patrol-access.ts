@@ -10,7 +10,8 @@ import {
  * - visibility: listados, reportes, dashboard, lectura de incidentes
  * - operational: configurar rutas/horarios/checkpoints (admin solo nativa;
  *   agente/supervisor en nativa + patrol_family_assignments)
- * - DELETE/desactivar: solo Super Admin
+ * - soft delete (desactivar): ADMIN/TECH con acceso operational a la familia
+ * - hard delete permanente: solo Super Admin
  */
 
 /** @deprecated Usar getPatrolVisibilityFamilyIds — alias de compatibilidad */
@@ -46,4 +47,45 @@ export async function checkPatrolFamilyOperate(
 
 export function canDeletePatrolResource(role: string, isSuperAdmin: boolean): boolean {
   return role === 'ADMIN' && isSuperAdmin
+}
+
+/** Soft-delete / desactivar recursos de config: solo ADMIN o TECHNICIAN. */
+export function canSoftDeletePatrolResource(role: string): boolean {
+  return role === 'ADMIN' || role === 'TECHNICIAN'
+}
+
+export type PatrolVisibilityFilterResult =
+  | { ok: true; familyWhere: Record<string, unknown> }
+  | { ok: false; status: number; error: string }
+
+/**
+ * Resuelve filtro familyId para listados de rondas (visibility).
+ * - familyId explícito: valida acceso; 403 si no.
+ * - sin familyId: { in: ids } o vacío → denegar con __NONE__
+ * - Super Admin (undefined): sin filtro
+ */
+export async function resolvePatrolVisibilityFilter(
+  userId: string,
+  role: string,
+  isSuperAdmin: boolean,
+  familyId: string | null | undefined
+): Promise<PatrolVisibilityFilterResult> {
+  const accessible = await getPatrolVisibilityFamilyIds(userId, role, isSuperAdmin)
+
+  if (familyId) {
+    if (!isFamilyInScope(familyId, accessible)) {
+      return { ok: false, status: 403, error: 'No tienes acceso a esta área' }
+    }
+    return { ok: true, familyWhere: { familyId } }
+  }
+
+  if (accessible === undefined) {
+    return { ok: true, familyWhere: {} }
+  }
+
+  if (accessible.length === 0) {
+    return { ok: true, familyWhere: { familyId: '__NONE__' } }
+  }
+
+  return { ok: true, familyWhere: { familyId: { in: accessible } } }
 }

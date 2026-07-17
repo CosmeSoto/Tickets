@@ -15,7 +15,6 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
-import { checkPatrolFamilyOperate } from '@/lib/patrol/patrol-access'
 import { z } from 'zod'
 
 const bodySchema = z.object({
@@ -58,40 +57,43 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Agente no encontrado' }, { status: 404 })
     }
 
-    // Si NO es super admin, verificar que tiene acceso a al menos una de las familias
-    // de las programaciones del agente
+    // Scope: Super Admin → todas; admin normal → solo familias que puede operar
+    let familyScopeFilter: { familyId?: { in: string[] } } = {}
     if (!isSuperAdmin) {
-      const agentFamilies = await prisma.patrol_schedules.findMany({
-        where: { agentId, isActive: true },
-        select: { familyId: true },
-        distinct: ['familyId'],
-      })
-
-      for (const { familyId } of agentFamilies) {
-        const hasAccess = await checkPatrolFamilyOperate(
-          session.user.id,
-          familyId,
-          session.user.role,
-          false
+      const { getPatrolOperationalFamilyIds } = await import('@/lib/auth/family-scope')
+      const operationalIds = await getPatrolOperationalFamilyIds(
+        session.user.id,
+        session.user.role,
+        false
+      )
+      if (!operationalIds || operationalIds.length === 0) {
+        return NextResponse.json(
+          { error: 'No tienes áreas de rondas donde operar' },
+          { status: 403 }
         )
-        if (!hasAccess) {
-          return NextResponse.json(
-            { error: `No tienes acceso a todas las áreas del agente` },
-            { status: 403 }
-          )
-        }
+      }
+      familyScopeFilter = { familyId: { in: operationalIds } }
+
+      // Si el agente tiene programaciones fuera del scope, no permitir cleanup global
+      const outOfScope = await prisma.patrol_schedules.count({
+        where: {
+          agentId,
+          isActive: true,
+          familyId: { notIn: operationalIds },
+        },
+      })
+      if (outOfScope > 0) {
+        // Solo limpiar dentro del scope (no bloquear)
       }
     }
 
-    // 1. Desactivar todas las programaciones activas del agente
     const deactivatedSchedules = await prisma.patrol_schedules.updateMany({
-      where: { agentId, isActive: true },
+      where: { agentId, isActive: true, ...familyScopeFilter },
       data: { isActive: false },
     })
 
-    // 2. Cancelar todas las rondas PENDING del agente → MISSED
     const cancelledPatrols = await prisma.patrols.updateMany({
-      where: { agentId, status: 'PENDING' },
+      where: { agentId, status: 'PENDING', ...familyScopeFilter },
       data: { status: 'MISSED' },
     })
 

@@ -23,7 +23,7 @@ export { formatDurationMinutes } from './patrol-format'
  * Usado en notificaciones de check-in rechazado, ronda incompleta, novedad creada, etc.
  */
 export async function getPatrolSupervisors(familyId: string): Promise<{ id: string }[]> {
-  const [admins, technicians] = await Promise.all([
+  const [admins, agents] = await Promise.all([
     // Admins: super admin + admin nativo de la familia de la ronda
     prisma.users.findMany({
       where: {
@@ -33,22 +33,24 @@ export async function getPatrolSupervisors(familyId: string): Promise<{ id: stri
       },
       select: { id: true },
     }),
-    // Técnicos: necesitan patrolsEnabled + familia asignada
+    // Agentes/supervisores: TECH o CLIENT con patrolsEnabled + patrol_family_assignments
     prisma.users.findMany({
       where: {
         isActive: true,
-        role: 'TECHNICIAN',
+        role: { in: ['TECHNICIAN', 'CLIENT'] },
         patrolsEnabled: true,
-        technicianFamilyAssignments: { some: { familyId, isActive: true } },
+        OR: [
+          { departments: { familyId, isActive: true } },
+          { patrolFamilyAssignments: { some: { familyId, isActive: true } } },
+        ],
       },
       select: { id: true },
     }),
   ])
 
-  // Deduplicar
   const ids = new Set<string>()
   const result: { id: string }[] = []
-  for (const u of [...admins, ...technicians]) {
+  for (const u of [...admins, ...agents]) {
     if (!ids.has(u.id)) {
       ids.add(u.id)
       result.push(u)

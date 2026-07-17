@@ -48,6 +48,8 @@ export interface UpdateIncidentData {
 export interface ListIncidentFilters {
   agentId?: string
   familyId?: string
+  /** Varias familias (admin con scope multi-área) */
+  familyIds?: string[]
   patrolId?: string
   severity?: string
   status?: string
@@ -336,6 +338,7 @@ export class PatrolIncidentService {
     const {
       agentId,
       familyId,
+      familyIds,
       patrolId,
       severity,
       status,
@@ -349,7 +352,11 @@ export class PatrolIncidentService {
 
     if (agentId) where.agentId = agentId
     if (patrolId) where.patrolId = patrolId
-    if (familyId) where.patrol = { familyId }
+    if (familyId) {
+      where.patrol = { familyId }
+    } else if (familyIds && familyIds.length > 0) {
+      where.patrol = { familyId: { in: familyIds } }
+    }
     if (severity) where.severity = severity
     if (status) where.status = status
 

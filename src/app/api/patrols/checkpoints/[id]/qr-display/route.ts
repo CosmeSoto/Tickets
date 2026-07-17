@@ -1,15 +1,26 @@
 /**
  * GET /api/patrols/checkpoints/[id]/qr-display
- * Obtiene el QR actual para visualización en pantalla pública.
+ * Obtiene el QR actual para visualización en pantalla.
  * Solo para checkpoints activos con QR DINÁMICO.
+ * Requiere sesión ADMIN/TECH con acceso operational a la familia.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { PatrolQRService } from '@/lib/services/patrol-qr.service'
+import { checkPatrolFamilyOperate } from '@/lib/patrol/patrol-access'
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+
+    if (!['ADMIN', 'TECHNICIAN'].includes(session.user.role)) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+    }
+
     const { id } = await params
 
     const checkpoint = await prisma.patrol_checkpoints.findUnique({
@@ -17,6 +28,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       select: {
         id: true,
         name: true,
+        familyId: true,
         qrType: true,
         qrSecret: true,
         isActive: true,
@@ -34,6 +46,17 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 
     if (!checkpoint)
       return NextResponse.json({ error: 'Checkpoint no encontrado' }, { status: 404 })
+
+    const isSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
+    const hasAccess = await checkPatrolFamilyOperate(
+      session.user.id,
+      checkpoint.familyId,
+      session.user.role,
+      isSuperAdmin
+    )
+    if (!hasAccess) {
+      return NextResponse.json({ error: 'No tienes acceso a esta área' }, { status: 403 })
+    }
 
     if (!checkpoint.isActive)
       return NextResponse.json({ error: 'Checkpoint inactivo' }, { status: 409 })

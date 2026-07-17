@@ -176,16 +176,15 @@ export class TicketService {
 
       ApplicationLogger.databaseOperationStart('create', 'tickets')
 
-      // 1. Resolver familyId desde categoryId → department → familyId
-      // Si se proporciona familyId explícito (ej: incidentes de patrulla), usarlo directamente
+      // 1. Resolver familyId: explícito → category.familyId → department.familyId → default
       const category = await prisma.categories.findUnique({
         where: { id: data.categoryId },
         include: { departments: { select: { familyId: true } } },
       })
 
-      // Prioridad: familyId explícito → categoría → departamento → familia default → primera familia activa
       let familyId: string | undefined =
         data.familyId ??
+        category?.familyId ??
         category?.departments?.familyId ??
         (await TicketFamilyConfigService.getDefaultFamily())?.id ??
         undefined

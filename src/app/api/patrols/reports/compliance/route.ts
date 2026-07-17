@@ -70,22 +70,18 @@ export async function GET(request: NextRequest) {
     })
 
     const data = await withCache(cacheKey, 60, async () => {
-      // Determinar familias accesibles para el usuario
-      const { getPatrolAccessibleFamilyIds } = await import('@/lib/patrol/patrol-access')
-      const isSuperAdmin = (session.user as any).isSuperAdmin === true
-      const accessibleFamilyIds = await getPatrolAccessibleFamilyIds(
+      const { resolvePatrolVisibilityFilter } = await import('@/lib/patrol/patrol-access')
+      const isSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
+      const scope = await resolvePatrolVisibilityFilter(
         session.user.id,
         session.user.role,
-        isSuperAdmin
+        isSuperAdmin,
+        familyId
       )
-
-      // Construir filtro de familia: explícito > accesibles > sin filtro (super admin)
-      let familyWhere: Record<string, any> = {}
-      if (familyId) {
-        familyWhere = { familyId }
-      } else if (accessibleFamilyIds !== undefined && accessibleFamilyIds.length > 0) {
-        familyWhere = { familyId: { in: accessibleFamilyIds } }
+      if (!scope.ok) {
+        throw Object.assign(new Error(scope.error), { statusCode: scope.status })
       }
+      const familyWhere = scope.familyWhere as Record<string, any>
 
       const baseWhere = {
         ...familyWhere,
@@ -262,6 +258,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: true, data })
   } catch (error) {
     console.error('[patrol/reports/compliance] GET:', error)
+    const statusCode = (error as { statusCode?: number })?.statusCode
+    if (statusCode === 403) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : 'No autorizado' },
+        { status: 403 }
+      )
+    }
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
 }

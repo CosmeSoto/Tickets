@@ -73,7 +73,7 @@ function CreateClientTicketContent() {
         {/* Formulario Principal */}
         <div className='lg:col-span-2'>
           <CreateTicketForm
-            familiesEndpoint='/api/families'
+            familiesEndpoint='/api/families?asClient=true'
             clientId={session.user.id}
             afterSuccessHref='/client/tickets'
             cancelHref='/client/tickets'

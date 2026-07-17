@@ -3,6 +3,7 @@ import { useToast } from '@/hooks/use-toast'
 import type { Checkpoint, CheckpointFormData } from './types'
 import type { QRPrintItem, PrintFormat } from '@/components/common/qr/qr-print-dialog'
 import { printBulkQR } from '@/components/common/qr/qr-bulk-print'
+import { formatPatrolLifecycleConflict } from '@/lib/patrol/patrol-lifecycle-messages'
 
 interface UseCheckpointsOptions {
   checkpoints: Checkpoint[]
@@ -114,8 +115,20 @@ export function useCheckpoints({ checkpoints, reload }: UseCheckpointsOptions) {
       try {
         const res = await fetch(`/api/patrols/checkpoints/${id}`, { method: 'DELETE' })
         const data = await res.json()
+        if (res.status === 409) {
+          const conflict = formatPatrolLifecycleConflict(data, 'desactivar')
+          toast({
+            title: conflict.title,
+            description: conflict.description,
+            variant: 'destructive',
+          })
+          return
+        }
         if (!res.ok) throw new Error(data.error ?? 'Error al desactivar')
-        toast({ title: 'Checkpoint desactivado' })
+        toast({
+          title: 'Checkpoint desactivado',
+          description: 'Ya no podrá usarse en nuevas rutas. El historial se conserva.',
+        })
         reload()
       } catch (err) {
         toast({
@@ -162,8 +175,21 @@ export function useCheckpoints({ checkpoints, reload }: UseCheckpointsOptions) {
           method: 'DELETE',
         })
         const data = await res.json()
+
+        if (res.status === 409) {
+          const conflict = formatPatrolLifecycleConflict(data, 'eliminar')
+          toast({
+            title: conflict.title,
+            description: conflict.description,
+            variant: 'destructive',
+          })
+          return
+        }
+
         if (!res.ok) throw new Error(data.error ?? 'Error al eliminar permanentemente')
-        toast({ title: 'Checkpoint eliminado permanentemente' })
+        toast({
+          title: data.message ?? 'Checkpoint eliminado permanentemente',
+        })
         reload()
       } catch (err) {
         toast({

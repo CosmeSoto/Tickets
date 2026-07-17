@@ -206,16 +206,58 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     if (!patrol) return NextResponse.json({ error: 'Patrulla no encontrada' }, { status: 404 })
 
-    // Solo el agente asignado puede iniciar/finalizar
+    const body = await request.json()
+    const data = patchPatrolSchema.parse(body)
+
+    // Cancelar: ADMIN con acceso a la familia (antes del gate de agente)
+    if (data.action === 'cancel') {
+      const sessionUser = session.user as { isSuperAdmin?: boolean }
+      if (session.user.role !== 'ADMIN') {
+        return NextResponse.json(
+          { error: 'Solo los administradores pueden cancelar rondas' },
+          { status: 403 }
+        )
+      }
+
+      const ok = await canViewPatrolAsStaff(
+        { id: session.user.id, role: session.user.role, isSuperAdmin: sessionUser.isSuperAdmin },
+        patrol.familyId
+      )
+      if (!ok) {
+        return NextResponse.json({ error: 'No autorizado para esta área' }, { status: 403 })
+      }
+
+      if (patrol.status !== 'PENDING') {
+        return NextResponse.json(
+          { error: 'Solo se pueden cancelar rondas en estado PENDIENTE' },
+          { status: 409 }
+        )
+      }
+
+      await prisma.patrols.update({
+        where: { id },
+        data: { status: 'MISSED' },
+      })
+
+      await AuditServiceComplete.log({
+        action: 'PATROL_CANCELLED_BY_ADMIN',
+        entityType: 'patrol',
+        entityId: id,
+        userId: session.user.id,
+        details: { agentId: patrol.agentId, familyId: patrol.familyId },
+        request,
+      })
+
+      return NextResponse.json({ success: true, status: 'MISSED' })
+    }
+
+    // Iniciar/finalizar: solo el agente asignado
     if (patrol.agentId !== session.user.id) {
       return NextResponse.json(
         { error: 'Solo el agente asignado puede operar esta patrulla' },
         { status: 403 }
       )
     }
-
-    const body = await request.json()
-    const data = patchPatrolSchema.parse(body)
 
     // Obtener config de familia y override de la programación en paralelo
     const [familyConfig, scheduleConfig] = await Promise.all([
@@ -415,51 +457,6 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         status: finalStatus,
         completionPercentage: completionPct,
       })
-    }
-
-    if (data.action === 'cancel') {
-      // Solo ADMIN puede cancelar rondas (marcarlas como MISSED desde el panel admin)
-      const sessionUser = session.user as { isSuperAdmin?: boolean }
-      const isAdmin = session.user.role === 'ADMIN'
-      if (!isAdmin) {
-        return NextResponse.json(
-          { error: 'Solo los administradores pueden cancelar rondas' },
-          { status: 403 }
-        )
-      }
-
-      // Verificar acceso al área de la patrulla
-      const ok = await canViewPatrolAsStaff(
-        { id: session.user.id, role: session.user.role, isSuperAdmin: sessionUser.isSuperAdmin },
-        patrol.familyId
-      )
-      if (!ok) {
-        return NextResponse.json({ error: 'No autorizado para esta área' }, { status: 403 })
-      }
-
-      // Solo se pueden cancelar rondas PENDING
-      if (patrol.status !== 'PENDING') {
-        return NextResponse.json(
-          { error: 'Solo se pueden cancelar rondas en estado PENDIENTE' },
-          { status: 409 }
-        )
-      }
-
-      await prisma.patrols.update({
-        where: { id },
-        data: { status: 'MISSED' },
-      })
-
-      await AuditServiceComplete.log({
-        action: 'PATROL_CANCELLED_BY_ADMIN',
-        entityType: 'patrol',
-        entityId: id,
-        userId: session.user.id,
-        details: { agentId: patrol.agentId, familyId: patrol.familyId },
-        request,
-      })
-
-      return NextResponse.json({ success: true, status: 'MISSED' })
     }
 
     return NextResponse.json({ error: 'Acción no válida' }, { status: 400 })

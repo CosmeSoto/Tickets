@@ -44,7 +44,7 @@ export default function ClientTicketsPage() {
     error,
     reload,
   } = useModuleData<TicketType>({
-    endpoint: '/api/tickets',
+    endpoint: '/api/tickets?limit=500',
     initialLoad: true,
   })
 
