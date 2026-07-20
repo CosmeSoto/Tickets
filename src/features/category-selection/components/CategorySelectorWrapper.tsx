@@ -54,12 +54,26 @@ export function CategorySelectorWrapper({
     flagsInitialized.current = true
   }
   const flags = useCategorySelectorFeatureFlags()
-  const { categories: allCategories, isLoading, error: queryError } = useCategoriesQuery()
+
+  // Pedir categorías del área al API (consumer). Evita filtrar en cliente
+  // sobre un listado operational incompleto (familias asignadas / nativa).
+  const {
+    categories: fetchedCategories,
+    isLoading,
+    error: queryError,
+  } = useCategoriesQuery({
+    familyId,
+    enabled: !requireFamily || Boolean(familyId),
+  })
 
   const categories = React.useMemo(() => {
-    if (!familyId) return allCategories
-    return allCategories.filter((c: any) => resolveCategoryFamilyId(c) === familyId)
-  }, [allCategories, familyId])
+    if (!familyId) return fetchedCategories
+    // Seguridad extra si el API devolviera algo fuera de scope
+    return fetchedCategories.filter((c: any) => {
+      const catFamily = resolveCategoryFamilyId(c)
+      return !catFamily || catFamily === familyId
+    })
+  }, [fetchedCategories, familyId])
 
   if (requireFamily && !familyId) {
     return (

@@ -2,7 +2,7 @@
  * Configuración de React Query para caché de categorías
  */
 
-import { QueryClient } from '@tanstack/react-query';
+import { QueryClient } from '@tanstack/react-query'
 
 /**
  * Query keys para React Query
@@ -10,10 +10,11 @@ import { QueryClient } from '@tanstack/react-query';
 export const categoryQueryKeys = {
   all: ['categories'] as const,
   active: () => [...categoryQueryKeys.all, 'active'] as const,
+  byFamily: (familyId: string) => [...categoryQueryKeys.all, 'active', 'family', familyId] as const,
   frequent: (clientId: string) => [...categoryQueryKeys.all, 'frequent', clientId] as const,
   metadata: (categoryId: string) => [...categoryQueryKeys.all, 'metadata', categoryId] as const,
   search: (query: string) => [...categoryQueryKeys.all, 'search', query] as const,
-};
+}
 
 /**
  * Opciones de configuración para queries de categorías
@@ -26,21 +27,21 @@ export const categoryQueryOptions = {
     refetchOnWindowFocus: false,
     refetchOnMount: false,
   },
-  
+
   // Categorías frecuentes - cachear por 1 minuto
   frequent: {
     staleTime: 1 * 60 * 1000, // 1 minuto
     gcTime: 5 * 60 * 1000, // 5 minutos
     refetchOnWindowFocus: false,
   },
-  
+
   // Metadata de categoría - cachear por 2 minutos
   metadata: {
     staleTime: 2 * 60 * 1000, // 2 minutos
     gcTime: 5 * 60 * 1000, // 5 minutos
     refetchOnWindowFocus: false,
   },
-};
+}
 
 /**
  * Cliente de React Query configurado para el módulo de categorías
@@ -54,5 +55,5 @@ export function createCategoryQueryClient(): QueryClient {
         staleTime: 5 * 60 * 1000, // 5 minutos por defecto
       },
     },
-  });
+  })
 }
