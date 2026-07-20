@@ -56,9 +56,9 @@ export async function GET(request: NextRequest) {
       where.parentId = parentId
     }
 
-    // Filtrar por familia a través del departamento / category.familyId
+    // Filtrar por familia: familyId directo O departamentos de esa área
+    let familyDiag: { departmentCount: number; synced: number } | null = null
     if (familyId) {
-      // Admin/Tech/Client: pueden pedir categorías de familias donde CREAN tickets (consumer)
       if (!isSuperAdmin && (role === 'ADMIN' || role === 'TECHNICIAN' || role === 'CLIENT')) {
         const { getTicketConsumerFamilyIds } = await import('@/lib/auth/family-scope')
         const consumerIds = await getTicketConsumerFamilyIds(session.user.id, role, false)
@@ -69,7 +69,22 @@ export async function GET(request: NextRequest) {
           )
         }
       }
-      where.OR = [{ familyId }, { departments: { familyId } }]
+
+      const { buildCategoryFamilyWhere } = await import('@/lib/categories/sync-category-families')
+      const { whereOR, departmentIds, synced } = await buildCategoryFamilyWhere(familyId)
+      where.OR = whereOR
+      familyDiag = { departmentCount: departmentIds.length, synced }
+
+      if (departmentIds.length === 0) {
+        console.warn(
+          `[categories] familyId=${familyId} no tiene departamentos. synced=${synced}. ` +
+            'Las categorías no aparecerán hasta asignar familyId a los departamentos del área.'
+        )
+      } else if (synced > 0) {
+        console.info(
+          `[categories] Sincronizadas ${synced} categorías con familyId=${familyId} desde departamentos`
+        )
+      }
     }
 
     // Sin familyId:
@@ -260,6 +275,12 @@ export async function GET(request: NextRequest) {
       meta: {
         total: enrichedCategories.length,
         filters: { isActive, level, parentId, familyId },
+        ...(familyDiag
+          ? {
+              departmentCount: familyDiag.departmentCount,
+              syncedCategoryFamilies: familyDiag.synced,
+            }
+          : {}),
       },
     }
 

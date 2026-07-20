@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { AlertCircle, CheckCircle2, Info, ChevronRight, X } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -192,10 +192,30 @@ export function CategorySelector({
     debounceMs: 500,
   })
 
-  const { frequentCategories, isLoading: isLoadingFrequent } = useFrequentCategories({
+  const { frequentCategories: frequentRaw, isLoading: isLoadingFrequent } = useFrequentCategories({
     clientId,
     limit: 5,
+    enabled: Boolean(clientId) && categories.length > 0,
   })
+
+  // Solo frecuentes que pertenecen al área actualmente cargada
+  const frequentCategories = useMemo(() => {
+    if (categories.length === 0) return []
+    const allowed = new Set(categories.map(c => c.id))
+    return frequentRaw.filter(f => allowed.has(f.category.id))
+  }, [frequentRaw, categories])
+
+  // Si hay texto pero no hay sugerencias, mostrar el árbol para selección manual
+  useEffect(() => {
+    if (categories.length === 0) {
+      setShowManualNavigation(false)
+      return
+    }
+    const hasText = Boolean(ticketTitle?.trim() || ticketDescription?.trim())
+    if (hasText && !isAnalyzing && suggestions.length === 0) {
+      setShowManualNavigation(true)
+    }
+  }, [categories.length, ticketTitle, ticketDescription, isAnalyzing, suggestions.length])
 
   // Build category path from selected category ID
   const buildCategoryPath = useCallback(
@@ -481,198 +501,196 @@ export function CategorySelector({
         </Alert>
       )}
 
-      {/* Search bar - always visible */}
-      <div className='space-y-2'>
-        <label htmlFor='category-search' className='text-sm font-medium'>
-          Buscar categoría
-          <span className='text-xs text-muted-foreground ml-2'>(Atajo: Ctrl+K)</span>
-        </label>
-        <SearchBar
-          ref={searchInputRef}
-          onSearch={handleSearch}
-          onResultSelect={handleSearchResultSelect}
-          results={searchResults}
-          isLoading={isSearching}
-          placeholder='Buscar...'
-        />
-      </div>
+      {categories.length > 0 && (
+        <>
+          {/* Search bar - always visible when hay categorías */}
+          <div className='space-y-2'>
+            <label htmlFor='category-search' className='text-sm font-medium'>
+              Buscar categoría
+              <span className='text-xs text-muted-foreground ml-2'>(Atajo: Ctrl+K)</span>
+            </label>
+            <SearchBar
+              ref={searchInputRef}
+              onSearch={handleSearch}
+              onResultSelect={handleSearchResultSelect}
+              results={searchResults}
+              isLoading={isSearching}
+              placeholder='Buscar...'
+            />
+          </div>
 
-      {/* Frequent categories - compact */}
-      {showFrequentCategories && !isLoadingFrequent && frequentCategories.length > 0 && (
-        <FrequentCategories
-          frequentCategories={frequentCategories}
-          onSelect={handleFrequentSelect}
-          isLoading={isLoadingFrequent}
-          maxItems={3}
-        />
-      )}
+          {/* Frequent categories - compact */}
+          {showFrequentCategories && !isLoadingFrequent && frequentCategories.length > 0 && (
+            <FrequentCategories
+              frequentCategories={frequentCategories}
+              onSelect={handleFrequentSelect}
+              isLoading={isLoadingFrequent}
+              maxItems={3}
+            />
+          )}
 
-      {/* Suggestions - compact */}
-      {showSuggestions && (ticketTitle || ticketDescription) && (
-        <SuggestionEngine
-          title={ticketTitle}
-          description={ticketDescription}
-          onSuggestionSelect={handleSuggestionSelect}
-          suggestions={suggestions}
-          isAnalyzing={isAnalyzing}
-          maxSuggestions={3}
-        />
-      )}
+          {/* Suggestions - compact */}
+          {showSuggestions && (ticketTitle || ticketDescription) && (
+            <SuggestionEngine
+              title={ticketTitle}
+              description={ticketDescription}
+              onSuggestionSelect={handleSuggestionSelect}
+              suggestions={suggestions}
+              isAnalyzing={isAnalyzing}
+              maxSuggestions={3}
+            />
+          )}
 
-      {/* Main selection area */}
-      {!state.showConfirmation ? (
-        <div className='space-y-3'>
-          {/* Show manual navigation only if user wants it */}
-          {!showManualNavigation ? (
-            <div className='space-y-2'>
-              {/* If there are suggestions, they will be shown above */}
-              {/* Button to show manual navigation */}
-              <Button
-                type='button'
-                variant='ghost'
-                size='sm'
-                onClick={() => setShowManualNavigation(true)}
-                className='w-full text-muted-foreground text-xs h-7'
-              >
-                No encuentras la categoría? Busca en el árbol completo
-              </Button>
-            </div>
+          {/* Main selection area: árbol/manual si no hay confirmación, o panel si ya hay categoría */}
+          {state.showConfirmation && selectedCategory ? (
+            <section aria-label='Resumen de categoría seleccionada' className='space-y-3'>
+              {categoryMetadata ? (
+                <ConfirmationPanel
+                  category={selectedCategory}
+                  path={categories.filter(c => state.selectedPath.includes(c.id))}
+                  metadata={categoryMetadata}
+                  onEdit={handleEditSelection}
+                  onConfirm={() => {
+                    setState(prev => ({ ...prev, showConfirmation: false }))
+                    setAnnouncement(`Categoría confirmada: ${selectedCategory.name}`)
+                  }}
+                />
+              ) : (
+                <Card className='border-primary/20'>
+                  <CardContent className='p-3 flex items-center justify-between gap-3'>
+                    <div className='min-w-0'>
+                      <p className='text-xs text-muted-foreground'>Categoría seleccionada</p>
+                      <p className='text-sm font-medium truncate'>{selectedCategory.name}</p>
+                    </div>
+                    <div className='flex gap-2 shrink-0'>
+                      <Button type='button' variant='ghost' size='sm' onClick={handleEditSelection}>
+                        Cambiar
+                      </Button>
+                      <Button
+                        type='button'
+                        size='sm'
+                        onClick={() => {
+                          setState(prev => ({ ...prev, showConfirmation: false }))
+                          setAnnouncement(`Categoría confirmada: ${selectedCategory.name}`)
+                        }}
+                      >
+                        Confirmar
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </section>
           ) : (
-            <div className='space-y-2'>
-              <Button
-                type='button'
-                variant='ghost'
-                size='sm'
-                onClick={() => setShowManualNavigation(false)}
-                className='w-full text-muted-foreground text-xs h-7'
-              >
-                Volver a sugerencias
-              </Button>
-              <CategoryTree
-                categories={categories}
-                selectedPath={state.selectedPath}
-                onSelect={handleTreeSelect}
-                mode='full'
-              />
+            <div className='space-y-3'>
+              {!showManualNavigation ? (
+                <div className='space-y-2'>
+                  <Button
+                    type='button'
+                    variant='outline'
+                    size='sm'
+                    onClick={() => setShowManualNavigation(true)}
+                    className='w-full text-xs h-8'
+                  >
+                    Ver árbol completo / seleccionar manualmente
+                  </Button>
+                </div>
+              ) : (
+                <div className='space-y-2'>
+                  {(ticketTitle || ticketDescription) && suggestions.length > 0 && (
+                    <Button
+                      type='button'
+                      variant='ghost'
+                      size='sm'
+                      onClick={() => setShowManualNavigation(false)}
+                      className='w-full text-muted-foreground text-xs h-7'
+                    >
+                      Volver a sugerencias
+                    </Button>
+                  )}
+                  <p className='text-xs text-muted-foreground'>
+                    Navega el árbol o usa la búsqueda (Ctrl+K) para elegir la categoría.
+                  </p>
+                  <CategoryTree
+                    categories={categories}
+                    selectedPath={state.selectedPath}
+                    onSelect={handleTreeSelect}
+                    mode='full'
+                  />
+                </div>
+              )}
             </div>
           )}
-        </div>
-      ) : selectedCategory ? (
-        <section aria-label='Resumen de categoría seleccionada' className='space-y-3'>
-          {/* Confidence indicator - very compact */}
-          {/* <Alert
-            className={cn(confidenceIndicator.bgColor, confidenceIndicator.borderColor, 'py-2')}
-            role='status'
-            aria-live='polite'
-          >
-            <ConfidenceIcon className={cn('h-4 w-4', confidenceIndicator.color)} />
-            <AlertDescription className={cn(confidenceIndicator.color, 'text-sm')}>
-              {confidenceIndicator.message}
-            </AlertDescription>
-          </Alert> */}
 
-          {categoryMetadata && (
-            <>
-              <ConfirmationPanel
-                category={selectedCategory}
-                path={categories.filter(c => state.selectedPath.includes(c.id))}
-                metadata={categoryMetadata}
-                onEdit={handleEditSelection}
-                onConfirm={() => {
-                  // Close confirmation panel and show compact summary
-                  setState(prev => ({ ...prev, showConfirmation: false }))
-                  setAnnouncement(`Categoría confirmada: ${selectedCategory.name}`)
-                }}
-              />
-
-              {/* Knowledge base: artículos relacionados + búsqueda en un solo bloque */}
-              {/* <RelatedArticles
-                categoryId={selectedCategory.id}
-                ticketTitle={ticketTitle}
-                ticketDescription={ticketDescription}
-                onArticleClick={(articleId: string) => {
-                  trackAnalyticsEvent('search', selectedCategory.id, undefined, {
-                    articleViewed: articleId,
-                  })
-                }}
-              /> */}
-            </>
-          )}
-        </section>
-      ) : (
-        // Fallback if no category selected
-        <Alert>
-          <AlertCircle className='h-4 w-4' />
-          <AlertDescription>
-            No hay categoría seleccionada. Por favor selecciona una categoría.
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* Compact summary when confirmed (not in confirmation mode) */}
-      {!state.showConfirmation && selectedCategory && (
-        <Card className='border-green-500/30 bg-green-50/30 dark:bg-green-950/10'>
-          <CardContent className='p-3'>
-            <div className='flex flex-col gap-3'>
-              <div className='flex items-center gap-3 flex-1 min-w-0'>
-                <CheckCircle2 className='h-5 w-5 text-green-600 flex-shrink-0' />
-                <div className='flex-1 min-w-0'>
-                  <p className='text-xs text-muted-foreground mb-1'>Categoría seleccionada:</p>
-                  <div className='flex items-center gap-2 flex-wrap'>
-                    {state.selectedPath
-                      .map(id => categories.find(c => c.id === id))
-                      .filter(Boolean)
-                      .map((cat, index, arr) => (
-                        <React.Fragment key={cat!.id}>
-                          {index > 0 && <ChevronRight className='h-3 w-3 text-muted-foreground' />}
-                          <Badge
-                            variant={index === arr.length - 1 ? 'default' : 'secondary'}
-                            className='text-xs'
-                          >
-                            {cat!.name}
-                          </Badge>
-                        </React.Fragment>
-                      ))}
+          {/* Compact summary when confirmed (not in confirmation mode) */}
+          {!state.showConfirmation && selectedCategory && (
+            <Card className='border-green-500/30 bg-green-50/30 dark:bg-green-950/10'>
+              <CardContent className='p-3'>
+                <div className='flex flex-col gap-3'>
+                  <div className='flex items-center gap-3 flex-1 min-w-0'>
+                    <CheckCircle2 className='h-5 w-5 text-green-600 flex-shrink-0' />
+                    <div className='flex-1 min-w-0'>
+                      <p className='text-xs text-muted-foreground mb-1'>Categoría seleccionada:</p>
+                      <div className='flex items-center gap-2 flex-wrap'>
+                        {state.selectedPath
+                          .map(id => categories.find(c => c.id === id))
+                          .filter(Boolean)
+                          .map((cat, index, arr) => (
+                            <React.Fragment key={cat!.id}>
+                              {index > 0 && (
+                                <ChevronRight className='h-3 w-3 text-muted-foreground' />
+                              )}
+                              <Badge
+                                variant={index === arr.length - 1 ? 'default' : 'secondary'}
+                                className='text-xs'
+                              >
+                                {cat!.name}
+                              </Badge>
+                            </React.Fragment>
+                          ))}
+                      </div>
+                    </div>
+                  </div>
+                  <div className='flex items-center gap-2 justify-end'>
+                    <Button
+                      type='button'
+                      variant='ghost'
+                      size='sm'
+                      onClick={() => setState(prev => ({ ...prev, showConfirmation: true }))}
+                      className='flex-shrink-0'
+                    >
+                      <Info className='h-4 w-4 mr-1' />
+                      Ver detalles
+                    </Button>
+                    <Button
+                      type='button'
+                      variant='destructive'
+                      size='sm'
+                      onClick={() => {
+                        setState({
+                          selectedPath: [],
+                          mode: 'full',
+                          searchQuery: '',
+                          showConfirmation: false,
+                          selectionStartTime: Date.now(),
+                          interactionMethod: null,
+                        })
+                        setShowManualNavigation(false)
+                        setCategoryMetadata(null)
+                        setConfidenceScore(0)
+                        onChange('')
+                      }}
+                      className='flex-shrink-0'
+                    >
+                      <X className='h-4 w-4 mr-1' />
+                      Limpiar
+                    </Button>
                   </div>
                 </div>
-              </div>
-              <div className='flex items-center gap-2 justify-end'>
-                <Button
-                  type='button'
-                  variant='ghost'
-                  size='sm'
-                  onClick={() => setState(prev => ({ ...prev, showConfirmation: true }))}
-                  className='flex-shrink-0'
-                >
-                  <Info className='h-4 w-4 mr-1' />
-                  Ver detalles
-                </Button>
-                <Button
-                  type='button'
-                  variant='destructive'
-                  size='sm'
-                  onClick={() => {
-                    setState({
-                      selectedPath: [],
-                      mode: 'full',
-                      searchQuery: '',
-                      showConfirmation: true,
-                      selectionStartTime: Date.now(),
-                      interactionMethod: null,
-                    })
-                    setCategoryMetadata(null)
-                    setConfidenceScore(0)
-                    onChange('')
-                  }}
-                  className='flex-shrink-0'
-                >
-                  <X className='h-4 w-4 mr-1' />
-                  Limpiar
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          )}
+        </>
       )}
     </div>
   )

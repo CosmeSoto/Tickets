@@ -29,13 +29,8 @@ export interface CategorySelectorWrapperProps {
   requireFamily?: boolean
 }
 
-function resolveCategoryFamilyId(c: any): string | null {
-  return c.familyId ?? c.family?.id ?? c.departments?.familyId ?? c.departments?.family?.id ?? null
-}
-
 /**
- * Wrapper: feature flags + filtro por familia.
- * Si se pasa familyId, muestra solo categorías de esa área.
+ * Wrapper: feature flags + carga de categorías por familia (API).
  */
 export function CategorySelectorWrapper({
   value,
@@ -67,13 +62,10 @@ export function CategorySelectorWrapper({
   })
 
   const categories = React.useMemo(() => {
-    if (!familyId) return fetchedCategories
-    // Seguridad extra si el API devolviera algo fuera de scope
-    return fetchedCategories.filter((c: any) => {
-      const catFamily = resolveCategoryFamilyId(c)
-      return !catFamily || catFamily === familyId
-    })
-  }, [fetchedCategories, familyId])
+    // Si el API ya filtró por familyId, no re-filtrar en cliente
+    // (evita perder categorías con familyId null pero department correcto)
+    return fetchedCategories
+  }, [fetchedCategories])
 
   if (requireFamily && !familyId) {
     return (
@@ -118,6 +110,7 @@ export function CategorySelectorWrapper({
 
   return (
     <CategorySelector
+      key={familyId || 'no-family'}
       value={value}
       onChange={onChange}
       ticketTitle={ticketTitle}
@@ -128,7 +121,7 @@ export function CategorySelectorWrapper({
       disabled={disabled}
       emptyMessage={
         familyId
-          ? 'No hay categorías activas para esta área de soporte.'
+          ? 'No hay categorías activas para esta área. Ve a Tickets → Categorías, filtra por esta área y crea o activa categorías (los departamentos del área deben tener la familia asignada).'
           : 'No hay categorías disponibles.'
       }
     />
