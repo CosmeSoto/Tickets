@@ -40,6 +40,7 @@ interface UserComboboxProps {
   allowClear?: boolean
   showEmail?: boolean
   showDepartment?: boolean
+  preloadedUser?: UserOption | null
 }
 
 export function UserCombobox({
@@ -54,6 +55,7 @@ export function UserCombobox({
   allowClear = true,
   showEmail = true,
   showDepartment = true,
+  preloadedUser = null,
 }: UserComboboxProps) {
   const [open, setOpen] = React.useState(false)
   const [search, setSearch] = React.useState('')
@@ -87,12 +89,14 @@ export function UserCombobox({
 
   // Cargar usuario seleccionado cuando cambia el value
   React.useEffect(() => {
-    if (value && !selectedUser) {
+    if (preloadedUser && value === preloadedUser.id) {
+      setSelectedUser(preloadedUser)
+    } else if (value && !selectedUser) {
       loadSelectedUser(value)
     } else if (!value) {
       setSelectedUser(null)
     }
-  }, [value]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [value, preloadedUser]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadUsers = async (query: string) => {
     setLoading(true)

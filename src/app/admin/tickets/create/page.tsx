@@ -455,7 +455,7 @@ export default function CreateTicketPage() {
                           <span className='text-xs text-muted-foreground self-center'>o</span>
                         </div>
                         <UserCombobox
-                          value={clientId === session?.user?.id ? undefined : watch('clientId')}
+                          value={watch('clientId')}
                           onValueChange={clientId => {
                             setValue('clientId', clientId)
                             handleClientSelect(clientId)
@@ -464,6 +464,17 @@ export default function CreateTicketPage() {
                           emptyText='No se encontraron usuarios'
                           showEmail={true}
                           showDepartment={true}
+                          disabled={clientId === session?.user?.id}
+                          preloadedUser={
+                            clientId === session?.user?.id && session?.user
+                              ? {
+                                  id: session.user.id,
+                                  name: session.user.name || 'Administrador',
+                                  email: session.user.email || '',
+                                  role: session.user.role as 'ADMIN' | 'CLIENT' | 'TECHNICIAN',
+                                }
+                              : null
+                          }
                           className={errors.clientId ? 'border-red-500' : ''}
                         />
                         {errors.clientId && (
@@ -472,8 +483,8 @@ export default function CreateTicketPage() {
                         {selectedClient && (
                           <p className='text-xs text-muted-foreground'>
                             {clientId === session?.user?.id
-                              ? '💡 Crearás un ticket propio. Selecciona el área de soporte a continuación.'
-                              : '💡 El usuario recibirá notificaciones automáticas sobre el progreso del ticket'}
+                              ? '✅ Ticket propio — se registrará a tu nombre. Selecciona el área de soporte a continuación.'
+                              : `📋 El ticket se creará a nombre de ${selectedClient.name}. Recibirá notificaciones automáticas sobre el progreso.`}
                           </p>
                         )}
                       </div>
@@ -873,11 +884,13 @@ export default function CreateTicketPage() {
           <div className='space-y-6'>
             {/* Cliente Seleccionado */}
             {selectedClient && (
-              <Card>
-                <CardHeader>
+              <Card
+                className={clientId === session?.user?.id ? 'border-primary/30 bg-primary/5' : ''}
+              >
+                <CardHeader className='pb-2'>
                   <CardTitle className='flex items-center text-sm'>
                     <User className='h-4 w-4 mr-2' />
-                    Cliente Seleccionado
+                    {clientId === session?.user?.id ? 'Tu Ticket' : 'Cliente Seleccionado'}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -896,6 +909,16 @@ export default function CreateTicketPage() {
                       >
                         {selectedClient.department.name}
                       </Badge>
+                    )}
+                    {clientId === session?.user?.id ? (
+                      <p className='text-xs text-primary font-medium'>
+                        🎟️ Gracias por utilizar el servicio de tickets. Tu solicitud quedará
+                        registrada a tu nombre.
+                      </p>
+                    ) : (
+                      <p className='text-xs text-muted-foreground'>
+                        📋 El ticket se creará a nombre de este cliente.
+                      </p>
                     )}
                   </div>
                 </CardContent>
@@ -916,13 +939,17 @@ export default function CreateTicketPage() {
             </div>
 
             {/* Información Adicional */}
-            <Alert>
+            <Alert
+              className={clientId === session?.user?.id ? 'border-primary/40 bg-primary/5' : ''}
+            >
               <AlertCircle className='h-4 w-4' />
               <AlertDescription>
                 <strong>Nota:</strong>{' '}
                 {clientId === session?.user?.id
-                  ? 'Este ticket se creará como solicitud propia.'
-                  : 'Este ticket se creará en nombre del usuario seleccionado. El usuario recibirá notificaciones automáticas sobre el progreso del ticket.'}
+                  ? 'Este ticket se registrará como solicitud propia. Quedará asociado a tu cuenta.'
+                  : selectedClient
+                    ? `Este ticket se creará a nombre de ${selectedClient.name}. El cliente recibirá notificaciones automáticas sobre el progreso.`
+                    : 'Selecciona un cliente o usa "Ticket Propio" para continuar.'}
               </AlertDescription>
             </Alert>
           </div>
