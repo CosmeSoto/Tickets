@@ -100,7 +100,7 @@ sudo ./start-production.sh --clean
 sudo ./start-production.sh
 
 # Al arrancar, el entrypoint verifica catálogos de inventario (marcas, tipos, bodegas)
-# y ejecuta ensure-catalogs automáticamente si faltan — no hace falta correr seed a mano.
+# y ejecuta ensure-catalogs / ensure-categories automáticamente si faltan — no hace falta correr seed a mano.
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # COMANDOS MANUALES (si prefieres no usar el script):
@@ -238,6 +238,10 @@ sudo docker exec tickets-app sh -c 'node ./node_modules/tsx/dist/cli.mjs prisma/
 # Solo catálogos de inventario (marcas, tipos, bodegas) — si ya hay usuarios pero catálogos vacíos:
 sudo docker exec tickets-app sh -c 'node ./node_modules/tsx/dist/cli.mjs prisma/ensure-catalogs.ts'
 # o localmente: npm run db:seed-catalogs
+
+# Solo categorías de tickets — si ya hay usuarios pero categories está vacía (0 en Gestión de Categorías):
+sudo docker exec tickets-app sh -c 'node ./node_modules/tsx/dist/cli.mjs prisma/ensure-categories.ts'
+# o localmente: npm run db:seed-categories
 ```
 
 ### Conectarse a la BD
@@ -256,7 +260,9 @@ docker compose -f docker-compose.prod.yml --env-file .env.production exec postgr
 
 Documentación completa: [docs/BACKUP-SYSTEM.md](docs/BACKUP-SYSTEM.md)
 
-### Arranque limpio (`--clean`)
+### Arranque limpio (`--clean` / `--clear`)
+
+`--clear` es alias de `--clean`: borra volúmenes (BD incluida) y vuelve a seedear.
 
 1. `start-production.sh` ejecuta automáticamente `init-pgbackrest.sh` (stanza + FULL + archivado WAL).
 2. El **backup-worker** usa la misma versión de pgBackRest que PostgreSQL 17 (2.58+).
@@ -397,13 +403,13 @@ mkcert -CAROOT
 
 #### Instalar la CA en otros dispositivos
 
-| Dispositivo | Pasos |
-|---|---|
-| **Mac** | Doble clic en `rootCA.pem` → Llavero de acceso → Confiar siempre en SSL/TLS |
-| **Windows** | Doble clic en `rootCA.pem` → Instalar certificado → Equipo local → "Entidades de certificación raíz de confianza" |
-| **Android** | Ajustes → Seguridad → Instalar certificado → desde archivo |
-| **iOS / iPadOS** | Enviar `rootCA.pem` por AirDrop o correo → Ajustes → General → VPN y gestión del dispositivo → Confiar |
-| **Linux (Chrome/Chromium)** | `certutil -d sql:$HOME/.pki/nssdb -A -t "C,," -n mkcert -i rootCA.pem` |
+| Dispositivo                 | Pasos                                                                                                             |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| **Mac**                     | Doble clic en `rootCA.pem` → Llavero de acceso → Confiar siempre en SSL/TLS                                       |
+| **Windows**                 | Doble clic en `rootCA.pem` → Instalar certificado → Equipo local → "Entidades de certificación raíz de confianza" |
+| **Android**                 | Ajustes → Seguridad → Instalar certificado → desde archivo                                                        |
+| **iOS / iPadOS**            | Enviar `rootCA.pem` por AirDrop o correo → Ajustes → General → VPN y gestión del dispositivo → Confiar            |
+| **Linux (Chrome/Chromium)** | `certutil -d sql:$HOME/.pki/nssdb -A -t "C,," -n mkcert -i rootCA.pem`                                            |
 
 #### Atajo temporal (solo para pruebas rápidas)
 
@@ -595,20 +601,20 @@ SELECT table_name FROM information_schema.tables WHERE table_name = 'patrol_fami
 
 ## Solución de Problemas
 
-| Problema                                        | Solución                                                                                                                                                            |
-| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| App no arranca                                  | `docker logs tickets-app` — verificar DATABASE_URL                                                                                                                  |
-| No accede a gestion.local                       | Verificar `/etc/hosts` y que nginx esté corriendo                                                                                                                   |
-| Certificado SSL no confiable (`NET::ERR_CERT_AUTHORITY_INVALID`) | Ver sección **Acceso desde la Red → Confianza en el certificado SSL** para instalar la CA de mkcert por dispositivo |
-| **404 en `/api/admin/news` u otros módulos**    | `sudo ./start-production.sh`. Si persiste: `sudo ./start-production.sh --clean` (⚠️ borra BD)                                                                       |
-| pgBackRest no disponible / recovery mode        | `./docker/scripts/fix-pgbackrest.sh`                                                                                                                                |
-| `VersionNotSupportedError` control version 1700 | Reconstruir **backup-worker** (pgBackRest 2.50+ para PG 17): `docker compose -f docker-compose.prod.yml build backup-worker && ./docker/scripts/init-pgbackrest.sh` |
-| `archive_mode must be enabled`                  | Bootstrap incompleto — `./docker/scripts/init-pgbackrest.sh` y reinicia postgres                                                                                    |
-| PostgreSQL bucle recovery / P1017 en app        | `archive-push` falló — ejecutar fix script y rebuild `postgres`                                                                                                     |
-| Módulo carga vacío tras restaurar backup        | Igual que arriba — si se reconstruyó sin `start-production.sh`, el `NEXTAUTH_URL` puede quedar con dominio errado                                                   |
-| Dashboard rondas vacío                          | Verificar que hay patrullas programadas para hoy (UTC-5)                                                                                                            |
-| Técnico no aparece en categorías                | Verificar `technician_family_assignments` para esa familia                                                                                                          |
-| Agente no aparece en programación               | Verificar `patrol_family_assignments` + `patrolsEnabled=true`                                                                                                       |
+| Problema                                                         | Solución                                                                                                                                                            |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| App no arranca                                                   | `docker logs tickets-app` — verificar DATABASE_URL                                                                                                                  |
+| No accede a gestion.local                                        | Verificar `/etc/hosts` y que nginx esté corriendo                                                                                                                   |
+| Certificado SSL no confiable (`NET::ERR_CERT_AUTHORITY_INVALID`) | Ver sección **Acceso desde la Red → Confianza en el certificado SSL** para instalar la CA de mkcert por dispositivo                                                 |
+| **404 en `/api/admin/news` u otros módulos**                     | `sudo ./start-production.sh`. Si persiste: `sudo ./start-production.sh --clean` (⚠️ borra BD)                                                                       |
+| pgBackRest no disponible / recovery mode                         | `./docker/scripts/fix-pgbackrest.sh`                                                                                                                                |
+| `VersionNotSupportedError` control version 1700                  | Reconstruir **backup-worker** (pgBackRest 2.50+ para PG 17): `docker compose -f docker-compose.prod.yml build backup-worker && ./docker/scripts/init-pgbackrest.sh` |
+| `archive_mode must be enabled`                                   | Bootstrap incompleto — `./docker/scripts/init-pgbackrest.sh` y reinicia postgres                                                                                    |
+| PostgreSQL bucle recovery / P1017 en app                         | `archive-push` falló — ejecutar fix script y rebuild `postgres`                                                                                                     |
+| Módulo carga vacío tras restaurar backup                         | Igual que arriba — si se reconstruyó sin `start-production.sh`, el `NEXTAUTH_URL` puede quedar con dominio errado                                                   |
+| Dashboard rondas vacío                                           | Verificar que hay patrullas programadas para hoy (UTC-5)                                                                                                            |
+| Técnico no aparece en categorías                                 | Verificar `technician_family_assignments` para esa familia                                                                                                          |
+| Agente no aparece en programación                                | Verificar `patrol_family_assignments` + `patrolsEnabled=true`                                                                                                       |
 
 ---
 

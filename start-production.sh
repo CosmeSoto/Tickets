@@ -9,6 +9,7 @@
 # Uso:
 #   sudo ./start-production.sh                 # rebuild normal
 #   sudo ./start-production.sh --clean         # borra volúmenes + rebuild con caché (~rápido)
+#   sudo ./start-production.sh --clear         # alias de --clean
 #   sudo ./start-production.sh --clean --no-cache  # rebuild total sin caché (~lento)
 #
 # Requisitos:
@@ -24,7 +25,7 @@ CLEAN_BUILD=false
 NO_CACHE=false
 for arg in "$@"; do
   case "$arg" in
-    --clean) CLEAN_BUILD=true ;;
+    --clean|--clear) CLEAN_BUILD=true ;;
     --no-cache) NO_CACHE=true ;;
   esac
 done

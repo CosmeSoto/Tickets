@@ -154,6 +154,43 @@ elif [ "$CATALOG_CHECK" != "0" ]; then
   echo "==> ADVERTENCIA: No se pudo verificar catálogos (código $CATALOG_CHECK)"
 fi
 
+# Categorías de tickets — si el seed completo se omitió (ya hay usuarios) pero
+# categories quedó vacía, restaurarlas igual que ensure-catalogs.
+echo "==> Verificando categorías de tickets..."
+CATEGORIES_CHECK=0
+node - <<'NODESCRIPT' || CATEGORIES_CHECK=$?
+const { PrismaClient } = require('@prisma/client');
+const p = new PrismaClient();
+(async () => {
+  try {
+    const count = await p.categories.count();
+    if (count === 0) {
+      console.log('  → Categorías vacías (0)');
+      process.exit(2);
+    }
+    console.log('  → Categorías OK (' + count + ')');
+    process.exit(0);
+  } catch (e) {
+    console.error('  → Error verificando categorías:', e.message);
+    process.exit(1);
+  } finally {
+    await p.$disconnect();
+  }
+})();
+NODESCRIPT
+
+if [ "$CATEGORIES_CHECK" = "2" ]; then
+  echo "==> Ejecutando ensure-categories..."
+  if $TSX_CLI prisma/ensure-categories.ts; then
+    echo "==> Categorías de tickets restauradas."
+  else
+    echo "==> ADVERTENCIA: ensure-categories falló — ejecuta manualmente:"
+    echo "==>   docker exec tickets-app sh -c 'node ./node_modules/tsx/dist/cli.mjs prisma/ensure-categories.ts'"
+  fi
+elif [ "$CATEGORIES_CHECK" != "0" ]; then
+  echo "==> ADVERTENCIA: No se pudo verificar categorías (código $CATEGORIES_CHECK)"
+fi
+
 # Verificar datos esenciales que podrían faltar (landing page services, etc.)
 echo "==> Verificando datos esenciales de landing page..."
 node - <<'NODESCRIPT' 2>/dev/null || true

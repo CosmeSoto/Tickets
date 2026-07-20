@@ -42,11 +42,16 @@ async function upsertCategory(
 }
 
 export async function seedCategoriesTechnology(prisma: PrismaClient, deptMap: Map<string, string>) {
-  const deptInfraId = deptMap.get('Tecnologías de la Información')!
-  const deptSoporteId = deptMap.get('Soporte Técnico')!
-  const deptSeguridadId = deptMap.get('Seguridad Informática')!
-  const deptUsuariosId = deptMap.get('Usuarios y Privilegios')!
-  const deptTelefoniaId = deptMap.get('Telefonía')!
+  const deptInfraId = deptMap.get('Tecnologías de la Información')
+  const deptSoporteId = deptMap.get('Soporte Técnico')
+  const deptSeguridadId = deptMap.get('Seguridad Informática')
+  const deptUsuariosId = deptMap.get('Usuarios y Privilegios')
+  const deptTelefoniaId = deptMap.get('Telefonía')
+
+  if (!deptInfraId || !deptSoporteId || !deptSeguridadId || !deptUsuariosId || !deptTelefoniaId) {
+    console.log('⚠️  Departamentos de Tecnología no encontrados, saltando seed de categorías TI...')
+    return
+  }
 
   // ==================== INFRAESTRUCTURA ====================
   const fallaErrorInfra = await upsertCategory(prisma, {

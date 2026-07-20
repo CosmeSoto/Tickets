@@ -209,6 +209,41 @@ export async function GET(request: NextRequest) {
     }
 
     // Obtener usuarios con conteo de tickets y relación con departamento
+    const technicianInclude =
+      role === 'TECHNICIAN'
+        ? {
+            technicianFamilyAssignments: {
+              where: { isActive: true },
+              select: {
+                familyId: true,
+                family: { select: { id: true, name: true, code: true, color: true } },
+              },
+            },
+            technician_assignments: {
+              select: {
+                id: true,
+                priority: true,
+                maxTickets: true,
+                autoAssign: true,
+                categories: {
+                  select: {
+                    id: true,
+                    name: true,
+                    color: true,
+                    level: true,
+                  },
+                },
+              },
+              where: {
+                isActive: true,
+              },
+            },
+          }
+        : {
+            technicianFamilyAssignments: false as const,
+            technician_assignments: false as const,
+          }
+
     const users = await prisma.users.findMany({
       where,
       select: {
@@ -234,16 +269,7 @@ export async function GET(request: NextRequest) {
             },
           },
         },
-        technicianFamilyAssignments:
-          role === 'TECHNICIAN'
-            ? {
-                where: { isActive: true },
-                select: {
-                  familyId: true,
-                  family: { select: { id: true, name: true, code: true, color: true } },
-                },
-              }
-            : false,
+        ...technicianInclude,
         phone: true,
         avatar: true,
         isActive: true,
@@ -266,34 +292,11 @@ export async function GET(request: NextRequest) {
             technician_assignments: true,
           },
         },
-        technician_assignments:
-          role === 'TECHNICIAN'
-            ? {
-                select: {
-                  id: true,
-                  priority: true,
-                  maxTickets: true,
-                  autoAssign: true,
-                  categories: {
-                    select: {
-                      id: true,
-                      name: true,
-                      color: true,
-                      level: true,
-                    },
-                  },
-                },
-                where: {
-                  isActive: true,
-                },
-              }
-            : false,
       },
       orderBy: {
         name: 'asc',
       },
-      // Aplicar límite si se especifica
-      take: limit ? Math.min(parseInt(limit), 500) : undefined,
+      ...(limit ? { take: Math.min(parseInt(limit, 10) || 500, 500) } : {}),
     })
 
     // Agregar levelName a las categorías de técnicos
