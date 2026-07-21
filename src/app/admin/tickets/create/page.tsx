@@ -48,7 +48,7 @@ import { useToast } from '@/hooks/use-toast'
 import { UserCombobox } from '@/components/ui/user-combobox'
 import { CategorySelectorWrapper } from '@/features/category-selection'
 import { FileInputWithCamera } from '@/components/common/file-input-with-camera'
-import { useClients } from '@/contexts/users-context'
+import { useUsers } from '@/contexts/users-context'
 
 interface User {
   id: string
@@ -94,8 +94,8 @@ export default function CreateTicketPage() {
   const [loadError, setLoadError] = useState('')
   const [createdTicketId, setCreatedTicketId] = useState<string | null>(null)
 
-  // ✅ Clientes desde contexto global — sin petición extra
-  const { clients } = useClients()
+  // ✅ Usuarios desde contexto global — sin petición extra
+  const { users: allUsers } = useUsers()
 
   // Familias disponibles para el cliente seleccionado
   const [clientFamilies, setClientFamilies] = useState<
@@ -142,13 +142,15 @@ export default function CreateTicketPage() {
     }
   }, [session, status, router])
 
-  // Solo al conocer el userId: ticket propio por defecto (no pisar si ya eligió otro)
+  // Ticket propio por defecto al cargar sesión (un solo combobox, sin botones extra)
   useEffect(() => {
     if (!session?.user?.id) return
     const current = watch('clientId')
-    if (!current) setValue('clientId', session.user.id)
+    if (!current) {
+      void handleClientSelect(session.user.id)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.user?.id, setValue])
+  }, [session?.user?.id])
 
   // Manejar selección de archivos
   const processFiles = (files: FileList | File[]) => {
@@ -293,11 +295,54 @@ export default function CreateTicketPage() {
     }
   }
 
-  const handleClientSelect = async (clientId: string) => {
-    // Si es el admin mismo, no buscar en la lista de clients
-    if (clientId !== session?.user?.id) {
-      const client = clients.find(c => c.id === clientId) as unknown as User | undefined
-      setSelectedClient(client || null)
+  const handleClientSelect = async (nextClientId: string) => {
+    if (nextClientId !== session?.user?.id) {
+      const fromList = allUsers.find(u => u.id === nextClientId)
+      if (fromList) {
+        setSelectedClient({
+          id: fromList.id,
+          name: fromList.name,
+          email: fromList.email,
+          role: fromList.role,
+          department: fromList.department
+            ? {
+                id: fromList.departmentId || '',
+                name: typeof fromList.department === 'string' ? fromList.department : '',
+                color: '#6B7280',
+              }
+            : undefined,
+        })
+      } else {
+        // Fallback: cargar datos del usuario seleccionado en el combobox
+        try {
+          const res = await fetch(`/api/users/${nextClientId}`)
+          if (res.ok) {
+            const u = await res.json()
+            const data = u.data ?? u
+            setSelectedClient({
+              id: data.id,
+              name: data.name || '',
+              email: data.email || '',
+              role: data.role || 'CLIENT',
+              department: data.department || data.departments || undefined,
+            })
+          } else {
+            setSelectedClient({
+              id: nextClientId,
+              name: 'Usuario seleccionado',
+              email: '',
+              role: 'CLIENT',
+            })
+          }
+        } catch {
+          setSelectedClient({
+            id: nextClientId,
+            name: 'Usuario seleccionado',
+            email: '',
+            role: 'CLIENT',
+          })
+        }
+      }
     } else if (session?.user) {
       setSelectedClient({
         id: session.user.id,
@@ -306,27 +351,25 @@ export default function CreateTicketPage() {
         role: session.user.role,
       })
     }
-    setValue('clientId', clientId)
-    // Limpiar familia y categoría al cambiar cliente
+    setValue('clientId', nextClientId)
+    // Limpiar familia y categoría al cambiar solicitante
     setSelectedFamilyId('')
     setValue('categoryId', '')
     setClientFamilies([])
 
-    // Cargar familias del cliente / scope del admin
-    if (clientId) {
+    // Cargar familias del solicitante / scope del admin
+    if (nextClientId) {
       setLoadingFamilies(true)
       try {
-        const isOwnTicket = clientId === session?.user?.id
-        // Super Admin: todas las áreas con tickets (igual que en edición)
-        // Admin normal: consumer del cliente (nativa + asignadas), intersectado en API
+        const isOwnTicket = nextClientId === session?.user?.id
         let url: string
         if (isSuperAdmin) {
           url = '/api/families?asClient=true'
-          if (!isOwnTicket) url += `&forClientId=${clientId}`
+          if (!isOwnTicket) url += `&forClientId=${nextClientId}`
         } else {
           url = isOwnTicket
             ? '/api/families?asClient=true'
-            : `/api/families?asClient=true&forClientId=${clientId}`
+            : `/api/families?asClient=true&forClientId=${nextClientId}`
         }
         const res = await fetch(url)
         if (res.ok) {
@@ -340,17 +383,12 @@ export default function CreateTicketPage() {
           }> = json.data ?? []
           setClientFamilies(families)
 
-          // Pre-seleccionar la familia nativa si está disponible, o la única si solo hay una
           const nativeFamily = families.find(f => f.isOwnFamily)
           if (nativeFamily) {
-            // Hay familia nativa: pre-seleccionarla (el usuario puede cambiarla)
             setSelectedFamilyId(nativeFamily.id)
           } else if (families.length === 1) {
-            // Sin familia nativa pero solo hay una opción: seleccionarla directamente
             setSelectedFamilyId(families[0].id)
           }
-          // Si hay varias y ninguna es nativa (ej: SuperAdmin para cliente externo sin departamento),
-          // dejar sin pre-seleccionar para que el usuario elija explícitamente
         }
       } catch {
         /* silencioso */
@@ -448,65 +486,29 @@ export default function CreateTicketPage() {
                   </CardHeader>
                   <CardContent>
                     <form onSubmit={handleSubmit(onSubmit)} className='space-y-6'>
-                      {/* Cliente */}
+                      {/* Solicitante: combobox único. Default = tú; otro usuario = en su nombre */}
                       <div className='space-y-2'>
                         <Label htmlFor='clientId' className='flex items-center'>
                           <User className='h-4 w-4 mr-2' />
-                          Cliente *
+                          Solicitante *
                         </Label>
-                        <div className='flex gap-2 flex-wrap items-center'>
-                          <Button
-                            type='button'
-                            variant={clientId === session?.user?.id ? 'default' : 'outline'}
-                            size='sm'
-                            onClick={() => {
-                              if (session?.user?.id) {
-                                setValue('clientId', session.user.id)
-                                setSelectedClient({
-                                  id: session.user.id,
-                                  name: session.user.name || '',
-                                  email: session.user.email || '',
-                                  role: 'ADMIN',
-                                } as User)
-                                handleClientSelect(session.user.id)
-                              }
-                            }}
-                          >
-                            Ticket Propio
-                          </Button>
-                          <Button
-                            type='button'
-                            variant={
-                              clientId && clientId !== session?.user?.id ? 'default' : 'outline'
-                            }
-                            size='sm'
-                            onClick={() => {
-                              setValue('clientId', '')
-                              setSelectedClient(null)
-                              setSelectedFamilyId('')
-                              setClientFamilies([])
-                              setValue('categoryId', '')
-                            }}
-                          >
-                            En nombre de cliente
-                          </Button>
-                        </div>
                         <UserCombobox
-                          value={watch('clientId')}
-                          onValueChange={clientId => {
-                            setValue('clientId', clientId)
-                            handleClientSelect(clientId)
+                          value={clientId}
+                          onValueChange={id => {
+                            // Limpiar vuelve a ticket propio (evita formulario vacío)
+                            if (!id && session?.user?.id) {
+                              void handleClientSelect(session.user.id)
+                              return
+                            }
+                            if (id) void handleClientSelect(id)
                           }}
-                          placeholder={
-                            clientId === session?.user?.id
-                              ? 'O busca otro usuario para crear a su nombre...'
-                              : 'Buscar usuario por nombre o email...'
-                          }
+                          placeholder='Buscar usuario por nombre o email...'
                           emptyText='No se encontraron usuarios'
                           showEmail={true}
                           showDepartment={true}
+                          allowClear={clientId !== session?.user?.id}
                           preloadedUser={
-                            clientId === session?.user?.id && session?.user
+                            session?.user
                               ? {
                                   id: session.user.id,
                                   name: session.user.name || 'Administrador',
@@ -520,21 +522,13 @@ export default function CreateTicketPage() {
                         {errors.clientId && (
                           <p className='text-sm text-destructive'>{errors.clientId.message}</p>
                         )}
-                        {clientId === session?.user?.id ? (
-                          <p className='text-xs text-muted-foreground'>
-                            ✅ Ticket propio — se registrará a tu nombre. Puedes cambiar a otro
-                            usuario con el buscador o el botón &quot;En nombre de cliente&quot;.
-                          </p>
-                        ) : selectedClient ? (
-                          <p className='text-xs text-muted-foreground'>
-                            📋 El ticket se creará a nombre de {selectedClient.name}. Recibirá
-                            notificaciones automáticas sobre el progreso.
-                          </p>
-                        ) : (
-                          <p className='text-xs text-amber-600 dark:text-amber-400'>
-                            Busca y selecciona el usuario solicitante.
-                          </p>
-                        )}
+                        <p className='text-xs text-muted-foreground'>
+                          {clientId === session?.user?.id
+                            ? 'Ticket propio: la solicitud queda a tu nombre. Elige otro usuario en la lista para crearla en su nombre.'
+                            : selectedClient
+                              ? `En nombre de ${selectedClient.name}: el ticket y las notificaciones quedan asociados a ese usuario.`
+                              : 'Selecciona el solicitante del ticket.'}
+                        </p>
                       </div>
 
                       {/* Área de soporte — visible solo cuando hay cliente seleccionado */}
@@ -1000,7 +994,7 @@ export default function CreateTicketPage() {
                   ? 'Este ticket se registrará como solicitud propia. Quedará asociado a tu cuenta.'
                   : selectedClient
                     ? `Este ticket se creará a nombre de ${selectedClient.name}. El cliente recibirá notificaciones automáticas sobre el progreso.`
-                    : 'Selecciona un cliente o usa "Ticket Propio" para continuar.'}
+                    : 'Selecciona el solicitante del ticket para continuar.'}
               </AlertDescription>
             </Alert>
           </div>
