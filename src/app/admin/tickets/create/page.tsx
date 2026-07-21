@@ -454,10 +454,10 @@ export default function CreateTicketPage() {
                           <User className='h-4 w-4 mr-2' />
                           Cliente *
                         </Label>
-                        <div className='flex gap-2'>
+                        <div className='flex gap-2 flex-wrap items-center'>
                           <Button
                             type='button'
-                            variant={clientId === session?.user?.id ? 'default' : 'ghost'}
+                            variant={clientId === session?.user?.id ? 'default' : 'outline'}
                             size='sm'
                             onClick={() => {
                               if (session?.user?.id) {
@@ -474,7 +474,22 @@ export default function CreateTicketPage() {
                           >
                             Ticket Propio
                           </Button>
-                          <span className='text-xs text-muted-foreground self-center'>o</span>
+                          <Button
+                            type='button'
+                            variant={
+                              clientId && clientId !== session?.user?.id ? 'default' : 'outline'
+                            }
+                            size='sm'
+                            onClick={() => {
+                              setValue('clientId', '')
+                              setSelectedClient(null)
+                              setSelectedFamilyId('')
+                              setClientFamilies([])
+                              setValue('categoryId', '')
+                            }}
+                          >
+                            En nombre de cliente
+                          </Button>
                         </div>
                         <UserCombobox
                           value={watch('clientId')}
@@ -482,11 +497,14 @@ export default function CreateTicketPage() {
                             setValue('clientId', clientId)
                             handleClientSelect(clientId)
                           }}
-                          placeholder='Buscar usuario por nombre o email...'
+                          placeholder={
+                            clientId === session?.user?.id
+                              ? 'O busca otro usuario para crear a su nombre...'
+                              : 'Buscar usuario por nombre o email...'
+                          }
                           emptyText='No se encontraron usuarios'
                           showEmail={true}
                           showDepartment={true}
-                          disabled={clientId === session?.user?.id}
                           preloadedUser={
                             clientId === session?.user?.id && session?.user
                               ? {
@@ -502,11 +520,19 @@ export default function CreateTicketPage() {
                         {errors.clientId && (
                           <p className='text-sm text-destructive'>{errors.clientId.message}</p>
                         )}
-                        {selectedClient && (
+                        {clientId === session?.user?.id ? (
                           <p className='text-xs text-muted-foreground'>
-                            {clientId === session?.user?.id
-                              ? '✅ Ticket propio — se registrará a tu nombre. Selecciona el área de soporte a continuación.'
-                              : `📋 El ticket se creará a nombre de ${selectedClient.name}. Recibirá notificaciones automáticas sobre el progreso.`}
+                            ✅ Ticket propio — se registrará a tu nombre. Puedes cambiar a otro
+                            usuario con el buscador o el botón &quot;En nombre de cliente&quot;.
+                          </p>
+                        ) : selectedClient ? (
+                          <p className='text-xs text-muted-foreground'>
+                            📋 El ticket se creará a nombre de {selectedClient.name}. Recibirá
+                            notificaciones automáticas sobre el progreso.
+                          </p>
+                        ) : (
+                          <p className='text-xs text-amber-600 dark:text-amber-400'>
+                            Busca y selecciona el usuario solicitante.
                           </p>
                         )}
                       </div>
