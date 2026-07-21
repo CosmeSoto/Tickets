@@ -182,10 +182,14 @@ export class TicketService {
         include: { departments: { select: { familyId: true } } },
       })
 
+      if (!category) {
+        throw new Error('Categoría no encontrada')
+      }
+
       let familyId: string | undefined =
         data.familyId ??
-        category?.familyId ??
-        category?.departments?.familyId ??
+        category.familyId ??
+        category.departments?.familyId ??
         (await TicketFamilyConfigService.getDefaultFamily())?.id ??
         undefined
 
@@ -199,75 +203,84 @@ export class TicketService {
         familyId = fallbackFamily?.familyId ?? undefined
       }
 
+      if (!familyId) {
+        throw new Error(
+          'No se pudo determinar el área del ticket. Selecciona un área e inténtalo de nuevo.'
+        )
+      }
+
       // 2. Generar ticketCode (automático o manual si es ADMIN)
       let ticketCode: string | undefined
       let codeIsManual = false
 
-      if (data.ticketCode && data.isAdmin && familyId) {
+      if (data.ticketCode && data.isAdmin) {
         const validation = await TicketCodeService.validateManualCode(data.ticketCode, familyId)
         if (!validation.valid) {
           throw new Error(validation.error ?? 'Código de ticket inválido')
         }
         ticketCode = data.ticketCode
         codeIsManual = true
-        // Actualizar contador si la secuencia manual es mayor al actual
         const parts = ticketCode.split('-')
         const sequence = parseInt(parts[parts.length - 1], 10)
         const year = parseInt(parts[parts.length - 2], 10)
         if (!isNaN(sequence) && !isNaN(year)) {
           await TicketCodeService.updateCounterIfNeeded(familyId, year, sequence)
         }
-      } else if (familyId) {
+      } else {
         ticketCode = await TicketCodeService.generateCode(familyId, new Date().getFullYear())
       }
 
-      // Extraer campos propios del servicio antes de pasar a Prisma
-      const {
-        ticketCode: _tc,
-        isAdmin: _ia,
-        historyUserId: _hu,
-        source,
-        checkInId,
-        familyId: _fid,
-        createdById,
-        ...ticketData
-      } = data
+      const historyUserId = data.historyUserId ?? data.clientId
+      const assigneeId =
+        data.assigneeId && String(data.assigneeId).trim() ? data.assigneeId.trim() : undefined
 
-      const ticket = await prisma.tickets.create({
-        data: {
-          ...ticketData,
-          id: randomUUID(),
-          updatedAt: new Date(),
-          ...(familyId && { familyId }),
-          ...(ticketCode && { ticketCode }),
-          ...(source && { source: source as any }),
-          ...(checkInId && { checkInId }),
-          ...(createdById && { createdById }),
-          codeIsManual,
-        },
-        include: {
-          users_tickets_clientIdTousers: { select: { id: true, name: true, email: true } },
-          categories: { select: { id: true, name: true, color: true } },
-          family: { select: { id: true, name: true, code: true, color: true } },
-        },
+      const ticketId = randomUUID()
+      const now = new Date()
+
+      // Campos explícitos (evita filtrar basura del body / undefined problemáticos)
+      const ticket = await prisma.$transaction(async tx => {
+        const created = await tx.tickets.create({
+          data: {
+            id: ticketId,
+            title: data.title.trim(),
+            description: data.description.trim(),
+            location: data.location?.trim() || null,
+            priority: data.priority,
+            clientId: data.clientId,
+            categoryId: data.categoryId,
+            familyId,
+            ticketCode,
+            codeIsManual,
+            tags: [],
+            updatedAt: now,
+            ...(assigneeId ? { assigneeId } : {}),
+            ...(data.source ? { source: data.source as any } : {}),
+            ...(data.checkInId ? { checkInId: data.checkInId } : {}),
+            ...(data.createdById ? { createdById: data.createdById } : {}),
+          },
+          include: {
+            users_tickets_clientIdTousers: { select: { id: true, name: true, email: true } },
+            users_tickets_assigneeIdTousers: { select: { id: true, name: true, email: true } },
+            categories: { select: { id: true, name: true, color: true } },
+            family: { select: { id: true, name: true, code: true, color: true } },
+          },
+        })
+
+        await tx.ticket_history.create({
+          data: {
+            id: randomUUID(),
+            action: 'created',
+            comment: 'Ticket creado',
+            ticketId: created.id,
+            userId: historyUserId,
+            createdAt: now,
+          },
+        })
+
+        return created
       })
 
       ApplicationLogger.databaseOperationComplete('create', 'tickets', performance.now(), 1)
-
-      // Crear entrada en el historial
-      await prisma.ticket_history.create({
-        data: {
-          id: randomUUID(),
-          action: 'created',
-          comment: 'Ticket creado',
-          ticketId: ticket.id,
-          userId: data.historyUserId ?? data.clientId,
-          createdAt: new Date(),
-        },
-      })
-
-      // Las notificaciones se generan automáticamente por el sistema unificado
-      // basado en la creación del ticket y sus propiedades
 
       ApplicationLogger.businessOperation('ticket_created', 'ticket', ticket.id, {
         userId: data.clientId,

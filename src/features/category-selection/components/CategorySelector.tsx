@@ -205,17 +205,8 @@ export function CategorySelector({
     return frequentRaw.filter(f => allowed.has(f.category.id))
   }, [frequentRaw, categories])
 
-  // Si hay texto pero no hay sugerencias, mostrar el árbol para selección manual
-  useEffect(() => {
-    if (categories.length === 0) {
-      setShowManualNavigation(false)
-      return
-    }
-    const hasText = Boolean(ticketTitle?.trim() || ticketDescription?.trim())
-    if (hasText && !isAnalyzing && suggestions.length === 0) {
-      setShowManualNavigation(true)
-    }
-  }, [categories.length, ticketTitle, ticketDescription, isAnalyzing, suggestions.length])
+  // El árbol manual permanece cerrado por defecto.
+  // Solo se abre si el usuario pulsa "Ver árbol completo / seleccionar manualmente".
 
   // Build category path from selected category ID
   const buildCategoryPath = useCallback(
@@ -597,17 +588,15 @@ export function CategorySelector({
                 </div>
               ) : (
                 <div className='space-y-2'>
-                  {(ticketTitle || ticketDescription) && suggestions.length > 0 && (
-                    <Button
-                      type='button'
-                      variant='ghost'
-                      size='sm'
-                      onClick={() => setShowManualNavigation(false)}
-                      className='w-full text-muted-foreground text-xs h-7'
-                    >
-                      Volver a sugerencias
-                    </Button>
-                  )}
+                  <Button
+                    type='button'
+                    variant='ghost'
+                    size='sm'
+                    onClick={() => setShowManualNavigation(false)}
+                    className='w-full text-muted-foreground text-xs h-7'
+                  >
+                    Ocultar árbol
+                  </Button>
                   <p className='text-xs text-muted-foreground'>
                     Navega el árbol o usa la búsqueda (Ctrl+K) para elegir la categoría.
                   </p>

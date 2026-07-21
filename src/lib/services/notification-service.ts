@@ -347,7 +347,7 @@ export class NotificationService {
       return notifications
     } catch (error) {
       console.error('[NOTIFICATION] Error en notifyTicketCreated:', error)
-      throw error
+      return []
     }
   }
 

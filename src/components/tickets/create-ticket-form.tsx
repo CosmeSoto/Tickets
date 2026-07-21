@@ -279,10 +279,10 @@ export function CreateTicketForm({
         toast({ title: 'Ticket creado', description: 'Tu solicitud fue registrada correctamente' })
         setTimeout(() => router.push(`${afterSuccessHref}/${ticketId}`), 1800)
       } else {
-        const err = await res.json()
+        const err = await res.json().catch(() => ({}))
         toast({
           title: 'Error',
-          description: err.message || 'Error al crear el ticket',
+          description: err.error || err.message || 'Error al crear el ticket',
           variant: 'destructive',
         })
       }

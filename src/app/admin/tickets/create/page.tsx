@@ -99,7 +99,7 @@ export default function CreateTicketPage() {
 
   // Familias disponibles para el cliente seleccionado
   const [clientFamilies, setClientFamilies] = useState<
-    Array<{ id: string; name: string; code: string; color?: string | null }>
+    Array<{ id: string; name: string; code: string; color?: string | null; isOwnFamily?: boolean }>
   >([])
   const [selectedFamilyId, setSelectedFamilyId] = useState<string>('')
   const [loadingFamilies, setLoadingFamilies] = useState(false)
@@ -141,6 +141,14 @@ export default function CreateTicketPage() {
       return
     }
   }, [session, status, router])
+
+  // Solo al conocer el userId: ticket propio por defecto (no pisar si ya eligió otro)
+  useEffect(() => {
+    if (!session?.user?.id) return
+    const current = watch('clientId')
+    if (!current) setValue('clientId', session.user.id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.user?.id, setValue])
 
   // Manejar selección de archivos
   const processFiles = (files: FileList | File[]) => {
@@ -266,10 +274,10 @@ export default function CreateTicketPage() {
           router.push(`/admin/tickets/${ticketId}`)
         }, 2000)
       } else {
-        const error = await response.json()
+        const error = await response.json().catch(() => ({}))
         toast({
           title: 'Error',
-          description: error.message || 'Error al crear el ticket',
+          description: error.error || error.message || 'Error al crear el ticket',
           variant: 'destructive',
         })
       }
@@ -323,12 +331,26 @@ export default function CreateTicketPage() {
         const res = await fetch(url)
         if (res.ok) {
           const json = await res.json()
-          const families = json.data ?? []
+          const families: Array<{
+            id: string
+            name: string
+            code: string
+            color?: string | null
+            isOwnFamily?: boolean
+          }> = json.data ?? []
           setClientFamilies(families)
-          // Auto-seleccionar solo si hay una única área (admin de una sola familia)
-          if (families.length === 1) {
+
+          // Pre-seleccionar la familia nativa si está disponible, o la única si solo hay una
+          const nativeFamily = families.find(f => f.isOwnFamily)
+          if (nativeFamily) {
+            // Hay familia nativa: pre-seleccionarla (el usuario puede cambiarla)
+            setSelectedFamilyId(nativeFamily.id)
+          } else if (families.length === 1) {
+            // Sin familia nativa pero solo hay una opción: seleccionarla directamente
             setSelectedFamilyId(families[0].id)
           }
+          // Si hay varias y ninguna es nativa (ej: SuperAdmin para cliente externo sin departamento),
+          // dejar sin pre-seleccionar para que el usuario elija explícitamente
         }
       } catch {
         /* silencioso */
@@ -508,54 +530,57 @@ export default function CreateTicketPage() {
                                 No hay áreas de soporte disponibles para este usuario.
                               </AlertDescription>
                             </Alert>
-                          ) : clientFamilies.length === 1 && !isSuperAdmin ? (
-                            <div className='flex items-center gap-2 p-3 rounded-lg border bg-muted/30'>
-                              {clientFamilies[0].color && (
-                                <span
-                                  className='w-3 h-3 rounded-full flex-shrink-0'
-                                  style={{ backgroundColor: clientFamilies[0].color }}
-                                />
-                              )}
-                              <span className='text-sm font-medium'>{clientFamilies[0].name}</span>
-                              <Badge variant='outline' className='text-xs font-mono ml-auto'>
-                                {clientFamilies[0].code}
-                              </Badge>
-                            </div>
                           ) : (
-                            <Select
-                              value={selectedFamilyId}
-                              onValueChange={v => {
-                                setSelectedFamilyId(v)
-                                setValue('categoryId', '')
-                              }}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder='Selecciona el área de soporte...' />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {clientFamilies.map(f => (
-                                  <SelectItem key={f.id} value={f.id}>
-                                    <div className='flex items-center gap-2'>
-                                      {f.color && (
-                                        <span
-                                          className='w-2.5 h-2.5 rounded-full flex-shrink-0'
-                                          style={{ backgroundColor: f.color }}
-                                        />
-                                      )}
-                                      <span>{f.name}</span>
-                                      <span className='text-xs text-muted-foreground font-mono ml-1'>
-                                        {f.code}
-                                      </span>
-                                    </div>
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          )}
-                          {clientFamilies.length > 1 && !selectedFamilyId && (
-                            <p className='text-xs text-amber-600 dark:text-amber-400'>
-                              Selecciona el área para cargar las categorías correctas.
-                            </p>
+                            <>
+                              <Select
+                                value={selectedFamilyId}
+                                onValueChange={v => {
+                                  setSelectedFamilyId(v)
+                                  setValue('categoryId', '')
+                                }}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder='Selecciona el área de soporte...' />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {clientFamilies.map(f => (
+                                    <SelectItem key={f.id} value={f.id}>
+                                      <div className='flex items-center gap-2'>
+                                        {f.color && (
+                                          <span
+                                            className='w-2.5 h-2.5 rounded-full flex-shrink-0'
+                                            style={{ backgroundColor: f.color }}
+                                          />
+                                        )}
+                                        <span>{f.name}</span>
+                                        <span className='text-xs text-muted-foreground font-mono ml-1'>
+                                          {f.code}
+                                        </span>
+                                        {f.isOwnFamily && (
+                                          <span className='text-xs text-primary font-medium ml-1'>
+                                            (nativa)
+                                          </span>
+                                        )}
+                                      </div>
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              {clientFamilies.length > 1 &&
+                                selectedFamilyId &&
+                                clientFamilies.find(f => f.id === selectedFamilyId)
+                                  ?.isOwnFamily && (
+                                  <p className='text-xs text-muted-foreground'>
+                                    🏠 Área nativa pre-seleccionada. Puedes cambiarla si lo
+                                    necesitas.
+                                  </p>
+                                )}
+                              {clientFamilies.length > 1 && !selectedFamilyId && (
+                                <p className='text-xs text-amber-600 dark:text-amber-400'>
+                                  Selecciona el área para cargar las categorías correctas.
+                                </p>
+                              )}
+                            </>
                           )}
                         </div>
                       )}

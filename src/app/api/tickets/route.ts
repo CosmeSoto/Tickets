@@ -407,6 +407,36 @@ export async function POST(request: NextRequest) {
       createdOnBehalf = ticketData.clientId !== session.user.id
     }
 
+    // Sesión obsoleta tras reseed: el JWT apunta a un userId que ya no existe
+    const requester = await prisma.users.findUnique({
+      where: { id: session.user.id },
+      select: { id: true, isActive: true },
+    })
+    if (!requester || !requester.isActive) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Tu sesión ya no es válida. Cierra sesión e inicia de nuevo.',
+        },
+        { status: 401 }
+      )
+    }
+
+    const clientExists = await prisma.users.findUnique({
+      where: { id: clientId },
+      select: { id: true },
+    })
+    if (!clientExists) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            'El solicitante no existe en el sistema. Recarga la página o vuelve a iniciar sesión.',
+        },
+        { status: 400 }
+      )
+    }
+
     if (!isPatrolSource) {
       const maxTickets = await getMaxTicketsPerUser()
       const openTicketCount = await prisma.tickets.count({
@@ -519,6 +549,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Asegurar familyId efectivo (formulario o categoría) antes de crear
+    if (effectiveFamilyId) {
+      ticketData.familyId = effectiveFamilyId
+    }
+
     const newTicket = (await TicketService.createTicket({
       title: ticketData.title,
       description: ticketData.description,
@@ -541,33 +576,36 @@ export async function POST(request: NextRequest) {
       // Campos de patrulla (incidentes reportados desde rondas)
       ...(ticketData.source && { source: ticketData.source }),
       ...(ticketData.checkInId && { checkInId: ticketData.checkInId }),
-      ...(ticketData.familyId && { familyId: ticketData.familyId }),
+      familyId: effectiveFamilyId ?? undefined,
     })) as any
 
-    // ⭐ AUDITORÍA: Registrar creación de ticket
-    await AuditServiceComplete.log({
-      action: AuditActionsComplete.TICKET_CREATED,
-      entityType: 'ticket',
-      entityId: newTicket.id,
-      userId: session.user.id,
-      details: {
-        ticketTitle: newTicket.title,
-        priority: newTicket.priority,
-        categoryName: newTicket.categories.name,
-        clientName: newTicket.users_tickets_clientIdTousers.name,
-        assigneeName: newTicket.users_tickets_assigneeIdTousers?.name || 'Sin asignar',
-        ...(createdOnBehalf && {
-          createdOnBehalf: true,
-          createdByRole: session.user.role,
-          createdByName: session.user.name,
-          onBehalfOfId: clientId,
-          onBehalfOfName: newTicket.users_tickets_clientIdTousers.name,
-        }),
-      },
-      request: request,
-    })
+    // Side-effects: nunca deben tumbar la creación si el ticket ya existe
+    try {
+      await AuditServiceComplete.log({
+        action: AuditActionsComplete.TICKET_CREATED,
+        entityType: 'ticket',
+        entityId: newTicket.id,
+        userId: session.user.id,
+        details: {
+          ticketTitle: newTicket.title,
+          priority: newTicket.priority,
+          categoryName: newTicket.categories?.name,
+          clientName: newTicket.users_tickets_clientIdTousers?.name,
+          assigneeName: newTicket.users_tickets_assigneeIdTousers?.name || 'Sin asignar',
+          ...(createdOnBehalf && {
+            createdOnBehalf: true,
+            createdByRole: session.user.role,
+            createdByName: session.user.name,
+            onBehalfOfId: clientId,
+            onBehalfOfName: newTicket.users_tickets_clientIdTousers?.name,
+          }),
+        },
+        request: request,
+      })
+    } catch (auditErr) {
+      console.error('[AUDIT] Error registrando creación de ticket:', auditErr)
+    }
 
-    // ⭐ NUEVO: Asignar SLA al ticket
     await SLAService.assignSLA(newTicket.id).catch(err => {
       console.error('[SLA] Error asignando SLA al ticket:', err)
     })
@@ -575,7 +613,7 @@ export async function POST(request: NextRequest) {
     // Asignación automática al crear (si está habilitada y no hay asignado)
     let ticketAfterAssign = newTicket
     if (!newTicket.assigneeId) {
-      const autoAssignmentEnabled = await getAutoAssignmentEnabled()
+      const autoAssignmentEnabled = await getAutoAssignmentEnabled().catch(() => false)
       if (autoAssignmentEnabled) {
         try {
           const { AssignmentService } = await import('@/lib/services/ticket-assignment.service')
@@ -591,6 +629,7 @@ export async function POST(request: NextRequest) {
               users_tickets_clientIdTousers: true,
               users_tickets_assigneeIdTousers: true,
               categories: true,
+              family: true,
             },
           })
           if (refreshed) ticketAfterAssign = refreshed as typeof newTicket
@@ -600,7 +639,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // ⭐ NUEVO: Disparar webhook de ticket creado
     await WebhookService.trigger(WebhookService.EVENTS.TICKET_CREATED, {
       ticketId: ticketAfterAssign.id,
       title: ticketAfterAssign.title,
@@ -627,7 +665,6 @@ export async function POST(request: NextRequest) {
       console.error('[WEBHOOK] Error disparando evento TICKET_CREATED:', err)
     })
 
-    // ⭐ NUEVO: Enviar email de notificación al cliente
     await EmailService.queueEmail(
       {
         to: ticketAfterAssign.users_tickets_clientIdTousers.email,
@@ -646,16 +683,17 @@ export async function POST(request: NextRequest) {
       console.error('[EMAIL] Error enviando email de ticket creado:', err)
     })
 
-    // ⭐ NUEVO: Enviar email al administrador para que asigne el ticket
-    const { triggerTicketCreatedToAdminEmail } = await import('@/lib/email-triggers')
-    void triggerTicketCreatedToAdminEmail(ticketAfterAssign.id)
+    try {
+      const { triggerTicketCreatedToAdminEmail } = await import('@/lib/email-triggers')
+      triggerTicketCreatedToAdminEmail(ticketAfterAssign.id)
+    } catch (emailTriggerErr) {
+      console.error('[EMAIL] Error disparando email a admins:', emailTriggerErr)
+    }
 
-    // ⭐ NUEVO: Enviar notificaciones in-app a todos los admins
     await NotificationService.notifyTicketCreated(ticketAfterAssign.id).catch(err => {
       console.error('[NOTIFICATION] Error enviando notificaciones de ticket creado:', err)
     })
 
-    // ⭐ Si el ticket fue asignado al crearse, notificar al técnico asignado
     if (ticketAfterAssign.assigneeId) {
       await NotificationService.notifyTicketAssigned(
         ticketAfterAssign.id,
@@ -701,13 +739,42 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error('Error creating ticket:', error)
+
+    const prismaCode =
+      error && typeof error === 'object' && 'code' in error
+        ? String((error as { code?: string }).code)
+        : null
+    const rawMessage = error instanceof Error ? error.message : 'Error desconocido'
+
+    let message = 'Error al crear el ticket'
+    let status = 500
+
+    if (prismaCode === 'P2003') {
+      message =
+        'No se pudo crear el ticket por una referencia inválida (usuario, categoría o área). Recarga la página o vuelve a iniciar sesión.'
+      status = 400
+    } else if (prismaCode === 'P2002') {
+      message = 'Ya existe un ticket con ese código. Intenta de nuevo.'
+      status = 409
+    } else if (
+      rawMessage.includes('Categoría') ||
+      rawMessage.includes('área') ||
+      rawMessage.includes('Código') ||
+      rawMessage.includes('familia')
+    ) {
+      message = rawMessage
+      status = 400
+    } else if (process.env.NODE_ENV === 'development') {
+      message = rawMessage
+    }
+
     return NextResponse.json(
       {
         success: false,
-        message: 'Error al crear el ticket',
-        error: error instanceof Error ? error.message : 'Error desconocido',
+        message,
+        error: rawMessage,
       },
-      { status: 500 }
+      { status }
     )
   }
 }
