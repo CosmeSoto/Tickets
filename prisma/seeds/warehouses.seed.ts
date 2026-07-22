@@ -41,7 +41,7 @@ async function upsertWarehouses(prisma: PrismaClient, warehouses: WarehouseSeed[
 export async function seedWarehouses(prisma: PrismaClient, familyMap: Map<string, string>) {
   console.log('🏢 Seeding bodegas por familia...')
 
-  const techFamilyId = familyMap.get('ADMINISTRATIVE')!
+  const adminFamilyId = familyMap.get('ADMINISTRATIVE')!
   const architectureFamilyId = familyMap.get('ARCHITECTURE')!
   const operationsFamilyId = familyMap.get('OPERATIONS')!
 
@@ -61,21 +61,21 @@ export async function seedWarehouses(prisma: PrismaClient, familyMap: Map<string
       name: 'Bodega TI Principal',
       location: 'Edificio A - Piso 2 - Sala 201',
       description: 'Equipos tecnológicos y hardware',
-      familyId: techFamilyId,
+      familyId: adminFamilyId,
       ...base,
     },
     {
       name: 'Bodega de Equipos en Reparación',
       location: 'Edificio A - Piso 1 - Taller',
       description: 'Equipos en reparación o mantenimiento',
-      familyId: techFamilyId,
+      familyId: adminFamilyId,
       ...base,
     },
     {
       name: 'Bodega de Equipos Obsoletos',
       location: 'Edificio C - Sótano',
       description: 'Equipos dados de baja pendientes de disposición',
-      familyId: techFamilyId,
+      familyId: adminFamilyId,
       ...base,
     },
   ]

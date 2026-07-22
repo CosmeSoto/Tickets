@@ -5,41 +5,7 @@
  */
 
 import { PrismaClient } from '@prisma/client'
-import { randomUUID } from 'crypto'
-
-const now = new Date()
-
-async function upsertCategory(
-  prisma: PrismaClient,
-  data: {
-    name: string
-    description: string
-    level: number
-    parentId: string | null
-    departmentId: string
-    order: number
-    color: string
-  }
-) {
-  const existing = await prisma.categories.findFirst({
-    where: { name: data.name, level: data.level, parentId: data.parentId },
-  })
-  if (existing) {
-    return prisma.categories.update({
-      where: { id: existing.id },
-      data: {
-        description: data.description,
-        departmentId: data.departmentId,
-        order: data.order,
-        color: data.color,
-        updatedAt: now,
-      },
-    })
-  }
-  return prisma.categories.create({
-    data: { id: randomUUID(), ...data, isActive: true, createdAt: now, updatedAt: now },
-  })
-}
+import { upsertCategory } from './category-upsert'
 
 export async function seedCategoriesAdministrative(
   prisma: PrismaClient,
@@ -207,5 +173,266 @@ export async function seedCategoriesAdministrative(
     })
   }
 
-  console.log('✅ Categorías ADMINISTRATIVE (Gestión Administrativa)')
+  // ==================== DEPARTAMENTO FINANCIERO ====================
+  const deptFinanciero = deptMap.get('Financiero')
+  if (deptFinanciero) {
+    const solicitudFin = await upsertCategory(prisma, {
+      name: 'Solicitud Financiera',
+      description: 'Solicitudes al área financiera',
+      level: 1,
+      parentId: null,
+      departmentId: deptFinanciero,
+      order: 1,
+      color: '#0EA5E9',
+    })
+
+    const consultaFin = await upsertCategory(prisma, {
+      name: 'Consulta Financiera',
+      description: 'Consultas de presupuestos, flujo de caja y reportes',
+      level: 1,
+      parentId: null,
+      departmentId: deptFinanciero,
+      order: 2,
+      color: '#0284C7',
+    })
+
+    await upsertCategory(prisma, {
+      name: 'Aprobación de Gasto',
+      description: 'Solicitar aprobación de un gasto o desembolso',
+      level: 2,
+      parentId: solicitudFin.id,
+      departmentId: deptFinanciero,
+      order: 1,
+      color: '#0EA5E9',
+    })
+
+    await upsertCategory(prisma, {
+      name: 'Anticipo o Reembolso',
+      description: 'Solicitar anticipo de viáticos o reembolso de gastos',
+      level: 2,
+      parentId: solicitudFin.id,
+      departmentId: deptFinanciero,
+      order: 2,
+      color: '#0EA5E9',
+    })
+
+    await upsertCategory(prisma, {
+      name: 'Presupuesto',
+      description: 'Consulta o ajuste de presupuesto por área',
+      level: 2,
+      parentId: consultaFin.id,
+      departmentId: deptFinanciero,
+      order: 1,
+      color: '#0284C7',
+    })
+
+    await upsertCategory(prisma, {
+      name: 'Reporte Financiero',
+      description: 'Solicitar reporte de ingresos, egresos o conciliaciones',
+      level: 2,
+      parentId: consultaFin.id,
+      departmentId: deptFinanciero,
+      order: 2,
+      color: '#0284C7',
+    })
+  }
+
+  // ==================== DEPARTAMENTO COMPRAS ====================
+  if (deptCompras) {
+    const solicitudCompras = await upsertCategory(prisma, {
+      name: 'Solicitud de Compras',
+      description: 'Requerimientos de compra de bienes o servicios',
+      level: 1,
+      parentId: null,
+      departmentId: deptCompras,
+      order: 1,
+      color: '#06B6D4',
+    })
+
+    const seguimientoCompras = await upsertCategory(prisma, {
+      name: 'Seguimiento de Compra',
+      description: 'Seguimiento de órdenes y proveedores',
+      level: 1,
+      parentId: null,
+      departmentId: deptCompras,
+      order: 2,
+      color: '#0891B2',
+    })
+
+    await upsertCategory(prisma, {
+      name: 'Cotización',
+      description: 'Solicitar cotización a proveedores',
+      level: 2,
+      parentId: solicitudCompras.id,
+      departmentId: deptCompras,
+      order: 1,
+      color: '#06B6D4',
+    })
+
+    await upsertCategory(prisma, {
+      name: 'Orden de Compra',
+      description: 'Generar o autorizar orden de compra',
+      level: 2,
+      parentId: solicitudCompras.id,
+      departmentId: deptCompras,
+      order: 2,
+      color: '#06B6D4',
+    })
+
+    await upsertCategory(prisma, {
+      name: 'Insumos / Materiales',
+      description: 'Compra de insumos, materiales o consumibles',
+      level: 2,
+      parentId: solicitudCompras.id,
+      departmentId: deptCompras,
+      order: 3,
+      color: '#06B6D4',
+    })
+
+    await upsertCategory(prisma, {
+      name: 'Estado de Pedido',
+      description: 'Consultar estado de una orden o pedido',
+      level: 2,
+      parentId: seguimientoCompras.id,
+      departmentId: deptCompras,
+      order: 1,
+      color: '#0891B2',
+    })
+
+    await upsertCategory(prisma, {
+      name: 'Recepción de Mercancía',
+      description: 'Reportar recepción o inconsistencia en entrega',
+      level: 2,
+      parentId: seguimientoCompras.id,
+      departmentId: deptCompras,
+      order: 2,
+      color: '#0891B2',
+    })
+  }
+
+  // ==================== DEPARTAMENTO MENSAJERÍA ====================
+  const deptMensajeria = deptMap.get('Mensajería')
+  if (deptMensajeria) {
+    const solicitudMensajeria = await upsertCategory(prisma, {
+      name: 'Solicitud de Mensajería',
+      description: 'Solicitudes de servicio de mensajería y envíos',
+      level: 1,
+      parentId: null,
+      departmentId: deptMensajeria,
+      order: 1,
+      color: '#A855F7',
+    })
+
+    const consultaMensajeria = await upsertCategory(prisma, {
+      name: 'Consulta o Seguimiento',
+      description: 'Consultas y seguimiento de envíos',
+      level: 1,
+      parentId: null,
+      departmentId: deptMensajeria,
+      order: 2,
+      color: '#10B981',
+    })
+
+    const entregaInterna = await upsertCategory(prisma, {
+      name: 'Entrega Interna',
+      description: 'Entregas dentro del centro comercial',
+      level: 2,
+      parentId: solicitudMensajeria.id,
+      departmentId: deptMensajeria,
+      order: 1,
+      color: '#A855F7',
+    })
+
+    const entregaExterna = await upsertCategory(prisma, {
+      name: 'Entrega Externa',
+      description: 'Envíos y entregas fuera del centro comercial',
+      level: 2,
+      parentId: solicitudMensajeria.id,
+      departmentId: deptMensajeria,
+      order: 2,
+      color: '#A855F7',
+    })
+
+    await upsertCategory(prisma, {
+      name: 'Recepción de Paquetes',
+      description: 'Recepción y gestión de paquetes',
+      level: 2,
+      parentId: solicitudMensajeria.id,
+      departmentId: deptMensajeria,
+      order: 3,
+      color: '#A855F7',
+    })
+
+    await upsertCategory(prisma, {
+      name: 'Correspondencia',
+      description: 'Entrega de correspondencia entre locales',
+      level: 3,
+      parentId: entregaInterna.id,
+      departmentId: deptMensajeria,
+      order: 1,
+      color: '#A855F7',
+    })
+
+    await upsertCategory(prisma, {
+      name: 'Documentos',
+      description: 'Entrega de documentos importantes',
+      level: 3,
+      parentId: entregaInterna.id,
+      departmentId: deptMensajeria,
+      order: 2,
+      color: '#A855F7',
+    })
+
+    await upsertCategory(prisma, {
+      name: 'Paquetes Pequeños',
+      description: 'Entrega de paquetes pequeños',
+      level: 3,
+      parentId: entregaInterna.id,
+      departmentId: deptMensajeria,
+      order: 3,
+      color: '#A855F7',
+    })
+
+    await upsertCategory(prisma, {
+      name: 'Envío a Cliente',
+      description: 'Envío de productos a clientes',
+      level: 3,
+      parentId: entregaExterna.id,
+      departmentId: deptMensajeria,
+      order: 1,
+      color: '#A855F7',
+    })
+
+    await upsertCategory(prisma, {
+      name: 'Envío a Proveedor',
+      description: 'Envío de devoluciones o documentos a proveedores',
+      level: 3,
+      parentId: entregaExterna.id,
+      departmentId: deptMensajeria,
+      order: 2,
+      color: '#A855F7',
+    })
+
+    await upsertCategory(prisma, {
+      name: 'Rastreo de Envío',
+      description: 'Consultar estado de un envío',
+      level: 3,
+      parentId: consultaMensajeria.id,
+      departmentId: deptMensajeria,
+      order: 1,
+      color: '#10B981',
+    })
+
+    await upsertCategory(prisma, {
+      name: 'Confirmación de Entrega',
+      description: 'Confirmar entrega realizada',
+      level: 3,
+      parentId: consultaMensajeria.id,
+      departmentId: deptMensajeria,
+      order: 2,
+      color: '#10B981',
+    })
+  }
+
+  console.log('✅ Categorías ADMINISTRATIVE (Admin, Financiero, Compras, RRHH, Mensajería)')
 }

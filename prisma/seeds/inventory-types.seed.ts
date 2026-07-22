@@ -13,7 +13,7 @@ import { randomUUID } from 'crypto'
 export async function seedEquipmentTypes(prisma: PrismaClient, familyMap: Map<string, string>) {
   const fam = (code: string) => familyMap.get(code)!
   const types = [
-    // TECHNOLOGY
+    // ADMINISTRATIVE (TI)
     { code: 'LAPTOP', name: 'Laptop', icon: 'Laptop', order: 1, familyId: fam('ADMINISTRATIVE') },
     {
       code: 'DESKTOP',
@@ -391,7 +391,7 @@ export async function seedInventoryTypes(prisma: PrismaClient, familyMap: Map<st
 
 /**
  * Crea tipos de equipo comunes (Laptop, Desktop, Monitor) en todas las familias
- * que no sean TECHNOLOGY (que ya los tiene). Esto permite a Compras registrar
+ * que no sean ADMINISTRATIVE (que ya los tiene). Esto permite a Compras registrar
  * equipos informáticos para cualquier familia.
  */
 async function seedCommonEquipmentTypesForAllFamilies(

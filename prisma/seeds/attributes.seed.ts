@@ -8,7 +8,7 @@ import { randomUUID } from 'crypto'
 export async function seedAttributes(prisma: PrismaClient, familyMap: Map<string, string>) {
   console.log('🔧 Seeding atributos de tipos de inventario...')
 
-  const techFamilyId = familyMap.get('ADMINISTRATIVE')!
+  const adminFamilyId = familyMap.get('ADMINISTRATIVE')!
 
   // ============================================
   // ATRIBUTOS PARA EQUIPMENT TYPES
@@ -18,16 +18,16 @@ export async function seedAttributes(prisma: PrismaClient, familyMap: Map<string
   const computerType = await prisma.equipment_types.findFirst({
     where: {
       OR: [
-        { name: 'Desktop', familyId: techFamilyId },
-        { name: 'Computadora de Escritorio', familyId: techFamilyId },
+        { name: 'Desktop', familyId: adminFamilyId },
+        { name: 'Computadora de Escritorio', familyId: adminFamilyId },
       ],
     },
   })
   const laptopType = await prisma.equipment_types.findFirst({
-    where: { name: 'Laptop', familyId: techFamilyId },
+    where: { name: 'Laptop', familyId: adminFamilyId },
   })
   const printerType = await prisma.equipment_types.findFirst({
-    where: { name: 'Impresora', familyId: techFamilyId },
+    where: { name: 'Impresora', familyId: adminFamilyId },
   })
 
   // Atributos para Computadora de Escritorio
@@ -287,16 +287,16 @@ export async function seedAttributes(prisma: PrismaClient, familyMap: Map<string
   // ============================================
 
   const officeType = await prisma.license_types.findFirst({
-    where: { name: 'Office 365', familyId: techFamilyId },
+    where: { name: 'Office 365', familyId: adminFamilyId },
   })
   const antivirusType = await prisma.license_types.findFirst({
-    where: { name: 'Antivirus', familyId: techFamilyId },
+    where: { name: 'Antivirus', familyId: adminFamilyId },
   })
   const windowsType = await prisma.license_types.findFirst({
-    where: { name: 'Windows', familyId: techFamilyId },
+    where: { name: 'Windows', familyId: adminFamilyId },
   })
   const adobeType = await prisma.license_types.findFirst({
-    where: { name: 'Adobe', familyId: techFamilyId },
+    where: { name: 'Adobe', familyId: adminFamilyId },
   })
 
   // Atributos para Office 365
@@ -583,10 +583,10 @@ export async function seedAttributes(prisma: PrismaClient, familyMap: Map<string
   // ============================================
 
   const tonerType = await prisma.consumable_types.findFirst({
-    where: { name: 'Tóner', familyId: techFamilyId },
+    where: { name: 'Tóner', familyId: adminFamilyId },
   })
   const paperType = await prisma.consumable_types.findFirst({
-    where: { name: 'Papel', familyId: techFamilyId },
+    where: { name: 'Papel', familyId: adminFamilyId },
   })
 
   // Atributos para Tóner
@@ -1062,7 +1062,7 @@ export async function seedAttributes(prisma: PrismaClient, familyMap: Map<string
 
   // ============================================
   // ATRIBUTOS COMUNES PARA TIPOS EN TODAS LAS FAMILIAS
-  // Busca todos los tipos Laptop/Desktop/Monitor en familias diferentes a TECHNOLOGY
+  // Busca todos los tipos Laptop/Desktop/Monitor en familias diferentes a ADMINISTRATIVE
   // y les asigna los mismos atributos base (procesador, ram, almacenamiento, etc.)
   // ============================================
 

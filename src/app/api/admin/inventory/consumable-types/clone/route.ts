@@ -11,8 +11,14 @@ import { getInventoryManageFamilyIds } from '@/lib/inventory/family-access'
 import { canManageInventory } from '@/lib/inventory-access'
 
 function slugify(name: string) {
-  return name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9\s-]/g, '').trim().replace(/\s+/g, '-').replace(/-+/g, '-')
+  return name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
 }
 
 export async function POST(request: NextRequest) {
@@ -27,15 +33,31 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { sourceTypeId, targetFamilyId, newName, copyAttributes = true } = body as {
-      sourceTypeId: string; targetFamilyId: string; newName?: string; copyAttributes?: boolean
+    const {
+      sourceTypeId,
+      targetFamilyId,
+      newName,
+      copyAttributes = true,
+    } = body as {
+      sourceTypeId: string
+      targetFamilyId: string
+      newName?: string
+      copyAttributes?: boolean
     }
 
     if (!sourceTypeId || !targetFamilyId) {
-      return NextResponse.json({ error: 'sourceTypeId y targetFamilyId son requeridos' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'sourceTypeId y targetFamilyId son requeridos' },
+        { status: 400 }
+      )
     }
 
-    const manageable = await getInventoryManageFamilyIds(session.user.id, session.user.role, isSuperAdmin, canManage)
+    const manageable = await getInventoryManageFamilyIds(
+      session.user.id,
+      session.user.role,
+      isSuperAdmin,
+      canManage
+    )
     if (manageable !== undefined && !manageable.includes(targetFamilyId)) {
       return NextResponse.json({ error: 'Sin acceso a la familia destino' }, { status: 403 })
     }
@@ -53,8 +75,11 @@ export async function POST(request: NextRequest) {
       select: { code: true },
     })
     const usedCodes = new Set(existing.map(t => t.code))
-    let finalCode = baseCode; let suffix = 1
-    while (usedCodes.has(finalCode)) { finalCode = `${baseCode}-${suffix++}` }
+    let finalCode = baseCode
+    let suffix = 1
+    while (usedCodes.has(finalCode)) {
+      finalCode = `${baseCode}-${suffix++}`
+    }
 
     const newType = await prisma.$transaction(async tx => {
       const created = await tx.consumable_types.create({
@@ -67,9 +92,6 @@ export async function POST(request: NextRequest) {
           family: { connect: { id: targetFamilyId } },
           isActive: source.isActive,
           order: source.order,
-          trackStock: source.trackStock ?? true,
-          minStockLevel: source.minStockLevel ?? null,
-          reorderPoint: source.reorderPoint ?? null,
         },
       })
 
@@ -81,7 +103,9 @@ export async function POST(request: NextRequest) {
             attributeName: a.attributeName,
             attributeLabel: a.attributeLabel,
             attributeType: a.attributeType,
-            options: a.options,
+            ...(a.options !== null && a.options !== undefined
+              ? { options: a.options as object }
+              : {}),
             isRequired: a.isRequired,
             isVisible: a.isVisible,
             order: a.order,
@@ -115,6 +139,9 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error('[POST consumable-types/clone]', error)
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'Error al copiar tipo' }, { status: 500 })
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Error al copiar tipo' },
+      { status: 500 }
+    )
   }
 }

@@ -236,7 +236,6 @@ export const DEPARTMENT_NAME_ALIASES: Record<string, string> = {
   'Seguridad Informatica': 'Seguridad Informática',
   'Servicio al cliente': 'Servicio al Cliente',
   contabilidad: 'Contabilidad',
-  Contabilidad: 'Contabilidad',
   // Mensajería (departamento propio bajo Administración)
   Mensajeria: 'Mensajería',
   MENSAJERIA: 'Mensajería',

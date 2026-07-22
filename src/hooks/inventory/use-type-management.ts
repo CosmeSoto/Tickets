@@ -43,39 +43,22 @@ export interface EquipmentType extends BaseType {
   trackMaintenance: boolean
 }
 
-export interface LicenseType extends BaseType {
-  // These fields are for backward compatibility, but configuration is now per-license
-  requiresKey: boolean
-  allowMultipleAssignments: boolean
-  maxAssignments?: number | null
-}
+export interface LicenseType extends BaseType {}
 
-export interface ConsumableType extends BaseType {
-  trackStock: boolean
-  minStockLevel?: number | null
-  reorderPoint?: number | null
-}
+export interface ConsumableType extends BaseType {}
 
 export type AnyType = EquipmentType | LicenseType | ConsumableType
 
 export interface CreateTypeData {
-  code?: string // Auto-generado si no se proporciona
+  code?: string
   name: string
   description?: string
   icon?: string | null
   familyId: string
   isActive?: boolean
   order?: number
-  // Equipment specific
+  /** Solo equipment_types */
   trackMaintenance?: boolean
-  // License specific (for backward compatibility - configuration now per-license)
-  requiresKey?: boolean
-  allowMultipleAssignments?: boolean
-  maxAssignments?: number | null
-  // Consumable specific
-  trackStock?: boolean
-  minStockLevel?: number | null
-  reorderPoint?: number | null
 }
 
 export interface UpdateTypeData extends Partial<CreateTypeData> {}
@@ -134,13 +117,24 @@ export function useTypeManagement<T extends AnyType = AnyType>(
 
       setSaving(true)
       try {
-        // Generar code automáticamente si no se proporciona
         const code = data.code || generateCode(data.name)
+        const body: Record<string, unknown> = {
+          code,
+          name: data.name,
+          description: data.description,
+          icon: data.icon,
+          familyId,
+          isActive: data.isActive,
+          order: data.order,
+        }
+        if (typeKind === 'equipment') {
+          body.trackMaintenance = data.trackMaintenance ?? false
+        }
 
         const res = await fetch(getEndpoint(), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...data, code, familyId }),
+          body: JSON.stringify(body),
         })
         const result = await res.json()
 
@@ -170,7 +164,7 @@ export function useTypeManagement<T extends AnyType = AnyType>(
         setSaving(false)
       }
     },
-    [familyId, getEndpoint, toast]
+    [familyId, getEndpoint, toast, typeKind]
   )
 
   // ── Update type ──

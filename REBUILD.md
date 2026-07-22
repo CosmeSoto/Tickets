@@ -252,6 +252,28 @@ sudo docker exec tickets-app sh -c 'node ./node_modules/tsx/dist/cli.mjs prisma/
 # Arquitectura, Operaciones. La antigua familia TECHNOLOGY se absorbe en Administración.
 ```
 
+### Organigrama PSF (estado final)
+
+| Familia        | Departamentos                                                                                                                                                  |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Administración | Administración, Financiero, Contabilidad, Compras, Recursos Humanos, Mensajería, TI, Soporte Técnico, Seguridad Informática, Usuarios y Privilegios, Telefonía |
+| Comercial      | Comercial                                                                                                                                                      |
+| Marketing      | Marketing, Medios Digitales, Diseño, Eventos, Servicio al Cliente                                                                                              |
+| Arquitectura   | Arquitectura                                                                                                                                                   |
+| Operaciones    | Parqueaderos, Seguridad Física, CCTV y Control de Accesos, Mantenimiento, SSO, Áreas Verdes, Limpieza                                                          |
+
+**Orden recomendado tras deploy (sin `--clean`):**
+
+```bash
+sudo docker exec tickets-app sh -c 'node ./node_modules/tsx/dist/cli.mjs prisma/ensure-departments.ts'
+sudo docker exec tickets-app sh -c 'node ./node_modules/tsx/dist/cli.mjs prisma/ensure-categories.ts'
+# Opcional catálogos inventario:
+sudo docker exec tickets-app sh -c 'node ./node_modules/tsx/dist/cli.mjs prisma/ensure-catalogs.ts'
+```
+
+Fuente de verdad en código: `prisma/seeds/family-map.ts` + `prisma/seeds/department-family-map.ts`.  
+Upsert de categorías: `prisma/seeds/category-upsert.ts` (único por dept).
+
 ### Conectarse a la BD
 
 ```bash

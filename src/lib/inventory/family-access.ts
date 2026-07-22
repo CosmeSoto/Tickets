@@ -12,6 +12,16 @@ import {
  * - visibility: listados, dashboard, lectura
  * - operational: CRUD activos (admin solo nativa; gestor nativa + inventory_manager_families)
  * - consumer: solicitud de activos (canRequestAssets)
+ *
+ * ## Superficies API (no unificar a ciegas)
+ *
+ * `/api/inventory/*` — operaciones de negocio (activos, actas, contratos, reportes,
+ *   listados de tipos/bodegas para formularios de operación). Auth: inventory-access.
+ *
+ * `/api/admin/inventory/*` — configuración de catálogo por familia (CRUD tipos,
+ *   marcas, atributos, clone entre áreas, bodegas de settings). Auth: admin + scope.
+ *
+ * Settings UI → admin. Asset forms / ops → inventory.
  */
 
 export async function getAccessibleFamilyIds(

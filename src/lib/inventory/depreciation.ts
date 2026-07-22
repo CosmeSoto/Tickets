@@ -154,13 +154,12 @@ export function getRecommendedDepreciationMethod(
   familyCode: string,
   assetTypeName?: string
 ): DepreciationMethod {
-  if (familyCode === 'TECHNOLOGY' || familyCode === 'ADMINISTRATIVE') {
-    // Administración / TI: saldo decreciente por obsolescencia rápida
+  // ADMINISTRATIVE (y TECHNOLOGY legacy): saldo decreciente por obsolescencia TI
+  if (familyCode === 'ADMINISTRATIVE' || familyCode === 'TECHNOLOGY') {
     return 'DECLINING_BALANCE'
   }
-  if (familyCode === 'FIXED_ASSETS' && assetTypeName) {
-    const lower = assetTypeName.toLowerCase()
-    // Equipos mecánicos con horas de uso medibles
+  if (familyCode === 'OPERATIONS' || familyCode === 'FIXED_ASSETS') {
+    const lower = (assetTypeName ?? '').toLowerCase()
     if (
       lower.includes('hvac') ||
       lower.includes('ascensor') ||
@@ -170,7 +169,6 @@ export function getRecommendedDepreciationMethod(
       return 'UNITS_OF_PRODUCTION'
     }
   }
-  // Default: lineal para todo lo demás
   return 'LINEAR'
 }
 
@@ -178,18 +176,25 @@ export function getRecommendedDepreciationMethod(
  * Vida útil estimada en años por familia (referencia NIC 16 / NIIF PYMES).
  * El usuario puede sobreescribir estos valores en el formulario.
  */
+/**
+ * Vida útil estimada en años por familia (referencia NIC 16 / NIIF PYMES).
+ * Claves PSF actuales: ADMINISTRATIVE, COMMERCIAL, MARKETING, ARCHITECTURE, OPERATIONS.
+ * Claves legacy (TECHNOLOGY, FIXED_ASSETS, …) se mantienen por datos históricos.
+ */
 export const DEFAULT_USEFUL_LIFE_YEARS: Record<string, number> = {
-  FIXED_ASSETS: 20, // Infraestructura: 20-50 años
-  TECHNOLOGY: 5, // Legacy alias
-  ADMINISTRATIVE: 5, // Incluye TI: 3-7 años
-  SECURITY: 10, // Seguridad: 8-15 años
-  COMMERCIAL: 10, // Activos comerciales: 5-15 años
-  GREEN_AREAS: 5, // Equipos de jardinería: 3-8 años
-  MAINTENANCE: 0, // MRO: no deprecia
-  SERVICES: 0, // Servicios: no deprecia
-  OPERATIONS: 10,
-  ARCHITECTURE: 15,
+  // Organigrama PSF
+  ADMINISTRATIVE: 5, // Incluye TI
+  COMMERCIAL: 10,
   MARKETING: 5,
+  ARCHITECTURE: 15,
+  OPERATIONS: 10,
+  // Legacy / alias
+  TECHNOLOGY: 5, // absorbida por ADMINISTRATIVE
+  FIXED_ASSETS: 20,
+  SECURITY: 10,
+  GREEN_AREAS: 5,
+  MAINTENANCE: 0,
+  SERVICES: 0,
 }
 
 /**

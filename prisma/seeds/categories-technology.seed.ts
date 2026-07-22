@@ -1,45 +1,12 @@
 /**
- * Seed: Categorías para Familia TECNOLOGÍA Y COMUNICACIONES
+ * Seed: Categorías TI bajo familia ADMINISTRACIÓN
  *
- * Categorías completas para los departamentos de Tecnologías de la Información, Soporte Técnico, Seguridad de la Información, Usuarios y Privilegios, y Telefonía.
+ * Departamentos: Tecnologías de la Información, Soporte Técnico, Seguridad Informática,
+ * Usuarios y Privilegios, Telefonía.
  */
 
 import { PrismaClient } from '@prisma/client'
-import { randomUUID } from 'crypto'
-
-const now = new Date()
-
-async function upsertCategory(
-  prisma: PrismaClient,
-  data: {
-    name: string
-    description: string
-    level: number
-    parentId: string | null
-    departmentId: string
-    order: number
-    color: string
-  }
-) {
-  const existing = await prisma.categories.findFirst({
-    where: { name: data.name, level: data.level, parentId: data.parentId },
-  })
-  if (existing) {
-    return prisma.categories.update({
-      where: { id: existing.id },
-      data: {
-        description: data.description,
-        departmentId: data.departmentId,
-        order: data.order,
-        color: data.color,
-        updatedAt: now,
-      },
-    })
-  }
-  return prisma.categories.create({
-    data: { id: randomUUID(), ...data, isActive: true, createdAt: now, updatedAt: now },
-  })
-}
+import { upsertCategory } from './category-upsert'
 
 export async function seedCategoriesTechnology(prisma: PrismaClient, deptMap: Map<string, string>) {
   const deptInfraId = deptMap.get('Tecnologías de la Información')

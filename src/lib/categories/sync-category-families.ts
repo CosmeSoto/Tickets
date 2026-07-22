@@ -1,8 +1,12 @@
 /**
  * Sincroniza categories.familyId desde departments.familyId.
  * Corrige datos legacy donde la categoría tiene departamento pero family_id null/desfasado.
+ *
+ * - syncCategoryFamilyIdsForFamily: una familia (runtime API)
+ * - syncAllCategoryFamilyIdsFromDepartments: todas (seed / ensure-categories)
  */
 
+import type { PrismaClient } from '@prisma/client'
 import prisma from '@/lib/prisma'
 
 export async function syncCategoryFamilyIdsForFamily(familyId: string): Promise<{
@@ -35,6 +39,22 @@ export async function syncCategoryFamilyIdsForFamily(familyId: string): Promise<
   }
 }
 
+/** Sync global vía SQL (idempotente). Acepta PrismaClient de seed o el singleton de app. */
+export async function syncAllCategoryFamilyIdsFromDepartments(
+  client: PrismaClient = prisma
+): Promise<number> {
+  const result = await client.$executeRaw`
+    UPDATE categories c
+    SET family_id = d.family_id,
+        "updatedAt" = NOW()
+    FROM departments d
+    WHERE c."departmentId" = d.id
+      AND d.family_id IS NOT NULL
+      AND (c.family_id IS NULL OR c.family_id <> d.family_id)
+  `
+  return typeof result === 'number' ? result : Number(result) || 0
+}
+
 /**
  * Construye el where de categorías para una familia:
  * - familyId directo
@@ -51,7 +71,6 @@ export async function buildCategoryFamilyWhere(familyId: string): Promise<{
   if (sync.departmentIds.length > 0) {
     whereOR.push({ departmentId: { in: sync.departmentIds } })
   } else {
-    // Fallback relación Prisma por si aún no hay IDs (no debería)
     whereOR.push({ departments: { familyId } })
   }
 

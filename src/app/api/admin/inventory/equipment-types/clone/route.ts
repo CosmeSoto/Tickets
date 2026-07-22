@@ -40,7 +40,12 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { sourceTypeId, targetFamilyId, newName, copyAttributes = true } = body as {
+    const {
+      sourceTypeId,
+      targetFamilyId,
+      newName,
+      copyAttributes = true,
+    } = body as {
       sourceTypeId: string
       targetFamilyId: string
       newName?: string
@@ -48,11 +53,19 @@ export async function POST(request: NextRequest) {
     }
 
     if (!sourceTypeId || !targetFamilyId) {
-      return NextResponse.json({ error: 'sourceTypeId y targetFamilyId son requeridos' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'sourceTypeId y targetFamilyId son requeridos' },
+        { status: 400 }
+      )
     }
 
     // Verificar acceso a la familia destino
-    const manageable = await getInventoryManageFamilyIds(session.user.id, session.user.role, isSuperAdmin, canManage)
+    const manageable = await getInventoryManageFamilyIds(
+      session.user.id,
+      session.user.role,
+      isSuperAdmin,
+      canManage
+    )
     if (manageable !== undefined && !manageable.includes(targetFamilyId)) {
       return NextResponse.json({ error: 'Sin acceso a la familia destino' }, { status: 403 })
     }
@@ -75,7 +88,9 @@ export async function POST(request: NextRequest) {
     const usedCodes = new Set(existing.map((t: { code: string }) => t.code))
     let finalCode = baseCode
     let suffix = 1
-    while (usedCodes.has(finalCode)) { finalCode = `${baseCode}-${suffix++}` }
+    while (usedCodes.has(finalCode)) {
+      finalCode = `${baseCode}-${suffix++}`
+    }
 
     const newType = await prisma.$transaction(async tx => {
       const created = await tx.equipment_types.create({
@@ -100,7 +115,7 @@ export async function POST(request: NextRequest) {
             attributeName: a.attributeName,
             attributeLabel: a.attributeLabel,
             attributeType: a.attributeType,
-            options: a.options,
+            ...(a.options !== null && a.options !== undefined ? { options: a.options } : {}),
             isRequired: a.isRequired,
             isVisible: a.isVisible,
             order: a.order,

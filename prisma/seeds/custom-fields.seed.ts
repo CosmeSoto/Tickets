@@ -1,7 +1,7 @@
 /**
  * Seed: Custom Fields (Atributos Dinámicos por familia)
  *
- * Familias: Tecnología, Arquitectura, Operaciones, Administrativa, Comercial, Marketing
+ * Familias: Administración (incluye TI), Arquitectura, Operaciones, Comercial, Marketing
  */
 
 import { Prisma, PrismaClient } from '@prisma/client'
@@ -12,15 +12,15 @@ export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<stri
   const fam = (code: string) => familyMap.get(code)
 
   // ============================================
-  // FAMILIA: TECNOLOGÍA (Technology)
+  // ADMINISTRACIÓN — atributos de equipos TI
   // ============================================
 
-  const technologyFamilyId = fam('ADMINISTRATIVE')
-  if (technologyFamilyId) {
+  const adminFamilyId = fam('ADMINISTRATIVE')
+  if (adminFamilyId) {
     await prisma.family_custom_fields.createMany({
       data: [
         {
-          familyId: technologyFamilyId,
+          familyId: adminFamilyId,
           fieldName: 'marca',
           fieldLabel: 'Marca',
           fieldType: 'text',
@@ -32,7 +32,7 @@ export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<stri
           helpText: 'Marca del equipo (ej: Dell, HP, Lenovo, Apple)',
         },
         {
-          familyId: technologyFamilyId,
+          familyId: adminFamilyId,
           fieldName: 'modelo',
           fieldLabel: 'Modelo',
           fieldType: 'text',
@@ -44,7 +44,7 @@ export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<stri
           helpText: 'Modelo específico del equipo',
         },
         {
-          familyId: technologyFamilyId,
+          familyId: adminFamilyId,
           fieldName: 'numero_serie',
           fieldLabel: 'Número de Serie',
           fieldType: 'text',
@@ -56,7 +56,7 @@ export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<stri
           helpText: 'Número de serie del fabricante',
         },
         {
-          familyId: technologyFamilyId,
+          familyId: adminFamilyId,
           fieldName: 'procesador',
           fieldLabel: 'Procesador',
           fieldType: 'text',
@@ -68,7 +68,7 @@ export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<stri
           helpText: 'Modelo del procesador (ej: Intel Core i7-12700K, AMD Ryzen 7 5800X)',
         },
         {
-          familyId: technologyFamilyId,
+          familyId: adminFamilyId,
           fieldName: 'ram',
           fieldLabel: 'RAM (GB)',
           fieldType: 'number',
@@ -81,7 +81,7 @@ export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<stri
           helpText: 'Memoria RAM en gigabytes',
         },
         {
-          familyId: technologyFamilyId,
+          familyId: adminFamilyId,
           fieldName: 'almacenamiento',
           fieldLabel: 'Almacenamiento (GB)',
           fieldType: 'number',
@@ -94,7 +94,7 @@ export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<stri
           helpText: 'Capacidad de almacenamiento en gigabytes',
         },
         {
-          familyId: technologyFamilyId,
+          familyId: adminFamilyId,
           fieldName: 'tipo_disco',
           fieldLabel: 'Tipo de Disco',
           fieldType: 'select',
@@ -106,7 +106,7 @@ export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<stri
           helpText: 'Tipo de disco de almacenamiento',
         },
         {
-          familyId: technologyFamilyId,
+          familyId: adminFamilyId,
           fieldName: 'sistema_operativo',
           fieldLabel: 'Sistema Operativo',
           fieldType: 'select',
@@ -128,7 +128,7 @@ export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<stri
           helpText: 'Sistema operativo instalado',
         },
         {
-          familyId: technologyFamilyId,
+          familyId: adminFamilyId,
           fieldName: 'tarjeta_grafica',
           fieldLabel: 'Tarjeta Gráfica',
           fieldType: 'text',
@@ -140,7 +140,7 @@ export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<stri
           helpText: 'Modelo de tarjeta gráfica (ej: NVIDIA RTX 3060, Intel Iris Xe)',
         },
         {
-          familyId: technologyFamilyId,
+          familyId: adminFamilyId,
           fieldName: 'pantalla_pulgadas',
           fieldLabel: 'Pantalla',
           fieldType: 'number',
@@ -153,7 +153,7 @@ export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<stri
           helpText: 'Tamaño de pantalla en pulgadas (para laptops, monitores)',
         },
         {
-          familyId: technologyFamilyId,
+          familyId: adminFamilyId,
           fieldName: 'resolucion',
           fieldLabel: 'Resolución',
           fieldType: 'select',
@@ -171,7 +171,7 @@ export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<stri
           helpText: 'Resolución de pantalla',
         },
         {
-          familyId: technologyFamilyId,
+          familyId: adminFamilyId,
           fieldName: 'direccion_ip',
           fieldLabel: 'Dirección IP',
           fieldType: 'text',
@@ -183,7 +183,7 @@ export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<stri
           helpText: 'Dirección IP asignada (para equipos de red)',
         },
         {
-          familyId: technologyFamilyId,
+          familyId: adminFamilyId,
           fieldName: 'direccion_mac',
           fieldLabel: 'Dirección MAC',
           fieldType: 'text',
@@ -195,7 +195,7 @@ export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<stri
           helpText: 'Dirección MAC del equipo',
         },
         {
-          familyId: technologyFamilyId,
+          familyId: adminFamilyId,
           fieldName: 'garantia_hasta',
           fieldLabel: 'Garantía Hasta',
           fieldType: 'date',
@@ -624,7 +624,7 @@ export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<stri
       data: officeFields(administrativeFamilyId, 'administrativo'),
       skipDuplicates: true,
     })
-    console.log('  ✓ Campos para Gestión Administrativa (7 campos)')
+    console.log('  ✓ Campos para Administración (7 campos)')
   }
 
   const commercialFamilyId = fam('COMMERCIAL')

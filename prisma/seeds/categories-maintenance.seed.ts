@@ -5,41 +5,7 @@
  */
 
 import { PrismaClient } from '@prisma/client'
-import { randomUUID } from 'crypto'
-
-const now = new Date()
-
-async function upsertCategory(
-  prisma: PrismaClient,
-  data: {
-    name: string
-    description: string
-    level: number
-    parentId: string | null
-    departmentId: string
-    order: number
-    color: string
-  }
-) {
-  const existing = await prisma.categories.findFirst({
-    where: { name: data.name, level: data.level, parentId: data.parentId },
-  })
-  if (existing) {
-    return prisma.categories.update({
-      where: { id: existing.id },
-      data: {
-        description: data.description,
-        departmentId: data.departmentId,
-        order: data.order,
-        color: data.color,
-        updatedAt: now,
-      },
-    })
-  }
-  return prisma.categories.create({
-    data: { id: randomUUID(), ...data, isActive: true, createdAt: now, updatedAt: now },
-  })
-}
+import { upsertCategory } from './category-upsert'
 
 export async function seedCategoriesMaintenance(
   prisma: PrismaClient,
@@ -52,17 +18,13 @@ export async function seedCategoriesMaintenance(
     return
   }
 
-  const deptCivil = deptMantenimiento
-  const deptElectrico = deptMantenimiento
-  const deptMecanico = deptMantenimiento
-
   // ==================== DEPARTAMENTO MANTENIMIENTO CIVIL ====================
   const fallaCivil = await upsertCategory(prisma, {
     name: 'Falla o Daño',
     description: 'Daño o desperfecto civil',
     level: 1,
     parentId: null,
-    departmentId: deptCivil,
+    departmentId: deptMantenimiento,
     order: 1,
     color: '#EF4444',
   })
@@ -72,7 +34,7 @@ export async function seedCategoriesMaintenance(
     description: 'Solicitudes de mantenimiento preventivo o correctivo',
     level: 1,
     parentId: null,
-    departmentId: deptCivil,
+    departmentId: deptMantenimiento,
     order: 2,
     color: '#3B82F6',
   })
@@ -83,7 +45,7 @@ export async function seedCategoriesMaintenance(
     description: 'Daños en pisos, baldosas, revestimientos',
     level: 2,
     parentId: fallaCivil.id,
-    departmentId: deptCivil,
+    departmentId: deptMantenimiento,
     order: 1,
     color: '#EF4444',
   })
@@ -93,7 +55,7 @@ export async function seedCategoriesMaintenance(
     description: 'Daños en puertas, ventanas, cerraduras',
     level: 2,
     parentId: fallaCivil.id,
-    departmentId: deptCivil,
+    departmentId: deptMantenimiento,
     order: 2,
     color: '#EF4444',
   })
@@ -103,7 +65,7 @@ export async function seedCategoriesMaintenance(
     description: 'Fallas en plomería, tuberías, sanitarios',
     level: 2,
     parentId: fallaCivil.id,
-    departmentId: deptCivil,
+    departmentId: deptMantenimiento,
     order: 3,
     color: '#EF4444',
   })
@@ -113,7 +75,7 @@ export async function seedCategoriesMaintenance(
     description: 'Goteras, filtraciones, daños en techos',
     level: 2,
     parentId: fallaCivil.id,
-    departmentId: deptCivil,
+    departmentId: deptMantenimiento,
     order: 4,
     color: '#EF4444',
   })
@@ -124,7 +86,7 @@ export async function seedCategoriesMaintenance(
     description: 'Baldosa de piso rota o suelta',
     level: 3,
     parentId: pisosParedes.id,
-    departmentId: deptCivil,
+    departmentId: deptMantenimiento,
     order: 1,
     color: '#EF4444',
   })
@@ -134,7 +96,7 @@ export async function seedCategoriesMaintenance(
     description: 'Grieta o fisura en pared',
     level: 3,
     parentId: pisosParedes.id,
-    departmentId: deptCivil,
+    departmentId: deptMantenimiento,
     order: 2,
     color: '#EF4444',
   })
@@ -144,7 +106,7 @@ export async function seedCategoriesMaintenance(
     description: 'Revestimiento o pintura desprendida',
     level: 3,
     parentId: pisosParedes.id,
-    departmentId: deptCivil,
+    departmentId: deptMantenimiento,
     order: 3,
     color: '#EF4444',
   })
@@ -155,7 +117,7 @@ export async function seedCategoriesMaintenance(
     description: 'Cerradura no funciona',
     level: 3,
     parentId: puertasVentanas.id,
-    departmentId: deptCivil,
+    departmentId: deptMantenimiento,
     order: 1,
     color: '#EF4444',
   })
@@ -165,7 +127,7 @@ export async function seedCategoriesMaintenance(
     description: 'Bisagra dañada o ruidosa',
     level: 3,
     parentId: puertasVentanas.id,
-    departmentId: deptCivil,
+    departmentId: deptMantenimiento,
     order: 2,
     color: '#EF4444',
   })
@@ -175,7 +137,7 @@ export async function seedCategoriesMaintenance(
     description: 'Vidrio de ventana o puerta roto',
     level: 3,
     parentId: puertasVentanas.id,
-    departmentId: deptCivil,
+    departmentId: deptMantenimiento,
     order: 3,
     color: '#EF4444',
   })
@@ -186,7 +148,7 @@ export async function seedCategoriesMaintenance(
     description: 'Fuga en tubería o conexión',
     level: 3,
     parentId: sanitariosCivil.id,
-    departmentId: deptCivil,
+    departmentId: deptMantenimiento,
     order: 1,
     color: '#EF4444',
   })
@@ -196,7 +158,7 @@ export async function seedCategoriesMaintenance(
     description: 'Desagüe tapado',
     level: 3,
     parentId: sanitariosCivil.id,
-    departmentId: deptCivil,
+    departmentId: deptMantenimiento,
     order: 2,
     color: '#EF4444',
   })
@@ -207,7 +169,7 @@ export async function seedCategoriesMaintenance(
     description: 'Solicitudes de mantenimiento programado',
     level: 2,
     parentId: solicitudCivil.id,
-    departmentId: deptCivil,
+    departmentId: deptMantenimiento,
     order: 1,
     color: '#3B82F6',
   })
@@ -217,7 +179,7 @@ export async function seedCategoriesMaintenance(
     description: 'Solicitudes de reparación',
     level: 2,
     parentId: solicitudCivil.id,
-    departmentId: deptCivil,
+    departmentId: deptMantenimiento,
     order: 2,
     color: '#3B82F6',
   })
@@ -227,7 +189,7 @@ export async function seedCategoriesMaintenance(
     description: 'Solicitudes de pintura',
     level: 2,
     parentId: solicitudCivil.id,
-    departmentId: deptCivil,
+    departmentId: deptMantenimiento,
     order: 3,
     color: '#3B82F6',
   })
@@ -238,7 +200,7 @@ export async function seedCategoriesMaintenance(
     description: 'Fallas en sistema eléctrico',
     level: 1,
     parentId: null,
-    departmentId: deptElectrico,
+    departmentId: deptMantenimiento,
     order: 1,
     color: '#EF4444',
   })
@@ -248,7 +210,7 @@ export async function seedCategoriesMaintenance(
     description: 'Solicitudes de instalación o mantenimiento eléctrico',
     level: 1,
     parentId: null,
-    departmentId: deptElectrico,
+    departmentId: deptMantenimiento,
     order: 2,
     color: '#3B82F6',
   })
@@ -259,7 +221,7 @@ export async function seedCategoriesMaintenance(
     description: 'Corte de energía eléctrica',
     level: 2,
     parentId: fallaElectrico.id,
-    departmentId: deptElectrico,
+    departmentId: deptMantenimiento,
     order: 1,
     color: '#EF4444',
   })
@@ -269,7 +231,7 @@ export async function seedCategoriesMaintenance(
     description: 'Fallas en luces, focos, luminarias',
     level: 2,
     parentId: fallaElectrico.id,
-    departmentId: deptElectrico,
+    departmentId: deptMantenimiento,
     order: 2,
     color: '#EF4444',
   })
@@ -279,7 +241,7 @@ export async function seedCategoriesMaintenance(
     description: 'Fallas en enchufes, tomacorrientes, interruptores',
     level: 2,
     parentId: fallaElectrico.id,
-    departmentId: deptElectrico,
+    departmentId: deptMantenimiento,
     order: 3,
     color: '#EF4444',
   })
@@ -289,7 +251,7 @@ export async function seedCategoriesMaintenance(
     description: 'Fallas en tableros, breakers, fusibles',
     level: 2,
     parentId: fallaElectrico.id,
-    departmentId: deptElectrico,
+    departmentId: deptMantenimiento,
     order: 4,
     color: '#EF4444',
   })
@@ -300,7 +262,7 @@ export async function seedCategoriesMaintenance(
     description: 'Corte total de energía',
     level: 3,
     parentId: sinEnergia.id,
-    departmentId: deptElectrico,
+    departmentId: deptMantenimiento,
     order: 1,
     color: '#EF4444',
   })
@@ -310,7 +272,7 @@ export async function seedCategoriesMaintenance(
     description: 'Corte parcial de energía',
     level: 3,
     parentId: sinEnergia.id,
-    departmentId: deptElectrico,
+    departmentId: deptMantenimiento,
     order: 2,
     color: '#EF4444',
   })
@@ -321,7 +283,7 @@ export async function seedCategoriesMaintenance(
     description: 'Foco o luminaria fundida',
     level: 3,
     parentId: iluminacion.id,
-    departmentId: deptElectrico,
+    departmentId: deptMantenimiento,
     order: 1,
     color: '#EF4444',
   })
@@ -331,7 +293,7 @@ export async function seedCategoriesMaintenance(
     description: 'Luz parpadea o es intermitente',
     level: 3,
     parentId: iluminacion.id,
-    departmentId: deptElectrico,
+    departmentId: deptMantenimiento,
     order: 2,
     color: '#EF4444',
   })
@@ -342,7 +304,7 @@ export async function seedCategoriesMaintenance(
     description: 'Instalación eléctrica nueva',
     level: 2,
     parentId: solicitudElectrico.id,
-    departmentId: deptElectrico,
+    departmentId: deptMantenimiento,
     order: 1,
     color: '#3B82F6',
   })
@@ -352,7 +314,7 @@ export async function seedCategoriesMaintenance(
     description: 'Mantenimiento preventivo eléctrico',
     level: 2,
     parentId: solicitudElectrico.id,
-    departmentId: deptElectrico,
+    departmentId: deptMantenimiento,
     order: 2,
     color: '#3B82F6',
   })
@@ -363,7 +325,7 @@ export async function seedCategoriesMaintenance(
     description: 'Fallas en equipos mecánicos',
     level: 1,
     parentId: null,
-    departmentId: deptMecanico,
+    departmentId: deptMantenimiento,
     order: 1,
     color: '#EF4444',
   })
@@ -373,7 +335,7 @@ export async function seedCategoriesMaintenance(
     description: 'Solicitudes de mantenimiento mecánico',
     level: 1,
     parentId: null,
-    departmentId: deptMecanico,
+    departmentId: deptMantenimiento,
     order: 2,
     color: '#3B82F6',
   })
@@ -384,7 +346,7 @@ export async function seedCategoriesMaintenance(
     description: 'Fallas en ascensores, montacargas',
     level: 2,
     parentId: fallaMecanico.id,
-    departmentId: deptMecanico,
+    departmentId: deptMantenimiento,
     order: 1,
     color: '#EF4444',
   })
@@ -394,7 +356,7 @@ export async function seedCategoriesMaintenance(
     description: 'Fallas en escaleras eléctricas',
     level: 2,
     parentId: fallaMecanico.id,
-    departmentId: deptMecanico,
+    departmentId: deptMantenimiento,
     order: 2,
     color: '#EF4444',
   })
@@ -404,7 +366,7 @@ export async function seedCategoriesMaintenance(
     description: 'Fallas en bombas, compresores, motores',
     level: 2,
     parentId: fallaMecanico.id,
-    departmentId: deptMecanico,
+    departmentId: deptMantenimiento,
     order: 3,
     color: '#EF4444',
   })
@@ -415,7 +377,7 @@ export async function seedCategoriesMaintenance(
     description: 'Ascensor atascado entre pisos',
     level: 3,
     parentId: ascensores.id,
-    departmentId: deptMecanico,
+    departmentId: deptMantenimiento,
     order: 1,
     color: '#EF4444',
   })
@@ -425,7 +387,7 @@ export async function seedCategoriesMaintenance(
     description: 'Puertas no abren o cierran',
     level: 3,
     parentId: ascensores.id,
-    departmentId: deptMecanico,
+    departmentId: deptMantenimiento,
     order: 2,
     color: '#EF4444',
   })
@@ -435,7 +397,7 @@ export async function seedCategoriesMaintenance(
     description: 'Ruido o vibración anormal',
     level: 3,
     parentId: ascensores.id,
-    departmentId: deptMecanico,
+    departmentId: deptMantenimiento,
     order: 3,
     color: '#EF4444',
   })
@@ -446,7 +408,7 @@ export async function seedCategoriesMaintenance(
     description: 'Mantenimiento preventivo de equipos',
     level: 2,
     parentId: solicitudMecanico.id,
-    departmentId: deptMecanico,
+    departmentId: deptMantenimiento,
     order: 1,
     color: '#3B82F6',
   })
@@ -456,9 +418,206 @@ export async function seedCategoriesMaintenance(
     description: 'Reparación de equipos mecánicos',
     level: 2,
     parentId: solicitudMecanico.id,
-    departmentId: deptMecanico,
+    departmentId: deptMantenimiento,
     order: 2,
     color: '#3B82F6',
+  })
+
+  // ==================== INFRAESTRUCTURA (agua, gas, HVAC, drenaje) ====================
+  const fallaInfra = await upsertCategory(prisma, {
+    name: 'Falla de Infraestructura',
+    description: 'Fallas en infraestructura (agua, gas, HVAC, drenaje, estacionamiento)',
+    level: 1,
+    parentId: null,
+    departmentId: deptMantenimiento,
+    order: 10,
+    color: '#EF4444',
+  })
+
+  // Nivel 2 - Fallas Infraestructura
+  const aguaSanitaria = await upsertCategory(prisma, {
+    name: 'Agua Sanitaria',
+    description: 'Fallas en tuberías, tanques, bombas',
+    level: 2,
+    parentId: fallaInfra.id,
+    departmentId: deptMantenimiento,
+    order: 1,
+    color: '#EF4444',
+  })
+
+  const drenaje = await upsertCategory(prisma, {
+    name: 'Drenaje y Alcantarillado',
+    description: 'Fallas en drenaje, cloacas, sumideros',
+    level: 2,
+    parentId: fallaInfra.id,
+    departmentId: deptMantenimiento,
+    order: 2,
+    color: '#EF4444',
+  })
+
+  const gas = await upsertCategory(prisma, {
+    name: 'Gas Natural',
+    description: 'Fugas o problemas con gas',
+    level: 2,
+    parentId: fallaInfra.id,
+    departmentId: deptMantenimiento,
+    order: 3,
+    color: '#EF4444',
+  })
+
+  const aireAcondicionado = await upsertCategory(prisma, {
+    name: 'Aire Acondicionado y Ventilación',
+    description: 'Fallas en HVAC, unidades de AC, ventilación',
+    level: 2,
+    parentId: fallaInfra.id,
+    departmentId: deptMantenimiento,
+    order: 4,
+    color: '#EF4444',
+  })
+
+  const estacionamiento = await upsertCategory(prisma, {
+    name: 'Estacionamiento',
+    description: 'Fallas en estacionamiento, barreras, sensores',
+    level: 2,
+    parentId: fallaInfra.id,
+    departmentId: deptMantenimiento,
+    order: 5,
+    color: '#EF4444',
+  })
+
+  // Nivel 3 - Fallas Agua Sanitaria
+  await upsertCategory(prisma, {
+    name: 'Fuga de Agua',
+    description: 'Fuga en tubería o conexión',
+    level: 3,
+    parentId: aguaSanitaria.id,
+    departmentId: deptMantenimiento,
+    order: 1,
+    color: '#EF4444',
+  })
+
+  await upsertCategory(prisma, {
+    name: 'Bomba de Agua',
+    description: 'Bomba de agua no funciona',
+    level: 3,
+    parentId: aguaSanitaria.id,
+    departmentId: deptMantenimiento,
+    order: 2,
+    color: '#EF4444',
+  })
+
+  await upsertCategory(prisma, {
+    name: 'Tanque de Agua',
+    description: 'Problema con tanque de agua',
+    level: 3,
+    parentId: aguaSanitaria.id,
+    departmentId: deptMantenimiento,
+    order: 3,
+    color: '#EF4444',
+  })
+
+  // Nivel 3 - Fallas Drenaje
+  await upsertCategory(prisma, {
+    name: 'Desagüe Obstruido',
+    description: 'Desagüe o cloaca obstruida',
+    level: 3,
+    parentId: drenaje.id,
+    departmentId: deptMantenimiento,
+    order: 1,
+    color: '#EF4444',
+  })
+
+  await upsertCategory(prisma, {
+    name: 'Sumidero Tapado',
+    description: 'Sumidero tapado con residuos',
+    level: 3,
+    parentId: drenaje.id,
+    departmentId: deptMantenimiento,
+    order: 2,
+    color: '#EF4444',
+  })
+
+  // Nivel 3 - Fallas Gas
+  await upsertCategory(prisma, {
+    name: 'Fuga de Gas',
+    description: 'Fuga de gas - EMERGENCIA',
+    level: 3,
+    parentId: gas.id,
+    departmentId: deptMantenimiento,
+    order: 1,
+    color: '#EF4444',
+  })
+
+  await upsertCategory(prisma, {
+    name: 'Olor a Gas',
+    description: 'Detección de olor a gas',
+    level: 3,
+    parentId: gas.id,
+    departmentId: deptMantenimiento,
+    order: 2,
+    color: '#EF4444',
+  })
+
+  // Nivel 3 - Fallas Aire Acondicionado
+  await upsertCategory(prisma, {
+    name: 'Unidad de AC No Enfría',
+    description: 'Aire acondicionado no enfría',
+    level: 3,
+    parentId: aireAcondicionado.id,
+    departmentId: deptMantenimiento,
+    order: 1,
+    color: '#EF4444',
+  })
+
+  await upsertCategory(prisma, {
+    name: 'Fuga de Refrigerante',
+    description: 'Fuga de gas refrigerante',
+    level: 3,
+    parentId: aireAcondicionado.id,
+    departmentId: deptMantenimiento,
+    order: 2,
+    color: '#EF4444',
+  })
+
+  await upsertCategory(prisma, {
+    name: 'Ventilación Deficiente',
+    description: 'Ventilación insuficiente o ruidos anormales',
+    level: 3,
+    parentId: aireAcondicionado.id,
+    departmentId: deptMantenimiento,
+    order: 3,
+    color: '#EF4444',
+  })
+
+  // Nivel 3 - Fallas Estacionamiento
+  await upsertCategory(prisma, {
+    name: 'Barrera No Funciona',
+    description: 'Barrera de estacionamiento defectuosa',
+    level: 3,
+    parentId: estacionamiento.id,
+    departmentId: deptMantenimiento,
+    order: 1,
+    color: '#EF4444',
+  })
+
+  await upsertCategory(prisma, {
+    name: 'Sensor de Vehículo',
+    description: 'Sensor de detección de vehículo defectuoso',
+    level: 3,
+    parentId: estacionamiento.id,
+    departmentId: deptMantenimiento,
+    order: 2,
+    color: '#EF4444',
+  })
+
+  await upsertCategory(prisma, {
+    name: 'Piso Estacionamiento',
+    description: 'Piso dañado o marcas de aceite',
+    level: 3,
+    parentId: estacionamiento.id,
+    departmentId: deptMantenimiento,
+    order: 3,
+    color: '#EF4444',
   })
 
   console.log('✅ Categorías OPERATIONS — Mantenimiento')

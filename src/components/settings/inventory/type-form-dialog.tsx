@@ -1,6 +1,6 @@
 /**
- * Type Form Dialog Component (Generic)
- * Formulario reutilizable para crear/editar tipos (Equipment, License, Consumable)
+ * Type Form Dialog — crear/editar tipos (Equipment, License, Consumable)
+ * Solo campos que existen en el schema Prisma.
  */
 
 'use client'
@@ -22,8 +22,6 @@ import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
 import type { TypeKind, AnyType, CreateTypeData } from '@/hooks/inventory/use-type-management'
 
-// ── Types ──────────────────────────────────────────────────────────────────
-
 interface TypeFormDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -40,7 +38,13 @@ const TYPE_LABELS: Record<TypeKind, { singular: string; plural: string }> = {
   consumable: { singular: 'Tipo de Consumible', plural: 'Tipos de Consumible' },
 }
 
-// ── Component ──────────────────────────────────────────────────────────────
+const EMPTY_FORM: CreateTypeData = {
+  name: '',
+  description: '',
+  familyId: '',
+  isActive: true,
+  trackMaintenance: false,
+}
 
 export function TypeFormDialog({
   open,
@@ -52,28 +56,9 @@ export function TypeFormDialog({
   saving,
 }: TypeFormDialogProps) {
   const labels = TYPE_LABELS[typeKind]
-
-  // Form state
-  const [formData, setFormData] = useState<CreateTypeData>({
-    name: '',
-    description: '',
-    familyId: '',
-    isActive: true,
-    // Equipment specific
-    trackMaintenance: false,
-    // License specific (defaults for new licenses)
-    requiresKey: false,
-    allowMultipleAssignments: false,
-    maxAssignments: null,
-    // Consumable specific
-    trackStock: true,
-    minStockLevel: null,
-    reorderPoint: null,
-  })
-
+  const [formData, setFormData] = useState<CreateTypeData>(EMPTY_FORM)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  // Load initial data when editing
   useEffect(() => {
     if (mode === 'edit' && initialData) {
       setFormData({
@@ -81,83 +66,44 @@ export function TypeFormDialog({
         description: initialData.description || '',
         familyId: initialData.familyId,
         isActive: initialData.isActive,
-        // Equipment specific
-        trackMaintenance: (initialData as any).trackMaintenance || false,
-        // License specific
-        requiresKey: (initialData as any).requiresKey || false,
-        allowMultipleAssignments: (initialData as any).allowMultipleAssignments || false,
-        maxAssignments: (initialData as any).maxAssignments || null,
-        // Consumable specific
-        trackStock:
-          (initialData as any).trackStock !== undefined ? (initialData as any).trackStock : true,
-        minStockLevel: (initialData as any).minStockLevel || null,
-        reorderPoint: (initialData as any).reorderPoint || null,
+        trackMaintenance:
+          typeKind === 'equipment'
+            ? Boolean((initialData as { trackMaintenance?: boolean }).trackMaintenance)
+            : false,
       })
     } else if (mode === 'create') {
-      // Reset form for create mode
-      setFormData({
-        name: '',
-        description: '',
-        familyId: '',
-        isActive: true,
-        trackMaintenance: false,
-        requiresKey: false,
-        allowMultipleAssignments: false,
-        maxAssignments: null,
-        trackStock: true,
-        minStockLevel: null,
-        reorderPoint: null,
-      })
+      setFormData({ ...EMPTY_FORM })
     }
     setErrors({})
-  }, [mode, initialData, open])
+  }, [mode, initialData, open, typeKind])
 
-  // Validate form
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {}
-
-    if (!formData.name.trim()) {
-      newErrors.name = 'El nombre es requerido'
-    }
-
-    if (typeKind === 'license' && formData.allowMultipleAssignments) {
-      if (formData.maxAssignments != null && formData.maxAssignments < 1) {
-        newErrors.maxAssignments = 'Debe ser mayor a 0'
-      }
-    }
-
-    if (typeKind === 'consumable') {
-      if (formData.minStockLevel != null && formData.minStockLevel < 0) {
-        newErrors.minStockLevel = 'No puede ser negativo'
-      }
-      if (formData.reorderPoint != null && formData.reorderPoint < 0) {
-        newErrors.reorderPoint = 'No puede ser negativo'
-      }
-    }
-
+    if (!formData.name.trim()) newErrors.name = 'El nombre es requerido'
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
 
-  // Handle submit
   const handleSubmit = async () => {
     if (!validate()) return
-
-    const success = await onSubmit(formData)
-    if (success) {
-      onOpenChange(false)
+    const payload: CreateTypeData = {
+      name: formData.name,
+      description: formData.description,
+      familyId: formData.familyId,
+      isActive: formData.isActive,
+      ...(typeKind === 'equipment' ? { trackMaintenance: formData.trackMaintenance } : {}),
     }
+    const success = await onSubmit(payload)
+    if (success) onOpenChange(false)
   }
 
-  // Update field
   const updateField = <K extends keyof CreateTypeData>(key: K, value: CreateTypeData[K]) => {
     setFormData(prev => ({ ...prev, [key]: value }))
-    // Clear error for this field
     if (errors[key]) {
       setErrors(prev => {
-        const newErrors = { ...prev }
-        delete newErrors[key]
-        return newErrors
+        const next = { ...prev }
+        delete next[key]
+        return next
       })
     }
   }
@@ -171,8 +117,14 @@ export function TypeFormDialog({
           </DialogTitle>
           <DialogDescription>
             {mode === 'create'
-              ? `Crea un nuevo tipo para clasificar tus ${typeKind === 'equipment' ? 'equipos' : typeKind === 'license' ? 'licencias' : 'consumibles'}`
-              : `Modifica la información de este tipo`}
+              ? `Crea un nuevo tipo para clasificar tus ${
+                  typeKind === 'equipment'
+                    ? 'equipos'
+                    : typeKind === 'license'
+                      ? 'licencias'
+                      : 'consumibles'
+                }`
+              : 'Modifica la información de este tipo'}
           </DialogDescription>
         </DialogHeader>
 
@@ -183,7 +135,6 @@ export function TypeFormDialog({
           }}
         >
           <div className='space-y-4 py-4 overflow-y-auto max-h-[calc(90vh-120px)]'>
-            {/* Basic fields */}
             <div className='space-y-2'>
               <Label htmlFor='name'>
                 Nombre <span className='text-destructive'>*</span>
@@ -192,7 +143,13 @@ export function TypeFormDialog({
                 id='name'
                 value={formData.name}
                 onChange={e => updateField('name', e.target.value)}
-                placeholder={`Ej: ${typeKind === 'equipment' ? 'Laptop' : typeKind === 'license' ? 'Microsoft Office' : 'Tóner'}`}
+                placeholder={`Ej: ${
+                  typeKind === 'equipment'
+                    ? 'Laptop'
+                    : typeKind === 'license'
+                      ? 'Microsoft Office'
+                      : 'Tóner'
+                }`}
                 className={errors.name ? 'border-destructive' : ''}
                 disabled={saving}
               />
@@ -223,137 +180,26 @@ export function TypeFormDialog({
               </Label>
             </div>
 
-            <Separator />
-
-            {/* Equipment specific fields */}
             {typeKind === 'equipment' && (
-              <div className='space-y-3'>
-                <h4 className='font-semibold text-sm'>Configuración de Equipos</h4>
-
-                <div className='flex items-center justify-between p-3 border rounded-lg'>
-                  <div>
-                    <p className='text-sm font-medium'>Rastrear mantenimiento</p>
-                    <p className='text-xs text-muted-foreground'>
-                      Habilita el registro de mantenimientos preventivos
-                    </p>
-                  </div>
-                  <Switch
-                    checked={formData.trackMaintenance}
-                    onCheckedChange={v => updateField('trackMaintenance', v)}
-                    disabled={saving}
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* License specific fields */}
-            {typeKind === 'license' && (
-              <div className='space-y-3'>
-                <h4 className='font-semibold text-sm'>Configuración por defecto</h4>
-
-                <div className='flex items-center justify-between p-3 border rounded-lg'>
-                  <div>
-                    <p className='text-sm font-medium'>Requiere clave</p>
-                    <p className='text-xs text-muted-foreground'>
-                      Por defecto, este tipo de licencia requiere clave
-                    </p>
-                  </div>
-                  <Switch
-                    checked={formData.requiresKey || false}
-                    onCheckedChange={v => updateField('requiresKey', v)}
-                    disabled={saving}
-                  />
-                </div>
-
-                <div className='flex items-center justify-between p-3 border rounded-lg'>
-                  <div className='flex-1'>
-                    <p className='text-sm font-medium'>Permitir asignaciones múltiples</p>
-                    <p className='text-xs text-muted-foreground'>
-                      Por defecto, este tipo de licencia permite múltiples usuarios
-                    </p>
-                  </div>
-                  <Switch
-                    checked={formData.allowMultipleAssignments || false}
-                    onCheckedChange={v => updateField('allowMultipleAssignments', v)}
-                    disabled={saving}
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Consumable specific fields */}
-            {typeKind === 'consumable' && (
-              <div className='space-y-3'>
-                <h4 className='font-semibold text-sm'>Configuración de Consumibles</h4>
-
-                <div className='flex items-center justify-between p-3 border rounded-lg'>
-                  <div>
-                    <p className='text-sm font-medium'>Rastrear inventario</p>
-                    <p className='text-xs text-muted-foreground'>
-                      Controla el stock disponible y movimientos
-                    </p>
-                  </div>
-                  <Switch
-                    checked={formData.trackStock}
-                    onCheckedChange={v => updateField('trackStock', v)}
-                    disabled={saving}
-                  />
-                </div>
-
-                {formData.trackStock && (
-                  <>
-                    <div className='space-y-2'>
-                      <Label htmlFor='minStockLevel'>Nivel mínimo de stock</Label>
-                      <Input
-                        id='minStockLevel'
-                        type='number'
-                        min={0}
-                        value={formData.minStockLevel || ''}
-                        onChange={e =>
-                          updateField(
-                            'minStockLevel',
-                            e.target.value ? parseInt(e.target.value) : null
-                          )
-                        }
-                        placeholder='Ej: 10'
-                        className={errors.minStockLevel ? 'border-destructive' : ''}
-                        disabled={saving}
-                      />
-                      {errors.minStockLevel && (
-                        <p className='text-xs text-destructive'>{errors.minStockLevel}</p>
-                      )}
+              <>
+                <Separator />
+                <div className='space-y-3'>
+                  <h4 className='font-semibold text-sm'>Configuración de Equipos</h4>
+                  <div className='flex items-center justify-between p-3 border rounded-lg'>
+                    <div>
+                      <p className='text-sm font-medium'>Rastrear mantenimiento</p>
                       <p className='text-xs text-muted-foreground'>
-                        Se generará una alerta cuando el stock esté por debajo de este nivel
+                        Habilita el registro de mantenimientos preventivos
                       </p>
                     </div>
-
-                    <div className='space-y-2'>
-                      <Label htmlFor='reorderPoint'>Punto de reorden</Label>
-                      <Input
-                        id='reorderPoint'
-                        type='number'
-                        min={0}
-                        value={formData.reorderPoint || ''}
-                        onChange={e =>
-                          updateField(
-                            'reorderPoint',
-                            e.target.value ? parseInt(e.target.value) : null
-                          )
-                        }
-                        placeholder='Ej: 20'
-                        className={errors.reorderPoint ? 'border-destructive' : ''}
-                        disabled={saving}
-                      />
-                      {errors.reorderPoint && (
-                        <p className='text-xs text-destructive'>{errors.reorderPoint}</p>
-                      )}
-                      <p className='text-xs text-muted-foreground'>
-                        Nivel sugerido para realizar un nuevo pedido
-                      </p>
-                    </div>
-                  </>
-                )}
-              </div>
+                    <Switch
+                      checked={formData.trackMaintenance || false}
+                      onCheckedChange={v => updateField('trackMaintenance', v)}
+                      disabled={saving}
+                    />
+                  </div>
+                </div>
+              </>
             )}
           </div>
 

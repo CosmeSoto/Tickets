@@ -204,11 +204,14 @@ const p = new PrismaClient();
 (async () => {
   try {
     const count = await p.categories.count();
-    if (count === 0) {
-      console.log('  → Categorías vacías (0)');
+    const gaps = await p.departments.count({
+      where: { isActive: true, categories: { none: {} } },
+    });
+    if (count === 0 || gaps > 0) {
+      console.log('  → Categorías a sincronizar (total=' + count + ', depts sin cats=' + gaps + ')');
       process.exit(2);
     }
-    console.log('  → Categorías OK (' + count + ')');
+    console.log('  → Categorías OK (' + count + ', todos los depts activos tienen al menos una)');
     process.exit(0);
   } catch (e) {
     console.error('  → Error verificando categorías:', e.message);
@@ -222,7 +225,7 @@ NODESCRIPT
 if [ "$CATEGORIES_CHECK" = "2" ]; then
   echo "==> Ejecutando ensure-categories..."
   if $TSX_CLI prisma/ensure-categories.ts; then
-    echo "==> Categorías de tickets restauradas."
+    echo "==> Categorías de tickets restauradas/sincronizadas."
   else
     echo "==> ADVERTENCIA: ensure-categories falló — ejecuta manualmente:"
     echo "==>   docker exec tickets-app sh -c 'node ./node_modules/tsx/dist/cli.mjs prisma/ensure-categories.ts'"

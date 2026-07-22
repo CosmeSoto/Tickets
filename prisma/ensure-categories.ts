@@ -1,10 +1,12 @@
 /**
  * Seed idempotente de categorías de tickets.
- * Útil cuando la BD ya tiene usuarios (seed completo omitido) pero
- * categories quedó vacía tras un seed parcial o un rebuild sin --clean.
  *
  *   npm run db:seed-categories
  *   docker exec tickets-app sh -c 'node ./node_modules/tsx/dist/cli.mjs prisma/ensure-categories.ts'
+ *
+ * Nota: este script corre fuera del bundle Next; el sync SQL se duplica aquí
+ * (misma query que syncAllCategoryFamilyIdsFromDepartments) para no depender
+ * del path alias @/lib en tsx prisma/*.
  */
 
 import { PrismaClient } from '@prisma/client'
@@ -22,7 +24,7 @@ async function buildDeptMap(prisma: PrismaClient): Promise<Map<string, string>> 
   return new Map(depts.map(d => [d.name, d.id]))
 }
 
-/** Sincroniza categories.family_id desde departments.family_id */
+/** Misma semántica que src/lib/categories/sync-category-families.ts */
 export async function syncCategoryFamiliesFromDepartments(prisma: PrismaClient): Promise<number> {
   const result = await prisma.$executeRaw`
     UPDATE categories c
@@ -33,7 +35,7 @@ export async function syncCategoryFamiliesFromDepartments(prisma: PrismaClient):
       AND d.family_id IS NOT NULL
       AND (c.family_id IS NULL OR c.family_id <> d.family_id)
   `
-  return typeof result === 'number' ? result : 0
+  return typeof result === 'number' ? result : Number(result) || 0
 }
 
 export async function ensureTicketCategories(prisma: PrismaClient): Promise<{
@@ -50,13 +52,11 @@ export async function ensureTicketCategories(prisma: PrismaClient): Promise<{
     )
   }
 
-  if (before > 0) {
-    const synced = await syncCategoryFamiliesFromDepartments(prisma)
-    console.log(`✅ Categorías ya existen (${before}). familyId sincronizado: ${synced}`)
-    return { before, after: before, synced }
-  }
-
-  console.log('📂 Categorías vacías — ejecutando seed de categorías por área...')
+  console.log(
+    before === 0
+      ? '📂 Categorías vacías — ejecutando seed de categorías por área...'
+      : `📂 Sincronizando categorías (${before} existentes, upsert idempotente)...`
+  )
   const deptMap = await buildDeptMap(prisma)
 
   await seedCategoriesTechnology(prisma, deptMap)
@@ -69,8 +69,21 @@ export async function ensureTicketCategories(prisma: PrismaClient): Promise<{
   await seedCategoriesServices(prisma, deptMap)
 
   const synced = await syncCategoryFamiliesFromDepartments(prisma)
+
+  // Categorías de departamentos fusionados/inactivos: ocultar (no borrar historial)
+  const hidden = await prisma.categories.updateMany({
+    where: {
+      isActive: true,
+      departments: { isActive: false },
+    },
+    data: { isActive: false, updatedAt: new Date() },
+  })
+  if (hidden.count > 0) {
+    console.log(`  → ${hidden.count} categoría(s) de depts inactivos ocultadas`)
+  }
+
   const after = await prisma.categories.count()
-  console.log(`✅ Categorías restauradas: ${before} → ${after} (familyId sync: ${synced})`)
+  console.log(`✅ Categorías: ${before} → ${after} (familyId sync: ${synced})`)
   return { before, after, synced }
 }
 
@@ -83,7 +96,12 @@ async function main() {
   }
 }
 
-main().catch(err => {
-  console.error('❌ Error en ensure-categories:', err)
-  process.exit(1)
-})
+const isDirectRun =
+  typeof process !== 'undefined' && (process.argv[1]?.includes('ensure-categories') ?? false)
+
+if (isDirectRun) {
+  main().catch(err => {
+    console.error('❌ Error en ensure-categories:', err)
+    process.exit(1)
+  })
+}

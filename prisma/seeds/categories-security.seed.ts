@@ -5,41 +5,7 @@
  */
 
 import { PrismaClient } from '@prisma/client'
-import { randomUUID } from 'crypto'
-
-const now = new Date()
-
-async function upsertCategory(
-  prisma: PrismaClient,
-  data: {
-    name: string
-    description: string
-    level: number
-    parentId: string | null
-    departmentId: string
-    order: number
-    color: string
-  }
-) {
-  const existing = await prisma.categories.findFirst({
-    where: { name: data.name, level: data.level, parentId: data.parentId },
-  })
-  if (existing) {
-    return prisma.categories.update({
-      where: { id: existing.id },
-      data: {
-        description: data.description,
-        departmentId: data.departmentId,
-        order: data.order,
-        color: data.color,
-        updatedAt: now,
-      },
-    })
-  }
-  return prisma.categories.create({
-    data: { id: randomUUID(), ...data, isActive: true, createdAt: now, updatedAt: now },
-  })
-}
+import { upsertCategory } from './category-upsert'
 
 export async function seedCategoriesSecurity(prisma: PrismaClient, deptMap: Map<string, string>) {
   const deptSeguridadFisica = deptMap.get('Seguridad Física')

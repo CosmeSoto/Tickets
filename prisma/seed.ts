@@ -223,27 +223,17 @@ async function seedDepartments(familyMap: Map<string, string>): Promise<Map<stri
   return map
 }
 
-/** Sincroniza categories.family_id desde el departamento asociado */
+/** Sincroniza categories.family_id desde el departamento (misma query que ensure-categories) */
 async function syncCategoryFamilies() {
-  const categories = await prisma.categories.findMany({
-    where: { departmentId: { not: null } },
-    select: { id: true, departmentId: true, familyId: true },
-  })
-
-  let updated = 0
-  for (const cat of categories) {
-    if (!cat.departmentId) continue
-    const dept = await prisma.departments.findUnique({
-      where: { id: cat.departmentId },
-      select: { familyId: true },
-    })
-    if (!dept?.familyId || dept.familyId === cat.familyId) continue
-    await prisma.categories.update({
-      where: { id: cat.id },
-      data: { familyId: dept.familyId, updatedAt: now },
-    })
-    updated++
-  }
+  const updated = await prisma.$executeRaw`
+    UPDATE categories c
+    SET family_id = d.family_id,
+        "updatedAt" = NOW()
+    FROM departments d
+    WHERE c."departmentId" = d.id
+      AND d.family_id IS NOT NULL
+      AND (c.family_id IS NULL OR c.family_id <> d.family_id)
+  `
   console.log(`✅ Categorías sincronizadas con familia del departamento (${updated} filas)`)
 }
 
@@ -466,7 +456,7 @@ async function seedSLAPolicies(familyMap: Map<string, string>) {
 }
 
 // ============================================
-// 9. CATEGORÍAS (todas bajo TECHNOLOGY)
+// 9. CATEGORÍAS (por familia / departamento)
 // ============================================
 
 // ============================================

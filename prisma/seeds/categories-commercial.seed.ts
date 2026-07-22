@@ -5,44 +5,7 @@
  */
 
 import { PrismaClient } from '@prisma/client'
-import { randomUUID } from 'crypto'
-
-const now = new Date()
-
-async function upsertCategory(
-  prisma: PrismaClient,
-  data: {
-    name: string
-    description: string
-    level: number
-    parentId: string | null
-    departmentId: string
-    order: number
-    color: string
-  },
-  counters: { created: number; updated: number }
-) {
-  const existing = await prisma.categories.findFirst({
-    where: { name: data.name, level: data.level, parentId: data.parentId },
-  })
-  if (existing) {
-    counters.updated++
-    return prisma.categories.update({
-      where: { id: existing.id },
-      data: {
-        description: data.description,
-        departmentId: data.departmentId,
-        order: data.order,
-        color: data.color,
-        updatedAt: now,
-      },
-    })
-  }
-  counters.created++
-  return prisma.categories.create({
-    data: { id: randomUUID(), ...data, isActive: true, createdAt: now, updatedAt: now },
-  })
-}
+import { upsertCategory } from './category-upsert'
 
 export async function seedCategoriesCommercial(prisma: PrismaClient, deptMap: Map<string, string>) {
   const counters = { created: 0, updated: 0 }
@@ -58,6 +21,7 @@ export async function seedCategoriesCommercial(prisma: PrismaClient, deptMap: Ma
     !deptMarketing &&
     !deptMediosDigitales &&
     !deptDiseno &&
+    !deptEventos &&
     !deptServicioCliente
   ) {
     console.log('⚠️  Departamentos de COMMERCIAL/MARKETING no encontrados, saltando seed...')
@@ -65,7 +29,12 @@ export async function seedCategoriesCommercial(prisma: PrismaClient, deptMap: Ma
   }
 
   const deptPrincipal =
-    deptComercial || deptMarketing || deptMediosDigitales || deptDiseno || deptServicioCliente!
+    deptComercial ||
+    deptMarketing ||
+    deptMediosDigitales ||
+    deptDiseno ||
+    deptEventos ||
+    deptServicioCliente!
 
   // ==================== DEPARTAMENTO COMERCIAL/MARKETING ====================
   const solicitudComercial = await upsertCategory(
