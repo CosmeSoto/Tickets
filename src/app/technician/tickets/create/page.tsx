@@ -71,16 +71,20 @@ export default function TechnicianCreateTicketPage() {
 
         {/* Sidebar */}
         <div className='space-y-6'>
-          {/* Consejos compactos */}
           <div className='border rounded-lg p-3 bg-muted/20'>
-            <p className='text-xs font-semibold text-muted-foreground mb-1.5'>
-              💡 Consejos rápidos:
-            </p>
+            <p className='text-xs font-semibold text-muted-foreground mb-1.5'>Consejos rápidos</p>
             <ul className='text-xs text-muted-foreground space-y-0.5'>
+              <li>• Elige primero el área de soporte</li>
               <li>• Usa un título claro y descriptivo</li>
               <li>• Describe el problema con detalles</li>
               <li>• Adjunta fotos o capturas si aplica</li>
             </ul>
+          </div>
+          <div className='border rounded-lg p-3 bg-muted/10'>
+            <p className='text-xs font-semibold text-muted-foreground mb-1'>Nota</p>
+            <p className='text-xs text-muted-foreground'>
+              La solicitud queda a tu nombre y será atendida por otro técnico o administrador.
+            </p>
           </div>
         </div>
       </div>

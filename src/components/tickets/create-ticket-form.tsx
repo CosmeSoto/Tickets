@@ -332,115 +332,7 @@ export function CreateTicketForm({
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className='space-y-4'>
-            {/* ── Título ──────────────────────────────────────────────── */}
-            <div className='space-y-1.5'>
-              <Label htmlFor='title'>
-                Título <span className='text-destructive'>*</span>
-              </Label>
-              <Input
-                id='title'
-                // placeholder='Describe brevemente tu problema o solicitud'
-                {...register('title')}
-                className={errors.title ? 'border-destructive' : ''}
-              />
-              {errors.title && <p className='text-xs text-destructive'>{errors.title.message}</p>}
-            </div>
-
-            {/* ── Descripción ─────────────────────────────────────────── */}
-            <div className='space-y-1.5'>
-              <Label htmlFor='description'>
-                Descripción <span className='text-destructive'>*</span>
-              </Label>
-              <Textarea
-                id='description'
-                // placeholder='Proporciona todos los detalles: qué ocurre, desde cuándo, pasos para reproducirlo, mensajes de error...'
-                rows={4}
-                {...register('description')}
-                className={errors.description ? 'border-destructive' : ''}
-              />
-              {errors.description && (
-                <p className='text-xs text-destructive'>{errors.description.message}</p>
-              )}
-            </div>
-
-            {/* ── Ubicación ───────────────────────────────────────────── */}
-            <div className='space-y-1.5'>
-              <Label htmlFor='location' className='flex items-center gap-1.5'>
-                <MapPin className='h-3.5 w-3.5' />
-                Ubicación
-                <span className='text-muted-foreground font-normal text-xs'>(opcional)</span>
-              </Label>
-              <Input
-                id='location'
-                // placeholder='Ej: Oficina 201, Piso 3, Sala de Reuniones A...'
-                {...register('location')}
-              />
-              {/* <p className='text-xs text-muted-foreground'>
-                Indica dónde debe acercarse el técnico para atender el problema.
-              </p> */}
-            </div>
-
-            {/* ── Prioridad ───────────────────────────────────────────── */}
-            <div className='space-y-1.5'>
-              <Label className='flex items-center gap-1.5'>
-                <Zap className='h-3.5 w-3.5' />
-                Prioridad <span className='text-destructive'>*</span>
-              </Label>
-              <Select
-                value={selectedPriority}
-                onValueChange={v => setValue('priority', v as TicketPriority)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(PRIORITY_LABELS).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>
-                      <div className='flex items-center gap-2'>
-                        <div
-                          className={`w-2.5 h-2.5 rounded-full ${
-                            value === 'LOW'
-                              ? 'bg-green-500'
-                              : value === 'MEDIUM'
-                                ? 'bg-yellow-500'
-                                : value === 'HIGH'
-                                  ? 'bg-orange-500'
-                                  : 'bg-red-500'
-                          }`}
-                        />
-                        {label}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {selectedPriority && (
-                <p
-                  className={`px-2 py-1.5 rounded text-xs border ${PRIORITY_COLORS[selectedPriority]}`}
-                >
-                  <strong>{PRIORITY_LABELS[selectedPriority]}:</strong>{' '}
-                  {PRIORITY_DESCRIPTIONS[selectedPriority]}
-                </p>
-              )}
-            </div>
-
-            {/* Consejos compactos */}
-            {showTips && (
-              <div className='border rounded-lg p-3 bg-muted/20'>
-                <p className='text-xs font-semibold text-muted-foreground mb-1.5'>
-                  💡 Consejos rápidos:
-                </p>
-                <ul className='text-xs text-muted-foreground space-y-0.5'>
-                  <li>• Usa un título claro y descriptivo</li>
-                  <li>• Describe el problema con detalles</li>
-                  <li>• Adjunta fotos o capturas si aplica</li>
-                </ul>
-              </div>
-            )}
-
-            <Separator />
-
-            {/* ── Área de soporte ─────────────────────────────────────── */}
+            {/* ── Área de soporte (primero: define categorías y sugerencias) ── */}
             {loadingFamilies ? (
               <div className='flex items-center gap-2 text-sm text-muted-foreground py-2'>
                 <Loader2 className='h-4 w-4 animate-spin' />
@@ -494,7 +386,13 @@ export function CreateTicketForm({
                           className='w-2 h-2 rounded-full'
                           style={{ backgroundColor: f.color ?? '#6366f1' }}
                         />
-                        Tu solicitud irá al equipo de <strong>{f.name}</strong>
+                        {f.isUserFamily ? (
+                          'Área nativa pre-seleccionada. Puedes cambiarla si lo necesitas.'
+                        ) : (
+                          <>
+                            Tu solicitud irá al equipo de <strong>{f.name}</strong>
+                          </>
+                        )}
                       </p>
                     ) : null
                   })()}
@@ -506,11 +404,111 @@ export function CreateTicketForm({
               </div>
             )}
 
-            {/* ── Categoría ───────────────────────────────────────────── */}
+            <Separator />
+
+            {/* ── Título ──────────────────────────────────────────────── */}
+            <div className='space-y-1.5'>
+              <Label htmlFor='title'>
+                Título del Ticket <span className='text-destructive'>*</span>
+              </Label>
+              <Input
+                id='title'
+                {...register('title')}
+                className={errors.title ? 'border-destructive' : ''}
+              />
+              {errors.title && <p className='text-xs text-destructive'>{errors.title.message}</p>}
+            </div>
+
+            {/* ── Descripción ─────────────────────────────────────────── */}
+            <div className='space-y-1.5'>
+              <Label htmlFor='description'>
+                Descripción Detallada <span className='text-destructive'>*</span>
+              </Label>
+              <Textarea
+                id='description'
+                rows={4}
+                {...register('description')}
+                className={errors.description ? 'border-destructive' : ''}
+              />
+              {errors.description && (
+                <p className='text-xs text-destructive'>{errors.description.message}</p>
+              )}
+            </div>
+
+            {/* ── Ubicación ───────────────────────────────────────────── */}
+            <div className='space-y-1.5'>
+              <Label htmlFor='location' className='flex items-center gap-1.5'>
+                <MapPin className='h-3.5 w-3.5' />
+                Ubicación / Área
+                <span className='text-muted-foreground font-normal text-xs'>(opcional)</span>
+              </Label>
+              <Input id='location' {...register('location')} />
+            </div>
+
+            {/* ── Prioridad ───────────────────────────────────────────── */}
+            <div className='space-y-1.5'>
+              <Label className='flex items-center gap-1.5'>
+                <Zap className='h-3.5 w-3.5' />
+                Prioridad <span className='text-destructive'>*</span>
+              </Label>
+              <Select
+                value={selectedPriority}
+                onValueChange={v => setValue('priority', v as TicketPriority)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(PRIORITY_LABELS).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>
+                      <div className='flex items-center gap-2'>
+                        <div
+                          className={`w-2.5 h-2.5 rounded-full ${
+                            value === 'LOW'
+                              ? 'bg-green-500'
+                              : value === 'MEDIUM'
+                                ? 'bg-yellow-500'
+                                : value === 'HIGH'
+                                  ? 'bg-orange-500'
+                                  : 'bg-red-500'
+                          }`}
+                        />
+                        {label}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedPriority && (
+                <p
+                  className={`px-2 py-1.5 rounded text-xs border ${PRIORITY_COLORS[selectedPriority]}`}
+                >
+                  <strong>{PRIORITY_LABELS[selectedPriority]}:</strong>{' '}
+                  {PRIORITY_DESCRIPTIONS[selectedPriority]}
+                </p>
+              )}
+            </div>
+
+            {showTips && (
+              <div className='border rounded-lg p-3 bg-muted/20'>
+                <p className='text-xs font-semibold text-muted-foreground mb-1.5'>
+                  Consejos rápidos:
+                </p>
+                <ul className='text-xs text-muted-foreground space-y-0.5'>
+                  <li>• Usa un título claro y descriptivo</li>
+                  <li>• Describe el problema con detalles</li>
+                  <li>• Adjunta fotos o capturas si aplica</li>
+                </ul>
+              </div>
+            )}
+
+            <Separator />
+
+            {/* ── Categoría (tras área + título para sugerencias) ─────── */}
             <div className='space-y-1.5'>
               <Label className='flex items-center gap-1.5 text-sm font-semibold'>
                 <Tag className='h-4 w-4' />
-                Categoría <span className='text-destructive'>*</span>
+                Categoría del Ticket <span className='text-destructive'>*</span>
               </Label>
               <div className='border rounded-lg p-3 bg-muted/30'>
                 <CategorySelectorWrapper

@@ -62,7 +62,9 @@ export async function GET(request: NextRequest) {
       if (!isSuperAdmin && (role === 'ADMIN' || role === 'TECHNICIAN' || role === 'CLIENT')) {
         const { getTicketConsumerFamilyIds } = await import('@/lib/auth/family-scope')
         const consumerIds = await getTicketConsumerFamilyIds(session.user.id, role, false)
-        if (consumerIds && !consumerIds.includes(familyId)) {
+        // consumerIds vacío = sin scope válido (p. ej. post-migración); no bloquear lectura
+        // de categorías de un familyId ya elegido en el formulario. undefined = sin límite.
+        if (consumerIds && consumerIds.length > 0 && !consumerIds.includes(familyId)) {
           return NextResponse.json(
             { success: false, message: 'No tienes acceso a esta familia' },
             { status: 403 }

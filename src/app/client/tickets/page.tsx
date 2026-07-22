@@ -253,19 +253,12 @@ export default function ClientTicketsPage() {
             title: hasActiveFilters ? 'No se encontraron tickets' : 'No tienes tickets',
             description: hasActiveFilters
               ? 'Intenta ajustar los filtros de búsqueda'
-              : 'Aún no has creado ninguna solicitud de soporte',
-            action: !hasActiveFilters ? (
-              <Button asChild>
-                <Link href='/client/tickets/create'>
-                  <Plus className='h-4 w-4 mr-2' />
-                  Crear mi primer ticket
-                </Link>
-              </Button>
-            ) : (
+              : 'Aún no has creado ninguna solicitud. Usa «Nuevo Ticket» en la barra superior.',
+            action: hasActiveFilters ? (
               <Button variant='outline' onClick={clearFilters}>
                 Limpiar filtros
               </Button>
-            ),
+            ) : undefined,
           }}
         />
       </div>

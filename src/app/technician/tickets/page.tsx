@@ -438,19 +438,12 @@ export default function TechnicianTicketsPage() {
               title: hasActiveFilters ? 'No se encontraron solicitudes' : 'No tienes solicitudes',
               description: hasActiveFilters
                 ? 'Intenta ajustar los filtros de búsqueda'
-                : 'Aún no has creado ninguna solicitud de soporte',
+                : 'Aún no has creado ninguna solicitud. Usa «Nuevo Ticket» en la barra superior.',
               action: hasActiveFilters ? (
                 <Button variant='outline' onClick={clearFilters}>
                   Limpiar filtros
                 </Button>
-              ) : (
-                <Button asChild>
-                  <Link href='/technician/tickets/create'>
-                    <Plus className='h-4 w-4 mr-2' />
-                    Nueva Solicitud
-                  </Link>
-                </Button>
-              ),
+              ) : undefined,
             }}
           />
         </TabsContent>

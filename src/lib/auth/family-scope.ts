@@ -16,16 +16,49 @@ import prisma from '@/lib/prisma'
 
 export type FamilyScopeMode = 'consumer' | 'operational' | 'visibility'
 
+function dedupeIds(ids: (string | null | undefined)[]): string[] {
+  return [...new Set(ids.filter((id): id is string => Boolean(id)))]
+}
+
+/**
+ * Descarta familias inactivas y remapea TECHNOLOGY (legacy) → ADMINISTRATIVE.
+ * Evita "sin áreas" / "sin categorías" cuando asignaciones quedaron en la familia absorbida.
+ */
+async function normalizeActiveFamilyIds(ids: string[]): Promise<string[]> {
+  const unique = dedupeIds(ids)
+  if (unique.length === 0) return []
+
+  const [legacyTech, adminFamily] = await Promise.all([
+    prisma.families.findUnique({
+      where: { code: 'TECHNOLOGY' },
+      select: { id: true },
+    }),
+    prisma.families.findUnique({
+      where: { code: 'ADMINISTRATIVE' },
+      select: { id: true },
+    }),
+  ])
+
+  const remapped = unique.map(id =>
+    legacyTech && adminFamily && id === legacyTech.id ? adminFamily.id : id
+  )
+
+  const active = await prisma.families.findMany({
+    where: { id: { in: dedupeIds(remapped) }, isActive: true },
+    select: { id: true },
+  })
+  return active.map(f => f.id)
+}
+
 export async function getNativeFamilyId(userId: string): Promise<string | null> {
   const user = await prisma.users.findUnique({
     where: { id: userId },
     select: { departments: { select: { familyId: true } } },
   })
-  return user?.departments?.familyId ?? null
-}
-
-function dedupeIds(ids: (string | null | undefined)[]): string[] {
-  return [...new Set(ids.filter((id): id is string => Boolean(id)))]
+  const raw = user?.departments?.familyId ?? null
+  if (!raw) return null
+  const [normalized] = await normalizeActiveFamilyIds([raw])
+  return normalized ?? null
 }
 
 /** Familias adicionales de consumo (client_family_assignments). */
@@ -69,21 +102,26 @@ export async function getTicketConsumerFamilyIds(
   const nativeId = await getNativeFamilyId(userId)
   const clientIds = await getClientAssignmentFamilyIds(userId)
 
+  let raw: string[]
   if (role === 'CLIENT') {
-    return dedupeIds([nativeId, ...clientIds])
-  }
-
-  if (role === 'TECHNICIAN') {
+    raw = dedupeIds([nativeId, ...clientIds])
+  } else if (role === 'TECHNICIAN') {
     const techConsumer = await getTechnicianConsumerFamilyIds(userId)
-    return dedupeIds([nativeId, ...techConsumer, ...clientIds])
-  }
-
-  if (role === 'ADMIN') {
+    raw = dedupeIds([nativeId, ...techConsumer, ...clientIds])
+  } else if (role === 'ADMIN') {
     const adminIds = await getAdminAssignmentFamilyIds(userId)
-    return dedupeIds([nativeId, ...adminIds, ...clientIds])
+    raw = dedupeIds([nativeId, ...adminIds, ...clientIds])
+  } else {
+    raw = nativeId ? [nativeId] : []
   }
 
-  return nativeId ? [nativeId] : []
+  const normalized = await normalizeActiveFamilyIds(raw)
+
+  // Admin sin nativa/asignaciones activas (p. ej. TECHNOLOGY legacy sin remapear en DB):
+  // no bloquear creación — mismo criterio que Super Admin (sin límite consumer).
+  if (role === 'ADMIN' && normalized.length === 0) return undefined
+
+  return normalized
 }
 
 /** Familias donde el usuario opera tickets (resolver, asignar, cola sin asignar). Solo nativa. */
@@ -96,7 +134,7 @@ export async function getTicketOperationalFamilyIds(
 
   const nativeId = await getNativeFamilyId(userId)
   if (role === 'ADMIN' || role === 'TECHNICIAN') {
-    return nativeId ? [nativeId] : []
+    return nativeId ? normalizeActiveFamilyIds([nativeId]) : []
   }
   return []
 }

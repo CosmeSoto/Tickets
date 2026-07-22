@@ -82,13 +82,18 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      if (allowedFamilyIds.size === 0) {
+      // Admin sin nativa/asignaciones válidas: al crear ticket, no bloquear — mismas áreas
+      // con tickets habilitados (post-migración TECHNOLOGY a menudo deja el scope vacío).
+      const adminCreateFallback =
+        allowedFamilyIds.size === 0 && session.user.role === 'ADMIN' && !forClientId
+
+      if (allowedFamilyIds.size === 0 && !adminCreateFallback) {
         return NextResponse.json({ success: true, data: [] })
       }
 
       const families = (await (prisma.families.findMany as any)({
         where: {
-          id: { in: Array.from(allowedFamilyIds) },
+          ...(adminCreateFallback ? {} : { id: { in: Array.from(allowedFamilyIds) } }),
           isActive: true,
           ticketFamilyConfig: { ticketsEnabled: true },
         },
@@ -115,7 +120,7 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // ── Clientes: solo las familias explícitamente asignadas ────────────────
+    // ── Clientes: scope consumer (nativa + asignaciones; TECHNOLOGY legacy remapeado) ──
     if (session.user.role === 'CLIENT') {
       // Excepción: usuarios con newsEnabled y scope=all pueden ver todas las familias (para gestión de noticias)
       const scopeAll = searchParams.get('scope') === 'all'
@@ -125,37 +130,25 @@ export async function GET(request: NextRequest) {
           select: { newsEnabled: true },
         })
         if (clientUser?.newsEnabled) {
-          // Devolver todas las familias activas (igual que un admin)
           const allFamilies = await FamilyService.findAll(false)
           return NextResponse.json({ success: true, data: allFamilies })
         }
       }
 
-      const [user, clientAssignments] = await Promise.all([
-        prisma.users.findUnique({
-          where: { id: session.user.id },
-          select: { departments: { select: { familyId: true } } },
-        }),
-        prisma.client_family_assignments.findMany({
-          where: { clientId: session.user.id, isActive: true },
-          select: { familyId: true },
-        }),
+      const { getTicketConsumerFamilyIds, getNativeFamilyId } =
+        await import('@/lib/auth/family-scope')
+      const [consumerIds, userFamilyId] = await Promise.all([
+        getTicketConsumerFamilyIds(session.user.id, 'CLIENT', false),
+        getNativeFamilyId(session.user.id),
       ])
 
-      const userFamilyId = user?.departments?.familyId ?? null
-
-      // Construir el conjunto de familias permitidas:
-      // la familia nativa del departamento + las asignaciones explícitas
-      const allowedFamilyIds = new Set<string>(clientAssignments.map(a => a.familyId))
-      if (userFamilyId) allowedFamilyIds.add(userFamilyId)
-
-      if (allowedFamilyIds.size === 0) {
+      if (!consumerIds || consumerIds.length === 0) {
         return NextResponse.json({ success: true, data: [] })
       }
 
       const families = (await (prisma.families.findMany as any)({
         where: {
-          id: { in: Array.from(allowedFamilyIds) },
+          id: { in: consumerIds },
           isActive: true,
           ticketFamilyConfig: { ticketsEnabled: true },
         },
