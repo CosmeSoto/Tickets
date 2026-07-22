@@ -36,12 +36,12 @@ async function upsertWarehouses(prisma: PrismaClient, warehouses: WarehouseSeed[
 
 /**
  * Bodegas por familia (organigrama PSF).
- * Solo TECHNOLOGY, ARCHITECTURE y OPERATIONS manejan inventario físico.
+ * ADMINISTRATIVE (incluye TI), ARCHITECTURE y OPERATIONS manejan inventario físico.
  */
 export async function seedWarehouses(prisma: PrismaClient, familyMap: Map<string, string>) {
   console.log('🏢 Seeding bodegas por familia...')
 
-  const techFamilyId = familyMap.get('TECHNOLOGY')!
+  const techFamilyId = familyMap.get('ADMINISTRATIVE')!
   const architectureFamilyId = familyMap.get('ARCHITECTURE')!
   const operationsFamilyId = familyMap.get('OPERATIONS')!
 
@@ -177,7 +177,9 @@ export async function seedWarehouses(prisma: PrismaClient, familyMap: Map<string
   }
 
   if (receptionCount > 0) {
-    console.log(`  ✅ ${receptionCount} bodegas "Recepción Compras" creadas (${allFamilyIds.length} familias)`)
+    console.log(
+      `  ✅ ${receptionCount} bodegas "Recepción Compras" creadas (${allFamilyIds.length} familias)`
+    )
   }
 
   console.log('✅ Seed de bodegas completado')

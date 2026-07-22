@@ -22,10 +22,9 @@ const BASE_BRANDS = [
 
 /** Familias que suelen registrar equipos con marca */
 const BRAND_FAMILIES = [
-  'TECHNOLOGY',
+  'ADMINISTRATIVE',
   'ARCHITECTURE',
   'OPERATIONS',
-  'ADMINISTRATIVE',
   'COMMERCIAL',
   'MARKETING',
 ] as const
@@ -38,11 +37,18 @@ export async function seedEquipmentBrands(prisma: PrismaClient, familyMap: Map<s
     if (!familyId) continue
 
     for (const brand of BASE_BRANDS) {
-      const code = familyCode === 'TECHNOLOGY' ? brand.code : `${brand.code}_${familyCode}`
+      const code = familyCode === 'ADMINISTRATIVE' ? brand.code : `${brand.code}_${familyCode}`
       await prisma.equipment_brands.upsert({
         where: { code },
         update: { name: brand.name, order: brand.order, familyId, isActive: true },
-        create: { id: randomUUID(), code, name: brand.name, order: brand.order, familyId, isActive: true },
+        create: {
+          id: randomUUID(),
+          code,
+          name: brand.name,
+          order: brand.order,
+          familyId,
+          isActive: true,
+        },
       })
       count++
     }
@@ -53,7 +59,7 @@ export async function seedEquipmentBrands(prisma: PrismaClient, familyMap: Map<s
 
 /** Asigna marcas sin familyId a Tecnología (migración de datos viejos) */
 export async function syncBrandFamilies(prisma: PrismaClient, familyMap: Map<string, string>) {
-  const techFamilyId = familyMap.get('TECHNOLOGY')
+  const techFamilyId = familyMap.get('ADMINISTRATIVE')
   if (!techFamilyId) return 0
 
   const result = await prisma.equipment_brands.updateMany({

@@ -85,10 +85,10 @@ async function verifySeed() {
     console.log('\n📊 Resumen:')
     const allGood =
       admin &&
-      families.length === 6 &&
+      families.length === 5 &&
       slaPolicies.length >= 8 &&
       siteConfig.length >= 5 &&
-      departments >= 25 &&
+      departments >= 20 &&
       categories > 0 &&
       brands > 0 &&
       brandsWithoutFamily === 0 &&

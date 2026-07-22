@@ -163,13 +163,15 @@ const { PrismaClient } = require('@prisma/client');
 const p = new PrismaClient();
 (async () => {
   try {
-    const total = await p.departments.count();
-    const orphans = await p.departments.count({ where: { familyId: null } });
-    if (total === 0 || orphans > 0) {
-      console.log('  → Departamentos a sincronizar (total=' + total + ', sin familia=' + orphans + ')');
+    const total = await p.departments.count({ where: { isActive: true } });
+    const orphans = await p.departments.count({ where: { familyId: null, isActive: true } });
+    const activeFamilies = await p.families.count({ where: { isActive: true } });
+    const techActive = await p.families.count({ where: { code: 'TECHNOLOGY', isActive: true } });
+    if (total === 0 || orphans > 0 || techActive > 0 || activeFamilies < 5) {
+      console.log('  → Organigrama a sincronizar (depts=' + total + ', sin familia=' + orphans + ', familias activas=' + activeFamilies + ', TECHNOLOGY activa=' + techActive + ')');
       process.exit(2);
     }
-    console.log('  → Departamentos OK (' + total + ', todos con familia)');
+    console.log('  → Departamentos OK (' + total + ', ' + activeFamilies + ' familias, todos con familia)');
     process.exit(0);
   } catch (e) {
     console.error('  → Error verificando departamentos:', e.message);

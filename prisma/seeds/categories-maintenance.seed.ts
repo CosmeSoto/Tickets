@@ -45,14 +45,16 @@ export async function seedCategoriesMaintenance(
   prisma: PrismaClient,
   deptMap: Map<string, string>
 ) {
-  const deptCivil = deptMap.get('Mantenimiento Civil')
-  const deptElectrico = deptMap.get('Mantenimiento Eléctrico')
-  const deptMecanico = deptMap.get('Mantenimiento Mecánico')
+  const deptMantenimiento = deptMap.get('Mantenimiento')
 
-  if (!deptCivil || !deptElectrico || !deptMecanico) {
-    console.log('⚠️  Departamentos de Operaciones (Mantenimiento) no encontrados, saltando seed...')
+  if (!deptMantenimiento) {
+    console.log('⚠️  Departamento Mantenimiento no encontrado, saltando seed...')
     return
   }
+
+  const deptCivil = deptMantenimiento
+  const deptElectrico = deptMantenimiento
+  const deptMecanico = deptMantenimiento
 
   // ==================== DEPARTAMENTO MANTENIMIENTO CIVIL ====================
   const fallaCivil = await upsertCategory(prisma, {

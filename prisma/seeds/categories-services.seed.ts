@@ -1,7 +1,8 @@
 /**
- * Seed: Categorías para Familia OPERACIONES — Limpieza, Mensajería, Parqueaderos y SSO
+ * Seed: Categorías para Familia OPERACIONES — Limpieza, Parqueaderos y SSO
+ * + Mensajería (departamento de Administración)
  *
- * Limpieza y áreas operativas bajo Operaciones. Mensajería permanece bajo Gestión Administrativa.
+ * Limpieza y áreas operativas bajo Operaciones. Mensajería bajo Administración.
  */
 
 import { PrismaClient } from '@prisma/client'
@@ -220,129 +221,129 @@ export async function seedCategoriesServices(prisma: PrismaClient, deptMap: Map<
 
   // ==================== DEPARTAMENTO MENSAJERÍA (Gestión Administrativa) ====================
   if (deptMensajeria) {
-  const solicitudMensajeria = await upsertCategory(prisma, {
-    name: 'Solicitud de Mensajería',
-    description: 'Solicitudes de servicio de mensajería y envíos',
-    level: 1,
-    parentId: null,
-    departmentId: deptMensajeria,
-    order: 1,
-    color: '#8B5CF6',
-  })
+    const solicitudMensajeria = await upsertCategory(prisma, {
+      name: 'Solicitud de Mensajería',
+      description: 'Solicitudes de servicio de mensajería y envíos',
+      level: 1,
+      parentId: null,
+      departmentId: deptMensajeria,
+      order: 1,
+      color: '#8B5CF6',
+    })
 
-  const consultaMensajeria = await upsertCategory(prisma, {
-    name: 'Consulta o Seguimiento',
-    description: 'Consultas y seguimiento de envíos',
-    level: 1,
-    parentId: null,
-    departmentId: deptMensajeria,
-    order: 2,
-    color: '#10B981',
-  })
+    const consultaMensajeria = await upsertCategory(prisma, {
+      name: 'Consulta o Seguimiento',
+      description: 'Consultas y seguimiento de envíos',
+      level: 1,
+      parentId: null,
+      departmentId: deptMensajeria,
+      order: 2,
+      color: '#10B981',
+    })
 
-  // Nivel 2 - Solicitudes Mensajería
-  const entregaInterna = await upsertCategory(prisma, {
-    name: 'Entrega Interna',
-    description: 'Entregas dentro del centro comercial',
-    level: 2,
-    parentId: solicitudMensajeria.id,
-    departmentId: deptMensajeria,
-    order: 1,
-    color: '#8B5CF6',
-  })
+    // Nivel 2 - Solicitudes Mensajería
+    const entregaInterna = await upsertCategory(prisma, {
+      name: 'Entrega Interna',
+      description: 'Entregas dentro del centro comercial',
+      level: 2,
+      parentId: solicitudMensajeria.id,
+      departmentId: deptMensajeria,
+      order: 1,
+      color: '#8B5CF6',
+    })
 
-  const entregaExterna = await upsertCategory(prisma, {
-    name: 'Entrega Externa',
-    description: 'Envíos y entregas fuera del centro comercial',
-    level: 2,
-    parentId: solicitudMensajeria.id,
-    departmentId: deptMensajeria,
-    order: 2,
-    color: '#8B5CF6',
-  })
+    const entregaExterna = await upsertCategory(prisma, {
+      name: 'Entrega Externa',
+      description: 'Envíos y entregas fuera del centro comercial',
+      level: 2,
+      parentId: solicitudMensajeria.id,
+      departmentId: deptMensajeria,
+      order: 2,
+      color: '#8B5CF6',
+    })
 
-  const recepcionPaquetes = await upsertCategory(prisma, {
-    name: 'Recepción de Paquetes',
-    description: 'Recepción y gestión de paquetes',
-    level: 2,
-    parentId: solicitudMensajeria.id,
-    departmentId: deptMensajeria,
-    order: 3,
-    color: '#8B5CF6',
-  })
+    const recepcionPaquetes = await upsertCategory(prisma, {
+      name: 'Recepción de Paquetes',
+      description: 'Recepción y gestión de paquetes',
+      level: 2,
+      parentId: solicitudMensajeria.id,
+      departmentId: deptMensajeria,
+      order: 3,
+      color: '#8B5CF6',
+    })
 
-  // Nivel 3 - Entrega Interna
-  await upsertCategory(prisma, {
-    name: 'Correspondencia',
-    description: 'Entrega de correspondencia entre locales',
-    level: 3,
-    parentId: entregaInterna.id,
-    departmentId: deptMensajeria,
-    order: 1,
-    color: '#8B5CF6',
-  })
+    // Nivel 3 - Entrega Interna
+    await upsertCategory(prisma, {
+      name: 'Correspondencia',
+      description: 'Entrega de correspondencia entre locales',
+      level: 3,
+      parentId: entregaInterna.id,
+      departmentId: deptMensajeria,
+      order: 1,
+      color: '#8B5CF6',
+    })
 
-  await upsertCategory(prisma, {
-    name: 'Documentos',
-    description: 'Entrega de documentos importantes',
-    level: 3,
-    parentId: entregaInterna.id,
-    departmentId: deptMensajeria,
-    order: 2,
-    color: '#8B5CF6',
-  })
+    await upsertCategory(prisma, {
+      name: 'Documentos',
+      description: 'Entrega de documentos importantes',
+      level: 3,
+      parentId: entregaInterna.id,
+      departmentId: deptMensajeria,
+      order: 2,
+      color: '#8B5CF6',
+    })
 
-  await upsertCategory(prisma, {
-    name: 'Paquetes Pequeños',
-    description: 'Entrega de paquetes pequeños',
-    level: 3,
-    parentId: entregaInterna.id,
-    departmentId: deptMensajeria,
-    order: 3,
-    color: '#8B5CF6',
-  })
+    await upsertCategory(prisma, {
+      name: 'Paquetes Pequeños',
+      description: 'Entrega de paquetes pequeños',
+      level: 3,
+      parentId: entregaInterna.id,
+      departmentId: deptMensajeria,
+      order: 3,
+      color: '#8B5CF6',
+    })
 
-  // Nivel 3 - Entrega Externa
-  await upsertCategory(prisma, {
-    name: 'Envío a Cliente',
-    description: 'Envío de productos a clientes',
-    level: 3,
-    parentId: entregaExterna.id,
-    departmentId: deptMensajeria,
-    order: 1,
-    color: '#8B5CF6',
-  })
+    // Nivel 3 - Entrega Externa
+    await upsertCategory(prisma, {
+      name: 'Envío a Cliente',
+      description: 'Envío de productos a clientes',
+      level: 3,
+      parentId: entregaExterna.id,
+      departmentId: deptMensajeria,
+      order: 1,
+      color: '#8B5CF6',
+    })
 
-  await upsertCategory(prisma, {
-    name: 'Envío a Proveedor',
-    description: 'Envío de devoluciones o documentos a proveedores',
-    level: 3,
-    parentId: entregaExterna.id,
-    departmentId: deptMensajeria,
-    order: 2,
-    color: '#8B5CF6',
-  })
+    await upsertCategory(prisma, {
+      name: 'Envío a Proveedor',
+      description: 'Envío de devoluciones o documentos a proveedores',
+      level: 3,
+      parentId: entregaExterna.id,
+      departmentId: deptMensajeria,
+      order: 2,
+      color: '#8B5CF6',
+    })
 
-  // Nivel 3 - Consultas
-  await upsertCategory(prisma, {
-    name: 'Rastreo de Envío',
-    description: 'Consultar estado de un envío',
-    level: 3,
-    parentId: consultaMensajeria.id,
-    departmentId: deptMensajeria,
-    order: 1,
-    color: '#10B981',
-  })
+    // Nivel 3 - Consultas
+    await upsertCategory(prisma, {
+      name: 'Rastreo de Envío',
+      description: 'Consultar estado de un envío',
+      level: 3,
+      parentId: consultaMensajeria.id,
+      departmentId: deptMensajeria,
+      order: 1,
+      color: '#10B981',
+    })
 
-  await upsertCategory(prisma, {
-    name: 'Confirmación de Entrega',
-    description: 'Confirmar entrega realizada',
-    level: 3,
-    parentId: consultaMensajeria.id,
-    departmentId: deptMensajeria,
-    order: 2,
-    color: '#10B981',
-  })
+    await upsertCategory(prisma, {
+      name: 'Confirmación de Entrega',
+      description: 'Confirmar entrega realizada',
+      level: 3,
+      parentId: consultaMensajeria.id,
+      departmentId: deptMensajeria,
+      order: 2,
+      color: '#10B981',
+    })
   }
 
   // ==================== DEPARTAMENTO PARQUEADEROS ====================

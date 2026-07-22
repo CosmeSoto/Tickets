@@ -46,7 +46,7 @@ export async function seedCategoriesAdministrative(
   deptMap: Map<string, string>
 ) {
   const deptAdministracion = deptMap.get('Administración')
-  const deptContabilidad = deptMap.get('Contabilidad')
+  const deptContabilidad = deptMap.get('Contabilidad') || deptMap.get('Financiero')
   const deptCompras = deptMap.get('Compras')
   const deptRRHH = deptMap.get('Recursos Humanos')
 

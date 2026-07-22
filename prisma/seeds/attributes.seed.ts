@@ -8,7 +8,7 @@ import { randomUUID } from 'crypto'
 export async function seedAttributes(prisma: PrismaClient, familyMap: Map<string, string>) {
   console.log('🔧 Seeding atributos de tipos de inventario...')
 
-  const techFamilyId = familyMap.get('TECHNOLOGY')!
+  const techFamilyId = familyMap.get('ADMINISTRATIVE')!
 
   // ============================================
   // ATRIBUTOS PARA EQUIPMENT TYPES

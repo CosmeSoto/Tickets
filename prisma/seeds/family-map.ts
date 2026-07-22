@@ -1,10 +1,11 @@
 /**
- * Familias del organigrama PSF (6 áreas principales).
+ * Familias del organigrama PSF (5 áreas).
+ * TI / Comunicaciones vive dentro de Administración (no hay familia TECHNOLOGY).
  */
 export const ORGANIGRAM_FAMILIES = [
   {
     code: 'ADMINISTRATIVE',
-    name: 'Gestión Administrativa',
+    name: 'Administración',
     icon: 'Briefcase',
     color: '#6B7280',
     order: 1,
@@ -37,13 +38,9 @@ export const ORGANIGRAM_FAMILIES = [
     color: '#10B981',
     order: 5,
   },
-  {
-    code: 'TECHNOLOGY',
-    name: 'Tecnología y Comunicaciones',
-    icon: 'Monitor',
-    color: '#3B82F6',
-    order: 6,
-  },
 ] as const
 
 export type OrganigramFamilyCode = (typeof ORGANIGRAM_FAMILIES)[number]['code']
+
+/** Familia legacy absorbida por ADMINISTRATIVE (TI). */
+export const LEGACY_TECHNOLOGY_FAMILY_CODE = 'TECHNOLOGY'

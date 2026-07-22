@@ -6,8 +6,8 @@
  * - DECLINING_BALANCE (Saldo Decreciente Doble): para tecnología con obsolescencia rápida
  * - UNITS_OF_PRODUCTION (Unidades de Producción): para equipos mecánicos con horas de uso
  *
- * Familias que NO deprecian: MAINTENANCE (MRO), SERVICES, ADMINISTRATIVE (contratos)
- * — son gastos operativos, no activos capitalizables.
+ * Familias que NO deprecian: MAINTENANCE (MRO), SERVICES
+ * ADMINISTRATIVE ahora incluye TI e inventarios capitalizables.
  */
 
 export type DepreciationMethod = 'LINEAR' | 'DECLINING_BALANCE' | 'UNITS_OF_PRODUCTION'
@@ -141,7 +141,8 @@ export function calculateDepreciation(
  * No controla visibilidad de formularios — eso lo define la configuración del área.
  */
 export function familySupportsDepreciation(familyCode: string): boolean {
-  const NON_DEPRECIABLE = ['MAINTENANCE', 'SERVICES', 'ADMINISTRATIVE']
+  // ADMINISTRATIVE incluye TI e inventarios capitalizables
+  const NON_DEPRECIABLE = ['MAINTENANCE', 'SERVICES']
   return !NON_DEPRECIABLE.includes(familyCode)
 }
 
@@ -153,8 +154,8 @@ export function getRecommendedDepreciationMethod(
   familyCode: string,
   assetTypeName?: string
 ): DepreciationMethod {
-  if (familyCode === 'TECHNOLOGY') {
-    // Tecnología: saldo decreciente por obsolescencia rápida
+  if (familyCode === 'TECHNOLOGY' || familyCode === 'ADMINISTRATIVE') {
+    // Administración / TI: saldo decreciente por obsolescencia rápida
     return 'DECLINING_BALANCE'
   }
   if (familyCode === 'FIXED_ASSETS' && assetTypeName) {
@@ -179,13 +180,16 @@ export function getRecommendedDepreciationMethod(
  */
 export const DEFAULT_USEFUL_LIFE_YEARS: Record<string, number> = {
   FIXED_ASSETS: 20, // Infraestructura: 20-50 años
-  TECHNOLOGY: 5, // Tecnología: 3-7 años
+  TECHNOLOGY: 5, // Legacy alias
+  ADMINISTRATIVE: 5, // Incluye TI: 3-7 años
   SECURITY: 10, // Seguridad: 8-15 años
   COMMERCIAL: 10, // Activos comerciales: 5-15 años
   GREEN_AREAS: 5, // Equipos de jardinería: 3-8 años
   MAINTENANCE: 0, // MRO: no deprecia
   SERVICES: 0, // Servicios: no deprecia
-  ADMINISTRATIVE: 0, // Documentos: no deprecia
+  OPERATIONS: 10,
+  ARCHITECTURE: 15,
+  MARKETING: 5,
 }
 
 /**

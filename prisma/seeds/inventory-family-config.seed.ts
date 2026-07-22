@@ -5,10 +5,11 @@ const FAMILY_CONFIGS: Record<
   string,
   { allowedSubtypes: string[]; visibleSections: string[]; requiredSections: string[] }
 > = {
+  // Administración incluye TI: mismos capabilities que tenía TECHNOLOGY
   ADMINISTRATIVE: {
-    allowedSubtypes: ['EQUIPMENT', 'LICENSE'],
-    visibleSections: ['FINANCIAL', 'CONTRACT'],
-    requiredSections: [],
+    allowedSubtypes: ['EQUIPMENT', 'LICENSE', 'MRO'],
+    visibleSections: ['FINANCIAL', 'DEPRECIATION', 'CONTRACT', 'WAREHOUSE'],
+    requiredSections: ['FINANCIAL'],
   },
   COMMERCIAL: {
     allowedSubtypes: ['EQUIPMENT', 'LICENSE'],
@@ -28,11 +29,6 @@ const FAMILY_CONFIGS: Record<
   OPERATIONS: {
     allowedSubtypes: ['EQUIPMENT', 'MRO', 'LICENSE'],
     visibleSections: ['FINANCIAL', 'DEPRECIATION', 'CONTRACT', 'STOCK_MRO', 'WAREHOUSE'],
-    requiredSections: ['FINANCIAL'],
-  },
-  TECHNOLOGY: {
-    allowedSubtypes: ['EQUIPMENT', 'LICENSE', 'MRO'],
-    visibleSections: ['FINANCIAL', 'DEPRECIATION', 'CONTRACT', 'WAREHOUSE'],
     requiredSections: ['FINANCIAL'],
   },
 }

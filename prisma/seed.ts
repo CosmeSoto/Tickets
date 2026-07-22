@@ -59,8 +59,17 @@ async function main() {
   await seedInventoryFamilyConfigs(prisma, familyMap)
   await seedAssetRequestsFamilySettings(prisma, familyMap)
 
-  // 4. DEPARTAMENTOS (con familyId directo)
+  // 4. DEPARTAMENTOS (con familyId directo) + sync aliases / legacy TECHNOLOGY
   const deptMap = await seedDepartments(familyMap)
+  const { ensureDepartments } = await import('./ensure-departments')
+  await ensureDepartments(prisma)
+  // Refrescar mapa por si hubo renombres/fusiones
+  for (const dept of await prisma.departments.findMany({
+    where: { isActive: true },
+    select: { id: true, name: true },
+  })) {
+    deptMap.set(dept.name, dept.id)
+  }
 
   // 5. USUARIO ADMINISTRADOR
   const adminId = await seedAdmin(deptMap.get('Administración')!)
@@ -68,7 +77,7 @@ async function main() {
   // 6. CONFIGURACIÓN DEL SITIO
   await seedSiteConfig()
 
-  // 8. POLÍTICAS DE SLA (globales + por familia TECHNOLOGY)
+  // 8. POLÍTICAS DE SLA (globales + por familia ADMINISTRATIVE / TI)
   await seedSLAPolicies(familyMap)
 
   // 9. CATEGORÍAS DE TICKETS (un archivo por familia/área)
@@ -151,8 +160,7 @@ async function seedTicketFamilyConfigs(familyMap: Map<string, string>) {
   // Familias con tickets habilitados
   // allowedFromFamilies vacío = acepta de TODAS las familias
   const enabledFamilies = [
-    { code: 'TECHNOLOGY', prefix: 'TI', isDefault: true, allowedFromFamilies: [] },
-    { code: 'ADMINISTRATIVE', prefix: 'ADM', isDefault: false, allowedFromFamilies: [] },
+    { code: 'ADMINISTRATIVE', prefix: 'ADM', isDefault: true, allowedFromFamilies: [] },
     { code: 'COMMERCIAL', prefix: 'COM', isDefault: false, allowedFromFamilies: [] },
     { code: 'MARKETING', prefix: 'MKT', isDefault: false, allowedFromFamilies: [] },
     { code: 'ARCHITECTURE', prefix: 'ARQ', isDefault: false, allowedFromFamilies: [] },
@@ -353,7 +361,7 @@ async function seedSLAPolicies(familyMap: Map<string, string>) {
     return
   }
 
-  const techFamilyId = familyMap.get('TECHNOLOGY')!
+  const adminFamilyId = familyMap.get('ADMINISTRATIVE')!
 
   // SLA globales (sin familia — fallback para todas las familias)
   const globalPolicies = [
@@ -402,7 +410,7 @@ async function seedSLAPolicies(familyMap: Map<string, string>) {
     await prisma.sla_policies.create({ data: { id: randomUUID(), ...p, isActive: true } })
   }
 
-  // SLA estrictos para TECHNOLOGY
+  // SLA estrictos para Administración (incluye TI)
   const techPolicies = [
     {
       name: 'TI - Urgente 24/7',
@@ -413,7 +421,7 @@ async function seedSLAPolicies(familyMap: Map<string, string>) {
       businessHoursStart: '00:00:00',
       businessHoursEnd: '23:59:59',
       businessDays: 'MON,TUE,WED,THU,FRI,SAT,SUN',
-      familyId: techFamilyId,
+      familyId: adminFamilyId,
     },
     {
       name: 'TI - Alta Prioridad',
@@ -424,7 +432,7 @@ async function seedSLAPolicies(familyMap: Map<string, string>) {
       businessHoursStart: '08:00:00',
       businessHoursEnd: '17:00:00',
       businessDays: 'MON,TUE,WED,THU,FRI',
-      familyId: techFamilyId,
+      familyId: adminFamilyId,
     },
     {
       name: 'TI - Prioridad Media',
@@ -435,7 +443,7 @@ async function seedSLAPolicies(familyMap: Map<string, string>) {
       businessHoursStart: '08:00:00',
       businessHoursEnd: '17:00:00',
       businessDays: 'MON,TUE,WED,THU,FRI',
-      familyId: techFamilyId,
+      familyId: adminFamilyId,
     },
     {
       name: 'TI - Baja Prioridad',
@@ -446,14 +454,14 @@ async function seedSLAPolicies(familyMap: Map<string, string>) {
       businessHoursStart: '08:00:00',
       businessHoursEnd: '17:00:00',
       businessDays: 'MON,TUE,WED,THU,FRI',
-      familyId: techFamilyId,
+      familyId: adminFamilyId,
     },
   ]
   for (const p of techPolicies) {
     await prisma.sla_policies.create({ data: { id: randomUUID(), ...p, isActive: true } })
   }
   console.log(
-    `✅ ${globalPolicies.length} SLA globales + ${techPolicies.length} SLA para TECHNOLOGY`
+    `✅ ${globalPolicies.length} SLA globales + ${techPolicies.length} SLA para Administración (TI)`
   )
 }
 
@@ -467,7 +475,6 @@ async function seedSLAPolicies(familyMap: Map<string, string>) {
 
 async function seedTicketCodeCounters(familyMap: Map<string, string>) {
   const familiesWithSeq: Array<{ code: string; lastSequence: number }> = [
-    { code: 'TECHNOLOGY', lastSequence: 0 },
     { code: 'ADMINISTRATIVE', lastSequence: 0 },
     { code: 'COMMERCIAL', lastSequence: 0 },
     { code: 'MARKETING', lastSequence: 0 },

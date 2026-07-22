@@ -15,7 +15,7 @@ export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<stri
   // FAMILIA: TECNOLOGÍA (Technology)
   // ============================================
 
-  const technologyFamilyId = fam('TECHNOLOGY')
+  const technologyFamilyId = fam('ADMINISTRATIVE')
   if (technologyFamilyId) {
     await prisma.family_custom_fields.createMany({
       data: [

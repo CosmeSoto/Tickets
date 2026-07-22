@@ -129,8 +129,38 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
     }
 
-    // Si cambia familyId, validar que no haya tickets abiertos en ese departamento
-    if (validatedData.familyId !== undefined && validatedData.familyId !== existing.familyId) {
+    // Todo departamento debe pertenecer a una familia (no se permite dejarlo huérfano)
+    if (validatedData.familyId === null) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Todo departamento debe pertenecer a una familia. Use "Mover" para reasignarlo.',
+        },
+        { status: 400 }
+      )
+    }
+
+    const isMovingFamily =
+      validatedData.familyId !== undefined && validatedData.familyId !== existing.familyId
+
+    if (isMovingFamily) {
+      const targetFamily = await prisma.families.findUnique({
+        where: { id: validatedData.familyId! },
+        select: { id: true, name: true, isActive: true },
+      })
+      if (!targetFamily) {
+        return NextResponse.json(
+          { success: false, error: 'La familia destino no existe' },
+          { status: 400 }
+        )
+      }
+      if (!targetFamily.isActive) {
+        return NextResponse.json(
+          { success: false, error: 'La familia destino está inactiva' },
+          { status: 400 }
+        )
+      }
+
       const openTicketsCount = await prisma.tickets.count({
         where: {
           categories: { departmentId: id },
@@ -160,17 +190,37 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
     })
 
-    const department = await prisma.departments.update({
-      where: { id },
-      data: validatedData,
-      include: {
-        _count: {
-          select: {
-            users: true,
-            categories: true,
+    const now = new Date()
+    let categoriesSynced = 0
+
+    const department = await prisma.$transaction(async tx => {
+      const updated = await tx.departments.update({
+        where: { id },
+        data: { ...validatedData, updatedAt: now },
+        include: {
+          family: { select: { id: true, name: true, code: true, color: true } },
+          _count: {
+            select: {
+              users: true,
+              categories: true,
+            },
           },
         },
-      },
+      })
+
+      // Al mover de familia: sincronizar categorías del departamento (tickets históricos no se tocan)
+      if (isMovingFamily && validatedData.familyId) {
+        const sync = await tx.categories.updateMany({
+          where: {
+            departmentId: id,
+            OR: [{ familyId: null }, { familyId: { not: validatedData.familyId } }],
+          },
+          data: { familyId: validatedData.familyId, updatedAt: now },
+        })
+        categoriesSynced = sync.count
+      }
+
+      return updated
     })
 
     // Registrar en auditoría
@@ -182,6 +232,14 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         userId: session.user.id,
         details: {
           departmentName: department.name,
+          ...(isMovingFamily
+            ? {
+                movedFamily: true,
+                fromFamilyId: existing.familyId,
+                toFamilyId: validatedData.familyId,
+                categoriesSynced,
+              }
+            : {}),
         },
         oldValues,
         newValues,
@@ -193,10 +251,17 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       console.log('✅ Departamento actualizado:', department.name)
     }
 
+    const message = isMovingFamily
+      ? `Departamento "${department.name}" movido exitosamente${
+          categoriesSynced > 0 ? ` (${categoriesSynced} categoría(s) sincronizada(s))` : ''
+        }`
+      : `Departamento "${department.name}" actualizado exitosamente`
+
     return NextResponse.json({
       success: true,
       data: department,
-      message: `Departamento "${department.name}" actualizado exitosamente`,
+      categoriesSynced,
+      message,
     })
   } catch (error) {
     console.error('❌ Error al actualizar departamento:', error)

@@ -244,9 +244,12 @@ sudo docker exec tickets-app sh -c 'node ./node_modules/tsx/dist/cli.mjs prisma/
 sudo docker exec tickets-app sh -c 'node ./node_modules/tsx/dist/cli.mjs prisma/ensure-categories.ts'
 # o localmente: npm run db:seed-categories
 
-# Departamentos con "Sin familia" (familyId null) o alias legacy (p.ej. PARQUEADEROS):
+# Departamentos con "Sin familia", organigrama desfasado (TECHNOLOGY legacy) o alias:
 sudo docker exec tickets-app sh -c 'node ./node_modules/tsx/dist/cli.mjs prisma/ensure-departments.ts'
 # o localmente: npm run db:seed-departments
+#
+# Organigrama canónico (5 familias): Administración (incluye TI), Comercial, Marketing,
+# Arquitectura, Operaciones. La antigua familia TECHNOLOGY se absorbe en Administración.
 ```
 
 ### Conectarse a la BD

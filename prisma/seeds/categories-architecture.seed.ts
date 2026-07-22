@@ -44,7 +44,7 @@ export async function seedCategoriesArchitecture(
   deptMap: Map<string, string>
 ) {
   const deptArquitectura = deptMap.get('Arquitectura')
-  const deptMantenimientoInfra = deptMap.get('Mantenimiento Civil')
+  const deptMantenimientoInfra = deptMap.get('Mantenimiento')
 
   if (!deptArquitectura || !deptMantenimientoInfra) {
     console.log('⚠️  Departamentos de ARCHITECTURE/OPERATIONS no encontrados, saltando seed...')

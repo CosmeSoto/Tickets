@@ -17,6 +17,7 @@ import {
   RefreshCw,
   Save,
   ChevronRight,
+  ArrowRightLeft,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -35,6 +36,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { DepartmentFormDialog } from '@/components/departments/department-form-dialog'
+import { MoveDepartmentDialog } from '@/components/departments/move-department-dialog'
 import { useToast } from '@/hooks/use-toast'
 import type { DepartmentData, DepartmentFormData } from '@/hooks/use-departments'
 import { IconPicker } from '@/components/inventory/icon-picker'
@@ -170,6 +172,8 @@ export function TabGeneral({
   const [showDeleteDeptDialog, setShowDeleteDeptDialog] = useState(false)
   const [deletingDeptLoading, setDeletingDeptLoading] = useState(false)
   const [togglingDept, setTogglingDept] = useState<string | null>(null)
+  const [movingDept, setMovingDept] = useState<DepartmentData | null>(null)
+  const [showMoveDeptDialog, setShowMoveDeptDialog] = useState(false)
 
   const openCreateDept = () => {
     setEditingDept(null)
@@ -461,7 +465,10 @@ export function TabGeneral({
                 <Building className='h-4 w-4 shrink-0' />
                 Departamentos ({departments.length})
               </CardTitle>
-              <CardDescription>Departamentos que pertenecen a esta familia</CardDescription>
+              <CardDescription>
+                Departamentos de esta familia. Como Super Admin puede moverlos a otra área sin
+                perder usuarios.
+              </CardDescription>
             </div>
             {canEditFamilyMetadata && (
               <Button size='sm' onClick={openCreateDept} className='w-full sm:w-auto shrink-0'>
@@ -535,6 +542,21 @@ export function TabGeneral({
                         <ToggleLeft className='h-4 w-4 sm:h-3.5 sm:w-3.5' />
                       )}
                     </Button>
+                    {canEditFamilyMetadata && (
+                      <Button
+                        variant='ghost'
+                        size='sm'
+                        className='h-10 w-10 sm:h-8 sm:w-8 p-0 text-muted-foreground hover:text-foreground touch-manipulation'
+                        onClick={e => {
+                          e.stopPropagation()
+                          setMovingDept(dept)
+                          setShowMoveDeptDialog(true)
+                        }}
+                        title='Mover a otra familia'
+                      >
+                        <ArrowRightLeft className='h-4 w-4 sm:h-3.5 sm:w-3.5' />
+                      </Button>
+                    )}
                     <Button
                       variant='ghost'
                       size='sm'
@@ -567,6 +589,22 @@ export function TabGeneral({
         onSubmit={handleSubmitDept}
         submitting={submittingDept}
         departments={departments}
+      />
+
+      <MoveDepartmentDialog
+        open={showMoveDeptDialog}
+        onOpenChange={open => {
+          setShowMoveDeptDialog(open)
+          if (!open) setMovingDept(null)
+        }}
+        department={movingDept}
+        currentFamilyId={family.id}
+        currentFamilyName={family.name}
+        onMoved={onDepartmentsChanged}
+        onSuccess={message => toast({ title: 'Departamento movido', description: message })}
+        onError={message =>
+          toast({ title: 'No se pudo mover', description: message, variant: 'destructive' })
+        }
       />
 
       <AlertDialog open={showDeleteDeptDialog} onOpenChange={setShowDeleteDeptDialog}>

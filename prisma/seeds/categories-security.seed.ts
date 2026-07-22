@@ -43,7 +43,7 @@ async function upsertCategory(
 
 export async function seedCategoriesSecurity(prisma: PrismaClient, deptMap: Map<string, string>) {
   const deptSeguridadFisica = deptMap.get('Seguridad Física')
-  const deptCctv = deptMap.get('CCTV y Control de Acceso')
+  const deptCctv = deptMap.get('CCTV y Control de Accesos')
 
   if (!deptSeguridadFisica || !deptCctv) {
     console.log('⚠️  Departamentos de Operaciones (Seguridad) no encontrados, saltando seed...')

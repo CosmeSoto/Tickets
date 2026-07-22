@@ -14,33 +14,69 @@ export async function seedEquipmentTypes(prisma: PrismaClient, familyMap: Map<st
   const fam = (code: string) => familyMap.get(code)!
   const types = [
     // TECHNOLOGY
-    { code: 'LAPTOP', name: 'Laptop', icon: 'Laptop', order: 1, familyId: fam('TECHNOLOGY') },
-    { code: 'DESKTOP', name: 'Desktop', icon: 'Monitor', order: 2, familyId: fam('TECHNOLOGY') },
-    { code: 'MONITOR', name: 'Monitor', icon: 'Monitor', order: 3, familyId: fam('TECHNOLOGY') },
-    { code: 'PRINTER', name: 'Impresora', icon: 'Printer', order: 4, familyId: fam('TECHNOLOGY') },
-    { code: 'PHONE', name: 'Teléfono', icon: 'Phone', order: 5, familyId: fam('TECHNOLOGY') },
-    { code: 'TABLET', name: 'Tablet', icon: 'Tablet', order: 6, familyId: fam('TECHNOLOGY') },
-    { code: 'KEYBOARD', name: 'Teclado', icon: 'Keyboard', order: 7, familyId: fam('TECHNOLOGY') },
-    { code: 'MOUSE', name: 'Mouse', icon: 'Mouse', order: 8, familyId: fam('TECHNOLOGY') },
+    { code: 'LAPTOP', name: 'Laptop', icon: 'Laptop', order: 1, familyId: fam('ADMINISTRATIVE') },
+    {
+      code: 'DESKTOP',
+      name: 'Desktop',
+      icon: 'Monitor',
+      order: 2,
+      familyId: fam('ADMINISTRATIVE'),
+    },
+    {
+      code: 'MONITOR',
+      name: 'Monitor',
+      icon: 'Monitor',
+      order: 3,
+      familyId: fam('ADMINISTRATIVE'),
+    },
+    {
+      code: 'PRINTER',
+      name: 'Impresora',
+      icon: 'Printer',
+      order: 4,
+      familyId: fam('ADMINISTRATIVE'),
+    },
+    { code: 'PHONE', name: 'Teléfono', icon: 'Phone', order: 5, familyId: fam('ADMINISTRATIVE') },
+    { code: 'TABLET', name: 'Tablet', icon: 'Tablet', order: 6, familyId: fam('ADMINISTRATIVE') },
+    {
+      code: 'KEYBOARD',
+      name: 'Teclado',
+      icon: 'Keyboard',
+      order: 7,
+      familyId: fam('ADMINISTRATIVE'),
+    },
+    { code: 'MOUSE', name: 'Mouse', icon: 'Mouse', order: 8, familyId: fam('ADMINISTRATIVE') },
     {
       code: 'HEADSET',
       name: 'Audífonos',
       icon: 'Headphones',
       order: 9,
-      familyId: fam('TECHNOLOGY'),
+      familyId: fam('ADMINISTRATIVE'),
     },
-    { code: 'WEBCAM', name: 'Webcam', icon: 'Camera', order: 10, familyId: fam('TECHNOLOGY') },
+    { code: 'WEBCAM', name: 'Webcam', icon: 'Camera', order: 10, familyId: fam('ADMINISTRATIVE') },
     {
       code: 'DOCKING_STATION',
       name: 'Docking Station',
       icon: 'Cpu',
       order: 11,
-      familyId: fam('TECHNOLOGY'),
+      familyId: fam('ADMINISTRATIVE'),
     },
-    { code: 'UPS', name: 'UPS', icon: 'Battery', order: 12, familyId: fam('TECHNOLOGY') },
-    { code: 'ROUTER', name: 'Router', icon: 'Router', order: 13, familyId: fam('TECHNOLOGY') },
-    { code: 'SWITCH', name: 'Switch de Red', icon: 'Wifi', order: 14, familyId: fam('TECHNOLOGY') },
-    { code: 'SERVER', name: 'Servidor', icon: 'Server', order: 15, familyId: fam('TECHNOLOGY') },
+    { code: 'UPS', name: 'UPS', icon: 'Battery', order: 12, familyId: fam('ADMINISTRATIVE') },
+    { code: 'ROUTER', name: 'Router', icon: 'Router', order: 13, familyId: fam('ADMINISTRATIVE') },
+    {
+      code: 'SWITCH',
+      name: 'Switch de Red',
+      icon: 'Wifi',
+      order: 14,
+      familyId: fam('ADMINISTRATIVE'),
+    },
+    {
+      code: 'SERVER',
+      name: 'Servidor',
+      icon: 'Server',
+      order: 15,
+      familyId: fam('ADMINISTRATIVE'),
+    },
     // ARCHITECTURE
     {
       code: 'AC_UNIT',
@@ -72,7 +108,13 @@ export async function seedEquipmentTypes(prisma: PrismaClient, familyMap: Map<st
       familyId: fam('ARCHITECTURE'),
     },
     // OPERATIONS — equipos de seguridad
-    { code: 'IP_CAMERA', name: 'Cámara IP', icon: 'Camera', order: 30, familyId: fam('OPERATIONS') },
+    {
+      code: 'IP_CAMERA',
+      name: 'Cámara IP',
+      icon: 'Camera',
+      order: 30,
+      familyId: fam('OPERATIONS'),
+    },
     { code: 'DVR_NVR', name: 'DVR/NVR', icon: 'HardDrive', order: 31, familyId: fam('OPERATIONS') },
     {
       code: 'ACCESS_CONTROL',
@@ -148,7 +190,7 @@ export async function seedEquipmentTypes(prisma: PrismaClient, familyMap: Map<st
       familyId: fam('COMMERCIAL'),
     },
     // General
-    { code: 'OTHER', name: 'Otro', icon: 'Box', order: 99, familyId: fam('TECHNOLOGY') },
+    { code: 'OTHER', name: 'Otro', icon: 'Box', order: 99, familyId: fam('ADMINISTRATIVE') },
   ]
 
   for (const t of types) {
@@ -164,38 +206,50 @@ export async function seedEquipmentTypes(prisma: PrismaClient, familyMap: Map<st
 export async function seedLicenseTypes(prisma: PrismaClient, familyMap: Map<string, string>) {
   const fam = (code: string) => familyMap.get(code)!
   const types = [
-    { code: 'WINDOWS', name: 'Windows', icon: 'Monitor', order: 1, familyId: fam('TECHNOLOGY') },
+    {
+      code: 'WINDOWS',
+      name: 'Windows',
+      icon: 'Monitor',
+      order: 1,
+      familyId: fam('ADMINISTRATIVE'),
+    },
     {
       code: 'OFFICE_365',
       name: 'Office 365',
       icon: 'FileText',
       order: 2,
-      familyId: fam('TECHNOLOGY'),
+      familyId: fam('ADMINISTRATIVE'),
     },
-    { code: 'ANTIVIRUS', name: 'Antivirus', icon: 'Shield', order: 3, familyId: fam('TECHNOLOGY') },
-    { code: 'ADOBE', name: 'Adobe', icon: 'Paintbrush', order: 4, familyId: fam('TECHNOLOGY') },
-    { code: 'AUTOCAD', name: 'AutoCAD', icon: 'Ruler', order: 5, familyId: fam('TECHNOLOGY') },
+    {
+      code: 'ANTIVIRUS',
+      name: 'Antivirus',
+      icon: 'Shield',
+      order: 3,
+      familyId: fam('ADMINISTRATIVE'),
+    },
+    { code: 'ADOBE', name: 'Adobe', icon: 'Paintbrush', order: 4, familyId: fam('ADMINISTRATIVE') },
+    { code: 'AUTOCAD', name: 'AutoCAD', icon: 'Ruler', order: 5, familyId: fam('ADMINISTRATIVE') },
     {
       code: 'GOOGLE_WORKSPACE',
       name: 'Google Workspace',
       icon: 'Cloud',
       order: 6,
-      familyId: fam('TECHNOLOGY'),
+      familyId: fam('ADMINISTRATIVE'),
     },
-    { code: 'SAAS', name: 'SaaS (Otro)', icon: 'Globe', order: 7, familyId: fam('TECHNOLOGY') },
+    { code: 'SAAS', name: 'SaaS (Otro)', icon: 'Globe', order: 7, familyId: fam('ADMINISTRATIVE') },
     {
       code: 'SUBSCRIPTION',
       name: 'Suscripción',
       icon: 'RefreshCw',
       order: 8,
-      familyId: fam('TECHNOLOGY'),
+      familyId: fam('ADMINISTRATIVE'),
     },
     {
       code: 'PERPETUAL',
       name: 'Licencia Perpetua',
       icon: 'Key',
       order: 9,
-      familyId: fam('TECHNOLOGY'),
+      familyId: fam('ADMINISTRATIVE'),
     },
     {
       code: 'MAINTENANCE_CONTRACT',
@@ -239,7 +293,7 @@ export async function seedLicenseTypes(prisma: PrismaClient, familyMap: Map<stri
       order: 40,
       familyId: fam('COMMERCIAL'),
     },
-    { code: 'OTHER', name: 'Otro', icon: 'Box', order: 99, familyId: fam('TECHNOLOGY') },
+    { code: 'OTHER', name: 'Otro', icon: 'Box', order: 99, familyId: fam('ADMINISTRATIVE') },
   ]
 
   for (const t of types) {
@@ -255,17 +309,23 @@ export async function seedLicenseTypes(prisma: PrismaClient, familyMap: Map<stri
 export async function seedConsumableTypes(prisma: PrismaClient, familyMap: Map<string, string>) {
   const fam = (code: string) => familyMap.get(code)!
   const types = [
-    { code: 'TONER', name: 'Tóner', icon: 'Printer', order: 1, familyId: fam('TECHNOLOGY') },
-    { code: 'INK', name: 'Tinta', icon: 'Droplets', order: 2, familyId: fam('TECHNOLOGY') },
-    { code: 'PAPER', name: 'Papel', icon: 'FileText', order: 3, familyId: fam('TECHNOLOGY') },
-    { code: 'CABLE', name: 'Cable', icon: 'Cable', order: 4, familyId: fam('TECHNOLOGY') },
-    { code: 'BATTERY', name: 'Batería', icon: 'Battery', order: 5, familyId: fam('TECHNOLOGY') },
+    { code: 'TONER', name: 'Tóner', icon: 'Printer', order: 1, familyId: fam('ADMINISTRATIVE') },
+    { code: 'INK', name: 'Tinta', icon: 'Droplets', order: 2, familyId: fam('ADMINISTRATIVE') },
+    { code: 'PAPER', name: 'Papel', icon: 'FileText', order: 3, familyId: fam('ADMINISTRATIVE') },
+    { code: 'CABLE', name: 'Cable', icon: 'Cable', order: 4, familyId: fam('ADMINISTRATIVE') },
+    {
+      code: 'BATTERY',
+      name: 'Batería',
+      icon: 'Battery',
+      order: 5,
+      familyId: fam('ADMINISTRATIVE'),
+    },
     {
       code: 'STORAGE',
       name: 'Almacenamiento',
       icon: 'HardDrive',
       order: 6,
-      familyId: fam('TECHNOLOGY'),
+      familyId: fam('ADMINISTRATIVE'),
     },
     {
       code: 'SPARE_PART',
@@ -307,7 +367,7 @@ export async function seedConsumableTypes(prisma: PrismaClient, familyMap: Map<s
     },
     { code: 'PESTICIDE', name: 'Pesticida', icon: 'Leaf', order: 41, familyId: fam('OPERATIONS') },
     { code: 'SEED', name: 'Semilla', icon: 'Flower2', order: 42, familyId: fam('OPERATIONS') },
-    { code: 'OTHER', name: 'Otro', icon: 'Box', order: 99, familyId: fam('TECHNOLOGY') },
+    { code: 'OTHER', name: 'Otro', icon: 'Box', order: 99, familyId: fam('ADMINISTRATIVE') },
   ]
 
   for (const t of types) {
@@ -346,14 +406,8 @@ async function seedCommonEquipmentTypesForAllFamilies(
     { code: 'PHONE', name: 'Teléfono', icon: 'Phone', order: 54 },
   ]
 
-  // Familias donde los tipos comunes deben existir (excluyendo TECHNOLOGY que ya los tiene)
-  const targetFamilies = [
-    'ARCHITECTURE',
-    'OPERATIONS',
-    'ADMINISTRATIVE',
-    'COMMERCIAL',
-    'MARKETING',
-  ]
+  // Familias donde clonar tipos comunes (ADMINISTRATIVE ya tiene códigos canónicos)
+  const targetFamilies = ['ARCHITECTURE', 'OPERATIONS', 'COMMERCIAL', 'MARKETING']
   let created = 0
 
   for (const familyCode of targetFamilies) {

@@ -117,12 +117,34 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const validatedData = departmentSchema.parse(body)
 
+    // Todo departamento nuevo debe pertenecer a una familia
+    if (!validatedData.familyId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'familyId es requerido: todo departamento debe pertenecer a una familia',
+        },
+        { status: 400 }
+      )
+    }
+
+    const targetFamily = await prisma.families.findUnique({
+      where: { id: validatedData.familyId },
+      select: { id: true, isActive: true },
+    })
+    if (!targetFamily) {
+      return NextResponse.json(
+        { success: false, error: 'La familia indicada no existe' },
+        { status: 400 }
+      )
+    }
+
     if (!currentUser?.isSuperAdmin) {
       const { getAdminFamilyScope } = await import('@/lib/auth/admin-scope')
       const scope = await getAdminFamilyScope(session.user.id, false)
       const allowedFamilyIds = scope.familyIds ? new Set(scope.familyIds) : new Set()
 
-      if (validatedData.familyId && !allowedFamilyIds.has(validatedData.familyId)) {
+      if (!allowedFamilyIds.has(validatedData.familyId)) {
         return NextResponse.json(
           {
             success: false,
@@ -156,7 +178,7 @@ export async function POST(request: NextRequest) {
         color: validatedData.color || '#3B82F6',
         isActive: validatedData.isActive ?? true,
         order: validatedData.order ?? 0,
-        familyId: validatedData.familyId ?? null,
+        familyId: validatedData.familyId,
         createdAt: new Date(),
         updatedAt: new Date(),
       },
