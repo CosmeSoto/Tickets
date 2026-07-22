@@ -71,6 +71,10 @@ export function translateEntityType(entityType: string): string {
     patrol_route: '🛤️ Ruta de Ronda',
     patrol_incident: '⚠️ Novedad de Ronda',
     patrol_checkpoint: '📍 Checkpoint',
+    // Inventario — tipos de activo
+    equipment_type: '🔧 Tipo de Equipo',
+    license_type: '🪪 Tipo de Licencia',
+    consumable_type: '📦 Tipo de Consumible',
   }
   return entityMap[entityType.toLowerCase()] || entityType
 }
@@ -79,6 +83,8 @@ export function translateEntityType(entityType: string): string {
  * Get action badge color classes (dark mode compatible)
  */
 export function getActionColor(action: string): string {
+  if (action === 'TYPE_CLONED')
+    return 'bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200'
   if (action.includes('created'))
     return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200'
   if (action.includes('updated'))
@@ -235,6 +241,8 @@ export function getActionLabel(action: string): string {
     PATROL_COMPLETED: 'Patrulla Completada',
     PATROL_MISSED: 'Patrulla Omitida',
     PATROL_INCOMPLETE: 'Patrulla Incompleta',
+    // Inventario — tipos
+    TYPE_CLONED: 'Tipo Copiado a Otra Área',
   }
   return actionLabels[action] || action
 }
@@ -266,6 +274,11 @@ export function getEntityLabel(entityType: string): string {
     patrol_route: 'Rutas de Rondas',
     patrol_incident: 'Novedades de Rondas',
     patrol_checkpoint: 'Checkpoints',
+    // Inventario — tipos de activo
+    equipment_type: 'Tipos de Equipo',
+    license_type: 'Tipos de Licencia',
+    consumable_type: 'Tipos de Consumible',
+    consumable_types: 'Tipos de Consumible',
   }
   return entityLabels[entityType] || entityType
 }
@@ -546,6 +559,11 @@ export function getFieldLabel(key: string): string {
     createdByRole: 'Rol del creador',
     createdByName: 'Creado por',
     onBehalfOfName: 'En nombre de',
+    // Inventario — clonación de tipos
+    sourceTypeName: 'Tipo de origen',
+    attributesCopied: 'Atributos copiados',
+    newTypeName: 'Nombre del nuevo tipo',
+    targetFamilyName: 'Área de destino',
   }
   return labels[key] || key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1')
 }

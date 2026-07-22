@@ -11,6 +11,7 @@ import {
   translateAction,
   translateEntityType,
   getActionColor,
+  getActionLabel,
   getRoleColor,
   getRoleLabel,
   formatRelativeTime,
@@ -59,44 +60,9 @@ export function getAuditColumns(onViewDetails: (log: AuditLog) => void) {
         const action = log.action
         const entityType = log.entityType
 
-        // Traducir acciones a español
-        let translatedAction = action
-        for (const [key, value] of Object.entries({
-          created: 'Creado',
-          updated: 'Actualizado',
-          deleted: 'Eliminado',
-          login: 'Inicio de sesión',
-          logout: 'Cierre de sesión',
-          login_failed: 'Intento de login fallido',
-          assigned: 'Asignado',
-          unassigned: 'Desasignado',
-          status_changed: 'Estado cambiado',
-          priority_changed: 'Prioridad cambiada',
-          resolved: 'Resuelto',
-          closed: 'Cerrado',
-          role_changed: 'Rol cambiado',
-          password_changed: 'Contraseña cambiada',
-          promoted: 'Promovido',
-          demoted: 'Degradado',
-          uploaded: 'Subido',
-          downloaded: 'Descargado',
-          exported: 'Exportado',
-          generated: 'Generado',
-          backup: 'Respaldo',
-          restore: 'Restauración',
-          config_changed: 'Configuración cambiada',
-          reactivated: 'Reactivado',
-          activated: 'Activado',
-          deactivated: 'Desactivado',
-          completed: 'Completado',
-          missed: 'Omitido',
-          escalated: 'Escalado',
-        })) {
-          if (action.toLowerCase().includes(key)) {
-            translatedAction = value
-            break
-          }
-        }
+        // Intentar etiqueta exacta primero; si no existe, usar traducción parcial
+        const rawLabel = getActionLabel(action)
+        const translatedAction = rawLabel !== action ? rawLabel : translateAction(action)
 
         return (
           <div className='space-y-1'>
@@ -332,6 +298,21 @@ export function getAuditColumns(onViewDetails: (log: AuditLog) => void) {
           const summary = getConfigAuditSummary(details)
           if (summary) {
             subDescription = subDescription ? `${subDescription} · ${summary}` : summary
+          }
+        } else if (action === 'TYPE_CLONED') {
+          const entityTypeLabels: Record<string, string> = {
+            license_type: 'una licencia',
+            equipment_type: 'un tipo de equipo',
+            consumable_type: 'un tipo de consumible',
+          }
+          icon = '📋'
+          const typeLabel = entityTypeLabels[entityType] ?? 'un tipo de activo'
+          mainDescription = `Copió ${typeLabel}`
+          if (details?.sourceTypeName) {
+            subDescription = `Origen: ${details.sourceTypeName}`
+            if (typeof details.attributesCopied === 'number') {
+              subDescription += ` · ${details.attributesCopied} atributo${details.attributesCopied !== 1 ? 's' : ''} copiado${details.attributesCopied !== 1 ? 's' : ''}`
+            }
           }
         } else if (action.startsWith('backup_')) {
           icon = '💾'
