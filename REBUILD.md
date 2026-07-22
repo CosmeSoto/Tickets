@@ -99,8 +99,9 @@ sudo ./start-production.sh --clean
 # ═══════════════════════════════════════════════════════════════════════════════
 sudo ./start-production.sh
 
-# Al arrancar, el entrypoint verifica catálogos de inventario (marcas, tipos, bodegas)
-# y ejecuta ensure-catalogs / ensure-categories automáticamente si faltan — no hace falta correr seed a mano.
+# Al arrancar, el entrypoint verifica catálogos de inventario (marcas, tipos, bodegas),
+# departamentos sin familia y categorías — y ejecuta ensure-catalogs / ensure-departments /
+# ensure-categories automáticamente si faltan — no hace falta correr seed a mano.
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # COMANDOS MANUALES (si prefieres no usar el script):
@@ -242,6 +243,10 @@ sudo docker exec tickets-app sh -c 'node ./node_modules/tsx/dist/cli.mjs prisma/
 # Solo categorías de tickets — si ya hay usuarios pero categories está vacía (0 en Gestión de Categorías):
 sudo docker exec tickets-app sh -c 'node ./node_modules/tsx/dist/cli.mjs prisma/ensure-categories.ts'
 # o localmente: npm run db:seed-categories
+
+# Departamentos con "Sin familia" (familyId null) o alias legacy (p.ej. PARQUEADEROS):
+sudo docker exec tickets-app sh -c 'node ./node_modules/tsx/dist/cli.mjs prisma/ensure-departments.ts'
+# o localmente: npm run db:seed-departments
 ```
 
 ### Conectarse a la BD

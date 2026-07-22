@@ -15,6 +15,7 @@ import { seedCategoriesCommercial } from './seeds/categories-commercial.seed'
 import { seedAttributes } from './seeds/attributes.seed'
 import { seedWarehouses } from './seeds/warehouses.seed'
 import { ORGANIGRAM_FAMILIES } from './seeds/family-map'
+import { DEPARTMENT_SEEDS } from './seeds/department-family-map'
 import { seedSupplierTypes } from './seeds/supplier-types.seed'
 import { seedAssetRequestsFamilySettings } from './seeds/asset-requests-settings.seed'
 import { seedInventoryFamilyConfigs } from './seeds/inventory-family-config.seed'
@@ -191,191 +192,8 @@ async function seedTicketFamilyConfigs(familyMap: Map<string, string>) {
 // ============================================
 
 async function seedDepartments(familyMap: Map<string, string>): Promise<Map<string, string>> {
-  const departments = [
-    // ── GESTIÓN ADMINISTRATIVA ──────────────────────────────────────────────
-    {
-      name: 'Administración',
-      description: 'Dirección financiera y administrativa',
-      color: '#3B82F6',
-      order: 1,
-      familyCode: 'ADMINISTRATIVE',
-    },
-    {
-      name: 'Contabilidad',
-      description: 'Contabilidad general y finanzas',
-      color: '#EF4444',
-      order: 2,
-      familyCode: 'ADMINISTRATIVE',
-    },
-    {
-      name: 'Compras',
-      description: 'Compras y adquisiciones',
-      color: '#06B6D4',
-      order: 3,
-      familyCode: 'ADMINISTRATIVE',
-    },
-    {
-      name: 'Recursos Humanos',
-      description: 'Talento humano, recepción y servicios internos',
-      color: '#8B5CF6',
-      order: 4,
-      familyCode: 'ADMINISTRATIVE',
-    },
-    {
-      name: 'Mensajería',
-      description: 'Mensajería y correspondencia interna',
-      color: '#A855F7',
-      order: 5,
-      familyCode: 'ADMINISTRATIVE',
-    },
-    // ── COMERCIAL ───────────────────────────────────────────────────────────
-    {
-      name: 'Comercial',
-      description: 'Dirección comercial y ventas',
-      color: '#F97316',
-      order: 6,
-      familyCode: 'COMMERCIAL',
-    },
-    // ── MARKETING ───────────────────────────────────────────────────────────
-    {
-      name: 'Marketing',
-      description: 'Marketing general, producción y eventos',
-      color: '#EC4899',
-      order: 7,
-      familyCode: 'MARKETING',
-    },
-    {
-      name: 'Medios Digitales',
-      description: 'Community manager, pauta y web',
-      color: '#DB2777',
-      order: 8,
-      familyCode: 'MARKETING',
-    },
-    {
-      name: 'Diseño',
-      description: 'Diseño gráfico y visual',
-      color: '#BE185D',
-      order: 9,
-      familyCode: 'MARKETING',
-    },
-    {
-      name: 'Servicio al Cliente',
-      description: 'Atención al cliente, información y punto de canje',
-      color: '#E879F9',
-      order: 10,
-      familyCode: 'MARKETING',
-    },
-    // ── ARQUITECTURA ────────────────────────────────────────────────────────
-    {
-      name: 'Arquitectura',
-      description: 'Dirección de arquitectura y diseño de espacios',
-      color: '#6366F1',
-      order: 11,
-      familyCode: 'ARCHITECTURE',
-    },
-    // ── OPERACIONES ─────────────────────────────────────────────────────────
-    {
-      name: 'Parqueaderos',
-      description: 'Operación y supervisión de parqueaderos',
-      color: '#0D9488',
-      order: 12,
-      familyCode: 'OPERATIONS',
-    },
-    {
-      name: 'Seguridad Física',
-      description: 'Supervisión y agentes de seguridad',
-      color: '#EF4444',
-      order: 13,
-      familyCode: 'OPERATIONS',
-    },
-    {
-      name: 'CCTV y Control de Acceso',
-      description: 'Cámaras, control de acceso y alarmas',
-      color: '#DC2626',
-      order: 14,
-      familyCode: 'OPERATIONS',
-    },
-    {
-      name: 'Mantenimiento Civil',
-      description: 'Mantenimiento civil e infraestructura',
-      color: '#10B981',
-      order: 15,
-      familyCode: 'OPERATIONS',
-    },
-    {
-      name: 'Mantenimiento Eléctrico',
-      description: 'Instalaciones eléctricas',
-      color: '#F59E0B',
-      order: 16,
-      familyCode: 'OPERATIONS',
-    },
-    {
-      name: 'Mantenimiento Mecánico',
-      description: 'Equipos mecánicos e hidráulicos',
-      color: '#84CC16',
-      order: 17,
-      familyCode: 'OPERATIONS',
-    },
-    {
-      name: 'Limpieza',
-      description: 'Limpieza general de instalaciones',
-      color: '#06B6D4',
-      order: 18,
-      familyCode: 'OPERATIONS',
-    },
-    {
-      name: 'Áreas Verdes',
-      description: 'Jardinería y mantenimiento de áreas verdes',
-      color: '#22C55E',
-      order: 19,
-      familyCode: 'OPERATIONS',
-    },
-    {
-      name: 'Seguridad y Salud Ocupacional',
-      description: 'SSO, salud ocupacional y bienestar',
-      color: '#14B8A6',
-      order: 20,
-      familyCode: 'OPERATIONS',
-    },
-    // ── TECNOLOGÍA Y COMUNICACIONES ─────────────────────────────────────────
-    {
-      name: 'Tecnologías de la Información',
-      description: 'Coordinación TI, infraestructura y sistemas',
-      color: '#10B981',
-      order: 21,
-      familyCode: 'TECHNOLOGY',
-    },
-    {
-      name: 'Soporte Técnico',
-      description: 'Soporte, mesa de ayuda y analistas TI',
-      color: '#F59E0B',
-      order: 22,
-      familyCode: 'TECHNOLOGY',
-    },
-    {
-      name: 'Seguridad Informática',
-      description: 'Seguridad de la información',
-      color: '#DC2626',
-      order: 23,
-      familyCode: 'TECHNOLOGY',
-    },
-    {
-      name: 'Usuarios y Privilegios',
-      description: 'Gestión de usuarios y accesos',
-      color: '#6366F1',
-      order: 24,
-      familyCode: 'TECHNOLOGY',
-    },
-    {
-      name: 'Telefonía',
-      description: 'Telefonía y comunicaciones',
-      color: '#0EA5E9',
-      order: 25,
-      familyCode: 'TECHNOLOGY',
-    },
-  ]
   const map = new Map<string, string>()
-  for (const dept of departments) {
+  for (const dept of DEPARTMENT_SEEDS) {
     const familyId = familyMap.get(dept.familyCode)!
     const d = await prisma.departments.upsert({
       where: { name: dept.name },
@@ -393,7 +211,7 @@ async function seedDepartments(familyMap: Map<string, string>): Promise<Map<stri
     })
     map.set(dept.name, d.id)
   }
-  console.log(`✅ ${departments.length} departamentos con familyId`)
+  console.log(`✅ ${DEPARTMENT_SEEDS.length} departamentos con familyId`)
   return map
 }
 

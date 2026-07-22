@@ -35,6 +35,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:seed-catalogs": "tsx prisma/ensure-catalogs.ts",
     "db:seed-categories": "tsx prisma/ensure-categories.ts",
+    "db:seed-departments": "tsx prisma/ensure-departments.ts",
     "db:sync": "prisma migrate deploy && prisma generate",
     "db:reset": "npx prisma db push --force-reset && npm run db:seed",
     "migrate:audit": "tsx scripts/audit-inventory-data.ts",

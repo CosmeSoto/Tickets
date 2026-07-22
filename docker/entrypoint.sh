@@ -154,6 +154,44 @@ elif [ "$CATALOG_CHECK" != "0" ]; then
   echo "==> ADVERTENCIA: No se pudo verificar catálogos (código $CATALOG_CHECK)"
 fi
 
+# Departamentos — si hay huérfanos (Sin familia) o la tabla está vacía, sincronizar
+# familyId según organigrama (idempotente; no borra datos de usuario).
+echo "==> Verificando departamentos y familias..."
+DEPTS_CHECK=0
+node - <<'NODESCRIPT' || DEPTS_CHECK=$?
+const { PrismaClient } = require('@prisma/client');
+const p = new PrismaClient();
+(async () => {
+  try {
+    const total = await p.departments.count();
+    const orphans = await p.departments.count({ where: { familyId: null } });
+    if (total === 0 || orphans > 0) {
+      console.log('  → Departamentos a sincronizar (total=' + total + ', sin familia=' + orphans + ')');
+      process.exit(2);
+    }
+    console.log('  → Departamentos OK (' + total + ', todos con familia)');
+    process.exit(0);
+  } catch (e) {
+    console.error('  → Error verificando departamentos:', e.message);
+    process.exit(1);
+  } finally {
+    await p.$disconnect();
+  }
+})();
+NODESCRIPT
+
+if [ "$DEPTS_CHECK" = "2" ]; then
+  echo "==> Ejecutando ensure-departments..."
+  if $TSX_CLI prisma/ensure-departments.ts; then
+    echo "==> Departamentos sincronizados con familias."
+  else
+    echo "==> ADVERTENCIA: ensure-departments falló — ejecuta manualmente:"
+    echo "==>   docker exec tickets-app sh -c 'node ./node_modules/tsx/dist/cli.mjs prisma/ensure-departments.ts'"
+  fi
+elif [ "$DEPTS_CHECK" != "0" ]; then
+  echo "==> ADVERTENCIA: No se pudo verificar departamentos (código $DEPTS_CHECK)"
+fi
+
 # Categorías de tickets — si el seed completo se omitió (ya hay usuarios) pero
 # categories quedó vacía, restaurarlas igual que ensure-catalogs.
 echo "==> Verificando categorías de tickets..."

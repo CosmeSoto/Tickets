@@ -26,10 +26,17 @@ export interface DepartmentItem {
   color?: string | null
   isActive: boolean
   familyId?: string | null
+  family?: {
+    id: string
+    name: string
+    code: string
+    color?: string | null
+  } | null
   createdAt?: string
   updatedAt?: string
   _count?: {
     users?: number
+    categories?: number
   }
 }
 
@@ -58,7 +65,9 @@ export function DepartmentsProvider({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     mountedRef.current = true
-    return () => { mountedRef.current = false }
+    return () => {
+      mountedRef.current = false
+    }
   }, [])
 
   const load = useCallback(async () => {
@@ -82,7 +91,7 @@ export function DepartmentsProvider({ children }: { children: React.ReactNode })
   }, [load])
 
   // Filtro derivado en memoria
-  const activeDepartments = departments.filter((d) => d.isActive)
+  const activeDepartments = departments.filter(d => d.isActive)
 
   return (
     <DepartmentsContext.Provider
