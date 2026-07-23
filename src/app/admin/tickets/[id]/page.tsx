@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { AlertCircle } from 'lucide-react'
@@ -21,6 +21,7 @@ import {
   getTicketDisplayCode,
 } from '@/hooks/use-ticket-data'
 import { useToast } from '@/hooks/use-toast'
+import { useTicketSSE } from '@/hooks/use-ticket-sse'
 import {
   HeaderActions,
   DescriptionCard,
@@ -45,8 +46,10 @@ export default function AdminTicketDetailPage() {
   const [assignmentDialogOpen, setAssignmentDialogOpen] = useState(false)
   const [timelineKey, setTimelineKey] = useState(0)
   const [fileKey, setFileKey] = useState(0)
+  const [ratingKey, setRatingKey] = useState(0)
   const [newStatus, setNewStatus] = useState<Ticket['status']>('OPEN')
   const [updatingStatus, setUpdatingStatus] = useState(false)
+  const prevStatusRef = useRef<string | null>(null)
   const [editForm, setEditForm] = useState({
     title: '',
     description: '',
@@ -88,46 +91,47 @@ export default function AdminTicketDetailPage() {
       .catch(() => setFilteredResolvers(resolvers))
   }, [ticket, resolvers])
 
-  // Polling
-  useEffect(() => {
-    if (!ticketId || ticketId === 'create') return
-    let stopped = false
-    const interval = setInterval(async () => {
-      if (stopped || unassigning || assignmentDialogOpen) return
-      try {
-        const res = await fetch(`/api/tickets/${ticketId}`, { cache: 'no-store' })
-        if (res.status === 404) {
-          stopped = true
-          router.push('/admin/tickets')
-          return
-        }
-        if (!res.ok) return
-        const { success, data } = await res.json()
-        if (!success || !data) return
-        setTicket(prev => {
-          if (
-            !prev ||
-            (prev.status === data.status &&
-              prev.updatedAt === data.updatedAt &&
-              prev.assignee?.id === data.assignee?.id)
-          )
-            return prev
-          setEditForm({
-            title: data.title,
-            description: data.description,
-            status: data.status,
-            priority: data.priority,
-            assigneeId: data.assignee?.id || '',
-          })
-          return data
-        })
-      } catch {}
-    }, 30_000) // 30s — el SSE notifica cambios en tiempo real
-    return () => {
-      stopped = true
-      clearInterval(interval)
+  const refreshTicketSilent = useCallback(async () => {
+    if (!ticketId || ticketId === 'create' || unassigning || assignmentDialogOpen) return
+    try {
+      const res = await fetch(`/api/tickets/${ticketId}?_t=${Date.now()}`, { cache: 'no-store' })
+      if (res.status === 404) {
+        router.push('/admin/tickets')
+        return
+      }
+      if (!res.ok) return
+      const { success, data } = await res.json()
+      if (!success || !data) return
+      const prevStatus = prevStatusRef.current
+      prevStatusRef.current = data.status
+      setTicket(data)
+      setNewStatus(data.status)
+      setEditForm({
+        title: data.title,
+        description: data.description,
+        status: data.status,
+        priority: data.priority,
+        assigneeId: data.assignee?.id || '',
+      })
+      if (prevStatus && (prevStatus !== data.status || data.status === 'CLOSED')) {
+        setTimelineKey(k => k + 1)
+        setRatingKey(k => k + 1)
+      }
+    } catch {
+      /* ignore */
     }
   }, [ticketId, unassigning, assignmentDialogOpen, router])
+
+  useTicketSSE(ticketId, refreshTicketSilent)
+
+  // Fallback si se pierde SSE
+  useEffect(() => {
+    if (!ticketId || ticketId === 'create') return
+    const interval = setInterval(() => {
+      void refreshTicketSilent()
+    }, 30_000)
+    return () => clearInterval(interval)
+  }, [ticketId, refreshTicketSilent])
 
   const loadTicket = async () => {
     setLoading(true)
@@ -136,6 +140,7 @@ export default function AdminTicketDetailPage() {
       if (!res.ok) return
       const { success, data } = await res.json()
       if (success && data) {
+        prevStatusRef.current = data.status
         setTicket(data)
         setNewStatus(data.status)
         setEditForm({
@@ -160,6 +165,7 @@ export default function AdminTicketDetailPage() {
     if (res.ok) {
       await loadTicket()
       setTimelineKey(k => k + 1)
+      setRatingKey(k => k + 1)
     }
   }
 
@@ -179,6 +185,7 @@ export default function AdminTicketDetailPage() {
       if (res.ok && data.success) {
         await loadTicket()
         setTimelineKey(k => k + 1)
+        setRatingKey(k => k + 1)
       } else {
         toast({
           title: 'Error al actualizar estado',
@@ -413,6 +420,7 @@ export default function AdminTicketDetailPage() {
 
           {/* Calificación */}
           <TicketRatingSystem
+            key={`admin-rating-${ratingKey}`}
             ticketId={ticket.id}
             technicianId={ticket.assignee?.id}
             canRate={
@@ -423,7 +431,11 @@ export default function AdminTicketDetailPage() {
             }
             showTechnicianStats
             mode='admin'
-            onRatingSubmitted={loadTicket}
+            refreshKey={ratingKey}
+            onRatingSubmitted={() => {
+              setRatingKey(k => k + 1)
+              void loadTicket()
+            }}
           />
         </div>
       </div>

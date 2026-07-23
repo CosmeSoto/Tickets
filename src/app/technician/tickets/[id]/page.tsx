@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import {
@@ -30,6 +30,7 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useToast } from '@/hooks/use-toast'
+import { useTicketSSE } from '@/hooks/use-ticket-sse'
 import {
   useTicketData,
   type Ticket,
@@ -102,6 +103,8 @@ export default function TechnicianTicketDetailPage() {
   const [updating, setUpdating] = useState<string | null>(null) // guarda el status que se está aplicando
   const [timelineKey, setTimelineKey] = useState(0)
   const [fileKey, setFileKey] = useState(0)
+  const [ratingKey, setRatingKey] = useState(0)
+  const prevStatusRef = useRef<string | null>(null)
 
   const isAssignedResolver = ticket?.assignee?.id === session?.user?.id
   const isUnassigned = !ticket?.assignee
@@ -134,28 +137,42 @@ export default function TechnicianTicketDetailPage() {
     if (ticketId) loadTicket()
   }, [session, authStatus, ticketId]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const refreshTicketSilent = useCallback(async () => {
+    if (!ticketId) return
+    try {
+      const res = await fetch(`/api/tickets/${ticketId}?_t=${Date.now()}`, { cache: 'no-store' })
+      if (!res.ok) return
+      const { success, data } = await res.json()
+      if (!success || !data) return
+      const prevStatus = prevStatusRef.current
+      prevStatusRef.current = data.status
+      setTicket(data)
+      if (prevStatus && (prevStatus !== data.status || data.status === 'CLOSED')) {
+        setTimelineKey(k => k + 1)
+        setRatingKey(k => k + 1)
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [ticketId])
+
+  useTicketSSE(ticketId, refreshTicketSilent)
+
   useEffect(() => {
     if (!ticketId || loading) return
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/tickets/${ticketId}`)
-        if (!res.ok) return
-        const { success, data } = await res.json()
-        if (!success || !data) return
-        setTicket(prev => {
-          if (!prev || (prev.status === data.status && prev.updatedAt === data.updatedAt))
-            return prev
-          return data
-        })
-      } catch {}
+    const interval = setInterval(() => {
+      void refreshTicketSilent()
     }, 30_000)
     return () => clearInterval(interval)
-  }, [ticketId, loading])
+  }, [ticketId, loading, refreshTicketSilent])
 
   const loadTicket = async () => {
     setLoading(true)
     const data = await getTicket(ticketId)
-    if (data) setTicket(data)
+    if (data) {
+      prevStatusRef.current = data.status
+      setTicket(data)
+    }
     setLoading(false)
   }
 
@@ -173,6 +190,7 @@ export default function TechnicianTicketDetailPage() {
       // Recargar para obtener el estado actualizado (incluyendo posible auto-asignación)
       await loadTicket()
       setTimelineKey(k => k + 1)
+      setRatingKey(k => k + 1)
       const cfg = STATUS_CONFIG[newStatus]
       toast({ title: 'Estado actualizado', description: `Ahora: ${cfg?.label ?? newStatus}` })
     } catch (err) {
@@ -483,11 +501,16 @@ export default function TechnicianTicketDetailPage() {
 
           {/* Calificación */}
           <TicketRatingSystem
+            key={`tech-rating-${ratingKey}`}
             ticketId={ticket.id}
             technicianId={ticket.assignee?.id}
             canRate={canRate}
             mode={isRequester ? 'client' : 'admin'}
-            onRatingSubmitted={loadTicket}
+            refreshKey={ratingKey}
+            onRatingSubmitted={() => {
+              setRatingKey(k => k + 1)
+              void loadTicket()
+            }}
           />
         </div>
       </div>

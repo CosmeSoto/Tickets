@@ -27,12 +27,12 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { ArticleVote } from '@/components/knowledge/article-vote'
+import { ArticleSourcePanel } from '@/components/knowledge/article-source-panel'
 import { useToast } from '@/hooks/use-toast'
 import type { Article } from '@/hooks/use-knowledge'
 
 function filterArticleContent(content: string): string {
   // Remover secciones de métricas y calificaciones para clientes
-  // Busca encabezados que contengan estas palabras clave (con o sin emojis, ## o ###)
   const patterns = [
     /#{2,3}\s*📊?\s*Métricas de Resolución[\s\S]*?(?=#{2,3}\s|$)/gi,
     /#{2,3}\s*⭐?\s*Calificación del Cliente[\s\S]*?(?=#{2,3}\s|$)/gi,
@@ -328,8 +328,17 @@ export default function KnowledgeDetailPage() {
             )}
           </div>
 
-          {/* Sidebar (solo para admins/tecnicos o info simple para clientes) */}
-          <div className='space-y-6'>{/* Si es cliente, no mostramos sidebar adicional */}</div>
+          {/* Sidebar */}
+          <div className='space-y-6'>
+            {article.sourceContext && (
+              <ArticleSourcePanel
+                sourceContext={article.sourceContext}
+                showStaffDetails={
+                  session.user.role === 'ADMIN' || session.user.role === 'TECHNICIAN'
+                }
+              />
+            )}
+          </div>
         </div>
       )}
     </ModuleLayout>

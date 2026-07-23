@@ -10,12 +10,15 @@ export interface AssignmentCriteria {
 
 export class AssignmentService {
   /**
-   * Asigna automáticamente un ticket al técnico más apropiado
+   * Asigna automáticamente un ticket al técnico más apropiado.
+   * @param options.skipNotifications - Si true, no envía notificaciones/emails
+   *   (el caller es responsable; evita duplicados al crear ticket).
    */
   static async autoAssignTicket(
     ticketId: string,
     criteria: AssignmentCriteria = {},
-    excludeUserId?: string
+    excludeUserId?: string,
+    options?: { skipNotifications?: boolean }
   ) {
     try {
       // Obtener información del ticket con categoría y departamento
@@ -154,21 +157,25 @@ export class AssignmentService {
         })
       }
 
-      // ⭐ NUEVO: Enviar notificaciones de asignación
-      const { NotificationService } = await import('./notification-service')
-      await NotificationService.notifyTicketAssigned(ticketId, bestTechnician.id).catch(err => {
-        console.error('[AUTO-ASSIGN] Error enviando notificaciones:', err)
-      })
+      // Notificaciones/emails: el caller puede omitirlas (p. ej. POST /api/tickets)
+      // para evitar el duplicado con el bloque de notificación post-creación.
+      if (!options?.skipNotifications) {
+        const { NotificationService } = await import('./notification-service')
+        await NotificationService.notifyTicketAssigned(ticketId, bestTechnician.id).catch(err => {
+          console.error('[AUTO-ASSIGN] Error enviando notificaciones:', err)
+        })
 
-      // ⭐ Enviar emails de asignación
-      const { triggerTicketAssignedToTechnicianEmail, triggerTicketAssignedToClientEmail } =
-        await import('@/lib/email-triggers')
-      void Promise.resolve(triggerTicketAssignedToTechnicianEmail(ticketId)).catch((err: Error) => {
-        console.error('[EMAIL] Error enviando email de asignación a técnico:', err)
-      })
-      void Promise.resolve(triggerTicketAssignedToClientEmail(ticketId)).catch((err: Error) => {
-        console.error('[EMAIL] Error enviando email de asignación a cliente:', err)
-      })
+        const { triggerTicketAssignedToTechnicianEmail, triggerTicketAssignedToClientEmail } =
+          await import('@/lib/email-triggers')
+        void Promise.resolve(triggerTicketAssignedToTechnicianEmail(ticketId)).catch(
+          (err: Error) => {
+            console.error('[EMAIL] Error enviando email de asignación a técnico:', err)
+          }
+        )
+        void Promise.resolve(triggerTicketAssignedToClientEmail(ticketId)).catch((err: Error) => {
+          console.error('[EMAIL] Error enviando email de asignación a cliente:', err)
+        })
+      }
 
       return {
         ticket: updatedTicket,

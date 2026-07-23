@@ -39,8 +39,42 @@ export interface Article {
     title: string
     status: string
   }
+  /** Contexto del ticket origen filtrado por rol (familia + permisos) */
+  sourceContext?: ArticleSourceContext | null
   helpfulPercentage?: number
   userVote?: boolean | null
+}
+
+export interface ArticleSourceContext {
+  ticketId: string
+  title: string
+  status: string
+  priority: string
+  categoryName: string | null
+  canOpenTicket: boolean
+  ticketHref: string | null
+  attachments: Array<{
+    id: string
+    originalName: string
+    mimeType: string
+    size: number
+    url: string
+  }>
+  rating: {
+    rating: number
+    feedback: string | null
+    responseTime: number
+    technicalSkill: number
+    communication: number
+    problemResolution: number
+  } | null
+  publicComments: Array<{
+    id: string
+    content: string
+    createdAt: string
+    authorName: string
+    authorRole: string
+  }>
 }
 
 export interface CreateArticleData {
@@ -89,7 +123,7 @@ export function useKnowledge() {
 
     try {
       const params = new URLSearchParams()
-      
+
       if (filters.search) params.append('search', filters.search)
       if (filters.categoryId) params.append('categoryId', filters.categoryId)
       if (filters.tags && filters.tags.length > 0) params.append('tags', filters.tags.join(','))
@@ -99,7 +133,7 @@ export function useKnowledge() {
       if (filters.limit) params.append('limit', filters.limit.toString())
 
       const response = await fetch(`/api/knowledge?${params.toString()}`)
-      
+
       if (!response.ok) {
         throw new Error('Error al buscar artículos')
       }
@@ -121,7 +155,7 @@ export function useKnowledge() {
 
     try {
       const response = await fetch(`/api/knowledge/${id}`)
-      
+
       if (!response.ok) {
         throw new Error('Error al obtener artículo')
       }
@@ -166,34 +200,37 @@ export function useKnowledge() {
     }
   }, [])
 
-  const updateArticle = useCallback(async (id: string, data: UpdateArticleData): Promise<Article | null> => {
-    setLoading(true)
-    setError(null)
+  const updateArticle = useCallback(
+    async (id: string, data: UpdateArticleData): Promise<Article | null> => {
+      setLoading(true)
+      setError(null)
 
-    try {
-      const response = await fetch(`/api/knowledge/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      })
+      try {
+        const response = await fetch(`/api/knowledge/${id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data),
+        })
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Error al actualizar artículo')
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || 'Error al actualizar artículo')
+        }
+
+        const article = await response.json()
+        return article
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Error desconocido'
+        setError(message)
+        return null
+      } finally {
+        setLoading(false)
       }
-
-      const article = await response.json()
-      return article
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Error desconocido'
-      setError(message)
-      return null
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+    },
+    []
+  )
 
   const deleteArticle = useCallback(async (id: string): Promise<boolean> => {
     setLoading(true)
@@ -299,43 +336,46 @@ export function useKnowledge() {
     }
   }, [])
 
-  const createFromTicket = useCallback(async (
-    ticketId: string,
-    data: Omit<CreateArticleData, 'categoryId' | 'sourceTicketId'>
-  ): Promise<Article | null> => {
-    setLoading(true)
-    setError(null)
+  const createFromTicket = useCallback(
+    async (
+      ticketId: string,
+      data: Omit<CreateArticleData, 'categoryId' | 'sourceTicketId'>
+    ): Promise<Article | null> => {
+      setLoading(true)
+      setError(null)
 
-    try {
-      const response = await fetch(`/api/tickets/${ticketId}/create-article`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      })
+      try {
+        const response = await fetch(`/api/tickets/${ticketId}/create-article`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data),
+        })
 
-      const result = await response.json()
+        const result = await response.json()
 
-      if (!response.ok) {
-        // Si ya existe un artículo (409), retornar el ID del artículo existente
-        if (response.status === 409 && result.articleId) {
-          setError('Ya existe un artículo creado desde este ticket')
-          return { id: result.articleId } as Article
+        if (!response.ok) {
+          // Si ya existe un artículo (409), retornar el ID del artículo existente
+          if (response.status === 409 && result.articleId) {
+            setError('Ya existe un artículo creado desde este ticket')
+            return { id: result.articleId } as Article
+          }
+
+          throw new Error(result.error || 'Error al crear artículo desde ticket')
         }
-        
-        throw new Error(result.error || 'Error al crear artículo desde ticket')
-      }
 
-      return result.article
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Error desconocido'
-      setError(message)
-      return null
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+        return result.article
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Error desconocido'
+        setError(message)
+        return null
+      } finally {
+        setLoading(false)
+      }
+    },
+    []
+  )
 
   const getTicketSuggestions = useCallback(async (ticketId: string) => {
     setLoading(true)
@@ -343,7 +383,7 @@ export function useKnowledge() {
 
     try {
       const response = await fetch(`/api/tickets/${ticketId}/create-article`)
-      
+
       if (!response.ok) {
         throw new Error('Error al obtener sugerencias')
       }

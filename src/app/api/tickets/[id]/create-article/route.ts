@@ -332,6 +332,16 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
             problemResolution: true,
           },
         },
+        attachments: {
+          select: {
+            id: true,
+            originalName: true,
+            mimeType: true,
+            size: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: 'asc' },
+        },
       },
     })
 
@@ -519,7 +529,6 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     }
 
     // 6. Calificación del Cliente (si existe)
-    // 6. Calificación del Cliente (si existe)
     if (ticket.ticket_ratings) {
       const rating = ticket.ticket_ratings
       suggestedContent += `## ⭐ Calificación del Cliente\n\n`
@@ -534,8 +543,17 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       suggestedContent += `\n`
     }
 
-    // 7. Conclusión
-    // 7. Conclusión
+    // 7. Archivos adjuntos del ticket
+    if (ticket.attachments && ticket.attachments.length > 0) {
+      suggestedContent += `## 📎 Archivos adjuntos\n\n`
+      for (const file of ticket.attachments) {
+        const href = `/api/tickets/${ticket.id}/attachments/${file.id}`
+        suggestedContent += `- [${file.originalName}](${href}) (${formatFileSize(file.size)})\n`
+      }
+      suggestedContent += `\n`
+    }
+
+    // 8. Conclusión
     suggestedContent += `## 💡 Conclusión\n\n`
     suggestedContent += `Este artículo documenta la solución aplicada al ticket #${ticket.id.substring(0, 8)}. `
     suggestedContent += `La información aquí presentada puede ser útil para resolver casos similares en el futuro.\n\n`
@@ -561,12 +579,28 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
         description: ticket.description,
         status: ticket.status,
         priority: ticket.priority,
-        category: ticket.categories,
+        categoryId: ticket.categoryId,
+        category: ticket.categories
+          ? {
+              id: ticket.categories.id,
+              name: ticket.categories.name,
+              color: ticket.categories.color,
+              departmentId: ticket.categories.departmentId,
+            }
+          : null,
         client: ticket.users_tickets_clientIdTousers,
         assignee: ticket.users_tickets_assigneeIdTousers,
         comments: ticket.comments,
         resolutionPlan: ticket.resolution_plans?.[0] || null,
         rating: ticket.ticket_ratings || null,
+        attachments: ticket.attachments.map(a => ({
+          id: a.id,
+          originalName: a.originalName,
+          mimeType: a.mimeType,
+          size: a.size,
+          createdAt: a.createdAt,
+          url: `/api/tickets/${ticket.id}/attachments/${a.id}`,
+        })),
       },
       existingArticle,
       suggestions: {
@@ -579,4 +613,10 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     console.error('Error al obtener información del ticket:', error)
     return NextResponse.json({ error: 'Error al obtener información del ticket' }, { status: 500 })
   }
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }

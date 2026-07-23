@@ -612,17 +612,25 @@ export async function POST(request: NextRequest) {
 
     // Asignación automática al crear (si está habilitada y no hay asignado)
     let ticketAfterAssign = newTicket
+    let wasAutoAssigned = false
     if (!newTicket.assigneeId) {
       const autoAssignmentEnabled = await getAutoAssignmentEnabled().catch(() => false)
       if (autoAssignmentEnabled) {
         try {
           const { AssignmentService } = await import('@/lib/services/ticket-assignment.service')
-          await AssignmentService.autoAssignTicket(newTicket.id, {
-            categoryId: newTicket.categoryId,
-            priority: newTicket.priority,
-            workloadBalance: true,
-            skillMatch: true,
-          })
+          // skipNotifications: las notificaciones/emails de asignación se envían
+          // una sola vez más abajo (evita el duplicado "Ticket asignado").
+          await AssignmentService.autoAssignTicket(
+            newTicket.id,
+            {
+              categoryId: newTicket.categoryId,
+              priority: newTicket.priority,
+              workloadBalance: true,
+              skillMatch: true,
+            },
+            undefined,
+            { skipNotifications: true }
+          )
           const refreshed = await prisma.tickets.findUnique({
             where: { id: newTicket.id },
             include: {
@@ -632,7 +640,10 @@ export async function POST(request: NextRequest) {
               family: true,
             },
           })
-          if (refreshed) ticketAfterAssign = refreshed as typeof newTicket
+          if (refreshed) {
+            ticketAfterAssign = refreshed as typeof newTicket
+            wasAutoAssigned = !!refreshed.assigneeId
+          }
         } catch (autoAssignErr) {
           console.error('[AUTO-ASSIGN] No se pudo asignar automáticamente:', autoAssignErr)
         }
@@ -694,6 +705,7 @@ export async function POST(request: NextRequest) {
       console.error('[NOTIFICATION] Error enviando notificaciones de ticket creado:', err)
     })
 
+    // Una sola notificación/email de asignación (manual en body o auto-asignación)
     if (ticketAfterAssign.assigneeId) {
       await NotificationService.notifyTicketAssigned(
         ticketAfterAssign.id,
@@ -701,6 +713,17 @@ export async function POST(request: NextRequest) {
       ).catch(err => {
         console.error('[NOTIFICATION] Error enviando notificación de asignación:', err)
       })
+
+      if (wasAutoAssigned) {
+        try {
+          const { triggerTicketAssignedToTechnicianEmail, triggerTicketAssignedToClientEmail } =
+            await import('@/lib/email-triggers')
+          void triggerTicketAssignedToTechnicianEmail(ticketAfterAssign.id)
+          void triggerTicketAssignedToClientEmail(ticketAfterAssign.id)
+        } catch (emailAssignErr) {
+          console.error('[EMAIL] Error disparando emails de asignación:', emailAssignErr)
+        }
+      }
     }
 
     let attachmentWarning: string | undefined

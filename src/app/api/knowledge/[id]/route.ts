@@ -5,6 +5,13 @@ import prisma from '@/lib/prisma'
 import { UserRole } from '@prisma/client'
 import { z } from 'zod'
 import { randomUUID } from 'crypto'
+import {
+  assertCanAccessKnowledgeArticle,
+  buildArticleSourceContext,
+  filterArticleContentForClient,
+  KnowledgeAccessError,
+  rewriteTicketAttachmentLinks,
+} from '@/lib/knowledge/article-access'
 
 // Schema de validación para actualizar artículo
 const updateArticleSchema = z.object({
@@ -17,21 +24,20 @@ const updateArticleSchema = z.object({
 })
 
 // GET /api/knowledge/[id] - Ver artículo (incrementa views)
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user) {
-      return NextResponse.json(
-        { error: 'No autorizado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
     const { id } = await params
+    const user = {
+      id: session.user.id,
+      role: session.user.role,
+      isSuperAdmin: (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true,
+    }
 
     // Obtener artículo
     const article = await prisma.knowledge_articles.findUnique({
@@ -50,6 +56,14 @@ export async function GET(
             name: true,
             email: true,
             avatar: true,
+          },
+        },
+        family: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            color: true,
           },
         },
         sourceTicket: {
@@ -76,10 +90,16 @@ export async function GET(
     })
 
     if (!article) {
-      return NextResponse.json(
-        { error: 'Artículo no encontrado' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: 'Artículo no encontrado' }, { status: 404 })
+    }
+
+    try {
+      await assertCanAccessKnowledgeArticle(user, article)
+    } catch (err) {
+      if (err instanceof KnowledgeAccessError) {
+        return NextResponse.json({ error: err.message }, { status: err.statusCode })
+      }
+      throw err
     }
 
     // Incrementar contador de vistas
@@ -93,41 +113,51 @@ export async function GET(
     })
 
     // Calcular estadísticas
-    const helpfulPercentage = article.helpfulVotes + article.notHelpfulVotes > 0
-      ? Math.round((article.helpfulVotes / (article.helpfulVotes + article.notHelpfulVotes)) * 100)
-      : 0
+    const helpfulPercentage =
+      article.helpfulVotes + article.notHelpfulVotes > 0
+        ? Math.round(
+            (article.helpfulVotes / (article.helpfulVotes + article.notHelpfulVotes)) * 100
+          )
+        : 0
 
     // Obtener voto del usuario actual
     const userVote = article.votes.length > 0 ? article.votes[0].isHelpful : null
 
+    // Contexto del ticket origen (filtrado por rol)
+    let sourceContext = null
+    if (article.sourceTicketId) {
+      sourceContext = await buildArticleSourceContext(article.id, article.sourceTicketId, user)
+    }
+
+    // Contenido: reescribir adjuntos al proxy del KB.
+    // Métricas/calificación salen del markdown (van en sourceContext para staff).
+    let content = article.content
+    if (article.sourceTicketId) {
+      content = rewriteTicketAttachmentLinks(content, article.id, article.sourceTicketId)
+    }
+    content = filterArticleContentForClient(content)
+
     return NextResponse.json({
       ...article,
-      views: article.views + 1, // Retornar el valor actualizado
+      content,
+      views: article.views + 1,
       helpfulPercentage,
       userVote,
+      sourceContext,
     })
   } catch (error) {
     console.error('Error al obtener artículo:', error)
-    return NextResponse.json(
-      { error: 'Error al obtener artículo' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error al obtener artículo' }, { status: 500 })
   }
 }
 
 // PUT /api/knowledge/[id] - Actualizar artículo
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user) {
-      return NextResponse.json(
-        { error: 'No autorizado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
     const { id } = await params
@@ -138,10 +168,7 @@ export async function PUT(
     })
 
     if (!existingArticle) {
-      return NextResponse.json(
-        { error: 'Artículo no encontrado' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: 'Artículo no encontrado' }, { status: 404 })
     }
 
     // Verificar permisos: solo el autor o ADMIN pueden editar
@@ -156,7 +183,7 @@ export async function PUT(
     }
 
     const body = await request.json()
-    
+
     // Validar datos
     const validationResult = updateArticleSchema.safeParse(body)
     if (!validationResult.success) {
@@ -175,10 +202,7 @@ export async function PUT(
       })
 
       if (!category) {
-        return NextResponse.json(
-          { error: 'Categoría no encontrada' },
-          { status: 404 }
-        )
+        return NextResponse.json({ error: 'Categoría no encontrada' }, { status: 404 })
       }
     }
 
@@ -231,10 +255,7 @@ export async function PUT(
     return NextResponse.json(updatedArticle)
   } catch (error) {
     console.error('Error al actualizar artículo:', error)
-    return NextResponse.json(
-      { error: 'Error al actualizar artículo' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error al actualizar artículo' }, { status: 500 })
   }
 }
 
@@ -245,12 +266,9 @@ export async function DELETE(
 ) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user) {
-      return NextResponse.json(
-        { error: 'No autorizado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
     const { id } = await params
@@ -261,10 +279,7 @@ export async function DELETE(
     })
 
     if (!existingArticle) {
-      return NextResponse.json(
-        { error: 'Artículo no encontrado' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: 'Artículo no encontrado' }, { status: 404 })
     }
 
     // Verificar permisos: solo el autor o ADMIN pueden eliminar
@@ -305,9 +320,6 @@ export async function DELETE(
     return NextResponse.json({ message: 'Artículo eliminado exitosamente' })
   } catch (error) {
     console.error('Error al eliminar artículo:', error)
-    return NextResponse.json(
-      { error: 'Error al eliminar artículo' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error al eliminar artículo' }, { status: 500 })
   }
 }

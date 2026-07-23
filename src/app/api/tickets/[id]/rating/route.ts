@@ -325,6 +325,14 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
       isPublic: rating.isPublic,
     }
 
+    // Detalle del ticket abierto: refrescar calificación / estado CLOSED al instante
+    const { TicketEvents } = await import('@/lib/ticket-events')
+    TicketEvents.emit(ticketId, {
+      type: 'rating_submitted',
+      status: ticket.status === 'RESOLVED' ? 'CLOSED' : ticket.status,
+      rating: data.rating,
+    })
+
     return NextResponse.json({
       success: true,
       message: 'Calificación creada exitosamente',

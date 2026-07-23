@@ -602,6 +602,13 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
             console.error('[WEBHOOK] Error disparando evento TICKET_REOPENED:', err)
           })
         }
+
+        const { TicketEvents } = await import('@/lib/ticket-events')
+        TicketEvents.emit(finalId, {
+          type: 'status_changed',
+          status: filteredUpdates.status,
+          previousStatus: existingTicket.status,
+        })
       }
 
       if (filteredUpdates.priority && filteredUpdates.priority !== existingTicket.priority) {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import {
@@ -31,6 +31,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { useToast } from '@/hooks/use-toast'
+import { useTicketSSE } from '@/hooks/use-ticket-sse'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -65,36 +66,67 @@ export default function ClientTicketDetailPage() {
   const stopPollingRef = useRef<(() => void) | null>(null)
   const [timelineKey, setTimelineKey] = useState(0)
   const [fileKey, setFileKey] = useState(0)
+  const [ratingKey, setRatingKey] = useState(0)
   const [editForm, setEditForm] = useState({ title: '', description: '' })
   const [showRatingModal, setShowRatingModal] = useState(false)
+  const prevStatusRef = useRef<string | null>(null)
 
   const ticketId = params.id as string
+
+  const applyTicketUpdate = useCallback(
+    (data: Ticket, opts?: { openRatingIfResolved?: boolean }) => {
+      const prevStatus = prevStatusRef.current
+      prevStatusRef.current = data.status
+      setTicket(data)
+      setEditForm({ title: data.title, description: data.description })
+
+      if (prevStatus && (prevStatus !== data.status || opts?.openRatingIfResolved)) {
+        setTimelineKey(k => k + 1)
+        setRatingKey(k => k + 1)
+      }
+
+      if (
+        opts?.openRatingIfResolved !== false &&
+        prevStatus &&
+        prevStatus !== 'RESOLVED' &&
+        data.status === 'RESOLVED' &&
+        data.source !== 'PATROL'
+      ) {
+        setShowRatingModal(true)
+      }
+    },
+    []
+  )
+
+  const refreshTicketSilent = useCallback(async () => {
+    if (!ticketId || ticketId === 'create') return
+    try {
+      const res = await fetch(`/api/tickets/${ticketId}?_t=${Date.now()}`, { cache: 'no-store' })
+      if (!res.ok) return
+      const { success, data } = await res.json()
+      if (!success || !data) return
+      if (data.client?.id !== session?.user?.id) return
+      applyTicketUpdate(data)
+    } catch {
+      /* ignore */
+    }
+  }, [ticketId, session?.user?.id, applyTicketUpdate])
 
   useEffect(() => {
     if (ticketId && ticketId !== 'create' && session?.user?.id) loadTicket()
   }, [ticketId, session?.user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Polling ligero para detectar cambios de estado
+  // Tiempo real: resolución → modal de calificación; calificación → ver estrellas
+  useTicketSSE(ticketId, refreshTicketSilent)
+
+  // Fallback por si se pierde la conexión SSE
   useEffect(() => {
     if (!ticketId || ticketId === 'create' || !session?.user?.id) return
-    // Polling cada 30s — el SSE notifica cambios en tiempo real
-    // Solo para detectar cambios que el SSE pudiera perder (reconexión, etc.)
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/tickets/${ticketId}`)
-        if (!res.ok) return
-        const { success, data } = await res.json()
-        if (!success || !data) return
-        setTicket(prev => {
-          if (!prev || (prev.status === data.status && prev.updatedAt === data.updatedAt))
-            return prev
-          setTimelineKey(k => k + 1)
-          return data
-        })
-      } catch {}
+    const interval = setInterval(() => {
+      void refreshTicketSilent()
     }, 30_000)
     return () => clearInterval(interval)
-  }, [ticketId, session?.user?.id])
+  }, [ticketId, session?.user?.id, refreshTicketSilent])
 
   const loadTicket = async () => {
     const data = await getTicket(ticketId)
@@ -103,8 +135,24 @@ export default function ClientTicketDetailPage() {
       router.push('/unauthorized')
       return
     }
+    prevStatusRef.current = data.status
     setTicket(data)
     setEditForm({ title: data.title, description: data.description })
+    // Si ya está resuelto al entrar, ofrecer calificar
+    if (data.status === 'RESOLVED' && data.source !== 'PATROL') {
+      setShowRatingModal(true)
+    }
+  }
+
+  const handleRatingSubmitted = () => {
+    setShowRatingModal(false)
+    setTicket(prev =>
+      prev ? { ...prev, status: 'CLOSED', closedAt: new Date().toISOString() } : prev
+    )
+    prevStatusRef.current = 'CLOSED'
+    setTimelineKey(k => k + 1)
+    setRatingKey(k => k + 1)
+    void refreshTicketSilent()
   }
 
   const handleSave = async () => {
@@ -394,6 +442,7 @@ export default function ClientTicketDetailPage() {
 
           {/* Calificación */}
           <TicketRatingSystem
+            key={`sidebar-rating-${ratingKey}`}
             ticketId={ticket.id}
             technicianId={ticket.assignee?.id}
             canRate={
@@ -402,12 +451,8 @@ export default function ClientTicketDetailPage() {
             }
             showTechnicianStats={false}
             mode='client'
-            onRatingSubmitted={() => {
-              setTicket(prev =>
-                prev ? { ...prev, status: 'CLOSED', closedAt: new Date().toISOString() } : prev
-              )
-              setTimelineKey(k => k + 1)
-            }}
+            refreshKey={ratingKey}
+            onRatingSubmitted={handleRatingSubmitted}
           />
         </div>
       </div>
@@ -445,6 +490,7 @@ export default function ClientTicketDetailPage() {
           </AlertDialogHeader>
           <div className='max-h-[60vh] overflow-y-auto'>
             <TicketRatingSystem
+              key={`modal-rating-${ratingKey}`}
               ticketId={ticket.id}
               technicianId={ticket.assignee?.id}
               canRate={
@@ -453,13 +499,8 @@ export default function ClientTicketDetailPage() {
               }
               showTechnicianStats={false}
               mode='client'
-              onRatingSubmitted={() => {
-                setShowRatingModal(false)
-                setTicket(prev =>
-                  prev ? { ...prev, status: 'CLOSED', closedAt: new Date().toISOString() } : prev
-                )
-                setTimelineKey(k => k + 1)
-              }}
+              refreshKey={ratingKey}
+              onRatingSubmitted={handleRatingSubmitted}
             />
           </div>
           <AlertDialogFooter>

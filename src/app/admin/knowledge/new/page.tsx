@@ -20,9 +20,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { ArrowLeft, Save, X, Plus, Loader2, BookOpen, AlertCircle } from 'lucide-react'
+import { ArrowLeft, Save, X, Plus, Loader2, BookOpen, AlertCircle, Paperclip } from 'lucide-react'
 import { toast } from 'sonner'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+
+type TicketAttachment = {
+  id: string
+  originalName: string
+  mimeType: string
+  size: number
+  url: string
+}
 
 function NewArticleContent() {
   const router = useRouter()
@@ -35,6 +43,12 @@ function NewArticleContent() {
   const [summary, setSummary] = useState('')
   const [content, setContent] = useState('')
   const [categoryId, setCategoryId] = useState('')
+  const [ticketCategory, setTicketCategory] = useState<{
+    id: string
+    name: string
+    color?: string | null
+  } | null>(null)
+  const [ticketAttachments, setTicketAttachments] = useState<TicketAttachment[]>([])
   const [tags, setTags] = useState<string[]>([])
   const [tagInput, setTagInput] = useState('')
   const [isPublished, setIsPublished] = useState(true)
@@ -100,7 +114,16 @@ function NewArticleContent() {
         // Pre-llenar formulario con sugerencias
         setTitle(data.suggestions.title)
         setContent(data.suggestions.content)
-        setCategoryId(data.ticket.category?.id || '')
+        const resolvedCategoryId = data.ticket.categoryId || data.ticket.category?.id || ''
+        setCategoryId(resolvedCategoryId)
+        if (data.ticket.category) {
+          setTicketCategory({
+            id: data.ticket.category.id,
+            name: data.ticket.category.name,
+            color: data.ticket.category.color,
+          })
+        }
+        setTicketAttachments(Array.isArray(data.ticket.attachments) ? data.ticket.attachments : [])
         setTags(data.suggestions.tags)
 
         // Generar resumen automático
@@ -154,8 +177,14 @@ function NewArticleContent() {
       return
     }
 
-    if (!categoryId) {
+    // Desde ticket: la categoría la toma el API del ticket; no forzar el Select
+    if (!sourceTicketId && !categoryId) {
       toast.error('Selecciona una categoría')
+      return
+    }
+
+    if (sourceTicketId && !categoryId && !ticketCategory?.id) {
+      toast.error('El ticket no tiene categoría asociada')
       return
     }
 
@@ -195,6 +224,18 @@ function NewArticleContent() {
   if (!session || (session.user.role !== 'ADMIN' && session.user.role !== 'TECHNICIAN')) {
     return null
   }
+
+  const categoryOptions =
+    ticketCategory && !categories.some(c => c.id === ticketCategory.id)
+      ? [
+          {
+            id: ticketCategory.id,
+            name: ticketCategory.name,
+            color: ticketCategory.color || '#6B7280',
+          },
+          ...categories,
+        ]
+      : categories
 
   return (
     <div className='container mx-auto py-6 space-y-6'>
@@ -310,25 +351,79 @@ function NewArticleContent() {
               <Label htmlFor='category'>
                 Categoría <span className='text-red-500'>*</span>
               </Label>
-              <Select value={categoryId} onValueChange={setCategoryId}>
-                <SelectTrigger>
-                  <SelectValue placeholder='Selecciona una categoría' />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map(category => (
-                    <SelectItem key={category.id} value={category.id}>
-                      <div className='flex items-center gap-2'>
-                        <div
-                          className='w-3 h-3 rounded-full'
-                          style={{ backgroundColor: category.color }}
-                        />
-                        {category.name}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {sourceTicketId && ticketCategory ? (
+                <div className='flex items-center gap-2 rounded-md border px-3 py-2 bg-muted/30'>
+                  <div
+                    className='w-3 h-3 rounded-full shrink-0'
+                    style={{ backgroundColor: ticketCategory.color || '#6B7280' }}
+                  />
+                  <span className='text-sm font-medium'>{ticketCategory.name}</span>
+                  <Badge variant='outline' className='ml-auto text-xs'>
+                    Del ticket
+                  </Badge>
+                </div>
+              ) : (
+                <Select value={categoryId || undefined} onValueChange={setCategoryId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder='Selecciona una categoría' />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categoryOptions.map(category => (
+                      <SelectItem key={category.id} value={category.id}>
+                        <div className='flex items-center gap-2'>
+                          <div
+                            className='w-3 h-3 rounded-full'
+                            style={{ backgroundColor: category.color }}
+                          />
+                          {category.name}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              {sourceTicketId && (
+                <p className='text-xs text-muted-foreground'>
+                  Se usa automáticamente la categoría del ticket al crear el artículo.
+                </p>
+              )}
             </div>
+
+            {/* Adjuntos del ticket */}
+            {sourceTicketId && (
+              <div className='space-y-2'>
+                <Label className='flex items-center gap-1.5'>
+                  <Paperclip className='h-3.5 w-3.5' />
+                  Archivos del ticket
+                </Label>
+                {ticketAttachments.length === 0 ? (
+                  <p className='text-sm text-muted-foreground rounded-md border border-dashed px-3 py-2'>
+                    Este ticket no tiene archivos adjuntos.
+                  </p>
+                ) : (
+                  <ul className='space-y-1.5 rounded-md border p-3 bg-muted/20'>
+                    {ticketAttachments.map(file => (
+                      <li key={file.id} className='flex items-center justify-between gap-2 text-sm'>
+                        <a
+                          href={file.url}
+                          target='_blank'
+                          rel='noopener noreferrer'
+                          className='text-primary hover:underline truncate'
+                        >
+                          {file.originalName}
+                        </a>
+                        <span className='text-xs text-muted-foreground shrink-0'>
+                          {(file.size / 1024).toFixed(1)} KB
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p className='text-xs text-muted-foreground'>
+                  Los enlaces a estos archivos también se incluyen en el contenido del artículo.
+                </p>
+              </div>
+            )}
 
             {/* Contenido */}
             <div className='space-y-2'>

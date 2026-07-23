@@ -30,6 +30,7 @@ import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
 import { ArticleVote } from '@/components/knowledge/article-vote'
+import { ArticleSourcePanel } from '@/components/knowledge/article-source-panel'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -448,30 +449,34 @@ export default function AdminKnowledgeDetailPage() {
 
           {/* Sidebar */}
           <div className='space-y-6'>
-            {/* Ticket relacionado */}
-            {article.sourceTicket && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className='text-base'>Ticket Relacionado</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Link href={`/admin/tickets/${article.sourceTicket.id}`}>
-                          <Button variant='outline' className='w-full justify-start'>
-                            <BookOpen className='h-4 w-4 mr-2' />
-                            {article.sourceTicket.title}
-                          </Button>
-                        </Link>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Ver el ticket del cual se creó este artículo</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </CardContent>
-              </Card>
+            {/* Ticket relacionado + adjuntos / calificación según rol */}
+            {article.sourceContext ? (
+              <ArticleSourcePanel sourceContext={article.sourceContext} showStaffDetails />
+            ) : (
+              article.sourceTicket && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className='text-base'>Ticket Relacionado</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Link href={`/admin/tickets/${article.sourceTicket.id}`}>
+                            <Button variant='outline' className='w-full justify-start'>
+                              <BookOpen className='h-4 w-4 mr-2' />
+                              {article.sourceTicket.title}
+                            </Button>
+                          </Link>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Ver el ticket del cual se creó este artículo</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </CardContent>
+                </Card>
+              )
             )}
 
             {/* Artículos similares */}

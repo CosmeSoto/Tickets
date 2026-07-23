@@ -51,6 +51,8 @@ interface TicketRatingSystemProps {
   canRate?: boolean
   showTechnicianStats?: boolean
   mode?: 'client' | 'admin'
+  /** Fuerza recarga (p. ej. tras SSE status/rating o al cerrar el modal) */
+  refreshKey?: number
   onRatingSubmitted?: () => void
 }
 
@@ -60,6 +62,7 @@ export function TicketRatingSystem({
   canRate = false,
   showTechnicianStats = false,
   mode = 'client',
+  refreshKey = 0,
   onRatingSubmitted,
 }: TicketRatingSystemProps) {
   const { toast } = useToast()
@@ -82,19 +85,25 @@ export function TicketRatingSystem({
 
   useEffect(() => {
     loadRatingData()
-  }, [ticketId, technicianId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [ticketId, technicianId, canRate, refreshKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadRatingData = async () => {
     try {
       setLoading(true)
 
       // Cargar calificación existente
-      const ratingResponse = await fetch(`/api/tickets/${ticketId}/rating`)
+      const ratingResponse = await fetch(`/api/tickets/${ticketId}/rating?_t=${Date.now()}`, {
+        cache: 'no-store',
+      })
       if (ratingResponse.ok) {
         const ratingData = await ratingResponse.json()
         if (ratingData.success && ratingData.data) {
           setRating(ratingData.data)
+        } else {
+          setRating(null)
         }
+      } else {
+        setRating(null)
       }
 
       // NOTA: Las estadísticas del técnico se obtienen desde el reporte de técnicos
@@ -138,7 +147,9 @@ export function TicketRatingSystem({
           title: 'Calificación enviada',
           description: 'Gracias por tu feedback. El ticket ha sido cerrado automáticamente.',
         })
-        loadRatingData()
+        // Mostrar la calificación al instante (sin esperar otro GET / remount)
+        if (data.data) setRating(data.data)
+        else await loadRatingData()
         onRatingSubmitted?.()
       }
     } catch (err) {

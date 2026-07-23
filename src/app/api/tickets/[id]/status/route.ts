@@ -239,6 +239,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       'dashboard:*',
     ]).catch(() => {})
 
+    // Avisar a quien tenga el detalle abierto (cliente ve calificación al instante)
+    const { TicketEvents } = await import('@/lib/ticket-events')
+    TicketEvents.emit(ticketId, {
+      type: 'status_changed',
+      status: newStatus,
+      previousStatus: currentStatus,
+    })
+
     return NextResponse.json({
       success: true,
       data: {
