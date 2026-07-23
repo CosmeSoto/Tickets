@@ -83,8 +83,12 @@ export type ArticleSourceContext = {
     communication: number
     problemResolution: number
   } | null
-  /** Comentarios públicos del ticket — solo staff */
-  publicComments: Array<{
+  /**
+   * Comentarios internos / solo equipo.
+   * Los públicos ya van en el cuerpo del artículo (Solución aplicada).
+   * Solo staff con acceso al ticket.
+   */
+  internalComments: Array<{
     id: string
     content: string
     createdAt: string
@@ -101,8 +105,8 @@ function ticketHrefForRole(role: string, ticketId: string): string {
 
 /**
  * Construye el contexto del ticket origen según el rol.
- * Clientes: adjuntos + datos básicos (sin calificación ni comentarios).
- * Staff: calificación, comentarios públicos y enlace al ticket si tiene acceso.
+ * Clientes: adjuntos + datos básicos (sin calificación ni notas internas).
+ * Staff con acceso al ticket: calificación + notas internas del equipo.
  */
 export async function buildArticleSourceContext(
   articleId: string,
@@ -140,9 +144,9 @@ export async function buildArticleSourceContext(
         },
       },
       comments: {
-        where: { isInternal: false },
+        where: { isInternal: true },
         orderBy: { createdAt: 'asc' },
-        take: 20,
+        take: 30,
         select: {
           id: true,
           content: true,
@@ -175,6 +179,9 @@ export async function buildArticleSourceContext(
     }
   }
 
+  // Internos: solo staff con acceso real al ticket (no clientes)
+  const canViewInternal = isStaff && canOpenTicket
+
   const attachments = ticket.attachments.map(a => ({
     id: a.id,
     originalName: a.originalName,
@@ -204,7 +211,7 @@ export async function buildArticleSourceContext(
             problemResolution: ticket.ticket_ratings.problemResolution,
           }
         : null,
-    publicComments: isStaff
+    internalComments: canViewInternal
       ? ticket.comments.map(c => ({
           id: c.id,
           content: c.content,

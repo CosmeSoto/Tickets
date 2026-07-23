@@ -68,7 +68,8 @@ export interface ArticleSourceContext {
     communication: number
     problemResolution: number
   } | null
-  publicComments: Array<{
+  /** Comentarios internos / solo equipo (no los públicos del cuerpo del artículo) */
+  internalComments: Array<{
     id: string
     content: string
     createdAt: string

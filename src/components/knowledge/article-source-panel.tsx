@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { BookOpen, Paperclip, Star, MessageSquare, ExternalLink, Eye, Download } from 'lucide-react'
+import { BookOpen, Paperclip, Star, Lock, ExternalLink, Eye, Download } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -48,7 +48,7 @@ interface ArticleSourcePanelProps {
 
 export function ArticleSourcePanel({ sourceContext, showStaffDetails }: ArticleSourcePanelProps) {
   const staff =
-    showStaffDetails ?? (sourceContext.rating !== null || sourceContext.publicComments.length > 0)
+    showStaffDetails ?? (sourceContext.rating !== null || sourceContext.internalComments.length > 0)
 
   const [previewFile, setPreviewFile] = useState<PreviewFile | null>(null)
 
@@ -189,17 +189,23 @@ export function ArticleSourcePanel({ sourceContext, showStaffDetails }: ArticleS
             </>
           )}
 
-          {staff && sourceContext.publicComments.length > 0 && (
+          {staff && sourceContext.internalComments.length > 0 && (
             <>
               <Separator />
               <div>
                 <p className='text-xs font-semibold text-muted-foreground flex items-center gap-1.5 mb-2'>
-                  <MessageSquare className='h-3.5 w-3.5' />
-                  Comentarios públicos ({sourceContext.publicComments.length})
+                  <Lock className='h-3.5 w-3.5' />
+                  Notas internas del equipo ({sourceContext.internalComments.length})
+                </p>
+                <p className='text-[10px] text-muted-foreground mb-2'>
+                  Solo visibles para el equipo con acceso al ticket. No se muestran al cliente.
                 </p>
                 <ul className='space-y-2 max-h-48 overflow-y-auto'>
-                  {sourceContext.publicComments.map(c => (
-                    <li key={c.id} className='text-xs border rounded-md p-2 bg-muted/20'>
+                  {sourceContext.internalComments.map(c => (
+                    <li
+                      key={c.id}
+                      className='text-xs border border-amber-200/60 dark:border-amber-500/30 rounded-md p-2 bg-amber-50/50 dark:bg-amber-500/10'
+                    >
                       <p className='font-medium'>
                         {c.authorName}{' '}
                         <span className='text-muted-foreground font-normal'>({c.authorRole})</span>
