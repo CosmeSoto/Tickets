@@ -314,6 +314,11 @@ export function getFieldDisplayName(fieldName: string): string {
     isEmailVerified: 'Email Verificado',
     lastLogin: 'Último Acceso',
     passwordChangedAt: 'Contraseña cambiada el',
+    rentalDeliveryDate: 'Fecha de entrega (renta)',
+    rentalBuyoutValue: 'Valor opción de compra',
+    rentalClientResponse: 'Respuesta del cliente (renta)',
+    rentalEndDate: 'Fin de renta',
+    rentalMonthlyCost: 'Costo mensual de renta',
     // Patrullas
     routeId: 'Ruta',
     routeName: 'Ruta',

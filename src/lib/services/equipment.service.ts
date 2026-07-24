@@ -388,6 +388,17 @@ export class EquipmentService {
           ...((data as any).saleListingPrice !== undefined && {
             saleListingPrice: (data as any).saleListingPrice ?? null,
           }),
+          ...((data as any).rentalDeliveryDate !== undefined && {
+            rentalDeliveryDate: (data as any).rentalDeliveryDate
+              ? new Date((data as any).rentalDeliveryDate)
+              : null,
+          }),
+          ...((data as any).rentalBuyoutValue !== undefined && {
+            rentalBuyoutValue: (data as any).rentalBuyoutValue ?? null,
+          }),
+          ...((data as any).rentalClientResponse !== undefined && {
+            rentalClientResponse: (data as any).rentalClientResponse,
+          }),
         } as Prisma.equipmentUpdateInput,
       })
 
@@ -409,6 +420,9 @@ export class EquipmentService {
         accessories: 'Accesorios',
         estimatedPrice: 'Precio Estimado',
         saleListingPrice: 'Precio de Venta',
+        rentalDeliveryDate: 'Fecha de entrega (renta)',
+        rentalBuyoutValue: 'Valor opción de compra',
+        rentalClientResponse: 'Respuesta del cliente (renta)',
       }
 
       for (const key of Object.keys(data)) {

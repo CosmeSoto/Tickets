@@ -219,7 +219,8 @@ export function ContractForm({
       startDate: contract?.startDate ? contract.startDate.slice(0, 10) : '',
       endDate: contract?.endDate ? contract.endDate.slice(0, 10) : '',
       autoRenew: contract?.autoRenew ?? false,
-      renewalNoticeDays: contract?.renewalNoticeDays ?? 30,
+      renewalNoticeDays:
+        contract?.renewalNoticeDays ?? (contract?.category === 'EQUIPMENT_RENTAL' ? 120 : 30),
       billingCycle: contract?.billingCycle ?? 'MONTHLY',
       totalValue: contract?.totalValue != null ? String(contract.totalValue) : '',
       monthlyCost: contract?.monthlyCost != null ? String(contract.monthlyCost) : '',
@@ -242,8 +243,7 @@ export function ContractForm({
       paymentCardExpiry: contract?.paymentCardExpiry ?? '',
       corporateCardLabel: contract?.corporateCardLabel ?? '',
       lastChargeDate: contract?.lastChargeDate ? contract.lastChargeDate.slice(0, 10) : '',
-      lastChargeAmount:
-        contract?.lastChargeAmount != null ? String(contract.lastChargeAmount) : '',
+      lastChargeAmount: contract?.lastChargeAmount != null ? String(contract.lastChargeAmount) : '',
       lastTransactionRef: contract?.lastTransactionRef ?? '',
       subscriptionUsageStatus: contract?.subscriptionUsageStatus ?? 'ACTIVE',
       cancellationNoticeDays:
@@ -397,349 +397,74 @@ export function ContractForm({
   return (
     <form onSubmit={handleSubmit(onSubmit)} className='space-y-6'>
       <fieldset disabled={readOnly} className={readOnly ? 'space-y-6' : 'contents'}>
-      {/* ── Datos generales ─────────────────────────────────────────────── */}
-      <Card>
-        <CardHeader>
-          <CardTitle className='text-base'>Datos generales</CardTitle>
-        </CardHeader>
-        <CardContent className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
-          <div className='space-y-1'>
-            <Label>
-              Nombre del contrato <span className='text-destructive'>*</span>
-            </Label>
-            <Input
-              {...register('name', { required: true })}
-              placeholder='Ej: Arrendamiento servidores 2026'
-            />
-            {errors.name && <p className='text-xs text-destructive'>Requerido</p>}
-          </div>
-
-          <div className='space-y-1'>
-            <Label>N° de contrato</Label>
-            <Input {...register('contractNumber')} placeholder='Ej: CONT-2026-001' />
-          </div>
-
-          <div className='space-y-1'>
-            <Label>
-              Categoría <span className='text-destructive'>*</span>
-            </Label>
-            <Combobox
-              value={watch('category')}
-              onValueChange={v => {
-                // Nunca limpiar la categoría — si el Combobox envía '' (deselección) se ignora
-                if (v && v !== '') setValue('category', v as any)
-              }}
-              options={categoryOptions}
-              placeholder='Seleccionar categoría'
-              searchPlaceholder='Buscar categoría...'
-            />
-          </div>
-
-          {(selectedCategory === 'SERVICE' ||
-            selectedCategory === 'SOFTWARE_LICENSE' ||
-            selectedCategory === 'SUPPORT') && (
+        {/* ── Datos generales ─────────────────────────────────────────────── */}
+        <Card>
+          <CardHeader>
+            <CardTitle className='text-base'>Datos generales</CardTitle>
+          </CardHeader>
+          <CardContent className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
             <div className='space-y-1'>
-              <Label>Tipo de servicio</Label>
-              <Select
-                value={watch('serviceSubtype') || 'none'}
-                onValueChange={v =>
-                  setValue(
-                    'serviceSubtype',
-                    v === 'none' ? '' : (v as ContractFormData['serviceSubtype'])
-                  )
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder='Ej: Redes, IA, Canvas...' />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value='none'>Sin especificar</SelectItem>
-                  {Object.entries(SUBSCRIPTION_SERVICE_TYPE_LABELS).map(([k, v]) => (
-                    <SelectItem key={k} value={k}>
-                      {v}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          <div className='space-y-1'>
-            <Label>Área / Familia</Label>
-            <Combobox
-              value={watch('familyId') || ''}
-              onValueChange={v => setValue('familyId', v || '')}
-              options={familyOptions}
-              placeholder='Todas las áreas'
-              searchPlaceholder='Buscar familia...'
-              emptyText='No se encontraron familias'
-            />
-          </div>
-
-          <div className='space-y-1'>
-            <Label>Proveedor</Label>
-            <Combobox
-              value={watch('supplierId') || ''}
-              onValueChange={v => setValue('supplierId', v || '')}
-              options={supplierOptions}
-              placeholder='Seleccionar proveedor'
-              searchPlaceholder='Buscar proveedor...'
-              emptyText='No se encontraron proveedores'
-            />
-          </div>
-
-          <div className='sm:col-span-2 space-y-1'>
-            <Label>Descripción</Label>
-            <Textarea
-              {...register('description')}
-              rows={2}
-              placeholder='Descripción del contrato...'
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* ── Vigencia y facturación ──────────────────────────────────────── */}
-      <Card>
-        <CardHeader>
-          <CardTitle className='text-base'>Vigencia y facturación</CardTitle>
-        </CardHeader>
-        <CardContent className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
-          <div className='space-y-1'>
-            <Label>Fecha de inicio</Label>
-            <Input type='date' {...register('startDate')} />
-          </div>
-
-          <div className='space-y-1'>
-            <Label>Fecha de vencimiento</Label>
-            <Input type='date' {...register('endDate')} />
-          </div>
-
-          <div className='space-y-1'>
-            <Label>Ciclo de facturación</Label>
-            <Select
-              value={watch('billingCycle')}
-              onValueChange={v => {
-                if (v) setValue('billingCycle', v as any)
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(BILLING_CYCLE_LABELS).map(([k, v]) => (
-                  <SelectItem key={k} value={k}>
-                    {v}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className='space-y-1'>
-            <Label>Moneda</Label>
-            <Select value={watch('currency')} onValueChange={v => setValue('currency', v)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value='USD'>USD — Dólar</SelectItem>
-                <SelectItem value='EUR'>EUR — Euro</SelectItem>
-                <SelectItem value='CLP'>CLP — Peso chileno</SelectItem>
-                <SelectItem value='MXN'>MXN — Peso mexicano</SelectItem>
-                <SelectItem value='COP'>COP — Peso colombiano</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className='space-y-1'>
-            <Label>Costo mensual</Label>
-            <Input
-              type='number'
-              min='0'
-              step='0.01'
-              {...register('monthlyCost')}
-              placeholder='0.00'
-            />
-          </div>
-
-          <div className='space-y-1'>
-            <Label>Valor total del contrato</Label>
-            <Input
-              type='number'
-              min='0'
-              step='0.01'
-              {...register('totalValue')}
-              placeholder='0.00'
-            />
-          </div>
-
-          <div className='flex items-center justify-between rounded-lg border p-3 sm:col-span-2'>
-            <div>
-              <p className='text-sm font-medium'>Renovación automática</p>
-              <p className='text-xs text-muted-foreground'>
-                El contrato se renueva automáticamente al vencer
-              </p>
-            </div>
-            <Switch checked={autoRenew} onCheckedChange={v => setValue('autoRenew', v)} />
-          </div>
-
-          {autoRenew && (
-            <div className='space-y-1'>
-              <Label>Días de aviso antes de renovar</Label>
-              <Input type='number' min='1' max='365' {...register('renewalNoticeDays')} />
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* ── Contacto ────────────────────────────────────────────────────── */}
-      <Card>
-        <CardHeader>
-          <CardTitle className='text-base'>Contacto del proveedor</CardTitle>
-          <p className='text-xs text-muted-foreground mt-1'>
-            Se auto-completa con los datos del proveedor seleccionado. Puedes modificarlos si es
-            necesario.
-          </p>
-        </CardHeader>
-        <CardContent className='grid grid-cols-1 sm:grid-cols-3 gap-4'>
-          <div className='space-y-1'>
-            <Label>Nombre</Label>
-            <Input {...register('contactName')} placeholder='Nombre del contacto' />
-          </div>
-          <div className='space-y-1'>
-            <Label>Email</Label>
-            <Input
-              type='email'
-              {...register('contactEmail')}
-              placeholder='contacto@proveedor.com'
-            />
-          </div>
-          <div className='space-y-1'>
-            <Label>Teléfono</Label>
-            <Input {...register('contactPhone')} placeholder='+1-555-0123' />
-          </div>
-          <div className='sm:col-span-3 space-y-1'>
-            <Label>URL de términos / contrato</Label>
-            <Input {...register('termsUrl')} placeholder='https://...' />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* ── Facturación y responsables ──────────────────────────────────── */}
-      <Card>
-        <CardHeader>
-          <CardTitle className='text-base'>Facturación y responsables</CardTitle>
-          <p className='text-xs text-muted-foreground mt-1'>
-            Datos para cancelación, trazabilidad de cargos y custodia operativa. Evita suscripciones
-            huérfanas cuando el personal deja la empresa.
-          </p>
-        </CardHeader>
-        <CardContent className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
-          <div className='space-y-1 sm:col-span-2'>
-            <Label>Método de pago</Label>
-            <Select
-              value={paymentMethodType}
-              onValueChange={v =>
-                setValue('paymentMethodType', v as ContractFormData['paymentMethodType'])
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(PAYMENT_METHOD_TYPE_LABELS).map(([k, v]) => (
-                  <SelectItem key={k} value={k}>
-                    {v}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {(paymentMethodType === 'PAYPAL' ||
-            paymentMethodType === 'CRYPTO' ||
-            paymentMethodType === 'BANK_TRANSFER' ||
-            paymentMethodType === 'OTHER') && (
-            <div className='space-y-1 sm:col-span-2'>
               <Label>
-                {paymentMethodType === 'CRYPTO'
-                  ? 'Dirección wallet / red'
-                  : paymentMethodType === 'PAYPAL'
-                    ? 'Email o ID PayPal'
-                    : 'Cuenta / referencia de pago'}
+                Nombre del contrato <span className='text-destructive'>*</span>
               </Label>
               <Input
-                {...register('paymentAccountRef')}
-                placeholder={
-                  paymentMethodType === 'CRYPTO'
-                    ? '0x… o dirección + red (ETH, BTC…)'
-                    : paymentMethodType === 'PAYPAL'
-                      ? 'cuenta@empresa.com'
-                      : 'N° cuenta, IBAN o alias'
-                }
+                {...register('name', { required: true })}
+                placeholder='Ej: Arrendamiento servidores 2026'
+              />
+              {errors.name && <p className='text-xs text-destructive'>Requerido</p>}
+            </div>
+
+            <div className='space-y-1'>
+              <Label>N° de contrato</Label>
+              <Input {...register('contractNumber')} placeholder='Ej: CONT-2026-001' />
+            </div>
+
+            <div className='space-y-1'>
+              <Label>
+                Categoría <span className='text-destructive'>*</span>
+              </Label>
+              <Combobox
+                value={watch('category')}
+                onValueChange={v => {
+                  // Nunca limpiar la categoría — si el Combobox envía '' (deselección) se ignora
+                  if (v && v !== '') {
+                    setValue('category', v as any)
+                    // Renta de equipos: aviso típico de 120 días (solo al crear / si aún está en 30)
+                    if (
+                      v === 'EQUIPMENT_RENTAL' &&
+                      !contract &&
+                      Number(watch('renewalNoticeDays')) === 30
+                    ) {
+                      setValue('renewalNoticeDays', 120)
+                    }
+                  }
+                }}
+                options={categoryOptions}
+                placeholder='Seleccionar categoría'
+                searchPlaceholder='Buscar categoría...'
               />
             </div>
-          )}
 
-          <div className='space-y-1'>
-            <Label>Custodio principal</Label>
-            <Combobox
-              options={custodianOptions}
-              value={watch('custodianUserId')}
-              onValueChange={v => setValue('custodianUserId', v)}
-              placeholder='Responsable del servicio...'
-            />
-          </div>
-          <div className='space-y-1'>
-            <Label>Custodio de respaldo</Label>
-            <Combobox
-              options={custodianOptions}
-              value={watch('backupCustodianUserId')}
-              onValueChange={v => setValue('backupCustodianUserId', v)}
-              placeholder='Respaldo para offboarding...'
-            />
-          </div>
-          <div className='space-y-1'>
-            <Label>Email cuenta de facturación</Label>
-            <Input
-              type='email'
-              {...register('billingAccountEmail')}
-              placeholder='portal@proveedor.com'
-            />
-          </div>
-          <div className='space-y-1'>
-            <Label>URL portal de facturación</Label>
-            <Input {...register('billingPortalUrl')} placeholder='https://billing...' />
-          </div>
-          <div className='space-y-1'>
-            <Label>ID cuenta en proveedor</Label>
-            <Input {...register('vendorAccountId')} placeholder='Opcional' />
-          </div>
-
-          {paymentMethodType === 'CORPORATE_CARD' && (
-            <>
+            {(selectedCategory === 'SERVICE' ||
+              selectedCategory === 'SOFTWARE_LICENSE' ||
+              selectedCategory === 'SUPPORT') && (
               <div className='space-y-1'>
-                <Label>Etiqueta tarjeta corporativa</Label>
-                <Input {...register('corporateCardLabel')} placeholder='Ej: Marketing Corp' />
-              </div>
-              <div className='space-y-1'>
-                <Label>Marca de tarjeta</Label>
+                <Label>Tipo de servicio</Label>
                 <Select
-                  value={watch('paymentCardBrand') || 'none'}
+                  value={watch('serviceSubtype') || 'none'}
                   onValueChange={v =>
                     setValue(
-                      'paymentCardBrand',
-                      v === 'none' ? '' : (v as ContractFormData['paymentCardBrand'])
+                      'serviceSubtype',
+                      v === 'none' ? '' : (v as ContractFormData['serviceSubtype'])
                     )
                   }
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder='Seleccionar' />
+                    <SelectValue placeholder='Ej: Redes, IA, Canvas...' />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value='none'>Sin especificar</SelectItem>
-                    {Object.entries(PAYMENT_CARD_BRAND_LABELS).map(([k, v]) => (
+                    {Object.entries(SUBSCRIPTION_SERVICE_TYPE_LABELS).map(([k, v]) => (
                       <SelectItem key={k} value={k}>
                         {v}
                       </SelectItem>
@@ -747,115 +472,293 @@ export function ContractForm({
                   </SelectContent>
                 </Select>
               </div>
-              <div className='space-y-1'>
-                <Label>Últimos 4 dígitos</Label>
-                <Input {...register('paymentCardLast4')} maxLength={4} placeholder='1234' />
-              </div>
-              <div className='space-y-1'>
-                <Label>Banco / entidad</Label>
-                <Input {...register('paymentCardBank')} placeholder='Ej: Banco Estado' />
-              </div>
-              <div className='space-y-1'>
-                <Label>Vencimiento tarjeta (MM/YYYY)</Label>
-                <Input {...register('paymentCardExpiry')} placeholder='12/2027' />
-              </div>
-            </>
-          )}
-          <div className='space-y-1'>
-            <Label>Estado de uso</Label>
-            <Select
-              value={watch('subscriptionUsageStatus')}
-              onValueChange={v => setValue('subscriptionUsageStatus', v as ContractFormData['subscriptionUsageStatus'])}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(SUBSCRIPTION_USAGE_STATUS_LABELS).map(([k, v]) => (
-                  <SelectItem key={k} value={k}>
-                    {v}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className='space-y-1'>
-            <Label>Días aviso de cancelación</Label>
-            <Input
-              type='number'
-              min='0'
-              {...register('cancellationNoticeDays')}
-              placeholder='30'
-            />
-          </div>
-          <div className='space-y-1'>
-            <Label>Último cargo (fecha)</Label>
-            <Input type='date' {...register('lastChargeDate')} />
-          </div>
-          <div className='space-y-1'>
-            <Label>Último cargo (monto)</Label>
-            <Input type='number' min='0' step='0.01' {...register('lastChargeAmount')} />
-          </div>
-          <div className='sm:col-span-2 space-y-1'>
-            <Label>Referencia última transacción</Label>
-            <Input {...register('lastTransactionRef')} placeholder='ID transacción bancaria' />
-          </div>
-        </CardContent>
-      </Card>
+            )}
 
-      {/* ── Líneas del contrato ─────────────────────────────────────────── */}
-      <Card>
-        <CardHeader>
-          <div className='flex items-center justify-between gap-2'>
-            <CardTitle className='text-base'>Líneas del contrato</CardTitle>
-            <Button
-              type='button'
-              variant='outline'
-              size='sm'
-              onClick={() => append({ ...EMPTY_LINE, order: fields.length })}
-              disabled={readOnly}
-            >
-              <Plus className='h-4 w-4 mr-1' /> Agregar línea
-            </Button>
-          </div>
-          <p className='text-xs text-muted-foreground mt-1'>
-            Cada línea vincula un activo (equipo, software, servicio). Los cambios contractuales
-            parciales se registran como adendums (folio ADN) en la sección inferior.
-          </p>
-        </CardHeader>
-        <CardContent className='space-y-3'>
-          {fields.length === 0 && (
-            <p className='text-sm text-muted-foreground text-center py-4'>
-              Sin líneas. Agrega servicios, equipos o software incluidos en este contrato.
-            </p>
-          )}
-          {fields.map((field, i) => (
-            <div key={field.id} className='rounded-lg border p-3 space-y-3'>
-              <div className='flex items-center justify-between'>
-                <span className='text-xs font-medium text-muted-foreground'>Línea {i + 1}</span>
-                <Button
-                  type='button'
-                  variant='ghost'
-                  size='sm'
-                  onClick={() => remove(i)}
-                  disabled={readOnly}
-                  className='h-7 w-7 p-0 text-destructive hover:text-destructive'
-                >
-                  <Trash2 className='h-3.5 w-3.5' />
-                </Button>
+            <div className='space-y-1'>
+              <Label>Área / Familia</Label>
+              <Combobox
+                value={watch('familyId') || ''}
+                onValueChange={v => setValue('familyId', v || '')}
+                options={familyOptions}
+                placeholder='Todas las áreas'
+                searchPlaceholder='Buscar familia...'
+                emptyText='No se encontraron familias'
+              />
+            </div>
+
+            <div className='space-y-1'>
+              <Label>Proveedor</Label>
+              <Combobox
+                value={watch('supplierId') || ''}
+                onValueChange={v => setValue('supplierId', v || '')}
+                options={supplierOptions}
+                placeholder='Seleccionar proveedor'
+                searchPlaceholder='Buscar proveedor...'
+                emptyText='No se encontraron proveedores'
+              />
+            </div>
+
+            <div className='sm:col-span-2 space-y-1'>
+              <Label>Descripción</Label>
+              <Textarea
+                {...register('description')}
+                rows={2}
+                placeholder='Descripción del contrato...'
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* ── Vigencia y facturación ──────────────────────────────────────── */}
+        <Card>
+          <CardHeader>
+            <CardTitle className='text-base'>Vigencia y facturación</CardTitle>
+          </CardHeader>
+          <CardContent className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
+            <div className='space-y-1'>
+              <Label>Fecha de inicio</Label>
+              <Input type='date' {...register('startDate')} />
+            </div>
+
+            <div className='space-y-1'>
+              <Label>Fecha de vencimiento</Label>
+              <Input type='date' {...register('endDate')} />
+            </div>
+
+            <div className='space-y-1'>
+              <Label>Ciclo de facturación</Label>
+              <Select
+                value={watch('billingCycle')}
+                onValueChange={v => {
+                  if (v) setValue('billingCycle', v as any)
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(BILLING_CYCLE_LABELS).map(([k, v]) => (
+                    <SelectItem key={k} value={k}>
+                      {v}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className='space-y-1'>
+              <Label>Moneda</Label>
+              <Select value={watch('currency')} onValueChange={v => setValue('currency', v)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='USD'>USD — Dólar</SelectItem>
+                  <SelectItem value='EUR'>EUR — Euro</SelectItem>
+                  <SelectItem value='CLP'>CLP — Peso chileno</SelectItem>
+                  <SelectItem value='MXN'>MXN — Peso mexicano</SelectItem>
+                  <SelectItem value='COP'>COP — Peso colombiano</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className='space-y-1'>
+              <Label>Costo mensual</Label>
+              <Input
+                type='number'
+                min='0'
+                step='0.01'
+                {...register('monthlyCost')}
+                placeholder='0.00'
+              />
+            </div>
+
+            <div className='space-y-1'>
+              <Label>Valor total del contrato</Label>
+              <Input
+                type='number'
+                min='0'
+                step='0.01'
+                {...register('totalValue')}
+                placeholder='0.00'
+              />
+            </div>
+
+            <div className='flex items-center justify-between rounded-lg border p-3 sm:col-span-2'>
+              <div>
+                <p className='text-sm font-medium'>Renovación automática</p>
+                <p className='text-xs text-muted-foreground'>
+                  El contrato se renueva automáticamente al vencer
+                </p>
               </div>
-              <div className='grid grid-cols-1 sm:grid-cols-3 gap-3'>
+              <Switch checked={autoRenew} onCheckedChange={v => setValue('autoRenew', v)} />
+            </div>
+
+            {(autoRenew || selectedCategory === 'EQUIPMENT_RENTAL') && (
+              <div className='space-y-1'>
+                <Label>
+                  {selectedCategory === 'EQUIPMENT_RENTAL'
+                    ? 'Días de aviso antes del fin de renta'
+                    : 'Días de aviso antes de renovar'}
+                </Label>
+                <Input type='number' min='1' max='365' {...register('renewalNoticeDays')} />
+                {selectedCategory === 'EQUIPMENT_RENTAL' && (
+                  <p className='text-xs text-muted-foreground'>
+                    Recomendado 120 días según contrato de arrendamiento (notificación al cliente).
+                  </p>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* ── Contacto ────────────────────────────────────────────────────── */}
+        <Card>
+          <CardHeader>
+            <CardTitle className='text-base'>Contacto del proveedor</CardTitle>
+            <p className='text-xs text-muted-foreground mt-1'>
+              Se auto-completa con los datos del proveedor seleccionado. Puedes modificarlos si es
+              necesario.
+            </p>
+          </CardHeader>
+          <CardContent className='grid grid-cols-1 sm:grid-cols-3 gap-4'>
+            <div className='space-y-1'>
+              <Label>Nombre</Label>
+              <Input {...register('contactName')} placeholder='Nombre del contacto' />
+            </div>
+            <div className='space-y-1'>
+              <Label>Email</Label>
+              <Input
+                type='email'
+                {...register('contactEmail')}
+                placeholder='contacto@proveedor.com'
+              />
+            </div>
+            <div className='space-y-1'>
+              <Label>Teléfono</Label>
+              <Input {...register('contactPhone')} placeholder='+1-555-0123' />
+            </div>
+            <div className='sm:col-span-3 space-y-1'>
+              <Label>URL de términos / contrato</Label>
+              <Input {...register('termsUrl')} placeholder='https://...' />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* ── Facturación y responsables ──────────────────────────────────── */}
+        <Card>
+          <CardHeader>
+            <CardTitle className='text-base'>Facturación y responsables</CardTitle>
+            <p className='text-xs text-muted-foreground mt-1'>
+              Datos para cancelación, trazabilidad de cargos y custodia operativa. Evita
+              suscripciones huérfanas cuando el personal deja la empresa.
+            </p>
+          </CardHeader>
+          <CardContent className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
+            <div className='space-y-1 sm:col-span-2'>
+              <Label>Método de pago</Label>
+              <Select
+                value={paymentMethodType}
+                onValueChange={v =>
+                  setValue('paymentMethodType', v as ContractFormData['paymentMethodType'])
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(PAYMENT_METHOD_TYPE_LABELS).map(([k, v]) => (
+                    <SelectItem key={k} value={k}>
+                      {v}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {(paymentMethodType === 'PAYPAL' ||
+              paymentMethodType === 'CRYPTO' ||
+              paymentMethodType === 'BANK_TRANSFER' ||
+              paymentMethodType === 'OTHER') && (
+              <div className='space-y-1 sm:col-span-2'>
+                <Label>
+                  {paymentMethodType === 'CRYPTO'
+                    ? 'Dirección wallet / red'
+                    : paymentMethodType === 'PAYPAL'
+                      ? 'Email o ID PayPal'
+                      : 'Cuenta / referencia de pago'}
+                </Label>
+                <Input
+                  {...register('paymentAccountRef')}
+                  placeholder={
+                    paymentMethodType === 'CRYPTO'
+                      ? '0x… o dirección + red (ETH, BTC…)'
+                      : paymentMethodType === 'PAYPAL'
+                        ? 'cuenta@empresa.com'
+                        : 'N° cuenta, IBAN o alias'
+                  }
+                />
+              </div>
+            )}
+
+            <div className='space-y-1'>
+              <Label>Custodio principal</Label>
+              <Combobox
+                options={custodianOptions}
+                value={watch('custodianUserId')}
+                onValueChange={v => setValue('custodianUserId', v)}
+                placeholder='Responsable del servicio...'
+              />
+            </div>
+            <div className='space-y-1'>
+              <Label>Custodio de respaldo</Label>
+              <Combobox
+                options={custodianOptions}
+                value={watch('backupCustodianUserId')}
+                onValueChange={v => setValue('backupCustodianUserId', v)}
+                placeholder='Respaldo para offboarding...'
+              />
+            </div>
+            <div className='space-y-1'>
+              <Label>Email cuenta de facturación</Label>
+              <Input
+                type='email'
+                {...register('billingAccountEmail')}
+                placeholder='portal@proveedor.com'
+              />
+            </div>
+            <div className='space-y-1'>
+              <Label>URL portal de facturación</Label>
+              <Input {...register('billingPortalUrl')} placeholder='https://billing...' />
+            </div>
+            <div className='space-y-1'>
+              <Label>ID cuenta en proveedor</Label>
+              <Input {...register('vendorAccountId')} placeholder='Opcional' />
+            </div>
+
+            {paymentMethodType === 'CORPORATE_CARD' && (
+              <>
                 <div className='space-y-1'>
-                  <Label className='text-xs'>Tipo</Label>
+                  <Label>Etiqueta tarjeta corporativa</Label>
+                  <Input {...register('corporateCardLabel')} placeholder='Ej: Marketing Corp' />
+                </div>
+                <div className='space-y-1'>
+                  <Label>Marca de tarjeta</Label>
                   <Select
-                    value={watch(`lines.${i}.type`)}
-                    onValueChange={v => setValue(`lines.${i}.type`, v as any)}
+                    value={watch('paymentCardBrand') || 'none'}
+                    onValueChange={v =>
+                      setValue(
+                        'paymentCardBrand',
+                        v === 'none' ? '' : (v as ContractFormData['paymentCardBrand'])
+                      )
+                    }
                   >
-                    <SelectTrigger className='h-8 text-sm'>
-                      <SelectValue />
+                    <SelectTrigger>
+                      <SelectValue placeholder='Seleccionar' />
                     </SelectTrigger>
                     <SelectContent>
-                      {Object.entries(CONTRACT_LINE_TYPE_LABELS).map(([k, v]) => (
+                      <SelectItem value='none'>Sin especificar</SelectItem>
+                      {Object.entries(PAYMENT_CARD_BRAND_LABELS).map(([k, v]) => (
                         <SelectItem key={k} value={k}>
                           {v}
                         </SelectItem>
@@ -863,145 +766,268 @@ export function ContractForm({
                     </SelectContent>
                   </Select>
                 </div>
-                <div className='sm:col-span-2 space-y-1'>
-                  <Label className='text-xs'>
-                    Descripción <span className='text-destructive'>*</span>
-                  </Label>
-                  <Input
-                    className='h-8 text-sm'
-                    {...register(`lines.${i}.description`, { required: true })}
-                    placeholder='Descripción del servicio o ítem'
-                  />
+                <div className='space-y-1'>
+                  <Label>Últimos 4 dígitos</Label>
+                  <Input {...register('paymentCardLast4')} maxLength={4} placeholder='1234' />
                 </div>
                 <div className='space-y-1'>
-                  <Label className='text-xs'>Cantidad</Label>
-                  <Input
-                    className='h-8 text-sm'
-                    type='number'
-                    min='0'
-                    step='0.01'
-                    {...register(`lines.${i}.quantity`)}
-                    placeholder='1'
-                  />
+                  <Label>Banco / entidad</Label>
+                  <Input {...register('paymentCardBank')} placeholder='Ej: Banco Estado' />
                 </div>
                 <div className='space-y-1'>
-                  <Label className='text-xs'>Precio unitario</Label>
-                  <Input
-                    className='h-8 text-sm'
-                    type='number'
-                    min='0'
-                    step='0.01'
-                    {...register(`lines.${i}.unitPrice`)}
-                    placeholder='0.00'
-                  />
+                  <Label>Vencimiento tarjeta (MM/YYYY)</Label>
+                  <Input {...register('paymentCardExpiry')} placeholder='12/2027' />
                 </div>
-                <div className='space-y-1'>
-                  <Label className='text-xs'>Notas</Label>
-                  <Input
-                    className='h-8 text-sm'
-                    {...register(`lines.${i}.notes`)}
-                    placeholder='Opcional'
-                  />
-                </div>
-                {watch(`lines.${i}.type`) === 'SOFTWARE' && (
-                  <div className='sm:col-span-3 space-y-1'>
-                    <Label className='text-xs'>Licencia vinculada</Label>
-                    <Combobox
-                      value={watch(`lines.${i}.licenseId`) || ''}
-                      onValueChange={v => setValue(`lines.${i}.licenseId`, v || '')}
-                      options={licenseOptions}
-                      placeholder={familyId ? 'Seleccionar licencia' : 'Asigna un área primero'}
-                      searchPlaceholder='Buscar licencia...'
-                      emptyText={familyId ? 'No hay licencias en esta área' : 'Selecciona un área'}
-                      disabled={!familyId}
-                    />
-                    <p className='text-[10px] text-muted-foreground'>
-                      Al guardar, sincroniza vigencia y costo de renovación con el contrato.
-                    </p>
-                  </div>
-                )}
-              </div>
+              </>
+            )}
+            <div className='space-y-1'>
+              <Label>Estado de uso</Label>
+              <Select
+                value={watch('subscriptionUsageStatus')}
+                onValueChange={v =>
+                  setValue(
+                    'subscriptionUsageStatus',
+                    v as ContractFormData['subscriptionUsageStatus']
+                  )
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(SUBSCRIPTION_USAGE_STATUS_LABELS).map(([k, v]) => (
+                    <SelectItem key={k} value={k}>
+                      {v}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          ))}
-        </CardContent>
-      </Card>
-
-      {/* ── Adjuntos / Contrato físico ──────────────────────────────────── */}
-      <Card>
-        <CardHeader>
-          <CardTitle className='text-base flex items-center gap-2'>
-            <Paperclip className='h-4 w-4' />
-            Documentos adjuntos
-          </CardTitle>
-          <p className='text-xs text-muted-foreground mt-1'>
-            Sube el contrato físico en PDF u otros documentos relacionados.
-          </p>
-        </CardHeader>
-        <CardContent className='space-y-4'>
-          {/* Adjuntos existentes (solo en edición) */}
-          {isEditing && existingAttachments.length > 0 && (
-            <div className='space-y-2'>
-              <p className='text-xs font-medium text-muted-foreground uppercase tracking-wide'>
-                Archivos guardados ({existingAttachments.length})
-              </p>
-              <ul className='space-y-1.5'>
-                {existingAttachments.map(att => (
-                  <li
-                    key={att.id}
-                    className='flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm'
-                  >
-                    <FileText className='h-3.5 w-3.5 shrink-0 text-muted-foreground' />
-                    <span className='flex-1 truncate text-foreground'>{att.originalName}</span>
-                    <span className='shrink-0 text-xs text-muted-foreground'>
-                      {formatSize(att.size)}
-                    </span>
-                    <a
-                      href={att.path}
-                      target='_blank'
-                      rel='noopener noreferrer'
-                      className='shrink-0 rounded p-0.5 hover:bg-muted'
-                      title='Descargar'
-                    >
-                      <Download className='h-3.5 w-3.5 text-muted-foreground' />
-                    </a>
-                    <button
-                      type='button'
-                      title='Eliminar adjunto'
-                      disabled={deletingAttachmentId === att.id}
-                      onClick={() => handleDeleteAttachment(att.id)}
-                      className='shrink-0 rounded p-0.5 hover:bg-muted disabled:opacity-50'
-                    >
-                      <X className='h-3.5 w-3.5 text-muted-foreground hover:text-destructive' />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-              <Separator />
+            <div className='space-y-1'>
+              <Label>Días aviso de cancelación</Label>
+              <Input
+                type='number'
+                min='0'
+                {...register('cancellationNoticeDays')}
+                placeholder='30'
+              />
             </div>
-          )}
+            <div className='space-y-1'>
+              <Label>Último cargo (fecha)</Label>
+              <Input type='date' {...register('lastChargeDate')} />
+            </div>
+            <div className='space-y-1'>
+              <Label>Último cargo (monto)</Label>
+              <Input type='number' min='0' step='0.01' {...register('lastChargeAmount')} />
+            </div>
+            <div className='sm:col-span-2 space-y-1'>
+              <Label>Referencia última transacción</Label>
+              <Input {...register('lastTransactionRef')} placeholder='ID transacción bancaria' />
+            </div>
+          </CardContent>
+        </Card>
 
-          {/* Subir nuevos archivos */}
-          <FileUploadZone
-            files={pendingFiles}
-            onChange={setPendingFiles}
-            maxFileSizeMB={maxFileSize}
-            label={isEditing ? 'Agregar nuevos documentos' : 'Documentos del contrato'}
-            accept='application/pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png'
-            onSizeError={(name, max) =>
-              toast({
-                title: 'Archivo muy grande',
-                description: `"${name}" supera ${max}MB`,
-                variant: 'destructive',
-              })
-            }
-          />
-          {!isEditing && pendingFiles.length > 0 && (
-            <p className='text-xs text-muted-foreground'>
-              Los archivos se subirán al guardar el contrato.
+        {/* ── Líneas del contrato ─────────────────────────────────────────── */}
+        <Card>
+          <CardHeader>
+            <div className='flex items-center justify-between gap-2'>
+              <CardTitle className='text-base'>Líneas del contrato</CardTitle>
+              <Button
+                type='button'
+                variant='outline'
+                size='sm'
+                onClick={() => append({ ...EMPTY_LINE, order: fields.length })}
+                disabled={readOnly}
+              >
+                <Plus className='h-4 w-4 mr-1' /> Agregar línea
+              </Button>
+            </div>
+            <p className='text-xs text-muted-foreground mt-1'>
+              Cada línea vincula un activo (equipo, software, servicio). Los cambios contractuales
+              parciales se registran como adendums (folio ADN) en la sección inferior.
             </p>
-          )}
-        </CardContent>
-      </Card>
+          </CardHeader>
+          <CardContent className='space-y-3'>
+            {fields.length === 0 && (
+              <p className='text-sm text-muted-foreground text-center py-4'>
+                Sin líneas. Agrega servicios, equipos o software incluidos en este contrato.
+              </p>
+            )}
+            {fields.map((field, i) => (
+              <div key={field.id} className='rounded-lg border p-3 space-y-3'>
+                <div className='flex items-center justify-between'>
+                  <span className='text-xs font-medium text-muted-foreground'>Línea {i + 1}</span>
+                  <Button
+                    type='button'
+                    variant='ghost'
+                    size='sm'
+                    onClick={() => remove(i)}
+                    disabled={readOnly}
+                    className='h-7 w-7 p-0 text-destructive hover:text-destructive'
+                  >
+                    <Trash2 className='h-3.5 w-3.5' />
+                  </Button>
+                </div>
+                <div className='grid grid-cols-1 sm:grid-cols-3 gap-3'>
+                  <div className='space-y-1'>
+                    <Label className='text-xs'>Tipo</Label>
+                    <Select
+                      value={watch(`lines.${i}.type`)}
+                      onValueChange={v => setValue(`lines.${i}.type`, v as any)}
+                    >
+                      <SelectTrigger className='h-8 text-sm'>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(CONTRACT_LINE_TYPE_LABELS).map(([k, v]) => (
+                          <SelectItem key={k} value={k}>
+                            {v}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className='sm:col-span-2 space-y-1'>
+                    <Label className='text-xs'>
+                      Descripción <span className='text-destructive'>*</span>
+                    </Label>
+                    <Input
+                      className='h-8 text-sm'
+                      {...register(`lines.${i}.description`, { required: true })}
+                      placeholder='Descripción del servicio o ítem'
+                    />
+                  </div>
+                  <div className='space-y-1'>
+                    <Label className='text-xs'>Cantidad</Label>
+                    <Input
+                      className='h-8 text-sm'
+                      type='number'
+                      min='0'
+                      step='0.01'
+                      {...register(`lines.${i}.quantity`)}
+                      placeholder='1'
+                    />
+                  </div>
+                  <div className='space-y-1'>
+                    <Label className='text-xs'>Precio unitario</Label>
+                    <Input
+                      className='h-8 text-sm'
+                      type='number'
+                      min='0'
+                      step='0.01'
+                      {...register(`lines.${i}.unitPrice`)}
+                      placeholder='0.00'
+                    />
+                  </div>
+                  <div className='space-y-1'>
+                    <Label className='text-xs'>Notas</Label>
+                    <Input
+                      className='h-8 text-sm'
+                      {...register(`lines.${i}.notes`)}
+                      placeholder='Opcional'
+                    />
+                  </div>
+                  {watch(`lines.${i}.type`) === 'SOFTWARE' && (
+                    <div className='sm:col-span-3 space-y-1'>
+                      <Label className='text-xs'>Licencia vinculada</Label>
+                      <Combobox
+                        value={watch(`lines.${i}.licenseId`) || ''}
+                        onValueChange={v => setValue(`lines.${i}.licenseId`, v || '')}
+                        options={licenseOptions}
+                        placeholder={familyId ? 'Seleccionar licencia' : 'Asigna un área primero'}
+                        searchPlaceholder='Buscar licencia...'
+                        emptyText={
+                          familyId ? 'No hay licencias en esta área' : 'Selecciona un área'
+                        }
+                        disabled={!familyId}
+                      />
+                      <p className='text-[10px] text-muted-foreground'>
+                        Al guardar, sincroniza vigencia y costo de renovación con el contrato.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        {/* ── Adjuntos / Contrato físico ──────────────────────────────────── */}
+        <Card>
+          <CardHeader>
+            <CardTitle className='text-base flex items-center gap-2'>
+              <Paperclip className='h-4 w-4' />
+              Documentos adjuntos
+            </CardTitle>
+            <p className='text-xs text-muted-foreground mt-1'>
+              Sube el contrato físico en PDF u otros documentos relacionados.
+            </p>
+          </CardHeader>
+          <CardContent className='space-y-4'>
+            {/* Adjuntos existentes (solo en edición) */}
+            {isEditing && existingAttachments.length > 0 && (
+              <div className='space-y-2'>
+                <p className='text-xs font-medium text-muted-foreground uppercase tracking-wide'>
+                  Archivos guardados ({existingAttachments.length})
+                </p>
+                <ul className='space-y-1.5'>
+                  {existingAttachments.map(att => (
+                    <li
+                      key={att.id}
+                      className='flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm'
+                    >
+                      <FileText className='h-3.5 w-3.5 shrink-0 text-muted-foreground' />
+                      <span className='flex-1 truncate text-foreground'>{att.originalName}</span>
+                      <span className='shrink-0 text-xs text-muted-foreground'>
+                        {formatSize(att.size)}
+                      </span>
+                      <a
+                        href={att.path}
+                        target='_blank'
+                        rel='noopener noreferrer'
+                        className='shrink-0 rounded p-0.5 hover:bg-muted'
+                        title='Descargar'
+                      >
+                        <Download className='h-3.5 w-3.5 text-muted-foreground' />
+                      </a>
+                      <button
+                        type='button'
+                        title='Eliminar adjunto'
+                        disabled={deletingAttachmentId === att.id}
+                        onClick={() => handleDeleteAttachment(att.id)}
+                        className='shrink-0 rounded p-0.5 hover:bg-muted disabled:opacity-50'
+                      >
+                        <X className='h-3.5 w-3.5 text-muted-foreground hover:text-destructive' />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <Separator />
+              </div>
+            )}
+
+            {/* Subir nuevos archivos */}
+            <FileUploadZone
+              files={pendingFiles}
+              onChange={setPendingFiles}
+              maxFileSizeMB={maxFileSize}
+              label={isEditing ? 'Agregar nuevos documentos' : 'Documentos del contrato'}
+              accept='application/pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png'
+              onSizeError={(name, max) =>
+                toast({
+                  title: 'Archivo muy grande',
+                  description: `"${name}" supera ${max}MB`,
+                  variant: 'destructive',
+                })
+              }
+            />
+            {!isEditing && pendingFiles.length > 0 && (
+              <p className='text-xs text-muted-foreground'>
+                Los archivos se subirán al guardar el contrato.
+              </p>
+            )}
+          </CardContent>
+        </Card>
       </fieldset>
 
       {!isEditing && embedMode && (
@@ -1037,14 +1063,14 @@ export function ContractForm({
 
       {/* ── Notas ───────────────────────────────────────────────────────── */}
       <fieldset disabled={readOnly} className={readOnly ? 'block' : 'contents'}>
-      <div className='space-y-1'>
-        <Label>Notas internas</Label>
-        <Textarea
-          {...register('notes')}
-          rows={3}
-          placeholder='Observaciones, condiciones especiales...'
-        />
-      </div>
+        <div className='space-y-1'>
+          <Label>Notas internas</Label>
+          <Textarea
+            {...register('notes')}
+            rows={3}
+            placeholder='Observaciones, condiciones especiales...'
+          />
+        </div>
       </fieldset>
 
       {/* ── Acciones ────────────────────────────────────────────────────── */}

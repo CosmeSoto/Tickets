@@ -47,7 +47,11 @@ export function QuickContractForm({
   const [submitting, setSubmitting] = useState(false)
 
   const resolved = buildContractPrefill(
-    { ...prefill, supplierId: prefill?.supplierId ?? supplierId, familyId: prefill?.familyId ?? familyId },
+    {
+      ...prefill,
+      supplierId: prefill?.supplierId ?? supplierId,
+      familyId: prefill?.familyId ?? familyId,
+    },
     context
   )
 
@@ -86,24 +90,23 @@ export function QuickContractForm({
 
     setSubmitting(true)
     try {
-      const lines =
-        resolved.suggestedLineDescription
-          ? [
-              {
-                type: resolved.suggestedLineType ?? 'SOFTWARE',
-                description: resolved.suggestedLineDescription,
-                quantity: 1,
-                unitPrice: isRecurring
-                  ? monthlyCost
-                    ? parseFloat(monthlyCost)
-                    : undefined
-                  : totalValue
-                    ? parseFloat(totalValue)
-                    : undefined,
-                order: 0,
-              },
-            ]
-          : []
+      const lines = resolved.suggestedLineDescription
+        ? [
+            {
+              type: resolved.suggestedLineType ?? 'SOFTWARE',
+              description: resolved.suggestedLineDescription,
+              quantity: 1,
+              unitPrice: isRecurring
+                ? monthlyCost
+                  ? parseFloat(monthlyCost)
+                  : undefined
+                : totalValue
+                  ? parseFloat(totalValue)
+                  : undefined,
+              order: 0,
+            },
+          ]
+        : []
 
       const res = await fetch('/api/inventory/contracts', {
         method: 'POST',
@@ -121,7 +124,10 @@ export function QuickContractForm({
           currency,
           billingCycle,
           autoRenew,
-          renewalNoticeDays: 30,
+          renewalNoticeDays:
+            (resolved.category ?? defaultCategoryForContext(context)) === 'EQUIPMENT_RENTAL'
+              ? 120
+              : 30,
           lines,
         }),
       })
@@ -162,9 +168,7 @@ export function QuickContractForm({
             value={name}
             onChange={e => setName(e.target.value)}
             placeholder={
-              context === 'license'
-                ? 'Ej: Microsoft 365 Empresa'
-                : 'Ej: Arrendamiento laptops 2026'
+              context === 'license' ? 'Ej: Microsoft 365 Empresa' : 'Ej: Arrendamiento laptops 2026'
             }
             required
           />
@@ -205,7 +209,10 @@ export function QuickContractForm({
 
         <div className='space-y-1'>
           <Label>Ciclo de facturación</Label>
-          <Select value={billingCycle} onValueChange={v => setBillingCycle(v as typeof billingCycle)}>
+          <Select
+            value={billingCycle}
+            onValueChange={v => setBillingCycle(v as typeof billingCycle)}
+          >
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>

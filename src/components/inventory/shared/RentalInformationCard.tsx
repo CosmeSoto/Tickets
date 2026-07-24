@@ -103,6 +103,37 @@ export function RentalInformationCard({ register, errors }: RentalInformationCar
           </div>
         </div>
 
+        <div className='grid gap-4 md:grid-cols-2'>
+          <div className='space-y-2'>
+            <Label htmlFor='rentalDeliveryDate'>Fecha de entrega</Label>
+            <Input id='rentalDeliveryDate' type='date' {...register('rentalDeliveryDate')} />
+          </div>
+          <div className='space-y-2'>
+            <Label htmlFor='rentalBuyoutValue'>Valor opción de compra</Label>
+            <Input
+              id='rentalBuyoutValue'
+              type='number'
+              step='0.01'
+              {...register('rentalBuyoutValue', { valueAsNumber: true })}
+              placeholder='0.00'
+            />
+          </div>
+          <div className='space-y-2 md:col-span-2'>
+            <Label htmlFor='rentalClientResponse'>Respuesta del cliente</Label>
+            <select
+              id='rentalClientResponse'
+              className='flex h-10 w-full rounded-md border border-border bg-card px-3 py-2 text-sm'
+              {...register('rentalClientResponse')}
+            >
+              <option value='NOT_NOTIFIED'>No se ha notificado al cliente</option>
+              <option value='PENDING_DECISION'>Pendiente de decisión</option>
+              <option value='PURCHASE_CONFIRMED'>Compra del equipo confirmada</option>
+              <option value='RETURN_REQUESTED'>Devolución solicitada</option>
+              <option value='RENEWAL_REQUESTED'>Renovación solicitada</option>
+            </select>
+          </div>
+        </div>
+
         <div className='space-y-2'>
           <Label htmlFor='rentalNotes'>Notas de Renta</Label>
           <Textarea

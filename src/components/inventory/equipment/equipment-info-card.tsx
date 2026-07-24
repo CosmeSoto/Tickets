@@ -115,6 +115,64 @@ export function EquipmentInfoCard({ equipment }: EquipmentInfoCardProps) {
           )}
         </div>
 
+        {/* ── Renta / arrendamiento ── */}
+        {equipment.ownershipType === 'RENTAL' && (
+          <>
+            <Separator />
+            <div className='grid grid-cols-2 gap-x-6 gap-y-3'>
+              {equipment.rentalContractNumber && (
+                <InfoRow label='N° contrato' value={equipment.rentalContractNumber} />
+              )}
+              {equipment.rentalDeliveryDate && (
+                <InfoRow
+                  label='Fecha de entrega'
+                  value={new Date(equipment.rentalDeliveryDate).toLocaleDateString('es-EC', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                  })}
+                />
+              )}
+              {equipment.rentalEndDate && (
+                <InfoRow
+                  label='Fecha de retiro / fin'
+                  value={new Date(equipment.rentalEndDate).toLocaleDateString('es-EC', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                  })}
+                />
+              )}
+              {equipment.rentalMonthlyCost != null && (
+                <InfoRow
+                  label='Costo mensual'
+                  value={`$${Number(equipment.rentalMonthlyCost).toFixed(2)}`}
+                />
+              )}
+              {equipment.rentalBuyoutValue != null && (
+                <InfoRow
+                  label='Valor opción de compra'
+                  value={`$${Number(equipment.rentalBuyoutValue).toFixed(2)}`}
+                />
+              )}
+              <InfoRow
+                label='Respuesta del cliente'
+                value={
+                  (
+                    {
+                      NOT_NOTIFIED: 'No se ha notificado al cliente',
+                      PENDING_DECISION: 'Pendiente de decisión',
+                      PURCHASE_CONFIRMED: 'Compra del equipo confirmada',
+                      RETURN_REQUESTED: 'Devolución solicitada',
+                      RENEWAL_REQUESTED: 'Renovación solicitada',
+                    } as Record<string, string>
+                  )[equipment.rentalClientResponse || 'NOT_NOTIFIED']
+                }
+              />
+            </div>
+          </>
+        )}
+
         {/* ── 1.5 Atributos Personalizados ── */}
         {hasCustomAttributes && (
           <>

@@ -220,6 +220,14 @@ export async function createAsset(
           specifications: specifications ?? undefined,
           notes: notes ?? undefined,
           estimatedPrice: estimatedPrice ?? undefined,
+          rentalDeliveryDate: body.rentalDeliveryDate
+            ? new Date(body.rentalDeliveryDate)
+            : undefined,
+          rentalBuyoutValue:
+            body.rentalBuyoutValue != null && body.rentalBuyoutValue !== ''
+              ? Number(body.rentalBuyoutValue)
+              : undefined,
+          rentalClientResponse: body.rentalClientResponse || undefined,
           customValues:
             customValues.length > 0
               ? {

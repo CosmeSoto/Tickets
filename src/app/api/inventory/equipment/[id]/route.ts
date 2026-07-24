@@ -187,6 +187,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       contractEndDate = undefined,
       contractRenewalCost = undefined,
       saleListingPrice = undefined,
+      rentalDeliveryDate = undefined,
+      rentalBuyoutValue = undefined,
+      rentalClientResponse = undefined,
     } = body as {
       supplierId?: string | null
       invoiceNumber?: string | null
@@ -203,6 +206,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       contractEndDate?: string | null
       contractRenewalCost?: number | null
       saleListingPrice?: number | null
+      rentalDeliveryDate?: string | null
+      rentalBuyoutValue?: number | null
+      rentalClientResponse?: string | null
     }
 
     // Validación: usefulLifeYears > 0
@@ -271,6 +277,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if ('contractRenewalCost' in body)
       financialFields.contractRenewalCost = contractRenewalCost ?? null
     if ('saleListingPrice' in body) financialFields.saleListingPrice = saleListingPrice ?? null
+    if ('rentalDeliveryDate' in body)
+      financialFields.rentalDeliveryDate = rentalDeliveryDate ? new Date(rentalDeliveryDate) : null
+    if ('rentalBuyoutValue' in body) financialFields.rentalBuyoutValue = rentalBuyoutValue ?? null
+    if ('rentalClientResponse' in body)
+      financialFields.rentalClientResponse = rentalClientResponse ?? 'NOT_NOTIFIED'
 
     // Campos de depreciación solo si la familia del activo los soporta
     const currentEquipment = await prisma.equipment.findUnique({

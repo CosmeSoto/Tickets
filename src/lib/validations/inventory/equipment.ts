@@ -1,5 +1,10 @@
 import { z } from 'zod'
-import { EquipmentStatus, EquipmentCondition, OwnershipType } from '@prisma/client'
+import {
+  EquipmentStatus,
+  EquipmentCondition,
+  OwnershipType,
+  RentalClientResponse,
+} from '@prisma/client'
 
 // Equipment status enum schema
 export const equipmentStatusSchema = z.nativeEnum(EquipmentStatus, {
@@ -120,6 +125,18 @@ const baseEquipmentSchema = z.object({
     .string()
     .max(1000, 'Las notas de renta no pueden exceder 1000 caracteres')
     .optional(),
+
+  rentalDeliveryDate: z.preprocess(
+    val => (val === '' || val === undefined || val === null ? undefined : val),
+    z.coerce.date().optional()
+  ),
+
+  rentalBuyoutValue: z.preprocess(
+    val => (val === '' || val === undefined || val === null || Number.isNaN(val) ? undefined : val),
+    z.number().positive('El valor de compra debe ser positivo').optional()
+  ),
+
+  rentalClientResponse: z.nativeEnum(RentalClientResponse).optional(),
 
   departmentId: z.string().uuid('ID de departamento inválido'),
 })

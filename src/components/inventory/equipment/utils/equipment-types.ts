@@ -52,6 +52,18 @@ export interface Equipment {
   invoiceNumber?: string
   purchaseOrderNumber?: string
   saleListingPrice?: number | null
+  rentalStartDate?: string | null
+  rentalEndDate?: string | null
+  rentalMonthlyCost?: number | null
+  rentalDeliveryDate?: string | null
+  rentalBuyoutValue?: number | null
+  rentalClientResponse?:
+    | 'NOT_NOTIFIED'
+    | 'PENDING_DECISION'
+    | 'PURCHASE_CONFIRMED'
+    | 'RETURN_REQUESTED'
+    | 'RENEWAL_REQUESTED'
+  rentalContractNumber?: string | null
 }
 
 export interface EquipmentType {

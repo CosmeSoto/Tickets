@@ -407,6 +407,7 @@ export function EquipmentDetail({
         equipmentBrandName={equipment.model?.brand?.name || equipment.brand}
         equipmentModelName={equipment.model?.model || equipment.modelDeprecated}
         currentOwnershipType={equipment.ownershipType}
+        suggestedBuyoutValue={equipment.rentalBuyoutValue}
         onSuccess={loadEquipmentDetail}
       />
 

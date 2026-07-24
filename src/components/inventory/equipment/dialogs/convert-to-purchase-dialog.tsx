@@ -10,7 +10,7 @@
  * Conserva el historial de arrendamiento en los campos rental_*.
  */
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Loader2, ShoppingCart, Info } from 'lucide-react'
 import {
   Dialog,
@@ -42,6 +42,8 @@ interface ConvertToPurchaseDialogProps {
   equipmentModelName?: string
   /** 'RENTAL' | 'LOAN' */
   currentOwnershipType: string
+  /** Prefill desde valor de opción de compra del activo en renta */
+  suggestedBuyoutValue?: number | null
   onSuccess: () => void
 }
 
@@ -54,12 +56,15 @@ export function ConvertToPurchaseDialog({
   equipmentBrandName,
   equipmentModelName,
   currentOwnershipType,
+  suggestedBuyoutValue,
   onSuccess,
 }: ConvertToPurchaseDialogProps) {
   const [loading, setLoading] = useState(false)
 
   // Campos obligatorios
-  const [purchasePrice, setPurchasePrice] = useState('')
+  const [purchasePrice, setPurchasePrice] = useState(
+    suggestedBuyoutValue != null && suggestedBuyoutValue > 0 ? String(suggestedBuyoutValue) : ''
+  )
   const [purchaseDate, setPurchaseDate] = useState(() => new Date().toISOString().split('T')[0])
 
   // Campos opcionales
@@ -78,6 +83,12 @@ export function ConvertToPurchaseDialog({
     equipmentBrandName,
     equipmentModelName,
   })
+
+  useEffect(() => {
+    if (open && suggestedBuyoutValue != null && suggestedBuyoutValue > 0) {
+      setPurchasePrice(String(suggestedBuyoutValue))
+    }
+  }, [open, suggestedBuyoutValue])
 
   const validate = () => {
     const e: Record<string, string> = {}

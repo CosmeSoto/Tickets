@@ -19,7 +19,10 @@ import {
   CONTRACT_BILLING_CYCLE_VALUES,
   CONTRACT_LINE_TYPE_VALUES,
 } from '@/lib/validations/contracts'
-import { getBillingCompletenessIssues, methodNeedsPortal } from '@/lib/contracts/billing-completeness'
+import {
+  getBillingCompletenessIssues,
+  methodNeedsPortal,
+} from '@/lib/contracts/billing-completeness'
 import { syncContractLicenseLines } from '@/lib/contracts/license-sync'
 import { syncContractEquipmentLines } from '@/lib/contracts/equipment-sync'
 
@@ -123,7 +126,8 @@ function mapBillingFields(data: BillingGovernanceInput) {
   const mapped: Record<string, unknown> = {}
   if (data.serviceSubtype !== undefined) mapped.serviceSubtype = data.serviceSubtype || null
   if (data.paymentMethodType !== undefined) mapped.paymentMethodType = data.paymentMethodType
-  if (data.paymentAccountRef !== undefined) mapped.paymentAccountRef = data.paymentAccountRef || null
+  if (data.paymentAccountRef !== undefined)
+    mapped.paymentAccountRef = data.paymentAccountRef || null
   if (data.custodianUserId !== undefined) mapped.custodianUserId = data.custodianUserId || null
   if (data.backupCustodianUserId !== undefined) {
     mapped.backupCustodianUserId = data.backupCustodianUserId || null
@@ -136,7 +140,8 @@ function mapBillingFields(data: BillingGovernanceInput) {
   if (data.paymentCardBrand !== undefined) mapped.paymentCardBrand = data.paymentCardBrand || null
   if (data.paymentCardLast4 !== undefined) mapped.paymentCardLast4 = data.paymentCardLast4 || null
   if (data.paymentCardBank !== undefined) mapped.paymentCardBank = data.paymentCardBank || null
-  if (data.paymentCardExpiry !== undefined) mapped.paymentCardExpiry = data.paymentCardExpiry || null
+  if (data.paymentCardExpiry !== undefined)
+    mapped.paymentCardExpiry = data.paymentCardExpiry || null
   if (data.corporateCardLabel !== undefined) {
     mapped.corporateCardLabel = data.corporateCardLabel || null
   }
@@ -294,40 +299,42 @@ export class ContractService {
 
   // ── Crear ───────────────────────────────────────────────────────────────────
 
-  static async create(data: {
-    contractNumber?: string
-    name: string
-    description?: string
-    category: string
-    supplierId?: string
-    familyId?: string
-    modelId?: string
-    batchId?: string
-    startDate?: string
-    endDate?: string
-    autoRenew?: boolean
-    renewalNoticeDays?: number
-    billingCycle?: string
-    totalValue?: number
-    monthlyCost?: number
-    currency?: string
-    contactName?: string
-    contactEmail?: string
-    contactPhone?: string
-    notes?: string
-    termsUrl?: string
-    lines?: Array<{
-      type: string
-      description: string
-      quantity?: number
-      unitPrice?: number
-      equipmentId?: string
-      licenseId?: string
+  static async create(
+    data: {
+      contractNumber?: string
+      name: string
+      description?: string
+      category: string
+      supplierId?: string
+      familyId?: string
+      modelId?: string
+      batchId?: string
+      startDate?: string
+      endDate?: string
+      autoRenew?: boolean
+      renewalNoticeDays?: number
+      billingCycle?: string
+      totalValue?: number
+      monthlyCost?: number
+      currency?: string
+      contactName?: string
+      contactEmail?: string
+      contactPhone?: string
       notes?: string
-      order?: number
-    }>
-    createdBy: string
-  } & BillingGovernanceInput) {
+      termsUrl?: string
+      lines?: Array<{
+        type: string
+        description: string
+        quantity?: number
+        unitPrice?: number
+        equipmentId?: string
+        licenseId?: string
+        notes?: string
+        order?: number
+      }>
+      createdBy: string
+    } & BillingGovernanceInput
+  ) {
     const { lines = [], createdBy, ...contractData } = data
 
     const contract = await prisma.contracts.create({
@@ -345,7 +352,9 @@ export class ContractService {
         startDate: contractData.startDate ? new Date(contractData.startDate) : null,
         endDate: contractData.endDate ? new Date(contractData.endDate) : null,
         autoRenew: contractData.autoRenew ?? false,
-        renewalNoticeDays: contractData.renewalNoticeDays ?? 30,
+        renewalNoticeDays:
+          contractData.renewalNoticeDays ??
+          (toValidCategory(contractData.category) === 'EQUIPMENT_RENTAL' ? 120 : 30),
         billingCycle: toValidBillingCycle(contractData.billingCycle),
         totalValue: contractData.totalValue ?? null,
         monthlyCost: contractData.monthlyCost ?? null,
@@ -405,30 +414,32 @@ export class ContractService {
 
   static async update(
     id: string,
-    data: Partial<{
-      contractNumber: string
-      name: string
-      description: string
-      category: string
-      supplierId: string
-      familyId: string
-      modelId: string
-      batchId: string
-      startDate: string
-      endDate: string
-      autoRenew: boolean
-      renewalNoticeDays: number
-      billingCycle: string
-      totalValue: number
-      monthlyCost: number
-      currency: string
-      contactName: string
-      contactEmail: string
-      contactPhone: string
-      notes: string
-      termsUrl: string
-      status: string
-    } & BillingGovernanceInput>,
+    data: Partial<
+      {
+        contractNumber: string
+        name: string
+        description: string
+        category: string
+        supplierId: string
+        familyId: string
+        modelId: string
+        batchId: string
+        startDate: string
+        endDate: string
+        autoRenew: boolean
+        renewalNoticeDays: number
+        billingCycle: string
+        totalValue: number
+        monthlyCost: number
+        currency: string
+        contactName: string
+        contactEmail: string
+        contactPhone: string
+        notes: string
+        termsUrl: string
+        status: string
+      } & BillingGovernanceInput
+    >,
     updatedBy: string
   ) {
     const before = await prisma.contracts.findUnique({
@@ -1021,7 +1032,11 @@ export class ContractService {
         if (billingIssues.length > 0) {
           risks.push(billingIssues[0])
         }
-        if (!c.billingPortalUrl && !c.billingAccountEmail && methodNeedsPortal(c.paymentMethodType)) {
+        if (
+          !c.billingPortalUrl &&
+          !c.billingAccountEmail &&
+          methodNeedsPortal(c.paymentMethodType)
+        ) {
           risks.push('Sin acceso al portal de facturación')
         }
         if (!c.assignments.length) {
@@ -1032,7 +1047,11 @@ export class ContractService {
         if (c.subscriptionUsageStatus === 'PENDING_CANCEL' && !c.lastTransactionRef) {
           risks.push('Cancelación sin referencia de transacción')
         }
-        return { ...c, risks, riskLevel: risks.length >= 3 ? 'high' : risks.length >= 1 ? 'medium' : 'low' }
+        return {
+          ...c,
+          risks,
+          riskLevel: risks.length >= 3 ? 'high' : risks.length >= 1 ? 'medium' : 'low',
+        }
       })
       .filter(c => c.risks.length > 0)
   }

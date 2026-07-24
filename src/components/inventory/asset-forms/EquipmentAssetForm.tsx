@@ -200,6 +200,17 @@ export function EquipmentAssetForm({
   const [linkedContractId, setLinkedContractId] = useState<string | null>(
     initialEquipment?.businessContractId || initialEquipment?.contractId || null
   )
+  const [rentalDeliveryDate, setRentalDeliveryDate] = useState(
+    initialEquipment?.rentalDeliveryDate
+      ? new Date(initialEquipment.rentalDeliveryDate).toISOString().split('T')[0]
+      : ''
+  )
+  const [rentalBuyoutValue, setRentalBuyoutValue] = useState(
+    initialEquipment?.rentalBuyoutValue != null ? String(initialEquipment.rentalBuyoutValue) : ''
+  )
+  const [rentalClientResponse, setRentalClientResponse] = useState<string>(
+    initialEquipment?.rentalClientResponse || 'NOT_NOTIFIED'
+  )
   const [purchaseDate, setPurchaseDate] = useState(
     initialEquipment?.purchaseDate
       ? new Date(initialEquipment.purchaseDate).toISOString().split('T')[0]
@@ -272,10 +283,9 @@ export function EquipmentAssetForm({
     () => ({
       familyId,
       supplierId: supplierId || null,
-      startDate:
-        initialEquipment?.rentalStartDate
-          ? new Date(initialEquipment.rentalStartDate).toISOString().slice(0, 10)
-          : purchaseDate || undefined,
+      startDate: initialEquipment?.rentalStartDate
+        ? new Date(initialEquipment.rentalStartDate).toISOString().slice(0, 10)
+        : purchaseDate || undefined,
       endDate: initialEquipment?.rentalEndDate
         ? new Date(initialEquipment.rentalEndDate).toISOString().slice(0, 10)
         : undefined,
@@ -673,6 +683,11 @@ export function EquipmentAssetForm({
           : undefined,
       supplierId: supplierId || undefined,
       contractId: linkedContractId || undefined,
+      ...(acquisitionMode === 'RENTAL' && {
+        rentalDeliveryDate: rentalDeliveryDate || undefined,
+        rentalBuyoutValue: rentalBuyoutValue ? parseFloat(rentalBuyoutValue) : undefined,
+        rentalClientResponse: rentalClientResponse || 'NOT_NOTIFIED',
+      }),
       purchaseDate: purchaseDate || undefined,
       purchasePrice: purchasePrice ? parseFloat(purchasePrice) : undefined,
       invoiceNumber: invoiceNumber || undefined,
@@ -1196,6 +1211,50 @@ export function EquipmentAssetForm({
                   automáticamente.
                 </p>
               )}
+
+              <div className='grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1'>
+                <div className='space-y-1'>
+                  <Label htmlFor='rentalDeliveryDate'>Fecha de entrega</Label>
+                  <Input
+                    id='rentalDeliveryDate'
+                    type='date'
+                    value={rentalDeliveryDate}
+                    onChange={e => setRentalDeliveryDate(e.target.value)}
+                  />
+                  <p className='text-[11px] text-muted-foreground'>
+                    Entrega física del equipo (puede diferir del inicio del contrato).
+                  </p>
+                </div>
+                <div className='space-y-1'>
+                  <Label htmlFor='rentalBuyoutValue'>Valor opción de compra</Label>
+                  <Input
+                    id='rentalBuyoutValue'
+                    type='number'
+                    min='0'
+                    step='0.01'
+                    value={rentalBuyoutValue}
+                    onChange={e => setRentalBuyoutValue(e.target.value)}
+                    placeholder='0.00'
+                  />
+                  <p className='text-[11px] text-muted-foreground'>
+                    Valor de compra al finalizar la renta (según contrato).
+                  </p>
+                </div>
+                <div className='space-y-1 sm:col-span-2'>
+                  <Label htmlFor='rentalClientResponse'>Respuesta del cliente</Label>
+                  <SimpleSelect
+                    value={rentalClientResponse}
+                    onChange={e => setRentalClientResponse(e.target.value)}
+                    options={[
+                      { value: 'NOT_NOTIFIED', label: 'No se ha notificado al cliente' },
+                      { value: 'PENDING_DECISION', label: 'Pendiente de decisión' },
+                      { value: 'PURCHASE_CONFIRMED', label: 'Compra del equipo confirmada' },
+                      { value: 'RETURN_REQUESTED', label: 'Devolución solicitada' },
+                      { value: 'RENEWAL_REQUESTED', label: 'Renovación solicitada' },
+                    ]}
+                  />
+                </div>
+              </div>
             </div>
           )}
         </>

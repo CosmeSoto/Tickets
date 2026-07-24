@@ -63,7 +63,18 @@ export class ContractAlertService {
         (contract.endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
       )
 
-      for (const threshold of thresholds) {
+      // Si el contrato define un aviso mayor (ej. 120 días en renta), usarlo como umbral temprano
+      const contractThresholds = [...thresholds]
+      const noticeDays = contract.renewalNoticeDays ?? 0
+      if (noticeDays > contractThresholds[0].days) {
+        contractThresholds[0] = {
+          days: Math.min(365, noticeDays),
+          upper: contractThresholds[0].upper,
+          flag: 'alert60DaysSent',
+        }
+      }
+
+      for (const threshold of contractThresholds) {
         const alreadySent = contract[threshold.flag] as boolean
         if (
           daysUntilExpiry <= threshold.days &&

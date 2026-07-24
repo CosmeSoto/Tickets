@@ -1051,6 +1051,12 @@ model equipment {
   rentalContactPhone    String?                   @map("rental_contact_phone")
   rentalNotes           String?                   @map("rental_notes")
   rentalAlertSentAt     DateTime?                 @map("rental_alert_sent_at")
+  /// Fecha física de entrega del equipo en arriendo (distinta del inicio del contrato)
+  rentalDeliveryDate    DateTime?                 @map("rental_delivery_date")
+  /// Valor de opción de compra / buyout mientras sigue en renta
+  rentalBuyoutValue     Float?                    @map("rental_buyout_value")
+  /// Decisión del cliente respecto al fin de renta
+  rentalClientResponse  RentalClientResponse      @default(NOT_NOTIFIED) @map("rental_client_response")
   supplierId            String?                   @map("supplier_id")
   invoiceNumber         String?                   @map("invoice_number") @db.VarChar(100)
   purchaseOrderNumber   String?                   @map("purchase_order_number") @db.VarChar(100)
@@ -2005,6 +2011,15 @@ enum OwnershipType {
   FIXED_ASSET
   RENTAL
   LOAN
+}
+
+/// Respuesta del cliente ante el fin de renta (por equipo)
+enum RentalClientResponse {
+  NOT_NOTIFIED
+  PENDING_DECISION
+  PURCHASE_CONFIRMED
+  RETURN_REQUESTED
+  RENEWAL_REQUESTED
 }
 
 enum AssignmentType {
