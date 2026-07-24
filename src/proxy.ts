@@ -136,11 +136,29 @@ export async function proxy(request: NextRequest) {
     if (!request.nextUrl.pathname.startsWith('/api/auth/')) {
       // Leer userId del JWT si existe (sin bloquear — getToken es async pero ligero)
       let userId: string | undefined
+      let mustChangePassword = false
       try {
         const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET })
         userId = token?.sub ?? undefined
+        mustChangePassword = token?.mustChangePassword === true
       } catch {
         /* sin token — usar IP */
+      }
+
+      // Forzar cambio de contraseña: bloquear APIs excepto el propio endpoint de cambio
+      if (
+        mustChangePassword &&
+        !path.startsWith('/api/user/change-password') &&
+        !path.startsWith('/api/auth/password-policy')
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Debes cambiar tu contraseña antes de continuar',
+            code: 'PASSWORD_CHANGE_REQUIRED',
+          },
+          { status: 403, headers: { 'X-Request-ID': requestId } }
+        )
       }
 
       const { key, limits } = getRateLimitKey(request, userId)
@@ -240,6 +258,13 @@ export async function proxy(request: NextRequest) {
       const loginUrl = new URL('/login', request.url)
       loginUrl.searchParams.set('callbackUrl', request.nextUrl.pathname)
       return NextResponse.redirect(loginUrl)
+    }
+
+    // Política: forzar cambio de contraseña antes de usar el sistema
+    if (token.mustChangePassword === true && path !== '/change-password') {
+      const changePasswordUrl = new URL('/change-password', request.url)
+      changePasswordUrl.searchParams.set('callbackUrl', request.nextUrl.pathname)
+      return NextResponse.redirect(changePasswordUrl)
     }
 
     // Verificar permisos por rol
