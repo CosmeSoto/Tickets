@@ -139,11 +139,12 @@ export function useCategoriesData(options: UseCategoriesDataOptions = {}) {
     [getCacheKey, getFromCache, setToCache, toast]
   ) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Cargar técnicos (opcionalmente filtrados por familia, siempre incluye los ya asignados)
+  // Cargar resolutores de categoría: técnicos + admins (según familia nativa/asignada)
   const loadAvailableTechnicians = useCallback(
     async (familyId?: string, alreadyAssignedIds?: string[]) => {
       const cacheKey = getCacheKey('/api/users', {
-        role: 'TECHNICIAN',
+        purpose: 'categoryResolvers',
+        roles: 'TECHNICIAN,ADMIN',
         isActive: true,
         familyId: familyId ?? 'all',
       })
@@ -153,9 +154,10 @@ export function useCategoriesData(options: UseCategoriesDataOptions = {}) {
         if (alreadyAssignedIds && alreadyAssignedIds.length > 0) {
           const missingIds = alreadyAssignedIds.filter(id => !cached.find((t: any) => t.id === id))
           if (missingIds.length > 0) {
-            // Cargar sin filtro de familia para obtener los técnicos asignados
             try {
-              const allRes = await fetch(`/api/users?role=TECHNICIAN&isActive=true`)
+              const allRes = await fetch(
+                `/api/users?purpose=categoryResolvers&roles=TECHNICIAN,ADMIN&isActive=true`
+              )
               if (allRes.ok) {
                 const allData = await allRes.json()
                 if (allData.success && Array.isArray(allData.data)) {
@@ -176,7 +178,11 @@ export function useCategoriesData(options: UseCategoriesDataOptions = {}) {
       }
 
       try {
-        const params = new URLSearchParams({ role: 'TECHNICIAN', isActive: 'true' })
+        const params = new URLSearchParams({
+          purpose: 'categoryResolvers',
+          roles: 'TECHNICIAN,ADMIN',
+          isActive: 'true',
+        })
         if (familyId) params.set('familyId', familyId)
         const response = await fetch(`/api/users?${params.toString()}`)
         if (response.ok) {
@@ -184,13 +190,15 @@ export function useCategoriesData(options: UseCategoriesDataOptions = {}) {
           if (data.success && Array.isArray(data.data)) {
             let technicians = data.data
 
-            // Si hay técnicos ya asignados que no están en la lista filtrada, cargarlos también
+            // Si hay resolutores ya asignados que no están en la lista filtrada, cargarlos también
             if (alreadyAssignedIds && alreadyAssignedIds.length > 0) {
               const missingIds = alreadyAssignedIds.filter(
                 id => !technicians.find((t: any) => t.id === id)
               )
               if (missingIds.length > 0) {
-                const allRes = await fetch(`/api/users?role=TECHNICIAN&isActive=true`)
+                const allRes = await fetch(
+                  `/api/users?purpose=categoryResolvers&roles=TECHNICIAN,ADMIN&isActive=true`
+                )
                 if (allRes.ok) {
                   const allData = await allRes.json()
                   if (allData.success && Array.isArray(allData.data)) {

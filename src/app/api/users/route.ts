@@ -56,6 +56,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
 
     const role = searchParams.get('role')
+    const rolesParam = searchParams.get('roles') // ej: TECHNICIAN,ADMIN
+    const purpose = searchParams.get('purpose') // categoryResolvers
     const isActive = searchParams.get('isActive')
     const departmentId = searchParams.get('departmentId')
     const department = searchParams.get('department')
@@ -69,10 +71,20 @@ export async function GET(request: NextRequest) {
     const formsEnabled = searchParams.get('formsEnabled')
     const newsEnabled = searchParams.get('newsEnabled')
 
+    const isCategoryResolvers = purpose === 'categoryResolvers'
+    const rolesList =
+      rolesParam
+        ?.split(',')
+        .map(r => r.trim())
+        .filter(Boolean) ?? null
+
     // Construir filtros para Prisma
     const where: any = {}
 
-    if (role) {
+    if (isCategoryResolvers || (rolesList && rolesList.length > 0)) {
+      // Técnicos + admins que pueden resolver / asignarse a categorías
+      where.role = { in: rolesList && rolesList.length > 0 ? rolesList : ['TECHNICIAN', 'ADMIN'] }
+    } else if (role) {
       where.role = role
     }
 
@@ -109,9 +121,31 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Filtrar técnicos por familia NATIVA (resolutores del área).
-    // Las technician_family_assignments son solo para crear tickets a otras áreas.
-    if (familyId) {
+    // Filtro por familia del área de la categoría (resolutores)
+    if (familyId && isCategoryResolvers) {
+      // Elegibles: nativa del área, Super Admin, o Admin con asignación a esa familia.
+      // (technician_family_assignments = solo consumo/crear tickets, no cola operativa)
+      where.AND = [
+        ...(where.AND ?? []),
+        {
+          OR: [
+            { departments: { familyId } },
+            { isSuperAdmin: true },
+            {
+              AND: [
+                { role: 'ADMIN' },
+                {
+                  adminFamilyAssignments: {
+                    some: { familyId, isActive: true },
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ]
+    } else if (familyId) {
+      // Filtrar técnicos por familia NATIVA (resolutores del área).
       where.AND = [...(where.AND ?? []), { departments: { familyId } }]
     }
 
@@ -143,7 +177,7 @@ export async function GET(request: NextRequest) {
       ]
     }
 
-    // ADMIN normal: solo ver usuarios de sus familias (Union_Scope: no super admins, no usuarios de otras familias)
+    // ADMIN normal: solo ver usuarios de sus familias (nativa + asignadas)
     const requesterIsSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
     const cacheScopeKey =
       session.user.role === 'ADMIN'
@@ -153,21 +187,69 @@ export async function GET(request: NextRequest) {
         : session.user.role
 
     if (session.user.role === 'ADMIN' && !requesterIsSuperAdmin) {
-      const { getAdminUnionDepartmentIds } = await import('@/lib/auth/admin-scope')
-      const deptIds = await getAdminUnionDepartmentIds(session.user.id, false)
+      if (isCategoryResolvers) {
+        // Scope por familias (nativa + asignadas), no solo departmentId:
+        // permite ver admins/super con assignment o nativa en esas familias.
+        const { getTicketConsumerFamilyIds } = await import('@/lib/auth/family-scope')
+        const allowedFamilies = await getTicketConsumerFamilyIds(session.user.id, 'ADMIN', false)
+        // undefined = sin límite (edge admin sin familias activas); [] = sin acceso
+        if (Array.isArray(allowedFamilies) && allowedFamilies.length === 0) {
+          return NextResponse.json({
+            success: true,
+            data: [],
+            meta: { total: 0, filters: { purpose, familyId, roles: rolesList } },
+          })
+        }
+        if (Array.isArray(allowedFamilies)) {
+          if (familyId && !allowedFamilies.includes(familyId)) {
+            return NextResponse.json({
+              success: true,
+              data: [],
+              meta: { total: 0, filters: { purpose, familyId, roles: rolesList } },
+            })
+          }
+          const effectiveFamilyIds = familyId ? [familyId] : allowedFamilies
+          where.AND = [
+            ...(where.AND ?? []),
+            {
+              OR: [
+                { departments: { familyId: { in: effectiveFamilyIds } } },
+                { isSuperAdmin: true },
+                {
+                  AND: [
+                    { role: 'ADMIN' },
+                    {
+                      adminFamilyAssignments: {
+                        some: { familyId: { in: effectiveFamilyIds }, isActive: true },
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+          ]
+        }
+      } else {
+        const { getAdminUnionDepartmentIds } = await import('@/lib/auth/admin-scope')
+        const deptIds = await getAdminUnionDepartmentIds(session.user.id, false)
 
-      if (!deptIds || deptIds.length === 0) {
-        return NextResponse.json({
-          success: true,
-          data: [],
-          meta: {
-            total: 0,
-            filters: { role, isActive, departmentId, department },
-          },
-        })
+        if (!deptIds || deptIds.length === 0) {
+          return NextResponse.json({
+            success: true,
+            data: [],
+            meta: {
+              total: 0,
+              filters: { role, isActive, departmentId, department },
+            },
+          })
+        }
+
+        where.AND = [
+          ...(where.AND ?? []),
+          { departmentId: { in: deptIds } },
+          { isSuperAdmin: false },
+        ]
       }
-
-      where.AND = [...(where.AND ?? []), { departmentId: { in: deptIds } }, { isSuperAdmin: false }]
     } else if (session.user.role !== 'ADMIN') {
       const { getUserFamilyScope, getDepartmentIdsForScope } =
         await import('@/lib/auth/admin-scope')
@@ -191,6 +273,8 @@ export async function GET(request: NextRequest) {
       const cacheKey = buildCacheKey('users:list', {
         scope: cacheScopeKey,
         role: role ?? 'all',
+        roles: rolesList?.join(',') ?? '',
+        purpose: purpose ?? '',
         isActive: isActive ?? 'all',
         departmentId: departmentId ?? '',
         familyId: familyId ?? '',
@@ -209,40 +293,41 @@ export async function GET(request: NextRequest) {
     }
 
     // Obtener usuarios con conteo de tickets y relación con departamento
-    const technicianInclude =
-      role === 'TECHNICIAN'
-        ? {
-            technicianFamilyAssignments: {
-              where: { isActive: true },
-              select: {
-                familyId: true,
-                family: { select: { id: true, name: true, code: true, color: true } },
-              },
+    const includeTechAssignments =
+      role === 'TECHNICIAN' || isCategoryResolvers || (rolesList?.includes('TECHNICIAN') ?? false)
+    const technicianInclude = includeTechAssignments
+      ? {
+          technicianFamilyAssignments: {
+            where: { isActive: true },
+            select: {
+              familyId: true,
+              family: { select: { id: true, name: true, code: true, color: true } },
             },
-            technician_assignments: {
-              select: {
-                id: true,
-                priority: true,
-                maxTickets: true,
-                autoAssign: true,
-                categories: {
-                  select: {
-                    id: true,
-                    name: true,
-                    color: true,
-                    level: true,
-                  },
+          },
+          technician_assignments: {
+            select: {
+              id: true,
+              priority: true,
+              maxTickets: true,
+              autoAssign: true,
+              categories: {
+                select: {
+                  id: true,
+                  name: true,
+                  color: true,
+                  level: true,
                 },
               },
-              where: {
-                isActive: true,
-              },
             },
-          }
-        : {
-            technicianFamilyAssignments: false as const,
-            technician_assignments: false as const,
-          }
+            where: {
+              isActive: true,
+            },
+          },
+        }
+      : {
+          technicianFamilyAssignments: false as const,
+          technician_assignments: false as const,
+        }
 
     const users = await prisma.users.findMany({
       where,
@@ -360,6 +445,8 @@ export async function GET(request: NextRequest) {
       const cacheKey = buildCacheKey('users:list', {
         scope: cacheScopeKey,
         role: role ?? 'all',
+        roles: rolesList?.join(',') ?? '',
+        purpose: purpose ?? '',
         isActive: isActive ?? 'all',
         departmentId: departmentId ?? '',
         familyId: familyId ?? '',

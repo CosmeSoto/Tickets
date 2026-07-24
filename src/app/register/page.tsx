@@ -83,16 +83,28 @@ export default function RegisterPage() {
 
   const validate = (): boolean => {
     const errors: FormErrors = {}
-    if (!formData.name.trim() || formData.name.trim().length < 2)
+    if (!formData.name.trim()) errors.name = 'El nombre es requerido'
+    else if (formData.name.trim().length < 2)
       errors.name = 'El nombre debe tener al menos 2 caracteres'
-    if (!formData.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email))
-      errors.email = 'Email inválido'
-    if (!formData.password || formData.password.length < 6) errors.password = 'Mínimo 6 caracteres'
-    if (formData.password !== formData.confirmPassword)
+    else if (formData.name.trim().length > 100)
+      errors.name = 'El nombre no puede superar los 100 caracteres'
+
+    if (!formData.email.trim()) errors.email = 'El email es requerido'
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email))
+      errors.email = 'Ingresa un email válido (ej: usuario@dominio.com)'
+
+    if (!formData.password) errors.password = 'La contraseña es requerida'
+    else if (formData.password.length < 6)
+      errors.password = `La contraseña debe tener al menos 6 caracteres (tiene ${formData.password.length})`
+
+    if (!formData.confirmPassword) errors.confirmPassword = 'Confirma tu contraseña'
+    else if (formData.password !== formData.confirmPassword)
       errors.confirmPassword = 'Las contraseñas no coinciden'
+
     if (formData.phone && !/^\+?[\d\s\-()]+$/.test(formData.phone))
-      errors.phone = 'Teléfono inválido'
-    if (!formData.departmentId) errors.departmentId = 'Selecciona un departamento'
+      errors.phone = 'Formato de teléfono inválido. Usa solo números, espacios, +, - o paréntesis'
+
+    if (!formData.departmentId) errors.departmentId = 'Debes seleccionar un departamento'
     setFormErrors(errors)
     return Object.keys(errors).length === 0
   }
@@ -101,6 +113,15 @@ export default function RegisterPage() {
     setFormData(prev => ({ ...prev, [field]: value }))
     if (formErrors[field]) setFormErrors(prev => ({ ...prev, [field]: undefined }))
     setError(null)
+  }
+
+  // Mapeo de nombres de campo de la API a los del formulario
+  const fieldNameMap: Record<string, keyof FormErrors> = {
+    name: 'name',
+    email: 'email',
+    password: 'password',
+    phone: 'phone',
+    departmentId: 'departmentId',
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -122,8 +143,26 @@ export default function RegisterPage() {
       })
       const data = await res.json()
       if (!res.ok) {
-        if (data.field === 'email') setFormErrors({ email: data.error })
-        else setError(data.error || 'Error al registrar usuario')
+        // Errores de validación Zod con múltiples campos
+        if (Array.isArray(data.errors) && data.errors.length > 0) {
+          const mapped: FormErrors = {}
+          data.errors.forEach((err: { field: string; message: string }) => {
+            const key = fieldNameMap[err.field]
+            if (key) mapped[key] = err.message
+          })
+          setFormErrors(mapped)
+          // Si hay errores que no tienen campo en el formulario, mostrar el primero
+          const unmapped = data.errors.find((err: { field: string }) => !fieldNameMap[err.field])
+          if (unmapped) setError(unmapped.message)
+          return
+        }
+        // Error de campo único (ej: email duplicado, departamento no encontrado)
+        if (data.field && fieldNameMap[data.field]) {
+          setFormErrors({ [fieldNameMap[data.field]]: data.error })
+          return
+        }
+        // Error general del servidor
+        setError(data.error || 'Error al registrar usuario. Intenta de nuevo.')
         return
       }
       setSuccess(true)

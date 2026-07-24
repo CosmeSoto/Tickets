@@ -10,6 +10,8 @@ interface Technician {
   id: string
   name: string
   email: string
+  role?: 'TECHNICIAN' | 'ADMIN' | 'CLIENT' | string
+  isSuperAdmin?: boolean
   department?: string | { id: string; name: string; color?: string; familyId?: string } | null
   isActive: boolean
   technicianFamilyAssignments?: {
@@ -69,19 +71,36 @@ export function TechnicianSelector({
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
 
+  const getDeptName = (dept: Technician['department']): string | null => {
+    if (!dept) return null
+    if (typeof dept === 'string') return dept
+    return dept.name ?? null
+  }
+
+  const getRoleLabel = (tech: Pick<Technician, 'role' | 'isSuperAdmin'>): string | null => {
+    if (tech.isSuperAdmin) return 'Super Admin'
+    if (tech.role === 'ADMIN') return 'Admin'
+    if (tech.role === 'TECHNICIAN') return 'Técnico'
+    return tech.role ?? null
+  }
+
   // Filtrar técnicos disponibles (no asignados)
   const availableTechnicians = technicians.filter(
     tech => tech.isActive && !(technicianAssignments || []).find(at => at.technicianId === tech.id)
   )
 
-  // Filtrar por búsqueda
-  const filteredTechnicians = availableTechnicians.filter(
-    tech =>
-      tech.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      tech.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (tech.department &&
-        getDeptName(tech.department)?.toLowerCase().includes(searchTerm.toLowerCase()))
-  )
+  // Filtrar por búsqueda (nombre, email, depto, rol)
+  const filteredTechnicians = availableTechnicians.filter(tech => {
+    const q = searchTerm.toLowerCase()
+    if (!q) return true
+    const roleLabel = getRoleLabel(tech)?.toLowerCase() ?? ''
+    return (
+      tech.name.toLowerCase().includes(q) ||
+      tech.email.toLowerCase().includes(q) ||
+      roleLabel.includes(q) ||
+      (tech.department && getDeptName(tech.department)?.toLowerCase().includes(q))
+    )
+  })
 
   // Obtener técnicos asignados con información completa
   const assignedTechniciansWithInfo = (technicianAssignments || [])
@@ -143,13 +162,6 @@ export function TechnicianSelector({
     }
   }, [highlightedIndex])
 
-  // Helper para obtener nombre del departamento
-  const getDeptName = (dept: Technician['department']): string | null => {
-    if (!dept) return null
-    if (typeof dept === 'string') return dept
-    return dept.name ?? null
-  }
-
   // Obtener descripción por nivel de categoría
   const getLevelDescription = (level: number): string => {
     switch (level) {
@@ -208,7 +220,14 @@ export function TechnicianSelector({
                   </div>
 
                   <div className='flex-1 min-w-0'>
-                    <div className='font-medium text-sm text-foreground truncate'>{tech.name}</div>
+                    <div className='font-medium text-sm text-foreground truncate'>
+                      {tech.name}
+                      {getRoleLabel(tech) && (
+                        <Badge variant='outline' className='ml-2 text-[10px] align-middle'>
+                          {getRoleLabel(tech)}
+                        </Badge>
+                      )}
+                    </div>
                     <div className='text-xs text-muted-foreground truncate'>
                       {tech.email}
                       {tech.department && ` • ${getDeptName(tech.department)}`}
@@ -286,7 +305,7 @@ export function TechnicianSelector({
       {/* Selector para agregar técnicos */}
       <div className='space-y-2'>
         <label className='text-sm font-medium text-foreground'>
-          Agregar Técnico ({availableTechnicians.length} disponibles)
+          Agregar resolutor ({availableTechnicians.length} disponibles)
         </label>
 
         <div className='relative'>
@@ -302,7 +321,7 @@ export function TechnicianSelector({
               'disabled:bg-muted disabled:text-muted-foreground',
               isOpen && 'ring-2 ring-blue-500 border-blue-500'
             )}
-            placeholder='Buscar técnico por nombre, email o departamento...'
+            placeholder='Buscar por nombre, email, rol o departamento...'
             value={searchTerm}
             onChange={e => {
               setSearchTerm(e.target.value)
@@ -358,6 +377,11 @@ export function TechnicianSelector({
                     <div className='flex-1 min-w-0'>
                       <div className='text-sm font-medium text-foreground truncate'>
                         {technician.name}
+                        {getRoleLabel(technician) && (
+                          <Badge variant='outline' className='ml-2 text-[10px] align-middle'>
+                            {getRoleLabel(technician)}
+                          </Badge>
+                        )}
                       </div>
                       <div className='text-xs text-muted-foreground truncate'>
                         {technician.email}

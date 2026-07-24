@@ -89,7 +89,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
           where: { isActive: true },
           include: {
             users: {
-              select: { id: true, name: true, email: true },
+              select: { id: true, name: true, email: true, role: true, isSuperAdmin: true },
             },
           },
         },
@@ -250,7 +250,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     // Si cambia el departamento, validar permiso en la nueva familia también
     let resolvedFamilyId =
-      existingCategory.departments?.familyId ?? (await getDepartmentFamilyId(validatedData.departmentId))
+      existingCategory.departments?.familyId ??
+      (await getDepartmentFamilyId(validatedData.departmentId))
     if (validatedData.departmentId !== existingCategory.departmentId) {
       const newFamilyId = await getDepartmentFamilyId(validatedData.departmentId)
       resolvedFamilyId = newFamilyId
@@ -330,7 +331,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         _count: { select: { tickets: true, other_categories: true } },
         technician_assignments: {
           where: { isActive: true },
-          include: { users: { select: { id: true, name: true, email: true } } },
+          include: {
+            users: {
+              select: { id: true, name: true, email: true, role: true, isSuperAdmin: true },
+            },
+          },
         },
       },
     })
@@ -381,7 +386,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         _count: { select: { tickets: true, other_categories: true } },
         technician_assignments: {
           where: { isActive: true },
-          include: { users: { select: { id: true, name: true, email: true } } },
+          include: {
+            users: {
+              select: { id: true, name: true, email: true, role: true, isSuperAdmin: true },
+            },
+          },
         },
       },
     })
@@ -512,7 +521,7 @@ export async function DELETE(
           where: { isActive: true },
           include: {
             users: {
-              select: { id: true, name: true, email: true },
+              select: { id: true, name: true, email: true, role: true, isSuperAdmin: true },
             },
           },
         },

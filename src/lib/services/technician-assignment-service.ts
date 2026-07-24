@@ -27,8 +27,8 @@ export class TechnicianAssignmentService {
     const category = await prisma.categories.findUnique({
       where: { id: categoryId },
       include: {
-        categories: true  // Relación con el padre
-      }
+        categories: true, // Relación con el padre
+      },
     })
 
     if (!category) {
@@ -38,13 +38,13 @@ export class TechnicianAssignmentService {
     // Construir la ruta desde la categoría actual hasta la raíz
     const categoryPath: string[] = []
     let currentCategory: any = category
-    
+
     while (currentCategory) {
       categoryPath.unshift(currentCategory.id)
       // Cargar el padre si existe
       if (currentCategory.parentId) {
         currentCategory = await prisma.categories.findUnique({
-          where: { id: currentCategory.parentId }
+          where: { id: currentCategory.parentId },
         })
       } else {
         currentCategory = null
@@ -58,7 +58,7 @@ export class TechnicianAssignmentService {
       categoryId,
       categoryLevel: category.level,
       categoryPath,
-      availableTechnicians
+      availableTechnicians,
     }
   }
 
@@ -71,15 +71,15 @@ export class TechnicianAssignmentService {
     // Recorrer desde el nivel más específico (final del array) al más general (inicio)
     for (let i = categoryPath.length - 1; i >= 0; i--) {
       const categoryId = categoryPath[i]
-      
+
       const technicians = await prisma.technician_assignments.findMany({
         where: {
           categoryId,
           isActive: true,
           users: {
             isActive: true,
-            role: 'TECHNICIAN'
-          }
+            role: { in: ['TECHNICIAN', 'ADMIN'] },
+          },
         },
         include: {
           users: {
@@ -93,25 +93,25 @@ export class TechnicianAssignmentService {
                   tickets_tickets_assigneeIdTousers: {
                     where: {
                       status: {
-                        in: ['OPEN', 'IN_PROGRESS']
-                      }
-                    }
-                  }
-                }
-              }
-            }
+                        in: ['OPEN', 'IN_PROGRESS'],
+                      },
+                    },
+                  },
+                },
+              },
+            },
           },
           categories: {
             select: {
               id: true,
               name: true,
-              level: true
-            }
-          }
+              level: true,
+            },
+          },
         },
         orderBy: {
-          priority: 'asc'
-        }
+          priority: 'asc',
+        },
       })
 
       // Agregar técnicos que no estén ya en la lista y que tengan capacidad
@@ -121,7 +121,7 @@ export class TechnicianAssignmentService {
           const currentTickets = assignment.users._count.tickets_tickets_assigneeIdTousers
           const maxTickets = assignment.maxTickets || 10
           const hasCapacity = currentTickets < maxTickets
-          
+
           if (hasCapacity && assignment.autoAssign) {
             allTechnicians.push({
               id: assignment.users.id,
@@ -133,7 +133,7 @@ export class TechnicianAssignmentService {
               currentTickets,
               categoryLevel: assignment.categories.level,
               categoryName: assignment.categories.name,
-              department: assignment.users.departments
+              department: assignment.users.departments,
             })
           }
         }
@@ -157,9 +157,12 @@ export class TechnicianAssignmentService {
   /**
    * Asigna automáticamente un técnico basado en la estrategia de cascada
    */
-  static async assignTechnicianToTicket(ticketId: string, categoryId: string): Promise<string | null> {
+  static async assignTechnicianToTicket(
+    ticketId: string,
+    categoryId: string
+  ): Promise<string | null> {
     const strategy = await this.getAssignmentStrategy(categoryId)
-    
+
     if (strategy.availableTechnicians.length === 0) {
       return null
     }
@@ -170,12 +173,12 @@ export class TechnicianAssignmentService {
     // Asignar el ticket
     await prisma.tickets.update({
       where: { id: ticketId },
-      data: { 
+      data: {
         assigneeId: selectedTechnician.id,
-        status: 'IN_PROGRESS'
-      }
+        status: 'IN_PROGRESS',
+      },
     })
-    
+
     return selectedTechnician.id
   }
 
@@ -186,7 +189,7 @@ export class TechnicianAssignmentService {
     const assignments = await prisma.technician_assignments.findMany({
       where: {
         categoryId,
-        isActive: true
+        isActive: true,
       },
       include: {
         users: {
@@ -198,15 +201,15 @@ export class TechnicianAssignmentService {
                 tickets_tickets_assigneeIdTousers: {
                   where: {
                     status: {
-                      in: ['OPEN', 'IN_PROGRESS']
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
+                      in: ['OPEN', 'IN_PROGRESS'],
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     })
 
     return assignments.map(assignment => ({
@@ -215,8 +218,11 @@ export class TechnicianAssignmentService {
       priority: assignment.priority,
       maxTickets: assignment.maxTickets || 10,
       currentTickets: assignment.users._count.tickets_tickets_assigneeIdTousers,
-      utilization: (assignment.users._count.tickets_tickets_assigneeIdTousers / (assignment.maxTickets || 10)) * 100,
-      autoAssign: assignment.autoAssign
+      utilization:
+        (assignment.users._count.tickets_tickets_assigneeIdTousers /
+          (assignment.maxTickets || 10)) *
+        100,
+      autoAssign: assignment.autoAssign,
     }))
   }
 
@@ -229,12 +235,12 @@ export class TechnicianAssignmentService {
     reason: string
   }> {
     const strategy = await this.getAssignmentStrategy(categoryId)
-    
+
     if (strategy.availableTechnicians.length === 0) {
       return {
         selectedTechnician: null,
         strategy,
-        reason: 'No hay técnicos disponibles en ningún nivel de la jerarquía'
+        reason: 'No hay técnicos disponibles en ningún nivel de la jerarquía',
       }
     }
 
@@ -244,7 +250,7 @@ export class TechnicianAssignmentService {
     return {
       selectedTechnician,
       strategy,
-      reason
+      reason,
     }
   }
 
@@ -257,22 +263,22 @@ export class TechnicianAssignmentService {
       where: {
         categoryId,
         assigneeId: null,
-        status: 'OPEN'
+        status: 'OPEN',
       },
       orderBy: {
-        createdAt: 'asc'
-      }
+        createdAt: 'asc',
+      },
     })
 
     const results = []
-    
+
     for (const ticket of pendingTickets) {
       try {
         const assignedTechnicianId = await this.assignTechnicianToTicket(ticket.id, categoryId)
         results.push({
           ticketId: ticket.id,
           assignedTechnicianId,
-          success: !!assignedTechnicianId
+          success: !!assignedTechnicianId,
         })
       } catch (error) {
         console.error('[CRITICAL] Error asignando ticket:', ticket.id, error)
@@ -280,7 +286,7 @@ export class TechnicianAssignmentService {
           ticketId: ticket.id,
           assignedTechnicianId: null,
           success: false,
-          error: error instanceof Error ? error.message : 'Error desconocido'
+          error: error instanceof Error ? error.message : 'Error desconocido',
         })
       }
     }

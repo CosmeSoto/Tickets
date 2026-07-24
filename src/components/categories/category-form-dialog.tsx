@@ -1,7 +1,7 @@
 'use client'
 
 import { RefreshCw, Building, ChevronRight, Home, Users } from 'lucide-react'
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -38,7 +38,7 @@ interface CategoryFormDialogProps {
   onSubmit: (e: React.FormEvent) => void
   onLoadAvailableParents: (excludeId?: string, familyId?: string) => void
   onLoadDepartments: (familyId?: string | null) => void
-  onLoadTechnicians: (familyId?: string) => void
+  onLoadTechnicians: (familyId?: string, alreadyAssignedIds?: string[]) => void
   families?: { id: string; name: string; code: string; color: string | null }[]
 }
 
@@ -88,26 +88,45 @@ export function CategoryFormDialog({
   const derivedFamilyId = (() => {
     // 1. familyId explícito en el formData (nivel 1 sin padre)
     if (formData.familyId) return formData.familyId
-    // 2. Derivar del padre seleccionado
+    // 2. Familia directa de la categoría en edición
+    if (editingCategory?.familyId) return editingCategory.familyId
+    if ((editingCategory as any)?.family?.id) return (editingCategory as any).family.id
+    // 3. Derivar del padre seleccionado
     if (formData.parentId) {
       const parent = availableParents.find(p => p.id === formData.parentId)
+      if ((parent as any)?.familyId) return (parent as any).familyId
+      if ((parent as any)?.family?.id) return (parent as any).family.id
       // Intentar desde el departamento del padre en el array departments
       const parentDept = departments.find((d: any) => d.id === parent?.departmentId)
       if (parentDept?.familyId) return parentDept.familyId
       // Fallback: desde la relación departments del padre (si viene del API)
       const parentDeptRel = (parent as any)?.departments
       if (parentDeptRel?.familyId) return parentDeptRel.familyId
+      if (parentDeptRel?.family?.id) return parentDeptRel.family.id
     }
-    // 3. Derivar del departamento ya seleccionado
+    // 4. Derivar del departamento ya seleccionado
     if (formData.departmentId) {
       const dept = departments.find((d: any) => d.id === formData.departmentId)
       if (dept?.familyId) return dept.familyId
       if (dept?.family?.id) return dept.family.id
     }
+    // 5. Departamento de la categoría en edición
+    const editDept = (editingCategory as any)?.departments
+    if (editDept?.familyId) return editDept.familyId
+    if (editDept?.family?.id) return editDept.family.id
     return null
   })()
 
   const derivedFamily = families.find(f => f.id === derivedFamilyId) ?? null
+
+  // Recargar resolutores al abrir / cambiar familia de la categoría
+  useEffect(() => {
+    if (!isOpen) return
+    const assignedIds = (formData.technician_assignments ?? []).map(
+      (a: { technicianId: string }) => a.technicianId
+    )
+    onLoadTechnicians(derivedFamilyId ?? undefined, assignedIds)
+  }, [isOpen, derivedFamilyId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Departamentos filtrados por familia derivada
   const filteredDepartments = derivedFamilyId
