@@ -76,7 +76,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     }
 
     // Generar imagen PNG — el token se codifica en el QR, no se expone en la respuesta HTTP
-    const pngBuffer = await PatrolQRService.generateQRImage(checkpoint.id, token)
+    const pngBuffer = await PatrolQRService.generateQRImage(checkpoint.id, token, checkpoint.name)
 
     const safeName = checkpoint.name.replace(/[^a-zA-Z0-9-_]/g, '_').slice(0, 50)
 

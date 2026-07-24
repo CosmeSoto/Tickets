@@ -10,6 +10,7 @@
 
 import { createHmac, randomBytes, timingSafeEqual, createHash } from 'crypto'
 import QRCode from 'qrcode'
+import sharp from 'sharp'
 
 export class PatrolQRService {
   // ── Token dinámico ──────────────────────────────────────────────────────────
@@ -116,22 +117,82 @@ export class PatrolQRService {
   /**
    * Genera una imagen PNG del código QR para un checkpoint.
    * El payload incluye checkpointId y el token (dinámico o estático).
+   * Si se proporciona `checkpointName`, se agrega como etiqueta debajo del QR.
    *
-   * @param checkpointId   - ID del checkpoint
-   * @param token          - Token a codificar en el QR
+   * @param checkpointId    - ID del checkpoint
+   * @param token           - Token a codificar en el QR
+   * @param checkpointName  - Nombre opcional a imprimir bajo el QR
    * @returns Buffer PNG listo para enviar como respuesta HTTP
    */
-  static async generateQRImage(checkpointId: string, token: string): Promise<Buffer> {
+  static async generateQRImage(
+    checkpointId: string,
+    token: string,
+    checkpointName?: string
+  ): Promise<Buffer> {
+    const QR_SIZE = 400
+    const PADDING = 16
+    const FONT_SIZE = 28
+    const LABEL_HEIGHT = FONT_SIZE + PADDING * 2
+
     const payload = JSON.stringify({ cid: checkpointId, t: token })
-    return QRCode.toBuffer(payload, {
+
+    const qrBuffer = await QRCode.toBuffer(payload, {
       errorCorrectionLevel: 'M',
       type: 'png',
-      width: 400,
+      width: QR_SIZE,
       margin: 2,
       color: {
         dark: '#000000',
         light: '#FFFFFF',
       },
     })
+
+    // Si no se envió nombre, devolver el QR plano (sin cambios)
+    if (!checkpointName) {
+      return qrBuffer
+    }
+
+    // Escapar caracteres especiales XML para evitar SVG inválido
+    const safeName = checkpointName
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+
+    const totalHeight = QR_SIZE + LABEL_HEIGHT
+    const textY = QR_SIZE + PADDING + FONT_SIZE
+
+    // SVG overlay: fondo blanco bajo el QR + texto centrado
+    const svgLabel = Buffer.from(`
+      <svg width="${QR_SIZE}" height="${totalHeight}" xmlns="http://www.w3.org/2000/svg">
+        <rect x="0" y="${QR_SIZE}" width="${QR_SIZE}" height="${LABEL_HEIGHT}" fill="white"/>
+        <text
+          x="${QR_SIZE / 2}"
+          y="${textY}"
+          font-family="monospace, sans-serif"
+          font-size="${FONT_SIZE}"
+          font-weight="bold"
+          fill="#000000"
+          text-anchor="middle"
+          dominant-baseline="auto"
+        >${safeName}</text>
+      </svg>
+    `)
+
+    // Componer: lienzo blanco (QR_SIZE × totalHeight) → QR arriba → texto SVG superpuesto
+    return sharp({
+      create: {
+        width: QR_SIZE,
+        height: totalHeight,
+        channels: 4,
+        background: { r: 255, g: 255, b: 255, alpha: 1 },
+      },
+    })
+      .composite([
+        { input: qrBuffer, top: 0, left: 0 },
+        { input: svgLabel, top: 0, left: 0 },
+      ])
+      .png()
+      .toBuffer()
   }
 }

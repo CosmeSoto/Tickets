@@ -46,6 +46,7 @@ export default function RegisterPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formErrors, setFormErrors] = useState<FormErrors>({})
+  const [minPasswordLength, setMinPasswordLength] = useState(8)
   const [departments, setDepartments] = useState<
     Array<{
       id: string
@@ -79,6 +80,15 @@ export default function RegisterPage() {
       })
       .catch(() => {})
       .finally(() => setLoadingProviders(false))
+
+    fetch('/api/auth/password-policy')
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => {
+        if (typeof d?.minLength === 'number' && d.minLength > 0) {
+          setMinPasswordLength(d.minLength)
+        }
+      })
+      .catch(() => {})
   }, [])
 
   const validate = (): boolean => {
@@ -94,8 +104,8 @@ export default function RegisterPage() {
       errors.email = 'Ingresa un email válido (ej: usuario@dominio.com)'
 
     if (!formData.password) errors.password = 'La contraseña es requerida'
-    else if (formData.password.length < 6)
-      errors.password = `La contraseña debe tener al menos 6 caracteres (tiene ${formData.password.length})`
+    else if (formData.password.length < minPasswordLength)
+      errors.password = `La contraseña debe tener al menos ${minPasswordLength} caracteres (tiene ${formData.password.length})`
 
     if (!formData.confirmPassword) errors.confirmPassword = 'Confirma tu contraseña'
     else if (formData.password !== formData.confirmPassword)
@@ -270,7 +280,7 @@ export default function RegisterPage() {
                   <Input
                     id='password'
                     type={showPassword ? 'text' : 'password'}
-                    placeholder='Mínimo 6 caracteres'
+                    placeholder={`Mínimo ${minPasswordLength} caracteres`}
                     value={formData.password}
                     onChange={e => handleChange('password', e.target.value)}
                     disabled={isSubmitting}
