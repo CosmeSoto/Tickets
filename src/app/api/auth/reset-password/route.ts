@@ -33,17 +33,14 @@ export async function POST(request: NextRequest) {
           select: {
             id: true,
             email: true,
-            name: true
-          }
-        }
-      }
+            name: true,
+          },
+        },
+      },
     })
 
     if (!resetToken) {
-      return NextResponse.json(
-        { success: false, message: 'Token inválido' },
-        { status: 400 }
-      )
+      return NextResponse.json({ success: false, message: 'Token inválido' }, { status: 400 })
     }
 
     // Verificar si ya fue usado
@@ -70,19 +67,20 @@ export async function POST(request: NextRequest) {
       where: { id: resetToken.userId },
       data: {
         passwordHash,
-        updatedAt: new Date()
-      }
+        passwordChangedAt: new Date(),
+        updatedAt: new Date(),
+      },
     })
 
     // Marcar token como usado
     await prisma.password_reset_tokens.update({
       where: { id: resetToken.id },
-      data: { used: true }
+      data: { used: true },
     })
 
     // Invalidar todas las sesiones activas del usuario por seguridad
     await prisma.sessions.deleteMany({
-      where: { userId: resetToken.userId }
+      where: { userId: resetToken.userId },
     })
 
     // Registrar en auditoría
@@ -93,17 +91,16 @@ export async function POST(request: NextRequest) {
       entityId: resetToken.userId,
       details: {
         email: resetToken.users.email,
-        method: 'email_reset'
-      }
+        method: 'email_reset',
+      },
     })
 
     console.log(`[RESET PASSWORD] Contraseña restablecida para: ${resetToken.users.email}`)
 
     return NextResponse.json({
       success: true,
-      message: 'Contraseña restablecida exitosamente'
+      message: 'Contraseña restablecida exitosamente',
     })
-
   } catch (error) {
     console.error('[RESET PASSWORD] Error:', error)
     return NextResponse.json(

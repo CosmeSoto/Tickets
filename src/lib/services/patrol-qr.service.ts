@@ -9,8 +9,12 @@
  */
 
 import { createHmac, randomBytes, timingSafeEqual, createHash } from 'crypto'
+import { join } from 'path'
 import QRCode from 'qrcode'
 import sharp from 'sharp'
+
+/** Fuente embebida en public/ — disponible en Docker (COPY public) y en local. */
+const LABEL_FONT_PATH = join(process.cwd(), 'public/fonts/NotoSans-Regular.ttf')
 
 export class PatrolQRService {
   // ── Token dinámico ──────────────────────────────────────────────────────────
@@ -152,45 +156,42 @@ export class PatrolQRService {
       return qrBuffer
     }
 
-    // Escapar caracteres especiales XML para evitar SVG inválido
-    const safeName = checkpointName
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
+    // Pango interpreta markup; escapar y acortar nombres muy largos
+    const displayName = checkpointName.trim().slice(0, 48)
+    const safeName = displayName.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
-    const totalHeight = QR_SIZE + LABEL_HEIGHT
-    const textY = QR_SIZE + PADDING + FONT_SIZE
+    // Renderizar texto con TTF embebido (API sharp.text + fontfile)
+    const labelBuffer = await sharp({
+      text: {
+        text: safeName,
+        font: 'Noto Sans',
+        fontfile: LABEL_FONT_PATH,
+        width: QR_SIZE - PADDING * 2,
+        height: FONT_SIZE + 8,
+        align: 'center',
+        rgba: true,
+      },
+    })
+      .png()
+      .toBuffer()
 
-    // SVG overlay: fondo blanco bajo el QR + texto centrado
-    const svgLabel = Buffer.from(`
-      <svg width="${QR_SIZE}" height="${totalHeight}" xmlns="http://www.w3.org/2000/svg">
-        <rect x="0" y="${QR_SIZE}" width="${QR_SIZE}" height="${LABEL_HEIGHT}" fill="white"/>
-        <text
-          x="${QR_SIZE / 2}"
-          y="${textY}"
-          font-family="monospace, sans-serif"
-          font-size="${FONT_SIZE}"
-          font-weight="bold"
-          fill="#000000"
-          text-anchor="middle"
-          dominant-baseline="auto"
-        >${safeName}</text>
-      </svg>
-    `)
+    const labelMeta = await sharp(labelBuffer).metadata()
+    const labelW = labelMeta.width ?? QR_SIZE
+    const labelH = labelMeta.height ?? FONT_SIZE
+    const labelLeft = Math.max(0, Math.floor((QR_SIZE - labelW) / 2))
+    const labelTop = QR_SIZE + Math.max(0, Math.floor((LABEL_HEIGHT - labelH) / 2))
 
-    // Componer: lienzo blanco (QR_SIZE × totalHeight) → QR arriba → texto SVG superpuesto
     return sharp({
       create: {
         width: QR_SIZE,
-        height: totalHeight,
+        height: QR_SIZE + LABEL_HEIGHT,
         channels: 4,
         background: { r: 255, g: 255, b: 255, alpha: 1 },
       },
     })
       .composite([
         { input: qrBuffer, top: 0, left: 0 },
-        { input: svgLabel, top: 0, left: 0 },
+        { input: labelBuffer, top: labelTop, left: labelLeft },
       ])
       .png()
       .toBuffer()

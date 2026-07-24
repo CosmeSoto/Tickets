@@ -313,6 +313,7 @@ export function getFieldDisplayName(fieldName: string): string {
     updatedAt: 'Última Actualización',
     isEmailVerified: 'Email Verificado',
     lastLogin: 'Último Acceso',
+    passwordChangedAt: 'Contraseña cambiada el',
     // Patrullas
     routeId: 'Ruta',
     routeName: 'Ruta',

@@ -56,6 +56,7 @@ interface SystemSettings {
   maxLoginAttempts: number
   passwordMinLength: number
   requirePasswordChange: boolean
+  passwordChangeIntervalDays: number
 
   // Configuración de archivos
   maxFileSize: number
@@ -685,15 +686,56 @@ function SettingsPage() {
                         </p>
                       </div>
                     </div>
-                    <div className='flex items-center space-x-2 pt-6'>
-                      <Switch
-                        id='requirePasswordChange'
-                        checked={settings.requirePasswordChange}
-                        onCheckedChange={checked =>
-                          setSettings({ ...settings, requirePasswordChange: checked })
-                        }
-                      />
-                      <Label htmlFor='requirePasswordChange'>Requerir cambio de contraseña</Label>
+                    <div className='space-y-3 pt-2'>
+                      <div className='flex items-center space-x-2'>
+                        <Switch
+                          id='requirePasswordChange'
+                          checked={settings.requirePasswordChange}
+                          onCheckedChange={checked =>
+                            setSettings({
+                              ...settings,
+                              requirePasswordChange: checked,
+                              // Al desactivar, resetear el intervalo a 0
+                              passwordChangeIntervalDays: checked
+                                ? settings.passwordChangeIntervalDays || 90
+                                : 0,
+                            })
+                          }
+                        />
+                        <Label htmlFor='requirePasswordChange'>Requerir cambio de contraseña</Label>
+                      </div>
+                      {settings.requirePasswordChange && (
+                        <div className='ml-0 space-y-2 border-l-2 border-primary/20 pl-4'>
+                          <Label htmlFor='passwordChangeIntervalDays' className='text-sm'>
+                            Vigencia de la contraseña
+                          </Label>
+                          <Input
+                            id='passwordChangeIntervalDays'
+                            type='number'
+                            value={settings.passwordChangeIntervalDays}
+                            onChange={e => {
+                              const value = parseInt(e.target.value)
+                              setSettings({
+                                ...settings,
+                                passwordChangeIntervalDays: isNaN(value) ? 0 : Math.max(0, value),
+                              })
+                            }}
+                            min='0'
+                            max='365'
+                            placeholder='0'
+                          />
+                          <p className='text-xs text-muted-foreground'>
+                            {settings.passwordChangeIntervalDays === 0
+                              ? '0 días — los usuarios deberán cambiar su contraseña en el próximo login (una sola vez)'
+                              : `Los usuarios deberán cambiar su contraseña cada ${settings.passwordChangeIntervalDays} día${settings.passwordChangeIntervalDays !== 1 ? 's' : ''}`}
+                          </p>
+                          <p className='text-xs text-amber-600 dark:text-amber-400'>
+                            Al activar y guardar por primera vez, los usuarios con contraseña local
+                            deberán cambiarla en su próximo inicio de sesión. Cambiar solo los días
+                            no vuelve a forzar el cambio.
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
 

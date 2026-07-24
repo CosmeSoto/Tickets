@@ -12,20 +12,25 @@ export async function POST(request: NextRequest) {
 
     // Schema de validación con Zod (dinámico según configuración)
     const registerSchema = z.object({
-      name: z.string()
+      name: z
+        .string()
         .min(2, 'El nombre debe tener al menos 2 caracteres')
         .max(100, 'El nombre es demasiado largo'),
-      email: z.string()
-        .email('Email inválido')
-        .toLowerCase(),
-      password: z.string()
-        .min(securityConfig.passwordMinLength, `La contraseña debe tener al menos ${securityConfig.passwordMinLength} caracteres`)
+      email: z.string().email('Email inválido').toLowerCase(),
+      password: z
+        .string()
+        .min(
+          securityConfig.passwordMinLength,
+          `La contraseña debe tener al menos ${securityConfig.passwordMinLength} caracteres`
+        )
         .max(100, 'La contraseña es demasiado larga'),
-      phone: z.string()
+      phone: z
+        .string()
         .optional()
         .nullable()
         .transform(val => val || null),
-      departmentId: z.string()
+      departmentId: z
+        .string()
         .optional()
         .nullable()
         .transform(val => val || null),
@@ -36,18 +41,18 @@ export async function POST(request: NextRequest) {
 
     // Validar datos con Zod
     const validationResult = registerSchema.safeParse(body)
-    
+
     if (!validationResult.success) {
       const errors = validationResult.error.errors.map(err => ({
         field: err.path[0],
-        message: err.message
+        message: err.message,
       }))
-      
+
       return NextResponse.json(
-        { 
-          success: false, 
+        {
+          success: false,
           error: 'Datos inválidos',
-          errors 
+          errors,
         },
         { status: 400 }
       )
@@ -57,15 +62,15 @@ export async function POST(request: NextRequest) {
 
     // Verificar si el email ya existe
     const existingUser = await prisma.users.findUnique({
-      where: { email }
+      where: { email },
     })
 
     if (existingUser) {
       return NextResponse.json(
-        { 
-          success: false, 
+        {
+          success: false,
           error: 'Este email ya está registrado',
-          field: 'email'
+          field: 'email',
         },
         { status: 409 }
       )
@@ -74,15 +79,15 @@ export async function POST(request: NextRequest) {
     // Si se proporciona departmentId, verificar que existe
     if (departmentId) {
       const department = await prisma.departments.findUnique({
-        where: { id: departmentId }
+        where: { id: departmentId },
       })
 
       if (!department) {
         return NextResponse.json(
-          { 
-            success: false, 
+          {
+            success: false,
             error: 'El departamento seleccionado no existe',
-            field: 'departmentId'
+            field: 'departmentId',
           },
           { status: 400 }
         )
@@ -104,6 +109,7 @@ export async function POST(request: NextRequest) {
         role: 'CLIENT',
         isActive: true,
         isEmailVerified: false,
+        passwordChangedAt: new Date(),
         createdAt: new Date(),
         updatedAt: new Date(),
       },
@@ -114,7 +120,7 @@ export async function POST(request: NextRequest) {
         role: true,
         departmentId: true,
         createdAt: true,
-      }
+      },
     })
 
     // Log de auditoría
@@ -130,10 +136,10 @@ export async function POST(request: NextRequest) {
           email: user.email,
           role: user.role,
           departmentId: user.departmentId,
-          registrationMethod: 'self_register'
+          registrationMethod: 'self_register',
         },
         createdAt: new Date(),
-      }
+      },
     })
 
     return NextResponse.json(
@@ -146,18 +152,17 @@ export async function POST(request: NextRequest) {
           email: user.email,
           role: user.role,
           departmentId: user.departmentId,
-        }
+        },
       },
       { status: 201 }
     )
-
   } catch (error) {
     console.error('Error en registro:', error)
-    
+
     return NextResponse.json(
-      { 
-        success: false, 
-        error: 'Error al registrar usuario. Intenta de nuevo.' 
+      {
+        success: false,
+        error: 'Error al registrar usuario. Intenta de nuevo.',
       },
       { status: 500 }
     )

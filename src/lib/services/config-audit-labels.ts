@@ -20,6 +20,7 @@ export const SYSTEM_SETTINGS_LABELS: Record<string, string> = {
   maxLoginAttempts: 'Máx. intentos de login',
   passwordMinLength: 'Longitud mínima contraseña',
   requirePasswordChange: 'Exigir cambio de contraseña',
+  passwordChangeIntervalDays: 'Intervalo cambio contraseña (días)',
   maxFileSize: 'Tamaño máx. archivo (MB)',
   autoCloseDays: 'Auto-cierre tickets (días)',
   allowedFileTypes: 'Tipos de archivo permitidos',

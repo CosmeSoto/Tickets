@@ -26,6 +26,7 @@ const settingsSchema = z.object({
   maxLoginAttempts: z.coerce.number().min(3).max(10).optional(),
   passwordMinLength: z.coerce.number().min(6).max(20).optional(),
   requirePasswordChange: z.boolean().optional(),
+  passwordChangeIntervalDays: z.coerce.number().min(0).max(365).optional(),
   maxFileSize: z.coerce.number().min(1).max(100).optional(),
   autoCloseDays: z.coerce.number().min(1).max(30).optional(),
   allowedFileTypes: z.array(z.string()).optional(),
@@ -57,6 +58,7 @@ const defaultSettings = {
   maxLoginAttempts: 5,
   passwordMinLength: 8,
   requirePasswordChange: false,
+  passwordChangeIntervalDays: 0,
   maxFileSize: 10, // MB
   autoCloseDays: 3, // Días para auto-cierre de tickets resueltos sin calificación
   allowedFileTypes: [
@@ -87,6 +89,7 @@ function parseSystemSettingsFromRows(
         'sessionTimeout',
         'maxLoginAttempts',
         'passwordMinLength',
+        'passwordChangeIntervalDays',
         'maxFileSize',
         'backupRetention',
         'autoCloseDays',
@@ -144,6 +147,7 @@ export async function GET() {
             'sessionTimeout',
             'maxLoginAttempts',
             'passwordMinLength',
+            'passwordChangeIntervalDays',
             'maxFileSize',
             'backupRetention',
             'autoCloseDays',
@@ -349,6 +353,30 @@ export async function PUT(request: NextRequest) {
       SecurityConfigService.clearCache()
     } catch (error) {
       console.warn('No se pudo limpiar caché de seguridad:', error)
+    }
+
+    // Solo al ACTIVAR el toggle (false → true): forzar cambio en próximo login.
+    // No resetear en cada guardado mientras ya está activo (p. ej. cambiar días).
+    if (validatedData.requirePasswordChange === true && oldValues.requirePasswordChange !== true) {
+      try {
+        await prisma.users.updateMany({
+          where: {
+            isActive: true,
+            // Excluir cuentas OAuth / sin contraseña local
+            passwordHash: { not: null },
+            // No bloquear al admin que activa la política
+            id: { not: session.user.id },
+          },
+          data: { passwordChangedAt: null },
+        })
+        // Marcar al admin actual como "ya cumplió" para no auto-bloquearse
+        await prisma.users.update({
+          where: { id: session.user.id },
+          data: { passwordChangedAt: new Date() },
+        })
+      } catch (err) {
+        console.warn('[SETTINGS] No se pudo resetear passwordChangedAt:', err)
+      }
     }
 
     // Crear entrada en el historial de auditoría con diff detallado

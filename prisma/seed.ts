@@ -20,7 +20,11 @@ import { seedSupplierTypes } from './seeds/supplier-types.seed'
 import { seedAssetRequestsFamilySettings } from './seeds/asset-requests-settings.seed'
 import { seedInventoryFamilyConfigs } from './seeds/inventory-family-config.seed'
 import { seedUnitsOfMeasure } from './seeds/units-of-measure.seed'
-import { seedInventorySettings, seedFolioCounters } from './seeds/inventory-settings.seed'
+import {
+  seedInventorySettings,
+  seedFolioCounters,
+  seedSecuritySettings,
+} from './seeds/inventory-settings.seed'
 
 const prisma = new PrismaClient()
 const now = new Date()
@@ -115,6 +119,9 @@ async function main() {
 
   // 14. CONFIGURACIONES DE INVENTARIO (system_settings)
   await seedInventorySettings(prisma)
+
+  // 14b. CONFIGURACIONES DE SEGURIDAD DE CONTRASEÑAS (system_settings)
+  await seedSecuritySettings(prisma)
 
   // 15. CONTADORES DE FOLIO
   await seedFolioCounters(prisma)

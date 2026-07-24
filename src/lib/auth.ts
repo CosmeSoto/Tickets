@@ -398,6 +398,7 @@ export const authOptions: NextAuthOptions = {
                   canManageNews: true,
                   formsEnabled: true,
                   canManageForms: true,
+                  passwordChangedAt: true,
                 },
               })
               token.canManageInventory = dbUser?.canManageInventory ?? false
@@ -410,6 +411,39 @@ export const authOptions: NextAuthOptions = {
               token.canManageNews = dbUser?.canManageNews ?? false
               token.formsEnabled = dbUser?.formsEnabled ?? false
               token.canManageForms = dbUser?.canManageForms ?? false
+
+              // ── Política de cambio de contraseña ───────────────────────
+              try {
+                const isOAuthUser = Boolean(token.isOAuth)
+                if (isOAuthUser) {
+                  token.mustChangePassword = false
+                } else {
+                  const { SecurityConfigService } =
+                    await import('./services/security-config-service')
+                  const secCfg = await SecurityConfigService.getConfig()
+
+                  if (secCfg.requirePasswordChange) {
+                    const passwordChangedAt = dbUser?.passwordChangedAt ?? null
+                    let mustChange = false
+
+                    if (!passwordChangedAt) {
+                      // Nunca cambió / forzado por admin → exigir cambio
+                      mustChange = true
+                    } else if (secCfg.passwordChangeIntervalDays > 0) {
+                      const expiresAt = new Date(passwordChangedAt)
+                      expiresAt.setDate(expiresAt.getDate() + secCfg.passwordChangeIntervalDays)
+                      mustChange = Date.now() > expiresAt.getTime()
+                    }
+
+                    token.mustChangePassword = mustChange
+                  } else {
+                    token.mustChangePassword = false
+                  }
+                }
+              } catch {
+                token.mustChangePassword = false
+              }
+              // ─────────────────────────────────────────────────────────────
             } catch {
               token.canManageInventory = false
               token.isSuperAdmin = false
@@ -419,6 +453,7 @@ export const authOptions: NextAuthOptions = {
               token.patrolsEnabled = false
               token.newsEnabled = false
               token.canManageNews = false
+              token.mustChangePassword = false
             }
           }
         }
@@ -445,6 +480,9 @@ export const authOptions: NextAuthOptions = {
                   formsEnabled: true,
                   canManageForms: true,
                   departmentId: true,
+                  passwordChangedAt: true,
+                  passwordHash: true,
+                  oauthProvider: true,
                   departments: { select: { name: true } },
                 },
               })
@@ -466,6 +504,31 @@ export const authOptions: NextAuthOptions = {
               token.canManageForms = dbUser.canManageForms ?? false
               token.departmentId = dbUser.departmentId || undefined
               token.department = dbUser.departments?.name || undefined
+
+              // Re-evaluar política de contraseña en refrescos (caducidad por días)
+              try {
+                const isOAuthUser = Boolean(dbUser.oauthProvider) && !dbUser.passwordHash
+                if (isOAuthUser) {
+                  token.mustChangePassword = false
+                } else {
+                  const { SecurityConfigService } =
+                    await import('./services/security-config-service')
+                  const secCfg = await SecurityConfigService.getConfig()
+                  if (!secCfg.requirePasswordChange) {
+                    token.mustChangePassword = false
+                  } else if (!dbUser.passwordChangedAt) {
+                    token.mustChangePassword = true
+                  } else if (secCfg.passwordChangeIntervalDays > 0) {
+                    const expiresAt = new Date(dbUser.passwordChangedAt)
+                    expiresAt.setDate(expiresAt.getDate() + secCfg.passwordChangeIntervalDays)
+                    token.mustChangePassword = Date.now() > expiresAt.getTime()
+                  } else {
+                    token.mustChangePassword = false
+                  }
+                }
+              } catch {
+                // Mantener valor previo del token
+              }
             }
           } catch {
             // Si falla la BD, continuar con el token existente
@@ -475,6 +538,13 @@ export const authOptions: NextAuthOptions = {
         // Si es una actualización de sesión explícita, aplicar los datos
         if (trigger === 'update' && session) {
           token = { ...token, ...session }
+          if (
+            typeof (session as { mustChangePassword?: boolean }).mustChangePassword === 'boolean'
+          ) {
+            token.mustChangePassword = (
+              session as { mustChangePassword: boolean }
+            ).mustChangePassword
+          }
         }
 
         return token
@@ -511,6 +581,9 @@ export const authOptions: NextAuthOptions = {
           ;(session.user as any).canManageNews = (token.canManageNews as boolean) ?? false
           ;(session.user as any).formsEnabled = (token.formsEnabled as boolean) ?? false
           ;(session.user as any).canManageForms = (token.canManageForms as boolean) ?? false
+
+          // Política de cambio de contraseña
+          ;(session.user as any).mustChangePassword = (token.mustChangePassword as boolean) ?? false
 
           // IMPORTANTE: Pasar loginTime a la sesión para el monitor de timeout
           if (token.loginTime) {

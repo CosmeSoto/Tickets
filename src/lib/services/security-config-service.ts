@@ -11,6 +11,7 @@ export interface SecurityConfig {
   maxLoginAttempts: number
   passwordMinLength: number
   requirePasswordChange: boolean
+  passwordChangeIntervalDays: number // 0 = sin expiración automática
   maxFileSize: number // MB
   allowedFileTypes: string[]
 }
@@ -40,6 +41,7 @@ export class SecurityConfigService {
               'maxLoginAttempts',
               'passwordMinLength',
               'requirePasswordChange',
+              'passwordChangeIntervalDays',
               'maxFileSize',
               'allowedFileTypes',
             ],
@@ -65,6 +67,7 @@ export class SecurityConfigService {
         maxLoginAttempts: configMap.maxLoginAttempts || 5,
         passwordMinLength: configMap.passwordMinLength || 8,
         requirePasswordChange: configMap.requirePasswordChange || false,
+        passwordChangeIntervalDays: configMap.passwordChangeIntervalDays ?? 0,
         maxFileSize: configMap.maxFileSize || 10, // MB
         allowedFileTypes: configMap.allowedFileTypes || [
           'image/jpeg',
@@ -93,6 +96,7 @@ export class SecurityConfigService {
         maxLoginAttempts: 5,
         passwordMinLength: 8,
         requirePasswordChange: false,
+        passwordChangeIntervalDays: 0,
         maxFileSize: 10,
         allowedFileTypes: ['image/jpeg', 'image/png', 'image/gif', 'application/pdf', 'text/plain'],
       }

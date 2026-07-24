@@ -459,6 +459,7 @@ model users {
   formsEnabled                                      Boolean                         @default(false) @map("forms_enabled")
   canManageForms                                    Boolean                         @default(false) @map("can_manage_forms")
   lastLogin                                         DateTime?
+  passwordChangedAt                                 DateTime?                       @map("password_changed_at")
   oauthProvider                                     String?
   oauthId                                           String?
   createdAt                                         DateTime                        @default(now())

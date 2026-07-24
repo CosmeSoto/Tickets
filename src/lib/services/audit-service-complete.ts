@@ -522,6 +522,7 @@ export class AuditServiceComplete {
       isActive: 'Estado',
       avatar: 'Avatar',
       password: 'Contraseña',
+      passwordChangedAt: 'Contraseña cambiada el',
       createdById: 'Creado por',
       assigneeId: 'Asignado a',
       ticketId: 'Ticket',
@@ -685,6 +686,9 @@ export class AuditServiceComplete {
     const criticalActions = [
       'user_deleted',
       'user_role_changed',
+      'user_password_changed',
+      'password_reset',
+      'password_change_required',
       'system_config_changed',
       'backup_created',
       'backup_imported',

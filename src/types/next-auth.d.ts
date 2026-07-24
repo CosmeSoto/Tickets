@@ -19,6 +19,7 @@ declare module 'next-auth' {
       ticketsEnabled?: boolean
       canRequestAssets?: boolean
       patrolsEnabled?: boolean
+      mustChangePassword?: boolean
     }
   }
 
@@ -48,5 +49,6 @@ declare module 'next-auth/jwt' {
     canRequestAssets?: boolean
     patrolsEnabled?: boolean
     loginTime?: number
+    mustChangePassword?: boolean
   }
 }
