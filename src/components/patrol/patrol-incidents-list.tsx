@@ -1,4 +1,5 @@
 'use client'
+import { DEFAULT_TIMEZONE } from '@/lib/constants'
 
 /**
  * PatrolIncidentsList
@@ -49,7 +50,7 @@ export function PatrolIncidentsList({ incidents }: PatrolIncidentsListProps) {
               <p className='text-xs text-muted-foreground mt-0.5'>
                 {incident.checkpoint?.name ?? 'Checkpoint'} ·{' '}
                 {new Date(incident.createdAt).toLocaleTimeString('es-EC', {
-                  timeZone: 'America/Guayaquil',
+                  timeZone: DEFAULT_TIMEZONE,
                   hour: '2-digit',
                   minute: '2-digit',
                 })}

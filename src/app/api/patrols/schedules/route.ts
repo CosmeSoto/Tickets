@@ -22,6 +22,7 @@ import {
   ScheduleValidationError,
 } from '@/lib/patrol/schedule-validation'
 import { resolvePatrolVisibilityFilter } from '@/lib/patrol/patrol-access'
+import { getAppTimezone } from '@/lib/utils/date-utils'
 
 const createScheduleSchema = z.object({
   familyId: z.string().uuid(),
@@ -204,7 +205,7 @@ export async function POST(request: NextRequest) {
       userId: data.agentId,
       type: NotificationType.PATROL_ASSIGNED,
       title: 'Nueva ronda asignada',
-      message: `Se te ha asignado la ruta "${route?.name ?? 'Ronda'}" programada para ${start.toLocaleString('es-EC', { timeZone: 'America/Guayaquil' })}.`,
+      message: `Se te ha asignado la ruta "${route?.name ?? 'Ronda'}" programada para ${start.toLocaleString('es-EC', { timeZone: getAppTimezone() })}.`,
       metadata: { scheduleId: schedule.id, routeId: data.routeId, familyId: data.familyId },
     })
 

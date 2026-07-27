@@ -11,6 +11,7 @@
 import prisma from '@/lib/prisma'
 import { NotificationService } from '@/lib/services/notification-service'
 import { NotificationType } from '@prisma/client'
+import { getAppTimezone } from '@/lib/utils/date-utils'
 
 // Acceso a campos de patrols que aún no están en el Prisma Client generado
 // (reminderSentAt, route, family, agent) — eliminar cast cuando se regenere el client
@@ -76,7 +77,7 @@ export class PatrolReminderService {
           const formattedTime = patrol.scheduledStart.toLocaleTimeString('es-EC', {
             hour: '2-digit',
             minute: '2-digit',
-            timeZone: 'America/Guayaquil',
+            timeZone: getAppTimezone(),
           })
 
           await NotificationService.push({

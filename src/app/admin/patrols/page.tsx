@@ -1,4 +1,5 @@
 'use client'
+import { DEFAULT_TIMEZONE } from '@/lib/constants'
 
 import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
@@ -270,7 +271,7 @@ export default function PatrolDashboardPage() {
                         <p className='text-xs text-muted-foreground mt-1.5'>
                           Iniciada:{' '}
                           {new Date(patrol.startedAt).toLocaleTimeString('es-EC', {
-                            timeZone: 'America/Guayaquil',
+                            timeZone: DEFAULT_TIMEZONE,
                             timeStyle: 'short',
                           })}
                         </p>

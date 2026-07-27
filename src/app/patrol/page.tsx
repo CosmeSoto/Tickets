@@ -1,4 +1,5 @@
 'use client'
+import { DEFAULT_TIMEZONE } from '@/lib/constants'
 
 import { useState, useEffect, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
@@ -46,7 +47,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 const formatDate = (iso: string) =>
   new Date(iso).toLocaleString('es-EC', {
-    timeZone: 'America/Guayaquil',
+    timeZone: DEFAULT_TIMEZONE,
     dateStyle: 'short',
     timeStyle: 'short',
   })

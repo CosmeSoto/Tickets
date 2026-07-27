@@ -64,17 +64,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       )
     }
 
-    const validConditions = ['EXCELLENT', 'GOOD', 'FAIR', 'POOR', 'DAMAGED']
+    const validConditions = ['NEW', 'USED', 'DAMAGED']
     if (!validConditions.includes(returnCondition)) {
       return NextResponse.json({ error: 'Condición de devolución inválida' }, { status: 400 })
     }
 
-    if (
-      (returnCondition === 'DAMAGED' || returnCondition === 'POOR') &&
-      !damageDescription?.trim()
-    ) {
+    if (returnCondition === 'DAMAGED' && !damageDescription?.trim()) {
       return NextResponse.json(
-        { error: 'La descripción de daños es requerida cuando la condición es Malo o Dañado' },
+        { error: 'La descripción de daños es requerida cuando la condición es Dañado' },
         { status: 400 }
       )
     }

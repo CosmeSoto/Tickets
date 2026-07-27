@@ -1,4 +1,5 @@
 'use client'
+import { DEFAULT_TIMEZONE } from '@/lib/constants'
 
 /**
  * Hook singleton para configuración del usuario.
@@ -54,7 +55,7 @@ const DEFAULTS: UserSettings = {
   maxConcurrentTickets: 10,
   theme: 'light',
   language: 'es',
-  timezone: 'America/Guayaquil',
+  timezone: DEFAULT_TIMEZONE,
 }
 
 // ── Store global ──────────────────────────────────────────────────────────────

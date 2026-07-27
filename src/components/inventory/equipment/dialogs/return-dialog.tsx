@@ -99,10 +99,8 @@ export function ReturnDialog({
                   <SelectValue placeholder='Sin cambio de condición...' />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value='EXCELLENT'>Excelente</SelectItem>
-                  <SelectItem value='GOOD'>Bueno</SelectItem>
-                  <SelectItem value='FAIR'>Regular</SelectItem>
-                  <SelectItem value='POOR'>Malo</SelectItem>
+                  <SelectItem value='NEW'>Nuevo</SelectItem>
+                  <SelectItem value='USED'>Usado</SelectItem>
                   <SelectItem value='DAMAGED'>Dañado</SelectItem>
                 </SelectContent>
               </Select>

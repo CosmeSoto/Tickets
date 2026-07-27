@@ -27,6 +27,7 @@ import {
   buildActionDescription,
   buildChangesDescription,
 } from './audit-export-helpers'
+import { getAppTimezone } from '@/lib/utils/date-utils'
 
 export interface AuditExportOptions {
   format: 'csv' | 'json'
@@ -116,7 +117,7 @@ export class AuditExportService {
     if (options.includeMetadata) {
       const now = new Date()
       csv += `# REGISTRO DE AUDITORÍA DEL SISTEMA\n`
-      csv += `# Generado: ${now.toLocaleString('es-ES', { timeZone: 'America/Guayaquil' })}\n`
+      csv += `# Generado: ${now.toLocaleString('es-ES', { timeZone: getAppTimezone() })}\n`
       csv += `# Total de Registros: ${logs.length.toLocaleString()}\n`
       csv += `# Período: ${getDateRange(logs)}\n`
       csv += `\n`
@@ -143,9 +144,9 @@ export class AuditExportService {
       const date = new Date(log.createdAt)
       const details = log.details || {}
 
-      const fecha = date.toLocaleDateString('es-EC', { timeZone: 'America/Guayaquil' })
+      const fecha = date.toLocaleDateString('es-EC', { timeZone: getAppTimezone() })
       const hora = date.toLocaleTimeString('es-EC', {
-        timeZone: 'America/Guayaquil',
+        timeZone: getAppTimezone(),
         hour: '2-digit',
         minute: '2-digit',
         second: '2-digit',

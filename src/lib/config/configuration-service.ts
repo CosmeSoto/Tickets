@@ -1,16 +1,17 @@
 /**
  * Configuration Service
- * 
+ *
  * Centralized configuration management with environment-specific loading,
  * validation, and type safety
  */
 
-import { DEFAULT_SYSTEM_NAME } from '@/lib/branding-constants';
-import { z } from 'zod';
-import { logger } from '@/lib/logging';
+import { DEFAULT_SYSTEM_NAME } from '@/lib/branding-constants'
+import { DEFAULT_TIMEZONE } from '@/lib/constants'
+import { z } from 'zod'
+import { logger } from '@/lib/logging'
 
 // Environment types
-export type Environment = 'development' | 'test' | 'staging' | 'production';
+export type Environment = 'development' | 'test' | 'staging' | 'production'
 
 // Database configuration schema
 const DatabaseConfigSchema = z.object({
@@ -20,7 +21,7 @@ const DatabaseConfigSchema = z.object({
   queryTimeout: z.number().min(1000).default(30000),
   ssl: z.boolean().default(false),
   logging: z.boolean().default(false),
-});
+})
 
 // Redis configuration schema
 const RedisConfigSchema = z.object({
@@ -30,7 +31,7 @@ const RedisConfigSchema = z.object({
   connectTimeout: z.number().min(1000).default(10000),
   commandTimeout: z.number().min(1000).default(5000),
   keyPrefix: z.string().default('tickets:'),
-});
+})
 
 // Authentication configuration schema
 const AuthConfigSchema = z.object({
@@ -47,21 +48,25 @@ const AuthConfigSchema = z.object({
       providers: z.array(z.string()).default([]),
     }),
   }),
-});
+})
 
 // Email configuration schema
 const EmailConfigSchema = z.object({
   enabled: z.boolean().default(true),
   provider: z.enum(['smtp', 'sendgrid', 'ses']).default('smtp'),
-  smtp: z.object({
-    host: z.string().optional(),
-    port: z.number().min(1).max(65535).optional(),
-    secure: z.boolean().default(false),
-    auth: z.object({
-      user: z.string().optional(),
-      pass: z.string().optional(),
-    }).optional(),
-  }).optional(),
+  smtp: z
+    .object({
+      host: z.string().optional(),
+      port: z.number().min(1).max(65535).optional(),
+      secure: z.boolean().default(false),
+      auth: z
+        .object({
+          user: z.string().optional(),
+          pass: z.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
   from: z.object({
     name: z.string().default(DEFAULT_SYSTEM_NAME),
     email: z.string().email('Invalid from email').optional(),
@@ -71,28 +76,41 @@ const EmailConfigSchema = z.object({
     ticketUpdated: z.string().default('ticket-updated'),
     ticketAssigned: z.string().default('ticket-assigned'),
   }),
-});
+})
 
 // File storage configuration schema
 const StorageConfigSchema = z.object({
   provider: z.enum(['local', 's3', 'gcs']).default('local'),
-  maxFileSize: z.number().min(1024).default(10 * 1024 * 1024), // 10MB
-  allowedTypes: z.array(z.string()).default([
-    'image/jpeg', 'image/png', 'image/gif',
-    'application/pdf', 'text/plain',
-    'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-  ]),
-  local: z.object({
-    uploadPath: z.string().default('./uploads'),
-    publicPath: z.string().default('/uploads'),
-  }).optional(),
-  s3: z.object({
-    bucket: z.string().optional(),
-    region: z.string().optional(),
-    accessKeyId: z.string().optional(),
-    secretAccessKey: z.string().optional(),
-  }).optional(),
-});
+  maxFileSize: z
+    .number()
+    .min(1024)
+    .default(10 * 1024 * 1024), // 10MB
+  allowedTypes: z
+    .array(z.string())
+    .default([
+      'image/jpeg',
+      'image/png',
+      'image/gif',
+      'application/pdf',
+      'text/plain',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ]),
+  local: z
+    .object({
+      uploadPath: z.string().default('./uploads'),
+      publicPath: z.string().default('/uploads'),
+    })
+    .optional(),
+  s3: z
+    .object({
+      bucket: z.string().optional(),
+      region: z.string().optional(),
+      accessKeyId: z.string().optional(),
+      secretAccessKey: z.string().optional(),
+    })
+    .optional(),
+})
 
 // Security configuration schema
 const SecurityConfigSchema = z.object({
@@ -117,7 +135,7 @@ const SecurityConfigSchema = z.object({
     frameOptions: z.enum(['DENY', 'SAMEORIGIN']).default('DENY'),
     xssProtection: z.boolean().default(true),
   }),
-});
+})
 
 // Monitoring configuration schema
 const MonitoringConfigSchema = z.object({
@@ -138,7 +156,7 @@ const MonitoringConfigSchema = z.object({
     enableApiLogging: z.boolean().default(true),
     enablePerformanceLogging: z.boolean().default(true),
   }),
-});
+})
 
 // Application configuration schema
 const AppConfigSchema = z.object({
@@ -146,7 +164,7 @@ const AppConfigSchema = z.object({
   version: z.string().optional().default('1.0.0'),
   description: z.string().optional().default('Sistema de gestión multi-área'),
   url: z.string().url('Invalid application URL').optional(),
-  timezone: z.string().optional().default('America/Guayaquil'),
+  timezone: z.string().optional().default(DEFAULT_TIMEZONE),
   locale: z.string().optional().default('es-EC'),
   features: z.object({
     ticketAssignment: z.boolean().default(true),
@@ -155,7 +173,7 @@ const AppConfigSchema = z.object({
     auditLog: z.boolean().default(true),
     reporting: z.boolean().default(true),
   }),
-});
+})
 
 // Main configuration schema
 const ConfigurationSchema = z.object({
@@ -168,51 +186,51 @@ const ConfigurationSchema = z.object({
   storage: StorageConfigSchema,
   security: SecurityConfigSchema,
   monitoring: MonitoringConfigSchema,
-});
+})
 
-export type Configuration = z.infer<typeof ConfigurationSchema>;
-export type DatabaseConfig = z.infer<typeof DatabaseConfigSchema>;
-export type RedisConfig = z.infer<typeof RedisConfigSchema>;
-export type AuthConfig = z.infer<typeof AuthConfigSchema>;
-export type EmailConfig = z.infer<typeof EmailConfigSchema>;
-export type StorageConfig = z.infer<typeof StorageConfigSchema>;
-export type SecurityConfig = z.infer<typeof SecurityConfigSchema>;
-export type MonitoringConfig = z.infer<typeof MonitoringConfigSchema>;
-export type AppConfig = z.infer<typeof AppConfigSchema>;
+export type Configuration = z.infer<typeof ConfigurationSchema>
+export type DatabaseConfig = z.infer<typeof DatabaseConfigSchema>
+export type RedisConfig = z.infer<typeof RedisConfigSchema>
+export type AuthConfig = z.infer<typeof AuthConfigSchema>
+export type EmailConfig = z.infer<typeof EmailConfigSchema>
+export type StorageConfig = z.infer<typeof StorageConfigSchema>
+export type SecurityConfig = z.infer<typeof SecurityConfigSchema>
+export type MonitoringConfig = z.infer<typeof MonitoringConfigSchema>
+export type AppConfig = z.infer<typeof AppConfigSchema>
 
 export class ConfigurationService {
-  private static instance: ConfigurationService;
-  private config: Configuration | null = null;
-  private environment: Environment;
+  private static instance: ConfigurationService
+  private config: Configuration | null = null
+  private environment: Environment
 
   private constructor() {
-    this.environment = this.detectEnvironment();
+    this.environment = this.detectEnvironment()
   }
 
   public static getInstance(): ConfigurationService {
     if (!ConfigurationService.instance) {
-      ConfigurationService.instance = new ConfigurationService();
+      ConfigurationService.instance = new ConfigurationService()
     }
-    return ConfigurationService.instance;
+    return ConfigurationService.instance
   }
 
   /**
    * Detect current environment
    */
   private detectEnvironment(): Environment {
-    const env = process.env.NODE_ENV as Environment;
-    const validEnvironments: Environment[] = ['development', 'test', 'staging', 'production'];
-    
+    const env = process.env.NODE_ENV as Environment
+    const validEnvironments: Environment[] = ['development', 'test', 'staging', 'production']
+
     if (validEnvironments.includes(env)) {
-      return env;
+      return env
     }
-    
+
     logger.warn(`Invalid NODE_ENV: ${env}, defaulting to development`, {
       component: 'configuration',
       operation: 'detect_environment',
-    });
-    
-    return 'development';
+    })
+
+    return 'development'
   }
 
   /**
@@ -220,15 +238,15 @@ export class ConfigurationService {
    */
   public loadConfiguration(): Configuration {
     if (this.config) {
-      return this.config;
+      return this.config
     }
 
     try {
-      const rawConfig = this.buildConfigFromEnv();
-      const validatedConfig = ConfigurationSchema.parse(rawConfig);
-      
-      this.config = validatedConfig;
-      
+      const rawConfig = this.buildConfigFromEnv()
+      const validatedConfig = ConfigurationSchema.parse(rawConfig)
+
+      this.config = validatedConfig
+
       logger.info('Configuration loaded successfully', {
         component: 'configuration',
         operation: 'load_configuration',
@@ -236,16 +254,20 @@ export class ConfigurationService {
           environment: this.environment,
           features: validatedConfig.app.features,
         },
-      });
-      
-      return this.config;
+      })
+
+      return this.config
     } catch (error) {
-      logger.error('Failed to load configuration', {
-        component: 'configuration',
-        operation: 'load_configuration',
-      }, error as Error);
-      
-      throw new Error(`Configuration validation failed: ${error}`);
+      logger.error(
+        'Failed to load configuration',
+        {
+          component: 'configuration',
+          operation: 'load_configuration',
+        },
+        error as Error
+      )
+
+      throw new Error(`Configuration validation failed: ${error}`)
     }
   }
 
@@ -253,9 +275,9 @@ export class ConfigurationService {
    * Parse number from environment variable with fallback
    */
   private parseNumber(value: string | undefined): number | undefined {
-    if (!value) return undefined;
-    const parsed = parseInt(value, 10);
-    return isNaN(parsed) ? undefined : parsed;
+    if (!value) return undefined
+    const parsed = parseInt(value, 10)
+    return isNaN(parsed) ? undefined : parsed
   }
 
   /**
@@ -307,7 +329,9 @@ export class ConfigurationService {
           },
           oauth: {
             enabled: process.env.AUTH_OAUTH_ENABLED === 'true',
-            providers: process.env.AUTH_OAUTH_PROVIDERS ? process.env.AUTH_OAUTH_PROVIDERS.split(',') : undefined,
+            providers: process.env.AUTH_OAUTH_PROVIDERS
+              ? process.env.AUTH_OAUTH_PROVIDERS.split(',')
+              : undefined,
           },
         },
       },
@@ -336,7 +360,9 @@ export class ConfigurationService {
       storage: {
         provider: process.env.STORAGE_PROVIDER as any,
         maxFileSize: this.parseNumber(process.env.STORAGE_MAX_FILE_SIZE),
-        allowedTypes: process.env.STORAGE_ALLOWED_TYPES ? process.env.STORAGE_ALLOWED_TYPES.split(',') : undefined,
+        allowedTypes: process.env.STORAGE_ALLOWED_TYPES
+          ? process.env.STORAGE_ALLOWED_TYPES.split(',')
+          : undefined,
         local: {
           uploadPath: process.env.STORAGE_LOCAL_UPLOAD_PATH,
           publicPath: process.env.STORAGE_LOCAL_PUBLIC_PATH,
@@ -390,7 +416,7 @@ export class ConfigurationService {
           enablePerformanceLogging: process.env.LOG_PERFORMANCE_ENABLED !== 'false',
         },
       },
-    };
+    }
   }
 
   /**
@@ -398,53 +424,53 @@ export class ConfigurationService {
    */
   public getConfiguration(): Configuration {
     if (!this.config) {
-      return this.loadConfiguration();
+      return this.loadConfiguration()
     }
-    return this.config;
+    return this.config
   }
 
   /**
    * Get specific configuration section
    */
   public getConfig<K extends keyof Configuration>(section: K): Configuration[K] {
-    const config = this.getConfiguration();
-    return config[section];
+    const config = this.getConfiguration()
+    return config[section]
   }
 
   /**
    * Get current environment
    */
   public getEnvironment(): Environment {
-    return this.environment;
+    return this.environment
   }
 
   /**
    * Check if running in production
    */
   public isProduction(): boolean {
-    return this.environment === 'production';
+    return this.environment === 'production'
   }
 
   /**
    * Check if running in development
    */
   public isDevelopment(): boolean {
-    return this.environment === 'development';
+    return this.environment === 'development'
   }
 
   /**
    * Check if running in test
    */
   public isTest(): boolean {
-    return this.environment === 'test';
+    return this.environment === 'test'
   }
 
   /**
    * Check if feature is enabled
    */
   public isFeatureEnabled(feature: keyof AppConfig['features']): boolean {
-    const config = this.getConfiguration();
-    return config.app.features[feature];
+    const config = this.getConfiguration()
+    return config.app.features[feature]
   }
 
   /**
@@ -452,11 +478,11 @@ export class ConfigurationService {
    */
   public validateConfiguration(): { valid: boolean; errors: string[] } {
     try {
-      this.loadConfiguration();
-      return { valid: true, errors: [] };
+      this.loadConfiguration()
+      return { valid: true, errors: [] }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      return { valid: false, errors: [errorMessage] };
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      return { valid: false, errors: [errorMessage] }
     }
   }
 
@@ -464,16 +490,16 @@ export class ConfigurationService {
    * Reload configuration (useful for testing)
    */
   public reloadConfiguration(): Configuration {
-    this.config = null;
-    return this.loadConfiguration();
+    this.config = null
+    return this.loadConfiguration()
   }
 
   /**
    * Get configuration summary for debugging
    */
   public getConfigurationSummary(): Record<string, any> {
-    const config = this.getConfiguration();
-    
+    const config = this.getConfiguration()
+
     return {
       environment: config.environment,
       app: {
@@ -507,9 +533,9 @@ export class ConfigurationService {
         healthCheckEnabled: config.monitoring.healthCheck.enabled,
         metricsEnabled: config.monitoring.metrics.enabled,
       },
-    };
+    }
   }
 }
 
 // Export singleton instance
-export const configurationService = ConfigurationService.getInstance();
+export const configurationService = ConfigurationService.getInstance()

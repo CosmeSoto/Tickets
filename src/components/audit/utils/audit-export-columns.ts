@@ -5,6 +5,7 @@
 
 import type { ExportColumn } from '@/lib/utils/export'
 import { getActionLabel, getEntityLabel } from './audit-formatters'
+import { getAppTimezone } from '@/lib/utils/date-utils'
 
 const ROLES: Record<string, string> = {
   ADMIN: 'Administrador',
@@ -18,7 +19,7 @@ export const AUDIT_EXPORT_COLUMNS: ExportColumn[] = [
     header: 'Fecha',
     accessor: (row: any) => {
       const d = new Date(row.createdAt)
-      return d.toLocaleDateString('es-EC', { timeZone: 'America/Guayaquil' })
+      return d.toLocaleDateString('es-EC', { timeZone: getAppTimezone() })
     },
   },
   {
@@ -27,7 +28,7 @@ export const AUDIT_EXPORT_COLUMNS: ExportColumn[] = [
     accessor: (row: any) => {
       const d = new Date(row.createdAt)
       return d.toLocaleTimeString('es-EC', {
-        timeZone: 'America/Guayaquil',
+        timeZone: getAppTimezone(),
         hour: '2-digit',
         minute: '2-digit',
       })

@@ -237,18 +237,7 @@ export function useEquipmentDetail({
       return
     }
 
-    const conditionMap: Record<string, string> = {
-      NEW: 'EXCELLENT',
-      LIKE_NEW: 'GOOD',
-      GOOD: 'GOOD',
-      FAIR: 'FAIR',
-      POOR: 'POOR',
-      DAMAGED: 'DAMAGED',
-      EXCELLENT: 'EXCELLENT',
-    }
-    const returnCondition = returnForm.condition
-      ? conditionMap[returnForm.condition] || returnForm.condition
-      : 'GOOD'
+    const returnCondition = returnForm.condition || 'USED'
 
     setReturning(true)
     try {

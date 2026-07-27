@@ -6,6 +6,7 @@ import prisma from './prisma'
 import bcrypt from 'bcryptjs'
 import { UserRole } from '@prisma/client'
 import { randomUUID } from 'crypto'
+import { DEFAULT_TIMEZONE } from '@/lib/constants'
 
 export const authOptions: NextAuthOptions = {
   // IMPORTANTE: No usar PrismaAdapter con strategy: 'jwt'
@@ -302,7 +303,7 @@ export const authOptions: NextAuthOptions = {
                   id: randomUUID(),
                   userId: newUser.id,
                   theme: 'light',
-                  timezone: 'America/Guayaquil',
+                  timezone: DEFAULT_TIMEZONE,
                   language: 'es',
                   updatedAt: new Date(),
                 },

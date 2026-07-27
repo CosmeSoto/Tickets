@@ -4,7 +4,10 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
-import { createReturnActSchema, type CreateReturnActInput } from '@/lib/validations/inventory/return-act'
+import {
+  createReturnActSchema,
+  type CreateReturnActInput,
+} from '@/lib/validations/inventory/return-act'
 
 interface ReturnFormProps {
   assignmentId: string
@@ -16,11 +19,17 @@ interface ReturnFormProps {
 }
 
 const conditionOptions = [
-  { value: 'EXCELLENT', label: 'Excelente', description: 'Sin desgaste, como nuevo' },
-  { value: 'GOOD', label: 'Bueno', description: 'Desgaste mínimo, funciona perfectamente' },
-  { value: 'FAIR', label: 'Regular', description: 'Desgaste visible, funciona correctamente' },
-  { value: 'POOR', label: 'Malo', description: 'Desgaste significativo, requiere mantenimiento' },
-  { value: 'DAMAGED', label: 'Dañado', description: 'No funciona correctamente, requiere reparación' },
+  { value: 'NEW', label: 'Nuevo', description: 'Sin uso o desgaste, estado original' },
+  {
+    value: 'USED',
+    label: 'Usado',
+    description: 'Con desgaste normal de uso, funciona correctamente',
+  },
+  {
+    value: 'DAMAGED',
+    label: 'Dañado',
+    description: 'No funciona correctamente, requiere reparación',
+  },
 ]
 
 export function ReturnForm({
@@ -45,19 +54,17 @@ export function ReturnForm({
     resolver: zodResolver(createReturnActSchema),
     defaultValues: {
       assignmentId,
-      returnCondition: 'GOOD',
+      returnCondition: 'USED',
       returnDate: new Date(),
     },
   })
 
   const selectedCondition = watch('returnCondition')
-  const showDamageField = selectedCondition === 'DAMAGED' || selectedCondition === 'POOR'
+  const showDamageField = selectedCondition === 'DAMAGED'
 
   const toggleAccessory = (accessory: string) => {
     setMissingAccessories(prev =>
-      prev.includes(accessory)
-        ? prev.filter(a => a !== accessory)
-        : [...prev, accessory]
+      prev.includes(accessory) ? prev.filter(a => a !== accessory) : [...prev, accessory]
     )
   }
 
@@ -95,22 +102,22 @@ export function ReturnForm({
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+    <form onSubmit={handleSubmit(onSubmit)} className='space-y-6'>
       {/* Información del equipo */}
-      <div className="bg-muted/50 p-4 rounded-lg">
-        <h3 className="text-sm font-medium text-foreground mb-2">Equipo a devolver</h3>
-        <p className="text-sm text-muted-foreground">
-          <span className="font-medium">{equipmentCode}</span> - {equipmentDescription}
+      <div className='bg-muted/50 p-4 rounded-lg'>
+        <h3 className='text-sm font-medium text-foreground mb-2'>Equipo a devolver</h3>
+        <p className='text-sm text-muted-foreground'>
+          <span className='font-medium'>{equipmentCode}</span> - {equipmentDescription}
         </p>
       </div>
 
       {/* Condición de devolución */}
       <div>
-        <label className="block text-sm font-medium text-foreground mb-2">
-          Condición del equipo <span className="text-destructive">*</span>
+        <label className='block text-sm font-medium text-foreground mb-2'>
+          Condición del equipo <span className='text-destructive'>*</span>
         </label>
-        <div className="space-y-2">
-          {conditionOptions.map((option) => (
+        <div className='space-y-2'>
+          {conditionOptions.map(option => (
             <label
               key={option.value}
               className={`flex items-start p-3 border rounded-lg cursor-pointer transition-colors ${
@@ -120,62 +127,68 @@ export function ReturnForm({
               }`}
             >
               <input
-                type="radio"
+                type='radio'
                 value={option.value}
                 {...register('returnCondition')}
-                className="mt-1 mr-3"
+                className='mt-1 mr-3'
               />
-              <div className="flex-1">
-                <div className="font-medium text-foreground">{option.label}</div>
-                <div className="text-sm text-muted-foreground">{option.description}</div>
+              <div className='flex-1'>
+                <div className='font-medium text-foreground'>{option.label}</div>
+                <div className='text-sm text-muted-foreground'>{option.description}</div>
               </div>
             </label>
           ))}
         </div>
         {errors.returnCondition && (
-          <p className="mt-1 text-sm text-destructive">{errors.returnCondition.message}</p>
+          <p className='mt-1 text-sm text-destructive'>{errors.returnCondition.message}</p>
         )}
       </div>
 
       {/* Fecha de devolución */}
       <div>
-        <label htmlFor="returnDate" className="block text-sm font-medium text-foreground mb-1">
+        <label htmlFor='returnDate' className='block text-sm font-medium text-foreground mb-1'>
           Fecha de devolución
         </label>
         <input
-          type="date"
-          id="returnDate"
+          type='date'
+          id='returnDate'
           {...register('returnDate')}
-          className="w-full px-3 py-2 border border-border bg-card text-foreground rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
+          className='w-full px-3 py-2 border border-border bg-card text-foreground rounded-md focus:outline-none focus:ring-2 focus:ring-ring'
         />
         {errors.returnDate && (
-          <p className="mt-1 text-sm text-destructive">{errors.returnDate.message}</p>
+          <p className='mt-1 text-sm text-destructive'>{errors.returnDate.message}</p>
         )}
       </div>
 
       {/* Accesorios */}
       {accessories.length > 0 && (
         <div>
-          <label className="block text-sm font-medium text-foreground mb-2">
+          <label className='block text-sm font-medium text-foreground mb-2'>
             Accesorios (marcar los que faltan)
           </label>
-          <div className="space-y-2">
+          <div className='space-y-2'>
             {accessories.map((accessory, index) => (
               <label
                 key={index}
-                className="flex items-center p-2 border border-border rounded-md hover:bg-accent cursor-pointer transition-colors"
+                className='flex items-center p-2 border border-border rounded-md hover:bg-accent cursor-pointer transition-colors'
               >
                 <input
-                  type="checkbox"
+                  type='checkbox'
                   checked={missingAccessories.includes(accessory)}
                   onChange={() => toggleAccessory(accessory)}
-                  className="mr-3"
+                  className='mr-3'
                 />
-                <span className={missingAccessories.includes(accessory) ? 'text-destructive line-through' : 'text-foreground'}>
+                <span
+                  className={
+                    missingAccessories.includes(accessory)
+                      ? 'text-destructive line-through'
+                      : 'text-foreground'
+                  }
+                >
                   {accessory}
                 </span>
                 {missingAccessories.includes(accessory) && (
-                  <span className="ml-auto text-xs text-destructive font-medium">FALTANTE</span>
+                  <span className='ml-auto text-xs text-destructive font-medium'>FALTANTE</span>
                 )}
               </label>
             ))}
@@ -185,63 +198,66 @@ export function ReturnForm({
 
       {/* Notas de inspección */}
       <div>
-        <label htmlFor="inspectionNotes" className="block text-sm font-medium text-foreground mb-1">
+        <label htmlFor='inspectionNotes' className='block text-sm font-medium text-foreground mb-1'>
           Notas de inspección
         </label>
         <textarea
-          id="inspectionNotes"
+          id='inspectionNotes'
           {...register('inspectionNotes')}
           rows={4}
-          placeholder="Observaciones generales sobre el estado del equipo..."
-          className="w-full px-3 py-2 border border-border bg-card text-foreground rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
+          placeholder='Observaciones generales sobre el estado del equipo...'
+          className='w-full px-3 py-2 border border-border bg-card text-foreground rounded-md focus:outline-none focus:ring-2 focus:ring-ring'
         />
         {errors.inspectionNotes && (
-          <p className="mt-1 text-sm text-destructive">{errors.inspectionNotes.message}</p>
+          <p className='mt-1 text-sm text-destructive'>{errors.inspectionNotes.message}</p>
         )}
       </div>
 
       {/* Descripción de daños (solo si está dañado o en mal estado) */}
       {showDamageField && (
         <div>
-          <label htmlFor="damageDescription" className="block text-sm font-medium text-foreground mb-1">
-            Descripción de daños <span className="text-destructive">*</span>
+          <label
+            htmlFor='damageDescription'
+            className='block text-sm font-medium text-foreground mb-1'
+          >
+            Descripción de daños <span className='text-destructive'>*</span>
           </label>
           <textarea
-            id="damageDescription"
+            id='damageDescription'
             {...register('damageDescription')}
             rows={4}
-            placeholder="Describa detalladamente los daños encontrados..."
-            className="w-full px-3 py-2 border border-border bg-card text-foreground rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
+            placeholder='Describa detalladamente los daños encontrados...'
+            className='w-full px-3 py-2 border border-border bg-card text-foreground rounded-md focus:outline-none focus:ring-2 focus:ring-ring'
           />
           {errors.damageDescription && (
-            <p className="mt-1 text-sm text-destructive">{errors.damageDescription.message}</p>
+            <p className='mt-1 text-sm text-destructive'>{errors.damageDescription.message}</p>
           )}
         </div>
       )}
 
       {/* Error general */}
       {error && (
-        <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-md">
-          <p className="text-sm text-destructive">{error}</p>
+        <div className='p-4 bg-destructive/10 border border-destructive/30 rounded-md'>
+          <p className='text-sm text-destructive'>{error}</p>
         </div>
       )}
 
       {/* Botones */}
-      <div className="flex justify-end space-x-3 pt-4 border-t border-border">
+      <div className='flex justify-end space-x-3 pt-4 border-t border-border'>
         {onCancel && (
           <button
-            type="button"
+            type='button'
             onClick={onCancel}
             disabled={isSubmitting}
-            className="px-4 py-2 text-sm font-medium text-foreground bg-card border border-border rounded-md hover:bg-accent disabled:opacity-50 transition-colors"
+            className='px-4 py-2 text-sm font-medium text-foreground bg-card border border-border rounded-md hover:bg-accent disabled:opacity-50 transition-colors'
           >
             Cancelar
           </button>
         )}
         <button
-          type="submit"
+          type='submit'
           disabled={isSubmitting}
-          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+          className='px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50'
         >
           {isSubmitting ? 'Creando acta...' : 'Crear acta de devolución'}
         </button>

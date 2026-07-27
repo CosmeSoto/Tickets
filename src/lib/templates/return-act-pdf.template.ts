@@ -2,6 +2,7 @@ import { loadPDFKit } from '@/lib/utils/load-pdfkit'
 import fs from 'fs'
 import path from 'path'
 import { getUploadDir } from '@/lib/upload-path'
+import { getAppTimezone } from '@/lib/utils/date-utils'
 
 async function fetchImageBuffer(url: string): Promise<Buffer | null> {
   try {
@@ -24,10 +25,8 @@ async function fetchImageBuffer(url: string): Promise<Buffer | null> {
 
 const CONDITION_LABELS: Record<string, string> = {
   NEW: 'Nuevo',
-  LIKE_NEW: 'Como Nuevo',
-  GOOD: 'Bueno',
-  FAIR: 'Regular',
-  POOR: 'Malo',
+  USED: 'Usado',
+  DAMAGED: 'Dañado',
 }
 
 const C = {
@@ -159,6 +158,7 @@ export async function generateReturnActPDF(
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
+      timeZone: getAppTimezone(),
     })
 
   // ── COLUMNA IZQUIERDA ────────────────────────────────────────────────────
@@ -313,6 +313,7 @@ export async function generateReturnActPDF(
             year: 'numeric',
             hour: '2-digit',
             minute: '2-digit',
+            timeZone: getAppTimezone(),
           }),
           col2X + 6,
           scy,
@@ -350,7 +351,7 @@ export async function generateReturnActPDF(
     .font('Helvetica')
     .fillColor('#BFDBFE')
     .text(
-      `Documento generado electrónicamente · ${companyName} · ${new Date().toLocaleDateString('es-EC', { day: '2-digit', month: 'long', year: 'numeric' })}`,
+      `Documento generado electrónicamente · ${companyName} · ${new Date().toLocaleDateString('es-EC', { day: '2-digit', month: 'long', year: 'numeric', timeZone: getAppTimezone() })}`,
       ML,
       footerY + 10,
       { width: CW, align: 'center' }

@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma'
 import { z } from 'zod'
 import { randomUUID } from 'crypto'
 import { withCache, invalidateCache } from '@/lib/api-cache'
+import { DEFAULT_TIMEZONE } from '@/lib/constants'
 
 // Schema de validación extendido para todas las preferencias de notificaciones
 const userSettingsSchema = z.object({
@@ -86,7 +87,7 @@ export async function GET(request: NextRequest) {
             maxConcurrentTickets: 10,
             theme: 'light',
             language: 'es',
-            timezone: 'America/Guayaquil',
+            timezone: DEFAULT_TIMEZONE,
             profileVisible: true,
             activityVisible: true,
           },
@@ -108,7 +109,7 @@ export async function GET(request: NextRequest) {
           update: {
             theme: 'light',
             language: 'es',
-            timezone: 'America/Guayaquil',
+            timezone: DEFAULT_TIMEZONE,
             systemAlerts: true,
             weeklyReport: false,
             soundEnabled: true,
@@ -146,7 +147,7 @@ export async function GET(request: NextRequest) {
             maxConcurrentTickets: 10,
             theme: 'light',
             language: 'es',
-            timezone: 'America/Guayaquil',
+            timezone: DEFAULT_TIMEZONE,
             updatedAt: now,
           },
         })
@@ -161,7 +162,7 @@ export async function GET(request: NextRequest) {
           data: {
             theme: settings.theme ?? 'light',
             language: settings.language ?? 'es',
-            timezone: settings.timezone ?? 'America/Guayaquil',
+            timezone: settings.timezone ?? DEFAULT_TIMEZONE,
             systemAlerts: settings.systemAlerts ?? true,
             weeklyReport: settings.weeklyReport ?? false,
             soundEnabled: settings.soundEnabled ?? true,
@@ -315,7 +316,7 @@ export async function PUT(request: NextRequest) {
         maxConcurrentTickets: data.maxConcurrentTickets ?? 10,
         theme: data.theme ?? 'light',
         language: 'es',
-        timezone: 'America/Guayaquil',
+        timezone: DEFAULT_TIMEZONE,
         updatedAt: new Date(),
       },
     })

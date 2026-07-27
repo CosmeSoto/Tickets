@@ -1,4 +1,5 @@
 'use client'
+import { DEFAULT_TIMEZONE } from '@/lib/constants'
 
 /**
  * Página de ejecución de ronda de patrulla.
@@ -88,7 +89,7 @@ export default function PatrolExecutionPage() {
   const isObserver = !isAssignedAgent
 
   const scheduledLabel = new Date(patrol.scheduledStart).toLocaleString('es-EC', {
-    timeZone: 'America/Guayaquil',
+    timeZone: DEFAULT_TIMEZONE,
     dateStyle: 'short',
     timeStyle: 'short',
   })

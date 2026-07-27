@@ -27,6 +27,7 @@ import { RoleBadge } from '@/components/ui/role-badge'
 import type { UserData } from '@/hooks/use-users'
 import { getUserInitials } from '@/components/users/user-utils'
 import { UserModulesPanel } from '@/components/users/user-modules-panel'
+import { getAppTimezone } from '@/lib/utils/date-utils'
 
 interface UserDetailsModalProps {
   isOpen: boolean
@@ -80,7 +81,7 @@ function formatDateTime(dateString: string): React.ReactNode {
   const isYesterday = new Date(now.getTime() - 86400000).toDateString() === date.toDateString()
 
   const time = date.toLocaleTimeString('es-EC', {
-    timeZone: 'America/Guayaquil',
+    timeZone: getAppTimezone(),
     hour: '2-digit',
     minute: '2-digit',
   })
@@ -95,7 +96,7 @@ function formatDateTime(dateString: string): React.ReactNode {
   return (
     <span>
       {date.toLocaleDateString('es-EC', {
-        timeZone: 'America/Guayaquil',
+        timeZone: getAppTimezone(),
         day: '2-digit',
         month: 'short',
         year: 'numeric',

@@ -42,7 +42,7 @@ export interface EquipmentSnapshot {
 // Datos para crear un acta de devolución
 export interface CreateReturnActData {
   assignmentId: string
-  returnCondition: 'EXCELLENT' | 'GOOD' | 'FAIR' | 'POOR' | 'DAMAGED'
+  returnCondition: 'NEW' | 'USED' | 'DAMAGED'
   inspectionNotes?: string
   missingAccessories?: string[]
   damageDescription?: string

@@ -1,4 +1,5 @@
 'use client'
+import { DEFAULT_TIMEZONE } from '@/lib/constants'
 
 import { MapPin, Clock, Image as ImageIcon, Ticket, WifiOff } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
@@ -105,7 +106,7 @@ export function PatrolCheckInCard({ checkIn, className }: PatrolCheckInCardProps
           <span className='flex items-center gap-1'>
             <Clock className='h-3 w-3' />
             {new Date(checkIn.deviceTimestamp).toLocaleString('es-EC', {
-              timeZone: 'America/Guayaquil',
+              timeZone: DEFAULT_TIMEZONE,
               dateStyle: 'short',
               timeStyle: 'short',
             })}

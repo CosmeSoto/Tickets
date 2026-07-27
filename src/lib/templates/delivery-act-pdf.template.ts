@@ -7,6 +7,7 @@ import http from 'http'
 import type { DeliveryAct } from '@/types/inventory/delivery-act'
 import { getUploadDir } from '@/lib/upload-path'
 import { DEFAULT_SYSTEM_NAME } from '@/lib/branding-constants'
+import { getAppTimezone } from '@/lib/utils/date-utils'
 
 async function fetchImageBuffer(url: string): Promise<Buffer | null> {
   try {
@@ -41,10 +42,8 @@ async function fetchImageBuffer(url: string): Promise<Buffer | null> {
 
 const CONDITION_LABELS: Record<string, string> = {
   NEW: 'Nuevo',
-  LIKE_NEW: 'Como Nuevo',
-  GOOD: 'Bueno',
-  FAIR: 'Regular',
-  POOR: 'Malo',
+  USED: 'Usado',
+  DAMAGED: 'Dañado',
 }
 
 // Paleta profesional: neutros + acento mínimo
@@ -367,8 +366,8 @@ export async function generateDeliveryActPDF(
     const imgBuffer = snap.equipmentImagePath
       ? await fetchImageBuffer(snap.equipmentImagePath)
       : null
-    const IMG_W = 90   // ancho de la miniatura
-    const IMG_H = 90   // alto máximo
+    const IMG_W = 90 // ancho de la miniatura
+    const IMG_H = 90 // alto máximo
     const IMG_GAP = 12 // espacio entre texto e imagen
     const dataW = imgBuffer ? CW - IMG_W - IMG_GAP : CW
 
@@ -376,40 +375,76 @@ export async function generateDeliveryActPDF(
     const blockStartY = y
 
     // Fila 1: Código | N° Serie
-    doc.fontSize(7.5).font('Helvetica-Bold').fillColor(C.muted)
+    doc
+      .fontSize(7.5)
+      .font('Helvetica-Bold')
+      .fillColor(C.muted)
       .text('CÓDIGO', ML, y, { width: dataW / 2 })
-    doc.fontSize(7.5).font('Helvetica-Bold').fillColor(C.muted)
+    doc
+      .fontSize(7.5)
+      .font('Helvetica-Bold')
+      .fillColor(C.muted)
       .text('N° DE SERIE', ML + dataW / 2, y, { width: dataW / 2 })
     y += 9
-    doc.fontSize(9).font('Helvetica').fillColor(C.text)
+    doc
+      .fontSize(9)
+      .font('Helvetica')
+      .fillColor(C.text)
       .text(act.equipmentSnapshot.code || '—', ML, y, { width: dataW / 2 })
-    doc.fontSize(9).font('Helvetica').fillColor(C.text)
+    doc
+      .fontSize(9)
+      .font('Helvetica')
+      .fillColor(C.text)
       .text(act.equipmentSnapshot.serialNumber || '—', ML + dataW / 2, y, { width: dataW / 2 })
     y += 14
 
     // Fila 2: Marca/Modelo | Tipo
-    doc.fontSize(7.5).font('Helvetica-Bold').fillColor(C.muted)
+    doc
+      .fontSize(7.5)
+      .font('Helvetica-Bold')
+      .fillColor(C.muted)
       .text('MARCA / MODELO', ML, y, { width: dataW / 2 })
-    doc.fontSize(7.5).font('Helvetica-Bold').fillColor(C.muted)
+    doc
+      .fontSize(7.5)
+      .font('Helvetica-Bold')
+      .fillColor(C.muted)
       .text('TIPO', ML + dataW / 2, y, { width: dataW / 2 })
     y += 9
-    doc.fontSize(9).font('Helvetica').fillColor(C.text)
-      .text(`${act.equipmentSnapshot.brand} ${act.equipmentSnapshot.model}`, ML, y, { width: dataW / 2 })
-    doc.fontSize(9).font('Helvetica').fillColor(C.text)
+    doc
+      .fontSize(9)
+      .font('Helvetica')
+      .fillColor(C.text)
+      .text(`${act.equipmentSnapshot.brand} ${act.equipmentSnapshot.model}`, ML, y, {
+        width: dataW / 2,
+      })
+    doc
+      .fontSize(9)
+      .font('Helvetica')
+      .fillColor(C.text)
       .text(
         act.equipmentSnapshot.typeName || act.equipmentSnapshot.type || '—',
-        ML + dataW / 2, y, { width: dataW / 2 }
+        ML + dataW / 2,
+        y,
+        { width: dataW / 2 }
       )
     y += 14
 
     // Fila 3: Condición
-    doc.fontSize(7.5).font('Helvetica-Bold').fillColor(C.muted)
+    doc
+      .fontSize(7.5)
+      .font('Helvetica-Bold')
+      .fillColor(C.muted)
       .text('CONDICIÓN', ML, y, { width: dataW / 2 })
     y += 9
-    doc.fontSize(9).font('Helvetica').fillColor(C.text)
+    doc
+      .fontSize(9)
+      .font('Helvetica')
+      .fillColor(C.text)
       .text(
         CONDITION_LABELS[act.equipmentSnapshot.condition] || act.equipmentSnapshot.condition || '—',
-        ML, y, { width: dataW / 2 }
+        ML,
+        y,
+        { width: dataW / 2 }
       )
     y += 14
 
@@ -418,7 +453,9 @@ export async function generateDeliveryActPDF(
       const imgX = ML + dataW + IMG_GAP
       try {
         doc.image(imgBuffer, imgX, blockStartY, { fit: [IMG_W, IMG_H] })
-      } catch { /* imagen inválida — ignorar silenciosamente */ }
+      } catch {
+        /* imagen inválida — ignorar silenciosamente */
+      }
       // Asegurar que y no quede por encima del borde inferior de la imagen
       y = Math.max(y, blockStartY + IMG_H + 4)
     }
@@ -429,7 +466,10 @@ export async function generateDeliveryActPDF(
       y += 2
       doc.fontSize(7.5).font('Helvetica-Bold').fillColor(C.muted).text('ACCESORIOS', ML, y)
       y += 9
-      doc.fontSize(8.5).font('Helvetica').fillColor(C.text)
+      doc
+        .fontSize(8.5)
+        .font('Helvetica')
+        .fillColor(C.text)
         .text(accList.join('  ·  '), ML, y, { width: CW })
       y += 13
     }
@@ -447,9 +487,15 @@ export async function generateDeliveryActPDF(
       customVals.forEach(cv => {
         const xPos = ML + col * (colW + 6)
         const label = (cv as any).label ?? cv.fieldName
-        doc.fontSize(7).font('Helvetica-Bold').fillColor(C.muted)
+        doc
+          .fontSize(7)
+          .font('Helvetica-Bold')
+          .fillColor(C.muted)
           .text(label.toUpperCase(), xPos, y, { width: colW })
-        doc.fontSize(8.5).font('Helvetica').fillColor(C.text)
+        doc
+          .fontSize(8.5)
+          .font('Helvetica')
+          .fillColor(C.text)
           .text(cv.fieldValue || '—', xPos, y + 8, { width: colW })
         col++
         if (col >= 3) {
@@ -562,6 +608,7 @@ export async function generateDeliveryActPDF(
           day: '2-digit',
           month: 'long',
           year: 'numeric',
+          timeZone: getAppTimezone(),
         }),
         y
       )
@@ -588,6 +635,7 @@ export async function generateDeliveryActPDF(
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
+      timeZone: getAppTimezone(),
     })
 
   doc
@@ -633,30 +681,47 @@ export async function generateDeliveryActPDF(
   const sigW = CW - qrSize - 16
   const sigStartY = y
 
-  doc
-    .fontSize(8)
-    .font('Helvetica-Bold')
-    .fillColor(C.accent)
-    .text('VERIFICACIÓN DIGITAL', ML, y)
+  doc.fontSize(8).font('Helvetica-Bold').fillColor(C.accent).text('VERIFICACIÓN DIGITAL', ML, y)
   y += 12
 
   if (act.status === 'ACCEPTED' && act.verificationHash) {
     const shortHash = act.verificationHash.substring(0, 36) + '...'
-    doc.fontSize(7).font('Helvetica').fillColor(C.muted).text('Hash: ' + shortHash, ML, y, { width: sigW })
+    doc
+      .fontSize(7)
+      .font('Helvetica')
+      .fillColor(C.muted)
+      .text('Hash: ' + shortHash, ML, y, { width: sigW })
     y += 10
     if (act.signatureTimestamp) {
       const fmtSig = new Date(act.signatureTimestamp).toLocaleString('es-EC', {
-        day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: getAppTimezone(),
       })
-      doc.fontSize(7).font('Helvetica').fillColor(C.muted).text('Firmado: ' + fmtSig, ML, y, { width: sigW })
+      doc
+        .fontSize(7)
+        .font('Helvetica')
+        .fillColor(C.muted)
+        .text('Firmado: ' + fmtSig, ML, y, { width: sigW })
       y += 10
     }
     if (act.signatureIp) {
-      doc.fontSize(7).font('Helvetica').fillColor(C.muted).text('IP: ' + act.signatureIp, ML, y, { width: sigW })
+      doc
+        .fontSize(7)
+        .font('Helvetica')
+        .fillColor(C.muted)
+        .text('IP: ' + act.signatureIp, ML, y, { width: sigW })
       y += 10
     }
   } else {
-    doc.fontSize(8).font('Helvetica').fillColor(C.muted).text('Pendiente de firma digital', ML, y, { width: sigW })
+    doc
+      .fontSize(8)
+      .font('Helvetica')
+      .fillColor(C.muted)
+      .text('Pendiente de firma digital', ML, y, { width: sigW })
     y += 10
   }
 
@@ -664,7 +729,10 @@ export async function generateDeliveryActPDF(
   const qrX = W - MR - qrSize
   const qrY = sigStartY
   doc.image(qrCodeDataUrl, qrX, qrY, { width: qrSize, height: qrSize })
-  doc.fontSize(6).font('Helvetica').fillColor(C.muted)
+  doc
+    .fontSize(6)
+    .font('Helvetica')
+    .fillColor(C.muted)
     .text('Escanear para verificar', qrX, qrY + qrSize + 2, { width: qrSize, align: 'center' })
 
   y = Math.max(y, qrY + qrSize + 10)
@@ -676,7 +744,7 @@ export async function generateDeliveryActPDF(
     .font('Helvetica')
     .fillColor(C.muted)
     .text(
-      `Documento generado electrónicamente · ${companyName} · ${new Date().toLocaleDateString('es-EC', { day: '2-digit', month: 'long', year: 'numeric' })}`,
+      `Documento generado electrónicamente · ${companyName} · ${new Date().toLocaleDateString('es-EC', { day: '2-digit', month: 'long', year: 'numeric', timeZone: getAppTimezone() })}`,
       ML,
       footerY,
       { width: CW, align: 'center' }

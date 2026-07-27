@@ -1,4 +1,5 @@
 'use client'
+import { DEFAULT_TIMEZONE } from '@/lib/constants'
 
 import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
@@ -53,13 +54,11 @@ function defaultTo() {
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString('es-EC', {
-    timeZone: 'America/Guayaquil',
+    timeZone: DEFAULT_TIMEZONE,
     dateStyle: 'short',
     timeStyle: 'short',
   })
 }
-
-// ── Page Component ──────────────────────────────────────────────────────────────
 
 export default function PatrolReportsPage() {
   const { data: session, status } = useSession()

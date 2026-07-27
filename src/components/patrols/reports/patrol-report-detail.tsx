@@ -1,4 +1,5 @@
 'use client'
+import { DEFAULT_TIMEZONE } from '@/lib/constants'
 
 import { ReactNode } from 'react'
 import {
@@ -57,7 +58,7 @@ export interface Pagination {
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString('es-EC', {
-    timeZone: 'America/Guayaquil',
+    timeZone: DEFAULT_TIMEZONE,
     dateStyle: 'short',
     timeStyle: 'short',
   })
@@ -260,8 +261,8 @@ export function PatrolReportDetail({
         <div className='flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t'>
           {/* Info de página */}
           <p className='text-xs text-muted-foreground order-2 sm:order-1'>
-            Página {pagination.page} de {pagination.totalPages} &middot;{' '}
-            {pagination.total} resultado{pagination.total !== 1 ? 's' : ''}
+            Página {pagination.page} de {pagination.totalPages} &middot; {pagination.total}{' '}
+            resultado{pagination.total !== 1 ? 's' : ''}
           </p>
 
           {/* Botones de navegación */}

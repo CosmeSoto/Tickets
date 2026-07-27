@@ -127,7 +127,7 @@ export class ReturnActService {
           receiverInfo,
           delivererInfo,
           returnDate,
-          returnCondition: data.returnCondition,
+          equipmentCondition: data.returnCondition,
           inspectionNotes: data.inspectionNotes,
           missingAccessories: data.missingAccessories || [],
           damageDescription: data.damageDescription,
@@ -259,27 +259,16 @@ export class ReturnActService {
       let newEquipmentStatus: EquipmentStatus
       let newEquipmentCondition: EquipmentCondition
 
-      switch ((act as any).returnCondition) {
+      switch ((act as any).equipmentCondition) {
         case 'DAMAGED':
           newEquipmentStatus = 'DAMAGED'
           newEquipmentCondition = 'DAMAGED'
           break
-        case 'POOR':
-          newEquipmentStatus = 'MAINTENANCE'
-          newEquipmentCondition = 'DAMAGED'
-          break
-        case 'FAIR':
-          newEquipmentStatus = 'AVAILABLE'
-          newEquipmentCondition = 'USED'
-          break
-        case 'GOOD':
-          newEquipmentStatus = 'AVAILABLE'
-          newEquipmentCondition = 'USED'
-          break
-        case 'EXCELLENT':
+        case 'NEW':
           newEquipmentStatus = 'AVAILABLE'
           newEquipmentCondition = 'NEW'
           break
+        case 'USED':
         default:
           newEquipmentStatus = 'AVAILABLE'
           newEquipmentCondition = 'USED'

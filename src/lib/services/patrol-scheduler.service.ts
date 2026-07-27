@@ -12,6 +12,7 @@ import prisma from '@/lib/prisma'
 import { NotificationService } from '@/lib/services/notification-service'
 import { NotificationType, PatrolRecurrence } from '@prisma/client'
 import { getPatrolSupervisors } from '@/lib/patrol/patrol-helpers'
+import { getAppTimezone } from '@/lib/utils/date-utils'
 
 export class PatrolSchedulerService {
   // ── Generación de patrullas ─────────────────────────────────────────────────
@@ -445,7 +446,7 @@ export class PatrolSchedulerService {
         (patrol.scheduledStart.getTime() - now.getTime()) / 60000
       )
       const startTime = patrol.scheduledStart.toLocaleTimeString('es-EC', {
-        timeZone: 'America/Guayaquil',
+        timeZone: getAppTimezone(),
         timeStyle: 'short',
       })
 
@@ -650,7 +651,7 @@ export class PatrolSchedulerService {
     if (supervisors.length === 0) return
 
     const endTime = patrol.scheduledEnd.toLocaleString('es-EC', {
-      timeZone: 'America/Guayaquil',
+      timeZone: getAppTimezone(),
       dateStyle: 'short',
       timeStyle: 'short',
     })
@@ -693,7 +694,7 @@ export class PatrolSchedulerService {
 
     for (const patrol of patrols) {
       const scheduledTime = patrol.scheduledStart.toLocaleString('es-EC', {
-        timeZone: 'America/Guayaquil',
+        timeZone: getAppTimezone(),
         dateStyle: 'short',
         timeStyle: 'short',
       })

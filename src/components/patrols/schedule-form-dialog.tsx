@@ -1,4 +1,5 @@
 'use client'
+import { DEFAULT_TIMEZONE } from '@/lib/constants'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Loader2, Clock } from 'lucide-react'
@@ -609,7 +610,7 @@ export function ScheduleFormDialog({
                     d.toLocaleTimeString('es-EC', { timeStyle: 'short' })
                   const formatDateTime = (d: Date) =>
                     d.toLocaleString('es-EC', {
-                      timeZone: 'America/Guayaquil',
+                      timeZone: DEFAULT_TIMEZONE,
                       dateStyle: 'full',
                       timeStyle: 'short',
                     })

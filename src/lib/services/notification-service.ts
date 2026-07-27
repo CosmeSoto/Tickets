@@ -7,6 +7,7 @@ import {
   getFamilyScopedAdmins,
   getFamilyScopedAdminsForFamilies,
 } from '@/lib/notifications/family-recipients'
+import { getAppTimezone } from '@/lib/utils/date-utils'
 
 export interface CreateNotificationData {
   userId: string
@@ -76,7 +77,7 @@ export class NotificationService {
               maxConcurrentTickets: 10,
               theme: 'light',
               language: 'es',
-              timezone: 'America/Guayaquil',
+              timezone: getAppTimezone(),
               updatedAt: new Date(),
             },
           })
