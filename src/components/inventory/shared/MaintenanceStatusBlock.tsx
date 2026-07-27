@@ -14,10 +14,10 @@
 import { useState, useEffect } from 'react'
 import { Wrench } from 'lucide-react'
 import { Label } from '@/components/ui/label'
-import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { SupplierSelect } from '@/components/inventory/suppliers/SupplierSelect'
+import { DateInput } from '@/components/ui/date-input'
 
 interface Technician {
   id: string
@@ -89,7 +89,7 @@ export function MaintenanceStatusBlock({
           <Label>
             Fecha de ingreso <span className='text-destructive'>*</span>
           </Label>
-          <Input type='date' value={date} onChange={e => onDateChange(e.target.value)} />
+          <DateInput value={date} onChange={e => onDateChange(e.target.value)} />
         </div>
 
         {/* Tipo */}

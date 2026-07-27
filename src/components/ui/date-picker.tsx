@@ -31,18 +31,26 @@ export function DatePicker({
         <Button
           variant={'outline'}
           className={cn(
-            'w-full justify-start text-left font-normal',
+            'w-full justify-start text-left font-normal h-10',
             !date && 'text-muted-foreground',
             className
           )}
           disabled={disabled}
         >
           <CalendarIcon className='mr-2 h-4 w-4' />
-          {date ? format(date, 'PPP', { locale: es }) : <span>{placeholder}</span>}
+          {date ? format(date, 'dd/MM/yyyy', { locale: es }) : <span>{placeholder}</span>}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className='w-auto p-0'>
-        <Calendar mode='single' selected={date} onSelect={onDateChange} initialFocus locale={es} />
+      <PopoverContent className='w-auto p-0' align='start'>
+        <Calendar
+          mode='single'
+          selected={date}
+          onSelect={onDateChange}
+          initialFocus
+          captionLayout='dropdown'
+          startMonth={new Date(1990, 0)}
+          endMonth={new Date(new Date().getFullYear() + 15, 11)}
+        />
       </PopoverContent>
     </Popover>
   )

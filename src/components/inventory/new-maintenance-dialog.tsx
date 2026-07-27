@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { Loader2, Wrench } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { DateInput } from '@/components/ui/date-input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import {
@@ -283,8 +284,7 @@ export function NewMaintenanceDialog({
             {/* Fecha */}
             <div>
               <Label>{isClient ? 'Fecha sugerida *' : 'Fecha programada *'}</Label>
-              <Input
-                type='date'
+              <DateInput
                 value={scheduledDate}
                 min={minDate}
                 onChange={e => setScheduledDate(e.target.value)}

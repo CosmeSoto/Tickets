@@ -1,18 +1,26 @@
 'use client'
 
-import { UseFormRegister, FieldErrors } from 'react-hook-form'
+import { UseFormRegister, UseFormWatch, UseFormSetValue, FieldErrors } from 'react-hook-form'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import type { CreateEquipmentInput } from '@/lib/validations/inventory/equipment'
+import { DateInput } from '@/components/ui/date-input'
 
 interface RentalInformationCardProps {
   register: UseFormRegister<CreateEquipmentInput>
+  watch: UseFormWatch<CreateEquipmentInput>
+  setValue: UseFormSetValue<CreateEquipmentInput>
   errors: FieldErrors<CreateEquipmentInput>
 }
 
-export function RentalInformationCard({ register, errors }: RentalInformationCardProps) {
+export function RentalInformationCard({
+  register,
+  watch,
+  setValue,
+  errors,
+}: RentalInformationCardProps) {
   return (
     <Card>
       <CardHeader>
@@ -46,12 +54,32 @@ export function RentalInformationCard({ register, errors }: RentalInformationCar
 
           <div className='space-y-2'>
             <Label htmlFor='rentalStartDate'>Fecha de Inicio</Label>
-            <Input id='rentalStartDate' type='date' {...register('rentalStartDate')} />
+            <DateInput
+              id='rentalStartDate'
+              value={watch('rentalStartDate')}
+              onChange={e =>
+                setValue('rentalStartDate', e.target.value as any, {
+                  shouldValidate: true,
+                  shouldDirty: true,
+                })
+              }
+              clearable
+            />
           </div>
 
           <div className='space-y-2'>
             <Label htmlFor='rentalEndDate'>Fecha de Fin</Label>
-            <Input id='rentalEndDate' type='date' {...register('rentalEndDate')} />
+            <DateInput
+              id='rentalEndDate'
+              value={watch('rentalEndDate')}
+              onChange={e =>
+                setValue('rentalEndDate', e.target.value as any, {
+                  shouldValidate: true,
+                  shouldDirty: true,
+                })
+              }
+              clearable
+            />
             {errors.rentalEndDate && (
               <p className='text-sm text-destructive'>{errors.rentalEndDate.message}</p>
             )}
@@ -106,7 +134,17 @@ export function RentalInformationCard({ register, errors }: RentalInformationCar
         <div className='grid gap-4 md:grid-cols-2'>
           <div className='space-y-2'>
             <Label htmlFor='rentalDeliveryDate'>Fecha de entrega</Label>
-            <Input id='rentalDeliveryDate' type='date' {...register('rentalDeliveryDate')} />
+            <DateInput
+              id='rentalDeliveryDate'
+              value={watch('rentalDeliveryDate')}
+              onChange={e =>
+                setValue('rentalDeliveryDate', e.target.value as any, {
+                  shouldValidate: true,
+                  shouldDirty: true,
+                })
+              }
+              clearable
+            />
           </div>
           <div className='space-y-2'>
             <Label htmlFor='rentalBuyoutValue'>Valor opción de compra</Label>

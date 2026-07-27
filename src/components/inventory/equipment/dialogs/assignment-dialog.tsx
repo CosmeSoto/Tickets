@@ -10,7 +10,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { DateInput } from '@/components/ui/date-input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import {
@@ -131,8 +131,7 @@ export function AssignmentDialog({
               <Label>
                 Fecha de Inicio <span className='text-destructive'>*</span>
               </Label>
-              <Input
-                type='date'
+              <DateInput
                 value={form.startDate}
                 onChange={e => onFormChange({ ...form, startDate: e.target.value })}
               />
@@ -145,10 +144,10 @@ export function AssignmentDialog({
                   Fecha de Devolución{' '}
                   <span className='text-xs text-muted-foreground font-normal'>(opcional)</span>
                 </Label>
-                <Input
-                  type='date'
+                <DateInput
                   value={form.endDate}
                   onChange={e => onFormChange({ ...form, endDate: e.target.value })}
+                  clearable
                 />
                 <p className='text-xs text-muted-foreground'>
                   Si no se conoce la fecha, puede dejarse vacía y actualizarse después.

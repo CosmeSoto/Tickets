@@ -12,6 +12,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { DateInput } from '@/components/ui/date-input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
@@ -1074,10 +1075,10 @@ export function BulkEquipmentForm({
               </div>
               <div className='space-y-1'>
                 <Label>Fecha de Compra</Label>
-                <Input
-                  type='date'
+                <DateInput
                   value={purchaseDate}
                   onChange={e => setPurchaseDate(e.target.value)}
+                  clearable
                 />
               </div>
               <div className='space-y-1'>

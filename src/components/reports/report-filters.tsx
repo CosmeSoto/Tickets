@@ -10,7 +10,7 @@ import { FamilyCombobox } from '@/components/ui/family-combobox'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
+import { DateInput } from '@/components/ui/date-input'
 import { Label } from '@/components/ui/label'
 import type { Family } from './utils/report-types'
 
@@ -90,22 +90,22 @@ export function ReportFilters({
               <Label className='text-sm font-medium text-muted-foreground whitespace-nowrap shrink-0'>
                 Desde:
               </Label>
-              <Input
-                type='date'
+              <DateInput
                 value={startDate}
                 onChange={e => onStartDateChange(e.target.value)}
                 className='w-full sm:w-36 h-9 text-sm'
+                clearable
               />
             </div>
             <div className='flex items-center gap-2'>
               <Label className='text-sm font-medium text-muted-foreground whitespace-nowrap shrink-0'>
                 Hasta:
               </Label>
-              <Input
-                type='date'
+              <DateInput
                 value={endDate}
                 onChange={e => onEndDateChange(e.target.value)}
                 className='w-full sm:w-36 h-9 text-sm'
+                clearable
               />
             </div>
             {(startDate || endDate) && (

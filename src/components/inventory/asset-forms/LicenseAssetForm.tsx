@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react'
 import { Input } from '@/components/ui/input'
+import { DateInput } from '@/components/ui/date-input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -154,9 +155,7 @@ export function LicenseAssetForm({
     setUserId(String(initialLicense.assignedToUser ?? ''))
     setDepartmentId(String(initialLicense.assignedToDepartment ?? ''))
     setSupplierId(
-      String(
-        (initialLicense.supplier as { id?: string })?.id ?? initialLicense.supplierId ?? ''
-      )
+      String((initialLicense.supplier as { id?: string })?.id ?? initialLicense.supplierId ?? '')
     )
     setPurchaseDate(formatDateInput(initialLicense.purchaseDate))
     setExpirationDate(formatDateInput(initialLicense.expirationDate))
@@ -188,9 +187,7 @@ export function LicenseAssetForm({
 
   const contractFinancial = useMemo(
     () =>
-      linkedContract
-        ? resolveLicenseFinancialFromContract(linkedContract, hasRecurring)
-        : null,
+      linkedContract ? resolveLicenseFinancialFromContract(linkedContract, hasRecurring) : null,
     [linkedContract, hasRecurring]
   )
 
@@ -438,10 +435,7 @@ export function LicenseAssetForm({
             <div className='rounded-md border bg-muted/30 px-3 py-2.5 space-y-1'>
               <p className='text-xs text-muted-foreground'>{contractFinancial.amountLabel}</p>
               <p className='text-sm font-medium font-mono'>
-                {formatContractAmount(
-                  contractFinancial.displayAmount,
-                  contractFinancial.currency
-                )}
+                {formatContractAmount(contractFinancial.displayAmount, contractFinancial.currency)}
               </p>
               <p className='text-[11px] text-muted-foreground'>
                 Tomado automáticamente del contrato vinculado.{' '}
@@ -473,8 +467,7 @@ export function LicenseAssetForm({
                 Fecha de Compra
                 {isRequired('FINANCIAL') && <span className='text-destructive'> *</span>}
               </Label>
-              <Input
-                type='date'
+              <DateInput
                 value={purchaseDate}
                 onChange={e => setPurchaseDate(e.target.value)}
                 required={isRequired('FINANCIAL')}
@@ -484,10 +477,10 @@ export function LicenseAssetForm({
               <>
                 <div className='space-y-1'>
                   <Label>Fecha de Vencimiento</Label>
-                  <Input
-                    type='date'
+                  <DateInput
                     value={expirationDate}
                     onChange={e => setExpirationDate(e.target.value)}
+                    clearable
                   />
                 </div>
                 <div className='space-y-1'>
@@ -539,10 +532,10 @@ export function LicenseAssetForm({
                   Fecha de Renovación{' '}
                   <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
                 </Label>
-                <Input
-                  type='date'
+                <DateInput
                   value={renewalDate}
                   onChange={e => setRenewalDate(e.target.value)}
+                  clearable
                 />
               </div>
             )}
@@ -574,11 +567,7 @@ export function LicenseAssetForm({
           ← Atrás
         </Button>
         <Button type='submit' disabled={submitting} className='flex-1'>
-          {submitting
-            ? 'Guardando...'
-            : isEditMode
-              ? 'Guardar cambios'
-              : 'Crear Licencia'}
+          {submitting ? 'Guardando...' : isEditMode ? 'Guardar cambios' : 'Crear Licencia'}
         </Button>
       </div>
     </form>

@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { DateInput } from '@/components/ui/date-input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import {
@@ -149,9 +150,8 @@ export function RenewContractDialog({
             <div className='grid grid-cols-2 gap-4'>
               <div className='space-y-2'>
                 <Label htmlFor='newStartDate'>Fecha de Inicio *</Label>
-                <Input
+                <DateInput
                   id='newStartDate'
-                  type='date'
                   required
                   value={formData.newStartDate}
                   onChange={e => setFormData({ ...formData, newStartDate: e.target.value })}
@@ -160,9 +160,8 @@ export function RenewContractDialog({
 
               <div className='space-y-2'>
                 <Label htmlFor='newEndDate'>Fecha de Fin *</Label>
-                <Input
+                <DateInput
                   id='newEndDate'
-                  type='date'
                   required
                   value={formData.newEndDate}
                   onChange={e => setFormData({ ...formData, newEndDate: e.target.value })}

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { Input } from '@/components/ui/input'
+import { DateInput } from '@/components/ui/date-input'
 import { SerialNumberInput } from '@/components/ui/serial-number-input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
@@ -1110,11 +1111,11 @@ export function EquipmentAssetForm({
               Fecha de Devolución Estimada{' '}
               <span className='text-xs text-muted-foreground font-normal'>(opcional)</span>
             </Label>
-            <Input
-              type='date'
+            <DateInput
               value={assignmentEndDate}
               onChange={e => setAssignmentEndDate(e.target.value)}
               min={new Date().toISOString().split('T')[0]}
+              clearable
             />
             <p className='text-xs text-muted-foreground'>
               Si es préstamo o uso temporal, indica la fecha esperada de devolución. El sistema
@@ -1215,11 +1216,11 @@ export function EquipmentAssetForm({
               <div className='grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1'>
                 <div className='space-y-1'>
                   <Label htmlFor='rentalDeliveryDate'>Fecha de entrega</Label>
-                  <Input
+                  <DateInput
                     id='rentalDeliveryDate'
-                    type='date'
                     value={rentalDeliveryDate}
                     onChange={e => setRentalDeliveryDate(e.target.value)}
+                    clearable
                   />
                   <p className='text-[11px] text-muted-foreground'>
                     Entrega física del equipo (puede diferir del inicio del contrato).
@@ -1285,10 +1286,10 @@ export function EquipmentAssetForm({
             </div>
             <div className='space-y-1'>
               <Label>Fecha de Compra</Label>
-              <Input
-                type='date'
+              <DateInput
                 value={purchaseDate}
                 onChange={e => setPurchaseDate(e.target.value)}
+                clearable
               />
             </div>
             <div className='space-y-1 col-span-2 sm:col-span-1'>

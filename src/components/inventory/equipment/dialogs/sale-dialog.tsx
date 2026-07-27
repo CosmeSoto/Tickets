@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { DollarSign, Loader2, CheckCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { DateInput } from '@/components/ui/date-input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import {
@@ -230,7 +231,7 @@ export function SaleDialog({
                 <Label>
                   Fecha de venta <span className='text-destructive'>*</span>
                 </Label>
-                <Input type='date' value={saleDate} onChange={e => setSaleDate(e.target.value)} />
+                <DateInput value={saleDate} onChange={e => setSaleDate(e.target.value)} />
               </div>
               <div className='space-y-1'>
                 <Label>N° de Factura</Label>

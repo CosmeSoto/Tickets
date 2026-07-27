@@ -33,7 +33,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
+import { DateInput } from '@/components/ui/date-input'
 import { Label } from '@/components/ui/label'
 import {
   Select,
@@ -273,21 +273,21 @@ export default function MisNovedadesPage() {
 
         <div className='space-y-1'>
           <Label className='text-xs'>Desde</Label>
-          <Input
-            type='date'
+          <DateInput
             className='h-9'
             value={filters.dateFrom}
             onChange={e => handleFilterChange('dateFrom', e.target.value)}
+            clearable
           />
         </div>
 
         <div className='space-y-1'>
           <Label className='text-xs'>Hasta</Label>
-          <Input
-            type='date'
+          <DateInput
             className='h-9'
             value={filters.dateTo}
             onChange={e => handleFilterChange('dateTo', e.target.value)}
+            clearable
           />
         </div>
       </div>

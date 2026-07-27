@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../card'
 import { Button } from '../button'
 import { Badge } from '../badge'
 import { Input } from '../input'
+import { DateInput } from '@/components/ui/date-input'
 import { Textarea } from '../textarea'
 import {
   Plus,
@@ -110,11 +111,11 @@ export function TaskList({
                   <option value='medium'>Prioridad Media</option>
                   <option value='high'>Prioridad Alta</option>
                 </select>
-                <Input
-                  type='date'
+                <DateInput
                   value={newTask.dueDate}
                   onChange={e => setNewTask(prev => ({ ...prev, dueDate: e.target.value }))}
                   placeholder='Fecha programada'
+                  clearable
                 />
               </div>
               <div>

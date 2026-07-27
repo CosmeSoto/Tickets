@@ -8,6 +8,7 @@ import {
   createReturnActSchema,
   type CreateReturnActInput,
 } from '@/lib/validations/inventory/return-act'
+import { DateInput } from '@/components/ui/date-input'
 
 interface ReturnFormProps {
   assignmentId: string
@@ -49,6 +50,7 @@ export function ReturnForm({
     register,
     handleSubmit,
     watch,
+    setValue,
     formState: { errors },
   } = useForm<CreateReturnActInput>({
     resolver: zodResolver(createReturnActSchema),
@@ -149,11 +151,16 @@ export function ReturnForm({
         <label htmlFor='returnDate' className='block text-sm font-medium text-foreground mb-1'>
           Fecha de devolución
         </label>
-        <input
-          type='date'
+        <DateInput
           id='returnDate'
-          {...register('returnDate')}
-          className='w-full px-3 py-2 border border-border bg-card text-foreground rounded-md focus:outline-none focus:ring-2 focus:ring-ring'
+          value={watch('returnDate')}
+          onChange={e =>
+            setValue('returnDate', e.target.value as any, {
+              shouldValidate: true,
+              shouldDirty: true,
+            })
+          }
+          className='w-full'
         />
         {errors.returnDate && (
           <p className='mt-1 text-sm text-destructive'>{errors.returnDate.message}</p>

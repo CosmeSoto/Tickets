@@ -5,7 +5,7 @@ import { Loader2, Upload, X, AlertTriangle, Package, RotateCcw } from 'lucide-re
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Input } from '@/components/ui/input'
+import { DateInput } from '@/components/ui/date-input'
 import {
   Select,
   SelectContent,
@@ -268,9 +268,8 @@ export function DecommissionRequestForm({
             <Label htmlFor='returnDate'>
               Fecha de devolución <span className='text-destructive'>*</span>
             </Label>
-            <Input
+            <DateInput
               id='returnDate'
-              type='date'
               value={returnDate}
               onChange={e => {
                 setReturnDate(e.target.value)

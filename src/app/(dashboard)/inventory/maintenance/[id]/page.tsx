@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { DateInput } from '@/components/ui/date-input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -678,11 +679,7 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
           <div className='space-y-4'>
             <div>
               <Label>Fecha programada *</Label>
-              <Input
-                type='date'
-                value={approveDate}
-                onChange={e => setApproveDate(e.target.value)}
-              />
+              <DateInput value={approveDate} onChange={e => setApproveDate(e.target.value)} />
             </div>
             <div>
               <Label>Notas para el cliente (opcional)</Label>
@@ -715,7 +712,7 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
           <div className='space-y-4'>
             <div>
               <Label>Nueva fecha *</Label>
-              <Input type='date' value={newDate} onChange={e => setNewDate(e.target.value)} />
+              <DateInput value={newDate} onChange={e => setNewDate(e.target.value)} />
             </div>
             <div>
               <Label>Descripción (opcional)</Label>
@@ -829,10 +826,10 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
                 </div>
                 <div>
                   <Label>Garantía hasta (opcional)</Label>
-                  <Input
-                    type='date'
+                  <DateInput
                     value={completeWarrantyDate}
                     onChange={e => setCompleteWarrantyDate(e.target.value)}
+                    clearable
                   />
                   <p className='text-xs text-muted-foreground mt-1'>
                     Si el proveedor ofrece garantía por el trabajo realizado

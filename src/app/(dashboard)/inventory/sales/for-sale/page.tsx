@@ -21,6 +21,7 @@ import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { DateInput } from '@/components/ui/date-input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import {
@@ -445,9 +446,8 @@ function SaleFormModal({ equipment, open, onClose, onSuccess }: SaleFormModalPro
                   <Label htmlFor='saleDate'>
                     Fecha de venta <span className='text-destructive'>*</span>
                   </Label>
-                  <Input
+                  <DateInput
                     id='saleDate'
-                    type='date'
                     value={saleDate}
                     onChange={e => setSaleDate(e.target.value)}
                     required

@@ -16,6 +16,7 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import { DateInput } from '@/components/ui/date-input'
 import { Textarea } from '@/components/ui/textarea'
 import {
   Select,
@@ -254,7 +255,7 @@ export function AssetRequestCreateForm({ onSuccess, onCancel }: AssetRequestCrea
                 <FormItem>
                   <FormLabel>Fecha Necesaria (Opcional)</FormLabel>
                   <FormControl>
-                    <Input type='date' {...field} />
+                    <DateInput {...field} clearable />
                   </FormControl>
                   <FormDescription>¿Para cuándo necesitas el activo?</FormDescription>
                   <FormMessage />

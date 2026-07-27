@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { DateInput } from '@/components/ui/date-input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import {
@@ -199,12 +200,12 @@ export function QuickContractForm({
 
         <div className='space-y-1'>
           <Label>Fecha de inicio</Label>
-          <Input type='date' value={startDate} onChange={e => setStartDate(e.target.value)} />
+          <DateInput value={startDate} onChange={e => setStartDate(e.target.value)} />
         </div>
 
         <div className='space-y-1'>
           <Label>Fecha de vencimiento</Label>
-          <Input type='date' value={endDate} onChange={e => setEndDate(e.target.value)} />
+          <DateInput value={endDate} onChange={e => setEndDate(e.target.value)} />
         </div>
 
         <div className='space-y-1'>

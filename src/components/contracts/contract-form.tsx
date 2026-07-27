@@ -5,6 +5,7 @@ import { useForm, useFieldArray } from 'react-hook-form'
 import { Plus, Trash2, RefreshCw, Paperclip, FileText, Download, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { DateInput } from '@/components/ui/date-input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
@@ -517,12 +518,29 @@ export function ContractForm({
           <CardContent className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
             <div className='space-y-1'>
               <Label>Fecha de inicio</Label>
-              <Input type='date' {...register('startDate')} />
+              <DateInput
+                value={watch('startDate')}
+                onChange={e =>
+                  setValue('startDate', e.target.value as any, {
+                    shouldValidate: true,
+                    shouldDirty: true,
+                  })
+                }
+              />
             </div>
 
             <div className='space-y-1'>
               <Label>Fecha de vencimiento</Label>
-              <Input type='date' {...register('endDate')} />
+              <DateInput
+                value={watch('endDate')}
+                onChange={e =>
+                  setValue('endDate', e.target.value as any, {
+                    shouldValidate: true,
+                    shouldDirty: true,
+                  })
+                }
+                clearable
+              />
             </div>
 
             <div className='space-y-1'>
@@ -814,7 +832,16 @@ export function ContractForm({
             </div>
             <div className='space-y-1'>
               <Label>Último cargo (fecha)</Label>
-              <Input type='date' {...register('lastChargeDate')} />
+              <DateInput
+                value={watch('lastChargeDate')}
+                onChange={e =>
+                  setValue('lastChargeDate', e.target.value as any, {
+                    shouldValidate: true,
+                    shouldDirty: true,
+                  })
+                }
+                clearable
+              />
             </div>
             <div className='space-y-1'>
               <Label>Último cargo (monto)</Label>

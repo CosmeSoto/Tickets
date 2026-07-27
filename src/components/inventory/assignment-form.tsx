@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { DateInput } from '@/components/ui/date-input'
 import {
   Select,
   SelectContent,
@@ -208,7 +209,16 @@ export function AssignmentForm({
               <Label htmlFor='startDate'>
                 Fecha de Inicio <span className='text-destructive'>*</span>
               </Label>
-              <Input id='startDate' type='date' {...register('startDate')} />
+              <DateInput
+                id='startDate'
+                value={watch('startDate')}
+                onChange={e =>
+                  setValue('startDate', e.target.value as any, {
+                    shouldValidate: true,
+                    shouldDirty: true,
+                  })
+                }
+              />
               {errors.startDate && (
                 <p className='text-sm text-destructive'>{errors.startDate.message}</p>
               )}
@@ -218,11 +228,17 @@ export function AssignmentForm({
               <Label htmlFor='endDate'>
                 Fecha de Fin {requiresEndDate && <span className='text-destructive'>*</span>}
               </Label>
-              <Input
+              <DateInput
                 id='endDate'
-                type='date'
-                {...register('endDate')}
+                value={watch('endDate')}
+                onChange={e =>
+                  setValue('endDate', e.target.value as any, {
+                    shouldValidate: true,
+                    shouldDirty: true,
+                  })
+                }
                 disabled={!requiresEndDate}
+                clearable
               />
               {errors.endDate && (
                 <p className='text-sm text-destructive'>{errors.endDate.message}</p>

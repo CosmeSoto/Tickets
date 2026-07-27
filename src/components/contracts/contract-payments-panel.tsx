@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { DateInput } from '@/components/ui/date-input'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
 import { PAYMENT_METHOD_TYPE_LABELS, type PaymentMethodType } from '@/types/contracts'
@@ -362,9 +363,8 @@ export function ContractPaymentsPanel({ contractId, hasBillingDates }: Props) {
                 <Label htmlFor='paid-date'>
                   Fecha de pago <span className='text-destructive'>*</span>
                 </Label>
-                <Input
+                <DateInput
                   id='paid-date'
-                  type='date'
                   value={paidDate}
                   onChange={e => setPaidDate(e.target.value)}
                 />

@@ -3,9 +3,11 @@
 import * as React from 'react'
 import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from 'lucide-react'
 import { DayButton, DayPicker, getDefaultClassNames } from 'react-day-picker'
+import { es } from 'date-fns/locale'
 
 import { cn } from '@/lib/utils'
 import { Button, buttonVariants } from '@/components/ui/button'
+import { DEFAULT_TIMEZONE } from '@/lib/constants'
 
 function Calendar({
   className,
@@ -31,8 +33,10 @@ function Calendar({
         className
       )}
       captionLayout={captionLayout}
+      locale={es}
       formatters={{
-        formatMonthDropdown: date => date.toLocaleString('default', { month: 'short' }),
+        formatMonthDropdown: date =>
+          date.toLocaleString('es-EC', { month: 'short', timeZone: DEFAULT_TIMEZONE }),
         ...formatters,
       }}
       classNames={{

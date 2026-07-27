@@ -21,6 +21,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { DateInput } from '@/components/ui/date-input'
 import { Label } from '@/components/ui/label'
 import {
   Select,
@@ -108,18 +109,18 @@ export function ReportExplorer({
   const [saveError, setSaveError] = useState<string | null>(null)
 
   const selectedDataset = useMemo(
-    () => getDatasetById(selectedDatasetId) ?? catalog?.datasets.find(d => d.id === selectedDatasetId),
+    () =>
+      getDatasetById(selectedDatasetId) ?? catalog?.datasets.find(d => d.id === selectedDatasetId),
     [selectedDatasetId, catalog]
   )
 
-  const isGroupedView =
-    !!filterValues.groupBy && filterValues.groupBy !== ALL_FILTER
+  const isGroupedView = !!filterValues.groupBy && filterValues.groupBy !== ALL_FILTER
 
   const groupByLabel = useMemo(() => {
     if (!isGroupedView || !selectedDataset) return undefined
-    return selectedDataset.filters.find(f => f.key === 'groupBy')?.options?.find(
-      o => o.value === filterValues.groupBy
-    )?.label
+    return selectedDataset.filters
+      .find(f => f.key === 'groupBy')
+      ?.options?.find(o => o.value === filterValues.groupBy)?.label
   }, [isGroupedView, selectedDataset, filterValues.groupBy])
 
   const activeColumnDefs = useMemo(() => {
@@ -138,11 +139,7 @@ export function ReportExplorer({
       setFilterValues(saved.filterValues)
       const ds = getDatasetById(saved.targetId)
       setVisibleColumns(
-        saved.visibleColumns.length
-          ? saved.visibleColumns
-          : ds
-            ? getDefaultVisibleColumns(ds)
-            : []
+        saved.visibleColumns.length ? saved.visibleColumns : ds ? getDefaultVisibleColumns(ds) : []
       )
       setActiveSavedId(saved.id)
       setActiveSavedName(saved.name)
@@ -182,7 +179,9 @@ export function ReportExplorer({
         return r.json()
       })
       .then((saved: InventorySavedReport) => applySavedReport(saved))
-      .catch(err => setError(err instanceof Error ? err.message : 'Error al cargar reporte guardado'))
+      .catch(err =>
+        setError(err instanceof Error ? err.message : 'Error al cargar reporte guardado')
+      )
   }, [initialSavedId, catalogLoading, applySavedReport])
 
   useEffect(() => {
@@ -261,7 +260,9 @@ export function ReportExplorer({
 
       const shouldPatch = activeSavedId && !asNew
       const res = await fetch(
-        shouldPatch ? `/api/inventory/reports/saved/${activeSavedId}` : '/api/inventory/reports/saved',
+        shouldPatch
+          ? `/api/inventory/reports/saved/${activeSavedId}`
+          : '/api/inventory/reports/saved',
         {
           method: shouldPatch ? 'PATCH' : 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -325,14 +326,12 @@ export function ReportExplorer({
   const openSaveDialog = (asNew: boolean) => {
     setSaveError(null)
     setSaveAsNew(asNew)
-    setSaveName(asNew ? '' : activeSavedName ?? '')
+    setSaveName(asNew ? '' : (activeSavedName ?? ''))
     setSaveDialogOpen(true)
   }
 
   const toggleColumn = (key: string) => {
-    setVisibleColumns(prev =>
-      prev.includes(key) ? prev.filter(c => c !== key) : [...prev, key]
-    )
+    setVisibleColumns(prev => (prev.includes(key) ? prev.filter(c => c !== key) : [...prev, key]))
   }
 
   const filteredRows = useMemo(() => {
@@ -340,7 +339,11 @@ export function ReportExplorer({
     if (!tableSearch.trim()) return reportData.data
     const q = tableSearch.toLowerCase()
     return reportData.data.filter(row =>
-      Object.values(row).some(v => String(v ?? '').toLowerCase().includes(q))
+      Object.values(row).some(v =>
+        String(v ?? '')
+          .toLowerCase()
+          .includes(q)
+      )
     )
   }, [reportData, tableSearch])
 
@@ -397,47 +400,48 @@ export function ReportExplorer({
               </div>
             )}
 
-            {catalog?.categories.map(category => (
-              category.datasets.length > 0 && (
-                <div key={category.id} className='space-y-2'>
-                  <p className='text-xs font-semibold uppercase tracking-wide text-muted-foreground'>
-                    {category.name}
-                  </p>
-                  <div className='space-y-1'>
-                    {category.datasets.map(ds => {
-                      const Icon = getReportIcon(ds.icon)
-                      const active = ds.id === selectedDatasetId
-                      return (
-                        <button
-                          key={ds.id}
-                          type='button'
-                          onClick={() => {
-                            setSelectedDatasetId(ds.id)
-                            setPage(1)
-                            router.replace(`/inventory/reports/explore?dataset=${ds.id}`, {
-                              scroll: false,
-                            })
-                          }}
-                          className={`w-full flex items-start gap-2 rounded-md px-2.5 py-2 text-left text-sm transition-colors ${
-                            active
-                              ? 'bg-primary/10 text-primary border border-primary/20'
-                              : 'hover:bg-muted/60'
-                          }`}
-                        >
-                          <Icon className='h-4 w-4 mt-0.5 shrink-0' />
-                          <span>
-                            <span className='font-medium block'>{ds.name}</span>
-                            <span className='text-xs text-muted-foreground line-clamp-2'>
-                              {ds.description}
+            {catalog?.categories.map(
+              category =>
+                category.datasets.length > 0 && (
+                  <div key={category.id} className='space-y-2'>
+                    <p className='text-xs font-semibold uppercase tracking-wide text-muted-foreground'>
+                      {category.name}
+                    </p>
+                    <div className='space-y-1'>
+                      {category.datasets.map(ds => {
+                        const Icon = getReportIcon(ds.icon)
+                        const active = ds.id === selectedDatasetId
+                        return (
+                          <button
+                            key={ds.id}
+                            type='button'
+                            onClick={() => {
+                              setSelectedDatasetId(ds.id)
+                              setPage(1)
+                              router.replace(`/inventory/reports/explore?dataset=${ds.id}`, {
+                                scroll: false,
+                              })
+                            }}
+                            className={`w-full flex items-start gap-2 rounded-md px-2.5 py-2 text-left text-sm transition-colors ${
+                              active
+                                ? 'bg-primary/10 text-primary border border-primary/20'
+                                : 'hover:bg-muted/60'
+                            }`}
+                          >
+                            <Icon className='h-4 w-4 mt-0.5 shrink-0' />
+                            <span>
+                              <span className='font-medium block'>{ds.name}</span>
+                              <span className='text-xs text-muted-foreground line-clamp-2'>
+                                {ds.description}
+                              </span>
                             </span>
-                          </span>
-                        </button>
-                      )
-                    })}
+                          </button>
+                        )
+                      })}
+                    </div>
                   </div>
-                </div>
-              )
-            ))}
+                )
+            )}
           </CardContent>
         </Card>
 
@@ -455,9 +459,7 @@ export function ReportExplorer({
                         {activeSavedName}
                       </Badge>
                     )}
-                    {isGroupedView && (
-                      <Badge variant='outline'>Vista agrupada</Badge>
-                    )}
+                    {isGroupedView && <Badge variant='outline'>Vista agrupada</Badge>}
                   </div>
                   <p className='text-sm text-muted-foreground'>{selectedDataset.description}</p>
                 </div>
@@ -472,7 +474,12 @@ export function ReportExplorer({
                         )}
                         {pinned ? 'Desanclar' : 'Anclar'}
                       </Button>
-                      <Button variant='outline' size='sm' onClick={handleUpdateSaved} disabled={saving}>
+                      <Button
+                        variant='outline'
+                        size='sm'
+                        onClick={handleUpdateSaved}
+                        disabled={saving}
+                      >
                         {saving ? (
                           <Loader2 className='h-4 w-4 animate-spin mr-1.5' />
                         ) : (
@@ -509,19 +516,13 @@ export function ReportExplorer({
                   </Button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button
-                        variant='outline'
-                        size='sm'
-                        disabled={!reportData?.data.length}
-                      >
+                      <Button variant='outline' size='sm' disabled={!reportData?.data.length}>
                         <Download className='h-4 w-4 mr-1.5' />
                         Exportar
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align='end'>
-                      <DropdownMenuItem onClick={() => handleExport('csv')}>
-                        CSV
-                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleExport('csv')}>CSV</DropdownMenuItem>
                       <DropdownMenuItem onClick={() => handleExport('xlsx')}>
                         Excel (.xlsx)
                       </DropdownMenuItem>
@@ -562,16 +563,18 @@ export function ReportExplorer({
                       <div key={filter.key} className='space-y-1'>
                         <Label>{filter.label}</Label>
                         {filter.type === 'date' ? (
-                          <Input
-                            type='date'
+                          <DateInput
                             value={filterValues[filter.key] ?? ''}
                             onChange={e =>
                               setFilterValues(prev => ({ ...prev, [filter.key]: e.target.value }))
                             }
+                            clearable
                           />
                         ) : filter.type === 'select' ? (
                           <Select
-                            value={filterValues[filter.key] ?? filter.options?.[0]?.value ?? ALL_FILTER}
+                            value={
+                              filterValues[filter.key] ?? filter.options?.[0]?.value ?? ALL_FILTER
+                            }
                             onValueChange={v =>
                               setFilterValues(prev => ({ ...prev, [filter.key]: v }))
                             }
@@ -604,31 +607,31 @@ export function ReportExplorer({
 
               {/* Columnas — ocultas en vista agrupada */}
               {!isGroupedView && (
-              <Card>
-                <CardHeader className='pb-3'>
-                  <CardTitle className='text-sm flex items-center gap-2'>
-                    <Columns3 className='h-4 w-4' />
-                    Columnas visibles
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className='flex flex-wrap gap-2'>
-                    {selectedDataset.columns.map(col => {
-                      const active = visibleColumns.includes(col.key)
-                      return (
-                        <Badge
-                          key={col.key}
-                          variant={active ? 'default' : 'outline'}
-                          className='cursor-pointer'
-                          onClick={() => toggleColumn(col.key)}
-                        >
-                          {col.label}
-                        </Badge>
-                      )
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
+                <Card>
+                  <CardHeader className='pb-3'>
+                    <CardTitle className='text-sm flex items-center gap-2'>
+                      <Columns3 className='h-4 w-4' />
+                      Columnas visibles
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className='flex flex-wrap gap-2'>
+                      {selectedDataset.columns.map(col => {
+                        const active = visibleColumns.includes(col.key)
+                        return (
+                          <Badge
+                            key={col.key}
+                            variant={active ? 'default' : 'outline'}
+                            className='cursor-pointer'
+                            onClick={() => toggleColumn(col.key)}
+                          >
+                            {col.label}
+                          </Badge>
+                        )
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
               )}
 
               {/* KPIs */}
@@ -748,7 +751,9 @@ export function ReportExplorer({
       <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{saveAsNew ? 'Guardar como nueva consulta' : 'Guardar consulta'}</DialogTitle>
+            <DialogTitle>
+              {saveAsNew ? 'Guardar como nueva consulta' : 'Guardar consulta'}
+            </DialogTitle>
             <DialogDescription>
               Guarda los filtros y columnas actuales para reutilizarlos después.
             </DialogDescription>

@@ -12,7 +12,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import {
@@ -22,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { DateInput } from '@/components/ui/date-input'
 import { getEquipmentDisplayName } from '@/lib/utils/equipment-display'
 import type { ReturnForm, Assignment } from '../utils/equipment-types'
 
@@ -83,8 +83,7 @@ export function ReturnDialog({
           <div className='space-y-4 py-2'>
             <div className='space-y-2'>
               <Label>Fecha de Devolución *</Label>
-              <Input
-                type='date'
+              <DateInput
                 value={form.returnDate}
                 onChange={e => onFormChange({ ...form, returnDate: e.target.value })}
               />

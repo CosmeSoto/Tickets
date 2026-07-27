@@ -23,6 +23,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { DateInput } from '@/components/ui/date-input'
 import { Label } from '@/components/ui/label'
 import {
   Select,
@@ -507,13 +508,13 @@ function ReportSlugContent({ slug }: { slug: string }) {
                       {f.label}
                     </Label>
                     {f.type === 'date' ? (
-                      <Input
-                        type='date'
+                      <DateInput
                         value={filterValues[f.key] ?? ''}
                         onChange={e =>
                           setFilterValues(prev => ({ ...prev, [f.key]: e.target.value }))
                         }
                         className='h-9 text-sm'
+                        clearable
                       />
                     ) : (
                       <Select
@@ -667,10 +668,7 @@ function ReportSlugContent({ slug }: { slug: string }) {
             {/* Tabla de datos */}
             <Card>
               <CardContent className='p-0'>
-                <DataTable
-                  rows={reportData.data}
-                  reportName={config?.name}
-                />
+                <DataTable rows={reportData.data} reportName={config?.name} />
               </CardContent>
             </Card>
           </>

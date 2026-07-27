@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
+import { DateInput } from '@/components/ui/date-input'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
@@ -165,8 +166,8 @@ export function ContractAmendmentsPanel({
             </div>
           ) : items.length === 0 ? (
             <p className='text-sm text-muted-foreground'>
-              Sin adendums. Las renovaciones completas siguen en el historial; los cambios
-              parciales (precio, plazo) se registran aquí.
+              Sin adendums. Las renovaciones completas siguen en el historial; los cambios parciales
+              (precio, plazo) se registran aquí.
             </p>
           ) : (
             <ul className='space-y-3'>
@@ -269,11 +270,7 @@ export function ContractAmendmentsPanel({
             </div>
             <div className='space-y-1'>
               <Label>Fecha efectiva</Label>
-              <Input
-                type='date'
-                value={effectiveDate}
-                onChange={e => setEffectiveDate(e.target.value)}
-              />
+              <DateInput value={effectiveDate} onChange={e => setEffectiveDate(e.target.value)} />
             </div>
             <div className='space-y-1'>
               <Label>Descripción / alcance del cambio</Label>
@@ -309,10 +306,10 @@ export function ContractAmendmentsPanel({
               </div>
               <div className='space-y-1'>
                 <Label>Nueva fecha fin</Label>
-                <Input
-                  type='date'
+                <DateInput
                   value={newEndDate}
                   onChange={e => setNewEndDate(e.target.value)}
+                  clearable
                 />
               </div>
               <div className='space-y-1'>
