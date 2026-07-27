@@ -270,44 +270,94 @@ if ! wait_for_healthy postgres 60 "PostgreSQL"; then
   exit 1
 fi
 
+# pgBackRest listo = marcador + archive_mode=on (evita reinicio de PG a mitad del seed)
+pgbackrest_ready() {
+  "${COMPOSE[@]}" exec -T postgres test -f /var/lib/pgbackrest/.bootstrap_done 2>/dev/null || return 1
+  local mode
+  mode=$("${COMPOSE[@]}" exec -T postgres psql -U tickets_user -d tickets_db -tAc \
+    "SHOW archive_mode" 2>/dev/null | tr -d '[:space:]')
+  [ "$mode" = "on" ]
+}
+
+wait_for_pgbackrest_ready() {
+  local max_attempts="${1:-180}"
+  local label="${2:-pgBackRest}"
+  for i in $(seq 1 "$max_attempts"); do
+    if pgbackrest_ready; then
+      echo "✅ $label listo (archive_mode=on)"
+      return 0
+    fi
+    if [ $((i % 12)) -eq 0 ]; then
+      echo "   … esperando $label — stanza/FULL/reinicio PG ($i/$max_attempts)"
+    fi
+    sleep 5
+  done
+  return 1
+}
+
 # pgBackRest: bootstrap en arranque limpio o si falta el marcador
 PG_OK=false
+NEEDS_PGBR_INIT=false
 if [ "$CLEAN_BUILD" = true ]; then
   echo "⚙️  Arranque limpio — bootstrap pgBackRest..."
   NEEDS_PGBR_INIT=true
+elif ! pgbackrest_ready; then
+  NEEDS_PGBR_INIT=true
+  echo "⚙️  pgBackRest pendiente — bootstrap antes de la app..."
 else
-  NEEDS_PGBR_INIT=false
-  if ! "${COMPOSE[@]}" exec -T postgres test -f /var/lib/pgbackrest/.bootstrap_done 2>/dev/null; then
-    NEEDS_PGBR_INIT=true
-  fi
-fi
-
-if [ "$NEEDS_PGBR_INIT" = true ] && [ -x "$SCRIPT_DIR/docker/scripts/init-pgbackrest.sh" ]; then
-  echo "   (bootstrap: stanza + FULL + archivado — no interrumpir, ~2–10 min)"
-  if timeout 1800 env COMPOSE_FILE="$SCRIPT_DIR/docker-compose.prod.yml" ENV_FILE="$SCRIPT_DIR/.env.production" \
-    "$SCRIPT_DIR/docker/scripts/init-pgbackrest.sh"; then
-    echo "✅ pgBackRest bootstrap OK"
-    PG_OK=true
-  else
-    echo "⚠️  pgBackRest bootstrap falló — la app arrancará igual (Admin → Backups → Config)"
-  fi
-elif [ -x "$SCRIPT_DIR/docker/scripts/disaster-recovery.sh" ] && \
-  COMPOSE_FILE="$SCRIPT_DIR/docker-compose.prod.yml" ENV_FILE="$SCRIPT_DIR/.env.production" \
-  "$SCRIPT_DIR/docker/scripts/disaster-recovery.sh" check 2>/dev/null; then
   PG_OK=true
   echo "✅ pgBackRest ya configurado"
 fi
 
+if [ "$NEEDS_PGBR_INIT" = true ] && [ -x "$SCRIPT_DIR/docker/scripts/init-pgbackrest.sh" ]; then
+  echo "   (bootstrap: stanza + FULL + archivado — no interrumpir, ~2–10 min)"
+  INIT_RC=0
+  # set +e: el fallo de bootstrap no debe abortar el arranque (set -e activo arriba)
+  set +e
+  timeout 1800 env COMPOSE_FILE="$SCRIPT_DIR/docker-compose.prod.yml" ENV_FILE="$SCRIPT_DIR/.env.production" \
+    "$SCRIPT_DIR/docker/scripts/init-pgbackrest.sh"
+  INIT_RC=$?
+  set -e
+  if [ "$INIT_RC" -eq 0 ]; then
+    echo "✅ pgBackRest bootstrap OK"
+    PG_OK=true
+  else
+    echo "⚠️  init-pgbackrest falló (código $INIT_RC) — backup-worker reintentará antes de la app"
+  fi
+fi
+
+# Tras bootstrap el watcher/init reinician Postgres: re-esperar healthy
+if ! wait_for_healthy postgres 60 "PostgreSQL"; then
+  echo "❌ PostgreSQL no volvió a healthy tras bootstrap"
+  exit 1
+fi
+
+# Levantar backup-worker ANTES de la app para que complete bootstrap/reinicio sin matar el seed
 echo ""
-echo "🐳 Levantando backup-worker, app y nginx..."
-"${COMPOSE[@]}" up -d backup-worker app nginx
+echo "🐳 Levantando backup-worker..."
+"${COMPOSE[@]}" up -d backup-worker
+
+if [ "$NEEDS_PGBR_INIT" = true ] || ! pgbackrest_ready; then
+  echo "⏳ Esperando pgBackRest (antes de seed/migraciones)..."
+  if wait_for_pgbackrest_ready 180 "pgBackRest"; then
+    PG_OK=true
+  else
+    echo "⚠️  pgBackRest no terminó a tiempo — la app arrancará igual (Admin → Backups → Config)"
+  fi
+  # Reinicio por archive_mode puede haber ocurrido durante la espera
+  wait_for_healthy postgres 60 "PostgreSQL" || true
+fi
+
+echo ""
+echo "🐳 Levantando app y nginx..."
+"${COMPOSE[@]}" up -d app nginx
 
 echo ""
 echo "⏳ Esperando app (seed/migraciones ~1–2 min)..."
 wait_for_healthy app 72 "app" || echo "⚠️  App aún iniciando — revisa logs si no responde en 3 min"
 
 if [ "$PG_OK" = true ]; then
-  echo "ℹ️  backup-worker sincroniza pgBackRest en segundo plano"
+  echo "ℹ️  pgBackRest operativo — backups en Admin → Sistema de Backups"
 fi
 
 echo ""
@@ -320,7 +370,7 @@ echo "║                                                              ║"
 echo "║  Accede desde cualquier equipo de la red con esa URL.        ║"
 echo "║                                                              ║"
 echo "║  📦 Backups: Admin → Sistema de Backups (/admin/backups)   ║"
-echo "║     · Tras --clean: pgBackRest se configura solo (~2 min)  ║"
+echo "║     · Bootstrap pgBackRest termina ANTES del seed          ║"
 echo "║     · Si queda pendiente: Config → Inicializar (1 clic)    ║"
 echo "║     · Respaldo pgBackRest = infraestructura (DR)             ║"
 echo "║     · Exportar .dump = archivo portable                      ║"

@@ -15,6 +15,8 @@ MARKER="/var/lib/pgbackrest/.bootstrap_done"
 
 cd "$PROJECT_DIR"
 
+trap 'echo "   ERROR: init-pgbackrest falló en línea $LINENO (exit $?)" >&2' ERR
+
 compose() {
   docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" "$@"
 }
@@ -48,6 +50,13 @@ marker_exists() {
   compose exec -T postgres test -f "$MARKER" 2>/dev/null
 }
 
+archive_mode_on() {
+  local mode
+  mode=$(compose exec -T postgres psql -U tickets_user -d tickets_db -tAc \
+    "SHOW archive_mode" 2>/dev/null | tr -d '[:space:]' || true)
+  [ "$mode" = "on" ]
+}
+
 echo "==> 1/5 Permisos pgBackRest..."
 if ! compose exec -T -u root postgres bash -c "
   mkdir -p /var/lib/pgbackrest /var/log/pgbackrest /var/spool/pgbackrest /var/run/postgresql
@@ -63,10 +72,19 @@ echo "   pgBackRest: $(compose exec -T postgres pgbackrest version 2>/dev/null |
 
 wait_postgres
 
-if marker_exists; then
+if marker_exists && archive_mode_on; then
   echo "==> Marcador bootstrap ya existe — solo verificando..."
   pgbr check --stanza="$STANZA"
   echo "✅ pgBackRest ya estaba configurado"
+  exit 0
+fi
+
+if marker_exists && ! archive_mode_on; then
+  echo "==> Marcador presente pero archive_mode=off — reiniciando PostgreSQL..."
+  compose restart -t 30 postgres
+  wait_postgres
+  pgbr check --stanza="$STANZA"
+  echo "✅ pgBackRest archivado activado"
   exit 0
 fi
 
@@ -89,6 +107,11 @@ compose exec -T -u root postgres bash -c "
 "
 compose restart -t 30 postgres
 wait_postgres
+
+if ! archive_mode_on; then
+  echo "   ERROR: archive_mode sigue off tras reinicio — revisa logs de postgres"
+  exit 1
+fi
 
 echo "==> 5/5 Verificación pgBackRest..."
 pgbr check --stanza="$STANZA"

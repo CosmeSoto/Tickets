@@ -113,6 +113,18 @@ else
   echo "==> Base de datos ya tiene usuarios — omitiendo seed completo."
 fi
 
+# Si pgBackRest activa archive_mode a mitad del arranque, Postgres reinicia.
+# Esperar estabilidad antes de las verificaciones post-seed.
+echo "==> Confirmando PostgreSQL estable..."
+for i in $(seq 1 30); do
+  if pg_isready -h postgres -p 5432 -U tickets_user -d tickets_db -q 2>/dev/null; then
+    if [ -n "${DATABASE_URL:-}" ] && psql "${DATABASE_URL}" -tAc "SELECT 1" >/dev/null 2>&1; then
+      break
+    fi
+  fi
+  sleep 2
+done
+
 # Catálogos de inventario (tipos, marcas, bodegas) — siempre verificar al arrancar
 echo "==> Verificando catálogos de inventario..."
 CATALOG_CHECK=0
