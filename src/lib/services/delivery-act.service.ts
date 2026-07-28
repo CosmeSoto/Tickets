@@ -363,6 +363,26 @@ export class DeliveryActService {
         },
       })
 
+      // Historial del activo
+      if (act.assignmentId && (act as any).assignment?.equipmentId) {
+        await prisma.audit_logs.create({
+          data: {
+            id: randomUUID(),
+            action: 'ASSIGNED',
+            entityType: 'equipment',
+            entityId: (act as any).assignment.equipmentId,
+            userId: act.receiverInfo.id,
+            details: {
+              folio: act.folio,
+              receiverName: act.receiverInfo.name,
+              delivererName: act.delivererInfo.name,
+              assignmentId: act.assignmentId,
+              description: `Acta de entrega ${act.folio} aceptada por ${act.receiverInfo.name}`,
+            },
+          },
+        })
+      }
+
       // ── Notificaciones INMEDIATAS al aceptar (no esperan el PDF) ──────────
       // Se envían de forma asíncrona pero sin bloquear la respuesta
       InventoryNotificationService.sendActAcceptedNotification(actId).catch(err => {

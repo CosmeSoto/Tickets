@@ -165,7 +165,7 @@ export class ReturnActService {
         },
       })
 
-      // Registrar en auditoría
+      // Registrar en auditoría (acta + equipo para historial del activo)
       await prisma.audit_logs.create({
         data: {
           id: randomUUID(),
@@ -177,6 +177,25 @@ export class ReturnActService {
             folio,
             assignmentId: data.assignmentId,
             returnCondition: data.returnCondition,
+            equipmentId: assignment.equipmentId,
+          },
+        },
+      })
+
+      await prisma.audit_logs.create({
+        data: {
+          id: randomUUID(),
+          action: 'RETURN_PENDING',
+          entityType: 'equipment',
+          entityId: assignment.equipmentId,
+          userId: assignment.delivererId,
+          details: {
+            folio,
+            assignmentId: data.assignmentId,
+            returnCondition: data.returnCondition,
+            receiverName: assignment.receiver.name,
+            delivererName: assignment.deliverer.name,
+            description: `Acta de devolución ${folio} generada. Pendiente de firma para liberar a bodega.`,
           },
         },
       })
@@ -335,7 +354,7 @@ export class ReturnActService {
           },
         })
 
-        // Registrar en auditoría
+        // Registrar en auditoría (acta + equipo)
         await tx.audit_logs.create({
           data: {
             id: randomUUID(),
@@ -349,11 +368,37 @@ export class ReturnActService {
               ipAddress: signature.ipAddress,
               newEquipmentStatus,
               newEquipmentCondition,
+              equipmentId: (act as any).assignment.equipmentId,
+            },
+          },
+        })
+
+        await tx.audit_logs.create({
+          data: {
+            id: randomUUID(),
+            action: 'RETURNED',
+            entityType: 'equipment',
+            entityId: (act as any).assignment.equipmentId,
+            userId: (act as any).delivererInfo?.id ?? (act as any).delivererId ?? '',
+            details: {
+              folio: act.folio,
+              assignmentId: act.assignmentId,
+              actualEndDate: act.returnDate.toISOString(),
+              newStatus: newEquipmentStatus,
+              newCondition: newEquipmentCondition,
+              receiverName: (act as any).receiverInfo?.name,
+              departmentCleared: true,
+              description: `Equipo devuelto a bodega (acta ${act.folio}). Estado: ${newEquipmentStatus}.`,
             },
           },
         })
 
         return updatedAct
+      })
+
+      // Notificar a las partes (no bloquea la respuesta)
+      this.notifyReturnAccepted(updated as ReturnAct).catch(err => {
+        console.error('Error notificando aceptación de devolución:', err)
       })
 
       // Generar PDF automáticamente (con reintentos)
@@ -366,6 +411,39 @@ export class ReturnActService {
     } catch (error) {
       console.error('Error aceptando acta de devolución:', error)
       throw error
+    }
+  }
+
+  private static async notifyReturnAccepted(act: ReturnAct): Promise<void> {
+    const { notifyUser } = await import('@/lib/api/notify')
+    const receiver = act.receiverInfo as any
+    const deliverer = act.delivererInfo as any
+    const equipment = (act as any).assignment?.equipment
+    const code = equipment?.code || 'equipo'
+    const label = equipment
+      ? `${equipment.code} — ${equipment.brand} ${equipment.model?.model || equipment.modelDeprecated || ''}`
+      : code
+    const link = `/inventory/acts/return/${act.id}`
+    const statusLabel =
+      (act as any).equipmentCondition === 'DAMAGED' ? 'Dañado' : 'Disponible en bodega'
+
+    if (receiver?.id) {
+      await notifyUser(
+        receiver.id,
+        'SUCCESS',
+        `Devolución completada — ${code}`,
+        `El acta ${act.folio} fue firmada. El equipo ${label} quedó como ${statusLabel}.`,
+        { metadata: { link } }
+      )
+    }
+    if (deliverer?.id && deliverer.id !== receiver?.id) {
+      await notifyUser(
+        deliverer.id,
+        'SUCCESS',
+        `Devolución firmada — ${code}`,
+        `Confirmaste la recepción de ${label} (acta ${act.folio}). Estado: ${statusLabel}.`,
+        { metadata: { link } }
+      )
     }
   }
 
@@ -415,8 +493,13 @@ export class ReturnActService {
           details: {
             folio: act.folio,
             reason,
+            equipmentId: (act as any).assignment?.equipmentId,
           },
         },
+      })
+
+      this.notifyReturnRejected(updated as ReturnAct, reason).catch(err => {
+        console.error('Error notificando rechazo de devolución:', err)
       })
 
       console.log(`Acta de devolución ${act.folio} rechazada`)
@@ -424,6 +507,34 @@ export class ReturnActService {
     } catch (error) {
       console.error('Error rechazando acta de devolución:', error)
       throw error
+    }
+  }
+
+  private static async notifyReturnRejected(act: ReturnAct, reason: string): Promise<void> {
+    const { notifyUser } = await import('@/lib/api/notify')
+    const receiver = act.receiverInfo as any
+    const deliverer = act.delivererInfo as any
+    const equipment = (act as any).assignment?.equipment
+    const code = equipment?.code || 'equipo'
+    const link = `/inventory/acts/return/${act.id}`
+
+    if (receiver?.id) {
+      await notifyUser(
+        receiver.id,
+        'WARNING',
+        `Devolución rechazada — ${code}`,
+        `El acta ${act.folio} fue rechazada. El equipo sigue asignado. Motivo: ${reason}`,
+        { metadata: { link } }
+      )
+    }
+    if (deliverer?.id && deliverer.id !== receiver?.id) {
+      await notifyUser(
+        deliverer.id,
+        'INFO',
+        `Acta de devolución rechazada — ${code}`,
+        `Se rechazó el acta ${act.folio}. El equipo permanece asignado hasta una nueva devolución firmada.`,
+        { metadata: { link: '/inventory/acts?tab=return' } }
+      )
     }
   }
 

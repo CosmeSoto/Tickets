@@ -198,6 +198,30 @@ export default function CategoriesPage() {
     return result
   }, [filteredCategories, familyFilter, departmentFilter])
 
+  // Opciones del filtro de departamento: unión de API + departamentos reales de las categorías del área.
+  // Así aparecen TI/Soporte aunque /api/departments venga incompleto o con familyId desfasado.
+  const departmentsForFilter = useMemo(() => {
+    const map = new Map<string, { id: string; name: string }>()
+
+    for (const d of departments as any[]) {
+      if (familyFilter === 'all' || d.familyId === familyFilter || d.family?.id === familyFilter) {
+        if (d.id && d.name) map.set(d.id, { id: d.id, name: d.name })
+      }
+    }
+
+    for (const cat of filteredCategories as any[]) {
+      const catFamilyId =
+        cat.familyId ?? cat.family?.id ?? cat.departments?.familyId ?? cat.departments?.family?.id
+      if (familyFilter !== 'all' && catFamilyId !== familyFilter) continue
+
+      const id = cat.departmentId ?? cat.departments?.id ?? cat.department?.id
+      const name = cat.departments?.name ?? cat.department?.name
+      if (id && name) map.set(id, { id, name })
+    }
+
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, 'es'))
+  }, [departments, filteredCategories, familyFilter])
+
   const paginatedCategories = pagination
     ? familyFilteredCategories.slice(
         (pagination.currentPage - 1) * pagination.pageSize,
@@ -672,29 +696,22 @@ export default function CategoriesPage() {
                     <SelectItem value='4'>Detalle</SelectItem>
                   </SelectContent>
                 </Select>
-                {/* Departamento — solo visible cuando hay familia seleccionada y tiene múltiples departamentos */}
-                {familyFilter !== 'all' &&
-                  departments.filter(
-                    (d: any) => d.familyId === familyFilter || d.family?.id === familyFilter
-                  ).length > 1 && (
-                    <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-                      <SelectTrigger className='w-auto min-w-[180px]'>
-                        <SelectValue placeholder='Departamento' />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value='all'>Todos los departamentos</SelectItem>
-                        {departments
-                          .filter(
-                            (d: any) => d.familyId === familyFilter || d.family?.id === familyFilter
-                          )
-                          .map((dept: any) => (
-                            <SelectItem key={dept.id} value={dept.id}>
-                              {dept.name}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                  )}
+                {/* Departamento — opciones derivadas de categorías + API del área */}
+                {familyFilter !== 'all' && departmentsForFilter.length > 1 && (
+                  <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+                    <SelectTrigger className='w-auto min-w-[180px]'>
+                      <SelectValue placeholder='Departamento' />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value='all'>Todos los departamentos</SelectItem>
+                      {departmentsForFilter.map(dept => (
+                        <SelectItem key={dept.id} value={dept.id}>
+                          {dept.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
                 <Select
                   value={statusFilter}
                   onValueChange={value => setStatusFilter(value as 'all' | 'active' | 'inactive')}

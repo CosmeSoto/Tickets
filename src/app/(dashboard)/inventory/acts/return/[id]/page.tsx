@@ -175,7 +175,10 @@ export default function ReturnActDetailPage({ params: paramsPromise }: PageProps
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Error al rechazar')
-      toast({ title: 'Acta rechazada' })
+      toast({
+        title: 'Acta rechazada',
+        description: 'El equipo sigue asignado. Puedes generar una nueva devolución si aplica.',
+      })
       setShowRejectDialog(false)
       setRejectReason('')
       await fetchAct()
@@ -194,7 +197,8 @@ export default function ReturnActDetailPage({ params: paramsPromise }: PageProps
       if (!res.ok) throw new Error(data.error || 'Error al eliminar')
       toast({
         title: 'Acta eliminada',
-        description: 'El acta de devolución fue eliminada permanentemente.',
+        description:
+          'Eliminada permanentemente. Si estaba pendiente, ya puedes generar una nueva devolución.',
       })
       setShowDeleteDialog(false)
       router.push('/inventory/acts?tab=return')

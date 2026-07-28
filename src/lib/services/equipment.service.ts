@@ -124,6 +124,9 @@ export class EquipmentService {
               deliveryAct: {
                 select: { id: true, status: true, folio: true, expirationDate: true },
               },
+              returnAct: {
+                select: { id: true, status: true, folio: true, expirationDate: true },
+              },
             },
             orderBy: { createdAt: 'desc' },
           },
@@ -399,6 +402,12 @@ export class EquipmentService {
           ...((data as any).rentalClientResponse !== undefined && {
             rentalClientResponse: (data as any).rentalClientResponse,
           }),
+          ...((data as any).departmentId !== undefined && {
+            departmentId: (data as any).departmentId || null,
+          }),
+          ...((data as any).warehouseId !== undefined && {
+            warehouseId: (data as any).warehouseId || null,
+          }),
         } as Prisma.equipmentUpdateInput,
       })
 
@@ -423,13 +432,63 @@ export class EquipmentService {
         rentalDeliveryDate: 'Fecha de entrega (renta)',
         rentalBuyoutValue: 'Valor opción de compra',
         rentalClientResponse: 'Respuesta del cliente (renta)',
+        departmentId: 'Área / Departamento',
+        warehouseId: 'Bodega',
+      }
+
+      // Resolver nombres de área/bodega para el historial
+      const idLookups = new Set<string>()
+      if ((equipment as any).departmentId) idLookups.add((equipment as any).departmentId)
+      if ((updated as any).departmentId) idLookups.add((updated as any).departmentId)
+      if ((equipment as any).warehouseId) idLookups.add((equipment as any).warehouseId)
+      if ((updated as any).warehouseId) idLookups.add((updated as any).warehouseId)
+
+      const [departments, warehouses] = await Promise.all([
+        idLookups.size
+          ? prisma.departments.findMany({
+              where: { id: { in: [...idLookups] } },
+              select: { id: true, name: true },
+            })
+          : Promise.resolve([]),
+        idLookups.size
+          ? prisma.warehouses.findMany({
+              where: { id: { in: [...idLookups] } },
+              select: { id: true, name: true },
+            })
+          : Promise.resolve([]),
+      ])
+      const deptName = new Map(departments.map(d => [d.id, d.name]))
+      const whName = new Map(warehouses.map(w => [w.id, w.name]))
+
+      const resolveFieldValue = (key: string, value: any) => {
+        if (value === null || value === undefined || value === '') return '—'
+        if (key === 'departmentId') return deptName.get(String(value)) || String(value)
+        if (key === 'warehouseId') return whName.get(String(value)) || String(value)
+        return value
       }
 
       for (const key of Object.keys(data)) {
         const oldVal = (equipment as any)[key]
         const newVal = (updated as any)[key]
         if (JSON.stringify(oldVal) !== JSON.stringify(newVal) && fieldLabels[key]) {
-          changedFields[fieldLabels[key]] = { antes: oldVal ?? '—', después: newVal ?? '—' }
+          changedFields[fieldLabels[key]] = {
+            antes: resolveFieldValue(key, oldVal),
+            después: resolveFieldValue(key, newVal),
+          }
+        }
+      }
+
+      // También detectar cambios de área/bodega pasados como financialFields
+      for (const key of ['departmentId', 'warehouseId'] as const) {
+        if ((data as any)[key] === undefined) continue
+        if (fieldLabels[key] && changedFields[fieldLabels[key]]) continue
+        const oldVal = (equipment as any)[key]
+        const newVal = (updated as any)[key]
+        if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
+          changedFields[fieldLabels[key]] = {
+            antes: resolveFieldValue(key, oldVal),
+            después: resolveFieldValue(key, newVal),
+          }
         }
       }
 
@@ -648,6 +707,7 @@ export class EquipmentService {
 
   /**
    * Construye el historial de eventos de un equipo
+   * Combina audit_logs del equipo + ciclo de vida de asignaciones/actas.
    */
   private static async buildEquipmentHistory(
     equipmentId: string
@@ -663,11 +723,66 @@ export class EquipmentService {
       'assignment_created',
     ])
 
-    // Obtener eventos de auditoría
+    const assignments = await prisma.equipment_assignments.findMany({
+      where: { equipmentId },
+      select: {
+        id: true,
+        startDate: true,
+        actualEndDate: true,
+        isActive: true,
+        createdAt: true,
+        assignmentType: true,
+        receiver: { select: { id: true, name: true } },
+        deliverer: { select: { id: true, name: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+    const assignmentIds = assignments.map(a => a.id)
+
+    const [returnActs, deliveryActs] = await Promise.all([
+      assignmentIds.length === 0
+        ? Promise.resolve([])
+        : prisma.return_acts.findMany({
+            where: { assignmentId: { in: assignmentIds } },
+            select: {
+              id: true,
+              folio: true,
+              status: true,
+              returnDate: true,
+              createdAt: true,
+              acceptedAt: true,
+              equipmentCondition: true,
+            },
+          }),
+      assignmentIds.length === 0
+        ? Promise.resolve([])
+        : prisma.delivery_acts.findMany({
+            where: { assignmentId: { in: assignmentIds } },
+            select: {
+              id: true,
+              folio: true,
+              status: true,
+              createdAt: true,
+              acceptedAt: true,
+            },
+          }),
+    ])
+
+    // Obtener eventos de auditoría del equipo + actas relacionadas
     const auditLogs = await prisma.audit_logs.findMany({
       where: {
-        entityType: 'equipment',
-        entityId: equipmentId,
+        OR: [
+          { entityType: 'equipment', entityId: equipmentId },
+          ...(returnActs.length
+            ? [{ entityType: 'return_act', entityId: { in: returnActs.map(r => r.id) } }]
+            : []),
+          ...(deliveryActs.length
+            ? [{ entityType: 'delivery_act', entityId: { in: deliveryActs.map(d => d.id) } }]
+            : []),
+          ...(assignmentIds.length
+            ? [{ entityType: 'equipment_assignment', entityId: { in: assignmentIds } }]
+            : []),
+        ],
       },
       include: {
         users: { select: { name: true } },
@@ -675,21 +790,17 @@ export class EquipmentService {
       orderBy: { createdAt: 'desc' },
     })
 
-    // Deduplicar: agrupar por timestamp (mismo segundo) y quedarse con el más descriptivo
+    // Deduplicar: agrupar por acción + minuto
     const seen = new Map<string, boolean>()
 
     for (const log of auditLogs) {
-      // Saltar acciones duplicadas del AuditServiceComplete
       if (duplicateActions.has(log.action)) continue
 
-      // Deduplicar por acción + timestamp (mismo minuto)
       const timeKey = `${log.action}_${Math.floor(log.createdAt.getTime() / 60000)}`
       if (seen.has(timeKey)) continue
       seen.set(timeKey, true)
 
       const details = log.details as any
-
-      // Construir metadata legible (sin objetos anidados)
       const metadata: Record<string, string> = {}
 
       if (log.action === 'UPDATE' && details?.changes) {
@@ -708,11 +819,25 @@ export class EquipmentService {
           }
           metadata['Tipo'] = typeLabels[details.assignmentType] || details.assignmentType
         }
-      } else if (log.action === 'RETURNED') {
+      } else if (
+        log.action === 'RETURNED' ||
+        log.action === 'RETURN_PENDING' ||
+        log.action === 'ACCEPTED'
+      ) {
+        if (details?.folio) metadata['Folio'] = details.folio
         if (details?.actualEndDate)
           metadata['Fecha de devolución'] = new Date(details.actualEndDate).toLocaleDateString(
             'es-ES'
           )
+        if (details?.newStatus) metadata['Estado'] = this.formatValue(details.newStatus)
+        if (details?.newCondition) metadata['Condición'] = this.formatValue(details.newCondition)
+        if (details?.receiverName) metadata['Devuelto por'] = details.receiverName
+        if (details?.departmentCleared) metadata['Área'] = 'Liberada (bodega)'
+      } else if (log.action === 'ACTA_ACEPTADA' || log.action === 'ACTA_ENTREGA_CREADA') {
+        if (details?.folio) metadata['Folio'] = details.folio
+        if (details?.equipo) metadata['Equipo'] = details.equipo
+        if (details?.recibidoPor) metadata['Recibido por'] = details.recibidoPor
+        if (details?.entregadoPor) metadata['Entregado por'] = details.entregadoPor
       }
 
       history.push({
@@ -726,6 +851,94 @@ export class EquipmentService {
       })
     }
 
+    // Eventos sintetizados desde tablas (cubre datos previos sin audit de equipo)
+    for (const a of assignments) {
+      const assignKey = `ASSIGNED_${Math.floor(new Date(a.startDate || a.createdAt).getTime() / 60000)}`
+      if (!seen.has(assignKey)) {
+        seen.set(assignKey, true)
+        history.push({
+          id: `synth-assign-${a.id}`,
+          type: 'ASSIGNED',
+          description: `Equipo asignado a ${a.receiver?.name || 'un usuario'}`,
+          userId: a.deliverer?.id,
+          userName: a.deliverer?.name,
+          timestamp: a.startDate || a.createdAt,
+          metadata: {
+            ...(a.receiver?.name ? { 'Asignado a': a.receiver.name } : {}),
+            ...(a.assignmentType
+              ? {
+                  Tipo:
+                    (
+                      {
+                        PERMANENT: 'Permanente',
+                        TEMPORARY: 'Temporal',
+                        LOAN: 'Préstamo',
+                      } as Record<string, string>
+                    )[a.assignmentType] || a.assignmentType,
+                }
+              : {}),
+          },
+        })
+      }
+
+      if (!a.isActive && a.actualEndDate) {
+        const returnKey = `RETURNED_${Math.floor(new Date(a.actualEndDate).getTime() / 60000)}`
+        if (!seen.has(returnKey)) {
+          seen.set(returnKey, true)
+          history.push({
+            id: `synth-return-${a.id}`,
+            type: 'RETURNED',
+            description: 'Equipo devuelto al inventario',
+            userName: a.deliverer?.name,
+            timestamp: a.actualEndDate,
+            metadata: {
+              'Fecha de devolución': new Date(a.actualEndDate).toLocaleDateString('es-ES'),
+              ...(a.receiver?.name ? { 'Devuelto por': a.receiver.name } : {}),
+            },
+          })
+        }
+      }
+    }
+
+    for (const r of returnActs) {
+      if (r.status === 'PENDING') {
+        const key = `RETURN_PENDING_${Math.floor(r.createdAt.getTime() / 60000)}`
+        if (!seen.has(key)) {
+          seen.set(key, true)
+          history.push({
+            id: `synth-ret-pending-${r.id}`,
+            type: 'RETURNED',
+            description: `Acta de devolución ${r.folio} pendiente de firma`,
+            timestamp: r.createdAt,
+            metadata: {
+              Folio: r.folio,
+              Condición: this.formatValue(r.equipmentCondition),
+            },
+          })
+        }
+      }
+    }
+
+    for (const d of deliveryActs) {
+      if (d.status === 'ACCEPTED' && d.acceptedAt) {
+        const key = `DELIVERY_ACCEPTED_${Math.floor(d.acceptedAt.getTime() / 60000)}`
+        if (
+          !seen.has(key) &&
+          !seen.has(`ACTA_ACEPTADA_${Math.floor(d.acceptedAt.getTime() / 60000)}`)
+        ) {
+          seen.set(key, true)
+          history.push({
+            id: `synth-del-${d.id}`,
+            type: 'ASSIGNED',
+            description: `Acta de entrega ${d.folio} aceptada`,
+            timestamp: d.acceptedAt,
+            metadata: { Folio: d.folio },
+          })
+        }
+      }
+    }
+
+    history.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
     return history
   }
 
@@ -740,7 +953,12 @@ export class EquipmentService {
       PERMANENT_DELETE: 'STATUS_CHANGE',
       ASSIGNED: 'ASSIGNED',
       ASSIGNMENT_CREATED: 'ASSIGNED',
+      ACTA_ENTREGA_CREADA: 'ASSIGNED',
+      ACTA_ACEPTADA: 'ASSIGNED',
+      ACTA_RECHAZADA: 'RETURNED',
       RETURNED: 'RETURNED',
+      RETURN_PENDING: 'RETURNED',
+      ACCEPTED: 'RETURNED',
       CANCELLED: 'RETURNED',
       CREATE_MAINTENANCE: 'MAINTENANCE',
       COMPLETED: 'MAINTENANCE',
@@ -793,6 +1011,9 @@ export class EquipmentService {
   private static getAuditLogDescription(action: string, details: any): string {
     switch (action) {
       case 'CREATE':
+        if (details?.folio && (details?.assignmentId || details?.equipmentId)) {
+          return `Acta de devolución ${details.folio} generada`
+        }
         return `Equipo registrado: ${details?.code || ''} — ${details?.brand || ''} ${details?.model || ''}`
       case 'UPDATE': {
         const changes = details?.changes
@@ -810,8 +1031,25 @@ export class EquipmentService {
       case 'ASSIGNED':
       case 'ASSIGNMENT_CREATED':
         return `Equipo asignado a ${details?.receiverName || 'un usuario'}`
+      case 'RETURN_PENDING':
+        return (
+          details?.description ||
+          `Acta de devolución ${details?.folio || ''} pendiente de firma`.trim()
+        )
       case 'RETURNED':
-        return 'Equipo devuelto al inventario'
+        return details?.description || 'Equipo devuelto al inventario'
+      case 'ACCEPTED':
+        return details?.folio
+          ? `Acta de devolución ${details.folio} firmada — equipo liberado a bodega`
+          : 'Acta de devolución aceptada'
+      case 'ACTA_ENTREGA_CREADA':
+        return details?.folio
+          ? `Acta de entrega ${details.folio} generada`
+          : 'Acta de entrega generada'
+      case 'ACTA_ACEPTADA':
+        return details?.descripcion || `Acta de entrega ${details?.folio || ''} aceptada`
+      case 'ACTA_RECHAZADA':
+        return details?.descripcion || `Acta de entrega ${details?.folio || ''} rechazada`
       case 'CANCELLED':
         return `Asignación cancelada${details?.reason ? ': ' + details.reason : ''}`
       case 'CREATE_MAINTENANCE':

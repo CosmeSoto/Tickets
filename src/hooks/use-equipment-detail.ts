@@ -131,7 +131,7 @@ export function useEquipmentDetail({
         if (response.status === 409) {
           setShowDeleteDialog(false)
           toast.error(
-            'El equipo tiene una asignación activa. Primero debes desasignarlo (generar acta de devolución) y luego retirarlo.',
+            'El equipo tiene una asignación activa. Genera y firma el acta de devolución para liberarlo a bodega, y luego retíralo.',
             {
               duration: 8000,
             }
@@ -207,7 +207,9 @@ export function useEquipmentDetail({
 
       const result = await response.json()
       if (result.acceptanceUrl) {
-        toast.success('Equipo asignado. Se generó el acta de entrega para firma del receptor.')
+        toast.success(
+          'Equipo asignado. El receptor debe firmar el acta de entrega para completar la asignación.'
+        )
       } else {
         toast.success('Equipo asignado exitosamente')
       }
@@ -277,7 +279,7 @@ export function useEquipmentDetail({
       if (useFormalReturn) {
         toast.success(
           payload?.message ||
-            'Acta generada. Debes firmarla (o el responsable de bodega) para liberar el equipo.'
+            'Acta generada. Fírmala ahora (o el responsable de bodega) — hasta entonces el equipo sigue Asignado.'
         )
         setShowReturnDialog(false)
         const actId = payload?.returnAct?.id
@@ -286,7 +288,7 @@ export function useEquipmentDetail({
           return
         }
       } else {
-        toast.success('Equipo devuelto al inventario')
+        toast.success('Equipo devuelto a bodega y marcado como Disponible')
         setData(prev =>
           prev
             ? {

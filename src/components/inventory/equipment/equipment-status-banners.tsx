@@ -76,14 +76,51 @@ export function EquipmentStatusBanners({
 
       {/* Banner de asignación activa */}
       {isAssigned && currentAssignment && (
-        <Alert className='border-blue-300 bg-blue-50 dark:bg-blue-950/30'>
-          <AlertCircle className='h-4 w-4 text-blue-600 dark:text-blue-400' />
-          <AlertDescription className='text-blue-800 dark:text-blue-200'>
-            <span className='font-medium'>Equipo asignado</span> a{' '}
-            <span className='font-medium'>{currentAssignment.receiver?.name}</span> desde el{' '}
-            {new Date(currentAssignment.startDate).toLocaleDateString('es-ES')}.
-            {(userRole === 'ADMIN' || userRole === 'TECHNICIAN') &&
-              ' Para reasignarlo, primero devuélvelo a bodega.'}
+        <Alert
+          className={
+            (currentAssignment as any).returnAct?.status === 'PENDING'
+              ? 'border-amber-400 bg-amber-50 dark:bg-amber-950/30'
+              : 'border-blue-300 bg-blue-50 dark:bg-blue-950/30'
+          }
+        >
+          <AlertCircle
+            className={
+              (currentAssignment as any).returnAct?.status === 'PENDING'
+                ? 'h-4 w-4 text-amber-600 dark:text-amber-400'
+                : 'h-4 w-4 text-blue-600 dark:text-blue-400'
+            }
+          />
+          <AlertDescription
+            className={
+              (currentAssignment as any).returnAct?.status === 'PENDING'
+                ? 'text-amber-800 dark:text-amber-200 flex items-center justify-between gap-3 flex-wrap'
+                : 'text-blue-800 dark:text-blue-200'
+            }
+          >
+            {(currentAssignment as any).returnAct?.status === 'PENDING' ? (
+              <>
+                <span>
+                  <span className='font-medium'>Devolución pendiente de firma</span> (
+                  {(currentAssignment as any).returnAct.folio}). El equipo sigue asignado a{' '}
+                  <span className='font-medium'>{currentAssignment.receiver?.name}</span> hasta
+                  firmar el acta.
+                </span>
+                <a
+                  href={`/inventory/acts/return/${(currentAssignment as any).returnAct.id}`}
+                  className='flex items-center gap-1 text-sm font-medium underline underline-offset-2 flex-shrink-0'
+                >
+                  Ir a firmar <ExternalLink className='h-3 w-3' />
+                </a>
+              </>
+            ) : (
+              <>
+                <span className='font-medium'>Equipo asignado</span> a{' '}
+                <span className='font-medium'>{currentAssignment.receiver?.name}</span> desde el{' '}
+                {new Date(currentAssignment.startDate).toLocaleDateString('es-ES')}.
+                {(userRole === 'ADMIN' || userRole === 'TECHNICIAN') &&
+                  ' Para reasignarlo: genera el acta de devolución y fírmala (el equipo solo pasa a Disponible al firmar).'}
+              </>
+            )}
           </AlertDescription>
         </Alert>
       )}

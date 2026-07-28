@@ -117,7 +117,7 @@ export async function proxy(request: NextRequest) {
     const response = NextResponse.next()
 
     // Rutas que sirven archivos para vista previa en iframe (mismo origen).
-    // Estas necesitan SAMEORIGIN en lugar de DENY para que el FilePreviewModal funcione.
+    // Estas necesitan SAMEORIGIN en lugar de DENY para que PdfPreviewModal / FilePreviewModal funcionen.
     const isFilePreviewRoute =
       /^\/api\/forms\/[^/]+\/file/.test(path) ||
       /^\/api\/admin\/forms\/[^/]+\/attachments\/[^/]+\/file/.test(path) ||
@@ -125,7 +125,10 @@ export async function proxy(request: NextRequest) {
       /^\/api\/admin\/news\/[^/]+\/attachments\/[^/]+\/file/.test(path) ||
       /^\/api\/attachments\/[^/]+/.test(path) ||
       /^\/api\/tickets\/[^/]+\/attachments\/[^/]+/.test(path) ||
-      /^\/api\/inventory\/acts\/[^/]+\/preview/.test(path)
+      /^\/api\/inventory\/acts\/[^/]+\/preview/.test(path) ||
+      /^\/api\/inventory\/return-acts\/[^/]+\/preview/.test(path) ||
+      /^\/api\/inventory\/decommission-acts\/[^/]+\/preview/.test(path) ||
+      /^\/api\/inventory\/contract-return-acts\/[^/]+\/preview/.test(path)
 
     // Headers de seguridad básicos para APIs
     response.headers.set('X-Content-Type-Options', 'nosniff')
