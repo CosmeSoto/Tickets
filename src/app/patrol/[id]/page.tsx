@@ -52,7 +52,7 @@ export default function PatrolExecutionPage() {
     // ADMIN siempre puede ver/monitorear rondas.
     // TECHNICIAN y CLIENT necesitan patrolsEnabled.
     const role = (session.user as any).role
-    if (role !== 'ADMIN' && (session.user as any).patrolsEnabled === false) {
+    if (role !== 'ADMIN' && (session.user as any).patrolsEnabled !== true) {
       router.push('/unauthorized')
       return
     }

@@ -147,8 +147,8 @@ export function PermissionsAndModulesSection({
               Acceso como Administrador de Familia
             </p>
             <p className='text-xs text-muted-foreground'>
-              Los módulos habilitados determinan qué secciones verá. La gestión operativa de
-              tickets es en su familia nativa; las adicionales son visibilidad y apoyo.
+              Los módulos habilitados determinan qué secciones verá. La gestión operativa de tickets
+              es en su familia nativa; las adicionales son visibilidad y apoyo.
             </p>
           </div>
         )}
@@ -232,18 +232,18 @@ export function PermissionsAndModulesSection({
             />
 
             {/* ── Rondas ── */}
-            {/* CLIENT: solo agente — sin familia nativa en el card ni selector adicional */}
-            {/* TECHNICIAN/ADMIN: supervisor multi-instalación — mostrar selector completo */}
+            {/* CLIENT/TECH: agentes — familia nativa + patrol_family_assignments (requerido para programar) */}
+            {/* ADMIN: supervisor multi-instalación — mismo selector en modo patrol */}
             <ModuleAccessCard
               moduleKey='patrols'
               moduleName='Rondas y Patrullajes'
               role={formData.role}
               enabled={formData.patrolsEnabled}
               onToggle={v => onToggle('patrolsEnabled', v)}
-              families={formData.role === 'CLIENT' ? [] : patrolFamilies}
-              assignedFamilyIds={formData.role === 'CLIENT' ? [] : patrolFamilyIds}
-              nativeFamilyId={formData.role === 'CLIENT' ? null : nativeFamilyId}
-              nativeFamily={formData.role === 'CLIENT' ? null : nativeFamily}
+              families={patrolFamilies}
+              assignedFamilyIds={patrolFamilyIds}
+              nativeFamilyId={nativeFamilyId}
+              nativeFamily={nativeFamily}
               readOnlyFamilyIds={patrolReadOnlyIds}
               onAssignFamily={handlers.handleAssignPatrolFamily}
               onUnassignFamily={handlers.handleUnassignPatrolFamily}

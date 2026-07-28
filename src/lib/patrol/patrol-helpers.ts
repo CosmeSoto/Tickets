@@ -62,8 +62,9 @@ export async function getPatrolSupervisors(familyId: string): Promise<{ id: stri
 // ── Verificación de acceso al módulo ─────────────────────────────────────────
 
 /**
- * Verifica si un TECHNICIAN tiene el módulo de patrullas habilitado.
- * Para ADMIN siempre retorna true.
+ * Acceso de supervisión/configuración del módulo (dashboard, schedules, routes, reports).
+ * ADMIN siempre; TECHNICIAN solo con patrolsEnabled.
+ * CLIENT nunca: los clientes ejecutan rondas en /api/patrols (agente), no en APIs de config.
  *
  * @returns true si puede acceder, false si no.
  */
@@ -79,10 +80,10 @@ export async function hasPatrolModuleAccess(userId: string, role: string): Promi
 }
 
 /**
- * Verifica acceso al módulo y devuelve una respuesta 403 lista si no tiene acceso.
- * Retorna `null` si el acceso está permitido (continuar con la lógica normal).
+ * Gate de supervisión/configuración. Retorna 403 listo o `null` si puede continuar.
+ * No usar en rutas de agente (listar/iniciar/check-in); ahí usar checkPatrolAgentAccess.
  *
- * Uso típico en API routes:
+ * Uso típico:
  * ```ts
  * const denied = await checkPatrolModuleAccess(session.user.id, session.user.role)
  * if (denied) return denied
@@ -94,6 +95,25 @@ export async function checkPatrolModuleAccess(
 ): Promise<NextResponse | null> {
   if (role === 'ADMIN') return null
   if (role !== 'TECHNICIAN') return patrolForbidden()
+
+  const user = await prisma.users.findUnique({
+    where: { id: userId },
+    select: { patrolsEnabled: true },
+  })
+  if (!user?.patrolsEnabled) return patrolModuleDisabled()
+  return null
+}
+
+/**
+ * Acceso de agente (ejecutar rondas asignadas).
+ * ADMIN puede monitorear; TECHNICIAN/CLIENT requieren patrolsEnabled.
+ */
+export async function checkPatrolAgentAccess(
+  userId: string,
+  role: string
+): Promise<NextResponse | null> {
+  if (role === 'ADMIN') return null
+  if (role !== 'TECHNICIAN' && role !== 'CLIENT') return patrolForbidden()
 
   const user = await prisma.users.findUnique({
     where: { id: userId },

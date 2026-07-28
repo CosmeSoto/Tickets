@@ -120,7 +120,14 @@ export default function MisNovedadesPage() {
   // Guard de autenticación
   useEffect(() => {
     if (status === 'loading') return
-    if (!session) router.push('/login')
+    if (!session) {
+      router.push('/login')
+      return
+    }
+    const role = (session.user as any).role
+    if (role !== 'ADMIN' && (session.user as any).patrolsEnabled !== true) {
+      router.push('/unauthorized')
+    }
   }, [session, status, router])
 
   // ── Cargar novedades ────────────────────────────────────────────────────────

@@ -71,8 +71,8 @@ export default function PatrolListPage() {
       return
     }
     const user = session.user as any
-    // ADMIN siempre puede ver rondas. Para otros roles, verificar patrolsEnabled.
-    if (user.role !== 'ADMIN' && user.patrolsEnabled === false) {
+    // ADMIN siempre puede ver rondas. Agentes (TECH/CLIENT) requieren patrolsEnabled.
+    if (user.role !== 'ADMIN' && user.patrolsEnabled !== true) {
       router.push('/unauthorized')
       return
     }
@@ -89,7 +89,22 @@ export default function PatrolListPage() {
       else if (sf !== 'all') params.set('status', sf.toUpperCase())
 
       const res = await fetch(`/api/patrols?${params}`, { signal: controller.signal })
-      if (!res.ok) throw new Error('Error al cargar patrullas')
+      if (!res.ok) {
+        let message = 'Error al cargar patrullas'
+        try {
+          const body = await res.json()
+          if (typeof body?.error === 'string' && body.error.trim()) {
+            message = body.error
+          } else if (res.status === 403) {
+            message = 'No tienes privilegios para el módulo de rondas'
+          }
+        } catch {
+          if (res.status === 403) {
+            message = 'No tienes privilegios para el módulo de rondas'
+          }
+        }
+        throw new Error(message)
+      }
       const data = await res.json()
       setPatrols(data.data ?? [])
       setPagination(data.pagination ?? null)

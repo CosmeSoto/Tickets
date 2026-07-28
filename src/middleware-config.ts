@@ -35,6 +35,7 @@ export const protectedRoutes = [
   '/admin',
   '/technician',
   '/client',
+  '/patrol',
   '/profile',
   '/settings',
   '/inventory',
