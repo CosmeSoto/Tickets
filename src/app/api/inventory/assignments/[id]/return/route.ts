@@ -80,7 +80,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const assignment = await prisma.equipment_assignments.findUnique({
       where: { id: assignmentId },
       include: {
-        equipment: { select: { id: true, code: true, brand: true, model: true } },
+        equipment: {
+          select: {
+            id: true,
+            code: true,
+            brand: true,
+            modelDeprecated: true,
+            model: { select: { model: true } },
+          },
+        },
         receiver: { select: { id: true, name: true, email: true } },
         deliveryAct: { select: { id: true, status: true } },
       },
@@ -105,7 +113,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     // Verificar que no haya ya un acta de devolución pendiente
-    const existingReturn = await (prisma.return_acts as any).findFirst({
+    const existingReturn = await prisma.return_acts.findFirst({
       where: { assignmentId, status: 'PENDING' },
     })
     if (existingReturn) {
@@ -128,12 +136,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     // Notificar al receptor (quien devuelve) que se generó el acta
     const { systemName } = await getSystemBranding()
 
-    const equipmentLabel = `${assignment.equipment.code} — ${assignment.equipment.brand} ${assignment.equipment.model}`
+    const equipmentModel =
+      assignment.equipment.model?.model || assignment.equipment.modelDeprecated || ''
+    const equipmentLabel = `${assignment.equipment.code} — ${assignment.equipment.brand} ${equipmentModel}`
     await notifyUser(
       assignment.receiver.id,
       'INFO',
       `Acta de devolución generada — ${assignment.equipment.code}`,
-      `Se generó el acta de devolución ${(returnAct as any).folio} para el equipo ${equipmentLabel}. Revisa y firma el acta.`,
+      `Se generó el acta de devolución ${returnAct.folio} para el equipo ${equipmentLabel}. Revisa y firma el acta.`,
       {
         metadata: { link: `/inventory/acts?tab=return` },
         email: {

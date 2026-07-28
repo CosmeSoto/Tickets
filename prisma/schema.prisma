@@ -1196,6 +1196,7 @@ model delivery_acts {
   contractAssignmentId String?               @unique @map("contract_assignment_id")
   assignment           equipment_assignments? @relation(fields: [assignmentId], references: [id])
   contractAssignment   contract_assignments?  @relation(fields: [contractAssignmentId], references: [id])
+  returnActs           return_acts[]
 
   @@index([folio])
   @@index([status, expirationDate])
@@ -1209,11 +1210,15 @@ model return_acts {
   folio              String                @unique
   assignmentId       String                @unique @map("assignment_id")
   deliveryActId      String                @map("delivery_act_id")
+  equipmentSnapshot  Json                  @map("equipment_snapshot")
   equipmentCondition EquipmentCondition    @map("equipment_condition")
   inspectionNotes    String?               @map("inspection_notes")
+  missingAccessories String[]              @default([]) @map("missing_accessories")
+  damageDescription  String?               @map("damage_description")
   returnDate         DateTime              @map("return_date")
   receiverInfo       Json                  @map("receiver_info")
   delivererInfo      Json                  @map("deliverer_info")
+  termsVersion       String                @default("1.0") @map("terms_version")
   status             ActStatus             @default(PENDING)
   acceptanceToken    String                @unique @map("acceptance_token")
   expirationDate     DateTime              @map("expiration_date")
@@ -1228,10 +1233,12 @@ model return_acts {
   createdAt          DateTime              @default(now()) @map("created_at")
   updatedAt          DateTime              @updatedAt @map("updated_at")
   assignment         equipment_assignments @relation(fields: [assignmentId], references: [id])
+  deliveryAct        delivery_acts         @relation(fields: [deliveryActId], references: [id])
 
   @@index([folio])
   @@index([status, expirationDate])
   @@index([acceptanceToken])
+  @@index([deliveryActId])
   @@map("return_acts")
 }
 

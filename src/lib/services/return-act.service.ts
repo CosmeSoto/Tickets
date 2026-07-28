@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto'
-import { EquipmentCondition, EquipmentStatus } from '@prisma/client'
+import { EquipmentCondition, EquipmentStatus, Prisma } from '@prisma/client'
 import prisma from '@/lib/prisma'
 import { FolioService } from './folio.service'
 import { DigitalSignatureService } from './digital-signature.service'
@@ -52,12 +52,24 @@ export class ReturnActService {
   static async generateReturnAct(data: CreateReturnActData): Promise<ReturnAct> {
     try {
       // Obtener asignación con relaciones
-      const assignment = await (prisma.equipment_assignments.findUnique as any)({
+      const assignment = await prisma.equipment_assignments.findUnique({
         where: { id: data.assignmentId },
         include: {
-          equipment: true,
-          receiver: true,
-          deliverer: true,
+          equipment: {
+            include: {
+              model: { select: { model: true } },
+              type: { select: { id: true, name: true } },
+              department: {
+                select: {
+                  id: true,
+                  name: true,
+                  family: { select: { id: true, name: true } },
+                },
+              },
+            },
+          },
+          receiver: { include: { departments: { select: { name: true } } } },
+          deliverer: { include: { departments: { select: { name: true } } } },
           deliveryAct: true,
         },
       })
@@ -70,7 +82,7 @@ export class ReturnActService {
         throw new Error('La asignación no está activa')
       }
 
-      if (!assignment.deliveryAct || (assignment.deliveryAct as any).status !== 'ACCEPTED') {
+      if (!assignment.deliveryAct || assignment.deliveryAct.status !== 'ACCEPTED') {
         throw new Error('La asignación no tiene un acta de entrega aceptada')
       }
 
@@ -87,16 +99,21 @@ export class ReturnActService {
       // Fecha de devolución (por defecto hoy)
       const returnDate = data.returnDate || new Date()
 
-      // Crear snapshot del equipo
+      const eq = assignment.equipment
+      // Crear snapshot del equipo (sin undefined — Prisma Json no los acepta bien)
       const equipmentSnapshot = {
-        id: assignment.equipment.id,
-        code: assignment.equipment.code,
-        serialNumber: assignment.equipment.serialNumber,
-        brand: assignment.equipment.brand,
-        model: assignment.equipment.model?.model || assignment.equipment.modelDeprecated,
-        type: (assignment.equipment as any).type,
+        id: eq.id,
+        code: eq.code,
+        serialNumber: eq.serialNumber,
+        brand: eq.brand,
+        model: eq.model?.model || eq.modelDeprecated,
+        type: eq.typeId,
+        typeName: eq.type?.name || '',
         condition: data.returnCondition,
-        specifications: assignment.equipment.specifications,
+        departmentId: eq.department?.id ?? null,
+        departmentName: eq.department?.name ?? null,
+        familyId: eq.department?.family?.id ?? null,
+        familyName: eq.department?.family?.name ?? null,
       }
 
       // Crear info del receiver (quien devuelve - era el receiver en la entrega)
@@ -105,7 +122,7 @@ export class ReturnActService {
         name: assignment.receiver.name,
         email: assignment.receiver.email,
         role: assignment.receiver.role,
-        department: (assignment.receiver as any).departments?.name,
+        department: assignment.receiver.departments?.name,
       }
 
       // Crear info del deliverer (quien recibe la devolución - era el deliverer en la entrega)
@@ -114,23 +131,23 @@ export class ReturnActService {
         name: assignment.deliverer.name,
         email: assignment.deliverer.email,
         role: assignment.deliverer.role,
-        department: (assignment.deliverer as any).departments?.name,
+        department: assignment.deliverer.departments?.name,
       }
 
       // Crear acta de devolución
-      const act = await (prisma.return_acts.create as any)({
+      const act = await prisma.return_acts.create({
         data: {
           folio,
           assignmentId: data.assignmentId,
-          deliveryActId: (assignment.deliveryAct as any).id,
-          equipmentSnapshot,
-          receiverInfo,
-          delivererInfo,
+          deliveryActId: assignment.deliveryAct.id,
+          equipmentSnapshot: equipmentSnapshot as unknown as Prisma.InputJsonValue,
+          receiverInfo: receiverInfo as unknown as Prisma.InputJsonValue,
+          delivererInfo: delivererInfo as unknown as Prisma.InputJsonValue,
           returnDate,
           equipmentCondition: data.returnCondition,
-          inspectionNotes: data.inspectionNotes,
+          inspectionNotes: data.inspectionNotes ?? null,
           missingAccessories: data.missingAccessories || [],
-          damageDescription: data.damageDescription,
+          damageDescription: data.damageDescription ?? null,
           termsVersion: '1.0',
           status: 'PENDING',
           acceptanceToken,
@@ -177,7 +194,7 @@ export class ReturnActService {
    */
   static async getActById(id: string): Promise<ReturnAct | null> {
     try {
-      const act = await (prisma.return_acts.findUnique as any)({
+      const act = await prisma.return_acts.findUnique({
         where: { id },
         include: {
           assignment: {
@@ -203,7 +220,7 @@ export class ReturnActService {
    */
   static async getActByToken(token: string): Promise<ReturnAct | null> {
     try {
-      const act = await (prisma.return_acts.findUnique as any)({
+      const act = await prisma.return_acts.findUnique({
         where: { acceptanceToken: token },
         include: {
           assignment: {
@@ -277,7 +294,7 @@ export class ReturnActService {
       // Actualizar acta, asignación y equipo en transacción
       const updated = await prisma.$transaction(async tx => {
         // Actualizar acta
-        const updatedAct = await (tx.return_acts.update as any)({
+        const updatedAct = await tx.return_acts.update({
           where: { id: actId },
           data: {
             status: 'ACCEPTED',
@@ -368,7 +385,7 @@ export class ReturnActService {
       }
 
       // Actualizar acta
-      const updated = await (prisma.return_acts.update as any)({
+      const updated = await prisma.return_acts.update({
         where: { id: actId },
         data: {
           status: 'REJECTED',
