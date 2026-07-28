@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
 
     const userId = session.user.id
     const isAdmin = session.user.role === 'ADMIN'
-    const canManage = !isAdmin && await canManageInventory(userId, session.user.role)
+    const canManage = !isAdmin && (await canManageInventory(userId, session.user.role))
 
     const statusFilter = status !== 'all' ? { status } : {}
 
@@ -84,18 +84,21 @@ export async function GET(request: NextRequest) {
 
     // Normalizar y añadir rol del usuario
     const result = acts.map((act: any) => {
-      const receiverInfo = typeof act.receiverInfo === 'string'
-        ? JSON.parse(act.receiverInfo) : act.receiverInfo
-      const delivererInfo = typeof act.delivererInfo === 'string'
-        ? JSON.parse(act.delivererInfo) : act.delivererInfo
-      const equipmentSnapshot = typeof act.equipmentSnapshot === 'string'
-        ? JSON.parse(act.equipmentSnapshot) : act.equipmentSnapshot
+      const receiverInfo =
+        typeof act.receiverInfo === 'string' ? JSON.parse(act.receiverInfo) : act.receiverInfo
+      const delivererInfo =
+        typeof act.delivererInfo === 'string' ? JSON.parse(act.delivererInfo) : act.delivererInfo
+      const equipmentSnapshot =
+        typeof act.equipmentSnapshot === 'string'
+          ? JSON.parse(act.equipmentSnapshot)
+          : act.equipmentSnapshot
 
       return {
         id: act.id,
         folio: act.folio,
         status: act.status,
-        returnCondition: act.returnCondition,
+        returnCondition: act.equipmentCondition ?? act.returnCondition,
+        equipmentCondition: act.equipmentCondition,
         createdAt: act.createdAt,
         expirationDate: act.expirationDate,
         acceptedAt: act.acceptedAt,
@@ -105,10 +108,14 @@ export async function GET(request: NextRequest) {
         delivererInfo,
         equipmentSnapshot,
         equipment: act.assignment?.equipment ?? null,
-        userRole: isAdmin || canManage ? 'admin'
-          : receiverInfo?.id === userId && delivererInfo?.id === userId ? 'both'
-          : receiverInfo?.id === userId ? 'returner'   // quien devuelve
-          : 'receiver',                                 // quien recibe la devolución
+        userRole:
+          isAdmin || canManage
+            ? 'admin'
+            : receiverInfo?.id === userId && delivererInfo?.id === userId
+              ? 'both'
+              : receiverInfo?.id === userId
+                ? 'returner' // quien devuelve
+                : 'receiver', // quien recibe la devolución (firma)
       }
     })
 

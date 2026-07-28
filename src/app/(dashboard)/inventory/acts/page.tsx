@@ -333,8 +333,10 @@ function ReturnActsTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
         loading={loading}
         emptyMessage='No hay actas de devolución'
         renderCard={act => {
-          const isMyAction = act.status === 'PENDING' && act.userRole === 'returner'
-          const condition = act.returnCondition
+          const isMyAction =
+            act.status === 'PENDING' &&
+            (act.userRole === 'receiver' || act.userRole === 'admin' || act.userRole === 'both')
+          const condition = act.returnCondition || act.equipmentCondition
           return (
             <ActCard
               key={act.id}

@@ -263,13 +263,28 @@ export function useEquipmentDetail({
 
       if (!response.ok) {
         const error = await response.json()
+        if (response.status === 409 && error.existingActId) {
+          toast.error(error.error || 'Ya existe un acta pendiente de firma')
+          setShowReturnDialog(false)
+          router.push(`/inventory/acts/return/${error.existingActId}`)
+          return
+        }
         throw new Error(error.error || 'Error al devolver equipo')
       }
 
+      const payload = await response.json().catch(() => ({}))
+
       if (useFormalReturn) {
         toast.success(
-          'Acta de devolución generada. El receptor debe firmarla para completar la devolución.'
+          payload?.message ||
+            'Acta generada. Debes firmarla (o el responsable de bodega) para liberar el equipo.'
         )
+        setShowReturnDialog(false)
+        const actId = payload?.returnAct?.id
+        if (actId) {
+          router.push(`/inventory/acts/return/${actId}`)
+          return
+        }
       } else {
         toast.success('Equipo devuelto al inventario')
         setData(prev =>
@@ -295,7 +310,7 @@ export function useEquipmentDetail({
     } finally {
       setReturning(false)
     }
-  }, [data, returnForm, loadEquipmentDetail])
+  }, [data, returnForm, loadEquipmentDetail, router])
 
   const submitMaintenance = useCallback(async () => {
     if (!maintenanceForm.description.trim()) {

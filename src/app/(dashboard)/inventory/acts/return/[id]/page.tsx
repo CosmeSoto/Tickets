@@ -151,7 +151,10 @@ export default function ReturnActDetailPage({ params: paramsPromise }: PageProps
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Error al aceptar')
-      toast({ title: 'Devolución aceptada', description: 'Has firmado el acta de devolución.' })
+      toast({
+        title: 'Devolución completada',
+        description: 'Acta firmada. El equipo ya está Disponible en bodega.',
+      })
       setShowAcceptDialog(false)
       await fetchAct()
     } catch (err: any) {
@@ -203,7 +206,7 @@ export default function ReturnActDetailPage({ params: paramsPromise }: PageProps
   }
 
   const copyLink = () => {
-    const text = `${window.location.origin}/acts/return/${act.id}/accept?token=${act.acceptanceToken}`
+    const text = `${window.location.origin}/inventory/acts/return/${act.id}`
     if (navigator?.clipboard?.writeText) {
       navigator.clipboard.writeText(text).catch(() => fallbackCopy(text))
     } else {
@@ -250,11 +253,12 @@ export default function ReturnActDetailPage({ params: paramsPromise }: PageProps
   const isSuperAdmin = (session.user as any)?.isSuperAdmin === true
   const isAdmin = userRole === 'ADMIN'
   const isAdminOrManager = isAdmin || accessLevel === 'manager'
-  // En devolución: receiverInfo = quien devuelve, delivererInfo = quien recibe la devolución
+  // En devolución: receiverInfo = quien devuelve, delivererInfo = quien recibe la devolución (firma)
   const isReturner = act.receiverInfo?.id === userId
   const isReceiver = act.delivererInfo?.id === userId
   const canDownload = act.status === 'ACCEPTED' && (isReturner || isReceiver || isAdminOrManager)
-  const canSign = canAccept && isReceiver // quien recibe la devolución firma
+  // Firma: deliverer original O admin (API ya lo permite)
+  const canSign = Boolean(canAccept && (isReceiver || isAdmin))
 
   const statusCfg = STATUS_CONFIG[act.status as keyof typeof STATUS_CONFIG] ?? STATUS_CONFIG.PENDING
   const StatusIcon = statusCfg.icon
@@ -286,25 +290,34 @@ export default function ReturnActDetailPage({ params: paramsPromise }: PageProps
         </div>
 
         {/* Banners */}
-        {act.status === 'PENDING' && isReceiver && canAccept && (
+        {act.status === 'PENDING' && canSign && (
           <Alert className='border-yellow-400 bg-yellow-50 dark:bg-yellow-500/10 dark:border-yellow-500/40'>
             <Clock className='h-4 w-4 text-yellow-600 dark:text-yellow-400' />
             <AlertTitle className='text-yellow-800 dark:text-yellow-300'>
               Acción requerida — Debes confirmar la devolución
             </AlertTitle>
             <AlertDescription className='text-yellow-700 dark:text-yellow-400'>
-              Tienes pendiente confirmar la recepción del equipo devuelto.
+              Hasta firmar esta acta, el equipo seguirá como <strong>Asignado</strong>. Confirma la
+              recepción para liberarlo a bodega.
+              {isAdmin && !isReceiver && (
+                <>
+                  {' '}
+                  Firmas como administrador (firmante habitual:{' '}
+                  <strong>{act.delivererInfo?.name}</strong>).
+                </>
+              )}
             </AlertDescription>
           </Alert>
         )}
-        {act.status === 'PENDING' && isReturner && !isReceiver && (
+        {act.status === 'PENDING' && !canSign && (
           <Alert className='border-blue-400 bg-blue-50 dark:bg-blue-500/10 dark:border-blue-500/40'>
             <FileText className='h-4 w-4 text-blue-600 dark:text-blue-400' />
             <AlertTitle className='text-blue-800 dark:text-blue-300'>
               Esperando confirmación
             </AlertTitle>
             <AlertDescription className='text-blue-700 dark:text-blue-400'>
-              Pendiente de confirmación por <strong>{act.delivererInfo?.name}</strong>.
+              Pendiente de firma por <strong>{act.delivererInfo?.name}</strong> o un administrador.
+              Mientras tanto el equipo permanece asignado.
             </AlertDescription>
           </Alert>
         )}
@@ -573,24 +586,24 @@ export default function ReturnActDetailPage({ params: paramsPromise }: PageProps
           </Card>
         )}
 
-        {/* Enlace para compartir — para quien devuelve o admin/gestor */}
+        {/* Enlace para compartir — dashboard (firma en sesión) */}
         {act.status === 'PENDING' && (isReturner || isAdminOrManager) && !isExpired && (
           <Card className='border-blue-200'>
             <CardHeader className='pb-3'>
               <CardTitle className='flex items-center gap-2 text-base'>
                 <ExternalLink className='h-4 w-4' />
-                Enlace de firma para quien recibe
+                Enlace de firma
               </CardTitle>
               <CardDescription>
-                Comparte con <strong>{act.delivererInfo?.name}</strong> para que confirme la
-                recepción
+                Comparte con <strong>{act.delivererInfo?.name}</strong> o ábrelo tú como admin para
+                firmar y liberar el equipo
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className='flex gap-2'>
                 <input
                   readOnly
-                  value={`${typeof window !== 'undefined' ? window.location.origin : ''}/acts/return/${act.id}/accept?token=${act.acceptanceToken}`}
+                  value={`${typeof window !== 'undefined' ? window.location.origin : ''}/inventory/acts/return/${act.id}`}
                   className='flex-1 px-3 py-2 text-xs border rounded-md bg-muted font-mono'
                 />
                 <Button variant='outline' size='sm' onClick={copyLink}>

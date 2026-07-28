@@ -36,8 +36,15 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 
     const isSuperAdmin = (session.user as any).isSuperAdmin === true
     const isExpired = ReturnActService.isActExpired(act)
-    const canAccept = act.status === 'PENDING' && !isExpired && isParticipant
-    const accessLevel = isSuperAdmin ? 'superadmin' : isAdmin ? 'admin' : canManage ? 'manager' : 'participant'
+    // Puede firmar: quien recibe la devolución (delivererInfo) o cualquier ADMIN
+    const canAccept = act.status === 'PENDING' && !isExpired && (isParticipant || isAdmin)
+    const accessLevel = isSuperAdmin
+      ? 'superadmin'
+      : isAdmin
+        ? 'admin'
+        : canManage
+          ? 'manager'
+          : 'participant'
 
     return NextResponse.json({ act, canAccept, isExpired, accessLevel })
   } catch (error) {
@@ -92,7 +99,7 @@ export async function DELETE(
       },
     })
 
-    await (prisma.return_acts.delete as any)({ where: { id } })
+    await prisma.return_acts.delete({ where: { id } })
 
     return NextResponse.json({ success: true })
   } catch (error) {

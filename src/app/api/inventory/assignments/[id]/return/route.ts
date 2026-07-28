@@ -90,6 +90,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           },
         },
         receiver: { select: { id: true, name: true, email: true } },
+        deliverer: { select: { id: true, name: true, email: true } },
         deliveryAct: { select: { id: true, status: true } },
       },
     })
@@ -112,16 +113,35 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       )
     }
 
-    // Verificar que no haya ya un acta de devolución pendiente
-    const existingReturn = await prisma.return_acts.findFirst({
+    // Acta pendiente vigente: no crear otra; devolver id para que la UI redirija a firmar
+    const existingPending = await prisma.return_acts.findFirst({
       where: { assignmentId, status: 'PENDING' },
+      select: { id: true, folio: true, expirationDate: true },
     })
-    if (existingReturn) {
-      return NextResponse.json(
-        { error: 'Ya existe un acta de devolución pendiente para esta asignación' },
-        { status: 409 }
-      )
+    if (existingPending) {
+      const expired = new Date() > new Date(existingPending.expirationDate)
+      if (!expired) {
+        return NextResponse.json(
+          {
+            error:
+              'Ya existe un acta de devolución pendiente. Debe firmarse para liberar el equipo, o el Super Admin puede eliminarla.',
+            existingActId: existingPending.id,
+            folio: existingPending.folio,
+          },
+          { status: 409 }
+        )
+      }
+      // Expirada: marcar EXPIRED para liberar el unique assignmentId
+      await prisma.return_acts.update({
+        where: { id: existingPending.id },
+        data: { status: 'EXPIRED' },
+      })
     }
+
+    // assignmentId es unique: retirar actas REJECTED/EXPIRED antes de recrear
+    await prisma.return_acts.deleteMany({
+      where: { assignmentId, status: { in: ['REJECTED', 'EXPIRED'] } },
+    })
 
     // Crear el acta de devolución
     const returnAct = await ReturnActService.generateReturnAct({
@@ -133,34 +153,56 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       returnDate: returnDate ? new Date(returnDate) : new Date(),
     })
 
-    // Notificar al receptor (quien devuelve) que se generó el acta
+    // Notificar a quien debe firmar (deliverer = quien recibió la devolución en bodega)
     const { systemName } = await getSystemBranding()
 
     const equipmentModel =
       assignment.equipment.model?.model || assignment.equipment.modelDeprecated || ''
     const equipmentLabel = `${assignment.equipment.code} — ${assignment.equipment.brand} ${equipmentModel}`
+    const actUrl = `/inventory/acts/return/${returnAct.id}`
+    const signer = assignment.deliverer
+
     await notifyUser(
-      assignment.receiver.id,
+      signer.id,
       'INFO',
-      `Acta de devolución generada — ${assignment.equipment.code}`,
-      `Se generó el acta de devolución ${returnAct.folio} para el equipo ${equipmentLabel}. Revisa y firma el acta.`,
+      `Firma requerida — devolución ${assignment.equipment.code}`,
+      `Se generó el acta ${returnAct.folio} para devolver ${equipmentLabel}. Debes firmarla para liberar el equipo a bodega.`,
       {
-        metadata: { link: `/inventory/acts?tab=return` },
+        metadata: { link: actUrl },
         email: {
-          to: assignment.receiver.email,
-          subject: `Acta de devolución generada — ${assignment.equipment.code}`,
+          to: signer.email,
+          subject: `Firma requerida — devolución ${assignment.equipment.code}`,
           html: buildReturnActEmail(
-            assignment.receiver.name,
+            signer.name,
             equipmentLabel,
-            (returnAct as any).folio,
+            returnAct.folio,
             session.user.name || session.user.email || 'Administrador',
-            systemName
+            systemName,
+            actUrl
           ),
         },
       }
     )
 
-    return NextResponse.json({ returnAct }, { status: 201 })
+    // Aviso informativo a quien devuelve (custodio actual)
+    if (assignment.receiver.id !== signer.id) {
+      await notifyUser(
+        assignment.receiver.id,
+        'INFO',
+        `Devolución iniciada — ${assignment.equipment.code}`,
+        `Se generó el acta ${returnAct.folio}. Pendiente de firma de ${signer.name} para completar la devolución a bodega.`,
+        { metadata: { link: actUrl } }
+      )
+    }
+
+    return NextResponse.json(
+      {
+        returnAct,
+        message: 'Acta de devolución generada. Debe firmarse para que el equipo pase a Disponible.',
+        signUrl: actUrl,
+      },
+      { status: 201 }
+    )
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Error al crear acta de devolución'
     return NextResponse.json({ error: message }, { status: 400 })
@@ -168,20 +210,23 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 }
 
 function buildReturnActEmail(
-  receiverName: string,
+  signerName: string,
   equipmentLabel: string,
   folio: string,
   adminName: string,
-  systemName: string
+  systemName: string,
+  actPath: string
 ): string {
+  const base = process.env.NEXTAUTH_URL || ''
+  const link = `${base}${actPath}`
   return `<!DOCTYPE html><html><head><meta charset="UTF-8">
-<style>body{font-family:Arial,sans-serif;line-height:1.6;color:#333}.container{max-width:600px;margin:0 auto;padding:20px}.header{background:#7C3AED;color:white;padding:20px;border-radius:5px 5px 0 0}.content{background:#f9fafb;padding:20px;border:1px solid #e5e7eb}.info-box{background:white;padding:15px;margin:15px 0;border-left:4px solid #7C3AED}.footer{text-align:center;margin-top:20px;color:#6b7280;font-size:12px}</style>
+<style>body{font-family:Arial,sans-serif;line-height:1.6;color:#333}.container{max-width:600px;margin:0 auto;padding:20px}.header{background:#7C3AED;color:white;padding:20px;border-radius:5px 5px 0 0}.content{background:#f9fafb;padding:20px;border:1px solid #e5e7eb}.info-box{background:white;padding:15px;margin:15px 0;border-left:4px solid #7C3AED}.footer{text-align:center;margin-top:20px;color:#6b7280;font-size:12px}.btn{display:inline-block;margin-top:12px;padding:10px 16px;background:#7C3AED;color:#fff;text-decoration:none;border-radius:6px}</style>
 </head><body><div class="container">
-<div class="header"><h2>📦 Acta de Devolución Generada</h2></div>
-<div class="content"><p>Hola <strong>${receiverName}</strong>,</p>
-<p>Se ha generado un acta de devolución para el equipo que tienes asignado.</p>
+<div class="header"><h2>📦 Firma requerida — Acta de Devolución</h2></div>
+<div class="content"><p>Hola <strong>${signerName}</strong>,</p>
+<p>Debes firmar el acta de devolución para liberar el equipo a bodega. Hasta firmar, el equipo seguirá como <strong>Asignado</strong>.</p>
 <div class="info-box"><p><strong>Equipo:</strong> ${equipmentLabel}</p><p><strong>Folio:</strong> ${folio}</p><p><strong>Generado por:</strong> ${adminName}</p></div>
-<p>Ingresa al sistema para revisar y firmar el acta de devolución.</p></div>
+<p><a class="btn" href="${link}">Abrir y firmar acta</a></p></div>
 <div class="footer"><p>Mensaje automático del ${systemName}</p></div>
 </div></body></html>`
 }

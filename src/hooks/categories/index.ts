@@ -212,7 +212,7 @@ export function useCategories(options: UseCategoriesOptions = {}) {
       const assignedTechIds = (category.technician_assignments ?? []).map(
         (a: any) => a.technicianId
       )
-      dataHook.loadDepartments(familyId)
+      dataHook.loadDepartments()
       dataHook.loadAvailableParents(category.id, familyId ?? undefined)
       dataHook.loadAvailableTechnicians(familyId ?? undefined, assignedTechIds)
     },

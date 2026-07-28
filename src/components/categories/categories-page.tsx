@@ -185,10 +185,7 @@ export default function CategoriesPage() {
     if (familyFilter !== 'all') {
       result = result.filter((cat: any) => {
         const deptFamilyId =
-          cat.familyId ??
-          cat.family?.id ??
-          cat.departments?.familyId ??
-          cat.departments?.family?.id
+          cat.familyId ?? cat.family?.id ?? cat.departments?.familyId ?? cat.departments?.family?.id
         return deptFamilyId === familyFilter
       })
     }
@@ -276,9 +273,9 @@ export default function CategoriesPage() {
             )}
             {/* En mobile: mostrar área y padre inline */}
             <div className='flex items-center gap-2 mt-0.5 sm:hidden'>
-              {category.departments?.family && (
+              {(category.departments?.name || category.department?.name) && (
                 <span className='text-xs text-muted-foreground truncate'>
-                  {category.departments.family.name}
+                  {category.departments?.name || category.department?.name}
                 </span>
               )}
               {category.parent && (
@@ -296,9 +293,7 @@ export default function CategoriesPage() {
       header: 'Área',
       sortable: true,
       accessor: (category: any) =>
-        category.family?.name ??
-        category.departments?.family?.name ??
-        '',
+        category.family?.name ?? category.departments?.family?.name ?? '',
       className: 'hidden sm:table-cell',
       render: (category: any) => {
         const family = category.family ?? category.departments?.family
@@ -314,6 +309,18 @@ export default function CategoriesPage() {
             <span className='text-sm truncate'>{family.name}</span>
           </div>
         )
+      },
+    },
+    {
+      key: 'department',
+      header: 'Departamento',
+      sortable: true,
+      accessor: (category: any) => category.departments?.name ?? category.department?.name ?? '',
+      className: 'hidden md:table-cell',
+      render: (category: any) => {
+        const dept = category.departments ?? category.department
+        if (!dept?.name) return <span className='text-xs text-muted-foreground'>—</span>
+        return <span className='text-sm truncate'>{dept.name}</span>
       },
     },
     {

@@ -220,12 +220,13 @@ export function useCategoriesData(options: UseCategoriesDataOptions = {}) {
     [getCacheKey, getFromCache, setToCache]
   )
 
-  // Cargar departamentos (opcionalmente filtrados por familia)
+  // Cargar TODOS los departamentos activos (el formulario filtra por familia en cliente).
+  // No pasar familyId aquí: si se reduce la lista, el filtro de la página queda incompleto.
   const loadDepartments = useCallback(
-    async (familyId?: string | null) => {
+    async (_familyId?: string | null) => {
       const cacheKey = getCacheKey('/api/departments', {
         isActive: true,
-        familyId: familyId ?? 'all',
+        familyId: 'all',
       })
       const cached = getFromCache<any[]>(cacheKey)
       if (cached) {
@@ -235,7 +236,6 @@ export function useCategoriesData(options: UseCategoriesDataOptions = {}) {
 
       try {
         const params = new URLSearchParams({ isActive: 'true' })
-        if (familyId) params.set('familyId', familyId)
         const response = await fetch(`/api/departments?${params}`)
         if (response.ok) {
           const data = await response.json()

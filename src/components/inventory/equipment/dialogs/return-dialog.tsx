@@ -65,13 +65,17 @@ export function ReturnDialog({
         <DialogHeader>
           <DialogTitle>Devolver Equipo</DialogTitle>
           <DialogDescription>
-            Registra la devolución del equipo <span className='font-semibold'>{displayName}</span>.
+            Genera el acta de devolución de <span className='font-semibold'>{displayName}</span>.
             {currentAssignment && (
               <span className='block mt-1'>
                 Actualmente asignado a:{' '}
                 <span className='font-medium'>{currentAssignment.receiver?.name}</span>
               </span>
             )}
+            <span className='block mt-2 text-amber-700 dark:text-amber-400'>
+              El equipo seguirá como Asignado hasta que se firme el acta (responsable de bodega o
+              administrador).
+            </span>
           </DialogDescription>
         </DialogHeader>
         <form
