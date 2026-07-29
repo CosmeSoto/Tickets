@@ -394,22 +394,33 @@ export async function ensureDepartments(prisma: PrismaClient): Promise<{
     }
   }
 
-  // Enlazar / corregir familyId
+  // Enlazar / corregir familyId (incluye FKs rotos: familyId apunta a familia inexistente)
   const orphanCount = await prisma.departments.count({ where: { familyId: null } })
+  const existingFamilyIds = new Set(
+    (await prisma.families.findMany({ select: { id: true } })).map(f => f.id)
+  )
   const allDepts = await prisma.departments.findMany({
     select: { id: true, name: true, familyId: true },
   })
 
+  let brokenFk = 0
   for (const dept of allDepts) {
     const code = resolveDepartmentFamilyCode(dept.name)
     if (!code) continue
     const familyId = familyMap.get(code)
-    if (!familyId || dept.familyId === familyId) continue
+    if (!familyId) continue
+    const fkBroken = !!dept.familyId && !existingFamilyIds.has(dept.familyId)
+    if (fkBroken) brokenFk++
+    if (dept.familyId === familyId) continue
     await prisma.departments.update({
       where: { id: dept.id },
       data: { familyId, updatedAt: now },
     })
     linked++
+  }
+
+  if (brokenFk > 0) {
+    console.log(`   → Reparados ${brokenFk} departamentos con familyId huérfano (FK inválido)`)
   }
 
   const cats = await prisma.$executeRaw`

@@ -23,8 +23,9 @@ function dedupeIds(ids: (string | null | undefined)[]): string[] {
 /**
  * Descarta familias inactivas y remapea TECHNOLOGY (legacy) → ADMINISTRATIVE.
  * Evita "sin áreas" / "sin categorías" cuando asignaciones quedaron en la familia absorbida.
+ * También elimina IDs huérfanos (p. ej. restore de users sin tabla families).
  */
-async function normalizeActiveFamilyIds(ids: string[]): Promise<string[]> {
+export async function normalizeActiveFamilyIds(ids: string[]): Promise<string[]> {
   const unique = dedupeIds(ids)
   if (unique.length === 0) return []
 
@@ -50,15 +51,41 @@ async function normalizeActiveFamilyIds(ids: string[]): Promise<string[]> {
   return active.map(f => f.id)
 }
 
+/**
+ * Resuelve un familyId usable para FKs (asignaciones, sync).
+ * - null/undefined → null
+ * - TECHNOLOGY (legacy) → ADMINISTRATIVE si existe
+ * - UUID inexistente o familia inactiva → null
+ */
+export async function resolveValidFamilyId(
+  familyId: string | null | undefined
+): Promise<string | null> {
+  if (!familyId) return null
+  const [normalized] = await normalizeActiveFamilyIds([familyId])
+  return normalized ?? null
+}
+
+/**
+ * Familia nativa del departamento = su `familyId` si apunta a una familia activa.
+ * Si el FK es huérfano, retorna null (limpieza: repairOrphanFamilyForeignKeys).
+ */
+export async function getDepartmentNativeFamilyId(departmentId: string): Promise<string | null> {
+  const dept = await prisma.departments.findUnique({
+    where: { id: departmentId },
+    select: { familyId: true },
+  })
+  return resolveValidFamilyId(dept?.familyId ?? null)
+}
+
 export async function getNativeFamilyId(userId: string): Promise<string | null> {
   const user = await prisma.users.findUnique({
     where: { id: userId },
-    select: { departments: { select: { familyId: true } } },
+    select: { departmentId: true, departments: { select: { familyId: true } } },
   })
-  const raw = user?.departments?.familyId ?? null
-  if (!raw) return null
-  const [normalized] = await normalizeActiveFamilyIds([raw])
-  return normalized ?? null
+  if (user?.departmentId) {
+    return getDepartmentNativeFamilyId(user.departmentId)
+  }
+  return resolveValidFamilyId(user?.departments?.familyId ?? null)
 }
 
 /** Familias adicionales de consumo (client_family_assignments). */

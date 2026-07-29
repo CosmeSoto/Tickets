@@ -95,9 +95,9 @@ export function PermissionsAndModulesSection({
 
   // Familia nativa: viene del departamento asignado
   const deptObj = user && typeof user.department === 'object' ? (user.department as any) : null
-  const nativeFamilyId: string | null = deptObj?.familyId ?? null
-  const nativeFamily =
-    nativeFamilyId && deptObj?.family
+  const rawNativeId: string | null = deptObj?.familyId ?? null
+  const nativeFromDept =
+    rawNativeId && deptObj?.family
       ? {
           id: deptObj.family.id as string,
           name: deptObj.family.name as string,
@@ -106,6 +106,16 @@ export function PermissionsAndModulesSection({
           isActive: true,
         }
       : null
+  // Si el FK del depto está roto (restore parcial), intentar resolver desde listas cargadas
+  const nativeFromLists =
+    !nativeFromDept && rawNativeId
+      ? ([...ticketFamilies, ...inventoryFamilies, ...patrolFamilies].find(
+          f => f.id === rawNativeId
+        ) ?? null)
+      : null
+  const nativeFamily = nativeFromDept ?? nativeFromLists
+  // Solo exponer ID nativo si la familia existe (evita UUID huérfanos post-restore)
+  const nativeFamilyId: string | null = nativeFamily?.id ?? null
 
   return (
     <div className='space-y-3'>
@@ -232,8 +242,6 @@ export function PermissionsAndModulesSection({
             />
 
             {/* ── Rondas ── */}
-            {/* CLIENT/TECH: agentes — familia nativa + patrol_family_assignments (requerido para programar) */}
-            {/* ADMIN: supervisor multi-instalación — mismo selector en modo patrol */}
             <ModuleAccessCard
               moduleKey='patrols'
               moduleName='Rondas y Patrullajes'
@@ -247,7 +255,6 @@ export function PermissionsAndModulesSection({
               readOnlyFamilyIds={patrolReadOnlyIds}
               onAssignFamily={handlers.handleAssignPatrolFamily}
               onUnassignFamily={handlers.handleUnassignPatrolFamily}
-              familyMode='patrol'
               loading={loadingFamilies}
               disabled={loading}
             />

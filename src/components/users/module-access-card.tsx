@@ -7,7 +7,11 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
-import { getModuleEmoji, getModuleRoleDescription, getAdditionalFamilyHint } from '@/hooks/use-system-modules'
+import {
+  getModuleEmoji,
+  getModuleRoleDescription,
+  getAdditionalFamilyHint,
+} from '@/hooks/use-system-modules'
 import { useToast } from '@/hooks/use-toast'
 
 export interface ModuleFamily {
@@ -54,13 +58,6 @@ interface ModuleAccessCardProps {
   readOnlyFamilyIds?: string[]
   loading?: boolean
   disabled?: boolean
-  /**
-   * 'standard' (default): selector de familias normal
-   * 'patrol': modo contextual — la familia nativa ya actúa como agente;
-   *           el selector adicional solo se muestra si hay más de una familia
-   *           disponible o ya tiene asignaciones adicionales.
-   */
-  familyMode?: 'standard' | 'patrol'
 }
 
 export function ModuleAccessCard({
@@ -79,7 +76,6 @@ export function ModuleAccessCard({
   readOnlyFamilyIds = [],
   loading,
   disabled,
-  familyMode = 'standard',
 }: ModuleAccessCardProps) {
   const [expanded, setExpanded] = useState(false)
   const [search, setSearch] = useState('')
@@ -91,11 +87,9 @@ export function ModuleAccessCard({
   const prevEnabledRef = useRef(enabled)
   useEffect(() => {
     if (enabled && !prevEnabledRef.current) {
-      // Módulo recién activado → expandir
       setExpanded(true)
     }
     if (!enabled) {
-      // Módulo desactivado → colapsar y limpiar búsqueda
       setExpanded(false)
       setSearch('')
     }
@@ -105,11 +99,9 @@ export function ModuleAccessCard({
   const assignedSet = new Set(assignedFamilyIds)
   const readOnlySet = new Set(readOnlyFamilyIds)
 
-  // Resolver el objeto de la familia nativa
   const resolvedNativeFamily: ModuleFamily | null =
     nativeFamily ?? (nativeFamilyId ? (families.find(f => f.id === nativeFamilyId) ?? null) : null)
 
-  // Familias adicionales (excluir la nativa — se muestra por separado)
   const additionalFamilies = families.filter(f => f.isActive && f.id !== nativeFamilyId)
 
   const filteredFamilies = additionalFamilies.filter(
@@ -119,18 +111,8 @@ export function ModuleAccessCard({
       f.code.toLowerCase().includes(search.toLowerCase())
   )
 
-  // En modo patrol: mostrar el selector adicional solo si hay familias extra disponibles
-  // o el usuario ya tiene asignaciones más allá de la nativa
-  const hasAdditionalAssignments = assignedFamilyIds.some(id => id !== nativeFamilyId)
-  const showAdditionalFamilySelector =
-    (familyMode === 'standard' && (additionalFamilies.length > 0 || !!nativeFamilyId)) ||
-    (familyMode === 'patrol' && (additionalFamilies.length > 0 || hasAdditionalAssignments))
-
-  // Mostrar sección de familias solo si hay familias que gestionar
-  const showFamiliesSection =
-    !!resolvedNativeFamily ||
-    showAdditionalFamilySelector ||
-    (familyMode === 'patrol' && !showAdditionalFamilySelector && !!resolvedNativeFamily)
+  const showAdditionalFamilySelector = additionalFamilies.length > 0 || !!nativeFamilyId
+  const showFamiliesSection = !!resolvedNativeFamily || showAdditionalFamilySelector
 
   const handleFamilyToggle = async (familyId: string, checked: boolean) => {
     if (savingId) return
@@ -270,24 +252,6 @@ export function ModuleAccessCard({
           {/* ── Sección de familias — solo si hay familias relevantes ── */}
           {showFamiliesSection && (
             <div className='px-3 py-2'>
-              {/* Modo patrol agente: solo muestra la familia nativa sin acordeón */}
-              {familyMode === 'patrol' && !showAdditionalFamilySelector && resolvedNativeFamily && (
-                <div className='flex items-center gap-2 rounded-md bg-muted/30 border border-dashed px-2.5 py-1.5'>
-                  {resolvedNativeFamily.color && (
-                    <div
-                      className='w-2 h-2 rounded-full shrink-0'
-                      style={{ backgroundColor: resolvedNativeFamily.color }}
-                    />
-                  )}
-                  <p className='text-[11px] text-muted-foreground'>
-                    <span className='font-medium text-foreground'>{resolvedNativeFamily.name}</span>
-                    <span className='ml-1'>· Nativa</span>
-                  </p>
-                  <Lock className='h-3 w-3 text-muted-foreground ml-auto shrink-0' />
-                </div>
-              )}
-
-              {/* Selector de familias (standard siempre, patrol solo si hay opciones adicionales) */}
               {showAdditionalFamilySelector && (
                 <>
                   <button
@@ -301,22 +265,14 @@ export function ModuleAccessCard({
                     />
                   </button>
 
-                  {/* Contexto para familias adicionales */}
                   {getAdditionalFamilyHint(moduleKey, role) && (
                     <p className='text-[10px] text-muted-foreground mt-1 mb-0.5 px-0.5'>
                       {getAdditionalFamilyHint(moduleKey, role)}
                     </p>
                   )}
 
-                  {familyMode === 'patrol' && !expanded && !getAdditionalFamilyHint(moduleKey, role) && (
-                    <p className='text-[10px] text-muted-foreground mt-0.5'>
-                      Para supervisores o agentes en varias instalaciones
-                    </p>
-                  )}
-
                   {expanded && (
                     <div className='mt-2 space-y-2'>
-                      {/* Buscador */}
                       <div className='relative'>
                         <Search className='absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground' />
                         <Input
@@ -333,7 +289,6 @@ export function ModuleAccessCard({
                         </div>
                       ) : (
                         <div className='space-y-1'>
-                          {/* Familia nativa — fija arriba, sin edición */}
                           {resolvedNativeFamily && (
                             <>
                               <p className='text-[10px] font-semibold text-muted-foreground uppercase tracking-wide px-0.5 pt-1'>
@@ -373,15 +328,12 @@ export function ModuleAccessCard({
                               </div>
                               {filteredFamilies.length > 0 && (
                                 <p className='text-[10px] font-semibold text-muted-foreground uppercase tracking-wide px-0.5 pt-1'>
-                                  {familyMode === 'patrol'
-                                    ? 'Instalaciones adicionales'
-                                    : 'Familias adicionales'}
+                                  Familias adicionales
                                 </p>
                               )}
                             </>
                           )}
 
-                          {/* Familias adicionales asignables */}
                           <div className='space-y-1 max-h-48 overflow-y-auto pr-1'>
                             {filteredFamilies.map(family => {
                               const isAssigned = assignedSet.has(family.id)

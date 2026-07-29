@@ -179,6 +179,18 @@ const p = new PrismaClient();
     const orphans = await p.departments.count({ where: { familyId: null, isActive: true } });
     const activeFamilies = await p.families.count({ where: { isActive: true } });
     const techActive = await p.families.count({ where: { code: 'TECHNOLOGY', isActive: true } });
+    // FKs rotos: familyId no nulo pero sin fila en families (restore parcial / datos inconsistentes)
+    const brokenFk = await p.$queryRawUnsafe(
+      `SELECT COUNT(*)::int AS c FROM departments d
+       LEFT JOIN families f ON f.id = d."familyId"
+       WHERE d."isActive" = true AND d."familyId" IS NOT NULL AND f.id IS NULL`
+    );
+    const brokenCount = Array.isArray(brokenFk) && brokenFk[0] ? Number(brokenFk[0].c) : 0;
+
+    if (brokenCount > 0) {
+      console.log('  → FKs de familia huérfanos: ' + brokenCount + ' (se limpiarán de forma genérica)');
+      process.exit(3);
+    }
     if (total === 0 || orphans > 0 || techActive > 0 || activeFamilies < 5) {
       console.log('  → Organigrama a sincronizar (depts=' + total + ', sin familia=' + orphans + ', familias activas=' + activeFamilies + ', TECHNOLOGY activa=' + techActive + ')');
       process.exit(2);
@@ -193,6 +205,38 @@ const p = new PrismaClient();
   }
 })();
 NODESCRIPT
+
+# Código 3: FKs huérfanos — limpieza genérica (no usa seed ni nombres de depto)
+if [ "$DEPTS_CHECK" = "3" ]; then
+  echo "==> Reparando FKs huérfanos hacia families..."
+  if $TSX_CLI prisma/repair-orphan-family-fks.ts; then
+    echo "==> FKs huérfanos limpiados."
+  else
+    echo "==> ADVERTENCIA: repair-orphan-family-fks falló"
+  fi
+  # Re-verificar organigrama (pueden haber quedado familyId null → ensure-departments)
+  DEPTS_CHECK=0
+  node - <<'NODESCRIPT' || DEPTS_CHECK=$?
+const { PrismaClient } = require('@prisma/client');
+const p = new PrismaClient();
+(async () => {
+  try {
+    const total = await p.departments.count({ where: { isActive: true } });
+    const orphans = await p.departments.count({ where: { familyId: null, isActive: true } });
+    const activeFamilies = await p.families.count({ where: { isActive: true } });
+    const techActive = await p.families.count({ where: { code: 'TECHNOLOGY', isActive: true } });
+    if (total === 0 || orphans > 0 || techActive > 0 || activeFamilies < 5) {
+      process.exit(2);
+    }
+    process.exit(0);
+  } catch (e) {
+    process.exit(1);
+  } finally {
+    await p.$disconnect();
+  }
+})();
+NODESCRIPT
+fi
 
 if [ "$DEPTS_CHECK" = "2" ]; then
   echo "==> Ejecutando ensure-departments..."

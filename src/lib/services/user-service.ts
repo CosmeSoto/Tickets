@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { UserRole } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { randomUUID } from 'crypto'
+import { getDepartmentNativeFamilyId } from '@/lib/auth/family-scope'
 import { AuditServiceComplete, AuditActionsComplete } from './audit-service-complete'
 
 // Función helper para obtener el nombre del nivel
@@ -263,6 +264,12 @@ export class UserService {
 
     const passwordHash = await bcrypt.hash(data.password, 12)
 
+    const createDeptId = data.departmentId || data.department || null
+    const nativeFamilyIdForTech =
+      data.role === 'TECHNICIAN' && createDeptId
+        ? await getDepartmentNativeFamilyId(createDeptId)
+        : null
+
     // Crear el usuario en una transacción para manejar las asignaciones de categorías
     const result = await prisma.$transaction(async tx => {
       const user = await tx.users.create({
@@ -322,27 +329,25 @@ export class UserService {
         })
       }
 
-      // Si es técnico y tiene departamento, asignar automáticamente la familia del departamento
-      if (data.role === 'TECHNICIAN' && (data.departmentId || data.department)) {
-        const deptId = data.departmentId || data.department
-        const dept = await tx.departments.findUnique({
-          where: { id: deptId! },
-          select: { familyId: true },
-        })
-        if (dept?.familyId) {
-          await tx.technician_family_assignments.upsert({
-            where: { technicianId_familyId: { technicianId: user.id, familyId: dept.familyId } },
-            create: {
-              id: randomUUID(),
+      // Si es técnico y tiene departamento, asignar la familia nativa (válida) del departamento
+      if (data.role === 'TECHNICIAN' && nativeFamilyIdForTech) {
+        await tx.technician_family_assignments.upsert({
+          where: {
+            technicianId_familyId: {
               technicianId: user.id,
-              familyId: dept.familyId,
-              isActive: true,
-              createdAt: new Date(),
-              updatedAt: new Date(),
+              familyId: nativeFamilyIdForTech,
             },
-            update: { isActive: true, updatedAt: new Date() },
-          })
-        }
+          },
+          create: {
+            id: randomUUID(),
+            technicianId: user.id,
+            familyId: nativeFamilyIdForTech,
+            isActive: true,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+          update: { isActive: true, updatedAt: new Date() },
+        })
       }
 
       // Crear user_settings por defecto (garantiza que las notificaciones estén habilitadas)
@@ -447,6 +452,16 @@ export class UserService {
 
     console.log('🔧 [UserService] Datos que se enviarán a Prisma:', updateData)
 
+    const effectiveRole = data.role ?? user.role
+    const deptIdForNative =
+      (updateData.departmentId as string | null | undefined) !== undefined
+        ? (updateData.departmentId as string | null)
+        : user.departmentId
+    const nativeFamilyIdForTech =
+      effectiveRole === 'TECHNICIAN' && deptIdForNative
+        ? await getDepartmentNativeFamilyId(deptIdForNative)
+        : null
+
     // Actualizar usuario en una transacción para manejar las asignaciones de categorías
     const result = await prisma.$transaction(async tx => {
       const updatedUser = await tx.users.update({
@@ -459,6 +474,10 @@ export class UserService {
               name: true,
               color: true,
               description: true,
+              familyId: true,
+              family: {
+                select: { id: true, name: true, code: true, color: true },
+              },
             },
           },
         },
@@ -489,28 +508,22 @@ export class UserService {
         }
       }
 
-      // Si es técnico y cambió el departamento, asignar automáticamente la familia del nuevo departamento
-      const effectiveRole = data.role ?? user.role
-      const newDeptId = updateData.departmentId
-      if (effectiveRole === 'TECHNICIAN' && newDeptId) {
-        const dept = await tx.departments.findUnique({
-          where: { id: newDeptId },
-          select: { familyId: true },
+      // Técnico: sincronizar familia nativa del depto (repara FKs huérfanos post-restore)
+      if (nativeFamilyIdForTech) {
+        await tx.technician_family_assignments.upsert({
+          where: {
+            technicianId_familyId: { technicianId: id, familyId: nativeFamilyIdForTech },
+          },
+          create: {
+            id: randomUUID(),
+            technicianId: id,
+            familyId: nativeFamilyIdForTech,
+            isActive: true,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+          update: { isActive: true, updatedAt: new Date() },
         })
-        if (dept?.familyId) {
-          await tx.technician_family_assignments.upsert({
-            where: { technicianId_familyId: { technicianId: id, familyId: dept.familyId } },
-            create: {
-              id: randomUUID(),
-              technicianId: id,
-              familyId: dept.familyId,
-              isActive: true,
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            },
-            update: { isActive: true, updatedAt: new Date() },
-          })
-        }
       }
 
       return updatedUser

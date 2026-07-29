@@ -271,8 +271,7 @@ async function restoreWithPgRestore(
       // dentro de la misma sesión y las FKs estén desactivadas durante todo el proceso.
 
       const tableFlags = tables.map(t => `--table="${t}"`).join(' ')
-      const dumpSqlCmd =
-        `pg_restore --data-only --no-owner --no-privileges -f - ${tableFlags} "${filepath}"`
+      const dumpSqlCmd = `pg_restore --data-only --no-owner --no-privileges -f - ${tableFlags} "${filepath}"`
 
       let dumpSqlContent: string
       try {
@@ -454,6 +453,24 @@ async function restoreWithPgRestore(
     }
 
     console.log(`[RESTORE] Restauración selectiva (${mode}) completada: ${tables.length} tablas`)
+
+    // Restore parcial puede dejar familyId huérfanos; limpieza genérica (sin seed).
+    try {
+      const { repairOrphanFamilyForeignKeys } =
+        await import('@/lib/data-integrity/repair-orphan-family-fks')
+      const stats = await repairOrphanFamilyForeignKeys(prisma)
+      if (
+        stats.departmentsCleared > 0 ||
+        stats.assignmentsDeleted > 0 ||
+        stats.technologyRemapped > 0
+      ) {
+        console.log(
+          `[RESTORE] Integridad familias: depts limpiados=${stats.departmentsCleared}, asignaciones eliminadas=${stats.assignmentsDeleted}, TECHNOLOGY remapeada=${stats.technologyRemapped}`
+        )
+      }
+    } catch (err) {
+      console.warn('[RESTORE] No se pudo reparar FKs de familias tras restore:', err)
+    }
   } else {
     // Restauración completa — el modo merge no aplica a nivel completo (demasiado riesgo de inconsistencias)
     const command =
