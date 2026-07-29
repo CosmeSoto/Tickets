@@ -86,12 +86,15 @@ npm run dev
 
 ```bash
 # ═══════════════════════════════════════════════════════════════════════════════
-# PRIMERA VEZ, migración pgBackRest o BD no importa (rebuild total ~8-12 min):
+# PRIMERA VEZ, migración pgBackRest o BD no importa (rebuild total ~3–6 min):
 # Borra volúmenes (BD, pgBackRest, Redis) y reconstruye postgres + backup-worker + app
-# pgBackRest se configura SOLO durante el arranque — no hace falta consola ni botón UI.
-# Si tras 3 min la tarjeta sigue en "Pendiente": Admin → Backups → Config → Inicializar.
+# pgBackRest lo configura backup-worker ANTES del seed — no hace falta consola ni botón UI.
+# Si tras ~5 min la tarjeta sigue en "Pendiente": ./docker/scripts/fix-pgbackrest.sh
 # ═══════════════════════════════════════════════════════════════════════════════
 sudo ./start-production.sh --clean
+
+# Solo si las imágenes quedaron corruptas / tras cambio de Dockerfile base:
+# sudo ./start-production.sh --clean --no-cache
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # DESPUÉS DE CAMBIOS DE CÓDIGO (rebuild incremental ~2-4 min):

@@ -6,19 +6,24 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && pgbackrest version
 
+# Solo el CLI de Docker (restauración desde UI) — evita apt install docker.io (~70s).
+FROM docker:27-cli AS dockercli
+
 FROM node:20-bookworm-slim
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        curl postgresql-client docker.io \
+        curl postgresql-client \
         libpq5 libxml2 libyaml-0-2 libssh-4 libssl3 \
         libzstd1 liblz4-1 libbz2-1.0 zlib1g \
     && rm -rf /var/lib/apt/lists/* \
     && mkdir -p /var/lib/pgbackrest /var/log/pgbackrest
 
 COPY --from=pgbr /usr/bin/pgbackrest /usr/bin/pgbackrest
+COPY --from=dockercli /usr/local/bin/docker /usr/local/bin/docker
 
 RUN pgbackrest version \
+    && docker --version \
     && (getent group postgres >/dev/null && groupmod -g 999 postgres || groupadd -g 999 postgres) \
     && (id postgres >/dev/null 2>&1 && usermod -u 999 -g 999 postgres || useradd -u 999 -g 999 -M -s /usr/sbin/nologin postgres) \
     && chown -R postgres:postgres /var/lib/pgbackrest /var/log/pgbackrest \

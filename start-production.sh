@@ -7,10 +7,10 @@
 # y levanta todos los servicios con docker compose.
 #
 # Uso:
-#   sudo ./start-production.sh                 # rebuild normal
-#   sudo ./start-production.sh --clean         # borra volúmenes + rebuild con caché (~rápido)
+#   sudo ./start-production.sh                 # rebuild normal (conserva BD)
+#   sudo ./start-production.sh --clean         # borra volúmenes + rebuild con caché (~3–6 min)
 #   sudo ./start-production.sh --clear         # alias de --clean
-#   sudo ./start-production.sh --clean --no-cache  # rebuild total sin caché (~lento)
+#   sudo ./start-production.sh --clean --no-cache  # rebuild total sin caché (solo si hay problemas de imagen)
 #
 # Requisitos:
 #   - Docker y Docker Compose instalados
@@ -230,17 +230,13 @@ SERVICES=(postgres backup-worker app)
 if [ "$CLEAN_BUILD" = true ]; then
   echo "🧹 Modo --clean: deteniendo servicios y borrando volúmenes (BD + pgBackRest)..."
   "${COMPOSE[@]}" down -v --remove-orphans 2>/dev/null || true
-  if [ "$NO_CACHE" = true ]; then
-    echo "🔨 Rebuild sin caché (postgres, backup-worker, app)..."
-    "${COMPOSE[@]}" build --no-cache "${SERVICES[@]}"
-  else
-    echo "🔨 Rebuild backup-worker sin caché (pgBackRest compatible PG17)..."
-    "${COMPOSE[@]}" build --no-cache backup-worker
-    echo "🔨 Rebuild postgres y app (con caché)..."
-    "${COMPOSE[@]}" build postgres app
-  fi
+fi
+
+if [ "$NO_CACHE" = true ]; then
+  echo "🔨 Rebuild sin caché (postgres, backup-worker, app)..."
+  "${COMPOSE[@]}" build --no-cache "${SERVICES[@]}"
 else
-  echo "🔨 Rebuild incremental (postgres, backup-worker, app)..."
+  echo "🔨 Rebuild con caché (postgres, backup-worker, app)..."
   "${COMPOSE[@]}" build "${SERVICES[@]}"
 fi
 
@@ -295,54 +291,35 @@ wait_for_pgbackrest_ready() {
   return 1
 }
 
-# pgBackRest: bootstrap en arranque limpio o si falta el marcador
+# Bootstrap lo hace backup-worker (una sola ruta).
+# NO envolver init-pgbackrest.sh con `timeout`: timeout + docker compose exec se cuelga
+# hasta el límite y sale 124 (bug conocido de Docker) — eso alargaba --clean ~30 min.
 PG_OK=false
 NEEDS_PGBR_INIT=false
 if [ "$CLEAN_BUILD" = true ]; then
-  echo "⚙️  Arranque limpio — bootstrap pgBackRest..."
+  echo "⚙️  Arranque limpio — bootstrap pgBackRest vía backup-worker..."
   NEEDS_PGBR_INIT=true
 elif ! pgbackrest_ready; then
   NEEDS_PGBR_INIT=true
-  echo "⚙️  pgBackRest pendiente — bootstrap antes de la app..."
+  echo "⚙️  pgBackRest pendiente — bootstrap vía backup-worker antes de la app..."
 else
   PG_OK=true
   echo "✅ pgBackRest ya configurado"
 fi
 
-if [ "$NEEDS_PGBR_INIT" = true ] && [ -x "$SCRIPT_DIR/docker/scripts/init-pgbackrest.sh" ]; then
-  echo "   (bootstrap: stanza + FULL + archivado — no interrumpir, ~2–10 min)"
-  INIT_RC=0
-  # set +e: el fallo de bootstrap no debe abortar el arranque (set -e activo arriba)
-  set +e
-  timeout 1800 env COMPOSE_FILE="$SCRIPT_DIR/docker-compose.prod.yml" ENV_FILE="$SCRIPT_DIR/.env.production" \
-    "$SCRIPT_DIR/docker/scripts/init-pgbackrest.sh"
-  INIT_RC=$?
-  set -e
-  if [ "$INIT_RC" -eq 0 ]; then
-    echo "✅ pgBackRest bootstrap OK"
-    PG_OK=true
-  else
-    echo "⚠️  init-pgbackrest falló (código $INIT_RC) — backup-worker reintentará antes de la app"
-  fi
-fi
-
-# Tras bootstrap el watcher/init reinician Postgres: re-esperar healthy
-if ! wait_for_healthy postgres 60 "PostgreSQL"; then
-  echo "❌ PostgreSQL no volvió a healthy tras bootstrap"
-  exit 1
-fi
-
-# Levantar backup-worker ANTES de la app para que complete bootstrap/reinicio sin matar el seed
+# Levantar backup-worker ANTES de la app: stanza + FULL + archive_mode sin matar el seed
 echo ""
 echo "🐳 Levantando backup-worker..."
 "${COMPOSE[@]}" up -d backup-worker
 
 if [ "$NEEDS_PGBR_INIT" = true ] || ! pgbackrest_ready; then
-  echo "⏳ Esperando pgBackRest (antes de seed/migraciones)..."
+  echo "⏳ Esperando pgBackRest (stanza + FULL + reinicio PG, ~1–3 min)..."
   if wait_for_pgbackrest_ready 180 "pgBackRest"; then
     PG_OK=true
   else
-    echo "⚠️  pgBackRest no terminó a tiempo — la app arrancará igual (Admin → Backups → Config)"
+    echo "⚠️  pgBackRest no terminó a tiempo — la app arrancará igual"
+    echo "   Repara con: ./docker/scripts/fix-pgbackrest.sh"
+    echo "   O en UI: Admin → Backups → Config → Inicializar"
   fi
   # Reinicio por archive_mode puede haber ocurrido durante la espera
   wait_for_healthy postgres 60 "PostgreSQL" || true
@@ -371,7 +348,7 @@ echo "║  Accede desde cualquier equipo de la red con esa URL.        ║"
 echo "║                                                              ║"
 echo "║  📦 Backups: Admin → Sistema de Backups (/admin/backups)   ║"
 echo "║     · Bootstrap pgBackRest termina ANTES del seed          ║"
-echo "║     · Si queda pendiente: Config → Inicializar (1 clic)    ║"
+echo "║     · Si falla: ./docker/scripts/fix-pgbackrest.sh         ║"
 echo "║     · Respaldo pgBackRest = infraestructura (DR)             ║"
 echo "║     · Exportar .dump = archivo portable                      ║"
 echo "║     · Monitoreo = pestaña pgBackRest                         ║"

@@ -2,7 +2,23 @@
 # Bootstrap pgBackRest: stanza + primer backup FULL + activar archivado WAL.
 # Uso: ./docker/scripts/init-pgbackrest.sh
 # Reanuda si se interrumpió (stanza/backup parcial) — idempotente.
+#
+# En arranque normal start-production.sh deja esto al backup-worker.
+# Usa este script solo para reparación manual (o fix-pgbackrest.sh).
+#
+# NUNCA lo envuelvas con `timeout …` — timeout + docker compose exec se cuelga
+# hasta el límite y sale con código 124 (bug conocido de Docker).
 set -euo pipefail
+
+# Salida línea a línea aunque stdout no sea TTY
+if command -v stdbuf >/dev/null 2>&1; then
+  export PYTHONUNBUFFERED=1
+  # re-exec solo una vez con line buffering
+  if [ "${_PGBR_STDBUF:-}" != "1" ]; then
+    export _PGBR_STDBUF=1
+    exec stdbuf -oL -eL bash "$0" "$@"
+  fi
+fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
