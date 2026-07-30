@@ -502,9 +502,10 @@ export function RoleDashboardLayout({
       if (item.href === '/technician/tickets' || item.href === '/client/tickets') {
         return hasTickets
       }
-      // Ocultar Inventario/Equipos si ninguna familia lo tiene habilitado
+      // Ocultar Inventario/Equipos si ninguna familia lo tiene habilitado,
+      // salvo que pueda solicitar activos (necesita el menú aunque no gestione inventario).
       if (item.href === '/inventory') {
-        return hasInventory
+        return hasInventory || canRequestAssets
       }
       // Ocultar Rondas si el usuario no tiene patrolsEnabled
       if (
@@ -534,24 +535,27 @@ export function RoleDashboardLayout({
       return true
     })
 
-    // Añadir "Solicitudes de Activos" para CLIENT y CLIENT_MANAGER si canRequestAssets es true
-    if ((navKey === 'CLIENT' || navKey === 'CLIENT_MANAGER') && canRequestAssets) {
-      // CLIENT usa "Mis Equipos", CLIENT_MANAGER usa "Inventario"
-      const targetItemName = navKey === 'CLIENT' ? 'Mis Equipos' : 'Inventario'
+    // Solicitudes de Compras: CLIENT/TECH (y variantes gestor) con canRequestAssets
+    const assetRequestParents: Record<string, string> = {
+      CLIENT: 'Mis Equipos',
+      TECHNICIAN: 'Mis Equipos',
+      CLIENT_MANAGER: 'Inventario',
+      TECHNICIAN_MANAGER: 'Inventario',
+    }
+    const assetParentName = assetRequestParents[navKey]
+    if (assetParentName && canRequestAssets) {
       navigation = navigation.map(item => {
-        if (item.name === targetItemName && item.children) {
-          const newChildren = [...item.children]
-          // Insertar antes de "Mantenimientos" si existe, si no al final
-          const insertIndex = newChildren.findIndex(child => child.name === 'Mantenimientos')
-          const position = insertIndex >= 0 ? insertIndex : newChildren.length
-          newChildren.splice(position, 0, {
-            name: 'Solicitudes de Activos',
-            href: '/inventory/asset-requests',
-            icon: FileText,
-          })
-          return { ...item, children: newChildren }
-        }
-        return item
+        if (item.name !== assetParentName || !item.children) return item
+        if (item.children.some(c => c.href === '/inventory/asset-requests')) return item
+        const newChildren = [...item.children]
+        const insertIndex = newChildren.findIndex(child => child.name === 'Mantenimientos')
+        const position = insertIndex >= 0 ? insertIndex : newChildren.length
+        newChildren.splice(position, 0, {
+          name: 'Solicitudes de Compras',
+          href: '/inventory/asset-requests',
+          icon: FileText,
+        })
+        return { ...item, children: newChildren }
       })
     }
   }

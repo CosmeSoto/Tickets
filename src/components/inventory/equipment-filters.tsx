@@ -22,6 +22,7 @@ import type {
 import { useInventoryFamilies } from '@/contexts/families-context'
 import { useFamilyOptions } from '@/hooks/use-family-options'
 import { useActiveDepartments } from '@/contexts/departments-context'
+import { departmentBelongsToFamily } from '@/lib/utils/department-family'
 
 interface EquipmentFiltersProps {
   filters: EquipmentFiltersType
@@ -99,7 +100,7 @@ export function EquipmentFilters({ filters, onFiltersChange, onReset }: Equipmen
 
   // Departamentos filtrados según la familia seleccionada
   const filteredDepartments = filters.familyId
-    ? allDepartments.filter(d => d.familyId === filters.familyId)
+    ? allDepartments.filter(d => departmentBelongsToFamily(d, filters.familyId))
     : allDepartments
 
   const handleSearchChange = (value: string) => {

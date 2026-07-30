@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/dialog'
 import { CategoryData, FormData } from '@/hooks/use-categories'
 import { useCategoryTechnicians } from '@/hooks/use-category-technicians'
+import { mergeDepartmentsForFamily } from '@/lib/utils/department-family'
 
 interface CategoryFormDialogProps {
   isOpen: boolean
@@ -35,6 +36,8 @@ interface CategoryFormDialogProps {
   availableParents: CategoryData[]
   availableTechnicians: any[]
   departments: any[]
+  /** Categorías del listado para enriquecer departamentos del área (mismo criterio que el filtro) */
+  categorySources?: any[]
   onSubmit: (e: React.FormEvent) => void
   onLoadAvailableParents: (excludeId?: string, familyId?: string) => void
   onLoadDepartments: (familyId?: string | null) => void
@@ -53,6 +56,7 @@ export function CategoryFormDialog({
   availableParents,
   availableTechnicians,
   departments,
+  categorySources = [],
   onSubmit,
   onLoadAvailableParents,
   onLoadDepartments,
@@ -128,11 +132,19 @@ export function CategoryFormDialog({
     onLoadTechnicians(derivedFamilyId ?? undefined, assignedIds)
   }, [isOpen, derivedFamilyId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Departamentos filtrados por familia derivada
-  const filteredDepartments = derivedFamilyId
-    ? departments.filter((d: any) => d.familyId === derivedFamilyId)
-    : departments
-
+  // Departamentos del área: API + categorías (cubre familyId desfasado / listado incompleto)
+  const filteredDepartments = useMemo(
+    () =>
+      mergeDepartmentsForFamily({
+        familyId: derivedFamilyId,
+        departments,
+        categorySources: [...availableParents, ...categorySources],
+        familyMeta: derivedFamily
+          ? { id: derivedFamily.id, name: derivedFamily.name, color: derivedFamily.color }
+          : null,
+      }) as any[],
+    [derivedFamilyId, departments, availableParents, categorySources, derivedFamily]
+  )
   // Construir la ruta de jerarquía completa (incluyendo la categoría actual)
   const getHierarchyPath = () => {
     // Crear un mapa de todas las categorías disponibles

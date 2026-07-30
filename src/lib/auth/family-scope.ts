@@ -414,6 +414,12 @@ export async function getInventoryConsumerFamilyIds(
   const nativeId = await getNativeFamilyId(userId)
   const clientIds = await getClientAssignmentFamilyIds(userId)
 
+  // Técnico: mismas áreas consumer que tickets (nativa + technician_family_assignments)
+  if (role === 'TECHNICIAN') {
+    const techIds = await getTechnicianConsumerFamilyIds(userId)
+    return dedupeIds([nativeId, ...techIds, ...clientIds])
+  }
+
   return dedupeIds([nativeId, ...clientIds])
 }
 

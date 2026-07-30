@@ -18,7 +18,18 @@ interface RoleAndDeptSectionProps {
   departmentId: string
   isCurrentUser: boolean
   errors: Record<string, string>
-  departments: Array<{ id: string; name: string; color: string }>
+  departments: Array<{
+    id: string
+    name: string
+    color?: string | null
+    familyId?: string | null
+    family?: {
+      id: string
+      name: string
+      code: string
+      color?: string | null
+    } | null
+  }>
   onChange: (field: 'role' | 'departmentId', value: string) => void
 }
 
@@ -48,11 +59,7 @@ export function RoleAndDeptSection({
           <Label htmlFor='edit-role'>
             Rol del usuario <span className='text-destructive'>*</span>
           </Label>
-          <Select
-            value={role}
-            onValueChange={r => onChange('role', r)}
-            disabled={isCurrentUser}
-          >
+          <Select value={role} onValueChange={r => onChange('role', r)} disabled={isCurrentUser}>
             <SelectTrigger id='edit-role' className='h-9'>
               <SelectValue placeholder='Seleccionar rol' />
             </SelectTrigger>

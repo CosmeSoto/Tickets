@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
+import { mergeDepartmentsForFamily } from '@/lib/utils/department-family'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -201,25 +202,11 @@ export default function CategoriesPage() {
   // Opciones del filtro de departamento: unión de API + departamentos reales de las categorías del área.
   // Así aparecen TI/Soporte aunque /api/departments venga incompleto o con familyId desfasado.
   const departmentsForFilter = useMemo(() => {
-    const map = new Map<string, { id: string; name: string }>()
-
-    for (const d of departments as any[]) {
-      if (familyFilter === 'all' || d.familyId === familyFilter || d.family?.id === familyFilter) {
-        if (d.id && d.name) map.set(d.id, { id: d.id, name: d.name })
-      }
-    }
-
-    for (const cat of filteredCategories as any[]) {
-      const catFamilyId =
-        cat.familyId ?? cat.family?.id ?? cat.departments?.familyId ?? cat.departments?.family?.id
-      if (familyFilter !== 'all' && catFamilyId !== familyFilter) continue
-
-      const id = cat.departmentId ?? cat.departments?.id ?? cat.department?.id
-      const name = cat.departments?.name ?? cat.department?.name
-      if (id && name) map.set(id, { id, name })
-    }
-
-    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, 'es'))
+    return mergeDepartmentsForFamily({
+      familyId: familyFilter === 'all' ? null : familyFilter,
+      departments: departments as any[],
+      categorySources: filteredCategories as any[],
+    }).map((d: any) => ({ id: d.id, name: d.name }))
   }, [departments, filteredCategories, familyFilter])
 
   const paginatedCategories = pagination
@@ -890,6 +877,7 @@ export default function CategoriesPage() {
           availableParents={availableParents}
           availableTechnicians={availableTechnicians}
           departments={departments}
+          categorySources={filteredCategories}
           onSubmit={handleSubmit}
           onLoadAvailableParents={loadAvailableParents}
           onLoadDepartments={loadDepartments}

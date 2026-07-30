@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { FamilyService } from '@/lib/services/family.service'
 import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
+import { listTicketRequestFamilies } from '@/lib/services/ticket-request-families.service'
+import { isFamilyTicketsEnabled } from '@/lib/utils/ticket-family'
 import prisma from '@/lib/prisma'
 import { invalidateCache } from '@/lib/api-cache'
 
@@ -37,32 +39,8 @@ export async function GET(request: NextRequest) {
       // Super Admin creando ticket (propio o para otro): todas las áreas con tickets
       // habilitados. El scope consumer del target no aplica — puede enrutar a cualquier familia.
       if (session.user.role === 'ADMIN' && isSuperAdmin) {
-        const families = (await (prisma.families.findMany as any)({
-          where: {
-            isActive: true,
-            ticketFamilyConfig: { ticketsEnabled: true },
-          },
-          select: {
-            id: true,
-            name: true,
-            code: true,
-            color: true,
-            icon: true,
-            description: true,
-            isActive: true,
-            ticketFamilyConfig: { select: { ticketsEnabled: true, allowedFromFamilies: true } },
-          },
-          orderBy: { order: 'asc' },
-        })) as any[]
-
-        return NextResponse.json({
-          success: true,
-          data: families.map((f: any) => ({
-            ...f,
-            isOwnFamily: f.id === userFamilyId,
-            isRestricted: (f.ticketFamilyConfig?.allowedFromFamilies ?? []).length > 0,
-          })),
-        })
+        const families = await listTicketRequestFamilies({ userFamilyId })
+        return NextResponse.json({ success: true, data: families })
       }
 
       const { getTicketConsumerFamilyIds } = await import('@/lib/auth/family-scope')
@@ -73,7 +51,6 @@ export async function GET(request: NextRequest) {
       // Admin Normal con forClientId: intersectar con familias donde el admin puede CREAR
       // (consumer = nativa + asignadas), no con cola operativa
       if (forClientId && session.user.role === 'ADMIN') {
-        const { getTicketConsumerFamilyIds } = await import('@/lib/auth/family-scope')
         const adminConsumer = await getTicketConsumerFamilyIds(session.user.id, 'ADMIN', false)
         if (adminConsumer) {
           for (const fId of [...allowedFamilyIds]) {
@@ -91,33 +68,11 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ success: true, data: [] })
       }
 
-      const families = (await (prisma.families.findMany as any)({
-        where: {
-          ...(adminCreateFallback ? {} : { id: { in: Array.from(allowedFamilyIds) } }),
-          isActive: true,
-          ticketFamilyConfig: { ticketsEnabled: true },
-        },
-        select: {
-          id: true,
-          name: true,
-          code: true,
-          color: true,
-          icon: true,
-          description: true,
-          isActive: true,
-          ticketFamilyConfig: { select: { ticketsEnabled: true, allowedFromFamilies: true } },
-        },
-        orderBy: { order: 'asc' },
-      })) as any[]
-
-      return NextResponse.json({
-        success: true,
-        data: families.map((f: any) => ({
-          ...f,
-          isOwnFamily: f.id === userFamilyId,
-          isRestricted: (f.ticketFamilyConfig?.allowedFromFamilies ?? []).length > 0,
-        })),
+      const families = await listTicketRequestFamilies({
+        familyIds: adminCreateFallback ? undefined : Array.from(allowedFamilyIds),
+        userFamilyId,
       })
+      return NextResponse.json({ success: true, data: families })
     }
 
     // ── Clientes: scope consumer (nativa + asignaciones; TECHNOLOGY legacy remapeado) ──
@@ -146,33 +101,11 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ success: true, data: [] })
       }
 
-      const families = (await (prisma.families.findMany as any)({
-        where: {
-          id: { in: consumerIds },
-          isActive: true,
-          ticketFamilyConfig: { ticketsEnabled: true },
-        },
-        select: {
-          id: true,
-          name: true,
-          code: true,
-          color: true,
-          icon: true,
-          description: true,
-          isActive: true,
-          ticketFamilyConfig: { select: { ticketsEnabled: true, allowedFromFamilies: true } },
-        },
-        orderBy: { order: 'asc' },
-      })) as any[]
-
-      return NextResponse.json({
-        success: true,
-        data: families.map((f: any) => ({
-          ...f,
-          isOwnFamily: f.id === userFamilyId,
-          isRestricted: (f.ticketFamilyConfig?.allowedFromFamilies ?? []).length > 0,
-        })),
+      const families = await listTicketRequestFamilies({
+        familyIds: consumerIds,
+        userFamilyId,
       })
+      return NextResponse.json({ success: true, data: families })
     }
 
     // ── Técnicos (y otros no-ADMIN): familias consumer de tickets ────────────
@@ -207,33 +140,11 @@ export async function GET(request: NextRequest) {
       })
       const userFamilyId = user?.departments?.familyId ?? null
 
-      const families = (await (prisma.families.findMany as any)({
-        where: {
-          id: { in: consumerIds },
-          isActive: true,
-          ticketFamilyConfig: { ticketsEnabled: true },
-        },
-        select: {
-          id: true,
-          name: true,
-          code: true,
-          color: true,
-          icon: true,
-          description: true,
-          isActive: true,
-          ticketFamilyConfig: { select: { ticketsEnabled: true, allowedFromFamilies: true } },
-        },
-        orderBy: { order: 'asc' },
-      })) as any[]
-
-      return NextResponse.json({
-        success: true,
-        data: families.map((f: any) => ({
-          ...f,
-          isOwnFamily: f.id === userFamilyId,
-          isRestricted: (f.ticketFamilyConfig?.allowedFromFamilies ?? []).length > 0,
-        })),
+      const families = await listTicketRequestFamilies({
+        familyIds: consumerIds,
+        userFamilyId,
       })
+      return NextResponse.json({ success: true, data: families })
     }
 
     // ── ADMIN ────────────────────────────────────────────────────────────────
@@ -256,10 +167,7 @@ export async function GET(request: NextRequest) {
     // EXCEPTO en configMode (pantallas de configuración necesitan ver todas para activar/desactivar)
     if (!configMode) {
       if (moduleFilter === 'tickets') {
-        families = families.filter((f: any) => {
-          if (!f.ticketFamilyConfig) return true
-          return f.ticketFamilyConfig.ticketsEnabled !== false
-        })
+        families = families.filter((f: any) => isFamilyTicketsEnabled(f))
       } else if (moduleFilter === 'inventory') {
         const invConfigs = await prisma.inventory_family_config.findMany({
           where: { inventoryEnabled: false },

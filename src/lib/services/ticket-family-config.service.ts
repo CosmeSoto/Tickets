@@ -118,17 +118,13 @@ export class TicketFamilyConfigService {
   }
 
   /**
-   * Retorna las familias con ticketsEnabled = true, incluyendo su configuración.
+   * Retorna las familias habilitadas para tickets (sin config = habilitada).
    * Usado en el selector de familia al crear un ticket.
    */
   static async getEnabledFamilies(): Promise<FamilyWithTicketConfig[]> {
+    const { isFamilyTicketsEnabled } = await import('@/lib/utils/ticket-family')
     const families = await prisma.families.findMany({
-      where: {
-        isActive: true,
-        ticketFamilyConfig: {
-          ticketsEnabled: true,
-        },
-      },
+      where: { isActive: true },
       orderBy: [{ order: 'asc' }, { name: 'asc' }],
       select: {
         id: true,
@@ -152,7 +148,7 @@ export class TicketFamilyConfigService {
       },
     })
 
-    return families as FamilyWithTicketConfig[]
+    return families.filter(isFamilyTicketsEnabled) as FamilyWithTicketConfig[]
   }
 
   /**

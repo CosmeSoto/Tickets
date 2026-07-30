@@ -5,18 +5,10 @@ import { useSession } from 'next-auth/react'
 import { useRouter, useParams } from 'next/navigation'
 import { useSyncDashboardPageMeta } from '@/contexts/dashboard-shell-context'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { StatusBadge, PriorityBadge } from '@/components/ui/status-badge'
 import { TechnicianSearchSelector } from '@/components/ui/technician-search-selector'
 import { CategorySelectorWrapper } from '@/features/category-selection'
@@ -25,6 +17,8 @@ import Link from 'next/link'
 import { getTicketDisplayCode } from '@/hooks/use-ticket-data'
 import { useToast } from '@/hooks/use-toast'
 import { useTechnicians } from '@/contexts/users-context'
+import { TicketSupportAreaField } from '@/components/tickets/ticket-support-area-field'
+import { ticketRequestFamiliesUrl } from '@/lib/utils/ticket-family'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -33,6 +27,7 @@ interface FamilyOption {
   name: string
   code: string
   color?: string | null
+  isOwnFamily?: boolean
 }
 
 interface TicketData {
@@ -97,16 +92,9 @@ export default function EditTicketPage() {
       setLoadingFamilies(true)
       try {
         const isSuperAdmin = (session?.user as any)?.isSuperAdmin ?? false
-        const isAdminUser = session?.user?.role === 'ADMIN'
-
-        let url: string
-        if (isAdminUser && isSuperAdmin) {
-          // Super admin: todas las familias con tickets habilitados
-          url = '/api/families?asClient=true'
-        } else {
-          // Admin normal: familias asignadas al cliente ∩ visibilidad del admin
-          url = `/api/families?asClient=true&forClientId=${clientId}`
-        }
+        const url = ticketRequestFamiliesUrl({
+          forClientId: isSuperAdmin ? null : clientId,
+        })
 
         const res = await fetch(url)
         if (res.ok) {
@@ -278,9 +266,6 @@ export default function EditTicketPage() {
     )
   }
 
-  // Familia actualmente seleccionada (para mostrar nombre en selector único)
-  const selectedFamily = availableFamilies.find(f => f.id === formData.familyId)
-
   return (
     <div className='space-y-6'>
       {/* ── Información básica ── */}
@@ -372,83 +357,26 @@ export default function EditTicketPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {loadingFamilies ? (
-            <p className='text-xs text-muted-foreground italic'>Cargando áreas disponibles…</p>
-          ) : availableFamilies.length === 0 ? (
-            <p className='text-xs text-muted-foreground italic'>No hay áreas disponibles.</p>
-          ) : availableFamilies.length === 1 ? (
-            // Solo una familia — mostrar como badge informativo
-            <div className='flex items-center gap-2 p-3 rounded-lg border bg-muted/30'>
-              {availableFamilies[0].color && (
-                <span
-                  className='w-3 h-3 rounded-full flex-shrink-0'
-                  style={{ backgroundColor: availableFamilies[0].color }}
-                />
-              )}
-              <span className='text-sm font-medium'>{availableFamilies[0].name}</span>
-              <Badge variant='outline' className='text-xs font-mono ml-auto'>
-                {availableFamilies[0].code}
-              </Badge>
-            </div>
-          ) : (
-            // Múltiples familias — selector completo
-            <>
-              <Select
-                value={formData.familyId}
-                onValueChange={newFamilyId => {
-                  setFormData(prev => ({
-                    ...prev,
-                    familyId: newFamilyId,
-                    // Limpiar categoría y técnico al cambiar de área
-                    categoryId: newFamilyId !== prev.familyId ? '' : prev.categoryId,
-                    assigneeId: newFamilyId !== prev.familyId ? '' : prev.assigneeId,
-                  }))
-                  loadTechniciansForFamily(newFamilyId)
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder='Selecciona el área de soporte…'>
-                    {selectedFamily && (
-                      <div className='flex items-center gap-2'>
-                        {selectedFamily.color && (
-                          <span
-                            className='w-2.5 h-2.5 rounded-full flex-shrink-0'
-                            style={{ backgroundColor: selectedFamily.color }}
-                          />
-                        )}
-                        <span>{selectedFamily.name}</span>
-                        <span className='text-xs text-muted-foreground font-mono'>
-                          {selectedFamily.code}
-                        </span>
-                      </div>
-                    )}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {availableFamilies.map(f => (
-                    <SelectItem key={f.id} value={f.id}>
-                      <div className='flex items-center gap-2'>
-                        {f.color && (
-                          <span
-                            className='w-2.5 h-2.5 rounded-full flex-shrink-0'
-                            style={{ backgroundColor: f.color }}
-                          />
-                        )}
-                        <span>{f.name}</span>
-                        <span className='text-xs text-muted-foreground font-mono ml-1'>
-                          {f.code}
-                        </span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {formData.familyId !== ticket.familyId && (
-                <p className='text-xs text-amber-600 dark:text-amber-400 mt-2'>
-                  ⚠️ El área fue cambiada. La categoría y técnico asignado fueron reiniciados.
-                </p>
-              )}
-            </>
+          <TicketSupportAreaField
+            families={availableFamilies}
+            loading={loadingFamilies}
+            value={formData.familyId}
+            onValueChange={newFamilyId => {
+              setFormData(prev => ({
+                ...prev,
+                familyId: newFamilyId,
+                categoryId: newFamilyId !== prev.familyId ? '' : prev.categoryId,
+                assigneeId: newFamilyId !== prev.familyId ? '' : prev.assigneeId,
+              }))
+              loadTechniciansForFamily(newFamilyId)
+            }}
+            emptyMessage='No hay áreas disponibles.'
+            showNativeHint={false}
+          />
+          {formData.familyId && ticket && formData.familyId !== ticket.familyId && (
+            <p className='text-xs text-amber-600 dark:text-amber-400 mt-2'>
+              El área fue cambiada. La categoría y técnico asignado fueron reiniciados.
+            </p>
           )}
         </CardContent>
       </Card>

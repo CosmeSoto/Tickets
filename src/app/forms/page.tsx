@@ -198,7 +198,7 @@ export default function PublicFormsPage() {
           fList.map((f: any) => ({
             id: f.id,
             name: f.name,
-            departments: allDepts.filter((d: any) => d.familyId === f.id),
+            departments: allDepts.filter((d: any) => d.familyId === f.id || d.family?.id === f.id),
           }))
         )
       }

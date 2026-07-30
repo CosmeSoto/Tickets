@@ -335,7 +335,8 @@ export function EquipmentAssetForm({
   // ✅ Departamentos desde contexto global — solo para referencia (no editable)
   const { departments: allDepartments } = useActiveDepartments()
   const departments = allDepartments.filter(
-    (dept): dept is typeof dept & { familyId: string } => dept.familyId === familyId
+    (dept): dept is typeof dept & { familyId: string } =>
+      !!familyId && (dept.familyId === familyId || dept.family?.id === familyId)
   )
 
   // departmentId efectivo: solo el del usuario asignado cuando estado = ASSIGNED

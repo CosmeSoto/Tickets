@@ -41,30 +41,24 @@ import {
   Upload,
   Paperclip,
   MapPin,
-  Users,
   Info,
   Camera,
-  AlertCircle,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useToast } from '@/hooks/use-toast'
 import { CategorySelectorWrapper } from '@/features/category-selection'
 import { FilePreviewList } from '@/components/tickets/file-preview-list'
-import { FamilyCombobox } from '@/components/ui/family-combobox'
 import { FileInputWithCamera } from '@/components/common/file-input-with-camera'
-import { Badge } from '@/components/ui/badge'
-
-interface FamilyOption {
-  id: string
-  name: string
-  code: string
-  color?: string | null
-  isUserFamily?: boolean
-}
+import {
+  TicketSupportAreaField,
+  type TicketSupportAreaFamily,
+} from '@/components/tickets/ticket-support-area-field'
+import { ticketRequestFamiliesUrl } from '@/lib/utils/ticket-family'
+import { pickDefaultTicketFamilyId } from '@/hooks/use-ticket-request-families'
 
 export interface CreateTicketFormProps {
   /** URL del endpoint para cargar familias disponibles */
-  familiesEndpoint: string
+  familiesEndpoint?: string
   /** clientId a usar al enviar (undefined = el servidor lo infiere de la sesión) */
   clientId?: string
   /** Datos extra a mezclar en el body del POST */
@@ -109,7 +103,7 @@ const PRIORITY_DESCRIPTIONS: Record<string, string> = {
 }
 
 export function CreateTicketForm({
-  familiesEndpoint,
+  familiesEndpoint = ticketRequestFamiliesUrl(),
   clientId,
   extraData,
   afterSuccessHref,
@@ -128,7 +122,7 @@ export function CreateTicketForm({
   const [submitSuccess, setSubmitSuccess] = useState(false)
   const [createdTicketId, setCreatedTicketId] = useState<string | null>(null)
 
-  const [availableFamilies, setAvailableFamilies] = useState<FamilyOption[]>([])
+  const [availableFamilies, setAvailableFamilies] = useState<TicketSupportAreaFamily[]>([])
   const [selectedFamilyId, setSelectedFamilyId] = useState<string | null>(null)
   const [loadingFamilies, setLoadingFamilies] = useState(true)
   const prevFamilyIdRef = useRef<string | null>(null)
@@ -159,21 +153,17 @@ export function CreateTicketForm({
       .then(r => r.json())
       .then(d => {
         if (d.success && Array.isArray(d.data)) {
-          const families: FamilyOption[] = d.data.map((f: any) => ({
+          const families: TicketSupportAreaFamily[] = d.data.map((f: any) => ({
             id: f.id,
             name: f.name,
             code: f.code,
             color: f.color,
+            isOwnFamily: f.isOwnFamily ?? false,
             isUserFamily: f.isOwnFamily ?? false,
           }))
           setAvailableFamilies(families)
-          // Pre-seleccionar: única área disponible, o la familia nativa del usuario
-          if (families.length === 1) {
-            setSelectedFamilyId(families[0].id)
-          } else {
-            const native = families.find(f => f.isUserFamily)
-            if (native) setSelectedFamilyId(native.id)
-          }
+          const defaultId = pickDefaultTicketFamilyId(families)
+          if (defaultId) setSelectedFamilyId(defaultId)
         }
       })
       .catch(() => {})
@@ -333,76 +323,14 @@ export function CreateTicketForm({
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className='space-y-4'>
             {/* ── Área de soporte (primero: define categorías y sugerencias) ── */}
-            {loadingFamilies ? (
-              <div className='flex items-center gap-2 text-sm text-muted-foreground py-2'>
-                <Loader2 className='h-4 w-4 animate-spin' />
-                Cargando áreas disponibles...
-              </div>
-            ) : availableFamilies.length === 0 ? (
-              <Alert className='border-amber-200 bg-amber-50 dark:bg-amber-500/10 dark:border-amber-500/40'>
-                <AlertCircle className='h-4 w-4 text-amber-600 dark:text-amber-400' />
-                <AlertDescription className='text-amber-800 dark:text-amber-300 text-sm'>
-                  No tienes áreas de soporte disponibles. Contacta al administrador para que te
-                  asigne una familia.
-                </AlertDescription>
-              </Alert>
-            ) : (
-              <div className='space-y-2'>
-                <Label className='flex items-center gap-1.5 text-sm font-semibold'>
-                  <Users className='h-4 w-4' />
-                  Área de soporte <span className='text-destructive'>*</span>
-                </Label>
-                {availableFamilies.length === 1 ? (
-                  <div className='flex items-center gap-2 p-3 rounded-lg border bg-muted/30'>
-                    {availableFamilies[0].color && (
-                      <span
-                        className='w-3 h-3 rounded-full flex-shrink-0'
-                        style={{ backgroundColor: availableFamilies[0].color }}
-                      />
-                    )}
-                    <span className='text-sm font-medium'>{availableFamilies[0].name}</span>
-                    <Badge variant='outline' className='text-xs font-mono ml-auto'>
-                      {availableFamilies[0].code}
-                    </Badge>
-                  </div>
-                ) : (
-                  <FamilyCombobox
-                    families={availableFamilies}
-                    value={selectedFamilyId ?? ''}
-                    onValueChange={v => setSelectedFamilyId(v || null)}
-                    allowNull={false}
-                    allowClear={false}
-                    placeholder='Selecciona el área de soporte...'
-                    popoverWidth='360px'
-                  />
-                )}
-                {selectedFamilyId &&
-                  availableFamilies.length > 1 &&
-                  (() => {
-                    const f = availableFamilies.find(x => x.id === selectedFamilyId)
-                    return f ? (
-                      <p className='text-xs text-muted-foreground flex items-center gap-1.5'>
-                        <span
-                          className='w-2 h-2 rounded-full'
-                          style={{ backgroundColor: f.color ?? '#6366f1' }}
-                        />
-                        {f.isUserFamily ? (
-                          'Área nativa pre-seleccionada. Puedes cambiarla si lo necesitas.'
-                        ) : (
-                          <>
-                            Tu solicitud irá al equipo de <strong>{f.name}</strong>
-                          </>
-                        )}
-                      </p>
-                    ) : null
-                  })()}
-                {availableFamilies.length > 1 && !selectedFamilyId && (
-                  <p className='text-xs text-amber-600 dark:text-amber-400'>
-                    Selecciona el área para cargar las categorías correctas.
-                  </p>
-                )}
-              </div>
-            )}
+            <TicketSupportAreaField
+              families={availableFamilies}
+              loading={loadingFamilies}
+              value={selectedFamilyId ?? ''}
+              onValueChange={v => setSelectedFamilyId(v || null)}
+              emptyMessage='No tienes áreas de soporte disponibles. Contacta al administrador para que te asigne una familia.'
+              labelClassName='flex items-center gap-1.5 text-sm font-semibold'
+            />
 
             <Separator />
 

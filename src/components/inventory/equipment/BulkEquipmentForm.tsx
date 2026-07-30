@@ -32,6 +32,7 @@ import {
 import { bulkEquipmentInputSchema } from '@/lib/validations/bulk-equipment'
 import { StockIndicatorBadge } from '@/components/inventory/equipment/StockIndicatorBadge'
 import { useActiveDepartments } from '@/contexts/departments-context'
+import { departmentBelongsToFamily } from '@/lib/utils/department-family'
 import { FamilySelector } from '@/components/inventory/family-selector'
 import { SubtypeSelector } from '@/components/inventory/subtype-selector'
 import { useInventoryFamilies } from '@/contexts/families-context'
@@ -410,13 +411,13 @@ export function BulkEquipmentForm({
 
   // ── Departamentos filtrados por familia ────────────────────────────────────
   const filteredDepartments = selectedFamilyId
-    ? allDepartments.filter(d => d.familyId === selectedFamilyId)
+    ? allDepartments.filter(d => departmentBelongsToFamily(d, selectedFamilyId))
     : allDepartments
 
   useEffect(() => {
     if (selectedDepartmentId) {
       const dept = allDepartments.find(d => d.id === selectedDepartmentId)
-      if (dept && selectedFamilyId && dept.familyId !== selectedFamilyId)
+      if (dept && selectedFamilyId && !departmentBelongsToFamily(dept, selectedFamilyId))
         setValue('departmentId', '')
     }
   }, [selectedFamilyId, selectedDepartmentId, allDepartments, setValue])

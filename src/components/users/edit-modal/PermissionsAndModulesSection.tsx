@@ -1,7 +1,7 @@
 'use client'
 
+import { useMemo } from 'react'
 import { Activity } from 'lucide-react'
-import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
 import { ModuleAccessCard } from '@/components/users/module-access-card'
 import { UserModulesPanel } from '@/components/users/user-modules-panel'
@@ -9,6 +9,20 @@ import { useSystemModules } from '@/hooks/use-system-modules'
 import { type UserRole } from '@/lib/constants/user-constants'
 import { type FamilyOption } from '@/components/users/family-assignment-section'
 import { type UserData } from '@/hooks/use-users'
+import { resolveNativeFamily } from '@/lib/utils/native-family'
+
+interface DepartmentOption {
+  id: string
+  name: string
+  color?: string | null
+  familyId?: string | null
+  family?: {
+    id: string
+    name: string
+    code: string
+    color?: string | null
+  } | null
+}
 
 interface PermissionsAndModulesSectionProps {
   user: UserData
@@ -17,6 +31,7 @@ interface PermissionsAndModulesSectionProps {
     isActive: boolean
     isSuperAdmin: boolean
     role: UserRole
+    departmentId: string
     ticketsEnabled: boolean
     inventoryEnabled: boolean
     patrolsEnabled: boolean
@@ -27,6 +42,10 @@ interface PermissionsAndModulesSectionProps {
     canManageInventory: boolean
     canRequestAssets: boolean
   }
+  /** Departamentos del sistema (con familyId/family) para resolver nativa al cambiar depto */
+  departments?: DepartmentOption[]
+  /** Todas las familias activas — fallback si el depto no trae family embebida */
+  allFamilies?: FamilyOption[]
   loading: boolean
   loadingFamilies: boolean
   ticketFamilies: FamilyOption[]
@@ -74,6 +93,8 @@ export function PermissionsAndModulesSection({
   user,
   isCurrentUser,
   formData,
+  departments = [],
+  allFamilies = [],
   loading,
   loadingFamilies,
   ticketFamilies,
@@ -93,29 +114,36 @@ export function PermissionsAndModulesSection({
 }: PermissionsAndModulesSectionProps) {
   const { modules: systemModules } = useSystemModules()
 
-  // Familia nativa: viene del departamento asignado
-  const deptObj = user && typeof user.department === 'object' ? (user.department as any) : null
-  const rawNativeId: string | null = deptObj?.familyId ?? null
-  const nativeFromDept =
-    rawNativeId && deptObj?.family
-      ? {
-          id: deptObj.family.id as string,
-          name: deptObj.family.name as string,
-          code: deptObj.family.code as string,
-          color: deptObj.family.color as string | null,
-          isActive: true,
-        }
-      : null
-  // Si el FK del depto está roto (restore parcial), intentar resolver desde listas cargadas
-  const nativeFromLists =
-    !nativeFromDept && rawNativeId
-      ? ([...ticketFamilies, ...inventoryFamilies, ...patrolFamilies].find(
-          f => f.id === rawNativeId
-        ) ?? null)
-      : null
-  const nativeFamily = nativeFromDept ?? nativeFromLists
-  // Solo exponer ID nativo si la familia existe (evita UUID huérfanos post-restore)
+  const familyLookup = useMemo(() => {
+    const map = new Map<string, FamilyOption>()
+    for (const f of [...allFamilies, ...ticketFamilies, ...inventoryFamilies, ...patrolFamilies]) {
+      if (f?.id) map.set(f.id, f)
+    }
+    return Array.from(map.values())
+  }, [allFamilies, ticketFamilies, inventoryFamilies, patrolFamilies])
+
+  // Familia nativa: depto del formulario (si cambia) o el del usuario cargado.
+  // familyId plano O family.id; TECHNOLOGY legacy → ADMINISTRATIVE.
+  const nativeFamily = useMemo(
+    () =>
+      resolveNativeFamily({
+        departmentId: formData.departmentId,
+        userDepartment: typeof user.department === 'object' ? user.department : null,
+        departments,
+        families: familyLookup,
+      }),
+    [formData.departmentId, user.department, departments, familyLookup]
+  )
   const nativeFamilyId: string | null = nativeFamily?.id ?? null
+  const nativeFamilyForCards = nativeFamily
+    ? {
+        id: nativeFamily.id,
+        name: nativeFamily.name,
+        code: nativeFamily.code,
+        color: nativeFamily.color ?? null,
+        isActive: true as boolean,
+      }
+    : null
 
   return (
     <div className='space-y-3'>
@@ -187,7 +215,7 @@ export function PermissionsAndModulesSection({
                     : clientFamilyIds
               }
               nativeFamilyId={nativeFamilyId}
-              nativeFamily={nativeFamily}
+              nativeFamily={nativeFamilyForCards}
               readOnlyFamilyIds={ticketReadOnlyIds}
               onAssignFamily={
                 formData.role === 'TECHNICIAN'
@@ -217,7 +245,7 @@ export function PermissionsAndModulesSection({
               families={inventoryFamilies}
               assignedFamilyIds={inventoryFamilyIds}
               nativeFamilyId={nativeFamilyId}
-              nativeFamily={nativeFamily}
+              nativeFamily={nativeFamilyForCards}
               readOnlyFamilyIds={inventoryReadOnlyIds}
               onAssignFamily={handlers.handleAssignInventoryFamily}
               onUnassignFamily={handlers.handleUnassignInventoryFamily}
@@ -251,7 +279,7 @@ export function PermissionsAndModulesSection({
               families={patrolFamilies}
               assignedFamilyIds={patrolFamilyIds}
               nativeFamilyId={nativeFamilyId}
-              nativeFamily={nativeFamily}
+              nativeFamily={nativeFamilyForCards}
               readOnlyFamilyIds={patrolReadOnlyIds}
               onAssignFamily={handlers.handleAssignPatrolFamily}
               onUnassignFamily={handlers.handleUnassignPatrolFamily}

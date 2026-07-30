@@ -179,7 +179,7 @@ export function useNotificationSSE({
   onNotification,
   sound = true,
 }: UseNotificationSSEOptions = {}) {
-  const { data: session, status } = useSession()
+  const { data: session, status, update: updateSession } = useSession()
   const onNotificationRef = useRef(onNotification)
   useEffect(() => {
     onNotificationRef.current = onNotification
@@ -205,13 +205,11 @@ export function useNotificationSSE({
           const data = JSON.parse(e.data)
 
           if (data.type === 'session_refresh') {
-            // Limpiar cache local de módulos
+            // Módulos (DB) + JWT: el dashboard/guards de asset-requests leen sesión
             window.dispatchEvent(new CustomEvent('modules-updated'))
+            void updateSession()
 
             // Solo forzar reload completo si la cuenta fue desactivada.
-            // Para cambios de permisos/módulos, el evento 'modules-updated' ya
-            // hace que useUserModules recargue los datos en background sin perder
-            // el estado del formulario abierto.
             if (data.reason === 'account_deactivated') {
               setTimeout(() => {
                 const url = new URL(window.location.href)
@@ -264,7 +262,7 @@ export function useNotificationSSE({
       if (retryTimeout) clearTimeout(retryTimeout)
       es?.close()
     }
-  }, [status, session?.user?.id])
+  }, [status, session?.user?.id, updateSession])
 
   useEffect(() => {
     const cleanup = connect()

@@ -21,6 +21,7 @@ import { ExportButton } from '@/components/common/export-button'
 import { createAssetRequestColumns } from '@/components/inventory/asset-requests/asset-request-columns'
 import { usePagination } from '@/hooks/common/use-pagination'
 import { useExport } from '@/hooks/common/use-export'
+import { useUserModules } from '@/hooks/use-user-modules'
 import { AssetRequestStatus, AssetType } from '@prisma/client'
 
 interface AssetRequest {
@@ -75,6 +76,7 @@ const EXPORT_COLUMNS = [
 export default function AssetRequestsPage() {
   const router = useRouter()
   const { data: session, status } = useSession()
+  const { canRequestAssets, loading: modulesLoading } = useUserModules()
   const [requests, setRequests] = useState<AssetRequest[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -127,23 +129,20 @@ export default function AssetRequestsPage() {
     setPage(1)
   }, [search, statusFilter, typeFilter])
 
-  // Guard de acceso: verificar canRequestAssets antes de mostrar la página.
-  // ADMIN y SuperAdmin siempre tienen acceso. Resto de roles: requieren canRequestAssets.
+  // Guard: ADMIN siempre; resto según canRequestAssets fresco (DB), no JWT stale
   useEffect(() => {
-    if (status === 'loading') return
+    if (status === 'loading' || modulesLoading) return
     if (!session) {
       router.replace('/login')
       return
     }
     const isSuperAdmin = (session.user as any)?.isSuperAdmin === true
     const isAdmin = session.user.role === 'ADMIN'
-    const canReq = (session.user as any)?.canRequestAssets === true
-    if (!isSuperAdmin && !isAdmin && !canReq) {
-      // Redirigir al dashboard según el rol
+    if (!isSuperAdmin && !isAdmin && !canRequestAssets) {
       const fallback = session.user.role === 'TECHNICIAN' ? '/technician' : '/client'
       router.replace(fallback)
     }
-  }, [session, status, router])
+  }, [session, status, router, canRequestAssets, modulesLoading])
 
   // Initial load and when page/limit/filters change
   useEffect(() => {

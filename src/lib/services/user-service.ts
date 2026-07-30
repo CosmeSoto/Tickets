@@ -118,6 +118,10 @@ export class UserService {
             name: true,
             color: true,
             description: true,
+            familyId: true,
+            family: {
+              select: { id: true, name: true, code: true, color: true },
+            },
           },
         },
         phone: true,
@@ -224,6 +228,10 @@ export class UserService {
             name: true,
             color: true,
             description: true,
+            familyId: true,
+            family: {
+              select: { id: true, name: true, code: true, color: true },
+            },
           },
         },
         phone: true,

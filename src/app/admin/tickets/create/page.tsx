@@ -41,7 +41,6 @@ import {
   Paperclip,
   MapPin,
   Camera,
-  Layers,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useToast } from '@/hooks/use-toast'
@@ -49,6 +48,9 @@ import { UserCombobox } from '@/components/ui/user-combobox'
 import { CategorySelectorWrapper } from '@/features/category-selection'
 import { FileInputWithCamera } from '@/components/common/file-input-with-camera'
 import { useUsers } from '@/contexts/users-context'
+import { TicketSupportAreaField } from '@/components/tickets/ticket-support-area-field'
+import { ticketRequestFamiliesUrl } from '@/lib/utils/ticket-family'
+import { pickDefaultTicketFamilyId } from '@/hooks/use-ticket-request-families'
 
 interface User {
   id: string
@@ -362,15 +364,9 @@ export default function CreateTicketPage() {
       setLoadingFamilies(true)
       try {
         const isOwnTicket = nextClientId === session?.user?.id
-        let url: string
-        if (isSuperAdmin) {
-          url = '/api/families?asClient=true'
-          if (!isOwnTicket) url += `&forClientId=${nextClientId}`
-        } else {
-          url = isOwnTicket
-            ? '/api/families?asClient=true'
-            : `/api/families?asClient=true&forClientId=${nextClientId}`
-        }
+        const url = ticketRequestFamiliesUrl({
+          forClientId: isOwnTicket ? null : nextClientId,
+        })
         const res = await fetch(url)
         if (res.ok) {
           const json = await res.json()
@@ -382,13 +378,8 @@ export default function CreateTicketPage() {
             isOwnFamily?: boolean
           }> = json.data ?? []
           setClientFamilies(families)
-
-          const nativeFamily = families.find(f => f.isOwnFamily)
-          if (nativeFamily) {
-            setSelectedFamilyId(nativeFamily.id)
-          } else if (families.length === 1) {
-            setSelectedFamilyId(families[0].id)
-          }
+          const defaultId = pickDefaultTicketFamilyId(families)
+          if (defaultId) setSelectedFamilyId(defaultId)
         }
       } catch {
         /* silencioso */
@@ -533,76 +524,15 @@ export default function CreateTicketPage() {
 
                       {/* Área de soporte — visible solo cuando hay cliente seleccionado */}
                       {clientId && (
-                        <div className='space-y-2'>
-                          <Label className='flex items-center gap-1.5'>
-                            <Layers className='h-4 w-4' />
-                            Área de soporte *
-                          </Label>
-                          {loadingFamilies ? (
-                            <p className='text-xs text-muted-foreground italic flex items-center gap-2'>
-                              <Loader2 className='h-3.5 w-3.5 animate-spin' />
-                              Cargando áreas disponibles...
-                            </p>
-                          ) : clientFamilies.length === 0 ? (
-                            <Alert>
-                              <AlertCircle className='h-4 w-4' />
-                              <AlertDescription className='text-sm'>
-                                No hay áreas de soporte disponibles para este usuario.
-                              </AlertDescription>
-                            </Alert>
-                          ) : (
-                            <>
-                              <Select
-                                value={selectedFamilyId}
-                                onValueChange={v => {
-                                  setSelectedFamilyId(v)
-                                  setValue('categoryId', '')
-                                }}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder='Selecciona el área de soporte...' />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {clientFamilies.map(f => (
-                                    <SelectItem key={f.id} value={f.id}>
-                                      <div className='flex items-center gap-2'>
-                                        {f.color && (
-                                          <span
-                                            className='w-2.5 h-2.5 rounded-full flex-shrink-0'
-                                            style={{ backgroundColor: f.color }}
-                                          />
-                                        )}
-                                        <span>{f.name}</span>
-                                        <span className='text-xs text-muted-foreground font-mono ml-1'>
-                                          {f.code}
-                                        </span>
-                                        {f.isOwnFamily && (
-                                          <span className='text-xs text-primary font-medium ml-1'>
-                                            (nativa)
-                                          </span>
-                                        )}
-                                      </div>
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                              {clientFamilies.length > 1 &&
-                                selectedFamilyId &&
-                                clientFamilies.find(f => f.id === selectedFamilyId)
-                                  ?.isOwnFamily && (
-                                  <p className='text-xs text-muted-foreground'>
-                                    🏠 Área nativa pre-seleccionada. Puedes cambiarla si lo
-                                    necesitas.
-                                  </p>
-                                )}
-                              {clientFamilies.length > 1 && !selectedFamilyId && (
-                                <p className='text-xs text-amber-600 dark:text-amber-400'>
-                                  Selecciona el área para cargar las categorías correctas.
-                                </p>
-                              )}
-                            </>
-                          )}
-                        </div>
+                        <TicketSupportAreaField
+                          families={clientFamilies}
+                          loading={loadingFamilies}
+                          value={selectedFamilyId}
+                          onValueChange={v => {
+                            setSelectedFamilyId(v)
+                            setValue('categoryId', '')
+                          }}
+                        />
                       )}
 
                       <Separator />

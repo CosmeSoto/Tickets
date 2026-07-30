@@ -459,9 +459,12 @@ export async function GET(request: Request) {
       resolvedNews = newsEnabled || canManageNews
       resolvedForms = formsEnabled
     } else {
-      // ADMIN normal y TECHNICIAN: requieren al menos una familia activa en el módulo
+      // ADMIN normal y TECHNICIAN: requieren al menos una familia activa en el módulo.
+      // canRequestAssets basta para mostrar Inventario (menú de solicitudes de compras).
       resolvedTickets = ticketsEnabled && ticketFamilyIds.size > 0
-      resolvedInventory = (inventoryEnabled || canManageInventory) && inventoryFamilyIds.size > 0
+      resolvedInventory =
+        ((inventoryEnabled || canManageInventory) && inventoryFamilyIds.size > 0) ||
+        (!!canRequestAssets && inventoryEnabled)
       resolvedPatrols = patrolsEnabled && patrolFamilyIds.size > 0
       // Noticias y Formularios son globales, no requieren familias - solo el flag del usuario
       // Si puede gestionar noticias, también puede verlas (canManageNews implica newsEnabled)

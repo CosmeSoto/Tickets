@@ -5,9 +5,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { Package, FileText, AlertCircle, CheckCircle, Clock } from 'lucide-react'
-import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
 import { NewsFeed } from '@/components/news'
+import { useUserModules } from '@/hooks/use-user-modules'
 
 interface ClientStats {
   assignedEquipment: number
@@ -26,8 +26,8 @@ interface AssignedEquipment {
 }
 
 export function ClientDashboard({ userId }: { userId: string }) {
-  const { data: session } = useSession()
-  const canRequestAssets = (session?.user as any)?.canRequestAssets ?? false
+  // Fuente fresca desde DB (no JWT), mismo criterio que el sidebar
+  const { canRequestAssets } = useUserModules()
 
   const [stats, setStats] = useState<ClientStats>({
     assignedEquipment: 0,

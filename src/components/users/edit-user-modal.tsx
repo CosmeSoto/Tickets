@@ -24,7 +24,18 @@ interface EditUserModalProps {
   onClose: () => void
   onUserUpdated: () => void
   user: UserData | null
-  departments: Array<{ id: string; name: string; color: string }>
+  departments: Array<{
+    id: string
+    name: string
+    color?: string | null
+    familyId?: string | null
+    family?: {
+      id: string
+      name: string
+      code: string
+      color?: string | null
+    } | null
+  }>
 }
 
 interface EditUserData {
@@ -436,6 +447,8 @@ export function EditUserModal({
                 user={user}
                 isCurrentUser={isCurrentUser}
                 formData={formData}
+                departments={departments}
+                allFamilies={allFamilies}
                 loading={loading}
                 loadingFamilies={loadingFamilies}
                 ticketFamilies={ticketFamilies}

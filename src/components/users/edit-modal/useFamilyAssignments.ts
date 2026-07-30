@@ -333,36 +333,35 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
         setAllFamilies(allActiveFamilies)
 
         // Familia nativa del usuario siendo editado — debe estar siempre disponible
-        const userDept = user && typeof user.department === 'object' ? user.department : null
-        const userNativeFamilyId = userDept?.familyId ?? null
-        // Objeto completo de la familia nativa si viene embebido en el departamento
-        const userNativeFamilyObj: FamilyOption | null =
-          userNativeFamilyId && userDept?.family
-            ? {
-                id: userDept.family.id,
-                name: userDept.family.name,
-                code: userDept.family.code,
-                color: userDept.family.color ?? null,
-                isActive: true,
-              }
-            : null
+        const { resolveNativeFamily } = await import('@/lib/utils/native-family')
+        const resolvedNative = resolveNativeFamily({
+          userDepartment: user && typeof user.department === 'object' ? user.department : null,
+          families: [
+            ...allActiveFamilies,
+            ...tModuleFamilies,
+            ...iModuleFamilies,
+            ...pModuleFamilies,
+          ],
+        })
+        const userNativeFamilyId = resolvedNative?.id ?? null
+        const userNativeFamilyObj: FamilyOption | null = resolvedNative
+          ? {
+              id: resolvedNative.id,
+              name: resolvedNative.name,
+              code: resolvedNative.code,
+              color: resolvedNative.color ?? null,
+              isActive: true,
+            }
+          : null
 
         /**
          * Garantiza que la familia nativa del usuario editado esté incluida
          * en la lista de familias disponibles, aunque esté fuera del scope del viewer.
          */
         const ensureNativeFamily = (list: FamilyOption[]): FamilyOption[] => {
-          if (!userNativeFamilyId) return list
-          const alreadyIn = list.some(f => f.id === userNativeFamilyId)
-          if (alreadyIn) return list
-          // Usar el objeto embebido primero, luego buscar en las listas cargadas
-          const nativeFamily =
-            userNativeFamilyObj ??
-            allActiveFamilies.find(f => f.id === userNativeFamilyId) ??
-            tModuleFamilies.find(f => f.id === userNativeFamilyId) ??
-            iModuleFamilies.find(f => f.id === userNativeFamilyId) ??
-            pModuleFamilies.find(f => f.id === userNativeFamilyId)
-          return nativeFamily ? [...list, nativeFamily] : list
+          if (!userNativeFamilyId || !userNativeFamilyObj) return list
+          if (list.some(f => f.id === userNativeFamilyId)) return list
+          return [...list, userNativeFamilyObj]
         }
 
         if (viewerIsSuperAdmin) {
