@@ -320,7 +320,7 @@ export default function CreateTicketPage() {
           const res = await fetch(`/api/users/${nextClientId}`)
           if (res.ok) {
             const u = await res.json()
-            const data = u.data ?? u
+            const data = u.user ?? u.data ?? u
             setSelectedClient({
               id: data.id,
               name: data.name || '',

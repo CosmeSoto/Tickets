@@ -31,26 +31,31 @@ export async function GET(request: NextRequest) {
 
       const targetUser = await prisma.users.findUnique({
         where: { id: targetId },
-        select: { role: true, departments: { select: { familyId: true } } },
+        select: { role: true },
       })
       const targetRole = forClientId ? (targetUser?.role ?? 'CLIENT') : session.user.role
-      const userFamilyId = targetUser?.departments?.familyId ?? null
 
-      // Super Admin creando ticket (propio o para otro): todas las áreas con tickets
-      // habilitados. El scope consumer del target no aplica — puede enrutar a cualquier familia.
-      if (session.user.role === 'ADMIN' && isSuperAdmin) {
+      const { getTicketConsumerFamilyIds, getNativeFamilyId } =
+        await import('@/lib/auth/family-scope')
+      // Nativa normalizada (p. ej. TECHNOLOGY → ADMINISTRATIVE) para marcar "Mi área"
+      const userFamilyId = await getNativeFamilyId(targetId)
+
+      // Super Admin creando ticket PROPIO: todas las áreas con tickets habilitados
+      // (puede enrutar a cualquier familia). En nombre de otro usuario: solo nativa +
+      // asignadas del solicitante, con la nativa preseleccionable vía isOwnFamily.
+      if (session.user.role === 'ADMIN' && isSuperAdmin && !forClientId) {
         const families = await listTicketRequestFamilies({ userFamilyId })
         return NextResponse.json({ success: true, data: families })
       }
 
-      const { getTicketConsumerFamilyIds } = await import('@/lib/auth/family-scope')
       const consumerIds = await getTicketConsumerFamilyIds(targetId, targetRole, false)
 
       const allowedFamilyIds = new Set(consumerIds ?? [])
 
       // Admin Normal con forClientId: intersectar con familias donde el admin puede CREAR
-      // (consumer = nativa + asignadas), no con cola operativa
-      if (forClientId && session.user.role === 'ADMIN') {
+      // (consumer = nativa + asignadas), no con cola operativa. Super Admin no intersecta:
+      // debe ver todas las áreas del solicitante.
+      if (forClientId && session.user.role === 'ADMIN' && !isSuperAdmin) {
         const adminConsumer = await getTicketConsumerFamilyIds(session.user.id, 'ADMIN', false)
         if (adminConsumer) {
           for (const fId of [...allowedFamilyIds]) {

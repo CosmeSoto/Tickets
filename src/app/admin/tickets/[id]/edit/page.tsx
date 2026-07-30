@@ -87,28 +87,24 @@ export default function EditTicketPage() {
   })
 
   // ── Carga de familias disponibles para el cliente del ticket ─────────────
-  const loadFamiliesForClient = useCallback(
-    async (clientId: string) => {
-      setLoadingFamilies(true)
-      try {
-        const isSuperAdmin = (session?.user as any)?.isSuperAdmin ?? false
-        const url = ticketRequestFamiliesUrl({
-          forClientId: isSuperAdmin ? null : clientId,
-        })
+  const loadFamiliesForClient = useCallback(async (clientId: string) => {
+    setLoadingFamilies(true)
+    try {
+      const url = ticketRequestFamiliesUrl({
+        forClientId: clientId,
+      })
 
-        const res = await fetch(url)
-        if (res.ok) {
-          const json = await res.json()
-          setAvailableFamilies(json.data ?? [])
-        }
-      } catch {
-        // silencioso
-      } finally {
-        setLoadingFamilies(false)
+      const res = await fetch(url)
+      if (res.ok) {
+        const json = await res.json()
+        setAvailableFamilies(json.data ?? [])
       }
-    },
-    [session]
-  )
+    } catch {
+      // silencioso
+    } finally {
+      setLoadingFamilies(false)
+    }
+  }, [])
 
   // ── Carga técnicos al cambiar familia ────────────────────────────────────
   const loadTechniciansForFamily = useCallback(async (familyId: string) => {
