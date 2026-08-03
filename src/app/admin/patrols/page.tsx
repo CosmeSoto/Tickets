@@ -4,7 +4,7 @@ import { DEFAULT_TIMEZONE } from '@/lib/constants'
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { endOfMonth, endOfWeek, startOfMonth, startOfWeek } from 'date-fns'
+import { addDays, endOfMonth, endOfWeek, startOfMonth, startOfWeek } from 'date-fns'
 import {
   Shield,
   CheckCircle2,
@@ -18,6 +18,8 @@ import {
   BarChart3,
   CalendarDays,
   User,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -418,6 +420,7 @@ export default function PatrolDashboardPage() {
               selectedDay={selectedDay}
               onSelectDay={day => {
                 setSelectedDay(day)
+                setMonth(day)
                 setDayBucket('all')
               }}
               byDay={byDay}
@@ -451,11 +454,49 @@ export default function PatrolDashboardPage() {
         <div className='xl:col-span-2 space-y-4'>
           <Card className='h-full'>
             <CardHeader className='pb-3'>
-              <CardTitle className='text-base flex items-center gap-2 capitalize'>
-                <CalendarDays className='h-4 w-4 text-primary' />
-                {selectedDayLabel}
-              </CardTitle>
-              <CardDescription>Rondas de este día · click para abrir detalle</CardDescription>
+              <div className='flex items-start justify-between gap-2'>
+                <div className='min-w-0'>
+                  <CardTitle className='text-base flex items-center gap-2 capitalize'>
+                    <CalendarDays className='h-4 w-4 text-primary shrink-0' />
+                    <span className='truncate'>{selectedDayLabel}</span>
+                  </CardTitle>
+                  <CardDescription>Rondas de este día · click para abrir detalle</CardDescription>
+                </div>
+                <div className='flex items-center gap-0.5 shrink-0'>
+                  <Button
+                    type='button'
+                    variant='outline'
+                    size='icon'
+                    className='h-7 w-7'
+                    title='Día anterior'
+                    aria-label='Día anterior'
+                    onClick={() => {
+                      const prev = addDays(selectedDay, -1)
+                      setSelectedDay(prev)
+                      setMonth(prev)
+                      setDayBucket('all')
+                    }}
+                  >
+                    <ChevronLeft className='h-3.5 w-3.5' />
+                  </Button>
+                  <Button
+                    type='button'
+                    variant='outline'
+                    size='icon'
+                    className='h-7 w-7'
+                    title='Día siguiente'
+                    aria-label='Día siguiente'
+                    onClick={() => {
+                      const next = addDays(selectedDay, 1)
+                      setSelectedDay(next)
+                      setMonth(next)
+                      setDayBucket('all')
+                    }}
+                  >
+                    <ChevronRight className='h-3.5 w-3.5' />
+                  </Button>
+                </div>
+              </div>
               <div className='flex flex-wrap gap-1.5 pt-1'>
                 {(
                   [

@@ -3,6 +3,7 @@ import { DEFAULT_TIMEZONE } from '@/lib/constants'
 
 import { useMemo } from 'react'
 import {
+  addDays,
   addMonths,
   eachDayOfInterval,
   endOfMonth,
@@ -16,7 +17,7 @@ import {
   subMonths,
 } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -60,6 +61,12 @@ interface PatrolAgendaCalendarProps {
   loading?: boolean
 }
 
+/** Al cambiar de día, mantiene el mes visible sincronizado. */
+function goToDay(day: Date, onSelectDay: (d: Date) => void, onMonthChange: (m: Date) => void) {
+  onSelectDay(day)
+  onMonthChange(day)
+}
+
 export function PatrolAgendaCalendar({
   month,
   onMonthChange,
@@ -74,22 +81,59 @@ export function PatrolAgendaCalendar({
     return eachDayOfInterval({ start, end })
   }, [month])
 
+  const shiftMonth = (delta: number) => {
+    const nextMonth = delta < 0 ? subMonths(month, 1) : addMonths(month, 1)
+    // Conservar el día del mes (p. ej. 3 → 3), o el último día si no existe
+    const targetDay = Math.min(selectedDay.getDate(), endOfMonth(nextMonth).getDate())
+    const next = new Date(nextMonth.getFullYear(), nextMonth.getMonth(), targetDay)
+    goToDay(next, onSelectDay, onMonthChange)
+  }
+
   return (
     <div className={cn('rounded-xl border bg-card', loading && 'opacity-70')}>
-      <div className='flex items-center justify-between px-4 py-3 border-b'>
-        <div>
-          <p className='text-sm font-semibold capitalize'>
-            {format(month, 'MMMM yyyy', { locale: es })}
+      <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between px-4 py-3 border-b'>
+        <div className='min-w-0'>
+          <div className='flex items-center gap-1'>
+            <Button
+              type='button'
+              variant='ghost'
+              size='icon'
+              className='h-7 w-7 shrink-0'
+              title='Mes anterior'
+              aria-label='Mes anterior'
+              onClick={() => shiftMonth(-1)}
+            >
+              <ChevronsLeft className='h-4 w-4' />
+            </Button>
+            <p className='text-sm font-semibold capitalize min-w-[9rem] text-center'>
+              {format(month, 'MMMM yyyy', { locale: es })}
+            </p>
+            <Button
+              type='button'
+              variant='ghost'
+              size='icon'
+              className='h-7 w-7 shrink-0'
+              title='Mes siguiente'
+              aria-label='Mes siguiente'
+              onClick={() => shiftMonth(1)}
+            >
+              <ChevronsRight className='h-4 w-4' />
+            </Button>
+          </div>
+          <p className='text-xs text-muted-foreground sm:pl-8'>
+            Doble flecha: mes · Una flecha: día
           </p>
-          <p className='text-xs text-muted-foreground'>Agenda de instancias de ronda</p>
         </div>
-        <div className='flex items-center gap-1'>
+
+        <div className='flex items-center gap-1 self-end sm:self-auto'>
           <Button
             type='button'
             variant='outline'
             size='icon'
             className='h-8 w-8'
-            onClick={() => onMonthChange(subMonths(month, 1))}
+            title='Día anterior'
+            aria-label='Día anterior'
+            onClick={() => goToDay(addDays(selectedDay, -1), onSelectDay, onMonthChange)}
           >
             <ChevronLeft className='h-4 w-4' />
           </Button>
@@ -97,11 +141,12 @@ export function PatrolAgendaCalendar({
             type='button'
             variant='outline'
             size='sm'
-            className='h-8'
+            className='h-8 min-w-[3.25rem]'
+            title='Ir a hoy'
+            aria-label='Ir a hoy'
             onClick={() => {
               const today = new Date()
-              onMonthChange(today)
-              onSelectDay(today)
+              goToDay(today, onSelectDay, onMonthChange)
             }}
           >
             Hoy
@@ -111,7 +156,9 @@ export function PatrolAgendaCalendar({
             variant='outline'
             size='icon'
             className='h-8 w-8'
-            onClick={() => onMonthChange(addMonths(month, 1))}
+            title='Día siguiente'
+            aria-label='Día siguiente'
+            onClick={() => goToDay(addDays(selectedDay, 1), onSelectDay, onMonthChange)}
           >
             <ChevronRight className='h-4 w-4' />
           </Button>

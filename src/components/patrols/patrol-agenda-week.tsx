@@ -3,6 +3,7 @@ import { DEFAULT_TIMEZONE } from '@/lib/constants'
 
 import { useMemo } from 'react'
 import {
+  addDays,
   addWeeks,
   eachDayOfInterval,
   endOfWeek,
@@ -13,7 +14,7 @@ import {
   subWeeks,
 } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { AgendaEvent } from '@/components/patrols/patrol-agenda-calendar'
@@ -104,23 +105,62 @@ export function PatrolAgendaWeek({
     return list
   }, [hourStart, hourEnd])
 
+  const goDay = (day: Date) => {
+    onSelectDay(day)
+    onWeekChange(day)
+  }
+
   return (
     <div className={cn('rounded-xl border bg-card overflow-hidden', loading && 'opacity-70')}>
-      <div className='flex items-center justify-between px-4 py-3 border-b'>
-        <div>
-          <p className='text-sm font-semibold capitalize'>
-            {format(weekStart, 'd MMM', { locale: es })} –{' '}
-            {format(weekEnd, 'd MMM yyyy', { locale: es })}
+      <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between px-4 py-3 border-b'>
+        <div className='min-w-0'>
+          <div className='flex items-center gap-1'>
+            <Button
+              type='button'
+              variant='ghost'
+              size='icon'
+              className='h-7 w-7 shrink-0'
+              title='Semana anterior'
+              aria-label='Semana anterior'
+              onClick={() => {
+                const prev = subWeeks(selectedDay, 1)
+                goDay(prev)
+              }}
+            >
+              <ChevronsLeft className='h-4 w-4' />
+            </Button>
+            <p className='text-sm font-semibold capitalize text-center min-w-[11rem]'>
+              {format(weekStart, 'd MMM', { locale: es })} –{' '}
+              {format(weekEnd, 'd MMM yyyy', { locale: es })}
+            </p>
+            <Button
+              type='button'
+              variant='ghost'
+              size='icon'
+              className='h-7 w-7 shrink-0'
+              title='Semana siguiente'
+              aria-label='Semana siguiente'
+              onClick={() => {
+                const next = addWeeks(selectedDay, 1)
+                goDay(next)
+              }}
+            >
+              <ChevronsRight className='h-4 w-4' />
+            </Button>
+          </div>
+          <p className='text-xs text-muted-foreground sm:pl-8'>
+            Doble flecha: semana · Una flecha: día
           </p>
-          <p className='text-xs text-muted-foreground'>Vista semanal por horario</p>
         </div>
-        <div className='flex items-center gap-1'>
+        <div className='flex items-center gap-1 self-end sm:self-auto'>
           <Button
             type='button'
             variant='outline'
             size='icon'
             className='h-8 w-8'
-            onClick={() => onWeekChange(subWeeks(weekAnchor, 1))}
+            title='Día anterior'
+            aria-label='Día anterior'
+            onClick={() => goDay(addDays(selectedDay, -1))}
           >
             <ChevronLeft className='h-4 w-4' />
           </Button>
@@ -128,11 +168,12 @@ export function PatrolAgendaWeek({
             type='button'
             variant='outline'
             size='sm'
-            className='h-8'
+            className='h-8 min-w-[3.25rem]'
+            title='Ir a hoy'
+            aria-label='Ir a hoy'
             onClick={() => {
               const today = new Date()
-              onWeekChange(today)
-              onSelectDay(today)
+              goDay(today)
             }}
           >
             Hoy
@@ -142,7 +183,9 @@ export function PatrolAgendaWeek({
             variant='outline'
             size='icon'
             className='h-8 w-8'
-            onClick={() => onWeekChange(addWeeks(weekAnchor, 1))}
+            title='Día siguiente'
+            aria-label='Día siguiente'
+            onClick={() => goDay(addDays(selectedDay, 1))}
           >
             <ChevronRight className='h-4 w-4' />
           </Button>
