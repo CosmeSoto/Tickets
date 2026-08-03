@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Plus, CalendarClock, Pencil, PowerOff, Power, Trash2 } from 'lucide-react'
+import { Plus, CalendarClock, Pencil, PowerOff, Power, Trash2, CalendarDays } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -45,6 +45,7 @@ import {
 } from '@/components/patrols/types'
 import { formatDateTimeLocal } from '@/components/patrols/utils'
 import { ScheduleFormDialog } from '@/components/patrols/schedule-form-dialog'
+import { ScheduleUpcomingDialog } from '@/components/patrols/schedule-upcoming-dialog'
 
 export default function SchedulesPage() {
   const { data: session, status } = useSession()
@@ -76,6 +77,7 @@ export default function SchedulesPage() {
   const [deactivatingId, setDeactivatingId] = useState<string | null>(null)
   const [reactivatingId, setReactivatingId] = useState<string | null>(null)
   const [permanentlyDeletingId, setPermanentlyDeletingId] = useState<string | null>(null)
+  const [upcomingSchedule, setUpcomingSchedule] = useState<PatrolSchedule | null>(null)
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -476,6 +478,14 @@ export default function SchedulesPage() {
         onRowClick={openEdit}
         rowActions={(schedule: PatrolSchedule) => (
           <div className='flex items-center gap-1 justify-end'>
+            <Button
+              size='sm'
+              variant='ghost'
+              onClick={() => setUpcomingSchedule(schedule)}
+              title='Ver próximas rondas'
+            >
+              <CalendarDays className='h-3.5 w-3.5' />
+            </Button>
             <Button size='sm' variant='ghost' onClick={() => openEdit(schedule)} title='Editar'>
               <Pencil className='h-3.5 w-3.5' />
             </Button>
@@ -541,6 +551,15 @@ export default function SchedulesPage() {
         saving={saving}
         onSave={handleSave}
         onFamilyChange={handleFamilyChange}
+      />
+
+      <ScheduleUpcomingDialog
+        open={!!upcomingSchedule}
+        onOpenChange={open => {
+          if (!open) setUpcomingSchedule(null)
+        }}
+        scheduleId={upcomingSchedule?.id ?? null}
+        scheduleLabel={upcomingSchedule?.route?.name}
       />
 
       <AlertDialog open={!!deactivatingId} onOpenChange={() => setDeactivatingId(null)}>

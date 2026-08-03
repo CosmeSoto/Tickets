@@ -455,13 +455,13 @@ export function PatrolAreasTab({
                       Validación estricta de horario
                     </Label>
                     <p className='text-xs text-muted-foreground'>
-                      Cuando está activo, el agente solo puede iniciar la ronda dentro del período
-                      de gracia definido. Si está desactivado, el agente puede iniciar en cualquier
-                      momento.
+                      Cuando está activo, el agente solo puede iniciar la ronda dentro del horario
+                      programado (inicio − gracia hasta fin + gracia). Si está desactivado, puede
+                      iniciar en cualquier momento.
                     </p>
                     <p className='text-xs text-amber-600 dark:text-amber-400 font-medium'>
                       {form.strictTimeValidation
-                        ? `Activo — rango permitido: ±${form.gracePeriodMinutes} min del horario`
+                        ? `Activo — ventana: inicio −${form.gracePeriodMinutes} min → fin +${form.gracePeriodMinutes} min`
                         : 'Inactivo — el agente puede iniciar sin restricción de horario'}
                     </p>
                   </div>

@@ -683,6 +683,7 @@ export default function RoutesPage() {
                             {rc.isRequired ? 'Req' : 'Opt'}
                           </button>
                           <Button
+                            type='button'
                             size='sm'
                             variant='ghost'
                             className='h-6 w-6 p-0'
@@ -692,6 +693,7 @@ export default function RoutesPage() {
                             <ChevronUp className='h-3 w-3' />
                           </Button>
                           <Button
+                            type='button'
                             size='sm'
                             variant='ghost'
                             className='h-6 w-6 p-0'
@@ -701,6 +703,7 @@ export default function RoutesPage() {
                             <ChevronDown className='h-3 w-3' />
                           </Button>
                           <Button
+                            type='button'
                             size='sm'
                             variant='ghost'
                             className='h-6 w-6 p-0 text-destructive hover:text-destructive'

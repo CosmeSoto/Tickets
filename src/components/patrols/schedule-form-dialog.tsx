@@ -352,7 +352,7 @@ export function ScheduleFormDialog({
                 <SelectContent>
                   <SelectItem value='inherit'>🏠 Default del área</SelectItem>
                   <SelectItem value='strict'>
-                    🔒 Estricto — solo dentro del período de gracia
+                    🔒 Estricto — solo dentro del horario del turno
                   </SelectItem>
                   <SelectItem value='flexible'>
                     🔓 Flexible — puede iniciar en cualquier momento
@@ -363,7 +363,7 @@ export function ScheduleFormDialog({
                 {form.overrideTimeValidation === null &&
                   'Usa la configuración definida en el área (Configuración de Rondas).'}
                 {form.overrideTimeValidation === true &&
-                  'Solo para esta programación: el agente debe iniciar dentro del período de gracia.'}
+                  'Solo para esta programación: el agente solo puede iniciar dentro del horario (inicio−gracia → fin+gracia).'}
                 {form.overrideTimeValidation === false &&
                   'Solo para esta programación: el agente puede iniciar sin restricción de horario.'}
               </p>

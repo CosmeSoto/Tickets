@@ -132,14 +132,31 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       }
     }
 
-    const familyCfg = await prisma.patrol_family_config.findUnique({
-      where: { familyId: patrol.familyId },
-      select: {
-        requirePhotoOnStart: true,
-        requirePhotoOnEnd: true,
-        patrolIncidentCategoryId: true,
-      },
-    })
+    const [familyCfg, scheduleCfg] = await Promise.all([
+      prisma.patrol_family_config.findUnique({
+        where: { familyId: patrol.familyId },
+        select: {
+          requirePhotoOnStart: true,
+          requirePhotoOnEnd: true,
+          patrolIncidentCategoryId: true,
+          gracePeriodMinutes: true,
+          strictTimeValidation: true,
+        },
+      }),
+      patrol.scheduleId
+        ? prisma.patrol_schedules.findUnique({
+            where: { id: patrol.scheduleId },
+            select: { overrideTimeValidation: true },
+          })
+        : Promise.resolve(null),
+    ])
+
+    const gracePeriodMinutes = familyCfg?.gracePeriodMinutes ?? 5
+    const strictTimeValidation =
+      scheduleCfg?.overrideTimeValidation !== null &&
+      scheduleCfg?.overrideTimeValidation !== undefined
+        ? scheduleCfg.overrideTimeValidation
+        : (familyCfg?.strictTimeValidation ?? true)
 
     // Calcular progreso en tiempo real
     const requiredCheckpoints = patrol.route.routeCheckpoints.filter(rc => rc.isRequired)
@@ -166,6 +183,8 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
           requirePhotoOnStart: familyCfg?.requirePhotoOnStart ?? false,
           requirePhotoOnEnd: familyCfg?.requirePhotoOnEnd ?? false,
           patrolIncidentCategoryId: familyCfg?.patrolIncidentCategoryId ?? null,
+          gracePeriodMinutes,
+          strictTimeValidation,
         },
       },
     })
@@ -299,12 +318,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
       if (strictTimeValidation) {
         const now = new Date()
+        // Ventana del turno: inicio − gracia … fin + gracia (alineado con check-in)
         const earliestStart = new Date(
           patrol.scheduledStart.getTime() - gracePeriodMinutes * 60 * 1000
         )
-        const latestStart = new Date(
-          patrol.scheduledStart.getTime() + gracePeriodMinutes * 60 * 1000
-        )
+        const latestStart = new Date(patrol.scheduledEnd.getTime() + gracePeriodMinutes * 60 * 1000)
 
         if (now < earliestStart) {
           const minutesUntilStart = Math.ceil(
@@ -325,7 +343,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         if (now > latestStart) {
           return NextResponse.json(
             {
-              error: 'El horario programado para esta ronda ya finalizó.',
+              error:
+                'El horario programado para esta ronda ya finalizó. No se puede iniciar fuera de la ventana de tiempo.',
               code: 'TOO_LATE',
             },
             { status: 422 }

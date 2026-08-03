@@ -58,11 +58,13 @@ export interface PatrolData {
     totalRequired: number
     completionPercentage: number
   }
-  /** Reglas de foto inicio/fin desde patrol_family_config */
+  /** Reglas de foto inicio/fin y ventana horaria desde patrol_family_config / schedule */
   familyConfig?: {
     requirePhotoOnStart: boolean
     requirePhotoOnEnd: boolean
     patrolIncidentCategoryId?: string | null
+    gracePeriodMinutes?: number
+    strictTimeValidation?: boolean
   }
 }
 

@@ -63,17 +63,31 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(50, Math.max(1, parseInt(searchParams.get('limit') ?? '20', 10) || 20))
     const statusParam = searchParams.get('status')
     const statusWhere = buildStatusWhere(statusParam)
+    const scheduleId = searchParams.get('scheduleId')
+    const fromDate = searchParams.get('from')
+    const toDate = searchParams.get('to')
 
     const isActiveFilter =
       statusParam === 'PENDING,IN_PROGRESS' || statusParam === 'IN_PROGRESS,PENDING'
-    const orderBy = isActiveFilter
-      ? { scheduledStart: 'asc' as const }
-      : { scheduledStart: 'desc' as const }
+    const orderBy =
+      isActiveFilter || scheduleId
+        ? { scheduledStart: 'asc' as const }
+        : { scheduledStart: 'desc' as const }
 
     // Construir filtro según rol:
     // - ADMIN: ve todas las patrullas de sus familias (sin filtro de agentId)
     // - TECHNICIAN/CLIENT agente: solo sus propias patrullas
     const where: Record<string, any> = { ...statusWhere }
+
+    if (scheduleId) {
+      where.scheduleId = scheduleId
+    }
+    if (fromDate || toDate) {
+      where.scheduledStart = {
+        ...(fromDate ? { gte: new Date(fromDate) } : {}),
+        ...(toDate ? { lte: new Date(toDate) } : {}),
+      }
+    }
 
     if (role === 'ADMIN') {
       const familyIds = await getPatrolAccessibleFamilyIds(userId, role, isSuperAdmin)

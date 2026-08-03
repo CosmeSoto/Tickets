@@ -20,6 +20,8 @@ interface PatrolActionButtonsProps {
   canFinish: boolean
   requiresIncidentForSkip: boolean
   hasCheckIns: boolean
+  /** Bloqueo por ventana horaria (fuera del turno programado) */
+  startBlockedReason?: string | null
   onStart: () => void
   onToggleScanner: () => void
   onEnd: () => void
@@ -35,6 +37,7 @@ export function PatrolActionButtons({
   canFinish,
   requiresIncidentForSkip,
   hasCheckIns,
+  startBlockedReason = null,
   onStart,
   onToggleScanner,
   onEnd,
@@ -42,19 +45,33 @@ export function PatrolActionButtons({
 }: PatrolActionButtonsProps) {
   const isPending = status === 'PENDING'
   const isInProgress = status === 'IN_PROGRESS'
+  const startBlocked = Boolean(startBlockedReason)
 
   return (
     <>
       {/* ── Iniciar ── */}
       {isPending && (
-        <Button className='w-full h-12 text-base' onClick={onStart} disabled={startingPatrol}>
-          {startingPatrol ? (
-            <Loader2 className='h-5 w-5 mr-2 animate-spin' />
-          ) : (
-            <Play className='h-5 w-5 mr-2' />
+        <div className='space-y-2'>
+          <Button
+            className='w-full h-12 text-base'
+            onClick={onStart}
+            disabled={startingPatrol || startBlocked}
+            title={startBlockedReason ?? undefined}
+          >
+            {startingPatrol ? (
+              <Loader2 className='h-5 w-5 mr-2 animate-spin' />
+            ) : (
+              <Play className='h-5 w-5 mr-2' />
+            )}
+            Iniciar Ronda
+          </Button>
+          {startBlocked && startBlockedReason && (
+            <p className='text-xs text-amber-700 dark:text-amber-400 flex items-start gap-1.5'>
+              <AlertTriangle className='h-3.5 w-3.5 mt-0.5 shrink-0' />
+              <span>{startBlockedReason}</span>
+            </p>
           )}
-          Iniciar Ronda
-        </Button>
+        </div>
       )}
 
       {/* ── Escanear QR + Finalizar ── */}

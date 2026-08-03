@@ -94,6 +94,24 @@ export default function PatrolExecutionPage() {
     timeStyle: 'short',
   })
 
+  // Ventana horaria: inicio − gracia … fin + gracia (misma regla que el API)
+  let startBlockedReason: string | null = null
+  if (patrol.status === 'PENDING' && patrol.familyConfig?.strictTimeValidation !== false) {
+    const grace = (patrol.familyConfig?.gracePeriodMinutes ?? 5) * 60 * 1000
+    const now = Date.now()
+    const earliest = new Date(patrol.scheduledStart).getTime() - grace
+    const latest = new Date(patrol.scheduledEnd).getTime() + grace
+    if (now < earliest) {
+      const mins = Math.ceil((new Date(patrol.scheduledStart).getTime() - now) / 60000)
+      const h = Math.floor(mins / 60)
+      const m = mins % 60
+      const timeLabel = h > 0 && m > 0 ? `${h}h ${m}min` : h > 0 ? `${h}h` : `${m} min`
+      startBlockedReason = `Fuera de horario: faltan ${timeLabel} para poder iniciar esta ronda.`
+    } else if (now > latest) {
+      startBlockedReason = 'Fuera de horario: la ventana programada para esta ronda ya finalizó.'
+    }
+  }
+
   return (
     <ModuleLayout
       title={patrol.route.name}
@@ -155,6 +173,7 @@ export default function PatrolExecutionPage() {
             canFinish={!exec.requiresIncidentForSkip}
             requiresIncidentForSkip={exec.requiresIncidentForSkip}
             hasCheckIns={patrol.checkIns.length > 0}
+            startBlockedReason={startBlockedReason}
             onStart={exec.handleStart}
             onToggleScanner={() => exec.setScannerActive(s => !s)}
             onEnd={exec.handleEnd}
