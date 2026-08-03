@@ -166,7 +166,7 @@ export default function AdminPatrolIncidentsPage() {
   // ── Export ─────────────────────────────────────────────────────────────────
   const { exportCSV, exportExcel, exporting } = useExport({
     filename: 'novedades-rondas',
-    title: 'Novedades de Rondas',
+    title: 'Incidentes de Rondas',
     subtitle: `Exportado el ${new Date().toLocaleDateString('es-CO')} • ${total} novedades`,
     getData: () => incidents,
     columns: PATROL_INCIDENTS_ADMIN_EXPORT_COLUMNS,
@@ -193,8 +193,8 @@ export default function AdminPatrolIncidentsPage() {
 
   return (
     <ModuleLayout
-      title='Novedades de Rondas'
-      subtitle='Gestión de novedades e incidentes reportados durante patrullas'
+      title='Incidentes de Rondas'
+      subtitle='Bandeja operativa: resolver o escalar lo reportado durante las patrullas'
       loading={loading && incidents.length === 0}
       error={error}
       onRetry={() => fetchIncidents(filters, page)}

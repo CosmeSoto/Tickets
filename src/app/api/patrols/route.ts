@@ -69,8 +69,9 @@ export async function GET(request: NextRequest) {
 
     const isActiveFilter =
       statusParam === 'PENDING,IN_PROGRESS' || statusParam === 'IN_PROGRESS,PENDING'
+    // Agenda / rangos futuros: orden cronológico ascendente
     const orderBy =
-      isActiveFilter || scheduleId
+      isActiveFilter || scheduleId || fromDate
         ? { scheduledStart: 'asc' as const }
         : { scheduledStart: 'desc' as const }
 

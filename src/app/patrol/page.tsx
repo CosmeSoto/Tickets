@@ -1,10 +1,10 @@
 'use client'
 import { DEFAULT_TIMEZONE } from '@/lib/constants'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { Shield, Clock, ChevronRight } from 'lucide-react'
+import { Shield, Clock, CalendarDays, History, Loader2 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
@@ -37,6 +37,8 @@ interface Pagination {
   hasPrev: boolean
 }
 
+type TimeBucket = 'today' | 'upcoming' | 'history'
+
 const STATUS_LABELS: Record<string, string> = {
   PENDING: 'Pendiente',
   IN_PROGRESS: 'En progreso',
@@ -52,6 +54,46 @@ const formatDate = (iso: string) =>
     timeStyle: 'short',
   })
 
+/** Inicio/fin del día en America/Guayaquil expresados como Date UTC. */
+function ecuadorDayBounds(offsetDays = 0): { start: Date; end: Date } {
+  const now = new Date()
+  const ecuadorOffsetMin = -5 * 60
+  const localNow = new Date(now.getTime() + ecuadorOffsetMin * 60 * 1000)
+  const startUtcMs =
+    Date.UTC(
+      localNow.getUTCFullYear(),
+      localNow.getUTCMonth(),
+      localNow.getUTCDate() + offsetDays
+    ) -
+    ecuadorOffsetMin * 60 * 1000
+  const start = new Date(startUtcMs)
+  const end = new Date(startUtcMs + 24 * 60 * 60 * 1000 - 1)
+  return { start, end }
+}
+
+function bucketQuery(bucket: TimeBucket): URLSearchParams {
+  const params = new URLSearchParams({ limit: '20' })
+  if (bucket === 'today') {
+    const { start, end } = ecuadorDayBounds(0)
+    params.set('from', start.toISOString())
+    params.set('to', end.toISOString())
+    params.set('status', 'all')
+  } else if (bucket === 'upcoming') {
+    const { end: todayEnd } = ecuadorDayBounds(0)
+    const { end: horizon } = ecuadorDayBounds(30)
+    params.set('from', new Date(todayEnd.getTime() + 1).toISOString())
+    params.set('to', horizon.toISOString())
+    params.set('status', 'PENDING,IN_PROGRESS')
+  } else {
+    const { start: from } = ecuadorDayBounds(-30)
+    const { end: to } = ecuadorDayBounds(0)
+    params.set('from', from.toISOString())
+    params.set('to', to.toISOString())
+    params.set('status', 'COMPLETED,INCOMPLETE,MISSED')
+  }
+  return params
+}
+
 export default function PatrolListPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
@@ -61,47 +103,39 @@ export default function PatrolListPage() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
-  const [statusFilter, setStatusFilter] = useState<string>('active')
+  const [bucket, setBucket] = useState<TimeBucket>('today')
+  const [counts, setCounts] = useState({ today: 0, upcoming: 0, history: 0 })
 
-  // Auth guard
   useEffect(() => {
     if (status === 'loading') return
     if (!session) {
       router.push('/login')
       return
     }
-    const user = session.user as any
-    // ADMIN siempre puede ver rondas. Agentes (TECH/CLIENT) requieren patrolsEnabled.
+    const user = session.user as { role?: string; patrolsEnabled?: boolean }
     if (user.role !== 'ADMIN' && user.patrolsEnabled !== true) {
       router.push('/unauthorized')
-      return
     }
   }, [session, status, router])
 
-  const fetchPatrols = async (p: number, sf: string) => {
+  const fetchPatrols = useCallback(async (p: number, b: TimeBucket) => {
     setLoading(true)
     setLoadError(null)
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 45_000)
     try {
-      const params = new URLSearchParams({ page: String(p), limit: '20' })
-      if (sf === 'active') params.set('status', 'PENDING,IN_PROGRESS')
-      else if (sf !== 'all') params.set('status', sf.toUpperCase())
+      const params = bucketQuery(b)
+      params.set('page', String(p))
 
       const res = await fetch(`/api/patrols?${params}`, { signal: controller.signal })
       if (!res.ok) {
         let message = 'Error al cargar patrullas'
         try {
           const body = await res.json()
-          if (typeof body?.error === 'string' && body.error.trim()) {
-            message = body.error
-          } else if (res.status === 403) {
-            message = 'No tienes privilegios para el módulo de rondas'
-          }
+          if (typeof body?.error === 'string' && body.error.trim()) message = body.error
+          else if (res.status === 403) message = 'No tienes privilegios para el módulo de rondas'
         } catch {
-          if (res.status === 403) {
-            message = 'No tienes privilegios para el módulo de rondas'
-          }
+          if (res.status === 403) message = 'No tienes privilegios para el módulo de rondas'
         }
         throw new Error(message)
       }
@@ -120,13 +154,37 @@ export default function PatrolListPage() {
       clearTimeout(timeoutId)
       setLoading(false)
     }
-  }
+  }, [])
+
+  const fetchCounts = useCallback(async () => {
+    try {
+      const [todayRes, upcomingRes, historyRes] = await Promise.all(
+        (['today', 'upcoming', 'history'] as TimeBucket[]).map(async b => {
+          const params = bucketQuery(b)
+          params.set('page', '1')
+          params.set('limit', '1')
+          const res = await fetch(`/api/patrols?${params}`)
+          if (!res.ok) return 0
+          const json = await res.json()
+          return json.pagination?.total ?? 0
+        })
+      )
+      setCounts({ today: todayRes, upcoming: upcomingRes, history: historyRes })
+    } catch {
+      /* silencioso */
+    }
+  }, [])
 
   useEffect(() => {
-    if (session) fetchPatrols(page, statusFilter)
-  }, [session, page, statusFilter]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (!session) return
+    void fetchPatrols(page, bucket)
+  }, [session, page, bucket, fetchPatrols])
 
-  // Columnas con soporte de sort para DataTable
+  useEffect(() => {
+    if (!session) return
+    void fetchCounts()
+  }, [session, fetchCounts])
+
   const columns: Column<PatrolListItem>[] = useMemo(
     () => [
       {
@@ -147,7 +205,7 @@ export default function PatrolListPage() {
       },
       {
         key: 'scheduledStart',
-        label: 'Inicio',
+        label: 'Horario',
         sortable: true,
         render: (patrol: PatrolListItem) => (
           <span className='text-muted-foreground text-sm flex items-center gap-1'>
@@ -193,11 +251,10 @@ export default function PatrolListPage() {
     []
   )
 
-  // Export
   const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
     filename: 'mis-rondas',
     title: 'Mis Rondas',
-    subtitle: 'Patrullas asignadas y en progreso',
+    subtitle: 'Patrullas asignadas',
     columns: [
       { key: 'route.name', label: 'Ruta' },
       { key: 'family.name', label: 'Área' },
@@ -227,7 +284,6 @@ export default function PatrolListPage() {
 
   if (status === 'loading' || !session) return null
 
-  // Card renderer para vista móvil
   const cardRenderer = (patrol: PatrolListItem) => (
     <Card
       className='cursor-pointer hover:border-primary/50 transition-colors'
@@ -247,9 +303,7 @@ export default function PatrolListPage() {
             {formatDate(patrol.scheduledStart)}
           </span>
           {patrol.route.estimatedDurationMinutes > 0 && (
-            <span className='flex items-center gap-1'>
-              ⏱ {formatDurationMinutes(patrol.route.estimatedDurationMinutes)}
-            </span>
+            <span>⏱ {formatDurationMinutes(patrol.route.estimatedDurationMinutes)}</span>
           )}
         </div>
         {patrol.status === 'IN_PROGRESS' && patrol.progress && (
@@ -262,74 +316,126 @@ export default function PatrolListPage() {
     </Card>
   )
 
+  const bucketMeta: Record<TimeBucket, { label: string; hint: string; icon: typeof CalendarDays }> =
+    {
+      today: {
+        label: 'Hoy',
+        hint: 'Rondas programadas para hoy',
+        icon: CalendarDays,
+      },
+      upcoming: {
+        label: 'Próximas',
+        hint: 'Pendientes de los próximos 30 días',
+        icon: Clock,
+      },
+      history: {
+        label: 'Cumplidas',
+        hint: 'Completadas, incompletas u omitidas (30 días)',
+        icon: History,
+      },
+    }
+
   return (
     <ModuleLayout
       title='Mis Rondas'
-      subtitle='Patrullas asignadas y en progreso'
+      subtitle='Hoy, próximas y lo ya cumplido'
       loading={loading && patrols.length === 0 && !loadError}
       error={loadError}
-      onRetry={() => fetchPatrols(page, statusFilter)}
+      onRetry={() => fetchPatrols(page, bucket)}
     >
-      {/* Filtros de estado */}
-      <div className='flex gap-2 flex-wrap mb-4'>
-        {[
-          { value: 'active', label: '🟡 Activas' },
-          { value: 'COMPLETED,INCOMPLETE', label: '✅ Historial' },
-          { value: 'MISSED', label: '❌ Omitidas' },
-          { value: 'all', label: 'Todas' },
-        ].map(opt => (
-          <Button
-            key={opt.value}
-            size='sm'
-            variant={statusFilter === opt.value ? 'default' : 'outline'}
-            onClick={() => {
-              setStatusFilter(opt.value)
-              setPage(1)
-            }}
-          >
-            {opt.label}
-          </Button>
-        ))}
+      <div className='grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4'>
+        {(Object.keys(bucketMeta) as TimeBucket[]).map(key => {
+          const meta = bucketMeta[key]
+          const Icon = meta.icon
+          const active = bucket === key
+          return (
+            <button
+              key={key}
+              type='button'
+              onClick={() => {
+                setBucket(key)
+                setPage(1)
+              }}
+              className={`text-left rounded-xl border p-3 transition-colors ${
+                active ? 'border-primary bg-primary/5 ring-1 ring-primary/30' : 'hover:bg-muted/40'
+              }`}
+            >
+              <div className='flex items-center justify-between gap-2'>
+                <span className='text-sm font-semibold flex items-center gap-1.5'>
+                  <Icon className='h-4 w-4' />
+                  {meta.label}
+                </span>
+                <span className='text-lg font-bold tabular-nums'>{counts[key]}</span>
+              </div>
+              <p className='text-xs text-muted-foreground mt-1'>{meta.hint}</p>
+            </button>
+          )
+        })}
       </div>
 
-      {/* Tabla con búsqueda, orden y exportación */}
-      <DataTable
-        data={patrols}
-        columns={columns}
-        loading={loading}
-        searchable
-        searchPlaceholder='Buscar por ruta o área...'
-        onRowClick={patrol => router.push(`/patrol/${patrol.id}`)}
-        cardRenderer={cardRenderer}
-        actions={
-          <ExportButton
-            onExportCSV={exportCSV}
-            onExportExcel={exportExcel}
-            onExportPDF={exportPDF}
-            loading={exporting}
-          />
-        }
-        pagination={
-          pagination
-            ? {
-                page,
-                limit: pagination.limit,
-                total: pagination.total,
-                onPageChange: setPage,
-                onLimitChange: () => {},
-              }
-            : undefined
-        }
-        onRefresh={() => fetchPatrols(page, statusFilter)}
-      />
+      <p className='text-xs text-muted-foreground mb-3'>{bucketMeta[bucket].hint}</p>
 
-      {/* Empty state si no hay patrullas y no está cargando */}
+      {loading && patrols.length === 0 ? (
+        <div className='flex justify-center py-12'>
+          <Loader2 className='h-6 w-6 animate-spin text-muted-foreground' />
+        </div>
+      ) : (
+        <DataTable
+          data={patrols}
+          columns={columns}
+          loading={loading}
+          searchable
+          searchPlaceholder='Buscar por ruta o área...'
+          onRowClick={patrol => router.push(`/patrol/${patrol.id}`)}
+          cardRenderer={cardRenderer}
+          actions={
+            <ExportButton
+              onExportCSV={exportCSV}
+              onExportExcel={exportExcel}
+              onExportPDF={exportPDF}
+              loading={exporting}
+            />
+          }
+          pagination={
+            pagination
+              ? {
+                  page,
+                  limit: pagination.limit,
+                  total: pagination.total,
+                  onPageChange: setPage,
+                  onLimitChange: () => {},
+                }
+              : undefined
+          }
+          onRefresh={() => {
+            void fetchPatrols(page, bucket)
+            void fetchCounts()
+          }}
+        />
+      )}
+
       {!loading && patrols.length === 0 && !loadError && (
         <Card className='mt-4'>
           <CardContent className='flex flex-col items-center justify-center py-16 text-center'>
             <Shield className='h-12 w-12 text-muted-foreground/30 mb-4' />
-            <p className='text-sm font-medium text-muted-foreground'>No hay patrullas</p>
-            <p className='text-xs text-muted-foreground mt-1'>No tienes patrullas en este estado</p>
+            <p className='text-sm font-medium text-muted-foreground'>
+              No hay rondas en “{bucketMeta[bucket].label}”
+            </p>
+            <p className='text-xs text-muted-foreground mt-1'>{bucketMeta[bucket].hint}</p>
+            {bucket === 'today' && counts.upcoming > 0 && (
+              <Button
+                type='button'
+                variant='link'
+                size='sm'
+                className='mt-2'
+                onClick={() => {
+                  setBucket('upcoming')
+                  setPage(1)
+                }}
+              >
+                Ver {counts.upcoming} próximas →
+              </Button>
+            )}
           </CardContent>
         </Card>
       )}

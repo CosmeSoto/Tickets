@@ -283,7 +283,7 @@ export default function PatrolReportsPage() {
   return (
     <ModuleLayout
       title='Reportes de Rondas'
-      subtitle='Análisis de rendimiento y cumplimiento de patrullas'
+      subtitle='Analítica histórica de cumplimiento (no es la bandeja de incidentes)'
     >
       {/* ── Filtros compartidos ── */}
       <div className='rounded-lg border bg-card p-4 mb-6'>
@@ -359,7 +359,7 @@ export default function PatrolReportsPage() {
           variant={activeTab === 'incidents' ? 'default' : 'outline'}
           onClick={() => setActiveTab('incidents')}
         >
-          Incidentes
+          Métricas de incidentes
         </Button>
       </div>
 

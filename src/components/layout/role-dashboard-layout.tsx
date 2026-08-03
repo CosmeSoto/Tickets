@@ -38,6 +38,7 @@ import {
   ClipboardList,
   AlertTriangle,
   Newspaper,
+  CalendarDays,
 } from 'lucide-react'
 import { Notifications } from '@/components/ui/notifications'
 import { PushSubscriptionManager } from '@/components/notifications/push-subscription-manager'
@@ -107,11 +108,11 @@ const navigationByRole: Record<string, NavItem[]> = {
       href: '/admin/patrols',
       icon: Shield,
       children: [
-        { name: 'Dashboard', href: '/admin/patrols', icon: LayoutDashboard },
+        { name: 'Agenda', href: '/admin/patrols', icon: CalendarDays },
         { name: 'Checkpoints', href: '/admin/patrols/checkpoints', icon: MapPin },
         { name: 'Rutas', href: '/admin/patrols/routes', icon: ClipboardList },
         { name: 'Programación', href: '/admin/patrols/schedules', icon: ClipboardList },
-        { name: 'Novedades', href: '/admin/patrols/incidents', icon: AlertTriangle },
+        { name: 'Incidentes', href: '/admin/patrols/incidents', icon: AlertTriangle },
         { name: 'Reportes', href: '/admin/patrols/reports', icon: BarChart3 },
         { name: 'Configuración', href: '/admin/settings/patrols', icon: Settings },
       ],
@@ -162,9 +163,9 @@ const navigationByRole: Record<string, NavItem[]> = {
       href: '/admin/patrols',
       icon: Shield,
       children: [
-        { name: 'Dashboard', href: '/admin/patrols', icon: LayoutDashboard },
+        { name: 'Agenda', href: '/admin/patrols', icon: CalendarDays },
         { name: 'Mis Rondas', href: '/patrol', icon: MapPin },
-        { name: 'Mis Novedades', href: '/patrol/incidents', icon: AlertTriangle },
+        { name: 'Mis Incidentes', href: '/patrol/incidents', icon: AlertTriangle },
         { name: 'Reportes', href: '/admin/patrols/reports', icon: BarChart3 },
       ],
     },
@@ -211,9 +212,9 @@ const navigationByRole: Record<string, NavItem[]> = {
       href: '/admin/patrols',
       icon: Shield,
       children: [
-        { name: 'Dashboard', href: '/admin/patrols', icon: LayoutDashboard },
+        { name: 'Agenda', href: '/admin/patrols', icon: CalendarDays },
         { name: 'Mis Rondas', href: '/patrol', icon: MapPin },
-        { name: 'Mis Novedades', href: '/patrol/incidents', icon: AlertTriangle },
+        { name: 'Mis Incidentes', href: '/patrol/incidents', icon: AlertTriangle },
         { name: 'Reportes', href: '/admin/patrols/reports', icon: BarChart3 },
       ],
     },
@@ -258,8 +259,8 @@ const navigationByRole: Record<string, NavItem[]> = {
       href: '/patrol',
       icon: Shield,
       children: [
-        { name: 'Patrullas Activas', href: '/patrol', icon: MapPin },
-        { name: 'Mis Novedades', href: '/patrol/incidents', icon: AlertTriangle },
+        { name: 'Mis Rondas', href: '/patrol', icon: MapPin },
+        { name: 'Mis Incidentes', href: '/patrol/incidents', icon: AlertTriangle },
       ],
     },
     // Noticias no aparece en el sidebar del CLIENT — el feed está embebido en el dashboard.
@@ -301,8 +302,8 @@ const navigationByRole: Record<string, NavItem[]> = {
       href: '/patrol',
       icon: Shield,
       children: [
-        { name: 'Patrullas Activas', href: '/patrol', icon: MapPin },
-        { name: 'Mis Novedades', href: '/patrol/incidents', icon: AlertTriangle },
+        { name: 'Mis Rondas', href: '/patrol', icon: MapPin },
+        { name: 'Mis Incidentes', href: '/patrol/incidents', icon: AlertTriangle },
       ],
     },
     // Noticias no aparece en el sidebar del CLIENT — el feed está embebido en el dashboard.

@@ -410,7 +410,7 @@ export default function SchedulesPage() {
   return (
     <ModuleLayout
       title='Programación de Rondas'
-      subtitle='Asignación de rutas y agentes en horarios específicos'
+      subtitle='Reglas recurrentes que generan la agenda (hoy, futuras y cumplidas se ven en Agenda)'
       loading={loading && schedules.length === 0}
       error={error}
       onRetry={reload}
