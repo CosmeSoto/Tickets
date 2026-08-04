@@ -1,24 +1,13 @@
 /**
  * Control de acceso para el módulo de Documentos (Forms).
  *
- * Roles y capacidades:
+ * - formsEnabled: puede VER documentos (según visibilidad).
+ * - canManageForms: puede CREAR / editar / eliminar (alcance por rol).
  *
- * SuperAdmin (ADMIN + isSuperAdmin):
- *   - Ve todos los documentos sin excepción
- *   - Puede crear, editar y eliminar cualquier documento
- *
- * Admin normal (ADMIN sin isSuperAdmin):
- *   - Ve todos los documentos en lectura (API admin)
- *   - Puede gestionar cualquier documento
- *
- * TECHNICIAN o CLIENT con canManageForms=true:
- *   - Ve solo documentos donde tiene visibilidad (formsEnabled debe estar activo)
- *   - Puede crear documentos nuevos
- *   - Puede editar/eliminar únicamente los documentos que él mismo creó
- *
- * Cualquier usuario con formsEnabled=true:
- *   - Ve documentos según reglas de visibilidad (rol, familia, departamento, usuario específico)
- *   - NO puede gestionar nada
+ * SuperAdmin / ADMIN: siempre pueden gestionar.
+ * TECHNICIAN / CLIENT: requieren canManageForms (+ módulo activo).
+ *   - CLIENT: crea solo para su familia
+ *   - TECHNICIAN: crea para familias de su alcance
  */
 
 import { NextResponse } from 'next/server'
@@ -32,22 +21,26 @@ export interface FormsAccessContext {
 }
 
 /**
- * Verifica si el usuario tiene permiso para gestionar (crear/editar/eliminar) documentos.
- * Devuelve un NextResponse 403 si no tiene acceso, o null si sí tiene.
+ * Verifica permiso de gestión (crear/editar/eliminar).
+ * Módulo activo solo = lectura. Crear requiere canManageForms.
  */
 export async function assertCanManageForms(
   userId: string,
   role: string
 ): Promise<NextResponse | null> {
-  if (role === 'ADMIN') return null // Admins siempre pueden gestionar
+  if (role === 'ADMIN') return null
 
-  // TECHNICIAN o CLIENT: necesitan canManageForms explícito
   const user = await prisma.users.findUnique({
     where: { id: userId },
     select: { canManageForms: true, formsEnabled: true },
   })
 
-  if (!user?.canManageForms) {
+  if (!user) {
+    return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 })
+  }
+
+  // Lectura ≠ gestión: hace falta el toggle de crear y el módulo activo
+  if (!user.canManageForms || !user.formsEnabled) {
     return NextResponse.json(
       { error: 'No tienes permisos para gestionar documentos' },
       { status: 403 }
@@ -59,21 +52,15 @@ export async function assertCanManageForms(
 
 /**
  * Verifica si el usuario puede editar o eliminar un documento específico.
- *
- * - SuperAdmin: siempre sí
- * - Admin normal: sí (todos los documentos)
- * - TECHNICIAN/CLIENT con canManageForms: solo los que crearon
  */
 export async function assertCanModifyForm(
   formId: string,
   userId: string,
   role: string,
-  isSuperAdmin: boolean
+  _isSuperAdmin: boolean
 ): Promise<NextResponse | null> {
-  // SuperAdmin y Admin tienen acceso total a modificar
   if (role === 'ADMIN') return null
 
-  // TECHNICIAN/CLIENT: solo pueden tocar sus propios documentos
   const form = await prisma.forms.findUnique({
     where: { id: formId },
     select: { createdById: true },

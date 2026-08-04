@@ -174,6 +174,16 @@ export function getActionLabel(action: string): string {
     knowledge_article_deleted: 'Artículo Eliminado',
     knowledge_article_published: 'Artículo Publicado',
     knowledge_article_unpublished: 'Artículo Despublicado',
+    // Documentos
+    form_created: 'Documento Creado',
+    form_updated: 'Documento Actualizado',
+    form_deleted: 'Documento Eliminado',
+    // Noticias
+    news_created: 'Noticia Creada',
+    news_updated: 'Noticia Actualizada',
+    news_deleted: 'Noticia Eliminada',
+    news_published: 'Noticia Publicada',
+    news_archived: 'Noticia Archivada',
     // Configuración
     settings_updated: 'Config. Sistema Actualizada',
     settings_viewed: 'Configuración Visualizada',
@@ -262,6 +272,8 @@ export function getEntityLabel(entityType: string): string {
     backup: 'Respaldos',
     auth: 'Autenticación',
     knowledge_article: 'Base de Conocimiento',
+    form: 'Documentos',
+    news: 'Noticias',
     comment: 'Comentarios',
     attachment: 'Archivos Adjuntos',
     notification: 'Notificaciones',

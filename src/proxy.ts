@@ -290,13 +290,13 @@ export async function proxy(request: NextRequest) {
     // /settings es la configuración personal del usuario (accesible para todos los roles)
 
     if (path.startsWith('/admin') && userRole !== 'ADMIN' && !(token as any).isSuperAdmin) {
-      // Excepción: usuarios con canManageNews pueden acceder a /admin/news
-      // Excepción: usuarios con formsEnabled pueden acceder a /admin/forms
-      // Excepción: técnicos con patrolsEnabled pueden acceder a /admin/patrols (supervisores).
+      // Noticias/Documentos admin: solo con toggle de crear (canManage*).
+      // Módulo activo sin canManage* = solo lectura en feed /forms (no /admin).
+      // Rondas: técnicos con patrolsEnabled → /admin/patrols (supervisores).
       // CLIENT con patrolsEnabled usa solo /patrol (Mis Rondas), no la consola admin.
       if (
         (path.startsWith('/admin/news') && (token as any).canManageNews === true) ||
-        (path.startsWith('/admin/forms') && (token as any).formsEnabled === true) ||
+        (path.startsWith('/admin/forms') && (token as any).canManageForms === true) ||
         (path.startsWith('/admin/patrols') &&
           userRole === 'TECHNICIAN' &&
           (token as any).patrolsEnabled === true)

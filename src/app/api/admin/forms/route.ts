@@ -10,6 +10,12 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 import { assertCanManageForms } from '@/lib/forms/forms-access'
+import {
+  getContentVisibilityScope,
+  sanitizeVisibilityPayload,
+} from '@/lib/content/visibility-scope'
+import { buildVisibilityAuditSummary } from '@/lib/content/visibility-audit'
+import { buildFormVisibilityConditions, getFormViewer } from '@/lib/forms/form-visibility'
 
 // Campos comunes de include para devolver un form completo
 const FORM_INCLUDE = {
@@ -49,7 +55,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    // Solo ADMIN o usuarios con canManageForms pueden acceder al panel de gestión
+    // Solo ADMIN o gestores (TECH canManage / CLIENT con módulo) pueden listar gestión
     const denied = await assertCanManageForms(session.user.id, session.user.role)
     if (denied) return denied
 
@@ -61,16 +67,33 @@ export async function GET(request: NextRequest) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const where: any = {}
 
+    const isSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
+    // Super Admin ve todo; el resto solo documentos visibles / propios
+    if (!(session.user.role === 'ADMIN' && isSuperAdmin)) {
+      const viewer = await getFormViewer(session.user.id)
+      if (viewer) {
+        where.OR = buildFormVisibilityConditions(viewer)
+      }
+    }
+
     if (status === 'active') where.isActive = true
     else if (status === 'inactive') where.isActive = false
 
     if (categoryId) where.categoryId = categoryId
 
     if (search) {
-      where.OR = [
-        { title: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
-      ]
+      const searchCondition = {
+        OR: [
+          { title: { contains: search, mode: 'insensitive' } },
+          { description: { contains: search, mode: 'insensitive' } },
+        ],
+      }
+      if (where.OR) {
+        where.AND = [{ OR: where.OR }, searchCondition]
+        delete where.OR
+      } else {
+        Object.assign(where, searchCondition)
+      }
     }
 
     const forms = await prisma.forms.findMany({
@@ -121,7 +144,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'La categoría es obligatoria' }, { status: 400 })
     }
 
+    const isSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
+    const visScope = await getContentVisibilityScope(
+      session.user.id,
+      session.user.role,
+      isSuperAdmin
+    )
+    const sanitized = await sanitizeVisibilityPayload(visScope, {
+      roles: data.roles,
+      familyIds: data.familyIds,
+      departmentIds: data.departmentIds,
+      userIds: data.userIds,
+      familyId: data.familyId,
+    })
+    if (sanitized instanceof NextResponse) return sanitized
+
     const slug = await generateSlug(data.title)
+    const isAdminRole = session.user.role === 'ADMIN'
 
     const form = await prisma.forms.create({
       data: {
@@ -131,25 +170,24 @@ export async function POST(request: NextRequest) {
         summary: data.summary?.trim() || null,
         version: data.version?.trim() || null,
         categoryId: data.categoryId,
-        familyId: data.familyId || null,
+        familyId: sanitized.familyId,
         fileUrl: data.fileUrl?.trim() || null,
         fileSize: data.fileSize ?? null,
         fileType: data.fileType?.trim() || null,
-        isActive: data.isActive !== false,
-        isFeatured: data.isFeatured === true,
+        isActive: isAdminRole ? data.isActive !== false : true,
+        isFeatured: isAdminRole ? data.isFeatured === true : false,
         createdById: session.user.id,
-        // Relaciones de visibilidad
-        form_roles: data.roles?.length
-          ? { create: data.roles.map((role: string) => ({ role })) }
+        form_roles: sanitized.roles.length
+          ? { create: sanitized.roles.map(role => ({ role })) }
           : undefined,
-        form_users: data.userIds?.length
-          ? { create: data.userIds.map((userId: string) => ({ userId })) }
+        form_users: sanitized.userIds.length
+          ? { create: sanitized.userIds.map(userId => ({ userId })) }
           : undefined,
-        form_departments: data.departmentIds?.length
-          ? { create: data.departmentIds.map((departmentId: string) => ({ departmentId })) }
+        form_departments: sanitized.departmentIds.length
+          ? { create: sanitized.departmentIds.map(departmentId => ({ departmentId })) }
           : undefined,
-        form_families: data.familyIds?.length
-          ? { create: data.familyIds.map((familyId: string) => ({ familyId })) }
+        form_families: sanitized.familyIds.length
+          ? { create: sanitized.familyIds.map(familyId => ({ familyId })) }
           : undefined,
       },
       include: FORM_INCLUDE,
@@ -165,6 +203,11 @@ export async function POST(request: NextRequest) {
         categoryId: form.categoryId,
         isActive: form.isActive,
         isFeatured: form.isFeatured,
+        ...buildVisibilityAuditSummary(sanitized),
+      },
+      details: {
+        notified: form.isActive,
+        source: 'forms_module',
       },
       request,
     })
@@ -174,10 +217,8 @@ export async function POST(request: NextRequest) {
       try {
         const { NotificationService } = await import('@/lib/services/notification-service')
         const { NotificationType } = await import('@prisma/client')
-        const {
-          getFormNotificationLink,
-          getFormNotificationRecipientIds,
-        } = await import('@/lib/forms/form-visibility')
+        const { getFormNotificationLink, getFormNotificationRecipientIds } =
+          await import('@/lib/forms/form-visibility')
 
         const targetUsers = await getFormNotificationRecipientIds(form.id, session.user.id)
 

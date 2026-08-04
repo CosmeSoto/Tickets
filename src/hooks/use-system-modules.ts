@@ -129,13 +129,13 @@ export function getModuleRoleDescription(moduleKey: string, role: string): strin
     },
     news: {
       ADMIN: 'Crear, publicar y gestionar noticias y comunicados del sistema',
-      TECHNICIAN: 'Ver noticias · puede habilitarse como redactor para crear y publicar',
-      CLIENT: 'Solo lectura · ve noticias y comunicados publicados para su perfil',
+      TECHNICIAN: 'Ver noticias · con permiso de crear puede publicar en su alcance',
+      CLIENT: 'Ver noticias · con permiso de crear puede publicar solo en su área',
     },
     forms: {
       ADMIN: 'Gestionar documentos del sistema',
-      TECHNICIAN: 'Ver y descargar documentos disponibles',
-      CLIENT: 'Ver y descargar documentos disponibles',
+      TECHNICIAN: 'Ver documentos · con permiso de crear puede publicar en su alcance',
+      CLIENT: 'Ver documentos · con permiso de crear puede publicar solo en su área',
     },
   }
   return descriptions[moduleKey]?.[role] ?? 'Acceso al módulo'

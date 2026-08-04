@@ -176,18 +176,7 @@ export function ModuleAccessCard({
       {/* Contenido expandible — solo cuando está habilitado */}
       {enabled && (
         <div className='border-t border-primary/20'>
-          {/* Nota de solo lectura para clientes en el módulo de noticias */}
-          {moduleKey === 'news' && role === 'CLIENT' && (
-            <div className='flex items-center gap-2 px-3 py-2 bg-muted/40 border-b border-primary/10'>
-              <Info className='h-3.5 w-3.5 text-muted-foreground shrink-0' />
-              <p className='text-[11px] text-muted-foreground'>
-                Los clientes solo pueden <span className='font-medium'>ver</span> noticias. La
-                gestión (crear, publicar) está disponible desde el rol{' '}
-                <span className='font-medium'>Técnico</span> en adelante.
-              </p>
-            </div>
-          )}
-          {/* Opciones específicas del módulo (ej. inventario) */}
+          {/* Opciones específicas del módulo (ej. inventario / crear contenido) */}
           {options && (
             <div className='px-3 py-2 space-y-2 border-b border-primary/10'>
               {options.onToggleManager !== undefined && (
@@ -219,35 +208,63 @@ export function ModuleAccessCard({
                 </div>
               )}
               {options.onToggleManageNews !== undefined && (
-                <div className='flex items-center justify-between'>
-                  <div className='flex items-center gap-1.5'>
-                    <span className='text-xs'>✏️</span>
-                    <p className='text-[11px] font-medium'>Crear y publicar noticias</p>
+                <div className='flex items-center justify-between gap-2'>
+                  <div className='min-w-0'>
+                    <div className='flex items-center gap-1.5'>
+                      <span className='text-xs'>✏️</span>
+                      <p className='text-[11px] font-medium'>Crear y publicar noticias</p>
+                    </div>
+                    <p className='text-[10px] text-muted-foreground mt-0.5 pl-5'>
+                      {role === 'CLIENT'
+                        ? 'Solo para su área. Sin esto, solo puede ver noticias.'
+                        : 'Sin esto, solo puede ver noticias del feed.'}
+                    </p>
                   </div>
                   <Switch
                     checked={options.canManageNews ?? false}
                     onCheckedChange={options.onToggleManageNews}
                     disabled={disabled}
-                    className='scale-90'
+                    className='scale-90 shrink-0'
                   />
                 </div>
               )}
               {options.onToggleManageForms !== undefined && (
-                <div className='flex items-center justify-between'>
-                  <div className='flex items-center gap-1.5'>
-                    <span className='text-xs'>✏️</span>
-                    <p className='text-[11px] font-medium'>Crear y gestionar documentos</p>
+                <div className='flex items-center justify-between gap-2'>
+                  <div className='min-w-0'>
+                    <div className='flex items-center gap-1.5'>
+                      <span className='text-xs'>✏️</span>
+                      <p className='text-[11px] font-medium'>Crear y gestionar documentos</p>
+                    </div>
+                    <p className='text-[10px] text-muted-foreground mt-0.5 pl-5'>
+                      {role === 'CLIENT'
+                        ? 'Solo para su área. Sin esto, solo puede ver/descargar.'
+                        : 'Sin esto, solo puede ver y descargar documentos.'}
+                    </p>
                   </div>
                   <Switch
                     checked={options.canManageForms ?? false}
                     onCheckedChange={options.onToggleManageForms}
                     disabled={disabled}
-                    className='scale-90'
+                    className='scale-90 shrink-0'
                   />
                 </div>
               )}
             </div>
           )}
+          {/* Sin toggle de crear: solo lectura del módulo */}
+          {enabled &&
+            !options?.onToggleManageNews &&
+            !options?.onToggleManageForms &&
+            (moduleKey === 'news' || moduleKey === 'forms') &&
+            role !== 'ADMIN' && (
+              <div className='flex items-center gap-2 px-3 py-2 bg-muted/40 border-b border-primary/10'>
+                <Info className='h-3.5 w-3.5 text-muted-foreground shrink-0' />
+                <p className='text-[11px] text-muted-foreground'>
+                  Con el módulo activo solo puede <span className='font-medium'>ver</span>. Activa
+                  el permiso de crear cuando deba publicar contenido.
+                </p>
+              </div>
+            )}
 
           {/* ── Sección de familias — solo si hay familias relevantes ── */}
           {showFamiliesSection && (

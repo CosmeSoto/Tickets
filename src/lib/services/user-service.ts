@@ -295,11 +295,11 @@ export class UserService {
           inventoryEnabled: data.inventoryEnabled ?? false,
           patrolsEnabled: data.patrolsEnabled ?? false,
           newsEnabled: data.newsEnabled ?? false,
-          canManageNews: data.canManageNews ?? false,
+          canManageNews: (data.newsEnabled ?? false) ? (data.canManageNews ?? false) : false,
           canManageInventory: data.canManageInventory ?? false,
           canRequestAssets: data.canRequestAssets ?? false,
           formsEnabled: data.formsEnabled ?? false,
-          canManageForms: data.canManageForms ?? false,
+          canManageForms: (data.formsEnabled ?? false) ? (data.canManageForms ?? false) : false,
           isEmailVerified: false,
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -448,6 +448,13 @@ export class UserService {
     if (data.canManageNews !== undefined) updateData.canManageNews = data.canManageNews
     if (data.formsEnabled !== undefined) updateData.formsEnabled = data.formsEnabled
     if (data.canManageForms !== undefined) updateData.canManageForms = data.canManageForms
+    // Crear requiere módulo activo: no dejar canManage* huérfano
+    const effectiveNewsEnabled =
+      updateData.newsEnabled !== undefined ? updateData.newsEnabled : user.newsEnabled
+    const effectiveFormsEnabled =
+      updateData.formsEnabled !== undefined ? updateData.formsEnabled : user.formsEnabled
+    if (!effectiveNewsEnabled) updateData.canManageNews = false
+    if (!effectiveFormsEnabled) updateData.canManageForms = false
     if (data.isSuperAdmin !== undefined) updateData.isSuperAdmin = data.isSuperAdmin
 
     // Manejar departmentId explícitamente

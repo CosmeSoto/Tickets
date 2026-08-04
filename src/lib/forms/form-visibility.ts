@@ -10,7 +10,10 @@ export type FormViewer = {
   id: string
   role: UserRole
   departmentId: string | null
+  /** Familia nativa (departamento) */
   familyId: string | null
+  /** Familias del scope (nativa + asignaciones) para matching de visibilidad */
+  familyIds: string[]
   isSuperAdmin: boolean
   formsEnabled: boolean
   canManageForms: boolean
@@ -48,11 +51,21 @@ export async function getFormViewer(userId: string): Promise<FormViewer | null> 
 
   if (!user) return null
 
+  const nativeFamilyId = user.departments?.familyId ?? null
+  let familyIds: string[] = nativeFamilyId ? [nativeFamilyId] : []
+
+  if (!(user.role === 'ADMIN' && user.isSuperAdmin)) {
+    const { getUserFamilyScope } = await import('@/lib/auth/admin-scope')
+    const scope = await getUserFamilyScope(userId, user.role, false)
+    familyIds = scope.familyIds ?? familyIds
+  }
+
   return {
     id: user.id,
     role: user.role,
     departmentId: user.departmentId,
-    familyId: user.departments?.familyId ?? null,
+    familyId: nativeFamilyId,
+    familyIds,
     isSuperAdmin: user.isSuperAdmin === true,
     formsEnabled: user.formsEnabled === true,
     canManageForms: user.canManageForms === true,
@@ -61,10 +74,7 @@ export async function getFormViewer(userId: string): Promise<FormViewer | null> 
 
 export function hasFormsModuleAccess(viewer: FormViewer): boolean {
   return (
-    viewer.isSuperAdmin ||
-    viewer.role === 'ADMIN' ||
-    viewer.formsEnabled ||
-    viewer.canManageForms
+    viewer.isSuperAdmin || viewer.role === 'ADMIN' || viewer.formsEnabled || viewer.canManageForms
   )
 }
 
@@ -84,7 +94,9 @@ export function buildFormVisibilityConditions(viewer: FormViewer) {
   if (viewer.departmentId) {
     conditions.push({ form_departments: { some: { departmentId: viewer.departmentId } } })
   }
-  if (viewer.familyId) {
+  if (viewer.familyIds.length > 0) {
+    conditions.push({ form_families: { some: { familyId: { in: viewer.familyIds } } } })
+  } else if (viewer.familyId) {
     conditions.push({ form_families: { some: { familyId: viewer.familyId } } })
   }
 
@@ -109,7 +121,11 @@ export function userCanAccessForm(form: FormVisibilityData, viewer: FormViewer):
     (viewer.departmentId
       ? form.form_departments.some(d => d.departmentId === viewer.departmentId)
       : false) ||
-    (viewer.familyId ? form.form_families.some(f => f.familyId === viewer.familyId) : false)
+    (viewer.familyIds.length > 0
+      ? form.form_families.some(f => viewer.familyIds.includes(f.familyId))
+      : viewer.familyId
+        ? form.form_families.some(f => f.familyId === viewer.familyId)
+        : false)
   )
 }
 
@@ -146,7 +162,8 @@ export function getFormNotificationLink(viewer: {
   role: string
   canManageForms?: boolean
 }): string {
-  if (viewer.role === 'ADMIN' || viewer.canManageForms) return '/admin/forms'
+  // ADMIN gestiona en /admin/forms; el resto (lectura o crear) usa /forms
+  if (viewer.role === 'ADMIN') return '/admin/forms'
   return '/forms'
 }
 

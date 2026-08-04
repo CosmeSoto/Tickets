@@ -11,6 +11,7 @@ export type NewsViewer = {
   role: UserRole
   departmentId: string | null
   familyId: string | null
+  familyIds: string[]
   isSuperAdmin: boolean
   newsEnabled: boolean
   canManageNews: boolean
@@ -50,11 +51,21 @@ export async function getNewsViewer(userId: string): Promise<NewsViewer | null> 
 
   if (!user) return null
 
+  const nativeFamilyId = user.departments?.familyId ?? null
+  let familyIds: string[] = nativeFamilyId ? [nativeFamilyId] : []
+
+  if (!(user.role === 'ADMIN' && user.isSuperAdmin)) {
+    const { getUserFamilyScope } = await import('@/lib/auth/admin-scope')
+    const scope = await getUserFamilyScope(userId, user.role, false)
+    familyIds = scope.familyIds ?? familyIds
+  }
+
   return {
     id: user.id,
     role: user.role,
     departmentId: user.departmentId,
-    familyId: user.departments?.familyId ?? null,
+    familyId: nativeFamilyId,
+    familyIds,
     isSuperAdmin: user.isSuperAdmin === true,
     newsEnabled: user.newsEnabled === true,
     canManageNews: user.canManageNews === true,
@@ -63,10 +74,7 @@ export async function getNewsViewer(userId: string): Promise<NewsViewer | null> 
 
 export function hasNewsModuleAccess(viewer: NewsViewer): boolean {
   return (
-    viewer.isSuperAdmin ||
-    viewer.role === 'ADMIN' ||
-    viewer.newsEnabled ||
-    viewer.canManageNews
+    viewer.isSuperAdmin || viewer.role === 'ADMIN' || viewer.newsEnabled || viewer.canManageNews
   )
 }
 
@@ -86,7 +94,9 @@ export function buildNewsVisibilityConditions(viewer: NewsViewer) {
   if (viewer.departmentId) {
     conditions.push({ news_departments: { some: { departmentId: viewer.departmentId } } })
   }
-  if (viewer.familyId) {
+  if (viewer.familyIds.length > 0) {
+    conditions.push({ news_families: { some: { familyId: { in: viewer.familyIds } } } })
+  } else if (viewer.familyId) {
     conditions.push({ news_families: { some: { familyId: viewer.familyId } } })
   }
 
@@ -123,7 +133,11 @@ export function userCanAccessNews(
     (viewer.departmentId
       ? news.news_departments.some(d => d.departmentId === viewer.departmentId)
       : false) ||
-    (viewer.familyId ? news.news_families.some(f => f.familyId === viewer.familyId) : false)
+    (viewer.familyIds.length > 0
+      ? news.news_families.some(f => viewer.familyIds.includes(f.familyId))
+      : viewer.familyId
+        ? news.news_families.some(f => f.familyId === viewer.familyId)
+        : false)
   )
 }
 
@@ -157,10 +171,8 @@ export async function assertCanViewNews(
   return null
 }
 
-export function getNewsNotificationLink(viewer: {
-  role: string
-  canManageNews?: boolean
-}): string {
+export function getNewsNotificationLink(viewer: { role: string; canManageNews?: boolean }): string {
+  // Gestores → panel admin; lectores → dashboard (feed embebido)
   if (viewer.role === 'ADMIN' || viewer.canManageNews) return '/admin/news'
   if (viewer.role === 'TECHNICIAN') return '/technician'
   return '/client'

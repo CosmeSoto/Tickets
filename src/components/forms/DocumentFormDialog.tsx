@@ -111,6 +111,8 @@ interface DocumentFormDialogProps {
   /** true = Resumen/Versión en acordeón colapsable; false = siempre visibles */
   collapseAdvanced?: boolean
   usersHint?: string
+  allowedRoles?: string[]
+  requireFamilyRestriction?: boolean
 }
 
 export function DocumentFormDialog({
@@ -130,6 +132,8 @@ export function DocumentFormDialog({
   onLoadCategories,
   collapseAdvanced = false,
   usersHint,
+  allowedRoles,
+  requireFamilyRestriction = false,
 }: DocumentFormDialogProps) {
   const [showAdvanced, setShowAdvanced] = useState(false)
   const categoryFeedback = inlineSelectFeedback('Categoría')
@@ -143,6 +147,25 @@ export function DocumentFormDialog({
       setShowAdvanced(false)
     }
   }, [open, collapseAdvanced, formData.summary, formData.version])
+
+  // CLIENT / alcance restringido: preseleccionar su única área al crear
+  useEffect(() => {
+    if (!open || editingForm || !requireFamilyRestriction) return
+    if (formData.familyIds.length > 0 || families.length !== 1) return
+    const only = families[0]
+    setFormData(prev => ({
+      ...prev,
+      familyIds: [only.id],
+      departmentIds: only.departments.map(d => d.id),
+    }))
+  }, [
+    open,
+    editingForm,
+    requireFamilyRestriction,
+    families,
+    formData.familyIds.length,
+    setFormData,
+  ])
 
   const handleClose = () => {
     setShowAdvanced(false)
@@ -404,6 +427,8 @@ export function DocumentFormDialog({
             onDepartmentIdsChange={departmentIds => setFormData(p => ({ ...p, departmentIds }))}
             onUserIdsChange={userIds => setFormData(p => ({ ...p, userIds }))}
             usersHint={usersHint}
+            allowedRoles={allowedRoles}
+            requireFamilyRestriction={requireFamilyRestriction}
           />
 
           <DialogFooter>

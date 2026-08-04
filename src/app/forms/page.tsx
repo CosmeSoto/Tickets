@@ -68,6 +68,8 @@ export default function PublicFormsPage() {
   const [users, setUsers] = useState<UserOption[]>([])
   const [departments, setDepartments] = useState<DepartmentOption[]>([])
   const [families, setFamilies] = useState<FamilyOption[]>([])
+  const [allowedRoles, setAllowedRoles] = useState<string[]>(['ADMIN', 'TECHNICIAN', 'CLIENT'])
+  const [requireFamilyRestriction, setRequireFamilyRestriction] = useState(false)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [editingForm, setEditingForm] = useState<FormItem | null>(null)
   const [deletingForm, setDeletingForm] = useState<FormFeedItem | null>(null)
@@ -126,7 +128,8 @@ export default function PublicFormsPage() {
         if (res.ok) {
           const data = await res.json()
           if (data.user?.formsEnabled || data.user?.canManageForms) {
-            const manage = !!data.user?.canManageForms
+            // Ver: formsEnabled. Crear: canManageForms (+ módulo activo).
+            const manage = !!(data.user?.canManageForms && data.user?.formsEnabled)
             setHasAccess(true)
             setCanManage(manage)
             loadForms()
@@ -140,8 +143,8 @@ export default function PublicFormsPage() {
         const res = await fetch(`/api/user/modules?_t=${Date.now()}`)
         if (res.ok) {
           const modules = await res.json()
-          if (modules.forms) {
-            const manage = !!modules.canManageForms
+          if (modules.forms || modules.canManageForms) {
+            const manage = !!(modules.canManageForms && modules.forms)
             setHasAccess(true)
             setCanManage(manage)
             loadForms()
@@ -178,29 +181,24 @@ export default function PublicFormsPage() {
 
   const loadUsersAndDepartments = async () => {
     try {
-      const [usersRes, deptsRes, familiesRes] = await Promise.all([
-        // Solo usuarios con el módulo de documentos activo (formsEnabled=true).
-        fetch('/api/users?limit=500&isActive=true&formsEnabled=true'),
-        fetch('/api/departments'),
-        fetch('/api/families?includeInactive=false&scope=all'),
-      ])
-      if (usersRes.ok) setUsers((await usersRes.json()).data || [])
-      if (deptsRes.ok) {
-        const d = await deptsRes.json()
-        setDepartments(d.departments || d.data || [])
-      }
-      if (familiesRes.ok) {
-        const fd = await familiesRes.json()
-        const fList = fd.data || fd.families || []
-        const d2Res = await fetch('/api/departments')
-        const allDepts: DepartmentOption[] = d2Res.ok ? (await d2Res.json()).departments || [] : []
+      const visRes = await fetch('/api/content/visibility-options')
+      if (visRes.ok) {
+        const vis = await visRes.json()
+        setUsers(vis.users || [])
         setFamilies(
-          fList.map((f: any) => ({
+          (vis.families || []).map((f: any) => ({
             id: f.id,
             name: f.name,
-            departments: allDepts.filter((d: any) => d.familyId === f.id || d.family?.id === f.id),
+            departments: f.departments || [],
           }))
         )
+        setDepartments(
+          (vis.families || []).flatMap((f: any) =>
+            (f.departments || []).map((d: any) => ({ ...d, familyId: f.id }))
+          )
+        )
+        if (vis.scope?.allowedRoles) setAllowedRoles(vis.scope.allowedRoles)
+        setRequireFamilyRestriction(!!vis.scope?.requireFamilyRestriction)
       }
     } catch {}
   }
@@ -588,7 +586,9 @@ export default function PublicFormsPage() {
           onDeleteCategory={handleDeleteCategory}
           onLoadCategories={loadCategories}
           collapseAdvanced
-          usersHint='Solo aparecen usuarios con el módulo de Documentos activo'
+          usersHint='Usuarios de tu alcance (áreas asignadas)'
+          allowedRoles={allowedRoles}
+          requireFamilyRestriction={requireFamilyRestriction}
         />
       )}
 

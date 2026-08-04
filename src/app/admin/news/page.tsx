@@ -205,6 +205,8 @@ export default function AdminNewsPage() {
   })
 
   const [families, setFamilies] = useState<FamilyOption[]>([])
+  const [allowedRoles, setAllowedRoles] = useState<string[]>(['ADMIN', 'TECHNICIAN', 'CLIENT'])
+  const [requireFamilyRestriction, setRequireFamilyRestriction] = useState(false)
   const [saving, setSaving] = useState(false)
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
   const [uploadedAttachments, setUploadedAttachments] = useState<UploadedAttachment[]>([])
@@ -259,8 +261,8 @@ export default function AdminNewsPage() {
         const res = await fetch(`/api/users/${session.user.id}`)
         if (res.ok) {
           const data = await res.json()
-          // canManageNews = puede crear/editar noticias. newsEnabled = solo ver.
-          if (data.user?.canManageNews) {
+          // Panel de gestión: requiere toggle de crear (módulo solo = ver feed)
+          if (data.user?.canManageNews && data.user?.newsEnabled) {
             setHasAccess(true)
             loadNews()
             loadUsersAndDepartments()
@@ -273,7 +275,7 @@ export default function AdminNewsPage() {
         const res = await fetch(`/api/user/modules?_t=${Date.now()}`)
         if (res.ok) {
           const data = await res.json()
-          if (data.canManageNews) {
+          if (data.canManageNews && data.news) {
             setHasAccess(true)
             loadNews()
             loadUsersAndDepartments()
@@ -282,7 +284,7 @@ export default function AdminNewsPage() {
         }
       } catch {}
 
-      if ((session.user as any).canManageNews) {
+      if ((session.user as any).canManageNews && (session.user as any).newsEnabled) {
         setHasAccess(true)
         loadNews()
         loadUsersAndDepartments()
@@ -299,39 +301,27 @@ export default function AdminNewsPage() {
 
   const loadUsersAndDepartments = async () => {
     try {
-      const [usersRes, deptsRes, familiesRes] = await Promise.all([
-        // Solo usuarios con el módulo de noticias activo (newsEnabled=true) o admins.
-        // Los ADMINs siempre tienen acceso a noticias independientemente del flag,
-        // por eso incluimos role=ADMIN sin filtro de módulo en una segunda petición.
-        fetch('/api/users?limit=500&newsEnabled=true&isActive=true'),
-        fetch('/api/departments'),
-        fetch('/api/families?includeInactive=false&scope=all'),
-      ])
-      if (usersRes.ok) {
-        const usersData = await usersRes.json()
-        setUsers(usersData.users || usersData.data || [])
-      }
-      if (deptsRes.ok) {
-        const deptsData = await deptsRes.json()
-        const deptsList = deptsData.departments || deptsData.data || []
-        setDepartments(deptsList)
-      }
-      if (familiesRes.ok) {
-        const familiesData = await familiesRes.json()
-        const familiesList = familiesData.data || familiesData.families || []
-        const deptsRes2 = await fetch('/api/departments')
-        const deptsData2 = deptsRes2.ok ? await deptsRes2.json() : { data: [] }
-        const allDepts: DepartmentOption[] = deptsData2.departments || deptsData2.data || []
-
-        const familiesWithDepts: FamilyOption[] = familiesList.map((f: any) => ({
-          id: f.id,
-          name: f.name,
-          departments: allDepts.filter((d: any) => d.familyId === f.id || d.family?.id === f.id),
-        }))
-        setFamilies(familiesWithDepts)
+      const visRes = await fetch('/api/content/visibility-options')
+      if (visRes.ok) {
+        const vis = await visRes.json()
+        setUsers(vis.users || [])
+        setFamilies(
+          (vis.families || []).map((f: any) => ({
+            id: f.id,
+            name: f.name,
+            departments: f.departments || [],
+          }))
+        )
+        setDepartments(
+          (vis.families || []).flatMap((f: any) =>
+            (f.departments || []).map((d: any) => ({ ...d, familyId: f.id }))
+          )
+        )
+        if (vis.scope?.allowedRoles) setAllowedRoles(vis.scope.allowedRoles)
+        setRequireFamilyRestriction(!!vis.scope?.requireFamilyRestriction)
       }
     } catch (e) {
-      console.error('Error loading users/departments/families', e)
+      console.error('Error loading visibility options', e)
     }
   }
 
@@ -965,7 +955,9 @@ export default function AdminNewsPage() {
                   setFormData(prev => ({ ...prev, departmentIds }))
                 }
                 onUserIdsChange={userIds => setFormData(prev => ({ ...prev, userIds }))}
-                usersHint='Solo aparecen usuarios con el módulo de Noticias activo'
+                usersHint='Usuarios de tu alcance (áreas asignadas)'
+                allowedRoles={allowedRoles}
+                requireFamilyRestriction={requireFamilyRestriction}
               />
             </div>
             <DialogFooter className='flex-col sm:flex-row gap-2'>

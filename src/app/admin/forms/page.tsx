@@ -64,6 +64,8 @@ export default function AdminFormsPage() {
   const [users, setUsers] = useState<UserOption[]>([])
   const [departments, setDepartments] = useState<DepartmentOption[]>([])
   const [families, setFamilies] = useState<FamilyOption[]>([])
+  const [allowedRoles, setAllowedRoles] = useState<string[]>(['ADMIN', 'TECHNICIAN', 'CLIENT'])
+  const [requireFamilyRestriction, setRequireFamilyRestriction] = useState(false)
 
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [editingForm, setEditingForm] = useState<FormItem | null>(null)
@@ -119,7 +121,9 @@ export default function AdminFormsPage() {
         const res = await fetch(`/api/users/${session.user.id}`)
         if (res.ok) {
           const data = await res.json()
-          if (data.user?.formsEnabled || data.user?.canManageForms) {
+          const u = data.user
+          // Panel de gestión: requiere toggle de crear (módulo solo = ver en /forms)
+          if (u?.canManageForms && u?.formsEnabled) {
             setHasAccess(true)
             loadForms()
             loadUsersAndDepartments()
@@ -132,7 +136,7 @@ export default function AdminFormsPage() {
         const res = await fetch(`/api/user/modules?_t=${Date.now()}`)
         if (res.ok) {
           const modules = await res.json()
-          if (modules.forms) {
+          if (modules.canManageForms && modules.forms) {
             setHasAccess(true)
             loadForms()
             loadUsersAndDepartments()
@@ -150,27 +154,41 @@ export default function AdminFormsPage() {
   // ── Carga de datos ─────────────────────────────────────────────────────────
   const loadUsersAndDepartments = async () => {
     try {
-      const [usersRes, deptsRes, familiesRes] = await Promise.all([
-        // Solo usuarios con el módulo de documentos activo (formsEnabled=true) o admins.
+      const visRes = await fetch('/api/content/visibility-options')
+      if (visRes.ok) {
+        const vis = await visRes.json()
+        setUsers(vis.users || [])
+        setFamilies(
+          (vis.families || []).map((f: any) => ({
+            id: f.id,
+            name: f.name,
+            departments: f.departments || [],
+          }))
+        )
+        setDepartments(
+          (vis.families || []).flatMap((f: any) =>
+            (f.departments || []).map((d: any) => ({ ...d, familyId: f.id }))
+          )
+        )
+        if (vis.scope?.allowedRoles) setAllowedRoles(vis.scope.allowedRoles)
+        setRequireFamilyRestriction(!!vis.scope?.requireFamilyRestriction)
+        return
+      }
+
+      // Fallback legado
+      const [usersRes, familiesRes] = await Promise.all([
         fetch('/api/users?limit=500&isActive=true&formsEnabled=true'),
-        fetch('/api/departments'),
-        fetch('/api/families?includeInactive=false&scope=all'),
+        fetch('/api/families?includeInactive=false&scope=content'),
       ])
       if (usersRes.ok) setUsers((await usersRes.json()).data || [])
-      if (deptsRes.ok) {
-        const d = await deptsRes.json()
-        setDepartments(d.departments || d.data || [])
-      }
       if (familiesRes.ok) {
         const fd = await familiesRes.json()
         const fList = fd.data || fd.families || []
-        const d2Res = await fetch('/api/departments')
-        const allDepts: DepartmentOption[] = d2Res.ok ? (await d2Res.json()).departments || [] : []
         setFamilies(
           fList.map((f: any) => ({
             id: f.id,
             name: f.name,
-            departments: allDepts.filter((d: any) => d.familyId === f.id || d.family?.id === f.id),
+            departments: f.departments || [],
           }))
         )
       }
@@ -581,6 +599,8 @@ export default function AdminFormsPage() {
         onDeleteCategory={handleDeleteCategory}
         onLoadCategories={loadCategories}
         collapseAdvanced
+        allowedRoles={allowedRoles}
+        requireFamilyRestriction={requireFamilyRestriction}
       />
 
       {/* ── Dialog eliminar ───────────────────────────────────────────────── */}

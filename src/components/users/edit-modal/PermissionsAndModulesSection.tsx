@@ -288,6 +288,7 @@ export function PermissionsAndModulesSection({
             />
 
             {/* ── Noticias ── */}
+            {/* Módulo activo = ver. Toggle "Crear…" = gestionar (alcance por rol). */}
             <ModuleAccessCard
               moduleKey='news'
               moduleName='Noticias'
@@ -299,8 +300,7 @@ export function PermissionsAndModulesSection({
               onAssignFamily={async () => {}}
               onUnassignFamily={async () => {}}
               options={
-                // ADMIN siempre gestiona — solo TECHNICIAN puede tener toggle de gestión de noticias
-                formData.role === 'TECHNICIAN'
+                formData.role === 'TECHNICIAN' || formData.role === 'CLIENT'
                   ? {
                       canManageNews: formData.canManageNews,
                       onToggleManageNews: v => onToggle('canManageNews', v),
@@ -311,7 +311,7 @@ export function PermissionsAndModulesSection({
             />
 
             {/* ── Documentos ── */}
-            {/* CLIENT: solo puede ver documentos, sin opción de gestionar */}
+            {/* Módulo activo = ver. Toggle "Crear…" = gestionar (alcance por rol). */}
             <ModuleAccessCard
               moduleKey='forms'
               moduleName='Documentos'
@@ -323,8 +323,7 @@ export function PermissionsAndModulesSection({
               onAssignFamily={async () => {}}
               onUnassignFamily={async () => {}}
               options={
-                // Solo TECHNICIAN puede tener canManageForms — CLIENT solo ve
-                formData.role === 'TECHNICIAN'
+                formData.role === 'TECHNICIAN' || formData.role === 'CLIENT'
                   ? {
                       canManageForms: formData.canManageForms,
                       onToggleManageForms: v => onToggle('canManageForms', v),

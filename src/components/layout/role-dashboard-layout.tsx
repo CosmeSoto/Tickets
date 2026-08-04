@@ -263,8 +263,12 @@ const navigationByRole: Record<string, NavItem[]> = {
         { name: 'Mis Incidentes', href: '/patrol/incidents', icon: AlertTriangle },
       ],
     },
-    // Noticias no aparece en el sidebar del CLIENT — el feed está embebido en el dashboard.
-    // El link solo aplica a TECHNICIAN con canManageNews y a ADMIN.
+    // Noticias: solo si canManageNews (ver abajo en filtro). Feed de lectura va en dashboard.
+    {
+      name: 'Noticias',
+      href: '/admin/news',
+      icon: Newspaper,
+    },
     {
       name: 'Documentos',
       href: '/forms',
@@ -306,7 +310,11 @@ const navigationByRole: Record<string, NavItem[]> = {
         { name: 'Mis Incidentes', href: '/patrol/incidents', icon: AlertTriangle },
       ],
     },
-    // Noticias no aparece en el sidebar del CLIENT — el feed está embebido en el dashboard.
+    {
+      name: 'Noticias',
+      href: '/admin/news',
+      icon: Newspaper,
+    },
     {
       name: 'Documentos',
       href: '/forms',
@@ -461,7 +469,7 @@ export function RoleDashboardLayout({
     )
   }
 
-  // canManageNews: leer del hook (fresco desde DB) — la sesión puede estar desactualizada
+  // canManage*: leer del hook (fresco desde DB) — la sesión puede estar desactualizada
   // si un admin acaba de cambiar el permiso sin que el usuario haya vuelto a hacer login.
   const canManageNews = canManageNewsFromModules || (session.user as any)?.canManageNews === true
   const userRole = session.user.role as string
@@ -517,20 +525,16 @@ export function RoleDashboardLayout({
       ) {
         return hasPatrols
       }
-      // Ocultar Noticias si el usuario no tiene newsEnabled.
-      // CLIENT: nunca muestra el link aunque tenga newsEnabled — las noticias
-      //         ya están en el dashboard como feed embebido.
-      // TECHNICIAN: solo muestra el link si tiene canManageNews (puede gestionar).
-      //             Si solo tiene newsEnabled sin canManageNews, ve el feed en el
-      //             dashboard pero no necesita el link de gestión.
-      // ADMIN: siempre visible (filtrado en su propio bloque arriba).
+      // Noticias: módulo = feed (dashboard). Link de gestión solo con canManageNews.
       if (item.href === '/admin/news' || item.name === 'Noticias') {
-        if (userRole === 'CLIENT') return false
-        if (userRole === 'TECHNICIAN') return hasNews && canManageNews
+        if (userRole === 'CLIENT' || userRole === 'TECHNICIAN') {
+          return hasNews && canManageNews
+        }
         return hasNews
       }
-      // Ocultar Formularios si el usuario no tiene formsEnabled
-      if (item.href === '/forms' || item.name === 'Documentos') {
+      // Documentos: ver con formsEnabled; /admin/forms solo con canManageForms (proxy).
+      // El listado de lectura/creación unificado está en /forms.
+      if (item.href === '/forms' || item.href === '/admin/forms' || item.name === 'Documentos') {
         return hasForms
       }
       return true

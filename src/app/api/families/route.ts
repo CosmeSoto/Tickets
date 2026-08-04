@@ -82,17 +82,19 @@ export async function GET(request: NextRequest) {
 
     // ── Clientes: scope consumer (nativa + asignaciones; TECHNOLOGY legacy remapeado) ──
     if (session.user.role === 'CLIENT') {
-      // Excepción: usuarios con newsEnabled y scope=all pueden ver todas las familias (para gestión de noticias)
-      const scopeAll = searchParams.get('scope') === 'all'
-      if (scopeAll) {
-        const clientUser = await prisma.users.findUnique({
-          where: { id: session.user.id },
-          select: { newsEnabled: true },
-        })
-        if (clientUser?.newsEnabled) {
-          const allFamilies = await FamilyService.findAll(false)
-          return NextResponse.json({ success: true, data: allFamilies })
+      // Documentos/Noticias: solo familia nativa (o asignaciones si no hay nativa)
+      if (searchParams.get('scope') === 'content') {
+        const { getContentVisibilityScope } = await import('@/lib/content/visibility-scope')
+        const vis = await getContentVisibilityScope(session.user.id, 'CLIENT', false)
+        const ids = vis.allowedFamilyIds ?? []
+        if (ids.length === 0) {
+          return NextResponse.json({ success: true, data: [] })
         }
+        const families = await listTicketRequestFamilies({
+          familyIds: ids,
+          userFamilyId: vis.nativeFamilyId,
+        })
+        return NextResponse.json({ success: true, data: families })
       }
 
       const { getTicketConsumerFamilyIds, getNativeFamilyId } =
@@ -115,17 +117,24 @@ export async function GET(request: NextRequest) {
 
     // ── Técnicos (y otros no-ADMIN): familias consumer de tickets ────────────
     if (session.user.role !== 'ADMIN') {
-      // Excepción: usuarios con newsEnabled y scope=all pueden ver todas las familias (para gestión de noticias)
-      const scopeAll = searchParams.get('scope') === 'all'
-      if (scopeAll) {
-        const techUser = await prisma.users.findUnique({
-          where: { id: session.user.id },
-          select: { newsEnabled: true },
-        })
-        if (techUser?.newsEnabled) {
-          const allFamilies = await FamilyService.findAll(false)
-          return NextResponse.json({ success: true, data: allFamilies })
+      // Documentos/Noticias: familias del scope del usuario (no org-wide)
+      if (searchParams.get('scope') === 'content') {
+        const { getContentVisibilityScope } = await import('@/lib/content/visibility-scope')
+        const isSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
+        const vis = await getContentVisibilityScope(
+          session.user.id,
+          session.user.role,
+          isSuperAdmin
+        )
+        const ids = vis.allowedFamilyIds ?? []
+        if (ids.length === 0) {
+          return NextResponse.json({ success: true, data: [] })
         }
+        const families = await listTicketRequestFamilies({
+          familyIds: ids,
+          userFamilyId: vis.nativeFamilyId,
+        })
+        return NextResponse.json({ success: true, data: families })
       }
 
       const { getTicketConsumerFamilyIds } = await import('@/lib/auth/family-scope')

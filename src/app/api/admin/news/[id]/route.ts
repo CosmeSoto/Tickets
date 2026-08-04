@@ -10,51 +10,15 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
+import { assertCanManageNews, assertCanModifyNews } from '@/lib/news/news-manage-access'
+import {
+  getContentVisibilityScope,
+  sanitizeVisibilityPayload,
+} from '@/lib/content/visibility-scope'
+import { buildVisibilityAuditSummary } from '@/lib/content/visibility-audit'
 
 interface Params {
   params: Promise<{ id: string }>
-}
-
-/** Verifica si el usuario tiene acceso a gestión de noticias (admin o canManageNews) */
-async function hasNewsManagementAccess(session: any): Promise<boolean> {
-  if (session.user.role === 'ADMIN' || session.user.isSuperAdmin) return true
-  const user = await prisma.users.findUnique({
-    where: { id: session.user.id },
-    select: { canManageNews: true },
-  })
-  return user?.canManageNews === true
-}
-
-/** Verifica si el usuario puede modificar una noticia específica */
-async function canModifyNews(
-  session: any,
-  newsId: string
-): Promise<{ allowed: boolean; reason?: string }> {
-  const dbUser = await prisma.users.findUnique({
-    where: { id: session.user.id },
-    select: { isSuperAdmin: true, canManageNews: true, role: true },
-  })
-
-  if (dbUser?.isSuperAdmin) return { allowed: true }
-  // Admin normal puede modificar cualquier noticia
-  if (dbUser?.role === 'ADMIN') return { allowed: true }
-
-  // TECHNICIAN/CLIENT: solo si tiene canManageNews y es el creador
-  if (!dbUser?.canManageNews) {
-    return { allowed: false, reason: 'No tienes permisos para gestionar noticias' }
-  }
-
-  const news = await prisma.news.findUnique({
-    where: { id: newsId },
-    select: { createdById: true },
-  })
-
-  if (!news) return { allowed: false, reason: 'Noticia no encontrada' }
-  if (news.createdById !== session.user.id) {
-    return { allowed: false, reason: 'Solo puedes modificar noticias que tú creaste' }
-  }
-
-  return { allowed: true }
 }
 
 /**
@@ -69,9 +33,8 @@ export async function GET(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    if (!(await hasNewsManagementAccess(session))) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-    }
+    const denied = await assertCanManageNews(session.user.id, session.user.role)
+    if (denied) return denied
 
     const news = await prisma.news.findUnique({
       where: { id },
@@ -156,10 +119,10 @@ export async function PUT(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    const access = await canModifyNews(session, id)
-    if (!access.allowed) {
-      return NextResponse.json({ error: access.reason || 'No autorizado' }, { status: 403 })
-    }
+    const deniedManage = await assertCanManageNews(session.user.id, session.user.role)
+    if (deniedManage) return deniedManage
+    const deniedModify = await assertCanModifyNews(id, session.user.id, session.user.role)
+    if (deniedModify) return deniedModify
 
     const data = await request.json()
     const existingNews = await prisma.news.findUnique({
@@ -168,6 +131,28 @@ export async function PUT(request: NextRequest, { params }: Params) {
 
     if (!existingNews) {
       return NextResponse.json({ error: 'Noticia no encontrada' }, { status: 404 })
+    }
+
+    const isSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
+    let sanitized = null as Awaited<ReturnType<typeof sanitizeVisibilityPayload>> | null
+    if (
+      data.roles !== undefined ||
+      data.userIds !== undefined ||
+      data.departmentIds !== undefined ||
+      data.familyIds !== undefined
+    ) {
+      const visScope = await getContentVisibilityScope(
+        session.user.id,
+        session.user.role,
+        isSuperAdmin
+      )
+      sanitized = await sanitizeVisibilityPayload(visScope, {
+        roles: data.roles,
+        familyIds: data.familyIds,
+        departmentIds: data.departmentIds,
+        userIds: data.userIds,
+      })
+      if (sanitized instanceof NextResponse) return sanitized
     }
 
     let slug = existingNews.slug
@@ -222,36 +207,43 @@ export async function PUT(request: NextRequest, { params }: Params) {
       },
     })
 
-    if (data.roles !== undefined) {
+    if (sanitized && !(sanitized instanceof NextResponse)) {
       await prisma.news_roles.deleteMany({ where: { newsId: id } })
-      await prisma.news_roles.createMany({
-        data: data.roles.map((role: string) => ({ newsId: id, role })),
-      })
-    }
+      if (sanitized.roles.length) {
+        await prisma.news_roles.createMany({
+          data: sanitized.roles.map(role => ({ newsId: id, role })),
+        })
+      }
 
-    if (data.userIds !== undefined) {
       await prisma.news_users.deleteMany({ where: { newsId: id } })
-      await prisma.news_users.createMany({
-        data: data.userIds.map((userId: string) => ({ newsId: id, userId })),
-      })
-    }
+      if (sanitized.userIds.length) {
+        await prisma.news_users.createMany({
+          data: sanitized.userIds.map(userId => ({ newsId: id, userId })),
+        })
+      }
 
-    if (data.departmentIds !== undefined) {
       await prisma.news_departments.deleteMany({ where: { newsId: id } })
-      await prisma.news_departments.createMany({
-        data: data.departmentIds.map((departmentId: string) => ({
-          newsId: id,
-          departmentId,
-        })),
-      })
+      if (sanitized.departmentIds.length) {
+        await prisma.news_departments.createMany({
+          data: sanitized.departmentIds.map(departmentId => ({
+            newsId: id,
+            departmentId,
+          })),
+        })
+      }
+
+      await prisma.news_families.deleteMany({ where: { newsId: id } })
+      if (sanitized.familyIds.length) {
+        await prisma.news_families.createMany({
+          data: sanitized.familyIds.map(familyId => ({ newsId: id, familyId })),
+        })
+      }
     }
 
-    if (data.familyIds !== undefined) {
-      await prisma.news_families.deleteMany({ where: { newsId: id } })
-      await prisma.news_families.createMany({
-        data: data.familyIds.map((familyId: string) => ({ newsId: id, familyId })),
-      })
-    }
+    const visibilitySummary =
+      sanitized && !(sanitized instanceof NextResponse)
+        ? buildVisibilityAuditSummary(sanitized)
+        : {}
 
     await AuditServiceComplete.log({
       action:
@@ -270,32 +262,34 @@ export async function PUT(request: NextRequest, { params }: Params) {
         title: data.title || existingNews.title,
         status: data.status,
         priority: data.priority,
+        ...visibilitySummary,
+      },
+      details: {
+        source: 'news_module',
+        publishedNow: data.status === 'PUBLISHED' && existingNews.status !== 'PUBLISHED',
       },
       request,
     })
 
-    // Notificar en tiempo real cuando se publica (especialmente ALERT/URGENT)
+    // Notificar solo a destinatarios de la visibilidad al publicar
     if (data.status === 'PUBLISHED' && existingNews.status !== 'PUBLISHED') {
       try {
+        const { NotificationService } = await import('@/lib/services/notification-service')
+        const { NotificationType } = await import('@prisma/client')
         const { NotificationEvents } = await import('@/lib/notification-events')
-        const activeUserIds = NotificationEvents.getConnectedUserIds?.() ?? []
-        if (activeUserIds.length > 0) {
-          NotificationEvents.emitToMany(activeUserIds, {
+        const { getNewsNotificationLink, getNewsNotificationRecipientIds } =
+          await import('@/lib/news/news-access')
+
+        const targetUsers = await getNewsNotificationRecipientIds(news.id, session.user.id)
+        const targetIds = targetUsers.map(u => u.id)
+
+        if (targetIds.length > 0) {
+          NotificationEvents.emitToMany?.(targetIds, {
             type: 'news_published',
             newsId: news.id,
             newsType: news.type,
           })
         }
-
-        // Crear notificaciones persistentes para usuarios con el módulo de noticias habilitado
-        const { NotificationService } = await import('@/lib/services/notification-service')
-        const { NotificationType } = await import('@prisma/client')
-        const {
-          getNewsNotificationLink,
-          getNewsNotificationRecipientIds,
-        } = await import('@/lib/news/news-access')
-
-        const targetUsers = await getNewsNotificationRecipientIds(news.id, session.user.id)
 
         const newsPriority = news.priority ?? 'MEDIUM'
         const priorityLabel =
@@ -342,10 +336,10 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    const access = await canModifyNews(session, id)
-    if (!access.allowed) {
-      return NextResponse.json({ error: access.reason || 'No autorizado' }, { status: 403 })
-    }
+    const deniedManage = await assertCanManageNews(session.user.id, session.user.role)
+    if (deniedManage) return deniedManage
+    const deniedModify = await assertCanModifyNews(id, session.user.id, session.user.role)
+    if (deniedModify) return deniedModify
 
     const existingNews = await prisma.news.findUnique({
       where: { id: id },

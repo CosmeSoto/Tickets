@@ -361,14 +361,15 @@ export function EditUserModal({
       setFormData(p => ({
         ...p,
         newsEnabled: value,
-        // Al desactivar noticias se limpia canManageNews automáticamente
+        // Desactivar módulo → quita permiso de crear. Activar módulo ≠ crear.
         canManageNews: value ? p.canManageNews : false,
       }))
     } else if (field === 'formsEnabled') {
       setFormData(p => ({
         ...p,
         formsEnabled: value,
-        canManageForms: false,
+        // Desactivar módulo → quita permiso de crear. Activar módulo ≠ crear.
+        canManageForms: value ? p.canManageForms : false,
       }))
     } else {
       setFormData(p => ({ ...p, [field]: value }))

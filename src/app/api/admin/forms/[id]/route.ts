@@ -11,6 +11,11 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 import { assertCanManageForms, assertCanModifyForm } from '@/lib/forms/forms-access'
+import {
+  getContentVisibilityScope,
+  sanitizeVisibilityPayload,
+} from '@/lib/content/visibility-scope'
+import { buildVisibilityAuditSummary } from '@/lib/content/visibility-audit'
 
 // Campos comunes de include (mismo que en route.ts padre)
 const FORM_INCLUDE = {
@@ -107,20 +112,32 @@ export async function PUT(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'Formulario no encontrado' }, { status: 404 })
     }
 
-    // TECHNICIAN/CLIENT con canManageForms no pueden cambiar isActive ni isFeatured
+    // TECHNICIAN/CLIENT no pueden cambiar isActive ni isFeatured
     const isAdminRole = session.user.role === 'ADMIN'
     const effectiveIsActive = isAdminRole ? data.isActive !== false : existing.isActive
     const effectiveIsFeatured = isAdminRole ? data.isFeatured === true : existing.isFeatured
 
+    const visScope = await getContentVisibilityScope(
+      session.user.id,
+      session.user.role,
+      isSuperAdmin
+    )
+    const sanitized = await sanitizeVisibilityPayload(visScope, {
+      roles: data.roles,
+      familyIds: data.familyIds,
+      departmentIds: data.departmentIds,
+      userIds: data.userIds,
+      familyId: data.familyId,
+    })
+    if (sanitized instanceof NextResponse) return sanitized
+
     // Actualizar en transacción: primero borrar relaciones antiguas, luego recrear
     const form = await prisma.$transaction(async tx => {
-      // Borrar relaciones de visibilidad anteriores
       await tx.form_roles.deleteMany({ where: { formId: id } })
       await tx.form_users.deleteMany({ where: { formId: id } })
       await tx.form_departments.deleteMany({ where: { formId: id } })
       await tx.form_families.deleteMany({ where: { formId: id } })
 
-      // Actualizar el form con los nuevos datos
       return tx.forms.update({
         where: { id },
         data: {
@@ -129,25 +146,24 @@ export async function PUT(request: NextRequest, { params }: Params) {
           summary: data.summary?.trim() || null,
           version: data.version?.trim() || null,
           categoryId: data.categoryId || existing.categoryId,
-          familyId: data.familyId || null,
+          familyId: sanitized.familyId,
           fileUrl: data.fileUrl?.trim() || null,
           fileSize: data.fileSize ?? null,
           fileType: data.fileType?.trim() || null,
           isActive: effectiveIsActive,
           isFeatured: effectiveIsFeatured,
           updatedById: session.user.id,
-          // Recrear relaciones de visibilidad
-          form_roles: data.roles?.length
-            ? { create: data.roles.map((role: string) => ({ role })) }
+          form_roles: sanitized.roles.length
+            ? { create: sanitized.roles.map(role => ({ role })) }
             : undefined,
-          form_users: data.userIds?.length
-            ? { create: data.userIds.map((userId: string) => ({ userId })) }
+          form_users: sanitized.userIds.length
+            ? { create: sanitized.userIds.map(userId => ({ userId })) }
             : undefined,
-          form_departments: data.departmentIds?.length
-            ? { create: data.departmentIds.map((departmentId: string) => ({ departmentId })) }
+          form_departments: sanitized.departmentIds.length
+            ? { create: sanitized.departmentIds.map(departmentId => ({ departmentId })) }
             : undefined,
-          form_families: data.familyIds?.length
-            ? { create: data.familyIds.map((familyId: string) => ({ familyId })) }
+          form_families: sanitized.familyIds.length
+            ? { create: sanitized.familyIds.map(familyId => ({ familyId })) }
             : undefined,
         },
         include: FORM_INCLUDE,
@@ -168,9 +184,42 @@ export async function PUT(request: NextRequest, { params }: Params) {
         title: data.title?.trim(),
         isActive: effectiveIsActive,
         isFeatured: effectiveIsFeatured,
+        ...buildVisibilityAuditSummary(sanitized),
+      },
+      details: {
+        becameActive: !existing.isActive && effectiveIsActive,
+        source: 'forms_module',
       },
       request,
     })
+
+    // Notificar al activar un documento que estaba inactivo
+    if (!existing.isActive && effectiveIsActive) {
+      try {
+        const { NotificationService } = await import('@/lib/services/notification-service')
+        const { NotificationType } = await import('@prisma/client')
+        const { getFormNotificationLink, getFormNotificationRecipientIds } =
+          await import('@/lib/forms/form-visibility')
+
+        const targetUsers = await getFormNotificationRecipientIds(id, session.user.id)
+        await Promise.allSettled(
+          targetUsers.map(u =>
+            NotificationService.push({
+              userId: u.id,
+              type: NotificationType.INFO,
+              title: 'Documento disponible',
+              message: `${form.title}`,
+              metadata: {
+                link: getFormNotificationLink(u),
+                formId: form.id,
+              },
+            })
+          )
+        )
+      } catch {
+        // no-op
+      }
+    }
 
     return NextResponse.json({ form })
   } catch (error) {
