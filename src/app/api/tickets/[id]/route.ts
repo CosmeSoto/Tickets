@@ -563,30 +563,49 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
             console.error('[WEBHOOK] Error disparando evento TICKET_RESOLVED:', err)
           })
 
-          // Enviar email al cliente
-          if (updatedTicket.users_tickets_clientIdTousers) {
-            await EmailService.queueEmail(
-              {
-                to: updatedTicket.users_tickets_clientIdTousers.email,
-                subject: `Ticket #${finalId.substring(0, 8)} resuelto`,
-                template: 'ticket-resolved',
-                templateData: {
-                  ticketId: finalId,
-                  title: updatedTicket.title,
-                  clientName: updatedTicket.users_tickets_clientIdTousers.name,
-                  technicianName: session.user.name,
+          // Email + notificación a quien debe calificar
+          // (PATROL → createdById / supervisor; WEB → clientId / solicitante)
+          const isPatrolResolved =
+            existingTicket.source === 'PATROL' && !!existingTicket.createdById
+          const raterId = isPatrolResolved ? existingTicket.createdById! : existingTicket.clientId
+          if (raterId) {
+            const rater = await prisma.users.findUnique({
+              where: { id: raterId },
+              select: { name: true, email: true, role: true },
+            })
+            if (rater?.email) {
+              const rolePrefix =
+                rater.role === 'ADMIN'
+                  ? 'admin'
+                  : rater.role === 'TECHNICIAN'
+                    ? 'technician'
+                    : 'client'
+              await EmailService.queueEmail(
+                {
+                  to: rater.email,
+                  subject: isPatrolResolved
+                    ? `Ticket escalado resuelto — califica el servicio`
+                    : `Ticket #${finalId.substring(0, 8)} resuelto`,
+                  template: 'ticket-resolved',
+                  templateData: {
+                    ticketId: finalId,
+                    title: updatedTicket.title,
+                    clientName: rater.name,
+                    technicianName: session.user.name,
+                    ticketUrl: `/${rolePrefix}/tickets/${finalId}`,
+                    isPatrolEscalation: isPatrolResolved,
+                  },
                 },
-              },
-              session.user.id
-            ).catch(err => {
-              console.error('[EMAIL] Error enviando email de ticket resuelto:', err)
-            })
-
-            // ⭐ NUEVO: Enviar notificación in-app al cliente
-            await NotificationService.notifyTicketResolved(finalId).catch(err => {
-              console.error('[NOTIFICATION] Error enviando notificación de ticket resuelto:', err)
-            })
+                session.user.id
+              ).catch(err => {
+                console.error('[EMAIL] Error enviando email de ticket resuelto:', err)
+              })
+            }
           }
+
+          await NotificationService.notifyTicketResolved(finalId).catch(err => {
+            console.error('[NOTIFICATION] Error enviando notificación de ticket resuelto:', err)
+          })
 
           // ⭐ NUEVO: Notificar al administrador que el ticket fue resuelto
           const { triggerTicketResolvedToAdminEmail } = await import('@/lib/email-triggers')

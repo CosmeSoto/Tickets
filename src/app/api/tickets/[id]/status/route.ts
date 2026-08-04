@@ -54,6 +54,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         status: true,
         assigneeId: true,
         clientId: true,
+        createdById: true,
+        source: true,
         familyId: true,
         title: true,
       },
@@ -196,9 +198,61 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       request: request,
     }).catch(err => console.error('[AUDIT] Error registrando cambio de estado:', err))
 
-    // Notificar al cliente cuando el técnico o SUPER ADMIN marca como RESOLVED
-    if (newStatus === 'RESOLVED' && ticket.clientId) {
+    // Notificar a quien debe calificar (PATROL → supervisor que escaló; WEB → solicitante)
+    if (newStatus === 'RESOLVED') {
       await NotificationService.notifyTicketResolved(ticketId).catch(() => {})
+
+      // Email al responsable de calificar (no siempre al clientId/agente en PATROL)
+      const isPatrol = ticket.source === 'PATROL' && !!ticket.createdById
+      const raterId = isPatrol ? ticket.createdById! : ticket.clientId
+      if (raterId) {
+        const rater = await prisma.users.findUnique({
+          where: { id: raterId },
+          select: { id: true, name: true, email: true, role: true },
+        })
+        if (rater?.email) {
+          const { EmailService } = await import('@/lib/services/email/email-service')
+          const rolePrefix =
+            rater.role === 'ADMIN' ? 'admin' : rater.role === 'TECHNICIAN' ? 'technician' : 'client'
+          await EmailService.queueEmail(
+            {
+              to: rater.email,
+              subject: isPatrol
+                ? `Ticket escalado resuelto — califica el servicio`
+                : `Ticket #${ticketId.substring(0, 8)} resuelto`,
+              template: 'ticket-resolved',
+              templateData: {
+                ticketId,
+                title: ticket.title,
+                clientName: rater.name,
+                technicianName: session.user.name,
+                ticketUrl: `/${rolePrefix}/tickets/${ticketId}`,
+                isPatrolEscalation: isPatrol,
+              },
+            },
+            session.user.id
+          ).catch(err => {
+            console.error('[EMAIL] Error enviando email de ticket resuelto:', err)
+          })
+        }
+      }
+
+      await AuditServiceComplete.log({
+        action: AuditActionsComplete.TICKET_RESOLVED,
+        entityType: 'ticket',
+        entityId: ticketId,
+        userId: session.user.id,
+        details: {
+          ticketTitle: ticket.title,
+          resolvedBy: session.user.name,
+          source: ticket.source,
+          raterUserId:
+            ticket.source === 'PATROL' && ticket.createdById ? ticket.createdById : ticket.clientId,
+        },
+        oldValues: { status: currentStatus },
+        newValues: { status: newStatus },
+        request: request,
+      }).catch(err => console.error('[AUDIT] Error registrando resolución:', err))
     }
 
     // Notificar al técnico cuando ADMIN o SUPER ADMIN cierra el ticket directamente
@@ -216,19 +270,37 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       }).catch(() => {})
     }
 
-    // Notificar al cliente cuando ADMIN o SUPER ADMIN cierra directamente (sin calificación)
-    if (
-      newStatus === 'CLOSED' &&
-      ticket.clientId &&
-      (session.user.role === 'ADMIN' || isSuperAdmin)
-    ) {
-      await NotificationService.push({
-        userId: ticket.clientId,
-        type: 'SUCCESS',
-        title: 'Ticket cerrado',
-        message: `Tu ticket "${ticket.title}" ha sido cerrado`,
-        ticketId,
-      }).catch(() => {})
+    // Cierre directo (sin calificación): avisar al solicitante / supervisor de escalamiento
+    if (newStatus === 'CLOSED' && (session.user.role === 'ADMIN' || isSuperAdmin)) {
+      const isPatrol = ticket.source === 'PATROL' && !!ticket.createdById
+      const notifyUserId = isPatrol ? ticket.createdById! : ticket.clientId
+      if (notifyUserId && notifyUserId !== session.user.id) {
+        await NotificationService.push({
+          userId: notifyUserId,
+          type: 'SUCCESS',
+          title: 'Ticket cerrado',
+          message: isPatrol
+            ? `El ticket escalado desde rondas "${ticket.title}" ha sido cerrado`
+            : `Tu ticket "${ticket.title}" ha sido cerrado`,
+          ticketId,
+        }).catch(() => {})
+      }
+      // En PATROL, informar también al agente si es distinto
+      if (
+        isPatrol &&
+        ticket.clientId &&
+        ticket.clientId !== notifyUserId &&
+        ticket.clientId !== session.user.id
+      ) {
+        await NotificationService.push({
+          userId: ticket.clientId,
+          type: 'SUCCESS',
+          title: 'Novedad cerrada',
+          message: `La novedad asociada al ticket "${ticket.title}" ha sido cerrada`,
+          ticketId,
+          metadata: { link: `/client/tickets/${ticketId}` },
+        }).catch(() => {})
+      }
     }
 
     // Invalidar caché de tickets y dashboard

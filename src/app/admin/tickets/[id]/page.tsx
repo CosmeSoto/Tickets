@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { AlertCircle } from 'lucide-react'
+import { AlertCircle, Star } from 'lucide-react'
 import { TicketDetailLayout } from '@/components/tickets/ticket-detail-layout'
 import { CompactFileManager } from '@/components/tickets/compact-file-manager'
 import { TicketTimeline } from '@/components/ui/ticket-timeline'
@@ -12,6 +12,15 @@ import { TicketResolutionTracker } from '@/components/ui/ticket-resolution-track
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import {
   useTicketData,
   useUserData,
@@ -39,6 +48,8 @@ export default function AdminTicketDetailPage() {
   const [ticket, setTicket] = useState<Ticket | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<{ status: number; message: string } | null>(null)
+  const [showRatingModal, setShowRatingModal] = useState(false)
+  const initialRatingPromptDone = useRef(false)
   const [resolvers, setResolvers] = useState<any[]>([])
   const [filteredResolvers, setFilteredResolvers] = useState<any[]>([])
   const [isEditing, setIsEditing] = useState(false)
@@ -92,6 +103,10 @@ export default function AdminTicketDetailPage() {
       .catch(() => setFilteredResolvers(resolvers))
   }, [ticket, resolvers])
 
+  const getRaterId = useCallback((data: Ticket) => {
+    return data.source === 'PATROL' && data.createdById ? data.createdById : data.client?.id
+  }, [])
+
   const refreshTicketSilent = useCallback(async () => {
     if (!ticketId || ticketId === 'create' || unassigning || assignmentDialogOpen) return
     try {
@@ -118,10 +133,20 @@ export default function AdminTicketDetailPage() {
         setTimelineKey(k => k + 1)
         setRatingKey(k => k + 1)
       }
+      // Al pasar a RESOLVED, abrir modal si este admin es quien debe calificar
+      if (
+        prevStatus &&
+        prevStatus !== 'RESOLVED' &&
+        data.status === 'RESOLVED' &&
+        session?.user?.id &&
+        session.user.id === getRaterId(data)
+      ) {
+        setShowRatingModal(true)
+      }
     } catch {
       /* ignore */
     }
-  }, [ticketId, unassigning, assignmentDialogOpen, router])
+  }, [ticketId, unassigning, assignmentDialogOpen, router, session?.user?.id, getRaterId])
 
   useTicketSSE(ticketId, refreshTicketSilent)
 
@@ -165,6 +190,17 @@ export default function AdminTicketDetailPage() {
           priority: data.priority,
           assigneeId: data.assignee?.id || '',
         })
+        // Primera carga: si ya está resuelto y este usuario debe calificar, abrir modal
+        if (
+          !initialRatingPromptDone.current &&
+          data.status === 'RESOLVED' &&
+          session?.user?.id &&
+          session.user.id ===
+            (data.source === 'PATROL' && data.createdById ? data.createdById : data.client?.id)
+        ) {
+          initialRatingPromptDone.current = true
+          setShowRatingModal(true)
+        }
       }
     } finally {
       setLoading(false)
@@ -198,9 +234,20 @@ export default function AdminTicketDetailPage() {
       })
       const data = await res.json()
       if (res.ok && data.success) {
+        const prevStatus = ticket.status
         await loadTicket()
         setTimelineKey(k => k + 1)
         setRatingKey(k => k + 1)
+        // Quien debe calificar (PATROL → quien escaló; WEB → solicitante) ve el modal al instante
+        const raterId =
+          ticket.source === 'PATROL' && ticket.createdById ? ticket.createdById : ticket.client?.id
+        if (
+          prevStatus !== 'RESOLVED' &&
+          statusToApply === 'RESOLVED' &&
+          session?.user?.id === raterId
+        ) {
+          setShowRatingModal(true)
+        }
       } else {
         toast({
           title: 'Error al actualizar estado',
@@ -323,6 +370,10 @@ export default function AdminTicketDetailPage() {
     ticket.source === 'PATROL' && ticket.createdBy?.name
       ? ticket.createdBy.name
       : ticket.client?.name
+  const canRateTicket =
+    !!session?.user?.id &&
+    session.user.id === ratingUserId &&
+    (ticket.status === 'RESOLVED' || ticket.status === 'CLOSED')
 
   return (
     <TicketDetailLayout
@@ -444,22 +495,70 @@ export default function AdminTicketDetailPage() {
             key={`admin-rating-${ratingKey}`}
             ticketId={ticket.id}
             technicianId={ticket.assignee?.id}
-            canRate={
-              (ticket.source === 'PATROL' && ticket.createdById
-                ? session?.user?.id === ticket.createdById
-                : session?.user?.id === ticket.client.id) &&
-              (ticket.status === 'RESOLVED' || ticket.status === 'CLOSED')
-            }
+            canRate={canRateTicket}
             showTechnicianStats
             mode='admin'
             refreshKey={ratingKey}
             onRatingSubmitted={() => {
+              setShowRatingModal(false)
               setRatingKey(k => k + 1)
               void loadTicket()
             }}
           />
+
+          {ticket.status === 'RESOLVED' && canRateTicket && !showRatingModal && (
+            <Button
+              type='button'
+              className='w-full bg-amber-600 hover:bg-amber-700 text-white'
+              onClick={() => setShowRatingModal(true)}
+            >
+              <Star className='h-4 w-4 mr-2' />
+              Calificar y cerrar ticket
+            </Button>
+          )}
         </div>
       </div>
+
+      <AlertDialog
+        open={showRatingModal}
+        onOpenChange={open => {
+          setShowRatingModal(open)
+          if (!open) initialRatingPromptDone.current = true
+        }}
+      >
+        <AlertDialogContent className='max-w-2xl'>
+          <AlertDialogHeader>
+            <AlertDialogTitle className='flex items-center gap-2'>
+              <Star className='h-5 w-5 text-amber-600' />
+              Califica el servicio
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {ticket.source === 'PATROL'
+                ? 'Como supervisor que escaló la novedad, califica la resolución para cerrar el ticket.'
+                : 'Tu opinión ayuda a mejorar la calidad del soporte. Al calificar se cerrará el ticket.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className='max-h-[60vh] overflow-y-auto'>
+            <TicketRatingSystem
+              key={`admin-modal-rating-${ratingKey}`}
+              ticketId={ticket.id}
+              technicianId={ticket.assignee?.id}
+              canRate={canRateTicket}
+              showTechnicianStats={false}
+              mode='admin'
+              refreshKey={ratingKey}
+              onRatingSubmitted={() => {
+                setShowRatingModal(false)
+                setRatingKey(k => k + 1)
+                void loadTicket()
+              }}
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Más tarde</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </TicketDetailLayout>
   )
 }

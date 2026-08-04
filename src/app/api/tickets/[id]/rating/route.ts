@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import { z } from 'zod'
 import { NotificationService } from '@/lib/services/notification-service'
+import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 import {
   assertTicketAccess,
   TicketAccessError,
@@ -289,9 +290,48 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
             ? `El supervisor calificó y cerró el ticket escalado desde rondas: "${ticket.title}" con ${data.rating} estrellas.`
             : `El cliente calificó y cerró el ticket: "${ticket.title}" con ${data.rating} estrellas. Ahora puedes promoverlo a artículo de conocimiento.`,
           ticketId,
+          metadata: {
+            link:
+              // El assignee suele ser TECHNICIAN; deep-link se resuelve por rol en el cliente
+              `/technician/tickets/${ticketId}`,
+          },
         }).catch(() => {})
       }
+
+      await AuditServiceComplete.log({
+        action: AuditActionsComplete.TICKET_CLOSED,
+        entityType: 'ticket',
+        entityId: ticketId,
+        userId: session.user.id,
+        details: {
+          ticketTitle: ticket.title,
+          closedByRating: true,
+          rating: data.rating,
+          source: ticket.source,
+          ratedByRole: isPatrolTicket ? 'supervisor_escalation' : 'client',
+        },
+        oldValues: { status: 'RESOLVED' },
+        newValues: { status: 'CLOSED' },
+        request: request,
+      }).catch(err => console.error('[AUDIT] Error registrando cierre por calificación:', err))
     }
+
+    await AuditServiceComplete.log({
+      action: AuditActionsComplete.TICKET_UPDATED,
+      entityType: 'ticket',
+      entityId: ticketId,
+      userId: session.user.id,
+      details: {
+        ticketTitle: ticket.title,
+        event: 'ticket_rated',
+        rating: data.rating,
+        feedback: data.feedback || null,
+        categories: data.categories,
+        source: ticket.source,
+        ratedBy: ticket.source === 'PATROL' && ticket.createdById ? 'patrol_escalator' : 'client',
+      },
+      request: request,
+    }).catch(err => console.error('[AUDIT] Error registrando calificación:', err))
 
     // Notificar al administrador sobre la nueva calificación
     const { triggerRatingToAdminEmail } = await import('@/lib/email-triggers')

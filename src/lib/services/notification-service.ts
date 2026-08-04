@@ -191,10 +191,24 @@ export class NotificationService {
       const hasActiveSSE = connectedUsers.includes(data.userId)
 
       if (!hasActiveSSE && WebPushService.isConfigured()) {
-        // Determinar URL de destino según metadata
+        // Determinar URL de destino según metadata (no asumir rol CLIENT)
         let url = '/'
-        if (data.metadata?.ticketId || data.ticketId) {
-          url = `/client/tickets/${data.ticketId || data.metadata?.ticketId}`
+        if (typeof data.metadata?.link === 'string' && data.metadata.link) {
+          url = data.metadata.link
+        } else if (data.metadata?.ticketId || data.ticketId) {
+          const tid = data.ticketId || data.metadata?.ticketId
+          // Rol del destinatario para deep-link correcto (admin/tech/client)
+          const destUser = await prisma.users.findUnique({
+            where: { id: data.userId },
+            select: { role: true },
+          })
+          const prefix =
+            destUser?.role === 'ADMIN'
+              ? 'admin'
+              : destUser?.role === 'TECHNICIAN'
+                ? 'technician'
+                : 'client'
+          url = `/${prefix}/tickets/${tid}`
         } else if (data.metadata?.equipmentId) {
           url = `/inventory/equipment/${data.metadata.equipmentId}`
         } else if (data.metadata?.patrolId) {
@@ -641,6 +655,9 @@ export class NotificationService {
           users_tickets_assigneeIdTousers: {
             select: { id: true, name: true, email: true },
           },
+          users_tickets_createdByIdTousers: {
+            select: { id: true, name: true, email: true, role: true },
+          },
         },
       })
 
@@ -650,28 +667,39 @@ export class NotificationService {
 
       // Determinar quién debe calificar:
       // - Tickets normales: el clientId
-      // - Tickets escalados de rondas (source=PATROL): el createdById (admin que escaló)
-      const raterUserId =
-        ticket.source === 'PATROL' && ticket.createdById ? ticket.createdById : ticket.clientId
+      // - Tickets escalados de rondas (source=PATROL): el createdById (admin/supervisor que escaló)
+      const isPatrol = ticket.source === 'PATROL' && !!ticket.createdById
+      const raterUserId = isPatrol ? ticket.createdById! : ticket.clientId
+      const raterRole = isPatrol
+        ? ticket.users_tickets_createdByIdTousers?.role
+        : ticket.users_tickets_clientIdTousers
+          ? 'CLIENT'
+          : null
+      const rolePrefix =
+        raterRole === 'ADMIN' ? 'admin' : raterRole === 'TECHNICIAN' ? 'technician' : 'client'
 
-      // Notificar al responsable de calificar con call-to-action
-      const notification = await this.createNotification({
+      // push() → SSE inmediato + Web Push si no hay pestaña abierta
+      const notification = await this.push({
         userId: raterUserId,
         type: 'SUCCESS',
         title: 'Ticket resuelto - Califica el servicio',
-        message: `${ticket.source === 'PATROL' ? 'El ticket escalado desde rondas' : 'Tu ticket'} "${ticket.title}" ha sido resuelto. Por favor califica el servicio recibido para cerrar el ticket.`,
+        message: `${isPatrol ? 'El ticket escalado desde rondas' : 'Tu ticket'} "${ticket.title}" ha sido resuelto. Por favor califica el servicio recibido para cerrar el ticket.`,
         ticketId: ticket.id,
-        specificType: 'statusChanged',
+        metadata: {
+          link: `/${rolePrefix}/tickets/${ticket.id}`,
+          specificType: 'statusChanged',
+        },
       })
 
       // Si es ticket de rondas, también notificar al agente que su novedad fue resuelta
-      if (ticket.source === 'PATROL' && ticket.createdById && ticket.clientId !== raterUserId) {
+      if (isPatrol && ticket.clientId !== raterUserId) {
         await this.push({
           userId: ticket.clientId,
           type: 'SUCCESS',
           title: 'Novedad resuelta',
           message: `La novedad que reportaste ha sido resuelta (ticket "${ticket.title}").`,
           ticketId: ticket.id,
+          metadata: { link: `/client/tickets/${ticket.id}` },
         }).catch(() => {})
       }
 

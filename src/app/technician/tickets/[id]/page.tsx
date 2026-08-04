@@ -29,6 +29,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { useToast } from '@/hooks/use-toast'
 import { useTicketSSE } from '@/hooks/use-ticket-sse'
 import {
@@ -104,7 +113,9 @@ export default function TechnicianTicketDetailPage() {
   const [timelineKey, setTimelineKey] = useState(0)
   const [fileKey, setFileKey] = useState(0)
   const [ratingKey, setRatingKey] = useState(0)
+  const [showRatingModal, setShowRatingModal] = useState(false)
   const prevStatusRef = useRef<string | null>(null)
+  const initialRatingPromptDone = useRef(false)
 
   const isAssignedResolver = ticket?.assignee?.id === session?.user?.id
   const isUnassigned = !ticket?.assignee
@@ -151,10 +162,20 @@ export default function TechnicianTicketDetailPage() {
         setTimelineKey(k => k + 1)
         setRatingKey(k => k + 1)
       }
+      const raterId =
+        data.source === 'PATROL' && data.createdById ? data.createdById : data.client?.id
+      if (
+        prevStatus &&
+        prevStatus !== 'RESOLVED' &&
+        data.status === 'RESOLVED' &&
+        session?.user?.id === raterId
+      ) {
+        setShowRatingModal(true)
+      }
     } catch {
       /* ignore */
     }
-  }, [ticketId])
+  }, [ticketId, session?.user?.id])
 
   useTicketSSE(ticketId, refreshTicketSilent)
 
@@ -172,6 +193,16 @@ export default function TechnicianTicketDetailPage() {
     if (data) {
       prevStatusRef.current = data.status
       setTicket(data)
+      const raterId =
+        data.source === 'PATROL' && data.createdById ? data.createdById : data.client?.id
+      if (
+        !initialRatingPromptDone.current &&
+        data.status === 'RESOLVED' &&
+        session?.user?.id === raterId
+      ) {
+        initialRatingPromptDone.current = true
+        setShowRatingModal(true)
+      }
     }
     setLoading(false)
   }
@@ -187,10 +218,16 @@ export default function TechnicianTicketDetailPage() {
       })
       const data = await res.json()
       if (!res.ok || !data.success) throw new Error(data.message)
+      const prevStatus = ticket.status
       // Recargar para obtener el estado actualizado (incluyendo posible auto-asignación)
       await loadTicket()
       setTimelineKey(k => k + 1)
       setRatingKey(k => k + 1)
+      const raterId =
+        ticket.source === 'PATROL' && ticket.createdById ? ticket.createdById : ticket.client?.id
+      if (prevStatus !== 'RESOLVED' && newStatus === 'RESOLVED' && session?.user?.id === raterId) {
+        setShowRatingModal(true)
+      }
       const cfg = STATUS_CONFIG[newStatus]
       toast({ title: 'Estado actualizado', description: `Ahora: ${cfg?.label ?? newStatus}` })
     } catch (err) {
@@ -508,12 +545,65 @@ export default function TechnicianTicketDetailPage() {
             mode={isRequester ? 'client' : 'admin'}
             refreshKey={ratingKey}
             onRatingSubmitted={() => {
+              setShowRatingModal(false)
               setRatingKey(k => k + 1)
               void loadTicket()
             }}
           />
+
+          {ticket.status === 'RESOLVED' && canRate && !showRatingModal && (
+            <Button
+              type='button'
+              className='w-full bg-amber-600 hover:bg-amber-700 text-white'
+              onClick={() => setShowRatingModal(true)}
+            >
+              <Star className='h-4 w-4 mr-2' />
+              Calificar y cerrar ticket
+            </Button>
+          )}
         </div>
       </div>
+
+      <AlertDialog
+        open={showRatingModal}
+        onOpenChange={open => {
+          setShowRatingModal(open)
+          if (!open) initialRatingPromptDone.current = true
+        }}
+      >
+        <AlertDialogContent className='max-w-2xl'>
+          <AlertDialogHeader>
+            <AlertDialogTitle className='flex items-center gap-2'>
+              <Star className='h-5 w-5 text-amber-600' />
+              Califica el servicio
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {ticket.source === 'PATROL'
+                ? 'Como supervisor que escaló la novedad, califica la resolución para cerrar el ticket.'
+                : 'Tu opinión ayuda a mejorar la calidad del soporte. Al calificar se cerrará el ticket.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className='max-h-[60vh] overflow-y-auto'>
+            <TicketRatingSystem
+              key={`tech-modal-rating-${ratingKey}`}
+              ticketId={ticket.id}
+              technicianId={ticket.assignee?.id}
+              canRate={canRate}
+              showTechnicianStats={false}
+              mode={isRequester ? 'client' : 'admin'}
+              refreshKey={ratingKey}
+              onRatingSubmitted={() => {
+                setShowRatingModal(false)
+                setRatingKey(k => k + 1)
+                void loadTicket()
+              }}
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Más tarde</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </TicketDetailLayout>
   )
 }
