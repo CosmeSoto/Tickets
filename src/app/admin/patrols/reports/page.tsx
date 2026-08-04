@@ -1,5 +1,4 @@
 'use client'
-import { DEFAULT_TIMEZONE } from '@/lib/constants'
 
 import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
@@ -27,6 +26,8 @@ import {
   IncidentReportView,
   type IncidentReport,
 } from '@/components/patrols/reports/incident-report-view'
+import { formatDateTimeShort } from '@/lib/utils/date-utils'
+import { formatDurationMinutes } from '@/lib/utils/patrol-utils'
 
 // ── Types ───────────────────────────────────────────────────────────────────────
 
@@ -50,14 +51,6 @@ function defaultFrom() {
 
 function defaultTo() {
   return new Date().toISOString().slice(0, 16)
-}
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleString('es-EC', {
-    timeZone: DEFAULT_TIMEZONE,
-    dateStyle: 'short',
-    timeStyle: 'short',
-  })
 }
 
 export default function PatrolReportsPage() {
@@ -183,7 +176,7 @@ export default function PatrolReportsPage() {
       {
         key: 'scheduledStart',
         label: 'Inicio Programado',
-        format: (v: string) => (v ? formatDate(v) : ''),
+        format: (v: string) => (v ? formatDateTimeShort(v) : ''),
       },
       {
         key: 'isOnTime',
@@ -205,7 +198,7 @@ export default function PatrolReportsPage() {
       { key: 'orden', label: 'CP #' },
       { key: 'checkpoint', label: 'Checkpoint' },
       { key: 'escaneado', label: 'Hora Escaneo' },
-      { key: 'desdeAnterior', label: 'Desde anterior (min)' },
+      { key: 'desdeAnterior', label: 'Desde anterior' },
       { key: 'estadoCP', label: 'Estado CP' },
     ],
     getData: () => {
@@ -242,8 +235,9 @@ export default function PatrolReportsPage() {
             incidentes: '',
             orden: cp.order,
             checkpoint: cp.checkpointName,
-            escaneado: cp.scannedAt ? formatDate(cp.scannedAt) : '—',
-            desdeAnterior: cp.timeFromPrevious !== null ? cp.timeFromPrevious : '—',
+            escaneado: cp.scannedAt ? formatDateTimeShort(cp.scannedAt) : '—',
+            desdeAnterior:
+              cp.timeFromPrevious !== null ? formatDurationMinutes(cp.timeFromPrevious) : '—',
             estadoCP: estadoLabel,
           })
         }

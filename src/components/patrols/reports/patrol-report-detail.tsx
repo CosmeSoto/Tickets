@@ -1,5 +1,4 @@
 'use client'
-import { DEFAULT_TIMEZONE } from '@/lib/constants'
 
 import { ReactNode } from 'react'
 import {
@@ -16,6 +15,8 @@ import {
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { formatDateTimeShort } from '@/lib/utils/date-utils'
+import { formatDurationMinutes } from '@/lib/utils/patrol-utils'
 
 // ── Types ───────────────────────────────────────────────────────────────────────
 
@@ -55,14 +56,6 @@ export interface Pagination {
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────────
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleString('es-EC', {
-    timeZone: DEFAULT_TIMEZONE,
-    dateStyle: 'short',
-    timeStyle: 'short',
-  })
-}
 
 const STATUS_BADGE: Record<string, { label: string; className: string }> = {
   ON_TIME: {
@@ -190,9 +183,11 @@ export function PatrolReportDetail({
                   )}
                 </div>
                 <div className='flex items-center gap-4 mt-1 text-xs text-muted-foreground'>
-                  <span>{formatDate(patrol.scheduledStart)}</span>
+                  <span>{formatDateTimeShort(patrol.scheduledStart)}</span>
                   {patrol.startDelayMinutes !== null && patrol.startDelayMinutes > 0 && (
-                    <span className='text-yellow-600'>+{patrol.startDelayMinutes} min retraso</span>
+                    <span className='text-yellow-600'>
+                      +{formatDurationMinutes(patrol.startDelayMinutes)} retraso
+                    </span>
                   )}
                 </div>
               </div>
@@ -233,10 +228,12 @@ export function PatrolReportDetail({
                           <td className='py-1.5 pr-3 text-muted-foreground'>{cp.order}</td>
                           <td className='py-1.5 pr-3'>{cp.checkpointName}</td>
                           <td className='py-1.5 pr-3'>
-                            {cp.scannedAt ? formatDate(cp.scannedAt) : '—'}
+                            {cp.scannedAt ? formatDateTimeShort(cp.scannedAt) : '—'}
                           </td>
                           <td className='py-1.5 pr-3'>
-                            {cp.timeFromPrevious !== null ? `${cp.timeFromPrevious} min` : '—'}
+                            {cp.timeFromPrevious !== null
+                              ? formatDurationMinutes(cp.timeFromPrevious)
+                              : '—'}
                           </td>
                           <td className='py-1.5'>
                             <Badge

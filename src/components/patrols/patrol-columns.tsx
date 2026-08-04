@@ -354,16 +354,15 @@ export function createScheduleColumns({
           return <span className='text-xs text-muted-foreground'>Default</span>
         }
         return (
-          <Badge
-            variant='outline'
-            className={`text-xs ${
+          <span
+            className={`text-xs font-medium ${
               schedule.overrideTimeValidation
-                ? 'border-primary/50 text-primary'
-                : 'border-amber-500/50 text-amber-600 dark:text-amber-400'
+                ? 'text-primary'
+                : 'text-amber-600 dark:text-amber-400'
             }`}
           >
             {schedule.overrideTimeValidation ? '🔒 Estricto' : '🔓 Flexible'}
-          </Badge>
+          </span>
         )
       },
     },

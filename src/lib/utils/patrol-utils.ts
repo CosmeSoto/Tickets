@@ -5,6 +5,7 @@
 
 import type { ExportColumn } from '@/lib/utils/export'
 import { getCachedBranding } from '@/lib/branding-cache'
+import { formatDurationMinutes } from '@/lib/patrol/patrol-format'
 
 // Re-exportar helper de formateo para uso en componentes (client-safe)
 export { formatDurationMinutes } from '@/lib/patrol/patrol-format'
@@ -272,8 +273,8 @@ export const PATROL_COMPLIANCE_ROUTE_EXPORT_COLUMNS: ExportColumn[] = [
   },
   {
     key: 'avgDurationMinutes',
-    label: 'Duración Promedio (min)',
-    format: (v: any) => (v != null ? `${Math.round(v)} min` : '—'),
+    label: 'Duración Promedio',
+    format: (v: any) => (v != null ? formatDurationMinutes(Math.round(v)) : '—'),
   },
   {
     key: 'mostMissedCheckpoints',
@@ -547,12 +548,7 @@ export function exportIncidentsToPDF(
             (new Date(inc.resolvedAt).getTime() - new Date(inc.createdAt).getTime()) / 60000
           )
         : null
-      const attStr =
-        attMin !== null
-          ? attMin < 60
-            ? `${attMin} min`
-            : `${Math.floor(attMin / 60)}h ${attMin % 60}min`
-          : '—'
+      const attStr = attMin !== null ? formatDurationMinutes(attMin) : '—'
       const attColor = attMin === null ? '#9ca3af' : attMin > 60 ? '#dc2626' : '#16a34a'
 
       // Ticket badge: código + estado del ticket
