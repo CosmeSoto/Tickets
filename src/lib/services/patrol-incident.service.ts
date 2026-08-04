@@ -507,7 +507,10 @@ export class PatrolIncidentService {
 
     // Resolver la familia destino del ticket:
     // Si no se provee targetFamilyId, hereda la familia de la ronda (comportamiento original).
-    const resolvedFamilyId = targetFamilyId ?? incident.patrol.familyId
+    // Normalizar TECHNOLOGY legacy → familia activa para que el admin del área lo vea en cola.
+    const { resolveValidFamilyId } = await import('@/lib/auth/family-scope')
+    const rawFamilyId = targetFamilyId ?? incident.patrol.familyId
+    const resolvedFamilyId = (await resolveValidFamilyId(rawFamilyId)) ?? rawFamilyId
     const familyChanged = resolvedFamilyId !== incident.patrol.familyId
 
     // Buscar la categoría configurada para la familia destino, o la primera disponible.

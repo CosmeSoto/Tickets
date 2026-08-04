@@ -13,7 +13,6 @@ import {
   getTicketOperationalFamilyIds,
   isFamilyInScope,
 } from '@/lib/auth/family-scope'
-import { buildFamilyFilter } from '@/lib/auth/admin-scope'
 import {
   assertValidPatrolIncident,
   PatrolIncidentValidationError,
@@ -121,12 +120,27 @@ export async function GET(request: NextRequest) {
       if (viewMode === 'created') {
         where.clientId = session.user.id
       } else if (!(session.user as any).isSuperAdmin) {
-        // Cola de soporte: solo familia nativa (asignadas = solo crear, no gestionar)
-        const operationalIds = await getTicketOperationalFamilyIds(session.user.id, 'ADMIN', false)
-        const familyFilter = buildFamilyFilter({ familyIds: operationalIds })
-        if (Object.keys(familyFilter).length > 0) {
-          andParts.push(familyFilter)
-        }
+        // Cola de soporte: familia nativa + tickets PATROL de áreas de rondas visibles
+        // + tickets donde el admin es el asignado (sin abrir cola consumer general)
+        const { getPatrolVisibilityFamilyIds } = await import('@/lib/auth/family-scope')
+        const [operationalIds, patrolIds] = await Promise.all([
+          getTicketOperationalFamilyIds(session.user.id, 'ADMIN', false),
+          getPatrolVisibilityFamilyIds(session.user.id, 'ADMIN', false),
+        ])
+        const nativeIds = operationalIds ?? []
+        const patrolFamilyIds = [...new Set([...(patrolIds ?? []), ...nativeIds])]
+
+        andParts.push({
+          OR: [
+            ...(nativeIds.length > 0
+              ? [{ familyId: { in: nativeIds } }]
+              : [{ familyId: '__NONE__' }]),
+            { assigneeId: session.user.id },
+            ...(patrolFamilyIds.length > 0
+              ? [{ AND: [{ source: 'PATROL' }, { familyId: { in: patrolFamilyIds } }] }]
+              : []),
+          ],
+        })
       }
       // Super Admin + viewMode !== created → sin filtro de familia (ve todo)
     }

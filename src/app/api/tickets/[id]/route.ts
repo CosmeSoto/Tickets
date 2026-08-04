@@ -156,6 +156,8 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
           clientId: ticket.clientId,
           assigneeId: ticket.assigneeId,
           familyId: ticket.familyId,
+          source: ticket.source,
+          createdById: ticket.createdById,
         },
         'read'
       )
@@ -234,6 +236,8 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
           clientId: existingTicket.clientId,
           assigneeId: existingTicket.assigneeId,
           familyId: existingTicket.familyId,
+          source: existingTicket.source,
+          createdById: existingTicket.createdById,
         },
         'write'
       )

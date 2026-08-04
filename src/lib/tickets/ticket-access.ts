@@ -4,11 +4,14 @@
  * Reglas de scope (ver family-scope.ts):
  * - Admin cola soporte (read/write): solo nativa
  * - Admin puede leer tickets que él solicitó (clientId) aunque sean a otra área
+ * - Admin asignado (assigneeId) siempre puede leer/escribir
+ * - Tickets source=PATROL: admin con visibilidad de rondas en esa familia puede gestionar
  * - Técnico cola sin asignar: solo nativa; asignado/colaborador/cliente: acceso directo
  */
 
 import prisma from '@/lib/prisma'
 import {
+  adminCanAccessPatrolSourcedTicketFamily,
   adminCanOperateTicketFamily,
   adminCanViewTicketFamily,
   technicianCanAccessUnassignedQueue,
@@ -34,6 +37,9 @@ export interface TicketAccessRecord {
   clientId: string
   assigneeId: string | null
   familyId: string | null
+  /** Presente al cargar via loadTicketForAccess; opcional en selects parciales */
+  source?: string | null
+  createdById?: string | null
 }
 
 export class TicketAccessError extends Error {
@@ -54,6 +60,8 @@ export async function loadTicketForAccess(ticketId: string): Promise<TicketAcces
       clientId: true,
       assigneeId: true,
       familyId: true,
+      source: true,
+      createdById: true,
     },
   })
 }
@@ -63,7 +71,18 @@ export async function assertTicketAccess(
   ticket: TicketAccessRecord,
   action: TicketAccessAction
 ): Promise<void> {
-  const allowed = await canAccessTicket(user, ticket, action)
+  // Selects parciales a menudo omiten source/createdById; recargar para reglas PATROL
+  let record = ticket
+  if (
+    user.role === 'ADMIN' &&
+    user.isSuperAdmin !== true &&
+    (ticket.source === undefined || ticket.createdById === undefined)
+  ) {
+    const full = await loadTicketForAccess(ticket.id)
+    if (full) record = full
+  }
+
+  const allowed = await canAccessTicket(user, record, action)
   if (!allowed) {
     throw new TicketAccessError('No tienes permisos para esta operación en el ticket', 403)
   }
@@ -111,14 +130,32 @@ export async function canAccessTicket(
   }
 }
 
+function isPatrolSourced(ticket: TicketAccessRecord): boolean {
+  return ticket.source === 'PATROL'
+}
+
+async function adminCanHandlePatrolTicket(
+  user: TicketAccessUser,
+  ticket: TicketAccessRecord
+): Promise<boolean> {
+  if (!isPatrolSourced(ticket)) return false
+  if (ticket.createdById === user.id) return true
+  return adminCanAccessPatrolSourcedTicketFamily(
+    user.id,
+    ticket.familyId,
+    user.isSuperAdmin === true
+  )
+}
+
 async function canReadTicket(user: TicketAccessUser, ticket: TicketAccessRecord): Promise<boolean> {
   if (user.role === 'CLIENT') {
     return ticket.clientId === user.id
   }
 
   if (user.role === 'ADMIN') {
-    // Solicitante: puede ver sus tickets a otras áreas
     if (ticket.clientId === user.id) return true
+    if (ticket.assigneeId === user.id) return true
+    if (await adminCanHandlePatrolTicket(user, ticket)) return true
     return adminCanViewTicketFamily(user.id, ticket.familyId, user.isSuperAdmin === true)
   }
 
@@ -148,6 +185,8 @@ async function canWriteTicket(
   }
 
   if (user.role === 'ADMIN') {
+    if (ticket.assigneeId === user.id) return true
+    if (await adminCanHandlePatrolTicket(user, ticket)) return true
     return adminCanOperateTicketFamily(user.id, ticket.familyId, user.isSuperAdmin === true)
   }
 
@@ -164,6 +203,7 @@ async function canAssignTicket(
   ticket: TicketAccessRecord
 ): Promise<boolean> {
   if (user.role !== 'ADMIN') return false
+  if (await adminCanHandlePatrolTicket(user, ticket)) return true
   return adminCanOperateTicketFamily(user.id, ticket.familyId, user.isSuperAdmin === true)
 }
 
@@ -175,6 +215,8 @@ async function canManageResolutionPlan(
     return ticket.assigneeId === user.id
   }
   if (user.role === 'ADMIN') {
+    if (ticket.assigneeId === user.id) return true
+    if (await adminCanHandlePatrolTicket(user, ticket)) return true
     return adminCanOperateTicketFamily(user.id, ticket.familyId, user.isSuperAdmin === true)
   }
   return false
@@ -185,6 +227,7 @@ async function canManageCollaborators(
   ticket: TicketAccessRecord
 ): Promise<boolean> {
   if (user.role === 'ADMIN') {
+    if (await adminCanHandlePatrolTicket(user, ticket)) return true
     return adminCanOperateTicketFamily(user.id, ticket.familyId, user.isSuperAdmin === true)
   }
   if (user.role === 'TECHNICIAN' && ticket.assigneeId === user.id) {
@@ -198,6 +241,7 @@ async function canDeleteTicket(
   ticket: TicketAccessRecord
 ): Promise<boolean> {
   if (user.role === 'ADMIN') {
+    // Borrado sigue siendo solo nativa / super — no ampliar por patrullas
     return adminCanOperateTicketFamily(user.id, ticket.familyId, user.isSuperAdmin === true)
   }
   if (user.role === 'CLIENT') {

@@ -38,6 +38,7 @@ export default function AdminTicketDetailPage() {
 
   const [ticket, setTicket] = useState<Ticket | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<{ status: number; message: string } | null>(null)
   const [resolvers, setResolvers] = useState<any[]>([])
   const [filteredResolvers, setFilteredResolvers] = useState<any[]>([])
   const [isEditing, setIsEditing] = useState(false)
@@ -135,9 +136,23 @@ export default function AdminTicketDetailPage() {
 
   const loadTicket = async () => {
     setLoading(true)
+    setLoadError(null)
     try {
       const res = await fetch(`/api/tickets/${ticketId}?_t=${Date.now()}`, { cache: 'no-store' })
-      if (!res.ok) return
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        setTicket(null)
+        setLoadError({
+          status: res.status,
+          message:
+            typeof body?.message === 'string'
+              ? body.message
+              : res.status === 403
+                ? 'No tienes permisos para ver este ticket'
+                : 'No se pudo cargar el ticket',
+        })
+        return
+      }
       const { success, data } = await res.json()
       if (success && data) {
         prevStatusRef.current = data.status
@@ -278,16 +293,22 @@ export default function AdminTicketDetailPage() {
   }
 
   if (!ticket) {
+    const isForbidden = loadError?.status === 403
     return (
       <TicketDetailLayout
-        title='Ticket no encontrado'
+        title={isForbidden ? 'Sin permiso' : 'Ticket no encontrado'}
         ticketCode=''
         status={{ label: '', color: '' }}
         priority={{ label: '', color: '' }}
       >
         <div className='text-center py-12'>
           <AlertCircle className='h-12 w-12 text-muted-foreground mx-auto mb-4' />
-          <p className='text-muted-foreground mb-4'>No se pudo cargar el ticket</p>
+          <p className='text-muted-foreground mb-4'>
+            {loadError?.message ??
+              (isForbidden
+                ? 'No tienes permisos para ver este ticket en tu área'
+                : 'No se pudo cargar el ticket')}
+          </p>
           <Button onClick={() => router.push('/admin/tickets')}>Volver a Tickets</Button>
         </div>
       </TicketDetailLayout>

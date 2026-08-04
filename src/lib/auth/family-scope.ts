@@ -225,7 +225,12 @@ export async function adminCanViewTicketFamily(
 ): Promise<boolean> {
   if (isSuperAdmin) return true
   const ids = await getTicketVisibilityFamilyIds(adminId, 'ADMIN', false)
-  return isFamilyInScope(familyId, ids)
+  // Normalizar TECHNOLOGY legacy del ticket para alinear con scope remapeado del admin
+  const normalized = familyId ? await resolveValidFamilyId(familyId) : null
+  return (
+    isFamilyInScope(normalized ?? familyId, ids) ||
+    (normalized !== familyId && isFamilyInScope(familyId, ids))
+  )
 }
 
 /** Admin puede operar (asignar, cerrar, configurar flujo) solo en familia nativa. */
@@ -236,7 +241,35 @@ export async function adminCanOperateTicketFamily(
 ): Promise<boolean> {
   if (isSuperAdmin) return true
   const ids = await getTicketOperationalFamilyIds(adminId, 'ADMIN', false)
-  return isFamilyInScope(familyId, ids)
+  const normalized = familyId ? await resolveValidFamilyId(familyId) : null
+  return (
+    isFamilyInScope(normalized ?? familyId, ids) ||
+    (normalized !== familyId && isFamilyInScope(familyId, ids))
+  )
+}
+
+/**
+ * Tickets source=PATROL: encargados del área de rondas (nativa + patrol_family_assignments)
+ * pueden ver/gestionar el ticket escalado sin abrir la cola general de tickets consumer.
+ */
+export async function adminCanAccessPatrolSourcedTicketFamily(
+  adminId: string,
+  familyId: string | null,
+  isSuperAdmin: boolean
+): Promise<boolean> {
+  if (isSuperAdmin) return true
+  if (await adminCanOperateTicketFamily(adminId, familyId, false)) return true
+
+  const patrolIds = await getPatrolVisibilityFamilyIds(adminId, 'ADMIN', false)
+  if (patrolIds === undefined) return true
+  if (!familyId) return true
+
+  const normalized = await resolveValidFamilyId(familyId)
+  const targets = new Set(await normalizeActiveFamilyIds([...patrolIds, familyId]))
+  if (normalized) targets.add(normalized)
+  for (const id of patrolIds) targets.add(id)
+
+  return targets.has(normalized ?? familyId) || targets.has(familyId)
 }
 
 /** Técnico puede tomar tickets sin asignar solo en su familia nativa. */
@@ -246,7 +279,9 @@ export async function technicianCanAccessUnassignedQueue(
 ): Promise<boolean> {
   const nativeId = await getNativeFamilyId(technicianId)
   if (!familyId) return true
-  return nativeId === familyId
+  if (nativeId === familyId) return true
+  const normalized = await resolveValidFamilyId(familyId)
+  return Boolean(nativeId && normalized && nativeId === normalized)
 }
 
 /** IDs de técnicos cuya familia NATIVA coincide (resolutores del área). */
