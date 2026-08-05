@@ -7,10 +7,16 @@
 # y levanta todos los servicios con docker compose.
 #
 # Uso:
-#   sudo ./start-production.sh                 # rebuild normal (conserva BD)
-#   sudo ./start-production.sh --clean         # borra volúmenes + rebuild con caché (~3–6 min)
+#   sudo ./start-production.sh                 # rebuild (conserva BD); entrypoint sincroniza organigrama
+#   sudo ./start-production.sh --clean         # borra volúmenes + seed completo desde cero (~3–6 min)
 #   sudo ./start-production.sh --clear         # alias de --clean
 #   sudo ./start-production.sh --clean --no-cache  # rebuild total sin caché (solo si hay problemas de imagen)
+#
+# Seed vs organigrama:
+#   - Sin --clean: NO re-ejecuta seed completo (hay usuarios); SÍ corre ensure-departments
+#     (TI, Telefonía, etc.) en cada arranque — idempotente, no borra datos.
+#   - Con --clean: borra BD → seed completo + ensures.
+#   - Dev desde cero: ./docker/scripts/reset-dev-from-scratch.sh (down -v + ensure-departments)
 #
 # Requisitos:
 #   - Docker y Docker Compose instalados

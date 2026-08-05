@@ -212,7 +212,14 @@ async function seedDepartments(familyMap: Map<string, string>): Promise<Map<stri
     const familyId = familyMap.get(dept.familyCode)!
     const d = await prisma.departments.upsert({
       where: { name: dept.name },
-      update: { description: dept.description, color: dept.color, order: dept.order, familyId },
+      update: {
+        description: dept.description,
+        color: dept.color,
+        order: dept.order,
+        familyId,
+        isActive: true,
+        updatedAt: now,
+      },
       create: {
         id: deterministicUUID('department', dept.name),
         name: dept.name,
@@ -220,6 +227,7 @@ async function seedDepartments(familyMap: Map<string, string>): Promise<Map<stri
         color: dept.color,
         order: dept.order,
         familyId,
+        isActive: true,
         createdAt: now,
         updatedAt: now,
       },

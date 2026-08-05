@@ -47,8 +47,14 @@ if [ "$NEEDS_SEED" = "yes" ]; then
   echo "==> [dev] Base de datos vacía — ejecutando seed..."
   npm run db:seed || echo "==> ADVERTENCIA: seed falló — el servidor arrancará de todas formas"
 else
-  echo "==> [dev] Base de datos con datos — omitiendo seed."
+  echo "==> [dev] Base de datos con datos — omitiendo seed completo."
 fi
+
+# Organigrama idempotente (TI/Telefonía/etc.) aunque el seed se haya omitido
+echo "==> [dev] Sincronizando departamentos (ensure-departments)..."
+npx tsx prisma/ensure-departments.ts || \
+  node ./node_modules/tsx/dist/cli.mjs prisma/ensure-departments.ts || \
+  echo "==> ADVERTENCIA: ensure-departments falló — npm run db:seed-departments"
 
 echo "==> [dev] Iniciando Next.js (webpack)..."
 exec npm run dev:docker

@@ -102,9 +102,14 @@ sudo ./start-production.sh --clean
 # ═══════════════════════════════════════════════════════════════════════════════
 sudo ./start-production.sh
 
-# Al arrancar, el entrypoint verifica catálogos de inventario (marcas, tipos, bodegas),
-# departamentos sin familia y categorías — y ejecuta ensure-catalogs / ensure-departments /
-# ensure-categories automáticamente si faltan — no hace falta correr seed a mano.
+# Al arrancar, el entrypoint:
+#   1) Seed COMPLETO solo si la BD no tiene usuarios (típicamente tras --clean).
+#   2) ensure-departments SIEMPRE (idempotente) → crea/actualiza TI, Telefonía, etc.
+#      aunque ya haya usuarios (antes solo corría si faltaban depts u huérfanos).
+#   3) ensure-catalogs / ensure-categories si están incompletos.
+#
+# Por eso `sudo ./start-production.sh` (sin --clean) ya sincroniza el organigrama
+# sin borrar datos. `--clean` borra volúmenes y vuelve a seedear desde cero.
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # COMANDOS MANUALES (si prefieres no usar el script):

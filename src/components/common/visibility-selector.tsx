@@ -182,16 +182,22 @@ export function VisibilitySelector({
     const family = families.find(f => f.id === familyId)
     if (!family) return
 
+    // Placeholder de UI (deptos huérfanos): solo marca departamentos reales
+    const isVirtualFamily = familyId.startsWith('__')
+
     if (checked) {
-      onFamilyIdsChange([...selectedFamilyIds, familyId])
+      if (!isVirtualFamily) {
+        onFamilyIdsChange([...selectedFamilyIds, familyId])
+      }
       const newDeptIds = family.departments.map(d => d.id)
       onDepartmentIdsChange([...new Set([...selectedDepartmentIds, ...newDeptIds])])
       setExpandedFamilies(prev => new Set(prev).add(familyId))
     } else {
-      onFamilyIdsChange(selectedFamilyIds.filter(id => id !== familyId))
+      if (!isVirtualFamily) {
+        onFamilyIdsChange(selectedFamilyIds.filter(id => id !== familyId))
+      }
       const familyDeptIds = new Set(family.departments.map(d => d.id))
       onDepartmentIdsChange(selectedDepartmentIds.filter(id => !familyDeptIds.has(id)))
-      // Quitar usuarios de esa área
       const removeUserIds = new Set(
         scopedUsers
           .filter(u => u.familyId === familyId || familyDeptIds.has(u.departmentId ?? ''))
@@ -209,7 +215,7 @@ export function VisibilitySelector({
       setExpandedDepts(prev => new Set(prev).add(deptId))
       setExpandedFamilies(prev => new Set(prev).add(familyId))
       const family = families.find(f => f.id === familyId)
-      if (family) {
+      if (family && !familyId.startsWith('__')) {
         const allDeptIds = family.departments.map(d => d.id)
         const allSelected = allDeptIds.every(
           id => id === deptId || selectedDepartmentIds.includes(id)
@@ -220,7 +226,7 @@ export function VisibilitySelector({
       }
     } else {
       onDepartmentIdsChange(selectedDepartmentIds.filter(id => id !== deptId))
-      if (selectedFamilyIds.includes(familyId)) {
+      if (!familyId.startsWith('__') && selectedFamilyIds.includes(familyId)) {
         onFamilyIdsChange(selectedFamilyIds.filter(id => id !== familyId))
       }
       const deptUserIds = new Set((usersByDept.get(deptId) ?? []).map(u => u.id))
@@ -368,27 +374,29 @@ export function VisibilitySelector({
               </button>
             </Badge>
           ))}
-          {selectedFamilyIds.map(id => {
-            const family = families.find(f => f.id === id)
-            return family ? (
-              <Badge key={id} variant='outline' className='gap-1 pr-1 bg-background'>
-                {family.color && (
-                  <span
-                    className='w-2 h-2 rounded-full'
-                    style={{ backgroundColor: family.color }}
-                  />
-                )}
-                {family.name}
-                <button
-                  type='button'
-                  onClick={() => removeFamily(id)}
-                  className='ml-0.5 rounded-full p-0.5 hover:bg-muted'
-                >
-                  <X className='h-3 w-3' />
-                </button>
-              </Badge>
-            ) : null
-          })}
+          {selectedFamilyIds
+            .filter(id => !id.startsWith('__'))
+            .map(id => {
+              const family = families.find(f => f.id === id)
+              return family ? (
+                <Badge key={id} variant='outline' className='gap-1 pr-1 bg-background'>
+                  {family.color && (
+                    <span
+                      className='w-2 h-2 rounded-full'
+                      style={{ backgroundColor: family.color }}
+                    />
+                  )}
+                  {family.name}
+                  <button
+                    type='button'
+                    onClick={() => removeFamily(id)}
+                    className='ml-0.5 rounded-full p-0.5 hover:bg-muted'
+                  >
+                    <X className='h-3 w-3' />
+                  </button>
+                </Badge>
+              ) : null
+            })}
           {selectedDepartmentIds
             .filter(
               id =>
@@ -465,7 +473,13 @@ export function VisibilitySelector({
 
         <div className='max-h-[320px] overflow-y-auto p-2 space-y-1'>
           {filteredFamilies.map(family => {
-            const isFamilySelected = selectedFamilyIds.includes(family.id)
+            const isVirtualFamily = family.id.startsWith('__')
+            const allDeptsSelected =
+              family.departments.length > 0 &&
+              family.departments.every(d => selectedDepartmentIds.includes(d.id))
+            const isFamilySelected = isVirtualFamily
+              ? allDeptsSelected
+              : selectedFamilyIds.includes(family.id)
             const selectedDeptCount = family.departments.filter(d =>
               selectedDepartmentIds.includes(d.id)
             ).length
@@ -641,7 +655,23 @@ export function VisibilitySelector({
             )}
 
           {filteredFamilies.length === 0 && orphanUsers.length === 0 && (
-            <p className='text-center text-xs text-muted-foreground py-6'>Sin resultados</p>
+            <div className='text-center px-3 py-6 space-y-1'>
+              <p className='text-xs text-muted-foreground'>
+                {q
+                  ? 'Sin resultados para la búsqueda'
+                  : 'No hay áreas ni departamentos disponibles'}
+              </p>
+              {!q && (
+                <p className='text-[10px] text-muted-foreground'>
+                  El sistema funciona igual con pocos datos. Si faltan departamentos del
+                  organigrama, un administrador puede sincronizarlos con{' '}
+                  <code className='text-[10px] bg-muted px-1 rounded'>
+                    npm run db:seed-departments
+                  </code>
+                  .
+                </p>
+              )}
+            </div>
           )}
         </div>
       </div>

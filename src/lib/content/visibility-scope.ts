@@ -123,10 +123,10 @@ export async function sanitizeVisibilityPayload(
     scope.allowedRoles.includes(r as UserRole)
   ) as UserRole[]
 
-  // Familias permitidas
-  let familyIds = requestedFamilyIds
+  // Familias permitidas (ignorar placeholders de UI como "__orphan__")
+  let familyIds = requestedFamilyIds.filter(id => !!id && !id.startsWith('__'))
   if (scope.allowedFamilyIds !== undefined) {
-    familyIds = requestedFamilyIds.filter(id => scope.allowedFamilyIds!.includes(id))
+    familyIds = familyIds.filter(id => scope.allowedFamilyIds!.includes(id))
   }
 
   // Departamentos permitidos

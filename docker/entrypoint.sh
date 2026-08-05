@@ -166,8 +166,10 @@ elif [ "$CATALOG_CHECK" != "0" ]; then
   echo "==> ADVERTENCIA: No se pudo verificar catálogos (código $CATALOG_CHECK)"
 fi
 
-# Departamentos — si hay huérfanos (Sin familia) o la tabla está vacía, sincronizar
-# familyId según organigrama (idempotente; no borra datos de usuario).
+# Departamentos / organigrama
+# - Seed completo solo corre si no hay usuarios (BD vacía / --clean).
+# - ensure-departments SIEMPRE: idempotente; crea TI/Telefonía/etc. si faltan
+#   aunque ya existan usuarios (antes solo corría si la tabla estaba vacía o con huérfanos).
 echo "==> Verificando departamentos y familias..."
 DEPTS_CHECK=0
 node - <<'NODESCRIPT' || DEPTS_CHECK=$?
@@ -179,24 +181,49 @@ const p = new PrismaClient();
     const orphans = await p.departments.count({ where: { familyId: null, isActive: true } });
     const activeFamilies = await p.families.count({ where: { isActive: true } });
     const techActive = await p.families.count({ where: { code: 'TECHNOLOGY', isActive: true } });
-    // FKs rotos: familyId no nulo pero sin fila en families (restore parcial / datos inconsistentes)
-    const brokenFk = await p.$queryRawUnsafe(
-      `SELECT COUNT(*)::int AS c FROM departments d
-       LEFT JOIN families f ON f.id = d."familyId"
-       WHERE d."isActive" = true AND d."familyId" IS NOT NULL AND f.id IS NULL`
+    // Nombres canónicos del organigrama (prisma/seeds/department-family-map.ts)
+    const expected = [
+      'Administración', 'Financiero', 'Contabilidad', 'Compras', 'Recursos Humanos',
+      'Mensajería', 'Tecnologías de la Información', 'Soporte Técnico',
+      'Seguridad Informática', 'Usuarios y Privilegios', 'Telefonía',
+      'Comercial', 'Marketing', 'Medios Digitales', 'Diseño', 'Eventos',
+      'Servicio al Cliente', 'Arquitectura', 'Parqueaderos', 'Seguridad Física',
+      'CCTV y Control de Accesos', 'Mantenimiento', 'Seguridad y Salud Ocupacional',
+      'Áreas Verdes', 'Limpieza',
+    ];
+    const present = await p.departments.count({
+      where: { isActive: true, name: { in: expected } },
+    });
+    const missing = expected.length - present;
+    // FKs rotos: familyId no nulo pero sin fila en families
+    // Columna mapeada en Prisma: family_id
+    let brokenCount = 0;
+    try {
+      const brokenFk = await p.$queryRawUnsafe(
+        `SELECT COUNT(*)::int AS c FROM departments d
+         LEFT JOIN families f ON f.id = d.family_id
+         WHERE d."isActive" = true AND d.family_id IS NOT NULL AND f.id IS NULL`
+      );
+      brokenCount = Array.isArray(brokenFk) && brokenFk[0] ? Number(brokenFk[0].c) : 0;
+    } catch (_) {
+      brokenCount = 0;
+    }
+
+    console.log(
+      '  → depts activos=' + total +
+        ', canónicos=' + present + '/' + expected.length +
+        (missing > 0 ? ' (faltan ' + missing + ')' : '') +
+        ', sin familia=' + orphans +
+        ', familias activas=' + activeFamilies +
+        ', TECHNOLOGY activa=' + techActive +
+        ', FKs rotos=' + brokenCount
     );
-    const brokenCount = Array.isArray(brokenFk) && brokenFk[0] ? Number(brokenFk[0].c) : 0;
 
     if (brokenCount > 0) {
-      console.log('  → FKs de familia huérfanos: ' + brokenCount + ' (se limpiarán de forma genérica)');
       process.exit(3);
     }
-    if (total === 0 || orphans > 0 || techActive > 0 || activeFamilies < 5) {
-      console.log('  → Organigrama a sincronizar (depts=' + total + ', sin familia=' + orphans + ', familias activas=' + activeFamilies + ', TECHNOLOGY activa=' + techActive + ')');
-      process.exit(2);
-    }
-    console.log('  → Departamentos OK (' + total + ', ' + activeFamilies + ' familias, todos con familia)');
-    process.exit(0);
+    // Siempre sincronizar organigrama (ensure es idempotente). Código 2 = sync.
+    process.exit(2);
   } catch (e) {
     console.error('  → Error verificando departamentos:', e.message);
     process.exit(1);
@@ -214,32 +241,11 @@ if [ "$DEPTS_CHECK" = "3" ]; then
   else
     echo "==> ADVERTENCIA: repair-orphan-family-fks falló"
   fi
-  # Re-verificar organigrama (pueden haber quedado familyId null → ensure-departments)
-  DEPTS_CHECK=0
-  node - <<'NODESCRIPT' || DEPTS_CHECK=$?
-const { PrismaClient } = require('@prisma/client');
-const p = new PrismaClient();
-(async () => {
-  try {
-    const total = await p.departments.count({ where: { isActive: true } });
-    const orphans = await p.departments.count({ where: { familyId: null, isActive: true } });
-    const activeFamilies = await p.families.count({ where: { isActive: true } });
-    const techActive = await p.families.count({ where: { code: 'TECHNOLOGY', isActive: true } });
-    if (total === 0 || orphans > 0 || techActive > 0 || activeFamilies < 5) {
-      process.exit(2);
-    }
-    process.exit(0);
-  } catch (e) {
-    process.exit(1);
-  } finally {
-    await p.$disconnect();
-  }
-})();
-NODESCRIPT
 fi
 
-if [ "$DEPTS_CHECK" = "2" ]; then
-  echo "==> Ejecutando ensure-departments..."
+# Siempre (salvo error de verificación): upsert organigrama canónico
+if [ "$DEPTS_CHECK" = "2" ] || [ "$DEPTS_CHECK" = "3" ]; then
+  echo "==> Ejecutando ensure-departments (organigrama idempotente)..."
   if $TSX_CLI prisma/ensure-departments.ts; then
     echo "==> Departamentos sincronizados con familias."
   else
@@ -248,6 +254,8 @@ if [ "$DEPTS_CHECK" = "2" ]; then
   fi
 elif [ "$DEPTS_CHECK" != "0" ]; then
   echo "==> ADVERTENCIA: No se pudo verificar departamentos (código $DEPTS_CHECK)"
+  echo "==> Intentando ensure-departments de todos modos..."
+  $TSX_CLI prisma/ensure-departments.ts || true
 fi
 
 # Categorías de tickets — si el seed completo se omitió (ya hay usuarios) pero
