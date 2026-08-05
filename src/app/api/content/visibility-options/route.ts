@@ -43,7 +43,6 @@ export async function GET() {
       orderBy: { name: 'asc' },
     })
 
-    // Usuarios del módulo: preferir los del alcance (deptos de familias permitidas)
     const userWhere: Record<string, unknown> = {
       isActive: true,
       id: { not: session.user.id },
@@ -64,9 +63,21 @@ export async function GET() {
       ]
     }
 
+    // Solo roles que el creador puede dirigir en visibilidad
+    if (scope.allowedRoles.length > 0) {
+      userWhere.role = { in: scope.allowedRoles }
+    }
+
     const users = await prisma.users.findMany({
       where: userWhere,
-      select: { id: true, name: true, email: true, role: true },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        departmentId: true,
+        departments: { select: { id: true, familyId: true } },
+      },
       orderBy: { name: 'asc' },
       take: 500,
     })
@@ -74,7 +85,14 @@ export async function GET() {
     return NextResponse.json({
       scope: serializeVisibilityScopeForClient(scope),
       families,
-      users,
+      users: users.map(u => ({
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        role: u.role,
+        departmentId: u.departmentId,
+        familyId: u.departments?.familyId ?? null,
+      })),
     })
   } catch (error) {
     console.error('[visibility-options]', error)
