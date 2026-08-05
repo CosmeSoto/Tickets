@@ -6,9 +6,11 @@ import prisma from '@/lib/prisma'
 import { invalidateCache } from '@/lib/api-cache'
 
 /**
- * Función compartida para marcar notificación como leída
+ * Marcar notificación como leída o no leída.
+ * Body opcional: { "isRead": false } → marcar no leída
+ * Sin body / isRead true → marcar leída
  */
-async function markNotificationAsRead(request: NextRequest, params: Promise<{ id: string }>) {
+async function setReadState(request: NextRequest, params: Promise<{ id: string }>) {
   try {
     const session = await getServerSession(authOptions)
 
@@ -18,9 +20,19 @@ async function markNotificationAsRead(request: NextRequest, params: Promise<{ id
 
     const { id: notificationId } = await params
 
-    // Verificar que la notificación pertenece al usuario
+    let isRead = true
+    try {
+      const body = await request.json()
+      if (typeof body?.isRead === 'boolean') {
+        isRead = body.isRead
+      }
+    } catch {
+      // sin body → marcar leída
+    }
+
     const notification = await prisma.notifications.findUnique({
       where: { id: notificationId },
+      select: { id: true, userId: true },
     })
 
     if (!notification) {
@@ -28,38 +40,34 @@ async function markNotificationAsRead(request: NextRequest, params: Promise<{ id
     }
 
     if (notification.userId !== session.user.id) {
-      // La notificación no pertenece a este usuario — retornar éxito silencioso
-      // para evitar errores 403 cuando el componente intenta marcar notificaciones
-      // que no son del usuario actual (ej: notificaciones dinámicas mezcladas)
-      return NextResponse.json({ success: true, skipped: true })
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const updatedNotification = await NotificationService.markAsRead(notificationId)
+    const updated = isRead
+      ? await NotificationService.markAsRead(notificationId)
+      : await NotificationService.markAsUnread(notificationId)
 
-    // Invalidar caché de lista
     try {
       await invalidateCache(`notif:list:${session.user.id}:*`)
     } catch {}
 
-    return NextResponse.json(updatedNotification)
+    return NextResponse.json(updated)
   } catch (error) {
-    console.error('Error marking notification as read:', error)
-    return NextResponse.json({ error: 'Error al marcar como leída' }, { status: 500 })
+    console.error('Error updating notification read state:', error)
+    return NextResponse.json({ error: 'Error al actualizar estado de lectura' }, { status: 500 })
   }
 }
 
 /**
  * POST /api/notifications/[id]/read
- * Marcar una notificación como leída (método POST para compatibilidad)
  */
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  return markNotificationAsRead(request, params)
+  return setReadState(request, params)
 }
 
 /**
  * PATCH /api/notifications/[id]/read
- * Marcar una notificación como leída (método PATCH estándar)
  */
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  return markNotificationAsRead(request, params)
+  return setReadState(request, params)
 }

@@ -20,16 +20,19 @@ export async function GET(request: NextRequest) {
     start(controller) {
       controller.enqueue(encoder.encode('data: {"type":"connected"}\n\n'))
 
-      const unsubscribe = NotificationEvents.subscribe(userId, (payload) => {
+      const unsubscribe = NotificationEvents.subscribe(userId, payload => {
         try {
           controller.enqueue(encoder.encode(payload))
-        } catch { /* stream cerrado */ }
+        } catch {
+          /* stream cerrado */
+        }
       })
 
-      // Heartbeat cada 25s para mantener la conexión viva a través de proxies
+      // Heartbeat cada 25s: mantiene proxies vivos + renueva presencia Redis
       const heartbeat = setInterval(() => {
         try {
           controller.enqueue(encoder.encode(': heartbeat\n\n'))
+          NotificationEvents.touchPresence(userId)
         } catch {
           clearInterval(heartbeat)
         }
@@ -38,7 +41,11 @@ export async function GET(request: NextRequest) {
       request.signal.addEventListener('abort', () => {
         clearInterval(heartbeat)
         unsubscribe()
-        try { controller.close() } catch { /* ya cerrado */ }
+        try {
+          controller.close()
+        } catch {
+          /* ya cerrado */
+        }
       })
     },
   })
@@ -47,7 +54,7 @@ export async function GET(request: NextRequest) {
     headers: {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache, no-transform',
-      'Connection': 'keep-alive',
+      Connection: 'keep-alive',
       'X-Accel-Buffering': 'no',
     },
   })

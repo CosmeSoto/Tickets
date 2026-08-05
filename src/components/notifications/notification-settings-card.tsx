@@ -16,6 +16,9 @@ import {
   AlertCircle,
   Smartphone,
   FilePlus,
+  Ticket,
+  Package,
+  Route,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -211,6 +214,67 @@ export function NotificationSettingsCard({
 
           {/* Permiso de notificaciones del navegador */}
           <NotificationPermissionRow />
+        </div>
+
+        {/* Módulos — visible desde básico */}
+        <Separator className='my-6' />
+        <div className='space-y-4'>
+          <h3 className='text-sm font-semibold text-muted-foreground'>Módulos</h3>
+          <p className='text-sm text-muted-foreground -mt-2'>
+            Activa o silencia notificaciones por área del sistema
+          </p>
+
+          <div className='flex items-center justify-between'>
+            <div className='space-y-0.5'>
+              <Label className='text-base flex items-center space-x-2'>
+                <Ticket className='h-4 w-4 text-blue-600 dark:text-blue-400' />
+                <span>Tickets</span>
+              </Label>
+              <p className='text-sm text-muted-foreground'>
+                Creación, asignación, comentarios y cambios de estado
+              </p>
+            </div>
+            <Switch
+              checked={preferences.notifyTickets}
+              onCheckedChange={checked => updatePreference('notifyTickets', checked)}
+            />
+          </div>
+
+          <Separator />
+
+          <div className='flex items-center justify-between'>
+            <div className='space-y-0.5'>
+              <Label className='text-base flex items-center space-x-2'>
+                <Package className='h-4 w-4 text-violet-600 dark:text-violet-400' />
+                <span>Inventario</span>
+              </Label>
+              <p className='text-sm text-muted-foreground'>
+                Actas, equipos, mantenimiento y alertas de stock
+              </p>
+            </div>
+            <Switch
+              checked={preferences.notifyInventory}
+              onCheckedChange={checked => updatePreference('notifyInventory', checked)}
+            />
+          </div>
+
+          <Separator />
+
+          <div className='flex items-center justify-between'>
+            <div className='space-y-0.5'>
+              <Label className='text-base flex items-center space-x-2'>
+                <Route className='h-4 w-4 text-teal-600 dark:text-teal-400' />
+                <span>Rondas</span>
+              </Label>
+              <p className='text-sm text-muted-foreground'>
+                Asignaciones, rondas omitidas/incompletas y sync offline
+              </p>
+            </div>
+            <Switch
+              checked={preferences.notifyPatrols}
+              onCheckedChange={checked => updatePreference('notifyPatrols', checked)}
+            />
+          </div>
         </div>
 
         {/* NIVEL INTERMEDIO - Solo para intermediate y advanced */}

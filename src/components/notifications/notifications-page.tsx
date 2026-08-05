@@ -6,15 +6,29 @@ import {
   Trash2,
   CheckCheck,
   AlertCircle,
-  Info,
-  CheckCircle,
-  Clock,
   Search,
   X,
   Ticket,
   Check,
   Filter,
+  Mail,
+  Loader2,
+  ChevronDown,
+  ChevronRight,
+  Layers,
+  List,
+  Clock,
+  BellOff,
+  MoreHorizontal,
 } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -31,54 +45,37 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { useNotifications, type NotificationData } from '@/hooks/use-notifications'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
-
-// Configuración visual por tipo de notificación
-const TYPE_CONFIG: Record<
-  string,
-  { icon: React.ElementType; borderColor: string; bgColor: string; label: string }
-> = {
-  SUCCESS: {
-    icon: CheckCircle,
-    borderColor: 'border-l-emerald-500 dark:border-l-emerald-400',
-    bgColor: 'bg-emerald-50/40 dark:bg-emerald-950/20',
-    label: 'Éxito',
-  },
-  INFO: {
-    icon: Info,
-    borderColor: 'border-l-blue-500 dark:border-l-blue-400',
-    bgColor: 'bg-blue-50/40 dark:bg-blue-950/20',
-    label: 'Info',
-  },
-  WARNING: {
-    icon: Clock,
-    borderColor: 'border-l-amber-500 dark:border-l-amber-400',
-    bgColor: 'bg-amber-50/40 dark:bg-amber-950/20',
-    label: 'Atención',
-  },
-  ERROR: {
-    icon: AlertCircle,
-    borderColor: 'border-l-red-500 dark:border-l-red-400',
-    bgColor: 'bg-red-50/40 dark:bg-red-950/20',
-    label: 'Error',
-  },
-}
+import { FILTER_TYPE_OPTIONS, getTypeConfig } from '@/lib/notifications/notification-types'
+import { groupNotifications } from '@/lib/notifications/group-notifications'
+import { buildEntityKey } from '@/lib/notifications/entity-key'
+import { ActiveMutesPanel } from '@/components/notifications/active-mutes-panel'
 
 function NotificationCard({
   notification,
   onMarkRead,
+  onMarkUnread,
   onDelete,
   onNavigate,
+  onSnooze,
+  onMuteThread,
 }: {
   notification: NotificationData
   onMarkRead: (id: string) => void
+  onMarkUnread: (id: string) => void
   onDelete: (id: string) => void
   onNavigate: (n: NotificationData) => void
+  onSnooze: (id: string, duration: '1h' | '8h' | '24h') => void
+  onMuteThread: (entityKey: string, duration: '1h' | '8h' | '24h' | 'forever') => void
 }) {
-  const cfg = TYPE_CONFIG[notification.type] ?? TYPE_CONFIG.INFO
+  const muteKey = buildEntityKey({
+    ticketId: notification.ticketId,
+    metadata: notification.metadata,
+  })
+  const cfg = getTypeConfig(notification.type)
   const Icon = cfg.icon
   const timeAgo = formatDistanceToNow(new Date(notification.createdAt), {
     addSuffix: true,
@@ -92,7 +89,8 @@ function NotificationCard({
     notification.metadata?.equipmentId ||
     notification.metadata?.patrolId ||
     notification.metadata?.scheduleId ||
-    notification.metadata?.routeId
+    notification.metadata?.routeId ||
+    notification.metadata?.incidentId
   )
 
   return (
@@ -106,18 +104,7 @@ function NotificationCard({
       onClick={isClickable ? () => onNavigate(notification) : undefined}
     >
       <div className='flex items-start gap-3'>
-        <Icon
-          className={cn(
-            'h-5 w-5 mt-0.5 shrink-0',
-            notification.type === 'SUCCESS'
-              ? 'text-emerald-600 dark:text-emerald-400'
-              : notification.type === 'WARNING'
-                ? 'text-amber-600 dark:text-amber-400'
-                : notification.type === 'ERROR'
-                  ? 'text-red-600 dark:text-red-400'
-                  : 'text-blue-600 dark:text-blue-400'
-          )}
-        />
+        <Icon className={cn('h-5 w-5 mt-0.5 shrink-0', cfg.textColor)} />
 
         <div className='flex-1 min-w-0'>
           <div className='flex items-start justify-between gap-2 mb-1'>
@@ -152,7 +139,7 @@ function NotificationCard({
           )}
 
           <div className='flex items-center gap-1' onClick={e => e.stopPropagation()}>
-            {!notification.isRead && (
+            {!notification.isRead ? (
               <Button
                 variant='ghost'
                 size='sm'
@@ -161,6 +148,16 @@ function NotificationCard({
               >
                 <Check className='h-3 w-3 mr-1' />
                 Marcar leída
+              </Button>
+            ) : (
+              <Button
+                variant='ghost'
+                size='sm'
+                className='h-7 text-xs text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-950/30'
+                onClick={() => onMarkUnread(notification.id)}
+              >
+                <Mail className='h-3 w-3 mr-1' />
+                Marcar no leída
               </Button>
             )}
             {isClickable && (
@@ -192,15 +189,51 @@ function NotificationCard({
                               : 'Ver ticket'}
               </Button>
             )}
-            <Button
-              variant='ghost'
-              size='sm'
-              className='h-7 text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/30 ml-auto'
-              onClick={() => onDelete(notification.id)}
-            >
-              <Trash2 className='h-3 w-3 mr-1' />
-              Eliminar
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant='ghost' size='sm' className='h-7 w-7 p-0 ml-auto'>
+                  <MoreHorizontal className='h-4 w-4' />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align='end' className='w-52'>
+                <DropdownMenuLabel>Posponer</DropdownMenuLabel>
+                <DropdownMenuItem onClick={() => onSnooze(notification.id, '1h')}>
+                  <Clock className='h-3.5 w-3.5 mr-2' />1 hora
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onSnooze(notification.id, '8h')}>
+                  <Clock className='h-3.5 w-3.5 mr-2' />8 horas
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onSnooze(notification.id, '24h')}>
+                  <Clock className='h-3.5 w-3.5 mr-2' />
+                  24 horas
+                </DropdownMenuItem>
+                {muteKey && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel>Silenciar hilo</DropdownMenuLabel>
+                    <DropdownMenuItem onClick={() => onMuteThread(muteKey, '8h')}>
+                      <BellOff className='h-3.5 w-3.5 mr-2' />8 horas
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onMuteThread(muteKey, '24h')}>
+                      <BellOff className='h-3.5 w-3.5 mr-2' />
+                      24 horas
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onMuteThread(muteKey, 'forever')}>
+                      <BellOff className='h-3.5 w-3.5 mr-2' />
+                      Indefinido
+                    </DropdownMenuItem>
+                  </>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className='text-red-600 focus:text-red-600'
+                  onClick={() => onDelete(notification.id)}
+                >
+                  <Trash2 className='h-3.5 w-3.5 mr-2' />
+                  Eliminar
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </div>
@@ -211,7 +244,8 @@ function NotificationCard({
 export default function NotificationsPage() {
   const {
     loading,
-    error,
+    loadingMore,
+    hasMore,
     filterRead,
     setFilterRead,
     filterType,
@@ -221,15 +255,36 @@ export default function NotificationsPage() {
     filteredNotifications,
     stats,
     markAsRead,
+    markAsUnread,
     markAllAsRead,
     deleteNotification,
     clearAllNotifications,
+    snoozeNotification,
+    muteEntity,
+    unmuteEntity,
     navigateToTicket,
+    loadMore,
     refresh,
     isAuthenticated,
   } = useNotifications()
 
   const [showClearDialog, setShowClearDialog] = useState(false)
+  const [groupByEntity, setGroupByEntity] = useState(true)
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
+
+  const groups = useMemo(
+    () => (groupByEntity ? groupNotifications(filteredNotifications) : []),
+    [groupByEntity, filteredNotifications]
+  )
+
+  const toggleGroup = (key: string) => {
+    setExpandedGroups(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
 
   if (!isAuthenticated) {
     return (
@@ -280,6 +335,8 @@ export default function NotificationsPage() {
       headerActions={headerActions}
     >
       <div className='max-w-3xl mx-auto space-y-4'>
+        <ActiveMutesPanel onUnmute={unmuteEntity} />
+
         {/* Filtros */}
         <Card>
           <CardContent className='p-4 space-y-3'>
@@ -321,23 +378,15 @@ export default function NotificationsPage() {
                 </Button>
               ))}
               <div className='w-px h-5 bg-border mx-1' />
-              {(['all', 'SUCCESS', 'INFO', 'WARNING', 'ERROR'] as const).map(t => (
+              {FILTER_TYPE_OPTIONS.map(opt => (
                 <Button
-                  key={t}
-                  variant={filterType === t ? 'default' : 'outline'}
+                  key={opt.value}
+                  variant={filterType === opt.value ? 'default' : 'outline'}
                   size='sm'
-                  onClick={() => setFilterType(t)}
+                  onClick={() => setFilterType(opt.value)}
                   className='h-7 text-xs'
                 >
-                  {t === 'all'
-                    ? 'Todos los tipos'
-                    : t === 'SUCCESS'
-                      ? '✅ Éxito'
-                      : t === 'INFO'
-                        ? 'ℹ️ Info'
-                        : t === 'WARNING'
-                          ? '⚠️ Atención'
-                          : '❌ Error'}
+                  {opt.label}
                 </Button>
               ))}
             </div>
@@ -347,12 +396,39 @@ export default function NotificationsPage() {
         {/* Lista */}
         <Card>
           <CardHeader className='pb-3'>
-            <CardTitle className='flex items-center gap-2 text-base'>
-              <Bell className='h-5 w-5' />
-              {stats.filtered === stats.total
-                ? `${stats.total} notificaciones`
-                : `${stats.filtered} de ${stats.total} notificaciones`}
-            </CardTitle>
+            <div className='flex items-center justify-between gap-2 flex-wrap'>
+              <CardTitle className='flex items-center gap-2 text-base'>
+                <Bell className='h-5 w-5' />
+                {filteredNotifications.length >= stats.total
+                  ? `${stats.total} notificaciones`
+                  : `${filteredNotifications.length} de ${stats.total} notificaciones`}
+                {groupByEntity && groups.length > 0 && (
+                  <span className='text-sm font-normal text-muted-foreground'>
+                    · {groups.length} grupos
+                  </span>
+                )}
+              </CardTitle>
+              <div className='flex items-center gap-1'>
+                <Button
+                  variant={groupByEntity ? 'default' : 'outline'}
+                  size='sm'
+                  className='h-7 text-xs'
+                  onClick={() => setGroupByEntity(true)}
+                >
+                  <Layers className='h-3.5 w-3.5 mr-1' />
+                  Agrupar
+                </Button>
+                <Button
+                  variant={!groupByEntity ? 'default' : 'outline'}
+                  size='sm'
+                  className='h-7 text-xs'
+                  onClick={() => setGroupByEntity(false)}
+                >
+                  <List className='h-3.5 w-3.5 mr-1' />
+                  Lista
+                </Button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             {loading && filteredNotifications.length === 0 ? (
@@ -384,6 +460,118 @@ export default function NotificationsPage() {
                   </Button>
                 )}
               </div>
+            ) : groupByEntity ? (
+              <div className='space-y-3'>
+                {groups.map(group => {
+                  const isSingle = group.notifications.length === 1
+                  const isOpen = isSingle || expandedGroups.has(group.key)
+                  if (isSingle) {
+                    const n = group.notifications[0]
+                    return (
+                      <NotificationCard
+                        key={n.id}
+                        notification={n}
+                        onMarkRead={markAsRead}
+                        onMarkUnread={markAsUnread}
+                        onDelete={deleteNotification}
+                        onNavigate={navigateToTicket}
+                        onSnooze={(id, d) => snoozeNotification(id, d)}
+                        onMuteThread={muteEntity}
+                      />
+                    )
+                  }
+                  return (
+                    <div
+                      key={group.key}
+                      className='rounded-lg border border-border overflow-hidden'
+                    >
+                      <div className='flex items-center gap-1 pr-2'>
+                        <button
+                          type='button'
+                          className='flex-1 flex items-center gap-3 p-3 text-left hover:bg-muted/50 transition-colors min-w-0'
+                          onClick={() => toggleGroup(group.key)}
+                        >
+                          {isOpen ? (
+                            <ChevronDown className='h-4 w-4 text-muted-foreground shrink-0' />
+                          ) : (
+                            <ChevronRight className='h-4 w-4 text-muted-foreground shrink-0' />
+                          )}
+                          <div className='flex-1 min-w-0'>
+                            <div className='flex items-center gap-2 flex-wrap'>
+                              <span className='text-sm font-semibold truncate'>{group.label}</span>
+                              {group.subtitle && (
+                                <span className='text-xs text-muted-foreground'>
+                                  {group.subtitle}
+                                </span>
+                              )}
+                              <Badge variant='secondary' className='text-[10px]'>
+                                {group.notifications.length}
+                              </Badge>
+                              {group.unreadCount > 0 && (
+                                <Badge className='text-[10px] bg-blue-500'>
+                                  {group.unreadCount} nuevas
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                        {group.muteKey && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant='ghost' size='sm' className='h-8 w-8 p-0 shrink-0'>
+                                <BellOff className='h-4 w-4' />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align='end'>
+                              <DropdownMenuLabel>Silenciar hilo</DropdownMenuLabel>
+                              <DropdownMenuItem onClick={() => muteEntity(group.muteKey!, '8h')}>
+                                8 horas
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => muteEntity(group.muteKey!, '24h')}>
+                                24 horas
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => muteEntity(group.muteKey!, 'forever')}
+                              >
+                                Indefinido
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                      </div>
+                      {isOpen && (
+                        <div className='space-y-2 p-2 pt-0 border-t border-border/60'>
+                          {group.notifications.map(n => (
+                            <NotificationCard
+                              key={n.id}
+                              notification={n}
+                              onMarkRead={markAsRead}
+                              onMarkUnread={markAsUnread}
+                              onDelete={deleteNotification}
+                              onNavigate={navigateToTicket}
+                              onSnooze={(id, d) => snoozeNotification(id, d)}
+                              onMuteThread={muteEntity}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+                {hasMore && (
+                  <div className='flex justify-center pt-2'>
+                    <Button
+                      variant='outline'
+                      size='sm'
+                      onClick={() => loadMore()}
+                      disabled={loadingMore}
+                    >
+                      {loadingMore && <Loader2 className='h-4 w-4 mr-2 animate-spin' />}
+                      {loadingMore ? 'Cargando...' : 'Cargar más'}
+                    </Button>
+                  </div>
+                )}
+              </div>
             ) : (
               <div className='space-y-3'>
                 {filteredNotifications.map(n => (
@@ -391,10 +579,26 @@ export default function NotificationsPage() {
                     key={n.id}
                     notification={n}
                     onMarkRead={markAsRead}
+                    onMarkUnread={markAsUnread}
                     onDelete={deleteNotification}
                     onNavigate={navigateToTicket}
+                    onSnooze={(id, d) => snoozeNotification(id, d)}
+                    onMuteThread={muteEntity}
                   />
                 ))}
+                {hasMore && (
+                  <div className='flex justify-center pt-2'>
+                    <Button
+                      variant='outline'
+                      size='sm'
+                      onClick={() => loadMore()}
+                      disabled={loadingMore}
+                    >
+                      {loadingMore && <Loader2 className='h-4 w-4 mr-2 animate-spin' />}
+                      {loadingMore ? 'Cargando...' : 'Cargar más'}
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
           </CardContent>

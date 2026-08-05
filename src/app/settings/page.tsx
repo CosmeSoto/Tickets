@@ -37,6 +37,9 @@ export default function SettingsPage() {
   const notificationPrefs: NotificationPreferences = {
     emailNotifications: settings.emailNotifications,
     pushNotifications: settings.pushNotifications,
+    notifyTickets: settings.notifyTickets,
+    notifyInventory: settings.notifyInventory,
+    notifyPatrols: settings.notifyPatrols,
     soundEnabled: settings.soundEnabled,
     ticketUpdates: settings.ticketUpdates,
     systemAlerts: settings.systemAlerts,

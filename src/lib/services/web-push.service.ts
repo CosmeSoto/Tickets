@@ -5,7 +5,7 @@
  * - Registrar/eliminar suscripciones push de dispositivos
  * - Enviar notificaciones push a usuarios (incluso con navegador cerrado)
  * - Limpiar suscripciones expiradas o inválidas
- * - Respetar preferencias de usuario (pushNotifications, quietHours)
+ * - La verificación de preferencias / quiet hours ocurre en NotificationService.deliver
  *
  * Requiere variables de entorno:
  * - VAPID_PUBLIC_KEY: clave pública VAPID (se comparte con el frontend)

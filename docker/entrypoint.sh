@@ -68,9 +68,17 @@ for attempt in 1 2 3 4 5; do
 done
 
 if [ "$DB_PUSH_OK" = "true" ]; then
-  # Marcar la migración de incidentes como aplicada si existe (puede que ya
-  # esté aplicada desde un deploy anterior; el || true evita error duplicado).
-  $PRISMA_CLI migrate resolve --applied 20260604000000_add_patrol_incidents 2>/dev/null || true
+  # db push deja el schema alineado con schema.prisma, pero no registra
+  # migraciones en _prisma_migrations. Marcar TODAS como applied evita
+  # drift al mover el proyecto a otro servidor o usar migrate deploy después.
+  if [ -d ./prisma/migrations ]; then
+    echo "==> Alineando historial de migraciones Prisma..."
+    for mig_dir in ./prisma/migrations/*/; do
+      [ -d "$mig_dir" ] || continue
+      mig_name=$(basename "$mig_dir")
+      $PRISMA_CLI migrate resolve --applied "$mig_name" 2>/dev/null || true
+    done
+  fi
   echo "==> Schema sincronizado."
 else
   echo "==> db push falló — intentando migrate deploy como fallback..."

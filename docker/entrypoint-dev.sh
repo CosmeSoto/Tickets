@@ -27,7 +27,21 @@ if [ "$POSTGRES_READY" != "true" ]; then
 fi
 
 echo "==> [dev] Sincronizando schema..."
-npx prisma db push --accept-data-loss || echo "==> ADVERTENCIA: db push falló"
+if npx prisma db push --accept-data-loss; then
+  # Mismo criterio que producción: schema.prisma es la fuente de verdad;
+  # alinear _prisma_migrations para portabilidad entre equipos/servidores.
+  if [ -d ./prisma/migrations ]; then
+    echo "==> [dev] Alineando historial de migraciones Prisma..."
+    for mig_dir in ./prisma/migrations/*/; do
+      [ -d "$mig_dir" ] || continue
+      mig_name=$(basename "$mig_dir")
+      npx prisma migrate resolve --applied "$mig_name" 2>/dev/null || true
+    done
+  fi
+else
+  echo "==> ADVERTENCIA: db push falló — intentando migrate deploy..."
+  npx prisma migrate deploy || echo "==> ADVERTENCIA: migrate deploy también falló"
+fi
 
 echo "==> [dev] Verificando seed..."
 NEEDS_SEED=$(node - <<'NODESCRIPT' 2>/dev/null || echo "no"

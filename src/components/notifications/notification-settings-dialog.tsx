@@ -13,6 +13,8 @@ import {
   User,
   MessageCircle,
   AlertCircle,
+  Package,
+  Route,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -152,6 +154,52 @@ export function NotificationSettingsDialog({
                 <Switch
                   checked={localPreferences.soundEnabled}
                   onCheckedChange={checked => updatePreference('soundEnabled', checked)}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Módulos */}
+          <Card>
+            <CardHeader>
+              <CardTitle className='text-lg'>Módulos</CardTitle>
+              <CardDescription>Silencia notificaciones por área del sistema</CardDescription>
+            </CardHeader>
+            <CardContent className='space-y-4'>
+              <div className='flex items-center justify-between'>
+                <div className='space-y-1'>
+                  <Label className='text-sm font-medium flex items-center space-x-2'>
+                    <Ticket className='h-3 w-3 text-blue-600' />
+                    <span>Tickets</span>
+                  </Label>
+                </div>
+                <Switch
+                  checked={localPreferences.notifyTickets}
+                  onCheckedChange={checked => updatePreference('notifyTickets', checked)}
+                />
+              </div>
+              <div className='flex items-center justify-between'>
+                <div className='space-y-1'>
+                  <Label className='text-sm font-medium flex items-center space-x-2'>
+                    <Package className='h-3 w-3 text-violet-600' />
+                    <span>Inventario</span>
+                  </Label>
+                </div>
+                <Switch
+                  checked={localPreferences.notifyInventory}
+                  onCheckedChange={checked => updatePreference('notifyInventory', checked)}
+                />
+              </div>
+              <div className='flex items-center justify-between'>
+                <div className='space-y-1'>
+                  <Label className='text-sm font-medium flex items-center space-x-2'>
+                    <Route className='h-3 w-3 text-teal-600' />
+                    <span>Rondas</span>
+                  </Label>
+                </div>
+                <Switch
+                  checked={localPreferences.notifyPatrols}
+                  onCheckedChange={checked => updatePreference('notifyPatrols', checked)}
                 />
               </div>
             </CardContent>

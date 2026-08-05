@@ -6,8 +6,15 @@ import { withCache } from '@/lib/api-cache'
 
 /**
  * GET /api/notifications
- * Caché de 10 segundos por usuario — absorbe remontajes de componentes
- * sin perder frescura (SSE entrega las nuevas en tiempo real)
+ * Paginación por cursor + filtros opcionales.
+ * Caché corta solo en la primera página sin filtros (SSE mantiene frescura).
+ *
+ * Query:
+ *  - limit (default 20, max 100)
+ *  - cursor (id de la última notificación cargada)
+ *  - filterRead: all | unread | read
+ *  - type: all | SUCCESS | INFO | WARNING | ERROR | INVENTORY | PATROL | TICKET
+ *  - q: búsqueda en título/mensaje
  */
 export async function GET(request: NextRequest) {
   try {
@@ -18,16 +25,31 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
-    const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100)
+    const limit = Math.min(parseInt(searchParams.get('limit') || '20', 10) || 20, 100)
+    const cursor = searchParams.get('cursor')
+    const filterRead = searchParams.get('filterRead') || 'all'
+    const type = searchParams.get('type') || 'all'
+    const q = searchParams.get('q')
     const userId = session.user.id
 
-    const notifications = await withCache(
-      `notif:list:${userId}:${limit}`,
-      10, // 10 segundos — SSE mantiene la frescura real
-      () => NotificationService.getUserNotifications(userId, limit)
-    )
+    const isRead = filterRead === 'unread' ? false : filterRead === 'read' ? true : null
 
-    return NextResponse.json(notifications)
+    const fetchPage = () =>
+      NotificationService.getUserNotifications(userId, {
+        limit,
+        cursor,
+        isRead,
+        typeGroup: type === 'all' ? null : type,
+        q,
+      })
+
+    // Caché solo primera página sin filtros/búsqueda (evita servir resultados stale filtrados)
+    const canCache = !cursor && filterRead === 'all' && type === 'all' && !q
+    const page = canCache
+      ? await withCache(`notif:list:${userId}:${limit}`, 10, fetchPage)
+      : await fetchPage()
+
+    return NextResponse.json(page)
   } catch (error) {
     console.error('Error fetching notifications:', error)
     return NextResponse.json({ error: 'Error al obtener notificaciones' }, { status: 500 })

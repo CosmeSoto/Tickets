@@ -168,21 +168,40 @@ model notification_preferences {
 }
 
 model notifications {
-  id        String           @id
-  title     String
-  message   String
-  type      NotificationType @default(INFO)
-  userId    String
-  ticketId  String?
-  isRead    Boolean          @default(false)
-  metadata  Json?
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
-  tickets   tickets?         @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  users     users            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id           String           @id
+  title        String
+  message      String
+  type         NotificationType @default(INFO)
+  userId       String
+  ticketId     String?
+  isRead       Boolean          @default(false)
+  /// Oculta la notificación del inbox hasta esta fecha (snooze individual)
+  snoozedUntil DateTime?
+  metadata     Json?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  tickets      tickets?         @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  users        users            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([ticketId])
   @@index([userId, isRead, createdAt(sort: Desc)])
+  @@index([userId, snoozedUntil])
+}
+
+/// Silenciar / snooze por entidad (ticket, equipo, ronda, acta…).
+/// mutedUntil = null → silenciado indefinido; fecha futura → snooze temporal.
+model notification_mutes {
+  id         String    @id
+  userId     String
+  /// Clave estable: ticket:{id} | equipment:{id} | patrol:{id} | act:{id} | maintenance:{id}
+  entityKey  String
+  mutedUntil DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  users      users     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, entityKey])
+  @@index([userId, mutedUntil])
 }
 
 model oauth_accounts {
@@ -385,6 +404,12 @@ model user_settings {
   statusChanged        Boolean  @default(true)
   newComments          Boolean  @default(true)
   ticketUpdated        Boolean  @default(true)
+  /// Master switch: notificaciones del módulo Tickets
+  notifyTickets        Boolean  @default(true)
+  /// Master switch: notificaciones del módulo Inventario
+  notifyInventory      Boolean  @default(true)
+  /// Master switch: notificaciones del módulo Rondas
+  notifyPatrols        Boolean  @default(true)
   quietHoursEnabled    Boolean  @default(false)
   quietHoursStart      String   @default("22:00")
   quietHoursEnd        String   @default("08:00")
@@ -488,6 +513,7 @@ model users {
   maintenanceRequests                               maintenance_records[]           @relation("MaintenanceRequester")
   maintenanceRecords                                maintenance_records[]           @relation("MaintenanceTechnician")
   notification_preferences                          notification_preferences?
+  notification_mutes                                notification_mutes[]
   notifications                                     notifications[]
   oauth_accounts                                    oauth_accounts[]
   password_reset_tokens                             password_reset_tokens[]

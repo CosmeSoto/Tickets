@@ -17,6 +17,12 @@ export interface UserSettings {
   soundEnabled: boolean
   emailNotifications: boolean
   pushNotifications: boolean
+  /** Master: módulo Tickets */
+  notifyTickets: boolean
+  /** Master: módulo Inventario */
+  notifyInventory: boolean
+  /** Master: módulo Rondas */
+  notifyPatrols: boolean
   /** Actualizaciones de actividad: tickets, inventario, rondas, noticias */
   ticketUpdates: boolean
   systemAlerts: boolean
@@ -42,6 +48,9 @@ const DEFAULTS: UserSettings = {
   soundEnabled: true,
   emailNotifications: true,
   pushNotifications: true,
+  notifyTickets: true,
+  notifyInventory: true,
+  notifyPatrols: true,
   ticketUpdates: true,
   systemAlerts: true,
   weeklyReport: false,
@@ -87,6 +96,9 @@ async function loadSettings() {
       soundEnabled: s.soundEnabled ?? DEFAULTS.soundEnabled,
       emailNotifications: s.emailNotifications ?? DEFAULTS.emailNotifications,
       pushNotifications: s.pushNotifications ?? DEFAULTS.pushNotifications,
+      notifyTickets: s.notifyTickets ?? DEFAULTS.notifyTickets,
+      notifyInventory: s.notifyInventory ?? DEFAULTS.notifyInventory,
+      notifyPatrols: s.notifyPatrols ?? DEFAULTS.notifyPatrols,
       ticketUpdates: s.ticketUpdates ?? DEFAULTS.ticketUpdates,
       systemAlerts: s.systemAlerts ?? DEFAULTS.systemAlerts,
       weeklyReport: s.weeklyReport ?? DEFAULTS.weeklyReport,

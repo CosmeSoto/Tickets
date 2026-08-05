@@ -13,6 +13,11 @@ const userSettingsSchema = z.object({
   emailNotifications: z.boolean().optional(),
   pushNotifications: z.boolean().optional(),
 
+  // Master por módulo
+  notifyTickets: z.boolean().optional(),
+  notifyInventory: z.boolean().optional(),
+  notifyPatrols: z.boolean().optional(),
+
   // Notificaciones intermedias
   ticketUpdates: z.boolean().optional(),
   systemAlerts: z.boolean().optional(),
@@ -73,6 +78,9 @@ export async function GET(request: NextRequest) {
           settings: {
             emailNotifications: true,
             pushNotifications: true,
+            notifyTickets: true,
+            notifyInventory: true,
+            notifyPatrols: true,
             ticketUpdates: true,
             systemAlerts: true,
             weeklyReport: false,
@@ -119,6 +127,9 @@ export async function GET(request: NextRequest) {
             statusChanged: true,
             newComments: true,
             ticketUpdated: true,
+            notifyTickets: true,
+            notifyInventory: true,
+            notifyPatrols: true,
             autoAssignEnabled: true,
             maxConcurrentTickets: 10,
             quietHoursEnabled: false,
@@ -140,6 +151,9 @@ export async function GET(request: NextRequest) {
             statusChanged: true,
             newComments: true,
             ticketUpdated: true,
+            notifyTickets: true,
+            notifyInventory: true,
+            notifyPatrols: true,
             quietHoursEnabled: false,
             quietHoursStart: '22:00',
             quietHoursEnd: '08:00',
@@ -172,6 +186,9 @@ export async function GET(request: NextRequest) {
             statusChanged: settings.statusChanged ?? true,
             newComments: settings.newComments ?? true,
             ticketUpdated: settings.ticketUpdated ?? true,
+            notifyTickets: settings.notifyTickets ?? true,
+            notifyInventory: settings.notifyInventory ?? true,
+            notifyPatrols: settings.notifyPatrols ?? true,
             autoAssignEnabled: settings.autoAssignEnabled ?? true,
             maxConcurrentTickets: settings.maxConcurrentTickets ?? 10,
             quietHoursEnabled: settings.quietHoursEnabled ?? false,
@@ -187,6 +204,9 @@ export async function GET(request: NextRequest) {
         settings: {
           emailNotifications: settings.emailNotifications,
           pushNotifications: settings.pushNotifications,
+          notifyTickets: settings.notifyTickets ?? true,
+          notifyInventory: settings.notifyInventory ?? true,
+          notifyPatrols: settings.notifyPatrols ?? true,
           ticketUpdates: settings.ticketUpdates,
           systemAlerts: settings.systemAlerts,
           weeklyReport: settings.weeklyReport,
@@ -263,6 +283,11 @@ export async function PUT(request: NextRequest) {
       updateData.emailNotifications = data.emailNotifications
     if (data.pushNotifications !== undefined) updateData.pushNotifications = data.pushNotifications
 
+    // Master por módulo
+    if (data.notifyTickets !== undefined) updateData.notifyTickets = data.notifyTickets
+    if (data.notifyInventory !== undefined) updateData.notifyInventory = data.notifyInventory
+    if (data.notifyPatrols !== undefined) updateData.notifyPatrols = data.notifyPatrols
+
     // Notificaciones intermedias
     if (data.ticketUpdates !== undefined) updateData.ticketUpdates = data.ticketUpdates
     if (data.systemAlerts !== undefined) updateData.systemAlerts = data.systemAlerts
@@ -309,6 +334,9 @@ export async function PUT(request: NextRequest) {
         statusChanged: data.statusChanged ?? true,
         newComments: data.newComments ?? true,
         ticketUpdated: data.ticketUpdated ?? true,
+        notifyTickets: data.notifyTickets ?? true,
+        notifyInventory: data.notifyInventory ?? true,
+        notifyPatrols: data.notifyPatrols ?? true,
         quietHoursEnabled: data.quietHoursEnabled ?? false,
         quietHoursStart: data.quietHoursStart ?? '22:00',
         quietHoursEnd: data.quietHoursEnd ?? '08:00',
@@ -332,6 +360,9 @@ export async function PUT(request: NextRequest) {
       settings: {
         emailNotifications: settings.emailNotifications,
         pushNotifications: settings.pushNotifications,
+        notifyTickets: settings.notifyTickets ?? true,
+        notifyInventory: settings.notifyInventory ?? true,
+        notifyPatrols: settings.notifyPatrols ?? true,
         ticketUpdates: settings.ticketUpdates,
         systemAlerts: settings.systemAlerts,
         weeklyReport: settings.weeklyReport,

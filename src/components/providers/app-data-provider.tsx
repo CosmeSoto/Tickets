@@ -18,13 +18,14 @@ import React from 'react'
 import { FamiliesProvider } from '@/contexts/families-context'
 import { UsersProvider } from '@/contexts/users-context'
 import { DepartmentsProvider } from '@/contexts/departments-context'
+import { NotificationsProvider } from '@/contexts/notifications-context'
 
 export function AppDataProvider({ children }: { children: React.ReactNode }) {
   return (
     <FamiliesProvider>
       <UsersProvider>
         <DepartmentsProvider>
-          {children}
+          <NotificationsProvider>{children}</NotificationsProvider>
         </DepartmentsProvider>
       </UsersProvider>
     </FamiliesProvider>

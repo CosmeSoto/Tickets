@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import {
@@ -9,21 +9,22 @@ import {
   Check,
   CheckCheck,
   Trash2,
-  Info,
-  CheckCircle,
-  AlertTriangle,
   ExternalLink,
   ChevronDown,
   ChevronUp,
-  Clock,
 } from 'lucide-react'
 import { Badge } from './badge'
 import { Button } from './button'
 import { Card, CardContent, CardHeader, CardTitle } from './card'
-import { Alert, AlertDescription } from './alert'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './tooltip'
 import { cn } from '@/lib/utils'
 import { useNotifications, type NotificationData } from '@/hooks/use-notifications'
+import {
+  dashboardPriority,
+  getTypeConfig,
+  isRelevantForDashboard,
+  type DashboardRole,
+} from '@/lib/notifications/notification-types'
 
 interface NotificationsProps {
   className?: string
@@ -31,25 +32,25 @@ interface NotificationsProps {
   maxVisible?: number
 }
 
-// Helpers de presentación
-function getNotificationIcon(type: string) {
-  switch (type) {
-    case 'ERROR':
-    case 'CRITICAL':
-      return <AlertTriangle className='h-4 w-4 text-red-600' />
-    case 'WARNING':
-      return <Clock className='h-4 w-4 text-orange-600' />
-    case 'SUCCESS':
-      return <CheckCircle className='h-4 w-4 text-green-600' />
-    default:
-      return <Info className='h-4 w-4 text-blue-600' />
-  }
+function hasDestination(n: NotificationData) {
+  return !!(
+    n.ticketId ||
+    n.metadata?.link ||
+    n.metadata?.patrolId ||
+    n.metadata?.scheduleId ||
+    n.metadata?.actId ||
+    n.metadata?.maintenanceId ||
+    n.metadata?.equipmentId ||
+    n.metadata?.routeId ||
+    n.metadata?.incidentId ||
+    n.metadata?.ticketId
+  )
 }
 
-function getNotificationColor(type: string) {
-  switch (type) {
+function getSeverityBorder(type: string) {
+  const severity = getTypeConfig(type).severity
+  switch (severity) {
     case 'ERROR':
-    case 'CRITICAL':
       return 'border-l-red-500 bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-950/60'
     case 'WARNING':
       return 'border-l-orange-500 bg-orange-50 dark:bg-orange-950/40 hover:bg-orange-100 dark:hover:bg-orange-950/60'
@@ -60,42 +61,17 @@ function getNotificationColor(type: string) {
   }
 }
 
-function getNotificationBadge(type: string) {
-  switch (type) {
+function getDashboardBorder(type: string) {
+  const severity = getTypeConfig(type).severity
+  switch (severity) {
     case 'ERROR':
-    case 'CRITICAL':
-      return (
-        <Badge variant='destructive' className='text-xs'>
-          Crítico
-        </Badge>
-      )
+      return 'border-l-2 border-l-red-500'
     case 'WARNING':
-      return (
-        <Badge
-          variant='secondary'
-          className='text-xs bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
-        >
-          Atención
-        </Badge>
-      )
+      return 'border-l-2 border-l-orange-500'
     case 'SUCCESS':
-      return (
-        <Badge
-          variant='default'
-          className='text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-        >
-          Éxito
-        </Badge>
-      )
+      return 'border-l-2 border-l-green-500'
     default:
-      return (
-        <Badge
-          variant='secondary'
-          className='text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-        >
-          Info
-        </Badge>
-      )
+      return 'border-l-2 border-l-blue-500'
   }
 }
 
@@ -121,30 +97,31 @@ export function Notifications({ className, variant = 'bell', maxVisible = 5 }: N
     markAllAsRead,
     deleteNotification,
     navigateToTicket,
-  } = useNotifications({ autoLoad: true })
+    stats,
+  } = useNotifications()
+
+  const role = (session?.user?.role ?? 'CLIENT') as DashboardRole
+
+  const dashboardFeed = useMemo(() => {
+    if (variant !== 'dashboard') return notifications
+    const relevant = notifications.filter(n => isRelevantForDashboard(n, role))
+    // Preferir no leídas relevantes; si no hay, mostrar relevantes leídas recientes
+    const unread = relevant.filter(n => !n.isRead)
+    const pool = unread.length > 0 ? unread : relevant.slice(0, maxVisible * 2)
+    return [...pool].sort((a, b) => dashboardPriority(b, role) - dashboardPriority(a, role))
+  }, [notifications, variant, role, maxVisible])
 
   if (!session?.user) return null
 
-  const unreadCount = notifications.filter(n => !n.isRead).length
-  const visibleNotifications = expanded ? notifications : notifications.slice(0, maxVisible)
-  const hasMoreNotifications = notifications.length > maxVisible
+  const feed = variant === 'dashboard' ? dashboardFeed : notifications
+  const unreadCount = stats.unread
+  const visibleNotifications = expanded ? feed : feed.slice(0, maxVisible)
+  const hasMoreNotifications = feed.length > maxVisible
 
   const handleAction = (notification: NotificationData) => {
     if (!notification.isRead) markAsRead(notification.id)
     if (variant === 'bell') setIsOpen(false)
-    // Navegar si hay cualquier destino disponible
-    const hasDestination =
-      notification.ticketId ||
-      notification.metadata?.link ||
-      notification.metadata?.patrolId ||
-      notification.metadata?.scheduleId ||
-      notification.metadata?.actId ||
-      notification.metadata?.maintenanceId ||
-      notification.metadata?.equipmentId ||
-      notification.metadata?.patrolId ||
-      notification.metadata?.scheduleId ||
-      notification.metadata?.routeId
-    if (hasDestination) navigateToTicket(notification)
+    if (hasDestination(notification)) navigateToTicket(notification)
   }
 
   const handleDismiss = (id: string, e: React.MouseEvent) => {
@@ -239,7 +216,6 @@ export function Notifications({ className, variant = 'bell', maxVisible = 5 }: N
                     ))}
                   </div>
                 )}
-                {/* Footer: enlace a página completa */}
                 <div className='border-t border-border p-2'>
                   <Link
                     href={`/${session.user.role?.toLowerCase()}/notifications`}
@@ -258,86 +234,84 @@ export function Notifications({ className, variant = 'bell', maxVisible = 5 }: N
     )
   }
 
-  // ── DASHBOARD VARIANT ─────────────────────────────────────────────────────
+  // ── DASHBOARD VARIANT (filtrado por rol) ──────────────────────────────────
   if (variant === 'dashboard') {
-    if (notifications.length === 0) return null
+    if (feed.length === 0) return null
 
     return (
       <div className={cn('space-y-2', className)}>
-        {visibleNotifications.map(n => (
-          <div
-            key={n.id}
-            className={cn(
-              'flex items-center gap-3 p-3 rounded-lg border transition-all duration-200 cursor-pointer hover:shadow-sm',
-              !n.isRead ? 'bg-primary/5 border-primary/20' : 'bg-card border-border',
-              n.type === 'ERROR' || (n.type as string) === 'CRITICAL'
-                ? 'border-l-2 border-l-red-500'
-                : n.type === 'WARNING'
-                  ? 'border-l-2 border-l-orange-500'
-                  : n.type === 'SUCCESS'
-                    ? 'border-l-2 border-l-green-500'
-                    : 'border-l-2 border-l-blue-500'
-            )}
-            onClick={() => handleAction(n)}
-          >
-            <div className='flex-shrink-0'>{getNotificationIcon(n.type)}</div>
-
-            <div className='flex-1 min-w-0'>
-              <div className='flex items-center gap-2 mb-0.5'>
-                <span
-                  className={cn(
-                    'text-sm font-medium truncate',
-                    !n.isRead ? 'text-foreground' : 'text-muted-foreground'
-                  )}
-                >
-                  {n.title}
-                </span>
-                <span className='text-xs text-muted-foreground'>{formatTimeAgo(n.createdAt)}</span>
-                {!n.isRead && (
-                  <span className='w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0' />
-                )}
+        {visibleNotifications.map(n => {
+          const cfg = getTypeConfig(n.type)
+          const Icon = cfg.icon
+          return (
+            <div
+              key={n.id}
+              className={cn(
+                'flex items-center gap-3 p-3 rounded-lg border transition-all duration-200 cursor-pointer hover:shadow-sm',
+                !n.isRead ? 'bg-primary/5 border-primary/20' : 'bg-card border-border',
+                getDashboardBorder(n.type)
+              )}
+              onClick={() => handleAction(n)}
+            >
+              <div className='flex-shrink-0'>
+                <Icon className={cn('h-4 w-4', cfg.textColor)} />
               </div>
 
-              <p className='text-xs text-muted-foreground line-clamp-1'>{n.message}</p>
-            </div>
+              <div className='flex-1 min-w-0'>
+                <div className='flex items-center gap-2 mb-0.5'>
+                  <span
+                    className={cn(
+                      'text-sm font-medium truncate',
+                      !n.isRead ? 'text-foreground' : 'text-muted-foreground'
+                    )}
+                  >
+                    {n.title}
+                  </span>
+                  <Badge variant='outline' className='text-[10px] px-1.5 py-0 h-5 shrink-0'>
+                    {cfg.label}
+                  </Badge>
+                  <span className='text-xs text-muted-foreground'>
+                    {formatTimeAgo(n.createdAt)}
+                  </span>
+                  {!n.isRead && (
+                    <span className='w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0' />
+                  )}
+                </div>
 
-            <div
-              className='flex items-center gap-1 flex-shrink-0'
-              onClick={e => e.stopPropagation()}
-            >
-              {(n.ticketId ||
-                n.metadata?.link ||
-                n.metadata?.actId ||
-                n.metadata?.maintenanceId ||
-                n.metadata?.equipmentId ||
-                n.metadata?.patrolId ||
-                n.metadata?.scheduleId ||
-                n.metadata?.routeId) && (
+                <p className='text-xs text-muted-foreground line-clamp-1'>{n.message}</p>
+              </div>
+
+              <div
+                className='flex items-center gap-1 flex-shrink-0'
+                onClick={e => e.stopPropagation()}
+              >
+                {hasDestination(n) && (
+                  <Button
+                    variant='ghost'
+                    size='sm'
+                    className='h-7 px-2 text-xs'
+                    onClick={e => {
+                      e.stopPropagation()
+                      handleAction(n)
+                    }}
+                  >
+                    Ver
+                  </Button>
+                )}
+
                 <Button
                   variant='ghost'
                   size='sm'
-                  className='h-7 px-2 text-xs'
-                  onClick={e => {
-                    e.stopPropagation()
-                    handleAction(n)
-                  }}
+                  onClick={e => handleDismiss(n.id, e)}
+                  className='h-7 w-7 p-0 text-muted-foreground hover:text-foreground'
+                  title='Descartar'
                 >
-                  Ver
+                  <X className='h-3 w-3' />
                 </Button>
-              )}
-
-              <Button
-                variant='ghost'
-                size='sm'
-                onClick={e => handleDismiss(n.id, e)}
-                className='h-7 w-7 p-0 text-muted-foreground hover:text-foreground'
-                title='Descartar'
-              >
-                <X className='h-3 w-3' />
-              </Button>
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
 
         {hasMoreNotifications && (
           <div className='flex justify-center pt-1'>
@@ -355,7 +329,7 @@ export function Notifications({ className, variant = 'bell', maxVisible = 5 }: N
               ) : (
                 <>
                   <ChevronDown className='h-3 w-3 mr-1' />
-                  Ver {notifications.length - maxVisible} más
+                  Ver {feed.length - maxVisible} más
                 </>
               )}
             </Button>
@@ -368,7 +342,6 @@ export function Notifications({ className, variant = 'bell', maxVisible = 5 }: N
   return null
 }
 
-// Item individual para la campanita
 function BellNotificationItem({
   notification: n,
   onAction,
@@ -380,38 +353,29 @@ function BellNotificationItem({
   onMarkRead: (id: string) => void
   onDismiss: (id: string, e: React.MouseEvent) => void
 }) {
-  const isClickable = !!(
-    n.ticketId ||
-    n.metadata?.link ||
-    n.metadata?.patrolId ||
-    n.metadata?.scheduleId ||
-    n.metadata?.actId ||
-    n.metadata?.maintenanceId ||
-    n.metadata?.equipmentId ||
-    n.metadata?.patrolId ||
-    n.metadata?.scheduleId ||
-    n.metadata?.routeId
-  )
+  const cfg = getTypeConfig(n.type)
+  const Icon = cfg.icon
+  const clickable = hasDestination(n)
 
   return (
     <div
       className={cn(
         'p-3 border-b border-gray-100 transition-colors border-l-4',
-        getNotificationColor(n.type),
+        getSeverityBorder(n.type),
         !n.isRead && 'bg-primary/5',
-        isClickable && 'hover:bg-muted/70 cursor-pointer'
+        clickable && 'hover:bg-muted/70 cursor-pointer'
       )}
-      onClick={isClickable ? () => onAction(n) : undefined}
+      onClick={clickable ? () => onAction(n) : undefined}
     >
       <div className='flex items-start justify-between space-x-2'>
         <div className='flex-1 min-w-0'>
           <div className='flex items-center space-x-2 mb-1'>
-            {getNotificationIcon(n.type)}
+            <Icon className={cn('h-4 w-4 shrink-0', cfg.textColor)} />
             <div className='text-sm font-medium text-foreground truncate'>{n.title}</div>
-            {getNotificationBadge(n.type)}
-            {isClickable && (
-              <ExternalLink className='h-3 w-3 text-muted-foreground flex-shrink-0' />
-            )}
+            <Badge variant='outline' className='text-[10px] px-1.5 py-0 h-5 shrink-0'>
+              {cfg.label}
+            </Badge>
+            {clickable && <ExternalLink className='h-3 w-3 text-muted-foreground flex-shrink-0' />}
             {!n.isRead && <div className='w-2 h-2 bg-primary rounded-full flex-shrink-0' />}
           </div>
           <div className='text-xs text-muted-foreground mb-2 leading-relaxed line-clamp-2'>

@@ -7,7 +7,7 @@ export interface SSENotification {
   id: string
   title: string
   message: string
-  notificationType: 'INFO' | 'SUCCESS' | 'WARNING' | 'ERROR'
+  notificationType: string
   ticketId?: string | null
   isRead: boolean
   createdAt: string

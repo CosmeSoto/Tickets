@@ -9,8 +9,16 @@ export interface NotificationPreferences {
   emailNotifications: boolean
   pushNotifications: boolean
 
+  // ===== MÓDULOS (master switches) =====
+  /** Notificaciones del módulo Tickets */
+  notifyTickets: boolean
+  /** Notificaciones del módulo Inventario */
+  notifyInventory: boolean
+  /** Notificaciones del módulo Rondas */
+  notifyPatrols: boolean
+
   // ===== NIVEL INTERMEDIO (Técnicos/Admins) =====
-  /** Actualizaciones generales: tickets, inventario, rondas, noticias */
+  /** Actualizaciones generales dentro de módulos activos */
   ticketUpdates: boolean
   systemAlerts: boolean
   weeklyReport: boolean
@@ -51,11 +59,21 @@ export const NOTIFICATION_FIELDS_BY_LEVEL: Record<
   NotificationLevel,
   (keyof NotificationPreferences | 'quietHours')[]
 > = {
-  basic: ['emailNotifications', 'pushNotifications', 'soundEnabled'],
+  basic: [
+    'emailNotifications',
+    'pushNotifications',
+    'soundEnabled',
+    'notifyTickets',
+    'notifyInventory',
+    'notifyPatrols',
+  ],
   intermediate: [
     'emailNotifications',
     'pushNotifications',
     'soundEnabled',
+    'notifyTickets',
+    'notifyInventory',
+    'notifyPatrols',
     'ticketUpdates',
     'newComments',
     'statusChanged',
@@ -64,6 +82,9 @@ export const NOTIFICATION_FIELDS_BY_LEVEL: Record<
     'emailNotifications',
     'pushNotifications',
     'soundEnabled',
+    'notifyTickets',
+    'notifyInventory',
+    'notifyPatrols',
     'ticketUpdates',
     'newComments',
     'statusChanged',
@@ -80,6 +101,9 @@ export const NOTIFICATION_FIELDS_BY_LEVEL: Record<
 export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   emailNotifications: true,
   pushNotifications: true,
+  notifyTickets: true,
+  notifyInventory: true,
+  notifyPatrols: true,
   ticketUpdates: true,
   systemAlerts: true,
   weeklyReport: false,

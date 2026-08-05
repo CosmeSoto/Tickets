@@ -431,7 +431,7 @@ export async function DELETE(
           type: NotificationType.WARNING,
           title: 'Programación desactivada',
           message: 'Se cancelaron rondas pendientes asociadas a una programación desactivada.',
-          link: '/patrols',
+          metadata: { link: '/patrol' },
         })
       )
     )

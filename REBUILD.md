@@ -103,13 +103,18 @@ sudo ./start-production.sh --clean
 sudo ./start-production.sh
 
 # Al arrancar, el entrypoint:
-#   1) Seed COMPLETO solo si la BD no tiene usuarios (típicamente tras --clean).
-#   2) ensure-departments SIEMPRE (idempotente) → crea/actualiza TI, Telefonía, etc.
-#      aunque ya haya usuarios (antes solo corría si faltaban depts u huérfanos).
-#   3) ensure-catalogs / ensure-categories si están incompletos.
+#   1) `prisma db push` desde schema.prisma (fuente de verdad del schema).
+#      Cualquier columna/tabla nueva (p. ej. notifyTickets, notification_mutes)
+#      se aplica sola al rebuild/arranque — no hace falta SQL manual en el servidor.
+#   2) Alinea `_prisma_migrations` (migrate resolve) para que el historial
+#      coincida al mover el proyecto a otro equipo/servidor.
+#   3) Seed COMPLETO solo si la BD no tiene usuarios (típicamente tras --clean).
+#   4) ensure-departments SIEMPRE (idempotente) → crea/actualiza TI, Telefonía, etc.
+#   5) ensure-catalogs / ensure-categories si están incompletos.
 #
-# Por eso `sudo ./start-production.sh` (sin --clean) ya sincroniza el organigrama
+# Por eso `sudo ./start-production.sh` (sin --clean) ya sincroniza schema + organigrama
 # sin borrar datos. `--clean` borra volúmenes y vuelve a seedear desde cero.
+# Dev: `./docker/scripts/reset-dev-from-scratch.sh` usa el mismo criterio (db push).
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # COMANDOS MANUALES (si prefieres no usar el script):

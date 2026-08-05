@@ -7,7 +7,7 @@ import {
   getFamilyScopedAdmins,
   getFamilyScopedAdminsForFamilies,
 } from '@/lib/notifications/family-recipients'
-import { getAppTimezone } from '@/lib/utils/date-utils'
+import { evaluateDelivery, type NotificationSpecificType } from '@/lib/notifications/delivery'
 
 export interface CreateNotificationData {
   userId: string
@@ -16,205 +16,119 @@ export interface CreateNotificationData {
   message: string
   ticketId?: string
   metadata?: any
+  specificType?: NotificationSpecificType
+  /**
+   * Ignora preferencias y horas silenciosas (alertas críticas, p. ej. calificar ticket).
+   * Usar con moderación.
+   */
+  force?: boolean
 }
 
 export class NotificationService {
-  /**
-   * Verificar si se debe enviar una notificación según las preferencias del usuario
-   */
-  private static async shouldNotify(
-    userId: string,
-    notificationType: 'push' | 'email',
-    specificType?:
-      | 'ticketCreated'
-      | 'ticketAssigned'
-      | 'statusChanged'
-      | 'newComments'
-      | 'ticketUpdates'
-  ): Promise<boolean> {
-    try {
-      const prefs = await prisma.user_settings.findUnique({
-        where: { userId },
-        select: {
-          emailNotifications: true,
-          pushNotifications: true,
-          ticketCreated: true,
-          ticketAssigned: true,
-          statusChanged: true,
-          newComments: true,
-          ticketUpdated: true,
-          quietHoursEnabled: true,
-          quietHoursStart: true,
-          quietHoursEnd: true,
-        },
-      })
-
-      // Si no hay preferencias, crear defaults y enviar
-      if (!prefs) {
-        // Crear settings por defecto en background (no bloquear)
-        prisma.user_settings
-          .upsert({
-            where: { userId },
-            update: {},
-            create: {
-              id: randomUUID(),
-              userId,
-              emailNotifications: true,
-              pushNotifications: true,
-              ticketCreated: true,
-              ticketAssigned: true,
-              statusChanged: true,
-              newComments: true,
-              ticketUpdated: true,
-              ticketUpdates: true,
-              systemAlerts: true,
-              weeklyReport: false,
-              soundEnabled: true,
-              quietHoursEnabled: false,
-              quietHoursStart: '22:00',
-              quietHoursEnd: '08:00',
-              autoAssignEnabled: true,
-              maxConcurrentTickets: 10,
-              theme: 'light',
-              language: 'es',
-              timezone: getAppTimezone(),
-              updatedAt: new Date(),
-            },
-          })
-          .catch(err => console.error('[NOTIFICATION] Error creating default settings:', err))
-        return true
-      }
-
-      // Verificar horarios silenciosos
-      if (prefs.quietHoursEnabled && prefs.quietHoursStart && prefs.quietHoursEnd) {
-        const now = new Date()
-        const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
-
-        // Comparar horarios
-        if (prefs.quietHoursStart <= prefs.quietHoursEnd) {
-          // Rango normal (ej: 22:00 - 08:00 del día siguiente)
-          if (currentTime >= prefs.quietHoursStart && currentTime <= prefs.quietHoursEnd) {
-            return false
-          }
-        } else {
-          // Rango que cruza medianoche (ej: 22:00 - 08:00)
-          if (currentTime >= prefs.quietHoursStart || currentTime <= prefs.quietHoursEnd) {
-            return false
-          }
-        }
-      }
-
-      // Verificar tipo de notificación general
-      if (notificationType === 'push' && !prefs.pushNotifications) {
-        return false
-      }
-
-      if (notificationType === 'email' && !prefs.emailNotifications) {
-        return false
-      }
-
-      // Verificar tipo específico
-      if (specificType) {
-        switch (specificType) {
-          case 'ticketCreated':
-            if (!prefs.ticketCreated) {
-              return false
-            }
-            break
-          case 'ticketAssigned':
-            if (!prefs.ticketAssigned) {
-              return false
-            }
-            break
-          case 'statusChanged':
-            if (!prefs.statusChanged) {
-              return false
-            }
-            break
-          case 'newComments':
-            if (!prefs.newComments) {
-              return false
-            }
-            break
-          case 'ticketUpdates':
-            if (!prefs.ticketUpdated) {
-              return false
-            }
-            break
-        }
-      }
-
-      return true
-    } catch (error) {
-      console.error('[NOTIFICATION] Error checking preferences:', error)
-      return true // En caso de error, enviar por defecto para no bloquear notificaciones críticas
+  /** Deep-link para Web Push según metadata / ticket / rol del destinatario. */
+  private static async resolvePushUrl(data: CreateNotificationData): Promise<string> {
+    if (typeof data.metadata?.link === 'string' && data.metadata.link) {
+      return data.metadata.link
     }
+    if (data.metadata?.ticketId || data.ticketId) {
+      const tid = data.ticketId || data.metadata?.ticketId
+      const destUser = await prisma.users.findUnique({
+        where: { id: data.userId },
+        select: { role: true },
+      })
+      const prefix =
+        destUser?.role === 'ADMIN'
+          ? 'admin'
+          : destUser?.role === 'TECHNICIAN'
+            ? 'technician'
+            : 'client'
+      return `/${prefix}/tickets/${tid}`
+    }
+    if (data.metadata?.equipmentId) {
+      return `/inventory/equipment/${data.metadata.equipmentId}`
+    }
+    if (data.metadata?.actId) {
+      return `/inventory/acts/${data.metadata.actId}`
+    }
+    if (data.metadata?.maintenanceId) {
+      return `/inventory/maintenance/${data.metadata.maintenanceId}`
+    }
+    if (data.metadata?.patrolId) {
+      return `/patrol/${data.metadata.patrolId}`
+    }
+    if (data.metadata?.scheduleId) {
+      return '/patrol'
+    }
+    return '/'
   }
 
   /**
-   * Enviar notificación directa sin verificar preferencias (para eventos de sistema:
-   * inventario, mantenimiento, actas, etc.). Siempre guarda en BD y emite por SSE.
-   * Si el usuario no tiene conexión SSE activa, envía por Web Push.
+   * Pipeline único de entrega:
+   * 1) Preferencias (categoría → in-app; push + quiet hours → Web Push)
+   * 2) Persistencia
+   * 3) SSE
+   * 4) Web Push si no hay SSE local y las prefs lo permiten
    */
-  static async push(data: CreateNotificationData) {
-    try {
-      const notification = await prisma.notifications.create({
-        data: {
-          id: randomUUID(),
-          userId: data.userId,
-          type: data.type,
-          title: data.title,
-          message: data.message,
-          ticketId: data.ticketId ?? null,
-          metadata: data.metadata ?? null,
-          isRead: false,
+  private static async deliver(data: CreateNotificationData) {
+    const specificType =
+      data.specificType ||
+      (typeof data.metadata?.specificType === 'string'
+        ? (data.metadata.specificType as NotificationSpecificType)
+        : undefined)
+
+    const decision = await evaluateDelivery(data.userId, {
+      type: data.type,
+      specificType,
+      force: data.force,
+      ticketId: data.ticketId,
+      metadata: data.metadata,
+    })
+
+    if (!decision.allowInApp) {
+      return null
+    }
+
+    const notification = await prisma.notifications.create({
+      data: {
+        id: randomUUID(),
+        userId: data.userId,
+        type: data.type,
+        title: data.title,
+        message: data.message,
+        ticketId: data.ticketId ?? null,
+        metadata: data.metadata ?? null,
+        isRead: false,
+      },
+      include: {
+        users: {
+          select: { id: true, name: true, email: true },
         },
-      })
-
-      // 1. Entregar por SSE (tiempo real si tiene pestaña abierta)
-      NotificationEvents.emit(data.userId, {
-        type: 'new_notification',
-        notification: {
-          id: notification.id,
-          title: notification.title,
-          message: notification.message,
-          notificationType: notification.type,
-          ticketId: notification.ticketId,
-          isRead: false,
-          createdAt: notification.createdAt,
-          metadata: notification.metadata,
+        tickets: {
+          select: { id: true, title: true },
         },
-      })
+      },
+    })
 
-      // 2. Si no tiene SSE activo → enviar por Web Push (navegador cerrado)
-      const connectedUsers = NotificationEvents.getConnectedUserIds()
-      const hasActiveSSE = connectedUsers.includes(data.userId)
+    NotificationEvents.emit(data.userId, {
+      type: 'new_notification',
+      notification: {
+        id: notification.id,
+        title: notification.title,
+        message: notification.message,
+        notificationType: notification.type,
+        ticketId: notification.ticketId,
+        isRead: false,
+        createdAt: notification.createdAt,
+        metadata: notification.metadata,
+      },
+    })
 
-      if (!hasActiveSSE && WebPushService.isConfigured()) {
-        // Determinar URL de destino según metadata (no asumir rol CLIENT)
-        let url = '/'
-        if (typeof data.metadata?.link === 'string' && data.metadata.link) {
-          url = data.metadata.link
-        } else if (data.metadata?.ticketId || data.ticketId) {
-          const tid = data.ticketId || data.metadata?.ticketId
-          // Rol del destinatario para deep-link correcto (admin/tech/client)
-          const destUser = await prisma.users.findUnique({
-            where: { id: data.userId },
-            select: { role: true },
-          })
-          const prefix =
-            destUser?.role === 'ADMIN'
-              ? 'admin'
-              : destUser?.role === 'TECHNICIAN'
-                ? 'technician'
-                : 'client'
-          url = `/${prefix}/tickets/${tid}`
-        } else if (data.metadata?.equipmentId) {
-          url = `/inventory/equipment/${data.metadata.equipmentId}`
-        } else if (data.metadata?.patrolId) {
-          url = `/patrol/${data.metadata.patrolId}`
-        }
+    if (decision.allowWebPush && WebPushService.isConfigured()) {
+      // Presencia cluster-wide (Redis) — evita push duplicado o perdido multi-instancia
+      const hasActiveSSE = await NotificationEvents.isUserConnected(data.userId)
 
+      if (!hasActiveSSE) {
+        const url = await this.resolvePushUrl(data)
         WebPushService.sendToUser(data.userId, {
           title: data.title,
           body: data.message,
@@ -226,8 +140,18 @@ export class NotificationService {
           console.error('[NotificationService] Error enviando Web Push:', err)
         })
       }
+    }
 
-      return notification
+    return notification
+  }
+
+  /**
+   * Notificación de dominio (inventario, rondas, helpers API).
+   * Respeta systemAlerts / preferencias; use force: true solo para críticos.
+   */
+  static async push(data: CreateNotificationData) {
+    try {
+      return await this.deliver(data)
     } catch (error) {
       console.error('[NOTIFICATION] Error en push:', error)
       return null
@@ -235,63 +159,12 @@ export class NotificationService {
   }
 
   /**
-   * Crear una notificación in-app (con verificación de preferencias)
+   * Notificación in-app (tickets y flujos con specificType).
+   * Mismo pipeline que push: prefs + SSE + Web Push offline.
    */
-  static async createNotification(
-    data: CreateNotificationData & {
-      specificType?:
-        | 'ticketCreated'
-        | 'ticketAssigned'
-        | 'statusChanged'
-        | 'newComments'
-        | 'ticketUpdates'
-    }
-  ) {
+  static async createNotification(data: CreateNotificationData) {
     try {
-      // Verificar si el usuario quiere notificaciones push
-      const shouldSend = await this.shouldNotify(data.userId, 'push', data.specificType)
-
-      if (!shouldSend) {
-        return null
-      }
-
-      const notification = await prisma.notifications.create({
-        data: {
-          id: randomUUID(),
-          userId: data.userId,
-          type: data.type,
-          title: data.title,
-          message: data.message,
-          ticketId: data.ticketId,
-          metadata: data.metadata,
-          isRead: false,
-        },
-        include: {
-          users: {
-            select: { id: true, name: true, email: true },
-          },
-          tickets: {
-            select: { id: true, title: true },
-          },
-        },
-      })
-
-      // Empujar al cliente vía SSE — inmediato, sin polling
-      NotificationEvents.emit(data.userId, {
-        type: 'new_notification',
-        notification: {
-          id: notification.id,
-          title: notification.title,
-          message: notification.message,
-          notificationType: notification.type,
-          ticketId: notification.ticketId,
-          isRead: false,
-          createdAt: notification.createdAt,
-          metadata: notification.metadata,
-        },
-      })
-
-      return notification
+      return await this.deliver(data)
     } catch (error) {
       console.error('[NOTIFICATION] Error creating notification:', error)
       throw error
@@ -678,16 +551,17 @@ export class NotificationService {
       const rolePrefix =
         raterRole === 'ADMIN' ? 'admin' : raterRole === 'TECHNICIAN' ? 'technician' : 'client'
 
-      // push() → SSE inmediato + Web Push si no hay pestaña abierta
+      // force: calificación es paso operativo crítico del cierre
       const notification = await this.push({
         userId: raterUserId,
         type: 'SUCCESS',
         title: 'Ticket resuelto - Califica el servicio',
         message: `${isPatrol ? 'El ticket escalado desde rondas' : 'Tu ticket'} "${ticket.title}" ha sido resuelto. Por favor califica el servicio recibido para cerrar el ticket.`,
         ticketId: ticket.id,
+        force: true,
+        specificType: 'statusChanged',
         metadata: {
           link: `/${rolePrefix}/tickets/${ticket.id}`,
-          specificType: 'statusChanged',
         },
       })
 
@@ -699,6 +573,7 @@ export class NotificationService {
           title: 'Novedad resuelta',
           message: `La novedad que reportaste ha sido resuelta (ticket "${ticket.title}").`,
           ticketId: ticket.id,
+          specificType: 'statusChanged',
           metadata: { link: `/client/tickets/${ticket.id}` },
         }).catch(() => {})
       }
@@ -711,29 +586,109 @@ export class NotificationService {
   }
 
   /**
-   * Obtener notificaciones de un usuario
+   * Obtener notificaciones de un usuario (paginación por cursor).
+   * typeGroup: SUCCESS|INFO|WARNING|ERROR|INVENTORY|PATROL|TICKET
    */
-  static async getUserNotifications(userId: string, limit = 50) {
+  static async getUserNotifications(
+    userId: string,
+    options: {
+      limit?: number
+      cursor?: string | null
+      isRead?: boolean | null
+      typeGroup?: string | null
+      q?: string | null
+    } = {}
+  ) {
+    const limit = Math.min(Math.max(options.limit ?? 20, 1), 100)
+    const typeFilter = this.buildTypeGroupFilter(options.typeGroup)
+
+    const where: Record<string, unknown> = {
+      userId,
+      // Ocultar snoozed activos del inbox (vuelven solos al vencer)
+      OR: [{ snoozedUntil: null }, { snoozedUntil: { lte: new Date() } }],
+    }
+    if (typeof options.isRead === 'boolean') {
+      where.isRead = options.isRead
+    }
+    if (typeFilter) {
+      where.type = typeFilter
+    }
+    if (options.q?.trim()) {
+      const q = options.q.trim()
+      // Combinar búsqueda con filtro de snooze (AND de grupos OR)
+      where.AND = [
+        { OR: [{ snoozedUntil: null }, { snoozedUntil: { lte: new Date() } }] },
+        {
+          OR: [
+            { title: { contains: q, mode: 'insensitive' } },
+            { message: { contains: q, mode: 'insensitive' } },
+          ],
+        },
+      ]
+      delete where.OR
+    }
+
     try {
-      const notifications = await prisma.notifications.findMany({
-        where: { userId },
-        orderBy: { createdAt: 'desc' },
-        take: limit,
-        include: {
-          tickets: {
-            select: {
-              id: true,
-              title: true,
-              status: true,
+      const [rows, total, unread] = await Promise.all([
+        prisma.notifications.findMany({
+          where,
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          take: limit + 1,
+          ...(options.cursor ? { cursor: { id: options.cursor }, skip: 1 } : {}),
+          include: {
+            tickets: {
+              select: {
+                id: true,
+                title: true,
+                status: true,
+              },
             },
           },
-        },
-      })
+        }),
+        prisma.notifications.count({ where }),
+        prisma.notifications.count({
+          where: {
+            userId,
+            isRead: false,
+            OR: [{ snoozedUntil: null }, { snoozedUntil: { lte: new Date() } }],
+          },
+        }),
+      ])
 
-      return notifications
+      const hasMore = rows.length > limit
+      const items = hasMore ? rows.slice(0, limit) : rows
+      const nextCursor = hasMore ? (items[items.length - 1]?.id ?? null) : null
+
+      return { items, nextCursor, hasMore, total, unread }
     } catch (error) {
       console.error('Error getting user notifications:', error)
       throw error
+    }
+  }
+
+  private static buildTypeGroupFilter(typeGroup?: string | null) {
+    if (!typeGroup || typeGroup === 'all') return null
+    switch (typeGroup) {
+      case 'PATROL':
+        return {
+          in: [
+            NotificationType.PATROL_MISSED,
+            NotificationType.PATROL_INCOMPLETE,
+            NotificationType.PATROL_ASSIGNED,
+            NotificationType.OFFLINE_SYNC_REJECTED,
+          ],
+        }
+      case 'TICKET':
+        return { in: [NotificationType.TICKET_FAMILY_CHANGE] }
+      case 'INVENTORY':
+        return NotificationType.INVENTORY
+      case 'SUCCESS':
+      case 'INFO':
+      case 'WARNING':
+      case 'ERROR':
+        return typeGroup as NotificationType
+      default:
+        return typeGroup as NotificationType
     }
   }
 
@@ -746,6 +701,7 @@ export class NotificationService {
         where: {
           userId,
           isRead: false,
+          OR: [{ snoozedUntil: null }, { snoozedUntil: { lte: new Date() } }],
         },
       })
 
@@ -754,6 +710,16 @@ export class NotificationService {
       console.error('Error getting unread count:', error)
       throw error
     }
+  }
+
+  /** Posponer una notificación individual hasta `until`. */
+  static async snoozeNotification(notificationId: string, userId: string, until: Date) {
+    const existing = await prisma.notifications.findUnique({ where: { id: notificationId } })
+    if (!existing || existing.userId !== userId) return null
+    return prisma.notifications.update({
+      where: { id: notificationId },
+      data: { snoozedUntil: until },
+    })
   }
 
   /**
@@ -769,6 +735,21 @@ export class NotificationService {
       return notification
     } catch (error) {
       console.error('Error marking notification as read:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Marcar notificación como no leída
+   */
+  static async markAsUnread(notificationId: string) {
+    try {
+      return await prisma.notifications.update({
+        where: { id: notificationId },
+        data: { isRead: false },
+      })
+    } catch (error) {
+      console.error('Error marking notification as unread:', error)
       throw error
     }
   }

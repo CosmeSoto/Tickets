@@ -6,7 +6,7 @@ import { invalidateCache } from '@/lib/api-cache'
 
 /**
  * DELETE /api/notifications/[id]
- * Eliminar una notificación
+ * Eliminar una notificación propia.
  */
 export async function DELETE(
   request: NextRequest,
@@ -21,38 +21,22 @@ export async function DELETE(
 
     const { id: notificationId } = await params
 
-    // Verificar que la notificación pertenece al usuario
     const notification = await prisma.notifications.findUnique({
       where: { id: notificationId },
+      select: { id: true, userId: true },
     })
 
     if (!notification) {
-      // Ya no existe, considerar como éxito
+      // Idempotente: ya no existe
       return NextResponse.json({ success: true })
     }
 
     if (notification.userId !== session.user.id) {
-      // Verificar si el usuario al que pertenece la notificación aún existe
-      const ownerExists = await prisma.users.findUnique({
-        where: { id: notification.userId },
-        select: { id: true },
-      })
-
-      // Si el dueño fue eliminado, o si el admin intenta limpiar, permitir
-      if (!ownerExists) {
-        await prisma.notifications.delete({ where: { id: notificationId } })
-        return NextResponse.json({ success: true })
-      }
-
-      // La notificación no pertenece al usuario — retornar éxito silencioso
-      // para que el frontend la quite de la UI sin mostrar error
-      return NextResponse.json({ success: true, skipped: true })
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    // Eliminar la notificación
     await prisma.notifications.delete({ where: { id: notificationId } })
 
-    // Invalidar caché de lista de notificaciones del usuario
     try {
       await invalidateCache(`notif:list:${session.user.id}:*`)
     } catch {}
