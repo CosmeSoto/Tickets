@@ -18,6 +18,7 @@ import Link from 'next/link'
 
 import { DataTable } from '@/components/ui/data-table'
 import { SymmetricStatsCard } from '@/components/shared/stats-card'
+import { StaggerGrid } from '@/components/shared/stagger-grid'
 import { TicketFilters } from '@/components/tickets/ticket-filters'
 import { createTechnicianTicketColumns } from '@/components/tickets/technician/ticket-columns'
 import { Button } from '@/components/ui/button'
@@ -231,7 +232,7 @@ export default function TechnicianTicketsPage() {
 
         {/* ── Tab: Asignados ── */}
         <TabsContent value='assigned' className='space-y-6 mt-0'>
-          <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
+          <StaggerGrid className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
             <SymmetricStatsCard
               title='Total Asignados'
               value={assignedStats.total}
@@ -273,7 +274,7 @@ export default function TechnicianTicketsPage() {
               icon={Target}
               color='purple'
             />
-          </div>
+          </StaggerGrid>
 
           <TicketFilters
             searchTerm={filters.search}
@@ -336,7 +337,7 @@ export default function TechnicianTicketsPage() {
 
         {/* ── Tab: Mis Solicitudes ── */}
         <TabsContent value='created' className='space-y-6 mt-0'>
-          <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
+          <StaggerGrid className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
             <SymmetricStatsCard
               title='Total Solicitudes'
               value={createdStats.total}
@@ -387,7 +388,7 @@ export default function TechnicianTicketsPage() {
                   : undefined
               }
             />
-          </div>
+          </StaggerGrid>
 
           <TicketFilters
             searchTerm={filters.search}

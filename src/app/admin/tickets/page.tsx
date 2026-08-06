@@ -9,6 +9,7 @@ import Link from 'next/link'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { DataTable } from '@/components/ui/data-table'
 import { SymmetricStatsCard } from '@/components/shared/stats-card'
+import { StaggerGrid } from '@/components/shared/stagger-grid'
 import { TicketFilters } from '@/components/tickets/ticket-filters'
 import { Button } from '@/components/ui/button'
 import { ExportButton } from '@/components/common/export-button'
@@ -211,7 +212,7 @@ export default function AdminTicketsPage() {
 
         {/* ── Tab: Todos los Tickets ── */}
         <TabsContent value='all' className='space-y-6 mt-0'>
-          <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
+          <StaggerGrid className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
             <SymmetricStatsCard
               title='Total Tickets'
               value={allStats.total}
@@ -262,7 +263,7 @@ export default function AdminTicketsPage() {
                   : undefined
               }
             />
-          </div>
+          </StaggerGrid>
 
           <TicketFilters
             searchTerm={filters.search}
@@ -324,7 +325,7 @@ export default function AdminTicketsPage() {
 
         {/* ── Tab: Mis Solicitudes ── */}
         <TabsContent value='created' className='space-y-6 mt-0'>
-          <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
+          <StaggerGrid className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
             <SymmetricStatsCard
               title='Total Solicitudes'
               value={createdStats.total}
@@ -375,7 +376,7 @@ export default function AdminTicketsPage() {
                   : undefined
               }
             />
-          </div>
+          </StaggerGrid>
 
           <TicketFilters
             searchTerm={filters.search}

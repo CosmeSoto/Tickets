@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { SymmetricStatsCard } from '@/components/shared/stats-card'
+import { StaggerGrid } from '@/components/shared/stagger-grid'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -135,7 +136,7 @@ export function TicketsStatsSection({
         </div>
 
         {/* Cards principales */}
-        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4'>
+        <StaggerGrid className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4'>
           <SymmetricStatsCard
             title={isSuperAdmin ? 'Total Usuarios' : 'Usuarios de mis Áreas'}
             value={stats.totalUsers ?? 0}
@@ -168,7 +169,7 @@ export function TicketsStatsSection({
             color='purple'
             status={healthStatus}
           />
-        </div>
+        </StaggerGrid>
 
         {/* Planes de resolución — sub-sección colapsable */}
         {stats.resolutionPlans && stats.resolutionPlans.total > 0 && (
@@ -178,7 +179,7 @@ export function TicketsStatsSection({
               <span className='text-xs text-muted-foreground px-2'>Planes de resolución</span>
               <div className='h-px flex-1 bg-border' />
             </div>
-            <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
+            <StaggerGrid className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
               <SymmetricStatsCard
                 title='Planes Creados'
                 value={stats.resolutionPlans.total}
@@ -217,7 +218,7 @@ export function TicketsStatsSection({
                   variant: 'default',
                 }}
               />
-            </div>
+            </StaggerGrid>
           </>
         )}
       </div>
@@ -252,7 +253,7 @@ export function TicketsStatsSection({
         </div>
 
         {/* Cards principales */}
-        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4'>
+        <StaggerGrid className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4'>
           <SymmetricStatsCard
             title='Tickets Asignados'
             value={stats.assignedTickets ?? 0}
@@ -295,7 +296,7 @@ export function TicketsStatsSection({
               variant: 'default',
             }}
           />
-        </div>
+        </StaggerGrid>
 
         {/* Mis planes de resolución */}
         {stats.myResolutionPlans && stats.myResolutionPlans.total > 0 && (
@@ -305,7 +306,7 @@ export function TicketsStatsSection({
               <span className='text-xs text-muted-foreground px-2'>Mis planes de resolución</span>
               <div className='h-px flex-1 bg-border' />
             </div>
-            <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
+            <StaggerGrid className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
               <SymmetricStatsCard
                 title='Planes Creados'
                 value={stats.myResolutionPlans.total}
@@ -348,7 +349,7 @@ export function TicketsStatsSection({
                   variant: 'default',
                 }}
               />
-            </div>
+            </StaggerGrid>
           </>
         )}
       </div>

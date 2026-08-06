@@ -10,6 +10,7 @@ import { memo } from 'react'
 import { LucideIcon, TrendingUp, TrendingDown, AlertTriangle, CheckCircle } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { AnimatedStatValue } from '@/components/ui/number-ticker'
 import { cn } from '@/lib/utils'
 
 interface StatsCardProps {
@@ -117,15 +118,15 @@ export const StatsCard = memo(function StatsCard({
 
   if (loading) {
     return (
-      <Card className="animate-pulse">
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
-            <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-12"></div>
+      <Card className='animate-pulse'>
+        <CardContent className='p-4'>
+          <div className='flex items-center justify-between mb-3'>
+            <div className='h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded-lg'></div>
+            <div className='h-3 bg-gray-200 dark:bg-gray-700 rounded w-12'></div>
           </div>
-          <div className="space-y-2">
-            <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
-            <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-24"></div>
+          <div className='space-y-2'>
+            <div className='h-6 bg-gray-200 dark:bg-gray-700 rounded w-16'></div>
+            <div className='h-3 bg-gray-200 dark:bg-gray-700 rounded w-24'></div>
           </div>
         </CardContent>
       </Card>
@@ -142,21 +143,18 @@ export const StatsCard = memo(function StatsCard({
       )}
       onClick={onClick}
     >
-      <CardContent className="p-4">
+      <CardContent className='p-4'>
         {/* Header con icono y badges */}
-        <div className="flex items-center justify-between mb-3">
+        <div className='flex items-center justify-between mb-3'>
           <div className={cn('p-2 rounded-lg', colors.bg)}>
             <Icon className={cn('h-5 w-5', colors.icon)} />
           </div>
-          <div className="flex items-center space-x-1">
+          <div className='flex items-center space-x-1'>
             {statusIndicator && (
               <statusIndicator.icon className={cn('h-3 w-3', statusIndicator.color)} />
             )}
             {badge && (
-              <Badge 
-                variant={badge.variant || 'default'}
-                className="text-xs px-2 py-0.5 h-5"
-              >
+              <Badge variant={badge.variant || 'default'} className='text-xs px-2 py-0.5 h-5'>
                 {badge.text}
               </Badge>
             )}
@@ -164,18 +162,19 @@ export const StatsCard = memo(function StatsCard({
               <div
                 className={cn(
                   'flex items-center space-x-1 text-xs font-medium px-1.5 py-0.5 rounded-full',
-                  trend.isPositive 
-                    ? 'text-green-700 bg-green-100 dark:text-green-300 dark:bg-green-900/30' 
+                  trend.isPositive
+                    ? 'text-green-700 bg-green-100 dark:text-green-300 dark:bg-green-900/30'
                     : 'text-red-700 bg-red-100 dark:text-red-300 dark:bg-red-900/30'
                 )}
               >
                 {trend.isPositive ? (
-                  <TrendingUp className="h-2.5 w-2.5" />
+                  <TrendingUp className='h-2.5 w-2.5' />
                 ) : (
-                  <TrendingDown className="h-2.5 w-2.5" />
+                  <TrendingDown className='h-2.5 w-2.5' />
                 )}
-                <span className="text-xs font-bold">
-                  {trend.value > 0 ? '+' : ''}{trend.value}%
+                <span className='text-xs font-bold'>
+                  {trend.value > 0 ? '+' : ''}
+                  {trend.value}%
                 </span>
               </div>
             )}
@@ -183,59 +182,63 @@ export const StatsCard = memo(function StatsCard({
         </div>
 
         {/* Contenido principal */}
-        <div className="space-y-1">
+        <div className='space-y-1'>
           {/* Valor principal */}
-          <div className="text-2xl font-bold text-foreground tracking-tight">
-            {typeof value === 'number' ? value.toLocaleString() : value}
+          <div className='text-2xl font-bold text-foreground tracking-tight'>
+            <AnimatedStatValue value={value} />
           </div>
-          
+
           {/* Título */}
-          <div className="text-sm font-medium text-foreground leading-tight">
-            {title}
-          </div>
-          
+          <div className='text-sm font-medium text-foreground leading-tight'>{title}</div>
+
           {/* Subtítulo */}
-          {subtitle && (
-            <div className="text-xs text-muted-foreground">
-              {subtitle}
-            </div>
-          )}
-          
+          {subtitle && <div className='text-xs text-muted-foreground'>{subtitle}</div>}
+
           {/* Descripción más pequeña */}
           {description && (
-            <div className="text-xs text-muted-foreground line-clamp-1">
-              {description}
-            </div>
+            <div className='text-xs text-muted-foreground line-clamp-1'>{description}</div>
           )}
-          
+
           {/* Trend label */}
-          {trend && (
-            <div className="text-xs text-muted-foreground">
-              {trend.label}
-            </div>
-          )}
+          {trend && <div className='text-xs text-muted-foreground'>{trend.label}</div>}
         </div>
 
         {/* Barra de progreso más delgada */}
         {typeof value === 'string' && value.includes('%') && (
-          <div className="mt-3">
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
+          <div className='mt-3'>
+            <div className='w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5'>
               <div
                 className={cn(
                   'h-1.5 rounded-full transition-all duration-700 ease-out',
                   colors.bg.replace('50', '400').replace('950/50', '600')
                 )}
-                style={{ 
+                style={{
                   width: value,
-                  background: `linear-gradient(90deg, ${colors.icon.includes('blue') ? '#3B82F6' : 
-                    colors.icon.includes('green') ? '#10B981' :
-                    colors.icon.includes('purple') ? '#8B5CF6' :
-                    colors.icon.includes('orange') ? '#F59E0B' :
-                    colors.icon.includes('red') ? '#EF4444' : '#6B7280'} 0%, ${colors.icon.includes('blue') ? '#1D4ED8' : 
-                    colors.icon.includes('green') ? '#059669' :
-                    colors.icon.includes('purple') ? '#7C3AED' :
-                    colors.icon.includes('orange') ? '#D97706' :
-                    colors.icon.includes('red') ? '#DC2626' : '#4B5563'} 100%)`
+                  background: `linear-gradient(90deg, ${
+                    colors.icon.includes('blue')
+                      ? '#3B82F6'
+                      : colors.icon.includes('green')
+                        ? '#10B981'
+                        : colors.icon.includes('purple')
+                          ? '#8B5CF6'
+                          : colors.icon.includes('orange')
+                            ? '#F59E0B'
+                            : colors.icon.includes('red')
+                              ? '#EF4444'
+                              : '#6B7280'
+                  } 0%, ${
+                    colors.icon.includes('blue')
+                      ? '#1D4ED8'
+                      : colors.icon.includes('green')
+                        ? '#059669'
+                        : colors.icon.includes('purple')
+                          ? '#7C3AED'
+                          : colors.icon.includes('orange')
+                            ? '#D97706'
+                            : colors.icon.includes('red')
+                              ? '#DC2626'
+                              : '#4B5563'
+                  } 100%)`,
                 }}
               />
             </div>
@@ -244,12 +247,14 @@ export const StatsCard = memo(function StatsCard({
 
         {/* Indicador de estado más pequeño */}
         {status !== 'normal' && (
-          <div className={cn(
-            'absolute top-2 right-2 w-2 h-2 rounded-full',
-            status === 'success' && 'bg-green-500',
-            status === 'warning' && 'bg-yellow-500',
-            status === 'error' && 'bg-red-500'
-          )} />
+          <div
+            className={cn(
+              'absolute top-2 right-2 w-2 h-2 rounded-full',
+              status === 'success' && 'bg-green-500',
+              status === 'warning' && 'bg-yellow-500',
+              status === 'error' && 'bg-red-500'
+            )}
+          />
         )}
       </CardContent>
     </Card>
@@ -276,16 +281,16 @@ export const SmallStatsCard = memo(function SmallStatsCard({
       )}
       onClick={onClick}
     >
-      <CardContent className="p-3">
-        <div className="flex items-center space-x-3">
+      <CardContent className='p-3'>
+        <div className='flex items-center space-x-3'>
           <div className={cn('p-2 rounded-lg', colors.bg)}>
             <Icon className={cn('h-4 w-4', colors.icon)} />
           </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-lg font-bold text-foreground">
-              {typeof value === 'number' ? value.toLocaleString() : value}
+          <div className='flex-1 min-w-0'>
+            <div className='text-lg font-bold text-foreground'>
+              <AnimatedStatValue value={value} />
             </div>
-            <div className="text-xs text-muted-foreground truncate">{title}</div>
+            <div className='text-xs text-muted-foreground truncate'>{title}</div>
           </div>
         </div>
       </CardContent>
@@ -307,18 +312,23 @@ export const SymmetricStatsCard = memo(function SymmetricStatsCard({
   onClick,
   status = 'normal',
   role, // Tema por rol
-}: Pick<StatsCardProps, 'title' | 'value' | 'icon' | 'color' | 'badge' | 'trend' | 'onClick' | 'status'> & {
+}: Pick<
+  StatsCardProps,
+  'title' | 'value' | 'icon' | 'color' | 'badge' | 'trend' | 'onClick' | 'status'
+> & {
   role?: 'ADMIN' | 'TECHNICIAN' | 'CLIENT'
 }) {
   const colors = colorClasses[color]
   const statusIndicator = statusIndicators[status]
 
   // Temas por rol para consistencia visual (legacy - preferir usar color directamente)
-  const roleTheme = role ? {
-    ADMIN: 'border-l-purple-500',
-    TECHNICIAN: 'border-l-green-500', 
-    CLIENT: 'border-l-blue-500'
-  }[role] : colors.border
+  const roleTheme = role
+    ? {
+        ADMIN: 'border-l-purple-500',
+        TECHNICIAN: 'border-l-green-500',
+        CLIENT: 'border-l-blue-500',
+      }[role]
+    : colors.border
 
   return (
     <Card
@@ -330,35 +340,35 @@ export const SymmetricStatsCard = memo(function SymmetricStatsCard({
       )}
       onClick={onClick}
     >
-      <CardContent className="p-2 h-full flex items-center">
+      <CardContent className='p-2 h-full flex items-center'>
         {/* Icono */}
         <div className={cn('p-1 rounded-md mr-2 flex-shrink-0', colors.bg)}>
           <Icon className={cn('h-3.5 w-3.5', colors.icon)} />
         </div>
 
         {/* Contenido principal horizontal */}
-        <div className="flex-1 min-w-0 flex items-center justify-between">
-          <div className="flex-1 min-w-0">
+        <div className='flex-1 min-w-0 flex items-center justify-between'>
+          <div className='flex-1 min-w-0'>
             {/* Valor principal */}
             <div className={cn('text-lg font-bold tracking-tight leading-none', colors.text)}>
-              {typeof value === 'number' ? value.toLocaleString() : value}
+              <AnimatedStatValue value={value} />
             </div>
-            
+
             {/* Título */}
-            <div className="text-xs font-medium text-muted-foreground leading-tight truncate">
+            <div className='text-xs font-medium text-muted-foreground leading-tight truncate'>
               {title}
             </div>
           </div>
 
           {/* Badges y trend en la derecha */}
-          <div className="flex items-center space-x-1 flex-shrink-0 ml-2">
+          <div className='flex items-center space-x-1 flex-shrink-0 ml-2'>
             {statusIndicator && (
               <statusIndicator.icon className={cn('h-2 w-2', statusIndicator.color)} />
             )}
             {badge && (
-              <Badge 
+              <Badge
                 variant={badge.variant || 'default'}
-                className="text-xs px-1 py-0 h-3 leading-none"
+                className='text-xs px-1 py-0 h-3 leading-none'
               >
                 {badge.text}
               </Badge>
@@ -367,18 +377,19 @@ export const SymmetricStatsCard = memo(function SymmetricStatsCard({
               <div
                 className={cn(
                   'flex items-center space-x-0.5 text-xs font-medium px-1 py-0.5 rounded-sm',
-                  trend.isPositive 
-                    ? 'text-green-700 bg-green-100 dark:text-green-300 dark:bg-green-900/30' 
+                  trend.isPositive
+                    ? 'text-green-700 bg-green-100 dark:text-green-300 dark:bg-green-900/30'
                     : 'text-red-700 bg-red-100 dark:text-red-300 dark:bg-red-900/30'
                 )}
               >
                 {trend.isPositive ? (
-                  <TrendingUp className="h-1.5 w-1.5" />
+                  <TrendingUp className='h-1.5 w-1.5' />
                 ) : (
-                  <TrendingDown className="h-1.5 w-1.5" />
+                  <TrendingDown className='h-1.5 w-1.5' />
                 )}
-                <span className="text-xs font-bold">
-                  {trend.value > 0 ? '+' : ''}{trend.value}%
+                <span className='text-xs font-bold'>
+                  {trend.value > 0 ? '+' : ''}
+                  {trend.value}%
                 </span>
               </div>
             )}
@@ -387,12 +398,14 @@ export const SymmetricStatsCard = memo(function SymmetricStatsCard({
 
         {/* Indicador de estado */}
         {status !== 'normal' && (
-          <div className={cn(
-            'absolute top-1 right-1 w-1 h-1 rounded-full',
-            status === 'success' && 'bg-green-500',
-            status === 'warning' && 'bg-yellow-500',
-            status === 'error' && 'bg-red-500'
-          )} />
+          <div
+            className={cn(
+              'absolute top-1 right-1 w-1 h-1 rounded-full',
+              status === 'success' && 'bg-green-500',
+              status === 'warning' && 'bg-yellow-500',
+              status === 'error' && 'bg-red-500'
+            )}
+          />
         )}
       </CardContent>
     </Card>

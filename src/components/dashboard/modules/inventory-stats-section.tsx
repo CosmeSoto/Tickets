@@ -10,6 +10,7 @@
 import { Package, Wrench, ShieldAlert, FileText, AlertTriangle, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 import { SymmetricStatsCard } from '@/components/shared/stats-card'
+import { StaggerGrid } from '@/components/shared/stagger-grid'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -48,7 +49,10 @@ export function InventoryStatsSection({ role }: InventoryStatsSectionProps) {
             <Package className='h-5 w-5 text-muted-foreground' />
             <h3 className='text-sm font-semibold text-foreground'>Mis Equipos</h3>
             {(stats.pendingMaintenance ?? 0) > 0 && (
-              <Badge variant='outline' className='text-xs h-5 px-1.5 border-amber-400 text-amber-700'>
+              <Badge
+                variant='outline'
+                className='text-xs h-5 px-1.5 border-amber-400 text-amber-700'
+              >
                 {stats.pendingMaintenance} mantenimientos
               </Badge>
             )}
@@ -59,7 +63,7 @@ export function InventoryStatsSection({ role }: InventoryStatsSectionProps) {
             </Link>
           </Button>
         </div>
-        <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+        <StaggerGrid className='grid grid-cols-1 md:grid-cols-2 gap-4'>
           <SymmetricStatsCard
             title='Equipos Asignados'
             value={stats.assignedEquipment}
@@ -77,7 +81,7 @@ export function InventoryStatsSection({ role }: InventoryStatsSectionProps) {
             status={(stats.pendingMaintenance ?? 0) > 0 ? 'warning' : 'normal'}
             badge={{ text: 'Tus equipos', variant: 'default' }}
           />
-        </div>
+        </StaggerGrid>
       </div>
     )
   }
@@ -112,7 +116,7 @@ export function InventoryStatsSection({ role }: InventoryStatsSectionProps) {
       </div>
 
       {/* Stats cards de equipos */}
-      <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4'>
+      <StaggerGrid className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4'>
         <SymmetricStatsCard
           title='Total Activos'
           value={stats.totalAssets}
@@ -137,18 +141,26 @@ export function InventoryStatsSection({ role }: InventoryStatsSectionProps) {
           icon={Wrench}
           color='orange'
           badge={{
-            text: stats.outOfStockConsumables > 0
-              ? `${stats.outOfStockConsumables} sin stock`
-              : stats.lowStockConsumables > 0
-                ? `${stats.lowStockConsumables} bajo stock`
-                : 'Stock OK',
-            variant: stats.outOfStockConsumables > 0
-              ? 'destructive'
-              : stats.lowStockConsumables > 0
-                ? 'outline'
-                : 'secondary',
+            text:
+              stats.outOfStockConsumables > 0
+                ? `${stats.outOfStockConsumables} sin stock`
+                : stats.lowStockConsumables > 0
+                  ? `${stats.lowStockConsumables} bajo stock`
+                  : 'Stock OK',
+            variant:
+              stats.outOfStockConsumables > 0
+                ? 'destructive'
+                : stats.lowStockConsumables > 0
+                  ? 'outline'
+                  : 'secondary',
           }}
-          status={stats.outOfStockConsumables > 0 ? 'error' : stats.lowStockConsumables > 0 ? 'warning' : 'normal'}
+          status={
+            stats.outOfStockConsumables > 0
+              ? 'error'
+              : stats.lowStockConsumables > 0
+                ? 'warning'
+                : 'normal'
+          }
         />
         <SymmetricStatsCard
           title='Licencias'
@@ -156,23 +168,29 @@ export function InventoryStatsSection({ role }: InventoryStatsSectionProps) {
           icon={ShieldAlert}
           color='purple'
           badge={{
-            text: stats.expiredLicenses > 0
-              ? `${stats.expiredLicenses} vencidas`
-              : stats.expiringLicenses > 0
-                ? `${stats.expiringLicenses} por vencer`
-                : 'Al día',
-            variant: stats.expiredLicenses > 0
-              ? 'destructive'
-              : stats.expiringLicenses > 0
-                ? 'outline'
-                : 'secondary',
+            text:
+              stats.expiredLicenses > 0
+                ? `${stats.expiredLicenses} vencidas`
+                : stats.expiringLicenses > 0
+                  ? `${stats.expiringLicenses} por vencer`
+                  : 'Al día',
+            variant:
+              stats.expiredLicenses > 0
+                ? 'destructive'
+                : stats.expiringLicenses > 0
+                  ? 'outline'
+                  : 'secondary',
           }}
-          status={stats.expiredLicenses > 0 ? 'error' : stats.expiringLicenses > 0 ? 'warning' : 'normal'}
+          status={
+            stats.expiredLicenses > 0 ? 'error' : stats.expiringLicenses > 0 ? 'warning' : 'normal'
+          }
         />
-      </div>
+      </StaggerGrid>
 
       {/* Actas y solicitudes pendientes — solo si hay algo */}
-      {(stats.pendingDeliveryActs > 0 || stats.pendingReturnActs > 0 || stats.pendingDecommissions > 0) && (
+      {(stats.pendingDeliveryActs > 0 ||
+        stats.pendingReturnActs > 0 ||
+        stats.pendingDecommissions > 0) && (
         <Card className='border-amber-200 bg-amber-50/50 dark:bg-amber-950/20 dark:border-amber-800'>
           <CardHeader className='pb-2 pt-3 px-4'>
             <CardTitle className='text-sm flex items-center gap-2 text-amber-800 dark:text-amber-200'>
@@ -184,21 +202,30 @@ export function InventoryStatsSection({ role }: InventoryStatsSectionProps) {
             <div className='flex flex-wrap gap-3'>
               {stats.pendingDeliveryActs > 0 && (
                 <Link href='/inventory/acts?tab=delivery&status=PENDING'>
-                  <Badge variant='outline' className='gap-1 cursor-pointer hover:bg-amber-100 border-amber-300 text-amber-800'>
+                  <Badge
+                    variant='outline'
+                    className='gap-1 cursor-pointer hover:bg-amber-100 border-amber-300 text-amber-800'
+                  >
                     {stats.pendingDeliveryActs} actas de entrega
                   </Badge>
                 </Link>
               )}
               {stats.pendingReturnActs > 0 && (
                 <Link href='/inventory/acts?tab=return&status=PENDING'>
-                  <Badge variant='outline' className='gap-1 cursor-pointer hover:bg-amber-100 border-amber-300 text-amber-800'>
+                  <Badge
+                    variant='outline'
+                    className='gap-1 cursor-pointer hover:bg-amber-100 border-amber-300 text-amber-800'
+                  >
                     {stats.pendingReturnActs} actas de devolución
                   </Badge>
                 </Link>
               )}
               {stats.pendingDecommissions > 0 && (
                 <Link href='/inventory/decommission'>
-                  <Badge variant='outline' className='gap-1 cursor-pointer hover:bg-amber-100 border-amber-300 text-amber-800'>
+                  <Badge
+                    variant='outline'
+                    className='gap-1 cursor-pointer hover:bg-amber-100 border-amber-300 text-amber-800'
+                  >
                     {stats.pendingDecommissions} solicitudes de baja
                   </Badge>
                 </Link>

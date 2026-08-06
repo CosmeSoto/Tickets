@@ -3,8 +3,11 @@
  * Displays audit statistics in card format
  */
 
+'use client'
+
 import { FileText, Users, AlertTriangle, Activity } from 'lucide-react'
 import { SymmetricStatsCard } from '@/components/shared/stats-card'
+import { StaggerGrid } from '@/components/shared/stagger-grid'
 import type { AuditStats } from './utils/audit-types'
 
 interface AuditStatsCardsProps {
@@ -21,7 +24,7 @@ export function AuditStatsCards({
   filteredTotal,
 }: AuditStatsCardsProps) {
   return (
-    <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
+    <StaggerGrid className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
       <SymmetricStatsCard
         title={hasActiveFilters ? 'Eventos (filtro activo)' : 'Total de Eventos'}
         value={hasActiveFilters ? (filteredTotal ?? stats?.totalLogs ?? 0) : stats?.totalLogs || 0}
@@ -50,6 +53,6 @@ export function AuditStatsCards({
         icon={Activity}
         color='purple'
       />
-    </div>
+    </StaggerGrid>
   )
 }

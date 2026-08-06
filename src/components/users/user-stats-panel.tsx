@@ -1,15 +1,16 @@
 'use client'
 
 import { SymmetricStatsCard } from '@/components/shared/stats-card'
-import { 
-  Users, 
-  UserCheck, 
-  UserX, 
+import { StaggerGrid } from '@/components/shared/stagger-grid'
+import {
+  Users,
+  UserCheck,
+  UserX,
   Shield,
   Wrench,
   UserCircle,
   TrendingUp,
-  Calendar
+  Calendar,
 } from 'lucide-react'
 import { UserStats } from '@/hooks/use-users'
 
@@ -21,15 +22,9 @@ interface UserStatsPanelProps {
 export function UserStatsPanel({ stats, loading }: UserStatsPanelProps) {
   if (loading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6'>
         {[...Array(8)].map((_, i) => (
-          <SymmetricStatsCard
-            key={i}
-            title="Cargando..."
-            value="--"
-            icon={Users}
-            color="gray"
-          />
+          <SymmetricStatsCard key={i} title='Cargando...' value='--' icon={Users} color='gray' />
         ))}
       </div>
     )
@@ -38,96 +33,96 @@ export function UserStatsPanel({ stats, loading }: UserStatsPanelProps) {
   const activityRate = stats.total > 0 ? Math.round((stats.active / stats.total) * 100) : 0
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <StaggerGrid className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6'>
       <SymmetricStatsCard
-        title="Total de Usuarios"
+        title='Total de Usuarios'
         value={stats.total}
         icon={Users}
-        color="blue"
-        status="normal"
+        color='blue'
+        status='normal'
       />
 
       <SymmetricStatsCard
-        title="Usuarios Activos"
+        title='Usuarios Activos'
         value={stats.active}
         icon={UserCheck}
-        color="green"
-        status="success"
+        color='green'
+        status='success'
         badge={{
-          text: stats.total > 0 ? `${Math.round((stats.active / stats.total) * 100)}%` : "0%",
-          variant: "default"
+          text: stats.total > 0 ? `${Math.round((stats.active / stats.total) * 100)}%` : '0%',
+          variant: 'default',
         }}
       />
 
       <SymmetricStatsCard
-        title="Usuarios Inactivos"
+        title='Usuarios Inactivos'
         value={stats.inactive}
         icon={UserX}
-        color="red"
-        status={stats.inactive > 5 ? "warning" : "normal"}
+        color='red'
+        status={stats.inactive > 5 ? 'warning' : 'normal'}
         badge={{
-          text: stats.total > 0 ? `${Math.round((stats.inactive / stats.total) * 100)}%` : "0%",
-          variant: "secondary"
+          text: stats.total > 0 ? `${Math.round((stats.inactive / stats.total) * 100)}%` : '0%',
+          variant: 'secondary',
         }}
       />
 
       <SymmetricStatsCard
-        title="Tasa de Actividad"
+        title='Tasa de Actividad'
         value={`${activityRate}%`}
         icon={TrendingUp}
-        color="purple"
-        status={activityRate >= 80 ? "success" : activityRate >= 60 ? "normal" : "warning"}
+        color='purple'
+        status={activityRate >= 80 ? 'success' : activityRate >= 60 ? 'normal' : 'warning'}
         trend={{
           value: activityRate >= 80 ? 5 : -3,
-          label: "vs mes anterior",
-          isPositive: activityRate >= 80
+          label: 'vs mes anterior',
+          isPositive: activityRate >= 80,
         }}
       />
 
       <SymmetricStatsCard
-        title="Administradores"
+        title='Administradores'
         value={stats.admins}
         icon={Shield}
-        color="purple"
+        color='purple'
         badge={{
-          text: stats.total > 0 ? `${Math.round((stats.admins / stats.total) * 100)}%` : "0%",
-          variant: "outline"
+          text: stats.total > 0 ? `${Math.round((stats.admins / stats.total) * 100)}%` : '0%',
+          variant: 'outline',
         }}
       />
 
       <SymmetricStatsCard
-        title="Técnicos"
+        title='Técnicos'
         value={stats.technicians}
         icon={Wrench}
-        color="blue"
+        color='blue'
         badge={{
-          text: stats.total > 0 ? `${Math.round((stats.technicians / stats.total) * 100)}%` : "0%",
-          variant: "default"
+          text: stats.total > 0 ? `${Math.round((stats.technicians / stats.total) * 100)}%` : '0%',
+          variant: 'default',
         }}
       />
 
       <SymmetricStatsCard
-        title="Clientes"
+        title='Clientes'
         value={stats.clients}
         icon={UserCircle}
-        color="green"
+        color='green'
         badge={{
-          text: stats.total > 0 ? `${Math.round((stats.clients / stats.total) * 100)}%` : "0%",
-          variant: "default"
+          text: stats.total > 0 ? `${Math.round((stats.clients / stats.total) * 100)}%` : '0%',
+          variant: 'default',
         }}
       />
 
       <SymmetricStatsCard
-        title="Nuevos Hoy"
+        title='Nuevos Hoy'
         value={0} // TODO: Implementar cálculo de usuarios creados hoy
         icon={Calendar}
-        color="orange"
+        color='orange'
         trend={{
           value: 0,
-          label: "vs ayer",
-          isPositive: false
+          label: 'vs ayer',
+          isPositive: false,
         }}
       />
-    </div>
+    </StaggerGrid>
   )
 }

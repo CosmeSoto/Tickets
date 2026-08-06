@@ -9,6 +9,7 @@ import Link from 'next/link'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { DataTable } from '@/components/ui/data-table'
 import { SymmetricStatsCard } from '@/components/shared/stats-card'
+import { StaggerGrid } from '@/components/shared/stagger-grid'
 import { TicketFilters } from '@/components/tickets/ticket-filters'
 import { createClientTicketColumns } from '@/components/tickets/client/ticket-columns'
 import { Button } from '@/components/ui/button'
@@ -150,7 +151,7 @@ export default function ClientTicketsPage() {
       }
     >
       <div className='space-y-6'>
-        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
+        <StaggerGrid className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
           <SymmetricStatsCard
             title='Total Tickets'
             value={stats.total}
@@ -202,7 +203,7 @@ export default function ClientTicketsPage() {
                 : undefined
             }
           />
-        </div>
+        </StaggerGrid>
 
         <TicketFilters
           searchTerm={filters.search}
