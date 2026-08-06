@@ -54,6 +54,7 @@ import {
   buildDashboardBreadcrumbs,
   DashboardBreadcrumbs,
 } from '@/components/layout/dashboard-breadcrumbs'
+import { collectLeafHrefs, isLeafNavActive } from '@/components/layout/nav-active'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -341,12 +342,15 @@ function NavItemComponent({
   depth = 0,
   onNavigate,
   collapsed = false,
+  leafHrefs = [],
 }: {
   item: NavItem
   pathname: string | null
   depth?: number
   onNavigate?: () => void
   collapsed?: boolean
+  /** Hrefs de todas las hojas de la nav — evita activos falsos por prefijo */
+  leafHrefs?: string[]
 }) {
   const router = useRouter()
   const reduceMotion = useReducedMotion()
@@ -358,23 +362,16 @@ function NavItemComponent({
   const hasChildren = children && children.length > 0
 
   const isDescendantActive = (navItem: NavItem): boolean => {
-    if (pathname === navItem.href) return true
-    if (navItem.children) return navItem.children.some(isDescendantActive)
-    return false
+    if (navItem.children?.length) return navItem.children.some(isDescendantActive)
+    return isLeafNavActive(navItem.href, pathname, leafHrefs)
   }
 
-  // Para items hoja (sin hijos): activar con match exacto o startsWith.
-  // Excepción: si el href es la raíz de un grupo (ej: /inventory), usar solo match exacto
-  // para evitar que "Activos" aparezca activo cuando estás en /inventory/maintenance.
-  // Un href es "raíz de grupo" si tiene exactamente un segmento de ruta (ej: /inventory, /admin).
-  const hrefSegments = item.href.split('/').filter(Boolean).length
-  const isRootGroupHref = !hasChildren && hrefSegments <= 1
-
+  // Padres: activos si la ruta cae bajo su href o un hijo está activo.
+  // Hojas: match exacto / prefijo, cediendo a hojas más específicas
+  // (evita que `/admin/settings` robe el activo de `/admin/settings/tickets`).
   const isDirectActive = hasChildren
-    ? pathname === item.href || pathname?.startsWith(item.href + '/')
-    : isRootGroupHref
-      ? pathname === item.href
-      : pathname === item.href || pathname?.startsWith(item.href + '/')
+    ? pathname === item.href || !!pathname?.startsWith(item.href + '/')
+    : isLeafNavActive(item.href, pathname, leafHrefs)
   const isActive = isDirectActive || (hasChildren ? children!.some(isDescendantActive) : false)
 
   const [isOpen, setIsOpen] = useState(isActive)
@@ -469,11 +466,7 @@ function NavItemComponent({
           <div className='my-1 h-px bg-border' />
           {children!.map(child => {
             const ChildIcon = child.icon
-            const childSegments = child.href.split('/').filter(Boolean).length
-            const childActive =
-              childSegments <= 1
-                ? pathname === child.href
-                : pathname === child.href || (!!pathname && pathname.startsWith(child.href + '/'))
+            const childActive = isLeafNavActive(child.href, pathname, leafHrefs)
             return (
               <Link
                 key={child.href + child.name}
@@ -578,6 +571,7 @@ function NavItemComponent({
                   depth={depth + 1}
                   onNavigate={onNavigate}
                   collapsed={false}
+                  leafHrefs={leafHrefs}
                 />
               ))}
             </div>
@@ -797,6 +791,7 @@ export function RoleDashboardLayout({
   })
   // En home / páginas de un solo nivel el título basta; el trail aporta en rutas anidadas
   const headerBreadcrumbs = breadcrumbs.length > 1 ? breadcrumbs : []
+  const leafHrefs = collectLeafHrefs(navigation)
 
   return (
     <div className='min-h-screen bg-background'>
@@ -862,6 +857,7 @@ export function RoleDashboardLayout({
                   pathname={pathname}
                   onNavigate={closeSidebar}
                   collapsed={railMode}
+                  leafHrefs={leafHrefs}
                 />
               ))}
             </LayoutGroup>
