@@ -146,14 +146,21 @@ pgBackRest restaura el **cluster completo**. Para restauración parcial:
 
 ## Variables de entorno
 
-| Variable                | Descripción                                                                       |
-| ----------------------- | --------------------------------------------------------------------------------- |
-| `BACKUP_WORKER_URL`     | URL interna del worker (ej. `http://backup-worker:8080`)                          |
-| `BACKUP_WORKER_SECRET`  | Token Bearer para API del worker                                                  |
-| `PGBACKREST_STANZA`     | Nombre del stanza (default: `main`)                                               |
-| `BACKUP_DIR`            | Exports portátiles (`/app/backups`)                                               |
-| `BACKUP_ENCRYPTION_KEY` | Cifrado AES de exports (opcional)                                                 |
-| `BACKUP_ALLOW_RESTORE`  | Legacy/informativo en worker health — usar Config → Restauración pgBackRest en UI |
+| Variable                | Descripción                                                                                                                                     |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `BACKUP_WORKER_URL`     | URL interna del worker (ej. `http://backup-worker:8080`)                                                                                        |
+| `BACKUP_WORKER_SECRET`  | Token Bearer para API del worker                                                                                                                |
+| `PGBACKREST_STANZA`     | Nombre del stanza (default: `main`)                                                                                                             |
+| `BACKUP_DIR`            | Exports portátiles (`/app/backups`)                                                                                                             |
+| `BACKUP_ENCRYPTION_KEY` | Cifrado AES de exports (opcional)                                                                                                               |
+| `ENCRYPTION_KEY`        | Cifrado de secretos del módulo Credenciales (AES-GCM en BD). Los backups llevan ciphertext; sin esta clave no se pueden revelar tras restaurar. |
+| `BACKUP_ALLOW_RESTORE`  | Legacy/informativo en worker health — usar Config → Restauración pgBackRest en UI                                                               |
+
+### Módulo Credenciales en respaldos
+
+- **pgBackRest / Export .dump completo:** incluyen tablas `credential_vaults`, `credential_entries`, `credential_shares`.
+- **Restore selectivo:** módulo `credentials` en el registro de backups.
+- Los valores de `secretEncrypted` **ya van cifrados** en el archivo descargado; no son contraseñas en claro. Protege `ENCRYPTION_KEY` fuera del dump (gestor de secretos / vault del servidor).
 
 ## Desarrollo local
 

@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { KeyRound, Plus, Eye, Loader2, ExternalLink, Trash2 } from 'lucide-react'
+import { KeyRound, Plus, Eye, Loader2, ExternalLink, Trash2, Copy, Share2 } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
@@ -17,14 +17,29 @@ import {
 } from '@/components/ui/select'
 import { CreateCredentialDialog } from '@/components/credentials/create-credential-dialog'
 import { RevealCredentialDialog } from '@/components/credentials/reveal-credential-dialog'
+import { ShareCredentialDialog } from '@/components/credentials/share-credential-dialog'
 import { useToast } from '@/hooks/use-toast'
+import { CREDENTIAL_ENTRY_TYPE_LABELS } from '@/lib/credentials/constants'
 
 type Vault = {
   id: string
   name: string
   kind: string
-  family?: { id: string; name: string; code: string; color?: string | null } | null
+  familyId?: string | null
+  family?: {
+    id: string
+    name: string
+    code: string
+    color?: string | null
+    order?: number
+  } | null
   _count?: { entries: number }
+}
+
+function vaultOptionLabel(v: Vault): string {
+  if (v.kind === 'PERSONAL') return `${v.name} · Personal`
+  if (v.family?.name) return `${v.family.name} · ${v.name}`
+  return v.name
 }
 
 type CredentialEntry = {
@@ -36,6 +51,8 @@ type CredentialEntry = {
   entryType: string
   equipmentId?: string | null
   lastRevealedAt?: string | null
+  sharedWithMe?: boolean
+  shareCapability?: string | null
   vault?: {
     id: string
     name: string
@@ -53,6 +70,7 @@ export default function CredentialsPage() {
   const [loading, setLoading] = useState(true)
   const [createOpen, setCreateOpen] = useState(false)
   const [revealEntry, setRevealEntry] = useState<CredentialEntry | null>(null)
+  const [shareEntry, setShareEntry] = useState<CredentialEntry | null>(null)
 
   const isSuperAdmin = (session?.user as { isSuperAdmin?: boolean })?.isSuperAdmin === true
   const credentialsEnabled =
@@ -142,11 +160,10 @@ export default function CredentialsPage() {
               <SelectValue placeholder='Filtrar por bóveda' />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value='all'>Todas las bóvedas</SelectItem>
+              <SelectItem value='all'>Todas las áreas</SelectItem>
               {vaults.map(v => (
                 <SelectItem key={v.id} value={v.id}>
-                  {v.name}
-                  {v.family ? ` · ${v.family.name}` : v.kind === 'PERSONAL' ? ' · Personal' : ''}
+                  {vaultOptionLabel(v)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -177,19 +194,42 @@ export default function CredentialsPage() {
                 <CardHeader className='pb-2'>
                   <div className='flex items-start justify-between gap-2'>
                     <CardTitle className='text-base'>{entry.title}</CardTitle>
-                    <Badge variant='outline'>{entry.entryType}</Badge>
+                    <div className='flex flex-wrap gap-1 justify-end'>
+                      {entry.sharedWithMe ? (
+                        <Badge variant='secondary'>Compartida contigo</Badge>
+                      ) : null}
+                      <Badge variant='outline'>
+                        {CREDENTIAL_ENTRY_TYPE_LABELS[entry.entryType] ?? entry.entryType}
+                      </Badge>
+                    </div>
                   </div>
                   {entry.vault && (
                     <p className='text-xs text-muted-foreground'>
-                      {entry.vault.family?.name ?? entry.vault.name}
+                      {entry.vault.family?.name
+                        ? `${entry.vault.family.name} · ${entry.vault.name}`
+                        : entry.vault.name}
                     </p>
                   )}
                 </CardHeader>
                 <CardContent className='space-y-3'>
                   {entry.username && (
-                    <p className='text-sm'>
-                      <span className='text-muted-foreground'>Usuario:</span> {entry.username}
-                    </p>
+                    <div className='flex items-center gap-2 text-sm'>
+                      <span className='text-muted-foreground shrink-0'>Usuario:</span>
+                      <span className='font-mono truncate'>{entry.username}</span>
+                      <Button
+                        type='button'
+                        variant='ghost'
+                        size='icon'
+                        className='h-7 w-7 shrink-0'
+                        title='Copiar usuario'
+                        onClick={async () => {
+                          await navigator.clipboard.writeText(entry.username!)
+                          toast({ title: 'Usuario copiado' })
+                        }}
+                      >
+                        <Copy className='h-3.5 w-3.5' />
+                      </Button>
+                    </div>
                   )}
                   {entry.url && (
                     <a
@@ -198,21 +238,31 @@ export default function CredentialsPage() {
                       rel='noopener noreferrer'
                       className='text-sm text-primary inline-flex items-center gap-1 hover:underline'
                     >
-                      Abrir enlace
+                      Abrir URL de acceso
                       <ExternalLink className='h-3 w-3' />
                     </a>
                   )}
                   <div className='flex gap-2'>
                     <Button
-                      variant='outline'
+                      variant='default'
                       size='sm'
                       className='flex-1'
                       onClick={() => setRevealEntry(entry)}
                     >
                       <Eye className='h-4 w-4 mr-1.5' />
-                      Revelar
+                      Usar / revelar
                     </Button>
-                    {canManage && (
+                    {canManage && !entry.sharedWithMe && (
+                      <Button
+                        variant='outline'
+                        size='sm'
+                        title='Compartir con otro usuario'
+                        onClick={() => setShareEntry(entry)}
+                      >
+                        <Share2 className='h-4 w-4' />
+                      </Button>
+                    )}
+                    {canManage && !entry.sharedWithMe && (
                       <Button
                         variant='outline'
                         size='sm'
@@ -230,9 +280,10 @@ export default function CredentialsPage() {
                             method: 'DELETE',
                           })
                           if (!res.ok) {
+                            const data = await res.json().catch(() => ({}))
                             toast({
-                              title: 'Error',
-                              description: 'No se pudo eliminar',
+                              title: 'No se pudo eliminar',
+                              description: data.error || 'Error del servidor',
                               variant: 'destructive',
                             })
                             return
@@ -262,6 +313,9 @@ export default function CredentialsPage() {
       )}
 
       <RevealCredentialDialog entry={revealEntry} onClose={() => setRevealEntry(null)} />
+      {canManage && (
+        <ShareCredentialDialog entry={shareEntry} onClose={() => setShareEntry(null)} />
+      )}
     </ModuleLayout>
   )
 }

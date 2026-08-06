@@ -8,6 +8,7 @@ import {
   checkCredentialsModuleAccess,
   canManageCredentialsVault,
   assertEquipmentLinkAllowed,
+  assertLicenseLinkAllowed,
   credentialEntryMetadataSelect,
   getCredentialsFamilyScopeIds,
   userCanAccessVault,
@@ -15,17 +16,59 @@ import {
 import { EncryptionService } from '@/lib/services/encryption.service'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 
+const emptyToUndefined = (v: unknown) => (typeof v === 'string' && v.trim() === '' ? undefined : v)
+
+const optionalUrl = z.preprocess(
+  emptyToUndefined,
+  z
+    .string()
+    .max(500)
+    .refine(
+      val => {
+        if (!val) return true
+        try {
+          // Acepta http(s) o host/IP sin esquema (lo normalizamos al guardar)
+          const candidate = /^https?:\/\//i.test(val) ? val : `https://${val}`
+          // eslint-disable-next-line no-new
+          new URL(candidate)
+          return true
+        } catch {
+          return false
+        }
+      },
+      { message: 'URL inválida. Usa un enlace como https://panel.ejemplo.com o 192.168.1.1' }
+    )
+    .optional()
+)
+
+const optionalUuid = z.preprocess(emptyToUndefined, z.string().uuid().optional())
+
 const createEntrySchema = z.object({
-  vaultId: z.string().uuid(),
-  title: z.string().min(1).max(200),
-  username: z.string().max(200).optional(),
-  secret: z.string().min(1),
-  url: z.string().url().optional().or(z.literal('')),
-  notes: z.string().max(2000).optional(),
-  entryType: z.string().max(50).optional(),
-  equipmentId: z.string().uuid().optional(),
-  licenseId: z.string().uuid().optional(),
+  vaultId: z.string().uuid({ message: 'Selecciona una bóveda válida' }),
+  title: z.string().min(1, 'El título es obligatorio').max(200),
+  username: z.preprocess(emptyToUndefined, z.string().max(200).optional()),
+  secret: z.string().min(1, 'La contraseña / secreto es obligatorio'),
+  url: optionalUrl,
+  notes: z.preprocess(emptyToUndefined, z.string().max(2000).optional()),
+  entryType: z
+    .enum(['GENERIC', 'EQUIPMENT', 'LICENSE', 'NETWORK', 'SERVICE'])
+    .optional()
+    .default('GENERIC'),
+  equipmentId: optionalUuid,
+  licenseId: optionalUuid,
 })
+
+function normalizeOptionalUrl(url?: string | null): string | null {
+  if (!url?.trim()) return null
+  const trimmed = url.trim()
+  if (/^https?:\/\//i.test(trimmed)) return trimmed
+  return `https://${trimmed}`
+}
+
+function formatZodError(error: z.ZodError): string {
+  const issues = error.issues.map(i => i.message).filter(Boolean)
+  return issues[0] || 'Datos inválidos'
+}
 
 export async function GET(request: Request) {
   const session = await getServerSession(authOptions)
@@ -53,16 +96,41 @@ export async function GET(request: Request) {
     where: {
       isActive: true,
       ...(vaultId ? { vaultId } : {}),
-      vault: {
-        isActive: true,
-        OR: [{ familyId: { in: familyIds } }, { ownerUserId: session.user.id, kind: 'PERSONAL' }],
+      OR: [
+        {
+          vault: {
+            isActive: true,
+            OR: [
+              { familyId: { in: familyIds } },
+              { ownerUserId: session.user.id, kind: 'PERSONAL' },
+            ],
+          },
+        },
+        // Compartidos explícitos usuario→usuario (capability VIEW en MVP)
+        {
+          vault: { isActive: true },
+          shares: { some: { userId: session.user.id } },
+        },
+      ],
+    },
+    select: {
+      ...credentialEntryMetadataSelect,
+      shares: {
+        where: { userId: session.user.id },
+        select: { id: true, capability: true },
+        take: 1,
       },
     },
-    select: credentialEntryMetadataSelect,
     orderBy: { updatedAt: 'desc' },
   })
 
-  return NextResponse.json({ entries })
+  return NextResponse.json({
+    entries: entries.map(({ shares, ...entry }) => ({
+      ...entry,
+      sharedWithMe: shares.length > 0,
+      shareCapability: shares[0]?.capability ?? null,
+    })),
+  })
 }
 
 export async function POST(request: Request) {
@@ -89,7 +157,10 @@ export async function POST(request: Request) {
   const parsed = createEntrySchema.safeParse(body)
   if (!parsed.success) {
     return NextResponse.json(
-      { error: 'Datos inválidos', details: parsed.error.flatten() },
+      {
+        error: formatZodError(parsed.error),
+        details: parsed.error.flatten(),
+      },
       { status: 400 }
     )
   }
@@ -105,23 +176,49 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Sin acceso a la bóveda' }, { status: 403 })
   }
 
-  const linkCheck = await assertEquipmentLinkAllowed(ctx, parsed.data.equipmentId, vault.familyId)
-  if (!linkCheck.ok) {
-    return NextResponse.json({ error: linkCheck.error }, { status: 422 })
+  let equipmentId = parsed.data.equipmentId
+  let licenseId = parsed.data.licenseId
+  let entryType = parsed.data.entryType
+
+  if (entryType === 'EQUIPMENT' && !equipmentId) {
+    return NextResponse.json(
+      { error: 'Selecciona el equipo al que enlazas esta credencial' },
+      { status: 400 }
+    )
   }
+  if (entryType === 'LICENSE' && !licenseId) {
+    return NextResponse.json(
+      { error: 'Selecciona la licencia a la que enlazas esta credencial' },
+      { status: 400 }
+    )
+  }
+  if (entryType !== 'EQUIPMENT') equipmentId = undefined
+  if (entryType !== 'LICENSE') licenseId = undefined
+
+  const equipmentCheck = await assertEquipmentLinkAllowed(ctx, equipmentId, vault.familyId)
+  if (!equipmentCheck.ok) {
+    return NextResponse.json({ error: equipmentCheck.error }, { status: 422 })
+  }
+  const licenseCheck = await assertLicenseLinkAllowed(ctx, licenseId, vault.familyId)
+  if (!licenseCheck.ok) {
+    return NextResponse.json({ error: licenseCheck.error }, { status: 422 })
+  }
+
+  if (equipmentId) entryType = 'EQUIPMENT'
+  if (licenseId) entryType = 'LICENSE'
 
   const entry = await prisma.credential_entries.create({
     data: {
       id: randomUUID(),
       vaultId: parsed.data.vaultId,
-      title: parsed.data.title,
-      username: parsed.data.username || null,
+      title: parsed.data.title.trim(),
+      username: parsed.data.username?.trim() || null,
       secretEncrypted: EncryptionService.encrypt(parsed.data.secret),
-      url: parsed.data.url || null,
-      notes: parsed.data.notes || null,
-      entryType: parsed.data.entryType || (parsed.data.equipmentId ? 'EQUIPMENT' : 'GENERIC'),
-      equipmentId: parsed.data.equipmentId || null,
-      licenseId: parsed.data.licenseId || null,
+      url: normalizeOptionalUrl(parsed.data.url),
+      notes: parsed.data.notes?.trim() || null,
+      entryType,
+      equipmentId: equipmentId || null,
+      licenseId: licenseId || null,
       createdById: session.user.id,
     },
     select: credentialEntryMetadataSelect,

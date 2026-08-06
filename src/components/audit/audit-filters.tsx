@@ -118,6 +118,7 @@ export function AuditFiltersComponent({
                 <SelectItem value='settings'>🛠️ Configuración</SelectItem>
                 <SelectItem value='inventory'>📦 Inventario</SelectItem>
                 <SelectItem value='patrol'>🚶 Rondas</SelectItem>
+                <SelectItem value='credential_entry'>🔐 Credenciales</SelectItem>
                 <SelectItem value='backup'>💾 Backups</SelectItem>
                 <SelectItem value='sla'>⏱️ SLA</SelectItem>
               </SelectContent>

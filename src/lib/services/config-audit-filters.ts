@@ -63,6 +63,7 @@ export type AuditQuickPresetId =
   | 'tickets_config'
   | 'patrols_config'
   | 'inventory_config'
+  | 'credentials'
   | 'backups'
   | 'sla'
   | 'critical'
@@ -108,6 +109,12 @@ export const AUDIT_QUICK_PRESETS: Array<{
     label: 'Inventario',
     description: 'Config inventario global y por área',
     filters: { configModule: 'inventory', entityType: 'all', action: '' },
+  },
+  {
+    id: 'credentials',
+    label: 'Credenciales',
+    description: 'Creación, revelado, compartidos y borrado (sin secretos en el log)',
+    filters: { configModule: 'all', entityType: 'credential_entry', action: '' },
   },
   {
     id: 'backups',

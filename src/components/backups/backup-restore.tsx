@@ -65,6 +65,8 @@ type RestoreModuleId =
   | 'users'
   | 'audits'
   | 'configurations'
+  | 'inventory'
+  | 'credentials'
 
 type RestoreMode = 'replace' | 'merge'
 
@@ -76,6 +78,11 @@ const RESTORE_MODULES: { id: RestoreModuleId; label: string }[] = [
   { id: 'users', label: 'Usuarios' },
   { id: 'audits', label: 'Auditorías' },
   { id: 'configurations', label: 'Configuraciones' },
+  { id: 'inventory', label: 'Inventario' },
+  {
+    id: 'credentials',
+    label: 'Credenciales (secretos cifrados)',
+  },
 ]
 
 interface BackupRestoreProps {

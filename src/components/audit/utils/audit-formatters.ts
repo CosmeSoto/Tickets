@@ -76,6 +76,8 @@ export function translateEntityType(entityType: string): string {
     license_type: '🪪 Tipo de Licencia',
     consumable_type: '📦 Tipo de Consumible',
     credential_entry: '🔐 Credencial',
+    credential_vault: '🔐 Bóveda de credenciales',
+    credential_share: '🔐 Compartido de credencial',
   }
   return entityMap[entityType.toLowerCase()] || entityType
 }
@@ -190,6 +192,9 @@ export function getActionLabel(action: string): string {
     credential_updated: 'Credencial Actualizada',
     credential_revealed: 'Credencial Revelada',
     credential_deleted: 'Credencial Eliminada',
+    credential_shared: 'Credencial Compartida',
+    credential_share_revoked: 'Compartido de Credencial Revocado',
+    credential_vault_created: 'Bóveda de Credenciales Creada',
     // Configuración
     settings_updated: 'Config. Sistema Actualizada',
     settings_viewed: 'Configuración Visualizada',
@@ -265,6 +270,9 @@ export function getActionLabel(action: string): string {
     CREDENTIAL_UPDATED: 'Credencial Actualizada',
     CREDENTIAL_REVEALED: 'Credencial Revelada',
     CREDENTIAL_DELETED: 'Credencial Eliminada',
+    CREDENTIAL_SHARED: 'Credencial Compartida',
+    CREDENTIAL_SHARE_REVOKED: 'Compartido de Credencial Revocado',
+    CREDENTIAL_VAULT_CREATED: 'Bóveda de Credenciales Creada',
     // Inventario — tipos
     TYPE_CLONED: 'Tipo Copiado a Otra Área',
   }
@@ -306,6 +314,8 @@ export function getEntityLabel(entityType: string): string {
     consumable_type: 'Tipos de Consumible',
     consumable_types: 'Tipos de Consumible',
     credential_entry: 'Credenciales',
+    credential_vault: 'Credenciales',
+    credential_share: 'Credenciales',
   }
   return entityLabels[entityType] || entityType
 }

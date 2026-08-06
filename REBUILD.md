@@ -607,9 +607,15 @@ npm run test:family-access                 # suite de regresión (81+ tests)
 | Family-access módulo `credentials`                                      | ✅                                              |
 | API CRUD + reveal cifrado (AES-GCM) + auditoría                         | ✅                                              |
 | UI `/credentials` + card en ficha de equipo                             | ✅                                              |
-| Compartir fino por usuario / export KeePass                             | ⏳ post-MVP                                     |
+| Compartir usuario→usuario (VIEW) + notificación + auditoría             | ✅                                              |
+| Backup módulo `credentials` (secretos cifrados en dump)                 | ✅                                              |
+| Export KeePass / shares por familia / capability EDIT                   | ⏳ post-MVP                                     |
 
-**Uso:** habilitar módulo en Usuarios, asignar áreas `credentials`, gestionar en menú Credenciales. Secretos solo en `/reveal`.
+**Uso:** habilitar módulo en Usuarios, asignar áreas `credentials`, gestionar en menú Credenciales. Secretos solo en `/reveal` (auditado).
+
+**Compartir:** un gestor (`canManageCredentials` / Admin con módulo) puede compartir una entrada con otro usuario que tenga Credenciales activo. El destinatario ve la tarjeta («Compartida contigo»), revela con auditoría y recibe notificación in-app **sin** la clave en el mensaje.
+
+**Backups / seguridad:** pgBackRest y exports incluyen `secretEncrypted` (AES-GCM), nunca plaintext. Tras restaurar se necesita la misma `ENCRYPTION_KEY`. En restore selectivo elige el módulo «Credenciales (secretos cifrados)».
 
 #### Cierre de fase (áreas unificadas) — DONE
 

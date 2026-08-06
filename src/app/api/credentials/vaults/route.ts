@@ -9,6 +9,7 @@ import {
   ensureDefaultAreaVault,
   getCredentialsFamilyScopeIds,
 } from '@/lib/credentials/access'
+import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 
 const createVaultSchema = z.object({
   familyId: z.string().uuid().optional(),
@@ -47,10 +48,22 @@ export async function GET() {
       OR: [{ familyId: { in: familyIds } }, { ownerUserId: session.user.id, kind: 'PERSONAL' }],
     },
     include: {
-      family: { select: { id: true, name: true, code: true, color: true } },
+      family: { select: { id: true, name: true, code: true, color: true, order: true } },
       _count: { select: { entries: { where: { isActive: true } } } },
     },
-    orderBy: [{ kind: 'asc' }, { name: 'asc' }],
+  })
+
+  // Orden operativo: áreas por order/name de familia; personales al final
+  vaults.sort((a, b) => {
+    if (a.kind !== b.kind) return a.kind === 'AREA' ? -1 : 1
+    const ao = a.family?.order ?? 9999
+    const bo = b.family?.order ?? 9999
+    if (ao !== bo) return ao - bo
+    const an = a.family?.name ?? a.name
+    const bn = b.family?.name ?? b.name
+    const byFamily = an.localeCompare(bn, 'es')
+    if (byFamily !== 0) return byFamily
+    return a.name.localeCompare(b.name, 'es')
   })
 
   return NextResponse.json({ vaults })
@@ -100,6 +113,15 @@ export async function POST(request: Request) {
         _count: { select: { entries: { where: { isActive: true } } } },
       },
     })
+    await AuditServiceComplete.log({
+      action: AuditActionsComplete.CREDENTIAL_VAULT_CREATED,
+      entityType: 'credential_vault',
+      entityId: vault.id,
+      userId: session.user.id,
+      details: { name: vault.name, kind: vault.kind },
+      ipAddress: request.headers.get('x-forwarded-for') || 'unknown',
+      userAgent: request.headers.get('user-agent') || 'unknown',
+    })
     return NextResponse.json({ vault }, { status: 201 })
   }
 
@@ -125,6 +147,16 @@ export async function POST(request: Request) {
       family: { select: { id: true, name: true, code: true, color: true } },
       _count: { select: { entries: { where: { isActive: true } } } },
     },
+  })
+
+  await AuditServiceComplete.log({
+    action: AuditActionsComplete.CREDENTIAL_VAULT_CREATED,
+    entityType: 'credential_vault',
+    entityId: vault.id,
+    userId: session.user.id,
+    details: { name: vault.name, kind: vault.kind, familyId: vault.familyId },
+    ipAddress: request.headers.get('x-forwarded-for') || 'unknown',
+    userAgent: request.headers.get('user-agent') || 'unknown',
   })
 
   return NextResponse.json({ vault }, { status: 201 })

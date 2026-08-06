@@ -13,12 +13,13 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Copy, Loader2 } from 'lucide-react'
+import { Copy, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
 type CredentialEntry = {
   id: string
   title: string
+  username?: string | null
 }
 
 interface RevealCredentialDialogProps {
@@ -33,14 +34,15 @@ export function RevealCredentialDialog({ entry, onClose }: RevealCredentialDialo
   const [loading, setLoading] = useState(false)
   const [secret, setSecret] = useState<string | null>(null)
   const [confirmed, setConfirmed] = useState(false)
+  const [showSecret, setShowSecret] = useState(true)
 
   const handleClose = () => {
     setSecret(null)
     setConfirmed(false)
+    setShowSecret(true)
     onClose()
   }
 
-  // Auto-ocultar secreto revelado
   useEffect(() => {
     if (!secret) return
     const t = setTimeout(() => {
@@ -58,14 +60,14 @@ export function RevealCredentialDialog({ entry, onClose }: RevealCredentialDialo
       const res = await fetch(`/api/credentials/entries/${entry.id}/reveal`, {
         method: 'POST',
       })
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error ?? 'Error al revelar')
       setSecret(data.secret)
       setConfirmed(true)
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast({
-        title: 'Error',
-        description: err.message ?? 'No se pudo revelar la credencial',
+        title: 'No se pudo revelar',
+        description: err instanceof Error ? err.message : 'Error inesperado',
         variant: 'destructive',
       })
       handleClose()
@@ -74,30 +76,66 @@ export function RevealCredentialDialog({ entry, onClose }: RevealCredentialDialo
     }
   }
 
-  const copySecret = async () => {
-    if (!secret) return
-    await navigator.clipboard.writeText(secret)
-    toast({ title: 'Copiado al portapapeles' })
+  const copyText = async (value: string, label: string) => {
+    if (!value) return
+    await navigator.clipboard.writeText(value)
+    toast({ title: `${label} copiado` })
   }
 
   return (
     <AlertDialog open={!!entry} onOpenChange={open => !open && handleClose()}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Revelar credencial</AlertDialogTitle>
+          <AlertDialogTitle>Usar credencial</AlertDialogTitle>
           <AlertDialogDescription>
             {confirmed
-              ? 'El secreto se muestra una sola vez. Esta acción queda registrada en auditoría.'
-              : `¿Confirmas revelar la contraseña de "${entry?.title}"? Esta acción queda auditada.`}
+              ? 'El secreto se oculta automáticamente en 30 s. Esta acción quedó registrada en auditoría.'
+              : `¿Confirmas revelar la contraseña de «${entry?.title}»? Queda auditado.`}
           </AlertDialogDescription>
         </AlertDialogHeader>
 
         {confirmed && secret !== null ? (
-          <div className='flex gap-2'>
-            <Input readOnly value={secret} className='font-mono text-sm' />
-            <Button type='button' variant='outline' size='icon' onClick={copySecret}>
-              <Copy className='h-4 w-4' />
-            </Button>
+          <div className='space-y-3'>
+            {entry?.username ? (
+              <div className='flex gap-2'>
+                <Input readOnly value={entry.username} className='font-mono text-sm' />
+                <Button
+                  type='button'
+                  variant='outline'
+                  size='icon'
+                  onClick={() => copyText(entry.username!, 'Usuario')}
+                  title='Copiar usuario'
+                >
+                  <Copy className='h-4 w-4' />
+                </Button>
+              </div>
+            ) : null}
+            <div className='flex gap-2'>
+              <Input
+                readOnly
+                type={showSecret ? 'text' : 'password'}
+                value={secret}
+                className='font-mono text-sm'
+              />
+              <Button
+                type='button'
+                variant='outline'
+                size='icon'
+                onClick={() => setShowSecret(s => !s)}
+                title={showSecret ? 'Ocultar' : 'Mostrar'}
+              >
+                {showSecret ? <EyeOff className='h-4 w-4' /> : <Eye className='h-4 w-4' />}
+              </Button>
+              <Button
+                type='button'
+                variant='outline'
+                size='icon'
+                onClick={() => copyText(secret, 'Contraseña')}
+                title='Copiar contraseña'
+              >
+                <Copy className='h-4 w-4' />
+              </Button>
+            </div>
           </div>
         ) : null}
 
@@ -108,7 +146,7 @@ export function RevealCredentialDialog({ entry, onClose }: RevealCredentialDialo
               {loading ? (
                 <>
                   <Loader2 className='h-4 w-4 mr-1.5 animate-spin' />
-                  Revelando...
+                  Revelando…
                 </>
               ) : (
                 'Confirmar y revelar'

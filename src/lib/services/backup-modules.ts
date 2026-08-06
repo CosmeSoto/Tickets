@@ -14,6 +14,7 @@ export type BackupModuleId =
   | 'audits'
   | 'configurations'
   | 'inventory'
+  | 'credentials'
 
 export interface BackupModuleDefinition {
   id: BackupModuleId
@@ -67,6 +68,12 @@ export const BACKUP_MODULE_REGISTRY: Record<BackupModuleId, BackupModuleDefiniti
     label: 'Inventario',
     description:
       'Equipos, licencias, consumibles, mantenimientos, proveedores, contratos, bodegas, modelos, marcas, tipos y sus configuraciones.',
+  },
+  credentials: {
+    id: 'credentials',
+    label: 'Credenciales',
+    description:
+      'Bóvedas, entradas y compartidos del módulo Credenciales. Los secretos se exportan cifrados (AES-GCM / secretEncrypted); nunca en claro. Tras restaurar hace falta la misma ENCRYPTION_KEY del entorno original para poder revelar.',
   },
 }
 
@@ -591,4 +598,37 @@ export async function exportInventoryModuleData(): Promise<Record<string, unknow
   await fetchTable('asset_request_sla_metrics', () => prisma.asset_request_sla_metrics.findMany())
 
   return data
+}
+
+/**
+ * Orden FK: bóvedas → entradas → shares.
+ *
+ * Seguridad: `secretEncrypted` ya es ciphertext AES-GCM. El respaldo (pgBackRest,
+ * .dump o JSON de módulo) NO contiene contraseñas en texto plano. Quien descargue
+ * el archivo aún necesita ENCRYPTION_KEY del entorno para descifrar al revelar.
+ * Soft-delete sobrescribe el ciphertext; no reexportes secretos borrados como útiles.
+ */
+export const CREDENTIALS_MODULE_RESTORE_ORDER = [
+  'credential_vaults',
+  'credential_entries',
+  'credential_shares',
+] as const
+
+export type CredentialsModuleTable = (typeof CREDENTIALS_MODULE_RESTORE_ORDER)[number]
+
+export async function exportCredentialsModuleData(): Promise<
+  Record<CredentialsModuleTable, unknown[]>
+> {
+  // Incluye secretEncrypted cifrado; no se descifra ni se transforma a plaintext.
+  const [credential_vaults, credential_entries, credential_shares] = await Promise.all([
+    prisma.credential_vaults.findMany(),
+    prisma.credential_entries.findMany(),
+    prisma.credential_shares.findMany(),
+  ])
+
+  return {
+    credential_vaults,
+    credential_entries,
+    credential_shares,
+  }
 }

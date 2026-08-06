@@ -8,6 +8,7 @@ import {
   checkCredentialsModuleAccess,
   canManageCredentialsVault,
   credentialEntryMetadataSelect,
+  userCanAccessEntry,
   userCanAccessVault,
 } from '@/lib/credentials/access'
 import { EncryptionService } from '@/lib/services/encryption.service'
@@ -55,7 +56,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
     return NextResponse.json({ error: 'Credencial no encontrada' }, { status: 404 })
   }
 
-  if (!(await userCanAccessVault(ctx, entry.vault))) {
+  if (!(await userCanAccessEntry(ctx, entry))) {
     return NextResponse.json({ error: 'Sin acceso' }, { status: 403 })
   }
 

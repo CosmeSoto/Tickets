@@ -167,6 +167,7 @@ export async function buildBackupAuditSummary(): Promise<BackupAuditSummary> {
 
   const recommendations: string[] = [
     'Nuevos módulos: se incluyen automáticamente en pgBackRest (cluster completo). Para restore selectivo, registrar el módulo en src/lib/services/backup-modules.ts.',
+    'Credenciales: en backups/exports los secretos van cifrados (AES-GCM). Protege ENCRYPTION_KEY fuera del dump; sin esa clave no se pueden revelar tras restaurar.',
     'Mensual: crear Export .dump, descargarlo y guardarlo fuera del servidor.',
     'Mensual: ejecutar ./docker/scripts/disaster-recovery.sh check y archivar la salida.',
     'Trimestral: prueba de restauración del .dump en entorno de prueba.',

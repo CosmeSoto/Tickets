@@ -102,6 +102,37 @@ export async function userCanAccessVault(
   return scope.includes(vault.familyId)
 }
 
+/** Acceso a una entrada: bóveda del área/personal, o share explícito (userId). */
+export async function userCanAccessEntry(
+  ctx: CredentialsAccessContext,
+  entry: {
+    id: string
+    vault: { familyId: string | null; ownerUserId: string | null; kind: string }
+  }
+): Promise<boolean> {
+  if (await userCanAccessVault(ctx, entry.vault)) return true
+
+  if (!(await checkCredentialsModuleAccess(ctx))) return false
+
+  const share = await prisma.credential_shares.findFirst({
+    where: {
+      entryId: entry.id,
+      userId: ctx.userId,
+    },
+    select: { id: true },
+  })
+  return !!share
+}
+
+/** Share solo VIEW en MVP: no otorga editar/borrar. */
+export async function userHasEntryShare(userId: string, entryId: string): Promise<boolean> {
+  const share = await prisma.credential_shares.findFirst({
+    where: { entryId, userId },
+    select: { id: true },
+  })
+  return !!share
+}
+
 /** Valida que el equipo exista y su familia esté en scope (o SuperAdmin). */
 export async function assertEquipmentLinkAllowed(
   ctx: CredentialsAccessContext,
@@ -135,6 +166,44 @@ export async function assertEquipmentLinkAllowed(
   })
   if (!scope.includes(equipmentFamilyId)) {
     return { ok: false, error: 'Equipo fuera de tu alcance de credenciales' }
+  }
+
+  return { ok: true }
+}
+
+/** Valida que la licencia exista y su familia esté en scope (o SuperAdmin). */
+export async function assertLicenseLinkAllowed(
+  ctx: CredentialsAccessContext,
+  licenseId: string | null | undefined,
+  vaultFamilyId: string | null
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!licenseId) return { ok: true }
+
+  const license = await prisma.software_licenses.findUnique({
+    where: { id: licenseId },
+    select: {
+      id: true,
+      licenseType: { select: { familyId: true } },
+    },
+  })
+  if (!license) return { ok: false, error: 'Licencia no encontrada' }
+
+  const licenseFamilyId = license.licenseType?.familyId ?? null
+  if (!licenseFamilyId) {
+    return { ok: false, error: 'La licencia no tiene área asociada' }
+  }
+
+  if (vaultFamilyId && vaultFamilyId !== licenseFamilyId) {
+    return { ok: false, error: 'La licencia pertenece a otra área distinta de la bóveda' }
+  }
+
+  if (ctx.isSuperAdmin) return { ok: true }
+
+  const scope = await getCredentialsFamilyScopeIds(ctx.userId, {
+    isSuperAdmin: ctx.isSuperAdmin,
+  })
+  if (!scope.includes(licenseFamilyId)) {
+    return { ok: false, error: 'Licencia fuera de tu alcance de credenciales' }
   }
 
   return { ok: true }

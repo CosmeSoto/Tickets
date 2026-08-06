@@ -122,3 +122,4 @@ export type BackupModuleId =
   | 'configurations'
   | 'users'
   | 'inventory'
+  | 'credentials'

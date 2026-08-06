@@ -14,6 +14,8 @@ import {
   AUDITS_MODULE_RESTORE_ORDER,
   CONFIGURATIONS_MODULE_RESTORE_ORDER,
   USERS_MODULE_RESTORE_ORDER,
+  CREDENTIALS_MODULE_RESTORE_ORDER,
+  INVENTORY_MODULE_RESTORE_ORDER,
 } from '../backup-modules'
 
 const execAsync = promisify(exec)
@@ -728,6 +730,9 @@ function getTablesForModules(modules: string[]): string[] {
     audits: AUDITS_MODULE_RESTORE_ORDER,
     configurations: CONFIGURATIONS_MODULE_RESTORE_ORDER,
     users: USERS_MODULE_RESTORE_ORDER,
+    inventory: INVENTORY_MODULE_RESTORE_ORDER,
+    // Secretos viajan cifrados (secretEncrypted); no hay plaintext en el dump filtrado.
+    credentials: CREDENTIALS_MODULE_RESTORE_ORDER,
   }
 
   const tables: string[] = []
@@ -926,6 +931,13 @@ async function restoreFromJSON(
           break
         case 'users':
           restoreOrder = USERS_MODULE_RESTORE_ORDER
+          break
+        case 'inventory':
+          restoreOrder = INVENTORY_MODULE_RESTORE_ORDER
+          break
+        case 'credentials':
+          // Restaura ciphertext AES-GCM tal cual; revelar requiere ENCRYPTION_KEY del origen.
+          restoreOrder = CREDENTIALS_MODULE_RESTORE_ORDER
           break
         default:
           throw new Error(`Módulo no soportado para restauración: ${effectiveModule}`)
