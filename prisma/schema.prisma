@@ -410,6 +410,8 @@ model user_settings {
   notifyInventory      Boolean  @default(true)
   /// Master switch: notificaciones del módulo Rondas
   notifyPatrols        Boolean  @default(true)
+  /// Último digest semanal enviado (idempotencia del cron)
+  lastWeeklyDigestAt   DateTime?
   quietHoursEnabled    Boolean  @default(false)
   quietHoursStart      String   @default("22:00")
   quietHoursEnd        String   @default("08:00")

@@ -338,6 +338,26 @@ export function NotificationSettingsCard({
                 />
               </div>
 
+              <Separator />
+
+              <div className='flex items-center justify-between'>
+                <div className='space-y-0.5'>
+                  <Label className='text-base flex items-center space-x-2'>
+                    <Clock className='h-4 w-4 text-emerald-600 dark:text-emerald-400' />
+                    <span>Reporte semanal por email</span>
+                  </Label>
+                  <p className='text-sm text-muted-foreground'>
+                    Cada lunes recibes un resumen de actividad (tickets, alertas y no leídas).
+                    Requiere notificaciones por email activadas.
+                  </p>
+                </div>
+                <Switch
+                  checked={preferences.weeklyReport}
+                  onCheckedChange={checked => updatePreference('weeklyReport', checked)}
+                  disabled={!preferences.emailNotifications}
+                />
+              </div>
+
               {level === 'advanced' && (
                 <>
                   <Separator />
@@ -355,24 +375,6 @@ export function NotificationSettingsCard({
                     <Switch
                       checked={preferences.systemAlerts}
                       onCheckedChange={checked => updatePreference('systemAlerts', checked)}
-                    />
-                  </div>
-
-                  <Separator />
-
-                  <div className='flex items-center justify-between'>
-                    <div className='space-y-0.5'>
-                      <Label className='text-base flex items-center space-x-2'>
-                        <Clock className='h-4 w-4 text-emerald-600 dark:text-emerald-400' />
-                        <span>Reporte semanal</span>
-                      </Label>
-                      <p className='text-sm text-muted-foreground'>
-                        Resumen semanal de tu actividad por email
-                      </p>
-                    </div>
-                    <Switch
-                      checked={preferences.weeklyReport}
-                      onCheckedChange={checked => updatePreference('weeklyReport', checked)}
                     />
                   </div>
                 </>

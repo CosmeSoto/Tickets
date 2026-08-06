@@ -77,6 +77,7 @@ export const NOTIFICATION_FIELDS_BY_LEVEL: Record<
     'ticketUpdates',
     'newComments',
     'statusChanged',
+    'weeklyReport',
   ],
   advanced: [
     'emailNotifications',
@@ -88,8 +89,8 @@ export const NOTIFICATION_FIELDS_BY_LEVEL: Record<
     'ticketUpdates',
     'newComments',
     'statusChanged',
-    'systemAlerts',
     'weeklyReport',
+    'systemAlerts',
     'ticketCreated',
     'ticketAssigned',
     'ticketUpdated',

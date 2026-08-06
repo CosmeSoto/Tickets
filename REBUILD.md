@@ -357,6 +357,24 @@ curl -fsS -X POST "${NEXTAUTH_URL%/}/api/admin/cron/backup" \
 
 Ver log del cron: `tail -f logs/backup-cron.log`
 
+### Digest semanal de notificaciones (email)
+
+Usuarios con **Email** + **Reporte semanal** reciben un resumen por rol (tickets, alertas, no leídas).  
+Endpoint: `POST /api/cron/weekly-digest` (idempotente: 1× por semana ISO vía `lastWeeklyDigestAt`).
+
+```bash
+chmod +x ./docker/scripts/setup-weekly-digest-cron.sh
+./docker/scripts/setup-weekly-digest-cron.sh
+
+# Prueba manual
+source .env.production 2>/dev/null || export $(grep -E '^CRON_SECRET=' .env.production | xargs)
+curl -fsS -X POST "${NEXTAUTH_URL%/}/api/cron/weekly-digest" \
+  -H "Authorization: Bearer $CRON_SECRET"
+```
+
+Requiere que la cola de email esté activa (`/api/cron/process-email-queue`).  
+Log: `tail -f logs/weekly-digest-cron.log`
+
 ### Auditoría y cumplimiento
 
 - **UI:** Admin → Backups → **Dashboard** → tarjeta _Guía de auditoría_ (checklist en vivo + **Exportar informe** JSON)
