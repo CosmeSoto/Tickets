@@ -139,6 +139,8 @@ export function CreateUserModal({
           inventoryEnabled: false,
           patrolsEnabled: false,
           canManageInventory: false,
+          credentialsEnabled: false,
+          canManageCredentials: false,
         }),
       })
       const result = await response.json()

@@ -25,6 +25,8 @@ const updateUserSchema = z.object({
   canManageNews: z.boolean().optional(),
   formsEnabled: z.boolean().optional(),
   canManageForms: z.boolean().optional(),
+  credentialsEnabled: z.boolean().optional(),
+  canManageCredentials: z.boolean().optional(),
   isSuperAdmin: z.boolean().optional(),
   assignedCategories: z
     .array(
@@ -116,7 +118,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         targetId
       )
       if (!scopeCheck.allowed) {
-        return NextResponse.json({ success: false, error: scopeCheck.error }, { status: scopeCheck.status })
+        return NextResponse.json(
+          { success: false, error: scopeCheck.error },
+          { status: scopeCheck.status }
+        )
       }
     }
 
@@ -209,6 +214,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
             newsEnabled: (currentUser as any).newsEnabled ?? false,
             formsEnabled: (currentUser as any).formsEnabled ?? false,
             canManageForms: (currentUser as any).canManageForms ?? false,
+            credentialsEnabled: (currentUser as any).credentialsEnabled ?? false,
+            canManageCredentials: (currentUser as any).canManageCredentials ?? false,
             canRequestAssets: (currentUser as any).canRequestAssets ?? false,
           },
           incoming: {
@@ -219,6 +226,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
             newsEnabled: validatedData.newsEnabled,
             formsEnabled: validatedData.formsEnabled,
             canManageForms: validatedData.canManageForms,
+            credentialsEnabled: validatedData.credentialsEnabled,
+            canManageCredentials: validatedData.canManageCredentials,
             canRequestAssets: (validatedData as any).canRequestAssets,
           },
         })
@@ -411,7 +420,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         ((validatedData as any).formsEnabled !== undefined &&
           (validatedData as any).formsEnabled !== (currentUser as any).formsEnabled) ||
         ((validatedData as any).canManageForms !== undefined &&
-          (validatedData as any).canManageForms !== (currentUser as any).canManageForms)
+          (validatedData as any).canManageForms !== (currentUser as any).canManageForms) ||
+        (validatedData.credentialsEnabled !== undefined &&
+          validatedData.credentialsEnabled !== (currentUser as any).credentialsEnabled) ||
+        (validatedData.canManageCredentials !== undefined &&
+          validatedData.canManageCredentials !== (currentUser as any).canManageCredentials)
 
       if (modulesActuallyChanged) {
         NotificationEvents.emit(targetId, {
@@ -548,7 +561,10 @@ export async function DELETE(
       targetId
     )
     if (!scopeCheck.allowed) {
-      return NextResponse.json({ success: false, error: scopeCheck.error }, { status: scopeCheck.status })
+      return NextResponse.json(
+        { success: false, error: scopeCheck.error },
+        { status: scopeCheck.status }
+      )
     }
 
     // Obtener datos del usuario antes de eliminarlo para las notificaciones

@@ -66,6 +66,16 @@ export const FAMILY_ACCESS_MODULES: Record<string, FamilyAccessModuleDefinition>
       CLIENT: { canConsume: false, canOperate: true, canView: true },
     },
   },
+  credentials: {
+    key: 'credentials',
+    label: 'Credenciales',
+    description: 'Áreas adicionales de visibilidad / operación de credenciales.',
+    defaultsByRole: {
+      ADMIN: { canConsume: false, canOperate: false, canView: true },
+      TECHNICIAN: { canConsume: false, canOperate: true, canView: true },
+      CLIENT: { canConsume: false, canOperate: true, canView: true },
+    },
+  },
 }
 
 export const BUILTIN_FAMILY_ACCESS_MODULE_KEYS = Object.keys(FAMILY_ACCESS_MODULES)

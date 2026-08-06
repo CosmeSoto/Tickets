@@ -693,6 +693,19 @@ async function seedSystemModules() {
       requiresManager: false,
       familyScoped: false,
     },
+    {
+      key: 'credentials',
+      name: 'Credenciales',
+      description: 'Bóveda de credenciales por área y enlaces a equipos',
+      icon: 'KeyRound',
+      isActive: true,
+      order: 6,
+      defaultForAdmin: true,
+      defaultForTech: false,
+      defaultForClient: false,
+      requiresManager: true,
+      familyScoped: true,
+    },
   ]
 
   for (const mod of modules) {
@@ -702,7 +715,7 @@ async function seedSystemModules() {
       create: mod,
     })
   }
-  console.log('✅ Módulos del sistema (tickets, inventory, patrols, news)')
+  console.log('✅ Módulos del sistema (tickets, inventory, patrols, news, credentials)')
 }
 
 // ============================================

@@ -88,6 +88,19 @@ const FALLBACK: SystemModule[] = [
     requiresManager: true,
     familyScoped: true,
   },
+  {
+    key: 'credentials',
+    name: 'Credenciales',
+    description: 'Bóveda de credenciales por área',
+    icon: 'KeyRound',
+    isActive: true,
+    order: 6,
+    defaultForAdmin: true,
+    defaultForTech: false,
+    defaultForClient: false,
+    requiresManager: true,
+    familyScoped: true,
+  },
 ]
 
 export function useSystemModules() {
@@ -137,6 +150,11 @@ export function getModuleRoleDescription(moduleKey: string, role: string): strin
       TECHNICIAN: 'Ver · con permiso de crear publica en áreas de contenido asignadas',
       CLIENT: 'Ver · con permiso de crear publica en su nativa + áreas de contenido',
     },
+    credentials: {
+      ADMIN: 'Gestionar credenciales de sus áreas asignadas',
+      TECHNICIAN: 'Ver y revelar credenciales · gestionar con permiso de gestor',
+      CLIENT: 'Ver y revelar credenciales de sus áreas asignadas',
+    },
   }
   return descriptions[moduleKey]?.[role] ?? 'Acceso al módulo'
 }
@@ -169,6 +187,11 @@ export function getAdditionalFamilyHint(moduleKey: string, role: string): string
       TECHNICIAN: 'Áreas de contenido donde puede publicar (mismas que Noticias).',
       CLIENT: 'Áreas de contenido donde puede publicar (mismas que Noticias).',
     },
+    credentials: {
+      ADMIN: 'Áreas adicionales de visibilidad de credenciales.',
+      TECHNICIAN: 'Áreas donde puede ver o gestionar credenciales.',
+      CLIENT: 'Áreas donde puede consultar credenciales.',
+    },
   }
   return hints[moduleKey]?.[role] ?? null
 }
@@ -183,6 +206,7 @@ export function getModuleEmoji(moduleKey: string): string {
     patrols: '🛡️',
     news: '📰',
     forms: '📋',
+    credentials: '🔐',
     contracts: '📄',
     reports: '📊',
     knowledge: '📚',

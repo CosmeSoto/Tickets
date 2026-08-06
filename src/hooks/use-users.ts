@@ -44,6 +44,8 @@ export interface UserData {
   canManageNews?: boolean
   formsEnabled?: boolean
   canManageForms?: boolean
+  credentialsEnabled?: boolean
+  canManageCredentials?: boolean
   isSuperAdmin?: boolean
   lastLogin?: string
   createdAt: string

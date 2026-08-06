@@ -236,6 +236,10 @@ export async function GET(request: NextRequest) {
             const allowedIds = new Set(scope.familyIds)
             families = families.filter(f => allowedIds.has(f.id))
           }
+        } else if (moduleFilter === 'credentials') {
+          const { getCredentialsFamilyScopeIds } = await import('@/lib/credentials/access')
+          const allowedIds = new Set(await getCredentialsFamilyScopeIds(userId))
+          families = families.filter(f => allowedIds.has(f.id))
         } else {
           // Default (sin módulo específico): calcular Union_Scope
           // Union_Scope = General_Scope + Inventory families + Patrols families + Nativa (deduplicado)

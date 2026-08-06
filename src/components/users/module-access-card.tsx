@@ -53,6 +53,9 @@ interface ModuleAccessCardProps {
     /** Documentos: puede crear, editar y eliminar documentos */
     canManageForms?: boolean
     onToggleManageForms?: (v: boolean) => void
+    /** Credenciales: gestión completa (crear/editar/eliminar) */
+    canManageCredentials?: boolean
+    onToggleManageCredentials?: (v: boolean) => void
   }
   /** Familias de solo lectura (fuera del scope del admin) */
   readOnlyFamilyIds?: string[]
@@ -246,6 +249,20 @@ export function ModuleAccessCard({
                     onCheckedChange={options.onToggleManageForms}
                     disabled={disabled}
                     className='scale-90 shrink-0'
+                  />
+                </div>
+              )}
+              {options.onToggleManageCredentials !== undefined && (
+                <div className='flex items-center justify-between'>
+                  <div className='flex items-center gap-1.5'>
+                    <span className='text-xs'>🔐</span>
+                    <p className='text-[11px] font-medium'>Gestión completa</p>
+                  </div>
+                  <Switch
+                    checked={options.canManageCredentials ?? false}
+                    onCheckedChange={options.onToggleManageCredentials}
+                    disabled={disabled}
+                    className='scale-90'
                   />
                 </div>
               )}

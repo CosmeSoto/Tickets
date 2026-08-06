@@ -36,6 +36,8 @@ import { ConvertToPurchaseDialog } from './equipment/dialogs/convert-to-purchase
 import { SaleDialog } from './equipment/dialogs/sale-dialog'
 import { TransferFamilyDialog } from './transfer-family-dialog'
 import { Button } from '@/components/ui/button'
+import { useSession } from 'next-auth/react'
+import { EquipmentCredentialsCard } from '@/components/credentials/equipment-credentials-card'
 
 interface EquipmentDetailProps {
   equipmentId: string
@@ -54,6 +56,16 @@ export function EquipmentDetail({
   const [showSaleDialog, setShowSaleDialog] = useState(false)
   const [showTransferFamilyDialog, setShowTransferFamilyDialog] = useState(false)
   const router = useRouter()
+  const { data: session } = useSession()
+  const isSuperAdminSession =
+    isSuperAdmin || (session?.user as { isSuperAdmin?: boolean })?.isSuperAdmin === true
+  const hasCredentials =
+    isSuperAdminSession ||
+    (session?.user as { credentialsEnabled?: boolean })?.credentialsEnabled === true
+  const canManageCredentials =
+    hasCredentials &&
+    (session?.user?.role === 'ADMIN' ||
+      (session?.user as { canManageCredentials?: boolean })?.canManageCredentials === true)
 
   const {
     // Data
@@ -297,6 +309,9 @@ export function EquipmentDetail({
 
         {/* Columna lateral — QR + asignación */}
         <div className='space-y-6'>
+          {hasCredentials && (
+            <EquipmentCredentialsCard equipmentId={equipmentId} canManage={canManageCredentials} />
+          )}
           <EquipmentQRCard
             qrCode={qrCode}
             equipmentCode={equipment.code}

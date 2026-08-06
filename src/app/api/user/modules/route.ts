@@ -45,6 +45,8 @@ export async function GET(request: Request) {
   let formsEnabled = false
   let canManageForms = false
   let canRequestAssets = false
+  let credentialsEnabled = false
+  let canManageCredentials = false
 
   if (targetUserId && targetUserId !== session.user.id) {
     const targetUser = await prisma.users.findUnique({
@@ -62,6 +64,8 @@ export async function GET(request: Request) {
         formsEnabled: true,
         canManageForms: true,
         canRequestAssets: true,
+        credentialsEnabled: true,
+        canManageCredentials: true,
       },
     })
     if (!targetUser) return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 })
@@ -77,6 +81,8 @@ export async function GET(request: Request) {
     formsEnabled = targetUser.formsEnabled ?? false
     canManageForms = targetUser.canManageForms ?? false
     canRequestAssets = targetUser.canRequestAssets ?? false
+    credentialsEnabled = targetUser.credentialsEnabled ?? false
+    canManageCredentials = targetUser.canManageCredentials ?? false
   } else {
     // Cargar flags del usuario actual desde DB (la sesión puede estar desactualizada)
     const currentUser = await prisma.users.findUnique({
@@ -93,6 +99,8 @@ export async function GET(request: Request) {
         formsEnabled: true,
         canManageForms: true,
         canRequestAssets: true,
+        credentialsEnabled: true,
+        canManageCredentials: true,
       },
     })
     if (currentUser) {
@@ -107,6 +115,8 @@ export async function GET(request: Request) {
       formsEnabled = currentUser.formsEnabled ?? false
       canManageForms = currentUser.canManageForms ?? false
       canRequestAssets = currentUser.canRequestAssets ?? false
+      credentialsEnabled = currentUser.credentialsEnabled ?? false
+      canManageCredentials = currentUser.canManageCredentials ?? false
     }
   }
 
@@ -162,6 +172,11 @@ export async function GET(request: Request) {
         const patrolIds = await getUserModuleFamilyGrantIds(userId, 'patrols')
         familyIds = [...new Set([...familyIds, ...patrolIds])]
       }
+      if (credentialsEnabled || canManageCredentials) {
+        const { getCredentialsFamilyScopeIds } = await import('@/lib/credentials/access')
+        const credIds = await getCredentialsFamilyScopeIds(userId)
+        familyIds = [...new Set([...familyIds, ...credIds])]
+      }
     } else if (role === 'CLIENT') {
       const explicitIds = await getUserModuleFamilyGrantIds(userId, 'tickets')
 
@@ -182,6 +197,11 @@ export async function GET(request: Request) {
       if (patrolsEnabled) {
         const patrolIds = await getUserModuleFamilyGrantIds(userId, 'patrols')
         familyIds = [...new Set([...familyIds, ...patrolIds])]
+      }
+      if (credentialsEnabled || canManageCredentials) {
+        const { getCredentialsFamilyScopeIds } = await import('@/lib/credentials/access')
+        const credIds = await getCredentialsFamilyScopeIds(userId)
+        familyIds = [...new Set([...familyIds, ...credIds])]
       }
     }
 
@@ -207,6 +227,8 @@ export async function GET(request: Request) {
           canManageForms: true,
           canRequestAssets: false,
           canManageInventory: true,
+          credentials: true,
+          canManageCredentials: true,
           families: [],
         }
       }
@@ -222,6 +244,8 @@ export async function GET(request: Request) {
           canManageForms: true,
           canRequestAssets: false,
           canManageInventory: true,
+          credentials: credentialsEnabled || canManageCredentials,
+          canManageCredentials: role === 'ADMIN' ? true : canManageCredentials,
           families: [],
         }
       }
@@ -236,6 +260,8 @@ export async function GET(request: Request) {
         canManageForms,
         canRequestAssets,
         canManageInventory,
+        credentials: credentialsEnabled || canManageCredentials,
+        canManageCredentials,
         families: [],
       }
     }
@@ -264,6 +290,7 @@ export async function GET(request: Request) {
     const ticketFamilyIds: Set<string> = new Set()
     const inventoryFamilyIds: Set<string> = new Set()
     const patrolFamilyIds: Set<string> = new Set()
+    const credentialsFamilyIds: Set<string> = new Set()
 
     if (isSuperAdmin) {
       const allActive = await prisma.families.findMany({
@@ -274,6 +301,7 @@ export async function GET(request: Request) {
         ticketFamilyIds.add(f.id)
         inventoryFamilyIds.add(f.id)
         patrolFamilyIds.add(f.id)
+        credentialsFamilyIds.add(f.id)
       })
     } else {
       const ticketGrants = await getUserModuleFamilyGrantIds(userId, 'tickets')
@@ -287,17 +315,28 @@ export async function GET(request: Request) {
         const patrolGrants = await getUserModuleFamilyGrantIds(userId, 'patrols')
         patrolGrants.forEach(id => patrolFamilyIds.add(id))
       }
+      if (credentialsEnabled || canManageCredentials) {
+        const { getCredentialsFamilyScopeIds } = await import('@/lib/credentials/access')
+        const credScope = await getCredentialsFamilyScopeIds(userId)
+        credScope.forEach(id => credentialsFamilyIds.add(id))
+      }
 
       if (nativeFamilyId) {
         if (ticketsEnabled) ticketFamilyIds.add(nativeFamilyId)
         if (inventoryEnabled || canManageInventory) inventoryFamilyIds.add(nativeFamilyId)
         if (patrolsEnabled) patrolFamilyIds.add(nativeFamilyId)
+        if (credentialsEnabled || canManageCredentials) credentialsFamilyIds.add(nativeFamilyId)
       }
     }
 
     // Cargar TODAS las familias que el usuario tiene en cualquier módulo
     const allModuleFamilyIds = [
-      ...new Set([...ticketFamilyIds, ...inventoryFamilyIds, ...patrolFamilyIds]),
+      ...new Set([
+        ...ticketFamilyIds,
+        ...inventoryFamilyIds,
+        ...patrolFamilyIds,
+        ...credentialsFamilyIds,
+      ]),
     ]
     const families =
       allModuleFamilyIds.length > 0
@@ -318,6 +357,9 @@ export async function GET(request: Request) {
         patrols: isSuperAdmin ? true : patrolFamilyIds.has(f.id) && patrolsEnabled,
         news: isSuperAdmin ? true : newsEnabled,
         forms: isSuperAdmin ? true : formsEnabled,
+        credentials: isSuperAdmin
+          ? true
+          : credentialsFamilyIds.has(f.id) && (credentialsEnabled || canManageCredentials),
       },
     }))
 
@@ -341,6 +383,7 @@ export async function GET(request: Request) {
     let resolvedPatrols: boolean
     let resolvedNews: boolean
     let resolvedForms: boolean
+    let resolvedCredentials: boolean
 
     if (role === 'ADMIN' && isSuperAdmin) {
       resolvedTickets = true
@@ -348,6 +391,7 @@ export async function GET(request: Request) {
       resolvedPatrols = true
       resolvedNews = true
       resolvedForms = true
+      resolvedCredentials = true
     } else if (role === 'CLIENT') {
       // Para CLIENT: el flag del usuario es suficiente para mostrar el módulo.
       // No bloqueamos por falta de familias — el usuario verá el módulo vacío
@@ -358,6 +402,7 @@ export async function GET(request: Request) {
       // Si puede gestionar noticias, también puede verlas (canManageNews implica newsEnabled)
       resolvedNews = newsEnabled || canManageNews
       resolvedForms = formsEnabled
+      resolvedCredentials = credentialsEnabled || canManageCredentials
     } else {
       // ADMIN normal y TECHNICIAN: requieren al menos una familia activa en el módulo.
       // canRequestAssets basta para mostrar Inventario (menú de solicitudes de compras).
@@ -370,6 +415,8 @@ export async function GET(request: Request) {
       // Si puede gestionar noticias, también puede verlas (canManageNews implica newsEnabled)
       resolvedNews = newsEnabled || canManageNews
       resolvedForms = formsEnabled
+      resolvedCredentials =
+        (credentialsEnabled || canManageCredentials) && credentialsFamilyIds.size > 0
     }
 
     return {
@@ -382,6 +429,8 @@ export async function GET(request: Request) {
       canManageForms: role === 'ADMIN' ? true : canManageForms,
       canRequestAssets: role === 'ADMIN' ? false : canRequestAssets,
       canManageInventory: role === 'ADMIN' ? true : canManageInventory,
+      credentials: resolvedCredentials,
+      canManageCredentials: role === 'ADMIN' ? true : canManageCredentials,
       families: enrichedFamilies,
     }
   })

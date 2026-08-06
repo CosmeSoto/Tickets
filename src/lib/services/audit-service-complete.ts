@@ -29,6 +29,7 @@ export interface AuditLogData {
     | 'form'
     | 'backup'
     | 'sla'
+    | 'credential_entry'
   entityId?: string
   userId: string
   details?: Record<string, any>
@@ -933,6 +934,12 @@ export const AuditActionsComplete = {
   FORM_CREATED: 'form_created',
   FORM_UPDATED: 'form_updated',
   FORM_DELETED: 'form_deleted',
+
+  // Credenciales
+  CREDENTIAL_CREATED: 'credential_created',
+  CREDENTIAL_UPDATED: 'credential_updated',
+  CREDENTIAL_REVEALED: 'credential_revealed',
+  CREDENTIAL_DELETED: 'credential_deleted',
 
   // Familias — asignaciones de admin
   ADMIN_FAMILY_ASSIGNED: 'admin_family_assigned',

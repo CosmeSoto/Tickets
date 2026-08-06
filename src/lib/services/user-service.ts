@@ -52,6 +52,8 @@ export interface CreateUserData {
   canRequestAssets?: boolean
   formsEnabled?: boolean
   canManageForms?: boolean
+  credentialsEnabled?: boolean
+  canManageCredentials?: boolean
   assignedCategories?: {
     categoryId: string
     priority: number
@@ -78,6 +80,8 @@ export interface UpdateUserData {
   canManageNews?: boolean
   formsEnabled?: boolean
   canManageForms?: boolean
+  credentialsEnabled?: boolean
+  canManageCredentials?: boolean
   isSuperAdmin?: boolean
   assignedCategories?: {
     categoryId: string
@@ -248,6 +252,8 @@ export class UserService {
         canManageNews: true,
         formsEnabled: true,
         canManageForms: true,
+        credentialsEnabled: true,
+        canManageCredentials: true,
         lastLogin: true,
         createdAt: true,
         updatedAt: true,
@@ -300,6 +306,9 @@ export class UserService {
           canRequestAssets: data.canRequestAssets ?? false,
           formsEnabled: data.formsEnabled ?? false,
           canManageForms: (data.formsEnabled ?? false) ? (data.canManageForms ?? false) : false,
+          credentialsEnabled: data.credentialsEnabled ?? false,
+          canManageCredentials:
+            (data.credentialsEnabled ?? false) ? (data.canManageCredentials ?? false) : false,
           isEmailVerified: false,
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -428,13 +437,22 @@ export class UserService {
     if (data.canManageNews !== undefined) updateData.canManageNews = data.canManageNews
     if (data.formsEnabled !== undefined) updateData.formsEnabled = data.formsEnabled
     if (data.canManageForms !== undefined) updateData.canManageForms = data.canManageForms
+    if (data.credentialsEnabled !== undefined)
+      updateData.credentialsEnabled = data.credentialsEnabled
+    if (data.canManageCredentials !== undefined)
+      updateData.canManageCredentials = data.canManageCredentials
     // Crear requiere módulo activo: no dejar canManage* huérfano
     const effectiveNewsEnabled =
       updateData.newsEnabled !== undefined ? updateData.newsEnabled : user.newsEnabled
     const effectiveFormsEnabled =
       updateData.formsEnabled !== undefined ? updateData.formsEnabled : user.formsEnabled
+    const effectiveCredentialsEnabled =
+      updateData.credentialsEnabled !== undefined
+        ? updateData.credentialsEnabled
+        : user.credentialsEnabled
     if (!effectiveNewsEnabled) updateData.canManageNews = false
     if (!effectiveFormsEnabled) updateData.canManageForms = false
+    if (!effectiveCredentialsEnabled) updateData.canManageCredentials = false
     if (data.isSuperAdmin !== undefined) updateData.isSuperAdmin = data.isSuperAdmin
 
     // Manejar departmentId explícitamente

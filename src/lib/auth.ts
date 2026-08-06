@@ -399,6 +399,8 @@ export const authOptions: NextAuthOptions = {
                   canManageNews: true,
                   formsEnabled: true,
                   canManageForms: true,
+                  credentialsEnabled: true,
+                  canManageCredentials: true,
                   passwordChangedAt: true,
                 },
               })
@@ -412,6 +414,8 @@ export const authOptions: NextAuthOptions = {
               token.canManageNews = dbUser?.canManageNews ?? false
               token.formsEnabled = dbUser?.formsEnabled ?? false
               token.canManageForms = dbUser?.canManageForms ?? false
+              token.credentialsEnabled = dbUser?.credentialsEnabled ?? false
+              token.canManageCredentials = dbUser?.canManageCredentials ?? false
 
               // ── Política de cambio de contraseña ───────────────────────
               try {
@@ -454,6 +458,8 @@ export const authOptions: NextAuthOptions = {
               token.patrolsEnabled = false
               token.newsEnabled = false
               token.canManageNews = false
+              token.credentialsEnabled = false
+              token.canManageCredentials = false
               token.mustChangePassword = false
             }
           }
@@ -480,6 +486,8 @@ export const authOptions: NextAuthOptions = {
                   canManageNews: true,
                   formsEnabled: true,
                   canManageForms: true,
+                  credentialsEnabled: true,
+                  canManageCredentials: true,
                   departmentId: true,
                   passwordChangedAt: true,
                   passwordHash: true,
@@ -503,6 +511,8 @@ export const authOptions: NextAuthOptions = {
               token.canManageNews = (dbUser as any).canManageNews ?? false
               token.formsEnabled = dbUser.formsEnabled ?? false
               token.canManageForms = dbUser.canManageForms ?? false
+              token.credentialsEnabled = dbUser.credentialsEnabled ?? false
+              token.canManageCredentials = dbUser.canManageCredentials ?? false
               token.departmentId = dbUser.departmentId || undefined
               token.department = dbUser.departments?.name || undefined
 
@@ -582,6 +592,9 @@ export const authOptions: NextAuthOptions = {
           ;(session.user as any).canManageNews = (token.canManageNews as boolean) ?? false
           ;(session.user as any).formsEnabled = (token.formsEnabled as boolean) ?? false
           ;(session.user as any).canManageForms = (token.canManageForms as boolean) ?? false
+          ;(session.user as any).credentialsEnabled = (token.credentialsEnabled as boolean) ?? false
+          ;(session.user as any).canManageCredentials =
+            (token.canManageCredentials as boolean) ?? false
 
           // Política de cambio de contraseña
           ;(session.user as any).mustChangePassword = (token.mustChangePassword as boolean) ?? false

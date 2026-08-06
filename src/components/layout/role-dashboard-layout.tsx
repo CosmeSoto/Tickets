@@ -42,6 +42,7 @@ import {
   CalendarDays,
   PanelLeft,
   PanelLeftClose,
+  KeyRound,
 } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -140,6 +141,11 @@ const navigationByRole: Record<string, NavItem[]> = {
       href: '/admin/forms',
       icon: FileText,
     },
+    {
+      name: 'Credenciales',
+      href: '/credentials',
+      icon: KeyRound,
+    },
     { name: 'Familias', href: '/admin/families', icon: Layers },
     { name: 'Usuarios', href: '/admin/users', icon: Users },
     { name: 'Auditoría', href: '/admin/audit', icon: Shield },
@@ -192,6 +198,11 @@ const navigationByRole: Record<string, NavItem[]> = {
       href: '/forms',
       icon: FileText,
     },
+    {
+      name: 'Credenciales',
+      href: '/credentials',
+      icon: KeyRound,
+    },
   ],
 
   // Técnico CON gestión de inventario: tickets + inventario operativo de sus familias
@@ -241,6 +252,11 @@ const navigationByRole: Record<string, NavItem[]> = {
       href: '/forms',
       icon: FileText,
     },
+    {
+      name: 'Credenciales',
+      href: '/credentials',
+      icon: KeyRound,
+    },
   ],
 
   // Cliente: sus tickets + sus equipos asignados + mantenimientos
@@ -287,6 +303,11 @@ const navigationByRole: Record<string, NavItem[]> = {
       href: '/forms',
       icon: FileText,
     },
+    {
+      name: 'Credenciales',
+      href: '/credentials',
+      icon: KeyRound,
+    },
   ],
 
   // Cliente CON gestión de inventario: tickets + inventario operativo de sus familias
@@ -332,6 +353,11 @@ const navigationByRole: Record<string, NavItem[]> = {
       name: 'Documentos',
       href: '/forms',
       icon: FileText,
+    },
+    {
+      name: 'Credenciales',
+      href: '/credentials',
+      icon: KeyRound,
     },
   ],
 }
@@ -638,6 +664,7 @@ export function RoleDashboardLayout({
     canRequestAssets,
     canManageInventory: canManageInventoryFromModules,
     canManageNews: canManageNewsFromModules,
+    credentials: hasCredentials,
   } = useUserModules()
 
   // Solo ocultar si definitivamente no hay sesión (no durante la carga/revalidación)
@@ -687,6 +714,7 @@ export function RoleDashboardLayout({
       if (item.href === '/admin/patrols' || item.name === 'Rondas') return hasPatrols
       if (item.href === '/admin/news' || item.name === 'Noticias') return hasNews
       if (item.href === '/admin/forms' || item.name === 'Documentos') return hasForms
+      if (item.href === '/credentials' || item.name === 'Credenciales') return hasCredentials
       return true
     })
     navigation = adminNav
@@ -723,6 +751,9 @@ export function RoleDashboardLayout({
       // El listado de lectura/creación unificado está en /forms.
       if (item.href === '/forms' || item.href === '/admin/forms' || item.name === 'Documentos') {
         return hasForms
+      }
+      if (item.href === '/credentials' || item.name === 'Credenciales') {
+        return hasCredentials
       }
       return true
     })

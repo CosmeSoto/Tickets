@@ -598,6 +598,19 @@ npx tsx prisma/sync-user-family-access.ts --force
 npm run test:family-access                 # suite de regresión (81+ tests)
 ```
 
+#### Módulo Credenciales (bóveda) — MVP
+
+| Pieza                                                                   | Estado                                          |
+| ----------------------------------------------------------------------- | ----------------------------------------------- |
+| Tablas `credential_vaults` / `credential_entries` / `credential_shares` | ✅ migración `20260806200000_credentials_vault` |
+| Flags `credentialsEnabled` + `canManageCredentials` + `system_modules`  | ✅                                              |
+| Family-access módulo `credentials`                                      | ✅                                              |
+| API CRUD + reveal cifrado (AES-GCM) + auditoría                         | ✅                                              |
+| UI `/credentials` + card en ficha de equipo                             | ✅                                              |
+| Compartir fino por usuario / export KeePass                             | ⏳ post-MVP                                     |
+
+**Uso:** habilitar módulo en Usuarios, asignar áreas `credentials`, gestionar en menú Credenciales. Secretos solo en `/reveal`.
+
 #### Cierre de fase (áreas unificadas) — DONE
 
 Esta sección queda **cerrada** para uso en producción con el siguiente contrato:

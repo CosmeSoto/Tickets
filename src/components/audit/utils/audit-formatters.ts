@@ -75,6 +75,7 @@ export function translateEntityType(entityType: string): string {
     equipment_type: '🔧 Tipo de Equipo',
     license_type: '🪪 Tipo de Licencia',
     consumable_type: '📦 Tipo de Consumible',
+    credential_entry: '🔐 Credencial',
   }
   return entityMap[entityType.toLowerCase()] || entityType
 }
@@ -184,6 +185,11 @@ export function getActionLabel(action: string): string {
     news_deleted: 'Noticia Eliminada',
     news_published: 'Noticia Publicada',
     news_archived: 'Noticia Archivada',
+    // Credenciales
+    credential_created: 'Credencial Creada',
+    credential_updated: 'Credencial Actualizada',
+    credential_revealed: 'Credencial Revelada',
+    credential_deleted: 'Credencial Eliminada',
     // Configuración
     settings_updated: 'Config. Sistema Actualizada',
     settings_viewed: 'Configuración Visualizada',
@@ -255,6 +261,10 @@ export function getActionLabel(action: string): string {
     PATROL_COMPLETED: 'Patrulla Completada',
     PATROL_MISSED: 'Patrulla Omitida',
     PATROL_INCOMPLETE: 'Patrulla Incompleta',
+    CREDENTIAL_CREATED: 'Credencial Creada',
+    CREDENTIAL_UPDATED: 'Credencial Actualizada',
+    CREDENTIAL_REVEALED: 'Credencial Revelada',
+    CREDENTIAL_DELETED: 'Credencial Eliminada',
     // Inventario — tipos
     TYPE_CLONED: 'Tipo Copiado a Otra Área',
   }
@@ -295,6 +305,7 @@ export function getEntityLabel(entityType: string): string {
     license_type: 'Tipos de Licencia',
     consumable_type: 'Tipos de Consumible',
     consumable_types: 'Tipos de Consumible',
+    credential_entry: 'Credenciales',
   }
   return entityLabels[entityType] || entityType
 }
@@ -562,6 +573,8 @@ export function getFieldLabel(key: string): string {
     ticketsEnabled: 'Módulo Tickets',
     inventoryEnabled: 'Módulo Inventario',
     patrolsEnabled: 'Módulo Rondas',
+    credentialsEnabled: 'Módulo Credenciales',
+    canManageCredentials: 'Gestor de Credenciales',
     canManageInventory: 'Gestor de Inventario',
     canRequestAssets: 'Solicitar Activos',
     isSuperAdmin: 'Super Admin',

@@ -16,6 +16,8 @@ interface UserModulesPanelProps {
   canManageNews?: boolean
   formsEnabled?: boolean
   canManageForms?: boolean
+  credentialsEnabled?: boolean
+  canManageCredentials?: boolean
   canRequestAssets?: boolean
   defaultCollapsed?: boolean
   hideGuides?: boolean
@@ -27,8 +29,10 @@ interface ModulesData {
   patrols: boolean
   news: boolean
   forms: boolean
+  credentials: boolean
   canManageNews?: boolean
   canManageForms?: boolean
+  canManageCredentials?: boolean
   families: Array<{
     id: string
     name: string
@@ -40,6 +44,7 @@ interface ModulesData {
       patrols: boolean
       news: boolean
       forms: boolean
+      credentials: boolean
     }
   }>
 }
@@ -55,6 +60,8 @@ export function UserModulesPanel({
   canManageNews,
   formsEnabled,
   canManageForms,
+  credentialsEnabled,
+  canManageCredentials,
   canRequestAssets,
   defaultCollapsed = false,
   hideGuides = false,
@@ -81,6 +88,8 @@ export function UserModulesPanel({
     canManageNews,
     formsEnabled,
     canManageForms,
+    credentialsEnabled,
+    canManageCredentials,
   ])
 
   if (loading) {
@@ -100,6 +109,7 @@ export function UserModulesPanel({
     patrols: data.patrols,
     news: newsEnabled ?? false,
     forms: formsEnabled ?? false,
+    credentials: data.credentials ?? credentialsEnabled ?? false,
   }
 
   const activeCount = Object.values(active).filter(Boolean).length
@@ -139,6 +149,10 @@ export function UserModulesPanel({
     ? 'Descarga documentos · crea y gestiona los de sus familias'
     : 'Consulta y descarga documentos disponibles para su perfil'
 
+  const credentialsCap = canManageCredentials
+    ? 'Ver, revelar y gestionar credenciales de sus áreas'
+    : 'Ver y revelar credenciales autorizadas'
+
   // Permisos adicionales por módulo
   const inventoryPerms: Array<{ icon: string; label: string }> = []
   if (canManageInventory) inventoryPerms.push({ icon: '🔧', label: 'Gestión completa' })
@@ -149,6 +163,10 @@ export function UserModulesPanel({
 
   const formsPerms: Array<{ icon: string; label: string }> = []
   if (canManageForms) formsPerms.push({ icon: '✏️', label: 'Crear y gestionar documentos' })
+
+  const credentialsPerms: Array<{ icon: string; label: string }> = []
+  if (canManageCredentials)
+    credentialsPerms.push({ icon: '🔐', label: 'Gestión completa de credenciales' })
 
   const allModules = [
     {
@@ -174,6 +192,13 @@ export function UserModulesPanel({
     },
     { key: 'news' as const, emoji: '📰', label: 'Noticias', cap: newsCap, perms: newsPerms },
     { key: 'forms' as const, emoji: '📄', label: 'Documentos', cap: formsCap, perms: formsPerms },
+    {
+      key: 'credentials' as const,
+      emoji: '🔐',
+      label: 'Credenciales',
+      cap: credentialsCap,
+      perms: credentialsPerms,
+    },
   ]
 
   return (
@@ -212,7 +237,7 @@ export function UserModulesPanel({
               extraPermissions={active[m.key] && m.perms.length > 0 ? m.perms : undefined}
               families={
                 active[m.key] && m.key !== 'news' && m.key !== 'forms'
-                  ? familiesByModule(m.key)
+                  ? familiesByModule(m.key as 'tickets' | 'inventory' | 'patrols' | 'credentials')
                   : undefined
               }
             />

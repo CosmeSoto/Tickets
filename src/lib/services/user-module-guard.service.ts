@@ -273,6 +273,8 @@ export class UserModuleGuardService {
         patrolsEnabled: true,
         newsEnabled: true,
         canRequestAssets: true,
+        credentialsEnabled: true,
+        canManageCredentials: true,
       },
     })
 
@@ -332,6 +334,8 @@ export interface ModuleFlags {
   newsEnabled: boolean
   formsEnabled: boolean
   canManageForms: boolean
+  credentialsEnabled: boolean
+  canManageCredentials: boolean
   canRequestAssets: boolean
 }
 
@@ -343,5 +347,7 @@ const MODULE_FLAG_KEYS: (keyof ModuleFlags)[] = [
   'newsEnabled',
   'formsEnabled',
   'canManageForms',
+  'credentialsEnabled',
+  'canManageCredentials',
   'canRequestAssets',
 ]

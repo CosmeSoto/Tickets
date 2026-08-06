@@ -20,6 +20,8 @@ const createUserSchema = z.object({
   newsEnabled: z.boolean().optional(),
   canManageInventory: z.boolean().optional(),
   canRequestAssets: z.boolean().optional(),
+  credentialsEnabled: z.boolean().optional(),
+  canManageCredentials: z.boolean().optional(),
 })
 
 export async function GET(request: NextRequest) {
@@ -372,6 +374,8 @@ export async function GET(request: NextRequest) {
         canManageNews: true,
         formsEnabled: true,
         canManageForms: true,
+        credentialsEnabled: true,
+        canManageCredentials: true,
         isSuperAdmin: true,
         createdAt: true,
         lastLogin: true,

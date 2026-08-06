@@ -9,10 +9,12 @@ interface UserModules {
   patrols: boolean
   news: boolean
   forms: boolean
+  credentials: boolean
   canRequestAssets: boolean
   canManageInventory: boolean
   canManageNews: boolean
   canManageForms: boolean
+  canManageCredentials: boolean
   families: Array<{
     id: string
     name: string
@@ -24,6 +26,7 @@ interface UserModules {
       patrols: boolean
       news: boolean
       forms: boolean
+      credentials: boolean
     }
   }>
 }
@@ -34,10 +37,12 @@ const DEFAULT: UserModules = {
   patrols: false,
   news: false,
   forms: false,
+  credentials: false,
   canRequestAssets: false,
   canManageInventory: false,
   canManageNews: false,
   canManageForms: false,
+  canManageCredentials: false,
   families: [],
 }
 

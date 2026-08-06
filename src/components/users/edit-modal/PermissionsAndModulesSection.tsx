@@ -39,6 +39,8 @@ interface PermissionsAndModulesSectionProps {
     canManageNews: boolean
     formsEnabled: boolean
     canManageForms: boolean
+    credentialsEnabled: boolean
+    canManageCredentials: boolean
     canManageInventory: boolean
     canRequestAssets: boolean
   }
@@ -51,16 +53,19 @@ interface PermissionsAndModulesSectionProps {
   ticketFamilies: FamilyOption[]
   inventoryFamilies: FamilyOption[]
   patrolFamilies: FamilyOption[]
+  credentialsFamilies: FamilyOption[]
   technicianFamilyIds: string[]
   clientFamilyIds: string[]
   inventoryFamilyIds: string[]
   patrolFamilyIds: string[]
+  credentialsFamilyIds: string[]
   adminFamilyIds: string[]
   /** Áreas adicionales del módulo unificado `content` (docs + noticias) */
   contentFamilyIds: string[]
   ticketReadOnlyIds: string[]
   inventoryReadOnlyIds: string[]
   patrolReadOnlyIds: string[]
+  credentialsReadOnlyIds: string[]
   adminScopeReadOnlyIds: string[]
   onToggle: (
     field:
@@ -73,6 +78,8 @@ interface PermissionsAndModulesSectionProps {
       | 'canManageNews'
       | 'formsEnabled'
       | 'canManageForms'
+      | 'credentialsEnabled'
+      | 'canManageCredentials'
       | 'canManageInventory'
       | 'canRequestAssets',
     value: boolean
@@ -86,6 +93,8 @@ interface PermissionsAndModulesSectionProps {
     handleUnassignInventoryFamily: (id: string) => Promise<any>
     handleAssignPatrolFamily: (id: string) => Promise<any>
     handleUnassignPatrolFamily: (id: string) => Promise<any>
+    handleAssignCredentialsFamily: (id: string) => Promise<any>
+    handleUnassignCredentialsFamily: (id: string) => Promise<any>
     handleAssignAdminFamily: (id: string) => Promise<any>
     handleUnassignAdminFamily: (id: string) => Promise<any>
     handleAssignContentFamily: (id: string) => Promise<any>
@@ -104,15 +113,18 @@ export function PermissionsAndModulesSection({
   ticketFamilies,
   inventoryFamilies,
   patrolFamilies,
+  credentialsFamilies,
   technicianFamilyIds,
   clientFamilyIds,
   inventoryFamilyIds,
   patrolFamilyIds,
+  credentialsFamilyIds,
   adminFamilyIds,
   contentFamilyIds,
   ticketReadOnlyIds,
   inventoryReadOnlyIds,
   patrolReadOnlyIds,
+  credentialsReadOnlyIds,
   adminScopeReadOnlyIds,
   onToggle,
   handlers,
@@ -121,11 +133,17 @@ export function PermissionsAndModulesSection({
 
   const familyLookup = useMemo(() => {
     const map = new Map<string, FamilyOption>()
-    for (const f of [...allFamilies, ...ticketFamilies, ...inventoryFamilies, ...patrolFamilies]) {
+    for (const f of [
+      ...allFamilies,
+      ...ticketFamilies,
+      ...inventoryFamilies,
+      ...patrolFamilies,
+      ...credentialsFamilies,
+    ]) {
       if (f?.id) map.set(f.id, f)
     }
     return Array.from(map.values())
-  }, [allFamilies, ticketFamilies, inventoryFamilies, patrolFamilies])
+  }, [allFamilies, ticketFamilies, inventoryFamilies, patrolFamilies, credentialsFamilies])
 
   // Familia nativa: depto del formulario (si cambia) o el del usuario cargado.
   // familyId plano O family.id; TECHNOLOGY legacy → ADMINISTRATIVE.
@@ -292,6 +310,32 @@ export function PermissionsAndModulesSection({
               disabled={loading}
             />
 
+            {/* ── Credenciales ── */}
+            <ModuleAccessCard
+              moduleKey='credentials'
+              moduleName='Credenciales'
+              role={formData.role}
+              enabled={formData.credentialsEnabled || formData.canManageCredentials}
+              onToggle={v => onToggle('credentialsEnabled', v)}
+              families={credentialsFamilies}
+              assignedFamilyIds={credentialsFamilyIds}
+              nativeFamilyId={nativeFamilyId}
+              nativeFamily={nativeFamilyForCards}
+              readOnlyFamilyIds={credentialsReadOnlyIds}
+              onAssignFamily={handlers.handleAssignCredentialsFamily}
+              onUnassignFamily={handlers.handleUnassignCredentialsFamily}
+              options={
+                formData.role !== 'CLIENT'
+                  ? {
+                      canManageCredentials: formData.canManageCredentials,
+                      onToggleManageCredentials: v => onToggle('canManageCredentials', v),
+                    }
+                  : undefined
+              }
+              loading={loadingFamilies}
+              disabled={loading}
+            />
+
             {/* ── Noticias ── */}
             {/* Áreas: módulo unificado `content` (compartido con Documentos). */}
             <ModuleAccessCard
@@ -362,6 +406,8 @@ export function PermissionsAndModulesSection({
           canManageNews={formData.canManageNews}
           formsEnabled={formData.formsEnabled}
           canManageForms={formData.canManageForms}
+          credentialsEnabled={formData.credentialsEnabled}
+          canManageCredentials={formData.canManageCredentials}
           defaultCollapsed
         />
       )}
@@ -379,6 +425,8 @@ export function PermissionsAndModulesSection({
           canManageNews={true}
           formsEnabled={true}
           canManageForms={true}
+          credentialsEnabled={true}
+          canManageCredentials={true}
           defaultCollapsed
         />
       )}

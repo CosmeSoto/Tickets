@@ -20,15 +20,18 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
   const [ticketFamilies, setTicketFamilies] = useState<FamilyOption[]>([])
   const [inventoryFamilies, setInventoryFamilies] = useState<FamilyOption[]>([])
   const [patrolFamilies, setPatrolFamilies] = useState<FamilyOption[]>([])
+  const [credentialsFamilies, setCredentialsFamilies] = useState<FamilyOption[]>([])
   const [adminTicketScopeIds, setAdminTicketScopeIds] = useState<string[]>([])
   const [adminInventoryScopeIds, setAdminInventoryScopeIds] = useState<string[]>([])
   const [adminPatrolScopeIds, setAdminPatrolScopeIds] = useState<string[]>([])
+  const [adminCredentialsScopeIds, setAdminCredentialsScopeIds] = useState<string[]>([])
   const [loadingFamilies, setLoadingFamilies] = useState(false)
   const [familyError, setFamilyError] = useState<string | null>(null)
   const [technicianFamilyIds, setTechnicianFamilyIds] = useState<string[]>([])
   const [clientFamilyIds, setClientFamilyIds] = useState<string[]>([])
   const [inventoryFamilyIds, setInventoryFamilyIds] = useState<string[]>([])
   const [patrolFamilyIds, setPatrolFamilyIds] = useState<string[]>([])
+  const [credentialsFamilyIds, setCredentialsFamilyIds] = useState<string[]>([])
   const [adminFamilyIds, setAdminFamilyIds] = useState<string[]>([])
   const [contentFamilyIds, setContentFamilyIds] = useState<string[]>([])
   const [adminScopeIds, setAdminScopeIds] = useState<string[]>([])
@@ -65,8 +68,18 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
     return allFamilies.map(f => f.id).filter(id => !adminPatrolScopeIds.includes(id))
   })()
 
+  const credentialsReadOnlyIds = (() => {
+    if (!viewerIsAdminNormal || adminCredentialsScopeIds.length === 0) return []
+    return allFamilies.map(f => f.id).filter(id => !adminCredentialsScopeIds.includes(id))
+  })()
+
   const adminScopeReadOnlyIds = [
-    ...new Set([...ticketReadOnlyIds, ...inventoryReadOnlyIds, ...patrolReadOnlyIds]),
+    ...new Set([
+      ...ticketReadOnlyIds,
+      ...inventoryReadOnlyIds,
+      ...patrolReadOnlyIds,
+      ...credentialsReadOnlyIds,
+    ]),
   ]
 
   const showApiError = (title: string, result: any, fallback?: string) => {
@@ -265,6 +278,43 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
     }
   }
 
+  const handleAssignCredentialsFamily = async (familyId: string) => {
+    if (!user) return
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}/family-access`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ module: 'credentials', familyId }),
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error ?? 'Error al asignar familia')
+      }
+      setCredentialsFamilyIds(prev => (prev.includes(familyId) ? prev : [...prev, familyId]))
+      invalidateModulesCache()
+    } catch (err) {
+      showNetworkError(err)
+    }
+  }
+
+  const handleUnassignCredentialsFamily = async (familyId: string) => {
+    if (!user) return
+    try {
+      const res = await fetch(
+        `/api/admin/users/${user.id}/family-access?module=credentials&familyId=${familyId}`,
+        { method: 'DELETE' }
+      )
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error ?? 'Error al desasignar familia')
+      }
+      setCredentialsFamilyIds(prev => prev.filter(id => id !== familyId))
+      invalidateModulesCache()
+    } catch (err) {
+      showNetworkError(err)
+    }
+  }
+
   const handleAssignAdminFamily = async (familyId: string) => {
     if (!user) return
     try {
@@ -353,12 +403,14 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
         // no filtre por el scope del admin viewer (que podría no tener asignaciones propias).
         // El filtro de módulo habilitado (inventoryEnabled/patrolsEnabled) sí se aplica.
         // Los fetches sin scope=all se usan para calcular el scope del viewer (readOnly locks).
-        const [ticketModuleRes, inventoryModuleRes, patrolModuleRes, allRes] = await Promise.all([
-          fetch('/api/families?includeInactive=false&module=tickets'),
-          fetch('/api/families?includeInactive=false&module=inventory&scope=all'),
-          fetch('/api/families?includeInactive=false&module=patrols&scope=all'),
-          fetch('/api/families?includeInactive=false&scope=all'),
-        ])
+        const [ticketModuleRes, inventoryModuleRes, patrolModuleRes, credentialsModuleRes, allRes] =
+          await Promise.all([
+            fetch('/api/families?includeInactive=false&module=tickets'),
+            fetch('/api/families?includeInactive=false&module=inventory&scope=all'),
+            fetch('/api/families?includeInactive=false&module=patrols&scope=all'),
+            fetch('/api/families?includeInactive=false&module=credentials&scope=all'),
+            fetch('/api/families?includeInactive=false&scope=all'),
+          ])
 
         const parseFamilies = async (res: Response) => {
           if (!res.ok) return [] as FamilyOption[]
@@ -369,6 +421,7 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
         const tModuleFamilies = await parseFamilies(ticketModuleRes)
         const iModuleFamilies = await parseFamilies(inventoryModuleRes)
         const pModuleFamilies = await parseFamilies(patrolModuleRes)
+        const cModuleFamilies = await parseFamilies(credentialsModuleRes)
         const allActiveFamilies = await parseFamilies(allRes)
 
         setAllFamilies(allActiveFamilies)
@@ -382,6 +435,7 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
             ...tModuleFamilies,
             ...iModuleFamilies,
             ...pModuleFamilies,
+            ...cModuleFamilies,
           ],
         })
         const userNativeFamilyId = resolvedNative?.id ?? null
@@ -410,6 +464,7 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
           setTicketFamilies(ensureNativeFamily(tModuleFamilies))
           setInventoryFamilies(ensureNativeFamily(iModuleFamilies))
           setPatrolFamilies(ensureNativeFamily(pModuleFamilies))
+          setCredentialsFamilies(ensureNativeFamily(cModuleFamilies))
         } else {
           // Para Admin Normal: las listas de inventario y patrullas ya vienen sin filtro
           // de scope (scope=all), por lo que las usamos directamente asegurando que la
@@ -423,19 +478,23 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
           setTicketFamilies(ensureNativeFamily(viewerTicketFamilies))
           setInventoryFamilies(ensureNativeFamily(iModuleFamilies))
           setPatrolFamilies(ensureNativeFamily(pModuleFamilies))
+          setCredentialsFamilies(ensureNativeFamily(cModuleFamilies))
 
           // Para los readOnly locks necesitamos el scope real del viewer (sin scope=all).
           // Hacemos fetches adicionales sin scope=all para obtener solo lo que el viewer puede asignar.
-          const [viewerInvRes, viewerPatrolRes] = await Promise.all([
+          const [viewerInvRes, viewerPatrolRes, viewerCredentialsRes] = await Promise.all([
             fetch('/api/families?includeInactive=false&module=inventory'),
             fetch('/api/families?includeInactive=false&module=patrols'),
+            fetch('/api/families?includeInactive=false&module=credentials'),
           ])
           const viewerInvFamilies = await parseFamilies(viewerInvRes)
           const viewerPatrolFamilies = await parseFamilies(viewerPatrolRes)
+          const viewerCredentialsFamilies = await parseFamilies(viewerCredentialsRes)
 
           setAdminTicketScopeIds(tModuleFamilies.map(f => f.id))
           setAdminInventoryScopeIds(viewerInvFamilies.map(f => f.id))
           setAdminPatrolScopeIds(viewerPatrolFamilies.map(f => f.id))
+          setAdminCredentialsScopeIds(viewerCredentialsFamilies.map(f => f.id))
           setAdminScopeIds(tModuleFamilies.map(f => f.id))
         }
 
@@ -463,6 +522,7 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
 
           setInventoryFamilyIds(byModule('inventory'))
           setPatrolFamilyIds(byModule('patrols'))
+          setCredentialsFamilyIds(byModule('credentials'))
           setContentFamilyIds(byModule('content'))
         } else {
           // Fallback legacy si la API unificada aún no está disponible
@@ -522,10 +582,12 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
     ticketFamilies,
     inventoryFamilies,
     patrolFamilies,
+    credentialsFamilies,
     technicianFamilyIds,
     clientFamilyIds,
     inventoryFamilyIds,
     patrolFamilyIds,
+    credentialsFamilyIds,
     adminFamilyIds,
     contentFamilyIds,
     adminScopeIds,
@@ -538,6 +600,7 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
     ticketReadOnlyIds,
     inventoryReadOnlyIds,
     patrolReadOnlyIds,
+    credentialsReadOnlyIds,
     adminScopeReadOnlyIds,
 
     // Handlers
@@ -550,6 +613,8 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
     handleUnassignInventoryFamily,
     handleAssignPatrolFamily,
     handleUnassignPatrolFamily,
+    handleAssignCredentialsFamily,
+    handleUnassignCredentialsFamily,
     handleAssignAdminFamily,
     handleUnassignAdminFamily,
     handleAssignContentFamily,

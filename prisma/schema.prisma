@@ -485,6 +485,8 @@ model users {
   canManageNews                                     Boolean                         @default(false) @map("can_manage_news")
   formsEnabled                                      Boolean                         @default(false) @map("forms_enabled")
   canManageForms                                    Boolean                         @default(false) @map("can_manage_forms")
+  credentialsEnabled                                Boolean                         @default(false) @map("credentials_enabled")
+  canManageCredentials                              Boolean                         @default(false) @map("can_manage_credentials")
   lastLogin                                         DateTime?
   passwordChangedAt                                 DateTime?                       @map("password_changed_at")
   oauthProvider                                     String?
@@ -571,6 +573,10 @@ model users {
   contractAssignmentsDelivered                      contract_assignments[]          @relation("ContractAssignmentDeliverer")
   inventorySavedReports                             inventory_saved_reports[]       @relation("InventorySavedReportOwner")
   inventoryScheduledReports                       inventory_scheduled_reports[]   @relation("InventoryScheduledReportOwner")
+  credentialVaultsOwned                           credential_vaults[]             @relation("CredentialVaultOwner")
+  credentialEntriesCreated                        credential_entries[]            @relation("CredentialEntryCreator")
+  credentialEntriesUpdated                        credential_entries[]            @relation("CredentialEntryUpdater")
+  credentialShares                                credential_shares[]
 
   @@index([departmentId])
   @@index([name, email])
@@ -1115,6 +1121,7 @@ model equipment {
   contractLines         contract_lines[]          @relation("ContractLineEquipment")
   sale                  equipment_sales?
   customValues          equipment_custom_values[]
+  credentialEntries     credential_entries[]
 
   @@index([code])
   @@index([serialNumber])
@@ -1357,6 +1364,7 @@ model software_licenses {
   supplier              suppliers?              @relation(fields: [supplierId], references: [id])
   licenseType           license_types           @relation(fields: [typeId], references: [id])
   contractLines         contract_lines[]        @relation("ContractLineLicense")
+  credentialEntries     credential_entries[]
 
   @@index([typeId, expirationDate])
   @@index([assignedToEquipment])
@@ -1694,6 +1702,8 @@ model families {
   forms                       forms[]
   form_families               form_families[]
   inventorySavedReports       inventory_saved_reports[]
+  credentialVaults            credential_vaults[]
+  credentialShares            credential_shares[]
 
   @@index([isActive, order])
   @@map("families")
@@ -3317,4 +3327,87 @@ model push_subscriptions {
 
   @@index([userId])
   @@map("push_subscriptions")
+}
+
+// ============================================
+// CREDENTIALS / VAULT
+// ============================================
+
+enum CredentialVaultKind {
+  AREA
+  PERSONAL
+}
+
+enum CredentialShareCapability {
+  VIEW
+  USE
+  EDIT
+  ADMIN
+}
+
+model credential_vaults {
+  id          String              @id @default(uuid())
+  familyId    String?             @map("family_id")
+  name        String
+  description String?
+  ownerUserId String?             @map("owner_user_id")
+  kind        CredentialVaultKind @default(AREA)
+  isActive    Boolean             @default(true) @map("is_active")
+  createdAt   DateTime            @default(now()) @map("created_at")
+  updatedAt   DateTime            @updatedAt @map("updated_at")
+
+  family  families?            @relation(fields: [familyId], references: [id], onDelete: SetNull)
+  owner   users?               @relation("CredentialVaultOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  entries credential_entries[]
+
+  @@index([familyId, isActive])
+  @@index([ownerUserId])
+  @@map("credential_vaults")
+}
+
+model credential_entries {
+  id              String    @id @default(uuid())
+  vaultId         String    @map("vault_id")
+  title           String
+  username        String?
+  secretEncrypted String    @map("secret_encrypted")
+  url             String?
+  notes           String?
+  entryType       String    @default("GENERIC") @map("entry_type")
+  equipmentId     String?   @map("equipment_id")
+  licenseId       String?   @map("license_id")
+  createdById     String    @map("created_by_id")
+  updatedById     String?   @map("updated_by_id")
+  lastRevealedAt  DateTime? @map("last_revealed_at")
+  isActive        Boolean   @default(true) @map("is_active")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  vault     credential_vaults  @relation(fields: [vaultId], references: [id], onDelete: Cascade)
+  equipment equipment?         @relation(fields: [equipmentId], references: [id], onDelete: SetNull)
+  license   software_licenses? @relation(fields: [licenseId], references: [id], onDelete: SetNull)
+  createdBy users              @relation("CredentialEntryCreator", fields: [createdById], references: [id])
+  updatedBy users?             @relation("CredentialEntryUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+  shares    credential_shares[]
+
+  @@index([vaultId, isActive])
+  @@index([equipmentId])
+  @@index([licenseId])
+  @@map("credential_entries")
+}
+
+model credential_shares {
+  id         String                    @id @default(uuid())
+  entryId    String                    @map("entry_id")
+  userId     String?                   @map("user_id")
+  familyId   String?                   @map("family_id")
+  capability CredentialShareCapability @default(VIEW)
+  createdAt  DateTime                  @default(now()) @map("created_at")
+
+  entry  credential_entries @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  user   users?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  family families?          @relation(fields: [familyId], references: [id], onDelete: SetNull)
+
+  @@index([entryId])
+  @@map("credential_shares")
 }
