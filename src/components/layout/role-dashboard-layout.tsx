@@ -904,7 +904,7 @@ export function RoleDashboardLayout({
                 <div className='min-w-0 flex-1 space-y-1'>
                   <DashboardBreadcrumbs items={headerBreadcrumbs} className='hidden sm:flex' />
                   {title && (
-                    <h1 className='text-base sm:text-xl font-bold text-foreground truncate leading-tight'>
+                    <h1 className='text-sm sm:text-xl font-bold text-foreground line-clamp-2 leading-tight'>
                       {title}
                     </h1>
                   )}

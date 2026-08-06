@@ -216,12 +216,12 @@ export default function ClientDashboard() {
         <div className='lg:col-span-2'>
           <Card>
             <CardHeader>
-              <CardTitle className='flex items-center justify-between'>
-                <div className='flex items-center'>
-                  <Zap className='h-5 w-5 mr-2 text-primary' />
-                  Acceso Rápido
+              <CardTitle className='flex items-center justify-between gap-2 flex-wrap sm:flex-nowrap'>
+                <div className='flex items-center min-w-0'>
+                  <Zap className='h-5 w-5 mr-2 flex-shrink-0 text-primary' />
+                  <span className='truncate'>Acceso Rápido</span>
                 </div>
-                <Badge variant='outline' className='text-xs'>
+                <Badge variant='outline' className='text-xs flex-shrink-0'>
                   Servicios Disponibles
                 </Badge>
               </CardTitle>
