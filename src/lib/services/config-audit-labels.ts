@@ -50,6 +50,7 @@ export const PATROL_FAMILY_CONFIG_LABELS: Record<string, string> = {
   photoMaxWidthPx: 'Ancho máx. foto (px)',
   requirePhotoOnStart: 'Foto obligatoria al iniciar',
   requirePhotoOnEnd: 'Foto obligatoria al finalizar',
+  autoCompleteWhenAllRequired: 'Cerrar al completar puntos obligatorios',
   offlineSyncToleranceMinutes: 'Tolerancia sync offline (min)',
   alertCompletionThreshold: 'Umbral completitud alertas',
   gracePeriodMinutes: 'Período de gracia (min)',

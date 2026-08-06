@@ -4,7 +4,7 @@ import { DEFAULT_TIMEZONE } from '@/lib/constants'
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { Shield, Clock, CalendarDays, History, Loader2 } from 'lucide-react'
+import { Shield, Clock, CalendarDays, History, Loader2, List } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
@@ -12,6 +12,7 @@ import { DataTable } from '@/components/ui/data-table'
 import { ExportButton } from '@/components/common/export-button'
 import { PatrolStatusBadge } from '@/components/patrol/patrol-status-badge'
 import { PatrolProgress } from '@/components/patrol/patrol-progress'
+import { AgentPatrolAgenda } from '@/components/patrols/agent-patrol-agenda'
 import { formatDurationMinutes } from '@/lib/utils/patrol-utils'
 import { useExport } from '@/hooks/common/use-export'
 import type { Column } from '@/components/ui/data-table'
@@ -38,6 +39,7 @@ interface Pagination {
 }
 
 type TimeBucket = 'today' | 'upcoming' | 'history'
+type PageView = 'list' | 'calendar'
 
 const STATUS_LABELS: Record<string, string> = {
   PENDING: 'Pendiente',
@@ -105,6 +107,7 @@ export default function PatrolListPage() {
   const [page, setPage] = useState(1)
   const [bucket, setBucket] = useState<TimeBucket>('today')
   const [counts, setCounts] = useState({ today: 0, upcoming: 0, history: 0 })
+  const [pageView, setPageView] = useState<PageView>('list')
 
   useEffect(() => {
     if (status === 'loading') return
@@ -176,14 +179,14 @@ export default function PatrolListPage() {
   }, [])
 
   useEffect(() => {
-    if (!session) return
+    if (!session || pageView !== 'list') return
     void fetchPatrols(page, bucket)
-  }, [session, page, bucket, fetchPatrols])
+  }, [session, page, bucket, fetchPatrols, pageView])
 
   useEffect(() => {
-    if (!session) return
+    if (!session || pageView !== 'list') return
     void fetchCounts()
-  }, [session, fetchCounts])
+  }, [session, fetchCounts, pageView])
 
   const columns: Column<PatrolListItem>[] = useMemo(
     () => [
@@ -338,106 +341,140 @@ export default function PatrolListPage() {
   return (
     <ModuleLayout
       title='Mis Rondas'
-      subtitle='Hoy, próximas y lo ya cumplido'
-      loading={loading && patrols.length === 0 && !loadError}
-      error={loadError}
+      subtitle={
+        pageView === 'calendar' ? 'Calendario de tus patrullajes' : 'Hoy, próximas y lo ya cumplido'
+      }
+      loading={pageView === 'list' && loading && patrols.length === 0 && !loadError}
+      error={pageView === 'list' ? loadError : null}
       onRetry={() => fetchPatrols(page, bucket)}
-    >
-      <div className='grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4'>
-        {(Object.keys(bucketMeta) as TimeBucket[]).map(key => {
-          const meta = bucketMeta[key]
-          const Icon = meta.icon
-          const active = bucket === key
-          return (
-            <button
-              key={key}
-              type='button'
-              onClick={() => {
-                setBucket(key)
-                setPage(1)
-              }}
-              className={`text-left rounded-xl border p-3 transition-colors ${
-                active ? 'border-primary bg-primary/5 ring-1 ring-primary/30' : 'hover:bg-muted/40'
-              }`}
-            >
-              <div className='flex items-center justify-between gap-2'>
-                <span className='text-sm font-semibold flex items-center gap-1.5'>
-                  <Icon className='h-4 w-4' />
-                  {meta.label}
-                </span>
-                <span className='text-lg font-bold tabular-nums'>{counts[key]}</span>
-              </div>
-              <p className='text-xs text-muted-foreground mt-1'>{meta.hint}</p>
-            </button>
-          )
-        })}
-      </div>
-
-      <p className='text-xs text-muted-foreground mb-3'>{bucketMeta[bucket].hint}</p>
-
-      {loading && patrols.length === 0 ? (
-        <div className='flex justify-center py-12'>
-          <Loader2 className='h-6 w-6 animate-spin text-muted-foreground' />
+      headerActions={
+        <div className='flex items-center gap-1 rounded-lg border p-0.5'>
+          <Button
+            type='button'
+            size='sm'
+            variant={pageView === 'list' ? 'default' : 'ghost'}
+            className='h-8 gap-1.5'
+            onClick={() => setPageView('list')}
+          >
+            <List className='h-3.5 w-3.5' />
+            Lista
+          </Button>
+          <Button
+            type='button'
+            size='sm'
+            variant={pageView === 'calendar' ? 'default' : 'ghost'}
+            className='h-8 gap-1.5'
+            onClick={() => setPageView('calendar')}
+          >
+            <CalendarDays className='h-3.5 w-3.5' />
+            Calendario
+          </Button>
         </div>
+      }
+    >
+      {pageView === 'calendar' ? (
+        <AgentPatrolAgenda />
       ) : (
-        <DataTable
-          data={patrols}
-          columns={columns}
-          loading={loading}
-          searchable
-          searchPlaceholder='Buscar por ruta o área...'
-          onRowClick={patrol => router.push(`/patrol/${patrol.id}`)}
-          cardRenderer={cardRenderer}
-          actions={
-            <ExportButton
-              onExportCSV={exportCSV}
-              onExportExcel={exportExcel}
-              onExportPDF={exportPDF}
-              loading={exporting}
-            />
-          }
-          pagination={
-            pagination
-              ? {
-                  page,
-                  limit: pagination.limit,
-                  total: pagination.total,
-                  onPageChange: setPage,
-                  onLimitChange: () => {},
-                }
-              : undefined
-          }
-          onRefresh={() => {
-            void fetchPatrols(page, bucket)
-            void fetchCounts()
-          }}
-        />
-      )}
+        <>
+          <div className='grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4'>
+            {(Object.keys(bucketMeta) as TimeBucket[]).map(key => {
+              const meta = bucketMeta[key]
+              const Icon = meta.icon
+              const active = bucket === key
+              return (
+                <button
+                  key={key}
+                  type='button'
+                  onClick={() => {
+                    setBucket(key)
+                    setPage(1)
+                  }}
+                  className={`text-left rounded-xl border p-3 transition-colors ${
+                    active
+                      ? 'border-primary bg-primary/5 ring-1 ring-primary/30'
+                      : 'hover:bg-muted/40'
+                  }`}
+                >
+                  <div className='flex items-center justify-between gap-2'>
+                    <span className='text-sm font-semibold flex items-center gap-1.5'>
+                      <Icon className='h-4 w-4' />
+                      {meta.label}
+                    </span>
+                    <span className='text-lg font-bold tabular-nums'>{counts[key]}</span>
+                  </div>
+                  <p className='text-xs text-muted-foreground mt-1'>{meta.hint}</p>
+                </button>
+              )
+            })}
+          </div>
 
-      {!loading && patrols.length === 0 && !loadError && (
-        <Card className='mt-4'>
-          <CardContent className='flex flex-col items-center justify-center py-16 text-center'>
-            <Shield className='h-12 w-12 text-muted-foreground/30 mb-4' />
-            <p className='text-sm font-medium text-muted-foreground'>
-              No hay rondas en “{bucketMeta[bucket].label}”
-            </p>
-            <p className='text-xs text-muted-foreground mt-1'>{bucketMeta[bucket].hint}</p>
-            {bucket === 'today' && counts.upcoming > 0 && (
-              <Button
-                type='button'
-                variant='link'
-                size='sm'
-                className='mt-2'
-                onClick={() => {
-                  setBucket('upcoming')
-                  setPage(1)
-                }}
-              >
-                Ver {counts.upcoming} próximas →
-              </Button>
-            )}
-          </CardContent>
-        </Card>
+          <p className='text-xs text-muted-foreground mb-3'>{bucketMeta[bucket].hint}</p>
+
+          {loading && patrols.length === 0 ? (
+            <div className='flex justify-center py-12'>
+              <Loader2 className='h-6 w-6 animate-spin text-muted-foreground' />
+            </div>
+          ) : (
+            <DataTable
+              data={patrols}
+              columns={columns}
+              loading={loading}
+              searchable
+              searchPlaceholder='Buscar por ruta o área...'
+              onRowClick={patrol => router.push(`/patrol/${patrol.id}`)}
+              cardRenderer={cardRenderer}
+              actions={
+                <ExportButton
+                  onExportCSV={exportCSV}
+                  onExportExcel={exportExcel}
+                  onExportPDF={exportPDF}
+                  loading={exporting}
+                />
+              }
+              pagination={
+                pagination
+                  ? {
+                      page,
+                      limit: pagination.limit,
+                      total: pagination.total,
+                      onPageChange: setPage,
+                      onLimitChange: () => {},
+                    }
+                  : undefined
+              }
+              onRefresh={() => {
+                void fetchPatrols(page, bucket)
+                void fetchCounts()
+              }}
+            />
+          )}
+
+          {!loading && patrols.length === 0 && !loadError && (
+            <Card className='mt-4'>
+              <CardContent className='flex flex-col items-center justify-center py-16 text-center'>
+                <Shield className='h-12 w-12 text-muted-foreground/30 mb-4' />
+                <p className='text-sm font-medium text-muted-foreground'>
+                  No hay rondas en “{bucketMeta[bucket].label}”
+                </p>
+                <p className='text-xs text-muted-foreground mt-1'>{bucketMeta[bucket].hint}</p>
+                {bucket === 'today' && counts.upcoming > 0 && (
+                  <Button
+                    type='button'
+                    variant='link'
+                    size='sm'
+                    className='mt-2'
+                    onClick={() => {
+                      setBucket('upcoming')
+                      setPage(1)
+                    }}
+                  >
+                    Ver {counts.upcoming} próximas →
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </>
       )}
     </ModuleLayout>
   )

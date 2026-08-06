@@ -31,6 +31,7 @@ export interface PatrolFormState {
   photoMaxWidthPx: number
   requirePhotoOnStart: boolean
   requirePhotoOnEnd: boolean
+  autoCompleteWhenAllRequired: boolean
   offlineSyncToleranceMinutes: number
   alertCompletionThreshold: number
   gracePeriodMinutes: number
@@ -48,6 +49,7 @@ const DEFAULT_FORM: PatrolFormState = {
   photoMaxWidthPx: 1280,
   requirePhotoOnStart: false,
   requirePhotoOnEnd: false,
+  autoCompleteWhenAllRequired: true,
   offlineSyncToleranceMinutes: 30,
   alertCompletionThreshold: 80,
   gracePeriodMinutes: 5,
@@ -67,6 +69,8 @@ function buildForm(cfg: Record<string, any> | null): PatrolFormState {
     photoMaxWidthPx: cfg.photoMaxWidthPx ?? DEFAULT_FORM.photoMaxWidthPx,
     requirePhotoOnStart: cfg.requirePhotoOnStart ?? DEFAULT_FORM.requirePhotoOnStart,
     requirePhotoOnEnd: cfg.requirePhotoOnEnd ?? DEFAULT_FORM.requirePhotoOnEnd,
+    autoCompleteWhenAllRequired:
+      cfg.autoCompleteWhenAllRequired ?? DEFAULT_FORM.autoCompleteWhenAllRequired,
     offlineSyncToleranceMinutes:
       cfg.offlineSyncToleranceMinutes ?? DEFAULT_FORM.offlineSyncToleranceMinutes,
     alertCompletionThreshold: cfg.alertCompletionThreshold ?? DEFAULT_FORM.alertCompletionThreshold,

@@ -2715,6 +2715,8 @@ model patrol_family_config {
   photoMaxWidthPx             Int      @default(1280) @map("photo_max_width_px")
   requirePhotoOnStart         Boolean  @default(false) @map("require_photo_on_start")
   requirePhotoOnEnd           Boolean  @default(false) @map("require_photo_on_end")
+  /// Al registrar el último checkpoint obligatorio, cerrar la ronda como COMPLETED (si no exige foto de cierre).
+  autoCompleteWhenAllRequired Boolean  @default(true) @map("auto_complete_when_all_required")
   offlineSyncToleranceMinutes Int      @default(30) @map("offline_sync_tolerance_minutes")
   alertCompletionThreshold    Int      @default(80) @map("alert_completion_threshold")
   gracePeriodMinutes          Int      @default(5) @map("grace_period_minutes")

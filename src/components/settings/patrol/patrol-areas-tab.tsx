@@ -338,6 +338,28 @@ export function PatrolAreasTab({
                     />
                   </div>
                 </div>
+                <Separator />
+                <div className='flex items-start justify-between gap-4 p-3 rounded-lg border bg-muted/30'>
+                  <div className='space-y-1 flex-1'>
+                    <Label className='text-xs font-medium'>Cerrar al completar obligatorios</Label>
+                    <p className='text-xs text-muted-foreground'>
+                      Al validar el último checkpoint obligatorio, la ronda pasa a Completada
+                      automáticamente. Si exiges foto al finalizar, el agente debe pulsar Finalizar.
+                    </p>
+                    {form.requirePhotoOnEnd && form.autoCompleteWhenAllRequired && (
+                      <p className='text-xs text-amber-600 dark:text-amber-400 font-medium'>
+                        Foto al finalizar activa — el auto-cierre quedará en pausa hasta que el
+                        agente finalice con foto.
+                      </p>
+                    )}
+                  </div>
+                  <Switch
+                    checked={form.autoCompleteWhenAllRequired}
+                    onCheckedChange={v => onSetField('autoCompleteWhenAllRequired', v)}
+                    disabled={saving}
+                    aria-label='Cerrar ronda al completar checkpoints obligatorios'
+                  />
+                </div>
               </CardContent>
             </Card>
 
@@ -420,8 +442,8 @@ export function PatrolAreasTab({
                       className='h-8 text-sm'
                     />
                     <p className='text-xs text-muted-foreground'>
-                      Tiempo antes de marcar una ronda como OMITIDA y permitir iniciar
-                      anticipadamente
+                      Ventana de inicio/escaneo (inicio − gracia … fin + gracia) y cierre automático
+                      por vencimiento si la ronda sigue En Progreso
                     </p>
                   </div>
                   <div className='space-y-1.5'>

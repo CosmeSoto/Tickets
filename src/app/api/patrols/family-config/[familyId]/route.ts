@@ -116,6 +116,7 @@ export async function PUT(
       'photoMaxWidthPx',
       'requirePhotoOnStart',
       'requirePhotoOnEnd',
+      'autoCompleteWhenAllRequired',
       'offlineSyncToleranceMinutes',
       'alertCompletionThreshold',
       'gracePeriodMinutes',

@@ -248,6 +248,10 @@ export function getActionLabel(action: string): string {
     // Patrullas - Patrullas
     PATROL_CREATED: 'Patrulla Creada',
     PATROL_STARTED: 'Patrulla Iniciada',
+    PATROL_ENDED: 'Patrulla Finalizada',
+    PATROL_AUTO_COMPLETED: 'Patrulla Auto-completada',
+    PATROL_FORCE_CLOSED: 'Patrulla Cerrada por Supervisor',
+    PATROL_AUTO_INVALIDATED: 'Patrulla Invalidada (skips)',
     PATROL_COMPLETED: 'Patrulla Completada',
     PATROL_MISSED: 'Patrulla Omitida',
     PATROL_INCOMPLETE: 'Patrulla Incompleta',

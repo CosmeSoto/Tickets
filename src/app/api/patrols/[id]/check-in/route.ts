@@ -14,6 +14,7 @@ import { PatrolQRService } from '@/lib/services/patrol-qr.service'
 import { PatrolGeofenceService } from '@/lib/services/patrol-geofence.service'
 import { PatrolPhotoService } from '@/lib/services/patrol-photo.service'
 import { calculateCompletionPercentage } from '@/lib/patrol/patrol-completion'
+import { allRequiredCheckpointsVisited, applyPatrolClose } from '@/lib/patrol/patrol-finalize'
 import { PATROL_FAMILY_DEFAULTS } from '@/lib/patrol/patrol-family-config'
 import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
 
@@ -115,6 +116,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           alertCompletionThreshold: true,
           gracePeriodMinutes: true,
           strictTimeValidation: true,
+          autoCompleteWhenAllRequired: true,
+          requirePhotoOnEnd: true,
         },
       }),
       patrol.scheduleId
@@ -460,11 +463,47 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       requiredCheckpoints.length
     )
 
-    // Actualizar completionPercentage en la patrulla
-    await prisma.patrols.update({
-      where: { id: patrolId },
-      data: { completionPercentage },
-    })
+    const allRequiredDone = allRequiredCheckpointsVisited(
+      requiredCheckpoints.length,
+      visitedRequired
+    )
+    const autoCompleteEnabled =
+      familyConfig?.autoCompleteWhenAllRequired ??
+      PATROL_FAMILY_DEFAULTS.autoCompleteWhenAllRequired
+    const requirePhotoOnEnd =
+      familyConfig?.requirePhotoOnEnd ?? PATROL_FAMILY_DEFAULTS.requirePhotoOnEnd
+    // Auto-cierre solo si no hay skip pendiente y no se exige foto de cierre
+    const canAutoComplete =
+      autoCompleteEnabled && allRequiredDone && !requirePhotoOnEnd && skippedRequired.length === 0
+
+    let patrolStatus: string = patrol.status
+    if (canAutoComplete) {
+      await applyPatrolClose(patrolId, {
+        status: 'COMPLETED',
+        completionPercentage,
+        missedCheckpointIds: [],
+        visitedRequired,
+        totalRequired: requiredCheckpoints.length,
+      })
+      patrolStatus = 'COMPLETED'
+      await AuditServiceComplete.log({
+        action: 'PATROL_AUTO_COMPLETED',
+        entityType: 'patrol',
+        entityId: patrolId,
+        userId: session.user.id,
+        details: {
+          checkpointId: data.checkpointId,
+          completionPercentage,
+          reason: 'ALL_REQUIRED_VISITED',
+        },
+        request,
+      })
+    } else {
+      await prisma.patrols.update({
+        where: { id: patrolId },
+        data: { completionPercentage },
+      })
+    }
 
     // Siguiente checkpoint no visitado
     const nextCheckpoint = patrol.route.routeCheckpoints.find(
@@ -476,7 +515,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       entityType: 'patrol',
       entityId: patrolId,
       userId: session.user.id,
-      details: { checkpointId: data.checkpointId, completionPercentage },
+      details: { checkpointId: data.checkpointId, completionPercentage, patrolStatus },
       request,
     })
 
@@ -485,7 +524,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       checkInId: checkIn.id,
       validationResult: 'VALID',
       completionPercentage,
-      patrolStatus: patrol.status,
+      patrolStatus,
+      autoCompleted: canAutoComplete,
+      readyToFinish: allRequiredDone && patrolStatus === 'IN_PROGRESS',
       nextCheckpoint: nextCheckpoint
         ? {
             id: nextCheckpoint.checkpoint.id,

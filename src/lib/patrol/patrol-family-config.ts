@@ -16,6 +16,7 @@ export const PATROL_FAMILY_DEFAULTS = {
   photoMaxWidthPx: 1280,
   requirePhotoOnStart: false,
   requirePhotoOnEnd: false,
+  autoCompleteWhenAllRequired: true,
   offlineSyncToleranceMinutes: 30,
   alertCompletionThreshold: 80,
   gracePeriodMinutes: 5,

@@ -5,6 +5,7 @@
  * Botones de acción principal durante la ejecución de una ronda:
  * - Estado PENDING: botón Iniciar
  * - Estado IN_PROGRESS: Escanear QR + Finalizar (con indicador de bloqueo)
+ * - Progreso 100%: CTA destacado para finalizar
  */
 
 import { Play, CheckCircle2, QrCode, Loader2, AlertTriangle, ClipboardList } from 'lucide-react'
@@ -20,6 +21,8 @@ interface PatrolActionButtonsProps {
   canFinish: boolean
   requiresIncidentForSkip: boolean
   hasCheckIns: boolean
+  /** Todos los obligatorios visitados — resaltar Finalizar */
+  readyToFinish?: boolean
   /** Bloqueo por ventana horaria (fuera del turno programado) */
   startBlockedReason?: string | null
   onStart: () => void
@@ -37,6 +40,7 @@ export function PatrolActionButtons({
   canFinish,
   requiresIncidentForSkip,
   hasCheckIns,
+  readyToFinish = false,
   startBlockedReason = null,
   onStart,
   onToggleScanner,
@@ -74,9 +78,32 @@ export function PatrolActionButtons({
         </div>
       )}
 
-      {/* ── Escanear QR + Finalizar ── */}
+      {/* ── CTA cuando ya visitó todos los obligatorios ── */}
+      {isInProgress && readyToFinish && (
+        <div className='rounded-lg border border-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 dark:border-emerald-800 p-3 space-y-2'>
+          <p className='text-sm text-emerald-900 dark:text-emerald-100 font-medium'>
+            Completaste todos los puntos obligatorios. Cierra la ronda para registrar el
+            cumplimiento.
+          </p>
+          <Button
+            className='w-full h-12 text-base bg-emerald-600 hover:bg-emerald-700'
+            onClick={onEnd}
+            disabled={endingPatrol || !canFinish}
+            title={!canFinish ? 'Reporta una novedad por el checkpoint saltado primero' : undefined}
+          >
+            {endingPatrol ? (
+              <Loader2 className='h-5 w-5 mr-2 animate-spin' />
+            ) : (
+              <CheckCircle2 className='h-5 w-5 mr-2' />
+            )}
+            Finalizar ronda
+          </Button>
+        </div>
+      )}
+
+      {/* ── Escanear QR (+ Finalizar si aún no está listo al 100%) ── */}
       {isInProgress && (
-        <div className='grid grid-cols-2 gap-3'>
+        <div className={readyToFinish ? 'grid grid-cols-1 gap-3' : 'grid grid-cols-2 gap-3'}>
           <Button
             className='h-12'
             onClick={onToggleScanner}
@@ -91,23 +118,27 @@ export function PatrolActionButtons({
             {scannerActive ? 'Cerrar' : 'Escanear QR'}
           </Button>
 
-          <Button
-            variant='outline'
-            className='h-12 relative'
-            onClick={onEnd}
-            disabled={endingPatrol}
-            title={!canFinish ? 'Reporta una novedad por el checkpoint saltado primero' : undefined}
-          >
-            {endingPatrol ? (
-              <Loader2 className='h-5 w-5 mr-2 animate-spin' />
-            ) : (
-              <CheckCircle2 className='h-5 w-5 mr-2' />
-            )}
-            Finalizar
-            {!canFinish && (
-              <AlertTriangle className='h-3.5 w-3.5 text-orange-500 absolute top-1.5 right-1.5' />
-            )}
-          </Button>
+          {!readyToFinish && (
+            <Button
+              variant='outline'
+              className='h-12 relative'
+              onClick={onEnd}
+              disabled={endingPatrol}
+              title={
+                !canFinish ? 'Reporta una novedad por el checkpoint saltado primero' : undefined
+              }
+            >
+              {endingPatrol ? (
+                <Loader2 className='h-5 w-5 mr-2 animate-spin' />
+              ) : (
+                <CheckCircle2 className='h-5 w-5 mr-2' />
+              )}
+              Finalizar
+              {!canFinish && (
+                <AlertTriangle className='h-3.5 w-3.5 text-orange-500 absolute top-1.5 right-1.5' />
+              )}
+            </Button>
+          )}
         </div>
       )}
 

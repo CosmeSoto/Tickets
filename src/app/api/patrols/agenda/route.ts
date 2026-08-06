@@ -1,7 +1,9 @@
 /**
  * GET /api/patrols/agenda
  * Instancias de patrulla para agenda/calendario (from/to en ISO).
- * Devuelve eventos ligeros listos para pintar por día.
+ *
+ * - ADMIN / TECH supervisor: familias accesibles (+ filtros opcionales).
+ * - Agente (CLIENT o TECH/ADMIN con mine=1): solo sus propias rondas.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -9,7 +11,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import type { PatrolStatus } from '@prisma/client'
-import { checkPatrolModuleAccess } from '@/lib/patrol/patrol-helpers'
+import { checkPatrolAgentAccess, checkPatrolModuleAccess } from '@/lib/patrol/patrol-helpers'
 import { checkPatrolFamilyAccess, getPatrolAccessibleFamilyIds } from '@/lib/patrol/patrol-access'
 import { DEFAULT_TIMEZONE } from '@/lib/constants'
 
@@ -25,12 +27,9 @@ export async function GET(request: NextRequest) {
     const session = await getServerSession(authOptions)
     if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
-    if (!['ADMIN', 'TECHNICIAN'].includes(session.user.role)) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-    }
-
-    const denied = await checkPatrolModuleAccess(session.user.id, session.user.role)
-    if (denied) return denied
+    const role = session.user.role
+    const userId = session.user.id
+    const isSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
 
     const { searchParams } = new URL(request.url)
     const fromParam = searchParams.get('from')
@@ -38,6 +37,7 @@ export async function GET(request: NextRequest) {
     const familyIdParam = searchParams.get('familyId')
     const agentIdParam = searchParams.get('agentId')
     const statusParam = searchParams.get('status')
+    const mine = searchParams.get('mine') === '1'
 
     if (!fromParam || !toParam) {
       return NextResponse.json(
@@ -60,33 +60,41 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const isSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
-    const accessibleFamilyIds = await getPatrolAccessibleFamilyIds(
-      session.user.id,
-      session.user.role,
-      isSuperAdmin
-    )
-
     const where: Record<string, unknown> = {
       scheduledStart: { gte: from, lte: to },
     }
 
-    if (familyIdParam) {
-      const hasAccess = await checkPatrolFamilyAccess(
-        session.user.id,
-        familyIdParam,
-        session.user.role,
-        isSuperAdmin
-      )
-      if (!hasAccess) {
-        return NextResponse.json({ error: 'No tienes acceso a esta área' }, { status: 403 })
-      }
-      where.familyId = familyIdParam
-    } else if (accessibleFamilyIds !== undefined) {
-      where.familyId = accessibleFamilyIds.length === 0 ? '__NONE__' : { in: accessibleFamilyIds }
-    }
+    // Agenda personal del agente (Mis Rondas) o CLIENT
+    const personalAgenda =
+      mine ||
+      role === 'CLIENT' ||
+      (role === 'TECHNICIAN' && agentIdParam === userId && !familyIdParam)
 
-    if (agentIdParam) where.agentId = agentIdParam
+    if (personalAgenda) {
+      const denied = await checkPatrolAgentAccess(userId, role)
+      if (denied) return denied
+      where.agentId = userId
+    } else {
+      if (!['ADMIN', 'TECHNICIAN'].includes(role)) {
+        return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+      }
+      const denied = await checkPatrolModuleAccess(userId, role)
+      if (denied) return denied
+
+      const accessibleFamilyIds = await getPatrolAccessibleFamilyIds(userId, role, isSuperAdmin)
+
+      if (familyIdParam) {
+        const hasAccess = await checkPatrolFamilyAccess(userId, familyIdParam, role, isSuperAdmin)
+        if (!hasAccess) {
+          return NextResponse.json({ error: 'No tienes acceso a esta área' }, { status: 403 })
+        }
+        where.familyId = familyIdParam
+      } else if (accessibleFamilyIds !== undefined) {
+        where.familyId = accessibleFamilyIds.length === 0 ? '__NONE__' : { in: accessibleFamilyIds }
+      }
+
+      if (agentIdParam) where.agentId = agentIdParam
+    }
 
     if (statusParam && statusParam !== 'all') {
       const parts = [
@@ -133,7 +141,6 @@ export async function GET(request: NextRequest) {
       scheduleId: p.scheduleId,
     }))
 
-    // Resumen por día (conteos por estado) para el grid del mes
     const byDay: Record<
       string,
       { total: number; byStatus: Partial<Record<PatrolStatus, number>> }
@@ -152,6 +159,7 @@ export async function GET(request: NextRequest) {
         to: to.toISOString(),
         timezone: DEFAULT_TIMEZONE,
         truncated: rows.length >= MAX_EVENTS,
+        mine: personalAgenda,
         events,
         byDay,
       },

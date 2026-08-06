@@ -14,6 +14,7 @@ import { PatrolGeofenceService } from '@/lib/services/patrol-geofence.service'
 import { PatrolPhotoService } from '@/lib/services/patrol-photo.service'
 import { PatrolOfflineSyncService } from '@/lib/services/patrol-offline-sync.service'
 import { calculateCompletionPercentage } from '@/lib/patrol/patrol-completion'
+import { allRequiredCheckpointsVisited, applyPatrolClose } from '@/lib/patrol/patrol-finalize'
 import { PATROL_FAMILY_DEFAULTS } from '@/lib/patrol/patrol-family-config'
 import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
 import { NotificationService } from '@/lib/services/notification-service'
@@ -90,6 +91,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         qrWindowMinutes: true,
         geofenceRadiusMeters: true,
         offlineSyncToleranceMinutes: true,
+        autoCompleteWhenAllRequired: true,
+        requirePhotoOnEnd: true,
       },
     })
     const qrWindowMinutes = familyConfig?.qrWindowMinutes ?? PATROL_FAMILY_DEFAULTS.qrWindowMinutes
@@ -288,7 +291,34 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       requiredCheckpoints.length
     )
 
-    await prisma.patrols.update({ where: { id: patrolId }, data: { completionPercentage } })
+    const allRequiredDone = allRequiredCheckpointsVisited(
+      requiredCheckpoints.length,
+      visitedRequired
+    )
+    const autoCompleteEnabled =
+      familyConfig?.autoCompleteWhenAllRequired ??
+      PATROL_FAMILY_DEFAULTS.autoCompleteWhenAllRequired
+    const requirePhotoOnEnd =
+      familyConfig?.requirePhotoOnEnd ?? PATROL_FAMILY_DEFAULTS.requirePhotoOnEnd
+    const canAutoComplete =
+      patrol.status === 'IN_PROGRESS' &&
+      autoCompleteEnabled &&
+      allRequiredDone &&
+      !requirePhotoOnEnd
+
+    let patrolStatus: string = patrol.status
+    if (canAutoComplete) {
+      await applyPatrolClose(patrolId, {
+        status: 'COMPLETED',
+        completionPercentage,
+        missedCheckpointIds: [],
+        visitedRequired,
+        totalRequired: requiredCheckpoints.length,
+      })
+      patrolStatus = 'COMPLETED'
+    } else {
+      await prisma.patrols.update({ where: { id: patrolId }, data: { completionPercentage } })
+    }
 
     await AuditServiceComplete.log({
       action: 'PATROL_OFFLINE_SYNC',
@@ -299,6 +329,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         total: checkIns.length,
         accepted: results.filter(r => r.status === 'ACCEPTED').length,
         rejected: results.filter(r => r.status === 'REJECTED').length,
+        autoCompleted: canAutoComplete,
       },
       request,
     })
@@ -307,7 +338,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       success: true,
       results,
       completionPercentage,
-      patrolStatus: patrol.status,
+      patrolStatus,
+      autoCompleted: canAutoComplete,
+      readyToFinish: allRequiredDone && patrolStatus === 'IN_PROGRESS',
     })
   } catch (error) {
     console.error('[patrol/[id]/check-in/sync] POST:', error)

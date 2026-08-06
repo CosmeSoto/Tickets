@@ -49,6 +49,7 @@ export function usePatrolExecution(
   const [submittingCheckIn, setSubmittingCheckIn] = useState(false)
   const [startingPatrol, setStartingPatrol] = useState(false)
   const [endingPatrol, setEndingPatrol] = useState(false)
+  const [forceClosing, setForceClosing] = useState(false)
 
   // ── Foto ─────────────────────────────────────────────────────────────────────
   const [photoFile, setPhotoFile] = useState<File | null>(null)
@@ -211,6 +212,48 @@ export function usePatrolExecution(
     }
   }, [patrol, patrolId, photoFile, toast, refresh, requiresIncidentForSkip])
 
+  // ── Forzar cierre (admin/supervisor observador) ───────────────────────────────
+  const handleForceClose = useCallback(async () => {
+    const reason = window.prompt(
+      'Motivo del cierre forzado (mín. 3 caracteres). Se registrará en auditoría:'
+    )
+    if (reason === null) return
+    const trimmed = reason.trim()
+    if (trimmed.length < 3) {
+      toast({
+        title: 'Motivo requerido',
+        description: 'Indica un motivo de al menos 3 caracteres.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    setForceClosing(true)
+    try {
+      const res = await fetch(`/api/patrols/${patrolId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'force_close', reason: trimmed }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'No se pudo forzar el cierre')
+
+      toast({
+        title: data.status === 'COMPLETED' ? 'Ronda cerrada como Completada' : 'Ronda cerrada',
+        description: `Completitud: ${data.completionPercentage}% · Cierre forzado por supervisor`,
+      })
+      refresh()
+    } catch (err) {
+      toast({
+        title: 'Error',
+        description: err instanceof Error ? err.message : 'Error al forzar cierre',
+        variant: 'destructive',
+      })
+    } finally {
+      setForceClosing(false)
+    }
+  }, [patrolId, toast, refresh])
+
   // ── Check-in QR ───────────────────────────────────────────────────────────────
   const handleScan = useCallback(
     async ({ checkpointId, token }: { checkpointId: string; token: string }) => {
@@ -297,7 +340,7 @@ export function usePatrolExecution(
           return
         }
 
-        // Check-in exitoso — ¿hubo skip?
+        // Check-in exitoso — ¿hubo skip / auto-cierre?
         if (data.warning?.code === 'CHECKPOINT_SKIPPED') {
           const skipped: SkippedCheckpoint[] = data.warning.skippedCheckpoints ?? []
           setSkippedCheckpoints(skipped)
@@ -310,6 +353,17 @@ export function usePatrolExecution(
             title: '⚠️ Checkpoint saltado',
             description: data.warning.message,
             variant: 'destructive',
+          })
+        } else if (data.autoCompleted || data.patrolStatus === 'COMPLETED') {
+          toast({
+            title: '¡Ronda completada!',
+            description: `Último punto registrado. Completitud: ${data.completionPercentage}%`,
+          })
+        } else if (data.readyToFinish) {
+          toast({
+            title: 'Check-in registrado ✓',
+            description:
+              'Ya visitaste todos los obligatorios. Pulsa Finalizar para cerrar la ronda.',
           })
         } else {
           toast({
@@ -375,6 +429,7 @@ export function usePatrolExecution(
     // loading
     startingPatrol,
     endingPatrol,
+    forceClosing,
     // foto
     photoFile,
     photoPreview,
@@ -396,6 +451,7 @@ export function usePatrolExecution(
     // handlers principales
     handleStart,
     handleEnd,
+    handleForceClose,
     handleScan,
   }
 }

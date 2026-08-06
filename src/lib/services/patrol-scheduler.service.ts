@@ -530,31 +530,33 @@ export class PatrolSchedulerService {
   // ── Cierre automático de rondas IN_PROGRESS vencidas ──────────────────────
 
   /**
-   * Cierra automáticamente las patrullas que están IN_PROGRESS pero superaron
-   * su scheduledEnd + gracePeriodMinutes sin que el agente las finalizara.
+   * Cierra automáticamente patrullas IN_PROGRESS:
+   * 1) Ventana vencida: scheduledEnd + gracePeriodMinutes
+   * 2) Completas al 100% (si autoCompleteWhenAllRequired): red de seguridad del cron
    *
    * Estado final: INCOMPLETE si hay checkpoints no visitados, COMPLETED si todos visitados.
-   * Notifica a los supervisores con el resumen de checkpoints faltantes.
-   *
    * Diseñado para ejecutarse como cron job cada 5 minutos.
-   *
-   * @returns Número de patrullas cerradas automáticamente
    */
   static async autoCloseExpiredPatrols(): Promise<number> {
     const now = new Date()
     let closedCount = 0
 
-    // Obtener configuraciones de familia para conocer el grace period
     const familyConfigs = await prisma.patrol_family_config.findMany({
       where: { patrolsEnabled: true },
-      select: { familyId: true, gracePeriodMinutes: true, alertCompletionThreshold: true },
+      select: {
+        familyId: true,
+        gracePeriodMinutes: true,
+        alertCompletionThreshold: true,
+        autoCompleteWhenAllRequired: true,
+        requirePhotoOnEnd: true,
+      },
     })
 
     for (const config of familyConfigs) {
-      // Corte: scheduledEnd + gracePeriodMinutes ya pasó
       const gracePeriodMs = (config.gracePeriodMinutes ?? 15) * 60 * 1000
       const cutoff = new Date(now.getTime() - gracePeriodMs)
 
+      // Ventana vencida + (opcional) rondas ya al 100% como red de seguridad
       const expiredPatrols = await prisma.patrols.findMany({
         where: {
           familyId: config.familyId,
@@ -582,21 +584,58 @@ export class PatrolSchedulerService {
         },
       })
 
-      if (expiredPatrols.length === 0) continue
+      const completeCandidates =
+        (config.autoCompleteWhenAllRequired ?? true) && !config.requirePhotoOnEnd
+          ? await prisma.patrols.findMany({
+              where: {
+                familyId: config.familyId,
+                status: 'IN_PROGRESS',
+                completionPercentage: { gte: 100 },
+                id: { notIn: expiredPatrols.map(p => p.id) },
+              },
+              select: {
+                id: true,
+                agentId: true,
+                familyId: true,
+                scheduledEnd: true,
+                route: {
+                  select: {
+                    name: true,
+                    routeCheckpoints: {
+                      select: { checkpointId: true, isRequired: true },
+                    },
+                  },
+                },
+                agent: { select: { name: true } },
+                checkIns: {
+                  where: { validationResult: 'VALID' },
+                  select: { checkpointId: true },
+                },
+              },
+            })
+          : []
 
-      for (const patrol of expiredPatrols) {
+      const patrolsToClose = [...expiredPatrols, ...completeCandidates]
+
+      for (const patrol of patrolsToClose) {
         const requiredCheckpointIds = patrol.route.routeCheckpoints
           .filter(rc => rc.isRequired)
           .map(rc => rc.checkpointId)
 
         const visitedIds = new Set(patrol.checkIns.map(ci => ci.checkpointId))
-        const visitedRequired = requiredCheckpointIds.filter(id => visitedIds.has(id)).length
-        const missedIds = requiredCheckpointIds.filter(id => !visitedIds.has(id))
+        const visitedRequired = requiredCheckpointIds.filter(cid => visitedIds.has(cid)).length
+        const missedIds = requiredCheckpointIds.filter(cid => !visitedIds.has(cid))
 
         const completionPct =
           requiredCheckpointIds.length === 0
-            ? 100
+            ? visitedIds.size > 0
+              ? 100
+              : 0
             : Math.round((visitedRequired / requiredCheckpointIds.length) * 100)
+
+        // Red de seguridad: solo cerrar por % si realmente faltan 0 obligatorios
+        const isExpired = expiredPatrols.some(p => p.id === patrol.id)
+        if (!isExpired && missedIds.length > 0) continue
 
         const finalStatus = missedIds.length === 0 ? 'COMPLETED' : 'INCOMPLETE'
 
@@ -612,7 +651,6 @@ export class PatrolSchedulerService {
           })
           closedCount++
 
-          // Notificar supervisores solo si quedó incompleta bajo el umbral
           const threshold = config.alertCompletionThreshold ?? 80
           if (completionPct < threshold) {
             await this.notifyAutoClose(patrol, config.familyId, completionPct, missedIds.length)
@@ -625,7 +663,7 @@ export class PatrolSchedulerService {
 
     if (closedCount > 0) {
       console.log(
-        `[PatrolSchedulerService] ${closedCount} patrullas IN_PROGRESS cerradas automáticamente por vencimiento`
+        `[PatrolSchedulerService] ${closedCount} patrullas IN_PROGRESS cerradas automáticamente`
       )
     }
     return closedCount

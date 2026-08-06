@@ -62,6 +62,7 @@ export interface PatrolData {
   familyConfig?: {
     requirePhotoOnStart: boolean
     requirePhotoOnEnd: boolean
+    autoCompleteWhenAllRequired?: boolean
     patrolIncidentCategoryId?: string | null
     gracePeriodMinutes?: number
     strictTimeValidation?: boolean

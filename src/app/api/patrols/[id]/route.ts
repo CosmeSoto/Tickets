@@ -12,6 +12,7 @@ import { PatrolPhotoService } from '@/lib/services/patrol-photo.service'
 import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
 import { NotificationService } from '@/lib/services/notification-service'
 import { calculateCompletionPercentage } from '@/lib/patrol/patrol-completion'
+import { applyPatrolClose, computePatrolCloseFromProgress } from '@/lib/patrol/patrol-finalize'
 import { NotificationType } from '@prisma/client'
 import { getPatrolSupervisors } from '@/lib/patrol/patrol-helpers'
 import { checkPatrolFamilyAccess } from '@/lib/patrol/patrol-access'
@@ -37,6 +38,10 @@ const patchPatrolSchema = z.discriminatedUnion('action', [
   }),
   z.object({
     action: z.literal('cancel'),
+  }),
+  z.object({
+    action: z.literal('force_close'),
+    reason: z.string().trim().min(3).max(500),
   }),
 ])
 
@@ -138,6 +143,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
         select: {
           requirePhotoOnStart: true,
           requirePhotoOnEnd: true,
+          autoCompleteWhenAllRequired: true,
           patrolIncidentCategoryId: true,
           gracePeriodMinutes: true,
           strictTimeValidation: true,
@@ -182,6 +188,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
         familyConfig: {
           requirePhotoOnStart: familyCfg?.requirePhotoOnStart ?? false,
           requirePhotoOnEnd: familyCfg?.requirePhotoOnEnd ?? false,
+          autoCompleteWhenAllRequired: familyCfg?.autoCompleteWhenAllRequired ?? true,
           patrolIncidentCategoryId: familyCfg?.patrolIncidentCategoryId ?? null,
           gracePeriodMinutes,
           strictTimeValidation,
@@ -228,9 +235,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const body = await request.json()
     const data = patchPatrolSchema.parse(body)
 
+    const sessionUser = session.user as { isSuperAdmin?: boolean }
+
     // Cancelar: ADMIN con acceso a la familia (antes del gate de agente)
     if (data.action === 'cancel') {
-      const sessionUser = session.user as { isSuperAdmin?: boolean }
       if (session.user.role !== 'ADMIN') {
         return NextResponse.json(
           { error: 'Solo los administradores pueden cancelar rondas' },
@@ -268,6 +276,57 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       })
 
       return NextResponse.json({ success: true, status: 'MISSED' })
+    }
+
+    // Force-close: ADMIN/TECH con acceso — cierra IN_PROGRESS atascada
+    if (data.action === 'force_close') {
+      if (session.user.role !== 'ADMIN' && session.user.role !== 'TECHNICIAN') {
+        return NextResponse.json(
+          { error: 'Solo supervisores pueden forzar el cierre de una ronda' },
+          { status: 403 }
+        )
+      }
+
+      const ok = await canViewPatrolAsStaff(
+        { id: session.user.id, role: session.user.role, isSuperAdmin: sessionUser.isSuperAdmin },
+        patrol.familyId
+      )
+      if (!ok) {
+        return NextResponse.json({ error: 'No autorizado para esta área' }, { status: 403 })
+      }
+
+      if (patrol.status !== 'IN_PROGRESS') {
+        return NextResponse.json(
+          { error: 'Solo se pueden cerrar forzadamente rondas en progreso' },
+          { status: 409 }
+        )
+      }
+
+      const closeResult = await computePatrolCloseFromProgress(id)
+      await applyPatrolClose(id, closeResult)
+
+      await AuditServiceComplete.log({
+        action: 'PATROL_FORCE_CLOSED',
+        entityType: 'patrol',
+        entityId: id,
+        userId: session.user.id,
+        details: {
+          agentId: patrol.agentId,
+          familyId: patrol.familyId,
+          reason: data.reason,
+          status: closeResult.status,
+          completionPercentage: closeResult.completionPercentage,
+          missedCount: closeResult.missedCheckpointIds.length,
+        },
+        request,
+      })
+
+      return NextResponse.json({
+        success: true,
+        status: closeResult.status,
+        completionPercentage: closeResult.completionPercentage,
+        forced: true,
+      })
     }
 
     // Iniciar/finalizar: solo el agente asignado
@@ -414,39 +473,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         endPhotoId = photo.id
       }
 
-      // Calcular completitud
-      const requiredCheckpointIds = patrol.route.routeCheckpoints
-        .filter(rc => rc.isRequired)
-        .map(rc => rc.checkpointId)
-
-      const validCheckIns = await prisma.patrol_check_ins.findMany({
-        where: { patrolId: id, validationResult: 'VALID' },
-        select: { checkpointId: true },
-      })
-
-      const visitedIds = new Set(validCheckIns.map(ci => ci.checkpointId))
-      const visitedRequired = requiredCheckpointIds.filter(cid => visitedIds.has(cid)).length
-      const completionPct = calculateCompletionPercentage(
-        visitedRequired,
-        requiredCheckpointIds.length
-      )
-      const missedIds = requiredCheckpointIds.filter(cid => !visitedIds.has(cid))
-      const finalStatus = missedIds.length === 0 ? 'COMPLETED' : 'INCOMPLETE'
-
-      await prisma.patrols.update({
-        where: { id },
-        data: {
-          status: finalStatus,
-          completedAt: new Date(),
-          completionPercentage: completionPct,
-          missedCheckpointIds: missedIds,
-          ...(endPhotoId ? { endPhotoId } : {}),
-        },
-      })
+      const closeResult = await computePatrolCloseFromProgress(id)
+      await applyPatrolClose(id, closeResult, { endPhotoId })
 
       // Notificar si completitud por debajo del umbral
       const threshold = familyConfig?.alertCompletionThreshold ?? 80
-      if (completionPct < threshold) {
+      if (closeResult.completionPercentage < threshold) {
         const supervisors = await getPatrolSupervisors(patrol.familyId)
 
         await Promise.allSettled(
@@ -455,8 +487,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
               userId: s.id,
               type: NotificationType.PATROL_INCOMPLETE,
               title: 'Ronda incompleta',
-              message: `La patrulla finalizó con ${completionPct}% de completitud (umbral: ${threshold}%). ${missedIds.length} checkpoint(s) requerido(s) no visitado(s).`,
-              metadata: { patrolId: id, completionPct, missedCheckpointIds: missedIds },
+              message: `La patrulla finalizó con ${closeResult.completionPercentage}% de completitud (umbral: ${threshold}%). ${closeResult.missedCheckpointIds.length} checkpoint(s) requerido(s) no visitado(s).`,
+              metadata: {
+                patrolId: id,
+                completionPct: closeResult.completionPercentage,
+                missedCheckpointIds: closeResult.missedCheckpointIds,
+              },
             })
           )
         )
@@ -467,14 +503,18 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         entityType: 'patrol',
         entityId: id,
         userId: session.user.id,
-        details: { status: finalStatus, completionPct, missedCount: missedIds.length },
+        details: {
+          status: closeResult.status,
+          completionPct: closeResult.completionPercentage,
+          missedCount: closeResult.missedCheckpointIds.length,
+        },
         request,
       })
 
       return NextResponse.json({
         success: true,
-        status: finalStatus,
-        completionPercentage: completionPct,
+        status: closeResult.status,
+        completionPercentage: closeResult.completionPercentage,
       })
     }
 

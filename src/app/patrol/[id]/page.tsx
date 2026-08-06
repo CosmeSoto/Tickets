@@ -82,11 +82,20 @@ export default function PatrolExecutionPage() {
   const checkpoints = patrol.route.routeCheckpoints
   const nextCheckpoint = checkpoints.find(rc => !visitedIds.has(rc.checkpoint.id))
   const isInProgress = patrol.status === 'IN_PROGRESS'
+  const readyToFinish =
+    isInProgress &&
+    patrol.progress.totalRequired > 0 &&
+    patrol.progress.visitedRequired >= patrol.progress.totalRequired
 
   // El agente asignado es el único que puede operar (escanear, finalizar, reportar).
-  // Admins y supervisores son observadores — solo ven el progreso.
+  // Admins y supervisores son observadores — solo ven el progreso (pueden force-close).
   const isAssignedAgent = patrol.agentId === session.user.id
   const isObserver = !isAssignedAgent
+  const canForceClose =
+    isObserver &&
+    isInProgress &&
+    ((session.user as { role?: string }).role === 'ADMIN' ||
+      (session.user as { role?: string }).role === 'TECHNICIAN')
 
   const scheduledLabel = new Date(patrol.scheduledStart).toLocaleString('es-EC', {
     timeZone: DEFAULT_TIMEZONE,
@@ -173,6 +182,7 @@ export default function PatrolExecutionPage() {
             canFinish={!exec.requiresIncidentForSkip}
             requiresIncidentForSkip={exec.requiresIncidentForSkip}
             hasCheckIns={patrol.checkIns.length > 0}
+            readyToFinish={readyToFinish}
             startBlockedReason={startBlockedReason}
             onStart={exec.handleStart}
             onToggleScanner={() => exec.setScannerActive(s => !s)}
@@ -184,12 +194,31 @@ export default function PatrolExecutionPage() {
         {/* Banner modo observador — visible solo para admin/supervisor */}
         {isObserver && isInProgress && (
           <Card className='border-blue-200 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-800'>
-            <CardContent className='pt-4 pb-3 flex items-center gap-2 text-sm text-blue-800 dark:text-blue-200'>
-              <span className='text-base'>👁️</span>
-              <span>
-                <strong>Modo observador</strong> — estás monitoreando esta ronda en tiempo real.
-                Solo el agente asignado puede operar.
-              </span>
+            <CardContent className='pt-4 pb-3 space-y-3 text-sm text-blue-800 dark:text-blue-200'>
+              <div className='flex items-center gap-2'>
+                <span className='text-base'>👁️</span>
+                <span>
+                  <strong>Modo observador</strong> — estás monitoreando esta ronda en tiempo real.
+                  Solo el agente asignado puede escanear; puedes forzar el cierre si quedó atascada.
+                </span>
+              </div>
+              {readyToFinish && (
+                <p className='text-xs text-emerald-800 dark:text-emerald-200'>
+                  El agente ya visitó todos los puntos obligatorios. Si no finaliza, el sistema
+                  puede cerrarla automáticamente según la config del área.
+                </p>
+              )}
+              {canForceClose && (
+                <Button
+                  variant='outline'
+                  size='sm'
+                  className='border-blue-300'
+                  disabled={exec.forceClosing}
+                  onClick={() => exec.handleForceClose()}
+                >
+                  {exec.forceClosing ? 'Cerrando…' : 'Forzar cierre de ronda'}
+                </Button>
+              )}
             </CardContent>
           </Card>
         )}
