@@ -33,7 +33,7 @@ export async function getPatrolSupervisors(familyId: string): Promise<{ id: stri
       },
       select: { id: true },
     }),
-    // Agentes/supervisores: TECH o CLIENT con patrolsEnabled + patrol_family_assignments
+    // Agentes/supervisores: TECH o CLIENT con patrolsEnabled + grants patrols
     prisma.users.findMany({
       where: {
         isActive: true,
@@ -41,7 +41,11 @@ export async function getPatrolSupervisors(familyId: string): Promise<{ id: stri
         patrolsEnabled: true,
         OR: [
           { departments: { familyId, isActive: true } },
-          { patrolFamilyAssignments: { some: { familyId, isActive: true } } },
+          {
+            userFamilyAccess: {
+              some: { familyId, module: 'patrols', isActive: true },
+            },
+          },
         ],
       },
       select: { id: true },

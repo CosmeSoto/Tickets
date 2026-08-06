@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import { NotificationEvents } from '@/lib/notification-events'
 import { invalidateCache } from '@/lib/api-cache'
+import { getUserModuleFamilyGrantIds, setUserModuleFamilies } from '@/lib/auth/user-family-access'
 
 /**
  * GET /api/inventory/managers/[managerId]/families
@@ -31,12 +32,13 @@ export async function GET(
 
     const { managerId } = await params
 
-    const assignments = await prisma.inventory_manager_families.findMany({
-      where: { managerId },
-      include: { family: true },
-    })
-
-    const families = assignments.map(a => a.family)
+    const familyIds = await getUserModuleFamilyGrantIds(managerId, 'inventory')
+    const families =
+      familyIds.length > 0
+        ? await prisma.families.findMany({
+            where: { id: { in: familyIds } },
+          })
+        : []
 
     return NextResponse.json({ families })
   } catch {
@@ -76,7 +78,6 @@ export async function PUT(
       return NextResponse.json({ error: 'familyIds debe ser un arreglo' }, { status: 400 })
     }
 
-    // Validar que todos los familyIds existan
     if (familyIds.length > 0) {
       const existingFamilies = await prisma.families.findMany({
         where: { id: { in: familyIds } },
@@ -88,21 +89,16 @@ export async function PUT(
       }
     }
 
-    // Operación atómica: delete + createMany
-    await prisma.$transaction(async tx => {
-      await tx.inventory_manager_families.deleteMany({
-        where: { managerId },
-      })
+    const manager = await prisma.users.findUnique({
+      where: { id: managerId },
+      select: { role: true },
+    })
 
-      if (familyIds.length > 0) {
-        await tx.inventory_manager_families.createMany({
-          data: familyIds.map(familyId => ({
-            id: randomUUID(),
-            managerId,
-            familyId,
-          })),
-        })
-      }
+    await setUserModuleFamilies({
+      userId: managerId,
+      moduleInput: 'inventory',
+      familyIds,
+      role: manager?.role,
     })
 
     await prisma.audit_logs.create({
@@ -117,19 +113,13 @@ export async function PUT(
       },
     })
 
-    // Retornar las familias asignadas con datos completos
-    const assignments = await prisma.inventory_manager_families.findMany({
-      where: { managerId },
-      include: { family: true },
-    })
+    const savedIds = await getUserModuleFamilyGrantIds(managerId, 'inventory')
+    const families =
+      savedIds.length > 0 ? await prisma.families.findMany({ where: { id: { in: savedIds } } }) : []
 
-    const families = assignments.map(a => a.family)
-
-    // Invalidar caché de módulos y permisos del gestor
     await invalidateCache(`user:modules:${managerId}`)
     await invalidateCache(`perm:inv:${managerId}`)
 
-    // Notificar al gestor para que refresque su sesión
     NotificationEvents.emit(managerId, { type: 'session_refresh', reason: 'permissions_changed' })
 
     return NextResponse.json({ families })

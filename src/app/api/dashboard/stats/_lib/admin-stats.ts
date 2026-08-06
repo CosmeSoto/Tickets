@@ -17,27 +17,11 @@ export async function getAdminStats(userId: string, isSuperAdmin: boolean) {
   let inventoryTypeFilter: Record<string, any> = {}
 
   if (!isSuperAdmin) {
-    // Una sola query para obtener: departamento del admin + asignaciones de tickets + asignaciones de inventario
-    const [adminUser, ticketAssignments, inventoryAssignments] = await Promise.all([
-      prisma.users.findUnique({
-        where: { id: userId },
-        select: { departments: { select: { familyId: true } } },
-      }),
-      prisma.admin_family_assignments.findMany({
-        where: { adminId: userId, isActive: true },
-        select: { familyId: true },
-      }),
-      prisma.inventory_manager_families.findMany({
-        where: { managerId: userId },
-        select: { familyId: true },
-      }),
+    const { resolveModuleFamilyScopeIds } = await import('@/lib/auth/user-family-access')
+    const [ticketFamilyIds, invFamilyIds] = await Promise.all([
+      resolveModuleFamilyScopeIds(userId, 'tickets'),
+      resolveModuleFamilyScopeIds(userId, 'inventory', 'canView'),
     ])
-
-    const nativeFamilyId = adminUser?.departments?.familyId ?? null
-    const ticketFamilyIds = ticketAssignments.map(a => a.familyId)
-    if (nativeFamilyId && !ticketFamilyIds.includes(nativeFamilyId)) {
-      ticketFamilyIds.push(nativeFamilyId)
-    }
     adminFamilyIds = ticketFamilyIds
 
     // Filtro de tickets
@@ -48,10 +32,6 @@ export async function getAdminStats(userId: string, isSuperAdmin: boolean) {
     }
 
     // Filtro de inventario (por typeId)
-    const invFamilyIds = inventoryAssignments.map(a => a.familyId)
-    if (nativeFamilyId && !invFamilyIds.includes(nativeFamilyId)) {
-      invFamilyIds.push(nativeFamilyId)
-    }
     if (invFamilyIds.length > 0) {
       const typesInScope = await prisma.equipment_types.findMany({
         where: { familyId: { in: invFamilyIds } },
@@ -192,11 +172,7 @@ export async function getAdminStats(userId: string, isSuperAdmin: boolean) {
     },
     ...(await (async () => {
       const [recentActivity, familyMetrics, proactiveAlerts] = await Promise.all([
-        getRecentActivity(
-          'ADMIN',
-          userId,
-          isSuperAdmin ? undefined : ticketFamilyFilter
-        ),
+        getRecentActivity('ADMIN', userId, isSuperAdmin ? undefined : ticketFamilyFilter),
         getFamilyMetrics(isSuperAdmin ? undefined : adminFamilyIds),
         getProactiveAlerts(),
       ])

@@ -106,6 +106,7 @@ export function EditUserModal({
     inventoryFamilyIds,
     patrolFamilyIds,
     adminFamilyIds,
+    contentFamilyIds,
     adminScopeIds,
     loadingFamilies,
     familyError,
@@ -130,6 +131,8 @@ export function EditUserModal({
     handleUnassignPatrolFamily,
     handleAssignAdminFamily,
     handleUnassignAdminFamily,
+    handleAssignContentFamily,
+    handleUnassignContentFamily,
     setConfirmUnassign,
     setPendingUnassignFamilyId,
   } = useFamilyAssignments({ user, isOpen })
@@ -460,6 +463,7 @@ export function EditUserModal({
                 inventoryFamilyIds={inventoryFamilyIds}
                 patrolFamilyIds={patrolFamilyIds}
                 adminFamilyIds={adminFamilyIds}
+                contentFamilyIds={contentFamilyIds}
                 ticketReadOnlyIds={ticketReadOnlyIds}
                 inventoryReadOnlyIds={inventoryReadOnlyIds}
                 patrolReadOnlyIds={patrolReadOnlyIds}
@@ -476,6 +480,8 @@ export function EditUserModal({
                   handleUnassignPatrolFamily,
                   handleAssignAdminFamily,
                   handleUnassignAdminFamily,
+                  handleAssignContentFamily,
+                  handleUnassignContentFamily,
                 }}
               />
 

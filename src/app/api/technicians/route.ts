@@ -81,8 +81,10 @@ export async function GET(request: NextRequest) {
             },
           },
         },
-        technicianFamilyAssignments: {
-          include: {
+        userFamilyAccess: {
+          where: { module: 'tickets', isActive: true },
+          select: {
+            familyId: true,
             family: {
               select: {
                 id: true,
@@ -106,7 +108,14 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: technicians,
+      data: technicians.map(t => ({
+        ...t,
+        technicianFamilyAssignments: (t as any).userFamilyAccess?.map((a: any) => ({
+          familyId: a.familyId,
+          family: a.family,
+        })),
+        userFamilyAccess: undefined,
+      })),
       meta: {
         total: technicians.length,
         filters: {

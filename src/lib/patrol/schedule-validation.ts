@@ -45,31 +45,15 @@ export async function assertScheduleAgent(params: {
     )
   }
 
-  const assignment = await prisma.patrol_family_assignments.findFirst({
-    where: {
-      userId: params.agentId,
-      familyId: params.familyId,
-      isActive: true,
-    },
-  })
+  const { userHasFamilyInModule } = await import('@/lib/auth/user-family-access')
+  const hasPatrolFamily = await userHasFamilyInModule(params.agentId, 'patrols', params.familyId)
 
-  // Fallback: asignación nativa por departamento
-  // (mismo criterio que GET /api/users?patrolFamilyId= para evitar asimetría)
-  if (!assignment) {
-    const nativeMatch = await prisma.users.findFirst({
-      where: {
-        id: params.agentId,
-        departments: { familyId: params.familyId },
-      },
-      select: { id: true },
-    })
-
-    if (!nativeMatch) {
-      throw new ScheduleValidationError(
-        'El agente no está asignado a esta familia en el módulo de rondas',
-        422
-      )
-    }
+  // Nativa + grants unificados (módulo patrols)
+  if (!hasPatrolFamily) {
+    throw new ScheduleValidationError(
+      'El agente no está asignado a esta familia en el módulo de rondas',
+      422
+    )
   }
 }
 

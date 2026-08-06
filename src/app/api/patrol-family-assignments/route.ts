@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import { randomUUID } from 'crypto'
 import { invalidateCache } from '@/lib/api-cache'
+import { assignUserModuleFamily, unassignUserModuleFamily } from '@/lib/auth/user-family-access'
 
 /**
- * GET /api/patrol-family-assignments?userId=xxx
- * Lista las familias asignadas a un usuario para el módulo de rondas.
+ * @deprecated Preferir `/api/admin/users/:id/family-access` (module=patrols).
+ * Thin wrapper sobre user_family_access.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -20,29 +20,31 @@ export async function GET(request: NextRequest) {
     const userId = searchParams.get('userId')
     if (!userId) return NextResponse.json({ error: 'userId requerido' }, { status: 400 })
 
-    const assignments = await prisma.patrol_family_assignments.findMany({
-      where: { userId, isActive: true },
+    const rows = await prisma.user_family_access.findMany({
+      where: { userId, module: 'patrols', isActive: true },
       include: {
         family: { select: { id: true, name: true, code: true, color: true, isActive: true } },
       },
       orderBy: { createdAt: 'asc' },
     })
 
-    return NextResponse.json({
-      success: true,
-      data: assignments.map(a => ({ ...a, familyId: a.familyId })),
-    })
+    const assignments = rows.map(row => ({
+      id: row.id,
+      userId: row.userId,
+      familyId: row.familyId,
+      isActive: row.isActive,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      family: row.family,
+    }))
+
+    return NextResponse.json({ success: true, data: assignments })
   } catch (error) {
     console.error('[GET /api/patrol-family-assignments]', error)
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
 }
 
-/**
- * POST /api/patrol-family-assignments
- * Body: { userId, familyId }
- * Asigna una familia al usuario para el módulo de rondas.
- */
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -54,15 +56,12 @@ export async function POST(request: NextRequest) {
     if (!userId || !familyId)
       return NextResponse.json({ error: 'userId y familyId son requeridos' }, { status: 400 })
 
-    // Validar que el usuario existe
     const user = await prisma.users.findUnique({
       where: { id: userId },
       select: { id: true, patrolsEnabled: true, role: true },
     })
     if (!user) return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 })
 
-    // RBAC: Admin Normal solo puede asignar familias dentro de su scope general.
-    // Super Admin puede asignar cualquier familia sin restricción.
     const viewer = await prisma.users.findUnique({
       where: { id: session.user.id },
       select: { isSuperAdmin: true },
@@ -76,36 +75,37 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Validar que la familia existe y está activa
     const family = await prisma.families.findUnique({
       where: { id: familyId },
-      select: { id: true, isActive: true },
+      select: { id: true, isActive: true, name: true, code: true, color: true },
     })
     if (!family) return NextResponse.json({ error: 'Familia no encontrada' }, { status: 404 })
     if (!family.isActive)
       return NextResponse.json({ error: 'La familia no está activa' }, { status: 400 })
 
-    // Verificar duplicado — reactivar si existe inactiva
-    const existing = await prisma.patrol_family_assignments.findUnique({
-      where: { userId_familyId: { userId, familyId } },
+    const existing = await prisma.user_family_access.findUnique({
+      where: {
+        userId_familyId_module: { userId, familyId, module: 'patrols' },
+      },
     })
-    if (existing) {
-      if (!existing.isActive) {
-        const reactivated = await prisma.patrol_family_assignments.update({
-          where: { userId_familyId: { userId, familyId } },
-          data: { isActive: true },
-        })
-        await invalidateCache(`user:modules:${userId}`)
-        return NextResponse.json({ success: true, data: reactivated })
-      }
+    if (existing?.isActive) {
       return NextResponse.json(
         { error: 'El usuario ya está asignado a esta familia para rondas' },
         { status: 409 }
       )
     }
 
-    const assignment = await prisma.patrol_family_assignments.create({
-      data: { id: randomUUID(), userId, familyId, isActive: true },
+    await assignUserModuleFamily({
+      userId,
+      familyId,
+      moduleInput: 'patrols',
+      role: user.role,
+    })
+
+    const row = await prisma.user_family_access.findUnique({
+      where: {
+        userId_familyId_module: { userId, familyId, module: 'patrols' },
+      },
       include: {
         family: { select: { id: true, name: true, code: true, color: true, isActive: true } },
       },
@@ -113,17 +113,26 @@ export async function POST(request: NextRequest) {
 
     await invalidateCache(`user:modules:${userId}`)
 
+    const assignment = row
+      ? {
+          id: row.id,
+          userId: row.userId,
+          familyId: row.familyId,
+          isActive: row.isActive,
+          family: row.family,
+        }
+      : { userId, familyId, isActive: true, family }
+
     return NextResponse.json({ success: true, data: assignment }, { status: 201 })
-  } catch (error) {
+  } catch (error: any) {
     console.error('[POST /api/patrol-family-assignments]', error)
-    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+    return NextResponse.json(
+      { error: error?.message ?? 'Error interno del servidor' },
+      { status: 400 }
+    )
   }
 }
 
-/**
- * DELETE /api/patrol-family-assignments?userId=xxx&familyId=yyy
- * Desasigna una familia del usuario para rondas (soft delete).
- */
 export async function DELETE(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -138,9 +147,16 @@ export async function DELETE(request: NextRequest) {
     if (!userId || !familyId)
       return NextResponse.json({ error: 'userId y familyId son requeridos' }, { status: 400 })
 
-    await prisma.patrol_family_assignments.updateMany({
-      where: { userId, familyId },
-      data: { isActive: false },
+    const target = await prisma.users.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    })
+
+    await unassignUserModuleFamily({
+      userId,
+      familyId,
+      moduleInput: 'patrols',
+      role: target?.role,
     })
 
     await invalidateCache(`user:modules:${userId}`)

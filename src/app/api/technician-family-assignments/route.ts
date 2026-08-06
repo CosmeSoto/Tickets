@@ -2,10 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import { randomUUID } from 'crypto'
 import { invalidateCache } from '@/lib/api-cache'
+import { assignUserModuleFamily } from '@/lib/auth/user-family-access'
 
-// GET /api/technician-family-assignments — Lista asignaciones; solo ADMIN
+/**
+ * @deprecated Preferir `/api/admin/users/:id/family-access` (module=tickets).
+ * Thin wrapper sobre user_family_access.
+ */
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -17,17 +20,31 @@ export async function GET(request: NextRequest) {
     const technicianId = searchParams.get('technicianId')
     const familyId = searchParams.get('familyId')
 
-    const assignments = await prisma.technician_family_assignments.findMany({
+    const rows = await prisma.user_family_access.findMany({
       where: {
-        ...(technicianId && { technicianId }),
+        module: 'tickets',
+        isActive: true,
+        user: { role: 'TECHNICIAN' },
+        ...(technicianId && { userId: technicianId }),
         ...(familyId && { familyId }),
       },
       include: {
-        technician: { select: { id: true, name: true, email: true, role: true, isActive: true } },
+        user: { select: { id: true, name: true, email: true, role: true, isActive: true } },
         family: { select: { id: true, name: true, code: true, color: true, isActive: true } },
       },
-      orderBy: [{ family: { order: 'asc' } }, { technician: { name: 'asc' } }],
+      orderBy: [{ family: { order: 'asc' } }, { user: { name: 'asc' } }],
     })
+
+    const assignments = rows.map(row => ({
+      id: row.id,
+      technicianId: row.userId,
+      familyId: row.familyId,
+      isActive: row.isActive,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      technician: row.user,
+      family: row.family,
+    }))
 
     return NextResponse.json({ success: true, data: assignments })
   } catch (error) {
@@ -39,7 +56,6 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/technician-family-assignments — Crea asignación; solo ADMIN
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -57,7 +73,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validar que el usuario tenga rol TECHNICIAN
     const user = await prisma.users.findUnique({
       where: { id: technicianId },
       select: { id: true, name: true, role: true, isActive: true },
@@ -77,10 +92,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Verificar que la familia existe
     const family = await prisma.families.findUnique({
       where: { id: familyId },
-      select: { id: true, name: true },
+      select: { id: true, name: true, code: true, color: true },
     })
 
     if (!family) {
@@ -90,38 +104,56 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Verificar que no exista ya la asignación
-    const existing = await prisma.technician_family_assignments.findUnique({
-      where: { technicianId_familyId: { technicianId, familyId } },
+    const existing = await prisma.user_family_access.findUnique({
+      where: {
+        userId_familyId_module: { userId: technicianId, familyId, module: 'tickets' },
+      },
     })
 
-    if (existing) {
+    if (existing?.isActive) {
       return NextResponse.json(
         { success: false, message: 'El técnico ya está asignado a esta familia' },
         { status: 400 }
       )
     }
 
-    const assignment = await prisma.technician_family_assignments.create({
-      data: { id: randomUUID(), technicianId, familyId },
+    await assignUserModuleFamily({
+      userId: technicianId,
+      familyId,
+      moduleInput: 'tickets',
+      role: 'TECHNICIAN',
+    })
+
+    const row = await prisma.user_family_access.findUnique({
+      where: {
+        userId_familyId_module: { userId: technicianId, familyId, module: 'tickets' },
+      },
       include: {
-        technician: { select: { id: true, name: true, email: true } },
+        user: { select: { id: true, name: true, email: true } },
         family: { select: { id: true, name: true, code: true, color: true } },
       },
     })
 
-    // Invalidar caché de módulos del técnico
     await invalidateCache(`user:modules:${technicianId}`)
+
+    const assignment = row
+      ? {
+          id: row.id,
+          technicianId: row.userId,
+          familyId: row.familyId,
+          isActive: row.isActive,
+          technician: row.user,
+          family: row.family,
+        }
+      : { technicianId, familyId, technician: user, family }
 
     return NextResponse.json(
       { success: true, data: assignment, message: 'Asignación creada exitosamente' },
       { status: 201 }
     )
-  } catch (error) {
+  } catch (error: any) {
     console.error('[POST /api/technician-family-assignments]', error)
-    return NextResponse.json(
-      { success: false, message: 'Error al crear asignación' },
-      { status: 500 }
-    )
+    const message = error?.message?.includes('nativa') ? error.message : 'Error al crear asignación'
+    return NextResponse.json({ success: false, message }, { status: 400 })
   }
 }

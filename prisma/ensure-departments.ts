@@ -221,44 +221,27 @@ async function absorbTechnologyFamily(
     console.warn('  ⚠ inventory_family_config:', e?.message ?? e)
   }
 
-  // Asignaciones de usuarios a familias (cada modelo usa un FK distinto, no "userId")
-  const assignmentRemaps: Array<{ model: string; userField: string }> = [
-    { model: 'admin_family_assignments', userField: 'adminId' },
-    { model: 'client_family_assignments', userField: 'clientId' },
-    { model: 'technician_family_assignments', userField: 'technicianId' },
-    { model: 'inventory_manager_families', userField: 'managerId' },
-  ]
-  for (const { model, userField } of assignmentRemaps) {
-    try {
-      const client = (prisma as any)[model]
-      if (!client?.findMany || !client?.update) continue
-      const rows = await client.findMany({
-        where: { familyId: fromId },
-        select: { id: true, [userField]: true },
+  // Asignaciones unificadas user_family_access
+  try {
+    const rows = await prisma.user_family_access.findMany({
+      where: { familyId: fromId },
+      select: { id: true, userId: true, module: true },
+    })
+    for (const row of rows) {
+      const exists = await prisma.user_family_access.findFirst({
+        where: { userId: row.userId, familyId: toId, module: row.module },
       })
-      for (const row of rows) {
-        const userKey = row[userField] as string | undefined
-        if (!userKey) continue
-        try {
-          const exists = await client.findFirst({
-            where: { [userField]: userKey, familyId: toId },
-          })
-          if (exists) {
-            await client.delete({ where: { id: row.id } })
-          } else {
-            await client.update({ where: { id: row.id }, data: { familyId: toId } })
-            touched++
-          }
-        } catch {
-          /* skip row */
-        }
+      if (exists) {
+        await prisma.user_family_access.delete({ where: { id: row.id } })
+      } else {
+        await prisma.user_family_access.update({
+          where: { id: row.id },
+          data: { familyId: toId },
+        })
       }
-      if (rows.length > 0) {
-        console.log(`  → ${model}: remapeadas/limpiadas asignaciones TECHNOLOGY → ADMINISTRATIVE`)
-      }
-    } catch (e: any) {
-      console.warn(`  ⚠ ${model}:`, e?.message ?? e)
     }
+  } catch (e: any) {
+    console.warn('  ⚠ user_family_access:', e?.message ?? e)
   }
 
   await prisma.families.update({

@@ -63,7 +63,7 @@ export class InventoryDepartmentService {
 
   /**
    * Scope de gestión del gestor (asistente Compras, etc.).
-   * Deriva departamentos accesibles desde inventory_manager_families + familia nativa.
+   * Deriva departamentos accesibles desde user_family_access (módulo inventory) + familia nativa.
    */
   static async getManagerScope(managerId: string): Promise<ManagerScope> {
     const { getInventoryOperationalFamilyIds } = await import('@/lib/auth/family-scope')
@@ -74,12 +74,13 @@ export class InventoryDepartmentService {
     })
 
     const canManage = user?.canManageInventory === true
-    const familyIds = (await getInventoryOperationalFamilyIds(
-      managerId,
-      user?.role ?? 'TECHNICIAN',
-      false,
-      canManage
-    )) ?? []
+    const familyIds =
+      (await getInventoryOperationalFamilyIds(
+        managerId,
+        user?.role ?? 'TECHNICIAN',
+        false,
+        canManage
+      )) ?? []
 
     if (familyIds.length === 0) {
       return { type: 'none', familyIds: [], departmentIds: [] }

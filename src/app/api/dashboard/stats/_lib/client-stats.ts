@@ -96,45 +96,31 @@ export async function getClientStats(userId: string, canManageInventory: boolean
   }
 
   stats.isInventoryManager = canManageInventory
+  const { resolveModuleFamilyScopeIds } = await import('@/lib/auth/user-family-access')
+  const familySelect = { id: true, name: true, code: true, color: true, icon: true } as const
+
   if (canManageInventory) {
-    const invFamilies = await prisma.inventory_manager_families.findMany({
-      where: { managerId: userId },
-      select: {
-        family: { select: { id: true, name: true, code: true, color: true, icon: true } },
-      },
-    })
-    const enriched = await enrichFamiliesWithModules(invFamilies.map(a => a.family))
+    const invScopeIds = await resolveModuleFamilyScopeIds(userId, 'inventory', 'canView')
+    const invFamilies =
+      invScopeIds.length > 0
+        ? await prisma.families.findMany({
+            where: { id: { in: invScopeIds }, isActive: true },
+            select: familySelect,
+          })
+        : []
+    const enriched = await enrichFamiliesWithModules(invFamilies)
     stats.inventoryFamilies = enriched
     stats.assignedFamilies = enriched
   } else {
-    const [userDept, clientAssignments] = await Promise.all([
-      prisma.users.findUnique({
-        where: { id: userId },
-        select: {
-          departments: {
-            select: {
-              familyId: true,
-              family: { select: { id: true, name: true, code: true, color: true, icon: true } },
-            },
-          },
-        },
-      }),
-      prisma.client_family_assignments.findMany({
-        where: { clientId: userId, isActive: true },
-        select: {
-          family: { select: { id: true, name: true, code: true, color: true, icon: true } },
-        },
-      }),
-    ])
-    const familyMap = new Map<string, any>()
-    if (userDept?.departments?.family) {
-      const f = userDept.departments.family
-      familyMap.set(f.id, f)
-    }
-    for (const a of clientAssignments) {
-      if (a.family) familyMap.set(a.family.id, a.family)
-    }
-    stats.assignedFamilies = await enrichFamiliesWithModules(Array.from(familyMap.values()))
+    const ticketScopeIds = await resolveModuleFamilyScopeIds(userId, 'tickets')
+    const families =
+      ticketScopeIds.length > 0
+        ? await prisma.families.findMany({
+            where: { id: { in: ticketScopeIds }, isActive: true },
+            select: familySelect,
+          })
+        : []
+    stats.assignedFamilies = await enrichFamiliesWithModules(families)
   }
 
   return stats

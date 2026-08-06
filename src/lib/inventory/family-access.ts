@@ -10,7 +10,7 @@ import {
  * Scope de familias para inventario (ver family-scope.ts).
  *
  * - visibility: listados, dashboard, lectura
- * - operational: CRUD activos (admin solo nativa; gestor nativa + inventory_manager_families)
+ * - operational: CRUD activos (admin solo nativa; gestor nativa + grants inventory)
  * - consumer: solicitud de activos (canRequestAssets)
  *
  * ## Superficies API (no unificar a ciegas)

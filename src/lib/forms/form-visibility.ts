@@ -55,9 +55,8 @@ export async function getFormViewer(userId: string): Promise<FormViewer | null> 
   let familyIds: string[] = nativeFamilyId ? [nativeFamilyId] : []
 
   if (!(user.role === 'ADMIN' && user.isSuperAdmin)) {
-    const { getUserFamilyScope } = await import('@/lib/auth/admin-scope')
-    const scope = await getUserFamilyScope(userId, user.role, false)
-    familyIds = scope.familyIds ?? familyIds
+    const { resolveModuleFamilyScopeIds } = await import('@/lib/auth/user-family-access')
+    familyIds = await resolveModuleFamilyScopeIds(userId, 'content', 'canView')
   }
 
   return {

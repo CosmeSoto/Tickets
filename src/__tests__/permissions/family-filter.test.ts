@@ -24,12 +24,22 @@ jest.mock('@/lib/auth/admin-scope', () => ({
 jest.mock('@/lib/prisma', () => {
   const prismaMock = {
     users: { findUnique: jest.fn() },
-    admin_family_assignments: { findMany: jest.fn() },
-    technician_family_assignments: { findMany: jest.fn() },
-    inventory_manager_families: { findMany: jest.fn() },
     equipment_assignments: { findMany: jest.fn(), findFirst: jest.fn() },
     equipment: { findUnique: jest.fn() },
-    families: { findMany: jest.fn() },
+    departments: { findUnique: jest.fn().mockResolvedValue(null) },
+    families: {
+      findUnique: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn(async ({ where }: { where?: { id?: { in?: string[] } } }) => {
+        const ids = where?.id?.in ?? []
+        return ids.map((id: string) => ({ id }))
+      }),
+    },
+    user_family_access: {
+      findMany: jest.fn().mockResolvedValue([]),
+      count: jest.fn().mockResolvedValue(0),
+      upsert: jest.fn(),
+      updateMany: jest.fn(),
+    },
   }
   return {
     prisma: prismaMock,
@@ -38,17 +48,33 @@ jest.mock('@/lib/prisma', () => {
   }
 })
 
+jest.mock('@/lib/auth/user-family-access', () => ({
+  getUserModuleFamilyGrantIds: jest.fn().mockResolvedValue([]),
+  resolveModuleFamilyScopeIds: jest.fn(),
+  syncUserModuleFamilyAccess: jest.fn().mockResolvedValue(0),
+}))
+
 import { prisma } from '@/lib/prisma'
 import { getModuleFamilyIds } from '@/lib/auth/admin-scope'
+import { getUserModuleFamilyGrantIds } from '@/lib/auth/user-family-access'
 
 describe('Family Filter Middleware', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     ;(prisma.users.findUnique as jest.Mock).mockResolvedValue({
+      role: 'ADMIN',
+      departmentId: null,
       departments: { familyId: nativeFamilyId },
     })
     ;(getModuleFamilyIds as jest.Mock).mockResolvedValue([])
-    ;(prisma.inventory_manager_families.findMany as jest.Mock).mockResolvedValue([])
+    ;(getUserModuleFamilyGrantIds as jest.Mock).mockResolvedValue([])
+    ;(prisma.families.findUnique as jest.Mock).mockResolvedValue(null)
+    ;(prisma.families.findMany as jest.Mock).mockImplementation(
+      async ({ where }: { where?: { id?: { in?: string[] } } }) => {
+        const ids = where?.id?.in ?? []
+        return ids.map((id: string) => ({ id }))
+      }
+    )
   })
 
   describe('applyEquipmentFamilyFilter', () => {
@@ -92,7 +118,7 @@ describe('Family Filter Middleware', () => {
       expect(filter).toEqual({ familyId: { in: [nativeFamilyId] } })
     })
 
-    it('TECHNICIAN gestor: filtra por nativa e inventory_manager_families', async () => {
+    it('TECHNICIAN gestor: filtra por nativa y grants inventory', async () => {
       const context = {
         userId: 'tech-1',
         userRole: 'TECHNICIAN' as UserRole,
@@ -100,9 +126,7 @@ describe('Family Filter Middleware', () => {
         canManageInventory: true,
       }
 
-      ;(prisma.inventory_manager_families.findMany as jest.Mock).mockResolvedValue([
-        { familyId: 'family-1' },
-      ])
+      ;(getUserModuleFamilyGrantIds as jest.Mock).mockResolvedValue(['family-1'])
 
       const filter = await applyEquipmentFamilyFilter(context)
 

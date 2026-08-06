@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: true, data: families })
     }
 
-    // ── Clientes: scope consumer (nativa + asignaciones; TECHNOLOGY legacy remapeado) ──
+    // ── Clientes: scope consumer (nativa + user_family_access; TECHNOLOGY remapeado) ──
     if (session.user.role === 'CLIENT') {
       // Documentos/Noticias: solo familia nativa (o asignaciones si no hay nativa)
       if (searchParams.get('scope') === 'content') {
@@ -205,16 +205,10 @@ export async function GET(request: NextRequest) {
 
         // Si se pide un módulo específico, filtrar por las familias de ese módulo
         if (moduleFilter === 'inventory') {
-          const invAssigns = await prisma.inventory_manager_families.findMany({
-            where: { managerId: userId },
-            select: { familyId: true },
-          })
-          const nativeUser = await prisma.users.findUnique({
-            where: { id: userId },
-            select: { departments: { select: { familyId: true } } },
-          })
-          const allowedIds = new Set(invAssigns.map(a => a.familyId))
-          if (nativeUser?.departments?.familyId) allowedIds.add(nativeUser.departments.familyId)
+          const { resolveModuleFamilyScopeIds } = await import('@/lib/auth/user-family-access')
+          const allowedIds = new Set(
+            await resolveModuleFamilyScopeIds(userId, 'inventory', 'canView')
+          )
           families = families.filter(f => allowedIds.has(f.id))
         } else if (moduleFilter === 'patrols') {
           // scope=operational → solo nativa (crear/config); default = visibility (listas/reportes)
@@ -229,20 +223,13 @@ export async function GET(request: NextRequest) {
               families = families.filter(f => allowedIds.has(f.id))
             }
           } else {
-            const patrolAssigns = await prisma.patrol_family_assignments.findMany({
-              where: { userId, isActive: true },
-              select: { familyId: true },
-            })
-            const nativeUser = await prisma.users.findUnique({
-              where: { id: userId },
-              select: { departments: { select: { familyId: true } } },
-            })
-            const allowedIds = new Set(patrolAssigns.map(a => a.familyId))
-            if (nativeUser?.departments?.familyId) allowedIds.add(nativeUser.departments.familyId)
+            const { resolveModuleFamilyScopeIds } = await import('@/lib/auth/user-family-access')
+            const patrolIds = await resolveModuleFamilyScopeIds(userId, 'patrols', 'canView')
+            const allowedIds = new Set(patrolIds)
             families = families.filter(f => allowedIds.has(f.id))
           }
         } else if (moduleFilter === 'tickets') {
-          // Módulo de tickets: usar admin_family_assignments + nativa
+          // Módulo tickets: user_family_access + nativa
           const { getAdminFamilyScope } = await import('@/lib/auth/admin-scope')
           const scope = await getAdminFamilyScope(userId, false)
           if (scope.familyIds && scope.familyIds.length > 0) {

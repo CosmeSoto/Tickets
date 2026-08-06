@@ -9,7 +9,7 @@ import {
  *
  * - visibility: listados, reportes, dashboard, lectura de incidentes
  * - operational: configurar rutas/horarios/checkpoints (admin solo nativa;
- *   agente/supervisor en nativa + patrol_family_assignments)
+ *   agente/supervisor en nativa + grants patrols)
  * - soft delete (desactivar): ADMIN/TECH con acceso operational a la familia
  * - hard delete permanente: solo Super Admin
  */

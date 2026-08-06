@@ -261,7 +261,6 @@ export async function exportNewsModuleData(): Promise<Record<NewsModuleTable, un
 /** Orden de inserción respetando FKs del módulo patrols. */
 export const PATROLS_MODULE_RESTORE_ORDER = [
   'patrol_family_config',
-  'patrol_family_assignments',
   'patrol_checkpoints',
   'patrol_routes',
   'patrol_route_checkpoints',
@@ -275,7 +274,6 @@ export type PatrolsModuleTable = (typeof PATROLS_MODULE_RESTORE_ORDER)[number]
 
 const EMPTY_PATROLS_PAYLOAD: Record<PatrolsModuleTable, unknown[]> = {
   patrol_family_config: [],
-  patrol_family_assignments: [],
   patrol_checkpoints: [],
   patrol_routes: [],
   patrol_route_checkpoints: [],
@@ -288,21 +286,14 @@ const EMPTY_PATROLS_PAYLOAD: Record<PatrolsModuleTable, unknown[]> = {
 /**
  * Exporta solo datos del módulo patrols (JSON). */
 export async function exportPatrolsModuleData(): Promise<Record<PatrolsModuleTable, unknown[]>> {
-  const [
-    patrol_family_config,
-    patrol_family_assignments,
-    patrol_checkpoints,
-    patrol_routes,
-    patrol_schedules,
-    patrols,
-  ] = await Promise.all([
-    prisma.patrol_family_config.findMany(),
-    prisma.patrol_family_assignments.findMany(),
-    prisma.patrol_checkpoints.findMany(),
-    prisma.patrol_routes.findMany(),
-    prisma.patrol_schedules.findMany(),
-    prisma.patrols.findMany(),
-  ])
+  const [patrol_family_config, patrol_checkpoints, patrol_routes, patrol_schedules, patrols] =
+    await Promise.all([
+      prisma.patrol_family_config.findMany(),
+      prisma.patrol_checkpoints.findMany(),
+      prisma.patrol_routes.findMany(),
+      prisma.patrol_schedules.findMany(),
+      prisma.patrols.findMany(),
+    ])
 
   const routeIds = patrol_routes.map(r => r.id)
   const scheduleIds = patrol_schedules.map(s => s.id)
@@ -322,7 +313,6 @@ export async function exportPatrolsModuleData(): Promise<Record<PatrolsModuleTab
 
   return {
     patrol_family_config,
-    patrol_family_assignments,
     patrol_checkpoints,
     patrol_routes,
     patrol_route_checkpoints,
@@ -421,10 +411,7 @@ export const USERS_MODULE_RESTORE_ORDER = [
   'password_reset_tokens',
   'verification_tokens',
   'technician_assignments',
-  'admin_family_assignments',
-  'client_family_assignments',
-  'technician_family_assignments',
-  'inventory_manager_families',
+  'user_family_access',
 ] as const
 
 export type UsersModuleTable = (typeof USERS_MODULE_RESTORE_ORDER)[number]
@@ -441,10 +428,7 @@ const EMPTY_USERS_PAYLOAD: Record<UsersModuleTable, unknown[]> = {
   password_reset_tokens: [],
   verification_tokens: [],
   technician_assignments: [],
-  admin_family_assignments: [],
-  client_family_assignments: [],
-  technician_family_assignments: [],
-  inventory_manager_families: [],
+  user_family_access: [],
 }
 
 export async function exportUsersModuleData(): Promise<Record<UsersModuleTable, unknown[]>> {
@@ -472,10 +456,7 @@ export async function exportUsersModuleData(): Promise<Record<UsersModuleTable, 
     password_reset_tokens,
     verification_tokens,
     technician_assignments,
-    admin_family_assignments,
-    client_family_assignments,
-    technician_family_assignments,
-    inventory_manager_families,
+    user_family_access,
   ] = await Promise.all([
     departmentIds.length > 0
       ? prisma.departments.findMany({ where: { id: { in: departmentIds } } })
@@ -489,10 +470,9 @@ export async function exportUsersModuleData(): Promise<Record<UsersModuleTable, 
     prisma.password_reset_tokens.findMany({ where: { userId: { in: userIds } } }),
     prisma.verification_tokens.findMany(),
     prisma.technician_assignments.findMany({ where: { technicianId: { in: userIds } } }),
-    prisma.admin_family_assignments.findMany({ where: { adminId: { in: userIds } } }),
-    prisma.client_family_assignments.findMany({ where: { clientId: { in: userIds } } }),
-    prisma.technician_family_assignments.findMany({ where: { technicianId: { in: userIds } } }),
-    prisma.inventory_manager_families.findMany({ where: { managerId: { in: userIds } } }),
+    typeof (prisma as any).user_family_access?.findMany === 'function'
+      ? (prisma as any).user_family_access.findMany({ where: { userId: { in: userIds } } })
+      : Promise.resolve([]),
   ])
 
   return {
@@ -507,10 +487,7 @@ export async function exportUsersModuleData(): Promise<Record<UsersModuleTable, 
     password_reset_tokens: password_reset_tokens as unknown[],
     verification_tokens: verification_tokens as unknown[],
     technician_assignments: technician_assignments as unknown[],
-    admin_family_assignments: admin_family_assignments as unknown[],
-    client_family_assignments: client_family_assignments as unknown[],
-    technician_family_assignments: technician_family_assignments as unknown[],
-    inventory_manager_families: inventory_manager_families as unknown[],
+    user_family_access: user_family_access as unknown[],
   }
 }
 

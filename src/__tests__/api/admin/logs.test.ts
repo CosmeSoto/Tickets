@@ -2,36 +2,36 @@
  * Admin Logs API Tests
  */
 
-// Setup test environment for Next.js API routes
 import { TextEncoder, TextDecoder } from 'util'
 
-// Mock globals
+// Polyfill local compatible con NextResponse.json (no pisar Response.json del setup)
 Object.assign(global, {
   TextEncoder,
   TextDecoder,
-  Request: class MockRequest {
-    constructor(url: string, options: any = {}) {
-      this.url = url
-      this.method = options.method || 'GET'
-      this.headers = new Map(Object.entries(options.headers || {}))
-      this.body = options.body
-    }
-    url: string
-    method: string
+})
+
+if (typeof (globalThis as any).Response?.json !== 'function') {
+  class MockResponse {
+    _body: any
+    status: number
     headers: Map<string, string>
-    body: any
-  },
-  Response: class MockResponse {
     constructor(body: any, options: any = {}) {
-      this.body = body
+      this._body = body
       this.status = options.status || 200
       this.headers = new Map(Object.entries(options.headers || {}))
     }
-    body: any
-    status: number
-    headers: Map<string, string>
-  },
-})
+    static json(data: any, init: any = {}) {
+      return new MockResponse(JSON.stringify(data), {
+        status: init.status || 200,
+        headers: { 'Content-Type': 'application/json', ...(init.headers || {}) },
+      })
+    }
+    async json() {
+      return typeof this._body === 'string' ? JSON.parse(this._body) : this._body
+    }
+  }
+  ;(globalThis as any).Response = MockResponse
+}
 
 import { NextRequest } from 'next/server'
 import { GET, POST } from '@/app/api/admin/logs/route'

@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 import { invalidateCache, buildCacheKey } from '@/lib/api-cache'
 import { NotificationService } from '@/lib/services/notification-service'
+import { unassignUserModuleFamily, userHasFamilyInModule } from '@/lib/auth/user-family-access'
 
 export async function DELETE(
   request: NextRequest,
@@ -18,7 +19,6 @@ export async function DELETE(
 
     const { id: technicianId, familyId } = await params
 
-    // Verify target user is a TECHNICIAN
     const targetUser = await prisma.users.findUnique({
       where: { id: technicianId },
       select: { id: true, name: true, role: true },
@@ -27,36 +27,32 @@ export async function DELETE(
       return NextResponse.json({ error: 'Usuario no encontrado o no es técnico' }, { status: 404 })
     }
 
-    // RBAC: ADMIN can only manage families they have access to
     const viewer = await prisma.users.findUnique({
       where: { id: session.user.id },
       select: { isSuperAdmin: true },
     })
     if (!viewer?.isSuperAdmin) {
-      const adminAccess = await prisma.admin_family_assignments.findFirst({
-        where: { adminId: session.user.id, familyId, isActive: true },
-      })
-      if (!adminAccess) {
+      const hasAccess = await userHasFamilyInModule(session.user.id, 'tickets', familyId, 'canView')
+      if (!hasAccess) {
         return NextResponse.json({ error: 'No tienes acceso a esta familia' }, { status: 403 })
       }
     }
 
-    // Get family name for audit/notification
     const family = await prisma.families.findUnique({
       where: { id: familyId },
       select: { id: true, name: true },
     })
     if (!family) return NextResponse.json({ error: 'Familia no encontrada' }, { status: 404 })
 
-    // Find the assignment record
-    const assignment = await prisma.technician_family_assignments.findFirst({
-      where: { technicianId, familyId },
+    const row = await prisma.user_family_access.findUnique({
+      where: {
+        userId_familyId_module: { userId: technicianId, familyId, module: 'tickets' },
+      },
     })
-    if (!assignment) {
+    if (!row?.isActive) {
       return NextResponse.json({ error: 'Asignación no encontrada' }, { status: 404 })
     }
 
-    // Count active tickets assigned to this technician in this family
     const activeTickets = await prisma.tickets.count({
       where: {
         assigneeId: technicianId,
@@ -67,22 +63,23 @@ export async function DELETE(
 
     const force = request.nextUrl.searchParams.get('force')
 
-    // If there are active tickets and force is not set, require confirmation
     if (activeTickets > 0 && force !== 'true') {
       return NextResponse.json({ requiresConfirmation: true, activeTickets }, { status: 200 })
     }
 
-    // Delete the assignment record
-    const deletedRecord = { ...assignment }
-    await prisma.technician_family_assignments.delete({
-      where: { id: assignment.id },
+    const deletedRecord = { ...row }
+
+    await unassignUserModuleFamily({
+      userId: technicianId,
+      familyId,
+      moduleInput: 'tickets',
+      role: 'TECHNICIAN',
     })
 
-    // Audit log (fire and forget)
     AuditServiceComplete.log({
       action: AuditActionsComplete.TECHNICIAN_FAMILY_UNASSIGNED,
       entityType: 'assignment',
-      entityId: assignment.id,
+      entityId: row.id,
       userId: session.user.id,
       details: {
         targetUserId: technicianId,
@@ -94,7 +91,6 @@ export async function DELETE(
       oldValues: { ...deletedRecord },
     }).catch(err => console.error('[AUDIT] Failed to log technician_family_unassigned:', err))
 
-    // In-app notification (fire and forget)
     NotificationService.push({
       userId: technicianId,
       type: 'WARNING',
@@ -103,7 +99,6 @@ export async function DELETE(
       metadata: { type: 'technician_family_unassigned', familyId, familyName: family.name },
     }).catch(err => console.error('[NOTIFICATION] Failed to notify technician:', err))
 
-    // Cache invalidation
     await invalidateCache(buildCacheKey('user:modules', { userId: technicianId })).catch(() => {})
 
     return NextResponse.json({ success: true })

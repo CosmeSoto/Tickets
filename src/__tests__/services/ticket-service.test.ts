@@ -1,6 +1,6 @@
 // Mock Prisma and NotificationService
 jest.mock('@/lib/prisma', () => {
-  const mockPrisma = {
+  const mockPrisma: Record<string, unknown> = {
     tickets: {
       findMany: jest.fn(),
       findUnique: jest.fn(),
@@ -21,9 +21,6 @@ jest.mock('@/lib/prisma', () => {
       createMany: jest.fn(),
       findMany: jest.fn(),
     },
-    technician_family_assignments: {
-      findFirst: jest.fn(),
-    },
     ticket_family_config: {
       findFirst: jest.fn().mockResolvedValue(null),
     },
@@ -31,6 +28,9 @@ jest.mock('@/lib/prisma', () => {
       create: jest.fn(),
     },
   }
+  mockPrisma.$transaction = jest.fn(async (callback: (tx: typeof mockPrisma) => unknown) =>
+    callback(mockPrisma)
+  )
   return {
     __esModule: true,
     default: mockPrisma,
@@ -209,6 +209,7 @@ describe('TicketService', () => {
       priority: TicketPriority.HIGH,
       categoryId: '1',
       clientId: '1',
+      familyId: 'family-1',
     }
 
     it('should create a new ticket with valid data', async () => {

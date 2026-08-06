@@ -57,69 +57,48 @@ export async function GET(request: NextRequest) {
     // Aplicar restricción de familia según rol
     if (!isSuperAdmin && familyId) {
       if (role === 'ADMIN') {
-        // Admin normal: verificar si tiene asignaciones de familia
-        const adminAssignments = await prisma.admin_family_assignments.findMany({
-          where: { adminId: userId, isActive: true },
-          select: { familyId: true },
-        })
-
-        if (adminAssignments.length > 0) {
-          // Solo puede asignar a usuarios de sus familias
-          const allowedFamilyIds = adminAssignments.map(a => a.familyId)
-
-          if (!allowedFamilyIds.includes(familyId)) {
-            // La familia del activo no está entre las del admin
+        const { getUserFamilyScope } = await import('@/lib/auth/admin-scope')
+        const scope = await getUserFamilyScope(userId, 'ADMIN', false)
+        if (scope.familyIds && scope.familyIds.length > 0) {
+          if (!scope.familyIds.includes(familyId)) {
             return NextResponse.json({ users: [] })
           }
-
-          // Filtrar usuarios cuyos departamentos pertenecen a las familias del admin
           if (!departmentId) {
-            where.departments = {
-              familyId: { in: allowedFamilyIds },
-            }
+            where.departments = { familyId: { in: scope.familyIds } }
           }
         }
-        // Si no tiene asignaciones explícitas → sin restricción adicional
       } else {
-        // Gestor de inventario: solo familias asignadas
-        const managerAssignments = await prisma.inventory_manager_families.findMany({
-          where: { managerId: userId },
-          select: { familyId: true },
-        })
-
-        const allowedFamilyIds = managerAssignments.map(a => a.familyId)
+        const { resolveModuleFamilyScopeIds } = await import('@/lib/auth/user-family-access')
+        const allowedFamilyIds = await resolveModuleFamilyScopeIds(
+          userId,
+          'inventory',
+          'canOperate'
+        )
 
         if (!allowedFamilyIds.includes(familyId)) {
           return NextResponse.json({ users: [] })
         }
 
         if (!departmentId) {
-          where.departments = {
-            familyId: { in: allowedFamilyIds },
-          }
+          where.departments = { familyId: { in: allowedFamilyIds } }
         }
       }
     } else if (!isSuperAdmin && !familyId && !departmentId) {
-      // Sin familia ni departamento y no es super_admin: filtrar por departamentos de sus familias
       if (role === 'ADMIN') {
-        const adminAssignments = await prisma.admin_family_assignments.findMany({
-          where: { adminId: userId, isActive: true },
-          select: { familyId: true },
-        })
-        if (adminAssignments.length > 0) {
-          where.departments = {
-            familyId: { in: adminAssignments.map(a => a.familyId) },
-          }
+        const { getUserFamilyScope } = await import('@/lib/auth/admin-scope')
+        const scope = await getUserFamilyScope(userId, 'ADMIN', false)
+        if (scope.familyIds && scope.familyIds.length > 0) {
+          where.departments = { familyId: { in: scope.familyIds } }
         }
       } else {
-        const managerAssignments = await prisma.inventory_manager_families.findMany({
-          where: { managerId: userId },
-          select: { familyId: true },
-        })
-        if (managerAssignments.length > 0) {
-          where.departments = {
-            familyId: { in: managerAssignments.map(a => a.familyId) },
-          }
+        const { resolveModuleFamilyScopeIds } = await import('@/lib/auth/user-family-access')
+        const allowedFamilyIds = await resolveModuleFamilyScopeIds(
+          userId,
+          'inventory',
+          'canOperate'
+        )
+        if (allowedFamilyIds.length > 0) {
+          where.departments = { familyId: { in: allowedFamilyIds } }
         }
       }
     }

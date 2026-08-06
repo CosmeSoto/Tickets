@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 import { invalidateCache, buildCacheKey } from '@/lib/api-cache'
 import { NotificationService } from '@/lib/services/notification-service'
+import { getUserModuleFamilyGrantIds, setUserModuleFamilies } from '@/lib/auth/user-family-access'
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -21,7 +22,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'familyIds debe ser un array' }, { status: 400 })
     }
 
-    // Verify target user exists
     const targetUser = await prisma.users.findUnique({
       where: { id: userId },
       select: {
@@ -36,8 +36,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 })
     }
 
-    // RBAC: Admin Normal solo puede asignar familias dentro de su scope general.
-    // Super Admin puede asignar cualquier familia sin restricción.
     const viewer = await prisma.users.findUnique({
       where: { id: session.user.id },
       select: { isSuperAdmin: true },
@@ -58,51 +56,31 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
     }
 
-    // Fetch current inventory_manager_families for the user
-    const currentAssignments = await prisma.inventory_manager_families.findMany({
-      where: { managerId: userId },
-      select: { id: true, familyId: true },
-    })
-    const currentFamilyIds = new Set(currentAssignments.map(a => a.familyId))
-    const newFamilyIds = new Set(familyIds)
+    const currentFamilyIds = await getUserModuleFamilyGrantIds(userId, 'inventory')
+    const currentSet = new Set(currentFamilyIds)
+    const newSet = new Set(familyIds)
+    const added = familyIds.filter(id => !currentSet.has(id))
+    const removed = currentFamilyIds.filter(id => !newSet.has(id))
 
-    // Compute added and removed sets
-    const added = familyIds.filter(id => !currentFamilyIds.has(id))
-    const removed = currentAssignments.filter(a => !newFamilyIds.has(a.familyId))
-
-    // Fetch family names for audit/notification
-    const allFamilyIds = [...new Set([...added, ...removed.map(r => r.familyId)])]
+    const allFamilyIds = [...new Set([...added, ...removed])]
     const families = await prisma.families.findMany({
       where: { id: { in: allFamilyIds } },
       select: { id: true, name: true },
     })
     const familyMap = new Map(families.map(f => [f.id, f.name]))
 
-    // Execute in a transaction: delete removed, create added
-    const assignments = await prisma.$transaction(async tx => {
-      // Delete removed records
-      if (removed.length > 0) {
-        await tx.inventory_manager_families.deleteMany({
-          where: { id: { in: removed.map(r => r.id) } },
-        })
-      }
-
-      // Create added records
-      const created = await Promise.all(
-        added.map(familyId =>
-          tx.inventory_manager_families.create({
-            data: { managerId: userId, familyId },
-          })
-        )
-      )
-
-      // Return all current assignments after the transaction
-      return tx.inventory_manager_families.findMany({
-        where: { managerId: userId },
-      })
+    await setUserModuleFamilies({
+      userId,
+      moduleInput: 'inventory',
+      familyIds,
+      role: targetUser.role,
     })
 
-    // Fire-and-forget: audit + notify for each added family
+    const assignments = await prisma.user_family_access.findMany({
+      where: { userId, module: 'inventory', isActive: true },
+      select: { id: true, familyId: true },
+    })
+
     for (const familyId of added) {
       const familyName = familyMap.get(familyId) ?? familyId
       AuditServiceComplete.log({
@@ -128,22 +106,20 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }).catch(err => console.error('[NOTIFICATION] Failed to notify manager (assign):', err))
     }
 
-    // Fire-and-forget: audit + notify for each removed family
-    for (const record of removed) {
-      const familyName = familyMap.get(record.familyId) ?? record.familyId
+    for (const familyId of removed) {
+      const familyName = familyMap.get(familyId) ?? familyId
       AuditServiceComplete.log({
         action: AuditActionsComplete.MANAGER_FAMILY_UNASSIGNED,
         entityType: 'assignment',
-        entityId: record.id,
+        entityId: userId,
         userId: session.user.id,
         details: {
           targetUserId: userId,
           targetUserName: targetUser.name,
-          familyId: record.familyId,
+          familyId,
           familyName,
           targetRole: targetUser.role,
         },
-        oldValues: { ...record },
       }).catch(err => console.error('[AUDIT] Failed to log manager_family_unassigned:', err))
 
       NotificationService.push({
@@ -151,11 +127,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         type: 'WARNING',
         title: 'Familia de inventario desasignada',
         message: `Se te ha desasignado de la familia ${familyName}.`,
-        metadata: { type: 'manager_family_unassigned', familyId: record.familyId, familyName },
+        metadata: { type: 'manager_family_unassigned', familyId, familyName },
       }).catch(err => console.error('[NOTIFICATION] Failed to notify manager (unassign):', err))
     }
 
-    // Cache invalidation: user:modules and perm:inv
     await Promise.allSettled([
       invalidateCache(buildCacheKey('user:modules', { userId })),
       invalidateCache(buildCacheKey('perm:inv', { userId })),

@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 import { invalidateCache, buildCacheKey } from '@/lib/api-cache'
 import { NotificationService } from '@/lib/services/notification-service'
+import { assignUserModuleFamily } from '@/lib/auth/user-family-access'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -13,7 +14,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (session.user.role !== 'ADMIN')
       return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
 
-    // Only SUPER_ADMIN can assign families to admins
     const viewer = await prisma.users.findUnique({
       where: { id: session.user.id },
       select: { isSuperAdmin: true },
@@ -31,7 +31,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     if (!familyId) return NextResponse.json({ error: 'familyId es requerido' }, { status: 400 })
 
-    // Verify target user exists
     const targetUser = await prisma.users.findUnique({
       where: { id: adminId },
       select: { id: true, name: true, role: true, isSuperAdmin: true },
@@ -46,63 +45,44 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       )
     }
 
-    // Get family name for audit/notification
     const family = await prisma.families.findUnique({
       where: { id: familyId },
       select: { id: true, name: true },
     })
     if (!family) return NextResponse.json({ error: 'Familia no encontrada' }, { status: 404 })
 
-    // Check if assignment already exists
-    const existing = await prisma.admin_family_assignments.findFirst({
-      where: { adminId, familyId },
+    const existing = await prisma.user_family_access.findUnique({
+      where: {
+        userId_familyId_module: { userId: adminId, familyId, module: 'tickets' },
+      },
     })
-    if (existing) {
-      if (existing.isActive) {
-        return NextResponse.json(
-          { error: 'El administrador ya está asignado a esta familia' },
-          { status: 409 }
-        )
-      }
-      // Reactivate if inactive
-      const updated = await prisma.admin_family_assignments.update({
-        where: { id: existing.id },
-        data: { isActive: true },
-      })
-
-      AuditServiceComplete.log({
-        action: AuditActionsComplete.ADMIN_FAMILY_ASSIGNED,
-        entityType: 'assignment',
-        entityId: updated.id,
-        userId: session.user.id,
-        details: {
-          targetUserId: adminId,
-          targetUserName: targetUser.name,
-          familyId,
-          familyName: family.name,
-          targetRole: 'ADMIN',
-        },
-      }).catch(err => console.error('[AUDIT] Failed to log admin_family_assigned:', err))
-
-      NotificationService.push({
-        userId: adminId,
-        type: 'INFO',
-        title: 'Nueva familia asignada',
-        message: `Se te ha asignado a la familia ${family.name}.`,
-        metadata: { type: 'admin_family_assigned', familyId, familyName: family.name },
-      }).catch(err => console.error('[NOTIFICATION] Failed to notify admin:', err))
-
-      await invalidateCache(buildCacheKey('user:modules', { userId: adminId })).catch(() => {})
-
-      return NextResponse.json({ assignment: updated }, { status: 201 })
+    if (existing?.isActive) {
+      return NextResponse.json(
+        { error: 'El administrador ya está asignado a esta familia' },
+        { status: 409 }
+      )
     }
 
-    // Create assignment
-    const assignment = await prisma.admin_family_assignments.create({
-      data: { adminId, familyId, isActive: true },
+    await assignUserModuleFamily({
+      userId: adminId,
+      familyId,
+      moduleInput: 'tickets',
+      role: 'ADMIN',
     })
 
-    // Audit log (fire and forget)
+    const row = await prisma.user_family_access.findUnique({
+      where: {
+        userId_familyId_module: { userId: adminId, familyId, module: 'tickets' },
+      },
+    })
+
+    const assignment = {
+      id: row?.id ?? adminId,
+      adminId,
+      familyId,
+      isActive: true,
+    }
+
     AuditServiceComplete.log({
       action: AuditActionsComplete.ADMIN_FAMILY_ASSIGNED,
       entityType: 'assignment',
@@ -117,7 +97,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       },
     }).catch(err => console.error('[AUDIT] Failed to log admin_family_assigned:', err))
 
-    // In-app notification (fire and forget)
     NotificationService.push({
       userId: adminId,
       type: 'INFO',
@@ -126,12 +105,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       metadata: { type: 'admin_family_assigned', familyId, familyName: family.name },
     }).catch(err => console.error('[NOTIFICATION] Failed to notify admin:', err))
 
-    // Cache invalidation
     await invalidateCache(buildCacheKey('user:modules', { userId: adminId })).catch(() => {})
 
     return NextResponse.json({ assignment }, { status: 201 })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error assigning admin to family:', error)
-    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+    return NextResponse.json(
+      { error: error?.message ?? 'Error interno del servidor' },
+      { status: 400 }
+    )
   }
 }

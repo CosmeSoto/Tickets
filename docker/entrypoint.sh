@@ -266,6 +266,14 @@ elif [ "$DEPTS_CHECK" != "0" ]; then
   $TSX_CLI prisma/ensure-departments.ts || true
 fi
 
+# Acceso unificado a áreas (user_family_access) — sync idempotente desde tablas legacy
+echo "==> Sincronizando user_family_access (áreas por módulo)..."
+if $TSX_CLI prisma/sync-user-family-access.ts; then
+  echo "==> user_family_access sincronizado."
+else
+  echo "==> ADVERTENCIA: sync user_family_access falló (se reintentará en lazy-sync)."
+fi
+
 # Categorías de tickets — si el seed completo se omitió (ya hay usuarios) pero
 # categories quedó vacía, restaurarlas igual que ensure-catalogs.
 echo "==> Verificando categorías de tickets..."

@@ -192,9 +192,7 @@ export async function POST(request: NextRequest) {
  * (tiene asignaciones de familia para el módulo de patrullas).
  */
 async function hasPatrolSupervisorAccess(userId: string): Promise<boolean> {
-  const { default: prisma } = await import('@/lib/prisma')
-  const count = await prisma.patrol_family_assignments.count({
-    where: { userId, isActive: true },
-  })
-  return count > 0
+  const { getUserModuleFamilyGrantIds } = await import('@/lib/auth/user-family-access')
+  const grants = await getUserModuleFamilyGrantIds(userId, 'patrols')
+  return grants.length > 0
 }

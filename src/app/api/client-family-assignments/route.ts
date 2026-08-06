@@ -2,12 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { randomUUID } from 'crypto'
+import { assignUserModuleFamily } from '@/lib/auth/user-family-access'
 
 /**
- * GET /api/client-family-assignments?clientId=xxx
- * Lista las asignaciones de familias de un cliente.
- * Incluye activeTickets por familia para mostrar en la UI.
+ * @deprecated Preferir `/api/admin/users/:id/family-access` (module=tickets).
+ * Thin wrapper sobre user_family_access.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -20,8 +19,8 @@ export async function GET(request: NextRequest) {
     const clientId = searchParams.get('clientId')
     if (!clientId) return NextResponse.json({ error: 'clientId requerido' }, { status: 400 })
 
-    const assignments = await prisma.client_family_assignments.findMany({
-      where: { clientId },
+    const rows = await prisma.user_family_access.findMany({
+      where: { userId: clientId, module: 'tickets', isActive: true },
       include: {
         family: {
           select: { id: true, name: true, code: true, color: true, isActive: true },
@@ -30,8 +29,7 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'asc' },
     })
 
-    // Contar tickets activos del cliente por familia (para mostrar badge en UI)
-    const familyIds = assignments.map(a => a.familyId)
+    const familyIds = rows.map(a => a.familyId)
     const activeTicketCounts =
       familyIds.length > 0
         ? await prisma.tickets.groupBy({
@@ -47,25 +45,24 @@ export async function GET(request: NextRequest) {
 
     const ticketMap = Object.fromEntries(activeTicketCounts.map(t => [t.familyId, t._count.id]))
 
-    return NextResponse.json({
-      success: true,
-      data: assignments.map(a => ({
-        ...a,
-        activeTickets: ticketMap[a.familyId] ?? 0,
-      })),
-    })
+    const assignments = rows.map(row => ({
+      id: row.id,
+      clientId: row.userId,
+      familyId: row.familyId,
+      isActive: row.isActive,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      family: row.family,
+      activeTickets: ticketMap[row.familyId] ?? 0,
+    }))
+
+    return NextResponse.json({ success: true, data: assignments })
   } catch (error) {
     console.error('[GET /api/client-family-assignments]', error)
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
 }
 
-/**
- * POST /api/client-family-assignments
- * Body: { clientId, familyId }
- * Crea una asignación cliente-familia.
- * HTTP 409 si ya existe.
- */
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -77,7 +74,6 @@ export async function POST(request: NextRequest) {
     if (!clientId || !familyId)
       return NextResponse.json({ error: 'clientId y familyId son requeridos' }, { status: 400 })
 
-    // Validar que el usuario existe y es CLIENT
     const user = await prisma.users.findUnique({
       where: { id: clientId },
       select: { id: true, role: true },
@@ -89,48 +85,62 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
 
-    // Validar que la familia existe y está activa
     const family = await prisma.families.findUnique({
       where: { id: familyId },
-      select: { id: true, isActive: true },
+      select: { id: true, isActive: true, name: true, code: true, color: true },
     })
     if (!family) return NextResponse.json({ error: 'Familia no encontrada' }, { status: 404 })
     if (!family.isActive)
       return NextResponse.json({ error: 'La familia no está activa' }, { status: 400 })
 
-    // Verificar duplicado
-    const existing = await prisma.client_family_assignments.findUnique({
-      where: { clientId_familyId: { clientId, familyId } },
+    const existing = await prisma.user_family_access.findUnique({
+      where: {
+        userId_familyId_module: { userId: clientId, familyId, module: 'tickets' },
+      },
     })
-    if (existing) {
-      // Si existe pero está inactiva, reactivar
-      if (!existing.isActive) {
-        const reactivated = await prisma.client_family_assignments.update({
-          where: { clientId_familyId: { clientId, familyId } },
-          data: { isActive: true },
-        })
-        await invalidateClientCache(clientId)
-        return NextResponse.json({ success: true, data: reactivated }, { status: 200 })
-      }
+    if (existing?.isActive) {
       return NextResponse.json(
         { error: 'El cliente ya está asignado a esta familia' },
         { status: 409 }
       )
     }
 
-    const assignment = await prisma.client_family_assignments.create({
-      data: { id: randomUUID(), clientId, familyId, isActive: true },
-      include: {
-        family: { select: { id: true, name: true, code: true, color: true, isActive: true } },
+    await assignUserModuleFamily({
+      userId: clientId,
+      familyId,
+      moduleInput: 'tickets',
+      role: 'CLIENT',
+    })
+
+    const row = await prisma.user_family_access.findUnique({
+      where: {
+        userId_familyId_module: { userId: clientId, familyId, module: 'tickets' },
       },
     })
 
     await invalidateClientCache(clientId)
 
-    return NextResponse.json({ success: true, data: assignment }, { status: 201 })
-  } catch (error) {
+    const assignment = {
+      id: row?.id ?? clientId,
+      clientId,
+      familyId,
+      isActive: true,
+      family: {
+        id: family.id,
+        name: family.name,
+        code: family.code,
+        color: family.color,
+        isActive: family.isActive,
+      },
+    }
+
+    return NextResponse.json({ success: true, data: assignment }, { status: existing ? 200 : 201 })
+  } catch (error: any) {
     console.error('[POST /api/client-family-assignments]', error)
-    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+    return NextResponse.json(
+      { error: error?.message ?? 'Error interno del servidor' },
+      { status: 400 }
+    )
   }
 }
 

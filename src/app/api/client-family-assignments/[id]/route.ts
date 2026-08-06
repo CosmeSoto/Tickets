@@ -2,12 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { unassignUserModuleFamily } from '@/lib/auth/user-family-access'
 
-/**
- * DELETE /api/client-family-assignments/[id]?confirm=true
- * Elimina una asignación cliente-familia.
- * Si el cliente tiene tickets activos en esa familia, requiere ?confirm=true.
- */
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -22,23 +18,23 @@ export async function DELETE(
     const { searchParams } = new URL(request.url)
     const confirmed = searchParams.get('confirm') === 'true'
 
-    const assignment = await prisma.client_family_assignments.findUnique({
+    const row = await prisma.user_family_access.findUnique({
       where: { id },
       include: {
         family: { select: { name: true } },
+        user: { select: { role: true } },
       },
     })
 
-    if (!assignment) {
+    if (!row || row.module !== 'tickets' || row.user.role !== 'CLIENT') {
       return NextResponse.json({ error: 'Asignación no encontrada' }, { status: 404 })
     }
 
-    // Verificar tickets activos del cliente en esta familia
     if (!confirmed) {
       const activeTickets = await prisma.tickets.count({
         where: {
-          clientId: assignment.clientId,
-          familyId: assignment.familyId,
+          clientId: row.userId,
+          familyId: row.familyId,
           status: { notIn: ['RESOLVED', 'CLOSED'] },
         },
       })
@@ -49,18 +45,23 @@ export async function DELETE(
             success: false,
             requiresConfirmation: true,
             activeTickets,
-            message: `El cliente tiene ${activeTickets} ticket(s) activo(s) en "${assignment.family.name}". ¿Desasignar de todas formas?`,
+            message: `El cliente tiene ${activeTickets} ticket(s) activo(s) en "${row.family.name}". ¿Desasignar de todas formas?`,
           },
           { status: 200 }
         )
       }
     }
 
-    await prisma.client_family_assignments.delete({ where: { id } })
+    await unassignUserModuleFamily({
+      userId: row.userId,
+      familyId: row.familyId,
+      moduleInput: 'tickets',
+      role: 'CLIENT',
+    })
 
     try {
       const { invalidateCache } = await import('@/lib/api-cache')
-      await invalidateCache(`user:modules:${assignment.clientId}`)
+      await invalidateCache(`user:modules:${row.userId}`)
     } catch {
       /* Redis no disponible */
     }

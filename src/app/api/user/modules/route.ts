@@ -123,74 +123,50 @@ export async function GET(request: Request) {
   }
 
   const result = await withCache(cacheKey, 30, async () => {
-    // Obtener familias del usuario según su rol
+    const { getUserModuleFamilyGrantIds, isUserModuleAccessInitialized } =
+      await import('@/lib/auth/user-family-access')
+    const { getNativeFamilyId } = await import('@/lib/auth/family-scope')
+
+    // Obtener familias del usuario vía capa unificada (+ reglas legacy de admin vacío)
     let familyIds: string[] = []
+    const nativeFamilyId = await getNativeFamilyId(userId)
 
     if (role === 'ADMIN') {
       if (isSuperAdmin) {
-        // SuperAdmin: todas las familias activas
         const all = await prisma.families.findMany({
           where: { isActive: true },
           select: { id: true },
         })
         familyIds = all.map(f => f.id)
       } else {
-        const assignments = await prisma.admin_family_assignments.findMany({
-          where: { adminId: userId, isActive: true },
-          select: { familyId: true },
-        })
-        // Sin asignaciones explícitas → acceso total (admin legacy)
-        if (assignments.length === 0) {
+        const ticketGrants = await getUserModuleFamilyGrantIds(userId, 'tickets')
+        const ticketsInitialized = await isUserModuleAccessInitialized(userId, 'tickets')
+        // Sin asignaciones (ni legacy ni unificado) → acceso total (admin legacy)
+        if (!ticketsInitialized && ticketGrants.length === 0) {
           const all = await prisma.families.findMany({
             where: { isActive: true },
             select: { id: true },
           })
           familyIds = all.map(f => f.id)
         } else {
-          familyIds = assignments.map(a => a.familyId)
+          familyIds = [...ticketGrants]
         }
       }
     } else if (role === 'TECHNICIAN') {
-      const assignments = await prisma.technician_family_assignments.findMany({
-        where: { technicianId: userId, isActive: true },
-        select: { familyId: true },
-      })
-      familyIds = assignments.map(a => a.familyId)
-
-      // Agregar familias de inventario si es gestor explícito
+      familyIds = await getUserModuleFamilyGrantIds(userId, 'tickets')
       if (canManageInventory) {
-        const invAssignments = await prisma.inventory_manager_families.findMany({
-          where: { managerId: userId },
-          select: { familyId: true },
-        })
-        const invIds = invAssignments.map(a => a.familyId)
+        const invIds = await getUserModuleFamilyGrantIds(userId, 'inventory')
         familyIds = [...new Set([...familyIds, ...invIds])]
       }
-
-      // Agregar familias de rondas si tiene el módulo habilitado
       if (patrolsEnabled) {
-        const patrolAssignments = await prisma.patrol_family_assignments.findMany({
-          where: { userId, isActive: true },
-          select: { familyId: true },
-        })
-        const patrolIds = patrolAssignments.map(a => a.familyId)
+        const patrolIds = await getUserModuleFamilyGrantIds(userId, 'patrols')
         familyIds = [...new Set([...familyIds, ...patrolIds])]
       }
     } else if (role === 'CLIENT') {
-      // Familias explícitamente asignadas al cliente
-      const explicitAssignments = await prisma.client_family_assignments.findMany({
-        where: { clientId: userId, isActive: true },
-        select: { familyId: true },
-      })
-      const explicitIds = explicitAssignments.map(a => a.familyId)
+      const explicitIds = await getUserModuleFamilyGrantIds(userId, 'tickets')
 
       if (canManageInventory) {
-        // Gestor de inventario: sus familias de inventario + las explícitas de tickets
-        const invAssignments = await prisma.inventory_manager_families.findMany({
-          where: { managerId: userId },
-          select: { familyId: true },
-        })
-        const invIds = invAssignments.map(a => a.familyId)
+        const invIds = await getUserModuleFamilyGrantIds(userId, 'inventory')
         familyIds = [...new Set([...invIds, ...explicitIds])]
       } else {
         // Familias explícitas + familias derivadas de tickets existentes
@@ -203,31 +179,19 @@ export async function GET(request: Request) {
         familyIds = [...new Set([...explicitIds, ...ticketIds])]
       }
 
-      // Agregar familias de rondas si tiene el módulo habilitado
       if (patrolsEnabled) {
-        const patrolAssignments = await prisma.patrol_family_assignments.findMany({
-          where: { userId, isActive: true },
-          select: { familyId: true },
-        })
-        const patrolIds = patrolAssignments.map(a => a.familyId)
+        const patrolIds = await getUserModuleFamilyGrantIds(userId, 'patrols')
         familyIds = [...new Set([...familyIds, ...patrolIds])]
       }
     }
 
-    // Siempre incluir la familia nativa del usuario (derivada de su departamento)
-    // Para Super Admin no es necesario (ya tiene todas las familias)
-    if (!(role === 'ADMIN' && isSuperAdmin)) {
-      const userWithDept = await prisma.users.findUnique({
-        where: { id: userId },
-        select: {
-          departmentId: true,
-          departments: { select: { familyId: true } },
-        },
-      })
-      const nativeFamilyId = userWithDept?.departments?.familyId
-      if (nativeFamilyId && !familyIds.includes(nativeFamilyId)) {
-        familyIds = [...familyIds, nativeFamilyId]
-      }
+    // Familia nativa (Super Admin ya tiene todas)
+    if (
+      !(role === 'ADMIN' && isSuperAdmin) &&
+      nativeFamilyId &&
+      !familyIds.includes(nativeFamilyId)
+    ) {
+      familyIds = [...familyIds, nativeFamilyId]
     }
 
     if (familyIds.length === 0) {
@@ -296,13 +260,12 @@ export async function GET(request: Request) {
     const invMap = new Map(invConfigs.map(c => [c.familyId, c.inventoryEnabled]))
     const patrolMap = new Map(patrolConfigs.map(c => [c.familyId, c.patrolsEnabled]))
 
-    // Cargar asignaciones específicas por módulo para determinar qué familias ve en cada módulo
+    // Asignaciones por módulo (capa unificada)
     const ticketFamilyIds: Set<string> = new Set()
     const inventoryFamilyIds: Set<string> = new Set()
     const patrolFamilyIds: Set<string> = new Set()
 
     if (isSuperAdmin) {
-      // Super admin: todas las familias activas en todos los módulos
       const allActive = await prisma.families.findMany({
         where: { isActive: true },
         select: { id: true },
@@ -312,87 +275,24 @@ export async function GET(request: Request) {
         inventoryFamilyIds.add(f.id)
         patrolFamilyIds.add(f.id)
       })
-    } else if (role === 'ADMIN') {
-      // Admin normal: tickets usa admin_family_assignments
-      const adminAssigns = await prisma.admin_family_assignments.findMany({
-        where: { adminId: userId, isActive: true },
-        select: { familyId: true },
-      })
-      adminAssigns.forEach(a => ticketFamilyIds.add(a.familyId))
-      // Inventario: inventory_manager_families (independiente)
-      if (inventoryEnabled || canManageInventory) {
-        const invAssigns = await prisma.inventory_manager_families.findMany({
-          where: { managerId: userId },
-          select: { familyId: true },
-        })
-        invAssigns.forEach(a => inventoryFamilyIds.add(a.familyId))
-      }
-      // Rondas: patrol_family_assignments (independiente)
-      if (patrolsEnabled) {
-        const patrolAssigns = await prisma.patrol_family_assignments.findMany({
-          where: { userId, isActive: true },
-          select: { familyId: true },
-        })
-        patrolAssigns.forEach(a => patrolFamilyIds.add(a.familyId))
-      }
-    } else if (role === 'TECHNICIAN') {
-      // Tickets: technician_family_assignments
-      const techAssigns = await prisma.technician_family_assignments.findMany({
-        where: { technicianId: userId, isActive: true },
-        select: { familyId: true },
-      })
-      techAssigns.forEach(a => ticketFamilyIds.add(a.familyId))
-      // Inventario: inventory_manager_families
-      if (canManageInventory || inventoryEnabled) {
-        const invAssigns = await prisma.inventory_manager_families.findMany({
-          where: { managerId: userId },
-          select: { familyId: true },
-        })
-        invAssigns.forEach(a => inventoryFamilyIds.add(a.familyId))
-      }
-      // Rondas: patrol_family_assignments
-      if (patrolsEnabled) {
-        const patrolAssigns = await prisma.patrol_family_assignments.findMany({
-          where: { userId, isActive: true },
-          select: { familyId: true },
-        })
-        patrolAssigns.forEach(a => patrolFamilyIds.add(a.familyId))
-      }
-    } else if (role === 'CLIENT') {
-      // Tickets: client_family_assignments
-      const clientAssigns = await prisma.client_family_assignments.findMany({
-        where: { clientId: userId, isActive: true },
-        select: { familyId: true },
-      })
-      clientAssigns.forEach(a => ticketFamilyIds.add(a.familyId))
-      // Inventario: inventory_manager_families
-      if (canManageInventory || inventoryEnabled) {
-        const invAssigns = await prisma.inventory_manager_families.findMany({
-          where: { managerId: userId },
-          select: { familyId: true },
-        })
-        invAssigns.forEach(a => inventoryFamilyIds.add(a.familyId))
-      }
-      // Rondas: patrol_family_assignments
-      if (patrolsEnabled) {
-        const patrolAssigns = await prisma.patrol_family_assignments.findMany({
-          where: { userId, isActive: true },
-          select: { familyId: true },
-        })
-        patrolAssigns.forEach(a => patrolFamilyIds.add(a.familyId))
-      }
-    }
+    } else {
+      const ticketGrants = await getUserModuleFamilyGrantIds(userId, 'tickets')
+      ticketGrants.forEach(id => ticketFamilyIds.add(id))
 
-    // Siempre incluir familia nativa en todos los módulos habilitados
-    const nativeUser = await prisma.users.findUnique({
-      where: { id: userId },
-      select: { departments: { select: { familyId: true } } },
-    })
-    const nativeId = nativeUser?.departments?.familyId
-    if (nativeId) {
-      if (ticketsEnabled) ticketFamilyIds.add(nativeId)
-      if (inventoryEnabled || canManageInventory) inventoryFamilyIds.add(nativeId)
-      if (patrolsEnabled) patrolFamilyIds.add(nativeId)
+      if (inventoryEnabled || canManageInventory) {
+        const invGrants = await getUserModuleFamilyGrantIds(userId, 'inventory')
+        invGrants.forEach(id => inventoryFamilyIds.add(id))
+      }
+      if (patrolsEnabled) {
+        const patrolGrants = await getUserModuleFamilyGrantIds(userId, 'patrols')
+        patrolGrants.forEach(id => patrolFamilyIds.add(id))
+      }
+
+      if (nativeFamilyId) {
+        if (ticketsEnabled) ticketFamilyIds.add(nativeFamilyId)
+        if (inventoryEnabled || canManageInventory) inventoryFamilyIds.add(nativeFamilyId)
+        if (patrolsEnabled) patrolFamilyIds.add(nativeFamilyId)
+      }
     }
 
     // Cargar TODAS las familias que el usuario tiene en cualquier módulo

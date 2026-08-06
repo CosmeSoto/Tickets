@@ -4,7 +4,7 @@
  * Regla de negocio:
  * - Super Admin: recibe eventos de todas las familias.
  * - Admin de familia: solo el admin cuya familia NATIVA (departamento) coincide.
- *   Las familias adicionales en admin_family_assignments son para visibilidad/gestión,
+ *   Las familias adicionales en user_family_access son para visibilidad/gestión,
  *   no para recibir notificaciones operativas.
  */
 

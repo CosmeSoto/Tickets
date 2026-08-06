@@ -123,8 +123,7 @@ export async function GET(request: NextRequest) {
 
     // Filtro por familia del área de la categoría (resolutores)
     if (familyId && isCategoryResolvers) {
-      // Elegibles: nativa del área, Super Admin, o Admin con asignación a esa familia.
-      // (technician_family_assignments = solo consumo/crear tickets, no cola operativa)
+      // Elegibles: nativa del área, Super Admin, o Admin con grant tickets en esa familia.
       where.AND = [
         ...(where.AND ?? []),
         {
@@ -135,8 +134,8 @@ export async function GET(request: NextRequest) {
               AND: [
                 { role: 'ADMIN' },
                 {
-                  adminFamilyAssignments: {
-                    some: { familyId, isActive: true },
+                  userFamilyAccess: {
+                    some: { familyId, module: 'tickets', isActive: true },
                   },
                 },
               ],
@@ -149,15 +148,17 @@ export async function GET(request: NextRequest) {
       where.AND = [...(where.AND ?? []), { departments: { familyId } }]
     }
 
-    // Filtrar por familia de rondas: usuarios con patrol_family_assignments O departamento nativo
+    // Filtrar por familia de rondas: grants patrols O departamento nativo
     if (patrolFamilyId) {
       where.AND = [
         ...(where.AND ?? []),
         {
           OR: [
-            // Asignación explícita en patrol_family_assignments
-            { patrolFamilyAssignments: { some: { familyId: patrolFamilyId, isActive: true } } },
-            // Usuario cuyo departamento pertenece a la familia (nativa)
+            {
+              userFamilyAccess: {
+                some: { familyId: patrolFamilyId, module: 'patrols', isActive: true },
+              },
+            },
             { departments: { familyId: patrolFamilyId } },
           ],
         },
@@ -219,8 +220,12 @@ export async function GET(request: NextRequest) {
                   AND: [
                     { role: 'ADMIN' },
                     {
-                      adminFamilyAssignments: {
-                        some: { familyId: { in: effectiveFamilyIds }, isActive: true },
+                      userFamilyAccess: {
+                        some: {
+                          familyId: { in: effectiveFamilyIds },
+                          module: 'tickets',
+                          isActive: true,
+                        },
                       },
                     },
                   ],
@@ -297,8 +302,8 @@ export async function GET(request: NextRequest) {
       role === 'TECHNICIAN' || isCategoryResolvers || (rolesList?.includes('TECHNICIAN') ?? false)
     const technicianInclude = includeTechAssignments
       ? {
-          technicianFamilyAssignments: {
-            where: { isActive: true },
+          userFamilyAccess: {
+            where: { module: 'tickets', isActive: true },
             select: {
               familyId: true,
               family: { select: { id: true, name: true, code: true, color: true } },
@@ -325,7 +330,7 @@ export async function GET(request: NextRequest) {
           },
         }
       : {
-          technicianFamilyAssignments: false as const,
+          userFamilyAccess: false as const,
           technician_assignments: false as const,
         }
 
@@ -413,14 +418,19 @@ export async function GET(request: NextRequest) {
       // Normalizar departments -> department y technician_assignments -> technicianAssignments
       const normalizedUser: any = {
         ...user,
-        department: user.departments, // Cambiar departments a department
+        department: user.departments,
         technicianAssignments: user.technician_assignments?.map((assignment: any) => ({
           ...assignment,
-          category: assignment.categories, // Cambiar categories a category (singular)
+          category: assignment.categories,
+        })),
+        technicianFamilyAssignments: (user as any).userFamilyAccess?.map((a: any) => ({
+          familyId: a.familyId,
+          family: a.family,
         })),
       }
-      delete normalizedUser.departments // Eliminar departments
-      delete normalizedUser.technician_assignments // Eliminar snake_case
+      delete normalizedUser.departments
+      delete normalizedUser.technician_assignments
+      delete normalizedUser.userFamilyAccess
 
       if (user.role === 'TECHNICIAN') {
         const canDelete =

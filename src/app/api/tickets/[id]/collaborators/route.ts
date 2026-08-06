@@ -111,12 +111,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     )
   }
 
-  // Verificar que el colaborador pertenece a la familia del ticket (si aplica)
+  // Verificar que el colaborador pertenece a la familia del ticket (nativa o grant)
   if (ticket.familyId) {
-    const familyAssignment = await prisma.technician_family_assignments.findFirst({
-      where: { technicianId: collaboratorId, familyId: ticket.familyId, isActive: true },
-    })
-    if (!familyAssignment) {
+    const { userHasFamilyInModule } = await import('@/lib/auth/user-family-access')
+    const inFamily = await userHasFamilyInModule(collaboratorId, 'tickets', ticket.familyId)
+    if (!inFamily) {
       return NextResponse.json(
         {
           success: false,

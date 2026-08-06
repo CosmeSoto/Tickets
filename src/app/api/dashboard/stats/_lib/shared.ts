@@ -198,11 +198,22 @@ export async function getFamilyMetrics(scopeFamilyIds?: string[]) {
       _count: { id: true },
     })
 
-    const techCounts = await prisma.technician_family_assignments.groupBy({
-      by: ['familyId'],
+    const techDeptCounts = await prisma.departments.findMany({
       where: { familyId: { in: familyIds }, isActive: true },
-      _count: { id: true },
+      select: {
+        familyId: true,
+        users: {
+          where: { role: 'TECHNICIAN', isActive: true },
+          select: { id: true },
+        },
+      },
     })
+
+    const techMap = new Map<string, number>()
+    for (const dept of techDeptCounts) {
+      if (!dept.familyId) continue
+      techMap.set(dept.familyId, (techMap.get(dept.familyId) ?? 0) + dept.users.length)
+    }
 
     const equipmentCounts = await prisma.equipment.groupBy({
       by: ['typeId', 'status'],
@@ -225,11 +236,6 @@ export async function getFamilyMetrics(scopeFamilyIds?: string[]) {
       if (row.status === 'OPEN') entry.open = row._count.id
       if (row.status === 'IN_PROGRESS') entry.inProgress = row._count.id
       ticketMap.set(row.familyId, entry)
-    }
-
-    const techMap = new Map<string, number>()
-    for (const row of techCounts) {
-      techMap.set(row.familyId, row._count.id)
     }
 
     const typeToFamily = new Map<string, string>()
@@ -315,7 +321,12 @@ export async function getProactiveAlerts() {
       where: {
         isActive: true,
         ticketFamilyConfig: { ticketsEnabled: true },
-        technicianFamilyAssignments: { none: { isActive: true } },
+        departments: {
+          none: {
+            isActive: true,
+            users: { some: { role: 'TECHNICIAN', isActive: true } },
+          },
+        },
       },
       select: { id: true, name: true },
     })

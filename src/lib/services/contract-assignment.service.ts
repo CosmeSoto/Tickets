@@ -100,14 +100,14 @@ export class ContractAssignmentService {
       throw new Error('Solo se pueden asignar usuarios con rol Cliente')
     }
 
-    const familyAccess = await prisma.client_family_assignments.findFirst({
-      where: {
-        clientId: data.clientId,
-        familyId: contract.familyId,
-        isActive: true,
-      },
-    })
-    if (!familyAccess) {
+    const { userHasFamilyInModule } = await import('@/lib/auth/user-family-access')
+    const hasAccess = await userHasFamilyInModule(
+      data.clientId,
+      'tickets',
+      contract.familyId,
+      'canConsume'
+    )
+    if (!hasAccess) {
       throw new Error('El cliente no tiene acceso al área de este contrato')
     }
 

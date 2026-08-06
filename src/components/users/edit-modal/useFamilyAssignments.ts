@@ -30,6 +30,7 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
   const [inventoryFamilyIds, setInventoryFamilyIds] = useState<string[]>([])
   const [patrolFamilyIds, setPatrolFamilyIds] = useState<string[]>([])
   const [adminFamilyIds, setAdminFamilyIds] = useState<string[]>([])
+  const [contentFamilyIds, setContentFamilyIds] = useState<string[]>([])
   const [adminScopeIds, setAdminScopeIds] = useState<string[]>([])
   const [confirmUnassign, setConfirmUnassign] = useState<{
     familyId: string
@@ -83,16 +84,16 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
   const handleAssignTechnicianFamily = async (familyId: string) => {
     if (!user) return
     try {
-      const res = await fetch(`/api/admin/users/${user.id}/families/technician`, {
+      const res = await fetch(`/api/admin/users/${user.id}/family-access`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ familyId }),
+        body: JSON.stringify({ module: 'tickets', familyId }),
       })
       if (!res.ok) {
         const data = await res.json()
-        throw new Error(data.message ?? 'Error al asignar familia')
+        throw new Error(data.error ?? data.message ?? 'Error al asignar familia')
       }
-      setTechnicianFamilyIds(prev => [...prev, familyId])
+      setTechnicianFamilyIds(prev => (prev.includes(familyId) ? prev : [...prev, familyId]))
       invalidateModulesCache()
     } catch (err) {
       showNetworkError(err)
@@ -153,16 +154,16 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
   const handleAssignClientFamily = async (familyId: string) => {
     if (!user) return
     try {
-      const res = await fetch(`/api/admin/users/${user.id}/families/client`, {
+      const res = await fetch(`/api/admin/users/${user.id}/family-access`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ familyId }),
+        body: JSON.stringify({ module: 'tickets', familyId }),
       })
       if (!res.ok) {
         const data = await res.json()
-        throw new Error(data.message ?? 'Error al asignar familia')
+        throw new Error(data.error ?? data.message ?? 'Error al asignar familia')
       }
-      setClientFamilyIds(prev => [...prev, familyId])
+      setClientFamilyIds(prev => (prev.includes(familyId) ? prev : [...prev, familyId]))
       invalidateModulesCache()
     } catch (err) {
       showNetworkError(err)
@@ -172,12 +173,13 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
   const handleUnassignClientFamily = async (familyId: string) => {
     if (!user) return
     try {
-      const res = await fetch(`/api/admin/users/${user.id}/families/client/${familyId}`, {
-        method: 'DELETE',
-      })
+      const res = await fetch(
+        `/api/admin/users/${user.id}/family-access?module=tickets&familyId=${familyId}`,
+        { method: 'DELETE' }
+      )
       if (!res.ok) {
         const data = await res.json()
-        throw new Error(data.message ?? 'Error al desasignar familia')
+        throw new Error(data.error ?? data.message ?? 'Error al desasignar familia')
       }
       setClientFamilyIds(prev => prev.filter(id => id !== familyId))
       invalidateModulesCache()
@@ -190,14 +192,14 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
     if (!user) return
     try {
       const newIds = [...inventoryFamilyIds, familyId]
-      const res = await fetch(`/api/admin/users/${user.id}/families/inventory`, {
+      const res = await fetch(`/api/admin/users/${user.id}/family-access`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ familyIds: newIds }),
+        body: JSON.stringify({ module: 'inventory', familyIds: newIds }),
       })
       if (!res.ok) {
         const data = await res.json()
-        throw new Error(data.message ?? 'Error al asignar familia')
+        throw new Error(data.error ?? data.message ?? 'Error al asignar familia')
       }
       setInventoryFamilyIds(newIds)
       invalidateModulesCache()
@@ -210,14 +212,14 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
     if (!user) return
     try {
       const newIds = inventoryFamilyIds.filter(id => id !== familyId)
-      const res = await fetch(`/api/admin/users/${user.id}/families/inventory`, {
+      const res = await fetch(`/api/admin/users/${user.id}/family-access`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ familyIds: newIds }),
+        body: JSON.stringify({ module: 'inventory', familyIds: newIds }),
       })
       if (!res.ok) {
         const data = await res.json()
-        throw new Error(data.message ?? 'Error al desasignar familia')
+        throw new Error(data.error ?? data.message ?? 'Error al desasignar familia')
       }
       setInventoryFamilyIds(newIds)
       invalidateModulesCache()
@@ -229,16 +231,16 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
   const handleAssignPatrolFamily = async (familyId: string) => {
     if (!user) return
     try {
-      const res = await fetch('/api/patrol-family-assignments', {
+      const res = await fetch(`/api/admin/users/${user.id}/family-access`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id, familyId }),
+        body: JSON.stringify({ module: 'patrols', familyId }),
       })
       if (!res.ok) {
         const data = await res.json()
         throw new Error(data.error ?? 'Error al asignar familia')
       }
-      setPatrolFamilyIds(prev => [...prev, familyId])
+      setPatrolFamilyIds(prev => (prev.includes(familyId) ? prev : [...prev, familyId]))
       invalidateModulesCache()
     } catch (err) {
       showNetworkError(err)
@@ -249,7 +251,7 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
     if (!user) return
     try {
       const res = await fetch(
-        `/api/patrol-family-assignments?userId=${user.id}&familyId=${familyId}`,
+        `/api/admin/users/${user.id}/family-access?module=patrols&familyId=${familyId}`,
         { method: 'DELETE' }
       )
       if (!res.ok) {
@@ -266,16 +268,16 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
   const handleAssignAdminFamily = async (familyId: string) => {
     if (!user) return
     try {
-      const res = await fetch(`/api/admin/users/${user.id}/families/admin`, {
+      const res = await fetch(`/api/admin/users/${user.id}/family-access`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ familyId }),
+        body: JSON.stringify({ module: 'tickets', familyId }),
       })
       if (!res.ok) {
         const data = await res.json()
-        throw new Error(data.message ?? 'Error al asignar familia')
+        throw new Error(data.error ?? data.message ?? 'Error al asignar familia')
       }
-      setAdminFamilyIds(prev => [...prev, familyId])
+      setAdminFamilyIds(prev => (prev.includes(familyId) ? prev : [...prev, familyId]))
       invalidateModulesCache()
     } catch (err) {
       showNetworkError(err)
@@ -285,14 +287,53 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
   const handleUnassignAdminFamily = async (familyId: string) => {
     if (!user) return
     try {
-      const res = await fetch(`/api/admin/users/${user.id}/families/admin/${familyId}`, {
-        method: 'DELETE',
+      const res = await fetch(
+        `/api/admin/users/${user.id}/family-access?module=tickets&familyId=${familyId}`,
+        { method: 'DELETE' }
+      )
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error ?? data.message ?? 'Error al desasignar familia')
+      }
+      setAdminFamilyIds(prev => prev.filter(id => id !== familyId))
+      invalidateModulesCache()
+    } catch (err) {
+      showNetworkError(err)
+    }
+  }
+
+  /** Áreas del módulo unificado `content` (Documentos + Noticias). */
+  const handleAssignContentFamily = async (familyId: string) => {
+    if (!user) return
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}/family-access`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ module: 'content', familyId }),
       })
       if (!res.ok) {
         const data = await res.json()
-        throw new Error(data.message ?? 'Error al desasignar familia')
+        throw new Error(data.error ?? 'Error al asignar área de contenido')
       }
-      setAdminFamilyIds(prev => prev.filter(id => id !== familyId))
+      setContentFamilyIds(prev => (prev.includes(familyId) ? prev : [...prev, familyId]))
+      invalidateModulesCache()
+    } catch (err) {
+      showNetworkError(err)
+    }
+  }
+
+  const handleUnassignContentFamily = async (familyId: string) => {
+    if (!user) return
+    try {
+      const res = await fetch(
+        `/api/admin/users/${user.id}/family-access?module=content&familyId=${familyId}`,
+        { method: 'DELETE' }
+      )
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error ?? 'Error al desasignar área de contenido')
+      }
+      setContentFamilyIds(prev => prev.filter(id => id !== familyId))
       invalidateModulesCache()
     } catch (err) {
       showNetworkError(err)
@@ -408,47 +449,62 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
           }
         }
 
-        if (user.role === 'TECHNICIAN') {
-          const res = await fetch(`/api/technician-family-assignments?technicianId=${user.id}`)
-          if (res.ok) {
-            const data = await res.json()
-            const assignments = data.data ?? data ?? []
-            setTechnicianFamilyIds(assignments.map((a: any) => a.familyId))
+        // Snapshot unificado (tickets / inventory / patrols / content)
+        const accessRes = await fetch(`/api/admin/users/${user.id}/family-access`)
+        if (accessRes.ok) {
+          const data = await accessRes.json()
+          const modules: Array<{ module: string; familyIds: string[] }> = data.data?.modules ?? []
+          const byModule = (key: string) => modules.find(m => m.module === key)?.familyIds ?? []
+
+          const ticketIds = byModule('tickets')
+          if (user.role === 'TECHNICIAN') setTechnicianFamilyIds(ticketIds)
+          if (user.role === 'CLIENT') setClientFamilyIds(ticketIds)
+          if (user.role === 'ADMIN' && !user.isSuperAdmin) setAdminFamilyIds(ticketIds)
+
+          setInventoryFamilyIds(byModule('inventory'))
+          setPatrolFamilyIds(byModule('patrols'))
+          setContentFamilyIds(byModule('content'))
+        } else {
+          // Fallback legacy si la API unificada aún no está disponible
+          if (user.role === 'TECHNICIAN') {
+            const res = await fetch(`/api/technician-family-assignments?technicianId=${user.id}`)
+            if (res.ok) {
+              const data = await res.json()
+              const assignments = data.data ?? data ?? []
+              setTechnicianFamilyIds(assignments.map((a: any) => a.familyId))
+            }
           }
-        }
-
-        if (user.role === 'CLIENT') {
-          const res = await fetch(`/api/client-family-assignments?clientId=${user.id}`)
-          if (res.ok) {
-            const data = await res.json()
-            const assignments = data.data ?? data ?? []
-            setClientFamilyIds(assignments.map((a: any) => a.familyId))
+          if (user.role === 'CLIENT') {
+            const res = await fetch(`/api/client-family-assignments?clientId=${user.id}`)
+            if (res.ok) {
+              const data = await res.json()
+              const assignments = data.data ?? data ?? []
+              setClientFamilyIds(assignments.map((a: any) => a.familyId))
+            }
           }
-        }
-
-        const invRes = await fetch(`/api/inventory/managers/${user.id}/families`)
-        if (invRes.ok) {
-          const data = await invRes.json()
-          const families = data.families ?? data.data ?? data ?? []
-          setInventoryFamilyIds(
-            Array.isArray(families) ? families.map((f: any) => f.familyId ?? f.id) : []
-          )
-        }
-
-        const patrolRes = await fetch(`/api/patrol-family-assignments?userId=${user.id}`)
-        if (patrolRes.ok) {
-          const data = await patrolRes.json()
-          const assignments = data.data ?? []
-          setPatrolFamilyIds(assignments.map((a: any) => a.familyId))
-        }
-
-        if (user.role === 'ADMIN' && !user.isSuperAdmin) {
-          const res = await fetch(`/api/admin/family-assignments?adminId=${user.id}`)
-          if (res.ok) {
-            const data = await res.json()
+          const invRes = await fetch(`/api/inventory/managers/${user.id}/families`)
+          if (invRes.ok) {
+            const data = await invRes.json()
+            const families = data.families ?? data.data ?? data ?? []
+            setInventoryFamilyIds(
+              Array.isArray(families) ? families.map((f: any) => f.familyId ?? f.id) : []
+            )
+          }
+          const patrolRes = await fetch(`/api/patrol-family-assignments?userId=${user.id}`)
+          if (patrolRes.ok) {
+            const data = await patrolRes.json()
             const assignments = data.data ?? []
-            setAdminFamilyIds(assignments.map((a: any) => a.familyId))
+            setPatrolFamilyIds(assignments.map((a: any) => a.familyId))
           }
+          if (user.role === 'ADMIN' && !user.isSuperAdmin) {
+            const res = await fetch(`/api/admin/family-assignments?adminId=${user.id}`)
+            if (res.ok) {
+              const data = await res.json()
+              const assignments = data.data ?? []
+              setAdminFamilyIds(assignments.map((a: any) => a.familyId))
+            }
+          }
+          setContentFamilyIds([])
         }
       } catch (err) {
         setFamilyError('Error al cargar familias')
@@ -471,6 +527,7 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
     inventoryFamilyIds,
     patrolFamilyIds,
     adminFamilyIds,
+    contentFamilyIds,
     adminScopeIds,
     loadingFamilies,
     familyError,
@@ -495,6 +552,8 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
     handleUnassignPatrolFamily,
     handleAssignAdminFamily,
     handleUnassignAdminFamily,
+    handleAssignContentFamily,
+    handleUnassignContentFamily,
     setConfirmUnassign,
     setPendingUnassignFamilyId,
   }

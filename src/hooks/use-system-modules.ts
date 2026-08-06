@@ -73,7 +73,7 @@ const FALLBACK: SystemModule[] = [
     defaultForTech: false,
     defaultForClient: false,
     requiresManager: false,
-    familyScoped: false,
+    familyScoped: true,
   },
   {
     key: 'forms',
@@ -86,7 +86,7 @@ const FALLBACK: SystemModule[] = [
     defaultForTech: false,
     defaultForClient: false,
     requiresManager: true,
-    familyScoped: false,
+    familyScoped: true,
   },
 ]
 
@@ -128,14 +128,14 @@ export function getModuleRoleDescription(moduleKey: string, role: string): strin
       CLIENT: 'Ejecutar rondas de seguridad asignadas como agente',
     },
     news: {
-      ADMIN: 'Crear, publicar y gestionar noticias y comunicados del sistema',
-      TECHNICIAN: 'Ver noticias · con permiso de crear puede publicar en su alcance',
-      CLIENT: 'Ver noticias · con permiso de crear puede publicar solo en su área',
+      ADMIN: 'Crear y publicar en áreas de contenido (compartidas con Documentos)',
+      TECHNICIAN: 'Ver · con permiso de crear publica en áreas de contenido asignadas',
+      CLIENT: 'Ver · con permiso de crear publica en su nativa + áreas de contenido',
     },
     forms: {
-      ADMIN: 'Gestionar documentos del sistema',
-      TECHNICIAN: 'Ver documentos · con permiso de crear puede publicar en su alcance',
-      CLIENT: 'Ver documentos · con permiso de crear puede publicar solo en su área',
+      ADMIN: 'Gestionar documentos en áreas de contenido (compartidas con Noticias)',
+      TECHNICIAN: 'Ver · con permiso de crear publica en áreas de contenido asignadas',
+      CLIENT: 'Ver · con permiso de crear publica en su nativa + áreas de contenido',
     },
   }
   return descriptions[moduleKey]?.[role] ?? 'Acceso al módulo'
@@ -158,6 +158,16 @@ export function getAdditionalFamilyHint(moduleKey: string, role: string): string
       ADMIN: 'Áreas adicionales de gestión de activos (según permiso).',
       TECHNICIAN: 'Áreas donde puede solicitar o gestionar activos.',
       CLIENT: 'Áreas donde puede solicitar equipos o mantenimientos.',
+    },
+    news: {
+      ADMIN: 'Áreas de contenido (mismas que Documentos).',
+      TECHNICIAN: 'Áreas de contenido donde puede publicar (mismas que Documentos).',
+      CLIENT: 'Áreas de contenido donde puede publicar (mismas que Documentos).',
+    },
+    forms: {
+      ADMIN: 'Áreas de contenido (mismas que Noticias).',
+      TECHNICIAN: 'Áreas de contenido donde puede publicar (mismas que Noticias).',
+      CLIENT: 'Áreas de contenido donde puede publicar (mismas que Noticias).',
     },
   }
   return hints[moduleKey]?.[role] ?? null

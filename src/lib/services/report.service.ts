@@ -244,7 +244,10 @@ export class ReportService {
       resolverWhere.OR = [
         {
           role: 'TECHNICIAN',
-          technicianFamilyAssignments: { some: { familyId: familyFilter, isActive: true } },
+          departments: {
+            familyId: familyFilter,
+            isActive: true,
+          },
         },
         { role: 'ADMIN' },
       ]

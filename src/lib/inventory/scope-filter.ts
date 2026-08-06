@@ -2,9 +2,9 @@
  * Helper centralizado para aplicar filtrado de scope de inventario.
  * Usado por todos los endpoints de inventario que necesitan restringir datos por familia.
  *
- * Para Admin Normal: usa inventory_manager_families + familia nativa
+ * Para Admin Normal: user_family_access (módulo inventory) + familia nativa
  * Para Super Admin: sin restricción
- * Para Gestores (canManageInventory): sus familias en inventory_manager_families
+ * Para Gestores (canManageInventory): grants inventory en user_family_access + nativa
  */
 
 import { getAccessibleFamilyIds } from './family-access'

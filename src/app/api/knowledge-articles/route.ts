@@ -7,7 +7,7 @@ import prisma from '@/lib/prisma'
  * GET /api/knowledge-articles
  * Filtra artículos por familia según el rol del usuario:
  * - ADMIN: sin filtro de familia
- * - TECHNICIAN: solo familias asignadas en technician_family_assignments
+ * - TECHNICIAN: solo familias con grant en user_family_access (módulo content)
  * - CLIENT: solo familias de los departamentos de sus tickets
  */
 export async function GET(request: NextRequest) {
@@ -43,46 +43,16 @@ export async function GET(request: NextRequest) {
     // Filtro de familia según rol
     const role = session.user.role
 
-    if (role === 'TECHNICIAN') {
-      // Solo artículos de familias asignadas al técnico
-      const assignments = await prisma.technician_family_assignments.findMany({
-        where: { technicianId: session.user.id, isActive: true },
-        select: { familyId: true },
-      })
-      const assignedFamilyIds = assignments.map(a => a.familyId)
+    if (role === 'TECHNICIAN' || role === 'CLIENT') {
+      // Scope unificado tickets (nativa + grants) — no inferir desde tickets
+      const { resolveModuleFamilyScopeIds } = await import('@/lib/auth/user-family-access')
+      const assignedFamilyIds = await resolveModuleFamilyScopeIds(session.user.id, 'tickets')
 
       if (assignedFamilyIds.length > 0) {
         const effectiveIds = familyId
           ? assignedFamilyIds.filter(id => id === familyId)
           : assignedFamilyIds
         // Artículos de sus familias O sin familia (legado), combinado con búsqueda si existe
-        const familyCondition = [{ familyId: { in: effectiveIds } }, { familyId: null }]
-        where.AND = [
-          { OR: familyCondition },
-          ...(textSearchCondition ? [{ OR: textSearchCondition }] : []),
-        ]
-      } else if (textSearchCondition) {
-        where.OR = textSearchCondition
-      }
-    } else if (role === 'CLIENT') {
-      // SECURITY: usar client_family_assignments, no inferir desde tickets
-      const [userDept, clientAssignments] = await Promise.all([
-        prisma.users.findUnique({
-          where: { id: session.user.id },
-          select: { departments: { select: { familyId: true } } },
-        }),
-        prisma.client_family_assignments.findMany({
-          where: { clientId: session.user.id, isActive: true },
-          select: { familyId: true },
-        }),
-      ])
-      const allowedIds = new Set<string>(clientAssignments.map(a => a.familyId))
-      if (userDept?.departments?.familyId) allowedIds.add(userDept.departments.familyId)
-
-      if (allowedIds.size > 0) {
-        const effectiveIds = familyId
-          ? Array.from(allowedIds).filter(id => id === familyId)
-          : Array.from(allowedIds)
         const familyCondition = [{ familyId: { in: effectiveIds } }, { familyId: null }]
         where.AND = [
           { OR: familyCondition },

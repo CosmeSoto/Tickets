@@ -2,10 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
+import { unassignUserModuleFamily } from '@/lib/auth/user-family-access'
+import { invalidateCache } from '@/lib/api-cache'
 
-// DELETE /api/technician-family-assignments/[id]
-// Si el técnico tiene tickets activos en esa familia, retorna 200 con campo `warning`
-// y requiere ?confirm=true para proceder
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -20,26 +19,25 @@ export async function DELETE(
     const { searchParams } = new URL(request.url)
     const confirm = searchParams.get('confirm') === 'true'
 
-    const assignment = await prisma.technician_family_assignments.findUnique({
+    const row = await prisma.user_family_access.findUnique({
       where: { id },
       include: {
-        technician: { select: { id: true, name: true } },
+        user: { select: { id: true, name: true, role: true } },
         family: { select: { id: true, name: true } },
       },
     })
 
-    if (!assignment) {
+    if (!row || row.module !== 'tickets' || row.user.role !== 'TECHNICIAN') {
       return NextResponse.json(
         { success: false, message: 'Asignación no encontrada' },
         { status: 404 }
       )
     }
 
-    // Verificar tickets activos del técnico en esa familia
     const activeTickets = await prisma.tickets.count({
       where: {
-        assigneeId: assignment.technicianId,
-        familyId: assignment.familyId,
+        assigneeId: row.userId,
+        familyId: row.familyId,
         status: { in: ['OPEN', 'IN_PROGRESS'] },
       },
     })
@@ -48,16 +46,23 @@ export async function DELETE(
       return NextResponse.json({
         success: false,
         warning: true,
-        message: `El técnico "${assignment.technician.name}" tiene ${activeTickets} ticket(s) activo(s) en la familia "${assignment.family.name}". Agrega ?confirm=true para confirmar la eliminación.`,
+        message: `El técnico "${row.user.name}" tiene ${activeTickets} ticket(s) activo(s) en la familia "${row.family.name}". Agrega ?confirm=true para confirmar la eliminación.`,
         activeTickets,
       })
     }
 
-    await prisma.technician_family_assignments.delete({ where: { id } })
+    await unassignUserModuleFamily({
+      userId: row.userId,
+      familyId: row.familyId,
+      moduleInput: 'tickets',
+      role: 'TECHNICIAN',
+    })
+
+    await invalidateCache(`user:modules:${row.userId}`)
 
     return NextResponse.json({
       success: true,
-      message: `Asignación de "${assignment.technician.name}" a "${assignment.family.name}" eliminada exitosamente`,
+      message: `Asignación de "${row.user.name}" a "${row.family.name}" eliminada exitosamente`,
     })
   } catch (error) {
     console.error('[DELETE /api/technician-family-assignments/[id]]', error)

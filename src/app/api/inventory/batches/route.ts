@@ -101,7 +101,7 @@ const createBatchSchema = z
  * Filtra por familia según el rol:
  * - SuperAdmin: todos los lotes
  * - Admin normal: lotes de sus familias asignadas
- * - Gestor (canManageInventory): lotes de sus familias en inventory_manager_families
+ * - Gestor (canManageInventory): lotes de sus familias en user_family_access (inventory)
  */
 export async function GET(request: NextRequest) {
   try {
@@ -133,12 +133,8 @@ export async function GET(request: NextRequest) {
         allowedFamilyIds = [] // Sin acceso
       }
     } else if (role !== 'ADMIN' && invCtx.canManageInventory) {
-      // Gestor: solo sus familias de inventario
-      const assignments = await prisma.inventory_manager_families.findMany({
-        where: { managerId: userId },
-        select: { familyId: true },
-      })
-      allowedFamilyIds = assignments.map(a => a.familyId)
+      const { resolveModuleFamilyScopeIds } = await import('@/lib/auth/user-family-access')
+      allowedFamilyIds = await resolveModuleFamilyScopeIds(userId, 'inventory', 'canOperate')
     }
     // SuperAdmin → allowedFamilyIds = null (sin restricción)
 

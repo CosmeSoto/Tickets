@@ -5,7 +5,7 @@
  *
  * Lógica de familias por rol:
  *   - TECHNICIAN/supervisor : sin selector — siempre hereda la familia de la ronda
- *   - Admin normal          : puede elegir entre sus admin_family_assignments + nativa
+ *   - Admin normal          : puede elegir entre sus grants user_family_access (patrols) + nativa
  *   - Super admin           : puede elegir entre TODAS las familias activas del sistema
  */
 
@@ -98,22 +98,15 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       })
     }
 
-    // Admin normal: sus familias en admin_family_assignments + nativa
-    const assignments = await prisma.admin_family_assignments.findMany({
-      where: { adminId: session.user.id, isActive: true },
-      select: { family: { select: { id: true, name: true } } },
+    // Admin normal: grants tickets + nativa
+    const { resolveModuleFamilyScopeIds } = await import('@/lib/auth/user-family-access')
+    const scopeIds = await resolveModuleFamilyScopeIds(session.user.id, 'tickets', 'canView')
+
+    const assignedFamilies = await prisma.families.findMany({
+      where: { id: { in: scopeIds }, isActive: true },
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
     })
-
-    const assignedFamilies = assignments.map((a: any) => a.family)
-
-    // Asegurar que la familia nativa (de origen) siempre esté en la lista
-    const allIds = new Set(assignedFamilies.map((f: any) => f.id))
-    if (!allIds.has(originFamily.id)) {
-      assignedFamilies.unshift(originFamily)
-    }
-
-    // Ordenar alfabéticamente
-    assignedFamilies.sort((a: any, b: any) => a.name.localeCompare(b.name))
 
     const canSelectFamily = assignedFamilies.length > 1
 
@@ -191,23 +184,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       }
 
       if (!isSuperAdmin) {
-        // Admin normal: verificar que la familia destino esté en su scope
-        const assignment = await prisma.admin_family_assignments.findFirst({
-          where: {
-            adminId: session.user.id,
-            familyId: requestedFamilyId,
-            isActive: true,
-          },
-        })
+        const { userHasFamilyInModule } = await import('@/lib/auth/user-family-access')
+        const hasDestAccess = await userHasFamilyInModule(
+          session.user.id,
+          'tickets',
+          requestedFamilyId,
+          'canView'
+        )
 
-        // También aceptar la familia nativa
-        const user = await prisma.users.findUnique({
-          where: { id: session.user.id },
-          select: { departments: { select: { familyId: true } } },
-        })
-        const nativeFamilyId = user?.departments?.familyId
-
-        if (!assignment && nativeFamilyId !== requestedFamilyId) {
+        if (!hasDestAccess) {
           return NextResponse.json(
             { error: 'No tienes acceso a la familia destino seleccionada' },
             { status: 403 }

@@ -4,6 +4,21 @@ import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { withCache, buildCacheKey } from '@/lib/api-cache'
 
+async function countFamilyAccessByModule(
+  familyId: string,
+  module: string,
+  userRole?: string
+): Promise<number> {
+  return prisma.user_family_access.count({
+    where: {
+      familyId,
+      module,
+      isActive: true,
+      ...(userRole ? { user: { role: userRole as 'ADMIN' | 'TECHNICIAN' | 'CLIENT' } } : {}),
+    },
+  })
+}
+
 /**
  * GET /api/admin/families/[id]
  * Retorna datos unificados de la familia (configuración + departamentos).
@@ -20,8 +35,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     const { id } = await params
 
-    const requesterIsSuperAdmin =
-      (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
+    const requesterIsSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
     const familyScope = await (
       await import('@/lib/auth/admin-scope')
     ).assertAdminCanAccessFamily(session.user.id, requesterIsSuperAdmin, id)
@@ -29,15 +43,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: familyScope.error }, { status: familyScope.status })
     }
 
-    // Caché 30 segundos — datos de familia, se invalida en mutaciones
     const cacheKey = buildCacheKey('admin:family', { id })
     const data = await withCache(cacheKey, 30, async () => {
-      const currentUser = await prisma.users.findUnique({
-        where: { id: session.user.id },
-        select: { isSuperAdmin: true },
-      })
-
-      const [family, departments] = await Promise.all([
+      const [family, departments, technicianCount, managerCount, clientCount] = await Promise.all([
         prisma.families.findUnique({
           where: { id },
           include: {
@@ -45,9 +53,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
               select: {
                 departments: true,
                 tickets: true,
-                technicianFamilyAssignments: true,
-                managerFamilies: true,
-                clientFamilyAssignments: true,
               },
             },
           },
@@ -56,22 +61,32 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
           where: { familyId: id },
           orderBy: [{ order: 'asc' }, { name: 'asc' }],
         }),
+        countFamilyAccessByModule(id, 'tickets', 'TECHNICIAN'),
+        countFamilyAccessByModule(id, 'inventory'),
+        countFamilyAccessByModule(id, 'tickets', 'CLIENT'),
       ])
 
+      if (!family) return null
+
       return {
-        family,
+        family: {
+          ...family,
+          _count: {
+            ...family._count,
+            technicianFamilyAssignments: technicianCount,
+            managerFamilies: managerCount,
+            clientFamilyAssignments: clientCount,
+          },
+        },
         departments,
-        currentUserIsSuperAdmin: currentUser?.isSuperAdmin ?? false,
       }
     })
 
-    if (!data.family) {
-      return NextResponse.json({ error: 'Familia no encontrada' }, { status: 404 })
-    }
+    if (!data) return NextResponse.json({ error: 'Familia no encontrada' }, { status: 404 })
 
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Error fetching family:', error)
+    console.error('[GET /api/admin/families/[id]]', error)
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
 }

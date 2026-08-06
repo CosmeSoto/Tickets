@@ -6,7 +6,7 @@ import { canManageInventory, inventoryForbidden } from '@/lib/inventory-access'
 
 /**
  * GET /api/inventory/contracts/clients?familyId=
- * Clientes activos con acceso al área (client_family_assignments).
+ * Clientes activos con acceso al área (user_family_access tickets).
  */
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions)
@@ -20,19 +20,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'familyId es requerido' }, { status: 400 })
   }
 
-  const assignments = await prisma.client_family_assignments.findMany({
-    where: { familyId, isActive: true },
+  const rows = await prisma.user_family_access.findMany({
+    where: { familyId, module: 'tickets', isActive: true, canConsume: true },
     include: {
-      client: {
+      user: {
         select: { id: true, name: true, email: true, role: true, isActive: true },
       },
     },
-    orderBy: { client: { name: 'asc' } },
+    orderBy: { user: { name: 'asc' } },
   })
 
-  const clients = assignments
-    .map(a => a.client)
-    .filter(c => c.isActive && c.role === 'CLIENT')
+  const clients = rows.map(a => a.user).filter(c => c.isActive && c.role === 'CLIENT')
 
   return NextResponse.json({ clients })
 }

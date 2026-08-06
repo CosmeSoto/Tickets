@@ -337,27 +337,7 @@ export class UserService {
         })
       }
 
-      // Si es técnico y tiene departamento, asignar la familia nativa (válida) del departamento
-      if (data.role === 'TECHNICIAN' && nativeFamilyIdForTech) {
-        await tx.technician_family_assignments.upsert({
-          where: {
-            technicianId_familyId: {
-              technicianId: user.id,
-              familyId: nativeFamilyIdForTech,
-            },
-          },
-          create: {
-            id: randomUUID(),
-            technicianId: user.id,
-            familyId: nativeFamilyIdForTech,
-            isActive: true,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-          update: { isActive: true, updatedAt: new Date() },
-        })
-      }
-
+      // Técnico: la familia nativa viene del departamento (no se persiste en user_family_access).
       // Crear user_settings por defecto (garantiza que las notificaciones estén habilitadas)
       await tx.user_settings.create({
         data: {
@@ -523,24 +503,7 @@ export class UserService {
         }
       }
 
-      // Técnico: sincronizar familia nativa del depto (repara FKs huérfanos post-restore)
-      if (nativeFamilyIdForTech) {
-        await tx.technician_family_assignments.upsert({
-          where: {
-            technicianId_familyId: { technicianId: id, familyId: nativeFamilyIdForTech },
-          },
-          create: {
-            id: randomUUID(),
-            technicianId: id,
-            familyId: nativeFamilyIdForTech,
-            isActive: true,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-          update: { isActive: true, updatedAt: new Date() },
-        })
-      }
-
+      // Técnico: familia nativa = departamento (user_family_access solo para áreas adicionales).
       return updatedUser
     })
 

@@ -30,15 +30,13 @@ export async function GET(_request: NextRequest) {
         familyIds = scope.familyIds
       }
     } else if (role === 'TECHNICIAN' || (role === 'CLIENT' && canManageInventory)) {
-      const invFamilies = await prisma.inventory_manager_families.findMany({
-        where: { managerId: userId },
-        select: { familyId: true },
-      })
-      if (invFamilies.length === 0) {
+      const { resolveModuleFamilyScopeIds } = await import('@/lib/auth/user-family-access')
+      const invFamilyIds = await resolveModuleFamilyScopeIds(userId, 'inventory', 'canOperate')
+      if (invFamilyIds.length === 0) {
         // Sin familias de inventario asignadas → no mostrar módulo
         return NextResponse.json(null)
       }
-      familyIds = invFamilies.map(a => a.familyId)
+      familyIds = invFamilyIds
     } else if (role === 'CLIENT' && !canManageInventory) {
       // Cliente sin gestión: solo sus equipos asignados personalmente
       const assignments = await prisma.equipment_assignments.findMany({

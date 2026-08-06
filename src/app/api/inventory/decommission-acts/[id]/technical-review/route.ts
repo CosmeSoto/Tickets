@@ -14,10 +14,7 @@ import { notifyUser, notifyAdmins } from '@/lib/api/notify'
  *
  * Body: { opinion: string, recommend: 'APPROVE' | 'REJECT' }
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
@@ -47,14 +44,22 @@ export async function POST(
     )
   }
 
-  const decommissionRequest = await prisma.decommission_requests.findUnique({
+  const decommissionRequest = (await prisma.decommission_requests.findUnique({
     where: { id: requestId },
     include: {
-      equipment: { select: { id: true, code: true, brand: true, model: true, type: { select: { familyId: true } } } },
+      equipment: {
+        select: {
+          id: true,
+          code: true,
+          brand: true,
+          model: true,
+          type: { select: { familyId: true } },
+        },
+      },
       license: { select: { id: true, name: true, licenseType: { select: { familyId: true } } } },
       requester: { select: { id: true, name: true, email: true } },
     },
-  }) as any
+  })) as any
 
   if (!decommissionRequest) {
     return NextResponse.json({ error: 'Solicitud no encontrada' }, { status: 404 })
@@ -62,29 +67,36 @@ export async function POST(
 
   if (decommissionRequest.status !== 'PENDING') {
     return NextResponse.json(
-      { error: `La solicitud está en estado "${decommissionRequest.status}" y no puede recibir dictamen técnico` },
+      {
+        error: `La solicitud está en estado "${decommissionRequest.status}" y no puede recibir dictamen técnico`,
+      },
       { status: 409 }
     )
   }
 
   // Verificar que el técnico pertenece a la familia del activo
-  const familyId = decommissionRequest.assetType === 'EQUIPMENT'
-    ? decommissionRequest.equipment?.type?.familyId
-    : decommissionRequest.license?.licenseType?.familyId
+  const familyId =
+    decommissionRequest.assetType === 'EQUIPMENT'
+      ? decommissionRequest.equipment?.type?.familyId
+      : decommissionRequest.license?.licenseType?.familyId
 
   if (familyId) {
     const isAssigned = await isTechnicianOfFamily(session.user.id, familyId)
     if (!isAssigned) {
       return NextResponse.json(
-        { error: 'No estás asignado a la familia de este activo. Solo técnicos de la familia pueden emitir el dictamen.' },
+        {
+          error:
+            'No estás asignado a la familia de este activo. Solo técnicos de la familia pueden emitir el dictamen.',
+        },
         { status: 403 }
       )
     }
   }
 
-  const assetName = decommissionRequest.assetType === 'EQUIPMENT'
-    ? `${decommissionRequest.equipment?.code} — ${decommissionRequest.equipment?.brand} ${decommissionRequest.equipment?.model}`
-    : decommissionRequest.license?.name ?? 'Activo'
+  const assetName =
+    decommissionRequest.assetType === 'EQUIPMENT'
+      ? `${decommissionRequest.equipment?.code} — ${decommissionRequest.equipment?.brand} ${decommissionRequest.equipment?.model}`
+      : (decommissionRequest.license?.name ?? 'Activo')
 
   const technicianName = session.user.name || session.user.email || 'Técnico'
 
@@ -111,19 +123,24 @@ export async function POST(
       { metadata: { link: `/inventory/acts?tab=decommission` } }
     )
 
-    await prisma.audit_logs.create({
-      data: {
-        id: randomUUID(),
-        action: 'DECOMMISSION_TECHNICAL_REJECTED',
-        entityType: 'inventory',
-        entityId: requestId,
-        userId: session.user.id,
-        details: { opinion: opinion.trim(), recommend, assetName },
-        createdAt: new Date(),
-      },
-    }).catch(() => {})
+    await prisma.audit_logs
+      .create({
+        data: {
+          id: randomUUID(),
+          action: 'DECOMMISSION_TECHNICAL_REJECTED',
+          entityType: 'inventory',
+          entityId: requestId,
+          userId: session.user.id,
+          details: { opinion: opinion.trim(), recommend, assetName },
+          createdAt: new Date(),
+        },
+      })
+      .catch(() => {})
 
-    return NextResponse.json({ message: 'Dictamen técnico emitido — solicitud rechazada', status: 'REJECTED' })
+    return NextResponse.json({
+      message: 'Dictamen técnico emitido — solicitud rechazada',
+      status: 'REJECTED',
+    })
   }
 
   // Técnico recomienda aprobar → pasa a TECHNICAL_REVIEW para que el gestor eleve
@@ -139,14 +156,17 @@ export async function POST(
 
   // Notificar a los gestores de la familia
   if (familyId) {
-    const managers = await prisma.inventory_manager_families.findMany({
-      where: { familyId },
-      include: { manager: { select: { id: true, name: true } } },
+    const managerRows = await prisma.user_family_access.findMany({
+      where: { familyId, module: 'inventory', isActive: true, canOperate: true },
+      include: {
+        user: { select: { id: true, name: true, canManageInventory: true, isActive: true } },
+      },
     })
 
-    for (const m of managers) {
+    for (const m of managerRows) {
+      if (!m.user.isActive || !m.user.canManageInventory) continue
       await notifyUser(
-        m.manager.id,
+        m.user.id,
         'INFO',
         `Dictamen técnico emitido — ${assetName}`,
         `El técnico ${technicianName} emitió dictamen favorable para la baja de "${assetName}". Revisa y eleva al administrador si estás de acuerdo.`,
@@ -155,17 +175,19 @@ export async function POST(
     }
   }
 
-  await prisma.audit_logs.create({
-    data: {
-      id: randomUUID(),
-      action: 'DECOMMISSION_TECHNICAL_REVIEW',
-      entityType: 'inventory',
-      entityId: requestId,
-      userId: session.user.id,
-      details: { opinion: opinion.trim(), recommend, assetName, familyId },
-      createdAt: new Date(),
-    },
-  }).catch(() => {})
+  await prisma.audit_logs
+    .create({
+      data: {
+        id: randomUUID(),
+        action: 'DECOMMISSION_TECHNICAL_REVIEW',
+        entityType: 'inventory',
+        entityId: requestId,
+        userId: session.user.id,
+        details: { opinion: opinion.trim(), recommend, assetName, familyId },
+        createdAt: new Date(),
+      },
+    })
+    .catch(() => {})
 
   return NextResponse.json({
     message: 'Dictamen técnico emitido — pendiente de elevación por el gestor',

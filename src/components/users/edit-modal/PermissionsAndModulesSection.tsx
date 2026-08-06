@@ -56,6 +56,8 @@ interface PermissionsAndModulesSectionProps {
   inventoryFamilyIds: string[]
   patrolFamilyIds: string[]
   adminFamilyIds: string[]
+  /** Áreas adicionales del módulo unificado `content` (docs + noticias) */
+  contentFamilyIds: string[]
   ticketReadOnlyIds: string[]
   inventoryReadOnlyIds: string[]
   patrolReadOnlyIds: string[]
@@ -86,6 +88,8 @@ interface PermissionsAndModulesSectionProps {
     handleUnassignPatrolFamily: (id: string) => Promise<any>
     handleAssignAdminFamily: (id: string) => Promise<any>
     handleUnassignAdminFamily: (id: string) => Promise<any>
+    handleAssignContentFamily: (id: string) => Promise<any>
+    handleUnassignContentFamily: (id: string) => Promise<any>
   }
 }
 
@@ -105,6 +109,7 @@ export function PermissionsAndModulesSection({
   inventoryFamilyIds,
   patrolFamilyIds,
   adminFamilyIds,
+  contentFamilyIds,
   ticketReadOnlyIds,
   inventoryReadOnlyIds,
   patrolReadOnlyIds,
@@ -288,17 +293,20 @@ export function PermissionsAndModulesSection({
             />
 
             {/* ── Noticias ── */}
-            {/* Módulo activo = ver. Toggle "Crear…" = gestionar (alcance por rol). */}
+            {/* Áreas: módulo unificado `content` (compartido con Documentos). */}
             <ModuleAccessCard
               moduleKey='news'
               moduleName='Noticias'
               role={formData.role}
               enabled={formData.newsEnabled}
               onToggle={v => onToggle('newsEnabled', v)}
-              families={[]}
-              assignedFamilyIds={[]}
-              onAssignFamily={async () => {}}
-              onUnassignFamily={async () => {}}
+              families={allFamilies}
+              assignedFamilyIds={contentFamilyIds}
+              nativeFamilyId={nativeFamilyId}
+              nativeFamily={nativeFamilyForCards}
+              readOnlyFamilyIds={adminScopeReadOnlyIds}
+              onAssignFamily={handlers.handleAssignContentFamily}
+              onUnassignFamily={handlers.handleUnassignContentFamily}
               options={
                 formData.role === 'TECHNICIAN' || formData.role === 'CLIENT'
                   ? {
@@ -307,21 +315,25 @@ export function PermissionsAndModulesSection({
                     }
                   : undefined
               }
+              loading={loadingFamilies}
               disabled={loading}
             />
 
             {/* ── Documentos ── */}
-            {/* Módulo activo = ver. Toggle "Crear…" = gestionar (alcance por rol). */}
+            {/* Mismas áreas que Noticias (user_family_access.module = content). */}
             <ModuleAccessCard
               moduleKey='forms'
               moduleName='Documentos'
               role={formData.role}
               enabled={formData.formsEnabled}
               onToggle={v => onToggle('formsEnabled', v)}
-              families={[]}
-              assignedFamilyIds={[]}
-              onAssignFamily={async () => {}}
-              onUnassignFamily={async () => {}}
+              families={allFamilies}
+              assignedFamilyIds={contentFamilyIds}
+              nativeFamilyId={nativeFamilyId}
+              nativeFamily={nativeFamilyForCards}
+              readOnlyFamilyIds={adminScopeReadOnlyIds}
+              onAssignFamily={handlers.handleAssignContentFamily}
+              onUnassignFamily={handlers.handleUnassignContentFamily}
               options={
                 formData.role === 'TECHNICIAN' || formData.role === 'CLIENT'
                   ? {
@@ -330,6 +342,7 @@ export function PermissionsAndModulesSection({
                     }
                   : undefined
               }
+              loading={loadingFamilies}
               disabled={loading}
             />
           </div>

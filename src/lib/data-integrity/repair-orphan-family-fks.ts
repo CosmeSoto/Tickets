@@ -14,13 +14,7 @@ export type OrphanFamilyRepairStats = {
   technologyRemapped: number
 }
 
-const ASSIGNMENT_TABLES = [
-  'technician_family_assignments',
-  'client_family_assignments',
-  'admin_family_assignments',
-  'inventory_manager_families',
-  'patrol_family_assignments',
-] as const
+const ASSIGNMENT_TABLES = ['user_family_access'] as const
 
 /**
  * 1) Remapea TECHNOLOGY → ADMINISTRATIVE (regla legacy de producto).

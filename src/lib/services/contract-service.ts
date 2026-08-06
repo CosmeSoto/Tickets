@@ -199,7 +199,7 @@ export class ContractService {
 
     // SuperAdmin ve todo — sin restricción de familias
     // Admin normal: ve contratos de sus familias asignadas (si tiene asignaciones)
-    // Gestor (canManageInventory): ve solo contratos de sus familias en inventory_manager_families
+    // Gestor (canManageInventory): ve contratos de sus familias en user_family_access (inventory)
     if (userId && userRole && !isSuperAdmin) {
       if (userRole === 'CLIENT') {
         where.assignments = { some: { clientId: userId } }
@@ -211,13 +211,10 @@ export class ContractService {
           where.familyId = { in: scope.familyIds }
         }
       } else {
-        // Gestor: solo sus familias en inventory_manager_families
-        const managerFamilies = await prisma.inventory_manager_families.findMany({
-          where: { managerId: userId },
-          select: { familyId: true },
-        })
-        if (managerFamilies.length > 0) {
-          where.familyId = { in: managerFamilies.map(f => f.familyId) }
+        const { getUserModuleFamilyGrantIds } = await import('@/lib/auth/user-family-access')
+        const managerFamilyIds = await getUserModuleFamilyGrantIds(userId, 'inventory')
+        if (managerFamilyIds.length > 0) {
+          where.familyId = { in: managerFamilyIds }
         }
       }
     }
@@ -985,12 +982,10 @@ export class ContractService {
         const scope = await getAdminFamilyScope(userId, false)
         if (scope.familyIds?.length) where.familyId = { in: scope.familyIds }
       } else {
-        const managerFamilies = await prisma.inventory_manager_families.findMany({
-          where: { managerId: userId },
-          select: { familyId: true },
-        })
-        if (managerFamilies.length > 0) {
-          where.familyId = { in: managerFamilies.map(f => f.familyId) }
+        const { getUserModuleFamilyGrantIds } = await import('@/lib/auth/user-family-access')
+        const managerFamilyIds = await getUserModuleFamilyGrantIds(userId, 'inventory')
+        if (managerFamilyIds.length > 0) {
+          where.familyId = { in: managerFamilyIds }
         }
       }
     }

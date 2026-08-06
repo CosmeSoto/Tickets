@@ -579,17 +579,9 @@ const MERGE_UPDATE_TABLES = new Set([
   '"system_modules"',
   'site_config',
   '"site_config"',
-  // Asignaciones de familias por usuario
-  'technician_family_assignments',
-  '"technician_family_assignments"',
-  'client_family_assignments',
-  '"client_family_assignments"',
-  'admin_family_assignments',
-  '"admin_family_assignments"',
-  'inventory_manager_families',
-  '"inventory_manager_families"',
-  'patrol_family_assignments',
-  '"patrol_family_assignments"',
+  // Asignaciones de familias por usuario (unificado)
+  'user_family_access',
+  '"user_family_access"',
   'technician_assignments',
   '"technician_assignments"',
 ])
@@ -878,6 +870,7 @@ async function restoreFromJSON(
     password_reset_tokens: 'password_reset_tokens',
     userSettings: 'user_settings',
     user_settings: 'user_settings',
+    // Tablas legacy de asignación → se pliegan a user_family_access abajo
     adminFamilyAssignments: 'admin_family_assignments',
     admin_family_assignments: 'admin_family_assignments',
     clientFamilyAssignments: 'client_family_assignments',
@@ -886,6 +879,10 @@ async function restoreFromJSON(
     technician_family_assignments: 'technician_family_assignments',
     inventoryManagerFamilies: 'inventory_manager_families',
     inventory_manager_families: 'inventory_manager_families',
+    patrolFamilyAssignments: 'patrol_family_assignments',
+    patrol_family_assignments: 'patrol_family_assignments',
+    userFamilyAccess: 'user_family_access',
+    user_family_access: 'user_family_access',
   }
 
   const mappedData: Record<string, any[]> = {}
@@ -893,6 +890,8 @@ async function restoreFromJSON(
     const realName = tableMapping[oldName] ?? oldName
     mappedData[realName] = Array.isArray(data) ? data : []
   }
+
+  foldLegacyFamilyAssignmentsIntoUnified(mappedData)
 
   console.log('Tablas a restaurar:', Object.keys(mappedData))
 
@@ -961,10 +960,7 @@ async function restoreFromJSON(
     'equipment_types',
     'suppliers',
     'warehouses',
-    'admin_family_assignments',
-    'technician_family_assignments',
-    'client_family_assignments',
-    'inventory_manager_families',
+    'user_family_access',
     'user_settings',
     'notification_preferences',
     'notification_mutes',
@@ -1173,6 +1169,130 @@ async function restoreModuleFromJSON(
     { timeout: 600000 }
   )
   console.log(`Restauración JSON módulo ${moduleId} (${mode}) completada`)
+}
+
+/**
+ * Backups antiguos pueden traer *_family_assignments / inventory_manager_families.
+ * Se convierten a user_family_access y se eliminan las claves legacy del payload.
+ */
+function foldLegacyFamilyAssignmentsIntoUnified(mappedData: Record<string, any[]>): void {
+  const existing = Array.isArray(mappedData.user_family_access) ? mappedData.user_family_access : []
+  const byKey = new Map<string, any>()
+  for (const row of existing) {
+    const userId = row.userId ?? row.user_id
+    const familyId = row.familyId ?? row.family_id
+    const moduleKey = row.module
+    if (userId && familyId && moduleKey) {
+      byKey.set(`${userId}|${familyId}|${moduleKey}`, row)
+    }
+  }
+
+  const push = (row: {
+    userId: string
+    familyId: string
+    module: string
+    canConsume: boolean
+    canOperate: boolean
+    canView: boolean
+    isActive: boolean
+    createdAt?: unknown
+    updatedAt?: unknown
+    id?: string
+  }) => {
+    if (!row.userId || !row.familyId) return
+    const k = `${row.userId}|${row.familyId}|${row.module}`
+    if (byKey.has(k)) return
+    byKey.set(k, {
+      id: row.id ?? randomUUID(),
+      userId: row.userId,
+      familyId: row.familyId,
+      module: row.module,
+      canConsume: row.canConsume,
+      canOperate: row.canOperate,
+      canView: row.canView,
+      isActive: row.isActive,
+      createdAt: row.createdAt ?? new Date().toISOString(),
+      updatedAt: row.updatedAt ?? new Date().toISOString(),
+    })
+  }
+
+  for (const r of mappedData.technician_family_assignments ?? []) {
+    push({
+      id: r.id,
+      userId: r.technicianId ?? r.technician_id,
+      familyId: r.familyId ?? r.family_id,
+      module: 'tickets',
+      canConsume: true,
+      canOperate: false,
+      canView: false,
+      isActive: r.isActive ?? r.is_active ?? true,
+      createdAt: r.createdAt ?? r.created_at,
+      updatedAt: r.updatedAt ?? r.updated_at,
+    })
+  }
+  for (const r of mappedData.admin_family_assignments ?? []) {
+    push({
+      id: r.id,
+      userId: r.adminId ?? r.admin_id,
+      familyId: r.familyId ?? r.family_id,
+      module: 'tickets',
+      canConsume: true,
+      canOperate: false,
+      canView: false,
+      isActive: r.isActive ?? r.is_active ?? true,
+      createdAt: r.createdAt ?? r.created_at,
+      updatedAt: r.updatedAt ?? r.updated_at,
+    })
+  }
+  for (const r of mappedData.client_family_assignments ?? []) {
+    push({
+      id: r.id,
+      userId: r.clientId ?? r.client_id,
+      familyId: r.familyId ?? r.family_id,
+      module: 'tickets',
+      canConsume: true,
+      canOperate: false,
+      canView: true,
+      isActive: r.isActive ?? r.is_active ?? true,
+      createdAt: r.createdAt ?? r.created_at,
+      updatedAt: r.updatedAt ?? r.updated_at,
+    })
+  }
+  for (const r of mappedData.inventory_manager_families ?? []) {
+    push({
+      id: r.id,
+      userId: r.managerId ?? r.manager_id,
+      familyId: r.familyId ?? r.family_id,
+      module: 'inventory',
+      canConsume: false,
+      canOperate: true,
+      canView: true,
+      isActive: true,
+      createdAt: r.createdAt ?? r.created_at,
+      updatedAt: r.updatedAt ?? r.updated_at,
+    })
+  }
+  for (const r of mappedData.patrol_family_assignments ?? []) {
+    push({
+      id: r.id,
+      userId: r.userId ?? r.user_id,
+      familyId: r.familyId ?? r.family_id,
+      module: 'patrols',
+      canConsume: false,
+      canOperate: true,
+      canView: true,
+      isActive: r.isActive ?? r.is_active ?? true,
+      createdAt: r.createdAt ?? r.created_at,
+      updatedAt: r.updatedAt ?? r.updated_at,
+    })
+  }
+
+  mappedData.user_family_access = [...byKey.values()]
+  delete mappedData.technician_family_assignments
+  delete mappedData.admin_family_assignments
+  delete mappedData.client_family_assignments
+  delete mappedData.inventory_manager_families
+  delete mappedData.patrol_family_assignments
 }
 
 function processRecordForRestore(record: any): any {

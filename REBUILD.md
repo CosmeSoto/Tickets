@@ -538,15 +538,66 @@ docker compose -f docker-compose.prod.yml --env-file .env.production up -d --for
 
 El sistema usa `inventory_manager_families` (no `admin_family_assignments`) para determinar qué familias puede gestionar un admin en el módulo de inventario. Si no tiene ninguna familia asignada en inventario, puede gestionar todas.
 
-### Asignación de familias por módulo (independientes)
+### Asignación de áreas por módulo (unificado + legacy)
 
-| Módulo            | Tabla                           | Quién asigna        |
-| ----------------- | ------------------------------- | ------------------- |
-| Tickets (técnico) | `technician_family_assignments` | Admin / Super Admin |
-| Tickets (cliente) | `client_family_assignments`     | Admin / Super Admin |
-| Inventario        | `inventory_manager_families`    | Admin / Super Admin |
-| Rondas            | `patrol_family_assignments`     | Admin / Super Admin |
-| Scope de Admin    | `admin_family_assignments`      | Solo Super Admin    |
+**Fuente de verdad nueva:** `user_family_access`  
+`(userId, familyId, module)` + flags `canConsume` / `canOperate` / `canView`.
+
+- `module` es **string** (registry en `src/lib/auth/family-access-modules.ts`) → agregar un módulo futuro **no requiere** migración de enum.
+- Familia **nativa** = departamento (no se guarda en esta tabla).
+- Documentos + Noticias comparten `module = content`.
+- API: `GET/PUT/POST/DELETE /api/admin/users/:id/family-access`
+- Sync: `npm run db:sync-family-access` (también en entrypoint de producción).
+
+| Módulo datos | Clave `module` | Legacy (dual-write en transición) |
+| ------------ | -------------- | --------------------------------- |
+| Tickets      | `tickets`      | tech / client / admin*family*\*   |
+| Inventario   | `inventory`    | `inventory_manager_families`      |
+| Rondas       | `patrols`      | `patrol_family_assignments`       |
+| Docs+News    | `content`      | _(solo tabla unificada)_          |
+
+Para un módulo nuevo: registrar en `FAMILY_ACCESS_MODULES` + card en Usuarios + usar `resolveModuleFamilyScopeIds(userId, 'mi_modulo', …)`.
+
+#### Cómo agregar un módulo futuro (checklist)
+
+1. **Registry** — `src/lib/auth/family-access-modules.ts`  
+   Añadir clave (`crm`, `hr`, …) con `defaultsByRole` y `hasLegacyTables: false`.
+2. **Permisos de usuario** — flags en `users` / `system_modules` si el módulo se enciende por toggle.
+3. **UI Usuarios** — `ModuleAccessCard` + handlers vía  
+   `POST/PUT/DELETE /api/admin/users/:id/family-access` con `module: 'crm'`.
+4. **Backend del módulo** — scope con  
+   `resolveModuleFamilyScopeIds(userId, 'crm', 'canOperate' | 'canView' | 'canConsume')`.
+5. **Tests** — registrar en `family-access-modules.test.ts` y un caso de scope.
+6. **Sin migración Prisma** — `module` es `VARCHAR`; no hace falta alterar enum.
+
+Lectura: si `user_family_access` ya tiene filas para ese usuario+módulo, es la **única** fuente (legacy no “revive” desasignaciones).
+
+```bash
+npm run db:sync-family-access              # import 1ª vez
+npm run db:diagnose-family-access          # drift legacy vs unificado
+npx tsx prisma/sync-user-family-access.ts --diagnose --fix   # reimport force
+npx tsx prisma/sync-user-family-access.ts --force
+npm run test:family-access                 # suite de regresión (81+ tests)
+```
+
+#### Cierre de fase (áreas unificadas) — DONE
+
+Esta sección queda **cerrada** para uso en producción con el siguiente contrato:
+
+| Pieza                                                            | Estado                                                       |
+| ---------------------------------------------------------------- | ------------------------------------------------------------ |
+| Tabla `user_family_access` + migration                           | ✅                                                           |
+| Registry extensible (`family-access-modules.ts`)                 | ✅                                                           |
+| API canónica `/api/admin/users/:id/family-access`                | ✅                                                           |
+| UI Usuarios (tickets/inv/rondas/content)                         | ✅                                                           |
+| Lectura prefer-unified + sync 1×                                 | ✅                                                           |
+| `/api/user/modules`, dashboards, knowledge, rondas/colaboradores | ✅                                                           |
+| Dual-write a tablas legacy                                       | ✅ retirado (solo `user_family_access`)                      |
+| Drop de tablas legacy                                            | ✅ migración `20260806120000_drop_legacy_family_assignments` |
+
+**Fuente única:** `user_family_access` (módulos `tickets` | `inventory` | `patrols` | `content`).
+Las APIs legacy de asignación quedan como wrappers thin hacia helpers unificados.
+**Operación post-deploy:** aplicar migraciones (`prisma migrate deploy` o flujo Docker); `sync` solo siembra `content` desde tickets si hace falta. Validar con `npm run db:diagnose-family-access`.
 
 ### Importación masiva de equipos (CSV / Excel)
 

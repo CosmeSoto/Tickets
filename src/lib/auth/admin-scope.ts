@@ -4,7 +4,7 @@
  * Para reglas por capas (nativa / consumer / operational / visibility) ver family-scope.ts.
  *
  * getUserFamilyScope = visibilidad legacy (nativa + asignaciones del rol).
- * Módulos específicos: inventario → inventory_manager_families; rondas → patrol_family_assignments.
+ * Módulos específicos: inventario/rondas → user_family_access (resolveModuleFamilyScopeIds).
  */
 
 import prisma from '@/lib/prisma'
@@ -23,6 +23,9 @@ export interface UserScope {
 /**
  * Obtiene el scope de familias para cualquier usuario.
  * Retorna undefined en familyIds si es super admin (acceso total).
+ *
+ * Scope general (admin UI / listados) = familia nativa + grants del módulo `tickets`
+ * vía user_family_access (con fallback legacy). Inventario/rondas usan getModuleFamilyIds.
  */
 export async function getUserFamilyScope(
   userId: string,
@@ -33,39 +36,12 @@ export async function getUserFamilyScope(
     return { familyIds: undefined, nativeFamilyId: null, isSuperAdmin: true, role }
   }
 
-  // Obtener familia nativa del departamento
-  const user = await prisma.users.findUnique({
-    where: { id: userId },
-    select: { departments: { select: { familyId: true } } },
-  })
-  const nativeFamilyId = user?.departments?.familyId ?? null
+  const { getNativeFamilyId } = await import('@/lib/auth/family-scope')
+  const { getUserModuleFamilyGrantIds } = await import('@/lib/auth/user-family-access')
 
-  let assignedIds: string[] = []
+  const nativeFamilyId = await getNativeFamilyId(userId)
+  const assignedIds = await getUserModuleFamilyGrantIds(userId, 'tickets')
 
-  if (role === 'ADMIN') {
-    // Admin normal: su scope general se define por admin_family_assignments + nativa
-    // Esto controla: qué familias ve en la sección Familias, Usuarios, Departamentos, etc.
-    // Las familias de inventario/rondas son para filtrar DENTRO de cada módulo específico
-    const assignments = await prisma.admin_family_assignments.findMany({
-      where: { adminId: userId, isActive: true },
-      select: { familyId: true },
-    })
-    assignedIds = assignments.map(a => a.familyId)
-  } else if (role === 'TECHNICIAN') {
-    const assignments = await prisma.technician_family_assignments.findMany({
-      where: { technicianId: userId, isActive: true },
-      select: { familyId: true },
-    })
-    assignedIds = assignments.map(a => a.familyId)
-  } else if (role === 'CLIENT') {
-    const assignments = await prisma.client_family_assignments.findMany({
-      where: { clientId: userId, isActive: true },
-      select: { familyId: true },
-    })
-    assignedIds = assignments.map(a => a.familyId)
-  }
-
-  // Combinar: asignadas + nativa (sin duplicados)
   const familyIds = [...assignedIds]
   if (nativeFamilyId && !familyIds.includes(nativeFamilyId)) {
     familyIds.push(nativeFamilyId)
@@ -117,39 +93,15 @@ export async function getDepartmentIdsForScope(
 
 /**
  * Obtiene familias de un módulo específico para un usuario.
- * Combina la asignación del módulo + familia nativa.
+ * Combina grants unificados del módulo + familia nativa.
  */
 export async function getModuleFamilyIds(
   userId: string,
   module: 'inventory' | 'patrols'
 ): Promise<string[]> {
-  let assignedIds: string[] = []
-
-  if (module === 'inventory') {
-    const assignments = await prisma.inventory_manager_families.findMany({
-      where: { managerId: userId },
-      select: { familyId: true },
-    })
-    assignedIds = assignments.map(a => a.familyId)
-  } else if (module === 'patrols') {
-    const assignments = await prisma.patrol_family_assignments.findMany({
-      where: { userId, isActive: true },
-      select: { familyId: true },
-    })
-    assignedIds = assignments.map(a => a.familyId)
-  }
-
-  // Agregar familia nativa
-  const user = await prisma.users.findUnique({
-    where: { id: userId },
-    select: { departments: { select: { familyId: true } } },
-  })
-  const nativeFamilyId = user?.departments?.familyId
-  if (nativeFamilyId && !assignedIds.includes(nativeFamilyId)) {
-    assignedIds.push(nativeFamilyId)
-  }
-
-  return assignedIds
+  const { resolveModuleFamilyScopeIds } = await import('@/lib/auth/user-family-access')
+  // canView: listados/visibilidad de módulo (incluye nativa)
+  return resolveModuleFamilyScopeIds(userId, module, 'canView')
 }
 
 /**

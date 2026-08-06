@@ -88,31 +88,25 @@ export async function getNativeFamilyId(userId: string): Promise<string | null> 
   return resolveValidFamilyId(user?.departments?.familyId ?? null)
 }
 
-/** Familias adicionales de consumo (client_family_assignments). */
+/** Grants adicionales de tickets (user_family_access, módulo tickets, canConsume). */
+async function getTicketGrantFamilyIds(userId: string): Promise<string[]> {
+  const { getUserModuleFamilyGrantIds } = await import('@/lib/auth/user-family-access')
+  return getUserModuleFamilyGrantIds(userId, 'tickets', 'canConsume')
+}
+
+/** @deprecated Alias — usa getTicketGrantFamilyIds. */
 export async function getClientAssignmentFamilyIds(userId: string): Promise<string[]> {
-  const rows = await prisma.client_family_assignments.findMany({
-    where: { clientId: userId, isActive: true },
-    select: { familyId: true },
-  })
-  return rows.map(r => r.familyId)
+  return getTicketGrantFamilyIds(userId)
 }
 
-/** Familias adicionales de tickets para técnicos (solicitar servicio en otra área). */
+/** @deprecated Alias — usa getTicketGrantFamilyIds. */
 export async function getTechnicianConsumerFamilyIds(userId: string): Promise<string[]> {
-  const rows = await prisma.technician_family_assignments.findMany({
-    where: { technicianId: userId, isActive: true },
-    select: { familyId: true },
-  })
-  return rows.map(r => r.familyId)
+  return getTicketGrantFamilyIds(userId)
 }
 
-/** Familias adicionales de consumo para admins (solicitar tickets a otras áreas). */
+/** @deprecated Alias — usa getTicketGrantFamilyIds. */
 export async function getAdminAssignmentFamilyIds(userId: string): Promise<string[]> {
-  const rows = await prisma.admin_family_assignments.findMany({
-    where: { adminId: userId, isActive: true },
-    select: { familyId: true },
-  })
-  return rows.map(r => r.familyId)
+  return getTicketGrantFamilyIds(userId)
 }
 
 /**
@@ -127,20 +121,13 @@ export async function getTicketConsumerFamilyIds(
   if (role === 'ADMIN' && isSuperAdmin) return undefined
 
   const nativeId = await getNativeFamilyId(userId)
-  const clientIds = await getClientAssignmentFamilyIds(userId)
-
-  let raw: string[]
-  if (role === 'CLIENT') {
-    raw = dedupeIds([nativeId, ...clientIds])
-  } else if (role === 'TECHNICIAN') {
-    const techConsumer = await getTechnicianConsumerFamilyIds(userId)
-    raw = dedupeIds([nativeId, ...techConsumer, ...clientIds])
-  } else if (role === 'ADMIN') {
-    const adminIds = await getAdminAssignmentFamilyIds(userId)
-    raw = dedupeIds([nativeId, ...adminIds, ...clientIds])
-  } else {
-    raw = nativeId ? [nativeId] : []
-  }
+  const grants = await getTicketGrantFamilyIds(userId)
+  const raw =
+    role === 'CLIENT' || role === 'TECHNICIAN' || role === 'ADMIN'
+      ? dedupeIds([nativeId, ...grants])
+      : nativeId
+        ? [nativeId]
+        : []
 
   const normalized = await normalizeActiveFamilyIds(raw)
 
@@ -169,7 +156,7 @@ export async function getTicketOperationalFamilyIds(
 /**
  * Familias visibles en listados/cola de soporte de tickets.
  * ADMIN/TECH: solo nativa (las asignadas son consumer → "Mis solicitudes").
- * CLIENT: nativa + client_family_assignments.
+ * CLIENT: nativa + grants tickets (canConsume).
  */
 export async function getTicketVisibilityFamilyIds(
   userId: string,
@@ -249,7 +236,7 @@ export async function adminCanOperateTicketFamily(
 }
 
 /**
- * Tickets source=PATROL: encargados del área de rondas (nativa + patrol_family_assignments)
+ * Tickets source=PATROL: encargados del área de rondas (nativa + grants patrols)
  * pueden ver/gestionar el ticket escalado sin abrir la cola general de tickets consumer.
  */
 export async function adminCanAccessPatrolSourcedTicketFamily(
@@ -314,14 +301,11 @@ export async function technicianIsNativeToFamily(
 
 // ── Rondas (patrols) ─────────────────────────────────────────────────────────
 // Admin: operar config (rutas, horarios) solo en nativa; ver reportes en adicionales.
-// Agente/supervisor (TECHNICIAN/CLIENT): operar patrullas en nativa + patrol_family_assignments.
+// Agente/supervisor (TECHNICIAN/CLIENT): operar patrullas en nativa + grants patrols.
 
 export async function getPatrolAssignmentFamilyIds(userId: string): Promise<string[]> {
-  const rows = await prisma.patrol_family_assignments.findMany({
-    where: { userId, isActive: true },
-    select: { familyId: true },
-  })
-  return rows.map(r => r.familyId)
+  const { getUserModuleFamilyGrantIds } = await import('@/lib/auth/user-family-access')
+  return getUserModuleFamilyGrantIds(userId, 'patrols')
 }
 
 export async function getPatrolVisibilityFamilyIds(
@@ -379,16 +363,13 @@ export async function adminCanOperatePatrolFamily(
 }
 
 // ── Inventario ───────────────────────────────────────────────────────────────
-// Gestor: operar en nativa + inventory_manager_families.
+// Gestor: operar en nativa + grants inventory.
 // Admin normal: operar solo nativa; ver/gestionar listados en familias asignadas al módulo.
 // Solicitud de activos (canRequestAssets): nativa + familias consumer asignadas.
 
 export async function getInventoryManagerFamilyIds(userId: string): Promise<string[]> {
-  const rows = await prisma.inventory_manager_families.findMany({
-    where: { managerId: userId },
-    select: { familyId: true },
-  })
-  return rows.map(r => r.familyId)
+  const { getUserModuleFamilyGrantIds } = await import('@/lib/auth/user-family-access')
+  return getUserModuleFamilyGrantIds(userId, 'inventory')
 }
 
 /** Familias visibles en listados/dashboard de inventario. */
@@ -447,15 +428,8 @@ export async function getInventoryConsumerFamilyIds(
   if (role === 'ADMIN' && isSuperAdmin) return undefined
 
   const nativeId = await getNativeFamilyId(userId)
-  const clientIds = await getClientAssignmentFamilyIds(userId)
-
-  // Técnico: mismas áreas consumer que tickets (nativa + technician_family_assignments)
-  if (role === 'TECHNICIAN') {
-    const techIds = await getTechnicianConsumerFamilyIds(userId)
-    return dedupeIds([nativeId, ...techIds, ...clientIds])
-  }
-
-  return dedupeIds([nativeId, ...clientIds])
+  const grants = await getTicketGrantFamilyIds(userId)
+  return dedupeIds([nativeId, ...grants])
 }
 
 export async function adminCanOperateInventoryFamily(

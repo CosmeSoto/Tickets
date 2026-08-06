@@ -70,5 +70,10 @@ npx tsx prisma/ensure-departments.ts || \
   node ./node_modules/tsx/dist/cli.mjs prisma/ensure-departments.ts || \
   echo "==> ADVERTENCIA: ensure-departments falló — npm run db:seed-departments"
 
+echo "==> [dev] Sincronizando user_family_access..."
+npx tsx prisma/sync-user-family-access.ts || \
+  node ./node_modules/tsx/dist/cli.mjs prisma/sync-user-family-access.ts || \
+  echo "==> ADVERTENCIA: sync family-access falló — npm run db:sync-family-access"
+
 echo "==> [dev] Iniciando Next.js (webpack)..."
 exec npm run dev:docker

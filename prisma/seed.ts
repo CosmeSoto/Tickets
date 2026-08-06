@@ -139,6 +139,17 @@ async function main() {
 
   // 20. MÓDULOS DEL SISTEMA
   await seedSystemModules()
+
+  // 21. Acceso unificado a áreas (user_family_access) desde tablas legacy
+  try {
+    const { syncAllUsersFamilyAccess } = await import('../src/lib/auth/user-family-access')
+    const result = await syncAllUsersFamilyAccess()
+    console.log(
+      `✅ user_family_access sincronizado (${result.users} usuarios, ${result.upserts} upserts)`
+    )
+  } catch (err) {
+    console.warn('⚠️  sync user_family_access omitido:', err)
+  }
 }
 
 // ============================================

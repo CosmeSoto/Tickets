@@ -113,23 +113,30 @@ export async function getTechnicianStats(userId: string, canManageInventory: boo
     },
   }
 
-  const techFamilies = await prisma.technician_family_assignments.findMany({
-    where: { technicianId: userId, isActive: true },
-    select: {
-      family: { select: { id: true, name: true, code: true, color: true, icon: true } },
-    },
-  })
-  stats.assignedFamilies = await enrichFamiliesWithModules(techFamilies.map(a => a.family))
+  const { resolveModuleFamilyScopeIds } = await import('@/lib/auth/user-family-access')
+  const familySelect = { id: true, name: true, code: true, color: true, icon: true } as const
+
+  const ticketScopeIds = await resolveModuleFamilyScopeIds(userId, 'tickets')
+  const techFamilies =
+    ticketScopeIds.length > 0
+      ? await prisma.families.findMany({
+          where: { id: { in: ticketScopeIds }, isActive: true },
+          select: familySelect,
+        })
+      : []
+  stats.assignedFamilies = await enrichFamiliesWithModules(techFamilies)
   stats.isInventoryManager = canManageInventory
 
   if (canManageInventory) {
-    const invFamilies = await prisma.inventory_manager_families.findMany({
-      where: { managerId: userId },
-      select: {
-        family: { select: { id: true, name: true, code: true, color: true, icon: true } },
-      },
-    })
-    stats.inventoryFamilies = await enrichFamiliesWithModules(invFamilies.map(a => a.family))
+    const invScopeIds = await resolveModuleFamilyScopeIds(userId, 'inventory', 'canView')
+    const invFamilies =
+      invScopeIds.length > 0
+        ? await prisma.families.findMany({
+            where: { id: { in: invScopeIds }, isActive: true },
+            select: familySelect,
+          })
+        : []
+    stats.inventoryFamilies = await enrichFamiliesWithModules(invFamilies)
   }
 
   return stats

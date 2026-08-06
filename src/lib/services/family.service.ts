@@ -199,8 +199,6 @@ export class FamilyService {
         _count: {
           select: {
             departments: true,
-            technicianFamilyAssignments: true,
-            managerFamilies: true,
           },
         },
         ticketFamilyConfig: {
@@ -218,7 +216,35 @@ export class FamilyService {
       },
     })
 
-    return families as FamilyWithStats[]
+    const familyIds = families.map(f => f.id)
+    const accessCounts =
+      familyIds.length > 0
+        ? await prisma.user_family_access.groupBy({
+            by: ['familyId', 'module'],
+            where: { familyId: { in: familyIds }, isActive: true },
+            _count: { id: true },
+          })
+        : []
+
+    const techByFamily = new Map<string, number>()
+    const invByFamily = new Map<string, number>()
+    for (const row of accessCounts) {
+      if (row.module === 'tickets') {
+        techByFamily.set(row.familyId, (techByFamily.get(row.familyId) ?? 0) + row._count.id)
+      }
+      if (row.module === 'inventory') {
+        invByFamily.set(row.familyId, row._count.id)
+      }
+    }
+
+    return families.map(f => ({
+      ...f,
+      _count: {
+        departments: f._count.departments,
+        technicianFamilyAssignments: techByFamily.get(f.id) ?? 0,
+        managerFamilies: invByFamily.get(f.id) ?? 0,
+      },
+    })) as FamilyWithStats[]
   }
 
   /**

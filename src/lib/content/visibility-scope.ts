@@ -11,7 +11,9 @@
 
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getUserFamilyScope, getDepartmentIdsForScope } from '@/lib/auth/admin-scope'
+import { getDepartmentIdsForScope } from '@/lib/auth/admin-scope'
+import { getNativeFamilyId } from '@/lib/auth/family-scope'
+import { getUserModuleFamilyGrantIds } from '@/lib/auth/user-family-access'
 import type { UserRole } from '@prisma/client'
 
 export const ALL_VISIBILITY_ROLES: UserRole[] = ['ADMIN', 'TECHNICIAN', 'CLIENT']
@@ -78,16 +80,16 @@ export async function getContentVisibilityScope(
     }
   }
 
-  const scope = await getUserFamilyScope(userId, role, false)
-  let allowedFamilyIds = scope.familyIds ?? []
+  const nativeFamilyId = await getNativeFamilyId(userId)
+  // content: áreas donde puede publicar (canOperate) + nativa
+  const contentGrants = await getUserModuleFamilyGrantIds(userId, 'content', 'canOperate')
+  let allowedFamilyIds = [
+    ...new Set([nativeFamilyId, ...contentGrants].filter(Boolean)),
+  ] as string[]
 
-  // CLIENT: solo su familia nativa (fallback a asignaciones si no tiene nativa)
-  if (role === 'CLIENT') {
-    if (scope.nativeFamilyId) {
-      allowedFamilyIds = [scope.nativeFamilyId]
-    } else {
-      allowedFamilyIds = scope.familyIds ?? []
-    }
+  // CLIENT sin grants de content: solo nativa (mismo criterio seguro de antes)
+  if (role === 'CLIENT' && contentGrants.length === 0 && nativeFamilyId) {
+    allowedFamilyIds = [nativeFamilyId]
   }
 
   const allowedDepartmentIds = await getDepartmentIdsForScope({ familyIds: allowedFamilyIds })
@@ -99,8 +101,7 @@ export async function getContentVisibilityScope(
     allowedFamilyIds,
     allowedDepartmentIds,
     allowedRoles: rolesForCreator(role, false),
-    nativeFamilyId: scope.nativeFamilyId,
-    // CLIENT siempre; TECH/ADMIN con scope vacío también deben acotar
+    nativeFamilyId,
     requireFamilyRestriction: role === 'CLIENT' || allowedFamilyIds.length > 0,
   }
 }

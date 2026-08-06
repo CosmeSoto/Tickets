@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 import { invalidateCache, buildCacheKey } from '@/lib/api-cache'
 import { NotificationService } from '@/lib/services/notification-service'
+import { assignUserModuleFamily } from '@/lib/auth/user-family-access'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -19,7 +20,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     if (!familyId) return NextResponse.json({ error: 'familyId es requerido' }, { status: 400 })
 
-    // Verify target user is a CLIENT
     const targetUser = await prisma.users.findUnique({
       where: { id: clientId },
       select: { id: true, name: true, role: true },
@@ -28,13 +28,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'Usuario no encontrado o no es cliente' }, { status: 404 })
     }
 
-    // RBAC: ADMIN can only assign families they have access to
     const viewer = await prisma.users.findUnique({
       where: { id: session.user.id },
       select: { isSuperAdmin: true },
     })
     if (!viewer?.isSuperAdmin) {
-      // Verify the admin has access to this family (admin_family_assignments + native family)
       const { getUserFamilyScope } = await import('@/lib/auth/admin-scope')
       const scope = await getUserFamilyScope(session.user.id, 'ADMIN', false)
       if (scope.familyIds && !scope.familyIds.includes(familyId)) {
@@ -42,30 +40,44 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       }
     }
 
-    // Get family name for audit/notification
     const family = await prisma.families.findUnique({
       where: { id: familyId },
       select: { id: true, name: true },
     })
     if (!family) return NextResponse.json({ error: 'Familia no encontrada' }, { status: 404 })
 
-    // Check if assignment already exists
-    const existing = await prisma.client_family_assignments.findFirst({
-      where: { clientId, familyId },
+    const existing = await prisma.user_family_access.findUnique({
+      where: {
+        userId_familyId_module: { userId: clientId, familyId, module: 'tickets' },
+      },
     })
-    if (existing) {
+    if (existing?.isActive) {
       return NextResponse.json(
         { error: 'El cliente ya está asignado a esta familia' },
         { status: 409 }
       )
     }
 
-    // Create assignment
-    const assignment = await prisma.client_family_assignments.create({
-      data: { clientId, familyId, isActive: true },
+    await assignUserModuleFamily({
+      userId: clientId,
+      familyId,
+      moduleInput: 'tickets',
+      role: 'CLIENT',
     })
 
-    // Audit log (fire and forget)
+    const row = await prisma.user_family_access.findUnique({
+      where: {
+        userId_familyId_module: { userId: clientId, familyId, module: 'tickets' },
+      },
+    })
+
+    const assignment = {
+      id: row?.id ?? clientId,
+      clientId,
+      familyId,
+      isActive: true,
+    }
+
     AuditServiceComplete.log({
       action: AuditActionsComplete.CLIENT_FAMILY_ASSIGNED,
       entityType: 'assignment',
@@ -80,7 +92,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       },
     }).catch(err => console.error('[AUDIT] Failed to log client_family_assigned:', err))
 
-    // In-app notification (fire and forget)
     NotificationService.push({
       userId: clientId,
       type: 'INFO',
@@ -89,12 +100,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       metadata: { type: 'client_family_assigned', familyId, familyName: family.name },
     }).catch(err => console.error('[NOTIFICATION] Failed to notify client:', err))
 
-    // Cache invalidation
     await invalidateCache(buildCacheKey('user:modules', { userId: clientId })).catch(() => {})
 
     return NextResponse.json({ assignment }, { status: 201 })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error assigning client to family:', error)
-    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+    return NextResponse.json(
+      { error: error?.message ?? 'Error interno del servidor' },
+      { status: 400 }
+    )
   }
 }

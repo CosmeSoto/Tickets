@@ -14,12 +14,23 @@ jest.mock('@/lib/prisma', () => ({
   __esModule: true,
   default: {
     users: { findUnique: jest.fn() },
-    client_family_assignments: { findMany: jest.fn().mockResolvedValue([]) },
-    technician_family_assignments: { findMany: jest.fn().mockResolvedValue([]) },
-    admin_family_assignments: { findMany: jest.fn().mockResolvedValue([]) },
-    patrol_family_assignments: { findMany: jest.fn().mockResolvedValue([]) },
-    inventory_manager_families: { findMany: jest.fn().mockResolvedValue([]) },
-    departments: { findMany: jest.fn().mockResolvedValue([]) },
+    families: {
+      findUnique: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn(async ({ where }: { where?: { id?: { in?: string[] } } }) => {
+        const ids = where?.id?.in ?? []
+        return ids.map((id: string) => ({ id }))
+      }),
+    },
+    departments: {
+      findMany: jest.fn().mockResolvedValue([]),
+      findUnique: jest.fn().mockResolvedValue(null),
+    },
+    user_family_access: {
+      findMany: jest.fn().mockResolvedValue([]),
+      count: jest.fn().mockResolvedValue(0),
+      upsert: jest.fn().mockResolvedValue({}),
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
   },
 }))
 
@@ -27,7 +38,14 @@ jest.mock('@/lib/auth/admin-scope', () => ({
   getModuleFamilyIds: jest.fn().mockResolvedValue([]),
 }))
 
+jest.mock('@/lib/auth/user-family-access', () => ({
+  getUserModuleFamilyGrantIds: jest.fn().mockResolvedValue([]),
+  resolveModuleFamilyScopeIds: jest.fn(),
+  syncUserModuleFamilyAccess: jest.fn().mockResolvedValue(0),
+}))
+
 import prisma from '@/lib/prisma'
+import { getUserModuleFamilyGrantIds } from '@/lib/auth/user-family-access'
 
 const nativeFamily = 'family-native'
 const extraFamily = 'family-extra'
@@ -35,33 +53,42 @@ const extraFamily = 'family-extra'
 beforeEach(() => {
   jest.clearAllMocks()
   ;(prisma.users.findUnique as jest.Mock).mockResolvedValue({
+    role: 'TECHNICIAN',
+    departmentId: null,
     departments: { familyId: nativeFamily },
   })
+  ;(prisma.families.findUnique as jest.Mock).mockResolvedValue(null)
+  ;(prisma.families.findMany as jest.Mock).mockImplementation(
+    async ({ where }: { where?: { id?: { in?: string[] } } }) => {
+      const ids = where?.id?.in ?? []
+      return ids.map((id: string) => ({ id }))
+    }
+  )
+  ;(getUserModuleFamilyGrantIds as jest.Mock).mockResolvedValue([])
 })
 
 describe('family-scope tickets', () => {
   it('operational solo incluye familia nativa para técnico', async () => {
-    ;(prisma.technician_family_assignments.findMany as jest.Mock).mockResolvedValue([
-      { familyId: extraFamily },
-    ])
+    ;(getUserModuleFamilyGrantIds as jest.Mock).mockResolvedValue([extraFamily])
 
     const operational = await getTicketOperationalFamilyIds('tech-1', 'TECHNICIAN', false)
     expect(operational).toEqual([nativeFamily])
   })
 
   it('consumer incluye nativa y adicionales para técnico', async () => {
-    ;(prisma.technician_family_assignments.findMany as jest.Mock).mockResolvedValue([
-      { familyId: extraFamily },
-    ])
+    ;(getUserModuleFamilyGrantIds as jest.Mock).mockResolvedValue([extraFamily])
 
     const consumer = await getTicketConsumerFamilyIds('tech-1', 'TECHNICIAN', false)
     expect(consumer).toEqual(expect.arrayContaining([nativeFamily, extraFamily]))
   })
 
   it('admin visibility = solo nativa (asignadas son consumer, no cola)', async () => {
-    ;(prisma.admin_family_assignments.findMany as jest.Mock).mockResolvedValue([
-      { familyId: extraFamily },
-    ])
+    ;(prisma.users.findUnique as jest.Mock).mockResolvedValue({
+      role: 'ADMIN',
+      departmentId: null,
+      departments: { familyId: nativeFamily },
+    })
+    ;(getUserModuleFamilyGrantIds as jest.Mock).mockResolvedValue([extraFamily])
 
     const visibility = await getTicketVisibilityFamilyIds('admin-1', 'ADMIN', false)
     expect(visibility).toEqual([nativeFamily])
@@ -69,9 +96,7 @@ describe('family-scope tickets', () => {
   })
 
   it('tech visibility = solo nativa', async () => {
-    ;(prisma.technician_family_assignments.findMany as jest.Mock).mockResolvedValue([
-      { familyId: extraFamily },
-    ])
+    ;(getUserModuleFamilyGrantIds as jest.Mock).mockResolvedValue([extraFamily])
 
     const visibility = await getTicketVisibilityFamilyIds('tech-1', 'TECHNICIAN', false)
     expect(visibility).toEqual([nativeFamily])
@@ -79,27 +104,36 @@ describe('family-scope tickets', () => {
   })
 
   it('admin consumer incluye nativa y asignadas', async () => {
-    ;(prisma.admin_family_assignments.findMany as jest.Mock).mockResolvedValue([
-      { familyId: extraFamily },
-    ])
+    ;(prisma.users.findUnique as jest.Mock).mockResolvedValue({
+      role: 'ADMIN',
+      departmentId: null,
+      departments: { familyId: nativeFamily },
+    })
+    ;(getUserModuleFamilyGrantIds as jest.Mock).mockResolvedValue([extraFamily])
 
     const consumer = await getTicketConsumerFamilyIds('admin-1', 'ADMIN', false)
     expect(consumer).toEqual(expect.arrayContaining([nativeFamily, extraFamily]))
   })
 
-  it('client consumer incluye nativa y client assignments', async () => {
-    ;(prisma.client_family_assignments.findMany as jest.Mock).mockResolvedValue([
-      { familyId: extraFamily },
-    ])
+  it('client consumer incluye nativa y grants tickets', async () => {
+    ;(prisma.users.findUnique as jest.Mock).mockResolvedValue({
+      role: 'CLIENT',
+      departmentId: null,
+      departments: { familyId: nativeFamily },
+    })
+    ;(getUserModuleFamilyGrantIds as jest.Mock).mockResolvedValue([extraFamily])
 
     const consumer = await getTicketConsumerFamilyIds('client-1', 'CLIENT', false)
     expect(consumer).toEqual(expect.arrayContaining([nativeFamily, extraFamily]))
   })
 
   it('admin operational solo nativa', async () => {
-    ;(prisma.admin_family_assignments.findMany as jest.Mock).mockResolvedValue([
-      { familyId: extraFamily },
-    ])
+    ;(prisma.users.findUnique as jest.Mock).mockResolvedValue({
+      role: 'ADMIN',
+      departmentId: null,
+      departments: { familyId: nativeFamily },
+    })
+    ;(getUserModuleFamilyGrantIds as jest.Mock).mockResolvedValue([extraFamily])
 
     const operational = await getTicketOperationalFamilyIds('admin-1', 'ADMIN', false)
     expect(operational).toEqual([nativeFamily])
@@ -114,6 +148,11 @@ describe('family-scope tickets', () => {
 
 describe('family-scope patrols', () => {
   it('admin operational solo nativa; visibility incluye módulo', async () => {
+    ;(prisma.users.findUnique as jest.Mock).mockResolvedValue({
+      role: 'ADMIN',
+      departmentId: null,
+      departments: { familyId: nativeFamily },
+    })
     const { getModuleFamilyIds } = await import('@/lib/auth/admin-scope')
     ;(getModuleFamilyIds as jest.Mock).mockResolvedValue([extraFamily])
 
@@ -125,10 +164,11 @@ describe('family-scope patrols', () => {
     expect(operational).not.toContain(extraFamily)
   })
 
-  it('agente patrulla en nativa y patrol assignments', async () => {
-    ;(prisma.patrol_family_assignments.findMany as jest.Mock).mockResolvedValue([
-      { familyId: extraFamily },
-    ])
+  it('agente patrulla en nativa y grants patrols', async () => {
+    ;(getUserModuleFamilyGrantIds as jest.Mock).mockImplementation(
+      async (_userId: string, moduleInput: string) =>
+        moduleInput === 'patrols' ? [extraFamily] : []
+    )
 
     const operational = await getPatrolOperationalFamilyIds('agent-1', 'TECHNICIAN', false)
     expect(operational).toEqual(expect.arrayContaining([nativeFamily, extraFamily]))
@@ -137,6 +177,11 @@ describe('family-scope patrols', () => {
 
 describe('family-scope inventory', () => {
   it('admin operational solo nativa', async () => {
+    ;(prisma.users.findUnique as jest.Mock).mockResolvedValue({
+      role: 'ADMIN',
+      departmentId: null,
+      departments: { familyId: nativeFamily },
+    })
     const { getModuleFamilyIds } = await import('@/lib/auth/admin-scope')
     ;(getModuleFamilyIds as jest.Mock).mockResolvedValue([extraFamily])
 
@@ -147,19 +192,23 @@ describe('family-scope inventory', () => {
     expect(visibility).toEqual(expect.arrayContaining([extraFamily]))
   })
 
-  it('gestor opera en nativa e inventory_manager_families', async () => {
-    ;(prisma.inventory_manager_families.findMany as jest.Mock).mockResolvedValue([
-      { familyId: extraFamily },
-    ])
+  it('gestor opera en nativa y grants inventory', async () => {
+    ;(getUserModuleFamilyGrantIds as jest.Mock).mockImplementation(
+      async (_userId: string, moduleInput: string) =>
+        moduleInput === 'inventory' ? [extraFamily] : []
+    )
 
     const operational = await getInventoryOperationalFamilyIds('mgr-1', 'TECHNICIAN', false, true)
     expect(operational).toEqual(expect.arrayContaining([nativeFamily, extraFamily]))
   })
 
-  it('consumer incluye client assignments', async () => {
-    ;(prisma.client_family_assignments.findMany as jest.Mock).mockResolvedValue([
-      { familyId: extraFamily },
-    ])
+  it('consumer incluye grants tickets', async () => {
+    ;(prisma.users.findUnique as jest.Mock).mockResolvedValue({
+      role: 'CLIENT',
+      departmentId: null,
+      departments: { familyId: nativeFamily },
+    })
+    ;(getUserModuleFamilyGrantIds as jest.Mock).mockResolvedValue([extraFamily])
 
     const consumer = await getInventoryConsumerFamilyIds('client-1', 'CLIENT', false)
     expect(consumer).toEqual(expect.arrayContaining([nativeFamily, extraFamily]))
