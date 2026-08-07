@@ -5,7 +5,6 @@ import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import {
   ArrowLeft,
-  RefreshCw,
   Search,
   Tag,
   Package,
@@ -46,12 +45,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { ExportButton } from '@/components/common/export-button'
+import { ListTableToolbar } from '@/components/common/list-table-toolbar'
 import { useExport } from '@/hooks/common/use-export'
 import { useTableSort } from '@/hooks/common/use-table-sort'
 import { SortableTableHead } from '@/components/ui/sortable-table-head'
 import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
-import { cn } from '@/lib/utils'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -664,7 +662,24 @@ export default function ForSalePage() {
           </Card>
         </div>
 
-        {/* Filters bar */}
+        <ListTableToolbar
+          title={
+            <p className='text-xs text-muted-foreground'>
+              {loading ? 'Cargando…' : `${sorted.length} equipo${sorted.length !== 1 ? 's' : ''}`}
+            </p>
+          }
+          loading={loading}
+          onRefresh={loadEquipment}
+          showViewToggle={false}
+          export={{
+            onExportCSV: exportCSV,
+            onExportExcel: exportExcel,
+            onExportPDF: exportPDF,
+            loading: exporting,
+            disabled: sorted.length === 0,
+          }}
+        />
+
         <div className='flex flex-col sm:flex-row gap-2 flex-wrap'>
           <div className='relative flex-1 min-w-[180px]'>
             <Search className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none' />
@@ -675,32 +690,7 @@ export default function ForSalePage() {
               className='flex h-9 w-full rounded-md border border-border bg-card pl-9 pr-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring placeholder:text-muted-foreground'
             />
           </div>
-
-          <Button
-            variant='outline'
-            size='icon'
-            onClick={loadEquipment}
-            disabled={loading}
-            title='Actualizar'
-          >
-            <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
-          </Button>
-
-          <ExportButton
-            onExportCSV={exportCSV}
-            onExportExcel={exportExcel}
-            onExportPDF={exportPDF}
-            loading={exporting}
-            disabled={sorted.length === 0}
-          />
         </div>
-
-        {/* Row count */}
-        {!loading && (
-          <p className='text-xs text-muted-foreground'>
-            {sorted.length} equipo{sorted.length !== 1 ? 's' : ''}
-          </p>
-        )}
 
         {/* Table */}
         {loading ? (

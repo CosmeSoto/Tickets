@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useRef } from 'react'
+import { useSession } from 'next-auth/react'
 import { Input } from '@/components/ui/input'
 import { DateInput } from '@/components/ui/date-input'
 import { SerialNumberInput } from '@/components/ui/serial-number-input'
@@ -50,7 +51,7 @@ import { useActiveDepartments } from '@/contexts/departments-context'
 import { FormDraftKeys, useFormDraft } from '@/hooks/common/use-form-draft'
 import { FormDraftBanner } from '@/components/common/form-draft-banner'
 import { toLocalDateInputValue } from '@/lib/forms/form-date'
-import { X, Plus, ChevronDown, ChevronUp, AlertCircle, Tag } from 'lucide-react'
+import { X, Plus, ChevronDown, ChevronUp, AlertCircle, Tag, KeyRound } from 'lucide-react'
 
 interface EquipmentAssetFormProps {
   familyId: string
@@ -129,6 +130,11 @@ export function EquipmentAssetForm({
   initialEquipment,
   equipmentId,
 }: EquipmentAssetFormProps) {
+  const { data: session } = useSession()
+  const hasCredentials =
+    (session?.user as { isSuperAdmin?: boolean })?.isSuperAdmin === true ||
+    (session?.user as { credentialsEnabled?: boolean })?.credentialsEnabled === true
+
   const getInitialBrandId = () => {
     if (!initialEquipment) return ''
     if (initialEquipment.brandId) return initialEquipment.brandId
@@ -850,7 +856,8 @@ export function EquipmentAssetForm({
       if (d.condition != null) setCondition(String(d.condition))
       if (d.equipmentStatus != null) setEquipmentStatus(String(d.equipmentStatus))
       if (Array.isArray(d.accessories)) setAccessories(d.accessories as string[])
-      if (Array.isArray(d.customFieldValues)) setCustomFieldValues(d.customFieldValues as typeof customFieldValues)
+      if (Array.isArray(d.customFieldValues))
+        setCustomFieldValues(d.customFieldValues as typeof customFieldValues)
       if (d.supplierId != null) setSupplierId(String(d.supplierId))
       if (d.linkedContractId !== undefined) setLinkedContractId(d.linkedContractId as string | null)
       if (d.rentalDeliveryDate != null) setRentalDeliveryDate(String(d.rentalDeliveryDate))
@@ -861,7 +868,8 @@ export function EquipmentAssetForm({
       if (d.invoiceNumber != null) setInvoiceNumber(String(d.invoiceNumber))
       if (d.purchaseOrderNumber != null) setPurchaseOrderNumber(String(d.purchaseOrderNumber))
       if (d.estimatedPrice != null) setEstimatedPrice(String(d.estimatedPrice))
-      if (d.depreciationMethod != null) setDepreciationMethod(d.depreciationMethod as typeof depreciationMethod)
+      if (d.depreciationMethod != null)
+        setDepreciationMethod(d.depreciationMethod as typeof depreciationMethod)
       if (d.usefulLifeYears != null) setUsefulLifeYears(String(d.usefulLifeYears))
       if (d.residualValue != null) setResidualValue(String(d.residualValue))
       if (d.totalUnits != null) setTotalUnits(String(d.totalUnits))
@@ -875,9 +883,11 @@ export function EquipmentAssetForm({
       if (d.saleListingPrice != null) setSaleListingPrice(String(d.saleListingPrice))
       if (d.maintenanceDate != null) setMaintenanceDate(String(d.maintenanceDate))
       if (d.maintenanceType != null) setMaintenanceType(d.maintenanceType as typeof maintenanceType)
-      if (d.maintenanceTechnicianId != null) setMaintenanceTechnicianId(String(d.maintenanceTechnicianId))
+      if (d.maintenanceTechnicianId != null)
+        setMaintenanceTechnicianId(String(d.maintenanceTechnicianId))
       if (d.maintenanceSupplierId != null) setMaintenanceSupplierId(String(d.maintenanceSupplierId))
-      if (d.maintenanceDescription != null) setMaintenanceDescription(String(d.maintenanceDescription))
+      if (d.maintenanceDescription != null)
+        setMaintenanceDescription(String(d.maintenanceDescription))
     },
   })
 
@@ -899,6 +909,17 @@ export function EquipmentAssetForm({
           dismissRestoredBanner()
         }}
       />
+      {hasCredentials && (
+        <div className='rounded-lg border bg-muted/40 px-3 py-2.5 text-xs text-muted-foreground flex items-start gap-2'>
+          <KeyRound className='h-3.5 w-3.5 shrink-0 mt-0.5' />
+          <span>
+            Contraseñas de equipo (BIOS, admin, Wi‑Fi, etc.) no van en este formulario: tras crear
+            el activo, úsalas en la tarjeta{' '}
+            <strong className='text-foreground'>Credenciales</strong> del detalle (bóveda con
+            auditoría).
+          </span>
+        </div>
+      )}
       {/* ── 1. IDENTIFICACIÓN ─────────────────────────────────────── */}
       <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
         {/* Tipo de equipo */}

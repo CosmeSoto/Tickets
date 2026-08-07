@@ -201,6 +201,21 @@ export async function POST(request: NextRequest) {
       await linkLicenseToBusinessContract(license.id, contractId, license.name)
     }
 
+    if (validatedData.key?.trim() && license.licenseType?.familyId) {
+      const { syncLicenseKeyToVault } = await import('@/lib/credentials/sync-license-key')
+      await syncLicenseKeyToVault({
+        ctx: {
+          userId: session.user.id,
+          role: session.user.role,
+          isSuperAdmin: (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true,
+        },
+        licenseId: license.id,
+        familyId: license.licenseType.familyId,
+        title: license.name,
+        plaintextKey: validatedData.key,
+      }).catch(err => console.error('[credentials] sync license key after create:', err))
+    }
+
     await AuditServiceComplete.log({
       action: AuditActionsComplete.LICENSE_CREATED,
       entityType: 'inventory',

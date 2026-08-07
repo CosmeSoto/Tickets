@@ -41,6 +41,30 @@ interface CreateCredentialDialogProps {
   defaultVaultId?: string
   equipmentId?: string
   licenseId?: string
+  /**
+   * Desde ficha de inventario: fija la bóveda al área del activo.
+   * Evita elegir otra área a mano (errores / enlaces cruzados).
+   */
+  lockFamilyId?: string
+  lockFamilyName?: string
+}
+
+function resolveVaultIdForContext(
+  vaults: Vault[],
+  opts: { defaultVaultId?: string; lockFamilyId?: string }
+): string {
+  if (opts.lockFamilyId) {
+    const match = vaults.find(
+      v =>
+        v.kind === 'AREA' &&
+        (v.familyId === opts.lockFamilyId || v.family?.id === opts.lockFamilyId)
+    )
+    if (match) return match.id
+  }
+  if (opts.defaultVaultId && vaults.some(v => v.id === opts.defaultVaultId)) {
+    return opts.defaultVaultId
+  }
+  return vaults.find(v => v.kind === 'AREA')?.id ?? vaults[0]?.id ?? ''
 }
 
 type EntryType = 'GENERIC' | 'EQUIPMENT' | 'LICENSE' | 'NETWORK' | 'SERVICE'
@@ -65,9 +89,9 @@ type CreatedSnapshot = {
   url: string
 }
 
-function emptyForm(defaultVaultId?: string, equipmentId?: string, licenseId?: string): FormState {
+function emptyForm(vaultId: string, equipmentId?: string, licenseId?: string): FormState {
   return {
-    vaultId: defaultVaultId ?? '',
+    vaultId,
     title: '',
     username: '',
     secret: '',
@@ -87,11 +111,13 @@ export function CreateCredentialDialog({
   defaultVaultId,
   equipmentId,
   licenseId,
+  lockFamilyId,
+  lockFamilyName,
 }: CreateCredentialDialogProps) {
   const { toast } = useToast()
   const [saving, setSaving] = useState(false)
   const [showSecret, setShowSecret] = useState(false)
-  const [form, setForm] = useState(() => emptyForm(defaultVaultId, equipmentId, licenseId))
+  const [form, setForm] = useState(() => emptyForm(defaultVaultId ?? '', equipmentId, licenseId))
   const [linkOptions, setLinkOptions] = useState<Array<{ value: string; label: string }>>([])
   const [loadingLinks, setLoadingLinks] = useState(false)
   const [created, setCreated] = useState<CreatedSnapshot | null>(null)
@@ -111,26 +137,48 @@ export function CreateCredentialDialog({
     })
   }, [vaults])
 
+  const lockContext = Boolean(equipmentId || licenseId || lockFamilyId)
   const selectedVault = sortedVaults.find(v => v.id === form.vaultId)
-  const familyId = selectedVault?.familyId ?? selectedVault?.family?.id ?? null
+  const familyId = lockFamilyId ?? selectedVault?.familyId ?? selectedVault?.family?.id ?? null
   const lockEquipment = Boolean(equipmentId)
   const lockLicense = Boolean(licenseId)
+  const lockVault = Boolean(lockFamilyId) || lockEquipment || lockLicense
   const needsEquipmentPicker = form.entryType === 'EQUIPMENT' && !lockEquipment
   const needsLicensePicker = form.entryType === 'LICENSE' && !lockLicense
+  const lockedVaultMissing =
+    lockVault &&
+    Boolean(lockFamilyId) &&
+    sortedVaults.length > 0 &&
+    !sortedVaults.some(
+      v => v.kind === 'AREA' && (v.familyId === lockFamilyId || v.family?.id === lockFamilyId)
+    )
 
   // Solo resetear al ABRIR el modal (no cuando loadData refresca vaults tras crear)
   useEffect(() => {
     if (open && !wasOpen.current) {
       setCreated(null)
       setShowSecret(false)
-      setForm(emptyForm(defaultVaultId ?? sortedVaults[0]?.id, equipmentId, licenseId))
+      const vaultId = resolveVaultIdForContext(sortedVaults, {
+        defaultVaultId,
+        lockFamilyId,
+      })
+      setForm(emptyForm(vaultId, equipmentId, licenseId))
     }
     if (!open && wasOpen.current) {
       setCreated(null)
       setShowSecret(false)
     }
     wasOpen.current = open
-  }, [open, defaultVaultId, equipmentId, licenseId, sortedVaults])
+  }, [open, defaultVaultId, equipmentId, licenseId, lockFamilyId, sortedVaults])
+
+  // Si las bóvedas llegan después de abrir (fetch async), fijar el vault del área del activo
+  useEffect(() => {
+    if (!open || created || !lockFamilyId || !sortedVaults.length) return
+    const resolved = resolveVaultIdForContext(sortedVaults, { lockFamilyId })
+    if (resolved && form.vaultId !== resolved) {
+      setForm(p => ({ ...p, vaultId: resolved }))
+    }
+  }, [open, created, lockFamilyId, sortedVaults, form.vaultId])
 
   useEffect(() => {
     if (!open || created) return
@@ -185,6 +233,7 @@ export function CreateCredentialDialog({
   }
 
   const handleVaultChange = (vaultId: string) => {
+    if (lockVault) return
     setForm(p => ({
       ...p,
       vaultId,
@@ -201,6 +250,15 @@ export function CreateCredentialDialog({
   }
 
   const handleSubmit = async () => {
+    if (lockedVaultMissing) {
+      toast({
+        title: 'Sin bóveda del área',
+        description:
+          'No tienes acceso a la bóveda del área de este activo. Revisa permisos de Credenciales por familia.',
+        variant: 'destructive',
+      })
+      return
+    }
     if (!form.vaultId || !form.title.trim() || !form.secret) {
       toast({
         title: 'Campos requeridos',
@@ -282,7 +340,13 @@ export function CreateCredentialDialog({
     if (!nextOpen) {
       setCreated(null)
       setShowSecret(false)
-      setForm(emptyForm(defaultVaultId, equipmentId, licenseId))
+      setForm(
+        emptyForm(
+          resolveVaultIdForContext(sortedVaults, { defaultVaultId, lockFamilyId }),
+          equipmentId,
+          licenseId
+        )
+      )
     }
     onOpenChange(nextOpen)
   }
@@ -374,7 +438,16 @@ export function CreateCredentialDialog({
                 onClick={() => {
                   setCreated(null)
                   setShowSecret(false)
-                  setForm(emptyForm(defaultVaultId ?? sortedVaults[0]?.id, equipmentId, licenseId))
+                  setForm(
+                    emptyForm(
+                      resolveVaultIdForContext(sortedVaults, {
+                        defaultVaultId,
+                        lockFamilyId,
+                      }),
+                      equipmentId,
+                      licenseId
+                    )
+                  )
                 }}
               >
                 Crear otra
@@ -396,18 +469,39 @@ export function CreateCredentialDialog({
             <div className='grid gap-4 py-2 sm:grid-cols-2'>
               <div className='space-y-1.5 sm:col-span-2'>
                 <Label>Área / bóveda</Label>
-                <Select value={form.vaultId} onValueChange={handleVaultChange}>
-                  <SelectTrigger>
-                    <SelectValue placeholder='Seleccionar área' />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {sortedVaults.map(v => (
-                      <SelectItem key={v.id} value={v.id}>
-                        {formatCredentialVaultLabel(v)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {lockVault ? (
+                  <div className='rounded-md border bg-muted/40 px-3 py-2.5 text-sm'>
+                    <p className='font-medium'>
+                      {lockFamilyName ||
+                        (selectedVault
+                          ? formatCredentialVaultLabel(selectedVault)
+                          : 'Área del activo')}
+                    </p>
+                    <p className='text-xs text-muted-foreground mt-0.5'>
+                      Fijada automáticamente por el equipo/licencia de la ficha. No se puede cambiar
+                      aquí para evitar enlaces a otra área.
+                    </p>
+                    {lockedVaultMissing ? (
+                      <p className='text-xs text-destructive mt-1.5'>
+                        No hay bóveda accesible para esta área con tu usuario. Un admin debe
+                        habilitar Credenciales en esa familia.
+                      </p>
+                    ) : null}
+                  </div>
+                ) : (
+                  <Select value={form.vaultId} onValueChange={handleVaultChange}>
+                    <SelectTrigger>
+                      <SelectValue placeholder='Seleccionar área' />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {sortedVaults.map(v => (
+                        <SelectItem key={v.id} value={v.id}>
+                          {formatCredentialVaultLabel(v)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
 
               <div className='space-y-1.5 sm:col-span-2'>
@@ -544,11 +638,13 @@ export function CreateCredentialDialog({
                 </div>
               )}
 
-              {(lockEquipment || lockLicense) && (
+              {lockContext && (
                 <div className='sm:col-span-2 rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground'>
                   {lockEquipment
-                    ? 'Esta credencial quedará enlazada al equipo actual de la ficha.'
-                    : 'Esta credencial quedará enlazada a la licencia actual.'}
+                    ? 'Enlace fijo al equipo de esta ficha · área tomada del inventario.'
+                    : lockLicense
+                      ? 'Enlace fijo a la licencia de esta ficha · área tomada del inventario.'
+                      : 'Área fijada por el contexto de inventario.'}
                 </div>
               )}
 
@@ -567,7 +663,7 @@ export function CreateCredentialDialog({
               <Button type='button' variant='outline' onClick={() => handleClose(false)}>
                 Cancelar
               </Button>
-              <Button type='submit' disabled={saving}>
+              <Button type='submit' disabled={saving || lockedVaultMissing}>
                 {saving ? (
                   <>
                     <Loader2 className='h-4 w-4 mr-1.5 animate-spin' />

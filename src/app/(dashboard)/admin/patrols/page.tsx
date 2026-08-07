@@ -34,7 +34,7 @@ import {
 } from '@/components/ui/select'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { PatrolStatusBadge } from '@/components/patrol/patrol-status-badge'
-import { ExportButton } from '@/components/common/export-button'
+import { ListTableToolbar } from '@/components/common/list-table-toolbar'
 import { useExport } from '@/hooks/common/use-export'
 import { PATROL_HISTORY_EXPORT_COLUMNS } from '@/lib/utils/patrol-utils'
 import {
@@ -586,25 +586,28 @@ export default function PatrolDashboardPage() {
         <div className='lg:col-span-2'>
           <Card>
             <CardHeader className='pb-3'>
-              <div className='flex items-center justify-between'>
-                <div>
-                  <CardTitle className='text-base flex items-center gap-2'>
-                    <Activity className='h-4 w-4 text-blue-500' />
-                    En progreso ahora
-                  </CardTitle>
-                  <CardDescription>Actualización automática cada 30 segundos</CardDescription>
-                </div>
-                {data && data.activePatrols.length > 0 && (
-                  <ExportButton
-                    onExportCSV={exportCSV}
-                    onExportExcel={exportExcel}
-                    onExportPDF={exportPDF}
-                    loading={exporting}
-                    size='sm'
-                    variant='outline'
-                  />
-                )}
-              </div>
+              <ListTableToolbar
+                title={
+                  <div>
+                    <CardTitle className='text-base flex items-center gap-2'>
+                      <Activity className='h-4 w-4 text-blue-500' />
+                      En progreso ahora
+                    </CardTitle>
+                    <CardDescription>Actualización automática cada 30 segundos</CardDescription>
+                  </div>
+                }
+                showViewToggle={false}
+                export={
+                  data && data.activePatrols.length > 0
+                    ? {
+                        onExportCSV: exportCSV,
+                        onExportExcel: exportExcel,
+                        onExportPDF: exportPDF,
+                        loading: exporting,
+                      }
+                    : undefined
+                }
+              />
             </CardHeader>
             <CardContent>
               {!data || data.activePatrols.length === 0 ? (

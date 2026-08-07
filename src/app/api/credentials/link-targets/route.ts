@@ -101,7 +101,6 @@ export async function GET(request: Request) {
             OR: [
               { name: { contains: search, mode: 'insensitive' } },
               { vendor: { contains: search, mode: 'insensitive' } },
-              { key: { contains: search, mode: 'insensitive' } },
             ],
           }
         : {}),

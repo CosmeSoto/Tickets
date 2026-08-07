@@ -32,7 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { ExportButton } from '@/components/common/export-button'
+import { ListTableToolbar } from '@/components/common/list-table-toolbar'
 import { useExport } from '@/hooks/common/use-export'
 import Link from 'next/link'
 import {
@@ -119,38 +119,42 @@ function DataTable({ rows, reportName }: { rows: Record<string, unknown>[]; repo
 
   return (
     <div className='space-y-3'>
-      {/* Búsqueda + Export */}
-      <div className='flex items-center gap-2 px-4 pt-4 flex-wrap'>
-        <div className='relative flex-1 min-w-[180px] max-w-xs'>
-          <Filter className='absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground' />
-          <Input
-            placeholder='Buscar en resultados...'
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className='pl-8 h-8 text-sm'
-          />
-          {search && (
-            <button
-              onClick={() => setSearch('')}
-              className='absolute right-2 top-1/2 -translate-y-1/2'
-            >
-              <X className='h-3.5 w-3.5 text-muted-foreground' />
-            </button>
-          )}
-        </div>
-        <span className='text-xs text-muted-foreground shrink-0'>
-          {filtered.length} de {rows.length} registros
-        </span>
-        <div className='ml-auto'>
-          <ExportButton
-            onExportCSV={exportCSV}
-            onExportExcel={exportExcel}
-            onExportPDF={exportPDF}
-            loading={exporting}
-            disabled={filtered.length === 0}
-            size='sm'
-          />
-        </div>
+      <div className='px-4 pt-4 space-y-3'>
+        <ListTableToolbar
+          title={
+            <span className='text-xs text-muted-foreground'>
+              {filtered.length} de {rows.length} registros
+            </span>
+          }
+          showViewToggle={false}
+          export={{
+            onExportCSV: exportCSV,
+            onExportExcel: exportExcel,
+            onExportPDF: exportPDF,
+            loading: exporting,
+            disabled: filtered.length === 0,
+          }}
+          endActions={
+            <div className='relative flex-1 min-w-[180px] max-w-xs'>
+              <Filter className='absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground' />
+              <Input
+                placeholder='Buscar en resultados...'
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className='pl-8 h-8 text-sm'
+              />
+              {search && (
+                <button
+                  type='button'
+                  onClick={() => setSearch('')}
+                  className='absolute right-2 top-1/2 -translate-y-1/2'
+                >
+                  <X className='h-3.5 w-3.5 text-muted-foreground' />
+                </button>
+              )}
+            </div>
+          }
+        />
       </div>
 
       {/* Tabla */}

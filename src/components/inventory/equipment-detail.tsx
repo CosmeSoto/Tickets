@@ -37,7 +37,7 @@ import { SaleDialog } from './equipment/dialogs/sale-dialog'
 import { TransferFamilyDialog } from './transfer-family-dialog'
 import { Button } from '@/components/ui/button'
 import { useSession } from 'next-auth/react'
-import { EquipmentCredentialsCard } from '@/components/credentials/equipment-credentials-card'
+import { LinkedCredentialsCard } from '@/components/credentials/linked-credentials-card'
 
 interface EquipmentDetailProps {
   equipmentId: string
@@ -310,7 +310,19 @@ export function EquipmentDetail({
         {/* Columna lateral — QR + asignación */}
         <div className='space-y-6'>
           {hasCredentials && (
-            <EquipmentCredentialsCard equipmentId={equipmentId} canManage={canManageCredentials} />
+            <LinkedCredentialsCard
+              entity='equipment'
+              entityId={equipmentId}
+              familyId={
+                (equipment.type as { familyId?: string; family?: { id?: string } } | undefined)
+                  ?.familyId ??
+                (equipment.type as { family?: { id?: string } } | undefined)?.family?.id
+              }
+              familyName={
+                (equipment.type as { family?: { name?: string } } | undefined)?.family?.name
+              }
+              canManage={canManageCredentials}
+            />
           )}
           <EquipmentQRCard
             qrCode={qrCode}

@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import {
   assertEquipmentLinkAllowed,
+  assertLicenseLinkAllowed,
   checkCredentialsModuleAccess,
   canManageCredentialsVault,
   credentialEntryMetadataSelect,
@@ -111,6 +112,17 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     const linkCheck = await assertEquipmentLinkAllowed(
       ctx,
       parsed.data.equipmentId,
+      entry.vault.familyId
+    )
+    if (!linkCheck.ok) {
+      return NextResponse.json({ error: linkCheck.error }, { status: 422 })
+    }
+  }
+
+  if (parsed.data.licenseId !== undefined) {
+    const linkCheck = await assertLicenseLinkAllowed(
+      ctx,
+      parsed.data.licenseId,
       entry.vault.familyId
     )
     if (!linkCheck.ok) {

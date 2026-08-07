@@ -743,7 +743,7 @@ Para pantallas nuevas o al tocar un listado existente, usar este estándar (migr
 
 **No usar** `legacy-role-filters.tsx` (antes `filters.tsx`; sombreaba el paquete `filters/`).
 
-Referencias ya migradas: Credenciales, Familias, Proveedores, Contratos, Mantenimientos. Tickets/Usuarios siguen en `DataTable` (correcto).
+Referencias ya migradas: Credenciales, Familias, Proveedores, Contratos, Mantenimientos, Ventas, Equipos en venta, Mis Novedades (agente), Reportes inventario (detalle), Dashboard rondas (activas). Tickets/Usuarios/Knowledge y listados con `DataTable` siguen con `actions={<ExportButton />}` (correcto).
 
 ---
 

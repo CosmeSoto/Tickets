@@ -22,6 +22,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { TransferFamilyDialog } from './transfer-family-dialog'
+import { LinkedCredentialsCard } from '@/components/credentials/linked-credentials-card'
 import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -113,10 +114,18 @@ export function LicenseDetail({ licenseId, userRole, isSuperAdmin = false }: Pro
   const [error, setError] = useState<string | null>(null)
   const [showTransferDialog, setShowTransferDialog] = useState(false)
 
-  const canManageInventory = (session?.user as { canManageInventory?: boolean })?.canManageInventory === true
+  const canManageInventory =
+    (session?.user as { canManageInventory?: boolean })?.canManageInventory === true
   const isAdmin = userRole === 'ADMIN' || isSuperAdmin
   const canEdit = isAdmin || userRole === 'TECHNICIAN' || canManageInventory
   const canDelete = isAdmin || canManageInventory
+  const hasCredentials =
+    isSuperAdmin || (session?.user as { credentialsEnabled?: boolean })?.credentialsEnabled === true
+  const canManageCredentials =
+    hasCredentials &&
+    (userRole === 'ADMIN' ||
+      isSuperAdmin ||
+      (session?.user as { canManageCredentials?: boolean })?.canManageCredentials === true)
 
   const loadLicense = useCallback(async () => {
     setLoading(true)
@@ -369,8 +378,19 @@ export function LicenseDetail({ licenseId, userRole, isSuperAdmin = false }: Pro
         </div>
       </div>
 
-      {/* Clave de licencia — solo admin */}
-      {isAdmin && license.key && (
+      {/* Credenciales (bóveda) — roles con módulo habilitado */}
+      {hasCredentials && (
+        <LinkedCredentialsCard
+          entity='license'
+          entityId={licenseId}
+          familyId={currentFamilyId}
+          familyName={currentFamilyName}
+          canManage={canManageCredentials}
+        />
+      )}
+
+      {/* Clave legacy en inventario: solo si NO hay módulo de credenciales (o admin sin bóveda aún) */}
+      {isAdmin && license.key && !hasCredentials && (
         <div className='rounded-lg border border-border p-4'>
           <h3 className='text-sm font-semibold flex items-center gap-2 mb-3'>
             <Key className='h-4 w-4 text-muted-foreground' />
@@ -379,6 +399,14 @@ export function LicenseDetail({ licenseId, userRole, isSuperAdmin = false }: Pro
           <code className='block rounded bg-muted px-3 py-2 text-sm font-mono break-all'>
             {license.key}
           </code>
+        </div>
+      )}
+
+      {isAdmin && license.key && hasCredentials && (
+        <div className='rounded-lg border border-amber-200 bg-amber-50/80 dark:bg-amber-500/10 px-4 py-3 text-xs text-amber-900 dark:text-amber-200'>
+          Hay una clave antigua guardada en inventario. Usa «Agregar» en Credenciales para migrarla
+          a la bóveda (recomendado). Tras sincronizar al editar con la clave, se elimina del
+          inventario.
         </div>
       )}
 

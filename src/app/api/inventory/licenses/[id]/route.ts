@@ -14,7 +14,11 @@ import {
 } from '@/lib/inventory/inventory-resource-access'
 import prisma from '@/lib/prisma'
 import { getRenewalAlertStatus } from '@/lib/inventory/renewal-alert'
-import { getLinkedBusinessContractIdForLicense, syncLicenseContractLink, mapLicenseScope } from '@/lib/inventory/license-contract'
+import {
+  getLinkedBusinessContractIdForLicense,
+  syncLicenseContractLink,
+  mapLicenseScope,
+} from '@/lib/inventory/license-contract'
 
 /**
  * GET /api/inventory/licenses/[id]
@@ -168,6 +172,25 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     if (contractId !== undefined) {
       await syncLicenseContractLink(id, contractId || null, license.name)
+    }
+
+    if (
+      typeof updatePayload.key === 'string' &&
+      updatePayload.key.trim() &&
+      license.licenseType?.familyId
+    ) {
+      const { syncLicenseKeyToVault } = await import('@/lib/credentials/sync-license-key')
+      await syncLicenseKeyToVault({
+        ctx: {
+          userId: session.user.id,
+          role: session.user.role,
+          isSuperAdmin: (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true,
+        },
+        licenseId: id,
+        familyId: license.licenseType.familyId,
+        title: license.name,
+        plaintextKey: updatePayload.key,
+      }).catch(err => console.error('[credentials] sync license key after update:', err))
     }
 
     await AuditServiceComplete.log({

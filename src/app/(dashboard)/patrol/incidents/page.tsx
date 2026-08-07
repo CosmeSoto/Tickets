@@ -16,7 +16,7 @@ import { useRouter } from 'next/navigation'
 import { FileWarning } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
-import { ExportButton } from '@/components/common/export-button'
+import { ListTableToolbar } from '@/components/common/list-table-toolbar'
 import { useExport } from '@/hooks/common/use-export'
 import { PATROL_INCIDENTS_AGENT_EXPORT_COLUMNS } from '@/lib/utils/patrol-utils'
 import { IncidentCard } from '@/components/patrols/incidents/incident-card'
@@ -228,17 +228,27 @@ export default function MisNovedadesPage() {
       loading={loading && incidents.length === 0 && !error}
       error={error}
       onRetry={() => fetchIncidents(filters, page)}
-      headerActions={
-        incidents.length > 0 ? (
-          <ExportButton
-            onExportCSV={exportCSV}
-            onExportExcel={exportExcel}
-            onExportPDF={exportPDF}
-            loading={exporting}
-          />
-        ) : undefined
-      }
     >
+      <ListTableToolbar
+        title={
+          <p className='text-sm text-muted-foreground'>
+            {pagination?.total ?? incidents.length} novedad
+            {(pagination?.total ?? incidents.length) !== 1 ? 'es' : ''}
+          </p>
+        }
+        loading={loading}
+        onRefresh={() => fetchIncidents(filters, page)}
+        showViewToggle={false}
+        export={{
+          onExportCSV: exportCSV,
+          onExportExcel: exportExcel,
+          onExportPDF: exportPDF,
+          loading: exporting,
+          disabled: incidents.length === 0,
+        }}
+        className='mb-4'
+      />
+
       {/* ── Filtros ───────────────────────────────────────────────────────────── */}
       <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4'>
         <div className='space-y-1'>

@@ -10,7 +10,6 @@ import {
   Clock,
   Loader2,
   ArrowLeft,
-  RefreshCw,
   Search,
   ChevronDown,
   ChevronUp,
@@ -36,12 +35,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { ExportButton } from '@/components/common/export-button'
+import { ListTableToolbar } from '@/components/common/list-table-toolbar'
 import { useExport } from '@/hooks/common/use-export'
 import { useTableSort } from '@/hooks/common/use-table-sort'
 import { SortableTableHead } from '@/components/ui/sortable-table-head'
 import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
-import { cn } from '@/lib/utils'
 import Link from 'next/link'
 
 interface SaleRecord {
@@ -531,7 +529,25 @@ export default function SalesPage() {
           </div>
         )}
 
-        {/* Filtros + búsqueda + exportar */}
+        <ListTableToolbar
+          title={
+            <p className='text-xs text-muted-foreground'>
+              {loading ? 'Cargando…' : `${sorted.length} registro${sorted.length !== 1 ? 's' : ''}`}
+            </p>
+          }
+          loading={loading}
+          onRefresh={loadSales}
+          showViewToggle={false}
+          export={{
+            onExportCSV: exportCSV,
+            onExportExcel: exportExcel,
+            onExportPDF: exportPDF,
+            loading: exporting,
+            disabled: sorted.length === 0,
+          }}
+        />
+
+        {/* Filtros + búsqueda */}
         <div className='flex flex-col sm:flex-row gap-2 flex-wrap'>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className='w-44'>
@@ -554,32 +570,7 @@ export default function SalesPage() {
               className='flex h-9 w-full rounded-md border border-border bg-card pl-9 pr-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring placeholder:text-muted-foreground'
             />
           </div>
-
-          <Button
-            variant='outline'
-            size='icon'
-            onClick={loadSales}
-            disabled={loading}
-            title='Actualizar'
-          >
-            <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
-          </Button>
-
-          <ExportButton
-            onExportCSV={exportCSV}
-            onExportExcel={exportExcel}
-            onExportPDF={exportPDF}
-            loading={exporting}
-            disabled={sorted.length === 0}
-          />
         </div>
-
-        {/* Contador */}
-        {!loading && (
-          <p className='text-xs text-muted-foreground'>
-            {sorted.length} registro{sorted.length !== 1 ? 's' : ''}
-          </p>
-        )}
 
         {/* Tabla */}
         {loading ? (

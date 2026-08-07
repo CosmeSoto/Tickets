@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect, useRef } from 'react'
+import { useSession } from 'next-auth/react'
 import { Input } from '@/components/ui/input'
 import { DateInput } from '@/components/ui/date-input'
 import { Label } from '@/components/ui/label'
@@ -29,7 +30,7 @@ import { FormDraftBanner } from '@/components/common/form-draft-banner'
 import { toLocalDateInputValue } from '@/lib/forms/form-date'
 import { parseMoneyInput } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
-import { RefreshCw } from 'lucide-react'
+import { KeyRound, RefreshCw } from 'lucide-react'
 
 interface LicenseAssetFormProps {
   familyId: string
@@ -49,7 +50,7 @@ type Scope = 'Individual' | 'Departamento' | 'Empresa'
 type LicenseDraft = {
   name: string
   licenseTypeId: string
-  licenseKey: string
+  // licenseKey NO se guarda en borrador (secreto)
   scope: Scope
   userId: string
   departmentId: string
@@ -112,6 +113,16 @@ export function LicenseAssetForm({
   licenseId,
 }: LicenseAssetFormProps) {
   const { toast } = useToast()
+  const { data: session } = useSession()
+  const isSuperAdmin = (session?.user as { isSuperAdmin?: boolean })?.isSuperAdmin === true
+  const hasCredentials =
+    isSuperAdmin || (session?.user as { credentialsEnabled?: boolean })?.credentialsEnabled === true
+  const canSyncToVault =
+    hasCredentials &&
+    (isSuperAdmin ||
+      session?.user?.role === 'ADMIN' ||
+      (session?.user as { canManageCredentials?: boolean })?.canManageCredentials === true)
+
   const [name, setName] = useState('')
   const [licenseTypeId, setLicenseTypeId] = useState('')
   const [licenseTypes, setLicenseTypes] = useState<{ id: string; name: string }[]>([])
@@ -154,15 +165,15 @@ export function LicenseAssetForm({
   const isVisible = (section: string) => familyConfig.visibleSections.includes(section as never)
   const isRequired = (section: string) => familyConfig.requiredSections.includes(section as never)
 
-  const draftKey = isEditMode && licenseId
-    ? FormDraftKeys.licenseEdit(licenseId)
-    : FormDraftKeys.licenseNew(familyId)
+  const draftKey =
+    isEditMode && licenseId
+      ? FormDraftKeys.licenseEdit(licenseId)
+      : FormDraftKeys.licenseNew(familyId)
 
   const draftValues: LicenseDraft = useMemo(
     () => ({
       name,
       licenseTypeId,
-      licenseKey,
       scope,
       userId,
       departmentId,
@@ -182,7 +193,6 @@ export function LicenseAssetForm({
     [
       name,
       licenseTypeId,
-      licenseKey,
       scope,
       userId,
       departmentId,
@@ -204,7 +214,6 @@ export function LicenseAssetForm({
   const applyDraft = (d: LicenseDraft) => {
     if (d.name != null) setName(String(d.name))
     if (d.licenseTypeId != null) setLicenseTypeId(String(d.licenseTypeId))
-    if (d.licenseKey != null) setLicenseKey(String(d.licenseKey))
     if (d.scope) setScope(d.scope)
     if (d.userId != null) setUserId(String(d.userId))
     if (d.departmentId != null) setDepartmentId(String(d.departmentId))
@@ -494,7 +503,26 @@ export function LicenseAssetForm({
             value={licenseKey}
             onChange={e => setLicenseKey(e.target.value)}
             placeholder='Ej: XXXXX-XXXXX-XXXXX'
+            type='password'
+            autoComplete='new-password'
           />
+          {canSyncToVault ? (
+            <p className='text-xs text-muted-foreground flex items-start gap-1.5 pt-1'>
+              <KeyRound className='h-3.5 w-3.5 shrink-0 mt-0.5' />
+              Con tu permiso de Credenciales, al guardar se sincroniza a la bóveda del área y se
+              elimina del inventario (fuente de verdad: módulo Credenciales).
+            </p>
+          ) : hasCredentials ? (
+            <p className='text-xs text-muted-foreground pt-1'>
+              Puedes ver credenciales vinculadas en el detalle. Para guardar claves en la bóveda
+              necesitas el permiso «gestionar credenciales».
+            </p>
+          ) : (
+            <p className='text-xs text-muted-foreground pt-1'>
+              Se guarda cifrada en inventario. Activa el módulo Credenciales para gestionar claves
+              con auditoría y compartición.
+            </p>
+          )}
         </div>
       </div>
 
