@@ -58,7 +58,7 @@ export function LinkedCredentialsCard({
   const emptyLabel =
     entity === 'equipment'
       ? 'Sin credenciales vinculadas a este equipo.'
-      : 'Sin credenciales vinculadas a esta licencia. Usa «Agregar» para guardar la clave en la bóveda.'
+      : 'Sin credenciales vinculadas. Usa «Agregar» para portal, admin o accesos del software (la clave de producto va en el inventario de la licencia).'
 
   const loadEntries = async () => {
     setLoading(true)

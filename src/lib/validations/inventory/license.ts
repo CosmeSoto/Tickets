@@ -1,5 +1,16 @@
 import { z } from 'zod'
 
+/** '' → undefined (campos texto/fecha/dinero opcionales) */
+const emptyToUndef = (v: unknown) => (v === '' || v === null ? undefined : v)
+
+/** '' → null para IDs opcionales (permite desasignar con null) */
+const emptyToNull = (v: unknown) => (v === '' ? null : v)
+
+const optionalString = z.preprocess(emptyToUndef, z.string().optional())
+const optionalNullableId = z.preprocess(emptyToNull, z.string().min(1).nullable().optional())
+const optionalDate = z.preprocess(emptyToUndef, z.coerce.date().optional())
+const optionalMoney = z.preprocess(emptyToUndef, z.number().min(0).optional())
+
 export const createLicenseSchema = z.object({
   name: z
     .string()
@@ -7,23 +18,26 @@ export const createLicenseSchema = z.object({
     .max(200, 'El nombre no puede exceder 200 caracteres'),
   typeId: z.string().min(1, 'El tipo de licencia es requerido'),
   licenseTypeId: z.string().optional(),
-  key: z.string().max(500, 'La clave no puede exceder 500 caracteres').optional().or(z.literal('')),
+  key: z.preprocess(
+    emptyToUndef,
+    z.string().max(500, 'La clave no puede exceder 500 caracteres').optional()
+  ),
   scope: z.enum(['Individual', 'Departamento', 'Empresa']).optional(),
-  purchaseDate: z.coerce.date().optional(),
-  expirationDate: z.coerce.date().optional(),
-  cost: z.number().min(0, 'El costo debe ser mayor o igual a 0').optional(),
-  vendor: z.string().max(100).optional(),
-  supplierId: z.string().optional(),
-  invoiceNumber: z.string().max(100).optional().or(z.literal('')),
-  purchaseOrderNumber: z.string().max(100).optional().or(z.literal('')),
-  renewalCost: z.number().min(0).optional(),
-  renewalDate: z.coerce.date().optional(),
-  contractId: z.string().optional(),
-  contractNumber: z.string().max(100).optional().or(z.literal('')),
-  notes: z.string().max(2000).optional(),
-  assignedToEquipment: z.string().optional(),
-  assignedToUser: z.string().optional(),
-  assignedToDepartment: z.string().optional(),
+  purchaseDate: optionalDate,
+  expirationDate: optionalDate,
+  cost: optionalMoney,
+  vendor: optionalString,
+  supplierId: optionalNullableId,
+  invoiceNumber: z.preprocess(emptyToUndef, z.string().max(100).optional()),
+  purchaseOrderNumber: z.preprocess(emptyToUndef, z.string().max(100).optional()),
+  renewalCost: optionalMoney,
+  renewalDate: optionalDate,
+  contractId: optionalNullableId,
+  contractNumber: z.preprocess(emptyToUndef, z.string().max(100).optional()),
+  notes: z.preprocess(emptyToUndef, z.string().max(2000).optional()),
+  assignedToEquipment: optionalNullableId,
+  assignedToUser: optionalNullableId,
+  assignedToDepartment: optionalNullableId,
   customValues: z
     .array(
       z.object({
@@ -37,9 +51,9 @@ export const createLicenseSchema = z.object({
 export const updateLicenseSchema = createLicenseSchema.partial()
 
 export const assignLicenseSchema = z.object({
-  assignedToEquipment: z.string().optional().nullable(),
-  assignedToUser: z.string().optional().nullable(),
-  assignedToDepartment: z.string().optional().nullable(),
+  assignedToEquipment: optionalNullableId,
+  assignedToUser: optionalNullableId,
+  assignedToDepartment: optionalNullableId,
 })
 
 export const licenseFiltersSchema = z.object({

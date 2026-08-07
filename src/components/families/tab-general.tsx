@@ -40,6 +40,8 @@ import { MoveDepartmentDialog } from '@/components/departments/move-department-d
 import { useToast } from '@/hooks/use-toast'
 import type { DepartmentData, DepartmentFormData } from '@/hooks/use-departments'
 import { IconPicker } from '@/components/inventory/icon-picker'
+import { ExportButton } from '@/components/common/export-button'
+import { exportToCSV, exportToExcel, exportToPDF } from '@/lib/utils/export'
 
 interface FamilyBase {
   id: string
@@ -174,6 +176,111 @@ export function TabGeneral({
   const [togglingDept, setTogglingDept] = useState<string | null>(null)
   const [movingDept, setMovingDept] = useState<DepartmentData | null>(null)
   const [showMoveDeptDialog, setShowMoveDeptDialog] = useState(false)
+  const [exportingDepts, setExportingDepts] = useState(false)
+
+  // --- Columnas y handlers de export de departamentos ---
+  const deptExportColumns = [
+    { key: 'name', label: 'Nombre' },
+    {
+      key: 'description',
+      label: 'Descripción',
+      format: (v: string | null | undefined) => v ?? '—',
+    },
+    {
+      key: 'isActive',
+      label: 'Estado',
+      format: (v: boolean) => (v ? 'Activo' : 'Inactivo'),
+    },
+    {
+      key: '_count',
+      label: 'Usuarios',
+      format: (_: unknown, row: DepartmentData) => String(row._count?.users ?? 0),
+    },
+    {
+      key: '_count',
+      label: 'Categorías',
+      format: (_: unknown, row: DepartmentData) => String(row._count?.categories ?? 0),
+    },
+    {
+      key: 'color',
+      label: 'Color',
+      format: (v: string | null | undefined) => v ?? '—',
+    },
+  ]
+
+  const exportDeptCSV = () => {
+    try {
+      if (departments.length === 0) {
+        toast({
+          title: 'Sin datos',
+          description: 'No hay departamentos para exportar',
+          variant: 'destructive',
+        })
+        return
+      }
+      const date = new Date().toISOString().split('T')[0]
+      exportToCSV({
+        filename: `departamentos-${family.code.toLowerCase()}-${date}`,
+        title: `Departamentos — ${family.name}`,
+        subtitle: `${departments.length} departamentos`,
+        columns: deptExportColumns,
+        rows: departments,
+      })
+      toast({ title: 'CSV exportado', description: `${departments.length} departamentos` })
+    } catch {
+      toast({ title: 'Error al exportar', variant: 'destructive' })
+    }
+  }
+
+  const exportDeptExcel = async () => {
+    setExportingDepts(true)
+    try {
+      if (departments.length === 0) {
+        toast({
+          title: 'Sin datos',
+          description: 'No hay departamentos para exportar',
+          variant: 'destructive',
+        })
+        return
+      }
+      const date = new Date().toISOString().split('T')[0]
+      await exportToExcel({
+        filename: `departamentos-${family.code.toLowerCase()}-${date}`,
+        title: `Departamentos — ${family.name}`,
+        subtitle: `${departments.length} departamentos`,
+        columns: deptExportColumns,
+        rows: departments,
+      })
+      toast({ title: 'Excel exportado', description: `${departments.length} departamentos` })
+    } catch {
+      toast({ title: 'Error al exportar Excel', variant: 'destructive' })
+    } finally {
+      setExportingDepts(false)
+    }
+  }
+
+  const exportDeptPDF = () => {
+    try {
+      if (departments.length === 0) {
+        toast({
+          title: 'Sin datos',
+          description: 'No hay departamentos para exportar',
+          variant: 'destructive',
+        })
+        return
+      }
+      const date = new Date().toISOString().split('T')[0]
+      exportToPDF({
+        filename: `departamentos-${family.code.toLowerCase()}-${date}`,
+        title: `Departamentos — ${family.name}`,
+        subtitle: `${departments.length} departamentos`,
+        columns: deptExportColumns,
+        rows: departments,
+      })
+    } catch {
+      toast({ title: 'Error al exportar PDF', variant: 'destructive' })
+    }
+  }
 
   const openCreateDept = () => {
     setEditingDept(null)
@@ -470,12 +577,22 @@ export function TabGeneral({
                 perder usuarios.
               </CardDescription>
             </div>
-            {canEditFamilyMetadata && (
-              <Button size='sm' onClick={openCreateDept} className='w-full sm:w-auto shrink-0'>
-                <Plus className='h-4 w-4 mr-2' />
-                Nuevo departamento
-              </Button>
-            )}
+            <div className='flex items-center gap-2 shrink-0'>
+              {departments.length > 0 && (
+                <ExportButton
+                  onExportCSV={exportDeptCSV}
+                  onExportExcel={exportDeptExcel}
+                  onExportPDF={exportDeptPDF}
+                  loading={exportingDepts}
+                />
+              )}
+              {canEditFamilyMetadata && (
+                <Button size='sm' onClick={openCreateDept} className='w-full sm:w-auto'>
+                  <Plus className='h-4 w-4 mr-2' />
+                  Nuevo departamento
+                </Button>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent className='p-0'>

@@ -158,11 +158,8 @@ export function LicenseDetail({ licenseId, userRole, isSuperAdmin = false }: Pro
   const canTransfer = isAdmin
   const hasCredentials =
     isSuperAdmin || (session?.user as { credentialsEnabled?: boolean })?.credentialsEnabled === true
-  const canManageCredentials =
-    hasCredentials &&
-    (userRole === 'ADMIN' ||
-      isSuperAdmin ||
-      (session?.user as { canManageCredentials?: boolean })?.canManageCredentials === true)
+  /** Vincular/crear propia: basta módulo ON (gestión completa = jerarquía, no creación). */
+  const canManageCredentials = hasCredentials
 
   const loadLicense = useCallback(async () => {
     setLoading(true)
@@ -373,6 +370,18 @@ export function LicenseDetail({ licenseId, userRole, isSuperAdmin = false }: Pro
                 <InfoRow label='Proveedor' value={license.supplier?.name || '—'} />
                 <InfoRow label='N° Factura' value={license.invoiceNumber || '—'} />
                 <InfoRow label='N° Orden de compra' value={license.purchaseOrderNumber || '—'} />
+                {canEdit && license.key && license.key !== '••••••••' && (
+                  <div className='col-span-2'>
+                    <InfoRow
+                      label='Clave de licencia'
+                      value={
+                        <code className='rounded bg-muted px-2 py-1 text-xs font-mono break-all'>
+                          {license.key}
+                        </code>
+                      }
+                    />
+                  </div>
+                )}
               </div>
 
               <Separator />
@@ -438,22 +447,6 @@ export function LicenseDetail({ licenseId, userRole, isSuperAdmin = false }: Pro
               )}
             </CardContent>
           </Card>
-
-          {isAdmin && license.key && !hasCredentials && (
-            <Card>
-              <CardHeader className='pb-2'>
-                <CardTitle className='text-base flex items-center gap-2'>
-                  <Key className='h-4 w-4' />
-                  Clave de licencia
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <code className='block rounded bg-muted px-3 py-2 text-sm font-mono break-all'>
-                  {license.key}
-                </code>
-              </CardContent>
-            </Card>
-          )}
         </div>
 
         {/* Lateral: credenciales + asignación (como QR/asignación en equipo) */}
@@ -466,13 +459,6 @@ export function LicenseDetail({ licenseId, userRole, isSuperAdmin = false }: Pro
               familyName={currentFamilyName}
               canManage={canManageCredentials}
             />
-          )}
-
-          {isAdmin && license.key && hasCredentials && (
-            <div className='rounded-lg border border-amber-200 bg-amber-50/80 dark:bg-amber-500/10 px-4 py-3 text-xs text-amber-900 dark:text-amber-200'>
-              Hay una clave antigua en inventario. Usa «Agregar» en Credenciales para migrarla a la
-              bóveda; al sincronizar se elimina del inventario.
-            </div>
           )}
 
           <Card>

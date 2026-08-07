@@ -163,7 +163,14 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Error en GET /api/inventory/licenses:', error)
     if (error instanceof ZodError) {
-      return NextResponse.json({ error: 'Datos inválidos', details: error.errors }, { status: 400 })
+      const first = error.errors[0]
+      const field = first?.path?.join('.') || undefined
+      const message = first?.message
+        ? field
+          ? `${first.message} (${field})`
+          : first.message
+        : 'Datos inválidos'
+      return NextResponse.json({ error: message, field, details: error.errors }, { status: 400 })
     }
     return NextResponse.json({ error: 'Error al obtener licencias' }, { status: 500 })
   }
@@ -201,21 +208,6 @@ export async function POST(request: NextRequest) {
       await linkLicenseToBusinessContract(license.id, contractId, license.name)
     }
 
-    if (validatedData.key?.trim() && license.licenseType?.familyId) {
-      const { syncLicenseKeyToVault } = await import('@/lib/credentials/sync-license-key')
-      await syncLicenseKeyToVault({
-        ctx: {
-          userId: session.user.id,
-          role: session.user.role,
-          isSuperAdmin: (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true,
-        },
-        licenseId: license.id,
-        familyId: license.licenseType.familyId,
-        title: license.name,
-        plaintextKey: validatedData.key,
-      }).catch(err => console.error('[credentials] sync license key after create:', err))
-    }
-
     await AuditServiceComplete.log({
       action: AuditActionsComplete.LICENSE_CREATED,
       entityType: 'inventory',
@@ -246,7 +238,14 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error en POST /api/inventory/licenses:', error)
     if (error instanceof ZodError) {
-      return NextResponse.json({ error: 'Datos inválidos', details: error.errors }, { status: 400 })
+      const first = error.errors[0]
+      const field = first?.path?.join('.') || undefined
+      const message = first?.message
+        ? field
+          ? `${first.message} (${field})`
+          : first.message
+        : 'Datos inválidos'
+      return NextResponse.json({ error: message, field, details: error.errors }, { status: 400 })
     }
     return NextResponse.json({ error: 'Error al crear licencia' }, { status: 500 })
   }

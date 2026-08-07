@@ -304,7 +304,9 @@ export function CategoryFormDialog({
                     <>
                       <span
                         className='inline-block h-3 w-3 rounded-full flex-shrink-0'
-                        style={{ backgroundColor: derivedFamily.color ?? '#6B7280' }}
+                        style={{
+                          backgroundColor: derivedFamily.color ?? 'hsl(var(--muted-foreground))',
+                        }}
                       />
                       <span className='font-medium'>{derivedFamily.name}</span>
                       <span className='text-muted-foreground text-xs'>({derivedFamily.code})</span>
@@ -361,11 +363,11 @@ export function CategoryFormDialog({
                   disabled={submitting}
                 />
                 {formErrors.departmentId && (
-                  <p className='text-sm text-red-600'>{formErrors.departmentId}</p>
+                  <p className='text-sm text-destructive'>{formErrors.departmentId}</p>
                 )}
                 {formData.departmentId && (
-                  <div className='text-xs text-green-600 bg-green-50 p-2 rounded flex items-start gap-2'>
-                    <Building className='h-4 w-4 mt-0.5 flex-shrink-0' />
+                  <div className='text-xs text-foreground bg-muted p-2 rounded flex items-start gap-2 border border-border'>
+                    <Building className='h-4 w-4 mt-0.5 flex-shrink-0 text-muted-foreground' />
                     <span>
                       <strong>Auto-asignación inteligente:</strong> Los tickets se asignarán
                       preferentemente a técnicos de este departamento.
@@ -376,7 +378,7 @@ export function CategoryFormDialog({
             )}
 
             {!derivedFamilyId && !formData.parentId && (
-              <p className='text-xs text-amber-600 bg-amber-50 p-2 rounded'>
+              <p className='text-xs text-primary/90 bg-primary/10 p-2 rounded border border-primary/20'>
                 ⚠️ Selecciona primero una familia para continuar.
               </p>
             )}
@@ -403,24 +405,24 @@ export function CategoryFormDialog({
               </div>
 
               {/* Nivel resultante */}
-              <div className='bg-blue-50 dark:bg-blue-950 p-3 rounded-lg border border-blue-200 dark:border-blue-800'>
-                <div className='text-sm font-medium text-blue-700 dark:text-blue-300 mb-2'>
+              <div className='bg-secondary/50 dark:bg-secondary p-3 rounded-lg border border-border'>
+                <div className='text-sm font-medium text-foreground mb-2'>
                   📊 Nivel de la Categoría
                 </div>
                 <div className='flex items-center justify-between text-sm'>
-                  <span className='text-blue-600 dark:text-blue-400'>Nivel resultante:</span>
+                  <span className='text-muted-foreground'>Nivel resultante:</span>
                   <Badge variant='outline' className='font-medium'>
                     Nivel {getResultingLevel()} - {getResultingLevelName()}
                   </Badge>
                 </div>
-                <div className='text-xs text-blue-600 dark:text-blue-400 mt-1'>
+                <div className='text-xs text-muted-foreground mt-1'>
                   {getResultingLevel() === 1 && '🏠 Categoría principal (sin padre)'}
                   {getResultingLevel() === 2 && '📁 Subcategoría de nivel 2'}
                   {getResultingLevel() === 3 && '🔖 Especialidad de nivel 3'}
                   {getResultingLevel() === 4 && '🎯 Detalle específico (nivel máximo)'}
                 </div>
                 {getResultingLevel() === 4 && (
-                  <div className='text-xs text-amber-600 bg-amber-50 p-2 rounded mt-1'>
+                  <div className='text-xs text-primary/90 bg-primary/10 p-2 rounded mt-1 border border-primary/20'>
                     ⚠️ Nivel máximo alcanzado. No se pueden crear subcategorías.
                   </div>
                 )}
@@ -443,24 +445,20 @@ export function CategoryFormDialog({
 
               {/* Ruta de jerarquía */}
               {(formData.parentId || (editingCategory && editingCategory.level > 1)) && (
-                <div className='bg-slate-50 dark:bg-slate-900 p-3 rounded-lg border border-slate-200 dark:border-slate-800'>
-                  <div className='text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 flex items-center'>
+                <div className='bg-muted p-3 rounded-lg border border-border'>
+                  <div className='text-sm font-medium text-foreground mb-2 flex items-center'>
                     <Home className='h-4 w-4 mr-2' />
                     Ruta de Jerarquía
                   </div>
-                  <div className='text-sm text-slate-600 dark:text-slate-400'>
+                  <div className='text-sm text-muted-foreground'>
                     {getHierarchyPath().map((item, index, array) => {
                       const isLast = index === array.length - 1
                       return (
                         <span key={`${item.id}-${index}`}>
-                          <span
-                            className={
-                              isLast ? 'font-medium text-slate-900 dark:text-slate-100' : ''
-                            }
-                          >
+                          <span className={isLast ? 'font-medium text-foreground' : ''}>
                             {item.name}
                           </span>
-                          {!isLast && <span className='mx-1 text-slate-400'>→</span>}
+                          {!isLast && <span className='mx-1 text-muted-foreground'>→</span>}
                         </span>
                       )
                     })}
@@ -482,7 +480,7 @@ export function CategoryFormDialog({
                 placeholder='Nombre de la categoría'
                 disabled={submitting}
               />
-              {formErrors.name && <p className='text-sm text-red-600'>{formErrors.name}</p>}
+              {formErrors.name && <p className='text-sm text-destructive'>{formErrors.name}</p>}
             </div>
 
             {/* Descripción */}
@@ -518,7 +516,7 @@ export function CategoryFormDialog({
                   disabled={submitting}
                 />
               </div>
-              {formErrors.color && <p className='text-sm text-red-600'>{formErrors.color}</p>}
+              {formErrors.color && <p className='text-sm text-destructive'>{formErrors.color}</p>}
             </div>
           </div>
 
@@ -558,7 +556,7 @@ export function CategoryFormDialog({
 
             {/* Información compacta sobre cascada */}
             {formData.technician_assignments.length === 0 && (
-              <div className='text-xs bg-amber-50 p-2 rounded text-amber-700'>
+              <div className='text-xs bg-primary/10 p-2 rounded text-primary/90 border border-primary/20'>
                 💡 Sin técnicos asignados. Se usará cascada inteligente hacia niveles superiores.
               </div>
             )}

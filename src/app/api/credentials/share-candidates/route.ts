@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { checkCredentialsModuleAccess, canManageCredentialsVault } from '@/lib/credentials/access'
+import { checkCredentialsModuleAccess } from '@/lib/credentials/access'
 import { listCredentialShareCandidates } from '@/lib/credentials/share-scope'
 
 /**
@@ -23,9 +23,6 @@ export async function GET(request: Request) {
   if (!(await checkCredentialsModuleAccess(ctx))) {
     return NextResponse.json({ error: 'Módulo de credenciales no habilitado' }, { status: 403 })
   }
-  if (!(await canManageCredentialsVault(session.user.id, session.user.role, ctx.isSuperAdmin))) {
-    return NextResponse.json({ error: 'Sin permiso' }, { status: 403 })
-  }
 
   const q = new URL(request.url).searchParams.get('q')?.trim() ?? ''
   const users = await listCredentialShareCandidates(ctx, { q, take: 50 })
@@ -35,7 +32,7 @@ export async function GET(request: Request) {
     meta: {
       rule: ctx.isSuperAdmin
         ? 'SuperAdmin: todos los usuarios activos (auditable)'
-        : 'Tu nivel o inferior, en tus áreas de credenciales (auditable)',
+        : 'Tu nivel o inferior, en tu área nativa o familias asignadas de Credenciales',
     },
   })
 }

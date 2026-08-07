@@ -151,9 +151,11 @@ export function getModuleRoleDescription(moduleKey: string, role: string): strin
       CLIENT: 'Ver · con permiso de crear publica en su nativa + áreas de contenido',
     },
     credentials: {
-      ADMIN: 'Gestionar credenciales de sus áreas asignadas',
-      TECHNICIAN: 'Ver y revelar credenciales · gestionar con permiso de gestor',
-      CLIENT: 'Ver y revelar credenciales de sus áreas asignadas',
+      ADMIN:
+        'Crear y ver propias + compartidas · con «Ver inferiores», también las de técnicos y clientes del área',
+      TECHNICIAN:
+        'Crear y ver propias + compartidas · con «Ver inferiores», también las de clientes del área',
+      CLIENT: 'Crear y ver propias + las que te compartan otros usuarios',
     },
   }
   return descriptions[moduleKey]?.[role] ?? 'Acceso al módulo'
@@ -188,9 +190,10 @@ export function getAdditionalFamilyHint(moduleKey: string, role: string): string
       CLIENT: 'Áreas de contenido donde puede publicar (mismas que Noticias).',
     },
     credentials: {
-      ADMIN: 'Áreas adicionales de visibilidad de credenciales.',
-      TECHNICIAN: 'Áreas donde puede ver o gestionar credenciales.',
-      CLIENT: 'Áreas donde puede consultar credenciales.',
+      ADMIN:
+        'Áreas donde guarda credenciales y, con «Ver inferiores», ve las de técnicos/clientes.',
+      TECHNICIAN: 'Áreas donde guarda credenciales y, con «Ver inferiores», ve las de clientes.',
+      CLIENT: 'Áreas donde puede guardar y consultar sus credenciales.',
     },
   }
   return hints[moduleKey]?.[role] ?? null

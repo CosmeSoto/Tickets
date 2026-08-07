@@ -96,7 +96,7 @@ export class ConsumableService {
 
       // Bloquear EXIT sobre MRO caducado
       if (data.type === 'EXIT' && consumable.status === 'EXPIRED') {
-        throw new Error('No se puede consumir un material caducado')
+        throw new Error('No se puede consumir un suministro caducado')
       }
 
       let newStock = consumable.currentStock
@@ -118,6 +118,8 @@ export class ConsumableService {
         )
       }
 
+      const occurredAt = data.occurredAt ? new Date(`${data.occurredAt}T12:00:00`) : undefined
+
       const movement = await tx.stock_movements.create({
         data: {
           consumableId: data.consumableId,
@@ -127,6 +129,7 @@ export class ConsumableService {
           userId: _userId,
           assignedToUserId: data.assignedToUserId || null,
           assignedToEquipmentId: data.assignedToEquipmentId || null,
+          ...(occurredAt && !Number.isNaN(occurredAt.getTime()) ? { createdAt: occurredAt } : {}),
         },
         include: {
           consumable: true,
@@ -159,6 +162,7 @@ export class ConsumableService {
             quantity: data.quantity,
             previousStock: consumable.currentStock,
             newStock,
+            occurredAt: data.occurredAt ?? null,
           },
         },
       })

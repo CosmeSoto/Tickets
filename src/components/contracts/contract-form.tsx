@@ -41,7 +41,10 @@ import {
   type ContractFormData,
 } from '@/types/contracts'
 import type { ContractPickerPrefill } from '@/lib/contracts/contract-picker-prefill'
-import { applyContractFormPrefill, lineTypeForCategory } from '@/lib/contracts/apply-contract-prefill'
+import {
+  applyContractFormPrefill,
+  lineTypeForCategory,
+} from '@/lib/contracts/apply-contract-prefill'
 
 interface ContractAttachment {
   id: string
@@ -289,7 +292,9 @@ export function ContractForm({
 
   const resolvedDraftKey =
     draftKey ??
-    (isEditing && contract?.id ? FormDraftKeys.contractEdit(contract.id) : FormDraftKeys.contractNew())
+    (isEditing && contract?.id
+      ? FormDraftKeys.contractEdit(contract.id)
+      : FormDraftKeys.contractNew())
 
   const watchedDraft = watch()
   const draftSnapshot = useMemo(() => {
@@ -365,8 +370,8 @@ export function ContractForm({
 
   /** Densidad de grilla: 3 columnas en modal amplio (embed) */
   const formGrid = embedMode
-    ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4'
-    : 'grid grid-cols-1 sm:grid-cols-2 gap-4'
+    ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 [&>*]:min-w-0'
+    : 'grid grid-cols-1 sm:grid-cols-2 gap-4 [&>*]:min-w-0'
 
   const { data: licenses } = useFetch<{ id: string; name: string; vendor?: string | null }>(
     '/api/inventory/licenses',
@@ -507,8 +512,12 @@ export function ContractForm({
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        const fieldHint = err.field ? ` (${err.field})` : ''
-        throw new Error((err.error ?? `Error ${res.status}`) + fieldHint)
+        const fieldHint = err.field ? ` · campo: ${err.field}` : ''
+        const detailHint =
+          Array.isArray(err.details) && err.details[0]?.message && !err.error
+            ? String(err.details[0].message)
+            : ''
+        throw new Error((err.error || detailHint || `Error ${res.status}`) + fieldHint)
       }
 
       const saved = await res.json()
@@ -1290,11 +1299,7 @@ export function ContractForm({
 
       {/* ── 7. Notas ─────────────────────────────────────────────────────── */}
       <fieldset disabled={readOnly} className={readOnly ? 'block' : 'contents'}>
-        <ContractFormSection
-          title='7. Notas internas'
-          badge='Opcional'
-          defaultOpen={false}
-        >
+        <ContractFormSection title='7. Notas internas' badge='Opcional' defaultOpen={false}>
           <div className='space-y-1'>
             <Label>Notas</Label>
             <Textarea

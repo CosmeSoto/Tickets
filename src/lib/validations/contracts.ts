@@ -8,6 +8,36 @@ const optionalUuid = z.preprocess(emptyToNull, z.string().uuid().nullable().opti
 const optionalEnum = <T extends z.ZodTypeAny>(schema: T) =>
   z.preprocess(emptyToNull, schema.nullable().optional())
 
+/** Email opcional: vacío → null (no falla .email()). */
+const optionalEmail = z.preprocess(
+  emptyToNull,
+  z.string().email('Email inválido').max(200).nullable().optional()
+)
+
+/** URL opcional: vacío → null (no falla .url()). */
+const optionalUrl = z.preprocess(
+  emptyToNull,
+  z.string().url('URL inválida').max(500).nullable().optional()
+)
+
+const optionalLast4 = z.preprocess(
+  emptyToNull,
+  z
+    .string()
+    .regex(/^\d{4}$/, 'Los últimos 4 dígitos deben ser exactamente 4 números')
+    .nullable()
+    .optional()
+)
+
+const optionalCardExpiry = z.preprocess(
+  emptyToNull,
+  z
+    .string()
+    .regex(/^\d{2}\/\d{4}$/, 'Vencimiento de tarjeta: usa formato MM/YYYY')
+    .nullable()
+    .optional()
+)
+
 // Valores exactos del enum ContractCategory en Prisma
 export const CONTRACT_CATEGORY_VALUES = [
   'EQUIPMENT_RENTAL',
@@ -63,29 +93,25 @@ const billingFieldsSchema = {
   paymentAccountRef: z.string().max(300).optional().nullable(),
   custodianUserId: optionalUuid,
   backupCustodianUserId: optionalUuid,
-  billingAccountEmail: z.string().email().max(200).optional().nullable().or(z.literal('')),
-  billingPortalUrl: z.string().url().max(500).optional().nullable().or(z.literal('')),
-  vendorAccountId: z.string().max(200).optional().nullable(),
+  billingAccountEmail: optionalEmail,
+  billingPortalUrl: optionalUrl,
+  vendorAccountId: z.preprocess(emptyToNull, z.string().max(200).nullable().optional()),
   paymentCardBrand: optionalEnum(z.enum(PAYMENT_CARD_BRAND_VALUES)),
-  paymentCardLast4: z
-    .string()
-    .regex(/^\d{4}$/, 'Últimos 4 dígitos inválidos')
-    .optional()
-    .nullable()
-    .or(z.literal('')),
-  paymentCardBank: z.string().max(100).optional().nullable(),
-  paymentCardExpiry: z
-    .string()
-    .regex(/^\d{2}\/\d{4}$/, 'Formato MM/YYYY')
-    .optional()
-    .nullable()
-    .or(z.literal('')),
-  corporateCardLabel: z.string().max(100).optional().nullable(),
+  paymentCardLast4: optionalLast4,
+  paymentCardBank: z.preprocess(emptyToNull, z.string().max(100).nullable().optional()),
+  paymentCardExpiry: optionalCardExpiry,
+  corporateCardLabel: z.preprocess(emptyToNull, z.string().max(100).nullable().optional()),
   lastChargeDate: z.preprocess(emptyToNull, z.string().nullable().optional()),
-  lastChargeAmount: z.number({ coerce: true }).min(0).optional().nullable(),
-  lastTransactionRef: z.string().max(200).optional().nullable(),
+  lastChargeAmount: z.preprocess(
+    v => (v === '' || v === undefined ? null : v),
+    z.number({ coerce: true }).min(0).nullable().optional()
+  ),
+  lastTransactionRef: z.preprocess(emptyToNull, z.string().max(200).nullable().optional()),
   subscriptionUsageStatus: z.enum(SUBSCRIPTION_USAGE_STATUS_VALUES).default('ACTIVE'),
-  cancellationNoticeDays: z.number({ coerce: true }).int().min(0).max(365).optional().nullable(),
+  cancellationNoticeDays: z.preprocess(
+    v => (v === '' || v === undefined ? null : v),
+    z.number({ coerce: true }).int().min(0).max(365).nullable().optional()
+  ),
 }
 
 export const CONTRACT_LINE_TYPE_VALUES = [
@@ -100,10 +126,7 @@ export const contractLineSchema = z.object({
   id: z.string().optional(),
   type: z.enum(CONTRACT_LINE_TYPE_VALUES).default('SERVICE'),
   description: z.string().min(1, 'La descripción de la línea es requerida').max(500),
-  quantity: z
-    .number({ coerce: true })
-    .min(0.01, 'La cantidad debe ser mayor a 0')
-    .default(1),
+  quantity: z.number({ coerce: true }).min(0.01, 'La cantidad debe ser mayor a 0').default(1),
   unitPrice: z.number({ coerce: true }).min(0).optional().nullable(),
   equipmentId: optionalUuid,
   licenseId: optionalUuid,
@@ -137,19 +160,17 @@ export const createContractSchema = z.object({
   monthlyCost: z.number({ coerce: true }).min(0).optional().nullable(),
   currency: z.string().length(3).default('USD'),
   contactName: z.string().max(200).optional().nullable(),
-  contactEmail: z.string().email().max(200).optional().nullable().or(z.literal('')),
-  contactPhone: z.string().max(50).optional().nullable(),
-  notes: z.string().max(5000).optional().nullable(),
-  termsUrl: z.string().url().max(500).optional().nullable().or(z.literal('')),
+  contactEmail: optionalEmail,
+  contactPhone: z.preprocess(emptyToNull, z.string().max(50).nullable().optional()),
+  notes: z.preprocess(emptyToNull, z.string().max(5000).nullable().optional()),
+  termsUrl: optionalUrl,
   lines: z.array(contractLineSchema).default([]),
   ...billingFieldsSchema,
 })
 
 export const updateContractSchema = createContractSchema.partial().extend({
   // Al actualizar, si se envía category vacía también se ignora
-  category: z
-    .enum(CONTRACT_CATEGORY_VALUES)
-    .optional(),
+  category: z.enum(CONTRACT_CATEGORY_VALUES).optional(),
 })
 
 export type CreateContractInput = z.infer<typeof createContractSchema>

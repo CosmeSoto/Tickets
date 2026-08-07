@@ -1,4 +1,5 @@
 import prisma from '@/lib/prisma'
+import type { Prisma } from '@prisma/client'
 import {
   getUserModuleFamilyGrantIds,
   resolveModuleFamilyScopeIds,
@@ -14,8 +15,38 @@ export type CredentialsAccessContext = {
   isSuperAdmin?: boolean
 }
 
+type VaultShape = { familyId: string | null; ownerUserId: string | null; kind: string }
+
+type EntryAccessShape = {
+  id: string
+  createdById: string
+  vault: VaultShape
+  createdBy?: { role: string; isSuperAdmin: boolean | null }
+}
+
 function dedupe(ids: (string | null | undefined)[]): string[] {
   return [...new Set(ids.filter((id): id is string => Boolean(id)))]
+}
+
+/** SuperAdmin(4) > Admin(3) > Técnico(2) > Cliente(1) */
+export function credentialsRoleRank(role: string, isSuperAdmin?: boolean): number {
+  if (role === 'ADMIN' && isSuperAdmin) return 4
+  if (role === 'ADMIN') return 3
+  if (role === 'TECHNICIAN') return 2
+  if (role === 'CLIENT') return 1
+  return 0
+}
+
+/** Roles estrictamente inferiores (nunca pares ni superiores). */
+export function inferiorCredentialRoles(
+  role: string,
+  isSuperAdmin?: boolean
+): Array<'ADMIN' | 'TECHNICIAN' | 'CLIENT'> {
+  const rank = credentialsRoleRank(role, isSuperAdmin)
+  if (rank >= 4) return ['ADMIN', 'TECHNICIAN', 'CLIENT']
+  if (rank === 3) return ['TECHNICIAN', 'CLIENT']
+  if (rank === 2) return ['CLIENT']
+  return []
 }
 
 export async function checkCredentialsModuleAccess(
@@ -34,21 +65,28 @@ export async function checkCredentialsModuleAccess(
   return !!user?.isActive && user.credentialsEnabled === true
 }
 
-/** Gestionar = crear/editar/borrar. ADMIN con módulo ON, o TECH/CLIENT con canManage. */
-export async function canManageCredentialsVault(
+/**
+ * Crear credenciales propias: basta el módulo activo.
+ * («Ver credenciales inferiores» NO es requisito para crear.)
+ */
+export async function canCreateCredentials(
+  userId: string,
+  role: string,
+  isSuperAdmin?: boolean
+): Promise<boolean> {
+  return checkCredentialsModuleAccess({ userId, role, isSuperAdmin })
+}
+
+/**
+ * Ver credenciales inferiores = ver/editar las de roles inferiores en el área.
+ * SuperAdmin siempre. ADMIN/TECH requieren canManageCredentials.
+ */
+export async function canManageCredentialsHierarchy(
   userId: string,
   role: string,
   isSuperAdmin?: boolean
 ): Promise<boolean> {
   if (role === 'ADMIN' && isSuperAdmin) return true
-
-  if (role === 'ADMIN') {
-    const user = await prisma.users.findUnique({
-      where: { id: userId },
-      select: { credentialsEnabled: true, isActive: true },
-    })
-    return !!user?.isActive && user.credentialsEnabled === true
-  }
 
   const user = await prisma.users.findUnique({
     where: { id: userId },
@@ -57,11 +95,20 @@ export async function canManageCredentialsVault(
   return !!user?.isActive && user.credentialsEnabled === true && user.canManageCredentials === true
 }
 
+/** @deprecated Usar canManageCredentialsHierarchy o canCreateCredentials */
+export async function canManageCredentialsVault(
+  userId: string,
+  role: string,
+  isSuperAdmin?: boolean
+): Promise<boolean> {
+  return canManageCredentialsHierarchy(userId, role, isSuperAdmin)
+}
+
 /**
  * Familias visibles en credenciales.
  * - SuperAdmin: todas activas
  * - Si hay grants de credentials: nativa + grants credentials
- * - Si no hay grants credentials: fallback a scope de inventario (útil al enlazar equipos)
+ * - Si no hay grants credentials: fallback a scope de inventario
  */
 export async function getCredentialsFamilyScopeIds(
   userId: string,
@@ -84,9 +131,15 @@ export async function getCredentialsFamilyScopeIds(
   return resolveModuleFamilyScopeIds(userId, 'inventory', 'canView')
 }
 
+/**
+ * Acceso a bóveda (para listar bóvedas / crear en ella):
+ * - PERSONAL: solo el dueño
+ * - AREA: familia en scope (sigue haciendo falta para guardar en el área)
+ * Nota: ver entradas del área NO implica ser dueño de todas; eso lo filtra userCanAccessEntry.
+ */
 export async function userCanAccessVault(
   ctx: CredentialsAccessContext,
-  vault: { familyId: string | null; ownerUserId: string | null; kind: string }
+  vault: VaultShape
 ): Promise<boolean> {
   if (!(await checkCredentialsModuleAccess(ctx))) return false
 
@@ -103,26 +156,152 @@ export async function userCanAccessVault(
   return scope.includes(vault.familyId)
 }
 
-/** Acceso a una entrada: bóveda del área/personal, o share explícito (userId). */
+function isCreatorInferior(
+  viewer: CredentialsAccessContext,
+  creator: { role: string; isSuperAdmin: boolean | null }
+): boolean {
+  const viewerRank = credentialsRoleRank(viewer.role, viewer.isSuperAdmin)
+  const creatorRank = credentialsRoleRank(creator.role, creator.isSuperAdmin === true)
+  return creatorRank > 0 && creatorRank < viewerRank
+}
+
+/**
+ * Visibilidad de una entrada:
+ * 1) Propias (createdBy o bóveda personal)
+ * 2) Compartidas conmigo
+ * 3) Con gestión completa: creadas por roles inferiores en familias de mi alcance
+ * 4) SuperAdmin: todas
+ * Nunca pares ni superiores salvo share explícito.
+ */
 export async function userCanAccessEntry(
   ctx: CredentialsAccessContext,
-  entry: {
-    id: string
-    vault: { familyId: string | null; ownerUserId: string | null; kind: string }
-  }
+  entry: EntryAccessShape
 ): Promise<boolean> {
-  if (await userCanAccessVault(ctx, entry.vault)) return true
-
   if (!(await checkCredentialsModuleAccess(ctx))) return false
 
+  if (ctx.isSuperAdmin) return true
+
+  if (entry.createdById === ctx.userId) return true
+
+  if (entry.vault.kind === 'PERSONAL' && entry.vault.ownerUserId === ctx.userId) return true
+
   const share = await prisma.credential_shares.findFirst({
-    where: {
-      entryId: entry.id,
-      userId: ctx.userId,
-    },
+    where: { entryId: entry.id, userId: ctx.userId },
     select: { id: true },
   })
-  return !!share
+  if (share) return true
+
+  if (!(await canManageCredentialsHierarchy(ctx.userId, ctx.role, ctx.isSuperAdmin))) {
+    return false
+  }
+
+  let creator = entry.createdBy
+  if (!creator) {
+    const row = await prisma.users.findUnique({
+      where: { id: entry.createdById },
+      select: { role: true, isSuperAdmin: true },
+    })
+    if (!row) return false
+    creator = row
+  }
+
+  if (!isCreatorInferior(ctx, creator)) return false
+
+  if (entry.vault.kind === 'PERSONAL') {
+    // Bóveda personal de un inferior: visible con gestión completa
+    return true
+  }
+
+  if (!entry.vault.familyId) return false
+  const scope = await getCredentialsFamilyScopeIds(ctx.userId, {
+    isSuperAdmin: ctx.isSuperAdmin,
+  })
+  return scope.includes(entry.vault.familyId)
+}
+
+/** Editar/borrar/compartir: dueño, o gestor de jerarquía sobre un inferior. */
+export async function userCanMutateEntry(
+  ctx: CredentialsAccessContext,
+  entry: EntryAccessShape
+): Promise<boolean> {
+  if (!(await checkCredentialsModuleAccess(ctx))) return false
+  if (ctx.isSuperAdmin) return true
+  if (entry.createdById === ctx.userId) return true
+
+  // Share VIEW no otorga mutación
+  if (!(await canManageCredentialsHierarchy(ctx.userId, ctx.role, ctx.isSuperAdmin))) {
+    return false
+  }
+
+  let creator = entry.createdBy
+  if (!creator) {
+    const row = await prisma.users.findUnique({
+      where: { id: entry.createdById },
+      select: { role: true, isSuperAdmin: true },
+    })
+    if (!row) return false
+    creator = row
+  }
+
+  if (!isCreatorInferior(ctx, creator)) return false
+
+  if (entry.vault.kind === 'PERSONAL') return true
+  if (!entry.vault.familyId) return false
+  const scope = await getCredentialsFamilyScopeIds(ctx.userId, {
+    isSuperAdmin: ctx.isSuperAdmin,
+  })
+  return scope.includes(entry.vault.familyId)
+}
+
+/** Prisma where para listado GET /entries según jerarquía. */
+export async function buildCredentialEntriesVisibilityWhere(
+  ctx: CredentialsAccessContext
+): Promise<Prisma.credential_entriesWhereInput> {
+  if (ctx.isSuperAdmin) {
+    return { isActive: true, vault: { isActive: true } }
+  }
+
+  const familyIds = await getCredentialsFamilyScopeIds(ctx.userId, {
+    isSuperAdmin: false,
+  })
+  const canHierarchy = await canManageCredentialsHierarchy(ctx.userId, ctx.role, ctx.isSuperAdmin)
+  const inferiorRoles = inferiorCredentialRoles(ctx.role, ctx.isSuperAdmin)
+
+  const or: Prisma.credential_entriesWhereInput[] = [
+    { createdById: ctx.userId },
+    {
+      vault: {
+        isActive: true,
+        kind: 'PERSONAL',
+        ownerUserId: ctx.userId,
+      },
+    },
+    {
+      vault: { isActive: true },
+      shares: { some: { userId: ctx.userId } },
+    },
+  ]
+
+  if (canHierarchy && inferiorRoles.length > 0) {
+    or.push({
+      vault: {
+        isActive: true,
+        OR: [
+          ...(familyIds.length > 0 ? [{ familyId: { in: familyIds } }] : []),
+          { kind: 'PERSONAL' as const },
+        ],
+      },
+      createdBy: {
+        role: { in: inferiorRoles },
+        isSuperAdmin: false,
+      },
+    })
+  }
+
+  return {
+    isActive: true,
+    OR: or,
+  }
 }
 
 /** Share solo VIEW en MVP: no otorga editar/borrar. */
@@ -258,5 +437,7 @@ export const credentialEntryMetadataSelect = {
       family: { select: { id: true, name: true, code: true, color: true } },
     },
   },
-  createdBy: { select: { id: true, name: true } },
+  createdBy: {
+    select: { id: true, name: true, email: true, role: true, isSuperAdmin: true },
+  },
 } as const

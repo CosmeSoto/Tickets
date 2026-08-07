@@ -13,6 +13,7 @@ import {
   toInventoryAccessUser,
   inventoryAccessToResponse,
 } from '@/lib/inventory/inventory-resource-access'
+import { getConsumableConsumptionSummary } from '@/lib/inventory/consumable-consumption'
 
 /**
  * GET /api/inventory/consumables/[id]
@@ -62,7 +63,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         ? consumable.costPerUnit * consumable.currentStock
         : null
 
-    return NextResponse.json({ ...consumable, totalStockValue })
+    const consumptionSummary = await getConsumableConsumptionSummary(
+      id,
+      consumable.currentStock ?? 0
+    )
+
+    return NextResponse.json({ ...consumable, totalStockValue, consumptionSummary })
   } catch (error) {
     console.error('Error en GET /api/inventory/consumables/[id]:', error)
     return NextResponse.json({ error: 'Error al obtener suministro' }, { status: 500 })

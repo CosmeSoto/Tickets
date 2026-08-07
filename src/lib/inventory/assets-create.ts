@@ -330,7 +330,7 @@ export async function createAsset(
 
     // ── MRO ──────────────────────────────────────────────────────────────────
   } else if (subtype === 'MRO') {
-    if (!name?.trim()) return { error: 'El nombre del material es obligatorio', status: 400 }
+    if (!name?.trim()) return { error: 'El nombre del suministro es obligatorio', status: 400 }
     if (!typeId) return { error: 'El tipo de suministro es obligatorio', status: 400 }
     if (!unitOfMeasureId) return { error: 'La unidad de medida es obligatoria', status: 400 }
 

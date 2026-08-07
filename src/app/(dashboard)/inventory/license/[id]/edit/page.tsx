@@ -26,9 +26,7 @@ export default function EditLicensePage({ params }: EditLicensePageProps) {
 
   const canManageInventory = (session?.user as any)?.canManageInventory === true
   const canEdit =
-    session?.user?.role === 'ADMIN' ||
-    session?.user?.role === 'TECHNICIAN' ||
-    canManageInventory
+    session?.user?.role === 'ADMIN' || session?.user?.role === 'TECHNICIAN' || canManageInventory
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login')
@@ -76,8 +74,12 @@ export default function EditLicensePage({ params }: EditLicensePageProps) {
         body: JSON.stringify(payload),
       })
       if (!response.ok) {
-        const err = await response.json()
-        throw new Error(err.error || 'Error al actualizar la licencia')
+        const err = await response.json().catch(() => ({}))
+        const detail =
+          Array.isArray(err.details) && err.details[0]?.message
+            ? String(err.details[0].message)
+            : null
+        throw new Error(err.error || detail || 'Error al actualizar la licencia')
       }
       toast.success('Licencia actualizada exitosamente')
       setTimeout(() => router.push(`/inventory/license/${id}`), 1500)

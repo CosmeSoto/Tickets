@@ -199,25 +199,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       await syncLicenseContractLink(id, contractId || null, license.name)
     }
 
-    if (
-      typeof updatePayload.key === 'string' &&
-      updatePayload.key.trim() &&
-      license.licenseType?.familyId
-    ) {
-      const { syncLicenseKeyToVault } = await import('@/lib/credentials/sync-license-key')
-      await syncLicenseKeyToVault({
-        ctx: {
-          userId: session.user.id,
-          role: session.user.role,
-          isSuperAdmin: (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true,
-        },
-        licenseId: id,
-        familyId: license.licenseType.familyId,
-        title: license.name,
-        plaintextKey: updatePayload.key,
-      }).catch(err => console.error('[credentials] sync license key after update:', err))
-    }
-
     await AuditServiceComplete.log({
       action: AuditActionsComplete.LICENSE_UPDATED,
       entityType: 'inventory',
@@ -233,7 +214,14 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   } catch (error) {
     console.error('Error en PUT /api/inventory/licenses/[id]:', error)
     if (error instanceof ZodError) {
-      return NextResponse.json({ error: 'Datos inválidos', details: error.errors }, { status: 400 })
+      const first = error.errors[0]
+      const field = first?.path?.join('.') || undefined
+      const message = first?.message
+        ? field
+          ? `${first.message} (${field})`
+          : first.message
+        : 'Datos inválidos'
+      return NextResponse.json({ error: message, field, details: error.errors }, { status: 400 })
     }
     return NextResponse.json({ error: 'Error al actualizar licencia' }, { status: 500 })
   }

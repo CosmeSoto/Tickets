@@ -273,7 +273,7 @@ export function PermissionsAndModulesSection({
               onAssignFamily={handlers.handleAssignInventoryFamily}
               onUnassignFamily={handlers.handleUnassignInventoryFamily}
               options={{
-                // "Gestión completa" — visible para TECHNICIAN y ADMIN (no CLIENT)
+                // Inventario: gestión completa — TECHNICIAN y ADMIN (no CLIENT)
                 canManageInventory:
                   formData.role !== 'CLIENT' ? formData.canManageInventory : undefined,
                 onToggleManager:

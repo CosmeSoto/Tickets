@@ -88,6 +88,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         movementType: validatedData.type,
         quantity: validatedData.quantity,
         reason: validatedData.reason,
+        occurredAt: validatedData.occurredAt ?? null,
       },
       ipAddress:
         request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',

@@ -4,8 +4,8 @@ import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import {
   checkCredentialsModuleAccess,
+  buildCredentialEntriesVisibilityWhere,
   credentialEntryMetadataSelect,
-  getCredentialsFamilyScopeIds,
 } from '@/lib/credentials/access'
 
 type RouteParams = { params: Promise<{ licenseId: string }> }
@@ -27,18 +27,11 @@ export async function GET(_request: Request, { params }: RouteParams) {
     return NextResponse.json({ error: 'Módulo de credenciales no habilitado' }, { status: 403 })
   }
 
-  const familyIds = await getCredentialsFamilyScopeIds(session.user.id, {
-    isSuperAdmin: ctx.isSuperAdmin,
-  })
+  const visibilityWhere = await buildCredentialEntriesVisibilityWhere(ctx)
 
   const entries = await prisma.credential_entries.findMany({
     where: {
-      licenseId,
-      isActive: true,
-      vault: {
-        isActive: true,
-        OR: [{ familyId: { in: familyIds } }, { ownerUserId: session.user.id, kind: 'PERSONAL' }],
-      },
+      AND: [visibilityWhere, { licenseId }],
     },
     select: credentialEntryMetadataSelect,
     orderBy: { title: 'asc' },

@@ -6,12 +6,15 @@ import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import {
   checkCredentialsModuleAccess,
-  canManageCredentialsVault,
+  canCreateCredentials,
+  canManageCredentialsHierarchy,
   assertEquipmentLinkAllowed,
   assertLicenseLinkAllowed,
+  buildCredentialEntriesVisibilityWhere,
   credentialEntryMetadataSelect,
   getCredentialsFamilyScopeIds,
   userCanAccessVault,
+  userCanMutateEntry,
 } from '@/lib/credentials/access'
 import { EncryptionService } from '@/lib/services/encryption.service'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
@@ -88,30 +91,11 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url)
   const vaultId = searchParams.get('vaultId')
-  const familyIds = await getCredentialsFamilyScopeIds(session.user.id, {
-    isSuperAdmin: ctx.isSuperAdmin,
-  })
+  const visibilityWhere = await buildCredentialEntriesVisibilityWhere(ctx)
 
   const entries = await prisma.credential_entries.findMany({
     where: {
-      isActive: true,
-      ...(vaultId ? { vaultId } : {}),
-      OR: [
-        {
-          vault: {
-            isActive: true,
-            OR: [
-              { familyId: { in: familyIds } },
-              { ownerUserId: session.user.id, kind: 'PERSONAL' },
-            ],
-          },
-        },
-        // Compartidos explícitos usuario→usuario (capability VIEW en MVP)
-        {
-          vault: { isActive: true },
-          shares: { some: { userId: session.user.id } },
-        },
-      ],
+      AND: [visibilityWhere, ...(vaultId ? [{ vaultId }] : [])],
     },
     select: {
       ...credentialEntryMetadataSelect,
@@ -127,42 +111,65 @@ export async function GET(request: Request) {
     orderBy: { updatedAt: 'desc' },
   })
 
+  const canHierarchy = await canManageCredentialsHierarchy(
+    session.user.id,
+    session.user.role,
+    ctx.isSuperAdmin
+  )
+
   return NextResponse.json({
-    entries: entries.map(({ shares, ...entry }) => {
-      const sharedWithMe = shares.some(s => s.userId === session.user.id)
-      const vault = entry.vault
-      const hasVaultAccess =
-        ctx.isSuperAdmin ||
-        (vault?.kind === 'PERSONAL' && vault.ownerUserId === session.user.id) ||
-        (!!vault?.familyId && familyIds.includes(vault.familyId))
+    entries: await Promise.all(
+      entries.map(async ({ shares, ...entry }) => {
+        const sharedWithMe = shares.some(s => s.userId === session.user.id)
+        const canMutate = await userCanMutateEntry(ctx, entry)
 
-      // Destinatarios solo si gestionas/ves la bóveda (privacidad del share)
-      const recipients = hasVaultAccess
-        ? shares
-            .filter(s => s.user)
-            .map(s => ({
-              id: s.user!.id,
-              name: s.user!.name,
-              email: s.user!.email,
-              capability: s.capability,
-            }))
-        : []
+        // Destinatarios solo si eres dueño o gestor de jerarquía (privacidad del share)
+        const recipients = canMutate
+          ? shares
+              .filter(s => s.user)
+              .map(s => ({
+                id: s.user!.id,
+                name: s.user!.name,
+                email: s.user!.email,
+                capability: s.capability,
+              }))
+          : []
 
-      return {
-        ...entry,
-        sharedWithMe,
-        shareCapability: shares.find(s => s.userId === session.user.id)?.capability ?? null,
-        isShared: recipients.length > 0,
-        shareCount: recipients.length,
-        sharedWith: recipients,
-        sharedWithLabel:
-          recipients.length > 0
-            ? recipients.map(r => `${r.name} <${r.email}>`).join('; ')
+        const visibility =
+          entry.createdById === session.user.id
+            ? 'own'
             : sharedWithMe
-              ? 'Compartida conmigo'
-              : '',
-      }
-    }),
+              ? 'shared'
+              : canHierarchy
+                ? 'hierarchy'
+                : 'other'
+
+        const creator = entry.createdBy
+        const sharedBy =
+          sharedWithMe && creator && creator.id !== session.user.id
+            ? { id: creator.id, name: creator.name, email: creator.email }
+            : null
+
+        const sharedWithLabel =
+          recipients.length > 0 ? recipients.map(r => r.name || r.email).join(', ') : ''
+
+        const sharedByLabel = sharedBy ? sharedBy.name || sharedBy.email || 'Usuario' : ''
+
+        return {
+          ...entry,
+          sharedWithMe,
+          visibility,
+          canMutate,
+          shareCapability: shares.find(s => s.userId === session.user.id)?.capability ?? null,
+          isShared: recipients.length > 0 || sharedWithMe,
+          shareCount: recipients.length,
+          sharedWith: recipients,
+          sharedBy,
+          sharedWithLabel,
+          sharedByLabel,
+        }
+      })
+    ),
   })
 }
 
@@ -182,8 +189,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Módulo de credenciales no habilitado' }, { status: 403 })
   }
 
-  if (!(await canManageCredentialsVault(session.user.id, session.user.role, ctx.isSuperAdmin))) {
-    return NextResponse.json({ error: 'Sin permiso para gestionar credenciales' }, { status: 403 })
+  if (!(await canCreateCredentials(session.user.id, session.user.role, ctx.isSuperAdmin))) {
+    return NextResponse.json({ error: 'Sin permiso para crear credenciales' }, { status: 403 })
   }
 
   const body = await request.json()

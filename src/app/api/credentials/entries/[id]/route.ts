@@ -7,10 +7,9 @@ import {
   assertEquipmentLinkAllowed,
   assertLicenseLinkAllowed,
   checkCredentialsModuleAccess,
-  canManageCredentialsVault,
   credentialEntryMetadataSelect,
   userCanAccessEntry,
-  userCanAccessVault,
+  userCanMutateEntry,
 } from '@/lib/credentials/access'
 import { EncryptionService } from '@/lib/services/encryption.service'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
@@ -86,17 +85,13 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     return NextResponse.json({ error: 'Módulo de credenciales no habilitado' }, { status: 403 })
   }
 
-  if (!(await canManageCredentialsVault(session.user.id, session.user.role, ctx.isSuperAdmin))) {
-    return NextResponse.json({ error: 'Sin permiso para gestionar credenciales' }, { status: 403 })
-  }
-
   const entry = await loadEntry(id)
   if (!entry) {
     return NextResponse.json({ error: 'Credencial no encontrada' }, { status: 404 })
   }
 
-  if (!(await userCanAccessVault(ctx, entry.vault))) {
-    return NextResponse.json({ error: 'Sin acceso' }, { status: 403 })
+  if (!(await userCanMutateEntry(ctx, entry))) {
+    return NextResponse.json({ error: 'Sin permiso para editar esta credencial' }, { status: 403 })
   }
 
   const body = await request.json()
@@ -180,17 +175,16 @@ export async function DELETE(request: Request, { params }: RouteParams) {
     return NextResponse.json({ error: 'Módulo de credenciales no habilitado' }, { status: 403 })
   }
 
-  if (!(await canManageCredentialsVault(session.user.id, session.user.role, ctx.isSuperAdmin))) {
-    return NextResponse.json({ error: 'Sin permiso para gestionar credenciales' }, { status: 403 })
-  }
-
   const entry = await loadEntry(id)
   if (!entry) {
     return NextResponse.json({ error: 'Credencial no encontrada' }, { status: 404 })
   }
 
-  if (!(await userCanAccessVault(ctx, entry.vault))) {
-    return NextResponse.json({ error: 'Sin acceso' }, { status: 403 })
+  if (!(await userCanMutateEntry(ctx, entry))) {
+    return NextResponse.json(
+      { error: 'Sin permiso para eliminar esta credencial' },
+      { status: 403 }
+    )
   }
 
   // Soft-delete + sobrescribe secreto para no dejar ciphertext recuperable

@@ -136,11 +136,6 @@ export function LicenseAssetForm({
   const isSuperAdmin = (session?.user as { isSuperAdmin?: boolean })?.isSuperAdmin === true
   const hasCredentials =
     isSuperAdmin || (session?.user as { credentialsEnabled?: boolean })?.credentialsEnabled === true
-  const canSyncToVault =
-    hasCredentials &&
-    (isSuperAdmin ||
-      session?.user?.role === 'ADMIN' ||
-      (session?.user as { canManageCredentials?: boolean })?.canManageCredentials === true)
 
   const [name, setName] = useState('')
   const [licenseTypeId, setLicenseTypeId] = useState('')
@@ -447,7 +442,7 @@ export function LicenseAssetForm({
       contractId: linkedContractId || undefined,
       notes: notes || undefined,
       customValues: customFieldValues.length ? customFieldValues : undefined,
-      attachments: attachments.length ? attachments : undefined,
+      // Los adjuntos se suben por endpoint aparte; no van en el PUT de licencia
     }
 
     // Solo enviar asignación si hay valor (evita borrar asignatario al editar otros campos)
@@ -504,8 +499,19 @@ export function LicenseAssetForm({
         onDismiss={dismissRestoredBanner}
         onDiscard={handleDiscardDraft}
       />
+      {hasCredentials && (
+        <div className='rounded-lg border bg-muted/40 px-3 py-2.5 text-xs text-muted-foreground flex items-start gap-2'>
+          <KeyRound className='h-3.5 w-3.5 shrink-0 mt-0.5' />
+          <span>
+            Contraseñas de acceso (portal del proveedor, admin del SaaS, VPN, etc.) no van en este
+            formulario: tras crear la licencia, úsalas en la tarjeta{' '}
+            <strong className='text-foreground'>Credenciales</strong> del detalle (bóveda con
+            auditoría). La clave de producto / licencia sí se registra abajo en este formulario.
+          </span>
+        </div>
+      )}
 
-      <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+      <div className='grid grid-cols-1 md:grid-cols-3 gap-4 [&>*]:min-w-0'>
         <div className='space-y-1'>
           <Label>
             Nombre <span className='text-destructive'>*</span>
@@ -553,26 +559,15 @@ export function LicenseAssetForm({
             value={licenseKey}
             onChange={e => setLicenseKey(e.target.value)}
             placeholder='Ej: XXXXX-XXXXX-XXXXX'
-            type='password'
-            autoComplete='new-password'
+            type='text'
+            autoComplete='off'
+            spellCheck={false}
+            className='font-mono'
           />
-          {canSyncToVault ? (
-            <p className='text-xs text-muted-foreground flex items-start gap-1.5 pt-1'>
-              <KeyRound className='h-3.5 w-3.5 shrink-0 mt-0.5' />
-              Con tu permiso de Credenciales, al guardar se sincroniza a la bóveda del área y se
-              elimina del inventario (fuente de verdad: módulo Credenciales).
-            </p>
-          ) : hasCredentials ? (
-            <p className='text-xs text-muted-foreground pt-1'>
-              Puedes ver credenciales vinculadas en el detalle. Para guardar claves en la bóveda
-              necesitas el permiso «gestionar credenciales».
-            </p>
-          ) : (
-            <p className='text-xs text-muted-foreground pt-1'>
-              Se guarda cifrada en inventario. Activa el módulo Credenciales para gestionar claves
-              con auditoría y compartición.
-            </p>
-          )}
+          <p className='text-xs text-muted-foreground pt-1'>
+            Clave de producto o serial de la licencia. Se guarda cifrada en inventario y se muestra
+            en el detalle a quien gestiona la licencia.
+          </p>
         </div>
       </div>
 
@@ -722,7 +717,7 @@ export function LicenseAssetForm({
               la licencia (factura, orden de compra, fecha de compra).
             </div>
           )}
-          <div className='grid grid-cols-1 md:grid-cols-3 gap-3'>
+          <div className='grid grid-cols-1 md:grid-cols-3 gap-3 [&>*]:min-w-0'>
             <div className='space-y-1'>
               <Label>
                 Fecha de Compra
@@ -764,7 +759,7 @@ export function LicenseAssetForm({
             )}
           </div>
 
-          <div className='grid grid-cols-1 md:grid-cols-3 gap-3'>
+          <div className='grid grid-cols-1 md:grid-cols-3 gap-3 [&>*]:min-w-0'>
             <div className='space-y-1'>
               <Label>
                 Número de Factura{' '}

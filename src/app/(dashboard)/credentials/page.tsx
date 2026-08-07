@@ -66,11 +66,16 @@ type CredentialEntry = {
   equipmentId?: string | null
   lastRevealedAt?: string | null
   sharedWithMe?: boolean
+  /** own | shared | hierarchy */
+  visibility?: 'own' | 'shared' | 'hierarchy' | 'other'
+  canMutate?: boolean
   shareCapability?: string | null
   isShared?: boolean
   shareCount?: number
   sharedWith?: ShareRecipient[]
+  sharedBy?: { id: string; name: string; email?: string | null } | null
   sharedWithLabel?: string
+  sharedByLabel?: string
   vaultId?: string
   vault?: {
     id: string
@@ -87,6 +92,7 @@ type CredentialRow = CredentialEntry & {
   passwordMasked: string
   isSharedLabel: string
   sharedWithLabel: string
+  sharedByLabel: string
 }
 
 type ViewMode = 'table' | 'cards'
@@ -100,6 +106,7 @@ const COLUMN_DEFS: TableColumnDef[] = [
   { key: 'url', label: 'URL' },
   { key: 'isSharedLabel', label: 'Compartida' },
   { key: 'sharedWithLabel', label: 'Compartida con' },
+  { key: 'sharedByLabel', label: 'Compartida por' },
 ]
 
 const DEFAULT_ORDER = COLUMN_DEFS.map(c => c.key)
@@ -114,6 +121,7 @@ const EXPORT_COLUMN_MAP: Record<string, ExportColumn> = {
   url: { key: 'url', label: 'URL' },
   isSharedLabel: { key: 'isSharedLabel', label: 'Compartida' },
   sharedWithLabel: { key: 'sharedWithLabel', label: 'Compartida con' },
+  sharedByLabel: { key: 'sharedByLabel', label: 'Compartida por' },
 }
 
 function toRow(entry: CredentialEntry): CredentialRow {
@@ -127,8 +135,9 @@ function toRow(entry: CredentialEntry): CredentialRow {
     typeLabel: CREDENTIAL_ENTRY_TYPE_LABELS[entry.entryType] ?? entry.entryType,
     vaultFilterId: entry.vault?.id ?? entry.vaultId ?? 'unknown',
     passwordMasked: '••••••••',
-    isSharedLabel: sharedOut || entry.sharedWithMe ? 'Sí' : 'No',
-    sharedWithLabel: entry.sharedWithLabel || (entry.sharedWithMe ? 'Compartida conmigo' : '—'),
+    isSharedLabel: sharedOut || entry.sharedWithMe || entry.isShared ? 'Sí' : 'No',
+    sharedWithLabel: entry.sharedWithLabel?.trim() || '—',
+    sharedByLabel: entry.sharedByLabel?.trim() || '—',
   }
 }
 
@@ -150,10 +159,8 @@ export default function CredentialsPage() {
   const isSuperAdmin = (session?.user as { isSuperAdmin?: boolean })?.isSuperAdmin === true
   const credentialsEnabled =
     isSuperAdmin || (session?.user as { credentialsEnabled?: boolean })?.credentialsEnabled === true
-  const canManage =
-    credentialsEnabled &&
-    (session?.user?.role === 'ADMIN' ||
-      (session?.user as { canManageCredentials?: boolean })?.canManageCredentials === true)
+  /** Crear propias: módulo ON. Gestión completa (ver inferiores) la aplica el API. */
+  const canCreate = credentialsEnabled
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -401,7 +408,7 @@ export default function CredentialsPage() {
         <Eye className='h-4 w-4' />
         <span className={cn(compact ? 'sr-only' : 'ml-1.5')}>Revelar</span>
       </Button>
-      {canManage && !entry.sharedWithMe && (
+      {entry.canMutate && (
         <Button
           variant='outline'
           size='sm'
@@ -411,7 +418,7 @@ export default function CredentialsPage() {
           <Share2 className='h-4 w-4' />
         </Button>
       )}
-      {canManage && !entry.sharedWithMe && (
+      {entry.canMutate && (
         <Button
           variant='outline'
           size='sm'
@@ -431,9 +438,15 @@ export default function CredentialsPage() {
         return (
           <TableCell key={key}>
             <div className='font-medium'>{entry.title}</div>
-            {entry.sharedWithMe ? (
+            {entry.visibility === 'shared' || entry.sharedWithMe ? (
               <Badge variant='secondary' className='mt-1'>
-                Compartida contigo
+                {entry.sharedByLabel && entry.sharedByLabel !== '—'
+                  ? `De ${entry.sharedByLabel}`
+                  : 'Compartida contigo'}
+              </Badge>
+            ) : entry.visibility === 'hierarchy' ? (
+              <Badge variant='outline' className='mt-1'>
+                Inferior
               </Badge>
             ) : null}
           </TableCell>
@@ -518,6 +531,18 @@ export default function CredentialsPage() {
             )}
           </TableCell>
         )
+      case 'sharedByLabel':
+        return (
+          <TableCell key={key} className='text-sm max-w-[200px]'>
+            {entry.sharedByLabel && entry.sharedByLabel !== '—' ? (
+              <span className='line-clamp-2' title={entry.sharedByLabel}>
+                {entry.sharedByLabel}
+              </span>
+            ) : (
+              <span className='text-muted-foreground'>—</span>
+            )}
+          </TableCell>
+        )
       default:
         return null
     }
@@ -538,7 +563,7 @@ export default function CredentialsPage() {
       title='Credenciales'
       subtitle='Bóveda de credenciales por área'
       headerActions={
-        canManage ? (
+        canCreate ? (
           <Button onClick={() => setCreateOpen(true)} size='sm'>
             <Plus className='h-4 w-4 mr-1.5' />
             Nueva credencial
@@ -593,7 +618,7 @@ export default function CredentialsPage() {
                 visible: visibleColumns,
                 onOrderChange: setColumnOrder,
                 onVisibleChange: setVisibleColumns,
-                storageKey: 'credentials-table-columns-v3',
+                storageKey: 'credentials-table-columns-v4',
               }}
               export={{
                 onExportCSV: exportCSV,
@@ -617,7 +642,7 @@ export default function CredentialsPage() {
                     ? 'No hay credenciales en tus áreas.'
                     : 'Ninguna credencial coincide con los filtros.'}
                 </p>
-                {canManage && rows.length === 0 && (
+                {canCreate && rows.length === 0 && (
                   <Button variant='link' className='mt-2' onClick={() => setCreateOpen(true)}>
                     Crear la primera credencial
                   </Button>
@@ -654,10 +679,11 @@ export default function CredentialsPage() {
                       <div className='flex items-start justify-between gap-2'>
                         <CardTitle className='text-base'>{entry.title}</CardTitle>
                         <div className='flex flex-wrap gap-1 justify-end'>
-                          {entry.sharedWithMe ? (
-                            <Badge variant='secondary'>Compartida contigo</Badge>
-                          ) : (entry.shareCount ?? 0) > 0 ? (
-                            <Badge variant='secondary'>Compartida ({entry.shareCount})</Badge>
+                          {entry.isSharedLabel === 'Sí' ? (
+                            <Badge variant='secondary'>Compartida</Badge>
+                          ) : null}
+                          {entry.visibility === 'hierarchy' ? (
+                            <Badge variant='outline'>Inferior</Badge>
                           ) : null}
                           <Badge variant='outline'>{entry.typeLabel}</Badge>
                         </div>
@@ -666,6 +692,11 @@ export default function CredentialsPage() {
                       {entry.sharedWithLabel && entry.sharedWithLabel !== '—' ? (
                         <p className='text-xs text-muted-foreground line-clamp-2'>
                           Con: {entry.sharedWithLabel}
+                        </p>
+                      ) : null}
+                      {entry.sharedByLabel && entry.sharedByLabel !== '—' ? (
+                        <p className='text-xs text-muted-foreground line-clamp-2'>
+                          Por: {entry.sharedByLabel}
                         </p>
                       ) : null}
                     </CardHeader>
@@ -695,7 +726,7 @@ export default function CredentialsPage() {
         </Card>
       </div>
 
-      {canManage && (
+      {canCreate && (
         <CreateCredentialDialog
           open={createOpen}
           onOpenChange={setCreateOpen}
@@ -705,7 +736,7 @@ export default function CredentialsPage() {
       )}
 
       <RevealCredentialDialog entry={revealEntry} onClose={() => setRevealEntry(null)} />
-      {canManage && (
+      {canCreate && (
         <ShareCredentialDialog entry={shareEntry} onClose={() => setShareEntry(null)} />
       )}
     </ModuleLayout>

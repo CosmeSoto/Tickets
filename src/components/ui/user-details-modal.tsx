@@ -216,6 +216,13 @@ export function UserDetailsModal({
                 label='📦 Inventario'
               />
               <ModuleChip enabled={user.patrolsEnabled === true} label='🛡️ Rondas' />
+              <ModuleChip
+                enabled={
+                  (user as any).credentialsEnabled === true ||
+                  (user as any).canManageCredentials === true
+                }
+                label='🔐 Credenciales'
+              />
               <ModuleChip enabled={(user as any).newsEnabled === true} label='📰 Noticias' />
               <ModuleChip enabled={(user as any).formsEnabled === true} label='📄 Documentos' />
             </div>
@@ -230,6 +237,8 @@ export function UserDetailsModal({
             ticketsEnabled={user.ticketsEnabled}
             inventoryEnabled={user.inventoryEnabled}
             patrolsEnabled={user.patrolsEnabled}
+            credentialsEnabled={(user as any).credentialsEnabled}
+            canManageCredentials={(user as any).canManageCredentials}
             newsEnabled={(user as any).newsEnabled}
             canManageNews={(user as any).canManageNews}
             formsEnabled={(user as any).formsEnabled}

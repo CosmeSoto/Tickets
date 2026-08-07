@@ -384,9 +384,17 @@ function ReportSlugContent({ slug }: { slug: string }) {
 
   // Filtros del reporte — defaults usan 'all' como centinela (Radix no permite value="")
   const familyId = searchParams.get('familyId') ?? undefined
-  const [filterValues, setFilterValues] = useState<Record<string, string>>(() =>
-    getDefaultFilterValues(config?.filters ?? [])
-  )
+  const [filterValues, setFilterValues] = useState<Record<string, string>>(() => {
+    const defaults = getDefaultFilterValues(config?.filters ?? [])
+    // Prefill desde query (ej. ficha suministro → ?consumableId=&type=EXIT)
+    const fromUrl: Record<string, string> = {}
+    searchParams.forEach((value, key) => {
+      if (key === 'familyId' || key === 'format' || !value) return
+      fromUrl[key] = value
+    })
+    return { ...defaults, ...fromUrl }
+  })
+  const scopedConsumableId = filterValues.consumableId || searchParams.get('consumableId') || ''
 
   const [reportData, setReportData] = useState<ReportData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -559,6 +567,7 @@ function ReportSlugContent({ slug }: { slug: string }) {
                           defaults[f.key] = f.options[0].value
                       })
                       if (slug === 'expiring') defaults['days'] = '90'
+                      // No conservar scope de URL (consumableId, etc.)
                       setFilterValues(defaults)
                     }}
                   >
@@ -567,6 +576,26 @@ function ReportSlugContent({ slug }: { slug: string }) {
                   </Button>
                 )}
               </div>
+              {scopedConsumableId && (
+                <div className='mt-3 flex flex-wrap items-center gap-2 text-xs'>
+                  <Badge variant='secondary'>Filtrado por un suministro</Badge>
+                  <Button
+                    size='sm'
+                    variant='ghost'
+                    className='h-7 text-muted-foreground'
+                    onClick={() => {
+                      setFilterValues(prev => {
+                        const next = { ...prev }
+                        delete next.consumableId
+                        return next
+                      })
+                    }}
+                  >
+                    <X className='h-3 w-3 mr-1' />
+                    Quitar filtro de suministro
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}

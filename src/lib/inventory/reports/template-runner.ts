@@ -839,9 +839,9 @@ async function runStockMovementsTemplate(
       description: `vs ${totalEntradas} unidades ingresadas`,
     },
     {
-      title: 'Materiales distintos movidos',
+      title: 'Suministros distintos movidos',
       value: uniqueConsumables,
-      description: 'Número de materiales MRO con al menos un movimiento',
+      description: 'Número de suministros con al menos un movimiento',
     },
   ]
 

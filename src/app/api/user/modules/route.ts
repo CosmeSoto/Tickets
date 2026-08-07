@@ -245,7 +245,7 @@ export async function GET(request: Request) {
           canRequestAssets: false,
           canManageInventory: true,
           credentials: credentialsEnabled || canManageCredentials,
-          canManageCredentials: role === 'ADMIN' ? true : canManageCredentials,
+          canManageCredentials,
           families: [],
         }
       }
@@ -415,8 +415,8 @@ export async function GET(request: Request) {
       // Si puede gestionar noticias, también puede verlas (canManageNews implica newsEnabled)
       resolvedNews = newsEnabled || canManageNews
       resolvedForms = formsEnabled
-      resolvedCredentials =
-        (credentialsEnabled || canManageCredentials) && credentialsFamilyIds.size > 0
+      // Credenciales: módulo ON basta (bóveda personal). Familias amplían áreas.
+      resolvedCredentials = credentialsEnabled || canManageCredentials
     }
 
     return {
@@ -430,7 +430,8 @@ export async function GET(request: Request) {
       canRequestAssets: role === 'ADMIN' ? false : canRequestAssets,
       canManageInventory: role === 'ADMIN' ? true : canManageInventory,
       credentials: resolvedCredentials,
-      canManageCredentials: role === 'ADMIN' ? true : canManageCredentials,
+      // Ver inferiores: flag explícito; no forzar true en ADMIN
+      canManageCredentials,
       families: enrichedFamilies,
     }
   })

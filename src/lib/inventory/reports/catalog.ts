@@ -119,7 +119,7 @@ export const REPORT_TEMPLATES: ReportTemplateDef[] = [
     slug: 'stock-movements',
     categoryId: 'operations',
     name: '¿Qué se ha consumido?',
-    description: 'Movimientos de stock MRO por período',
+    description: 'Movimientos de stock de suministros por período',
     icon: 'ShoppingCart',
     roles: ['ADMIN', 'SUPER_ADMIN', 'MANAGER'],
     filters: [

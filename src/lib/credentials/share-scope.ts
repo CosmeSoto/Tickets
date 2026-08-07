@@ -1,18 +1,21 @@
 /**
  * Alcance de compartición de credenciales (usuario → usuario).
  *
- * Reglas:
+ * Reglas por rol (Admin / Técnico / Cliente):
+ * - Solo usuarios activos de igual o menor rango (nunca SuperAdmin destino salvo emisor SuperAdmin).
+ * - Intersección de áreas: familia nativa + familias asignadas al módulo Credenciales.
  * - SuperAdmin: puede compartir con cualquier usuario activo (auditable).
- * - Admin (no super): usuarios de igual o menor rango cuya familia nativa o
- *   grants intersectan el alcance de credenciales del emisor. No SuperAdmins.
- * - Técnico / Cliente con canManage: solo roles ≤ al suyo en familias del alcance.
  *
  * El destinatario debe tener credentialsEnabled (o ser SuperAdmin) para usar el módulo;
  * los candidatos sin módulo se listan marcados para que el gestor sepa activarlos.
+ *
+ * Nota: «Ver credenciales inferiores» NO es requisito para compartir; basta el módulo ON
+ * y ser dueño (o gestor) de la entrada.
  */
 
 import prisma from '@/lib/prisma'
-import { getCredentialsFamilyScopeIds } from '@/lib/credentials/access'
+import { normalizeActiveFamilyIds } from '@/lib/auth/family-scope'
+import { resolveFamilyAccessModuleKey } from '@/lib/auth/family-access-modules'
 
 export type ShareActor = {
   userId: string
@@ -29,6 +32,8 @@ export type ShareCandidate = {
   credentialsEnabled: boolean
   canReceiveShare: boolean
   reasonBlocked?: string
+  /** Familias usadas para el cruce (nativa + asignadas credenciales). */
+  familyIds?: string[]
 }
 
 function roleRank(role: string, isSuperAdmin: boolean): number {
@@ -45,35 +50,64 @@ function familiesOverlap(a: string[], b: string[]): boolean {
   return b.some(id => set.has(id))
 }
 
-async function mapUserFamilyTouchIds(userIds: string[]): Promise<Map<string, string[]>> {
+/**
+ * Familias para compartir: nativa (departamento) + asignadas del módulo Credenciales.
+ * Misma regla para emisor y destinatario, en todos los roles.
+ */
+export async function mapCredentialShareFamilyIds(
+  userIds: string[]
+): Promise<Map<string, string[]>> {
   const map = new Map<string, string[]>()
-  if (userIds.length === 0) return map
+  const uniqueIds = [...new Set(userIds.filter(Boolean))]
+  if (uniqueIds.length === 0) return map
+
+  const moduleKey = resolveFamilyAccessModuleKey('credentials')
 
   const [users, grants] = await Promise.all([
     prisma.users.findMany({
-      where: { id: { in: userIds } },
+      where: { id: { in: uniqueIds } },
       select: {
         id: true,
         departments: { select: { familyId: true } },
       },
     }),
     prisma.user_family_access.findMany({
-      where: { userId: { in: userIds }, isActive: true },
+      where: {
+        userId: { in: uniqueIds },
+        module: moduleKey,
+        isActive: true,
+        canView: true,
+      },
       select: { userId: true, familyId: true },
     }),
   ])
 
+  const raw = new Map<string, string[]>()
+  for (const id of uniqueIds) raw.set(id, [])
+
   for (const u of users) {
-    const ids = new Set<string>()
-    if (u.departments?.familyId) ids.add(u.departments.familyId)
-    map.set(u.id, [...ids])
+    const ids = raw.get(u.id) ?? []
+    if (u.departments?.familyId) ids.push(u.departments.familyId)
+    raw.set(u.id, ids)
   }
   for (const g of grants) {
-    const cur = map.get(g.userId) ?? []
-    if (!cur.includes(g.familyId)) cur.push(g.familyId)
-    map.set(g.userId, cur)
+    const ids = raw.get(g.userId) ?? []
+    ids.push(g.familyId)
+    raw.set(g.userId, ids)
   }
+
+  await Promise.all(
+    uniqueIds.map(async id => {
+      map.set(id, await normalizeActiveFamilyIds(raw.get(id) ?? []))
+    })
+  )
+
   return map
+}
+
+export async function getCredentialShareFamilyIds(userId: string): Promise<string[]> {
+  const map = await mapCredentialShareFamilyIds([userId])
+  return map.get(userId) ?? []
 }
 
 export async function listCredentialShareCandidates(
@@ -84,10 +118,6 @@ export async function listCredentialShareCandidates(
   const take = opts?.take ?? 50
 
   const actorRank = roleRank(actor.role, actor.isSuperAdmin === true)
-  const actorFamilyIds =
-    actor.isSuperAdmin === true
-      ? null
-      : await getCredentialsFamilyScopeIds(actor.userId, { isSuperAdmin: false })
 
   const users = await prisma.users.findMany({
     where: {
@@ -117,7 +147,9 @@ export async function listCredentialShareCandidates(
   const familyMap =
     actor.isSuperAdmin === true
       ? new Map<string, string[]>()
-      : await mapUserFamilyTouchIds(users.map(u => u.id))
+      : await mapCredentialShareFamilyIds([actor.userId, ...users.map(u => u.id)])
+
+  const actorFamilyIds = actor.isSuperAdmin === true ? null : (familyMap.get(actor.userId) ?? [])
 
   const out: ShareCandidate[] = []
 
@@ -145,8 +177,9 @@ export async function listCredentialShareCandidates(
     if (u.isSuperAdmin) continue
     if (targetRank > actorRank) continue
 
-    const targetFamilies = familyMap.get(u.id) ?? []
     if (!actorFamilyIds || actorFamilyIds.length === 0) continue
+
+    const targetFamilies = familyMap.get(u.id) ?? []
     if (!familiesOverlap(actorFamilyIds, targetFamilies)) continue
 
     const canReceive = u.credentialsEnabled === true
@@ -158,6 +191,7 @@ export async function listCredentialShareCandidates(
       isSuperAdmin: false,
       credentialsEnabled: u.credentialsEnabled === true,
       canReceiveShare: canReceive,
+      familyIds: targetFamilies,
       reasonBlocked: canReceive
         ? undefined
         : 'Activa el módulo Credenciales en Usuarios para este destinatario',
@@ -192,8 +226,6 @@ export async function assertCanShareCredentialWith(
     return { ok: false, error: 'Usuario destino no encontrado o inactivo' }
   }
 
-  // Reutiliza el listado (incluye reglas de rango/área); busca por id exacto con q vacío
-  // y filtro amplio — para un id concreto validamos inline con la misma lógica.
   const actorRank = roleRank(actor.role, actor.isSuperAdmin === true)
   const targetRank = roleRank(targetUser.role, targetUser.isSuperAdmin === true)
 
@@ -204,12 +236,22 @@ export async function assertCanShareCredentialWith(
     if (targetRank > actorRank) {
       return { ok: false, error: 'Solo puedes compartir con usuarios de tu nivel o inferior' }
     }
-    const [actorFamilyIds, familyMap] = await Promise.all([
-      getCredentialsFamilyScopeIds(actor.userId, { isSuperAdmin: false }),
-      mapUserFamilyTouchIds([targetUserId]),
-    ])
-    if (!familiesOverlap(actorFamilyIds, familyMap.get(targetUserId) ?? [])) {
-      return { ok: false, error: 'El usuario no pertenece a tus áreas de credenciales' }
+
+    const familyMap = await mapCredentialShareFamilyIds([actor.userId, targetUserId])
+    const actorFamilies = familyMap.get(actor.userId) ?? []
+    const targetFamilies = familyMap.get(targetUserId) ?? []
+
+    if (actorFamilies.length === 0) {
+      return {
+        ok: false,
+        error: 'No tienes área nativa ni familias de Credenciales asignadas para compartir',
+      }
+    }
+    if (!familiesOverlap(actorFamilies, targetFamilies)) {
+      return {
+        ok: false,
+        error: 'El usuario no comparte tu área nativa ni ninguna familia asignada de Credenciales',
+      }
     }
   }
 

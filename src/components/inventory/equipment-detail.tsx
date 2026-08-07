@@ -62,10 +62,8 @@ export function EquipmentDetail({
   const hasCredentials =
     isSuperAdminSession ||
     (session?.user as { credentialsEnabled?: boolean })?.credentialsEnabled === true
-  const canManageCredentials =
-    hasCredentials &&
-    (session?.user?.role === 'ADMIN' ||
-      (session?.user as { canManageCredentials?: boolean })?.canManageCredentials === true)
+  /** Vincular/crear propia: basta módulo ON (gestión completa = jerarquía, no creación). */
+  const canManageCredentials = hasCredentials
 
   const {
     // Data

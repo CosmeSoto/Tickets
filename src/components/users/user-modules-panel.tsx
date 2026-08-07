@@ -150,8 +150,12 @@ export function UserModulesPanel({
     : 'Consulta y descarga documentos disponibles para su perfil'
 
   const credentialsCap = canManageCredentials
-    ? 'Ver, revelar y gestionar credenciales de sus áreas'
-    : 'Ver y revelar credenciales autorizadas'
+    ? role === 'ADMIN'
+      ? 'Propias + compartidas + credenciales de técnicos y clientes del área'
+      : role === 'TECHNICIAN'
+        ? 'Propias + compartidas + credenciales de clientes del área'
+        : 'Propias + compartidas'
+    : 'Crear y ver propias + las que le compartan'
 
   // Permisos adicionales por módulo
   const inventoryPerms: Array<{ icon: string; label: string }> = []
@@ -166,7 +170,7 @@ export function UserModulesPanel({
 
   const credentialsPerms: Array<{ icon: string; label: string }> = []
   if (canManageCredentials)
-    credentialsPerms.push({ icon: '🔐', label: 'Gestión completa de credenciales' })
+    credentialsPerms.push({ icon: '🔐', label: 'Ver credenciales inferiores' })
 
   const allModules = [
     {

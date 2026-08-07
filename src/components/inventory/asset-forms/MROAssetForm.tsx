@@ -121,8 +121,35 @@ export function MROAssetForm({
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     if (!isDirectFormSubmit(e)) return
+    if (!name.trim()) {
+      toast.error('Ingresa el nombre del suministro')
+      return
+    }
+    if (!consumableTypeId) {
+      toast.error('Selecciona o crea una categoría (tipo de suministro)')
+      return
+    }
+    if (!unitOfMeasureId) {
+      toast.error('Selecciona o crea la unidad de medida (ej. botellón, unidad)')
+      return
+    }
+    if (acquisitionMode === 'RENTAL' && !supplierId) {
+      toast.error('Selecciona el proveedor del suministro')
+      return
+    }
     if (isRequired('STOCK_MRO') && isVisible('STOCK_MRO') && !initialStock) {
       toast.error('Ingresa la cantidad inicial en stock')
+      return
+    }
+    const parsedMin = minStock ? parseFloat(minStock) : 0
+    const parsedMax = maxStock ? parseFloat(maxStock) : 0
+    const parsedCurrent = initialStock ? parseFloat(initialStock) : 0
+    if (parsedMax > 0 && parsedMax < parsedMin) {
+      toast.error('El máximo a mantener debe ser mayor o igual al mínimo de alerta')
+      return
+    }
+    if (parsedMax > 0 && parsedCurrent > parsedMax) {
+      toast.error('La cantidad inicial no puede superar el máximo a mantener')
       return
     }
     if (isRequired('FINANCIAL') && isVisible('FINANCIAL') && !costPerUnit) {
@@ -134,14 +161,14 @@ export function MROAssetForm({
       return
     }
     onSubmit({
-      name,
-      typeId: consumableTypeId || undefined,
-      unitOfMeasureId: unitOfMeasureId || undefined,
+      name: name.trim(),
+      typeId: consumableTypeId,
+      unitOfMeasureId,
       acquisitionMode,
       supplierId: supplierId || undefined,
-      currentStock: initialStock ? parseFloat(initialStock) : 0,
-      minStock: minStock ? parseFloat(minStock) : 0,
-      maxStock: maxStock ? parseFloat(maxStock) : 0,
+      currentStock: parsedCurrent,
+      minStock: parsedMin,
+      maxStock: parsedMax,
       costPerUnit: costPerUnit ? parseFloat(costPerUnit) : undefined,
       warehouseId: warehouseId || undefined,
       notes: notes || undefined,
@@ -151,6 +178,12 @@ export function MROAssetForm({
 
   return (
     <form onSubmit={handleSubmit} className='space-y-5'>
+      <div className='rounded-lg border bg-muted/40 px-3 py-2.5 text-xs text-muted-foreground'>
+        Para consumos diarios (ej. botellones de agua), registra el stock aquí y luego, en la ficha,
+        usa <strong className='text-foreground'>Registrar consumo</strong> cada día. El detalle
+        muestra totales del día, semana y mes para decidir compras.
+      </div>
+
       {/* ── 1. NOMBRE ─────────────────────────────────────────────── */}
       <div className='space-y-1'>
         <Label>
@@ -160,7 +193,7 @@ export function MROAssetForm({
           value={name}
           onChange={e => setName(e.target.value)}
           required
-          placeholder='Ej: Tornillo M6, Tóner HP 85A, Papel A4...'
+          placeholder='Ej: Botellón de agua 20L, Papel A4, Tóner HP…'
         />
       </div>
 
@@ -168,14 +201,13 @@ export function MROAssetForm({
       <div className='grid grid-cols-2 gap-3'>
         <div className='space-y-1'>
           <Label>
-            Categoría <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
+            Categoría <span className='text-destructive'>*</span>
           </Label>
           <InlineCreateSelect
             options={consumableTypes}
             value={consumableTypeId}
             onChange={setConsumableTypeId}
-            placeholder='Ej: Lubricante, Papel...'
-            allowClear
+            placeholder='Ej: Bebidas, Oficina…'
             createLabel='Crear categoría'
             createTitle='Nueva categoría de suministro'
             editTitle='Editar categoría'
@@ -207,15 +239,13 @@ export function MROAssetForm({
         </div>
         <div className='space-y-1'>
           <Label>
-            Unidad de medida{' '}
-            <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
+            Unidad de medida <span className='text-destructive'>*</span>
           </Label>
           <InlineCreateSelect
             options={unitsOfMeasure}
             value={unitOfMeasureId}
             onChange={setUnitOfMeasureId}
-            placeholder='Ej: Unidad, Litro, Kg...'
-            allowClear
+            placeholder='Ej: Botellón, Unidad, Litro…'
             createLabel='Crear unidad'
             createTitle='Nueva unidad de medida'
             editTitle='Editar unidad de medida'
@@ -264,18 +294,21 @@ export function MROAssetForm({
         </p>
       </div>
 
-      {acquisitionMode === 'RENTAL' && (
-        <div className='space-y-1'>
-          <Label>
-            Proveedor <span className='text-destructive'>*</span>
-          </Label>
-          <SupplierSelect
-            value={supplierId || null}
-            onChange={v => setSupplierId(v || '')}
-            familyId={familyId}
-          />
-        </div>
-      )}
+      <div className='space-y-1'>
+        <Label>
+          Proveedor{' '}
+          {acquisitionMode === 'RENTAL' ? (
+            <span className='text-destructive'>*</span>
+          ) : (
+            <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
+          )}
+        </Label>
+        <SupplierSelect
+          value={supplierId || null}
+          onChange={v => setSupplierId(v || '')}
+          familyId={familyId}
+        />
+      </div>
 
       {/* ── 4. STOCK ──────────────────────────────────────────────── */}
       {isVisible('STOCK_MRO') && (
@@ -284,6 +317,10 @@ export function MROAssetForm({
             Cantidades en stock
             {isRequired('STOCK_MRO') && <span className='text-destructive'> *</span>}
           </legend>
+          <p className='text-xs text-muted-foreground'>
+            El mínimo dispara alerta de reposición. El máximo es la cantidad objetivo a mantener
+            (ej. 10 botellones).
+          </p>
           <div className='grid grid-cols-3 gap-3'>
             <div className='space-y-1'>
               <Label>Cantidad inicial</Label>
@@ -302,7 +339,7 @@ export function MROAssetForm({
                 min='0'
                 value={minStock}
                 onChange={e => setMinStock(e.target.value)}
-                placeholder='0'
+                placeholder='2'
               />
             </div>
             <div className='space-y-1'>
@@ -312,7 +349,7 @@ export function MROAssetForm({
                 min='0'
                 value={maxStock}
                 onChange={e => setMaxStock(e.target.value)}
-                placeholder='0'
+                placeholder='10'
               />
             </div>
           </div>

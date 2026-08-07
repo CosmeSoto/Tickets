@@ -53,7 +53,7 @@ interface ModuleAccessCardProps {
     /** Documentos: puede crear, editar y eliminar documentos */
     canManageForms?: boolean
     onToggleManageForms?: (v: boolean) => void
-    /** Credenciales: gestión completa (crear/editar/eliminar) */
+    /** Credenciales: ver/editar de roles inferiores (no es requisito para crear propias) */
     canManageCredentials?: boolean
     onToggleManageCredentials?: (v: boolean) => void
   }
@@ -253,16 +253,23 @@ export function ModuleAccessCard({
                 </div>
               )}
               {options.onToggleManageCredentials !== undefined && (
-                <div className='flex items-center justify-between'>
-                  <div className='flex items-center gap-1.5'>
-                    <span className='text-xs'>🔐</span>
-                    <p className='text-[11px] font-medium'>Gestión completa</p>
+                <div className='flex items-center justify-between gap-2'>
+                  <div className='min-w-0'>
+                    <div className='flex items-center gap-1.5'>
+                      <span className='text-xs'>🔐</span>
+                      <p className='text-[11px] font-medium'>Ver credenciales inferiores</p>
+                    </div>
+                    <p className='text-[10px] text-muted-foreground mt-0.5 pl-5'>
+                      {role === 'ADMIN'
+                        ? 'Permite ver y editar las de técnicos y clientes del área. Sin esto solo ve propias y las que le compartan. Crear propias no requiere este permiso.'
+                        : 'Permite ver y editar las de clientes del área. Sin esto solo ve propias y las que le compartan. Crear propias no requiere este permiso.'}
+                    </p>
                   </div>
                   <Switch
                     checked={options.canManageCredentials ?? false}
                     onCheckedChange={options.onToggleManageCredentials}
                     disabled={disabled}
-                    className='scale-90'
+                    className='scale-90 shrink-0'
                   />
                 </div>
               )}

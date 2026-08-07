@@ -4,13 +4,7 @@ import * as React from 'react'
 import { Check, ChevronsUpDown, Search } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-} from '@/components/ui/command'
+import { Command, CommandEmpty, CommandGroup, CommandItem } from '@/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 
 export interface ComboboxOption {
@@ -61,27 +55,27 @@ export function Combobox({
           variant='outline'
           role='combobox'
           aria-expanded={open}
-          className={cn('w-full justify-between', className)}
+          className={cn('w-full min-w-0 justify-between gap-2', className)}
           disabled={disabled}
         >
           {selectedOption ? (
-            <div className='flex items-center space-x-2'>
+            <div className='flex min-w-0 flex-1 items-center gap-2 overflow-hidden'>
               {selectedOption.color && (
                 <div
-                  className='w-3 h-3 rounded-full'
+                  className='h-3 w-3 shrink-0 rounded-full'
                   style={{ backgroundColor: selectedOption.color }}
                 />
               )}
-              <span className='truncate'>{selectedOption.label}</span>
+              <span className='truncate text-left'>{selectedOption.label}</span>
             </div>
           ) : (
-            <span className='text-muted-foreground'>{placeholder}</span>
+            <span className='truncate text-muted-foreground'>{placeholder}</span>
           )}
-          <ChevronsUpDown className='ml-2 h-4 w-4 shrink-0 opacity-50' />
+          <ChevronsUpDown className='h-4 w-4 shrink-0 opacity-50' />
         </Button>
       </PopoverTrigger>
       <PopoverContent
-        className='w-full p-0 max-h-[400px] overflow-hidden'
+        className='w-[var(--radix-popover-trigger-width)] max-w-[min(100vw-2rem,28rem)] p-0 max-h-[400px] overflow-hidden'
         align='start'
         side='bottom'
         sideOffset={4}
@@ -110,21 +104,23 @@ export function Combobox({
               >
                 <Check
                   className={cn(
-                    'mr-2 h-4 w-4',
+                    'mr-2 h-4 w-4 shrink-0',
                     value === option.value ? 'opacity-100' : 'opacity-0'
                   )}
                 />
-                <div className='flex items-center space-x-2 flex-1'>
+                <div className='flex min-w-0 flex-1 items-center gap-2'>
                   {option.color && (
                     <div
-                      className='w-3 h-3 rounded-full flex-shrink-0'
+                      className='h-3 w-3 shrink-0 rounded-full'
                       style={{ backgroundColor: option.color }}
                     />
                   )}
-                  <div className='flex-1'>
-                    <div className='font-medium'>{option.label}</div>
+                  <div className='min-w-0 flex-1'>
+                    <div className='truncate font-medium'>{option.label}</div>
                     {option.description && (
-                      <div className='text-xs text-muted-foreground'>{option.description}</div>
+                      <div className='truncate text-xs text-muted-foreground'>
+                        {option.description}
+                      </div>
                     )}
                   </div>
                 </div>

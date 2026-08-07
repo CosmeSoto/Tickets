@@ -4,11 +4,7 @@ import { z } from 'zod'
 import { randomUUID } from 'crypto'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import {
-  checkCredentialsModuleAccess,
-  canManageCredentialsVault,
-  userCanAccessVault,
-} from '@/lib/credentials/access'
+import { checkCredentialsModuleAccess, userCanMutateEntry } from '@/lib/credentials/access'
 import { assertCanShareCredentialWith } from '@/lib/credentials/share-scope'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 import { notifyUser } from '@/lib/api/notify'
@@ -49,16 +45,16 @@ export async function GET(request: Request, { params }: RouteParams) {
   if (!(await checkCredentialsModuleAccess(ctx))) {
     return NextResponse.json({ error: 'Módulo de credenciales no habilitado' }, { status: 403 })
   }
-  if (!(await canManageCredentialsVault(session.user.id, session.user.role, ctx.isSuperAdmin))) {
-    return NextResponse.json({ error: 'Sin permiso para gestionar compartidos' }, { status: 403 })
-  }
 
   const entry = await loadEntryWithVault(id)
   if (!entry) {
     return NextResponse.json({ error: 'Credencial no encontrada' }, { status: 404 })
   }
-  if (!(await userCanAccessVault(ctx, entry.vault))) {
-    return NextResponse.json({ error: 'Sin acceso a la bóveda' }, { status: 403 })
+  if (!(await userCanMutateEntry(ctx, entry))) {
+    return NextResponse.json(
+      { error: 'Sin permiso para ver compartidos de esta credencial' },
+      { status: 403 }
+    )
   }
 
   const shares = await prisma.credential_shares.findMany({
@@ -88,16 +84,16 @@ export async function POST(request: Request, { params }: RouteParams) {
   if (!(await checkCredentialsModuleAccess(ctx))) {
     return NextResponse.json({ error: 'Módulo de credenciales no habilitado' }, { status: 403 })
   }
-  if (!(await canManageCredentialsVault(session.user.id, session.user.role, ctx.isSuperAdmin))) {
-    return NextResponse.json({ error: 'Sin permiso para compartir' }, { status: 403 })
-  }
 
   const entry = await loadEntryWithVault(id)
   if (!entry) {
     return NextResponse.json({ error: 'Credencial no encontrada' }, { status: 404 })
   }
-  if (!(await userCanAccessVault(ctx, entry.vault))) {
-    return NextResponse.json({ error: 'Sin acceso a la bóveda' }, { status: 403 })
+  if (!(await userCanMutateEntry(ctx, entry))) {
+    return NextResponse.json(
+      { error: 'Sin permiso para compartir esta credencial' },
+      { status: 403 }
+    )
   }
 
   const body = await request.json()
@@ -182,16 +178,13 @@ export async function DELETE(request: Request, { params }: RouteParams) {
   if (!(await checkCredentialsModuleAccess(ctx))) {
     return NextResponse.json({ error: 'Módulo de credenciales no habilitado' }, { status: 403 })
   }
-  if (!(await canManageCredentialsVault(session.user.id, session.user.role, ctx.isSuperAdmin))) {
-    return NextResponse.json({ error: 'Sin permiso para revocar compartidos' }, { status: 403 })
-  }
 
   const entry = await loadEntryWithVault(id)
   if (!entry) {
     return NextResponse.json({ error: 'Credencial no encontrada' }, { status: 404 })
   }
-  if (!(await userCanAccessVault(ctx, entry.vault))) {
-    return NextResponse.json({ error: 'Sin acceso a la bóveda' }, { status: 403 })
+  if (!(await userCanMutateEntry(ctx, entry))) {
+    return NextResponse.json({ error: 'Sin permiso para revocar compartidos' }, { status: 403 })
   }
 
   const { searchParams } = new URL(request.url)

@@ -183,8 +183,9 @@ export function TechnicianSelector({
     const assignmentCount = technician._count?.technicianAssignments || 0
     const ticketCount = technician._count?.assignedTickets || 0
 
-    if (ticketCount > 50 || assignmentCount > 5) return <Star className='h-3 w-3 text-yellow-500' />
-    if (ticketCount > 20 || assignmentCount > 2) return <Zap className='h-3 w-3 text-blue-500' />
+    if (ticketCount > 50 || assignmentCount > 5) return <Star className='h-3 w-3 text-primary' />
+    if (ticketCount > 20 || assignmentCount > 2)
+      return <Zap className='h-3 w-3 text-secondary-foreground' />
     return <User className='h-3 w-3 text-muted-foreground' />
   }
 
@@ -289,7 +290,7 @@ export function TechnicianSelector({
                     variant='outline'
                     size='sm'
                     onClick={() => onRemove(tech.id)}
-                    className='h-6 w-6 p-0 text-red-500 hover:text-red-700'
+                    className='h-6 w-6 p-0 text-destructive hover:text-destructive/80'
                     title='Remover técnico'
                     disabled={disabled}
                   >
@@ -316,10 +317,10 @@ export function TechnicianSelector({
             ref={inputRef}
             type='text'
             className={cn(
-              'w-full pl-10 pr-10 py-2 border border-border rounded-md',
-              'focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
+              'w-full pl-10 pr-10 py-2 border border-border rounded-md bg-background text-foreground',
+              'focus:ring-2 focus:ring-ring focus:border-ring',
               'disabled:bg-muted disabled:text-muted-foreground',
-              isOpen && 'ring-2 ring-blue-500 border-blue-500'
+              isOpen && 'ring-2 ring-ring border-ring'
             )}
             placeholder='Buscar por nombre, email, rol o departamento...'
             value={searchTerm}
@@ -364,14 +365,14 @@ export function TechnicianSelector({
                     key={technician.id}
                     className={cn(
                       'px-3 py-3 cursor-pointer flex items-center space-x-3',
-                      'hover:bg-muted border-b border-gray-100 last:border-b-0',
-                      highlightedIndex === index && 'bg-blue-50'
+                      'hover:bg-muted border-b border-border last:border-b-0',
+                      highlightedIndex === index && 'bg-accent'
                     )}
                     onClick={() => handleSelect(technician.id)}
                   >
                     <div className='flex items-center space-x-2'>
                       {getExperienceIcon(technician)}
-                      <div className='w-2 h-2 bg-green-500 rounded-full' title='Activo' />
+                      <div className='w-2 h-2 bg-chart-2 rounded-full' title='Activo' />
                     </div>
 
                     <div className='flex-1 min-w-0'>
@@ -399,8 +400,9 @@ export function TechnicianSelector({
                                 key={fa.familyId}
                                 className='inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium'
                                 style={{
-                                  backgroundColor: (fa.family.color ?? '#6B7280') + '20',
-                                  color: fa.family.color ?? '#6B7280',
+                                  backgroundColor:
+                                    (fa.family.color ?? 'hsl(var(--muted-foreground))') + '20',
+                                  color: fa.family.color ?? 'hsl(var(--muted-foreground))',
                                 }}
                               >
                                 {fa.family.code}
@@ -434,7 +436,7 @@ export function TechnicianSelector({
 
       {/* Información adicional */}
       {assignedTechniciansWithInfo.length === 0 && (
-        <div className='text-xs text-amber-600 bg-amber-50 p-2 rounded'>
+        <div className='text-xs text-primary/90 bg-primary/10 p-2 rounded border border-primary/20'>
           ⚠️ Sin técnicos asignados. Los tickets se asignarán manualmente.
         </div>
       )}

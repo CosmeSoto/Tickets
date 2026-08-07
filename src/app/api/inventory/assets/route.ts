@@ -83,28 +83,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: result.error }, { status: result.status })
     }
 
-    // Licencia + clave → bóveda de Credenciales (si el usuario puede gestionar)
-    if (
-      result.subtype === 'LICENSE' &&
-      body.key &&
-      typeof body.key === 'string' &&
-      body.key.trim() &&
-      body.familyId
-    ) {
-      const { syncLicenseKeyToVault } = await import('@/lib/credentials/sync-license-key')
-      await syncLicenseKeyToVault({
-        ctx: {
-          userId: session.user.id,
-          role: session.user.role,
-          isSuperAdmin: (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true,
-        },
-        licenseId: result.asset.id,
-        familyId: String(body.familyId),
-        title: String(body.name || result.asset.name || 'Clave de licencia'),
-        plaintextKey: body.key,
-      }).catch(err => console.error('[credentials] sync license key after asset create:', err))
-    }
-
     return NextResponse.json({ ...result.asset, subtype: result.subtype }, { status: 201 })
   } catch (error) {
     console.error('[POST /api/inventory/assets]', error)

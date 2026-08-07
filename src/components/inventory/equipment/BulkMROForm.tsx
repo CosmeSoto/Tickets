@@ -110,6 +110,14 @@ export function BulkMROForm({
       setError('El nombre del suministro es requerido')
       return
     }
+    if (!consumableTypeId) {
+      setError('Selecciona o crea una categoría (tipo de suministro)')
+      return
+    }
+    if (!unitOfMeasureId) {
+      setError('Selecciona o crea la unidad de medida')
+      return
+    }
     if (isRequired('STOCK_MRO') && isVisible('STOCK_MRO') && !quantity) {
       toast.error('Ingresa la cantidad del lote')
       return
@@ -240,15 +248,13 @@ export function BulkMROForm({
         <div className='grid grid-cols-2 gap-4'>
           <div className='space-y-1.5'>
             <Label>
-              Categoría{' '}
-              <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
+              Categoría <span className='text-destructive'>*</span>
             </Label>
             <InlineCreateSelect
               options={consumableTypes}
               value={consumableTypeId}
               onChange={setConsumableTypeId}
-              placeholder='Ej: Tóner, Papel...'
-              allowClear
+              placeholder='Ej: Bebidas, Oficina…'
               createLabel='Crear categoría'
               createTitle='Nueva categoría'
               {...inlineSelectFeedback('Categoría')}
@@ -280,15 +286,13 @@ export function BulkMROForm({
           </div>
           <div className='space-y-1.5'>
             <Label>
-              Unidad de medida{' '}
-              <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
+              Unidad de medida <span className='text-destructive'>*</span>
             </Label>
             <InlineCreateSelect
               options={unitsOfMeasure}
               value={unitOfMeasureId}
               onChange={setUnitOfMeasureId}
-              placeholder='Ej: Unidad, Litro...'
-              allowClear
+              placeholder='Ej: Botellón, Unidad…'
               createLabel='Crear unidad'
               createTitle='Nueva unidad'
               {...inlineSelectFeedback('Unidad de medida')}

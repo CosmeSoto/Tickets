@@ -60,6 +60,8 @@ export interface CreateStockMovementData {
   reason?: string
   assignedToUserId?: string
   assignedToEquipmentId?: string
+  /** ISO date YYYY-MM-DD — se guarda como createdAt del movimiento */
+  occurredAt?: string
 }
 
 export interface ConsumableSummary {

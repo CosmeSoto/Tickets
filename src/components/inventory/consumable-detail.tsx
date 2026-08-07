@@ -22,6 +22,7 @@ import {
   Warehouse,
   ArrowDownUp,
   FileText,
+  CalendarDays,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -82,6 +83,14 @@ interface ConsumableData {
     model?: string | null
   } | null
   movements?: StockMovement[]
+  consumptionSummary?: {
+    today: number
+    week: number
+    month: number
+    last30Days: number
+    avgPerDay30: number
+    daysOfStockLeft: number | null
+  }
 }
 
 interface Props {
@@ -325,8 +334,8 @@ export function ConsumableDetail({ consumableId, userRole, isSuperAdmin = false 
         <div className='flex items-center gap-2 shrink-0'>
           {canEdit && (
             <Button size='sm' onClick={() => openMovement('EXIT')} disabled={isExpired}>
-              <ArrowDownUp className='h-4 w-4 mr-1.5' />
-              Movimiento
+              <TrendingDown className='h-4 w-4 mr-1.5' />
+              Registrar consumo
             </Button>
           )}
           {hasSecondaryActions && (
@@ -569,6 +578,89 @@ export function ConsumableDetail({ consumableId, userRole, isSuperAdmin = false 
         </div>
 
         <div className='space-y-6'>
+          <Card>
+            <CardHeader className='pb-2'>
+              <CardTitle className='text-base flex items-center gap-2'>
+                <CalendarDays className='h-4 w-4' />
+                Consumo
+              </CardTitle>
+            </CardHeader>
+            <CardContent className='space-y-3'>
+              {(() => {
+                const c = consumable.consumptionSummary
+                if (!c) {
+                  return (
+                    <p className='text-xs text-muted-foreground'>
+                      Registra salidas con «Registrar consumo» para ver totales del día, semana y
+                      mes.
+                    </p>
+                  )
+                }
+                return (
+                  <>
+                    <div className='grid grid-cols-3 gap-2 text-center'>
+                      <div className='rounded-md border px-2 py-2'>
+                        <p className='text-[10px] uppercase text-muted-foreground'>Hoy</p>
+                        <p className='text-lg font-semibold tabular-nums'>{c.today}</p>
+                      </div>
+                      <div className='rounded-md border px-2 py-2'>
+                        <p className='text-[10px] uppercase text-muted-foreground'>Semana</p>
+                        <p className='text-lg font-semibold tabular-nums'>{c.week}</p>
+                      </div>
+                      <div className='rounded-md border px-2 py-2'>
+                        <p className='text-[10px] uppercase text-muted-foreground'>Mes</p>
+                        <p className='text-lg font-semibold tabular-nums'>{c.month}</p>
+                      </div>
+                    </div>
+                    <InfoRow
+                      label='Promedio diario (30 días)'
+                      value={
+                        <span className='tabular-nums'>
+                          {c.avgPerDay30} {unit}/día
+                        </span>
+                      }
+                    />
+                    <InfoRow
+                      label='Stock estimado'
+                      value={
+                        c.daysOfStockLeft == null ? (
+                          'Sin consumo reciente'
+                        ) : (
+                          <span className='tabular-nums'>
+                            ~{c.daysOfStockLeft} día{c.daysOfStockLeft === 1 ? '' : 's'} al ritmo
+                            actual
+                          </span>
+                        )
+                      }
+                    />
+                    {c.avgPerDay30 > 0 && consumable.costPerUnit != null && (
+                      <InfoRow
+                        label='Costo estimado / mes'
+                        value={fmtCurrency(c.avgPerDay30 * 30 * consumable.costPerUnit)}
+                      />
+                    )}
+                    <p className='text-xs text-muted-foreground'>
+                      Usa estos números para decidir si mantener la compra diaria o ajustar el stock
+                      objetivo.
+                    </p>
+                    <Button
+                      variant='outline'
+                      size='sm'
+                      className='w-full'
+                      onClick={() =>
+                        router.push(
+                          `/inventory/reports/stock-movements?consumableId=${consumableId}&type=EXIT`
+                        )
+                      }
+                    >
+                      Ver reporte de consumo
+                    </Button>
+                  </>
+                )
+              })()}
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader className='pb-2'>
               <CardTitle className='text-base flex items-center gap-2'>

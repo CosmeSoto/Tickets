@@ -5,7 +5,7 @@ import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import {
   checkCredentialsModuleAccess,
-  canManageCredentialsVault,
+  canCreateCredentials,
   ensureDefaultAreaVault,
   getCredentialsFamilyScopeIds,
 } from '@/lib/credentials/access'
@@ -85,8 +85,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Módulo de credenciales no habilitado' }, { status: 403 })
   }
 
-  if (!(await canManageCredentialsVault(session.user.id, session.user.role, ctx.isSuperAdmin))) {
-    return NextResponse.json({ error: 'Sin permiso para gestionar credenciales' }, { status: 403 })
+  if (!(await canCreateCredentials(session.user.id, session.user.role, ctx.isSuperAdmin))) {
+    return NextResponse.json({ error: 'Sin permiso para crear bóvedas' }, { status: 403 })
   }
 
   const body = await request.json()

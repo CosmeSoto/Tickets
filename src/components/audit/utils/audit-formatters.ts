@@ -586,7 +586,7 @@ export function getFieldLabel(key: string): string {
     inventoryEnabled: 'Módulo Inventario',
     patrolsEnabled: 'Módulo Rondas',
     credentialsEnabled: 'Módulo Credenciales',
-    canManageCredentials: 'Gestor de Credenciales',
+    canManageCredentials: 'Ver credenciales inferiores',
     canManageInventory: 'Gestor de Inventario',
     canRequestAssets: 'Solicitar Activos',
     isSuperAdmin: 'Super Admin',
