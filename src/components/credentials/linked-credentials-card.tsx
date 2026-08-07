@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { KeyRound, Eye, Loader2, Plus } from 'lucide-react'
+import { KeyRound, Eye, Loader2, Plus, Copy, User } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { RevealCredentialDialog } from '@/components/credentials/reveal-credential-dialog'
 import { CreateCredentialDialog } from '@/components/credentials/create-credential-dialog'
+import { useToast } from '@/hooks/use-toast'
 
 type CredentialEntry = {
   id: string
@@ -41,11 +42,13 @@ export function LinkedCredentialsCard({
   familyName,
   canManage = false,
 }: LinkedCredentialsCardProps) {
+  const { toast } = useToast()
   const [entries, setEntries] = useState<CredentialEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [revealEntry, setRevealEntry] = useState<CredentialEntry | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [vaults, setVaults] = useState<Vault[]>([])
+  const [copyingId, setCopyingId] = useState<string | null>(null)
 
   const apiPath =
     entity === 'equipment'
@@ -90,6 +93,41 @@ export function LinkedCredentialsCard({
     ? vaults.find(v => v.kind === 'AREA' && (v.familyId === familyId || v.family?.id === familyId))
         ?.id
     : undefined
+
+  const copyUsername = async (username: string) => {
+    try {
+      await navigator.clipboard.writeText(username)
+      toast({ title: 'Usuario copiado', description: 'En el portapapeles.' })
+    } catch {
+      toast({
+        title: 'No se pudo copiar',
+        description: 'Permiso de portapapeles denegado o no disponible.',
+        variant: 'destructive',
+      })
+    }
+  }
+
+  const copyPassword = async (entry: CredentialEntry) => {
+    setCopyingId(entry.id)
+    try {
+      const res = await fetch(`/api/credentials/entries/${entry.id}/copy`, { method: 'POST' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'No se pudo copiar')
+      await navigator.clipboard.writeText(data.secret)
+      toast({
+        title: 'Contraseña copiada',
+        description: 'En portapapeles (sin mostrar). Acción registrada en auditoría.',
+      })
+    } catch (err: unknown) {
+      toast({
+        title: 'No se pudo copiar',
+        description: err instanceof Error ? err.message : 'Error inesperado',
+        variant: 'destructive',
+      })
+    } finally {
+      setCopyingId(null)
+    }
+  }
 
   if (loading) {
     return (
@@ -138,20 +176,64 @@ export function LinkedCredentialsCard({
             entries.map(entry => (
               <div
                 key={entry.id}
-                className='flex items-center justify-between rounded-md border px-3 py-2 text-sm'
+                className='flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm'
               >
-                <div>
-                  <p className='font-medium'>{entry.title}</p>
-                  {entry.username && (
-                    <p className='text-xs text-muted-foreground'>{entry.username}</p>
+                <div className='min-w-0 flex-1'>
+                  <p className='font-medium truncate'>{entry.title}</p>
+                  {entry.username ? (
+                    <p className='text-xs text-muted-foreground truncate'>{entry.username}</p>
+                  ) : (
+                    <p className='text-xs text-muted-foreground'>Sin usuario</p>
                   )}
                 </div>
-                <Button variant='ghost' size='sm' onClick={() => setRevealEntry(entry)}>
-                  <Eye className='h-4 w-4' />
-                </Button>
+                <div className='flex items-center gap-0.5 shrink-0'>
+                  {entry.username ? (
+                    <Button
+                      type='button'
+                      variant='ghost'
+                      size='icon'
+                      className='h-8 w-8'
+                      title='Copiar usuario'
+                      onClick={() => void copyUsername(entry.username!)}
+                    >
+                      <User className='h-3.5 w-3.5' />
+                    </Button>
+                  ) : null}
+                  <Button
+                    type='button'
+                    variant='ghost'
+                    size='icon'
+                    className='h-8 w-8'
+                    title='Copiar contraseña (auditado)'
+                    disabled={copyingId === entry.id}
+                    onClick={() => void copyPassword(entry)}
+                  >
+                    {copyingId === entry.id ? (
+                      <Loader2 className='h-3.5 w-3.5 animate-spin' />
+                    ) : (
+                      <Copy className='h-3.5 w-3.5' />
+                    )}
+                  </Button>
+                  <Button
+                    type='button'
+                    variant='ghost'
+                    size='icon'
+                    className='h-8 w-8'
+                    title='Revelar en pantalla'
+                    onClick={() => setRevealEntry(entry)}
+                  >
+                    <Eye className='h-3.5 w-3.5' />
+                  </Button>
+                </div>
               </div>
             ))
           )}
+          {entries.length > 0 ? (
+            <p className='text-[11px] text-muted-foreground pt-1'>
+              Copiar clave usa la bóveda (sin mostrar) y queda en auditoría. Requiere módulo
+              Credenciales activo y acceso al área.
+            </p>
+          ) : null}
         </CardContent>
       </Card>
 
