@@ -21,31 +21,41 @@ export function applyContractFormPrefill(
   currentLineCount: number
 ): void {
   if (prefill.name) setValue('name', prefill.name)
-  if (prefill.category) setValue('category', prefill.category)
+  if (prefill.category) {
+    setValue('category', prefill.category)
+    if (prefill.category === 'EQUIPMENT_RENTAL') {
+      setValue('renewalNoticeDays', 120)
+    }
+  }
   if (prefill.supplierId) setValue('supplierId', prefill.supplierId)
   if (prefill.familyId) setValue('familyId', prefill.familyId)
   if (prefill.startDate) setValue('startDate', prefill.startDate)
   if (prefill.endDate) setValue('endDate', prefill.endDate)
   if (prefill.billingCycle) setValue('billingCycle', prefill.billingCycle)
-  if (prefill.monthlyCost != null && prefill.monthlyCost !== '') {
+
+  const isRecurring = (prefill.billingCycle ?? (prefill.hasRecurring ? 'MONTHLY' : 'ONE_TIME')) !== 'ONE_TIME'
+  if (isRecurring && prefill.monthlyCost != null && prefill.monthlyCost !== '') {
     setValue('monthlyCost', String(prefill.monthlyCost))
-  }
-  if (prefill.totalValue != null && prefill.totalValue !== '') {
+    setValue('totalValue', '')
+  } else if (!isRecurring && prefill.totalValue != null && prefill.totalValue !== '') {
     setValue('totalValue', String(prefill.totalValue))
+    setValue('monthlyCost', '')
   }
   if (prefill.description) setValue('description', prefill.description)
 
   if (prefill.suggestedLineDescription && currentLineCount === 0) {
+    const unitPrice = isRecurring
+      ? prefill.monthlyCost != null
+        ? String(prefill.monthlyCost)
+        : ''
+      : prefill.totalValue != null
+        ? String(prefill.totalValue)
+        : ''
     appendLine({
       type: prefill.suggestedLineType ?? 'SOFTWARE',
       description: prefill.suggestedLineDescription,
       quantity: '1',
-      unitPrice:
-        prefill.monthlyCost != null
-          ? String(prefill.monthlyCost)
-          : prefill.totalValue != null
-            ? String(prefill.totalValue)
-            : '',
+      unitPrice,
       equipmentId: '',
       licenseId: '',
       notes: '',

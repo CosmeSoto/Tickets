@@ -423,6 +423,7 @@ export default function ProfilePage() {
   }
 
   return (
+    <>
       <div className='max-w-4xl mx-auto space-y-6'>
         {/* Información Principal */}
         <Card>
@@ -764,5 +765,6 @@ export default function ProfilePage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </>
   )
 }

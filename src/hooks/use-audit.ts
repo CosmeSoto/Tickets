@@ -105,14 +105,20 @@ export function useAudit() {
   }, [searchParams])
 
   // ── Sync URL + localStorage when filters change ──
+  // history.replaceState evita remount de la página (router.replace con ?qs sí remonta)
   useEffect(() => {
     if (!initializedRef.current) return
 
     saveAuditFilters(filters)
     const params = auditFiltersToUrlParams(filters)
     const qs = params.toString()
-    router.replace(qs ? `/admin/audit?${qs}` : '/admin/audit', { scroll: false })
-  }, [filters, router])
+    const desired = qs ? `/admin/audit?${qs}` : '/admin/audit'
+    if (typeof window === 'undefined') return
+    const current = `${window.location.pathname}${window.location.search}`
+    if (current !== desired) {
+      window.history.replaceState(window.history.state, '', desired)
+    }
+  }, [filters])
 
   // ── Authorization check ──
   useEffect(() => {

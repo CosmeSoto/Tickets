@@ -9,6 +9,10 @@ export type DashboardNavItem = {
 
 export const SIDEBAR_COLLAPSED_KEY = 'sidebar-collapsed'
 
+/** Ancho del rail colapsado (más cómodo que w-16) */
+export const SIDEBAR_RAIL_WIDTH = 'lg:w-20'
+export const SIDEBAR_RAIL_PAD = 'lg:pl-20'
+
 /** Mapa de submenús abiertos (sessionStorage) — sobrevive remounts raros sin recargar la página */
 export const SIDEBAR_OPEN_MENUS_KEY = 'sidebar-open-menus'
 

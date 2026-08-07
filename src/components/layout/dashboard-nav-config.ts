@@ -28,6 +28,7 @@ import {
   Newspaper,
   CalendarDays,
   KeyRound,
+  ScrollText,
 } from 'lucide-react'
 import type { DashboardNavItem } from '@/components/layout/dashboard-nav-types'
 
@@ -93,7 +94,7 @@ export const navigationByRole: Record<string, DashboardNavItem[]> = {
     },
     { name: 'Familias', href: '/admin/families', icon: Layers },
     { name: 'Usuarios', href: '/admin/users', icon: Users },
-    { name: 'Auditoría', href: '/admin/audit', icon: Shield },
+    { name: 'Auditoría', href: '/admin/audit', icon: ScrollText },
     { name: 'Página Pública', href: '/admin/help-config', icon: Globe },
     { name: 'Configuración Sistema', href: '/admin/settings', icon: Settings },
   ],

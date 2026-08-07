@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { useForm, useFieldArray } from 'react-hook-form'
-import { Plus, Trash2, RefreshCw, Paperclip, FileText, Download, X } from 'lucide-react'
+import { Plus, Trash2, RefreshCw, FileText, Download, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DateInput } from '@/components/ui/date-input'
@@ -17,7 +17,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Combobox } from '@/components/ui/combobox'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { useToast } from '@/hooks/use-toast'
 import { useInventoryFamilies } from '@/contexts/families-context'
@@ -26,6 +25,8 @@ import { FileUploadZone } from '@/components/ui/file-upload-zone'
 import { ContractPaymentsPanel } from '@/components/contracts/contract-payments-panel'
 import { ContractAssignmentsPanel } from '@/components/contracts/contract-assignments-panel'
 import { ContractAmendmentsPanel } from '@/components/contracts/contract-amendments-panel'
+import { ContractFormSection } from '@/components/contracts/contract-form-section'
+import { parseMoneyInput } from '@/lib/utils'
 import {
   CONTRACT_CATEGORY_LABELS,
   CONTRACT_LINE_TYPE_LABELS,
@@ -276,6 +277,23 @@ export function ContractForm({
   const familyId = watch('familyId')
   const paymentMethodType = watch('paymentMethodType')
   const selectedSupplierId = watch('supplierId')
+  const billingCycle = watch('billingCycle')
+  const startDateValue = watch('startDate')
+  const isRecurringBilling = billingCycle !== 'ONE_TIME'
+
+  const recurringCostLabel =
+    billingCycle === 'QUARTERLY'
+      ? 'Costo trimestral'
+      : billingCycle === 'SEMIANNUAL'
+        ? 'Costo semestral'
+        : billingCycle === 'ANNUAL'
+          ? 'Costo anual'
+          : 'Costo mensual / recurrente'
+
+  /** Densidad de grilla: 3 columnas en modal amplio (embed) */
+  const formGrid = embedMode
+    ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4'
+    : 'grid grid-cols-1 sm:grid-cols-2 gap-4'
 
   const { data: licenses } = useFetch<{ id: string; name: string; vendor?: string | null }>(
     '/api/inventory/licenses',
@@ -323,30 +341,73 @@ export function ContractForm({
     }
   }, [selectedSupplierId, suppliers, contactName, contactEmail, contactPhone, termsUrl, setValue])
 
+  const emptyToUndef = (v: string | null | undefined) => {
+    if (v == null || v === '') return undefined
+    return v
+  }
+
   const onSubmit = async (data: ContractFormData) => {
     if (readOnly) return
+
+    const start = emptyToUndef(data.startDate)
+    const end = emptyToUndef(data.endDate)
+    if (start && end && end < start) {
+      toast({
+        title: 'Fechas inválidas',
+        description: 'La fecha de vencimiento no puede ser anterior al inicio.',
+        variant: 'destructive',
+      })
+      return
+    }
+
     setSubmitting(true)
     try {
+      const recurring = data.billingCycle !== 'ONE_TIME'
+      const monthlyCost = parseMoneyInput(data.monthlyCost)
+      const totalValue = parseMoneyInput(data.totalValue)
       const payload = {
         ...data,
-        totalValue: data.totalValue ? parseFloat(data.totalValue) : undefined,
-        monthlyCost: data.monthlyCost ? parseFloat(data.monthlyCost) : undefined,
-        renewalNoticeDays: Number(data.renewalNoticeDays),
-        lastChargeAmount: data.lastChargeAmount ? parseFloat(data.lastChargeAmount) : undefined,
+        contractNumber: emptyToUndef(data.contractNumber),
+        description: emptyToUndef(data.description),
+        supplierId: emptyToUndef(data.supplierId),
+        familyId: emptyToUndef(data.familyId),
+        startDate: start,
+        endDate: end,
+        contactName: emptyToUndef(data.contactName),
+        contactEmail: emptyToUndef(data.contactEmail),
+        contactPhone: emptyToUndef(data.contactPhone),
+        notes: emptyToUndef(data.notes),
+        termsUrl: emptyToUndef(data.termsUrl),
+        // Ciclo recurrente → monthlyCost; pago único → totalValue (0 es válido)
+        totalValue: !recurring ? totalValue : undefined,
+        monthlyCost: recurring ? monthlyCost : undefined,
+        renewalNoticeDays: Number(data.renewalNoticeDays) || 30,
+        lastChargeDate: emptyToUndef(data.lastChargeDate),
+        lastChargeAmount: parseMoneyInput(data.lastChargeAmount),
+        lastTransactionRef: emptyToUndef(data.lastTransactionRef),
         cancellationNoticeDays: data.cancellationNoticeDays
           ? Number(data.cancellationNoticeDays)
           : undefined,
-        serviceSubtype: data.serviceSubtype || null,
+        serviceSubtype: emptyToUndef(data.serviceSubtype) ?? null,
         paymentMethodType: data.paymentMethodType,
-        paymentAccountRef: data.paymentAccountRef || null,
-        custodianUserId: data.custodianUserId || null,
-        backupCustodianUserId: data.backupCustodianUserId || null,
-        paymentCardBrand: data.paymentCardBrand || null,
-        paymentCardLast4: data.paymentCardLast4 || null,
+        paymentAccountRef: emptyToUndef(data.paymentAccountRef) ?? null,
+        custodianUserId: emptyToUndef(data.custodianUserId) ?? null,
+        backupCustodianUserId: emptyToUndef(data.backupCustodianUserId) ?? null,
+        billingAccountEmail: emptyToUndef(data.billingAccountEmail),
+        billingPortalUrl: emptyToUndef(data.billingPortalUrl),
+        vendorAccountId: emptyToUndef(data.vendorAccountId),
+        paymentCardBrand: emptyToUndef(data.paymentCardBrand) ?? null,
+        paymentCardLast4: emptyToUndef(data.paymentCardLast4) ?? null,
+        paymentCardBank: emptyToUndef(data.paymentCardBank),
+        paymentCardExpiry: emptyToUndef(data.paymentCardExpiry),
+        corporateCardLabel: emptyToUndef(data.corporateCardLabel),
         lines: data.lines.map((l, i) => ({
           ...l,
-          quantity: parseFloat(l.quantity) || 1,
-          unitPrice: l.unitPrice ? parseFloat(l.unitPrice) : undefined,
+          quantity: parseMoneyInput(l.quantity) ?? 1,
+          unitPrice: parseMoneyInput(l.unitPrice),
+          equipmentId: emptyToUndef(l.equipmentId),
+          licenseId: emptyToUndef(l.licenseId),
+          notes: emptyToUndef(l.notes),
           order: i,
         })),
       }
@@ -363,8 +424,9 @@ export function ContractForm({
       })
 
       if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error ?? 'Error al guardar')
+        const err = await res.json().catch(() => ({}))
+        const fieldHint = err.field ? ` (${err.field})` : ''
+        throw new Error((err.error ?? `Error ${res.status}`) + fieldHint)
       }
 
       const saved = await res.json()
@@ -396,15 +458,22 @@ export function ContractForm({
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className='space-y-6'>
-      <fieldset disabled={readOnly} className={readOnly ? 'space-y-6' : 'contents'}>
-        {/* ── Datos generales ─────────────────────────────────────────────── */}
-        <Card>
-          <CardHeader>
-            <CardTitle className='text-base'>Datos generales</CardTitle>
-          </CardHeader>
-          <CardContent className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
-            <div className='space-y-1'>
+    <form onSubmit={handleSubmit(onSubmit)} className='space-y-4'>
+      {embedMode && (
+        <p className='text-xs text-muted-foreground'>
+          Completa las secciones esenciales (1–2). El resto es opcional y puedes expandirlo según
+          necesites.
+        </p>
+      )}
+      <fieldset disabled={readOnly} className={readOnly ? 'space-y-4' : 'contents'}>
+        {/* ── 1. Datos generales ──────────────────────────────────────────── */}
+        <ContractFormSection
+          title='1. Datos generales'
+          description='Identificación del contrato y vínculo con área / proveedor.'
+          collapsible={false}
+        >
+          <div className={formGrid}>
+            <div className='space-y-1 lg:col-span-2'>
               <Label>
                 Nombre del contrato <span className='text-destructive'>*</span>
               </Label>
@@ -499,7 +568,7 @@ export function ContractForm({
               />
             </div>
 
-            <div className='sm:col-span-2 space-y-1'>
+            <div className='sm:col-span-2 lg:col-span-3 space-y-1'>
               <Label>Descripción</Label>
               <Textarea
                 {...register('description')}
@@ -507,34 +576,22 @@ export function ContractForm({
                 placeholder='Descripción del contrato...'
               />
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </ContractFormSection>
 
-        {/* ── Vigencia y facturación ──────────────────────────────────────── */}
-        <Card>
-          <CardHeader>
-            <CardTitle className='text-base'>Vigencia y facturación</CardTitle>
-          </CardHeader>
-          <CardContent className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
+        {/* ── 2. Vigencia y costos ────────────────────────────────────────── */}
+        <ContractFormSection
+          title='2. Vigencia y costos'
+          description='Fechas, ciclo de facturación y monto según el ciclo (recurrente o pago único).'
+          collapsible={false}
+        >
+          <div className={formGrid}>
             <div className='space-y-1'>
               <Label>Fecha de inicio</Label>
               <DateInput
-                value={watch('startDate')}
+                value={startDateValue}
                 onChange={e =>
-                  setValue('startDate', e.target.value as any, {
-                    shouldValidate: true,
-                    shouldDirty: true,
-                  })
-                }
-              />
-            </div>
-
-            <div className='space-y-1'>
-              <Label>Fecha de vencimiento</Label>
-              <DateInput
-                value={watch('endDate')}
-                onChange={e =>
-                  setValue('endDate', e.target.value as any, {
+                  setValue('startDate', e.target.value, {
                     shouldValidate: true,
                     shouldDirty: true,
                   })
@@ -544,11 +601,33 @@ export function ContractForm({
             </div>
 
             <div className='space-y-1'>
+              <Label>Fecha de vencimiento</Label>
+              <DateInput
+                value={watch('endDate')}
+                onChange={e =>
+                  setValue('endDate', e.target.value, {
+                    shouldValidate: true,
+                    shouldDirty: true,
+                  })
+                }
+                clearable
+                min={startDateValue || undefined}
+              />
+            </div>
+
+            <div className='space-y-1'>
               <Label>Ciclo de facturación</Label>
               <Select
-                value={watch('billingCycle')}
+                value={billingCycle}
                 onValueChange={v => {
-                  if (v) setValue('billingCycle', v as any)
+                  if (!v) return
+                  setValue('billingCycle', v as ContractFormData['billingCycle'])
+                  // Evitar costos duplicados al cambiar entre recurrente y pago único
+                  if (v === 'ONE_TIME') {
+                    setValue('monthlyCost', '')
+                  } else {
+                    setValue('totalValue', '')
+                  }
                 }}
               >
                 <SelectTrigger>
@@ -580,33 +659,42 @@ export function ContractForm({
               </Select>
             </div>
 
-            <div className='space-y-1'>
-              <Label>Costo mensual</Label>
-              <Input
-                type='number'
-                min='0'
-                step='0.01'
-                {...register('monthlyCost')}
-                placeholder='0.00'
-              />
-            </div>
+            {isRecurringBilling ? (
+              <div className='space-y-1'>
+                <Label>{recurringCostLabel}</Label>
+                <Input
+                  type='text'
+                  inputMode='decimal'
+                  autoComplete='off'
+                  {...register('monthlyCost')}
+                  placeholder='0.00'
+                />
+                <p className='text-[10px] text-muted-foreground'>
+                  Acepta punto o coma decimal (ej. 24.50 o 24,50).
+                </p>
+              </div>
+            ) : (
+              <div className='space-y-1'>
+                <Label>Valor total del contrato</Label>
+                <Input
+                  type='text'
+                  inputMode='decimal'
+                  autoComplete='off'
+                  {...register('totalValue')}
+                  placeholder='0.00'
+                />
+                <p className='text-[10px] text-muted-foreground'>
+                  Acepta punto o coma decimal (ej. 1200 o 1.200,00).
+                </p>
+              </div>
+            )}
 
-            <div className='space-y-1'>
-              <Label>Valor total del contrato</Label>
-              <Input
-                type='number'
-                min='0'
-                step='0.01'
-                {...register('totalValue')}
-                placeholder='0.00'
-              />
-            </div>
-
-            <div className='flex items-center justify-between rounded-lg border p-3 sm:col-span-2'>
+            <div className='flex items-center justify-between rounded-lg border p-3 sm:col-span-2 lg:col-span-3'>
               <div>
                 <p className='text-sm font-medium'>Renovación automática</p>
                 <p className='text-xs text-muted-foreground'>
-                  El contrato se renueva automáticamente al vencer
+                  El contrato se renueva automáticamente al vencer (notificación y auditoría
+                  programadas).
                 </p>
               </div>
               <Switch checked={autoRenew} onCheckedChange={v => setValue('autoRenew', v)} />
@@ -627,19 +715,17 @@ export function ContractForm({
                 )}
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </ContractFormSection>
 
-        {/* ── Contacto ────────────────────────────────────────────────────── */}
-        <Card>
-          <CardHeader>
-            <CardTitle className='text-base'>Contacto del proveedor</CardTitle>
-            <p className='text-xs text-muted-foreground mt-1'>
-              Se auto-completa con los datos del proveedor seleccionado. Puedes modificarlos si es
-              necesario.
-            </p>
-          </CardHeader>
-          <CardContent className='grid grid-cols-1 sm:grid-cols-3 gap-4'>
+        {/* ── 3. Contacto ─────────────────────────────────────────────────── */}
+        <ContractFormSection
+          title='3. Contacto del proveedor'
+          description='Se auto-completa con el proveedor seleccionado.'
+          badge='Opcional'
+          defaultOpen={!embedMode}
+        >
+          <div className={formGrid}>
             <div className='space-y-1'>
               <Label>Nombre</Label>
               <Input {...register('contactName')} placeholder='Nombre del contacto' />
@@ -656,24 +742,22 @@ export function ContractForm({
               <Label>Teléfono</Label>
               <Input {...register('contactPhone')} placeholder='+1-555-0123' />
             </div>
-            <div className='sm:col-span-3 space-y-1'>
+            <div className='sm:col-span-2 lg:col-span-3 space-y-1'>
               <Label>URL de términos / contrato</Label>
               <Input {...register('termsUrl')} placeholder='https://...' />
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </ContractFormSection>
 
-        {/* ── Facturación y responsables ──────────────────────────────────── */}
-        <Card>
-          <CardHeader>
-            <CardTitle className='text-base'>Facturación y responsables</CardTitle>
-            <p className='text-xs text-muted-foreground mt-1'>
-              Datos para cancelación, trazabilidad de cargos y custodia operativa. Evita
-              suscripciones huérfanas cuando el personal deja la empresa.
-            </p>
-          </CardHeader>
-          <CardContent className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
-            <div className='space-y-1 sm:col-span-2'>
+        {/* ── 4. Facturación y responsables ───────────────────────────────── */}
+        <ContractFormSection
+          title='4. Facturación y responsables'
+          description='Custodios, método de pago y trazabilidad de cargos (auditoría).'
+          badge='Opcional'
+          defaultOpen={!embedMode}
+        >
+          <div className={formGrid}>
+            <div className='space-y-1 sm:col-span-2 lg:col-span-3'>
               <Label>Método de pago</Label>
               <Select
                 value={paymentMethodType}
@@ -698,7 +782,7 @@ export function ContractForm({
               paymentMethodType === 'CRYPTO' ||
               paymentMethodType === 'BANK_TRANSFER' ||
               paymentMethodType === 'OTHER') && (
-              <div className='space-y-1 sm:col-span-2'>
+              <div className='space-y-1 sm:col-span-2 lg:col-span-3'>
                 <Label>
                   {paymentMethodType === 'CRYPTO'
                     ? 'Dirección wallet / red'
@@ -835,7 +919,7 @@ export function ContractForm({
               <DateInput
                 value={watch('lastChargeDate')}
                 onChange={e =>
-                  setValue('lastChargeDate', e.target.value as any, {
+                  setValue('lastChargeDate', e.target.value, {
                     shouldValidate: true,
                     shouldDirty: true,
                   })
@@ -847,18 +931,22 @@ export function ContractForm({
               <Label>Último cargo (monto)</Label>
               <Input type='number' min='0' step='0.01' {...register('lastChargeAmount')} />
             </div>
-            <div className='sm:col-span-2 space-y-1'>
+            <div className='sm:col-span-2 lg:col-span-3 space-y-1'>
               <Label>Referencia última transacción</Label>
               <Input {...register('lastTransactionRef')} placeholder='ID transacción bancaria' />
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </ContractFormSection>
 
-        {/* ── Líneas del contrato ─────────────────────────────────────────── */}
-        <Card>
-          <CardHeader>
-            <div className='flex items-center justify-between gap-2'>
-              <CardTitle className='text-base'>Líneas del contrato</CardTitle>
+        {/* ── 5. Líneas del contrato ──────────────────────────────────────── */}
+        <ContractFormSection
+          title='5. Líneas del contrato'
+          description='Cada línea vincula un activo. Al guardar se sincronizan vigencia y costo.'
+          defaultOpen
+          badge={embedMode ? 'Recomendado' : undefined}
+        >
+          <div className='space-y-3'>
+            <div className='flex justify-end'>
               <Button
                 type='button'
                 variant='outline'
@@ -869,12 +957,6 @@ export function ContractForm({
                 <Plus className='h-4 w-4 mr-1' /> Agregar línea
               </Button>
             </div>
-            <p className='text-xs text-muted-foreground mt-1'>
-              Cada línea vincula un activo (equipo, software, servicio). Los cambios contractuales
-              parciales se registran como adendums (folio ADN) en la sección inferior.
-            </p>
-          </CardHeader>
-          <CardContent className='space-y-3'>
             {fields.length === 0 && (
               <p className='text-sm text-muted-foreground text-center py-4'>
                 Sin líneas. Agrega servicios, equipos o software incluidos en este contrato.
@@ -939,9 +1021,9 @@ export function ContractForm({
                     <Label className='text-xs'>Precio unitario</Label>
                     <Input
                       className='h-8 text-sm'
-                      type='number'
-                      min='0'
-                      step='0.01'
+                      type='text'
+                      inputMode='decimal'
+                      autoComplete='off'
                       {...register(`lines.${i}.unitPrice`)}
                       placeholder='0.00'
                     />
@@ -976,21 +1058,17 @@ export function ContractForm({
                 </div>
               </div>
             ))}
-          </CardContent>
-        </Card>
+          </div>
+        </ContractFormSection>
 
-        {/* ── Adjuntos / Contrato físico ──────────────────────────────────── */}
-        <Card>
-          <CardHeader>
-            <CardTitle className='text-base flex items-center gap-2'>
-              <Paperclip className='h-4 w-4' />
-              Documentos adjuntos
-            </CardTitle>
-            <p className='text-xs text-muted-foreground mt-1'>
-              Sube el contrato físico en PDF u otros documentos relacionados.
-            </p>
-          </CardHeader>
-          <CardContent className='space-y-4'>
+        {/* ── 6. Documentos ───────────────────────────────────────────────── */}
+        <ContractFormSection
+          title='6. Documentos adjuntos'
+          description='Contrato físico en PDF u otros documentos relacionados.'
+          badge='Opcional'
+          defaultOpen={isEditing}
+        >
+          <div className='space-y-4'>
             {/* Adjuntos existentes (solo en edición) */}
             {isEditing && existingAttachments.length > 0 && (
               <div className='space-y-2'>
@@ -1053,14 +1131,15 @@ export function ContractForm({
                 Los archivos se subirán al guardar el contrato.
               </p>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </ContractFormSection>
       </fieldset>
 
       {!isEditing && embedMode && (
         <p className='text-xs text-muted-foreground rounded-md border border-dashed px-3 py-2'>
-          Tras crear y vincular, podrá registrar adendums, asignar cliente y adjuntos desde{' '}
-          <strong>Completar</strong> o desde Contratos.
+          Al crear y vincular, el contrato queda en borrador con auditoría. Al guardar el activo se
+          activa el vínculo (líneas equipo/licencia). Adendums, asignaciones y pagos se gestionan
+          después con <strong>Completar</strong> o desde Contratos.
         </p>
       )}
 
@@ -1088,20 +1167,26 @@ export function ContractForm({
         </>
       )}
 
-      {/* ── Notas ───────────────────────────────────────────────────────── */}
+      {/* ── 7. Notas ─────────────────────────────────────────────────────── */}
       <fieldset disabled={readOnly} className={readOnly ? 'block' : 'contents'}>
-        <div className='space-y-1'>
-          <Label>Notas internas</Label>
-          <Textarea
-            {...register('notes')}
-            rows={3}
-            placeholder='Observaciones, condiciones especiales...'
-          />
-        </div>
+        <ContractFormSection
+          title='7. Notas internas'
+          badge='Opcional'
+          defaultOpen={false}
+        >
+          <div className='space-y-1'>
+            <Label>Notas</Label>
+            <Textarea
+              {...register('notes')}
+              rows={3}
+              placeholder='Observaciones, condiciones especiales...'
+            />
+          </div>
+        </ContractFormSection>
       </fieldset>
 
       {/* ── Acciones ────────────────────────────────────────────────────── */}
-      <div className='flex justify-end gap-3 pt-2'>
+      <div className='sticky bottom-0 z-10 flex justify-end gap-3 pt-3 pb-1 bg-background/95 backdrop-blur border-t mt-2'>
         <Button type='button' variant='outline' onClick={onCancel} disabled={submitting}>
           {readOnly || embedMode ? 'Volver' : 'Cancelar'}
         </Button>

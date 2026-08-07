@@ -38,20 +38,27 @@ export interface DateInputProps extends Omit<
   max?: string
 }
 
-/** Normaliza cualquier entrada de fecha a "YYYY-MM-DD" o "". */
+/** Normaliza cualquier entrada de fecha a "YYYY-MM-DD" o "". Evita desfase UTC. */
 export function toDateInputValue(value: unknown): string {
   if (value == null || value === '') return ''
   if (value instanceof Date) {
-    return isValid(value) ? format(value, 'yyyy-MM-dd') : ''
+    if (!isValid(value)) return ''
+    // Usar componentes locales (no toISOString) para no restar un día en UTC-
+    const y = value.getFullYear()
+    const m = String(value.getMonth() + 1).padStart(2, '0')
+    const d = String(value.getDate()).padStart(2, '0')
+    return `${y}-${m}-${d}`
   }
   if (typeof value === 'string') {
     const trimmed = value.trim()
     if (!trimmed) return ''
+    // ISO o date-only: tomar solo la parte de calendario (sin parsear como UTC)
     if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) return trimmed.slice(0, 10)
     const parsed = parse(trimmed, 'yyyy-MM-dd', new Date())
     if (isValid(parsed)) return format(parsed, 'yyyy-MM-dd')
-    const asDate = new Date(trimmed)
-    return isValid(asDate) ? format(asDate, 'yyyy-MM-dd') : ''
+    const dmy = parse(trimmed, 'dd/MM/yyyy', new Date())
+    if (isValid(dmy)) return format(dmy, 'yyyy-MM-dd')
+    return ''
   }
   return ''
 }
@@ -147,7 +154,7 @@ export const DateInput = React.forwardRef<HTMLInputElement, DateInputProps>(
           aria-hidden
           {...(rest as React.InputHTMLAttributes<HTMLInputElement>)}
         />
-        <Popover open={open} onOpenChange={disabled ? undefined : setOpen}>
+        <Popover modal open={open} onOpenChange={disabled ? undefined : setOpen}>
           <PopoverTrigger asChild>
             <Button
               type='button'
@@ -170,12 +177,17 @@ export const DateInput = React.forwardRef<HTMLInputElement, DateInputProps>(
               )}
             </Button>
           </PopoverTrigger>
-          <PopoverContent className='w-auto p-0' align='start'>
+          <PopoverContent
+            className='z-[200] w-auto p-0 pointer-events-auto'
+            align='start'
+            onOpenAutoFocus={e => e.preventDefault()}
+            onCloseAutoFocus={e => e.preventDefault()}
+          >
             <Calendar
               mode='single'
               selected={selectedDate}
               onSelect={handleSelect}
-              initialFocus
+              defaultMonth={selectedDate ?? minDate ?? maxDate}
               captionLayout='dropdown'
               startMonth={new Date(1990, 0)}
               endMonth={new Date(new Date().getFullYear() + 15, 11)}

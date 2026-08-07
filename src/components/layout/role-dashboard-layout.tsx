@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils'
 import { useUserModules } from '@/hooks/use-user-modules'
 import { DashboardSidebar } from '@/components/layout/dashboard-sidebar'
 import { DashboardHeader } from '@/components/layout/dashboard-header'
-import { SIDEBAR_COLLAPSED_KEY } from '@/components/layout/dashboard-nav-types'
+import { SIDEBAR_COLLAPSED_KEY, SIDEBAR_RAIL_PAD } from '@/components/layout/dashboard-nav-types'
 import { buildRoleNavigation, roleHomeHref } from '@/components/layout/use-role-navigation'
 
 interface RoleDashboardLayoutProps {
@@ -165,7 +165,7 @@ export function RoleDashboardLayout({
       <div
         className={cn(
           'transition-[padding] duration-300 ease-in-out',
-          collapsed ? 'lg:pl-16' : 'lg:pl-64'
+          collapsed ? SIDEBAR_RAIL_PAD : 'lg:pl-64'
         )}
       >
         <DashboardHeader

@@ -4,8 +4,7 @@
  * ContractPicker — selector de contrato embebido en formularios de activos/licencias.
  *
  * - Vincular existente (búsqueda)
- * - Crear rápido (campos mínimos)
- * - Formulario completo (mismo ContractForm del módulo Contratos)
+ * - Crear contrato (formulario único completo, prellenado desde el activo)
  * - Completar/editar contrato vinculado sin salir del flujo
  */
 
@@ -23,7 +22,6 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { useFetch } from '@/hooks/common/use-fetch'
-import { QuickContractForm } from '@/components/contracts/quick-contract-form'
 import { ContractForm } from '@/components/contracts/contract-form'
 import type { Contract } from '@/types/contracts'
 import { CONTRACT_CATEGORY_LABELS } from '@/types/contracts'
@@ -45,7 +43,7 @@ interface Props {
   prefill?: ContractPickerPrefill | null
 }
 
-type PickerTab = 'link' | 'create-quick' | 'create-full' | 'edit'
+type PickerTab = 'link' | 'create' | 'edit'
 
 export function ContractPicker({
   value,
@@ -190,8 +188,8 @@ export function ContractPicker({
       )}
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className='max-w-4xl max-h-[92vh]'>
-          <DialogHeader>
+        <DialogContent className='w-[min(96vw,72rem)] max-w-6xl max-h-[94vh] p-0 gap-0 overflow-hidden'>
+          <DialogHeader className='px-6 pt-6 pb-3 border-b shrink-0'>
             <DialogTitle>
               {tab === 'edit' ? 'Completar contrato' : 'Gestionar contrato'}
             </DialogTitle>
@@ -200,11 +198,11 @@ export function ContractPicker({
                 ? 'Agrega facturación, líneas, custodio y adjuntos sin salir de la creación de la ' +
                   contextLabel +
                   '.'
-                : 'Vincula un contrato existente o créalo con los datos ya capturados en este formulario.'}
+                : `Vincula un contrato existente o créalo con los datos ya capturados de esta ${contextLabel}.`}
             </DialogDescription>
           </DialogHeader>
 
-          <div className='overflow-y-auto max-h-[calc(92vh-120px)]'>
+          <div className='overflow-y-auto max-h-[calc(94vh-5.5rem)] px-6 py-4'>
             {tab === 'edit' && selectedContract ? (
               <ContractForm
                 contract={selectedContract}
@@ -214,36 +212,44 @@ export function ContractPicker({
               />
             ) : (
               <Tabs value={tab} onValueChange={v => setTab(v as PickerTab)}>
-                <TabsList className='grid w-full grid-cols-3'>
+                <TabsList className='grid w-full grid-cols-2'>
                   <TabsTrigger value='link'>Vincular existente</TabsTrigger>
-                  <TabsTrigger value='create-quick'>Crear rápido</TabsTrigger>
-                  <TabsTrigger value='create-full'>Formulario completo</TabsTrigger>
+                  <TabsTrigger value='create'>Crear contrato</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value='link' className='space-y-4 pt-4'>
                   {contracts.length === 0 ? (
-                    <div className='text-center py-8 text-muted-foreground'>
+                    <div className='text-center py-10 text-muted-foreground'>
                       <FileSignature className='h-10 w-10 mx-auto mb-3 opacity-30' />
                       <p className='text-sm'>No hay contratos activos disponibles.</p>
-                      <div className='flex gap-2 justify-center mt-3'>
+                      <p className='text-xs mt-1 max-w-sm mx-auto'>
+                        Crea un contrato con los datos de esta {contextLabel}; se vinculará al
+                        guardar el activo.
+                      </p>
+                      <Button
+                        type='button'
+                        size='sm'
+                        className='mt-4'
+                        onClick={() => setTab('create')}
+                      >
+                        <Plus className='h-4 w-4 mr-1' /> Crear contrato
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className='space-y-2'>
+                      <div className='flex items-center justify-between gap-2 flex-wrap'>
+                        <p className='text-sm text-muted-foreground'>
+                          Selecciona el contrato al que pertenece esta {contextLabel}:
+                        </p>
                         <Button
                           type='button'
                           variant='outline'
                           size='sm'
-                          onClick={() => setTab('create-quick')}
+                          onClick={() => setTab('create')}
                         >
-                          Crear rápido
-                        </Button>
-                        <Button type='button' size='sm' onClick={() => setTab('create-full')}>
-                          <Plus className='h-4 w-4 mr-1' /> Formulario completo
+                          <Plus className='h-4 w-4 mr-1' /> Nuevo contrato
                         </Button>
                       </div>
-                    </div>
-                  ) : (
-                    <div className='space-y-2'>
-                      <p className='text-sm text-muted-foreground'>
-                        Selecciona el contrato al que pertenece esta {contextLabel}:
-                      </p>
                       <SearchableSelect
                         options={contracts.map(c => ({
                           value: c.id,
@@ -254,7 +260,7 @@ export function ContractPicker({
                         placeholder='Buscar contrato...'
                         emptyLabel='Sin contratos disponibles'
                       />
-                      <div className='space-y-1 max-h-64 overflow-y-auto'>
+                      <div className='space-y-1 max-h-72 overflow-y-auto'>
                         {contracts.map(c => (
                           <button
                             key={c.id}
@@ -291,18 +297,7 @@ export function ContractPicker({
                   )}
                 </TabsContent>
 
-                <TabsContent value='create-quick' className='pt-4'>
-                  <QuickContractForm
-                    context={context}
-                    prefill={resolvedPrefill}
-                    supplierId={supplierId}
-                    familyId={familyId}
-                    onSuccess={handleCreated}
-                    onCancel={() => setOpen(false)}
-                  />
-                </TabsContent>
-
-                <TabsContent value='create-full' className='pt-4'>
+                <TabsContent value='create' className='pt-4'>
                   <ContractForm
                     embedMode
                     prefill={resolvedPrefill}

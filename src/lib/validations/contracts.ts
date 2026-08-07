@@ -1,5 +1,13 @@
 import { z } from 'zod'
 
+/** Convierte '' / undefined a null para campos opcionales (Combobox / Select). */
+const emptyToNull = (v: unknown) => (v === '' || v === undefined ? null : v)
+
+const optionalUuid = z.preprocess(emptyToNull, z.string().uuid().nullable().optional())
+
+const optionalEnum = <T extends z.ZodTypeAny>(schema: T) =>
+  z.preprocess(emptyToNull, schema.nullable().optional())
+
 // Valores exactos del enum ContractCategory en Prisma
 export const CONTRACT_CATEGORY_VALUES = [
   'EQUIPMENT_RENTAL',
@@ -50,15 +58,15 @@ export const SUBSCRIPTION_SERVICE_TYPE_VALUES = [
 ] as const
 
 const billingFieldsSchema = {
-  serviceSubtype: z.enum(SUBSCRIPTION_SERVICE_TYPE_VALUES).optional().nullable(),
+  serviceSubtype: optionalEnum(z.enum(SUBSCRIPTION_SERVICE_TYPE_VALUES)),
   paymentMethodType: z.enum(PAYMENT_METHOD_TYPE_VALUES).default('CORPORATE_CARD'),
   paymentAccountRef: z.string().max(300).optional().nullable(),
-  custodianUserId: z.string().uuid().optional().nullable(),
-  backupCustodianUserId: z.string().uuid().optional().nullable(),
+  custodianUserId: optionalUuid,
+  backupCustodianUserId: optionalUuid,
   billingAccountEmail: z.string().email().max(200).optional().nullable().or(z.literal('')),
   billingPortalUrl: z.string().url().max(500).optional().nullable().or(z.literal('')),
   vendorAccountId: z.string().max(200).optional().nullable(),
-  paymentCardBrand: z.enum(PAYMENT_CARD_BRAND_VALUES).optional().nullable(),
+  paymentCardBrand: optionalEnum(z.enum(PAYMENT_CARD_BRAND_VALUES)),
   paymentCardLast4: z
     .string()
     .regex(/^\d{4}$/, 'Últimos 4 dígitos inválidos')
@@ -73,7 +81,7 @@ const billingFieldsSchema = {
     .nullable()
     .or(z.literal('')),
   corporateCardLabel: z.string().max(100).optional().nullable(),
-  lastChargeDate: z.string().optional().nullable(),
+  lastChargeDate: z.preprocess(emptyToNull, z.string().nullable().optional()),
   lastChargeAmount: z.number({ coerce: true }).min(0).optional().nullable(),
   lastTransactionRef: z.string().max(200).optional().nullable(),
   subscriptionUsageStatus: z.enum(SUBSCRIPTION_USAGE_STATUS_VALUES).default('ACTIVE'),
@@ -97,8 +105,8 @@ export const contractLineSchema = z.object({
     .min(0.01, 'La cantidad debe ser mayor a 0')
     .default(1),
   unitPrice: z.number({ coerce: true }).min(0).optional().nullable(),
-  equipmentId: z.string().optional().nullable(),
-  licenseId: z.string().optional().nullable(),
+  equipmentId: optionalUuid,
+  licenseId: optionalUuid,
   notes: z.string().max(1000).optional().nullable(),
   order: z.number({ coerce: true }).int().min(0).default(0),
 })
@@ -116,12 +124,12 @@ export const createContractSchema = z.object({
       errorMap: () => ({ message: 'Categoría inválida' }),
     })
     .default('SERVICE'),
-  supplierId: z.string().uuid().optional().nullable(),
-  familyId: z.string().uuid().optional().nullable(),
-  modelId: z.string().uuid().optional().nullable(),
-  batchId: z.string().uuid().optional().nullable(),
-  startDate: z.string().optional().nullable(),
-  endDate: z.string().optional().nullable(),
+  supplierId: optionalUuid,
+  familyId: optionalUuid,
+  modelId: optionalUuid,
+  batchId: optionalUuid,
+  startDate: z.preprocess(emptyToNull, z.string().nullable().optional()),
+  endDate: z.preprocess(emptyToNull, z.string().nullable().optional()),
   autoRenew: z.boolean().default(false),
   renewalNoticeDays: z.number({ coerce: true }).int().min(0).max(365).default(30),
   billingCycle: z.enum(CONTRACT_BILLING_CYCLE_VALUES).default('MONTHLY'),

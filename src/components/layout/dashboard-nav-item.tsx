@@ -107,7 +107,7 @@ export function DashboardNavItemComponent({
   const itemClass = (active: boolean) =>
     cn(
       'relative flex items-center text-sm font-medium rounded-lg transition-colors',
-      collapsed ? 'justify-center px-0 py-2.5' : 'pr-4 py-2',
+      collapsed ? 'justify-center px-0 py-3' : 'pr-4 py-2',
       active ? 'text-primary' : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
     )
 
@@ -145,7 +145,7 @@ export function DashboardNavItemComponent({
               {isActive && <SidebarActiveIndicator spring={spring} rail />}
               <Icon
                 className={cn(
-                  'relative z-10 h-4 w-4 flex-shrink-0',
+                  'relative z-10 h-5 w-5 flex-shrink-0',
                   isActive ? 'text-primary' : 'text-muted-foreground'
                 )}
               />
@@ -179,7 +179,7 @@ export function DashboardNavItemComponent({
                 {isActive && <span className='absolute inset-0 rounded-lg bg-primary/10' />}
                 <Icon
                   className={cn(
-                    'relative z-10 h-4 w-4 flex-shrink-0',
+                    'relative z-10 h-5 w-5 flex-shrink-0',
                     isActive ? 'text-primary' : 'text-muted-foreground'
                   )}
                 />
