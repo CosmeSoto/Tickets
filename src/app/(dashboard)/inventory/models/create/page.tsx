@@ -82,7 +82,12 @@ export default function CreateModelPage() {
     <div className='space-y-6'>
       {/* Header */}
       <div className='flex items-center gap-4'>
-        <Button variant='ghost' size='icon' onClick={() => router.back()}>
+        <Button
+          variant='ghost'
+          size='icon'
+          onClick={() => router.push('/inventory/models')}
+          title='Volver a Modelos'
+        >
           <ArrowLeft className='h-4 w-4' />
         </Button>
         <div>
@@ -100,7 +105,11 @@ export default function CreateModelPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <ModelForm onSubmit={handleSubmit} onCancel={() => router.back()} isLoading={isLoading} />
+          <ModelForm
+            onSubmit={handleSubmit}
+            onCancel={() => router.push('/inventory/models')}
+            isLoading={isLoading}
+          />
         </CardContent>
       </Card>
     </div>

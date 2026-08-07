@@ -153,7 +153,7 @@ export function CreateCredentialDialog({
       v => v.kind === 'AREA' && (v.familyId === lockFamilyId || v.family?.id === lockFamilyId)
     )
 
-  // Solo resetear al ABRIR el modal (no cuando loadData refresca vaults tras crear)
+  // Solo resetear al ABRIR el modal (depende solo de `open` para no resetear al llegar vaults)
   useEffect(() => {
     if (open && !wasOpen.current) {
       setCreated(null)
@@ -169,7 +169,8 @@ export function CreateCredentialDialog({
       setShowSecret(false)
     }
     wasOpen.current = open
-  }, [open, defaultVaultId, equipmentId, licenseId, lockFamilyId, sortedVaults])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset solo al abrir/cerrar
+  }, [open])
 
   // Si las bóvedas llegan después de abrir (fetch async), fijar el vault del área del activo
   useEffect(() => {
@@ -312,6 +313,29 @@ export function CreateCredentialDialog({
         throw new Error(detailMsg || data.error || `No se pudo crear (${res.status})`)
       }
 
+      toast({
+        title: 'Credencial creada',
+        description: lockContext
+          ? 'Quedó vinculada al activo. Puedes revelarla o copiarla desde la tarjeta.'
+          : 'Ya puedes copiar usuario o contraseña. El secreto no se vuelve a mostrar sin revelar.',
+      })
+      onCreated()
+
+      // Desde ficha de inventario: cerrar el modal (la tarjeta ya muestra la entrada)
+      if (lockContext) {
+        setCreated(null)
+        setShowSecret(false)
+        setForm(
+          emptyForm(
+            resolveVaultIdForContext(sortedVaults, { defaultVaultId, lockFamilyId }),
+            equipmentId,
+            licenseId
+          )
+        )
+        onOpenChange(false)
+        return
+      }
+
       setCreated({
         id: data.entry?.id,
         title: form.title.trim(),
@@ -319,12 +343,6 @@ export function CreateCredentialDialog({
         secret: form.secret,
         url: data.entry?.url || form.url.trim(),
       })
-      toast({
-        title: 'Credencial creada',
-        description:
-          'Ya puedes copiar usuario o contraseña. El secreto no se vuelve a mostrar sin revelar.',
-      })
-      onCreated()
     } catch (err: unknown) {
       toast({
         title: 'No se pudo crear la credencial',

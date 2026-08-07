@@ -129,19 +129,37 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
     }
 
-    // Validar XOR para licenseScope INDIVIDUAL
-    if (licenseScope === 'INDIVIDUAL') {
-      const assignedToEquipment = rest.assignedToEquipment ?? body.assignedToEquipment ?? null
-      const assignedToUser = rest.assignedToUser ?? body.assignedToUser ?? null
-      const hasEquipment = assignedToEquipment != null
-      const hasUser = assignedToUser != null
+    const existingAssign = await prisma.software_licenses.findUnique({
+      where: { id },
+      select: {
+        assignedToUser: true,
+        assignedToEquipment: true,
+        assignedToDepartment: true,
+        licenseScope: true,
+      },
+    })
 
-      if (!hasEquipment && !hasUser) {
-        return NextResponse.json(
-          { error: 'Una licencia individual debe estar asignada a un equipo o usuario' },
-          { status: 422 }
-        )
-      }
+    const nextScope =
+      (scope !== undefined ? mapLicenseScope(scope) : undefined) ??
+      (licenseScope !== undefined ? String(licenseScope) : undefined) ??
+      existingAssign?.licenseScope ??
+      null
+
+    // Solo validar conflicto XOR si el body toca asignación (no bloquear editar datos)
+    const touchesAssign =
+      body.assignedToUser !== undefined ||
+      body.assignedToEquipment !== undefined ||
+      body.assignedToDepartment !== undefined
+
+    if (touchesAssign && nextScope === 'INDIVIDUAL') {
+      const nextEquipment =
+        body.assignedToEquipment !== undefined
+          ? body.assignedToEquipment
+          : existingAssign?.assignedToEquipment
+      const nextUser =
+        body.assignedToUser !== undefined ? body.assignedToUser : existingAssign?.assignedToUser
+      const hasEquipment = nextEquipment != null && nextEquipment !== ''
+      const hasUser = nextUser != null && nextUser !== ''
       if (hasEquipment && hasUser) {
         return NextResponse.json(
           {
@@ -166,6 +184,13 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (contractType !== undefined) updatePayload.contractType = contractType
     if (customValues !== undefined) {
       updatePayload.customValues = customValues.length > 0 ? customValues : null
+    }
+
+    // No vaciar asignación al editar campos generales sin enviar asignatarios
+    if (!touchesAssign) {
+      delete updatePayload.assignedToUser
+      delete updatePayload.assignedToEquipment
+      delete updatePayload.assignedToDepartment
     }
 
     const license = await LicenseService.updateLicense(id, updatePayload, session.user.id)

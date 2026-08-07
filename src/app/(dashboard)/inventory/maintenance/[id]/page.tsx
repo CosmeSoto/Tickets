@@ -278,7 +278,7 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
       toast({ title: 'Cancelado', description: 'El mantenimiento fue cancelado.' })
       if (maintenance?.equipment?.id)
         router.push(`/inventory/equipment/${maintenance.equipment.id}`)
-      else router.back()
+      else router.push('/inventory/maintenance')
     } catch (e) {
       toast({
         title: 'Error',
@@ -302,8 +302,12 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
     return (
       <div className='text-center py-20'>
         <p className='text-muted-foreground'>Mantenimiento no encontrado</p>
-        <Button variant='ghost' className='mt-4' onClick={() => router.back()}>
-          <ArrowLeft className='mr-2 h-4 w-4' /> Volver
+        <Button
+          variant='ghost'
+          className='mt-4'
+          onClick={() => router.push('/inventory/maintenance')}
+        >
+          <ArrowLeft className='mr-2 h-4 w-4' /> Volver a Mantenimientos
         </Button>
       </div>
     )
@@ -322,7 +326,12 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
       {/* Header */}
       <div className='flex items-center justify-between flex-wrap gap-3'>
         <div className='flex items-center gap-4'>
-          <Button variant='ghost' size='icon' onClick={() => router.back()}>
+          <Button
+            variant='ghost'
+            size='icon'
+            onClick={() => router.push('/inventory/maintenance')}
+            title='Volver a Mantenimientos'
+          >
             <ArrowLeft className='h-5 w-5' />
           </Button>
           <Wrench className='h-8 w-8' />

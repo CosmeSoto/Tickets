@@ -33,7 +33,7 @@ export default function CreateAssetRequestPage() {
   }
 
   const handleCancel = () => {
-    router.back()
+    router.push('/inventory/asset-requests')
   }
 
   return (

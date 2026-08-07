@@ -25,11 +25,17 @@ import { TypeAttributesInput } from '@/components/inventory/custom-fields/type-a
 import type { FamilyConfig } from '@/lib/inventory/family-config-types'
 import { useFetch } from '@/hooks/common/use-fetch'
 import { useActiveDepartments } from '@/contexts/departments-context'
-import { FormDraftKeys, peekFormDraft, useFormDraft } from '@/hooks/common/use-form-draft'
+import {
+  FormDraftKeys,
+  clearFormDraft,
+  peekFormDraft,
+  useFormDraft,
+} from '@/hooks/common/use-form-draft'
 import { FormDraftBanner } from '@/components/common/form-draft-banner'
 import { toLocalDateInputValue } from '@/lib/forms/form-date'
 import { parseMoneyInput } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
+import { AssignableUserSelect } from '@/components/inventory/shared/AssignableUserSelect'
 import { KeyRound, RefreshCw } from 'lucide-react'
 
 interface LicenseAssetFormProps {
@@ -66,6 +72,19 @@ type LicenseDraft = {
   linkedContractId: string | null
   notes: string
   customFieldValues: Array<{ fieldName: string; fieldValue: string }>
+}
+
+/** Borrador útil (evita que un draft solo con scope=Empresa vacíe el editar). */
+function isUsefulLicenseDraft(d: Partial<LicenseDraft> | null | undefined): boolean {
+  if (!d) return false
+  return Boolean(
+    (typeof d.name === 'string' && d.name.trim()) ||
+    (typeof d.licenseTypeId === 'string' && d.licenseTypeId.trim()) ||
+    (typeof d.purchaseDate === 'string' && d.purchaseDate.trim()) ||
+    (typeof d.notes === 'string' && d.notes.trim()) ||
+    (typeof d.userId === 'string' && d.userId.trim()) ||
+    (typeof d.departmentId === 'string' && d.departmentId.trim())
+  )
 }
 
 const SCOPE_FROM_API: Record<string, Scope> = {
@@ -133,16 +152,8 @@ export function LicenseAssetForm({
   const [scope, setScope] = useState<Scope>('Empresa')
   const [userId, setUserId] = useState('')
   const [departmentId, setDepartmentId] = useState('')
-
-  const { data: rawUsers } = useFetch<{ id: string; name?: string; email?: string }>('/api/users', {
-    params: { limit: 200 },
-    enabled: scope === 'Individual',
-    showErrorToast: false,
-  })
-  const users: SearchableSelectOption[] = useMemo(
-    () => rawUsers.map(u => ({ id: u.id, name: u.name ?? u.email ?? u.id })),
-    [rawUsers]
-  )
+  /** En edición: no guardar borrador hasta hidratar desde el servidor */
+  const [hydrated, setHydrated] = useState(!isEditMode)
 
   const { departments: rawDepartments } = useActiveDepartments()
   const departments: SearchableSelectOption[] = useMemo(
@@ -234,7 +245,7 @@ export function LicenseAssetForm({
   const { clearDraft, wasRestored, dismissRestoredBanner } = useFormDraft({
     key: draftKey,
     values: draftValues,
-    enabled: !submitting,
+    enabled: !submitting && hydrated,
     onRestore: applyDraft,
   })
 
@@ -254,9 +265,21 @@ export function LicenseAssetForm({
   }, [familyId])
 
   useEffect(() => {
-    if (!isEditMode || !initialLicense) return
-    // Si hay borrador de esta edición, useFormDraft lo restaura (prioridad ante crash)
-    if (peekFormDraft(draftKey)) return
+    if (!isEditMode) {
+      setHydrated(true)
+      return
+    }
+    if (!initialLicense) return
+
+    const draft = peekFormDraft<LicenseDraft>(draftKey)
+    if (isUsefulLicenseDraft(draft)) {
+      // useFormDraft restaurará el borrador al habilitar hydrated
+      setHydrated(true)
+      return
+    }
+
+    // Draft vacío/basura: cargar servidor y limpiar sessionStorage
+    clearFormDraft(draftKey)
 
     setName(String(initialLicense.name ?? ''))
     const typeId =
@@ -264,11 +287,21 @@ export function LicenseAssetForm({
       (initialLicense.typeId as string | undefined) ??
       ''
     setLicenseTypeId(typeId)
-    setLicenseKey(String(initialLicense.key ?? ''))
+    setLicenseKey(
+      initialLicense.key && initialLicense.key !== '••••••••' ? String(initialLicense.key) : ''
+    )
     const scopeValue = initialLicense.licenseScope ?? initialLicense.scope
     setScope(SCOPE_FROM_API[String(scopeValue)] ?? 'Empresa')
-    setUserId(String(initialLicense.assignedToUser ?? ''))
-    setDepartmentId(String(initialLicense.assignedToDepartment ?? ''))
+    const assignedUser =
+      (initialLicense.assignedToUser as string | undefined) ??
+      (initialLicense.user as { id?: string } | undefined)?.id ??
+      ''
+    setUserId(String(assignedUser))
+    const assignedDept =
+      (initialLicense.assignedToDepartment as string | undefined) ??
+      (initialLicense.department as { id?: string } | undefined)?.id ??
+      ''
+    setDepartmentId(String(assignedDept))
     setSupplierId(
       String((initialLicense.supplier as { id?: string })?.id ?? initialLicense.supplierId ?? '')
     )
@@ -282,13 +315,15 @@ export function LicenseAssetForm({
     setHasRecurring(
       initialLicense.renewalCost != null ||
         initialLicense.renewalDate != null ||
-        initialLicense.contractType === 'RECURRING'
+        initialLicense.contractType === 'RECURRING' ||
+        initialLicense.contractType === 'SOFTWARE'
     )
     setLinkedContractId((initialLicense.linkedContractId as string | null) ?? null)
     setNotes(String(initialLicense.notes ?? ''))
     setCustomFieldValues(
       (initialLicense.customValues as Array<{ fieldName: string; fieldValue: string }>) ?? []
     )
+    setHydrated(true)
   }, [isEditMode, initialLicense, draftKey])
 
   const { data: linkedContracts } = useFetch<Contract>(
@@ -370,11 +405,12 @@ export function LicenseAssetForm({
       toast({ title: 'Selecciona el tipo de licencia', variant: 'destructive' })
       return
     }
-    if (scope === 'Individual' && !userId) {
+    // En alta: asignación obligatoria. En edición se puede completar luego con «Asignar».
+    if (!isEditMode && scope === 'Individual' && !userId) {
       toast({ title: 'Selecciona el usuario asignado', variant: 'destructive' })
       return
     }
-    if (scope === 'Departamento' && !departmentId) {
+    if (!isEditMode && scope === 'Departamento' && !departmentId) {
       toast({ title: 'Selecciona el departamento asignado', variant: 'destructive' })
       return
     }
@@ -400,8 +436,6 @@ export function LicenseAssetForm({
       typeId: licenseTypeId || undefined,
       key: licenseKey || undefined,
       scope,
-      assignedToUser: scope === 'Individual' ? userId || undefined : undefined,
-      assignedToDepartment: scope === 'Departamento' ? departmentId || undefined : undefined,
       supplierId: supplierId || undefined,
       purchaseDate: purchaseDate || undefined,
       expirationDate: expirationDate || undefined,
@@ -415,6 +449,22 @@ export function LicenseAssetForm({
       customValues: customFieldValues.length ? customFieldValues : undefined,
       attachments: attachments.length ? attachments : undefined,
     }
+
+    // Solo enviar asignación si hay valor (evita borrar asignatario al editar otros campos)
+    if (scope === 'Individual' && userId) {
+      payload.assignedToUser = userId
+      payload.assignedToDepartment = null
+      payload.assignedToEquipment = null
+    } else if (scope === 'Departamento' && departmentId) {
+      payload.assignedToDepartment = departmentId
+      payload.assignedToUser = null
+      payload.assignedToEquipment = null
+    } else if (scope === 'Empresa' && !isEditMode) {
+      payload.assignedToUser = null
+      payload.assignedToDepartment = null
+      payload.assignedToEquipment = null
+    }
+
     onSubmit(payload)
   }
 
@@ -555,22 +605,24 @@ export function LicenseAssetForm({
         </div>
 
         {scope === 'Individual' && (
-          <div className='space-y-1'>
-            <Label>
-              Usuario Asignado <span className='text-destructive'>*</span>
-            </Label>
-            <SearchableSelect
-              options={users}
+          <div className='space-y-1 md:col-span-2'>
+            <AssignableUserSelect
+              familyId={familyId}
               value={userId}
               onChange={setUserId}
-              placeholder='Buscar usuario...'
+              label={
+                isEditMode
+                  ? 'Usuario asignado (opcional aquí; también desde Asignar)'
+                  : 'Usuario asignado'
+              }
+              required={!isEditMode}
             />
           </div>
         )}
         {scope === 'Departamento' && (
           <div className='space-y-1'>
             <Label>
-              Departamento Asignado <span className='text-destructive'>*</span>
+              Departamento Asignado {!isEditMode && <span className='text-destructive'>*</span>}
             </Label>
             <SearchableSelect
               options={departments}

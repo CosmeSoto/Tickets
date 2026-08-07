@@ -242,8 +242,9 @@ export function ConsumableDetail({ consumableId, userRole, isSuperAdmin = false 
           <Button
             variant='ghost'
             size='icon'
-            onClick={() => router.back()}
+            onClick={() => router.push('/inventory')}
             className='shrink-0 mt-0.5'
+            title='Regresar a Inventario'
           >
             <ArrowLeft className='h-4 w-4' />
           </Button>

@@ -165,7 +165,9 @@ export function LinkedCredentialsCard({
           lockFamilyName={familyName ?? undefined}
           equipmentId={entity === 'equipment' ? entityId : undefined}
           licenseId={entity === 'license' ? entityId : undefined}
-          onCreated={loadEntries}
+          onCreated={() => {
+            void loadEntries()
+          }}
         />
       )}
 

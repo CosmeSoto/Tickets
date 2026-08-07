@@ -18,11 +18,13 @@ import {
   Pencil,
   Trash2,
   AlertTriangle,
+  UserPlus,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { TransferFamilyDialog } from './transfer-family-dialog'
 import { LinkedCredentialsCard } from '@/components/credentials/linked-credentials-card'
+import { LicenseAssignDialog } from '@/components/inventory/license/license-assign-dialog'
 import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -41,6 +43,9 @@ interface LicenseData {
   renewalCost?: number | null
   invoiceNumber?: string | null
   purchaseOrderNumber?: string | null
+  assignedToUser?: string | null
+  assignedToEquipment?: string | null
+  assignedToDepartment?: string | null
   customValues?: Array<{ fieldName: string; fieldValue: string }> | null
   renewalAlertStatus?: 'ok' | 'warning' | 'critical' | 'expired' | null
   licenseType?: {
@@ -113,6 +118,7 @@ export function LicenseDetail({ licenseId, userRole, isSuperAdmin = false }: Pro
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showTransferDialog, setShowTransferDialog] = useState(false)
+  const [showAssignDialog, setShowAssignDialog] = useState(false)
 
   const canManageInventory =
     (session?.user as { canManageInventory?: boolean })?.canManageInventory === true
@@ -195,20 +201,21 @@ export function LicenseDetail({ licenseId, userRole, isSuperAdmin = false }: Pro
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className='space-y-6 max-w-4xl mx-auto'>
+      <button
+        type='button'
+        onClick={() => router.push('/inventory')}
+        className='flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors'
+      >
+        <ArrowLeft className='h-4 w-4' />
+        Regresar a Inventario
+      </button>
+
       {/* Header */}
       <div className='flex items-start justify-between gap-4'>
-        <div className='flex items-start gap-3'>
-          <Button
-            variant='ghost'
-            size='icon'
-            onClick={() => router.back()}
-            className='shrink-0 mt-0.5'
-          >
-            <ArrowLeft className='h-4 w-4' />
-          </Button>
-          <div>
+        <div className='flex items-start gap-3 min-w-0'>
+          <div className='min-w-0'>
             <h1 className='text-xl font-semibold flex items-center gap-2'>
-              <Key className='h-5 w-5 text-muted-foreground' />
+              <Key className='h-5 w-5 text-muted-foreground shrink-0' />
               {license.name}
             </h1>
             <div className='flex items-center gap-2 mt-1 flex-wrap'>
@@ -247,7 +254,13 @@ export function LicenseDetail({ licenseId, userRole, isSuperAdmin = false }: Pro
 
         {/* Acciones de gestión */}
         {(canEdit || canDelete) && (
-          <div className='flex items-center gap-2 shrink-0'>
+          <div className='flex items-center gap-2 shrink-0 flex-wrap justify-end'>
+            {canEdit && (
+              <Button size='sm' onClick={() => setShowAssignDialog(true)}>
+                <UserPlus className='h-3.5 w-3.5 mr-1.5' />
+                Asignar
+              </Button>
+            )}
             {canEdit && (
               <Button
                 variant='outline'
@@ -346,10 +359,17 @@ export function LicenseDetail({ licenseId, userRole, isSuperAdmin = false }: Pro
 
         {/* Asignación */}
         <div className='rounded-lg border border-border p-4 space-y-4'>
-          <h3 className='text-sm font-semibold flex items-center gap-2'>
-            <User className='h-4 w-4 text-muted-foreground' />
-            Asignación
-          </h3>
+          <div className='flex items-center justify-between gap-2'>
+            <h3 className='text-sm font-semibold flex items-center gap-2'>
+              <User className='h-4 w-4 text-muted-foreground' />
+              Asignación
+            </h3>
+            {canEdit && (
+              <Button variant='ghost' size='sm' onClick={() => setShowAssignDialog(true)}>
+                {license.user || license.equipment || license.department ? 'Cambiar' : 'Asignar'}
+              </Button>
+            )}
+          </div>
           <div className='grid grid-cols-2 gap-4'>
             <InfoRow
               label='Usuario'
@@ -363,6 +383,12 @@ export function LicenseDetail({ licenseId, userRole, isSuperAdmin = false }: Pro
             />
             <InfoRow label='Departamento' value={license.department?.name} />
           </div>
+          {!license.user && !license.equipment && !license.department && (
+            <p className='text-xs text-muted-foreground'>
+              Sin asignar. Usa «Asignar» para vincular usuario, equipo o departamento según el
+              alcance.
+            </p>
+          )}
         </div>
 
         {/* Área */}
@@ -425,7 +451,22 @@ export function LicenseDetail({ licenseId, userRole, isSuperAdmin = false }: Pro
         </div>
       )}
 
-      {/* TransferFamilyDialog */}
+      <LicenseAssignDialog
+        open={showAssignDialog}
+        onOpenChange={setShowAssignDialog}
+        licenseId={licenseId}
+        licenseName={license.name}
+        familyId={currentFamilyId}
+        currentScope={license.licenseScope}
+        currentUserId={license.assignedToUser ?? license.user?.id ?? null}
+        currentDepartmentId={license.assignedToDepartment ?? license.department?.id ?? null}
+        currentEquipmentId={license.assignedToEquipment ?? license.equipment?.id ?? null}
+        onAssigned={() => {
+          toast({ title: 'Asignación actualizada' })
+          void loadLicense()
+        }}
+      />
+
       <TransferFamilyDialog
         open={showTransferDialog}
         onOpenChange={setShowTransferDialog}
