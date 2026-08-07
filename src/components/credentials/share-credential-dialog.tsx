@@ -10,9 +10,15 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
 import { Loader2, Share2, Trash2, UserPlus } from 'lucide-react'
 
@@ -22,11 +28,25 @@ type ShareRow = {
   user: { id: string; name: string; email: string; role: string } | null
 }
 
-type Candidate = { id: string; name: string; email: string; role: string }
+type Candidate = {
+  id: string
+  name: string
+  email: string
+  role: string
+  canReceiveShare?: boolean
+  reasonBlocked?: string
+  credentialsEnabled?: boolean
+}
 
 interface ShareCredentialDialogProps {
   entry: { id: string; title: string } | null
   onClose: () => void
+}
+
+const ROLE_LABEL: Record<string, string> = {
+  ADMIN: 'Admin',
+  TECHNICIAN: 'Técnico',
+  CLIENT: 'Cliente',
 }
 
 export function ShareCredentialDialog({ entry, onClose }: ShareCredentialDialogProps) {
@@ -34,9 +54,10 @@ export function ShareCredentialDialog({ entry, onClose }: ShareCredentialDialogP
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [shares, setShares] = useState<ShareRow[]>([])
-  const [query, setQuery] = useState('')
   const [candidates, setCandidates] = useState<Candidate[]>([])
+  const [metaRule, setMetaRule] = useState('')
   const [selectedUserId, setSelectedUserId] = useState('')
+  const [loadingCandidates, setLoadingCandidates] = useState(false)
 
   const loadShares = async (entryId: string) => {
     setLoading(true)
@@ -57,33 +78,56 @@ export function ShareCredentialDialog({ entry, onClose }: ShareCredentialDialogP
     }
   }
 
+  const loadCandidates = async () => {
+    setLoadingCandidates(true)
+    try {
+      const res = await fetch('/api/credentials/share-candidates')
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'No se pudieron cargar usuarios')
+      setCandidates(data.users ?? [])
+      setMetaRule(data.meta?.rule ?? '')
+    } catch (err: unknown) {
+      setCandidates([])
+      toast({
+        title: 'No se pudo cargar usuarios',
+        description: err instanceof Error ? err.message : 'Error de red',
+        variant: 'destructive',
+      })
+    } finally {
+      setLoadingCandidates(false)
+    }
+  }
+
   useEffect(() => {
     if (!entry) {
       setShares([])
       setSelectedUserId('')
-      setQuery('')
       setCandidates([])
       return
     }
     void loadShares(entry.id)
+    void loadCandidates()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al abrir por entry.id
   }, [entry?.id])
 
-  useEffect(() => {
-    if (!entry) return
-    const t = setTimeout(() => {
-      fetch(`/api/credentials/share-candidates?q=${encodeURIComponent(query)}`)
-        .then(r => (r.ok ? r.json() : { users: [] }))
-        .then(data => setCandidates(data.users ?? []))
-        .catch(() => setCandidates([]))
-    }, 250)
-    return () => clearTimeout(t)
-  }, [query, entry])
+  const selected = candidates.find(c => c.id === selectedUserId)
+  const canShareSelected = Boolean(selected?.canReceiveShare)
 
   const handleShare = async () => {
     if (!entry || !selectedUserId) {
       toast({
         title: 'Selecciona un usuario',
-        description: 'Solo aparecen usuarios con el módulo Credenciales activo',
+        description: 'Elige un destinatario del desplegable',
+        variant: 'destructive',
+      })
+      return
+    }
+    if (!canShareSelected) {
+      toast({
+        title: 'Destinatario no listo',
+        description:
+          selected?.reasonBlocked ||
+          'Activa el módulo Credenciales en Usuarios para este destinatario',
         variant: 'destructive',
       })
       return
@@ -99,7 +143,7 @@ export function ShareCredentialDialog({ entry, onClose }: ShareCredentialDialogP
       if (!res.ok) throw new Error(data.error || 'No se pudo compartir')
       toast({
         title: 'Credencial compartida',
-        description: 'El usuario recibirá una notificación. No se envió la contraseña en claro.',
+        description: 'Queda auditado. El usuario recibe notificación sin la clave en claro.',
       })
       setSelectedUserId('')
       await loadShares(entry.id)
@@ -143,8 +187,8 @@ export function ShareCredentialDialog({ entry, onClose }: ShareCredentialDialogP
             Compartir credencial
           </DialogTitle>
           <DialogDescription>
-            Comparte «{entry?.title}» con otro usuario que tenga Credenciales activo. Solo podrá
-            revelar/usar (queda auditado); no recibe la clave por notificación.
+            Comparte «{entry?.title}» con un usuario de tu alcance. Solo podrá revelar/usar (queda
+            auditado); no recibe la clave por notificación.
           </DialogDescription>
         </DialogHeader>
 
@@ -154,40 +198,62 @@ export function ShareCredentialDialog({ entry, onClose }: ShareCredentialDialogP
           </div>
         ) : (
           <div className='space-y-4 py-1'>
+            {metaRule ? (
+              <p className='text-xs text-muted-foreground rounded-md border bg-muted/40 px-3 py-2'>
+                {metaRule}
+              </p>
+            ) : null}
+
             <div className='space-y-1.5'>
-              <Label>Buscar usuario</Label>
-              <Input
-                value={query}
-                onChange={e => setQuery(e.target.value)}
-                placeholder='Nombre o email…'
-              />
-              <div className='max-h-36 overflow-y-auto rounded-md border divide-y'>
-                {candidates.length === 0 ? (
-                  <p className='p-3 text-sm text-muted-foreground'>
-                    No hay candidatos. Activa Credenciales en Usuarios para el destinatario.
-                  </p>
-                ) : (
-                  candidates.map(u => (
-                    <button
-                      key={u.id}
-                      type='button'
-                      className={`w-full text-left px-3 py-2 text-sm hover:bg-muted/60 ${
-                        selectedUserId === u.id ? 'bg-muted' : ''
-                      }`}
-                      onClick={() => setSelectedUserId(u.id)}
-                    >
-                      <span className='font-medium'>{u.name}</span>
-                      <span className='text-muted-foreground'> · {u.email}</span>
-                      <Badge variant='outline' className='ml-2 text-[10px]'>
-                        {u.role}
-                      </Badge>
-                    </button>
-                  ))
-                )}
-              </div>
+              <Label>Usuario del sistema</Label>
+              {loadingCandidates ? (
+                <div className='flex items-center gap-2 text-sm text-muted-foreground py-2'>
+                  <Loader2 className='h-4 w-4 animate-spin' />
+                  Cargando usuarios…
+                </div>
+              ) : (
+                <Select value={selectedUserId || undefined} onValueChange={setSelectedUserId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder='Seleccionar usuario…' />
+                  </SelectTrigger>
+                  <SelectContent className='max-h-72'>
+                    {candidates.length === 0 ? (
+                      <div className='px-3 py-2 text-sm text-muted-foreground'>
+                        No hay usuarios en tu alcance.
+                      </div>
+                    ) : (
+                      candidates.map(u => (
+                        <SelectItem key={u.id} value={u.id} disabled={u.canReceiveShare === false}>
+                          <span className='flex flex-col items-start gap-0.5 py-0.5'>
+                            <span>
+                              {u.name}{' '}
+                              <span className='text-muted-foreground'>
+                                ({ROLE_LABEL[u.role] ?? u.role})
+                              </span>
+                            </span>
+                            <span className='text-xs text-muted-foreground'>{u.email}</span>
+                            {u.canReceiveShare === false ? (
+                              <span className='text-xs text-amber-600'>
+                                Sin módulo Credenciales
+                              </span>
+                            ) : null}
+                          </span>
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              )}
+              {selected && selected.canReceiveShare === false ? (
+                <p className='text-xs text-amber-700'>{selected.reasonBlocked}</p>
+              ) : null}
             </div>
 
-            <Button onClick={handleShare} disabled={saving || !selectedUserId} className='w-full'>
+            <Button
+              onClick={handleShare}
+              disabled={saving || !selectedUserId || !canShareSelected}
+              className='w-full'
+            >
               {saving ? (
                 <Loader2 className='h-4 w-4 mr-1.5 animate-spin' />
               ) : (

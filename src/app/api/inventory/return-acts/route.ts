@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import { canManageInventory } from '@/lib/inventory-access'
+import { getInventorySessionContext } from '@/lib/inventory/inventory-session'
+import { buildReturnActFamilyWhere } from '@/lib/inventory/scope-filter'
 
 /**
  * GET /api/inventory/return-acts
  * Lista actas de devolución.
- * - ADMIN / SuperAdmin: todas
- * - Gestor: las de sus familias + las propias
+ * - Super Admin: todas
+ * - Admin / Gestor: por familias de inventario accesibles
  * - Otros: solo las propias (donde son receiver o deliverer)
  */
 export async function GET(request: NextRequest) {
@@ -26,18 +27,31 @@ export async function GET(request: NextRequest) {
 
     const userId = session.user.id
     const isAdmin = session.user.role === 'ADMIN'
-    const canManage = !isAdmin && (await canManageInventory(userId, session.user.role))
+    const invCtx = await getInventorySessionContext(session.user)
+    const canManage = isAdmin || invCtx.canManageInventory
 
     const statusFilter = status !== 'all' ? { status } : {}
 
     let acts: any[]
     let total: number
 
-    if (isAdmin || canManage) {
-      // Admin y gestores ven todas (gestor filtra por familias en el futuro si es necesario)
+    if (canManage) {
+      if (invCtx.scope.noAccess) {
+        return NextResponse.json({
+          acts: [],
+          pagination: { page, limit, total: 0, pages: 0 },
+        })
+      }
+
+      const familyIds = invCtx.user.isSuperAdmin ? undefined : invCtx.scope.familyIds
+      const where = {
+        ...statusFilter,
+        ...buildReturnActFamilyWhere(familyIds),
+      }
+
       ;[acts, total] = await Promise.all([
         (prisma.return_acts as any).findMany({
-          where: statusFilter,
+          where,
           orderBy: { createdAt: 'desc' },
           skip,
           take: limit,
@@ -51,7 +65,7 @@ export async function GET(request: NextRequest) {
             },
           },
         }),
-        (prisma.return_acts as any).count({ where: statusFilter }),
+        (prisma.return_acts as any).count({ where }),
       ])
     } else {
       // Participantes: solo las suyas (receiver o deliverer en el JSON)

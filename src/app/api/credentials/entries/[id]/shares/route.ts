@@ -9,6 +9,7 @@ import {
   canManageCredentialsVault,
   userCanAccessVault,
 } from '@/lib/credentials/access'
+import { assertCanShareCredentialWith } from '@/lib/credentials/share-scope'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 import { notifyUser } from '@/lib/api/notify'
 
@@ -108,41 +109,11 @@ export async function POST(request: Request, { params }: RouteParams) {
     )
   }
 
-  if (parsed.data.userId === session.user.id) {
-    return NextResponse.json(
-      { error: 'No puedes compartirte la credencial a ti mismo' },
-      { status: 400 }
-    )
+  const scopeCheck = await assertCanShareCredentialWith(ctx, parsed.data.userId)
+  if (!scopeCheck.ok) {
+    return NextResponse.json({ error: scopeCheck.error }, { status: 422 })
   }
-
-  const target = await prisma.users.findUnique({
-    where: { id: parsed.data.userId },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      isActive: true,
-      credentialsEnabled: true,
-      isSuperAdmin: true,
-      role: true,
-    },
-  })
-
-  if (!target?.isActive) {
-    return NextResponse.json({ error: 'Usuario destino no encontrado o inactivo' }, { status: 404 })
-  }
-
-  const targetCanUseModule =
-    (target.role === 'ADMIN' && target.isSuperAdmin === true) || target.credentialsEnabled === true
-  if (!targetCanUseModule) {
-    return NextResponse.json(
-      {
-        error:
-          'El usuario destino no tiene el módulo Credenciales habilitado. Actívalo en Usuarios antes de compartir.',
-      },
-      { status: 422 }
-    )
-  }
+  const target = scopeCheck.target
 
   const existing = await prisma.credential_shares.findFirst({
     where: { entryId: id, userId: target.id },
@@ -176,6 +147,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       title: entry.title,
       targetUserId: target.id,
       targetEmail: target.email,
+      targetRole: target.role,
       capability: share.capability,
     },
     ipAddress: request.headers.get('x-forwarded-for') || 'unknown',

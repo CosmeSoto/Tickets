@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import prisma from '@/lib/prisma'
 import { checkCredentialsModuleAccess, canManageCredentialsVault } from '@/lib/credentials/access'
+import { listCredentialShareCandidates } from '@/lib/credentials/share-scope'
 
 /**
  * GET /api/credentials/share-candidates?q=
- * Usuarios activos con módulo Credenciales (o SuperAdmin) para el picker de compartir.
+ * Lista usuarios del sistema según jerarquía del emisor (SuperAdmin / Admin / inferior).
  */
 export async function GET(request: Request) {
   const session = await getServerSession(authOptions)
@@ -28,34 +28,14 @@ export async function GET(request: Request) {
   }
 
   const q = new URL(request.url).searchParams.get('q')?.trim() ?? ''
+  const users = await listCredentialShareCandidates(ctx, { q, take: 50 })
 
-  const users = await prisma.users.findMany({
-    where: {
-      isActive: true,
-      id: { not: session.user.id },
-      OR: [{ credentialsEnabled: true }, { isSuperAdmin: true, role: 'ADMIN' }],
-      ...(q
-        ? {
-            AND: [
-              {
-                OR: [
-                  { name: { contains: q, mode: 'insensitive' } },
-                  { email: { contains: q, mode: 'insensitive' } },
-                ],
-              },
-            ],
-          }
-        : {}),
+  return NextResponse.json({
+    users,
+    meta: {
+      rule: ctx.isSuperAdmin
+        ? 'SuperAdmin: todos los usuarios activos (auditable)'
+        : 'Tu nivel o inferior, en tus áreas de credenciales (auditable)',
     },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      role: true,
-    },
-    orderBy: { name: 'asc' },
-    take: 40,
   })
-
-  return NextResponse.json({ users })
 }

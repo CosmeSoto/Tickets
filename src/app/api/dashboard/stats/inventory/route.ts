@@ -3,6 +3,11 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { withCache, buildCacheKey } from '@/lib/api-cache'
+import { getInventorySessionContext } from '@/lib/inventory/inventory-session'
+import {
+  buildDeliveryActFamilyWhere,
+  buildReturnActFamilyWhere,
+} from '@/lib/inventory/scope-filter'
 
 /**
  * GET /api/dashboard/stats/inventory
@@ -17,26 +22,20 @@ export async function GET(_request: NextRequest) {
     }
 
     const { role, id: userId } = session.user as { role: string; id: string }
-    const isSuperAdmin = (session.user as any).isSuperAdmin === true
-    const canManageInventory = (session.user as any).canManageInventory === true
+    const invCtx = await getInventorySessionContext(session.user)
+    const isSuperAdmin = invCtx.user.isSuperAdmin
+    const canManageInventory = invCtx.canManageInventory
 
     // Determinar familias con inventario activo accesibles para este usuario
     let familyIds: string[] | undefined // undefined = todas
 
-    if (role === 'ADMIN' && !isSuperAdmin) {
-      const { getAdminFamilyScope } = await import('@/lib/auth/admin-scope')
-      const scope = await getAdminFamilyScope(userId, false)
-      if (scope.familyIds && scope.familyIds.length > 0) {
-        familyIds = scope.familyIds
-      }
-    } else if (role === 'TECHNICIAN' || (role === 'CLIENT' && canManageInventory)) {
-      const { resolveModuleFamilyScopeIds } = await import('@/lib/auth/user-family-access')
-      const invFamilyIds = await resolveModuleFamilyScopeIds(userId, 'inventory', 'canOperate')
-      if (invFamilyIds.length === 0) {
-        // Sin familias de inventario asignadas → no mostrar módulo
+    if (isSuperAdmin) {
+      familyIds = undefined
+    } else if (role === 'ADMIN' || canManageInventory) {
+      if (invCtx.scope.noAccess || !invCtx.scope.familyIds?.length) {
         return NextResponse.json(null)
       }
-      familyIds = invFamilyIds
+      familyIds = invCtx.scope.familyIds
     } else if (role === 'CLIENT' && !canManageInventory) {
       // Cliente sin gestión: solo sus equipos asignados personalmente
       const assignments = await prisma.equipment_assignments.findMany({
@@ -62,6 +61,9 @@ export async function GET(_request: NextRequest) {
         maintenanceEquipment: maintenance,
         pendingMaintenance,
       })
+    } else {
+      // Técnico u otro rol sin gestión de inventario
+      return NextResponse.json(null)
     }
 
     // Verificar que hay al menos una familia con inventario habilitado
@@ -139,12 +141,25 @@ export async function GET(_request: NextRequest) {
             },
           },
         }),
-        // Actas de entrega pendientes
-        prisma.delivery_acts.count({ where: { status: 'PENDING' } }),
-        // Actas de devolución pendientes
-        (prisma.return_acts as any).count({ where: { status: 'PENDING' } }).catch(() => 0),
-        // Solicitudes de baja pendientes
-        prisma.decommission_requests.count({ where: { status: 'PENDING' } }),
+        // Actas de entrega/devolución pendientes (sin familyId directo)
+        prisma.delivery_acts.count({
+          where: { status: 'PENDING', ...buildDeliveryActFamilyWhere(activeFamilyIds) },
+        }),
+        (prisma.return_acts as any)
+          .count({
+            where: { status: 'PENDING', ...buildReturnActFamilyWhere(activeFamilyIds) },
+          })
+          .catch(() => 0),
+        // Solicitudes de baja pendientes (vía equipo o licencia)
+        prisma.decommission_requests.count({
+          where: {
+            status: 'PENDING',
+            OR: [
+              { equipment: { type: { familyId: { in: activeFamilyIds } } } },
+              { license: { licenseType: { familyId: { in: activeFamilyIds } } } },
+            ],
+          },
+        }),
       ])
 
       return {

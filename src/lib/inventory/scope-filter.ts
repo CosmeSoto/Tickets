@@ -96,6 +96,37 @@ export function buildEquipmentFamilyWhere(
   return { type: { familyId: { in: familyIds } } }
 }
 
+/**
+ * Filtro Prisma para delivery_acts (NO tienen familyId directo).
+ * Scope vía assignment.equipment.type o contractAssignment.familyId.
+ */
+export function buildDeliveryActFamilyWhere(
+  familyIds: string[] | undefined
+): Record<string, unknown> {
+  if (familyIds === undefined) return {}
+  if (familyIds.length === 0) return { id: '__NONE__' }
+  return {
+    OR: [
+      { assignment: { equipment: { type: { familyId: { in: familyIds } } } } },
+      { contractAssignment: { familyId: { in: familyIds } } },
+    ],
+  }
+}
+
+/**
+ * Filtro Prisma para return_acts (NO tienen familyId directo).
+ * Scope vía assignment.equipment.type.
+ */
+export function buildReturnActFamilyWhere(
+  familyIds: string[] | undefined
+): Record<string, unknown> {
+  if (familyIds === undefined) return {}
+  if (familyIds.length === 0) return { id: '__NONE__' }
+  return {
+    assignment: { equipment: { type: { familyId: { in: familyIds } } } },
+  }
+}
+
 /** Filtro Prisma para consumibles por familias (vía consumable_types). */
 export function buildConsumableFamilyWhere(
   familyIds: string[] | undefined

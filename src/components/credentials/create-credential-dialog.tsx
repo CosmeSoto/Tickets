@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -100,6 +100,7 @@ export function CreateCredentialDialog({
   const [linkOptions, setLinkOptions] = useState<Array<{ value: string; label: string }>>([])
   const [loadingLinks, setLoadingLinks] = useState(false)
   const [created, setCreated] = useState<CreatedSnapshot | null>(null)
+  const wasOpen = useRef(false)
 
   const sortedVaults = useMemo(() => {
     return [...vaults].sort((a, b) => {
@@ -122,12 +123,18 @@ export function CreateCredentialDialog({
   const needsEquipmentPicker = form.entryType === 'EQUIPMENT' && !lockEquipment
   const needsLicensePicker = form.entryType === 'LICENSE' && !lockLicense
 
+  // Solo resetear al ABRIR el modal (no cuando loadData refresca vaults tras crear)
   useEffect(() => {
-    if (open) {
+    if (open && !wasOpen.current) {
       setCreated(null)
       setShowSecret(false)
       setForm(emptyForm(defaultVaultId ?? sortedVaults[0]?.id, equipmentId, licenseId))
     }
+    if (!open && wasOpen.current) {
+      setCreated(null)
+      setShowSecret(false)
+    }
+    wasOpen.current = open
   }, [open, defaultVaultId, equipmentId, licenseId, sortedVaults])
 
   useEffect(() => {
@@ -365,12 +372,32 @@ export function CreateCredentialDialog({
               </Button>
             ) : null}
 
-            <DialogFooter>
-              <Button onClick={() => handleClose(false)}>Listo</Button>
+            <DialogFooter className='gap-2 sm:gap-2'>
+              <Button
+                type='button'
+                variant='outline'
+                onClick={() => {
+                  setCreated(null)
+                  setShowSecret(false)
+                  setForm(emptyForm(defaultVaultId ?? sortedVaults[0]?.id, equipmentId, licenseId))
+                }}
+              >
+                Crear otra
+              </Button>
+              <Button type='button' onClick={() => handleClose(false)}>
+                Cerrar
+              </Button>
             </DialogFooter>
           </div>
         ) : (
-          <>
+          <form
+            className='space-y-4'
+            onSubmit={e => {
+              e.preventDefault()
+              void handleSubmit()
+            }}
+            autoComplete='off'
+          >
             <div className='grid gap-4 py-2 sm:grid-cols-2'>
               <div className='space-y-1.5 sm:col-span-2'>
                 <Label>Área / bóveda</Label>
@@ -542,10 +569,10 @@ export function CreateCredentialDialog({
             </div>
 
             <DialogFooter>
-              <Button variant='outline' onClick={() => handleClose(false)}>
+              <Button type='button' variant='outline' onClick={() => handleClose(false)}>
                 Cancelar
               </Button>
-              <Button onClick={handleSubmit} disabled={saving}>
+              <Button type='submit' disabled={saving}>
                 {saving ? (
                   <>
                     <Loader2 className='h-4 w-4 mr-1.5 animate-spin' />
@@ -556,7 +583,7 @@ export function CreateCredentialDialog({
                 )}
               </Button>
             </DialogFooter>
-          </>
+          </form>
         )}
       </DialogContent>
     </Dialog>

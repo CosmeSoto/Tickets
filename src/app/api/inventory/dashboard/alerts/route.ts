@@ -6,6 +6,7 @@ import { getInventorySessionContext } from '@/lib/inventory/inventory-session'
 import { BatchService } from '@/lib/services/batch-inventory.service'
 import {
   buildConsumableFamilyWhere,
+  buildDeliveryActFamilyWhere,
   buildEquipmentFamilyWhere,
   buildInventoryFamilyWhere,
   buildLicenseFamilyWhere,
@@ -50,6 +51,7 @@ export async function GET(_request: NextRequest) {
     const equipmentScope = buildEquipmentFamilyWhere(familyIds)
     const licenseScope = buildLicenseFamilyWhere(familyIds)
     const directFamilyScope = buildInventoryFamilyWhere(familyIds)
+    const actsScope = buildDeliveryActFamilyWhere(familyIds)
 
     const now = new Date()
     const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
@@ -104,9 +106,10 @@ export async function GET(_request: NextRequest) {
         },
       }),
 
+      // delivery_acts no tiene familyId directo
       prisma.delivery_acts.count({
         where: {
-          ...directFamilyScope,
+          ...actsScope,
           status: 'PENDING',
         },
       }),

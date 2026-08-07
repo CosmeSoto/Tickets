@@ -1,7 +1,18 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { KeyRound, Plus, Eye, Loader2, ExternalLink, Trash2, Copy, Share2 } from 'lucide-react'
+import {
+  KeyRound,
+  Plus,
+  Eye,
+  Loader2,
+  ExternalLink,
+  Trash2,
+  Copy,
+  Share2,
+  LayoutGrid,
+  List,
+} from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
@@ -15,11 +26,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import { CreateCredentialDialog } from '@/components/credentials/create-credential-dialog'
 import { RevealCredentialDialog } from '@/components/credentials/reveal-credential-dialog'
 import { ShareCredentialDialog } from '@/components/credentials/share-credential-dialog'
 import { useToast } from '@/hooks/use-toast'
 import { CREDENTIAL_ENTRY_TYPE_LABELS } from '@/lib/credentials/constants'
+import { cn } from '@/lib/utils'
 
 type Vault = {
   id: string
@@ -42,6 +62,13 @@ function vaultOptionLabel(v: Vault): string {
   return v.name
 }
 
+function entryAreaLabel(entry: CredentialEntry): string {
+  if (!entry.vault) return '—'
+  return entry.vault.family?.name
+    ? `${entry.vault.family.name} · ${entry.vault.name}`
+    : entry.vault.name
+}
+
 type CredentialEntry = {
   id: string
   title: string
@@ -60,6 +87,8 @@ type CredentialEntry = {
   }
 }
 
+type ViewMode = 'table' | 'cards'
+
 export default function CredentialsPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
@@ -71,6 +100,7 @@ export default function CredentialsPage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [revealEntry, setRevealEntry] = useState<CredentialEntry | null>(null)
   const [shareEntry, setShareEntry] = useState<CredentialEntry | null>(null)
+  const [viewMode, setViewMode] = useState<ViewMode>('table')
 
   const isSuperAdmin = (session?.user as { isSuperAdmin?: boolean })?.isSuperAdmin === true
   const credentialsEnabled =
@@ -130,6 +160,67 @@ export default function CredentialsPage() {
     }
   }, [status, loadData, router, credentialsEnabled])
 
+  const copyUsername = async (username: string) => {
+    await navigator.clipboard.writeText(username)
+    toast({ title: 'Usuario copiado' })
+  }
+
+  const deleteEntry = async (entry: CredentialEntry) => {
+    if (
+      !window.confirm(
+        `¿Eliminar la credencial «${entry.title}»? Esta acción se registra en auditoría.`
+      )
+    ) {
+      return
+    }
+    const res = await fetch(`/api/credentials/entries/${entry.id}`, { method: 'DELETE' })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      toast({
+        title: 'No se pudo eliminar',
+        description: data.error || 'Error del servidor',
+        variant: 'destructive',
+      })
+      return
+    }
+    toast({ title: 'Credencial eliminada' })
+    void loadData()
+  }
+
+  const renderActions = (entry: CredentialEntry, compact = false) => (
+    <div className={cn('flex items-center gap-1.5', compact ? 'justify-end' : '')}>
+      <Button
+        variant={compact ? 'outline' : 'default'}
+        size='sm'
+        onClick={() => setRevealEntry(entry)}
+      >
+        <Eye className='h-4 w-4 mr-1.5' />
+        {compact ? 'Usar' : 'Usar / revelar'}
+      </Button>
+      {canManage && !entry.sharedWithMe && (
+        <Button
+          variant='outline'
+          size='sm'
+          title='Compartir con otro usuario'
+          onClick={() => setShareEntry(entry)}
+        >
+          <Share2 className='h-4 w-4' />
+        </Button>
+      )}
+      {canManage && !entry.sharedWithMe && (
+        <Button
+          variant='outline'
+          size='sm'
+          className='text-destructive hover:text-destructive'
+          title='Eliminar credencial'
+          onClick={() => void deleteEntry(entry)}
+        >
+          <Trash2 className='h-4 w-4' />
+        </Button>
+      )}
+    </div>
+  )
+
   if (status === 'loading' || !session) {
     return (
       <ModuleLayout title='Credenciales' subtitle='Cargando...'>
@@ -153,7 +244,7 @@ export default function CredentialsPage() {
         ) : undefined
       }
     >
-      <div className='space-y-6'>
+      <div className='space-y-4'>
         <div className='flex flex-wrap items-center gap-3'>
           <Select value={selectedVaultId} onValueChange={setSelectedVaultId}>
             <SelectTrigger className='w-[280px]'>
@@ -169,6 +260,28 @@ export default function CredentialsPage() {
             </SelectContent>
           </Select>
           <Badge variant='secondary'>{entries.length} credenciales</Badge>
+          <div className='ml-auto flex items-center rounded-md border p-0.5'>
+            <Button
+              type='button'
+              variant={viewMode === 'table' ? 'secondary' : 'ghost'}
+              size='sm'
+              className='h-8 px-2.5'
+              onClick={() => setViewMode('table')}
+              title='Vista tabla'
+            >
+              <List className='h-4 w-4' />
+            </Button>
+            <Button
+              type='button'
+              variant={viewMode === 'cards' ? 'secondary' : 'ghost'}
+              size='sm'
+              className='h-8 px-2.5'
+              onClick={() => setViewMode('cards')}
+              title='Vista tarjetas'
+            >
+              <LayoutGrid className='h-4 w-4' />
+            </Button>
+          </div>
         </div>
 
         {loading ? (
@@ -187,6 +300,79 @@ export default function CredentialsPage() {
               )}
             </CardContent>
           </Card>
+        ) : viewMode === 'table' ? (
+          <div className='rounded-md border bg-card overflow-x-auto'>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Título</TableHead>
+                  <TableHead>Área</TableHead>
+                  <TableHead>Tipo</TableHead>
+                  <TableHead>Usuario</TableHead>
+                  <TableHead>URL</TableHead>
+                  <TableHead className='text-right w-[220px]'>Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {entries.map(entry => (
+                  <TableRow key={entry.id}>
+                    <TableCell>
+                      <div className='font-medium'>{entry.title}</div>
+                      {entry.sharedWithMe ? (
+                        <Badge variant='secondary' className='mt-1'>
+                          Compartida contigo
+                        </Badge>
+                      ) : null}
+                    </TableCell>
+                    <TableCell className='text-sm text-muted-foreground max-w-[200px] truncate'>
+                      {entryAreaLabel(entry)}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant='outline'>
+                        {CREDENTIAL_ENTRY_TYPE_LABELS[entry.entryType] ?? entry.entryType}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {entry.username ? (
+                        <div className='flex items-center gap-1'>
+                          <span className='font-mono text-sm truncate max-w-[140px]'>
+                            {entry.username}
+                          </span>
+                          <Button
+                            type='button'
+                            variant='ghost'
+                            size='icon'
+                            className='h-7 w-7'
+                            onClick={() => void copyUsername(entry.username!)}
+                          >
+                            <Copy className='h-3.5 w-3.5' />
+                          </Button>
+                        </div>
+                      ) : (
+                        <span className='text-muted-foreground'>—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {entry.url ? (
+                        <a
+                          href={entry.url}
+                          target='_blank'
+                          rel='noopener noreferrer'
+                          className='text-sm text-primary inline-flex items-center gap-1 hover:underline'
+                        >
+                          Abrir
+                          <ExternalLink className='h-3 w-3' />
+                        </a>
+                      ) : (
+                        <span className='text-muted-foreground'>—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className='text-right'>{renderActions(entry, true)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         ) : (
           <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-3'>
             {entries.map(entry => (
@@ -203,13 +389,7 @@ export default function CredentialsPage() {
                       </Badge>
                     </div>
                   </div>
-                  {entry.vault && (
-                    <p className='text-xs text-muted-foreground'>
-                      {entry.vault.family?.name
-                        ? `${entry.vault.family.name} · ${entry.vault.name}`
-                        : entry.vault.name}
-                    </p>
-                  )}
+                  <p className='text-xs text-muted-foreground'>{entryAreaLabel(entry)}</p>
                 </CardHeader>
                 <CardContent className='space-y-3'>
                   {entry.username && (
@@ -221,11 +401,7 @@ export default function CredentialsPage() {
                         variant='ghost'
                         size='icon'
                         className='h-7 w-7 shrink-0'
-                        title='Copiar usuario'
-                        onClick={async () => {
-                          await navigator.clipboard.writeText(entry.username!)
-                          toast({ title: 'Usuario copiado' })
-                        }}
+                        onClick={() => void copyUsername(entry.username!)}
                       >
                         <Copy className='h-3.5 w-3.5' />
                       </Button>
@@ -242,60 +418,7 @@ export default function CredentialsPage() {
                       <ExternalLink className='h-3 w-3' />
                     </a>
                   )}
-                  <div className='flex gap-2'>
-                    <Button
-                      variant='default'
-                      size='sm'
-                      className='flex-1'
-                      onClick={() => setRevealEntry(entry)}
-                    >
-                      <Eye className='h-4 w-4 mr-1.5' />
-                      Usar / revelar
-                    </Button>
-                    {canManage && !entry.sharedWithMe && (
-                      <Button
-                        variant='outline'
-                        size='sm'
-                        title='Compartir con otro usuario'
-                        onClick={() => setShareEntry(entry)}
-                      >
-                        <Share2 className='h-4 w-4' />
-                      </Button>
-                    )}
-                    {canManage && !entry.sharedWithMe && (
-                      <Button
-                        variant='outline'
-                        size='sm'
-                        className='text-destructive hover:text-destructive'
-                        title='Eliminar credencial'
-                        onClick={async () => {
-                          if (
-                            !window.confirm(
-                              `¿Eliminar la credencial «${entry.title}»? Esta acción se registra en auditoría.`
-                            )
-                          ) {
-                            return
-                          }
-                          const res = await fetch(`/api/credentials/entries/${entry.id}`, {
-                            method: 'DELETE',
-                          })
-                          if (!res.ok) {
-                            const data = await res.json().catch(() => ({}))
-                            toast({
-                              title: 'No se pudo eliminar',
-                              description: data.error || 'Error del servidor',
-                              variant: 'destructive',
-                            })
-                            return
-                          }
-                          toast({ title: 'Credencial eliminada' })
-                          void loadData()
-                        }}
-                      >
-                        <Trash2 className='h-4 w-4' />
-                      </Button>
-                    )}
-                  </div>
+                  {renderActions(entry)}
                 </CardContent>
               </Card>
             ))}

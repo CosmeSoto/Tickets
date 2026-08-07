@@ -32,10 +32,12 @@ export async function GET(request: NextRequest) {
     const userRole = session.user.role
     const isSuperAdmin = (session.user as any).isSuperAdmin === true
     const isAdmin = userRole === 'ADMIN'
-    const canManage =
-      !isAdmin &&
-      (await import('@/lib/inventory-access').then(m => m.canManageInventory(userId, userRole)))
-    const isFullAdmin = isAdmin
+    const { getInventorySessionContext } = await import('@/lib/inventory/inventory-session')
+    const { buildDeliveryActFamilyWhere } = await import('@/lib/inventory/scope-filter')
+    const invCtx = await getInventorySessionContext(session.user)
+    const canManage = isAdmin || invCtx.canManageInventory
+    // Admin / gestor de inventario: listado por familia; resto: solo actas propias
+    const useFamilyScopedList = canManage
 
     // Construir filtros
     const filters: any = {}
@@ -62,32 +64,23 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Filtro por familia (a través de assignment.equipment.type)
+    // Filtro por familia (a través de assignment.equipment.type / contractAssignment)
     if (familyId) {
-      filters.assignment = {
-        ...filters.assignment,
-        equipment: {
-          type: {
-            familyId: familyId,
-          },
+      filters.AND = [
+        ...(filters.AND || []),
+        {
+          OR: [
+            { assignment: { equipment: { type: { familyId } } } },
+            { contractAssignment: { familyId } },
+          ],
         },
-      }
-    } else if (isAdmin && !isSuperAdmin) {
-      // Admin Normal sin familyId explícito: aplicar scope de inventario
-      const { getInventorySessionContext } = await import('@/lib/inventory/inventory-session')
-      const scope = (await getInventorySessionContext(session.user)).scope
-      if (scope.familyIds && scope.familyIds.length > 0) {
-        filters.assignment = {
-          ...filters.assignment,
-          equipment: {
-            type: {
-              familyId: { in: scope.familyIds },
-            },
-          },
-        }
-      } else if (scope.noAccess) {
+      ]
+    } else if (useFamilyScopedList && !isSuperAdmin) {
+      const scope = invCtx.scope
+      if (scope.noAccess) {
         return NextResponse.json({ acts: [], total: 0, page, limit, totalPages: 0 })
       }
+      Object.assign(filters, buildDeliveryActFamilyWhere(scope.familyIds))
     }
 
     // Rango de fechas
@@ -109,11 +102,10 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Admin ve todas; otros solo las suyas
     let acts: any[]
     let total: number
 
-    if (isFullAdmin) {
+    if (useFamilyScopedList) {
       ;[acts, total] = await Promise.all([
         prisma.delivery_acts.findMany({
           where: filters,
@@ -202,7 +194,7 @@ export async function GET(request: NextRequest) {
         equipmentSnapshot,
         equipment: act.assignment?.equipment ?? null,
         family: act.assignment?.equipment?.type?.family ?? null,
-        userRole: isFullAdmin
+        userRole: canManage
           ? 'admin'
           : delivererInfo?.id === userId && receiverInfo?.id === userId
             ? 'both'
