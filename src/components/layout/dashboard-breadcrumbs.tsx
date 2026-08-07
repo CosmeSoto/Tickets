@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { ChevronRight, Home } from 'lucide-react'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { cn } from '@/lib/utils'
 
 export type BreadcrumbItem = {
@@ -89,54 +90,68 @@ interface DashboardBreadcrumbsProps {
   className?: string
 }
 
+const EASE = [0.25, 0.1, 0.25, 1] as const
+
 /**
  * Breadcrumbs compactos para el header del dashboard (patrón estilo 21st / shadcn).
  */
 export function DashboardBreadcrumbs({ items, className }: DashboardBreadcrumbsProps) {
+  const reduceMotion = useReducedMotion()
   if (items.length === 0) return null
+
+  const trailKey = items.map(i => i.label).join('/')
 
   return (
     <nav
       aria-label='Breadcrumb'
       className={cn('flex items-center gap-1 text-xs text-muted-foreground min-w-0', className)}
     >
-      <ol className='flex items-center gap-1 min-w-0 flex-wrap'>
-        {items.map((item, index) => {
-          const isLast = index === items.length - 1
-          const isHome = index === 0 && item.label === 'Inicio'
+      <AnimatePresence mode='wait'>
+        <motion.ol
+          key={trailKey}
+          className='flex items-center gap-1 min-w-0 flex-wrap'
+          initial={reduceMotion ? false : { opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={reduceMotion ? undefined : { opacity: 0, y: -3 }}
+          transition={{ duration: reduceMotion ? 0 : 0.2, ease: EASE }}
+        >
+          {items.map((item, index) => {
+            const isLast = index === items.length - 1
+            const isHome = index === 0 && item.label === 'Inicio'
 
-          return (
-            <li key={`${item.label}-${index}`} className='flex items-center gap-1 min-w-0'>
-              {index > 0 && (
-                <ChevronRight
-                  className='h-3 w-3 flex-shrink-0 text-muted-foreground/50'
-                  aria-hidden
-                />
-              )}
-              {item.href && !isLast ? (
-                <Link
-                  href={item.href}
-                  className='inline-flex items-center gap-1 truncate hover:text-foreground transition-colors'
-                >
-                  {isHome && <Home className='h-3 w-3 flex-shrink-0' aria-hidden />}
-                  <span className='truncate'>{item.label}</span>
-                </Link>
-              ) : (
-                <span
-                  className={cn(
-                    'inline-flex items-center gap-1 truncate',
-                    isLast ? 'text-foreground/80 font-medium' : undefined
-                  )}
-                  aria-current={isLast ? 'page' : undefined}
-                >
-                  {isHome && <Home className='h-3 w-3 flex-shrink-0' aria-hidden />}
-                  <span className='truncate'>{item.label}</span>
-                </span>
-              )}
-            </li>
-          )
-        })}
-      </ol>
+            return (
+              <li key={`${item.label}-${index}`} className='flex items-center gap-1 min-w-0'>
+                {index > 0 && (
+                  <ChevronRight
+                    className='h-3 w-3 flex-shrink-0 text-muted-foreground/50'
+                    aria-hidden
+                  />
+                )}
+                {item.href && !isLast ? (
+                  <Link
+                    href={item.href}
+                    className='inline-flex items-center gap-1 truncate hover:text-foreground transition-colors'
+                  >
+                    {isHome && <Home className='h-3 w-3 flex-shrink-0' aria-hidden />}
+                    <span className='truncate'>{item.label}</span>
+                  </Link>
+                ) : (
+                  <span
+                    className={cn(
+                      'inline-flex items-center gap-1 truncate',
+                      isLast ? 'text-foreground/80 font-medium' : undefined
+                    )}
+                    aria-current={isLast ? 'page' : undefined}
+                  >
+                    {isHome && <Home className='h-3 w-3 flex-shrink-0' aria-hidden />}
+                    <span className='truncate'>{item.label}</span>
+                  </span>
+                )}
+              </li>
+            )
+          })}
+        </motion.ol>
+      </AnimatePresence>
     </nav>
   )
 }

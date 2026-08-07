@@ -362,6 +362,34 @@ const navigationByRole: Record<string, NavItem[]> = {
   ],
 }
 
+const NAV_EASE = [0.25, 0.1, 0.25, 1] as const
+
+/** Indicador activo: pill + barra lateral — mismos tokens primary */
+function SidebarActiveIndicator({
+  spring,
+  rail = false,
+}: {
+  spring: { duration: number } | { type: 'spring'; stiffness: number; damping: number }
+  rail?: boolean
+}) {
+  return (
+    <>
+      <motion.span
+        layoutId='sidebar-active-indicator'
+        className='absolute inset-0 rounded-lg bg-primary/10'
+        transition={spring}
+      />
+      {!rail && (
+        <motion.span
+          layoutId='sidebar-active-bar'
+          className='absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-primary'
+          transition={spring}
+        />
+      )}
+    </>
+  )
+}
+
 function NavItemComponent({
   item,
   pathname,
@@ -411,7 +439,9 @@ function NavItemComponent({
   const indent = depth * 12
   const spring = reduceMotion
     ? { duration: 0 }
-    : { type: 'spring' as const, stiffness: 380, damping: 30 }
+    : { type: 'spring' as const, stiffness: 420, damping: 28 }
+  const hoverMotion = reduceMotion ? undefined : { x: depth > 0 ? 3 : 2 }
+  const tapMotion = reduceMotion ? undefined : { scale: 0.985 }
 
   const itemClass = (active: boolean) =>
     cn(
@@ -420,32 +450,47 @@ function NavItemComponent({
       active ? 'text-primary' : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
     )
 
+  const submenuVariants = {
+    hidden: {},
+    show: {
+      transition: {
+        staggerChildren: reduceMotion ? 0 : 0.045,
+        delayChildren: reduceMotion ? 0 : 0.04,
+      },
+    },
+  }
+
+  const submenuItemVariants = {
+    hidden: { opacity: 0, x: reduceMotion ? 0 : -10 },
+    show: {
+      opacity: 1,
+      x: 0,
+      transition: { duration: reduceMotion ? 0 : 0.28, ease: NAV_EASE },
+    },
+  }
+
   // ── Modo rail (colapsado): solo iconos + tooltip / flyout ──
   if (collapsed) {
     if (!hasChildren) {
       return (
         <Tooltip>
           <TooltipTrigger asChild>
-            <Link
-              href={item.href}
-              onClick={onNavigate}
-              aria-label={item.name}
-              className={itemClass(isActive)}
-            >
-              {isActive && (
-                <motion.span
-                  layoutId='sidebar-active-indicator'
-                  className='absolute inset-0 rounded-lg bg-primary/10'
-                  transition={spring}
+            <motion.div whileHover={hoverMotion} whileTap={tapMotion} className='w-full'>
+              <Link
+                href={item.href}
+                onClick={onNavigate}
+                aria-label={item.name}
+                className={itemClass(isActive)}
+              >
+                {isActive && <SidebarActiveIndicator spring={spring} rail />}
+                <Icon
+                  className={cn(
+                    'relative z-10 h-4 w-4 flex-shrink-0',
+                    isActive ? 'text-primary' : 'text-muted-foreground'
+                  )}
                 />
-              )}
-              <Icon
-                className={cn(
-                  'relative z-10 h-4 w-4 flex-shrink-0',
-                  isActive ? 'text-primary' : 'text-muted-foreground'
-                )}
-              />
-            </Link>
+              </Link>
+            </motion.div>
           </TooltipTrigger>
           <TooltipContent side='right' sideOffset={8}>
             {item.name}
@@ -459,10 +504,12 @@ function NavItemComponent({
         <Tooltip open={flyoutOpen ? false : undefined}>
           <TooltipTrigger asChild>
             <PopoverTrigger asChild>
-              <button
+              <motion.button
                 type='button'
                 aria-label={item.name}
                 className={cn(itemClass(isActive), 'w-full')}
+                whileHover={hoverMotion}
+                whileTap={tapMotion}
               >
                 {isActive && <span className='absolute inset-0 rounded-lg bg-primary/10' />}
                 <Icon
@@ -471,7 +518,7 @@ function NavItemComponent({
                     isActive ? 'text-primary' : 'text-muted-foreground'
                   )}
                 />
-              </button>
+              </motion.button>
             </PopoverTrigger>
           </TooltipTrigger>
           <TooltipContent side='right' sideOffset={8}>
@@ -521,58 +568,57 @@ function NavItemComponent({
   // ── Modo expandido ──
   if (!hasChildren) {
     return (
-      <Link
-        href={item.href}
-        onClick={onNavigate}
-        style={{ paddingLeft: `${16 + indent}px` }}
-        className={itemClass(isActive)}
-      >
-        {isActive && (
-          <motion.span
-            layoutId='sidebar-active-indicator'
-            className='absolute inset-0 rounded-lg bg-primary/10'
-            transition={spring}
+      <motion.div whileHover={hoverMotion} whileTap={tapMotion}>
+        <Link
+          href={item.href}
+          onClick={onNavigate}
+          style={{ paddingLeft: `${16 + indent}px` }}
+          className={itemClass(isActive)}
+        >
+          {isActive && <SidebarActiveIndicator spring={spring} />}
+          <Icon
+            className={cn(
+              'relative z-10 h-4 w-4 mr-2.5 flex-shrink-0',
+              isActive ? 'text-primary' : 'text-muted-foreground'
+            )}
           />
-        )}
-        <Icon
-          className={cn(
-            'relative z-10 h-4 w-4 mr-2.5 flex-shrink-0',
-            isActive ? 'text-primary' : 'text-muted-foreground'
-          )}
-        />
-        <span className='relative z-10'>{item.name}</span>
-      </Link>
+          <span className='relative z-10'>{item.name}</span>
+        </Link>
+      </motion.div>
     )
   }
 
   return (
     <div>
-      <Link
-        href={item.href}
-        onClick={e => {
-          e.preventDefault()
-          setIsOpen(!isOpen)
-          router.push(item.href)
-          onNavigate?.()
-        }}
-        style={{ paddingLeft: `${16 + indent}px` }}
-        className={cn(itemClass(isActive), 'w-full')}
-      >
-        <Icon
-          className={cn(
-            'h-4 w-4 mr-2.5 flex-shrink-0',
-            isActive ? 'text-primary' : 'text-muted-foreground'
-          )}
-        />
-        <span className='flex-1 text-left'>{item.name}</span>
-        <motion.span
-          animate={{ rotate: isOpen ? 180 : 0 }}
-          transition={spring}
-          className='inline-flex'
+      <motion.div whileHover={hoverMotion} whileTap={tapMotion}>
+        <Link
+          href={item.href}
+          onClick={e => {
+            e.preventDefault()
+            setIsOpen(!isOpen)
+            router.push(item.href)
+            onNavigate?.()
+          }}
+          style={{ paddingLeft: `${16 + indent}px` }}
+          className={cn(itemClass(isActive), 'w-full')}
+          aria-expanded={isOpen}
         >
-          <ChevronDown className='h-4 w-4' />
-        </motion.span>
-      </Link>
+          <Icon
+            className={cn(
+              'h-4 w-4 mr-2.5 flex-shrink-0',
+              isActive ? 'text-primary' : 'text-muted-foreground'
+            )}
+          />
+          <span className='flex-1 text-left'>{item.name}</span>
+          <motion.span
+            animate={{ rotate: isOpen ? 180 : 0 }}
+            transition={spring}
+            className='inline-flex text-muted-foreground'
+          >
+            <ChevronDown className='h-4 w-4' />
+          </motion.span>
+        </Link>
+      </motion.div>
       <AnimatePresence initial={false}>
         {isOpen && (
           <motion.div
@@ -581,26 +627,40 @@ function NavItemComponent({
             animate={{ height: 'auto', opacity: 1 }}
             exit={reduceMotion ? undefined : { height: 0, opacity: 0 }}
             transition={
-              reduceMotion ? { duration: 0 } : { duration: 0.22, ease: [0.25, 0.1, 0.25, 1] }
+              reduceMotion
+                ? { duration: 0 }
+                : { height: { duration: 0.34, ease: NAV_EASE }, opacity: { duration: 0.22 } }
             }
             className='overflow-hidden'
           >
-            <div
-              className='mt-0.5 space-y-0.5 border-l-2 border-border'
+            <motion.div
+              className='mt-0.5 space-y-0.5 relative'
               style={{ marginLeft: `${20 + indent}px`, paddingLeft: '8px' }}
+              variants={submenuVariants}
+              initial='hidden'
+              animate='show'
             >
+              {/* Línea árbol — crece al abrir */}
+              <motion.span
+                aria-hidden
+                className='absolute left-0 top-1 bottom-1 w-0.5 rounded-full bg-border origin-top'
+                initial={reduceMotion ? false : { scaleY: 0 }}
+                animate={{ scaleY: 1 }}
+                transition={{ duration: reduceMotion ? 0 : 0.38, ease: NAV_EASE }}
+              />
               {children!.map(child => (
-                <NavItemComponent
-                  key={child.href + child.name}
-                  item={child}
-                  pathname={pathname}
-                  depth={depth + 1}
-                  onNavigate={onNavigate}
-                  collapsed={false}
-                  leafHrefs={leafHrefs}
-                />
+                <motion.div key={child.href + child.name} variants={submenuItemVariants}>
+                  <NavItemComponent
+                    item={child}
+                    pathname={pathname}
+                    depth={depth + 1}
+                    onNavigate={onNavigate}
+                    collapsed={false}
+                    leafHrefs={leafHrefs}
+                  />
+                </motion.div>
               ))}
-            </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -616,6 +676,7 @@ export function RoleDashboardLayout({
 }: RoleDashboardLayoutProps) {
   const { data: session, status } = useSession()
   const pathname = usePathname()
+  const reduceMotion = useReducedMotion()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
   const [isDesktop, setIsDesktop] = useState(false)
@@ -827,9 +888,19 @@ export function RoleDashboardLayout({
   return (
     <div className='min-h-screen bg-background'>
       {/* Overlay móvil */}
-      {sidebarOpen && (
-        <div className='fixed inset-0 z-40 bg-black/50 lg:hidden' onClick={closeSidebar} />
-      )}
+      <AnimatePresence>
+        {sidebarOpen && (
+          <motion.div
+            key='sidebar-overlay'
+            className='fixed inset-0 z-40 bg-black/50 lg:hidden'
+            initial={reduceMotion ? false : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: reduceMotion ? 0 : 0.22 }}
+            onClick={closeSidebar}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Sidebar */}
       <aside
@@ -881,15 +952,25 @@ export function RoleDashboardLayout({
         >
           <TooltipProvider delayDuration={200}>
             <LayoutGroup id='sidebar-nav'>
-              {navigation.map(item => (
-                <NavItemComponent
+              {navigation.map((item, index) => (
+                <motion.div
                   key={item.name}
-                  item={item}
-                  pathname={pathname}
-                  onNavigate={closeSidebar}
-                  collapsed={railMode}
-                  leafHrefs={leafHrefs}
-                />
+                  initial={reduceMotion ? false : { opacity: 0, x: -8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{
+                    duration: reduceMotion ? 0 : 0.3,
+                    ease: NAV_EASE,
+                    delay: reduceMotion ? 0 : Math.min(index * 0.03, 0.24),
+                  }}
+                >
+                  <NavItemComponent
+                    item={item}
+                    pathname={pathname}
+                    onNavigate={closeSidebar}
+                    collapsed={railMode}
+                    leafHrefs={leafHrefs}
+                  />
+                </motion.div>
               ))}
             </LayoutGroup>
           </TooltipProvider>
@@ -897,15 +978,29 @@ export function RoleDashboardLayout({
 
         {/* Toggle rail — solo desktop */}
         <div className='hidden lg:flex flex-shrink-0 border-t border-border p-2 justify-center'>
-          <button
+          <motion.button
             type='button'
             onClick={toggleCollapsed}
             aria-label={collapsed ? 'Expandir menú lateral' : 'Colapsar menú lateral'}
             title={collapsed ? 'Expandir menú' : 'Colapsar menú'}
             className='p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors'
+            whileHover={reduceMotion ? undefined : { scale: 1.06 }}
+            whileTap={reduceMotion ? undefined : { scale: 0.94 }}
           >
-            {collapsed ? <PanelLeft className='h-4 w-4' /> : <PanelLeftClose className='h-4 w-4' />}
-          </button>
+            <motion.span
+              key={collapsed ? 'expand' : 'collapse'}
+              initial={reduceMotion ? false : { rotate: -90, opacity: 0 }}
+              animate={{ rotate: 0, opacity: 1 }}
+              transition={{ duration: reduceMotion ? 0 : 0.25, ease: NAV_EASE }}
+              className='inline-flex'
+            >
+              {collapsed ? (
+                <PanelLeft className='h-4 w-4' />
+              ) : (
+                <PanelLeftClose className='h-4 w-4' />
+              )}
+            </motion.span>
+          </motion.button>
         </div>
       </aside>
 
@@ -922,19 +1017,29 @@ export function RoleDashboardLayout({
             <div className='flex items-start sm:items-center justify-between gap-3'>
               {/* Hamburguesa + breadcrumbs + título */}
               <div className='flex items-start gap-3 min-w-0 flex-1'>
-                <button
+                <motion.button
                   onClick={() => setSidebarOpen(true)}
                   className='lg:hidden mt-0.5 p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent flex-shrink-0'
+                  whileTap={reduceMotion ? undefined : { scale: 0.92 }}
                 >
                   <Menu className='h-5 w-5' />
-                </button>
+                </motion.button>
                 <div className='min-w-0 flex-1 space-y-1'>
                   <DashboardBreadcrumbs items={headerBreadcrumbs} className='hidden sm:flex' />
-                  {title && (
-                    <h1 className='text-sm sm:text-xl font-bold text-foreground line-clamp-2 leading-tight'>
-                      {title}
-                    </h1>
-                  )}
+                  <AnimatePresence mode='wait'>
+                    {title ? (
+                      <motion.h1
+                        key={title}
+                        className='text-sm sm:text-xl font-bold text-foreground line-clamp-2 leading-tight'
+                        initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={reduceMotion ? undefined : { opacity: 0, y: -4 }}
+                        transition={{ duration: reduceMotion ? 0 : 0.22, ease: NAV_EASE }}
+                      >
+                        {title}
+                      </motion.h1>
+                    ) : null}
+                  </AnimatePresence>
                   {subtitle && (
                     <div className='text-xs text-muted-foreground hidden sm:flex items-center flex-wrap gap-1'>
                       {subtitle}
@@ -948,17 +1053,22 @@ export function RoleDashboardLayout({
                 {headerActions && <div className='hidden sm:block'>{headerActions}</div>}
 
                 {/* Ver Página Pública — visible para todos los roles */}
-                <Link
-                  href='/?preview=true'
-                  target='_blank'
-                  rel='noopener noreferrer'
-                  title='Ver Página Pública'
-                  className='flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors border border-border rounded-md px-2 py-1.5 hover:bg-accent flex-shrink-0'
+                <motion.div
+                  whileHover={reduceMotion ? undefined : { y: -1 }}
+                  transition={{ duration: 0.15 }}
                 >
-                  <Globe className='h-3.5 w-3.5 flex-shrink-0' />
-                  <span className='hidden sm:inline'>Página Pública</span>
-                  <ExternalLink className='h-3 w-3 opacity-60 hidden lg:inline' />
-                </Link>
+                  <Link
+                    href='/?preview=true'
+                    target='_blank'
+                    rel='noopener noreferrer'
+                    title='Ver Página Pública'
+                    className='flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors border border-border rounded-md px-2 py-1.5 hover:bg-accent flex-shrink-0'
+                  >
+                    <Globe className='h-3.5 w-3.5 flex-shrink-0' />
+                    <span className='hidden sm:inline'>Página Pública</span>
+                    <ExternalLink className='h-3 w-3 opacity-60 hidden lg:inline' />
+                  </Link>
+                </motion.div>
 
                 <Notifications variant='bell' />
                 <PushSubscriptionManager />
@@ -1019,8 +1129,17 @@ export function RoleDashboardLayout({
           </div>
         </header>
 
-        {/* Page Content */}
-        <main className='p-4 sm:p-8'>{children}</main>
+        {/* Page Content — entrada suave al cambiar de ruta (sin exit wait = sin flash) */}
+        <main className='p-4 sm:p-8'>
+          <motion.div
+            key={pathname}
+            initial={reduceMotion ? false : { opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: reduceMotion ? 0 : 0.28, ease: NAV_EASE }}
+          >
+            {children}
+          </motion.div>
+        </main>
       </div>
     </div>
   )
