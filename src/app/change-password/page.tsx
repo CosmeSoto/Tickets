@@ -3,11 +3,19 @@
 import { Suspense, useEffect, useState } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { motion, useReducedMotion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { AuthLayout, AuthCard, AuthHeader } from '@/components/auth/auth-layout'
+import {
+  AuthLayout,
+  AuthCard,
+  AuthHeader,
+  AuthStep,
+  AuthAlertMotion,
+  AuthPressable,
+} from '@/components/auth/auth-layout'
 import { useToast } from '@/hooks/use-toast'
 import { Loader2, Eye, EyeOff, AlertCircle, Lock, Shield, CheckCircle } from 'lucide-react'
 
@@ -16,6 +24,7 @@ function ChangePasswordForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { toast } = useToast()
+  const reduceMotion = useReducedMotion()
 
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -74,7 +83,6 @@ function ChangePasswordForm() {
         return
       }
 
-      // Limpiar flag en el JWT para salir del bucle de redirección del middleware
       await update({ mustChangePassword: false })
 
       setSuccess(true)
@@ -96,158 +104,161 @@ function ChangePasswordForm() {
     }
   }
 
-  if (status === 'loading') {
-    return (
-      <AuthLayout>
-        <AuthCard>
-          <div className='flex flex-col items-center py-8 gap-3'>
-            <Loader2 className='h-10 w-10 animate-spin text-primary' />
-            <p className='text-sm text-muted-foreground'>Cargando sesión...</p>
-          </div>
-        </AuthCard>
-      </AuthLayout>
-    )
-  }
-
-  if (success) {
-    return (
-      <AuthLayout>
-        <AuthCard>
-          <div className='flex flex-col items-center gap-3 text-center py-4'>
-            <div className='p-3 bg-green-500/10 rounded-full'>
-              <CheckCircle className='h-10 w-10 text-green-600' />
-            </div>
-            <h2 className='text-lg font-semibold'>¡Contraseña actualizada!</h2>
-            <p className='text-sm text-muted-foreground'>Redirigiendo...</p>
-          </div>
-        </AuthCard>
-      </AuthLayout>
-    )
-  }
+  const viewKey = status === 'loading' ? 'loading' : success ? 'success' : 'form'
 
   return (
     <AuthLayout>
       <AuthCard>
-        <AuthHeader
-          title='Cambiar contraseña'
-          description={
-            mustChange
-              ? 'Por política de seguridad debes actualizar tu contraseña para continuar.'
-              : 'Ingresa tu contraseña actual y define una nueva.'
-          }
-        />
-
-        {mustChange && (
-          <Alert>
-            <Shield className='h-4 w-4' />
-            <AlertDescription>
-              No podrás acceder al resto del sistema hasta completar este cambio.
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {error && (
-          <Alert variant='destructive'>
-            <AlertCircle className='h-4 w-4' />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
-        <form onSubmit={handleSubmit} className='space-y-4'>
-          <div className='space-y-1.5'>
-            <Label htmlFor='currentPassword'>Contraseña actual</Label>
-            <div className='relative'>
-              <Lock className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
-              <Input
-                id='currentPassword'
-                type={showCurrent ? 'text' : 'password'}
-                className='pl-9 pr-10'
-                value={currentPassword}
-                onChange={e => setCurrentPassword(e.target.value)}
-                required
-                autoComplete='current-password'
-              />
-              <button
-                type='button'
-                className='absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground'
-                onClick={() => setShowCurrent(v => !v)}
-                tabIndex={-1}
-              >
-                {showCurrent ? <EyeOff className='h-4 w-4' /> : <Eye className='h-4 w-4' />}
-              </button>
+        <AuthStep stepKey={viewKey}>
+          {status === 'loading' && (
+            <div className='flex flex-col items-center py-8 gap-3'>
+              <Loader2 className='h-10 w-10 animate-spin text-primary' />
+              <p className='text-sm text-muted-foreground'>Cargando sesión...</p>
             </div>
-          </div>
+          )}
 
-          <div className='space-y-1.5'>
-            <Label htmlFor='newPassword'>Nueva contraseña</Label>
-            <div className='relative'>
-              <Lock className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
-              <Input
-                id='newPassword'
-                type={showNew ? 'text' : 'password'}
-                className='pl-9 pr-10'
-                value={newPassword}
-                onChange={e => setNewPassword(e.target.value)}
-                required
-                minLength={minLength}
-                autoComplete='new-password'
-              />
-              <button
-                type='button'
-                className='absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground'
-                onClick={() => setShowNew(v => !v)}
-                tabIndex={-1}
+          {success && (
+            <div className='flex flex-col items-center gap-3 text-center py-4'>
+              <motion.div
+                className='p-3 bg-green-500/10 rounded-full'
+                initial={reduceMotion ? false : { scale: 0.7, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: 'spring', stiffness: 380, damping: 22 }}
               >
-                {showNew ? <EyeOff className='h-4 w-4' /> : <Eye className='h-4 w-4' />}
-              </button>
+                <CheckCircle className='h-10 w-10 text-green-600' />
+              </motion.div>
+              <h2 className='text-lg font-semibold'>¡Contraseña actualizada!</h2>
+              <p className='text-sm text-muted-foreground'>Redirigiendo...</p>
             </div>
-            <p className='text-xs text-muted-foreground'>Mínimo {minLength} caracteres</p>
-          </div>
+          )}
 
-          <div className='space-y-1.5'>
-            <Label htmlFor='confirmPassword'>Confirmar nueva contraseña</Label>
-            <div className='relative'>
-              <Lock className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
-              <Input
-                id='confirmPassword'
-                type={showConfirm ? 'text' : 'password'}
-                className='pl-9 pr-10'
-                value={confirmPassword}
-                onChange={e => setConfirmPassword(e.target.value)}
-                required
-                autoComplete='new-password'
+          {status !== 'loading' && !success && (
+            <div className='space-y-6'>
+              <AuthHeader
+                title='Cambiar contraseña'
+                description={
+                  mustChange
+                    ? 'Por política de seguridad debes actualizar tu contraseña para continuar.'
+                    : 'Ingresa tu contraseña actual y define una nueva.'
+                }
               />
-              <button
-                type='button'
-                className='absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground'
-                onClick={() => setShowConfirm(v => !v)}
-                tabIndex={-1}
-              >
-                {showConfirm ? <EyeOff className='h-4 w-4' /> : <Eye className='h-4 w-4' />}
-              </button>
+
+              {mustChange && (
+                <Alert>
+                  <Shield className='h-4 w-4' />
+                  <AlertDescription>
+                    No podrás acceder al resto del sistema hasta completar este cambio.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              <AuthAlertMotion show={!!error} alertKey={error ?? undefined}>
+                <Alert variant='destructive'>
+                  <AlertCircle className='h-4 w-4' />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              </AuthAlertMotion>
+
+              <form onSubmit={handleSubmit} className='space-y-4'>
+                <div className='space-y-1.5'>
+                  <Label htmlFor='currentPassword'>Contraseña actual</Label>
+                  <div className='relative'>
+                    <Lock className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
+                    <Input
+                      id='currentPassword'
+                      type={showCurrent ? 'text' : 'password'}
+                      className='pl-9 pr-10'
+                      value={currentPassword}
+                      onChange={e => setCurrentPassword(e.target.value)}
+                      required
+                      autoComplete='current-password'
+                    />
+                    <button
+                      type='button'
+                      className='absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground'
+                      onClick={() => setShowCurrent(v => !v)}
+                      tabIndex={-1}
+                    >
+                      {showCurrent ? <EyeOff className='h-4 w-4' /> : <Eye className='h-4 w-4' />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className='space-y-1.5'>
+                  <Label htmlFor='newPassword'>Nueva contraseña</Label>
+                  <div className='relative'>
+                    <Lock className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
+                    <Input
+                      id='newPassword'
+                      type={showNew ? 'text' : 'password'}
+                      className='pl-9 pr-10'
+                      value={newPassword}
+                      onChange={e => setNewPassword(e.target.value)}
+                      required
+                      minLength={minLength}
+                      autoComplete='new-password'
+                    />
+                    <button
+                      type='button'
+                      className='absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground'
+                      onClick={() => setShowNew(v => !v)}
+                      tabIndex={-1}
+                    >
+                      {showNew ? <EyeOff className='h-4 w-4' /> : <Eye className='h-4 w-4' />}
+                    </button>
+                  </div>
+                  <p className='text-xs text-muted-foreground'>Mínimo {minLength} caracteres</p>
+                </div>
+
+                <div className='space-y-1.5'>
+                  <Label htmlFor='confirmPassword'>Confirmar nueva contraseña</Label>
+                  <div className='relative'>
+                    <Lock className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
+                    <Input
+                      id='confirmPassword'
+                      type={showConfirm ? 'text' : 'password'}
+                      className='pl-9 pr-10'
+                      value={confirmPassword}
+                      onChange={e => setConfirmPassword(e.target.value)}
+                      required
+                      autoComplete='new-password'
+                    />
+                    <button
+                      type='button'
+                      className='absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground'
+                      onClick={() => setShowConfirm(v => !v)}
+                      tabIndex={-1}
+                    >
+                      {showConfirm ? <EyeOff className='h-4 w-4' /> : <Eye className='h-4 w-4' />}
+                    </button>
+                  </div>
+                </div>
+
+                <AuthPressable disabled={isLoading}>
+                  <Button type='submit' className='w-full' disabled={isLoading}>
+                    {isLoading ? (
+                      <>
+                        <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                        Guardando...
+                      </>
+                    ) : (
+                      'Actualizar contraseña'
+                    )}
+                  </Button>
+                </AuthPressable>
+
+                <Button
+                  type='button'
+                  variant='ghost'
+                  className='w-full'
+                  onClick={() => signOut({ callbackUrl: '/login' })}
+                >
+                  Cerrar sesión
+                </Button>
+              </form>
             </div>
-          </div>
-
-          <Button type='submit' className='w-full' disabled={isLoading}>
-            {isLoading ? (
-              <>
-                <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                Guardando...
-              </>
-            ) : (
-              'Actualizar contraseña'
-            )}
-          </Button>
-
-          <Button
-            type='button'
-            variant='ghost'
-            className='w-full'
-            onClick={() => signOut({ callbackUrl: '/login' })}
-          >
-            Cerrar sesión
-          </Button>
-        </form>
+          )}
+        </AuthStep>
       </AuthCard>
     </AuthLayout>
   )
