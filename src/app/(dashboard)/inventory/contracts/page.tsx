@@ -41,7 +41,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { FamilyCombobox } from '@/components/ui/family-combobox'
-import { ExportButton } from '@/components/common/export-button'
+import { ListTableToolbar } from '@/components/common/list-table-toolbar'
 import { useExport } from '@/hooks/common/use-export'
 import { useFamilyOptions } from '@/hooks/use-family-options'
 import { useFetch } from '@/hooks/common/use-fetch'
@@ -116,12 +116,8 @@ const STATUS_CONFIG: Record<ContractStatus, { label: string; icon: any; cls: str
 // ── Página ────────────────────────────────────────────────────────────────────
 
 export default function ContractsPage() {
-  const {
-    canManageContracts,
-    canViewOwnContracts,
-    isClient,
-    isSuperAdmin,
-  } = useInventoryPermissions()
+  const { canManageContracts, canViewOwnContracts, isClient, isSuperAdmin } =
+    useInventoryPermissions()
   const isClientOnly = isClient && !canManageContracts
 
   const [search, setSearch] = useState('')
@@ -153,13 +149,15 @@ export default function ContractsPage() {
     reload,
   } = useFetch<Contract>(buildUrl(), { transform: d => d.contracts ?? [] })
 
-  const {
-    data: atRiskItems,
-    reload: reloadAtRisk,
-  } = useFetch<{ id: string; name: string; risks: string[]; riskLevel: string }>(
-    '/api/inventory/contracts/at-risk',
-    { transform: d => d.items ?? [], enabled: canManageContracts }
-  )
+  const { data: atRiskItems } = useFetch<{
+    id: string
+    name: string
+    risks: string[]
+    riskLevel: string
+  }>('/api/inventory/contracts/at-risk', {
+    transform: d => d.items ?? [],
+    enabled: canManageContracts,
+  })
 
   // Filtro de búsqueda en cliente
   const contracts = contractsRaw.filter(c => {
@@ -171,6 +169,12 @@ export default function ContractsPage() {
       (c.supplier?.name ?? '').toLowerCase().includes(q)
     )
   })
+
+  const {
+    sortedData: sortedContracts,
+    requestSort,
+    getSortIcon,
+  } = useTableSort(contracts, { key: 'name', direction: 'asc' })
 
   // Stats
   const stats = {
@@ -223,12 +227,6 @@ export default function ContractsPage() {
       </ModuleLayout>
     )
   }
-
-  const {
-    sortedData: sortedContracts,
-    requestSort,
-    getSortIcon,
-  } = useTableSort(contracts, { key: 'name', direction: 'asc' })
 
   // Helper para renderizar iconos de ordenamiento
   const renderSortIcon = (key: string) => {
@@ -287,10 +285,21 @@ export default function ContractsPage() {
               Permisos por rol
             </div>
             <div className='grid sm:grid-cols-2 lg:grid-cols-4 gap-2'>
-              <p><strong>Super Admin / Admin:</strong> CRUD en sus familias, asignar clientes, actas, alertas.</p>
-              <p><strong>Gestor:</strong> Igual que admin en familias asignadas (canManageInventory).</p>
-              <p><strong>Cliente:</strong> Solo lectura de suscripciones asignadas; firma actas vía enlace.</p>
-              <p><strong>Técnico:</strong> Sin acceso al listado de contratos (solo actas de equipos).</p>
+              <p>
+                <strong>Super Admin / Admin:</strong> CRUD en sus familias, asignar clientes, actas,
+                alertas.
+              </p>
+              <p>
+                <strong>Gestor:</strong> Igual que admin en familias asignadas (canManageInventory).
+              </p>
+              <p>
+                <strong>Cliente:</strong> Solo lectura de suscripciones asignadas; firma actas vía
+                enlace.
+              </p>
+              <p>
+                <strong>Técnico:</strong> Sin acceso al listado de contratos (solo actas de
+                equipos).
+              </p>
             </div>
           </div>
         )}
@@ -324,8 +333,8 @@ export default function ContractsPage() {
                   {atRiskItems.length} suscripción{atRiskItems.length !== 1 ? 'es' : ''} en riesgo
                 </p>
                 <p className='text-xs text-amber-800/90 dark:text-amber-300/90 mt-0.5'>
-                  Sin custodio, datos de pago incompletos o sin cliente asignado. Complete facturación
-                  y asignación para evitar cobros huérfanos.
+                  Sin custodio, datos de pago incompletos o sin cliente asignado. Complete
+                  facturación y asignación para evitar cobros huérfanos.
                 </p>
                 <ul className='mt-2 space-y-1 text-xs'>
                   {atRiskItems.slice(0, 5).map(item => (
@@ -353,6 +362,24 @@ export default function ContractsPage() {
             </div>
           </div>
         )}
+
+        <ListTableToolbar
+          title={
+            <span className='text-sm font-medium'>
+              {contracts.length} contrato{contracts.length !== 1 ? 's' : ''}
+            </span>
+          }
+          loading={loading}
+          onRefresh={reload}
+          showViewToggle={false}
+          export={{
+            onExportCSV: exportCSV,
+            onExportExcel: exportExcel,
+            onExportPDF: exportPDF,
+            loading: exporting,
+            disabled: contracts.length === 0,
+          }}
+        />
 
         {/* ── Filtros ───────────────────────────────────────────────────── */}
         <div className='flex flex-col sm:flex-row gap-2 flex-wrap'>
@@ -402,18 +429,6 @@ export default function ContractsPage() {
               ))}
             </SelectContent>
           </Select>
-
-          <Button variant='outline' size='icon' onClick={reload} disabled={loading}>
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          </Button>
-
-          <ExportButton
-            onExportCSV={exportCSV}
-            onExportExcel={exportExcel}
-            onExportPDF={exportPDF}
-            loading={exporting}
-            disabled={contracts.length === 0}
-          />
         </div>
 
         {/* ── Tabla ─────────────────────────────────────────────────────── */}
@@ -559,48 +574,48 @@ export default function ContractsPage() {
                                 </Button>
                               ) : (
                                 <>
-                              <Button
-                                variant='ghost'
-                                size='sm'
-                                className='h-7 w-7 p-0'
-                                title='Historial de renovaciones'
-                                onClick={() => setHistoryContract(c)}
-                              >
-                                <History className='h-3.5 w-3.5' />
-                              </Button>
-                              {(c.status === 'ACTIVE' || c.status === 'EXPIRING') && (
-                                <Button
-                                  variant='ghost'
-                                  size='sm'
-                                  className='h-7 w-7 p-0'
-                                  title='Renovar contrato'
-                                  onClick={() => setRenewContract(c)}
-                                >
-                                  <RefreshCw className='h-3.5 w-3.5' />
-                                </Button>
-                              )}
-                              <Button
-                                variant='ghost'
-                                size='sm'
-                                className='h-7 w-7 p-0'
-                                onClick={() => {
-                                  setEditingContract(c)
-                                  setFormOpen(true)
-                                }}
-                              >
-                                <Pencil className='h-3.5 w-3.5' />
-                              </Button>
-                              {isSuperAdmin && (
-                                <Button
-                                  variant='ghost'
-                                  size='sm'
-                                  className='h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10'
-                                  title='Eliminar contrato (Solo Super Admin)'
-                                  onClick={() => setDeletingContract(c)}
-                                >
-                                  <Trash2 className='h-3.5 w-3.5' />
-                                </Button>
-                              )}
+                                  <Button
+                                    variant='ghost'
+                                    size='sm'
+                                    className='h-7 w-7 p-0'
+                                    title='Historial de renovaciones'
+                                    onClick={() => setHistoryContract(c)}
+                                  >
+                                    <History className='h-3.5 w-3.5' />
+                                  </Button>
+                                  {(c.status === 'ACTIVE' || c.status === 'EXPIRING') && (
+                                    <Button
+                                      variant='ghost'
+                                      size='sm'
+                                      className='h-7 w-7 p-0'
+                                      title='Renovar contrato'
+                                      onClick={() => setRenewContract(c)}
+                                    >
+                                      <RefreshCw className='h-3.5 w-3.5' />
+                                    </Button>
+                                  )}
+                                  <Button
+                                    variant='ghost'
+                                    size='sm'
+                                    className='h-7 w-7 p-0'
+                                    onClick={() => {
+                                      setEditingContract(c)
+                                      setFormOpen(true)
+                                    }}
+                                  >
+                                    <Pencil className='h-3.5 w-3.5' />
+                                  </Button>
+                                  {isSuperAdmin && (
+                                    <Button
+                                      variant='ghost'
+                                      size='sm'
+                                      className='h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10'
+                                      title='Eliminar contrato (Solo Super Admin)'
+                                      onClick={() => setDeletingContract(c)}
+                                    >
+                                      <Trash2 className='h-3.5 w-3.5' />
+                                    </Button>
+                                  )}
                                 </>
                               )}
                             </div>

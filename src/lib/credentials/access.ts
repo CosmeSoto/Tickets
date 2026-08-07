@@ -253,6 +253,7 @@ export const credentialEntryMetadataSelect = {
       id: true,
       name: true,
       familyId: true,
+      ownerUserId: true,
       kind: true,
       family: { select: { id: true, name: true, code: true, color: true } },
     },

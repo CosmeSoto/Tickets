@@ -112,25 +112,17 @@ export function exportToCSV<T>(options: ExportOptions<T>): void {
  * Exporta datos a Excel (.xlsx) usando la librería `xlsx` ya instalada.
  * Incluye encabezados en negrita y anchos de columna automáticos.
  */
-export async function exportToExcel<T>(options: ExportOptions<T>): Promise<void> {
-  const { filename, columns, rows, title } = options
-
-  // Importación dinámica para no aumentar el bundle inicial
-  const XLSX = await import('xlsx')
-
+function buildExcelSheet(XLSX: typeof import('xlsx'), columns: ExportColumn[], rows: unknown[]) {
   const headerRow = columns.map(c => getColumnLabel(c))
   const dataRows = rows.map(row => columns.map(col => getCellText(row, col)))
-
   const wsData = [headerRow, ...dataRows]
   const ws = XLSX.utils.aoa_to_sheet(wsData)
 
-  // Ancho de columnas automático (máximo 50 chars)
   ws['!cols'] = columns.map((col, i) => {
     const maxLen = Math.max(getColumnLabel(col).length, ...dataRows.map(r => (r[i] ?? '').length))
     return { wch: Math.min(maxLen + 2, 50) }
   })
 
-  // Estilo de encabezado (negrita) — solo funciona con xlsx-style, pero dejamos la estructura
   const range = XLSX.utils.decode_range(ws['!ref'] ?? 'A1')
   for (let c = range.s.c; c <= range.e.c; c++) {
     const cellAddr = XLSX.utils.encode_cell({ r: 0, c })
@@ -138,10 +130,32 @@ export async function exportToExcel<T>(options: ExportOptions<T>): Promise<void>
       ws[cellAddr].s = { font: { bold: true } }
     }
   }
+  return ws
+}
 
+export async function exportToExcel<T>(options: ExportOptions<T>): Promise<void> {
+  const { filename, columns, rows, title } = options
+  const XLSX = await import('xlsx')
   const wb = XLSX.utils.book_new()
+  const ws = buildExcelSheet(XLSX, columns, rows)
   XLSX.utils.book_append_sheet(wb, ws, title?.slice(0, 31) ?? 'Datos')
+  XLSX.writeFile(wb, `${sanitizeFilename(filename)}.xlsx`)
+}
 
+/** Excel con varias hojas (p. ej. Familias + Departamentos). */
+export async function exportToExcelMulti(options: {
+  filename: string
+  sheets: Array<{ name: string; columns: ExportColumn[]; rows: unknown[] }>
+}): Promise<void> {
+  const { filename, sheets } = options
+  if (!sheets.length) throw new Error('Sin hojas para exportar')
+  const XLSX = await import('xlsx')
+  const wb = XLSX.utils.book_new()
+  for (const sheet of sheets) {
+    const ws = buildExcelSheet(XLSX, sheet.columns, sheet.rows)
+    const safeName = (sheet.name || 'Datos').slice(0, 31)
+    XLSX.utils.book_append_sheet(wb, ws, safeName)
+  }
   XLSX.writeFile(wb, `${sanitizeFilename(filename)}.xlsx`)
 }
 

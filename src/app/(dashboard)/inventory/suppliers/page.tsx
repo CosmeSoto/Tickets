@@ -40,7 +40,7 @@ import { SortableTableHead } from '@/components/ui/sortable-table-head'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { SupplierForm } from '@/components/inventory/suppliers/SupplierForm'
 import { SupplierTypesSection } from '@/components/settings/inventory/supplier-types-section'
-import { ExportButton } from '@/components/common/export-button'
+import { ListTableToolbar } from '@/components/common/list-table-toolbar'
 import { useExport } from '@/hooks/common/use-export'
 import { FamilyCombobox } from '@/components/ui/family-combobox'
 import { useFamilyOptions } from '@/hooks/use-family-options'
@@ -89,7 +89,7 @@ export default function SuppliersPage() {
     } finally {
       setLoading(false)
     }
-  }, [search, activeFilter, familyFilter, page, toast])
+  }, [search, activeFilter, familyFilter, page])
 
   useEffect(() => {
     const timer = setTimeout(() => setSearch(searchInput), 350)
@@ -201,20 +201,28 @@ export default function SuppliersPage() {
         </TabsList>
 
         <TabsContent value='suppliers' className='space-y-6'>
-          <div className='flex flex-wrap gap-2 justify-between items-center'>
-            <p className='text-sm text-muted-foreground'>
-              {total} proveedor{total !== 1 ? 'es' : ''}{' '}
-              {activeFilter === 'true'
-                ? 'activos'
-                : activeFilter === 'false'
-                  ? 'inactivos'
-                  : 'en total'}
-            </p>
-            <div className='flex flex-wrap gap-2'>
-              <Button variant='outline' size='sm' onClick={fetchSuppliers} disabled={loading}>
-                <RefreshCw className={`h-4 w-4 sm:mr-2 ${loading ? 'animate-spin' : ''}`} />
-                <span className='hidden sm:inline'>Actualizar</span>
-              </Button>
+          <ListTableToolbar
+            title={
+              <p className='text-sm text-muted-foreground'>
+                {total} proveedor{total !== 1 ? 'es' : ''}{' '}
+                {activeFilter === 'true'
+                  ? 'activos'
+                  : activeFilter === 'false'
+                    ? 'inactivos'
+                    : 'en total'}
+              </p>
+            }
+            loading={loading}
+            onRefresh={fetchSuppliers}
+            showViewToggle={false}
+            export={{
+              onExportCSV: exportCSV,
+              onExportExcel: exportExcel,
+              onExportPDF: exportPDF,
+              loading: exporting,
+              disabled: suppliers.length === 0,
+            }}
+            endActions={
               <Button
                 onClick={() => {
                   setEditingSupplier(null)
@@ -224,9 +232,8 @@ export default function SuppliersPage() {
                 <Plus className='h-4 w-4 sm:mr-2' />
                 <span className='hidden sm:inline'>Nuevo proveedor</span>
               </Button>
-            </div>
-          </div>
-          {/* Filtros */}
+            }
+          />
           <div className='flex flex-wrap gap-3'>
             <Input
               placeholder='Buscar por nombre o RUC/NIT...'
@@ -255,13 +262,6 @@ export default function SuppliersPage() {
                 <SelectItem value='false'>Inactivos</SelectItem>
               </SelectContent>
             </Select>
-            <ExportButton
-              onExportCSV={exportCSV}
-              onExportExcel={exportExcel}
-              onExportPDF={exportPDF}
-              loading={exporting}
-              disabled={suppliers.length === 0}
-            />
           </div>
 
           {/* Tabla */}

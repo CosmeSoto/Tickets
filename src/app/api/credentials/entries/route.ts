@@ -116,20 +116,53 @@ export async function GET(request: Request) {
     select: {
       ...credentialEntryMetadataSelect,
       shares: {
-        where: { userId: session.user.id },
-        select: { id: true, capability: true },
-        take: 1,
+        select: {
+          id: true,
+          capability: true,
+          userId: true,
+          user: { select: { id: true, name: true, email: true } },
+        },
       },
     },
     orderBy: { updatedAt: 'desc' },
   })
 
   return NextResponse.json({
-    entries: entries.map(({ shares, ...entry }) => ({
-      ...entry,
-      sharedWithMe: shares.length > 0,
-      shareCapability: shares[0]?.capability ?? null,
-    })),
+    entries: entries.map(({ shares, ...entry }) => {
+      const sharedWithMe = shares.some(s => s.userId === session.user.id)
+      const vault = entry.vault
+      const hasVaultAccess =
+        ctx.isSuperAdmin ||
+        (vault?.kind === 'PERSONAL' && vault.ownerUserId === session.user.id) ||
+        (!!vault?.familyId && familyIds.includes(vault.familyId))
+
+      // Destinatarios solo si gestionas/ves la bóveda (privacidad del share)
+      const recipients = hasVaultAccess
+        ? shares
+            .filter(s => s.user)
+            .map(s => ({
+              id: s.user!.id,
+              name: s.user!.name,
+              email: s.user!.email,
+              capability: s.capability,
+            }))
+        : []
+
+      return {
+        ...entry,
+        sharedWithMe,
+        shareCapability: shares.find(s => s.userId === session.user.id)?.capability ?? null,
+        isShared: recipients.length > 0,
+        shareCount: recipients.length,
+        sharedWith: recipients,
+        sharedWithLabel:
+          recipients.length > 0
+            ? recipients.map(r => `${r.name} <${r.email}>`).join('; ')
+            : sharedWithMe
+              ? 'Compartida conmigo'
+              : '',
+      }
+    }),
   })
 }
 

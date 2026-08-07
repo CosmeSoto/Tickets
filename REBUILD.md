@@ -730,6 +730,23 @@ SELECT table_name FROM information_schema.tables WHERE table_name = 'patrol_fami
 
 ---
 
+## Patrones de UI (listados)
+
+Para pantallas nuevas o al tocar un listado existente, usar este estándar (migración gradual; no reescribir todo de golpe):
+
+| Necesidad                                                | Pieza canónica                                                              |
+| -------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Filtros + stats                                          | `FilterBar` + `useFilters` → `@/components/common/filters`                  |
+| Toolbar Card+Table (refresh / vista / columnas / export) | `ListTableToolbar`                                                          |
+| Export CSV/Excel/PDF                                     | `useExport` + `ExportButton` (`exportToExcelMulti` si hay varias hojas)     |
+| Tabla con paginación/cards ya armada                     | `DataTable` (`@/components/ui/data-table`) + `actions={<ExportButton … />}` |
+
+**No usar** `legacy-role-filters.tsx` (antes `filters.tsx`; sombreaba el paquete `filters/`).
+
+Referencias ya migradas: Credenciales, Familias, Proveedores, Contratos, Mantenimientos. Tickets/Usuarios siguen en `DataTable` (correcto).
+
+---
+
 ## Solución de Problemas
 
 | Problema                                                         | Solución                                                                                                                                                            |

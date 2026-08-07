@@ -1,12 +1,22 @@
 /**
- * Sistema de filtros unificado con diseño simétrico y configuración por rol
- * Optimizado para consistencia visual y funcionalidad específica por usuario
+ * @deprecated LEGACY — no usar en módulos nuevos.
+ *
+ * Antes vivía como `filters.tsx` y sombreaba el paquete canónico
+ * `@/components/common/filters` (FilterBar + SearchInput + SelectFilter).
+ *
+ * Para listados nuevos:
+ *   import { FilterBar } from '@/components/common/filters'
+ *   import { useFilters } from '@/hooks/common/use-filters'
+ *
+ * Este archivo no tiene consumidores activos; se conserva solo por si
+ * algún import dinámico antiguo lo necesitara. Preferir eliminarlo en
+ * una limpieza futura.
  */
 
 'use client'
 
 import { useState, useCallback, useMemo } from 'react'
-import { Calendar, Filter, RefreshCw, RotateCcw, ChevronDown, ChevronUp, X } from 'lucide-react'
+import { Filter, RefreshCw, RotateCcw, ChevronDown, ChevronUp, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DateInput } from '@/components/ui/date-input'
@@ -136,7 +146,7 @@ export function Filters({
 
   // Contar filtros activos
   const activeFiltersCount = useMemo(() => {
-    return Object.entries(values).filter(([key, value]) => {
+    return Object.entries(values).filter(([_key, value]) => {
       if (!value) return false
       if (Array.isArray(value)) return value.length > 0
       if (typeof value === 'string') return value !== '' && value !== 'all'

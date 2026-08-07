@@ -9,7 +9,6 @@ import {
   Trash2,
   ToggleLeft,
   ToggleRight,
-  RefreshCw,
   Layers,
   Users,
   Building,
@@ -64,6 +63,8 @@ import { useToast } from '@/hooks/use-toast'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { useTableSort } from '@/hooks/common/use-table-sort'
 import { SortableTableHead } from '@/components/ui/sortable-table-head'
+import { ListTableToolbar } from '@/components/common/list-table-toolbar'
+import { exportToCSV, exportToExcelMulti, exportToPDF } from '@/lib/utils/export'
 
 interface Family {
   id: string
@@ -148,6 +149,183 @@ export default function FamiliesPage() {
     requestSort,
     getSortIcon,
   } = useTableSort(filteredFamilies, { key: 'name', direction: 'asc' })
+
+  const [exporting, setExporting] = useState(false)
+
+  const familyExportColumns = [
+    { key: 'name', label: 'Nombre' },
+    { key: 'code', label: 'Código' },
+    {
+      key: 'description',
+      label: 'Descripción',
+      format: (v: string | null | undefined) => v ?? '—',
+    },
+    {
+      key: 'isActive',
+      label: 'Estado',
+      format: (v: boolean) => (v ? 'Activo' : 'Inactivo'),
+    },
+    {
+      key: '_count',
+      label: 'Departamentos',
+      format: (_: unknown, row: Family) => String(row._count?.departments ?? 0),
+    },
+    {
+      key: 'ticketFamilyConfig',
+      label: 'Tickets',
+      format: (_: unknown, row: Family) => (row.ticketFamilyConfig?.ticketsEnabled ? 'Sí' : 'No'),
+    },
+    {
+      key: 'formConfig',
+      label: 'Inventario',
+      format: (_: unknown, row: Family) =>
+        row.formConfig?.inventoryEnabled !== false ? 'Sí' : 'No',
+    },
+    {
+      key: '_count',
+      label: 'Técnicos',
+      format: (_: unknown, row: Family) => String(row._count?.technicianFamilyAssignments ?? 0),
+    },
+    {
+      key: '_count',
+      label: 'Managers',
+      format: (_: unknown, row: Family) => String(row._count?.managerFamilies ?? 0),
+    },
+    { key: 'color', label: 'Color', format: (v: string | null | undefined) => v ?? '—' },
+    { key: 'order', label: 'Orden' },
+  ]
+
+  const departmentExportColumns = [
+    { key: 'familyName', label: 'Familia' },
+    { key: 'familyCode', label: 'Código familia' },
+    { key: 'name', label: 'Departamento' },
+    {
+      key: 'description',
+      label: 'Descripción',
+      format: (v: string | null | undefined) => v ?? '—',
+    },
+    {
+      key: 'isActive',
+      label: 'Estado',
+      format: (v: boolean) => (v ? 'Activo' : 'Inactivo'),
+    },
+    { key: 'usersCount', label: 'Usuarios' },
+    { key: 'categoriesCount', label: 'Categorías' },
+    { key: 'color', label: 'Color', format: (v: string | null | undefined) => v ?? '—' },
+  ]
+
+  const loadDepartmentsForExport = async () => {
+    const res = await fetch('/api/departments')
+    const data = await res.json().catch(() => ({}))
+    const list = (data.data ?? data.departments ?? []) as Array<{
+      name: string
+      description?: string | null
+      isActive: boolean
+      color?: string | null
+      family?: { name?: string; code?: string } | null
+      _count?: { users?: number; categories?: number }
+    }>
+    return list.map(d => ({
+      familyName: d.family?.name ?? '—',
+      familyCode: d.family?.code ?? '—',
+      name: d.name,
+      description: d.description,
+      isActive: d.isActive,
+      usersCount: d._count?.users ?? 0,
+      categoriesCount: d._count?.categories ?? 0,
+      color: d.color,
+    }))
+  }
+
+  const exportCSV = () => {
+    try {
+      if (sortedFamilies.length === 0) {
+        toast({
+          title: 'Sin datos',
+          description: 'No hay familias para exportar con los filtros actuales',
+          variant: 'destructive',
+        })
+        return
+      }
+      const date = new Date().toISOString().split('T')[0]
+      exportToCSV({
+        filename: `familias-${date}`,
+        title: 'Informe de Familias',
+        subtitle: `Generado el ${new Date().toLocaleDateString('es-EC')} · ${sortedFamilies.length} familias`,
+        columns: familyExportColumns,
+        rows: sortedFamilies,
+      })
+      toast({ title: 'CSV exportado', description: `${sortedFamilies.length} familias` })
+    } catch {
+      toast({ title: 'Error al exportar', variant: 'destructive' })
+    }
+  }
+
+  const exportPDF = () => {
+    try {
+      if (sortedFamilies.length === 0) {
+        toast({
+          title: 'Sin datos',
+          description: 'No hay familias para exportar',
+          variant: 'destructive',
+        })
+        return
+      }
+      const date = new Date().toISOString().split('T')[0]
+      exportToPDF({
+        filename: `familias-${date}`,
+        title: 'Informe de Familias',
+        subtitle: `Generado el ${new Date().toLocaleDateString('es-EC')} · ${sortedFamilies.length} familias`,
+        columns: familyExportColumns,
+        rows: sortedFamilies,
+      })
+    } catch {
+      toast({ title: 'Error al exportar PDF', variant: 'destructive' })
+    }
+  }
+
+  const exportExcel = async () => {
+    setExporting(true)
+    try {
+      if (sortedFamilies.length === 0) {
+        toast({
+          title: 'Sin datos',
+          description: 'No hay familias para exportar',
+          variant: 'destructive',
+        })
+        return
+      }
+      const departments = await loadDepartmentsForExport()
+      const date = new Date().toISOString().split('T')[0]
+      await exportToExcelMulti({
+        filename: `familias-informe-${date}`,
+        sheets: [
+          {
+            name: 'Familias',
+            columns: familyExportColumns,
+            rows: sortedFamilies,
+          },
+          {
+            name: 'Departamentos',
+            columns: departmentExportColumns,
+            rows: departments,
+          },
+        ],
+      })
+      toast({
+        title: 'Excel exportado',
+        description: `${sortedFamilies.length} familias · ${departments.length} departamentos`,
+      })
+    } catch {
+      toast({
+        title: 'Error al exportar Excel',
+        description: 'No se pudo generar el informe',
+        variant: 'destructive',
+      })
+    } finally {
+      setExporting(false)
+    }
+  }
 
   const loadFamilies = useCallback(async () => {
     setLoading(true)
@@ -275,63 +453,71 @@ export default function FamiliesPage() {
       error={error && families.length === 0 ? error : null}
       onRetry={loadFamilies}
       headerActions={
-        <div className='flex items-center space-x-2'>
-          <Button variant='outline' size='sm' onClick={loadFamilies} disabled={loading}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            Recargar
+        isSuperAdmin ? (
+          <Button onClick={openCreateDialog}>
+            <Plus className='h-4 w-4 mr-2' />
+            Nueva Familia
           </Button>
-          {isSuperAdmin && (
-            <Button onClick={openCreateDialog}>
-              <Plus className='h-4 w-4 mr-2' />
-              Nueva Familia
-            </Button>
-          )}
-        </div>
+        ) : undefined
       }
     >
       <Card>
         <CardHeader>
-          <div className='flex flex-col sm:flex-row sm:items-center gap-3'>
-            <CardTitle className='flex items-center gap-2 flex-1'>
-              <Layers className='h-5 w-5' />
-              Familias ({filteredFamilies.length}
-              {filteredFamilies.length !== families.length ? ` de ${families.length}` : ''})
-            </CardTitle>
-            <div className='flex items-center gap-2 flex-wrap w-full sm:w-auto min-w-0'>
-              {/* Search */}
-              <div className='relative flex-1 min-w-0 sm:flex-initial sm:w-52'>
-                <Search className='absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground' />
-                <Input
-                  placeholder='Buscar por nombre o código...'
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  className='pl-8 h-8 w-full text-sm'
-                />
-                {search && (
-                  <button
-                    onClick={() => setSearch('')}
-                    className='absolute right-2 top-2 text-muted-foreground hover:text-foreground'
-                  >
-                    <X className='h-3.5 w-3.5' />
-                  </button>
-                )}
-              </div>
-              {/* Status filter */}
-              <Select
-                value={filterStatus}
-                onValueChange={v => setFilterStatus(v as typeof filterStatus)}
-              >
-                <SelectTrigger className='h-8 w-32 text-sm'>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value='all'>Todos</SelectItem>
-                  <SelectItem value='active'>Activos</SelectItem>
-                  <SelectItem value='inactive'>Inactivos</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+          <ListTableToolbar
+            title={
+              <CardTitle className='flex items-center gap-2 text-base'>
+                <Layers className='h-5 w-5' />
+                Familias ({filteredFamilies.length}
+                {filteredFamilies.length !== families.length ? ` de ${families.length}` : ''})
+              </CardTitle>
+            }
+            subtitle='Excel incluye hoja Familias + Departamentos. CSV/PDF exportan la tabla visible.'
+            loading={loading}
+            onRefresh={loadFamilies}
+            showViewToggle={false}
+            export={{
+              onExportCSV: exportCSV,
+              onExportExcel: exportExcel,
+              onExportPDF: exportPDF,
+              loading: exporting,
+              disabled: sortedFamilies.length === 0,
+            }}
+            endActions={
+              <>
+                <div className='relative flex-1 min-w-0 sm:flex-initial sm:w-52'>
+                  <Search className='absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground' />
+                  <Input
+                    placeholder='Buscar por nombre o código...'
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    className='pl-8 h-8 w-full text-sm'
+                  />
+                  {search && (
+                    <button
+                      type='button'
+                      onClick={() => setSearch('')}
+                      className='absolute right-2 top-2 text-muted-foreground hover:text-foreground'
+                    >
+                      <X className='h-3.5 w-3.5' />
+                    </button>
+                  )}
+                </div>
+                <Select
+                  value={filterStatus}
+                  onValueChange={v => setFilterStatus(v as typeof filterStatus)}
+                >
+                  <SelectTrigger className='h-8 w-32 text-sm'>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value='all'>Todos</SelectItem>
+                    <SelectItem value='active'>Activos</SelectItem>
+                    <SelectItem value='inactive'>Inactivos</SelectItem>
+                  </SelectContent>
+                </Select>
+              </>
+            }
+          />
         </CardHeader>
         <CardContent className='p-0'>
           <div className='overflow-x-auto -mx-px'>

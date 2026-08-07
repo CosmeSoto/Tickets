@@ -31,7 +31,7 @@ import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { NewMaintenanceDialog } from '@/components/inventory/new-maintenance-dialog'
 import { CreateByModelDialog } from '@/components/inventory/maintenance/create-by-model-dialog'
 import { FamilyCombobox } from '@/components/ui/family-combobox'
-import { ExportButton } from '@/components/common/export-button'
+import { ListTableToolbar } from '@/components/common/list-table-toolbar'
 import { useExport } from '@/hooks/common/use-export'
 import { useFamilyOptions } from '@/hooks/use-family-options'
 import {
@@ -345,41 +345,45 @@ export default function MaintenanceListPage() {
               <SelectItem value='CORRECTIVE'>Correctivo</SelectItem>
             </SelectContent>
           </Select>
-          <ExportButton
-            onExportCSV={exportCSV}
-            onExportExcel={exportExcel}
-            onExportPDF={exportPDF}
-            loading={exporting}
-            size='sm'
-          />
         </div>
 
-        {/* Ordenar + contador */}
-        <div className='flex items-center justify-between gap-2 flex-wrap'>
-          <p className='text-xs text-muted-foreground'>
-            {filtered.length} registro{filtered.length !== 1 ? 's' : ''}
-          </p>
-          <div className='flex items-center gap-1 text-xs text-muted-foreground'>
-            <span className='hidden sm:inline'>Ordenar por:</span>
-            {[
-              { key: 'date' as const, label: 'Fecha' },
-              { key: 'status' as const, label: 'Estado' },
-              { key: 'type' as const, label: 'Tipo' },
-            ].map(opt => (
-              <button
-                key={opt.key}
-                type='button'
-                onClick={() => toggleSort(opt.key)}
-                className={`px-2 py-1 rounded transition-colors ${sortField === opt.key ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted'}`}
-              >
-                {opt.label}
-                {sortField === opt.key && (
-                  <span className='ml-1'>{sortDir === 'asc' ? '↑' : '↓'}</span>
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
+        <ListTableToolbar
+          title={
+            <p className='text-xs text-muted-foreground'>
+              {filtered.length} registro{filtered.length !== 1 ? 's' : ''}
+            </p>
+          }
+          showViewToggle={false}
+          export={{
+            onExportCSV: exportCSV,
+            onExportExcel: exportExcel,
+            onExportPDF: exportPDF,
+            loading: exporting,
+            disabled: filtered.length === 0,
+          }}
+          endActions={
+            <div className='flex items-center gap-1 text-xs text-muted-foreground'>
+              <span className='hidden sm:inline'>Ordenar por:</span>
+              {[
+                { key: 'date' as const, label: 'Fecha' },
+                { key: 'status' as const, label: 'Estado' },
+                { key: 'type' as const, label: 'Tipo' },
+              ].map(opt => (
+                <button
+                  key={opt.key}
+                  type='button'
+                  onClick={() => toggleSort(opt.key)}
+                  className={`px-2 py-1 rounded transition-colors ${sortField === opt.key ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted'}`}
+                >
+                  {opt.label}
+                  {sortField === opt.key && (
+                    <span className='ml-1'>{sortDir === 'asc' ? '↑' : '↓'}</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          }
+        />
 
         {/* Lista */}
         {loading ? (

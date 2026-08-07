@@ -1,5 +1,11 @@
 /**
- * Exportación centralizada de componentes de filtros
+ * Filtros canónicos del dashboard.
+ *
+ * Preferir siempre este paquete:
+ *   import { FilterBar, SearchInput } from '@/components/common/filters'
+ *   import { useFilters } from '@/hooks/common/use-filters'
+ *
+ * No confundir con `legacy-role-filters.tsx` (obsoleto, sin consumidores).
  */
 
 export { FilterBar } from './filter-bar'
