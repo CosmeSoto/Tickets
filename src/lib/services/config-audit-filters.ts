@@ -113,7 +113,7 @@ export const AUDIT_QUICK_PRESETS: Array<{
   {
     id: 'credentials',
     label: 'Credenciales',
-    description: 'Creación, revelado, compartidos y borrado (sin secretos en el log)',
+    description: 'Creación, revelado, copiado, compartidos y borrado (sin secretos en el log)',
     filters: { configModule: 'all', entityType: 'credential_entry', action: '' },
   },
   {

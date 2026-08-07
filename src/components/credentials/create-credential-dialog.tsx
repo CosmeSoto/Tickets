@@ -23,6 +23,7 @@ import {
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { useToast } from '@/hooks/use-toast'
 import { CheckCircle2, Copy, Eye, EyeOff, ExternalLink, Loader2 } from 'lucide-react'
+import { formatCredentialVaultLabel } from '@/lib/credentials/constants'
 
 type Vault = {
   id: string
@@ -62,12 +63,6 @@ type CreatedSnapshot = {
   username: string
   secret: string
   url: string
-}
-
-function vaultLabel(v: Vault): string {
-  if (v.kind === 'PERSONAL') return `${v.name} · Personal`
-  if (v.family?.name) return `${v.family.name} · ${v.name}`
-  return v.name
 }
 
 function emptyForm(defaultVaultId?: string, equipmentId?: string, licenseId?: string): FormState {
@@ -408,7 +403,7 @@ export function CreateCredentialDialog({
                   <SelectContent>
                     {sortedVaults.map(v => (
                       <SelectItem key={v.id} value={v.id}>
-                        {vaultLabel(v)}
+                        {formatCredentialVaultLabel(v)}
                       </SelectItem>
                     ))}
                   </SelectContent>

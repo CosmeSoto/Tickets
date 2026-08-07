@@ -4,8 +4,9 @@ import {
   resolveModuleFamilyScopeIds,
 } from '@/lib/auth/user-family-access'
 import { getNativeFamilyId, normalizeActiveFamilyIds } from '@/lib/auth/family-scope'
+import { DEFAULT_AREA_VAULT_NAME } from '@/lib/credentials/constants'
 
-export const DEFAULT_AREA_VAULT_NAME = 'Credenciales del área'
+export { DEFAULT_AREA_VAULT_NAME }
 
 export type CredentialsAccessContext = {
   userId: string

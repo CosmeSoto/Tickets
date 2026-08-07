@@ -941,6 +941,8 @@ export const AuditActionsComplete = {
   CREDENTIAL_CREATED: 'credential_created',
   CREDENTIAL_UPDATED: 'credential_updated',
   CREDENTIAL_REVEALED: 'credential_revealed',
+  /** Copiar al portapapeles sin mostrar en pantalla (estilo KeePass). */
+  CREDENTIAL_COPIED: 'credential_copied',
   CREDENTIAL_DELETED: 'credential_deleted',
   CREDENTIAL_SHARED: 'credential_shared',
   CREDENTIAL_SHARE_REVOKED: 'credential_share_revoked',
