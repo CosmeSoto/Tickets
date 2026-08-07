@@ -65,7 +65,7 @@ interface TypeSectionProps<T extends AnyType> {
 const TYPE_LABELS: Record<TypeKind, { singular: string; plural: string }> = {
   equipment: { singular: 'Tipo de Equipo', plural: 'Tipos de Equipo' },
   license: { singular: 'Tipo de Licencia', plural: 'Tipos de Licencia' },
-  consumable: { singular: 'Tipo de Consumible', plural: 'Tipos de Consumible' },
+  consumable: { singular: 'Tipo de Suministro', plural: 'Tipos de Suministro' },
 }
 
 // ── Component ──────────────────────────────────────────────────────────────
@@ -255,7 +255,10 @@ export function TypeSection<T extends AnyType>({
             <Button
               variant='ghost'
               size='sm'
-              onClick={() => { setTypeToClone(type); setCloneDialogOpen(true) }}
+              onClick={() => {
+                setTypeToClone(type)
+                setCloneDialogOpen(true)
+              }}
               disabled={saving}
               title='Copiar a otra área'
             >
@@ -307,7 +310,9 @@ export function TypeSection<T extends AnyType>({
           sourceType={typeToClone}
           typeKind={typeKind}
           currentFamilyId={currentFamilyId ?? null}
-          onSuccess={() => { onCloneSuccess?.() }}
+          onSuccess={() => {
+            onCloneSuccess?.()
+          }}
         />
       )}
     </>

@@ -14,11 +14,7 @@ import {
   buildLicenseFamilyWhere,
 } from '@/lib/inventory/scope-filter'
 import { emptyReportResponse } from './empty-report'
-import {
-  consumableScopeWhere,
-  equipmentScopeWhere,
-  type ReportScopeContext,
-} from './scope'
+import { consumableScopeWhere, equipmentScopeWhere, type ReportScopeContext } from './scope'
 import type { ReportResponse } from './types'
 import { InventoryReportService } from '@/lib/services/inventory-report.service'
 
@@ -266,7 +262,7 @@ async function runSummaryTemplate(
     if (!subtype || subtype === 'MRO') {
       rows.push({
         familia,
-        subtipo: 'Consumible',
+        subtipo: 'Suministro',
         cantidad: count,
         valorTotal: formatCurrency(value),
         estado,
@@ -526,7 +522,7 @@ async function runExpiringTemplate(
   for (const c of consumables) {
     const dias = daysUntil(c.expirationDate) ?? 0
     rows.push({
-      tipo: 'Consumible',
+      tipo: 'Suministro',
       nombre: c.name,
       codigo: c.id.slice(0, 8).toUpperCase(),
       familia: c.consumableType?.family?.name ?? '—',
@@ -828,9 +824,7 @@ async function runStockMovementsTemplate(
   const totalEntradas = movements
     .filter(m => m.type === 'ENTRY')
     .reduce((s, m) => s + m.quantity, 0)
-  const totalSalidas = movements
-    .filter(m => m.type === 'EXIT')
-    .reduce((s, m) => s + m.quantity, 0)
+  const totalSalidas = movements.filter(m => m.type === 'EXIT').reduce((s, m) => s + m.quantity, 0)
   const uniqueConsumables = new Set(movements.map(m => m.consumableId)).size
 
   const summary = [
@@ -1374,25 +1368,27 @@ async function runFinancialSummaryTemplate(
     })
   }
 
-  const [globalEquipment, globalLicenses, globalConsumables, globalMaintenance] = await Promise.all([
-    prisma.equipment.aggregate({
-      where: { status: { not: 'RETIRED' } },
-      _count: true,
-      _sum: { purchasePrice: true, rentalMonthlyCost: true },
-    }),
-    prisma.software_licenses.aggregate({
-      _count: true,
-      _sum: { cost: true },
-    }),
-    prisma.consumables.aggregate({
-      _count: true,
-      _sum: { costPerUnit: true },
-    }),
-    prisma.maintenance_records.aggregate({
-      where: { status: 'COMPLETED' },
-      _sum: { cost: true },
-    }),
-  ])
+  const [globalEquipment, globalLicenses, globalConsumables, globalMaintenance] = await Promise.all(
+    [
+      prisma.equipment.aggregate({
+        where: { status: { not: 'RETIRED' } },
+        _count: true,
+        _sum: { purchasePrice: true, rentalMonthlyCost: true },
+      }),
+      prisma.software_licenses.aggregate({
+        _count: true,
+        _sum: { cost: true },
+      }),
+      prisma.consumables.aggregate({
+        _count: true,
+        _sum: { costPerUnit: true },
+      }),
+      prisma.maintenance_records.aggregate({
+        where: { status: 'COMPLETED' },
+        _sum: { cost: true },
+      }),
+    ]
+  )
 
   const totalValorActivos =
     (globalEquipment._sum.purchasePrice ?? 0) +

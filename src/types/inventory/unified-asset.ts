@@ -42,7 +42,7 @@ export interface UnifiedAssetsResponse {
 export const SUBTYPE_FILTER_OPTIONS: { value: AssetSubtype | ''; label: string }[] = [
   { value: '', label: 'Todos los tipos' },
   { value: 'EQUIPMENT', label: 'Equipo' },
-  { value: 'MRO', label: 'Material / Consumible' },
+  { value: 'MRO', label: 'Suministro' },
   { value: 'LICENSE', label: 'Licencia y Contrato' },
 ]
 

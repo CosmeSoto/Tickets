@@ -121,7 +121,7 @@ export function AlertsSection() {
           <AlertTitle>Stock Bajo</AlertTitle>
           <AlertDescription className='flex items-center justify-between'>
             <span>
-              {alerts.lowStockConsumables} consumible{alerts.lowStockConsumables !== 1 ? 's' : ''}{' '}
+              {alerts.lowStockConsumables} suministro{alerts.lowStockConsumables !== 1 ? 's' : ''}{' '}
               con stock bajo del mínimo
             </span>
             <Link href='/inventory'>

@@ -203,7 +203,7 @@ export function UnifiedAssetForm({
           <StepHeader
             mode='individual'
             step={2}
-            description='Indica si es un equipo físico, una licencia/contrato o un consumible.'
+            description='Indica si es un equipo físico, una licencia/contrato o un suministro.'
             familyName={selectedFamily?.name}
             familyColor={selectedFamily?.color}
             backLabel='Cambiar familia'

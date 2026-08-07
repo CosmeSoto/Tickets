@@ -8,7 +8,7 @@ interface SubtypeSelectorProps {
 
 const SUBTYPE_CONFIG: Record<AssetSubtype, { icon: React.ElementType; label: string }> = {
   EQUIPMENT: { icon: Monitor, label: 'Equipo Físico' },
-  MRO: { icon: Wrench, label: 'Consumible' },
+  MRO: { icon: Wrench, label: 'Suministro' },
   LICENSE: { icon: Key, label: 'Contrato / Licencia' },
 }
 

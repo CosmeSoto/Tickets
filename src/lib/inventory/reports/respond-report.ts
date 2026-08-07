@@ -116,11 +116,11 @@ export const TEMPLATE_EXPORT: Record<string, ReportExportOptions> = {
     pdfTitle: '¿Qué se ha consumido? — Movimientos de Stock',
     csvFilename: 'reporte-movimientos-stock.csv',
     pdfFilename: 'reporte-movimientos-stock.pdf',
-    pdfHeaders: ['Fecha', 'Consumible', 'Familia', 'Tipo', 'Cantidad', 'Unidad', 'Usuario'],
+    pdfHeaders: ['Fecha', 'Suministro', 'Familia', 'Tipo', 'Cantidad', 'Unidad', 'Usuario'],
     pdfRowKeys: ['fecha', 'consumible', 'familia', 'tipo', 'cantidad', 'unidad', 'usuario'],
     csvRowMapper: r => ({
       Fecha: r.fecha,
-      Consumible: r.consumible,
+      Suministro: r.consumible,
       Familia: r.familia,
       Tipo: r.tipo,
       Cantidad: r.cantidad,
@@ -159,7 +159,15 @@ export const TEMPLATE_EXPORT: Record<string, ReportExportOptions> = {
     pdfTitle: '¿Dónde están los equipos?',
     csvFilename: 'reporte-ubicaciones.csv',
     pdfFilename: 'reporte-ubicaciones.pdf',
-    pdfHeaders: ['Código', 'Equipo', 'Familia', 'Estado', 'Ubicación Física', 'Usuario', 'Departamento'],
+    pdfHeaders: [
+      'Código',
+      'Equipo',
+      'Familia',
+      'Estado',
+      'Ubicación Física',
+      'Usuario',
+      'Departamento',
+    ],
     pdfRowKeys: [
       'equipmentCode',
       'equipmentName',
@@ -186,7 +194,15 @@ export const TEMPLATE_EXPORT: Record<string, ReportExportOptions> = {
     csvFilename: 'reporte-ventas.csv',
     pdfFilename: 'reporte-ventas.pdf',
     pdfHeaders: ['Código', 'Equipo', 'Comprador', 'Precio Venta', 'Resultado', 'Fecha', 'Estado'],
-    pdfRowKeys: ['codigo', 'equipo', 'comprador', 'precioVenta', 'resultado', 'fechaVenta', 'estado'],
+    pdfRowKeys: [
+      'codigo',
+      'equipo',
+      'comprador',
+      'precioVenta',
+      'resultado',
+      'fechaVenta',
+      'estado',
+    ],
     csvRowMapper: r => ({
       Código: r.codigo,
       Equipo: r.equipo,
@@ -212,7 +228,14 @@ export const TEMPLATE_EXPORT: Record<string, ReportExportOptions> = {
     csvFilename: 'reporte-financiero-global.csv',
     pdfFilename: 'reporte-financiero-global.pdf',
     pdfHeaders: ['Familia', 'Equipos', 'Valor Equipos', 'Renta/Mes', 'Licencias', 'Valor Total'],
-    pdfRowKeys: ['familia', 'equiposActivos', 'valorEquipos', 'costoRentaMensual', 'licencias', 'valorTotal'],
+    pdfRowKeys: [
+      'familia',
+      'equiposActivos',
+      'valorEquipos',
+      'costoRentaMensual',
+      'licencias',
+      'valorTotal',
+    ],
     csvRowMapper: r => ({
       Familia: r.familia,
       'Equipos Activos': r.equiposActivos,
@@ -274,9 +297,7 @@ export async function respondWithReportFormat(
 ): Promise<NextResponse> {
   if (format === 'csv') {
     const exportCfg = TEMPLATE_EXPORT[slug]
-    const csvRows = response.data.map(row =>
-      exportCfg?.csvRowMapper(row) ?? row
-    )
+    const csvRows = response.data.map(row => exportCfg?.csvRowMapper(row) ?? row)
     const csv = toCSV(csvRows)
     return new NextResponse(csv, {
       headers: {

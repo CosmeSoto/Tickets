@@ -28,7 +28,7 @@ const FALLBACK_MODULES = [
   {
     key: 'inventory',
     name: 'Inventario',
-    description: 'Gestión de activos, equipos y consumibles',
+    description: 'Gestión de activos, equipos y suministros',
     icon: 'Package',
     isActive: true,
     order: 2,

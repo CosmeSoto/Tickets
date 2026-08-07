@@ -136,7 +136,7 @@ export function CloneTypeDialog({
   }
 
   const typeKindLabel =
-    typeKind === 'equipment' ? 'equipo' : typeKind === 'license' ? 'licencia' : 'consumible'
+    typeKind === 'equipment' ? 'equipo' : typeKind === 'license' ? 'licencia' : 'suministro'
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

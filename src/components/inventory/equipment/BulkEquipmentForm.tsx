@@ -674,7 +674,7 @@ export function BulkEquipmentForm({
         <StepHeader
           mode='bulk'
           step={2}
-          description='Indica si el lote es de equipos físicos o materiales consumibles.'
+          description='Indica si el lote es de equipos físicos o suministros.'
           familyName={selectedFamily?.name}
           familyColor={selectedFamily?.color}
           backLabel='Cambiar familia'

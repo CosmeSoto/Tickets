@@ -327,7 +327,7 @@ function formatHeader(key: string): string {
     fechaVencimiento: 'Vencimiento',
     diasRestantes: 'Días',
     urgencia: 'Urgencia',
-    consumible: 'Consumible',
+    consumible: 'Suministro',
     cantidad: 'Cantidad',
     unidad: 'Unidad',
     motivo: 'Motivo',

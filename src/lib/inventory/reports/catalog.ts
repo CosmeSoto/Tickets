@@ -58,7 +58,7 @@ export const REPORT_TEMPLATES: ReportTemplateDef[] = [
         options: [
           { value: ALL_FILTER, label: 'Todos' },
           { value: 'EQUIPMENT', label: 'Equipos' },
-          { value: 'MRO', label: 'Materiales MRO' },
+          { value: 'MRO', label: 'Suministros' },
           { value: 'LICENSE', label: 'Licencias' },
         ],
       },
@@ -220,7 +220,12 @@ export const REPORT_TEMPLATES: ReportTemplateDef[] = [
         ],
       },
       ...DATE_RANGE_FILTERS,
-      { key: 'modelId', label: 'ID modelo', type: 'text', placeholder: 'Filtrar por modelo específico...' },
+      {
+        key: 'modelId',
+        label: 'ID modelo',
+        type: 'text',
+        placeholder: 'Filtrar por modelo específico...',
+      },
     ],
   },
   {
@@ -231,8 +236,18 @@ export const REPORT_TEMPLATES: ReportTemplateDef[] = [
     icon: 'Boxes',
     roles: ['ADMIN', 'SUPER_ADMIN', 'MANAGER'],
     filters: [
-      { key: 'batchId', label: 'ID lote', type: 'text', placeholder: 'Filtrar por lote específico...' },
-      { key: 'supplierId', label: 'ID proveedor', type: 'text', placeholder: 'Filtrar por proveedor...' },
+      {
+        key: 'batchId',
+        label: 'ID lote',
+        type: 'text',
+        placeholder: 'Filtrar por lote específico...',
+      },
+      {
+        key: 'supplierId',
+        label: 'ID proveedor',
+        type: 'text',
+        placeholder: 'Filtrar por proveedor...',
+      },
     ],
   },
 ]
@@ -650,9 +665,7 @@ export function hasInventoryReportsAccess(
   return isSuperAdmin || role === 'ADMIN' || canManageInventory
 }
 
-export function getReportRoleCapabilities(
-  userRole: InventoryReportRole
-): ReportRoleCapabilities {
+export function getReportRoleCapabilities(userRole: InventoryReportRole): ReportRoleCapabilities {
   switch (userRole) {
     case 'SUPER_ADMIN':
       return {
@@ -668,8 +681,7 @@ export function getReportRoleCapabilities(
     case 'ADMIN':
       return {
         label: 'Administrador',
-        description:
-          'Plantillas y explorador sobre todas las familias de la organización.',
+        description: 'Plantillas y explorador sobre todas las familias de la organización.',
         dataScope: 'Todas las familias',
         templateAccess: 'Todas excepto resumen financiero global',
         canSaveReports: true,
@@ -700,19 +712,13 @@ export function resolveUserReportRole(
   return 'MANAGER'
 }
 
-export function canAccessTemplate(
-  slug: string,
-  userRole: InventoryReportRole
-): boolean {
+export function canAccessTemplate(slug: string, userRole: InventoryReportRole): boolean {
   const template = REPORT_TEMPLATES.find(t => t.slug === slug)
   if (!template) return false
   return template.roles.includes(userRole)
 }
 
-export function canAccessDataset(
-  datasetId: string,
-  userRole: InventoryReportRole
-): boolean {
+export function canAccessDataset(datasetId: string, userRole: InventoryReportRole): boolean {
   const dataset = REPORT_DATASETS.find(d => d.id === datasetId)
   if (!dataset) return false
   return dataset.roles.includes(userRole)
@@ -758,9 +764,7 @@ export function getVisibleDatasets(userRole: InventoryReportRole): ReportDataset
   return REPORT_DATASETS.filter(d => d.roles.includes(userRole)).map(enrichDatasetWithGroupBy)
 }
 
-export function getDefaultFilterValues(
-  filters: ReportFilterDef[]
-): Record<string, string> {
+export function getDefaultFilterValues(filters: ReportFilterDef[]): Record<string, string> {
   const defaults: Record<string, string> = {}
   for (const filter of filters) {
     if (filter.defaultValue) {

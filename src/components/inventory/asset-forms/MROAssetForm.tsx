@@ -154,7 +154,7 @@ export function MROAssetForm({
       {/* ── 1. NOMBRE ─────────────────────────────────────────────── */}
       <div className='space-y-1'>
         <Label>
-          Nombre del material <span className='text-destructive'>*</span>
+          Nombre del suministro <span className='text-destructive'>*</span>
         </Label>
         <Input
           value={name}
@@ -177,9 +177,9 @@ export function MROAssetForm({
             placeholder='Ej: Lubricante, Papel...'
             allowClear
             createLabel='Crear categoría'
-            createTitle='Nueva categoría de material'
+            createTitle='Nueva categoría de suministro'
             editTitle='Editar categoría'
-            deleteConfirmMessage='¿Eliminar esta categoría? Solo es posible si no tiene materiales asociados.'
+            deleteConfirmMessage='¿Eliminar esta categoría? Solo es posible si no tiene suministros asociados.'
             {...inlineSelectFeedback('Categoría')}
             createForm={({ item, onSuccess, onCancel }) => (
               <CatalogTypeInlineForm
@@ -219,7 +219,7 @@ export function MROAssetForm({
             createLabel='Crear unidad'
             createTitle='Nueva unidad de medida'
             editTitle='Editar unidad de medida'
-            deleteConfirmMessage='¿Eliminar esta unidad de medida? Solo es posible si no tiene materiales asociados.'
+            deleteConfirmMessage='¿Eliminar esta unidad de medida? Solo es posible si no tiene suministros asociados.'
             {...inlineSelectFeedback('Unidad de medida')}
             createForm={({ item, onSuccess, onCancel }) => (
               <UnitOfMeasureInlineForm
@@ -253,7 +253,7 @@ export function MROAssetForm({
 
       {/* ── 3. ADQUISICIÓN ────────────────────────────────────────── */}
       <div className='space-y-1'>
-        <Label>¿Cómo se obtiene este material?</Label>
+        <Label>¿Cómo se obtiene este suministro?</Label>
         <SimpleSelect
           value={acquisitionMode}
           onChange={e => setAcquisitionMode(e.target.value as typeof acquisitionMode)}
@@ -395,7 +395,7 @@ export function MROAssetForm({
           ← Atrás
         </Button>
         <Button type='submit' disabled={submitting} className='flex-1'>
-          {submitting ? 'Guardando...' : 'Crear Material'}
+          {submitting ? 'Guardando...' : 'Crear suministro'}
         </Button>
       </div>
     </form>

@@ -35,7 +35,7 @@ interface TypeFormDialogProps {
 const TYPE_LABELS: Record<TypeKind, { singular: string; plural: string }> = {
   equipment: { singular: 'Tipo de Equipo', plural: 'Tipos de Equipo' },
   license: { singular: 'Tipo de Licencia', plural: 'Tipos de Licencia' },
-  consumable: { singular: 'Tipo de Consumible', plural: 'Tipos de Consumible' },
+  consumable: { singular: 'Tipo de Suministro', plural: 'Tipos de Suministro' },
 }
 
 const EMPTY_FORM: CreateTypeData = {
@@ -122,7 +122,7 @@ export function TypeFormDialog({
                     ? 'equipos'
                     : typeKind === 'license'
                       ? 'licencias'
-                      : 'consumibles'
+                      : 'suministros'
                 }`
               : 'Modifica la información de este tipo'}
           </DialogDescription>

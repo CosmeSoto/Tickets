@@ -137,12 +137,12 @@ async function checkLowStockAndNotify(consumableId: string) {
   })
 
   const title = isOutOfStock
-    ? `¡ALERTA! Consumible Agotado: ${consumable.name}`
+    ? `¡ALERTA! Suministro agotado: ${consumable.name}`
     : `Stock Bajo: ${consumable.name}`
 
   const message = isOutOfStock
-    ? `El consumible "${consumable.name}" se ha agotado (stock: 0). Se requiere reabastecimiento inmediato.`
-    : `El consumible "${consumable.name}" tiene stock bajo (${consumable.currentStock}/${consumable.minStock} ${consumable.unitOfMeasure?.symbol || ''}).`
+    ? `El suministro "${consumable.name}" se ha agotado (stock: 0). Se requiere reabastecimiento inmediato.`
+    : `El suministro "${consumable.name}" tiene stock bajo (${consumable.currentStock}/${consumable.minStock} ${consumable.unitOfMeasure?.symbol || ''}).`
 
   const { systemName } = await getSystemBranding()
 
@@ -180,7 +180,12 @@ async function checkLowStockAndNotify(consumableId: string) {
   }
 }
 
-function generateLowStockEmail(consumable: any, adminName: string, isOutOfStock: boolean, systemName: string): string {
+function generateLowStockEmail(
+  consumable: any,
+  adminName: string,
+  isOutOfStock: boolean,
+  systemName: string
+): string {
   const bgColor = isOutOfStock ? '#dc2626' : '#f59e0b'
   const icon = isOutOfStock ? '🚨' : '⚠️'
   const urgency = isOutOfStock ? 'AGOTADO' : 'STOCK BAJO'
@@ -206,11 +211,11 @@ function generateLowStockEmail(consumable: any, adminName: string, isOutOfStock:
       <p>Hola ${adminName},</p>
       <p>${
         isOutOfStock
-          ? `El consumible <strong>"${consumable.name}"</strong> se ha <strong>agotado completamente</strong>. Se requiere reabastecimiento inmediato.`
-          : `El consumible <strong>"${consumable.name}"</strong> tiene <strong>stock por debajo del mínimo</strong>.`
+          ? `El suministro <strong>"${consumable.name}"</strong> se ha <strong>agotado completamente</strong>. Se requiere reabastecimiento inmediato.`
+          : `El suministro <strong>"${consumable.name}"</strong> tiene <strong>stock por debajo del mínimo</strong>.`
       }</p>
       <div class="info-box">
-        <p><strong>Consumible:</strong> ${consumable.name}</p>
+        <p><strong>Suministro:</strong> ${consumable.name}</p>
         <p><strong>Tipo:</strong> ${consumable.consumableType?.name || 'N/A'}</p>
         <p><strong>Stock actual:</strong> ${consumable.currentStock} ${consumable.unitOfMeasure?.symbol || ''}</p>
         <p><strong>Stock mínimo:</strong> ${consumable.minStock} ${consumable.unitOfMeasure?.symbol || ''}</p>
@@ -218,7 +223,7 @@ function generateLowStockEmail(consumable: any, adminName: string, isOutOfStock:
         ${consumable.costPerUnit ? `<p><strong>Costo por unidad:</strong> $${consumable.costPerUnit}</p>` : ''}
       </div>
       <p style="text-align: center;">
-        <a href="${process.env.NEXTAUTH_URL}/inventory?subtype=MRO" class="button">Ver Consumibles</a>
+        <a href="${process.env.NEXTAUTH_URL}/inventory?subtype=MRO" class="button">Ver Suministros</a>
       </p>
     </div>
     <div class="footer"><p>Mensaje automático del ${systemName}</p></div>

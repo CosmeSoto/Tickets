@@ -28,8 +28,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const consumable = await prisma.consumables.findUnique({
       where: { id },
       include: {
-        consumableType: true,
+        consumableType: { include: { family: { select: { id: true, name: true } } } },
         unitOfMeasure: true,
+        warehouse: { select: { id: true, name: true } },
         assignedEquipment: {
           select: { id: true, code: true, brand: true, model: true, serialNumber: true },
         },
@@ -46,7 +47,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       },
     })
     if (!consumable) {
-      return NextResponse.json({ error: 'Consumible no encontrado' }, { status: 404 })
+      return NextResponse.json({ error: 'Suministro no encontrado' }, { status: 404 })
     }
 
     try {
@@ -64,7 +65,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ ...consumable, totalStockValue })
   } catch (error) {
     console.error('Error en GET /api/inventory/consumables/[id]:', error)
-    return NextResponse.json({ error: 'Error al obtener consumible' }, { status: 500 })
+    return NextResponse.json({ error: 'Error al obtener suministro' }, { status: 500 })
   }
 }
 
@@ -124,7 +125,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (error instanceof ZodError) {
       return NextResponse.json({ error: 'Datos inválidos', details: error.errors }, { status: 400 })
     }
-    return NextResponse.json({ error: 'Error al actualizar consumible' }, { status: 500 })
+    return NextResponse.json({ error: 'Error al actualizar suministro' }, { status: 500 })
   }
 }
 
@@ -162,9 +163,9 @@ export async function DELETE(
       userAgent: request.headers.get('user-agent') || 'unknown',
     }).catch(err => console.error('[AUDIT] Error registrando eliminación de consumible:', err))
 
-    return NextResponse.json({ message: 'Consumible eliminado exitosamente' })
+    return NextResponse.json({ message: 'Suministro eliminado exitosamente' })
   } catch (error) {
     console.error('Error en DELETE /api/inventory/consumables/[id]:', error)
-    return NextResponse.json({ error: 'Error al eliminar consumible' }, { status: 500 })
+    return NextResponse.json({ error: 'Error al eliminar suministro' }, { status: 500 })
   }
 }

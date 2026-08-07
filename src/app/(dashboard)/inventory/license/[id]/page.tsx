@@ -33,12 +33,15 @@ export default function LicenseDetailPage({ params }: PageProps) {
   if (!session?.user) return null
 
   return (
-    <ModuleLayout title='Licencia' subtitle='Detalle de licencia de software'>
+    <ModuleLayout
+      title='Detalle de la Licencia'
+      subtitle='Información completa de la licencia / contrato'
+    >
       <LicenseDetail
         licenseId={id}
         userRole={session.user.role}
         userId={session.user.id}
-        isSuperAdmin={(session.user as any).isSuperAdmin === true}
+        isSuperAdmin={(session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true}
       />
     </ModuleLayout>
   )

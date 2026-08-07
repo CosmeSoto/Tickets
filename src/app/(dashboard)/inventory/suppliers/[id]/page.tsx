@@ -203,7 +203,7 @@ export default function SupplierDetailPage({
               </div>
               <div className='rounded-lg border p-3 text-center'>
                 <p className='text-2xl font-semibold'>{supplier._count.consumables}</p>
-                <p className='text-xs text-muted-foreground'>Consumibles</p>
+                <p className='text-xs text-muted-foreground'>Suministros</p>
               </div>
               <div className='rounded-lg border p-3 text-center'>
                 <p className='text-2xl font-semibold'>{supplier._count.software_licenses}</p>

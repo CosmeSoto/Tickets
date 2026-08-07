@@ -11,7 +11,7 @@ interface PageProps {
   params: Promise<{ id: string }>
 }
 
-export default function MRODetailPage({ params }: PageProps) {
+export default function SuministroDetailPage({ params }: PageProps) {
   const { id } = use(params)
   const { data: session, status } = useSession()
   const router = useRouter()
@@ -22,7 +22,7 @@ export default function MRODetailPage({ params }: PageProps) {
 
   if (status === 'loading') {
     return (
-      <ModuleLayout title='Cargando...' subtitle='Obteniendo información del material'>
+      <ModuleLayout title='Cargando...' subtitle='Obteniendo información del suministro'>
         <div className='flex items-center justify-center h-64'>
           <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-primary' />
         </div>
@@ -33,12 +33,15 @@ export default function MRODetailPage({ params }: PageProps) {
   if (!session?.user) return null
 
   return (
-    <ModuleLayout title='Material / Consumible' subtitle='Detalle de material MRO'>
+    <ModuleLayout
+      title='Detalle del Suministro'
+      subtitle='Información completa del material / suministro'
+    >
       <ConsumableDetail
         consumableId={id}
         userRole={session.user.role}
         userId={session.user.id}
-        isSuperAdmin={(session.user as any).isSuperAdmin === true}
+        isSuperAdmin={(session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true}
       />
     </ModuleLayout>
   )

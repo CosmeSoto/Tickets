@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
     if (error instanceof ZodError) {
       return NextResponse.json({ error: 'Datos inválidos', details: error.errors }, { status: 400 })
     }
-    return NextResponse.json({ error: 'Error al obtener consumibles' }, { status: 500 })
+    return NextResponse.json({ error: 'Error al obtener suministros' }, { status: 500 })
   }
 }
 
@@ -141,6 +141,6 @@ export async function POST(request: NextRequest) {
     if (error instanceof ZodError) {
       return NextResponse.json({ error: 'Datos inválidos', details: error.errors }, { status: 400 })
     }
-    return NextResponse.json({ error: 'Error al crear consumible' }, { status: 500 })
+    return NextResponse.json({ error: 'Error al crear suministro' }, { status: 500 })
   }
 }

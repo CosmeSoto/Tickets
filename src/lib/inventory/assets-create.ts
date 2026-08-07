@@ -331,7 +331,7 @@ export async function createAsset(
     // ── MRO ──────────────────────────────────────────────────────────────────
   } else if (subtype === 'MRO') {
     if (!name?.trim()) return { error: 'El nombre del material es obligatorio', status: 400 }
-    if (!typeId) return { error: 'El tipo de consumible es obligatorio', status: 400 }
+    if (!typeId) return { error: 'El tipo de suministro es obligatorio', status: 400 }
     if (!unitOfMeasureId) return { error: 'La unidad de medida es obligatoria', status: 400 }
 
     const consumableType = await prisma.consumable_types.findUnique({
@@ -339,11 +339,11 @@ export async function createAsset(
       select: { familyId: true, name: true },
     })
     if (!consumableType) {
-      return { error: 'El tipo de consumible no existe', status: 404 }
+      return { error: 'El tipo de suministro no existe', status: 404 }
     }
     if (consumableType.familyId && consumableType.familyId !== familyId) {
       return {
-        error: 'El tipo de consumible no pertenece al área seleccionada',
+        error: 'El tipo de suministro no pertenece al área seleccionada',
         status: 422,
       }
     }

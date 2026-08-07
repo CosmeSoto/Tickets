@@ -136,7 +136,7 @@ export function InventoryStatsSection({ role }: InventoryStatsSectionProps) {
           status={stats.maintenanceAssets > 0 ? 'warning' : 'normal'}
         />
         <SymmetricStatsCard
-          title='Consumibles'
+          title='Suministros'
           value={stats.totalConsumables}
           icon={Wrench}
           color='orange'

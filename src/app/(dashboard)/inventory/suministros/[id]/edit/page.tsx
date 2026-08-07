@@ -10,15 +10,18 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { ArrowLeft, Loader2, Save } from 'lucide-react'
 import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
+import { getInventoryAssetPath } from '@/lib/utils/inventory-utils'
 
 interface PageProps {
   params: Promise<{ id: string }>
 }
 
-export default function MROEditPage({ params }: PageProps) {
+export default function SuministroEditPage({ params }: PageProps) {
   const { id } = use(params)
   const { data: session, status } = useSession()
   const router = useRouter()
+  const detailPath = getInventoryAssetPath('MRO', id)
+
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({
@@ -38,7 +41,7 @@ export default function MROEditPage({ params }: PageProps) {
     if (status !== 'authenticated') return
     fetch(`/api/inventory/consumables/${id}`)
       .then(res => {
-        if (!res.ok) throw new Error('No se pudo cargar el consumible')
+        if (!res.ok) throw new Error('No se pudo cargar el suministro')
         return res.json()
       })
       .then(data => {
@@ -75,8 +78,8 @@ export default function MROEditPage({ params }: PageProps) {
         const err = await res.json().catch(() => ({}))
         throw new Error(err.error || 'Error al guardar')
       }
-      toast.success('Material actualizado correctamente')
-      router.push(`/inventory/mro/${id}`)
+      toast.success('Suministro actualizado correctamente')
+      router.push(detailPath)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error al guardar')
     } finally {
@@ -86,7 +89,7 @@ export default function MROEditPage({ params }: PageProps) {
 
   if (status === 'loading' || loading) {
     return (
-      <ModuleLayout title='Editar material' subtitle='Cargando...'>
+      <ModuleLayout title='Editar suministro' subtitle='Cargando...'>
         <div className='flex items-center justify-center h-64'>
           <Loader2 className='h-8 w-8 animate-spin text-muted-foreground' />
         </div>
@@ -97,9 +100,9 @@ export default function MROEditPage({ params }: PageProps) {
   if (!session?.user) return null
 
   return (
-    <ModuleLayout title='Editar material' subtitle='Actualizar datos del consumible MRO'>
+    <ModuleLayout title='Editar suministro' subtitle='Actualizar datos del material / suministro'>
       <div className='max-w-2xl space-y-6'>
-        <Button variant='ghost' size='sm' onClick={() => router.push(`/inventory/mro/${id}`)}>
+        <Button variant='ghost' size='sm' onClick={() => router.push(detailPath)}>
           <ArrowLeft className='h-4 w-4 mr-2' />
           Volver al detalle
         </Button>
@@ -170,11 +173,7 @@ export default function MROEditPage({ params }: PageProps) {
           </div>
 
           <div className='flex justify-end gap-2 pt-2'>
-            <Button
-              type='button'
-              variant='outline'
-              onClick={() => router.push(`/inventory/mro/${id}`)}
-            >
+            <Button type='button' variant='outline' onClick={() => router.push(detailPath)}>
               Cancelar
             </Button>
             <Button type='submit' disabled={saving}>

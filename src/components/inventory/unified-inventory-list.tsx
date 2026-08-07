@@ -12,6 +12,7 @@ import {
   getAssetConditionColor,
   getAssetConditionLabel,
   getAcquisitionModeLabel,
+  getInventoryAssetPath,
 } from '@/lib/utils/inventory-utils'
 import {
   Search,
@@ -485,9 +486,7 @@ export function UnifiedInventoryList({
                 <tr
                   key={asset.id}
                   className='cursor-pointer hover:bg-muted/50 transition-colors'
-                  onClick={() =>
-                    router.push(`/inventory/${asset.subtype.toLowerCase()}/${asset.id}`)
-                  }
+                  onClick={() => router.push(getInventoryAssetPath(asset.subtype, asset.id))}
                 >
                   <td className='px-3 py-3' onClick={e => e.stopPropagation()}>
                     {asset.subtype === 'EQUIPMENT' && (

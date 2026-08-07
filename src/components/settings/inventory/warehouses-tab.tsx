@@ -80,7 +80,7 @@ export function WarehousesTab({ familyId }: WarehousesTabProps) {
       { header: 'Ubicación', accessor: (w: Warehouse) => w.location || '' },
       { header: 'Responsable', accessor: (w: Warehouse) => w.manager?.name || 'Sin responsable' },
       { header: 'Equipos', accessor: (w: Warehouse) => String(w._count?.equipment || 0) },
-      { header: 'Consumibles', accessor: (w: Warehouse) => String(w._count?.consumables || 0) },
+      { header: 'Suministros', accessor: (w: Warehouse) => String(w._count?.consumables || 0) },
       {
         header: 'Total Items',
         accessor: (w: Warehouse) =>
@@ -207,7 +207,7 @@ export function WarehousesTab({ familyId }: WarehousesTabProps) {
             </div>
             <div
               className='flex items-center gap-1 cursor-help'
-              title={`${consumablesCount} Consumible${consumablesCount !== 1 ? 's' : ''}`}
+              title={`${consumablesCount} Suministro${consumablesCount !== 1 ? 's' : ''}`}
             >
               <Box className='h-3.5 w-3.5 text-amber-500' />
               <span className='text-sm font-medium'>{consumablesCount}</span>

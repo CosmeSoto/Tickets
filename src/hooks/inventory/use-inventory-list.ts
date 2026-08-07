@@ -52,8 +52,7 @@ const ALL_EXPORT_COLUMNS = [
     key: 'subtype',
     label: 'Tipo',
     format: (v: string) =>
-      ({ EQUIPMENT: 'Equipo', MRO: 'Material / Consumible', LICENSE: 'Licencia y Contrato' })[v] ??
-      v,
+      ({ EQUIPMENT: 'Equipo', MRO: 'Suministro', LICENSE: 'Licencia y Contrato' })[v] ?? v,
   },
   { key: 'family', label: 'Área', format: (v: any) => v?.name ?? '' },
   { key: 'name', label: 'Nombre' },

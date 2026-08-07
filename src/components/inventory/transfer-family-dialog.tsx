@@ -267,7 +267,7 @@ export function TransferFamilyDialog({
       ? 'Tipo de equipo'
       : assetKind === 'LICENSE'
         ? 'Tipo de licencia'
-        : 'Tipo de consumible'
+        : 'Tipo de suministro'
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

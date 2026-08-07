@@ -303,7 +303,7 @@ export function getAuditColumns(onViewDetails: (log: AuditLog) => void) {
           const entityTypeLabels: Record<string, string> = {
             license_type: 'una licencia',
             equipment_type: 'un tipo de equipo',
-            consumable_type: 'un tipo de consumible',
+            consumable_type: 'un tipo de suministro',
           }
           icon = '📋'
           const typeLabel = entityTypeLabels[entityType] ?? 'un tipo de activo'

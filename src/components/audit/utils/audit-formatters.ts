@@ -74,7 +74,7 @@ export function translateEntityType(entityType: string): string {
     // Inventario — tipos de activo
     equipment_type: '🔧 Tipo de Equipo',
     license_type: '🪪 Tipo de Licencia',
-    consumable_type: '📦 Tipo de Consumible',
+    consumable_type: '📦 Tipo de Suministro',
     credential_entry: '🔐 Credencial',
     credential_vault: '🔐 Bóveda de credenciales',
     credential_share: '🔐 Compartido de credencial',
@@ -313,8 +313,8 @@ export function getEntityLabel(entityType: string): string {
     // Inventario — tipos de activo
     equipment_type: 'Tipos de Equipo',
     license_type: 'Tipos de Licencia',
-    consumable_type: 'Tipos de Consumible',
-    consumable_types: 'Tipos de Consumible',
+    consumable_type: 'Tipos de Suministro',
+    consumable_types: 'Tipos de Suministro',
     credential_entry: 'Credenciales',
     credential_vault: 'Credenciales',
     credential_share: 'Credenciales',

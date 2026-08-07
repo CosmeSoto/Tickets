@@ -200,6 +200,17 @@ const nextConfig: NextConfig = {
         destination: '/verify/equipment/:id',
         permanent: false,
       },
+      // Consumibles / MRO → Suministros (UI)
+      {
+        source: '/inventory/mro/:id',
+        destination: '/inventory/suministros/:id',
+        permanent: true,
+      },
+      {
+        source: '/inventory/mro/:id/edit',
+        destination: '/inventory/suministros/:id/edit',
+        permanent: true,
+      },
     ]
   },
 

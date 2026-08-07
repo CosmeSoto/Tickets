@@ -107,7 +107,7 @@ export function BulkMROForm({
     e.preventDefault()
     if (!isDirectFormSubmit(e)) return
     if (!name.trim()) {
-      setError('El nombre del material es requerido')
+      setError('El nombre del suministro es requerido')
       return
     }
     if (isRequired('STOCK_MRO') && isVisible('STOCK_MRO') && !quantity) {
@@ -149,7 +149,7 @@ export function BulkMROForm({
         }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Error al crear el material')
+      if (!res.ok) throw new Error(data.error || 'Error al crear el suministro')
       setSuccess(true)
       onSuccess?.(data)
     } catch (err: any) {
@@ -169,10 +169,10 @@ export function BulkMROForm({
             </div>
             <div className='flex-1 space-y-3'>
               <h2 className='text-xl font-semibold text-green-900 dark:text-green-100'>
-                Material creado exitosamente
+                Suministro creado exitosamente
               </h2>
               <p className='text-sm text-green-700 dark:text-green-300'>
-                El material <strong>{name}</strong> fue registrado en el inventario.
+                El suministro <strong>{name}</strong> fue registrado en el inventario.
               </p>
               <div className='flex gap-2 pt-2'>
                 <Button onClick={() => router.push('/inventory')} className='flex-1'>
@@ -202,7 +202,7 @@ export function BulkMROForm({
       <StepHeader
         mode='bulk'
         step={3}
-        description='Registra una entrada de stock de materiales MRO / consumibles.'
+        description='Registra una entrada de stock de suministros / materiales.'
         familyName={familyName}
         familyColor={familyColor}
         subtypeName='MRO'
@@ -220,13 +220,13 @@ export function BulkMROForm({
       {/* ── Identificación del material ─────────────────────────── */}
       <div className='rounded-lg border bg-card p-5 space-y-4'>
         <div>
-          <h3 className='font-semibold mb-1'>Identificación del Material</h3>
-          <p className='text-xs text-muted-foreground'>Nombre y clasificación del material</p>
+          <h3 className='font-semibold mb-1'>Identificación del suministro</h3>
+          <p className='text-xs text-muted-foreground'>Nombre y clasificación del suministro</p>
         </div>
 
         <div className='space-y-1.5'>
           <Label htmlFor='name'>
-            Nombre del material <span className='text-destructive'>*</span>
+            Nombre del suministro <span className='text-destructive'>*</span>
           </Label>
           <Input
             id='name'
@@ -371,7 +371,7 @@ export function BulkMROForm({
       <div className='rounded-lg border bg-card p-5 space-y-4'>
         <div>
           <h3 className='font-semibold mb-1'>Adquisición</h3>
-          <p className='text-xs text-muted-foreground'>Cómo se obtiene este material</p>
+          <p className='text-xs text-muted-foreground'>Cómo se obtiene este suministro</p>
         </div>
 
         <div className='space-y-1.5'>
@@ -479,7 +479,7 @@ export function BulkMROForm({
           {submitting ? (
             <>
               <Package className='mr-2 h-4 w-4 animate-pulse' />
-              Creando material...
+              Creando suministro...
             </>
           ) : (
             <>

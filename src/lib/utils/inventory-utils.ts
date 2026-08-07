@@ -71,7 +71,7 @@ const SUBTYPE_CONFIG: Record<string, { label: string; className: string }> = {
       'bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100 dark:bg-blue-900 dark:text-blue-200 dark:border-blue-800',
   },
   MRO: {
-    label: 'Consumible',
+    label: 'Suministro',
     className:
       'bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-100 dark:bg-amber-900 dark:text-amber-200 dark:border-amber-800',
   },
@@ -89,6 +89,24 @@ export function getSubtypeConfig(subtype: string) {
       className: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200',
     }
   )
+}
+
+/** Ruta de ficha de activo en UI (MRO → /suministros). */
+export function getInventoryAssetPath(
+  subtype: string,
+  id: string,
+  suffix?: 'edit' | string
+): string {
+  const segment =
+    subtype === 'MRO' || subtype === 'mro'
+      ? 'suministros'
+      : subtype === 'LICENSE' || subtype === 'license'
+        ? 'license'
+        : subtype === 'EQUIPMENT' || subtype === 'equipment'
+          ? 'equipment'
+          : subtype.toLowerCase()
+  const base = `/inventory/${segment}/${id}`
+  return suffix ? `${base}/${suffix}` : base
 }
 
 // ── Alerta de renovación ──────────────────────────────────────────────────

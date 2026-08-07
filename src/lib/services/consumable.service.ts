@@ -92,7 +92,7 @@ export class ConsumableService {
   ): Promise<StockMovement> {
     const result = await prisma.$transaction(async tx => {
       const consumable = await tx.consumables.findUnique({ where: { id: data.consumableId } })
-      if (!consumable) throw new Error('Consumible no encontrado')
+      if (!consumable) throw new Error('Suministro no encontrado')
 
       // Bloquear EXIT sobre MRO caducado
       if (data.type === 'EXIT' && consumable.status === 'EXPIRED') {

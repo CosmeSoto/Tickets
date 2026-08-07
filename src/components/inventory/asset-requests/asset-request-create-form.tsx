@@ -32,7 +32,7 @@ import { AssetType } from '@prisma/client'
 const ASSET_TYPE_OPTIONS: { value: AssetType; label: string }[] = [
   { value: 'EQUIPMENT', label: 'Equipo' },
   { value: 'LICENSE', label: 'Licencia' },
-  { value: 'OTHER', label: 'Otro (consumible / general)' },
+  { value: 'OTHER', label: 'Otro (suministro / general)' },
 ]
 
 const formSchema = z.object({
