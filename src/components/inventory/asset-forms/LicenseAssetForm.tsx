@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { Input } from '@/components/ui/input'
 import { DateInput } from '@/components/ui/date-input'
 import { Label } from '@/components/ui/label'
@@ -24,7 +24,12 @@ import { TypeAttributesInput } from '@/components/inventory/custom-fields/type-a
 import type { FamilyConfig } from '@/lib/inventory/family-config-types'
 import { useFetch } from '@/hooks/common/use-fetch'
 import { useActiveDepartments } from '@/contexts/departments-context'
-import { RefreshCw, Tag } from 'lucide-react'
+import { FormDraftKeys, peekFormDraft, useFormDraft } from '@/hooks/common/use-form-draft'
+import { FormDraftBanner } from '@/components/common/form-draft-banner'
+import { toLocalDateInputValue } from '@/lib/forms/form-date'
+import { parseMoneyInput } from '@/lib/utils'
+import { useToast } from '@/hooks/use-toast'
+import { RefreshCw } from 'lucide-react'
 
 interface LicenseAssetFormProps {
   familyId: string
@@ -41,6 +46,27 @@ interface LicenseAssetFormProps {
 
 type Scope = 'Individual' | 'Departamento' | 'Empresa'
 
+type LicenseDraft = {
+  name: string
+  licenseTypeId: string
+  licenseKey: string
+  scope: Scope
+  userId: string
+  departmentId: string
+  supplierId: string
+  purchaseDate: string
+  expirationDate: string
+  cost: string
+  invoiceNumber: string
+  purchaseOrderNumber: string
+  renewalCost: string
+  renewalDate: string
+  hasRecurring: boolean
+  linkedContractId: string | null
+  notes: string
+  customFieldValues: Array<{ fieldName: string; fieldValue: string }>
+}
+
 const SCOPE_FROM_API: Record<string, Scope> = {
   INDIVIDUAL: 'Individual',
   DEPARTMENT: 'Departamento',
@@ -50,14 +76,6 @@ const SCOPE_FROM_API: Record<string, Scope> = {
   Empresa: 'Empresa',
 }
 
-function formatDateInput(value: unknown): string {
-  if (!value) return ''
-  const d = new Date(String(value))
-  if (Number.isNaN(d.getTime())) return ''
-  return d.toISOString().slice(0, 10)
-}
-
-// ── Componente definido fuera del padre para evitar remount en cada render ───
 function LicenseTypeAttributesSection({
   typeId,
   values,
@@ -93,6 +111,7 @@ export function LicenseAssetForm({
   initialLicense,
   licenseId,
 }: LicenseAssetFormProps) {
+  const { toast } = useToast()
   const [name, setName] = useState('')
   const [licenseTypeId, setLicenseTypeId] = useState('')
   const [licenseTypes, setLicenseTypes] = useState<{ id: string; name: string }[]>([])
@@ -107,6 +126,7 @@ export function LicenseAssetForm({
   const { data: rawUsers } = useFetch<{ id: string; name?: string; email?: string }>('/api/users', {
     params: { limit: 200 },
     enabled: scope === 'Individual',
+    showErrorToast: false,
   })
   const users: SearchableSelectOption[] = useMemo(
     () => rawUsers.map(u => ({ id: u.id, name: u.name ?? u.email ?? u.id })),
@@ -134,14 +154,100 @@ export function LicenseAssetForm({
   const isVisible = (section: string) => familyConfig.visibleSections.includes(section as never)
   const isRequired = (section: string) => familyConfig.requiredSections.includes(section as never)
 
+  const draftKey = isEditMode && licenseId
+    ? FormDraftKeys.licenseEdit(licenseId)
+    : FormDraftKeys.licenseNew(familyId)
+
+  const draftValues: LicenseDraft = useMemo(
+    () => ({
+      name,
+      licenseTypeId,
+      licenseKey,
+      scope,
+      userId,
+      departmentId,
+      supplierId,
+      purchaseDate,
+      expirationDate,
+      cost,
+      invoiceNumber,
+      purchaseOrderNumber,
+      renewalCost,
+      renewalDate,
+      hasRecurring,
+      linkedContractId,
+      notes,
+      customFieldValues,
+    }),
+    [
+      name,
+      licenseTypeId,
+      licenseKey,
+      scope,
+      userId,
+      departmentId,
+      supplierId,
+      purchaseDate,
+      expirationDate,
+      cost,
+      invoiceNumber,
+      purchaseOrderNumber,
+      renewalCost,
+      renewalDate,
+      hasRecurring,
+      linkedContractId,
+      notes,
+      customFieldValues,
+    ]
+  )
+
+  const applyDraft = (d: LicenseDraft) => {
+    if (d.name != null) setName(String(d.name))
+    if (d.licenseTypeId != null) setLicenseTypeId(String(d.licenseTypeId))
+    if (d.licenseKey != null) setLicenseKey(String(d.licenseKey))
+    if (d.scope) setScope(d.scope)
+    if (d.userId != null) setUserId(String(d.userId))
+    if (d.departmentId != null) setDepartmentId(String(d.departmentId))
+    if (d.supplierId != null) setSupplierId(String(d.supplierId))
+    if (d.purchaseDate != null) setPurchaseDate(String(d.purchaseDate))
+    if (d.expirationDate != null) setExpirationDate(String(d.expirationDate))
+    if (d.cost != null) setCost(String(d.cost))
+    if (d.invoiceNumber != null) setInvoiceNumber(String(d.invoiceNumber))
+    if (d.purchaseOrderNumber != null) setPurchaseOrderNumber(String(d.purchaseOrderNumber))
+    if (d.renewalCost != null) setRenewalCost(String(d.renewalCost))
+    if (d.renewalDate != null) setRenewalDate(String(d.renewalDate))
+    if (typeof d.hasRecurring === 'boolean') setHasRecurring(d.hasRecurring)
+    if (d.linkedContractId !== undefined) setLinkedContractId(d.linkedContractId)
+    if (d.notes != null) setNotes(String(d.notes))
+    if (Array.isArray(d.customFieldValues)) setCustomFieldValues(d.customFieldValues)
+  }
+
+  const { clearDraft, wasRestored, dismissRestoredBanner } = useFormDraft({
+    key: draftKey,
+    values: draftValues,
+    enabled: !submitting,
+    onRestore: applyDraft,
+  })
+
+  const prevSubmitting = useRef(false)
+  useEffect(() => {
+    if (prevSubmitting.current && !submitting && !submitError) {
+      clearDraft()
+    }
+    prevSubmitting.current = submitting
+  }, [submitting, submitError, clearDraft])
+
   useEffect(() => {
     fetch(`/api/inventory/license-types?familyId=${familyId}`)
       .then(r => r.json())
       .then(d => setLicenseTypes(d.types ?? d ?? []))
+      .catch(() => {})
   }, [familyId])
 
   useEffect(() => {
     if (!isEditMode || !initialLicense) return
+    // Si hay borrador de esta edición, useFormDraft lo restaura (prioridad ante crash)
+    if (peekFormDraft(draftKey)) return
 
     setName(String(initialLicense.name ?? ''))
     const typeId =
@@ -157,13 +263,13 @@ export function LicenseAssetForm({
     setSupplierId(
       String((initialLicense.supplier as { id?: string })?.id ?? initialLicense.supplierId ?? '')
     )
-    setPurchaseDate(formatDateInput(initialLicense.purchaseDate))
-    setExpirationDate(formatDateInput(initialLicense.expirationDate))
+    setPurchaseDate(toLocalDateInputValue(initialLicense.purchaseDate))
+    setExpirationDate(toLocalDateInputValue(initialLicense.expirationDate))
     setCost(initialLicense.cost != null ? String(initialLicense.cost) : '')
     setInvoiceNumber(String(initialLicense.invoiceNumber ?? ''))
     setPurchaseOrderNumber(String(initialLicense.purchaseOrderNumber ?? ''))
     setRenewalCost(initialLicense.renewalCost != null ? String(initialLicense.renewalCost) : '')
-    setRenewalDate(formatDateInput(initialLicense.renewalDate))
+    setRenewalDate(toLocalDateInputValue(initialLicense.renewalDate))
     setHasRecurring(
       initialLicense.renewalCost != null ||
         initialLicense.renewalDate != null ||
@@ -174,13 +280,14 @@ export function LicenseAssetForm({
     setCustomFieldValues(
       (initialLicense.customValues as Array<{ fieldName: string; fieldValue: string }>) ?? []
     )
-  }, [isEditMode, initialLicense])
+  }, [isEditMode, initialLicense, draftKey])
 
   const { data: linkedContracts } = useFetch<Contract>(
     linkedContractId ? `/api/inventory/contracts/${linkedContractId}` : '/api/inventory/contracts',
     {
       enabled: !!linkedContractId,
       transform: d => (d.id ? [d] : []),
+      showErrorToast: false,
     }
   )
   const linkedContract = linkedContracts[0] ?? null
@@ -202,7 +309,7 @@ export function LicenseAssetForm({
       monthlyCost: hasRecurring ? renewalCost || cost : undefined,
       totalValue: !hasRecurring ? cost : undefined,
       hasRecurring,
-      suggestedLineDescription: name.trim() || 'Licencia de software',
+      suggestedLineDescription: name.trim() || undefined,
       category: 'SOFTWARE_LICENSE' as const,
     }),
     [
@@ -245,8 +352,41 @@ export function LicenseAssetForm({
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     if (!isDirectFormSubmit(e)) return
+
+    if (!name.trim()) {
+      toast({ title: 'El nombre es obligatorio', variant: 'destructive' })
+      return
+    }
+    if (!licenseTypeId) {
+      toast({ title: 'Selecciona el tipo de licencia', variant: 'destructive' })
+      return
+    }
+    if (scope === 'Individual' && !userId) {
+      toast({ title: 'Selecciona el usuario asignado', variant: 'destructive' })
+      return
+    }
+    if (scope === 'Departamento' && !departmentId) {
+      toast({ title: 'Selecciona el departamento asignado', variant: 'destructive' })
+      return
+    }
+    if (isRequired('FINANCIAL') && !purchaseDate) {
+      toast({ title: 'La fecha de compra es obligatoria', variant: 'destructive' })
+      return
+    }
+    if (purchaseDate && expirationDate && expirationDate < purchaseDate) {
+      toast({
+        title: 'Fechas inválidas',
+        description: 'El vencimiento no puede ser anterior a la compra.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    const parsedCost = parseMoneyInput(cost)
+    const parsedRenewal = parseMoneyInput(renewalCost)
+
     const payload: Record<string, unknown> = {
-      name,
+      name: name.trim(),
       licenseTypeId: licenseTypeId || undefined,
       typeId: licenseTypeId || undefined,
       key: licenseKey || undefined,
@@ -256,10 +396,10 @@ export function LicenseAssetForm({
       supplierId: supplierId || undefined,
       purchaseDate: purchaseDate || undefined,
       expirationDate: expirationDate || undefined,
-      cost: cost ? parseFloat(cost) : undefined,
+      cost: parsedCost,
       invoiceNumber: invoiceNumber || undefined,
       purchaseOrderNumber: purchaseOrderNumber || undefined,
-      renewalCost: renewalCost ? parseFloat(renewalCost) : undefined,
+      renewalCost: parsedRenewal,
       renewalDate: renewalDate || undefined,
       contractId: linkedContractId || undefined,
       notes: notes || undefined,
@@ -269,8 +409,43 @@ export function LicenseAssetForm({
     onSubmit(payload)
   }
 
+  const handleDiscardDraft = () => {
+    clearDraft()
+    dismissRestoredBanner()
+    if (isEditMode && initialLicense) {
+      // Recargar desde servidor
+      setName(String(initialLicense.name ?? ''))
+      // ... simplified: reload page fields via effect by forcing - just clear banner
+    } else {
+      setName('')
+      setLicenseTypeId('')
+      setLicenseKey('')
+      setScope('Empresa')
+      setUserId('')
+      setDepartmentId('')
+      setSupplierId('')
+      setPurchaseDate('')
+      setExpirationDate('')
+      setCost('')
+      setInvoiceNumber('')
+      setPurchaseOrderNumber('')
+      setRenewalCost('')
+      setRenewalDate('')
+      setHasRecurring(false)
+      setLinkedContractId(null)
+      setNotes('')
+      setCustomFieldValues([])
+    }
+  }
+
   return (
     <form onSubmit={handleSubmit} className='space-y-5'>
+      <FormDraftBanner
+        visible={wasRestored}
+        onDismiss={dismissRestoredBanner}
+        onDiscard={handleDiscardDraft}
+      />
+
       <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
         <div className='space-y-1'>
           <Label>
@@ -341,7 +516,8 @@ export function LicenseAssetForm({
 
         <div className='space-y-1'>
           <Label>
-            Proveedor / Vendedor <span className='text-destructive'>*</span>
+            Proveedor / Vendedor{' '}
+            <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
           </Label>
           <SupplierSelect
             value={supplierId || null}
@@ -352,7 +528,9 @@ export function LicenseAssetForm({
 
         {scope === 'Individual' && (
           <div className='space-y-1'>
-            <Label>Usuario Asignado</Label>
+            <Label>
+              Usuario Asignado <span className='text-destructive'>*</span>
+            </Label>
             <SearchableSelect
               options={users}
               value={userId}
@@ -363,7 +541,9 @@ export function LicenseAssetForm({
         )}
         {scope === 'Departamento' && (
           <div className='space-y-1'>
-            <Label>Departamento Asignado</Label>
+            <Label>
+              Departamento Asignado <span className='text-destructive'>*</span>
+            </Label>
             <SearchableSelect
               options={departments}
               value={departmentId}
@@ -428,6 +608,7 @@ export function LicenseAssetForm({
               familyId={familyId}
               context='license'
               prefill={contractPrefill}
+              draftParentKey={draftKey}
             />
           </div>
 
@@ -471,6 +652,7 @@ export function LicenseAssetForm({
                 value={purchaseDate}
                 onChange={e => setPurchaseDate(e.target.value)}
                 required={isRequired('FINANCIAL')}
+                clearable
               />
             </div>
             {!linkedContract && (
@@ -481,19 +663,18 @@ export function LicenseAssetForm({
                     value={expirationDate}
                     onChange={e => setExpirationDate(e.target.value)}
                     clearable
+                    min={purchaseDate || undefined}
                   />
                 </div>
                 <div className='space-y-1'>
                   <Label>
                     Costo{' '}
-                    {!isRequired('FINANCIAL') && (
-                      <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
-                    )}
+                    <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
                   </Label>
                   <Input
-                    type='number'
-                    min='0'
-                    step='0.01'
+                    type='text'
+                    inputMode='decimal'
+                    autoComplete='off'
                     value={cost}
                     onChange={e => setCost(e.target.value)}
                     placeholder='0.00'

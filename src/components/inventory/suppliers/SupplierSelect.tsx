@@ -382,7 +382,7 @@ export function SupplierSelect({
 
       {/* Modal crear/editar */}
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
-        <DialogContent className='max-w-2xl' aria-describedby={undefined}>
+        <DialogContent className='w-[min(98vw,56rem)] max-w-4xl' aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>{editingSupplier ? 'Editar proveedor' : 'Nuevo proveedor'}</DialogTitle>
           </DialogHeader>

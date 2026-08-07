@@ -255,7 +255,7 @@ export function InlineCreateSelect({
       {/* Modal crear/editar */}
       {createForm && (
         <Dialog open={formOpen} onOpenChange={setFormOpen}>
-          <DialogContent className='max-w-lg' aria-describedby={undefined}>
+          <DialogContent className='w-[min(96vw,40rem)] max-w-2xl' aria-describedby={undefined}>
             <DialogHeader>
               <DialogTitle>{editingItem ? editTitle : createTitle}</DialogTitle>
             </DialogHeader>

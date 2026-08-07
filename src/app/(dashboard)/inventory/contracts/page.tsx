@@ -626,7 +626,7 @@ export default function ContractsPage() {
           }
         }}
       >
-        <DialogContent className='w-[min(96vw,72rem)] max-w-6xl max-h-[94vh]'>
+        <DialogContent className='w-[min(98vw,90rem)] max-w-[90rem] max-h-[94vh]'>
           <DialogHeader>
             <DialogTitle>
               {isClientOnly

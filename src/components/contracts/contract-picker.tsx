@@ -8,7 +8,7 @@
  * - Completar/editar contrato vinculado sin salir del flujo
  */
 
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { FileSignature, Plus, X, ExternalLink, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -30,6 +30,7 @@ import {
   type ContractPickerContext,
   type ContractPickerPrefill,
 } from '@/lib/contracts/contract-picker-prefill'
+import { FormDraftKeys } from '@/hooks/common/use-form-draft'
 
 interface Props {
   value: string | null
@@ -41,6 +42,8 @@ interface Props {
   context?: ContractPickerContext
   /** Datos del formulario padre para pre-rellenar creación */
   prefill?: ContractPickerPrefill | null
+  /** Clave del borrador del formulario padre (licencia/equipo) para anidar el del contrato */
+  draftParentKey?: string
 }
 
 type PickerTab = 'link' | 'create' | 'edit'
@@ -53,9 +56,17 @@ export function ContractPicker({
   disabled,
   context = 'license',
   prefill = null,
+  draftParentKey,
 }: Props) {
   const [open, setOpen] = useState(false)
   const [tab, setTab] = useState<PickerTab>('link')
+  const [formDirty, setFormDirty] = useState(false)
+
+  const contractDraftKey = useMemo(() => {
+    if (tab === 'edit' && value) return FormDraftKeys.contractEdit(value)
+    const parent = draftParentKey || familyId || 'anon'
+    return FormDraftKeys.contractEmbed(context, parent)
+  }, [tab, value, draftParentKey, familyId, context])
 
   const resolvedPrefill = useMemo(
     () =>
@@ -81,6 +92,7 @@ export function ContractPicker({
       return list.filter((c: { status: string }) => c.status === 'ACTIVE' || c.status === 'DRAFT')
     },
     enabled: open && tab === 'link',
+    showErrorToast: false,
   })
 
   const { data: selectedContracts, reload: reloadSelected } = useFetch<Contract>(
@@ -88,17 +100,46 @@ export function ContractPicker({
     {
       enabled: !!value,
       transform: d => (d.id ? [d] : []),
+      showErrorToast: false,
     }
   )
   const selectedContract = selectedContracts[0] ?? null
 
+  const isFormTab = tab === 'create' || tab === 'edit'
+
+  const confirmDiscard = useCallback(() => {
+    if (!formDirty || !isFormTab) return true
+    return window.confirm(
+      'Hay cambios sin guardar en el contrato. ¿Cerrar y descartar lo que estabas llenando?'
+    )
+  }, [formDirty, isFormTab])
+
+  const closePicker = useCallback(() => {
+    if (!confirmDiscard()) return
+    setFormDirty(false)
+    setOpen(false)
+  }, [confirmDiscard])
+
+  const handleOpenChange = useCallback(
+    (next: boolean) => {
+      if (next) {
+        setOpen(true)
+        return
+      }
+      closePicker()
+    },
+    [closePicker]
+  )
+
   const openPicker = (initialTab: PickerTab = 'link') => {
+    setFormDirty(false)
     setTab(initialTab)
     setOpen(true)
   }
 
   const handleLink = (contractId: string) => {
     onChange(contractId)
+    setFormDirty(false)
     setOpen(false)
   }
 
@@ -106,6 +147,7 @@ export function ContractPicker({
     onChange(contract.id)
     reload()
     reloadSelected()
+    setFormDirty(false)
     setOpen(false)
   }
 
@@ -113,10 +155,19 @@ export function ContractPicker({
     onChange(contract.id)
     reload()
     reloadSelected()
+    setFormDirty(false)
     setOpen(false)
   }
 
   const handleClear = () => onChange(null)
+
+  const switchTab = (next: PickerTab) => {
+    if (isFormTab && formDirty && next !== tab) {
+      if (!confirmDiscard()) return
+      setFormDirty(false)
+    }
+    setTab(next)
+  }
 
   const contextLabel = context === 'license' ? 'licencia' : 'equipo'
 
@@ -187,8 +238,20 @@ export function ContractPicker({
         </Button>
       )}
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className='w-[min(96vw,72rem)] max-w-6xl max-h-[94vh] p-0 gap-0 overflow-hidden'>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent
+          className='w-[min(98vw,90rem)] max-w-[90rem] h-[min(94vh,56rem)] max-h-[94vh] p-0 gap-0 overflow-hidden flex flex-col'
+          onEscapeKeyDown={e => {
+            if (isFormTab && formDirty) {
+              e.preventDefault()
+              closePicker()
+            }
+          }}
+          onPointerDownOutside={e => {
+            // Evita cerrar al click fuera mientras se edita/crea (pérdida de datos)
+            if (isFormTab) e.preventDefault()
+          }}
+        >
           <DialogHeader className='px-6 pt-6 pb-3 border-b shrink-0'>
             <DialogTitle>
               {tab === 'edit' ? 'Completar contrato' : 'Gestionar contrato'}
@@ -202,16 +265,18 @@ export function ContractPicker({
             </DialogDescription>
           </DialogHeader>
 
-          <div className='overflow-y-auto max-h-[calc(94vh-5.5rem)] px-6 py-4'>
+          <div className='overflow-y-auto flex-1 min-h-0 px-6 py-4'>
             {tab === 'edit' && selectedContract ? (
               <ContractForm
                 contract={selectedContract}
                 embedMode
+                draftKey={contractDraftKey}
+                onDirtyChange={setFormDirty}
                 onSuccess={handleUpdated}
-                onCancel={() => setOpen(false)}
+                onCancel={closePicker}
               />
             ) : (
-              <Tabs value={tab} onValueChange={v => setTab(v as PickerTab)}>
+              <Tabs value={tab} onValueChange={v => switchTab(v as PickerTab)}>
                 <TabsList className='grid w-full grid-cols-2'>
                   <TabsTrigger value='link'>Vincular existente</TabsTrigger>
                   <TabsTrigger value='create'>Crear contrato</TabsTrigger>
@@ -230,7 +295,7 @@ export function ContractPicker({
                         type='button'
                         size='sm'
                         className='mt-4'
-                        onClick={() => setTab('create')}
+                        onClick={() => switchTab('create')}
                       >
                         <Plus className='h-4 w-4 mr-1' /> Crear contrato
                       </Button>
@@ -245,7 +310,7 @@ export function ContractPicker({
                           type='button'
                           variant='outline'
                           size='sm'
-                          onClick={() => setTab('create')}
+                          onClick={() => switchTab('create')}
                         >
                           <Plus className='h-4 w-4 mr-1' /> Nuevo contrato
                         </Button>
@@ -260,7 +325,7 @@ export function ContractPicker({
                         placeholder='Buscar contrato...'
                         emptyLabel='Sin contratos disponibles'
                       />
-                      <div className='space-y-1 max-h-72 overflow-y-auto'>
+                      <div className='space-y-1 max-h-[min(50vh,28rem)] overflow-y-auto'>
                         {contracts.map(c => (
                           <button
                             key={c.id}
@@ -300,9 +365,15 @@ export function ContractPicker({
                 <TabsContent value='create' className='pt-4'>
                   <ContractForm
                     embedMode
+                    draftKey={contractDraftKey}
                     prefill={resolvedPrefill}
+                    onDirtyChange={setFormDirty}
                     onSuccess={handleCreated}
-                    onCancel={() => setTab('link')}
+                    onCancel={() => {
+                      if (!confirmDiscard()) return
+                      setFormDirty(false)
+                      setTab('link')
+                    }}
                   />
                 </TabsContent>
               </Tabs>

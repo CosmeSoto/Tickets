@@ -26,6 +26,8 @@ import { ContractPaymentsPanel } from '@/components/contracts/contract-payments-
 import { ContractAssignmentsPanel } from '@/components/contracts/contract-assignments-panel'
 import { ContractAmendmentsPanel } from '@/components/contracts/contract-amendments-panel'
 import { ContractFormSection } from '@/components/contracts/contract-form-section'
+import { FormDraftBanner } from '@/components/common/form-draft-banner'
+import { FormDraftKeys, useFormDraft } from '@/hooks/common/use-form-draft'
 import { parseMoneyInput } from '@/lib/utils'
 import {
   CONTRACT_CATEGORY_LABELS,
@@ -39,7 +41,7 @@ import {
   type ContractFormData,
 } from '@/types/contracts'
 import type { ContractPickerPrefill } from '@/lib/contracts/contract-picker-prefill'
-import { applyContractFormPrefill } from '@/lib/contracts/apply-contract-prefill'
+import { applyContractFormPrefill, lineTypeForCategory } from '@/lib/contracts/apply-contract-prefill'
 
 interface ContractAttachment {
   id: string
@@ -57,6 +59,10 @@ interface Props {
   readOnly?: boolean
   embedMode?: boolean
   prefill?: ContractPickerPrefill | null
+  /** Notifica si el formulario tiene cambios sin guardar (para confirmar al cerrar). */
+  onDirtyChange?: (dirty: boolean) => void
+  /** Clave sessionStorage para borrador (página o embebido). */
+  draftKey?: string
 }
 
 const EMPTY_LINE = {
@@ -77,6 +83,8 @@ export function ContractForm({
   readOnly = false,
   embedMode = false,
   prefill = null,
+  onDirtyChange,
+  draftKey,
 }: Props) {
   const { toast } = useToast()
   const [submitting, setSubmitting] = useState(false)
@@ -156,8 +164,9 @@ export function ContractForm({
     contactName?: string | null
     website?: string | null
   }>('/api/inventory/suppliers', {
-    params: { active: 'true', limit: 500 },
+    params: { active: 'true', limit: 100 },
     transform: d => d.suppliers ?? d ?? [],
+    showErrorToast: false,
   })
 
   const supplierOptions = useMemo(
@@ -178,6 +187,7 @@ export function ContractForm({
     role: string
   }>('/api/inventory/assignable-users', {
     transform: d => d.users ?? [],
+    showErrorToast: false,
   })
 
   const custodianOptions = useMemo(
@@ -208,7 +218,9 @@ export function ContractForm({
     control,
     watch,
     setValue,
-    formState: { errors },
+    formState: { errors, isDirty },
+    reset,
+    getValues,
   } = useForm<ContractFormData>({
     defaultValues: {
       contractNumber: contract?.contractNumber ?? '',
@@ -268,6 +280,67 @@ export function ContractForm({
   const { fields, append, remove } = useFieldArray({ control, name: 'lines' })
 
   useEffect(() => {
+    onDirtyChange?.(isDirty)
+  }, [isDirty, onDirtyChange])
+
+  useEffect(() => {
+    return () => onDirtyChange?.(false)
+  }, [onDirtyChange])
+
+  const resolvedDraftKey =
+    draftKey ??
+    (isEditing && contract?.id ? FormDraftKeys.contractEdit(contract.id) : FormDraftKeys.contractNew())
+
+  const watchedDraft = watch()
+  const draftSnapshot = useMemo(() => {
+    const v = watchedDraft
+    return {
+      name: v.name ?? '',
+      contractNumber: v.contractNumber ?? '',
+      description: v.description ?? '',
+      category: v.category ?? 'SERVICE',
+      serviceSubtype: v.serviceSubtype ?? '',
+      supplierId: v.supplierId ?? '',
+      familyId: v.familyId ?? '',
+      startDate: v.startDate ?? '',
+      endDate: v.endDate ?? '',
+      autoRenew: !!v.autoRenew,
+      renewalNoticeDays: v.renewalNoticeDays ?? 30,
+      billingCycle: v.billingCycle ?? 'MONTHLY',
+      totalValue: v.totalValue ?? '',
+      monthlyCost: v.monthlyCost ?? '',
+      currency: v.currency ?? 'USD',
+      contactName: v.contactName ?? '',
+      contactEmail: v.contactEmail ?? '',
+      contactPhone: v.contactPhone ?? '',
+      notes: v.notes ?? '',
+      termsUrl: v.termsUrl ?? '',
+      paymentMethodType: v.paymentMethodType ?? 'CORPORATE_CARD',
+      lines: (v.lines ?? []).map(l => ({
+        type: l.type,
+        description: l.description,
+        quantity: l.quantity,
+        unitPrice: l.unitPrice,
+        notes: l.notes,
+        order: l.order,
+      })),
+    }
+  }, [watchedDraft])
+
+  const { clearDraft, wasRestored, dismissRestoredBanner } = useFormDraft({
+    key: resolvedDraftKey,
+    values: draftSnapshot,
+    enabled: !readOnly && !submitting,
+    onRestore: data => {
+      reset({
+        ...getValues(),
+        ...data,
+        lines: Array.isArray(data.lines) ? data.lines : getValues('lines'),
+      } as ContractFormData)
+    },
+  })
+
+  useEffect(() => {
     if (contract || !prefill) return
     applyContractFormPrefill(prefill, setValue, line => append(line), fields.length)
   }, [contract, prefill, setValue, append, fields.length])
@@ -298,9 +371,10 @@ export function ContractForm({
   const { data: licenses } = useFetch<{ id: string; name: string; vendor?: string | null }>(
     '/api/inventory/licenses',
     {
-      params: { familyId: familyId || undefined, limit: 300 },
+      params: { familyId: familyId || undefined, limit: 100 },
       transform: d => d.licenses ?? [],
       enabled: !!familyId,
+      showErrorToast: false,
     }
   )
 
@@ -365,20 +439,24 @@ export function ContractForm({
       const recurring = data.billingCycle !== 'ONE_TIME'
       const monthlyCost = parseMoneyInput(data.monthlyCost)
       const totalValue = parseMoneyInput(data.totalValue)
+      // Payload limpio (sin spread de RHF) para evitar campos basura / ids de field-array
       const payload = {
-        ...data,
+        name: data.name.trim(),
         contractNumber: emptyToUndef(data.contractNumber),
         description: emptyToUndef(data.description),
+        category: data.category,
         supplierId: emptyToUndef(data.supplierId),
         familyId: emptyToUndef(data.familyId),
         startDate: start,
         endDate: end,
+        autoRenew: data.autoRenew,
+        billingCycle: data.billingCycle,
+        currency: data.currency,
         contactName: emptyToUndef(data.contactName),
         contactEmail: emptyToUndef(data.contactEmail),
         contactPhone: emptyToUndef(data.contactPhone),
         notes: emptyToUndef(data.notes),
         termsUrl: emptyToUndef(data.termsUrl),
-        // Ciclo recurrente → monthlyCost; pago único → totalValue (0 es válido)
         totalValue: !recurring ? totalValue : undefined,
         monthlyCost: recurring ? monthlyCost : undefined,
         renewalNoticeDays: Number(data.renewalNoticeDays) || 30,
@@ -401,15 +479,19 @@ export function ContractForm({
         paymentCardBank: emptyToUndef(data.paymentCardBank),
         paymentCardExpiry: emptyToUndef(data.paymentCardExpiry),
         corporateCardLabel: emptyToUndef(data.corporateCardLabel),
-        lines: data.lines.map((l, i) => ({
-          ...l,
-          quantity: parseMoneyInput(l.quantity) ?? 1,
-          unitPrice: parseMoneyInput(l.unitPrice),
-          equipmentId: emptyToUndef(l.equipmentId),
-          licenseId: emptyToUndef(l.licenseId),
-          notes: emptyToUndef(l.notes),
-          order: i,
-        })),
+        subscriptionUsageStatus: data.subscriptionUsageStatus,
+        lines: data.lines
+          .filter(l => l.description?.trim())
+          .map((l, i) => ({
+            type: l.type || lineTypeForCategory(data.category),
+            description: l.description.trim(),
+            quantity: parseMoneyInput(l.quantity) ?? 1,
+            unitPrice: parseMoneyInput(l.unitPrice),
+            equipmentId: emptyToUndef(l.equipmentId),
+            licenseId: emptyToUndef(l.licenseId),
+            notes: emptyToUndef(l.notes),
+            order: i,
+          })),
       }
 
       const url = isEditing
@@ -449,6 +531,7 @@ export function ContractForm({
       }
 
       toast({ title: isEditing ? 'Contrato actualizado' : 'Contrato creado' })
+      clearDraft()
       onSuccess(saved)
     } catch (err: any) {
       toast({ title: 'Error', description: err.message, variant: 'destructive' })
@@ -459,12 +542,18 @@ export function ContractForm({
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className='space-y-4'>
-      {embedMode && (
-        <p className='text-xs text-muted-foreground'>
-          Completa las secciones esenciales (1–2). El resto es opcional y puedes expandirlo según
-          necesites.
-        </p>
-      )}
+      <FormDraftBanner
+        visible={wasRestored}
+        onDismiss={dismissRestoredBanner}
+        onDiscard={() => {
+          clearDraft()
+          dismissRestoredBanner()
+        }}
+      />
+      <p className='text-xs text-muted-foreground'>
+        Empieza por <strong>Datos generales</strong>. Abre las demás secciones solo cuando las
+        necesites; así el formulario no se siente sobrecargado.
+      </p>
       <fieldset disabled={readOnly} className={readOnly ? 'space-y-4' : 'contents'}>
         {/* ── 1. Datos generales ──────────────────────────────────────────── */}
         <ContractFormSection
@@ -583,7 +672,7 @@ export function ContractForm({
         <ContractFormSection
           title='2. Vigencia y costos'
           description='Fechas, ciclo de facturación y monto según el ciclo (recurrente o pago único).'
-          collapsible={false}
+          defaultOpen={false}
         >
           <div className={formGrid}>
             <div className='space-y-1'>
@@ -723,7 +812,7 @@ export function ContractForm({
           title='3. Contacto del proveedor'
           description='Se auto-completa con el proveedor seleccionado.'
           badge='Opcional'
-          defaultOpen={!embedMode}
+          defaultOpen={false}
         >
           <div className={formGrid}>
             <div className='space-y-1'>
@@ -754,7 +843,7 @@ export function ContractForm({
           title='4. Facturación y responsables'
           description='Custodios, método de pago y trazabilidad de cargos (auditoría).'
           badge='Opcional'
-          defaultOpen={!embedMode}
+          defaultOpen={false}
         >
           <div className={formGrid}>
             <div className='space-y-1 sm:col-span-2 lg:col-span-3'>
@@ -929,7 +1018,13 @@ export function ContractForm({
             </div>
             <div className='space-y-1'>
               <Label>Último cargo (monto)</Label>
-              <Input type='number' min='0' step='0.01' {...register('lastChargeAmount')} />
+              <Input
+                type='text'
+                inputMode='decimal'
+                autoComplete='off'
+                {...register('lastChargeAmount')}
+                placeholder='0.00'
+              />
             </div>
             <div className='sm:col-span-2 lg:col-span-3 space-y-1'>
               <Label>Referencia última transacción</Label>
@@ -940,26 +1035,52 @@ export function ContractForm({
 
         {/* ── 5. Líneas del contrato ──────────────────────────────────────── */}
         <ContractFormSection
-          title='5. Líneas del contrato'
-          description='Cada línea vincula un activo. Al guardar se sincronizan vigencia y costo.'
-          defaultOpen
-          badge={embedMode ? 'Recomendado' : undefined}
+          title='5. Líneas adicionales'
+          description={
+            embedMode
+              ? 'El activo que estás creando se vinculará al guardar. Aquí solo agrega otros ítems del mismo contrato.'
+              : 'Ítems del contrato (equipos, software, servicios). No duplica la categoría del contrato.'
+          }
+          defaultOpen={false}
+          badge='Opcional'
         >
           <div className='space-y-3'>
+            {embedMode && (
+              <p className='text-xs rounded-md border border-dashed px-3 py-2 text-muted-foreground'>
+                La categoría en Datos generales ya define el tipo de contrato. No hace falta repetir
+                «Software» / «Licencia de software» aquí: al guardar el activo se crea el vínculo
+                automáticamente.
+              </p>
+            )}
             <div className='flex justify-end'>
               <Button
                 type='button'
                 variant='outline'
                 size='sm'
-                onClick={() => append({ ...EMPTY_LINE, order: fields.length })}
+                onClick={() =>
+                  append({
+                    ...EMPTY_LINE,
+                    type: lineTypeForCategory(selectedCategory),
+                    description: watch('name')?.trim()
+                      ? `${watch('name').trim()} (ítem adicional)`
+                      : '',
+                    unitPrice:
+                      billingCycle !== 'ONE_TIME'
+                        ? watch('monthlyCost') || ''
+                        : watch('totalValue') || '',
+                    order: fields.length,
+                  })
+                }
                 disabled={readOnly}
               >
-                <Plus className='h-4 w-4 mr-1' /> Agregar línea
+                <Plus className='h-4 w-4 mr-1' /> Agregar ítem
               </Button>
             </div>
             {fields.length === 0 && (
               <p className='text-sm text-muted-foreground text-center py-4'>
-                Sin líneas. Agrega servicios, equipos o software incluidos en este contrato.
+                {embedMode
+                  ? 'Sin ítems adicionales. Puedes crear el contrato y vincular el activo al guardar.'
+                  : 'Sin líneas. Agrega ítems incluidos en este contrato si aplica.'}
               </p>
             )}
             {fields.map((field, i) => (
@@ -1002,8 +1123,8 @@ export function ContractForm({
                     </Label>
                     <Input
                       className='h-8 text-sm'
-                      {...register(`lines.${i}.description`, { required: true })}
-                      placeholder='Descripción del servicio o ítem'
+                      {...register(`lines.${i}.description`)}
+                      placeholder='Ej: Servidor Dell rack 2U — no repetir la categoría'
                     />
                   </div>
                   <div className='space-y-1'>
@@ -1066,7 +1187,7 @@ export function ContractForm({
           title='6. Documentos adjuntos'
           description='Contrato físico en PDF u otros documentos relacionados.'
           badge='Opcional'
-          defaultOpen={isEditing}
+          defaultOpen={false}
         >
           <div className='space-y-4'>
             {/* Adjuntos existentes (solo en edición) */}

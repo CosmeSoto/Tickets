@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { Input } from '@/components/ui/input'
 import { DateInput } from '@/components/ui/date-input'
 import { SerialNumberInput } from '@/components/ui/serial-number-input'
@@ -47,6 +47,9 @@ import {
   type DepreciationMethod,
 } from '@/lib/inventory/depreciation'
 import { useActiveDepartments } from '@/contexts/departments-context'
+import { FormDraftKeys, useFormDraft } from '@/hooks/common/use-form-draft'
+import { FormDraftBanner } from '@/components/common/form-draft-banner'
+import { toLocalDateInputValue } from '@/lib/forms/form-date'
 import { X, Plus, ChevronDown, ChevronUp, AlertCircle, Tag } from 'lucide-react'
 
 interface EquipmentAssetFormProps {
@@ -213,9 +216,7 @@ export function EquipmentAssetForm({
     initialEquipment?.rentalClientResponse || 'NOT_NOTIFIED'
   )
   const [purchaseDate, setPurchaseDate] = useState(
-    initialEquipment?.purchaseDate
-      ? new Date(initialEquipment.purchaseDate).toISOString().split('T')[0]
-      : ''
+    toLocalDateInputValue(initialEquipment?.purchaseDate)
   )
   const [purchasePrice, setPurchasePrice] = useState(
     initialEquipment?.purchasePrice != null ? String(initialEquipment.purchasePrice) : ''
@@ -271,6 +272,7 @@ export function EquipmentAssetForm({
     {
       enabled: !!linkedContractId && acquisitionMode === 'RENTAL',
       transform: d => (d.id ? [d] : []),
+      showErrorToast: false,
     }
   )
   const linkedContract = linkedContracts[0] ?? null
@@ -748,8 +750,155 @@ export function EquipmentAssetForm({
     }
   }
 
+  const draftKey =
+    isEditMode && equipmentId
+      ? FormDraftKeys.equipmentEdit(equipmentId)
+      : FormDraftKeys.equipmentNew(familyId)
+
+  const equipmentDraftValues = useMemo(
+    () => ({
+      acquisitionMode,
+      code,
+      serialNumber,
+      selectedBrandId,
+      selectedModelId,
+      equipmentTypeId,
+      condition,
+      equipmentStatus,
+      accessories,
+      customFieldValues,
+      supplierId,
+      linkedContractId,
+      rentalDeliveryDate,
+      rentalBuyoutValue,
+      rentalClientResponse,
+      purchaseDate,
+      purchasePrice,
+      invoiceNumber,
+      purchaseOrderNumber,
+      estimatedPrice,
+      depreciationMethod,
+      usefulLifeYears,
+      residualValue,
+      totalUnits,
+      usedUnits,
+      unitLabel,
+      warehouseId,
+      assignedUserId,
+      assignmentEndDate,
+      notes,
+      physicalLocation,
+      saleListingPrice,
+      maintenanceDate,
+      maintenanceType,
+      maintenanceTechnicianId,
+      maintenanceSupplierId,
+      maintenanceDescription,
+    }),
+    [
+      acquisitionMode,
+      code,
+      serialNumber,
+      selectedBrandId,
+      selectedModelId,
+      equipmentTypeId,
+      condition,
+      equipmentStatus,
+      accessories,
+      customFieldValues,
+      supplierId,
+      linkedContractId,
+      rentalDeliveryDate,
+      rentalBuyoutValue,
+      rentalClientResponse,
+      purchaseDate,
+      purchasePrice,
+      invoiceNumber,
+      purchaseOrderNumber,
+      estimatedPrice,
+      depreciationMethod,
+      usefulLifeYears,
+      residualValue,
+      totalUnits,
+      usedUnits,
+      unitLabel,
+      warehouseId,
+      assignedUserId,
+      assignmentEndDate,
+      notes,
+      physicalLocation,
+      saleListingPrice,
+      maintenanceDate,
+      maintenanceType,
+      maintenanceTechnicianId,
+      maintenanceSupplierId,
+      maintenanceDescription,
+    ]
+  )
+
+  const { clearDraft, wasRestored, dismissRestoredBanner } = useFormDraft({
+    key: draftKey,
+    values: equipmentDraftValues,
+    enabled: !submitting,
+    onRestore: d => {
+      if (d.acquisitionMode) setAcquisitionMode(d.acquisitionMode as typeof acquisitionMode)
+      if (d.code != null) setCode(String(d.code))
+      if (d.serialNumber != null) setSerialNumber(String(d.serialNumber))
+      if (d.selectedBrandId != null) setSelectedBrandId(String(d.selectedBrandId))
+      if (d.selectedModelId != null) setSelectedModelId(String(d.selectedModelId))
+      if (d.equipmentTypeId != null) setEquipmentTypeId(String(d.equipmentTypeId))
+      if (d.condition != null) setCondition(String(d.condition))
+      if (d.equipmentStatus != null) setEquipmentStatus(String(d.equipmentStatus))
+      if (Array.isArray(d.accessories)) setAccessories(d.accessories as string[])
+      if (Array.isArray(d.customFieldValues)) setCustomFieldValues(d.customFieldValues as typeof customFieldValues)
+      if (d.supplierId != null) setSupplierId(String(d.supplierId))
+      if (d.linkedContractId !== undefined) setLinkedContractId(d.linkedContractId as string | null)
+      if (d.rentalDeliveryDate != null) setRentalDeliveryDate(String(d.rentalDeliveryDate))
+      if (d.rentalBuyoutValue != null) setRentalBuyoutValue(String(d.rentalBuyoutValue))
+      if (d.rentalClientResponse != null) setRentalClientResponse(String(d.rentalClientResponse))
+      if (d.purchaseDate != null) setPurchaseDate(String(d.purchaseDate))
+      if (d.purchasePrice != null) setPurchasePrice(String(d.purchasePrice))
+      if (d.invoiceNumber != null) setInvoiceNumber(String(d.invoiceNumber))
+      if (d.purchaseOrderNumber != null) setPurchaseOrderNumber(String(d.purchaseOrderNumber))
+      if (d.estimatedPrice != null) setEstimatedPrice(String(d.estimatedPrice))
+      if (d.depreciationMethod != null) setDepreciationMethod(d.depreciationMethod as typeof depreciationMethod)
+      if (d.usefulLifeYears != null) setUsefulLifeYears(String(d.usefulLifeYears))
+      if (d.residualValue != null) setResidualValue(String(d.residualValue))
+      if (d.totalUnits != null) setTotalUnits(String(d.totalUnits))
+      if (d.usedUnits != null) setUsedUnits(String(d.usedUnits))
+      if (d.unitLabel != null) setUnitLabel(String(d.unitLabel))
+      if (d.warehouseId != null) setWarehouseId(String(d.warehouseId))
+      if (d.assignedUserId != null) setAssignedUserId(String(d.assignedUserId))
+      if (d.assignmentEndDate != null) setAssignmentEndDate(String(d.assignmentEndDate))
+      if (d.notes != null) setNotes(String(d.notes))
+      if (d.physicalLocation != null) setPhysicalLocation(String(d.physicalLocation))
+      if (d.saleListingPrice != null) setSaleListingPrice(String(d.saleListingPrice))
+      if (d.maintenanceDate != null) setMaintenanceDate(String(d.maintenanceDate))
+      if (d.maintenanceType != null) setMaintenanceType(d.maintenanceType as typeof maintenanceType)
+      if (d.maintenanceTechnicianId != null) setMaintenanceTechnicianId(String(d.maintenanceTechnicianId))
+      if (d.maintenanceSupplierId != null) setMaintenanceSupplierId(String(d.maintenanceSupplierId))
+      if (d.maintenanceDescription != null) setMaintenanceDescription(String(d.maintenanceDescription))
+    },
+  })
+
+  const prevSubmittingEq = useRef(false)
+  useEffect(() => {
+    if (prevSubmittingEq.current && !submitting && !submitError) {
+      clearDraft()
+    }
+    prevSubmittingEq.current = submitting
+  }, [submitting, submitError, clearDraft])
+
   return (
     <form onSubmit={handleSubmit} className='space-y-5'>
+      <FormDraftBanner
+        visible={wasRestored}
+        onDismiss={dismissRestoredBanner}
+        onDiscard={() => {
+          clearDraft()
+          dismissRestoredBanner()
+        }}
+      />
       {/* ── 1. IDENTIFICACIÓN ─────────────────────────────────────── */}
       <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
         {/* Tipo de equipo */}
@@ -1186,6 +1335,7 @@ export function EquipmentAssetForm({
                 familyId={familyId}
                 context='equipment'
                 prefill={contractPrefill}
+                draftParentKey={draftKey}
               />
               {linkedContract && contractFinancial ? (
                 <div className='rounded-md border bg-muted/30 px-3 py-2.5 space-y-1'>

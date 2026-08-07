@@ -13,6 +13,23 @@ type LineDraft = {
   order: number
 }
 
+/** Descripciones genéricas que duplican la categoría — no crear línea automática. */
+const GENERIC_LINE_DESCRIPTIONS = new Set([
+  'licencia de software',
+  'equipo en arrendamiento',
+  'software',
+  'equipo',
+])
+
+export function lineTypeForCategory(
+  category?: ContractFormData['category'] | string | null
+): ContractLineType {
+  if (category === 'SOFTWARE_LICENSE') return 'SOFTWARE'
+  if (category === 'EQUIPMENT_RENTAL') return 'EQUIPMENT'
+  if (category === 'MAINTENANCE' || category === 'SUPPORT') return 'SERVICE'
+  return 'SERVICE'
+}
+
 /** Aplica prefill al formulario completo de contrato (creación embebida). */
 export function applyContractFormPrefill(
   prefill: ContractPickerPrefill,
@@ -33,7 +50,8 @@ export function applyContractFormPrefill(
   if (prefill.endDate) setValue('endDate', prefill.endDate)
   if (prefill.billingCycle) setValue('billingCycle', prefill.billingCycle)
 
-  const isRecurring = (prefill.billingCycle ?? (prefill.hasRecurring ? 'MONTHLY' : 'ONE_TIME')) !== 'ONE_TIME'
+  const isRecurring =
+    (prefill.billingCycle ?? (prefill.hasRecurring ? 'MONTHLY' : 'ONE_TIME')) !== 'ONE_TIME'
   if (isRecurring && prefill.monthlyCost != null && prefill.monthlyCost !== '') {
     setValue('monthlyCost', String(prefill.monthlyCost))
     setValue('totalValue', '')
@@ -43,7 +61,13 @@ export function applyContractFormPrefill(
   }
   if (prefill.description) setValue('description', prefill.description)
 
-  if (prefill.suggestedLineDescription && currentLineCount === 0) {
+  // Solo prellenar línea si hay identificación concreta del activo (no texto genérico
+  // que repite la categoría: "Licencia de software" / "Equipo en arrendamiento").
+  const rawDesc = prefill.suggestedLineDescription?.trim()
+  const isGeneric =
+    !rawDesc || GENERIC_LINE_DESCRIPTIONS.has(rawDesc.toLowerCase())
+
+  if (rawDesc && !isGeneric && currentLineCount === 0) {
     const unitPrice = isRecurring
       ? prefill.monthlyCost != null
         ? String(prefill.monthlyCost)
@@ -52,8 +76,8 @@ export function applyContractFormPrefill(
         ? String(prefill.totalValue)
         : ''
     appendLine({
-      type: prefill.suggestedLineType ?? 'SOFTWARE',
-      description: prefill.suggestedLineDescription,
+      type: prefill.suggestedLineType ?? lineTypeForCategory(prefill.category),
+      description: rawDesc,
       quantity: '1',
       unitPrice,
       equipmentId: '',
