@@ -42,7 +42,7 @@ export async function buildGeneralActSnapshot(params: {
         unitOfMeasure: { select: { name: true, symbol: true } },
       },
     })
-    if (!consumable) throw new Error('El consumible referenciado no existe')
+    if (!consumable) throw new Error('El suministro referenciado no existe')
 
     const unit = consumable.unitOfMeasure?.symbol ?? consumable.unitOfMeasure?.name ?? 'u'
     return {

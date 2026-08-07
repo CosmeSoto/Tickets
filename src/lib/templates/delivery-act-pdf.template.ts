@@ -187,11 +187,11 @@ export async function generateDeliveryActPDF(
   const halfW = CW / 2 - 8
 
   if (actType === 'MRO_DELIVERY') {
-    // ── Materiales / Consumibles ─────────────────────────────────────────
-    y = sectionTitle('Material Entregado', y)
+    // ── Suministros ─────────────────────────────────────────────────────
+    y = sectionTitle('Suministro Entregado', y)
 
-    // Nombre completo del material
-    y = fieldRow('NOMBRE DEL MATERIAL', snap.name || snap.code || '—', y)
+    // Nombre completo del suministro
+    y = fieldRow('NOMBRE DEL SUMINISTRO', snap.name || snap.code || '—', y)
 
     // Categoría | Cantidad entregada
     doc

@@ -84,7 +84,7 @@ export async function checkStockAlerts(): Promise<void> {
   for (const item of lowStockItems) {
     await notifyFamilyAdmins(item.consumableType?.familyId ?? null, {
       type: 'WARNING',
-      title: 'Stock bajo de consumible',
+      title: 'Stock bajo de suministro',
       message: `El material "${item.name}" tiene stock bajo: ${item.currentStock} unidades (mínimo: ${item.minStock}).`,
       metadata: { link: '/inventory/consumables' },
     })
@@ -204,7 +204,7 @@ export async function checkMROExpiryAlerts(): Promise<void> {
 
     await notifyFamilyAdmins(familyId, {
       type: 'WARNING',
-      title: 'Consumible próximo a caducar',
+      title: 'Suministro próximo a caducar',
       message: `Material "${item.name}" caduca el ${item.expirationDate?.toLocaleDateString('es-CL') ?? 'fecha desconocida'}. Stock actual: ${item.currentStock}.`,
       metadata: { link: '/inventory/consumables' },
     })
@@ -214,7 +214,7 @@ export async function checkMROExpiryAlerts(): Promise<void> {
     if (item.expirationDate && item.expirationDate <= urgentDate) {
       await notifyFamilyAdmins(familyId, {
         type: 'ERROR',
-        title: '¡URGENTE! Consumible caduca pronto',
+        title: '¡URGENTE! Suministro caduca pronto',
         message: `Material "${item.name}" caduca en menos de ${urgentDays} días (${item.expirationDate.toLocaleDateString('es-CL')}). Stock: ${item.currentStock}.`,
         metadata: { link: '/inventory/consumables' },
       })

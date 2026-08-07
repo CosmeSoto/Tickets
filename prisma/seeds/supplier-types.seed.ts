@@ -9,8 +9,8 @@ const SUPPLIER_TYPES = [
   },
   {
     code: 'CONSUMABLE',
-    name: 'Consumibles',
-    description: 'Proveedor de materiales MRO y consumibles',
+    name: 'Suministros',
+    description: 'Proveedor de materiales MRO y suministros',
   },
   { code: 'LICENSE', name: 'Licencias', description: 'Proveedor de software y licencias' },
   { code: 'MIXED', name: 'Mixto', description: 'Proveedor de múltiples categorías' },

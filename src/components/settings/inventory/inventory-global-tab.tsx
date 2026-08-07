@@ -64,7 +64,7 @@ export function InventoryGlobalTab({
             <div>
               <p className='text-sm font-medium'>Alertas de stock bajo</p>
               <p className='text-xs text-muted-foreground'>
-                Notificar cuando un consumible esté por debajo del mínimo
+                Notificar cuando un suministro esté por debajo del mínimo
               </p>
             </div>
             <Switch

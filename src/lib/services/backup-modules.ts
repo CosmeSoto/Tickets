@@ -67,7 +67,7 @@ export const BACKUP_MODULE_REGISTRY: Record<BackupModuleId, BackupModuleDefiniti
     id: 'inventory',
     label: 'Inventario',
     description:
-      'Equipos, licencias, consumibles, mantenimientos, proveedores, contratos, bodegas, modelos, marcas, tipos y sus configuraciones.',
+      'Equipos, licencias, suministros, mantenimientos, proveedores, contratos, bodegas, modelos, marcas, tipos y sus configuraciones.',
   },
   credentials: {
     id: 'credentials',

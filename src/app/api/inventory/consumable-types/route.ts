@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     if (error instanceof InventoryAccessError) return inventoryAccessToResponse(error)
     console.error('Error en GET /api/inventory/consumable-types:', error)
-    return NextResponse.json({ error: 'Error al obtener tipos de consumible' }, { status: 500 })
+    return NextResponse.json({ error: 'Error al obtener tipos de suministro' }, { status: 500 })
   }
 }
 
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
     })
     if (existing) {
       return NextResponse.json(
-        { error: 'Ya existe un tipo de consumible con este código' },
+        { error: 'Ya existe un tipo de suministro con este código' },
         { status: 400 }
       )
     }
@@ -88,12 +88,12 @@ export async function POST(request: NextRequest) {
       ipAddress:
         request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
       userAgent: request.headers.get('user-agent') || 'unknown',
-    }).catch(err => console.error('[AUDIT] Error registrando creación de tipo de consumible:', err))
+    }).catch(err => console.error('[AUDIT] Error registrando creación de tipo de suministro:', err))
 
     return NextResponse.json(newType, { status: 201 })
   } catch (error) {
     if (error instanceof InventoryAccessError) return inventoryAccessToResponse(error)
     console.error('Error en POST /api/inventory/consumable-types:', error)
-    return NextResponse.json({ error: 'Error al crear tipo de consumible' }, { status: 500 })
+    return NextResponse.json({ error: 'Error al crear tipo de suministro' }, { status: 500 })
   }
 }

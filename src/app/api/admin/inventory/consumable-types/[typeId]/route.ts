@@ -22,7 +22,7 @@ const consumableTypeUpdateSchema = z.object({
 })
 
 /**
- * GET - Obtener tipo de consumible por ID
+ * GET - Obtener tipo de suministro por ID
  */
 export async function GET(
   request: NextRequest,
@@ -58,18 +58,18 @@ export async function GET(
     })
 
     if (!consumableType) {
-      return NextResponse.json({ error: 'Tipo de consumible no encontrado' }, { status: 404 })
+      return NextResponse.json({ error: 'Tipo de suministro no encontrado' }, { status: 404 })
     }
 
     return NextResponse.json({ consumableType })
   } catch (error) {
-    console.error('Error obteniendo tipo de consumible:', error)
-    return NextResponse.json({ error: 'Error al obtener tipo de consumible' }, { status: 500 })
+    console.error('Error obteniendo tipo de suministro:', error)
+    return NextResponse.json({ error: 'Error al obtener tipo de suministro' }, { status: 500 })
   }
 }
 
 /**
- * PUT - Actualizar tipo de consumible
+ * PUT - Actualizar tipo de suministro
  */
 export async function PUT(
   request: NextRequest,
@@ -104,7 +104,7 @@ export async function PUT(
     })
 
     if (!existing) {
-      return NextResponse.json({ error: 'Tipo de consumible no encontrado' }, { status: 404 })
+      return NextResponse.json({ error: 'Tipo de suministro no encontrado' }, { status: 404 })
     }
 
     // Si se cambia el código, verificar que no exista otro con el mismo código
@@ -115,7 +115,7 @@ export async function PUT(
 
       if (duplicate) {
         return NextResponse.json(
-          { error: 'Ya existe un tipo de consumible con ese código' },
+          { error: 'Ya existe un tipo de suministro con ese código' },
           { status: 409 }
         )
       }
@@ -150,13 +150,13 @@ export async function PUT(
 
     return NextResponse.json({ type: consumableType })
   } catch (error) {
-    console.error('Error actualizando tipo de consumible:', error)
-    return NextResponse.json({ error: 'Error al actualizar tipo de consumible' }, { status: 500 })
+    console.error('Error actualizando tipo de suministro:', error)
+    return NextResponse.json({ error: 'Error al actualizar tipo de suministro' }, { status: 500 })
   }
 }
 
 /**
- * DELETE - Eliminar tipo de consumible
+ * DELETE - Eliminar tipo de suministro
  */
 export async function DELETE(
   request: NextRequest,
@@ -188,10 +188,10 @@ export async function DELETE(
     })
 
     if (!existing) {
-      return NextResponse.json({ error: 'Tipo de consumible no encontrado' }, { status: 404 })
+      return NextResponse.json({ error: 'Tipo de suministro no encontrado' }, { status: 404 })
     }
 
-    // Verificar si tiene consumibles asignados
+    // Verificar si tiene suministros asignados
     if (existing._count.consumables > 0) {
       // Soft delete - solo desactivar
       const consumableType = await prisma.consumable_types.update({
@@ -201,7 +201,7 @@ export async function DELETE(
 
       return NextResponse.json({
         success: true,
-        message: `Tipo de consumible desactivado (tiene ${existing._count.consumables} consumibles asignados)`,
+        message: `Tipo de suministro desactivado (tiene ${existing._count.consumables} suministros asignados)`,
         type: consumableType,
       })
     } else {
@@ -212,11 +212,11 @@ export async function DELETE(
 
       return NextResponse.json({
         success: true,
-        message: 'Tipo de consumible eliminado',
+        message: 'Tipo de suministro eliminado',
       })
     }
   } catch (error) {
-    console.error('Error eliminando tipo de consumible:', error)
-    return NextResponse.json({ error: 'Error al eliminar tipo de consumible' }, { status: 500 })
+    console.error('Error eliminando tipo de suministro:', error)
+    return NextResponse.json({ error: 'Error al eliminar tipo de suministro' }, { status: 500 })
   }
 }

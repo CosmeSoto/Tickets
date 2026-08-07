@@ -9,14 +9,11 @@ import { canManageInventory, inventoryForbidden } from '@/lib/inventory-access'
  * @deprecated Este endpoint está deprecado y será eliminado el 2026-06-08.
  * Las unidades de medida ahora son atributos de consumable_types.
  */
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-    if (!await canManageInventory(session.user.id, session.user.role)) {
+    if (!(await canManageInventory(session.user.id, session.user.role))) {
       return inventoryForbidden()
     }
 
@@ -45,21 +42,44 @@ export async function PUT(
       entityId: id,
       userId: session.user.id,
       details: { name: updated.name, code: updated.code },
-      oldValues: { name: existing.name, symbol: existing.symbol, description: existing.description, order: existing.order, isActive: existing.isActive },
-      newValues: { name: updated.name, symbol: updated.symbol, description: updated.description, order: updated.order, isActive: updated.isActive },
-      ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
+      oldValues: {
+        name: existing.name,
+        symbol: existing.symbol,
+        description: existing.description,
+        order: existing.order,
+        isActive: existing.isActive,
+      },
+      newValues: {
+        name: updated.name,
+        symbol: updated.symbol,
+        description: updated.description,
+        order: updated.order,
+        isActive: updated.isActive,
+      },
+      ipAddress:
+        request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
       userAgent: request.headers.get('user-agent') || 'unknown',
-    }).catch(err => console.error('[AUDIT] Error registrando actualización de unidad de medida:', err))
+    }).catch(err =>
+      console.error('[AUDIT] Error registrando actualización de unidad de medida:', err)
+    )
 
     const response = NextResponse.json(updated)
     response.headers.set('X-Deprecated', 'true')
     response.headers.set('X-Deprecated-Date', '2026-06-08')
-    response.headers.set('Warning', '299 - "Este endpoint está deprecado. Las unidades ahora son atributos de tipos de consumibles"')
+    response.headers.set(
+      'Warning',
+      '299 - "Este endpoint está deprecado. Las unidades ahora son atributos de tipos de suministros"'
+    )
     return response
   } catch (error: any) {
     console.error('Error en PUT /api/inventory/units-of-measure/[id]:', error)
     return NextResponse.json(
-      { error: error?.code === 'P2025' ? 'Unidad de medida no encontrada' : 'Error al actualizar unidad de medida' },
+      {
+        error:
+          error?.code === 'P2025'
+            ? 'Unidad de medida no encontrada'
+            : 'Error al actualizar unidad de medida',
+      },
       { status: error?.code === 'P2025' ? 404 : 500 }
     )
   }
@@ -76,7 +96,10 @@ export async function DELETE(
     const session = await getServerSession(authOptions)
     if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     if (session.user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Solo administradores pueden eliminar unidades de medida' }, { status: 403 })
+      return NextResponse.json(
+        { error: 'Solo administradores pueden eliminar unidades de medida' },
+        { status: 403 }
+      )
     }
 
     const { id } = await params
@@ -88,24 +111,41 @@ export async function DELETE(
 
     const count = await prisma.consumables.count({ where: { unitOfMeasureId: id } })
     if (count > 0) {
-      const updated = await prisma.units_of_measure.update({ where: { id }, data: { isActive: false } })
+      const updated = await prisma.units_of_measure.update({
+        where: { id },
+        data: { isActive: false },
+      })
 
       await AuditServiceComplete.log({
         action: AuditActionsComplete.UNIT_OF_MEASURE_UPDATED,
         entityType: 'inventory',
         entityId: id,
         userId: session.user.id,
-        details: { name: existing.name, code: existing.code, action: 'desactivada', reason: `${count} consumible(s) la usan` },
+        details: {
+          name: existing.name,
+          code: existing.code,
+          action: 'desactivada',
+          reason: `${count} suministro(s) la usan`,
+        },
         oldValues: { isActive: true },
         newValues: { isActive: false },
-        ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
+        ipAddress:
+          request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
         userAgent: request.headers.get('user-agent') || 'unknown',
-      }).catch(err => console.error('[AUDIT] Error registrando desactivación de unidad de medida:', err))
+      }).catch(err =>
+        console.error('[AUDIT] Error registrando desactivación de unidad de medida:', err)
+      )
 
-      const response = NextResponse.json({ message: `Unidad desactivada. ${count} consumible(s) la usan.`, unit: updated })
+      const response = NextResponse.json({
+        message: `Unidad desactivada. ${count} suministro(s) la usan.`,
+        unit: updated,
+      })
       response.headers.set('X-Deprecated', 'true')
       response.headers.set('X-Deprecated-Date', '2026-06-08')
-      response.headers.set('Warning', '299 - "Este endpoint está deprecado. Las unidades ahora son atributos de tipos de consumibles"')
+      response.headers.set(
+        'Warning',
+        '299 - "Este endpoint está deprecado. Las unidades ahora son atributos de tipos de suministros"'
+      )
       return response
     }
 
@@ -117,25 +157,29 @@ export async function DELETE(
       entityId: id,
       userId: session.user.id,
       details: { name: existing.name, code: existing.code },
-      ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
+      ipAddress:
+        request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
       userAgent: request.headers.get('user-agent') || 'unknown',
-    }).catch(err => console.error('[AUDIT] Error registrando eliminación de unidad de medida:', err))
+    }).catch(err =>
+      console.error('[AUDIT] Error registrando eliminación de unidad de medida:', err)
+    )
 
     const response = NextResponse.json({ message: 'Unidad eliminada permanentemente' })
     response.headers.set('X-Deprecated', 'true')
     response.headers.set('X-Deprecated-Date', '2026-06-08')
-    response.headers.set('Warning', '299 - "Este endpoint está deprecado. Las unidades ahora son atributos de tipos de consumibles"')
+    response.headers.set(
+      'Warning',
+      '299 - "Este endpoint está deprecado. Las unidades ahora son atributos de tipos de suministros"'
+    )
     return response
   } catch (error: any) {
     console.error('Error en DELETE /api/inventory/units-of-measure/[id]:', error)
-    const message = error?.code === 'P2003'
-      ? 'No se puede eliminar: hay registros que dependen de esta unidad'
-      : error?.code === 'P2025'
-        ? 'Unidad de medida no encontrada'
-        : 'Error al eliminar unidad de medida'
-    return NextResponse.json(
-      { error: message },
-      { status: error?.code === 'P2025' ? 404 : 500 }
-    )
+    const message =
+      error?.code === 'P2003'
+        ? 'No se puede eliminar: hay registros que dependen de esta unidad'
+        : error?.code === 'P2025'
+          ? 'Unidad de medida no encontrada'
+          : 'Error al eliminar unidad de medida'
+    return NextResponse.json({ error: message }, { status: error?.code === 'P2025' ? 404 : 500 })
   }
 }

@@ -12,7 +12,7 @@ import { AttributeHandler } from '@/lib/api/attribute-handler'
 const handler = new AttributeHandler('consumable')
 
 /**
- * GET - Obtener atributos de un tipo de consumible
+ * GET - Obtener atributos de un tipo de suministro
  */
 export async function GET(request: NextRequest, context: { params: Promise<{ typeId: string }> }) {
   const session = await getServerSession(authOptions)
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ typ
 }
 
 /**
- * POST - Crear atributo para un tipo de consumible
+ * POST - Crear atributo para un tipo de suministro
  */
 export async function POST(request: NextRequest, context: { params: Promise<{ typeId: string }> }) {
   const session = await getServerSession(authOptions)

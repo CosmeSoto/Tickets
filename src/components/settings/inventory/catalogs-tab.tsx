@@ -242,7 +242,9 @@ export function CatalogsTab({ familyId, familyColor }: CatalogsTabProps) {
             onDeleteType={equipmentTypes.deleteType}
             onToggleActive={equipmentTypes.toggleActive}
             onManageAttributes={handleManageEquipmentAttributes}
-            onCloneSuccess={() => { /* No recargar: el tipo se copia a OTRA familia */ }}
+            onCloneSuccess={() => {
+              /* No recargar: el tipo se copia a OTRA familia */
+            }}
           />
         </CardContent>
       </Card>
@@ -271,7 +273,9 @@ export function CatalogsTab({ familyId, familyColor }: CatalogsTabProps) {
             onDeleteType={licenseTypes.deleteType}
             onToggleActive={licenseTypes.toggleActive}
             onManageAttributes={handleManageLicenseAttributes}
-            onCloneSuccess={() => { /* Tipo copiado a otra familia */ }}
+            onCloneSuccess={() => {
+              /* Tipo copiado a otra familia */
+            }}
           />
         </CardContent>
       </Card>
@@ -283,9 +287,9 @@ export function CatalogsTab({ familyId, familyColor }: CatalogsTabProps) {
         <CardHeader>
           <CardTitle className='flex items-center gap-2'>
             <Box className='h-5 w-5' />
-            Consumibles
+            Suministros
           </CardTitle>
-          <CardDescription>Tipos de materiales y consumibles (tóner, cables, etc.)</CardDescription>
+          <CardDescription>Tipos de materiales y suministros (tóner, cables, etc.)</CardDescription>
         </CardHeader>
         <CardContent>
           <TypeSection
@@ -300,7 +304,9 @@ export function CatalogsTab({ familyId, familyColor }: CatalogsTabProps) {
             onDeleteType={consumableTypes.deleteType}
             onToggleActive={consumableTypes.toggleActive}
             onManageAttributes={handleManageConsumableAttributes}
-            onCloneSuccess={() => { /* Tipo copiado a otra familia */ }}
+            onCloneSuccess={() => {
+              /* Tipo copiado a otra familia */
+            }}
           />
         </CardContent>
       </Card>

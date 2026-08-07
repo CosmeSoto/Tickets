@@ -21,7 +21,7 @@ const consumableTypeSchema = z.object({
 })
 
 /**
- * GET - Obtener todos los tipos de consumible
+ * GET - Obtener todos los tipos de suministro
  * Query params:
  * - familyId: filtrar por familia (opcional)
  */
@@ -68,13 +68,13 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ types: consumableTypes })
   } catch (error) {
-    console.error('Error obteniendo tipos de consumible:', error)
-    return NextResponse.json({ error: 'Error al obtener tipos de consumible' }, { status: 500 })
+    console.error('Error obteniendo tipos de suministro:', error)
+    return NextResponse.json({ error: 'Error al obtener tipos de suministro' }, { status: 500 })
   }
 }
 
 /**
- * POST - Crear tipo de consumible
+ * POST - Crear tipo de suministro
  */
 export async function POST(request: NextRequest) {
   try {
@@ -117,12 +117,12 @@ export async function POST(request: NextRequest) {
 
     if (existing) {
       return NextResponse.json(
-        { error: 'Ya existe un tipo de consumible con ese código' },
+        { error: 'Ya existe un tipo de suministro con ese código' },
         { status: 409 }
       )
     }
 
-    // Crear tipo de consumible
+    // Crear tipo de suministro
     const consumableType = await prisma.consumable_types.create({
       data: {
         code: validation.data.code,
@@ -147,7 +147,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ type: consumableType }, { status: 201 })
   } catch (error) {
-    console.error('Error creando tipo de consumible:', error)
-    return NextResponse.json({ error: 'Error al crear tipo de consumible' }, { status: 500 })
+    console.error('Error creando tipo de suministro:', error)
+    return NextResponse.json({ error: 'Error al crear tipo de suministro' }, { status: 500 })
   }
 }

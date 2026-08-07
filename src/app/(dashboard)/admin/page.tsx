@@ -475,7 +475,7 @@ export default function AdminDashboard() {
                     href='/inventory'
                     icon={Package}
                     title='Gestión de Inventario'
-                    description='Equipos, consumibles y licencias'
+                    description='Equipos, suministros y licencias'
                     color='orange'
                     badge={stats.inventoryStats.totalAssets}
                   />

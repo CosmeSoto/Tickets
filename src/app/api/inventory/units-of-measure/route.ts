@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
     response.headers.set('X-Deprecated-Replacement', 'Atributos de consumable_types')
     response.headers.set(
       'Warning',
-      '299 - "Este endpoint está deprecado. Las unidades ahora son atributos de tipos de consumibles"'
+      '299 - "Este endpoint está deprecado. Las unidades ahora son atributos de tipos de suministros"'
     )
 
     return response
@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
     response.headers.set('X-Deprecated-Date', '2026-06-08')
     response.headers.set(
       'Warning',
-      '299 - "Este endpoint está deprecado. Las unidades ahora son atributos de tipos de consumibles"'
+      '299 - "Este endpoint está deprecado. Las unidades ahora son atributos de tipos de suministros"'
     )
 
     return response

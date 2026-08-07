@@ -65,7 +65,7 @@ export function WarehouseCard({ warehouse, onEdit, onDelete, disabled }: Warehou
           <div className='flex items-center gap-1.5 text-sm'>
             <Package className='h-4 w-4 text-muted-foreground' />
             <span className='font-medium'>{warehouse._count?.consumables || 0}</span>
-            <span className='text-muted-foreground'>consumibles</span>
+            <span className='text-muted-foreground'>suministros</span>
           </div>
         </div>
 

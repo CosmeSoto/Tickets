@@ -1,6 +1,6 @@
 /**
  * POST /api/admin/inventory/consumable-types/clone
- * Copia un tipo de consumible (con todos sus atributos) a otra familia.
+ * Copia un tipo de suministro (con todos sus atributos) a otra familia.
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'

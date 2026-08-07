@@ -26,7 +26,7 @@ export async function PUT(
 
     const existing = await prisma.consumable_types.findUnique({ where: { id: typeId } })
     if (!existing) {
-      return NextResponse.json({ error: 'Tipo de consumible no encontrado' }, { status: 404 })
+      return NextResponse.json({ error: 'Tipo de suministro no encontrado' }, { status: 404 })
     }
 
     await assertCatalogEntryWrite(user, existing.familyId)
@@ -72,7 +72,7 @@ export async function PUT(
         request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
       userAgent: request.headers.get('user-agent') || 'unknown',
     }).catch(err =>
-      console.error('[AUDIT] Error registrando actualización de tipo de consumible:', err)
+      console.error('[AUDIT] Error registrando actualización de tipo de suministro:', err)
     )
 
     return NextResponse.json(updated)
@@ -82,8 +82,8 @@ export async function PUT(
       {
         error:
           error?.code === 'P2025'
-            ? 'Tipo de consumible no encontrado'
-            : 'Error al actualizar tipo de consumible',
+            ? 'Tipo de suministro no encontrado'
+            : 'Error al actualizar tipo de suministro',
       },
       { status: error?.code === 'P2025' ? 404 : 500 }
     )
@@ -103,7 +103,7 @@ export async function DELETE(
 
     const existing = await prisma.consumable_types.findUnique({ where: { id: typeId } })
     if (!existing) {
-      return NextResponse.json({ error: 'Tipo de consumible no encontrado' }, { status: 404 })
+      return NextResponse.json({ error: 'Tipo de suministro no encontrado' }, { status: 404 })
     }
 
     const count = await prisma.consumables.count({ where: { typeId: typeId } })
@@ -122,7 +122,7 @@ export async function DELETE(
           name: existing.name,
           code: existing.code,
           action: 'desactivado',
-          reason: `${count} consumible(s) usan este tipo`,
+          reason: `${count} suministro(s) usan este tipo`,
         },
         oldValues: { isActive: true },
         newValues: { isActive: false },
@@ -130,11 +130,11 @@ export async function DELETE(
           request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
         userAgent: request.headers.get('user-agent') || 'unknown',
       }).catch(err =>
-        console.error('[AUDIT] Error registrando desactivación de tipo de consumible:', err)
+        console.error('[AUDIT] Error registrando desactivación de tipo de suministro:', err)
       )
 
       return NextResponse.json({
-        message: `Tipo desactivado. ${count} consumible(s) usan este tipo.`,
+        message: `Tipo desactivado. ${count} suministro(s) usan este tipo.`,
         type: updated,
       })
     }
@@ -151,7 +151,7 @@ export async function DELETE(
         request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
       userAgent: request.headers.get('user-agent') || 'unknown',
     }).catch(err =>
-      console.error('[AUDIT] Error registrando eliminación de tipo de consumible:', err)
+      console.error('[AUDIT] Error registrando eliminación de tipo de suministro:', err)
     )
 
     return NextResponse.json({ message: 'Tipo eliminado permanentemente' })
@@ -162,8 +162,8 @@ export async function DELETE(
       error?.code === 'P2003'
         ? 'No se puede eliminar: hay registros que dependen de este tipo'
         : error?.code === 'P2025'
-          ? 'Tipo de consumible no encontrado'
-          : 'Error al eliminar tipo de consumible'
+          ? 'Tipo de suministro no encontrado'
+          : 'Error al eliminar tipo de suministro'
     return NextResponse.json({ error: message }, { status: error?.code === 'P2025' ? 404 : 500 })
   }
 }

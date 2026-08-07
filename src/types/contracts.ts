@@ -3,44 +3,50 @@
  */
 
 export type ContractStatus = 'DRAFT' | 'ACTIVE' | 'EXPIRING' | 'EXPIRED' | 'TERMINATED' | 'RENEWED'
-export type ContractCategory = 'EQUIPMENT_RENTAL' | 'SOFTWARE_LICENSE' | 'SERVICE' | 'MAINTENANCE' | 'SUPPORT' | 'OTHER'
+export type ContractCategory =
+  | 'EQUIPMENT_RENTAL'
+  | 'SOFTWARE_LICENSE'
+  | 'SERVICE'
+  | 'MAINTENANCE'
+  | 'SUPPORT'
+  | 'OTHER'
 export type ContractLineType = 'EQUIPMENT' | 'SOFTWARE' | 'SERVICE' | 'CONSUMABLE' | 'OTHER'
 export type BillingCycle = 'MONTHLY' | 'QUARTERLY' | 'SEMIANNUAL' | 'ANNUAL' | 'ONE_TIME'
 
 // ── Labels ────────────────────────────────────────────────────────────────────
 
 export const CONTRACT_STATUS_LABELS: Record<ContractStatus, string> = {
-  DRAFT:      'Borrador',
-  ACTIVE:     'Vigente',
-  EXPIRING:   'Por vencer',
-  EXPIRED:    'Vencido',
+  DRAFT: 'Borrador',
+  ACTIVE: 'Vigente',
+  EXPIRING: 'Por vencer',
+  EXPIRED: 'Vencido',
   TERMINATED: 'Terminado',
-  RENEWED:    'Renovado',
+  RENEWED: 'Renovado',
 }
 
 export const CONTRACT_CATEGORY_LABELS: Record<ContractCategory, string> = {
   EQUIPMENT_RENTAL: 'Arrendamiento de equipo',
   SOFTWARE_LICENSE: 'Licencia de software',
-  SERVICE:          'Servicio',
-  MAINTENANCE:      'Mantenimiento',
-  SUPPORT:          'Soporte',
-  OTHER:            'Otro',
+  SERVICE: 'Servicio',
+  MAINTENANCE: 'Mantenimiento',
+  SUPPORT: 'Soporte',
+  OTHER: 'Otro',
 }
 
 export const CONTRACT_LINE_TYPE_LABELS: Record<ContractLineType, string> = {
-  EQUIPMENT:  'Equipo',
-  SOFTWARE:   'Software',
-  SERVICE:    'Servicio',
-  CONSUMABLE: 'Consumible',
-  OTHER:      'Otro',
+  EQUIPMENT: 'Equipo',
+  SOFTWARE: 'Software',
+  SERVICE: 'Servicio',
+  CONSUMABLE: 'Suministro',
+  OTHER: 'Otro',
 }
 
 export const BILLING_CYCLE_LABELS: Record<BillingCycle, string> = {
-  MONTHLY:    'Mensual',
-  QUARTERLY:  'Trimestral',
+  MONTHLY: 'Mensual',
+  QUARTERLY: 'Trimestral',
   SEMIANNUAL: 'Semestral',
-  ANNUAL:     'Anual',
-  ONE_TIME:   'Pago único',
+  ANNUAL: 'Anual',
+  ONE_TIME: 'Pago único',
 }
 
 export type SubscriptionUsageStatus = 'ACTIVE' | 'UNUSED' | 'PENDING_CANCEL' | 'CANCELLED'

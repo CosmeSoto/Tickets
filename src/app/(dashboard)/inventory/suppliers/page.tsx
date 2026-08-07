@@ -496,7 +496,7 @@ export default function SuppliersPage() {
             </AlertDialogTitle>
             <AlertDialogDescription>
               El proveedor quedará inactivo y no aparecerá en nuevos formularios. Solo se puede
-              desactivar si no tiene equipos, consumibles o licencias asociados actualmente.
+              desactivar si no tiene equipos, suministros o licencias asociados actualmente.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

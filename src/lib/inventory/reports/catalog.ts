@@ -339,8 +339,8 @@ export const REPORT_DATASETS: ReportDatasetDef[] = [
   {
     id: 'consumables',
     categoryId: 'inventory',
-    name: 'Materiales MRO',
-    description: 'Stock de consumibles con mínimos y valor',
+    name: 'Suministros',
+    description: 'Stock de suministros con mínimos y valor',
     icon: 'Boxes',
     roles: ['ADMIN', 'SUPER_ADMIN', 'MANAGER'],
     filters: [
@@ -533,7 +533,7 @@ export const REPORT_DATASETS: ReportDatasetDef[] = [
     id: 'expiring',
     categoryId: 'contracts',
     name: 'Próximos vencimientos',
-    description: 'Licencias, garantías, consumibles y rentas por urgencia',
+    description: 'Licencias, garantías, suministros y rentas por urgencia',
     icon: 'Clock',
     roles: ['ADMIN', 'SUPER_ADMIN', 'MANAGER'],
     filters: [
@@ -564,7 +564,7 @@ export const REPORT_DATASETS: ReportDatasetDef[] = [
     id: 'stock-movements',
     categoryId: 'operations',
     name: 'Movimientos de stock',
-    description: 'Entradas, salidas y ajustes de materiales MRO',
+    description: 'Entradas, salidas y ajustes de suministros',
     icon: 'ShoppingCart',
     roles: ['ADMIN', 'SUPER_ADMIN', 'MANAGER'],
     filters: [
@@ -583,7 +583,7 @@ export const REPORT_DATASETS: ReportDatasetDef[] = [
     ],
     columns: [
       { key: 'fecha', label: 'Fecha', defaultVisible: true },
-      { key: 'consumible', label: 'Material', defaultVisible: true },
+      { key: 'consumible', label: 'Suministro', defaultVisible: true },
       { key: 'familia', label: 'Familia', defaultVisible: true },
       { key: 'tipo', label: 'Tipo', defaultVisible: true },
       { key: 'cantidad', label: 'Cantidad', defaultVisible: true },
