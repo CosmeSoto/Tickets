@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
-import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
+import { useSyncDashboardPageMeta } from '@/contexts/dashboard-shell-context'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -101,6 +101,11 @@ export default function HelpCenterPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [config, setConfig] = useState<HelpConfig | null>(null)
 
+  useSyncDashboardPageMeta({
+    title: 'Centro de Ayuda',
+    subtitle: 'Encuentra respuestas rápidas a tus preguntas',
+  })
+
   // Cargar configuración del sistema de ayuda
   useEffect(() => {
     const loadConfig = async () => {
@@ -119,10 +124,6 @@ export default function HelpCenterPage() {
   }, [])
 
   return (
-    <RoleDashboardLayout
-      title='Centro de Ayuda'
-      subtitle='Encuentra respuestas rápidas a tus preguntas'
-    >
       <div className='max-w-6xl mx-auto space-y-8'>
         {/* Búsqueda */}
         <Card>
@@ -369,6 +370,5 @@ export default function HelpCenterPage() {
           </CardContent>
         </Card>
       </div>
-    </RoleDashboardLayout>
   )
 }

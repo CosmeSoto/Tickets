@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
+import { useSyncDashboardPageMeta } from '@/contexts/dashboard-shell-context'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -179,6 +179,11 @@ export default function DocumentationPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [config, setConfig] = useState<HelpConfig | null>(null)
 
+  useSyncDashboardPageMeta({
+    title: 'Documentación',
+    subtitle: `Guías completas y recursos para ${config?.companyName || 'el sistema'}`,
+  })
+
   // Cargar configuración del sistema de ayuda
   useEffect(() => {
     const loadConfig = async () => {
@@ -221,10 +226,6 @@ export default function DocumentationPage() {
   }
 
   return (
-    <RoleDashboardLayout
-      title='Documentación'
-      subtitle={`Guías completas y recursos para ${config?.companyName || 'el sistema'}`}
-    >
       <div className='max-w-6xl mx-auto space-y-8'>
         {/* Búsqueda */}
         <Card>
@@ -405,6 +406,5 @@ export default function DocumentationPage() {
           </CardContent>
         </Card>
       </div>
-    </RoleDashboardLayout>
   )
 }

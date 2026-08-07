@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
-import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
+import { useSyncDashboardPageMeta } from '@/contexts/dashboard-shell-context'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -54,6 +54,11 @@ export default function ContactSupportPage() {
     category: '',
     priority: 'MEDIUM',
     message: '',
+  })
+
+  useSyncDashboardPageMeta({
+    title: 'Contactar Soporte',
+    subtitle: `Obtén ayuda directa de nuestro equipo de ${config?.companyName || 'soporte'}`,
   })
 
   // Cargar configuración del sistema de ayuda
@@ -135,22 +140,13 @@ export default function ContactSupportPage() {
 
   if (configLoading) {
     return (
-      <RoleDashboardLayout
-        title='Contactar Soporte'
-        subtitle='Obtén ayuda directa de nuestro equipo de soporte'
-      >
-        <div className='flex items-center justify-center h-64'>
-          <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600'></div>
-        </div>
-      </RoleDashboardLayout>
+      <div className='flex items-center justify-center h-64'>
+        <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600'></div>
+      </div>
     )
   }
 
   return (
-    <RoleDashboardLayout
-      title='Contactar Soporte'
-      subtitle={`Obtén ayuda directa de nuestro equipo de ${config?.companyName || 'soporte'}`}
-    >
       <div className='max-w-4xl mx-auto space-y-6'>
         {/* Estado del Soporte */}
         <Card
@@ -448,6 +444,5 @@ export default function ContactSupportPage() {
           </div>
         </div>
       </div>
-    </RoleDashboardLayout>
   )
 }

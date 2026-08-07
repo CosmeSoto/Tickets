@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useSession } from 'next-auth/react'
-import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
+import { useSyncDashboardPageMeta } from '@/contexts/dashboard-shell-context'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -25,6 +25,11 @@ export default function ReportBugPage() {
     expected: '',
     actual: '',
     additional: '',
+  })
+
+  useSyncDashboardPageMeta({
+    title: 'Reportar Problema',
+    subtitle: 'Ayúdanos a mejorar reportando bugs y problemas técnicos',
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -62,10 +67,6 @@ export default function ReportBugPage() {
   }
 
   return (
-    <RoleDashboardLayout
-      title='Reportar Problema'
-      subtitle='Ayúdanos a mejorar reportando bugs y problemas técnicos'
-    >
       <div className='max-w-4xl mx-auto space-y-6'>
         {/* Información */}
         <Card className='bg-blue-50 border-blue-200'>
@@ -339,6 +340,5 @@ export default function ReportBugPage() {
           </div>
         </div>
       </div>
-    </RoleDashboardLayout>
   )
 }

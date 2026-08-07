@@ -66,7 +66,8 @@ export function useDashboardShellSetter(): SetPageMetaFn | null {
 
 /**
  * Sincroniza el encabezado del shell con la página actual.
- * Limpia al desmontar. Memoiza `headerActions` en la página si cambia cada render.
+ * No vacía título/subtítulo al desmontar (evita flash / sensación de rebuild).
+ * Solo limpia acciones del header que podrían quedar stale.
  */
 export function useSyncDashboardPageMeta(meta: DashboardPageMeta): void {
   const setMeta = useContext(DashboardShellSetterContext)
@@ -75,7 +76,7 @@ export function useSyncDashboardPageMeta(meta: DashboardPageMeta): void {
     if (!setMeta) return
     setMeta(meta)
     return () => {
-      setMeta(null)
+      setMeta({ headerActions: undefined })
     }
   }, [setMeta, meta.title, meta.subtitle, meta.headerActions])
 }

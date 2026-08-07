@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
+import { useSyncDashboardPageMeta } from '@/contexts/dashboard-shell-context'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -58,6 +58,11 @@ export default function ProfilePage() {
   const router = useRouter()
   const { toast } = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  useSyncDashboardPageMeta({
+    title: 'Mi Perfil',
+    subtitle: 'Gestiona tu información personal y configuración de cuenta',
+  })
 
   const [loading, setLoading] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -407,11 +412,9 @@ export default function ProfilePage() {
 
   if (status === 'loading') {
     return (
-      <RoleDashboardLayout title='Mi Perfil' subtitle='Gestiona tu información personal'>
-        <div className='flex items-center justify-center h-64'>
-          <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto'></div>
-        </div>
-      </RoleDashboardLayout>
+      <div className='flex items-center justify-center h-64'>
+        <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto'></div>
+      </div>
     )
   }
 
@@ -420,10 +423,6 @@ export default function ProfilePage() {
   }
 
   return (
-    <RoleDashboardLayout
-      title='Mi Perfil'
-      subtitle='Gestiona tu información personal y configuración de cuenta'
-    >
       <div className='max-w-4xl mx-auto space-y-6'>
         {/* Información Principal */}
         <Card>
@@ -765,6 +764,5 @@ export default function ProfilePage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </RoleDashboardLayout>
   )
 }

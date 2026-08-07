@@ -70,7 +70,8 @@ export function ModuleLayout({
     if (resolvedShell !== 'context' || !setShellMeta) return
     setShellMeta({ title, subtitle, headerActions })
     return () => {
-      setShellMeta(null)
+      // No vaciar título: la siguiente página lo sobrescribe (evita flash del header)
+      setShellMeta({ headerActions: undefined })
     }
   }, [resolvedShell, setShellMeta, title, subtitle, headerActions])
 

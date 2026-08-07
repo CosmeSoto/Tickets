@@ -1,6 +1,14 @@
 /**
- * Configuración de rutas públicas para el middleware
- * Estas rutas NO requieren autenticación
+ * Configuración de rutas públicas / protegidas.
+ *
+ * Convención App Router:
+ * - `app/(dashboard)/**` → shell compartido (sidebar/header)
+ * - `app/(public)/**` → sin shell (aceptación de actas, verificación QR, etc.)
+ * - auth pages (`/login`, …) → fuera de ambos
+ */
+
+/**
+ * Rutas públicas — NO requieren autenticación
  */
 export const publicRoutes = [
   '/',
@@ -9,10 +17,15 @@ export const publicRoutes = [
   '/forgot-password',
   '/reset-password',
   '/change-password',
-  '/help',
+  '/unauthorized',
   '/help/terms',
   '/help/privacy',
-  // Páginas públicas de verificación (accesibles sin login, ej: desde QR)
+  '/terminos',
+  '/privacidad',
+  // Aceptación de actas por token (email / link externo)
+  '/acts/*/accept',
+  '/acts/contract-return/*/accept',
+  // Verificación pública (QR)
   '/verify/equipment/*',
   '/api/public',
   '/api/uploads',
@@ -26,10 +39,13 @@ export const publicRoutes = [
   '/api/auth/forgot-password',
   '/api/auth/reset-password',
   '/api/auth/check-oauth',
+  '/api/auth/validate-reset-token',
+  '/api/auth/oauth-providers',
+  '/api/auth/password-policy',
 ]
 
 /**
- * Rutas que requieren autenticación
+ * Prefijos que requieren autenticación (shell de dashboard)
  */
 export const protectedRoutes = [
   '/admin',
@@ -39,6 +55,14 @@ export const protectedRoutes = [
   '/profile',
   '/settings',
   '/inventory',
+  '/credentials',
+  '/forms',
+  '/knowledge',
+  '/help/center',
+  '/help/documentation',
+  '/help/contact',
+  '/help/report-bug',
+  '/patrol-checkpoint-display',
 ]
 
 /**
@@ -46,13 +70,10 @@ export const protectedRoutes = [
  */
 export function isPublicRoute(pathname: string): boolean {
   return publicRoutes.some(route => {
-    // Soporte para wildcard simple: '/verify/equipment/*'
+    // Soporte para wildcard: '/acts/*/accept' o '/verify/equipment/*'
     if (route.includes('*')) {
       const regex = new RegExp('^' + route.replace(/\*/g, '[^/]+') + '(/.*)?$')
       return regex.test(pathname)
-    }
-    if (route.endsWith('*')) {
-      return pathname.startsWith(route.slice(0, -1))
     }
     return pathname === route || pathname.startsWith(route + '/')
   })
@@ -62,5 +83,5 @@ export function isPublicRoute(pathname: string): boolean {
  * Verifica si una ruta es protegida
  */
 export function isProtectedRoute(pathname: string): boolean {
-  return protectedRoutes.some(route => pathname.startsWith(route))
+  return protectedRoutes.some(route => pathname === route || pathname.startsWith(route + '/'))
 }

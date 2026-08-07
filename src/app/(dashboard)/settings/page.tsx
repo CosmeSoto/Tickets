@@ -92,7 +92,6 @@ export default function SettingsPage() {
     <ModuleLayout
       title='Configuración'
       subtitle='Personaliza tu experiencia y configuraciones del sistema'
-      layoutShell='self'
     >
       <div className='max-w-6xl mx-auto'>
         <Tabs defaultValue='personal' className='space-y-6'>

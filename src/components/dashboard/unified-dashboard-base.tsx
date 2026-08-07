@@ -85,7 +85,7 @@ export function UnifiedDashboardBase({
     if (isLoading) {
       setShellMeta({ title, subtitle })
       return () => {
-        setShellMeta(null)
+        setShellMeta({ headerActions: undefined })
       }
     }
 
@@ -95,7 +95,7 @@ export function UnifiedDashboardBase({
       headerActions: defaultHeaderActions,
     })
     return () => {
-      setShellMeta(null)
+      setShellMeta({ headerActions: undefined })
     }
   }, [setShellMeta, isAuthorized, isLoading, title, subtitle, displayTitle, defaultHeaderActions])
 
