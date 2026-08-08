@@ -72,6 +72,7 @@ export function SupplierSelect({
   const [loading, setLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [formOpen, setFormOpen] = useState(false)
+  const [formDirty, setFormDirty] = useState(false)
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null)
   const [confirm, setConfirm] = useState<ConfirmAction | null>(null)
   const [actionLoading, setActionLoading] = useState(false)
@@ -138,18 +139,35 @@ export function SupplierSelect({
 
   const openCreate = () => {
     setEditingSupplier(null)
+    setFormDirty(false)
     setOpen(false)
     setFormOpen(true)
   }
   const openEdit = (s: Supplier, e: React.MouseEvent) => {
     e.stopPropagation()
     setEditingSupplier(s)
+    setFormDirty(false)
     setOpen(false)
     setFormOpen(true)
   }
 
+  const closeForm = () => {
+    if (
+      formDirty &&
+      !window.confirm(
+        'Hay cambios sin guardar en el proveedor. ¿Cerrar y descartar lo que estabas llenando?'
+      )
+    ) {
+      return
+    }
+    setFormDirty(false)
+    setFormOpen(false)
+    setEditingSupplier(null)
+  }
+
   const handleSaved = (supplier: Supplier) => {
     const wasEdit = !!editingSupplier
+    setFormDirty(false)
     setFormOpen(false)
     setEditingSupplier(null)
     loadSuppliers(searchQuery, 1, false)
@@ -195,8 +213,16 @@ export function SupplierSelect({
         }
         const res = await fetch(`/api/inventory/suppliers/${confirm.supplier.id}`, {
           method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ isActive: false }),
         })
-        if (!res.ok) throw new Error()
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}))
+          toast.error('No se puede desactivar', {
+            description: data.error || 'Error al desactivar',
+          })
+          return
+        }
         toast.success('Proveedor desactivado', { description: confirm.supplier.name })
         if (value === confirm.supplier.id) onChange(null)
         loadSuppliers(searchQuery, 1, false)
@@ -381,8 +407,17 @@ export function SupplierSelect({
       </div>
 
       {/* Modal crear/editar */}
-      <Dialog open={formOpen} onOpenChange={setFormOpen}>
-        <DialogContent className='w-[min(98vw,56rem)] max-w-4xl' aria-describedby={undefined}>
+      <Dialog
+        open={formOpen}
+        onOpenChange={open => {
+          if (open) {
+            setFormOpen(true)
+            return
+          }
+          closeForm()
+        }}
+      >
+        <DialogContent className='w-[min(98vw,56rem)] max-w-4xl max-h-[92vh] overflow-y-auto' aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>{editingSupplier ? 'Editar proveedor' : 'Nuevo proveedor'}</DialogTitle>
           </DialogHeader>
@@ -391,11 +426,9 @@ export function SupplierSelect({
               supplier={editingSupplier}
               defaultFamilyId={familyId}
               embedded
+              onDirtyChange={setFormDirty}
               onSuccess={handleSaved}
-              onCancel={() => {
-                setFormOpen(false)
-                setEditingSupplier(null)
-              }}
+              onCancel={closeForm}
             />
           </div>
         </DialogContent>

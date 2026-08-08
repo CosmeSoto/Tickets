@@ -10,6 +10,9 @@ const UNITS = [
   { code: 'LITER', name: 'Litro', symbol: 'L', order: 6 },
   { code: 'KG', name: 'Kilogramo', symbol: 'kg', order: 7 },
   { code: 'SET', name: 'Juego', symbol: 'juego', order: 8 },
+  // Consumo diario de oficina (dispensers / pantries)
+  { code: 'BOTELLON', name: 'Botellón', symbol: 'bot', order: 9 },
+  { code: 'GALLON', name: 'Galón', symbol: 'gal', order: 10 },
 ]
 
 export async function seedUnitsOfMeasure(prisma: PrismaClient) {

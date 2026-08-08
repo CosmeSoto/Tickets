@@ -298,3 +298,60 @@ export async function checkWarrantyAlerts(): Promise<void> {
     })
   }
 }
+
+type SupplierLifecycleEvent = 'created' | 'deactivated' | 'reactivated' | 'deleted'
+
+/**
+ * Notifica a admins del área (o globales) cambios de ciclo de vida del maestro de proveedores.
+ * No cubre ediciones rutinarias (ruido); sí create/deactivate/reactivate/delete.
+ */
+export async function notifySupplierLifecycle(params: {
+  familyId: string | null | undefined
+  supplierId: string
+  supplierName: string
+  event: SupplierLifecycleEvent
+  actorName?: string | null
+  extra?: string
+}): Promise<void> {
+  const { familyId, supplierId, supplierName, event, actorName, extra } = params
+  const by = actorName ? ` por ${actorName}` : ''
+  const suffix = extra ? ` ${extra}` : ''
+
+  const config: Record<
+    SupplierLifecycleEvent,
+    { type: NotificationType; title: string; message: string }
+  > = {
+    created: {
+      type: 'INVENTORY',
+      title: 'Nuevo proveedor',
+      message: `Se registró el proveedor "${supplierName}"${by}.${suffix}`,
+    },
+    deactivated: {
+      type: 'WARNING',
+      title: 'Proveedor desactivado',
+      message: `El proveedor "${supplierName}" fue desactivado${by}.${suffix}`,
+    },
+    reactivated: {
+      type: 'SUCCESS',
+      title: 'Proveedor reactivado',
+      message: `El proveedor "${supplierName}" volvió a estar activo${by}.${suffix}`,
+    },
+    deleted: {
+      type: 'WARNING',
+      title: 'Proveedor eliminado',
+      message: `El proveedor "${supplierName}" fue eliminado permanentemente${by}.${suffix}`,
+    },
+  }
+
+  const n = config[event]
+  await notifyFamilyAdmins(familyId, {
+    type: n.type,
+    title: n.title,
+    message: n.message,
+    metadata: {
+      link: event === 'deleted' ? '/inventory/suppliers' : `/inventory/suppliers/${supplierId}`,
+      supplierId,
+      event: `SUPPLIER_${event.toUpperCase()}`,
+    },
+  })
+}

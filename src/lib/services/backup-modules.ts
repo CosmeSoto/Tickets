@@ -557,7 +557,15 @@ export async function exportInventoryModuleData(): Promise<Record<string, unknow
 
   // Catálogos
   await fetchTable('supplier_types', () => prisma.supplier_types.findMany())
-  await fetchTable('suppliers', () => prisma.suppliers.findMany())
+  // findMany sin select: incluye campos comerciales (crédito, banco, plazos).
+  // Decimal → string para JSON de módulo estable en restore.
+  await fetchTable('suppliers', async () => {
+    const rows = await prisma.suppliers.findMany()
+    return rows.map(s => ({
+      ...s,
+      creditLimit: s.creditLimit != null ? s.creditLimit.toString() : null,
+    }))
+  })
   await fetchTable('units_of_measure', () => prisma.units_of_measure.findMany())
   await fetchTable('equipment_types', () => prisma.equipment_types.findMany())
   await fetchTable('equipment_type_attributes', () => prisma.equipment_type_attributes.findMany())

@@ -1530,27 +1530,42 @@ model stock_movements {
 }
 
 model suppliers {
-  id                String              @id @default(cuid())
-  name              String              @db.VarChar(200)
-  typeId            String?             @map("type_id")
-  familyId          String?             @map("family_id")
-  taxId             String?             @unique @map("tax_id") @db.VarChar(20)
-  email             String?             @db.VarChar(200)
-  phone             String?             @db.VarChar(50)
-  address           String?
-  website           String?
-  contactName       String?             @map("contact_name") @db.VarChar(200)
-  isActive          Boolean             @default(true) @map("is_active")
-  createdAt         DateTime            @default(now()) @map("created_at")
-  updatedAt         DateTime            @updatedAt @map("updated_at")
-  family            families?           @relation(fields: [familyId], references: [id])
-  supplierType      supplier_types?     @relation(fields: [typeId], references: [id])
-  consumables       consumables[]
-  equipment         equipment[]
-  software_licenses software_licenses[]
-  contracts         contracts[]
-  batches           equipment_batches[]
-  maintenances      maintenance_records[]
+  id                     String    @id @default(cuid())
+  name                   String    @db.VarChar(200)
+  legalName              String?   @map("legal_name") @db.VarChar(200)
+  typeId                 String?   @map("type_id")
+  familyId               String?   @map("family_id")
+  taxId                  String?   @unique @map("tax_id") @db.VarChar(20)
+  email                  String?   @db.VarChar(200)
+  phone                  String?   @db.VarChar(50)
+  address                String?
+  city                   String?   @db.VarChar(100)
+  country                String?   @db.VarChar(100)
+  website                String?
+  contactName            String?   @map("contact_name") @db.VarChar(200)
+  /// Plazo de pago habitual (días): 0 = contado, 30 = Net 30, etc.
+  paymentTermsDays       Int?      @map("payment_terms_days")
+  /// Límite de crédito otorgado por el proveedor (referencia AP)
+  creditLimit            Decimal?  @map("credit_limit") @db.Decimal(14, 2)
+  creditCurrency         String?   @default("USD") @map("credit_currency") @db.VarChar(3)
+  /// Alineado a PaymentMethodType de contratos (BANK_TRANSFER, PROVIDER_INVOICE, …)
+  preferredPaymentMethod String?   @map("preferred_payment_method") @db.VarChar(30)
+  bankName               String?   @map("bank_name") @db.VarChar(100)
+  bankAccountNumber      String?   @map("bank_account_number") @db.VarChar(80)
+  bankAccountType        String?   @map("bank_account_type") @db.VarChar(30)
+  bankSwift              String?   @map("bank_swift") @db.VarChar(30)
+  notes                  String?
+  isActive               Boolean   @default(true) @map("is_active")
+  createdAt              DateTime  @default(now()) @map("created_at")
+  updatedAt              DateTime  @updatedAt @map("updated_at")
+  family                 families? @relation(fields: [familyId], references: [id])
+  supplierType           supplier_types? @relation(fields: [typeId], references: [id])
+  consumables            consumables[]
+  equipment              equipment[]
+  software_licenses      software_licenses[]
+  contracts              contracts[]
+  batches                equipment_batches[]
+  maintenances           maintenance_records[]
 
   @@index([typeId, isActive])
   @@index([familyId, isActive])

@@ -3,6 +3,12 @@ import { z } from 'zod'
 /** Convierte '' / undefined a null para campos opcionales (Combobox / Select). */
 const emptyToNull = (v: unknown) => (v === '' || v === undefined ? null : v)
 
+/** IDs de entidades (cuid o uuid) — proveedores usan cuid. */
+const optionalEntityId = z.preprocess(
+  emptyToNull,
+  z.string().min(1).max(40).nullable().optional()
+)
+
 const optionalUuid = z.preprocess(emptyToNull, z.string().uuid().nullable().optional())
 
 const optionalEnum = <T extends z.ZodTypeAny>(schema: T) =>
@@ -147,8 +153,8 @@ export const createContractSchema = z.object({
       errorMap: () => ({ message: 'Categoría inválida' }),
     })
     .default('SERVICE'),
-  supplierId: optionalUuid,
-  familyId: optionalUuid,
+  supplierId: optionalEntityId,
+  familyId: optionalEntityId,
   modelId: optionalUuid,
   batchId: optionalUuid,
   startDate: z.preprocess(emptyToNull, z.string().nullable().optional()),

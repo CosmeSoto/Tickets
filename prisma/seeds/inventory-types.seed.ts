@@ -328,6 +328,20 @@ export async function seedConsumableTypes(prisma: PrismaClient, familyMap: Map<s
       familyId: fam('ADMINISTRATIVE'),
     },
     {
+      code: 'BEVERAGE',
+      name: 'Bebidas',
+      icon: 'Droplets',
+      order: 7,
+      familyId: fam('ADMINISTRATIVE'),
+    },
+    {
+      code: 'WATER_JUG',
+      name: 'Botellón de agua',
+      icon: 'Droplets',
+      order: 8,
+      familyId: fam('ADMINISTRATIVE'),
+    },
+    {
       code: 'SPARE_PART',
       name: 'Repuesto Mecánico',
       icon: 'Wrench',

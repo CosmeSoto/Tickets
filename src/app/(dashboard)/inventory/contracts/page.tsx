@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import {
   Plus,
   Search,
@@ -18,6 +19,7 @@ import {
   History,
   Eye,
   Info,
+  X,
 } from 'lucide-react'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { Button } from '@/components/ui/button'
@@ -116,6 +118,8 @@ const STATUS_CONFIG: Record<ContractStatus, { label: string; icon: any; cls: str
 // ── Página ────────────────────────────────────────────────────────────────────
 
 export default function ContractsPage() {
+  const searchParams = useSearchParams()
+  const supplierIdFromUrl = searchParams.get('supplierId')
   const { canManageContracts, canViewOwnContracts, isClient, isSuperAdmin } =
     useInventoryPermissions()
   const isClientOnly = isClient && !canManageContracts
@@ -124,6 +128,7 @@ export default function ContractsPage() {
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [categoryFilter, setCategoryFilter] = useState('ALL')
   const [familyFilter, setFamilyFilter] = useState('all')
+  const [supplierFilter, setSupplierFilter] = useState<string | null>(supplierIdFromUrl)
   const [formOpen, setFormOpen] = useState(false)
   const [editingContract, setEditingContract] = useState<Contract | null>(null)
   const [deletingContract, setDeletingContract] = useState<Contract | null>(null)
@@ -133,15 +138,20 @@ export default function ContractsPage() {
 
   const { families } = useFamilyOptions()
 
+  useEffect(() => {
+    setSupplierFilter(supplierIdFromUrl)
+  }, [supplierIdFromUrl])
+
   // Carga de contratos con useFetch
   const buildUrl = useCallback(() => {
     const p = new URLSearchParams()
     if (statusFilter !== 'ALL') p.set('status', statusFilter)
     if (categoryFilter !== 'ALL') p.set('category', categoryFilter)
     if (familyFilter !== 'all') p.set('familyId', familyFilter)
+    if (supplierFilter) p.set('supplierId', supplierFilter)
     p.set('pageSize', '200')
     return `/api/inventory/contracts?${p}`
-  }, [statusFilter, categoryFilter, familyFilter])
+  }, [statusFilter, categoryFilter, familyFilter, supplierFilter])
 
   const {
     data: contractsRaw,
@@ -431,12 +441,31 @@ export default function ContractsPage() {
           </Select>
         </div>
 
+        {supplierFilter && (
+          <div className='flex items-center gap-2 text-sm'>
+            <span className='rounded-md border px-2 py-1 bg-muted/40 inline-flex items-center gap-2'>
+              Filtrado por proveedor
+              <button
+                type='button'
+                className='inline-flex items-center text-muted-foreground hover:text-foreground'
+                title='Quitar filtro de proveedor'
+                onClick={() => setSupplierFilter(null)}
+              >
+                <X className='h-3.5 w-3.5' />
+              </button>
+            </span>
+          </div>
+        )}
+
         {/* ── Tabla ─────────────────────────────────────────────────────── */}
         {contracts.length === 0 && !loading ? (
           <div className='flex flex-col items-center justify-center py-16 text-muted-foreground'>
             <FileSignature className='h-12 w-12 mb-4 opacity-30' />
             <p className='text-sm'>
-              {search || statusFilter !== 'ALL' || categoryFilter !== 'ALL'
+              {search ||
+              statusFilter !== 'ALL' ||
+              categoryFilter !== 'ALL' ||
+              supplierFilter
                 ? 'No se encontraron contratos con los filtros aplicados'
                 : 'No hay contratos registrados'}
             </p>

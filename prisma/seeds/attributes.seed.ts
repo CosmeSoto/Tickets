@@ -588,6 +588,22 @@ export async function seedAttributes(prisma: PrismaClient, familyMap: Map<string
   const paperType = await prisma.consumable_types.findFirst({
     where: { name: 'Papel', familyId: adminFamilyId },
   })
+  const waterJugType = await prisma.consumable_types.findFirst({
+    where: {
+      OR: [
+        { code: 'WATER_JUG', familyId: adminFamilyId },
+        { name: 'Botellón de agua', familyId: adminFamilyId },
+      ],
+    },
+  })
+  const beverageType = await prisma.consumable_types.findFirst({
+    where: {
+      OR: [
+        { code: 'BEVERAGE', familyId: adminFamilyId },
+        { name: 'Bebidas', familyId: adminFamilyId },
+      ],
+    },
+  })
 
   // Atributos para Tóner
   if (tonerType) {
@@ -714,6 +730,128 @@ export async function seedAttributes(prisma: PrismaClient, familyMap: Map<string
       })
     }
     console.log(`  ✅ ${paperAttrs.length} atributos para Papel`)
+  }
+
+  // Atributos para Botellón de agua (consumo diario / dispensers)
+  if (waterJugType) {
+    const waterJugAttrs = [
+      {
+        attributeName: 'capacidad_litros',
+        attributeLabel: 'Capacidad',
+        attributeType: 'select',
+        isRequired: true,
+        isVisible: true,
+        order: 1,
+        options: ['5 L', '10 L', '20 L'],
+        helpText: 'Capacidad típica del botellón retornable',
+      },
+      {
+        attributeName: 'formato',
+        attributeLabel: 'Formato',
+        attributeType: 'select',
+        isRequired: true,
+        isVisible: true,
+        order: 2,
+        options: ['Retornable', 'Desechable'],
+      },
+      {
+        attributeName: 'marca',
+        attributeLabel: 'Marca / proveedor de agua',
+        attributeType: 'text',
+        isRequired: false,
+        isVisible: true,
+        order: 3,
+        helpText: 'Ej: Tesalia, Güitig, marca local',
+      },
+    ]
+
+    for (const attr of waterJugAttrs) {
+      await prisma.consumable_type_attributes.upsert({
+        where: {
+          consumableTypeId_attributeName: {
+            consumableTypeId: waterJugType.id,
+            attributeName: attr.attributeName,
+          },
+        },
+        update: {
+          attributeLabel: attr.attributeLabel,
+          attributeType: attr.attributeType,
+          isRequired: attr.isRequired,
+          isVisible: attr.isVisible,
+          order: attr.order,
+          helpText: attr.helpText,
+          options: attr.options ? { options: attr.options } : undefined,
+        },
+        create: {
+          id: randomUUID(),
+          consumableTypeId: waterJugType.id,
+          attributeName: attr.attributeName,
+          attributeLabel: attr.attributeLabel,
+          attributeType: attr.attributeType,
+          isRequired: attr.isRequired,
+          isVisible: attr.isVisible,
+          order: attr.order,
+          helpText: attr.helpText,
+          options: attr.options ? { options: attr.options } : undefined,
+        },
+      })
+    }
+    console.log(`  ✅ ${waterJugAttrs.length} atributos para Botellón de agua`)
+  }
+
+  // Atributos para categoría genérica Bebidas
+  if (beverageType) {
+    const beverageAttrs = [
+      {
+        attributeName: 'presentacion',
+        attributeLabel: 'Presentación',
+        attributeType: 'select',
+        isRequired: false,
+        isVisible: true,
+        order: 1,
+        options: ['Botellón', 'Botella', 'Lata', 'Caja', 'Otro'],
+      },
+      {
+        attributeName: 'sabor_tipo',
+        attributeLabel: 'Tipo',
+        attributeType: 'select',
+        isRequired: false,
+        isVisible: true,
+        order: 2,
+        options: ['Agua', 'Gaseosa', 'Jugo', 'Café/Té', 'Otro'],
+      },
+    ]
+
+    for (const attr of beverageAttrs) {
+      await prisma.consumable_type_attributes.upsert({
+        where: {
+          consumableTypeId_attributeName: {
+            consumableTypeId: beverageType.id,
+            attributeName: attr.attributeName,
+          },
+        },
+        update: {
+          attributeLabel: attr.attributeLabel,
+          attributeType: attr.attributeType,
+          isRequired: attr.isRequired,
+          isVisible: attr.isVisible,
+          order: attr.order,
+          options: attr.options ? { options: attr.options } : undefined,
+        },
+        create: {
+          id: randomUUID(),
+          consumableTypeId: beverageType.id,
+          attributeName: attr.attributeName,
+          attributeLabel: attr.attributeLabel,
+          attributeType: attr.attributeType,
+          isRequired: attr.isRequired,
+          isVisible: attr.isVisible,
+          order: attr.order,
+          options: attr.options ? { options: attr.options } : undefined,
+        },
+      })
+    }
+    console.log(`  ✅ ${beverageAttrs.length} atributos para Bebidas`)
   }
 
   // ============================================

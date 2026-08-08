@@ -166,6 +166,10 @@ export function ContractForm({
     phone?: string | null
     contactName?: string | null
     website?: string | null
+    preferredPaymentMethod?: string | null
+    paymentTermsDays?: number | null
+    bankName?: string | null
+    bankAccountNumber?: string | null
   }>('/api/inventory/suppliers', {
     params: { active: 'true', limit: 100 },
     transform: d => d.suppliers ?? d ?? [],
@@ -393,32 +397,43 @@ export function ContractForm({
     ],
     [licenses]
   )
-  const contactName = watch('contactName')
-  const contactEmail = watch('contactEmail')
-  const contactPhone = watch('contactPhone')
-  const termsUrl = watch('termsUrl')
-
-  // Auto-rellenar datos de contacto cuando se selecciona un proveedor
+  // Auto-rellenar contacto y preferencias comerciales desde el proveedor
   useEffect(() => {
     if (!selectedSupplierId || !suppliers.length) return
 
     const supplier = suppliers.find(s => s.id === selectedSupplierId)
     if (!supplier) return
 
-    // Solo auto-rellenar si los campos están vacíos
-    if (!contactName && supplier.contactName) {
+    const current = getValues()
+
+    if (!current.contactName && supplier.contactName) {
       setValue('contactName', supplier.contactName)
     }
-    if (!contactEmail && supplier.email) {
+    if (!current.contactEmail && supplier.email) {
       setValue('contactEmail', supplier.email)
     }
-    if (!contactPhone && supplier.phone) {
+    if (!current.contactPhone && supplier.phone) {
       setValue('contactPhone', supplier.phone)
     }
-    if (!termsUrl && supplier.website) {
+    if (!current.termsUrl && supplier.website) {
       setValue('termsUrl', supplier.website)
     }
-  }, [selectedSupplierId, suppliers, contactName, contactEmail, contactPhone, termsUrl, setValue])
+    if (
+      supplier.preferredPaymentMethod &&
+      current.paymentMethodType === 'CORPORATE_CARD'
+    ) {
+      setValue(
+        'paymentMethodType',
+        supplier.preferredPaymentMethod as ContractFormData['paymentMethodType']
+      )
+    }
+    // Plazo de pago del proveedor ≠ aviso de cancelación del contrato: no se mapean.
+    if (supplier.bankAccountNumber && !current.paymentAccountRef) {
+      const ref = [supplier.bankName, supplier.bankAccountNumber].filter(Boolean).join(' — ')
+      setValue('paymentAccountRef', ref)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSupplierId, suppliers, setValue, getValues])
 
   const emptyToUndef = (v: string | null | undefined) => {
     if (v == null || v === '') return undefined
@@ -560,8 +575,8 @@ export function ContractForm({
         }}
       />
       <p className='text-xs text-muted-foreground'>
-        Empieza por <strong>Datos generales</strong>. Abre las demás secciones solo cuando las
-        necesites; así el formulario no se siente sobrecargado.
+        Empieza por <strong>Datos generales</strong>. Abre las demás secciones cuando las
+        necesites.
       </p>
       <fieldset disabled={readOnly} className={readOnly ? 'space-y-4' : 'contents'}>
         {/* ── 1. Datos generales ──────────────────────────────────────────── */}

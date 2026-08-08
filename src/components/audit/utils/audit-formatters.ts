@@ -215,6 +215,8 @@ export function getActionLabel(action: string): string {
     CREATE: 'Creación',
     UPDATE: 'Actualización',
     DELETE: 'Eliminación',
+    DEACTIVATE: 'Desactivación',
+    REACTIVATE: 'Reactivación',
     VIEW: 'Visualización',
     READ: 'Lectura',
     // Colaboradores
@@ -318,6 +320,8 @@ export function getEntityLabel(entityType: string): string {
     credential_entry: 'Credenciales',
     credential_vault: 'Credenciales',
     credential_share: 'Credenciales',
+    SUPPLIER: 'Proveedores',
+    supplier: 'Proveedores',
   }
   return entityLabels[entityType] || entityType
 }
@@ -358,6 +362,19 @@ export function getFieldDisplayName(fieldName: string): string {
     rentalClientResponse: 'Respuesta del cliente (renta)',
     rentalEndDate: 'Fin de renta',
     rentalMonthlyCost: 'Costo mensual de renta',
+    // Proveedores
+    legalName: 'Razón social',
+    taxId: 'RUC / NIT',
+    contactName: 'Contacto',
+    paymentTermsDays: 'Plazo de pago (días)',
+    creditLimit: 'Límite de crédito',
+    creditCurrency: 'Moneda del crédito',
+    preferredPaymentMethod: 'Método de pago preferido',
+    bankName: 'Banco',
+    bankAccountMasked: 'Cuenta bancaria',
+    bankAccountType: 'Tipo de cuenta',
+    bankSwift: 'SWIFT / BIC',
+    notesPreview: 'Notas',
     // Patrullas
     routeId: 'Ruta',
     routeName: 'Ruta',

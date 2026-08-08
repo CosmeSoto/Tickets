@@ -11,6 +11,14 @@ import {
   toInventoryAccessUser,
   inventoryAccessToResponse,
 } from '@/lib/inventory/inventory-resource-access'
+import { sanitizeSupplierPayload } from '@/lib/validations/inventory/supplier'
+import {
+  buildSupplierAuditSnapshot,
+  supplierAuditMessage,
+} from '@/lib/inventory/supplier-audit'
+import { buildSupplierCommercialSummary } from '@/lib/inventory/supplier-commercial'
+import { notifySupplierLifecycle } from '@/lib/inventory/notifications'
+import { ZodError } from 'zod'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -46,6 +54,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
             consumables: true,
             software_licenses: true,
             maintenances: true,
+            contracts: true,
           },
         },
       },
@@ -55,7 +64,27 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: 'Proveedor no encontrado' }, { status: 404 })
     }
 
-    return NextResponse.json(supplier)
+    const openContracts = await prisma.contracts.findMany({
+      where: {
+        supplierId: id,
+        status: { in: ['ACTIVE', 'EXPIRING'] },
+      },
+      select: {
+        monthlyCost: true,
+        totalValue: true,
+        billingCycle: true,
+        currency: true,
+        status: true,
+      },
+    })
+
+    const commercialSummary = buildSupplierCommercialSummary({
+      contracts: openContracts,
+      creditLimit: supplier.creditLimit,
+      creditCurrency: supplier.creditCurrency,
+    })
+
+    return NextResponse.json({ ...supplier, commercialSummary })
   } catch (err) {
     if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
     console.error('[GET /api/inventory/suppliers/[id]]', err)
@@ -91,9 +120,25 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
     }
 
     const body = await request.json()
-    const { name, typeId, taxId, email, phone, address, website, contactName, familyId } = body
+    let data: ReturnType<typeof sanitizeSupplierPayload>
+    try {
+      data = sanitizeSupplierPayload(body)
+    } catch (err) {
+      if (err instanceof ZodError) {
+        const first = err.errors[0]
+        return NextResponse.json(
+          {
+            error: first?.message ?? 'Datos inválidos',
+            field: first?.path?.join('.'),
+            details: err.errors,
+          },
+          { status: 422 }
+        )
+      }
+      throw err
+    }
 
-    const targetFamilyId = familyId !== undefined ? familyId : existing.familyId
+    const targetFamilyId = data.familyId !== undefined ? data.familyId : existing.familyId
     if (targetFamilyId) {
       try {
         await assertInventoryManageByFamily(user, targetFamilyId)
@@ -103,23 +148,9 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
       }
     }
 
-    // Validar nombre
-    if (!name || !name.trim()) {
-      return NextResponse.json({ error: 'El nombre del proveedor es obligatorio' }, { status: 400 })
-    }
-
-    // Validar al menos email o teléfono
-    if (!email && !phone) {
-      return NextResponse.json(
-        { error: 'Debe proporcionar al menos un email o teléfono de contacto' },
-        { status: 400 }
-      )
-    }
-
-    // Verificar unicidad de taxId excluyendo el propio
-    if (taxId) {
+    if (data.taxId) {
       const duplicate = await prisma.suppliers.findFirst({
-        where: { taxId, id: { not: id } },
+        where: { taxId: data.taxId, id: { not: id } },
       })
       if (duplicate) {
         return NextResponse.json(
@@ -129,20 +160,13 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
       }
     }
 
-    const supplier = await (prisma.suppliers.update as any)({
+    const supplier = await prisma.suppliers.update({
       where: { id },
-      data: {
-        name: name.trim(),
-        typeId: typeId !== undefined ? typeId || null : existing.typeId,
-        familyId: familyId !== undefined ? familyId || null : existing.familyId,
-        taxId: taxId || null,
-        email: email || null,
-        phone: phone || null,
-        address: address || null,
-        website: website || null,
-        contactName: contactName || null,
-      },
+      data,
     })
+
+    const before = buildSupplierAuditSnapshot(existing)
+    const after = buildSupplierAuditSnapshot(supplier)
 
     await prisma.audit_logs.create({
       data: {
@@ -153,9 +177,9 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
         userId: session.user.id,
         userEmail: session.user.email,
         details: {
-          message: `Proveedor "${supplier.name}" actualizado por ${session.user.email}`,
-          supplierName: supplier.name,
-          typeId: supplier.typeId,
+          message: supplierAuditMessage('UPDATE', supplier.name, session.user.email),
+          ...after,
+          changes: { before, after },
         },
       },
     })
@@ -170,7 +194,8 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
 
 /**
  * PATCH /api/inventory/suppliers/[id]
- * Desactivar proveedor.
+ * Activar / desactivar proveedor.
+ * Body opcional: `{ isActive: boolean }` (default `false` = desactivar, compatible con clientes actuales).
  * Solo ADMIN/SuperAdmin. No se puede desactivar si tiene activos asociados.
  */
 export async function PATCH(request: NextRequest, { params }: RouteContext) {
@@ -181,17 +206,25 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    // Solo ADMIN puede desactivar — gestores solo pueden crear/editar
     const role = session.user.role
     const isSuperAdmin = (session.user as any).isSuperAdmin === true
     if (role !== 'ADMIN' && !isSuperAdmin) {
       return NextResponse.json(
-        { error: 'Solo el administrador puede desactivar proveedores' },
+        { error: 'Solo el administrador puede activar o desactivar proveedores' },
         { status: 403 }
       )
     }
 
     const { id } = await params
+
+    let isActive = false
+    try {
+      const body = await request.json()
+      if (typeof body?.isActive === 'boolean') isActive = body.isActive
+    } catch {
+      // Sin body (clientes legacy): desactivar
+      isActive = false
+    }
 
     const existing = await prisma.suppliers.findUnique({
       where: { id },
@@ -205,43 +238,68 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: 'Proveedor no encontrado' }, { status: 404 })
     }
 
-    // Verificar que no tenga activos asociados antes de desactivar
-    const total =
-      existing._count.equipment + existing._count.consumables + existing._count.software_licenses
-    if (total > 0) {
-      return NextResponse.json(
-        {
-          error: `No se puede desactivar: el proveedor tiene ${total} activo(s) asociado(s). Reasígnalos primero.`,
-        },
-        { status: 409 }
-      )
+    if (existing.isActive === isActive) {
+      return NextResponse.json(existing)
+    }
+
+    if (!isActive) {
+      const total =
+        existing._count.equipment + existing._count.consumables + existing._count.software_licenses
+      if (total > 0) {
+        return NextResponse.json(
+          {
+            error: `No se puede desactivar: el proveedor tiene ${total} activo(s) asociado(s). Reasígnalos primero.`,
+          },
+          { status: 409 }
+        )
+      }
     }
 
     const supplier = await prisma.suppliers.update({
       where: { id },
-      data: { isActive: false },
+      data: { isActive },
     })
 
+    const action = isActive ? 'REACTIVATE' : 'DEACTIVATE'
     await prisma.audit_logs.create({
       data: {
         id: randomUUID(),
-        action: 'DEACTIVATE',
+        action,
         entityType: 'SUPPLIER',
         entityId: supplier.id,
         userId: session.user.id,
         userEmail: session.user.email,
         details: {
-          message: `Proveedor "${supplier.name}" desactivado por ${session.user.email}`,
-          supplierName: supplier.name,
+          message: supplierAuditMessage(action, supplier.name, session.user.email),
+          ...buildSupplierAuditSnapshot(supplier),
         },
       },
     })
+
+    const openContracts = await prisma.contracts.count({
+      where: { supplierId: id, status: { in: ['ACTIVE', 'EXPIRING'] } },
+    })
+
+    notifySupplierLifecycle({
+      familyId: supplier.familyId,
+      supplierId: supplier.id,
+      supplierName: supplier.name,
+      event: isActive ? 'reactivated' : 'deactivated',
+      actorName: session.user.email,
+      extra:
+        !isActive && openContracts > 0
+          ? `Aún tiene ${openContracts} contrato(s) abierto(s).`
+          : undefined,
+    }).catch(err => console.error('[NOTIFICATION] supplier lifecycle:', err))
 
     return NextResponse.json(supplier)
   } catch (err) {
     if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
     console.error('[PATCH /api/inventory/suppliers/[id]]', err)
-    return NextResponse.json({ error: 'Error al desactivar proveedor' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Error al cambiar el estado del proveedor' },
+      { status: 500 }
+    )
   }
 }
 
@@ -305,11 +363,19 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
         userId: session.user.id,
         userEmail: session.user.email,
         details: {
-          message: `Proveedor "${existing.name}" eliminado por ${session.user.email}`,
-          supplierName: existing.name,
+          message: supplierAuditMessage('DELETE', existing.name, session.user.email),
+          ...buildSupplierAuditSnapshot(existing),
         },
       },
     })
+
+    notifySupplierLifecycle({
+      familyId: existing.familyId,
+      supplierId: id,
+      supplierName: existing.name,
+      event: 'deleted',
+      actorName: session.user.email,
+    }).catch(err => console.error('[NOTIFICATION] supplier lifecycle:', err))
 
     return NextResponse.json({ success: true })
   } catch (err) {

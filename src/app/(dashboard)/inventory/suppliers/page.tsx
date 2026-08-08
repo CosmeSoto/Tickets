@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Pencil, PowerOff, RefreshCw, Trash2 } from 'lucide-react'
+import { Plus, Pencil, PowerOff, Power, RefreshCw, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -42,6 +42,7 @@ import { SupplierForm } from '@/components/inventory/suppliers/SupplierForm'
 import { SupplierTypesSection } from '@/components/settings/inventory/supplier-types-section'
 import { ListTableToolbar } from '@/components/common/list-table-toolbar'
 import { useExport } from '@/hooks/common/use-export'
+import { PAYMENT_METHOD_TYPE_LABELS } from '@/types/contracts'
 import { FamilyCombobox } from '@/components/ui/family-combobox'
 import { useFamilyOptions } from '@/hooks/use-family-options'
 
@@ -49,6 +50,7 @@ export default function SuppliersPage() {
   const router = useRouter()
   const { data: session } = useSession()
   const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
+  const isAdmin = session?.user?.role === 'ADMIN' || isSuperAdmin
 
   const [suppliers, setSuppliers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -59,11 +61,14 @@ export default function SuppliersPage() {
   const [activeFilter, setActiveFilter] = useState('true')
   const [familyFilter, setFamilyFilter] = useState('all')
   const [formOpen, setFormOpen] = useState(false)
+  const [formDirty, setFormDirty] = useState(false)
   const [editingSupplier, setEditingSupplier] = useState<any>(null)
   const [deactivatingSupplier, setDeactivatingSupplier] = useState<any>(null)
   const [deactivating, setDeactivating] = useState(false)
+  const [reactivatingId, setReactivatingId] = useState<string | null>(null)
   const [deletingSupplier, setDeletingSupplier] = useState<any>(null)
   const [deleting, setDeleting] = useState(false)
+  const [creditFilter, setCreditFilter] = useState<'all' | 'high' | 'ok'>('all')
 
   // Familias de inventario desde el contexto global (cache Redis, sin peticion extra) - memoizadas
   const { families } = useFamilyOptions()
@@ -74,6 +79,7 @@ export default function SuppliersPage() {
     if (search) params.set('search', search)
     if (activeFilter !== 'all') params.set('active', activeFilter)
     if (familyFilter !== 'all') params.set('familyId', familyFilter)
+    if (creditFilter !== 'all') params.set('creditRef', creditFilter)
     try {
       const res = await fetch(`/api/inventory/suppliers?${params}`)
       if (!res.ok) throw new Error('Error al cargar')
@@ -89,7 +95,7 @@ export default function SuppliersPage() {
     } finally {
       setLoading(false)
     }
-  }, [search, activeFilter, familyFilter, page])
+  }, [search, activeFilter, familyFilter, creditFilter, page])
 
   useEffect(() => {
     const timer = setTimeout(() => setSearch(searchInput), 350)
@@ -98,7 +104,7 @@ export default function SuppliersPage() {
 
   useEffect(() => {
     setPage(1)
-  }, [search, activeFilter, familyFilter])
+  }, [search, activeFilter, familyFilter, creditFilter])
 
   useEffect(() => {
     fetchSuppliers()
@@ -111,12 +117,35 @@ export default function SuppliersPage() {
     getData: () => suppliers,
     columns: [
       { key: 'name', label: 'Nombre' },
+      { key: 'legalName', label: 'Razón social', format: v => v ?? '' },
       { key: 'supplierType', label: 'Tipo', format: v => v?.name ?? '' },
       { key: 'family', label: 'Área', format: v => v?.name ?? '' },
       { key: 'taxId', label: 'RUC / NIT', format: v => v ?? '' },
       { key: 'email', label: 'Email', format: v => v ?? '' },
       { key: 'phone', label: 'Teléfono', format: v => v ?? '' },
       { key: 'contactName', label: 'Contacto', format: v => v ?? '' },
+      {
+        key: 'paymentTermsDays',
+        label: 'Plazo pago (días)',
+        format: v => (v == null ? '' : String(v)),
+      },
+      {
+        key: 'creditLimit',
+        label: 'Límite crédito',
+        format: (v, row) =>
+          v == null ? '' : `${Number(v).toLocaleString()} ${row?.creditCurrency || 'USD'}`,
+      },
+      {
+        key: 'preferredPaymentMethod',
+        label: 'Método pago preferido',
+        format: v =>
+          v
+            ? PAYMENT_METHOD_TYPE_LABELS[v as keyof typeof PAYMENT_METHOD_TYPE_LABELS] || String(v)
+            : '',
+      },
+      { key: 'bankName', label: 'Banco', format: v => v ?? '' },
+      { key: 'city', label: 'Ciudad', format: v => v ?? '' },
+      { key: 'country', label: 'País', format: v => v ?? '' },
       { key: 'isActive', label: 'Estado', format: v => (v ? 'Activo' : 'Inactivo') },
     ],
   })
@@ -127,6 +156,8 @@ export default function SuppliersPage() {
     try {
       const res = await fetch(`/api/inventory/suppliers/${deactivatingSupplier.id}`, {
         method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: false }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -144,6 +175,32 @@ export default function SuppliersPage() {
       })
     } finally {
       setDeactivating(false)
+    }
+  }
+
+  const handleReactivate = async (supplier: { id: string; name: string }) => {
+    setReactivatingId(supplier.id)
+    try {
+      const res = await fetch(`/api/inventory/suppliers/${supplier.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: true }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        toast({ title: 'No se puede reactivar', description: data.error, variant: 'destructive' })
+        return
+      }
+      toast({ title: 'Proveedor reactivado', description: supplier.name })
+      fetchSuppliers()
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'No se pudo reactivar el proveedor',
+        variant: 'destructive',
+      })
+    } finally {
+      setReactivatingId(null)
     }
   }
 
@@ -187,8 +244,33 @@ export default function SuppliersPage() {
     direction: 'asc',
   })
 
+  const closeSupplierForm = useCallback(() => {
+    if (
+      formDirty &&
+      !window.confirm(
+        'Hay cambios sin guardar en el proveedor. ¿Cerrar y descartar lo que estabas llenando?'
+      )
+    ) {
+      return
+    }
+    setFormDirty(false)
+    setFormOpen(false)
+    setEditingSupplier(null)
+  }, [formDirty])
+
+  const handleFormOpenChange = useCallback(
+    (open: boolean) => {
+      if (open) {
+        setFormOpen(true)
+        return
+      }
+      closeSupplierForm()
+    },
+    [closeSupplierForm]
+  )
+
   return (
-    <ModuleLayout title='Proveedores' subtitle='Gestiona proveedores y tipos de proveedor'>
+    <ModuleLayout title='Proveedores' subtitle='Maestro comercial: identidad, crédito, banco y vínculo con contratos'>
       <Tabs defaultValue='suppliers' className='space-y-6'>
         <TabsList>
           <TabsTrigger value='suppliers'>
@@ -205,11 +287,15 @@ export default function SuppliersPage() {
             title={
               <p className='text-sm text-muted-foreground'>
                 {total} proveedor{total !== 1 ? 'es' : ''}{' '}
-                {activeFilter === 'true'
-                  ? 'activos'
-                  : activeFilter === 'false'
-                    ? 'inactivos'
-                    : 'en total'}
+                {creditFilter === 'high'
+                  ? 'con compromiso alto'
+                  : creditFilter === 'ok'
+                    ? 'dentro de referencia de crédito'
+                    : activeFilter === 'true'
+                      ? 'activos'
+                      : activeFilter === 'false'
+                        ? 'inactivos'
+                        : 'en total'}
               </p>
             }
             loading={loading}
@@ -226,6 +312,7 @@ export default function SuppliersPage() {
               <Button
                 onClick={() => {
                   setEditingSupplier(null)
+                  setFormDirty(false)
                   setFormOpen(true)
                 }}
               >
@@ -236,7 +323,7 @@ export default function SuppliersPage() {
           />
           <div className='flex flex-wrap gap-3'>
             <Input
-              placeholder='Buscar por nombre o RUC/NIT...'
+              placeholder='Buscar por nombre, razón social o RUC/NIT...'
               value={searchInput}
               onChange={e => setSearchInput(e.target.value)}
               className='flex-1 min-w-[200px]'
@@ -260,6 +347,19 @@ export default function SuppliersPage() {
                 <SelectItem value='all'>Todos</SelectItem>
                 <SelectItem value='true'>Activos</SelectItem>
                 <SelectItem value='false'>Inactivos</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={creditFilter}
+              onValueChange={v => setCreditFilter(v as 'all' | 'high' | 'ok')}
+            >
+              <SelectTrigger className='w-full sm:w-48'>
+                <SelectValue placeholder='Crédito' />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value='all'>Crédito: todos</SelectItem>
+                <SelectItem value='high'>Compromiso alto</SelectItem>
+                <SelectItem value='ok'>Dentro de referencia</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -304,11 +404,12 @@ export default function SuppliersPage() {
                     sortKey='email'
                     currentSort={getSortIcon('email')}
                     onSort={requestSort}
-                    className='hidden lg:table-cell'
+                    className='hidden xl:table-cell'
                   >
                     Email
                   </SortableTableHead>
-                  <TableHead className='hidden xl:table-cell'>Teléfono</TableHead>
+                  <TableHead className='hidden lg:table-cell'>Plazo</TableHead>
+                  <TableHead className='hidden xl:table-cell'>Crédito</TableHead>
                   <SortableTableHead
                     sortKey='isActive'
                     currentSort={getSortIcon('isActive')}
@@ -316,21 +417,21 @@ export default function SuppliersPage() {
                   >
                     Estado
                   </SortableTableHead>
-                  <TableHead className='hidden lg:table-cell text-center'>Mant.</TableHead>
+                  <TableHead className='hidden lg:table-cell text-center'>Ctr./Mant.</TableHead>
                   <TableHead className='text-right'>Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={9} className='text-center py-8 text-muted-foreground'>
+                    <TableCell colSpan={10} className='text-center py-8 text-muted-foreground'>
                       <RefreshCw className='h-4 w-4 animate-spin mx-auto mb-2' />
                       Cargando...
                     </TableCell>
                   </TableRow>
                 ) : suppliers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className='text-center py-8 text-muted-foreground'>
+                    <TableCell colSpan={10} className='text-center py-8 text-muted-foreground'>
                       No se encontraron proveedores
                       {activeFilter === 'true' && (
                         <p className='text-xs mt-1'>
@@ -348,7 +449,14 @@ export default function SuppliersPage() {
                       className='cursor-pointer hover:bg-muted/50'
                       onClick={() => router.push(`/inventory/suppliers/${s.id}`)}
                     >
-                      <TableCell className='font-medium'>{s.name}</TableCell>
+                      <TableCell className='font-medium'>
+                        <div>{s.name}</div>
+                        {s.legalName && s.legalName !== s.name && (
+                          <div className='text-xs text-muted-foreground truncate max-w-[14rem]'>
+                            {s.legalName}
+                          </div>
+                        )}
+                      </TableCell>
                       <TableCell className='text-sm text-muted-foreground hidden md:table-cell'>
                         {s.supplierType?.name ?? s.type ?? '—'}
                       </TableCell>
@@ -358,11 +466,36 @@ export default function SuppliersPage() {
                       <TableCell className='text-muted-foreground hidden lg:table-cell'>
                         {s.taxId || '—'}
                       </TableCell>
-                      <TableCell className='text-muted-foreground hidden lg:table-cell'>
+                      <TableCell className='text-muted-foreground hidden xl:table-cell'>
                         {s.email || '—'}
                       </TableCell>
+                      <TableCell className='text-muted-foreground hidden lg:table-cell'>
+                        {s.paymentTermsDays == null
+                          ? '—'
+                          : s.paymentTermsDays === 0
+                            ? 'Contado'
+                            : `Net ${s.paymentTermsDays}`}
+                      </TableCell>
                       <TableCell className='text-muted-foreground hidden xl:table-cell'>
-                        {s.phone || '—'}
+                        <div className='flex flex-col gap-1 items-start'>
+                          <span>
+                            {s.creditLimit != null
+                              ? `${Number(s.creditLimit).toLocaleString()} ${s.creditCurrency || 'USD'}`
+                              : '—'}
+                          </span>
+                          {s.commercialSummary?.referenceStatus === 'high' && (
+                            <Badge variant='destructive' className='text-[10px] px-1.5 py-0'>
+                              Compromiso alto
+                            </Badge>
+                          )}
+                          {s.commercialSummary?.referenceStatus === 'ok' &&
+                            s.commercialSummary?.openContracts > 0 &&
+                            s.creditLimit != null && (
+                              <Badge variant='outline' className='text-[10px] px-1.5 py-0'>
+                                Dentro de ref.
+                              </Badge>
+                            )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <Badge variant={s.isActive ? 'default' : 'secondary'}>
@@ -370,18 +503,32 @@ export default function SuppliersPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className='hidden lg:table-cell text-center'>
-                        {s._count?.maintenances > 0 ? (
-                          <a
-                            href={`/inventory/maintenance?supplierId=${s.id}`}
-                            onClick={e => e.stopPropagation()}
-                            className='inline-flex items-center justify-center h-6 min-w-6 px-1.5 rounded-full bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20 transition-colors'
-                            title='Ver mantenimientos de este proveedor'
-                          >
-                            {s._count.maintenances}
-                          </a>
-                        ) : (
-                          <span className='text-xs text-muted-foreground'>0</span>
-                        )}
+                        <div className='inline-flex items-center gap-1.5 justify-center'>
+                          {(s._count?.contracts ?? 0) > 0 ? (
+                            <a
+                              href={`/inventory/contracts?supplierId=${s.id}`}
+                              onClick={e => e.stopPropagation()}
+                              className='inline-flex items-center justify-center h-6 min-w-6 px-1.5 rounded-full bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20 transition-colors'
+                              title='Ver contratos de este proveedor'
+                            >
+                              C{s._count.contracts}
+                            </a>
+                          ) : null}
+                          {(s._count?.maintenances ?? 0) > 0 ? (
+                            <a
+                              href={`/inventory/maintenance?supplierId=${s.id}`}
+                              onClick={e => e.stopPropagation()}
+                              className='inline-flex items-center justify-center h-6 min-w-6 px-1.5 rounded-full bg-muted text-muted-foreground text-xs font-medium hover:bg-muted/80 transition-colors'
+                              title='Ver mantenimientos de este proveedor'
+                            >
+                              M{s._count.maintenances}
+                            </a>
+                          ) : null}
+                          {(s._count?.contracts ?? 0) === 0 &&
+                            (s._count?.maintenances ?? 0) === 0 && (
+                              <span className='text-xs text-muted-foreground'>—</span>
+                            )}
+                        </div>
                       </TableCell>
                       <TableCell className='text-right'>
                         <div className='flex justify-end gap-1'>
@@ -392,12 +539,13 @@ export default function SuppliersPage() {
                             onClick={e => {
                               e.stopPropagation()
                               setEditingSupplier(s)
+                              setFormDirty(false)
                               setFormOpen(true)
                             }}
                           >
                             <Pencil className='h-4 w-4' />
                           </Button>
-                          {s.isActive && (
+                          {isAdmin && s.isActive && (
                             <Button
                               variant='ghost'
                               size='icon'
@@ -408,6 +556,20 @@ export default function SuppliersPage() {
                               }}
                             >
                               <PowerOff className='h-4 w-4 text-destructive' />
+                            </Button>
+                          )}
+                          {isAdmin && !s.isActive && (
+                            <Button
+                              variant='ghost'
+                              size='icon'
+                              title='Reactivar'
+                              disabled={reactivatingId === s.id}
+                              onClick={e => {
+                                e.stopPropagation()
+                                handleReactivate(s)
+                              }}
+                            >
+                              <Power className='h-4 w-4 text-primary' />
                             </Button>
                           )}
                           {isSuperAdmin && (
@@ -468,18 +630,21 @@ export default function SuppliersPage() {
       </Tabs>
 
       {/* Dialog formulario */}
-      <Dialog open={formOpen} onOpenChange={setFormOpen}>
-        <DialogContent className='max-w-2xl' aria-describedby={undefined}>
+      <Dialog open={formOpen} onOpenChange={handleFormOpenChange}>
+        <DialogContent className='w-[min(98vw,56rem)] max-w-4xl max-h-[92vh] overflow-y-auto' aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>{editingSupplier ? 'Editar proveedor' : 'Nuevo proveedor'}</DialogTitle>
           </DialogHeader>
           <SupplierForm
             supplier={editingSupplier}
+            onDirtyChange={setFormDirty}
             onSuccess={() => {
+              setFormDirty(false)
               setFormOpen(false)
+              setEditingSupplier(null)
               fetchSuppliers()
             }}
-            onCancel={() => setFormOpen(false)}
+            onCancel={closeSupplierForm}
           />
         </DialogContent>
       </Dialog>
