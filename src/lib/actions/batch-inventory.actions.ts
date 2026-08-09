@@ -16,9 +16,7 @@ export async function deleteBatch(
       return { success: false, error: 'No autenticado' }
     }
 
-    const allowed =
-      session.user.role === 'ADMIN' ||
-      (await canManageInventory(session.user.id, session.user.role))
+    const allowed = await canManageInventory(session.user.id, session.user.role)
     if (!allowed) {
       return { success: false, error: 'No autorizado' }
     }

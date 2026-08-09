@@ -338,6 +338,18 @@ export async function proxy(request: NextRequest) {
 
     // ADMIN de familia: respetar toggles de módulos (Super Admin exento).
     if (userRole === 'ADMIN' && (token as any).isSuperAdmin !== true) {
+      if (
+        (path.startsWith('/admin/tickets') || path === '/admin/tickets') &&
+        (token as any).ticketsEnabled !== true
+      ) {
+        ApplicationLogger.securityEvent(
+          'insufficient_privileges',
+          'medium',
+          { userId, userRole, requiredCapability: 'ticketsEnabled', path, ip },
+          { requestId }
+        )
+        return NextResponse.redirect(new URL('/admin', request.url))
+      }
       if (path.startsWith('/admin/news') && (token as any).newsEnabled !== true) {
         ApplicationLogger.securityEvent(
           'insufficient_privileges',
@@ -357,6 +369,18 @@ export async function proxy(request: NextRequest) {
         return NextResponse.redirect(new URL('/admin', request.url))
       }
       if (
+        (path.startsWith('/admin/patrols') || path === '/admin/patrols') &&
+        (token as any).patrolsEnabled !== true
+      ) {
+        ApplicationLogger.securityEvent(
+          'insufficient_privileges',
+          'medium',
+          { userId, userRole, requiredCapability: 'patrolsEnabled', path, ip },
+          { requestId }
+        )
+        return NextResponse.redirect(new URL('/admin', request.url))
+      }
+      if (
         (path.startsWith('/inventory') ||
           path === '/settings/inventory' ||
           path.startsWith('/settings/inventory/')) &&
@@ -371,6 +395,21 @@ export async function proxy(request: NextRequest) {
         )
         return NextResponse.redirect(new URL('/admin', request.url))
       }
+    }
+
+    // TECH/CLIENT: tickets requieren ticketsEnabled
+    if (
+      ((path.startsWith('/technician/tickets') && userRole === 'TECHNICIAN') ||
+        (path.startsWith('/client/tickets') && userRole === 'CLIENT')) &&
+      (token as any).ticketsEnabled !== true
+    ) {
+      ApplicationLogger.securityEvent(
+        'insufficient_privileges',
+        'medium',
+        { userId, userRole, requiredCapability: 'ticketsEnabled', path, ip },
+        { requestId }
+      )
+      return NextResponse.redirect(new URL(dashboardForRole(userRole), request.url))
     }
 
     if (path.startsWith('/technician') && userRole !== 'TECHNICIAN') {
@@ -395,10 +434,10 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(new URL(dashboardForRole(userRole), request.url))
     }
 
-    // Documentos (lectura): TECH/CLIENT requieren formsEnabled o canManageForms.
+    // Documentos (lectura): todos excepto Super Admin requieren formsEnabled o canManageForms.
     if (
       path.startsWith('/forms') &&
-      userRole !== 'ADMIN' &&
+      (token as any).isSuperAdmin !== true &&
       (token as any).formsEnabled !== true &&
       (token as any).canManageForms !== true
     ) {
@@ -442,36 +481,40 @@ export async function proxy(request: NextRequest) {
     }
 
     // Rutas de inventario:
-    // - ADMIN: acceso total
-    // - TECHNICIAN: acceso total (granularidad en API routes)
-    // - CLIENT gestor (canManageInventory): acceso operativo + /inventory/settings
-    // - CLIENT sin gestión: activos asignados, licencias, actas, mantenimientos,
-    //   contratos (Mis Suscripciones) y solicitudes si canRequestAssets
+    // - Super Admin: acceso total
+    // - ADMIN/TECH/CLIENT: inventoryEnabled o canManageInventory; CLIENT sin gestión → allowlist
     if (path.startsWith('/inventory') || path === '/settings/inventory' || path.startsWith('/settings/inventory/')) {
-      if (userRole === 'CLIENT') {
-        const canManage = (token as any).canManageInventory === true
-        const canRequest = (token as any).canRequestAssets === true
+      const isSuper = (token as any).isSuperAdmin === true
+      const invOn = (token as any).inventoryEnabled === true
+      const canManage = (token as any).canManageInventory === true
+      const canRequest = (token as any).canRequestAssets === true
 
-        if (canManage) {
-          // Redirects legacy de catálogo → /inventory/settings (permitir el hop)
-          // Bloquear solo rutas de sistema no aplicables a gestores cliente
-        } else {
-          const clientAllowed = [
-            '/inventory',
-            '/inventory/equipment',
-            '/inventory/license',
-            '/inventory/suministros',
-            '/inventory/acts',
-            '/inventory/maintenance',
-            '/inventory/contracts',
-          ]
-          if (canRequest) {
-            clientAllowed.push('/inventory/asset-requests')
-          }
-          const isAllowed = clientAllowed.some(r => path === r || path.startsWith(r + '/'))
-          if (!isAllowed) {
-            return NextResponse.redirect(new URL('/client', request.url))
-          }
+      if (!isSuper && !invOn && !canManage && !(userRole === 'CLIENT' && canRequest)) {
+        ApplicationLogger.securityEvent(
+          'insufficient_privileges',
+          'medium',
+          { userId, userRole, requiredCapability: 'inventoryEnabled', path, ip },
+          { requestId }
+        )
+        return NextResponse.redirect(new URL(dashboardForRole(userRole), request.url))
+      }
+
+      if (userRole === 'CLIENT' && !canManage) {
+        const clientAllowed = [
+          '/inventory',
+          '/inventory/equipment',
+          '/inventory/license',
+          '/inventory/suministros',
+          '/inventory/acts',
+          '/inventory/maintenance',
+          '/inventory/contracts',
+        ]
+        if (canRequest) {
+          clientAllowed.push('/inventory/asset-requests')
+        }
+        const isAllowed = clientAllowed.some(r => path === r || path.startsWith(r + '/'))
+        if (!isAllowed) {
+          return NextResponse.redirect(new URL('/client', request.url))
         }
       }
     }

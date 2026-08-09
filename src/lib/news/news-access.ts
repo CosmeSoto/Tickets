@@ -170,8 +170,9 @@ export async function assertCanViewNews(
 }
 
 export function getNewsNotificationLink(viewer: { role: string; canManageNews?: boolean }): string {
-  // Gestores → panel admin; lectores → dashboard (feed embebido)
-  if (viewer.role === 'ADMIN' || viewer.canManageNews) return '/admin/news'
+  // Solo gestores → panel admin; ADMIN sin manage → dashboard (feed si módulo ON)
+  if (viewer.canManageNews) return '/admin/news'
+  if (viewer.role === 'ADMIN') return '/admin'
   if (viewer.role === 'TECHNICIAN') return '/technician'
   return '/client'
 }

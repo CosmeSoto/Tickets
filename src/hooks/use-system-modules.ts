@@ -131,9 +131,9 @@ export function getModuleRoleDescription(moduleKey: string, role: string): strin
       CLIENT: 'Crear y seguir tickets en su área y áreas de servicio adicionales',
     },
     inventory: {
-      ADMIN: 'Gestionar activos de inventario de sus familias asignadas',
-      TECHNICIAN: 'Ver y gestionar activos de sus familias como gestor',
-      CLIENT: 'Ver sus equipos asignados y solicitar mantenimientos',
+      ADMIN: 'Módulo ON = ver inventario · «Gestión completa» = CRUD de activos',
+      TECHNICIAN: 'Ver · con gestión completa opera activos · puede solicitar si está habilitado',
+      CLIENT: 'Ver asignados · solicitar activos/mantenimientos según toggles',
     },
     patrols: {
       ADMIN: 'Ver reportes y supervisar rondas de sus familias',

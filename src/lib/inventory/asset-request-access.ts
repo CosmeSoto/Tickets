@@ -8,9 +8,8 @@ type SessionUser = {
   inventoryEnabled?: boolean
 }
 
-/** Admin o gestor con permiso de inventario */
+/** Super Admin o gestor con canManageInventory (incluye ADMIN de familia). */
 export async function canManageAssetRequests(user: SessionUser): Promise<boolean> {
-  if (user.role === 'ADMIN') return true
   if (user.isSuperAdmin) return true
   return canManageInventory(user.id, user.role)
 }

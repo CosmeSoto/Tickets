@@ -7,12 +7,11 @@ import {
   type InventoryAccessUser,
 } from '@/lib/inventory/inventory-resource-access'
 
-/** Admin o gestor con permiso global de inventario */
+/** Gestor con permiso global de inventario (Super Admin vía canManageInventory). */
 export async function requireInventoryModuleAccess(user: {
   id: string
   role: string
 }): Promise<NextResponse | null> {
-  if (user.role === 'ADMIN') return null
   if (!(await canManageInventory(user.id, user.role))) {
     return NextResponse.json(
       { error: 'No tienes permiso para gestionar el inventario' },

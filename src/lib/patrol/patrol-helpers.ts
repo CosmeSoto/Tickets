@@ -29,7 +29,13 @@ export async function getPatrolSupervisors(familyId: string): Promise<{ id: stri
       where: {
         isActive: true,
         role: 'ADMIN',
-        OR: [{ isSuperAdmin: true }, { departments: { familyId, isActive: true } }],
+        OR: [
+          { isSuperAdmin: true },
+          {
+            patrolsEnabled: true,
+            departments: { familyId, isActive: true },
+          },
+        ],
       },
       select: { id: true },
     }),
@@ -67,63 +73,57 @@ export async function getPatrolSupervisors(familyId: string): Promise<{ id: stri
 
 /**
  * Acceso de supervisión/configuración del módulo (dashboard, schedules, routes, reports).
- * ADMIN siempre; TECHNICIAN solo con patrolsEnabled.
- * CLIENT nunca: los clientes ejecutan rondas en /api/patrols (agente), no en APIs de config.
- *
- * @returns true si puede acceder, false si no.
+ * Super Admin / ADMIN con patrolsEnabled; TECHNICIAN con patrolsEnabled.
+ * CLIENT nunca: ejecutan rondas en APIs de agente.
  */
 export async function hasPatrolModuleAccess(userId: string, role: string): Promise<boolean> {
-  if (role === 'ADMIN') return true
-  if (role !== 'TECHNICIAN') return false
+  if (role !== 'ADMIN' && role !== 'TECHNICIAN') return false
 
   const user = await prisma.users.findUnique({
     where: { id: userId },
-    select: { patrolsEnabled: true },
+    select: { patrolsEnabled: true, isSuperAdmin: true },
   })
-  return user?.patrolsEnabled === true
+  if (!user) return false
+  if (user.isSuperAdmin) return true
+  return user.patrolsEnabled === true
 }
 
 /**
  * Gate de supervisión/configuración. Retorna 403 listo o `null` si puede continuar.
- * No usar en rutas de agente (listar/iniciar/check-in); ahí usar checkPatrolAgentAccess.
- *
- * Uso típico:
- * ```ts
- * const denied = await checkPatrolModuleAccess(session.user.id, session.user.role)
- * if (denied) return denied
- * ```
  */
 export async function checkPatrolModuleAccess(
   userId: string,
   role: string
 ): Promise<NextResponse | null> {
-  if (role === 'ADMIN') return null
-  if (role !== 'TECHNICIAN') return patrolForbidden()
+  if (role !== 'ADMIN' && role !== 'TECHNICIAN') return patrolForbidden()
 
   const user = await prisma.users.findUnique({
     where: { id: userId },
-    select: { patrolsEnabled: true },
+    select: { patrolsEnabled: true, isSuperAdmin: true },
   })
-  if (!user?.patrolsEnabled) return patrolModuleDisabled()
+  if (!user) return patrolForbidden()
+  if (user.isSuperAdmin) return null
+  if (!user.patrolsEnabled) return patrolModuleDisabled()
   return null
 }
 
 /**
  * Acceso de agente (ejecutar rondas asignadas).
- * ADMIN puede monitorear; TECHNICIAN/CLIENT requieren patrolsEnabled.
+ * Super Admin / ADMIN con módulo ON pueden monitorear; TECH/CLIENT requieren patrolsEnabled.
  */
 export async function checkPatrolAgentAccess(
   userId: string,
   role: string
 ): Promise<NextResponse | null> {
-  if (role === 'ADMIN') return null
-  if (role !== 'TECHNICIAN' && role !== 'CLIENT') return patrolForbidden()
+  if (role !== 'ADMIN' && role !== 'TECHNICIAN' && role !== 'CLIENT') return patrolForbidden()
 
   const user = await prisma.users.findUnique({
     where: { id: userId },
-    select: { patrolsEnabled: true },
+    select: { patrolsEnabled: true, isSuperAdmin: true },
   })
-  if (!user?.patrolsEnabled) return patrolModuleDisabled()
+  if (!user) return patrolForbidden()
+  if (user.isSuperAdmin) return null
+  if (!user.patrolsEnabled) return patrolModuleDisabled()
   return null
 }
 

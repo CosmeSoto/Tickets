@@ -39,8 +39,8 @@ export async function GET(request: NextRequest) {
     const isSuperAdmin = (session.user as any).isSuperAdmin === true
     const patrolsEnabled = (session.user as any).patrolsEnabled
 
-    // ADMIN siempre tiene acceso. Para otros roles, verificar patrolsEnabled.
-    if (role !== 'ADMIN') {
+    // Super Admin siempre. Resto (incluido ADMIN de familia): requieren patrolsEnabled.
+    if (!isSuperAdmin) {
       const enabled =
         patrolsEnabled === true
           ? true

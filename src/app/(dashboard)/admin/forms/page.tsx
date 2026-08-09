@@ -108,7 +108,7 @@ export default function AdminFormsPage() {
     }
     accessChecked.current = true
 
-    if (session.user.role === 'ADMIN' || (session.user as any).isSuperAdmin) {
+    if ((session.user as any).isSuperAdmin) {
       setHasAccess(true)
       loadForms()
       loadUsersAndDepartments()
@@ -122,8 +122,10 @@ export default function AdminFormsPage() {
         if (res.ok) {
           const data = await res.json()
           const u = data.user
-          // Panel de gestión: requiere toggle de crear (módulo solo = ver en /forms)
-          if (u?.canManageForms && u?.formsEnabled) {
+          const formsOn = u?.formsEnabled === true
+          const canManage =
+            session.user.role === 'ADMIN' ? formsOn : u?.canManageForms && formsOn
+          if (canManage) {
             setHasAccess(true)
             loadForms()
             loadUsersAndDepartments()
@@ -136,7 +138,11 @@ export default function AdminFormsPage() {
         const res = await fetch(`/api/user/modules?_t=${Date.now()}`)
         if (res.ok) {
           const modules = await res.json()
-          if (modules.canManageForms && modules.forms) {
+          const canManage =
+            session.user.role === 'ADMIN'
+              ? modules.forms === true
+              : modules.canManageForms && modules.forms
+          if (canManage) {
             setHasAccess(true)
             loadForms()
             loadUsersAndDepartments()
@@ -146,7 +152,13 @@ export default function AdminFormsPage() {
         }
       } catch {}
       setHasAccess(false)
-      router.replace(session.user.role === 'TECHNICIAN' ? '/technician' : '/client')
+      const dest =
+        session.user.role === 'ADMIN'
+          ? '/admin'
+          : session.user.role === 'TECHNICIAN'
+            ? '/technician'
+            : '/client'
+      router.replace(dest)
     }
     checkAccess()
   }, [session, status, router]) // eslint-disable-line react-hooks/exhaustive-deps

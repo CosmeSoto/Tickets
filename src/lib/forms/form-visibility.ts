@@ -72,9 +72,7 @@ export async function getFormViewer(userId: string): Promise<FormViewer | null> 
 }
 
 export function hasFormsModuleAccess(viewer: FormViewer): boolean {
-  return (
-    viewer.isSuperAdmin || viewer.role === 'ADMIN' || viewer.formsEnabled || viewer.canManageForms
-  )
+  return viewer.isSuperAdmin || viewer.formsEnabled || viewer.canManageForms
 }
 
 export function buildFormVisibilityConditions(viewer: FormViewer) {
