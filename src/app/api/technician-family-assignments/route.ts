@@ -73,6 +73,29 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const viewer = await prisma.users.findUnique({
+      where: { id: session.user.id },
+      select: { isSuperAdmin: true },
+    })
+    const isSuperAdmin = viewer?.isSuperAdmin === true
+    const { assertAdminCanManageUser, assertAdminCanAccessFamily } = await import(
+      '@/lib/auth/admin-scope'
+    )
+    const userScope = await assertAdminCanManageUser(session.user.id, isSuperAdmin, technicianId)
+    if (!userScope.allowed) {
+      return NextResponse.json(
+        { success: false, message: userScope.error },
+        { status: userScope.status }
+      )
+    }
+    const familyScope = await assertAdminCanAccessFamily(session.user.id, isSuperAdmin, familyId)
+    if (!familyScope.allowed) {
+      return NextResponse.json(
+        { success: false, message: familyScope.error },
+        { status: familyScope.status }
+      )
+    }
+
     const user = await prisma.users.findUnique({
       where: { id: technicianId },
       select: { id: true, name: true, role: true, isActive: true },

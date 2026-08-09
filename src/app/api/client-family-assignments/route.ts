@@ -19,6 +19,20 @@ export async function GET(request: NextRequest) {
     const clientId = searchParams.get('clientId')
     if (!clientId) return NextResponse.json({ error: 'clientId requerido' }, { status: 400 })
 
+    const viewer = await prisma.users.findUnique({
+      where: { id: session.user.id },
+      select: { isSuperAdmin: true },
+    })
+    const { assertAdminCanManageUser } = await import('@/lib/auth/admin-scope')
+    const scopeCheck = await assertAdminCanManageUser(
+      session.user.id,
+      viewer?.isSuperAdmin === true,
+      clientId
+    )
+    if (!scopeCheck.allowed) {
+      return NextResponse.json({ error: scopeCheck.error }, { status: scopeCheck.status })
+    }
+
     const rows = await prisma.user_family_access.findMany({
       where: { userId: clientId, module: 'tickets', isActive: true },
       include: {
@@ -73,6 +87,23 @@ export async function POST(request: NextRequest) {
     const { clientId, familyId } = await request.json()
     if (!clientId || !familyId)
       return NextResponse.json({ error: 'clientId y familyId son requeridos' }, { status: 400 })
+
+    const viewer = await prisma.users.findUnique({
+      where: { id: session.user.id },
+      select: { isSuperAdmin: true },
+    })
+    const isSuperAdmin = viewer?.isSuperAdmin === true
+    const { assertAdminCanManageUser, assertAdminCanAccessFamily } = await import(
+      '@/lib/auth/admin-scope'
+    )
+    const userScope = await assertAdminCanManageUser(session.user.id, isSuperAdmin, clientId)
+    if (!userScope.allowed) {
+      return NextResponse.json({ error: userScope.error }, { status: userScope.status })
+    }
+    const familyScope = await assertAdminCanAccessFamily(session.user.id, isSuperAdmin, familyId)
+    if (!familyScope.allowed) {
+      return NextResponse.json({ error: familyScope.error }, { status: familyScope.status })
+    }
 
     const user = await prisma.users.findUnique({
       where: { id: clientId },

@@ -36,6 +36,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ success: false, error: 'No autorizado' }, { status: 401 })
     }
 
+    const viewer = await prisma.users.findUnique({
+      where: { id: session.user.id },
+      select: { isSuperAdmin: true },
+    })
+    const isSuperAdmin = viewer?.isSuperAdmin === true
+    const { assertAdminCanManageUser } = await import('@/lib/auth/admin-scope')
+    const scopeCheck = await assertAdminCanManageUser(session.user.id, isSuperAdmin, id)
+    if (!scopeCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: scopeCheck.error },
+        { status: scopeCheck.status }
+      )
+    }
+
     // Verificar que el usuario existe y es CLIENT
     const user = await prisma.users.findUnique({
       where: { id },
@@ -119,12 +133,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       throw validationError
     }
 
+    // Solo Super Admin puede reasignar departamento al promover
+    const nextDepartmentId =
+      isSuperAdmin && validatedData.departmentId
+        ? validatedData.departmentId
+        : user.departmentId
+
     // Promover usuario a técnico
     const promotedUser = await prisma.users.update({
       where: { id },
       data: {
         role: 'TECHNICIAN',
-        departmentId: validatedData.departmentId || user.departmentId,
+        departmentId: nextDepartmentId,
         updatedAt: new Date(),
       },
       select: {

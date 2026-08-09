@@ -19,6 +19,23 @@ export async function POST(_request: NextRequest, context: { params: Promise<{ i
     const params = await context.params
     const userId = params.id
 
+    const viewer = await prisma.users.findUnique({
+      where: { id: session.user.id },
+      select: { isSuperAdmin: true },
+    })
+    const { assertAdminCanManageUser } = await import('@/lib/auth/admin-scope')
+    const scopeCheck = await assertAdminCanManageUser(
+      session.user.id,
+      viewer?.isSuperAdmin === true,
+      userId
+    )
+    if (!scopeCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: scopeCheck.error },
+        { status: scopeCheck.status }
+      )
+    }
+
     // Verificar que el usuario existe y es técnico
     const user = await prisma.users.findUnique({
       where: { id: userId },

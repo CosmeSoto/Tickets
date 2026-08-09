@@ -222,7 +222,10 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    const includeAll = searchParams.get('scope') === 'all' && session.user.role === 'ADMIN'
+    const includeAll =
+      searchParams.get('scope') === 'all' &&
+      session.user.role === 'ADMIN' &&
+      currentUser?.isSuperAdmin === true
     const moduleFilter = searchParams.get('module') // 'tickets' | 'inventory' | 'patrols' | null
     const configMode = searchParams.get('configMode') === 'true' // Si es true, no filtrar por módulo habilitado (para pantallas de configuración)
     let families = await FamilyService.findAll(includeInactive)

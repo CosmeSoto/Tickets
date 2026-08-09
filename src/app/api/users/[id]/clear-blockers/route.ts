@@ -34,6 +34,21 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     const { id: userId } = await params
+
+    const viewer = await prisma.users.findUnique({
+      where: { id: session.user.id },
+      select: { isSuperAdmin: true },
+    })
+    const { assertAdminCanManageUser } = await import('@/lib/auth/admin-scope')
+    const scopeCheck = await assertAdminCanManageUser(
+      session.user.id,
+      viewer?.isSuperAdmin === true,
+      userId
+    )
+    if (!scopeCheck.allowed) {
+      return NextResponse.json({ error: scopeCheck.error }, { status: scopeCheck.status })
+    }
+
     const body = await request.json()
     const parsed = bodySchema.safeParse(body)
     if (!parsed.success) {

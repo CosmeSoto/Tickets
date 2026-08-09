@@ -511,6 +511,16 @@ export async function POST(request: NextRequest) {
 
     const requesterIsSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
 
+    if (validatedData.role === 'ADMIN' && !requesterIsSuperAdmin) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Solo un Super Administrador puede crear usuarios administradores',
+        },
+        { status: 403 }
+      )
+    }
+
     // Verificar si el departamento existe y está en el ámbito del admin
     if (validatedData.departmentId) {
       const department = await prisma.departments.findUnique({

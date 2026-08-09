@@ -142,12 +142,25 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       )
     }
 
-    // Si no es admin, no puede cambiar rol o estado activo
-    if (session.user.role !== 'ADMIN') {
+    // Si no es admin, o edita su propio perfil: solo campos de perfil (sin privilegios)
+    if (session.user.role !== 'ADMIN' || isSelf) {
       delete validatedData.role
       delete validatedData.isActive
-      delete validatedData.assignedCategories // Solo admins pueden asignar categorías
-      delete (validatedData as any).canRequestAssets // Solo admins pueden modificar canRequestAssets
+      delete validatedData.assignedCategories
+      delete validatedData.departmentId
+      delete validatedData.department
+      delete validatedData.isSuperAdmin
+      delete validatedData.canRequestAssets
+      delete validatedData.canManageInventory
+      delete validatedData.ticketsEnabled
+      delete validatedData.inventoryEnabled
+      delete validatedData.patrolsEnabled
+      delete validatedData.newsEnabled
+      delete validatedData.canManageNews
+      delete validatedData.formsEnabled
+      delete validatedData.canManageForms
+      delete validatedData.credentialsEnabled
+      delete validatedData.canManageCredentials
     }
 
     // Un admin no puede desactivar su propia cuenta
@@ -177,10 +190,21 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       delete validatedData.isSuperAdmin
     }
 
+    // Crear/elevar a ADMIN: solo Super Admin
+    const isSuperAdmin = (session.user as any).isSuperAdmin === true
+    if (validatedData.role === 'ADMIN' && !isSuperAdmin) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Solo un Super Administrador puede asignar el rol de administrador',
+        },
+        { status: 403 }
+      )
+    }
+
     // ── Solo Super Admin puede cambiar el departamento ────────────────────────
     // El departamento es el vínculo nativo del usuario a su familia.
     // Un admin normal no puede reasignarlo — solo el super admin puede hacerlo.
-    const isSuperAdmin = (session.user as any).isSuperAdmin === true
     if (
       validatedData.departmentId !== undefined &&
       validatedData.departmentId !== currentUser.departmentId &&

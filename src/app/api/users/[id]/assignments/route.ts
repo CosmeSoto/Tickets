@@ -275,6 +275,24 @@ export async function POST(
     }
 
     const { id } = await params
+
+    const viewer = await prisma.users.findUnique({
+      where: { id: session.user.id },
+      select: { isSuperAdmin: true },
+    })
+    const { assertAdminCanManageUser } = await import('@/lib/auth/admin-scope')
+    const scopeCheck = await assertAdminCanManageUser(
+      session.user.id,
+      viewer?.isSuperAdmin === true,
+      id
+    )
+    if (!scopeCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: scopeCheck.error },
+        { status: scopeCheck.status }
+      )
+    }
+
     const body = await request.json()
     const { categoryId, priority, maxTickets, autoAssign } = body
 
@@ -382,6 +400,24 @@ export async function DELETE(
     }
 
     const { id } = await params
+
+    const viewer = await prisma.users.findUnique({
+      where: { id: session.user.id },
+      select: { isSuperAdmin: true },
+    })
+    const { assertAdminCanManageUser } = await import('@/lib/auth/admin-scope')
+    const scopeCheck = await assertAdminCanManageUser(
+      session.user.id,
+      viewer?.isSuperAdmin === true,
+      id
+    )
+    if (!scopeCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: scopeCheck.error },
+        { status: scopeCheck.status }
+      )
+    }
+
     const { searchParams } = new URL(request.url)
     const assignmentId = searchParams.get('assignmentId')
 

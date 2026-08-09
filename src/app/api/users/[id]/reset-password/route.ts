@@ -14,10 +14,25 @@ export async function GET(
   try {
     const session = await getServerSession(authOptions)
     if (!session || session.user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+      return NextResponse.json({ isLocked: false }, { status: 401 })
     }
 
     const { id } = await params
+
+    const viewer = await prisma.users.findUnique({
+      where: { id: session.user.id },
+      select: { isSuperAdmin: true },
+    })
+    const { assertAdminCanManageUser } = await import('@/lib/auth/admin-scope')
+    const scopeCheck = await assertAdminCanManageUser(
+      session.user.id,
+      viewer?.isSuperAdmin === true,
+      id
+    )
+    if (!scopeCheck.allowed) {
+      return NextResponse.json({ error: scopeCheck.error }, { status: scopeCheck.status })
+    }
+
     const user = await prisma.users.findUnique({ where: { id }, select: { email: true } })
     if (!user) {
       return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 })
@@ -63,6 +78,21 @@ export async function POST(
     }
 
     const { id } = await params
+
+    const viewer = await prisma.users.findUnique({
+      where: { id: session.user.id },
+      select: { isSuperAdmin: true },
+    })
+    const { assertAdminCanManageUser } = await import('@/lib/auth/admin-scope')
+    const scopeCheck = await assertAdminCanManageUser(
+      session.user.id,
+      viewer?.isSuperAdmin === true,
+      id
+    )
+    if (!scopeCheck.allowed) {
+      return NextResponse.json({ error: scopeCheck.error }, { status: scopeCheck.status })
+    }
+
     const body = await request.json()
     const { newPassword } = body
 
@@ -126,7 +156,25 @@ export async function DELETE(
     }
 
     const { id } = await params
-    const user = await prisma.users.findUnique({ where: { id }, select: { id: true, name: true, email: true } })
+
+    const viewer = await prisma.users.findUnique({
+      where: { id: session.user.id },
+      select: { isSuperAdmin: true },
+    })
+    const { assertAdminCanManageUser } = await import('@/lib/auth/admin-scope')
+    const scopeCheck = await assertAdminCanManageUser(
+      session.user.id,
+      viewer?.isSuperAdmin === true,
+      id
+    )
+    if (!scopeCheck.allowed) {
+      return NextResponse.json({ error: scopeCheck.error }, { status: scopeCheck.status })
+    }
+
+    const user = await prisma.users.findUnique({
+      where: { id },
+      select: { id: true, name: true, email: true },
+    })
     if (!user) {
       return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 })
     }
