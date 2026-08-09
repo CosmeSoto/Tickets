@@ -8,6 +8,7 @@ import {
   canCreateCredentials,
   ensureDefaultAreaVault,
   getCredentialsFamilyScopeIds,
+  buildCredentialEntriesVisibilityWhere,
 } from '@/lib/credentials/access'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 
@@ -42,6 +43,8 @@ export async function GET() {
     await ensureDefaultAreaVault(familyId)
   }
 
+  const entryVisibility = await buildCredentialEntriesVisibilityWhere(ctx)
+
   const vaults = await prisma.credential_vaults.findMany({
     where: {
       isActive: true,
@@ -49,7 +52,7 @@ export async function GET() {
     },
     include: {
       family: { select: { id: true, name: true, code: true, color: true, order: true } },
-      _count: { select: { entries: { where: { isActive: true } } } },
+      _count: { select: { entries: { where: entryVisibility } } },
     },
   })
 

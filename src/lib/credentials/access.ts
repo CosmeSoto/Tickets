@@ -1,10 +1,6 @@
 import prisma from '@/lib/prisma'
 import type { Prisma } from '@prisma/client'
-import {
-  getUserModuleFamilyGrantIds,
-  resolveModuleFamilyScopeIds,
-} from '@/lib/auth/user-family-access'
-import { getNativeFamilyId, normalizeActiveFamilyIds } from '@/lib/auth/family-scope'
+import { resolveModuleFamilyScopeIds } from '@/lib/auth/user-family-access'
 import { DEFAULT_AREA_VAULT_NAME } from '@/lib/credentials/constants'
 
 export { DEFAULT_AREA_VAULT_NAME }
@@ -22,10 +18,6 @@ type EntryAccessShape = {
   createdById: string
   vault: VaultShape
   createdBy?: { role: string; isSuperAdmin: boolean | null }
-}
-
-function dedupe(ids: (string | null | undefined)[]): string[] {
-  return [...new Set(ids.filter((id): id is string => Boolean(id)))]
 }
 
 /** SuperAdmin(4) > Admin(3) > Técnico(2) > Cliente(1) */
@@ -107,8 +99,7 @@ export async function canManageCredentialsVault(
 /**
  * Familias visibles en credenciales.
  * - SuperAdmin: todas activas
- * - Si hay grants de credentials: nativa + grants credentials
- * - Si no hay grants credentials: fallback a scope de inventario
+ * - Resto: familia nativa + grants del módulo credentials (sin fallback a inventario)
  */
 export async function getCredentialsFamilyScopeIds(
   userId: string,
@@ -122,13 +113,56 @@ export async function getCredentialsFamilyScopeIds(
     return all.map(f => f.id)
   }
 
-  const grants = await getUserModuleFamilyGrantIds(userId, 'credentials', 'canView')
-  if (grants.length > 0) {
-    const nativeId = await getNativeFamilyId(userId)
-    return normalizeActiveFamilyIds(dedupe([nativeId, ...grants]))
-  }
+  return resolveModuleFamilyScopeIds(userId, 'credentials', 'canView')
+}
 
-  return resolveModuleFamilyScopeIds(userId, 'inventory', 'canView')
+/** Inferiores cuya nativa/grants de credentials intersectan el scope del viewer. */
+async function getInferiorCreatorIdsInCredentialsScope(
+  familyIds: string[],
+  inferiorRoles: Array<'ADMIN' | 'TECHNICIAN' | 'CLIENT'>
+): Promise<string[]> {
+  if (familyIds.length === 0 || inferiorRoles.length === 0) return []
+
+  const moduleKey = (await import('@/lib/auth/family-access-modules')).resolveFamilyAccessModuleKey(
+    'credentials'
+  )
+
+  const users = await prisma.users.findMany({
+    where: {
+      isActive: true,
+      isSuperAdmin: false,
+      role: { in: inferiorRoles },
+      OR: [
+        { departments: { familyId: { in: familyIds } } },
+        {
+          userFamilyAccess: {
+            some: {
+              module: moduleKey,
+              isActive: true,
+              canView: true,
+              familyId: { in: familyIds },
+            },
+          },
+        },
+      ],
+    },
+    select: { id: true },
+  })
+  return users.map(u => u.id)
+}
+
+async function personalVaultOverlapsCredentialsScope(
+  viewerUserId: string,
+  creatorUserId: string,
+  isSuperAdmin?: boolean
+): Promise<boolean> {
+  const scope = await getCredentialsFamilyScopeIds(viewerUserId, { isSuperAdmin })
+  if (scope.length === 0) return false
+  const { mapCredentialShareFamilyIds } = await import('@/lib/credentials/share-scope')
+  const creatorFamilies = (await mapCredentialShareFamilyIds([creatorUserId])).get(creatorUserId) ?? []
+  if (creatorFamilies.length === 0) return false
+  const set = new Set(scope)
+  return creatorFamilies.some(id => set.has(id))
 }
 
 /**
@@ -208,8 +242,7 @@ export async function userCanAccessEntry(
   if (!isCreatorInferior(ctx, creator)) return false
 
   if (entry.vault.kind === 'PERSONAL') {
-    // Bóveda personal de un inferior: visible con gestión completa
-    return true
+    return personalVaultOverlapsCredentialsScope(ctx.userId, entry.createdById, ctx.isSuperAdmin)
   }
 
   if (!entry.vault.familyId) return false
@@ -245,7 +278,9 @@ export async function userCanMutateEntry(
 
   if (!isCreatorInferior(ctx, creator)) return false
 
-  if (entry.vault.kind === 'PERSONAL') return true
+  if (entry.vault.kind === 'PERSONAL') {
+    return personalVaultOverlapsCredentialsScope(ctx.userId, entry.createdById, ctx.isSuperAdmin)
+  }
   if (!entry.vault.familyId) return false
   const scope = await getCredentialsFamilyScopeIds(ctx.userId, {
     isSuperAdmin: ctx.isSuperAdmin,
@@ -283,19 +318,19 @@ export async function buildCredentialEntriesVisibilityWhere(
   ]
 
   if (canHierarchy && inferiorRoles.length > 0) {
-    or.push({
-      vault: {
-        isActive: true,
-        OR: [
-          ...(familyIds.length > 0 ? [{ familyId: { in: familyIds } }] : []),
-          { kind: 'PERSONAL' as const },
-        ],
-      },
-      createdBy: {
-        role: { in: inferiorRoles },
-        isSuperAdmin: false,
-      },
-    })
+    const inferiorIds = await getInferiorCreatorIdsInCredentialsScope(familyIds, inferiorRoles)
+    if (inferiorIds.length > 0) {
+      or.push({
+        createdById: { in: inferiorIds },
+        vault: {
+          isActive: true,
+          OR: [
+            ...(familyIds.length > 0 ? [{ familyId: { in: familyIds } }] : []),
+            { kind: 'PERSONAL' as const },
+          ],
+        },
+      })
+    }
   }
 
   return {

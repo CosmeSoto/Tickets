@@ -360,6 +360,21 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(new URL(dashboardForRole(userRole), request.url))
     }
 
+    // Credenciales: requieren credentialsEnabled (SuperAdmin exento).
+    if (
+      path.startsWith('/credentials') &&
+      (token as any).isSuperAdmin !== true &&
+      (token as any).credentialsEnabled !== true
+    ) {
+      ApplicationLogger.securityEvent(
+        'insufficient_privileges',
+        'medium',
+        { userId, userRole, requiredCapability: 'credentialsEnabled', path, ip },
+        { requestId }
+      )
+      return NextResponse.redirect(new URL(dashboardForRole(userRole), request.url))
+    }
+
     // Rondas (agente): TECH/CLIENT requieren patrolsEnabled. ADMIN puede monitorear.
     if (
       (path.startsWith('/patrol') || path.startsWith('/patrol-checkpoint-display')) &&

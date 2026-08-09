@@ -16,14 +16,17 @@ export class EncryptionService {
    */
   private static getEncryptionKey(): Buffer {
     const key = process.env.ENCRYPTION_KEY
-    
+
     if (!key) {
-      console.warn('⚠️ ENCRYPTION_KEY no configurada. Usando clave por defecto (NO SEGURO EN PRODUCCIÓN)')
-      // Clave por defecto solo para desarrollo
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error('ENCRYPTION_KEY no configurada — cifrado fallido en producción')
+      }
+      console.warn(
+        '⚠️ ENCRYPTION_KEY no configurada. Usando clave por defecto (NO SEGURO EN PRODUCCIÓN)'
+      )
       return crypto.scryptSync('default-dev-key-change-in-production', 'salt', 32)
     }
 
-    // Derivar clave de 32 bytes desde la clave configurada
     return crypto.scryptSync(key, 'salt', 32)
   }
 
