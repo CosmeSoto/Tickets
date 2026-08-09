@@ -5,9 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ContractReturnAcceptanceForm } from '@/components/inventory/contract-return-acceptance-form'
 import {
   PAYMENT_METHOD_TYPE_LABELS,
-  SUBSCRIPTION_SERVICE_TYPE_LABELS,
+  getServiceSubtypeLabel,
   type PaymentMethodType,
-  type SubscriptionServiceType,
 } from '@/types/contracts'
 
 interface PageProps {
@@ -87,9 +86,9 @@ export default async function ContractReturnAcceptPage({ params, searchParams }:
             <div>
               <p className='text-muted-foreground'>Tipo de servicio</p>
               <p className='font-medium'>
-                {snap.serviceSubtype
-                  ? SUBSCRIPTION_SERVICE_TYPE_LABELS[snap.serviceSubtype as SubscriptionServiceType]
-                  : '—'}
+                {getServiceSubtypeLabel(
+                  typeof snap.serviceSubtype === 'string' ? snap.serviceSubtype : null
+                )}
               </p>
             </div>
             <div>

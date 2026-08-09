@@ -18,6 +18,9 @@ import {
 } from '@/components/ui/select'
 import { Combobox } from '@/components/ui/combobox'
 import { Separator } from '@/components/ui/separator'
+import { InlineCreateSelect, type InlineSelectOption } from '@/components/ui/inline-create-select'
+import { CatalogTypeInlineForm } from '@/components/inventory/asset-forms/CatalogTypeInlineForm'
+import { inlineSelectFeedback } from '@/lib/utils/inline-select-feedback'
 import { useToast } from '@/hooks/use-toast'
 import { useInventoryFamilies } from '@/contexts/families-context'
 import { useFetch } from '@/hooks/common/use-fetch'
@@ -36,7 +39,6 @@ import {
   SUBSCRIPTION_USAGE_STATUS_LABELS,
   PAYMENT_CARD_BRAND_LABELS,
   PAYMENT_METHOD_TYPE_LABELS,
-  SUBSCRIPTION_SERVICE_TYPE_LABELS,
   type Contract,
   type ContractFormData,
 } from '@/types/contracts'
@@ -196,6 +198,38 @@ export function ContractForm({
     transform: d => d.users ?? [],
     showErrorToast: false,
   })
+
+  type ServiceTypeRow = { id: string; code: string; name: string }
+  const [serviceTypes, setServiceTypes] = useState<ServiceTypeRow[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch('/api/inventory/contract-service-types')
+        if (!res.ok) return
+        const data = await res.json()
+        if (!cancelled && Array.isArray(data)) {
+          setServiceTypes(
+            data.map((t: ServiceTypeRow) => ({ id: t.id, code: t.code, name: t.name }))
+          )
+        }
+      } catch {
+        /* silencioso */
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const serviceTypeOptions: InlineSelectOption[] = useMemo(
+    () => serviceTypes.map(t => ({ id: t.code, name: t.name })),
+    [serviceTypes]
+  )
+
+  const resolveServiceTypeUuid = (code: string) =>
+    serviceTypes.find(t => t.code === code)?.id
 
   const custodianOptions = useMemo(
     () => [
@@ -633,27 +667,66 @@ export function ContractForm({
               selectedCategory === 'SUPPORT') && (
               <div className='space-y-1'>
                 <Label>Tipo de servicio</Label>
-                <Select
-                  value={watch('serviceSubtype') || 'none'}
-                  onValueChange={v =>
-                    setValue(
-                      'serviceSubtype',
-                      v === 'none' ? '' : (v as ContractFormData['serviceSubtype'])
-                    )
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder='Ej: Redes, IA, Canvas...' />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value='none'>Sin especificar</SelectItem>
-                    {Object.entries(SUBSCRIPTION_SERVICE_TYPE_LABELS).map(([k, v]) => (
-                      <SelectItem key={k} value={k}>
-                        {v}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <InlineCreateSelect
+                  options={serviceTypeOptions}
+                  value={watch('serviceSubtype') || ''}
+                  onChange={code => setValue('serviceSubtype', code, { shouldDirty: true })}
+                  placeholder='Buscar tipo de servicio...'
+                  allowClear
+                  createLabel='Crear tipo de servicio'
+                  createTitle='Nuevo tipo de servicio'
+                  editTitle='Editar tipo de servicio'
+                  deleteConfirmMessage='¿Eliminar este tipo de servicio? Si hay contratos que lo usan, solo se desactivará.'
+                  {...inlineSelectFeedback('Tipo de servicio')}
+                  createForm={({ item, onSuccess, onCancel }) => (
+                    <CatalogTypeInlineForm
+                      apiEndpoint='/api/inventory/contract-service-types'
+                      item={
+                        item
+                          ? {
+                              id: resolveServiceTypeUuid(item.id) || item.id,
+                              name: item.name,
+                            }
+                          : undefined
+                      }
+                      onSuccess={async saved => {
+                        const res = await fetch('/api/inventory/contract-service-types')
+                        const list = res.ok ? await res.json() : []
+                        const rows: ServiceTypeRow[] = Array.isArray(list)
+                          ? list.map((t: ServiceTypeRow) => ({
+                              id: t.id,
+                              code: t.code,
+                              name: t.name,
+                            }))
+                          : []
+                        setServiceTypes(rows)
+                        const row =
+                          rows.find(t => t.id === saved.id) ||
+                          rows.find(t => t.name === saved.name)
+                        onSuccess({
+                          id: row?.code || saved.id,
+                          name: row?.name || saved.name,
+                        })
+                      }}
+                      onCancel={onCancel}
+                    />
+                  )}
+                  onDelete={async code => {
+                    const uuid = resolveServiceTypeUuid(code)
+                    if (!uuid) throw new Error('Tipo no encontrado')
+                    const res = await fetch(`/api/inventory/contract-service-types/${uuid}`, {
+                      method: 'DELETE',
+                    })
+                    if (!res.ok) {
+                      const d = await res.json().catch(() => ({}))
+                      throw new Error(d.error || 'Error al eliminar')
+                    }
+                    setServiceTypes(prev => prev.filter(t => t.code !== code))
+                    if (watch('serviceSubtype') === code) {
+                      setValue('serviceSubtype', '', { shouldDirty: true })
+                    }
+                  }}
+                />
               </div>
             )}
 

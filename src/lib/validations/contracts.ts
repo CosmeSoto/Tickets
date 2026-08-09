@@ -93,8 +93,14 @@ export const SUBSCRIPTION_SERVICE_TYPE_VALUES = [
   'OTHER',
 ] as const
 
+/** Código del catálogo (enum legacy o personalizado). */
+const serviceSubtypeSchema = z.preprocess(
+  emptyToNull,
+  z.string().max(50).nullable().optional()
+)
+
 const billingFieldsSchema = {
-  serviceSubtype: optionalEnum(z.enum(SUBSCRIPTION_SERVICE_TYPE_VALUES)),
+  serviceSubtype: serviceSubtypeSchema,
   paymentMethodType: z.enum(PAYMENT_METHOD_TYPE_VALUES).default('CORPORATE_CARD'),
   paymentAccountRef: z.string().max(300).optional().nullable(),
   custodianUserId: optionalUuid,

@@ -69,6 +69,7 @@ export type SubscriptionServiceType =
   | 'COMMUNICATIONS'
   | 'DIGITAL_ADS'
   | 'OTHER'
+  | (string & {})
 
 export const PAYMENT_METHOD_TYPE_LABELS: Record<PaymentMethodType, string> = {
   CORPORATE_CARD: 'Tarjeta corporativa',
@@ -79,7 +80,8 @@ export const PAYMENT_METHOD_TYPE_LABELS: Record<PaymentMethodType, string> = {
   OTHER: 'Otro método',
 }
 
-export const SUBSCRIPTION_SERVICE_TYPE_LABELS: Record<SubscriptionServiceType, string> = {
+/** Labels legacy (códigos sembrados). Preferir catálogo en UI. */
+export const SUBSCRIPTION_SERVICE_TYPE_LABELS: Record<string, string> = {
   SOCIAL_MEDIA: 'Redes sociales',
   CONTENT: 'Contenido / editorial',
   AUDIOVISUAL: 'Servicios audiovisuales',
@@ -90,6 +92,17 @@ export const SUBSCRIPTION_SERVICE_TYPE_LABELS: Record<SubscriptionServiceType, s
   COMMUNICATIONS: 'Comunicaciones / internet',
   DIGITAL_ADS: 'Publicidad digital / Ads',
   OTHER: 'Otro servicio',
+}
+
+/** Resuelve etiqueta: mapa local → código legible. */
+export function getServiceSubtypeLabel(
+  code: string | null | undefined,
+  catalog?: Array<{ code: string; name: string }>
+): string {
+  if (!code) return '—'
+  const fromCatalog = catalog?.find(t => t.code === code)?.name
+  if (fromCatalog) return fromCatalog
+  return SUBSCRIPTION_SERVICE_TYPE_LABELS[code] ?? code.replace(/_/g, ' ')
 }
 
 export const SUBSCRIPTION_USAGE_STATUS_LABELS: Record<SubscriptionUsageStatus, string> = {
@@ -197,7 +210,7 @@ export interface Contract {
   name: string
   description?: string | null
   category: ContractCategory
-  serviceSubtype?: SubscriptionServiceType | null
+  serviceSubtype?: string | null
   status: ContractStatus
   supplierId?: string | null
   familyId?: string | null
@@ -255,7 +268,7 @@ export interface ContractFormData {
   name: string
   description: string
   category: ContractCategory
-  serviceSubtype: SubscriptionServiceType | ''
+  serviceSubtype: string
   supplierId: string
   familyId: string
   startDate: string

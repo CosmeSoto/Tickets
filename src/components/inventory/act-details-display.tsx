@@ -9,9 +9,8 @@ import { Separator } from '@/components/ui/separator'
 import type { DeliveryAct } from '@/types/inventory/delivery-act'
 import {
   PAYMENT_METHOD_TYPE_LABELS,
-  SUBSCRIPTION_SERVICE_TYPE_LABELS,
+  getServiceSubtypeLabel,
   type PaymentMethodType,
-  type SubscriptionServiceType,
 } from '@/types/contracts'
 
 interface ActDetailsDisplayProps {
@@ -111,9 +110,9 @@ export function ActDetailsDisplay({ act, showStatus = true }: ActDetailsDisplayP
             <div>
               <p className="text-sm text-muted-foreground">Tipo de servicio</p>
               <p className="font-medium">
-                {snap.serviceSubtype
-                  ? SUBSCRIPTION_SERVICE_TYPE_LABELS[snap.serviceSubtype as SubscriptionServiceType]
-                  : '—'}
+                {getServiceSubtypeLabel(
+                  typeof snap.serviceSubtype === 'string' ? snap.serviceSubtype : null
+                )}
               </p>
             </div>
             <div>

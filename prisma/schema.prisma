@@ -2092,17 +2092,19 @@ enum PaymentMethodType {
   OTHER
 }
 
-enum SubscriptionServiceType {
-  SOCIAL_MEDIA
-  CONTENT
-  AUDIOVISUAL
-  ARTIFICIAL_INTELLIGENCE
-  EDUCATION_LMS
-  CLOUD_SERVICES
-  DESIGN
-  COMMUNICATIONS
-  DIGITAL_ADS
-  OTHER
+/// Catálogo editable de tipos de servicio (contratos / suscripciones).
+model contract_service_types {
+  id          String   @id @default(uuid())
+  code        String   @unique @db.VarChar(50)
+  name        String   @db.VarChar(100)
+  description String?
+  isActive    Boolean  @default(true) @map("is_active")
+  order       Int      @default(0)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([isActive, order])
+  @@map("contract_service_types")
 }
 
 enum AssetSubtype {
@@ -2204,7 +2206,8 @@ model contracts {
   name              String           @db.VarChar(200)
   description       String?
   category          ContractCategory @default(SERVICE)
-  serviceSubtype    SubscriptionServiceType? @map("service_subtype")
+  /// Código del catálogo contract_service_types (antes enum SubscriptionServiceType)
+  serviceSubtype    String?          @map("service_subtype") @db.VarChar(50)
   status            ContractStatus   @default(DRAFT)
   supplierId        String?          @map("supplier_id")
   familyId          String?          @map("family_id")
