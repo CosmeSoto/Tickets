@@ -19,6 +19,8 @@ interface UserModulesPanelProps {
   credentialsEnabled?: boolean
   canManageCredentials?: boolean
   canRequestAssets?: boolean
+  /** Vista del propio usuario: copy en 2ª persona y nota de solo lectura */
+  selfView?: boolean
   defaultCollapsed?: boolean
   hideGuides?: boolean
   /** Muestra chips de módulos con la misma resolución del API (evita desfase con flags crudos) */
@@ -91,6 +93,7 @@ export function UserModulesPanel({
   credentialsEnabled,
   canManageCredentials,
   canRequestAssets,
+  selfView = false,
   defaultCollapsed = false,
   hideGuides = false,
   showModuleChips = false,
@@ -177,31 +180,57 @@ export function UserModulesPanel({
   // Capacidades contextuales por rol
   const ticketsCap =
     role === 'ADMIN'
-      ? 'Gestiona y supervisa tickets de sus familias asignadas'
+      ? selfView
+        ? 'Gestionas y supervisas tickets de tus familias asignadas'
+        : 'Gestiona y supervisa tickets de sus familias asignadas'
       : role === 'TECHNICIAN'
-        ? 'Atiende tickets asignados · crea tickets propios'
-        : 'Crea y hace seguimiento de sus propios tickets de soporte'
+        ? selfView
+          ? 'Atiendes tickets asignados · creas tickets propios'
+          : 'Atiende tickets asignados · crea tickets propios'
+        : selfView
+          ? 'Creas y das seguimiento a tus propios tickets de soporte'
+          : 'Crea y hace seguimiento de sus propios tickets de soporte'
 
   const inventoryCap = manageInventory
-    ? 'Gestión completa: activos, asignaciones, mantenimientos'
+    ? selfView
+      ? 'Gestión completa: activos, asignaciones y mantenimientos'
+      : 'Gestión completa: activos, asignaciones, mantenimientos'
     : requestAssets
-      ? 'Ve sus equipos asignados · puede solicitar nuevos activos'
-      : 'Consulta los equipos asignados a su perfil'
+      ? selfView
+        ? 'Ves tus equipos asignados · puedes solicitar nuevos activos'
+        : 'Ve sus equipos asignados · puede solicitar nuevos activos'
+      : selfView
+        ? 'Consultas los equipos asignados a tu perfil'
+        : 'Consulta los equipos asignados a su perfil'
 
   const patrolsCap =
     role === 'ADMIN'
-      ? 'Supervisa rondas, ve reportes y configura rutas'
+      ? selfView
+        ? 'Supervisas rondas, ves reportes y configuras rutas'
+        : 'Supervisa rondas, ve reportes y configura rutas'
       : role === 'TECHNICIAN'
-        ? 'Ejecuta rondas programadas · puede supervisar su instalación'
-        : 'Ejecuta rondas de seguridad asignadas como agente'
+        ? selfView
+          ? 'Ejecutas rondas programadas · puedes supervisar tu instalación'
+          : 'Ejecuta rondas programadas · puede supervisar su instalación'
+        : selfView
+          ? 'Ejecutas rondas de seguridad asignadas como agente'
+          : 'Ejecuta rondas de seguridad asignadas como agente'
 
   const newsCap = manageNews
-    ? 'Lee comunicados · crea y publica noticias para todos los usuarios'
-    : 'Lee noticias y comunicados según su perfil'
+    ? selfView
+      ? 'Lees comunicados · creas y publicas noticias para los usuarios'
+      : 'Lee comunicados · crea y publica noticias para todos los usuarios'
+    : selfView
+      ? 'Lees noticias y comunicados según tu perfil'
+      : 'Lee noticias y comunicados según su perfil'
 
   const formsCap = manageForms
-    ? 'Descarga documentos · crea y gestiona los de sus familias'
-    : 'Consulta y descarga documentos disponibles para su perfil'
+    ? selfView
+      ? 'Descargas documentos · creas y gestionas los de tus familias'
+      : 'Descarga documentos · crea y gestiona los de sus familias'
+    : selfView
+      ? 'Consultas y descargas documentos disponibles para tu perfil'
+      : 'Consulta y descarga documentos disponibles para su perfil'
 
   const credentialsCap = manageCredentials
     ? role === 'ADMIN'
@@ -209,7 +238,9 @@ export function UserModulesPanel({
       : role === 'TECHNICIAN'
         ? 'Propias + compartidas + credenciales de clientes del área'
         : 'Propias + compartidas'
-    : 'Crear y ver propias + las que le compartan'
+    : selfView
+      ? 'Crear y ver las tuyas + las que te compartan'
+      : 'Crear y ver propias + las que le compartan'
 
   // Permisos adicionales por módulo
   const inventoryPerms: Array<{ icon: string; label: string }> = []
@@ -273,8 +304,9 @@ export function UserModulesPanel({
           </div>
           {!hideGuides && activeCount < MODULE_CHIP_LABELS.length && (
             <p className='text-[11px] text-muted-foreground'>
-              Los chips reflejan el acceso real (flags + familias asignadas), igual que el menú del
-              usuario.
+              {selfView
+                ? 'Los chips reflejan tu acceso real en el menú. Si falta un módulo, contacta a tu administrador.'
+                : 'Los chips reflejan el acceso real (flags + familias asignadas), igual que el menú del usuario.'}
             </p>
           )}
         </div>
@@ -289,7 +321,9 @@ export function UserModulesPanel({
         >
           <div className='flex items-center gap-2'>
             <Activity className='h-3.5 w-3.5 text-muted-foreground' />
-            <span className='text-xs font-semibold text-foreground'>Perfil de acceso</span>
+            <span className='text-xs font-semibold text-foreground'>
+              {selfView ? 'Tu perfil de acceso' : 'Perfil de acceso'}
+            </span>
             <span className='text-[10px] text-muted-foreground'>
               · {activeCount}/{allModules.length} módulos activos
             </span>
@@ -320,6 +354,12 @@ export function UserModulesPanel({
                 }
               />
             ))}
+            {selfView && (
+              <p className='pt-2 text-[11px] text-muted-foreground leading-relaxed'>
+                Este resumen es solo consulta. Los módulos y familias los asigna un administrador;
+                coinciden con lo que ves en el menú lateral.
+              </p>
+            )}
           </div>
         )}
       </div>

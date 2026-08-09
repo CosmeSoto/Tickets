@@ -51,7 +51,9 @@ import {
   Key,
   Eye,
   EyeOff,
+  LayoutGrid,
 } from 'lucide-react'
+import { UserModulesPanel } from '@/components/users/user-modules-panel'
 
 export default function ProfilePage() {
   const { data: session, status, update } = useSession()
@@ -61,7 +63,7 @@ export default function ProfilePage() {
 
   useSyncDashboardPageMeta({
     title: 'Mi Perfil',
-    subtitle: 'Gestiona tu información personal y configuración de cuenta',
+    subtitle: 'Tu información, seguridad y módulos activos en el sistema',
   })
 
   const [loading, setLoading] = useState(false)
@@ -593,6 +595,39 @@ export default function ProfilePage() {
                 </Button>
               )}
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Acceso a módulos — solo lectura, misma resolución que el menú */}
+        <Card>
+          <CardHeader>
+            <CardTitle className='flex items-center space-x-2'>
+              <LayoutGrid className='h-5 w-5' />
+              <span>Acceso a módulos</span>
+            </CardTitle>
+            <CardDescription>
+              Qué tienes activado hoy según tu rol y familias asignadas. No puedes cambiar estos
+              permisos desde aquí.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <UserModulesPanel
+              userId={session.user.id}
+              role={session.user.role}
+              canManageInventory={(session.user as any).canManageInventory ?? false}
+              canRequestAssets={(session.user as any).canRequestAssets ?? false}
+              ticketsEnabled={(session.user as any).ticketsEnabled}
+              inventoryEnabled={(session.user as any).inventoryEnabled}
+              patrolsEnabled={(session.user as any).patrolsEnabled}
+              credentialsEnabled={(session.user as any).credentialsEnabled}
+              canManageCredentials={(session.user as any).canManageCredentials}
+              newsEnabled={(session.user as any).newsEnabled}
+              canManageNews={(session.user as any).canManageNews}
+              formsEnabled={(session.user as any).formsEnabled}
+              canManageForms={(session.user as any).canManageForms}
+              selfView
+              showModuleChips
+            />
           </CardContent>
         </Card>
 
