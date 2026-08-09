@@ -21,6 +21,8 @@ interface UserModulesPanelProps {
   canRequestAssets?: boolean
   /** Vista del propio usuario: copy en 2ª persona y nota de solo lectura */
   selfView?: boolean
+  /** Si false, el detalle queda siempre visible (sin acordeón). Default true. */
+  collapsible?: boolean
   defaultCollapsed?: boolean
   hideGuides?: boolean
   /** Muestra chips de módulos con la misma resolución del API (evita desfase con flags crudos) */
@@ -94,6 +96,7 @@ export function UserModulesPanel({
   canManageCredentials,
   canRequestAssets,
   selfView = false,
+  collapsible = true,
   defaultCollapsed = false,
   hideGuides = false,
   showModuleChips = false,
@@ -101,6 +104,7 @@ export function UserModulesPanel({
   const [data, setData] = useState<ModulesData | null>(null)
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState(!defaultCollapsed)
+  const showDetail = !collapsible || expanded
 
   useEffect(() => {
     setLoading(true)
@@ -314,30 +318,44 @@ export function UserModulesPanel({
 
       <div className='rounded-lg border overflow-hidden'>
         {/* Header */}
-        <button
-          type='button'
-          onClick={() => setExpanded(v => !v)}
-          className='w-full flex items-center justify-between px-3 py-2.5 sm:px-4 bg-muted/30 hover:bg-muted/50 transition-colors'
-        >
-          <div className='flex items-center gap-2'>
-            <Activity className='h-3.5 w-3.5 text-muted-foreground' />
-            <span className='text-xs font-semibold text-foreground'>
-              {selfView ? 'Tu perfil de acceso' : 'Perfil de acceso'}
-            </span>
-            <span className='text-[10px] text-muted-foreground'>
-              · {activeCount}/{allModules.length} módulos activos
-            </span>
+        {collapsible ? (
+          <button
+            type='button'
+            onClick={() => setExpanded(v => !v)}
+            className='w-full flex items-center justify-between px-3 py-2.5 sm:px-4 bg-muted/30 hover:bg-muted/50 transition-colors'
+          >
+            <div className='flex items-center gap-2'>
+              <Activity className='h-3.5 w-3.5 text-muted-foreground' />
+              <span className='text-xs font-semibold text-foreground'>
+                {selfView ? 'Tu perfil de acceso' : 'Perfil de acceso'}
+              </span>
+              <span className='text-[10px] text-muted-foreground'>
+                · {activeCount}/{allModules.length} módulos activos
+              </span>
+            </div>
+            <ChevronDown
+              className={cn(
+                'h-3.5 w-3.5 text-muted-foreground transition-transform',
+                expanded && 'rotate-180'
+              )}
+            />
+          </button>
+        ) : (
+          <div className='w-full flex items-center px-3 py-2.5 sm:px-4 bg-muted/30'>
+            <div className='flex items-center gap-2'>
+              <Activity className='h-3.5 w-3.5 text-muted-foreground' />
+              <span className='text-xs font-semibold text-foreground'>
+                {selfView ? 'Tu perfil de acceso' : 'Perfil de acceso'}
+              </span>
+              <span className='text-[10px] text-muted-foreground'>
+                · {activeCount}/{allModules.length} módulos activos
+              </span>
+            </div>
           </div>
-          <ChevronDown
-            className={cn(
-              'h-3.5 w-3.5 text-muted-foreground transition-transform',
-              expanded && 'rotate-180'
-            )}
-          />
-        </button>
+        )}
 
         {/* Detalle */}
-        {expanded && (
+        {showDetail && (
           <div className='px-3 py-3 sm:px-4 border-t space-y-1.5'>
             {allModules.map(m => (
               <ModuleLine
