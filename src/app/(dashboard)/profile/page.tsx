@@ -627,8 +627,7 @@ export default function ProfilePage() {
               canManageForms={(session.user as any).canManageForms}
               selfView
               showModuleChips
-              collapsible={false}
-              defaultCollapsed={false}
+              defaultCollapsed
             />
           </CardContent>
         </Card>
