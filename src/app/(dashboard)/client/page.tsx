@@ -257,7 +257,7 @@ export default function ClientDashboard() {
                     color: 'purple',
                   },
                   {
-                    href: '/client/help',
+                    href: '/help/center',
                     icon: HelpCircle,
                     title: 'Centro de Ayuda',
                     description: 'FAQ, guías y soporte adicional',

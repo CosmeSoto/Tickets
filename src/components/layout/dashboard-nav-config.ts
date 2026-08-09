@@ -95,6 +95,7 @@ export const navigationByRole: Record<string, DashboardNavItem[]> = {
     { name: 'Familias', href: '/admin/families', icon: Layers },
     { name: 'Usuarios', href: '/admin/users', icon: Users },
     { name: 'Auditoría', href: '/admin/audit', icon: ScrollText },
+    { name: 'Centro de Ayuda', href: '/help/center', icon: HelpCircle },
     { name: 'Página Pública', href: '/admin/help-config', icon: Globe },
     { name: 'Configuración Sistema', href: '/admin/settings', icon: Settings },
   ],
@@ -149,6 +150,7 @@ export const navigationByRole: Record<string, DashboardNavItem[]> = {
       href: '/credentials',
       icon: KeyRound,
     },
+    { name: 'Centro de Ayuda', href: '/help/center', icon: HelpCircle },
   ],
 
   // Técnico CON gestión de inventario: tickets + inventario operativo de sus familias
@@ -204,6 +206,7 @@ export const navigationByRole: Record<string, DashboardNavItem[]> = {
       href: '/credentials',
       icon: KeyRound,
     },
+    { name: 'Centro de Ayuda', href: '/help/center', icon: HelpCircle },
   ],
 
   // Cliente: sus tickets + sus equipos asignados + mantenimientos
@@ -216,7 +219,6 @@ export const navigationByRole: Record<string, DashboardNavItem[]> = {
       children: [
         { name: 'Ver Tickets', href: '/client/tickets', icon: Ticket },
         { name: 'Base de Conocimientos', href: '/knowledge', icon: BookOpen },
-        { name: 'Centro de Ayuda', href: '/client/help', icon: HelpCircle },
       ],
     },
     {
@@ -255,6 +257,7 @@ export const navigationByRole: Record<string, DashboardNavItem[]> = {
       href: '/credentials',
       icon: KeyRound,
     },
+    { name: 'Centro de Ayuda', href: '/help/center', icon: HelpCircle },
   ],
 
   // Cliente CON gestión de inventario: tickets + inventario operativo de sus familias
@@ -267,7 +270,6 @@ export const navigationByRole: Record<string, DashboardNavItem[]> = {
       children: [
         { name: 'Ver Tickets', href: '/client/tickets', icon: Ticket },
         { name: 'Base de Conocimientos', href: '/knowledge', icon: BookOpen },
-        { name: 'Centro de Ayuda', href: '/client/help', icon: HelpCircle },
       ],
     },
     {
@@ -307,5 +309,6 @@ export const navigationByRole: Record<string, DashboardNavItem[]> = {
       href: '/credentials',
       icon: KeyRound,
     },
+    { name: 'Centro de Ayuda', href: '/help/center', icon: HelpCircle },
   ],
 }
