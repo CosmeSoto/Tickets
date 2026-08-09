@@ -33,6 +33,36 @@ export async function POST(
 
     const { id } = await params;
 
+    const article = await prisma.knowledge_articles.findUnique({ where: { id } });
+    if (!article) {
+      return NextResponse.json(
+        { success: false, error: 'Artículo no encontrado' },
+        { status: 404 }
+      );
+    }
+
+    try {
+      const { assertCanAccessKnowledgeArticle, KnowledgeAccessError } =
+        await import('@/lib/knowledge/article-access');
+      await assertCanAccessKnowledgeArticle(
+        {
+          id: session.user.id,
+          role: session.user.role,
+          isSuperAdmin: (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true,
+        },
+        article
+      );
+    } catch (err) {
+      const { KnowledgeAccessError } = await import('@/lib/knowledge/article-access');
+      if (err instanceof KnowledgeAccessError) {
+        return NextResponse.json(
+          { success: false, error: err.message },
+          { status: err.statusCode }
+        );
+      }
+      throw err;
+    }
+
     // Verificar si el usuario ya votó
     const existingVote = await prisma.article_votes.findFirst({
       where: {

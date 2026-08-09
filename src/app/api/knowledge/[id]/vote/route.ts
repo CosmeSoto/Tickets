@@ -38,6 +38,25 @@ export async function POST(
       )
     }
 
+    try {
+      const { assertCanAccessKnowledgeArticle, KnowledgeAccessError } =
+        await import('@/lib/knowledge/article-access')
+      await assertCanAccessKnowledgeArticle(
+        {
+          id: session.user.id,
+          role: session.user.role,
+          isSuperAdmin: (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true,
+        },
+        article
+      )
+    } catch (err) {
+      const { KnowledgeAccessError } = await import('@/lib/knowledge/article-access')
+      if (err instanceof KnowledgeAccessError) {
+        return NextResponse.json({ error: err.message }, { status: err.statusCode })
+      }
+      throw err
+    }
+
     const body = await request.json()
     
     // Validar datos

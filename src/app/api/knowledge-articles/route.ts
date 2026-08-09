@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
           ? assignedFamilyIds.filter(id => id === familyId)
           : assignedFamilyIds
         // Artículos de sus familias O sin familia (legado), combinado con búsqueda si existe
-        const familyCondition = [{ familyId: { in: effectiveIds } }, { familyId: null }]
+        const familyCondition = [{ familyId: { in: effectiveIds } }]
         where.AND = [
           { OR: familyCondition },
           ...(textSearchCondition ? [{ OR: textSearchCondition }] : []),
@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
           const effectiveIds = familyId
             ? scope.familyIds.filter(id => id === familyId)
             : scope.familyIds
-          const familyCondition = [{ familyId: { in: effectiveIds } }, { familyId: null }]
+          const familyCondition = [{ familyId: { in: effectiveIds } }]
           where.AND = [
             { OR: familyCondition },
             ...(textSearchCondition ? [{ OR: textSearchCondition }] : []),

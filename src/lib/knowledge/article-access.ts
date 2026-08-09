@@ -49,13 +49,45 @@ export async function assertCanAccessKnowledgeArticle(
     }
   }
 
-  // Sin familia = legado visible si ya pasó publicación
-  if (!article.familyId) return
+  // Sin familia = legado: solo Super Admin o autor (evita fuga global)
+  if (!article.familyId) {
+    if (user.isSuperAdmin === true || article.authorId === user.id) return
+    throw new KnowledgeAccessError('No tienes acceso a este artículo', 403)
+  }
 
   const allowed = await getKnowledgeFamilyIds(user)
   if (allowed === undefined) return // Super Admin
   if (allowed.length === 0 || !allowed.includes(article.familyId)) {
     throw new KnowledgeAccessError('No tienes acceso a artículos de esta área de soporte', 403)
+  }
+}
+
+/** Filtro Prisma familyId para listados/búsquedas (sin null legado para no-super). */
+export async function buildKnowledgeFamilyFilter(
+  user: SessionUser
+): Promise<{ familyId?: string | { in: string[] } } | Record<string, never>> {
+  const allowed = await getKnowledgeFamilyIds(user)
+  if (allowed === undefined) return {}
+  if (allowed.length === 0) return { familyId: { in: [] } }
+  return { familyId: { in: allowed } }
+}
+
+/** Assert escritura: familia de la categoría debe estar en scope del autor. */
+export async function assertCanWriteKnowledgeFamily(
+  user: SessionUser,
+  familyId: string | null
+): Promise<void> {
+  if (user.isSuperAdmin === true) return
+  if (!familyId) {
+    throw new KnowledgeAccessError(
+      'La categoría del artículo debe pertenecer a un área de soporte',
+      400
+    )
+  }
+  const allowed = await getKnowledgeFamilyIds(user)
+  if (allowed === undefined) return
+  if (!allowed.includes(familyId)) {
+    throw new KnowledgeAccessError('No puedes publicar artículos en esta área', 403)
   }
 }
 

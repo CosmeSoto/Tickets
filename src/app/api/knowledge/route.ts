@@ -58,18 +58,40 @@ export async function POST(request: NextRequest) {
 
     const data = validationResult.data
 
-    // Verificar que la categoría existe y obtener su familia
     const category = await prisma.categories.findUnique({
       where: { id: data.categoryId },
-      include: { departments: { select: { familyId: true } } },
+      select: {
+        id: true,
+        familyId: true,
+        departments: { select: { familyId: true } },
+      },
     })
 
     if (!category) {
       return NextResponse.json({ error: 'Categoría no encontrada' }, { status: 404 })
     }
 
-    // Derivar familyId: categoría → departamento → familia
-    const familyId = category.departments?.familyId ?? null
+    // Derivar familyId: categoría → departamento → familia (o familyId directo)
+    const familyId = category.familyId ?? category.departments?.familyId ?? null
+
+    try {
+      const { assertCanWriteKnowledgeFamily, KnowledgeAccessError } =
+        await import('@/lib/knowledge/article-access')
+      await assertCanWriteKnowledgeFamily(
+        {
+          id: session.user.id,
+          role: session.user.role,
+          isSuperAdmin: (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true,
+        },
+        familyId
+      )
+    } catch (err) {
+      const { KnowledgeAccessError } = await import('@/lib/knowledge/article-access')
+      if (err instanceof KnowledgeAccessError) {
+        return NextResponse.json({ error: err.message }, { status: err.statusCode })
+      }
+      throw err
+    }
 
     // Si hay sourceTicketId, verificar que el ticket existe, está resuelto/cerrado,
     // y que quien crea el artículo es el resolutor asignado o un admin

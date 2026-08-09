@@ -123,9 +123,17 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Construir condiciones de búsqueda
+    // Construir condiciones de búsqueda (scoped por familia)
+    const { buildKnowledgeFamilyFilter } = await import('@/lib/knowledge/article-access')
+    const familyFilter = await buildKnowledgeFamilyFilter({
+      id: session.user.id,
+      role: session.user.role,
+      isSuperAdmin: (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true,
+    })
+
     const whereConditions: any = {
       isPublished: true,
+      ...familyFilter,
       OR: [
         // Buscar en título
         ...keywords.map(keyword => ({

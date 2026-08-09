@@ -32,11 +32,19 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Buscar artículos publicados de la categoría
+    // Buscar artículos publicados de la categoría (scoped)
+    const { buildKnowledgeFamilyFilter } = await import('@/lib/knowledge/article-access')
+    const familyFilter = await buildKnowledgeFamilyFilter({
+      id: session.user.id,
+      role: session.user.role,
+      isSuperAdmin: (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true,
+    })
+
     const articles = await prisma.knowledge_articles.findMany({
       where: {
         categoryId,
         isPublished: true,
+        ...familyFilter,
       },
       orderBy: [
         { helpfulVotes: 'desc' },
@@ -96,7 +104,6 @@ export async function GET(request: NextRequest) {
         article: {
           id: article.id,
           title: article.title,
-          content: article.content,
           summary: article.summary,
           categoryId: article.categoryId,
           tags: article.tags,

@@ -41,10 +41,18 @@ export async function GET(request: NextRequest) {
       .filter((word) => word.length > 2)
       .map((word) => word.replace(/[^\w]/g, ''));
 
-    // Buscar artículos publicados
+    // Buscar artículos publicados (scoped por familia)
+    const { buildKnowledgeFamilyFilter } = await import('@/lib/knowledge/article-access')
+    const familyFilter = await buildKnowledgeFamilyFilter({
+      id: session.user.id,
+      role: session.user.role,
+      isSuperAdmin: (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true,
+    })
+
     const articles = await prisma.knowledge_articles.findMany({
       where: {
         isPublished: true,
+        ...familyFilter,
         OR: [
           {
             title: {
@@ -115,7 +123,6 @@ export async function GET(request: NextRequest) {
         article: {
           id: article.id,
           title: article.title,
-          content: article.content,
           summary: article.summary,
           categoryId: article.categoryId,
           tags: article.tags,

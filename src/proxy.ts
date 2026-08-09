@@ -322,6 +322,20 @@ export async function proxy(request: NextRequest) {
       }
     }
 
+    // Auditoría: solo Super Admin (la UI ya filtra; el proxy cierra la URL directa)
+    if (
+      path.startsWith('/admin/audit') &&
+      (token as any).isSuperAdmin !== true
+    ) {
+      ApplicationLogger.securityEvent(
+        'insufficient_privileges',
+        'medium',
+        { userId, userRole, requiredCapability: 'isSuperAdmin', path, ip },
+        { requestId }
+      )
+      return NextResponse.redirect(new URL(dashboardForRole(userRole), request.url))
+    }
+
     if (path.startsWith('/technician') && userRole !== 'TECHNICIAN') {
       ApplicationLogger.securityEvent(
         'insufficient_privileges',
