@@ -101,14 +101,41 @@ export class ConfigService {
       }
     }
 
-    // Valores por defecto si no existen
+    // Fuente de verdad: Configuración del Sistema (supportEmail / systemName).
+    // help.* y landing son respaldo; nunca inventar correos de marcas demo.
+    const generalEmail = String(generalSettings.supportEmail || '').trim()
+    const landingEmail = String(landingPage?.contactEmail || '').trim()
+    const helpEmail = String(config.supportEmail || '').trim()
+    const supportEmail = generalEmail || landingEmail || helpEmail
+
+    // Sanar deriva: si el admin definió supportEmail y help.support_email quedó viejo
+    if (generalEmail && helpEmail && generalEmail !== helpEmail) {
+      void prisma.system_settings
+        .upsert({
+          where: { key: 'help.support_email' },
+          update: { value: generalEmail, updatedAt: new Date() },
+          create: {
+            id: randomUUID(),
+            key: 'help.support_email',
+            value: generalEmail,
+            description: 'Email de contacto para soporte técnico',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        })
+        .catch(() => {})
+    }
+
+    const generalName = String(generalSettings.systemName || '').trim()
+    const companyName =
+      generalName ||
+      String(config.companyName || '').trim() ||
+      String(landingPage?.companyName || '').trim() ||
+      DEFAULT_SYSTEM_NAME
+
     return {
-      supportEmail:
-        config.supportEmail ||
-        generalSettings.supportEmail ||
-        landingPage?.contactEmail ||
-        'soporte@ticketpro.com',
-      supportPhone: config.supportPhone || '+1 (555) 123-4567',
+      supportEmail,
+      supportPhone: String(config.supportPhone || '').trim(),
       supportHours: config.supportHours || {
         monday: '9:00-18:00',
         tuesday: '9:00-18:00',
@@ -124,14 +151,13 @@ export class ConfigService {
         medium: '1-2 días',
         low: '2-5 días',
       },
-      companyName:
-        config.companyName || generalSettings.systemName || landingPage?.companyName || DEFAULT_SYSTEM_NAME,
-      companyAddress: config.companyAddress || '123 Tech Street, Silicon Valley, CA 94000',
-      chatEnabled: config.chatEnabled !== undefined ? config.chatEnabled : true,
-      chatUrl: config.chatUrl || 'https://chat.ticketpro.com',
-      documentationUrl: config.documentationUrl || 'https://docs.ticketpro.com',
-      videoTutorialsUrl: config.videoTutorialsUrl || 'https://videos.ticketpro.com',
-      statusPageUrl: config.statusPageUrl || 'https://status.ticketpro.com',
+      companyName,
+      companyAddress: String(config.companyAddress || '').trim(),
+      chatEnabled: config.chatEnabled === true,
+      chatUrl: config.chatEnabled === true ? String(config.chatUrl || '').trim() : '',
+      documentationUrl: String(config.documentationUrl || '').trim(),
+      videoTutorialsUrl: String(config.videoTutorialsUrl || '').trim(),
+      statusPageUrl: String(config.statusPageUrl || '').trim(),
       bugReportEnabled: config.bugReportEnabled !== undefined ? config.bugReportEnabled : true,
       feedbackEnabled: config.feedbackEnabled !== undefined ? config.feedbackEnabled : true,
     }

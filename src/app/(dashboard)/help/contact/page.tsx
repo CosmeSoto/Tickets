@@ -22,8 +22,8 @@ import {
 } from 'lucide-react'
 
 interface HelpConfig {
-  supportEmail: string
-  supportPhone: string
+  supportEmail: string | null
+  supportPhone: string | null
   supportHours: {
     monday: string
     tuesday: string
@@ -42,6 +42,7 @@ interface HelpConfig {
   companyName: string
   chatEnabled: boolean
   chatUrl: string | null
+  privacyUrl?: string
 }
 
 export default function ContactSupportPage() {
@@ -365,24 +366,39 @@ export default function ContactSupportPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className='space-y-4'>
-                  <div className='flex items-center space-x-3'>
-                    <div className='flex items-center justify-center w-8 h-8 bg-blue-100 rounded-full'>
-                      <Mail className='h-4 w-4 text-blue-600' />
+                  {config.supportEmail && (
+                    <div className='flex items-center space-x-3'>
+                      <div className='flex items-center justify-center w-8 h-8 bg-blue-100 rounded-full'>
+                        <Mail className='h-4 w-4 text-blue-600' />
+                      </div>
+                      <div>
+                        <div className='text-sm font-medium'>Email</div>
+                        <a
+                          href={`mailto:${config.supportEmail}`}
+                          className='text-sm text-muted-foreground hover:underline'
+                        >
+                          {config.supportEmail}
+                        </a>
+                      </div>
                     </div>
-                    <div>
-                      <div className='text-sm font-medium'>Email</div>
-                      <div className='text-sm text-muted-foreground'>{config.supportEmail}</div>
+                  )}
+                  {config.supportPhone && (
+                    <div className='flex items-center space-x-3'>
+                      <div className='flex items-center justify-center w-8 h-8 bg-green-100 rounded-full'>
+                        <Phone className='h-4 w-4 text-green-600' />
+                      </div>
+                      <div>
+                        <div className='text-sm font-medium'>Teléfono</div>
+                        <div className='text-sm text-muted-foreground'>{config.supportPhone}</div>
+                      </div>
                     </div>
-                  </div>
-                  <div className='flex items-center space-x-3'>
-                    <div className='flex items-center justify-center w-8 h-8 bg-green-100 rounded-full'>
-                      <Phone className='h-4 w-4 text-green-600' />
-                    </div>
-                    <div>
-                      <div className='text-sm font-medium'>Teléfono</div>
-                      <div className='text-sm text-muted-foreground'>{config.supportPhone}</div>
-                    </div>
-                  </div>
+                  )}
+                  {!config.supportEmail && !config.supportPhone && (
+                    <p className='text-sm text-muted-foreground'>
+                      Aún no hay datos de contacto configurados. Usa un ticket de soporte o pide a un
+                      administrador que defina el email en Configuración del Sistema.
+                    </p>
+                  )}
                   {config.chatEnabled && config.chatUrl && (
                     <div className='flex items-center space-x-3'>
                       <div className='flex items-center justify-center w-8 h-8 bg-purple-100 rounded-full'>
@@ -398,6 +414,18 @@ export default function ContactSupportPage() {
                       </div>
                     </div>
                   )}
+                  <p className='text-xs text-muted-foreground pt-2 border-t leading-relaxed'>
+                    Minimiza datos personales en tu mensaje. Consulta la{' '}
+                    <a
+                      href={config.privacyUrl || '/privacidad'}
+                      className='underline underline-offset-2'
+                      target='_blank'
+                      rel='noopener noreferrer'
+                    >
+                      Política de Privacidad
+                    </a>
+                    .
+                  </p>
                 </CardContent>
               </Card>
             )}

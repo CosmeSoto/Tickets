@@ -34,11 +34,13 @@ import {
 } from '@/features/help/filter-help-faqs'
 
 interface HelpConfig {
-  supportEmail?: string
+  supportEmail?: string | null
   chatEnabled?: boolean
   chatUrl?: string | null
-  documentationUrl?: string
-  videoTutorialsUrl?: string
+  documentationUrl?: string | null
+  videoTutorialsUrl?: string | null
+  companyName?: string
+  privacyUrl?: string
 }
 
 const MODULE_ICONS: Record<HelpModuleId, typeof HelpCircle> = {
@@ -259,28 +261,57 @@ export function HelpHub() {
             ¿Necesitas más ayuda?
           </CardTitle>
           <CardDescription>
-            Si no encuentras la respuesta, contacta al equipo de soporte.
+            Usa el correo de soporte configurado por tu organización
+            {config?.companyName ? ` (${config.companyName})` : ''}.
           </CardDescription>
         </CardHeader>
-        <CardContent className='flex flex-col sm:flex-row gap-2'>
-          {flags.tickets && (
-            <Button asChild className='flex-1'>
-              <Link href={createTicketHref}>
-                <Ticket className='h-4 w-4 mr-2' />
-                {session?.user?.role === 'CLIENT' || !session?.user?.role
-                  ? 'Crear ticket de soporte'
-                  : 'Ir a tickets'}
-              </Link>
-            </Button>
-          )}
+        <CardContent className='space-y-3'>
+          <div className='flex flex-col sm:flex-row gap-2'>
+            {flags.tickets && (
+              <Button asChild className='flex-1'>
+                <Link href={createTicketHref}>
+                  <Ticket className='h-4 w-4 mr-2' />
+                  {session?.user?.role === 'CLIENT' || !session?.user?.role
+                    ? 'Crear ticket de soporte'
+                    : 'Ir a tickets'}
+                </Link>
+              </Button>
+            )}
+            {config?.supportEmail ? (
+              <Button asChild variant='default' className='flex-1'>
+                <a href={`mailto:${config.supportEmail}?subject=${encodeURIComponent('Consulta de soporte')}`}>
+                  <Mail className='h-4 w-4 mr-2' />
+                  Contactar soporte
+                </a>
+              </Button>
+            ) : (
+              <Button asChild variant='outline' className='flex-1'>
+                <Link href='/help/contact'>Formulario de contacto</Link>
+              </Button>
+            )}
+          </div>
           {config?.supportEmail && (
-            <Button asChild variant='outline' className='flex-1'>
-              <a href={`mailto:${config.supportEmail}`}>
-                <Mail className='h-4 w-4 mr-2' />
-                {config.supportEmail}
-              </a>
-            </Button>
+            <p className='text-xs text-muted-foreground'>
+              Correo: <span className='font-medium text-foreground'>{config.supportEmail}</span>
+              {' · '}
+              <Link href='/help/contact' className='underline underline-offset-2'>
+                Más opciones de contacto
+              </Link>
+            </p>
           )}
+          <p className='text-xs text-muted-foreground leading-relaxed'>
+            Al contactar, envía solo la información necesaria para atender tu caso. El tratamiento de
+            datos personales se rige por la{' '}
+            <Link
+              href={config?.privacyUrl || '/privacidad'}
+              className='underline underline-offset-2'
+              target='_blank'
+              rel='noopener noreferrer'
+            >
+              Política de Privacidad
+            </Link>
+            .
+          </p>
         </CardContent>
       </Card>
     </div>

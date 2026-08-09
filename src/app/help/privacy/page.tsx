@@ -1,17 +1,43 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { PublicPageLayout } from '@/components/auth/auth-layout'
 import { ArrowLeft, Shield } from 'lucide-react'
 
+interface PrivacyContact {
+  companyName?: string
+  supportEmail?: string | null
+  companyAddress?: string | null
+}
+
 export default function PrivacyPage() {
+  const [contact, setContact] = useState<PrivacyContact>({})
+
+  useEffect(() => {
+    fetch('/api/config/help')
+      .then(r => (r.ok ? r.json() : null))
+      .then(data => {
+        if (data?.data) {
+          setContact({
+            companyName: data.data.companyName,
+            supportEmail: data.data.supportEmail,
+          })
+        }
+      })
+      .catch(() => {})
+  }, [])
+
+  const orgName = contact.companyName || 'la organización responsable del sistema'
+  const supportEmail = contact.supportEmail
+
   return (
     <PublicPageLayout>
       <Button variant='outline' size='sm' asChild>
-        <Link href='/register'>
+        <Link href='/login'>
           <ArrowLeft className='h-4 w-4 mr-2' />
-          Volver al Registro
+          Volver al inicio de sesión
         </Link>
       </Button>
 
@@ -27,21 +53,17 @@ export default function PrivacyPage() {
               1. Identidad del Responsable del Tratamiento
             </h2>
             <p>
-              <strong>Nombre de la Empresa:</strong> [Nombre del Centro Comercial]
+              <strong>Organización:</strong> {orgName}
             </p>
-            <p>
-              <strong>RUC:</strong> [Número de RUC]
-            </p>
-            <p>
-              <strong>Dirección:</strong> [Dirección completa del centro comercial]
-            </p>
-            <p>
-              <strong>Email de contacto:</strong> [correo@empresa.com]
-            </p>
+            {supportEmail && (
+              <p>
+                <strong>Email de contacto:</strong> {supportEmail}
+              </p>
+            )}
             <p>
               En cumplimiento con la{' '}
               <strong>Ley Orgánica de Protección de Datos Personales (LOPD) del Ecuador</strong>,
-              somos responsables del tratamiento de sus datos personales.
+              somos responsables del tratamiento de sus datos personales en el uso de este sistema.
             </p>
           </section>
 
@@ -49,111 +71,58 @@ export default function PrivacyPage() {
             <h2 className='text-base font-semibold text-foreground'>
               2. Información que Recopilamos
             </h2>
-            <p>Recopilamos información que usted nos proporciona directamente, como:</p>
+            <p>Podemos tratar, según el módulo habilitado:</p>
             <ul className='list-disc list-inside space-y-1 ml-2'>
-              <li>Nombre completo, cédula de identidad o pasaporte</li>
-              <li>Información de contacto (email, teléfono, dirección)</li>
-              <li>Credenciales de acceso (email y contraseña encriptada)</li>
-              <li>
-                Información relacionada con tickets de soporte técnico y mantenimiento del centro
-                comercial
-              </li>
-              <li>Datos de uso del sistema para mejorar el servicio</li>
-              <li>Información de visitas al centro comercial (si aplica)</li>
-            </ul>
-          </section>
-
-          <section className='space-y-2'>
-            <h2 className='text-base font-semibold text-foreground'>
-              3. Finalidad del Tratamiento de Datos
-            </h2>
-            <p>Utilizamos su información personal para:</p>
-            <ul className='list-disc list-inside space-y-1 ml-2'>
-              <li>Gestionar y dar seguimiento a tickets de soporte técnico y mantenimiento</li>
-              <li>
-                Proporcionar y mantener nuestro servicio de gestión de operaciones del centro
-                comercial
-              </li>
-              <li>
-                Comunicarnos con usted sobre el servicio, notificaciones y actualizaciones
-                importantes
-              </li>
-              <li>Mejorar y personalizar su experiencia en el sistema y en el centro comercial</li>
-              <li>Cumplir con obligaciones legales, tributarias y regulatorias en Ecuador</li>
-              <li>
-                Garantizar la seguridad de las instalaciones y las personas en el centro comercial
-              </li>
-            </ul>
-          </section>
-
-          <section className='space-y-2'>
-            <h2 className='text-base font-semibold text-foreground'>4. Compartir Información</h2>
-            <p>No vendemos ni transferimos su información personal a terceros, excepto:</p>
-            <ul className='list-disc list-inside space-y-1 ml-2'>
-              <li>
-                Con proveedores de servicios que nos ayudan a operar (ej: hosting, servicios de
-                pago), siempre sujetos a contratos de confidencialidad
-              </li>
-              <li>Con autoridades competentes del Ecuador, cuando exista una obligación legal</li>
-              <li>Con su consentimiento explícito previo</li>
-              <li>
-                Para proteger nuestros derechos, propiedad o seguridad, y la de los usuarios del
-                centro comercial
-              </li>
-            </ul>
-          </section>
-
-          <section className='space-y-2'>
-            <h2 className='text-base font-semibold text-foreground'>5. Seguridad de los Datos</h2>
-            <p>
-              Implementamos medidas de seguridad técnicas y organizativas apropiadas para proteger
-              su información personal contra:
-            </p>
-            <ul className='list-disc list-inside space-y-1 ml-2'>
-              <li>Acceso no autorizado</li>
-              <li>Divulgación indebida</li>
-              <li>Alteración o destrucción</li>
+              <li>Datos de cuenta: nombre, correo, rol y preferencias de notificación</li>
+              <li>Contenido operativo: tickets, comentarios y adjuntos que usted envíe</li>
+              <li>Inventario/rondas/documentos: solo si su organización activa esos módulos</li>
+              <li>Registros técnicos de seguridad y auditoría de acciones relevantes</li>
             </ul>
             <p>
-              Entre estas medidas se incluyen el cifrado de datos, controles de acceso y auditorías
-              periódicas de seguridad.
+              Aplicamos el principio de minimización: no pedimos ni mostramos más datos de los
+              necesarios para la finalidad del servicio.
             </p>
           </section>
 
           <section className='space-y-2'>
-            <h2 className='text-base font-semibold text-foreground'>
-              6. Sus Derechos como Titular de Datos
-            </h2>
+            <h2 className='text-base font-semibold text-foreground'>3. Finalidades del Tratamiento</h2>
+            <ul className='list-disc list-inside space-y-1 ml-2'>
+              <li>Autenticación, autorización y prestación del servicio solicitado</li>
+              <li>Gestión de soporte, inventario, rondas u otros módulos contratados</li>
+              <li>Notificaciones in-app y por correo según sus preferencias</li>
+              <li>Seguridad, prevención de abuso y cumplimiento de obligaciones legales</li>
+            </ul>
+          </section>
+
+          <section className='space-y-2'>
+            <h2 className='text-base font-semibold text-foreground'>4. Base Legítima</h2>
+            <p>
+              El tratamiento se fundamenta en la ejecución del servicio, el cumplimiento de
+              obligaciones legales y, cuando corresponda, el consentimiento o el interés legítimo de
+              la organización para la seguridad y continuidad operativa.
+            </p>
+          </section>
+
+          <section className='space-y-2'>
+            <h2 className='text-base font-semibold text-foreground'>5. Destinatarios y Acceso</h2>
+            <p>
+              El acceso a datos personales está restringido por rol y módulos habilitados.
+              Administradores y personal técnico autorizados solo ven lo necesario para su función.
+              Secretos de la bóveda de credenciales se almacenan cifrados.
+            </p>
+          </section>
+
+          <section className='space-y-2'>
+            <h2 className='text-base font-semibold text-foreground'>6. Derechos del Titular</h2>
             <p>De acuerdo con la LOPD ecuatoriana, usted tiene derecho a:</p>
             <ul className='list-disc list-inside space-y-1 ml-2'>
-              <li>
-                <strong>Acceder:</strong> Obtener información sobre el tratamiento de sus datos
-                personales
-              </li>
-              <li>
-                <strong>Rectificar:</strong> Corregir información inexacta o incompleta
-              </li>
-              <li>
-                <strong>Cancelar:</strong> Solicitar la eliminación de sus datos cuando no sean
-                necesarios para los fines para los que se recopilaron
-              </li>
-              <li>
-                <strong>Oponerse:</strong> Objecionar al tratamiento de sus datos por motivos
-                legítimos
-              </li>
-              <li>
-                <strong>Portabilidad:</strong> Recibir sus datos en un formato estructurado y de uso
-                común
-              </li>
-              <li>
-                <strong>Revocar consentimiento:</strong> Anular el consentimiento otorgado para el
-                tratamiento de sus datos
-              </li>
+              <li>Acceso, rectificación, actualización y eliminación cuando proceda</li>
+              <li>Oposición y limitación del tratamiento en los casos previstos</li>
+              <li>Portabilidad cuando sea técnicamente aplicable</li>
             </ul>
             <p>
-              Para ejercer estos derechos, puede contactarnos a través del sistema de tickets o al
-              email: [correo@empresa.com]. Responderemos a su solicitud dentro de los plazos
-              establecidos por la ley.
+              Para ejercerlos, contacte al responsable mediante el correo de soporte configurado o
+              un ticket interno, identificándose adecuadamente.
             </p>
           </section>
 
@@ -163,8 +132,7 @@ export default function PrivacyPage() {
             </h2>
             <p>
               Conservaremos sus datos personales durante el tiempo necesario para cumplir con los
-              fines para los que se recopilaron y para cumplir con las obligaciones legales
-              aplicables en Ecuador.
+              fines para los que se recopilaron y con las obligaciones legales aplicables en Ecuador.
             </p>
           </section>
 
@@ -182,13 +150,16 @@ export default function PrivacyPage() {
           <section className='space-y-2'>
             <h2 className='text-base font-semibold text-foreground'>9. Contacto</h2>
             <p>
-              Si tiene preguntas sobre esta política de privacidad o desea ejercer sus derechos,
-              puede contactarnos a través de:
+              Si tiene preguntas sobre esta política o desea ejercer sus derechos, puede
+              contactarnos a través de:
             </p>
             <ul className='list-disc list-inside space-y-1 ml-2'>
               <li>El sistema de tickets de soporte</li>
-              <li>Email: [correo@empresa.com]</li>
-              <li>Dirección: [Dirección del centro comercial]</li>
+              {supportEmail ? (
+                <li>Email: {supportEmail}</li>
+              ) : (
+                <li>El correo de soporte publicado por su organización en el Centro de Ayuda</li>
+              )}
             </ul>
             <p>
               También tiene derecho a presentar una queja ante la{' '}

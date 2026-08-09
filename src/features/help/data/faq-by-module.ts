@@ -303,4 +303,13 @@ export const HELP_FAQS: HelpFaqItem[] = [
       'Sí, si las notificaciones por correo están activas para tu usuario y el evento lo contempla (tickets, comentarios, mantenimientos programados, alertas de contratos, etc.). Revisa preferencias de notificación y la carpeta de spam si no llegan.',
     keywords: ['correo', 'email', 'notificación'],
   },
+  {
+    id: 'acc-8',
+    module: 'account',
+    category: 'Cuenta y acceso',
+    question: '¿Cómo se protegen mis datos personales?',
+    answer:
+      'Tratamos los datos conforme a la normativa aplicable de protección de datos personales (p. ej. LOPD Ecuador): minimización (solo lo necesario), control de acceso por rol/módulo, auditoría de acciones sensibles y cifrado de secretos en la bóveda de credenciales. El correo de contacto de soporte es el configurado por la organización en «Configuración del Sistema». Puedes consultar la Política de Privacidad y ejercer derechos de acceso, rectificación u oposición según el procedimiento indicado allí.',
+    keywords: ['privacidad', 'LOPD', 'datos', 'personales', 'protección'],
+  },
 ]
