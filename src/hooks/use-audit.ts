@@ -85,12 +85,26 @@ export function useAudit() {
 
   const handleIncludeSensitiveChange = useCallback((value: boolean) => {
     setIncludeSensitive(value)
-    if (!value) {
-      // LOPDP: al desactivar, quitar columnas sensibles de la selección
-      setVisibleColumns(prev =>
-        prev.filter(k => !(SENSITIVE_AUDIT_COLUMNS as string[]).includes(k))
-      )
-    }
+    setVisibleColumns(prev => {
+      const next = value
+        ? [...new Set([...prev, ...SENSITIVE_AUDIT_COLUMNS])]
+        : prev.filter(k => !(SENSITIVE_AUDIT_COLUMNS as string[]).includes(k))
+      // Mantener sync con menú Columnas (localStorage)
+      try {
+        const raw = localStorage.getItem('audit-export-columns-v1')
+        const stored = raw ? (JSON.parse(raw) as { order?: string[] }) : {}
+        localStorage.setItem(
+          'audit-export-columns-v1',
+          JSON.stringify({
+            order: stored.order?.length ? stored.order : DEFAULT_AUDIT_COLUMN_ORDER,
+            visible: next,
+          })
+        )
+      } catch {
+        /* ignore */
+      }
+      return next
+    })
   }, [])
 
   // ── Init filters from URL or localStorage ──

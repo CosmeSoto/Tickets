@@ -292,11 +292,11 @@ export function AuditFiltersComponent({
               </label>
               {includeSensitive ? (
                 <p>
-                  <strong className='text-foreground'>Activado:</strong> en «Columnas» puedes marcar
-                  email, IP, cambios y User-Agent para la <em>exportación</em>. Salen enmascarados
-                  (ej. <code className='text-[11px]'>in***@gmail.com</code>,{' '}
-                  <code className='text-[11px]'>192.168.10.***</code>). No cambia la tabla en pantalla.
-                  La descarga queda registrada en auditoría.
+                  <strong className='text-foreground'>Activado:</strong> se añaden al export email,
+                  IP, cambios y User-Agent (enmascarados: p. ej.{' '}
+                  <code className='text-[11px]'>in***@gmail.com</code>,{' '}
+                  <code className='text-[11px]'>192.168.10.***</code>). Puedes quitarlas en
+                  «Columnas». No cambia la tabla en pantalla. La descarga queda auditada.
                 </p>
               ) : (
                 <p>
