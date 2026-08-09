@@ -292,16 +292,21 @@ export async function proxy(request: NextRequest) {
     if (path.startsWith('/admin') && userRole !== 'ADMIN' && !(token as any).isSuperAdmin) {
       // Noticias/Documentos admin: solo con toggle de crear (canManage*).
       // Módulo activo sin canManage* = solo lectura en feed /forms (no /admin).
-      // Rondas: técnicos con patrolsEnabled → /admin/patrols (supervisores).
+      // Rondas: TECH con patrolsEnabled → agenda/reportes/incidentes admin (no config).
       // CLIENT con patrolsEnabled usa solo /patrol (Mis Rondas), no la consola admin.
+      const techPatrolSuperviseAllowed =
+        userRole === 'TECHNICIAN' &&
+        (token as any).patrolsEnabled === true &&
+        (path === '/admin/patrols' ||
+          path.startsWith('/admin/patrols/reports') ||
+          path.startsWith('/admin/patrols/incidents'))
+
       if (
         (path.startsWith('/admin/news') && (token as any).canManageNews === true) ||
         (path.startsWith('/admin/forms') && (token as any).canManageForms === true) ||
-        (path.startsWith('/admin/patrols') &&
-          userRole === 'TECHNICIAN' &&
-          (token as any).patrolsEnabled === true)
+        techPatrolSuperviseAllowed
       ) {
-        // Permitir acceso a gestión de noticias, formularios o rondas (técnicos)
+        // Permitir acceso a gestión de noticias, formularios o supervisión de rondas
       } else {
         ApplicationLogger.securityEvent(
           'insufficient_privileges',

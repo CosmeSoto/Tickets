@@ -374,96 +374,16 @@ export class PatrolSchedulerService {
     return totalGenerated
   }
 
-  // ── Recordatorios de rondas próximas ────────────────────────────────────────
+  // ── Recordatorios (alias → PatrolReminderService) ───────────────────────────
 
   /**
-   * Envía notificaciones de recordatorio a los agentes cuyas rondas están
-   * próximas a iniciar (dentro del gracePeriodMinutes configurado por familia, default 5 min).
-   *
-   * Diseñado para ejecutarse cada 5 minutos vía cron.
-   * Usa un campo de metadata para evitar enviar duplicados.
-   *
-   * @returns Número de recordatorios enviados
+   * @deprecated Usar PatrolReminderService.sendPendingReminders (reminderMinutesBefore).
+   * Alias de compatibilidad para no duplicar lógica ni notificaciones.
    */
   static async sendUpcomingReminders(): Promise<number> {
-    const now = new Date()
-
-    // Obtener configuraciones de familia para conocer el tiempo de recordatorio
-    const familyConfigs = await prisma.patrol_family_config.findMany({
-      where: { patrolsEnabled: true },
-      select: { familyId: true, gracePeriodMinutes: true },
-    })
-
-    const maxReminderMinutes =
-      familyConfigs.length > 0 ? Math.max(...familyConfigs.map(c => c.gracePeriodMinutes ?? 5)) : 5
-    const reminderWindowMs = maxReminderMinutes * 60 * 1000
-    const windowEnd = new Date(now.getTime() + reminderWindowMs)
-
-    // Buscar patrullas PENDING que inician en los próximos N minutos
-    const upcomingPatrols = await prisma.patrols.findMany({
-      where: {
-        status: 'PENDING',
-        scheduledStart: { gte: now, lte: windowEnd },
-      },
-      select: {
-        id: true,
-        agentId: true,
-        scheduledStart: true,
-        route: { select: { name: true } },
-        family: { select: { name: true } },
-      },
-    })
-
-    if (upcomingPatrols.length === 0) return 0
-
-    // Verificar cuáles ya recibieron recordatorio (evitar duplicados)
-    const patrolIds = upcomingPatrols.map(p => p.id)
-    const alreadyNotified =
-      patrolIds.length > 0
-        ? await prisma.notifications.findMany({
-            where: {
-              type: 'PATROL_ASSIGNED',
-              OR: patrolIds.map(patrolId => ({
-                metadata: { path: ['reminderFor'], equals: patrolId },
-              })),
-            },
-            select: { metadata: true },
-          })
-        : []
-
-    // Extraer IDs ya notificados del metadata
-    const notifiedIds = new Set<string>()
-    for (const n of alreadyNotified) {
-      const meta = n.metadata as any
-      if (meta?.reminderFor) notifiedIds.add(meta.reminderFor)
-    }
-
-    let sent = 0
-    for (const patrol of upcomingPatrols) {
-      if (notifiedIds.has(patrol.id)) continue
-
-      const minutesUntilStart = Math.round(
-        (patrol.scheduledStart.getTime() - now.getTime()) / 60000
-      )
-      const startTime = patrol.scheduledStart.toLocaleTimeString('es-EC', {
-        timeZone: getAppTimezone(),
-        timeStyle: 'short',
-      })
-
-      await NotificationService.push({
-        userId: patrol.agentId,
-        type: NotificationType.PATROL_ASSIGNED,
-        title: '🔔 Ronda próxima a iniciar',
-        message: `Tu ronda "${patrol.route.name}" inicia en ${minutesUntilStart} minutos (${startTime}). Prepárate para escanear los checkpoints.`,
-        metadata: { patrolId: patrol.id, reminderFor: patrol.id, type: 'upcoming_reminder' },
-      })
-      sent++
-    }
-
-    if (sent > 0) {
-      console.log(`[PatrolSchedulerService] ${sent} recordatorios enviados`)
-    }
-    return sent
+    const { PatrolReminderService } = await import('@/lib/services/patrol-reminder.service')
+    const result = await PatrolReminderService.sendPendingReminders()
+    return result.sent
   }
 
   // ── Detección de patrullas perdidas ─────────────────────────────────────────

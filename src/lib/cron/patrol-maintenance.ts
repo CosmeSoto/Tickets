@@ -5,6 +5,7 @@
  */
 
 import { PatrolPhotoService } from '@/lib/services/patrol-photo.service'
+import { PatrolReminderService } from '@/lib/services/patrol-reminder.service'
 import { PatrolSchedulerService } from '@/lib/services/patrol-scheduler.service'
 
 export interface PatrolMaintenanceResult {
@@ -30,9 +31,10 @@ export async function runPatrolMaintenanceJobs(): Promise<PatrolMaintenanceResul
   let patrolsGenerated = 0
   let reminderssSent = 0
 
-  // 1. Enviar recordatorios de rondas próximas a iniciar
+  // 1. Recordatorios pre-ronda (reminderMinutesBefore + reminderSentAt)
   try {
-    reminderssSent = await PatrolSchedulerService.sendUpcomingReminders()
+    const reminderResult = await PatrolReminderService.sendPendingReminders()
+    reminderssSent = reminderResult.sent
   } catch (err) {
     console.error('[patrol-maintenance] Error en job de recordatorios:', err)
   }

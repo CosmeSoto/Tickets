@@ -99,8 +99,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const session = await getServerSession(authOptions)
     if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
-    if (!['ADMIN', 'TECHNICIAN'].includes(session.user.role)) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+    if (session.user.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Solo administradores pueden gestionar la configuración de rondas' }, { status: 403 })
     }
 
     const denied = await checkPatrolModuleAccess(session.user.id, session.user.role)

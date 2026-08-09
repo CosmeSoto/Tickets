@@ -9,8 +9,8 @@ import {
  *
  * - visibility: listados, reportes, dashboard, lectura de incidentes
  * - operational: configurar rutas/horarios/checkpoints (admin solo nativa;
- *   agente/supervisor en nativa + grants patrols)
- * - soft delete (desactivar): ADMIN/TECH con acceso operational a la familia
+ *   agente/supervisor en nativa + grants patrols — lectura; mutación config solo ADMIN)
+ * - soft delete (desactivar): solo ADMIN con acceso operational a la familia
  * - hard delete permanente: solo Super Admin
  */
 
@@ -49,9 +49,9 @@ export function canDeletePatrolResource(role: string, isSuperAdmin: boolean): bo
   return role === 'ADMIN' && isSuperAdmin
 }
 
-/** Soft-delete / desactivar recursos de config: solo ADMIN o TECHNICIAN. */
+/** Soft-delete / desactivar recursos de config: solo ADMIN. */
 export function canSoftDeletePatrolResource(role: string): boolean {
-  return role === 'ADMIN' || role === 'TECHNICIAN'
+  return role === 'ADMIN'
 }
 
 export type PatrolVisibilityFilterResult =
