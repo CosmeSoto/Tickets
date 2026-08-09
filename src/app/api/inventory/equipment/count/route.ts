@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const modelId = searchParams.get('modelId')
+    const typeId = searchParams.get('typeId')
     const batchId = searchParams.get('batchId')
     const familyIdParam = searchParams.get('familyId')
     const status = searchParams.get('status')?.split(',')
@@ -30,6 +31,7 @@ export async function GET(request: NextRequest) {
     const where: Record<string, unknown> = {}
 
     if (modelId) where.modelId = modelId
+    if (typeId) where.typeId = typeId
     if (batchId) where.batchId = batchId
     if (status && status.length > 0) where.status = { in: status }
 

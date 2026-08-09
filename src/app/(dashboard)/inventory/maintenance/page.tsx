@@ -29,7 +29,7 @@ import {
 } from '@/components/ui/select'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { NewMaintenanceDialog } from '@/components/inventory/new-maintenance-dialog'
-import { CreateByModelDialog } from '@/components/inventory/maintenance/create-by-model-dialog'
+import { CreateByTypeDialog } from '@/components/inventory/maintenance/create-by-type-dialog'
 import { FamilyCombobox } from '@/components/ui/family-combobox'
 import { ListTableToolbar } from '@/components/common/list-table-toolbar'
 import { useExport } from '@/hooks/common/use-export'
@@ -107,7 +107,7 @@ export function MaintenanceListPageContent() {
   const [familyFilter, setFamilyFilter] = useState('all')
   const [supplierIdFilter] = useState(searchParams?.get('supplierId') || '')
   const [showNew, setShowNew] = useState(false)
-  const [showByModel, setShowByModel] = useState(false)
+  const [showByType, setShowByType] = useState(false)
 
   // Familias ya disponibles desde el contexto global
 
@@ -244,9 +244,9 @@ export function MaintenanceListPageContent() {
                   <Plus className='h-4 w-4 mr-2' />
                   Equipo Individual
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setShowByModel(true)}>
+                <DropdownMenuItem onClick={() => setShowByType(true)}>
                   <Package className='h-4 w-4 mr-2' />
-                  Por Modelo (masivo)
+                  Por Tipo (masivo)
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -522,12 +522,12 @@ export function MaintenanceListPageContent() {
         />
       )}
 
-      {showByModel && (
-        <CreateByModelDialog
-          open={showByModel}
-          onClose={() => setShowByModel(false)}
+      {showByType && (
+        <CreateByTypeDialog
+          open={showByType}
+          onClose={() => setShowByType(false)}
           onCreated={() => {
-            setShowByModel(false)
+            setShowByType(false)
             fetchRecords()
           }}
         />

@@ -59,6 +59,9 @@ function normalizeModelsPayload(data: unknown): ModelOption[] {
     .filter((m): m is ModelOption => m != null)
 }
 
+/**
+ * Selector de modelos. Carga bajo demanda con abort; no entra en bucle si la lista viene vacía.
+ */
 export function ModelCombobox({
   value,
   onValueChange,
@@ -70,33 +73,58 @@ export function ModelCombobox({
   const [models, setModels] = React.useState<ModelOption[]>([])
   const [loading, setLoading] = React.useState(false)
   const [loadError, setLoadError] = React.useState<string | null>(null)
+  const loadedRef = React.useRef(false)
 
   React.useEffect(() => {
-    if (!open || models.length > 0 || loading) return
+    if (!open || loadedRef.current) return
+
+    const ac = new AbortController()
+    let cancelled = false
 
     const fetchModels = async () => {
       setLoading(true)
       setLoadError(null)
       try {
-        const res = await fetch('/api/inventory/models?limit=500&isActive=true')
+        const res = await fetch('/api/inventory/models?limit=200&isActive=true', {
+          signal: ac.signal,
+          cache: 'no-store',
+        })
         if (!res.ok) {
-          setLoadError('No se pudieron cargar los modelos')
-          setModels([])
+          if (!cancelled) {
+            setLoadError(
+              res.status === 403
+                ? 'Sin permiso para listar modelos (requiere gestión de inventario)'
+                : 'No se pudieron cargar los modelos'
+            )
+            setModels([])
+            loadedRef.current = true
+          }
           return
         }
         const data = await res.json()
-        setModels(normalizeModelsPayload(data))
+        if (!cancelled) {
+          setModels(normalizeModelsPayload(data))
+          loadedRef.current = true
+        }
       } catch (error) {
+        if ((error as Error).name === 'AbortError') return
         console.error('Error fetching models:', error)
-        setLoadError('No se pudieron cargar los modelos')
-        setModels([])
+        if (!cancelled) {
+          setLoadError('No se pudieron cargar los modelos')
+          setModels([])
+          loadedRef.current = true
+        }
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
 
     void fetchModels()
-  }, [open, models.length, loading])
+    return () => {
+      cancelled = true
+      ac.abort()
+    }
+  }, [open])
 
   const selectedModel = models.find(m => m.id === value)
 
@@ -104,6 +132,7 @@ export function ModelCombobox({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
+          type='button'
           variant='outline'
           role='combobox'
           aria-expanded={open}
@@ -119,7 +148,7 @@ export function ModelCombobox({
           <ChevronsUpDown className='h-4 w-4 opacity-40 flex-shrink-0' />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className='w-[400px] p-0' align='start'>
+      <PopoverContent className='z-[200] w-[400px] p-0' align='start'>
         <Command>
           <CommandInput placeholder='Buscar modelo...' />
           <CommandList>

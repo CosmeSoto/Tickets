@@ -599,6 +599,81 @@ export class MaintenanceService {
   }
 
   /**
+   * Crea mantenimiento para todos los equipos de un tipo (ej. Laptops, Impresoras).
+   */
+  static async createMaintenanceByType(
+    data: {
+      typeId: string
+      type: 'PREVENTIVE' | 'CORRECTIVE'
+      description: string
+      scheduledDate: Date
+      technicianId?: string
+      statusFilter?: string[]
+      familyId?: string
+      cost?: number
+      notes?: string
+    },
+    userId: string
+  ): Promise<{ created: MaintenanceRecord[]; skipped: Array<{ code: string; reason: string }> }> {
+    const equipment = await prisma.equipment.findMany({
+      where: {
+        typeId: data.typeId,
+        status: data.statusFilter
+          ? { in: data.statusFilter as any }
+          : { notIn: ['RETIRED', 'SOLD'] },
+        ...(data.familyId ? { type: { familyId: data.familyId } } : {}),
+      },
+      select: { id: true, code: true, status: true },
+    })
+
+    const created: MaintenanceRecord[] = []
+    const skipped: Array<{ code: string; reason: string }> = []
+
+    for (const eq of equipment) {
+      try {
+        const maintenance = await this.createMaintenance(
+          {
+            equipmentId: eq.id,
+            type: data.type,
+            description: data.description,
+            scheduledDate: data.scheduledDate,
+            technicianId: data.technicianId,
+            cost: data.cost,
+            notes: data.notes,
+          },
+          userId
+        )
+        created.push(maintenance)
+      } catch (error) {
+        skipped.push({
+          code: eq.code,
+          reason: error instanceof Error ? error.message : 'Error desconocido',
+        })
+      }
+    }
+
+    await prisma.audit_logs.create({
+      data: {
+        id: randomUUID(),
+        action: 'MAINTENANCE_BULK_CREATE',
+        entityType: 'equipment_type',
+        entityId: data.typeId,
+        userId,
+        details: {
+          descripcion: `Se creó mantenimiento ${data.type === 'PREVENTIVE' ? 'preventivo' : 'correctivo'} para ${created.length} equipos del tipo. ${skipped.length > 0 ? `${skipped.length} equipos omitidos.` : ''}`,
+          typeId: data.typeId,
+          maintenanceType: data.type,
+          created: created.length,
+          skipped: skipped.length,
+          scheduledDate: data.scheduledDate,
+        },
+      },
+    })
+
+    return { created, skipped }
+  }
+
+  /**
    * Crea mantenimiento para todos los equipos de un lote
    */
   static async createMaintenanceByBatch(
