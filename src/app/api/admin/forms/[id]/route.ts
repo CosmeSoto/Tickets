@@ -16,6 +16,7 @@ import {
   sanitizeVisibilityPayload,
 } from '@/lib/content/visibility-scope'
 import { buildVisibilityAuditSummary } from '@/lib/content/visibility-audit'
+import { buildFormVisibilityConditions, getFormViewer } from '@/lib/forms/form-visibility'
 
 // Campos comunes de include (mismo que en route.ts padre)
 const FORM_INCLUDE = {
@@ -71,6 +72,19 @@ export async function GET(_request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'Formulario no encontrado' }, { status: 404 })
     }
 
+    const viewer = await getFormViewer(session.user.id)
+    if (!viewer?.isSuperAdmin) {
+      const inScope = await prisma.forms.count({
+        where: {
+          id,
+          OR: viewer ? buildFormVisibilityConditions(viewer) : [{ createdById: session.user.id }],
+        },
+      })
+      if (!inScope) {
+        return NextResponse.json({ error: 'No tienes acceso a este documento' }, { status: 403 })
+      }
+    }
+
     return NextResponse.json({ form })
   } catch (error) {
     console.error('Error obteniendo formulario:', error)
@@ -91,7 +105,13 @@ export async function PUT(request: NextRequest, { params }: Params) {
     if (deniedManage) return deniedManage
 
     // Verificar que puede modificar este documento específico
-    const isSuperAdmin = (session.user as any).isSuperAdmin === true
+    const isSuperAdmin =
+      (
+        await prisma.users.findUnique({
+          where: { id: session.user.id },
+          select: { isSuperAdmin: true },
+        })
+      )?.isSuperAdmin === true
     const deniedModify = await assertCanModifyForm(
       id,
       session.user.id,
@@ -241,7 +261,13 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     if (deniedManage) return deniedManage
 
     // Verificar que puede modificar este documento específico
-    const isSuperAdmin = (session.user as any).isSuperAdmin === true
+    const isSuperAdmin =
+      (
+        await prisma.users.findUnique({
+          where: { id: session.user.id },
+          select: { isSuperAdmin: true },
+        })
+      )?.isSuperAdmin === true
     const deniedModify = await assertCanModifyForm(
       id,
       session.user.id,

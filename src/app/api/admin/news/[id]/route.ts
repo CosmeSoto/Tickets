@@ -16,6 +16,7 @@ import {
   sanitizeVisibilityPayload,
 } from '@/lib/content/visibility-scope'
 import { buildVisibilityAuditSummary } from '@/lib/content/visibility-audit'
+import { buildNewsVisibilityConditions, getNewsViewer } from '@/lib/news/news-access'
 
 interface Params {
   params: Promise<{ id: string }>
@@ -100,6 +101,19 @@ export async function GET(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'Noticia no encontrada' }, { status: 404 })
     }
 
+    const viewer = await getNewsViewer(session.user.id)
+    if (!viewer?.isSuperAdmin) {
+      const inScope = await prisma.news.count({
+        where: {
+          id,
+          OR: viewer ? buildNewsVisibilityConditions(viewer) : [{ createdById: session.user.id }],
+        },
+      })
+      if (!inScope) {
+        return NextResponse.json({ error: 'No tienes acceso a esta noticia' }, { status: 403 })
+      }
+    }
+
     return NextResponse.json({ news })
   } catch (error) {
     console.error('Error obteniendo noticia:', error)
@@ -133,7 +147,13 @@ export async function PUT(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'Noticia no encontrada' }, { status: 404 })
     }
 
-    const isSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
+    const isSuperAdmin =
+      (
+        await prisma.users.findUnique({
+          where: { id: session.user.id },
+          select: { isSuperAdmin: true },
+        })
+      )?.isSuperAdmin === true
     let sanitized = null as Awaited<ReturnType<typeof sanitizeVisibilityPayload>> | null
     if (
       data.roles !== undefined ||

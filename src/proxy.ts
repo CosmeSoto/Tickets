@@ -290,7 +290,7 @@ export async function proxy(request: NextRequest) {
     // /settings es la configuración personal del usuario (accesible para todos los roles)
 
     if (path.startsWith('/admin') && userRole !== 'ADMIN' && !(token as any).isSuperAdmin) {
-      // Noticias/Documentos admin: solo con toggle de crear (canManage*).
+      // Noticias/Documentos admin: JWT manage + módulo habilitado.
       // Módulo activo sin canManage* = solo lectura en feed /forms (no /admin).
       // Rondas: TECH con patrolsEnabled → agenda/reportes/incidentes admin (no config).
       // CLIENT con patrolsEnabled usa solo /patrol (Mis Rondas), no la consola admin.
@@ -302,8 +302,12 @@ export async function proxy(request: NextRequest) {
           path.startsWith('/admin/patrols/incidents'))
 
       if (
-        (path.startsWith('/admin/news') && (token as any).canManageNews === true) ||
-        (path.startsWith('/admin/forms') && (token as any).canManageForms === true) ||
+        (path.startsWith('/admin/news') &&
+          (token as any).canManageNews === true &&
+          (token as any).newsEnabled === true) ||
+        (path.startsWith('/admin/forms') &&
+          (token as any).canManageForms === true &&
+          (token as any).formsEnabled === true) ||
         techPatrolSuperviseAllowed
       ) {
         // Permitir acceso a gestión de noticias, formularios o supervisión de rondas
@@ -335,6 +339,22 @@ export async function proxy(request: NextRequest) {
         'insufficient_privileges',
         'medium',
         { userId, userRole, requiredRole: 'CLIENT', path, ip },
+        { requestId }
+      )
+      return NextResponse.redirect(new URL(dashboardForRole(userRole), request.url))
+    }
+
+    // Documentos (lectura): TECH/CLIENT requieren formsEnabled o canManageForms.
+    if (
+      path.startsWith('/forms') &&
+      userRole !== 'ADMIN' &&
+      (token as any).formsEnabled !== true &&
+      (token as any).canManageForms !== true
+    ) {
+      ApplicationLogger.securityEvent(
+        'insufficient_privileges',
+        'medium',
+        { userId, userRole, requiredCapability: 'formsEnabled', path, ip },
         { requestId }
       )
       return NextResponse.redirect(new URL(dashboardForRole(userRole), request.url))

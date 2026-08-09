@@ -3,26 +3,22 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { FileService } from '@/lib/services/file-service'
 import { prisma } from '@/lib/prisma'
+import { assertCanManageNews, assertCanModifyNews } from '@/lib/news/news-manage-access'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    // Permitir admin o usuarios con canManageNews (gestores de noticias)
-    if (session.user.role !== 'ADMIN') {
-      const user = await prisma.users.findUnique({
-        where: { id: session.user.id },
-        select: { canManageNews: true },
-      })
-      if (!user?.canManageNews) {
-        return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-      }
-    }
+    const deniedManage = await assertCanManageNews(session.user.id, session.user.role)
+    if (deniedManage) return deniedManage
 
     const { id: newsId } = await params
+
+    const deniedModify = await assertCanModifyNews(newsId, session.user.id, session.user.role)
+    if (deniedModify) return deniedModify
 
     const formData = await request.formData()
     const file = formData.get('file') as File | null
@@ -47,25 +43,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 }
 
-export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    // Permitir admin o usuarios con canManageNews (gestores de noticias)
-    if (session.user.role !== 'ADMIN') {
-      const user = await prisma.users.findUnique({
-        where: { id: session.user.id },
-        select: { canManageNews: true },
-      })
-      if (!user?.canManageNews) {
-        return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-      }
-    }
+    const deniedManage = await assertCanManageNews(session.user.id, session.user.role)
+    if (deniedManage) return deniedManage
 
     const { id: newsId } = await params
+
+    const deniedModify = await assertCanModifyNews(newsId, session.user.id, session.user.role)
+    if (deniedModify) return deniedModify
 
     const attachments = await FileService.getFilesByNews(newsId)
     return NextResponse.json(attachments)

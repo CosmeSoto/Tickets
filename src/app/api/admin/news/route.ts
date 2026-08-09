@@ -173,7 +173,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'El título es obligatorio' }, { status: 400 })
     }
 
-    const isSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
+    const isSuperAdmin =
+      (
+        await prisma.users.findUnique({
+          where: { id: session.user.id },
+          select: { isSuperAdmin: true },
+        })
+      )?.isSuperAdmin === true
     const visScope = await getContentVisibilityScope(
       session.user.id,
       session.user.role,

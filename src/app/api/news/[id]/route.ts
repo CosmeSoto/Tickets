@@ -10,7 +10,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { getNewsViewer, userCanAccessNews } from '@/lib/news/news-access'
+import { getNewsViewer, userCanAccessNews, hasNewsModuleAccess } from '@/lib/news/news-access'
 
 interface Params {
   params: Promise<{ id: string }>
@@ -32,6 +32,10 @@ export async function GET(request: NextRequest, { params }: Params) {
 
     if (!user) {
       return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 })
+    }
+
+    if (!hasNewsModuleAccess(user)) {
+      return NextResponse.json({ error: 'No tienes acceso al módulo de noticias' }, { status: 403 })
     }
 
     const news = await prisma.news.findUnique({

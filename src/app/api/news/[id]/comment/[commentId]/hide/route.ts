@@ -43,6 +43,14 @@ export async function PATCH(
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
     }
 
+    const comment = await prisma.news_comments.findFirst({
+      where: { id: commentId, newsId },
+      select: { id: true },
+    })
+    if (!comment) {
+      return NextResponse.json({ error: 'Comentario no encontrado' }, { status: 404 })
+    }
+
     const updated = await prisma.news_comments.update({
       where: { id: commentId },
       data: { isHidden: Boolean(isHidden) },

@@ -1,13 +1,15 @@
 /**
  * API: Admin - Form Categories Management
- * GET  /api/admin/form-categories  — cualquier usuario con acceso a forms
- * POST /api/admin/form-categories  — solo admins / canManageForms
+ * GET  /api/admin/form-categories  — usuarios con módulo documentos
+ * POST /api/admin/form-categories  — assertCanManageForms (+ formsEnabled)
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { assertCanManageForms } from '@/lib/forms/forms-access'
+import { getFormViewer, hasFormsModuleAccess } from '@/lib/forms/form-visibility'
 
 export async function GET(_request: NextRequest) {
   try {
@@ -16,7 +18,11 @@ export async function GET(_request: NextRequest) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    // Cualquier usuario autenticado puede leer las categorías (necesario para el select del formulario)
+    const viewer = await getFormViewer(session.user.id)
+    if (!viewer || !hasFormsModuleAccess(viewer)) {
+      return NextResponse.json({ error: 'No tienes acceso al módulo de documentos' }, { status: 403 })
+    }
+
     const categories = await prisma.form_categories.findMany({
       where: { isActive: true },
       include: {
@@ -39,17 +45,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    const dbUser = await prisma.users.findUnique({
-      where: { id: session.user.id },
-      select: { canManageForms: true, isSuperAdmin: true, role: true },
-    })
-
-    const canManage =
-      dbUser?.isSuperAdmin === true || dbUser?.canManageForms === true || dbUser?.role === 'ADMIN'
-
-    if (!canManage) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-    }
+    const denied = await assertCanManageForms(session.user.id, session.user.role)
+    if (denied) return denied
 
     const data = await request.json()
 

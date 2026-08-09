@@ -8,18 +8,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { assertCanManageForms } from '@/lib/forms/forms-access'
 
 type Params = { params: Promise<{ id: string }> }
-
-async function requireManageAccess(userId: string) {
-  const dbUser = await prisma.users.findUnique({
-    where: { id: userId },
-    select: { canManageForms: true, isSuperAdmin: true, role: true },
-  })
-  return (
-    dbUser?.isSuperAdmin === true || dbUser?.canManageForms === true || dbUser?.role === 'ADMIN'
-  )
-}
 
 export async function PUT(request: NextRequest, { params }: Params) {
   try {
@@ -29,10 +20,8 @@ export async function PUT(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    const canManage = await requireManageAccess(session.user.id)
-    if (!canManage) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-    }
+    const denied = await assertCanManageForms(session.user.id, session.user.role)
+    if (denied) return denied
 
     const data = await request.json()
 
@@ -65,10 +54,8 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    const canManage = await requireManageAccess(session.user.id)
-    if (!canManage) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-    }
+    const denied = await assertCanManageForms(session.user.id, session.user.role)
+    if (denied) return denied
 
     const category = await prisma.form_categories.findUnique({
       where: { id },

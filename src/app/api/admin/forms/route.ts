@@ -67,7 +67,13 @@ export async function GET(request: NextRequest) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const where: any = {}
 
-    const isSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
+    const isSuperAdmin =
+      (
+        await prisma.users.findUnique({
+          where: { id: session.user.id },
+          select: { isSuperAdmin: true },
+        })
+      )?.isSuperAdmin === true
     // Super Admin ve todo; el resto solo documentos visibles / propios
     if (!(session.user.role === 'ADMIN' && isSuperAdmin)) {
       const viewer = await getFormViewer(session.user.id)
@@ -144,7 +150,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'La categoría es obligatoria' }, { status: 400 })
     }
 
-    const isSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
+    const isSuperAdmin =
+      (
+        await prisma.users.findUnique({
+          where: { id: session.user.id },
+          select: { isSuperAdmin: true },
+        })
+      )?.isSuperAdmin === true
     const visScope = await getContentVisibilityScope(
       session.user.id,
       session.user.role,

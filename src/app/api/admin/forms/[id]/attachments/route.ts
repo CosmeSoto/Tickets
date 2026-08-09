@@ -27,7 +27,13 @@ export async function POST(request: NextRequest, { params }: Params) {
     if (deniedManage) return deniedManage
 
     // Verificar que puede modificar este documento específico
-    const isSuperAdmin = (session.user as any).isSuperAdmin === true
+    const isSuperAdmin =
+      (
+        await prisma.users.findUnique({
+          where: { id: session.user.id },
+          select: { isSuperAdmin: true },
+        })
+      )?.isSuperAdmin === true
     const deniedModify = await assertCanModifyForm(
       id,
       session.user.id,

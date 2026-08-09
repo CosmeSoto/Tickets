@@ -46,7 +46,7 @@ export async function GET(
       headers: {
         'Content-Type': attachment.mimeType,
         'Content-Disposition': `inline; filename="${attachment.originalName}"`,
-        'Cache-Control': 'public, max-age=86400',
+        'Cache-Control': 'private, max-age=86400',
       },
     })
   } catch (error) {

@@ -2,30 +2,34 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { FileService } from '@/lib/services/file-service'
+import { prisma } from '@/lib/prisma'
+import { assertCanManageNews, assertCanModifyNews } from '@/lib/news/news-manage-access'
 
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string; attachmentId: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    // Permitir admin o usuarios con canManageNews (gestores de noticias)
-    if (session.user.role !== 'ADMIN') {
-      const { prisma } = await import('@/lib/prisma')
-      const user = await prisma.users.findUnique({
-        where: { id: session.user.id },
-        select: { canManageNews: true },
-      })
-      if (!user?.canManageNews) {
-        return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-      }
-    }
+    const deniedManage = await assertCanManageNews(session.user.id, session.user.role)
+    if (deniedManage) return deniedManage
 
-    const { attachmentId } = await params
+    const { id: newsId, attachmentId } = await params
+
+    const deniedModify = await assertCanModifyNews(newsId, session.user.id, session.user.role)
+    if (deniedModify) return deniedModify
+
+    const attachment = await prisma.news_attachments.findFirst({
+      where: { id: attachmentId, newsId },
+      select: { id: true },
+    })
+    if (!attachment) {
+      return NextResponse.json({ error: 'Archivo no encontrado' }, { status: 404 })
+    }
 
     await FileService.deleteNewsFile(attachmentId, session.user.id)
 
