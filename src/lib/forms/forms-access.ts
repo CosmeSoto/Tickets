@@ -2,12 +2,9 @@
  * Control de acceso para el módulo de Documentos (Forms).
  *
  * - formsEnabled: puede VER documentos (según visibilidad).
- * - canManageForms: puede CREAR / editar / eliminar (alcance por rol).
- *
- * SuperAdmin / ADMIN: siempre pueden gestionar.
- * TECHNICIAN / CLIENT: requieren canManageForms (+ módulo activo).
- *   - CLIENT: crea solo para su familia
- *   - TECHNICIAN: crea para familias de su alcance
+ * - canManageForms: puede CREAR / editar / eliminar (TECH/CLIENT).
+ * - ADMIN de familia: módulo ON (formsEnabled) implica gestión; OFF = sin acceso.
+ * - Super Admin: siempre puede gestionar.
  */
 
 import { NextResponse } from 'next/server'
@@ -22,24 +19,33 @@ export interface FormsAccessContext {
 
 /**
  * Verifica permiso de gestión (crear/editar/eliminar).
- * Módulo activo solo = lectura. Crear requiere canManageForms.
+ * Módulo activo solo = lectura. Crear requiere canManageForms (o ADMIN con módulo ON).
  */
 export async function assertCanManageForms(
   userId: string,
   role: string
 ): Promise<NextResponse | null> {
-  if (role === 'ADMIN') return null
-
   const user = await prisma.users.findUnique({
     where: { id: userId },
-    select: { canManageForms: true, formsEnabled: true },
+    select: { canManageForms: true, formsEnabled: true, isSuperAdmin: true },
   })
 
   if (!user) {
     return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 })
   }
 
-  // Lectura ≠ gestión: hace falta el toggle de crear y el módulo activo
+  if (user.isSuperAdmin) return null
+
+  if (role === 'ADMIN') {
+    if (!user.formsEnabled) {
+      return NextResponse.json(
+        { error: 'No tienes permisos para gestionar documentos' },
+        { status: 403 }
+      )
+    }
+    return null
+  }
+
   if (!user.canManageForms || !user.formsEnabled) {
     return NextResponse.json(
       { error: 'No tienes permisos para gestionar documentos' },
@@ -57,9 +63,23 @@ export async function assertCanModifyForm(
   formId: string,
   userId: string,
   role: string,
-  _isSuperAdmin: boolean
+  isSuperAdmin: boolean
 ): Promise<NextResponse | null> {
-  if (role === 'ADMIN') return null
+  if (isSuperAdmin) return null
+
+  if (role === 'ADMIN') {
+    const user = await prisma.users.findUnique({
+      where: { id: userId },
+      select: { formsEnabled: true },
+    })
+    if (!user?.formsEnabled) {
+      return NextResponse.json(
+        { error: 'No tienes permisos para gestionar documentos' },
+        { status: 403 }
+      )
+    }
+    return null
+  }
 
   const form = await prisma.forms.findUnique({
     where: { id: formId },

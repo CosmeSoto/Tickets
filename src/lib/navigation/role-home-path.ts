@@ -19,14 +19,14 @@ export function loginPathWithReturnTo(returnToPath: string): string {
 
 /**
  * Verifica si el usuario tiene acceso al módulo de inventario.
- * - ADMIN: siempre tiene acceso (gestiona el sistema)
- * - TECHNICIAN/CLIENT: necesita inventoryEnabled o canManageInventory
+ * Super Admin: siempre. Resto: inventoryEnabled o canManageInventory.
  */
 export function canAccessInventory(user: {
   role?: string
+  isSuperAdmin?: boolean
   inventoryEnabled?: boolean
   canManageInventory?: boolean
 }): boolean {
-  if (user.role === 'ADMIN') return true
+  if (user.isSuperAdmin) return true
   return !!(user.inventoryEnabled || user.canManageInventory)
 }

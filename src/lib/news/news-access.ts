@@ -72,9 +72,8 @@ export async function getNewsViewer(userId: string): Promise<NewsViewer | null> 
 }
 
 export function hasNewsModuleAccess(viewer: NewsViewer): boolean {
-  return (
-    viewer.isSuperAdmin || viewer.role === 'ADMIN' || viewer.newsEnabled || viewer.canManageNews
-  )
+  // Super Admin: siempre. Resto (incluido ADMIN de familia): solo flags del usuario.
+  return viewer.isSuperAdmin || viewer.newsEnabled || viewer.canManageNews
 }
 
 export function buildNewsVisibilityConditions(viewer: NewsViewer) {
@@ -191,7 +190,11 @@ export async function getNewsNotificationRecipientIds(
 
   const moduleAccess = {
     isActive: true,
-    OR: [{ newsEnabled: true }, { canManageNews: true }, { role: 'ADMIN' as const }],
+    OR: [
+      { isSuperAdmin: true },
+      { newsEnabled: true },
+      { canManageNews: true },
+    ],
   }
 
   const noRestrictions =

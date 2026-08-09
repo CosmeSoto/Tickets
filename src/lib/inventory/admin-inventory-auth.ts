@@ -49,7 +49,7 @@ export async function requireAdminInventoryAccess(
   const role = session.user.role
   const isSuperAdmin = session.user.isSuperAdmin === true
 
-  if (role === 'ADMIN' || isSuperAdmin) {
+  if (isSuperAdmin) {
     return {
       ok: true,
       auth: { userId, role, isSuperAdmin, manageFamilyIds: undefined },
@@ -64,6 +64,7 @@ export async function requireAdminInventoryAccess(
     }
   }
 
+  // ADMIN de familia y gestores: scope operativo (no bypass total)
   const manageFamilyIds = await getInventoryManageFamilyIds(userId, role, isSuperAdmin, true)
   if (!manageFamilyIds || manageFamilyIds.length === 0) {
     return {

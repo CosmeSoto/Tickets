@@ -2,6 +2,7 @@
  * Resolución de permisos de inventario desde sesión (siempre contra BD, no JWT).
  */
 
+import prisma from '@/lib/prisma'
 import { canManageInventory } from '@/lib/inventory-access'
 import { getInventoryScope, type InventoryScopeResult } from '@/lib/inventory/scope-filter'
 import {
@@ -16,6 +17,8 @@ export async function resolveCanManageInventory(userId: string, role: string): P
 export interface InventorySessionContext {
   user: InventoryAccessUser
   canManageInventory: boolean
+  /** Módulo visible (inventoryEnabled o gestión). Super Admin siempre. */
+  inventoryEnabled: boolean
   scope: InventoryScopeResult
 }
 
@@ -25,14 +28,21 @@ export async function getInventorySessionContext(sessionUser: {
   isSuperAdmin?: boolean
 }): Promise<InventorySessionContext> {
   const user = toInventoryAccessUser(sessionUser)
+  const db = await prisma.users.findUnique({
+    where: { id: user.id },
+    select: { inventoryEnabled: true, isActive: true },
+  })
   const canManage = await canManageInventory(user.id, user.role)
+  const inventoryEnabled =
+    user.isSuperAdmin ||
+    (db?.isActive !== false && (db?.inventoryEnabled === true || canManage))
   const scope = await getInventoryScope(user.id, user.role, user.isSuperAdmin, canManage)
-  return { user, canManageInventory: canManage, scope }
+  return { user, canManageInventory: canManage, inventoryEnabled, scope }
 }
 
-/** Admin, super admin o gestor con flag en BD (no JWT). */
+/** Módulo inventario accesible: Super Admin, inventoryEnabled o gestión completa. */
 export function hasInventoryModuleAccess(ctx: InventorySessionContext): boolean {
-  return ctx.user.role === 'ADMIN' || ctx.user.isSuperAdmin || ctx.canManageInventory
+  return ctx.user.isSuperAdmin || ctx.inventoryEnabled || ctx.canManageInventory
 }
 
 export type InventoryListScopeResult =
@@ -56,7 +66,7 @@ export async function resolveInventoryListScope(
     }
   }
 
-  if (ctx.scope.noAccess) {
+  if (!hasInventoryModuleAccess(ctx) || ctx.scope.noAccess) {
     return { noAccess: true }
   }
 

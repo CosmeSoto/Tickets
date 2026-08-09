@@ -423,11 +423,13 @@ export async function GET(request: Request) {
       inventory: resolvedInventory,
       patrols: resolvedPatrols,
       news: resolvedNews,
-      canManageNews: role === 'ADMIN' ? true : canManageNews,
+      // ADMIN de familia: módulo ON implica gestionar. TECH/CLIENT: flag explícito.
+      canManageNews: isSuperAdmin || (role === 'ADMIN' ? newsEnabled : canManageNews),
       forms: resolvedForms,
-      canManageForms: role === 'ADMIN' ? true : canManageForms,
+      canManageForms: isSuperAdmin || (role === 'ADMIN' ? formsEnabled : canManageForms),
       canRequestAssets: role === 'ADMIN' ? false : canRequestAssets,
-      canManageInventory: role === 'ADMIN' ? true : canManageInventory,
+      // Respetar toggle "Gestión completa" también para ADMIN de familia
+      canManageInventory: isSuperAdmin || canManageInventory,
       credentials: resolvedCredentials,
       // Ver inferiores: flag explícito; no forzar true en ADMIN
       canManageCredentials,

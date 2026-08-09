@@ -102,9 +102,8 @@ export function NewsFeed({ className }: NewsFeedProps) {
   const [period, setPeriod] = useState<string>('')
 
   const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
-  const isAdmin = session?.user?.role === 'ADMIN'
-  // SuperAdmin y Admin siempre tienen acceso. Resto de roles: respetar el flag newsEnabled.
-  const canViewNews = isSuperAdmin || isAdmin || newsModuleEnabled
+  // Super Admin: siempre. Resto (incluido ADMIN de familia): flag news del API de módulos.
+  const canViewNews = isSuperAdmin || newsModuleEnabled
 
   const loadNews = async (tab: string = 'all', selectedPeriod: string = '') => {
     if (!session?.user) return
@@ -163,9 +162,7 @@ export function NewsFeed({ className }: NewsFeedProps) {
   const featuredNews = news.filter(n => n.isFeatured && n.priority !== 'URGENT').sort(sortByDate)
   const regularNews = news.filter(n => !n.isFeatured && n.priority !== 'URGENT').sort(sortByDate)
 
-  // Si el módulo de noticias no está habilitado para este usuario, no renderizar nada.
-  // Los admins (incluido superadmin) siempre tienen acceso.
-  // Mientras se cargan los módulos no mostrar nada para evitar flash.
+  // Módulo OFF → no renderizar. Mientras cargan módulos, evitar flash.
   if (modulesLoading || !canViewNews) return null
 
   return (

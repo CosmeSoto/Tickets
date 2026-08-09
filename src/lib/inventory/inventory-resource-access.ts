@@ -261,7 +261,8 @@ export async function assertContractAccess(
   contractId: string,
   mode: 'read' | 'write'
 ): Promise<void> {
-  const hasModuleAccess = user.role === 'ADMIN' || (await canManageInventory(user.id, user.role))
+  const hasModuleAccess =
+    user.isSuperAdmin || (await canManageInventory(user.id, user.role))
   if (!hasModuleAccess) {
     throw new InventoryAccessError('No tienes permisos de gestión de inventario', 403)
   }

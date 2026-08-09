@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { withCache, buildCacheKey, getSetting } from '@/lib/api-cache'
-import { getInventorySessionContext } from '@/lib/inventory/inventory-session'
+import { getInventorySessionContext, hasInventoryModuleAccess } from '@/lib/inventory/inventory-session'
 import {
   buildDeliveryActFamilyWhere,
   buildReturnActFamilyWhere,
@@ -31,7 +31,7 @@ export async function GET(_request: NextRequest) {
 
     if (isSuperAdmin) {
       familyIds = undefined
-    } else if (role === 'ADMIN' || canManageInventory) {
+    } else if (hasInventoryModuleAccess(invCtx)) {
       if (invCtx.scope.noAccess || !invCtx.scope.familyIds?.length) {
         return NextResponse.json(null)
       }

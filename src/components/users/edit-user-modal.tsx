@@ -379,15 +379,14 @@ export function EditUserModal({
       setFormData(p => ({
         ...p,
         newsEnabled: value,
-        // Desactivar módulo → quita permiso de crear. Activar módulo ≠ crear.
-        canManageNews: value ? p.canManageNews : false,
+        // ADMIN: módulo ON = gestión. TECH/CLIENT: activar ≠ crear; desactivar quita crear.
+        canManageNews: value ? (p.role === 'ADMIN' ? true : p.canManageNews) : false,
       }))
     } else if (field === 'formsEnabled') {
       setFormData(p => ({
         ...p,
         formsEnabled: value,
-        // Desactivar módulo → quita permiso de crear. Activar módulo ≠ crear.
-        canManageForms: value ? p.canManageForms : false,
+        canManageForms: value ? (p.role === 'ADMIN' ? true : p.canManageForms) : false,
       }))
     } else if (field === 'credentialsEnabled') {
       setFormData(p => ({

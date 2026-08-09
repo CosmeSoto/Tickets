@@ -20,12 +20,13 @@ function InventoryContent() {
 
   const role = session?.user?.role
   const isClient = role === 'CLIENT'
+  const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
   const canManageInventory = (session?.user as any)?.canManageInventory === true
   const isManager = canManageInventory
   const isClientOnly = isClient && !canManageInventory
   const isAdmin = role === 'ADMIN'
-  // Lotes visibles para ADMIN y gestores (no para clientes sin permisos)
-  const canSeeBatches = isAdmin || canManageInventory
+  // Lotes: Super Admin o gestión completa (incluye ADMIN de familia con el toggle)
+  const canSeeBatches = isSuperAdmin || canManageInventory
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login')
@@ -41,7 +42,8 @@ function InventoryContent() {
 
   if (!session?.user) return null
 
-  const canCreate = role === 'ADMIN' || role === 'TECHNICIAN' || canManageInventory
+  const canCreate =
+    isSuperAdmin || canManageInventory || role === 'TECHNICIAN'
   const title = isClientOnly ? 'Mis Activos' : 'Inventario'
   const subtitle = isClientOnly
     ? 'Activos asignados a tu cuenta'

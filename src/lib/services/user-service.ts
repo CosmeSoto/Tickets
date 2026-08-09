@@ -458,6 +458,7 @@ export class UserService {
     if (data.canManageCredentials !== undefined)
       updateData.canManageCredentials = data.canManageCredentials
     // Crear requiere módulo activo: no dejar canManage* huérfano
+    const effectiveRole = data.role ?? user.role
     const effectiveNewsEnabled =
       updateData.newsEnabled !== undefined ? updateData.newsEnabled : user.newsEnabled
     const effectiveFormsEnabled =
@@ -467,8 +468,17 @@ export class UserService {
         ? updateData.credentialsEnabled
         : user.credentialsEnabled
     if (!effectiveNewsEnabled) updateData.canManageNews = false
+    else if (effectiveRole === 'ADMIN') updateData.canManageNews = true
     if (!effectiveFormsEnabled) updateData.canManageForms = false
+    else if (effectiveRole === 'ADMIN') updateData.canManageForms = true
     if (!effectiveCredentialsEnabled) updateData.canManageCredentials = false
+    const effectiveInventoryEnabled =
+      updateData.inventoryEnabled !== undefined
+        ? updateData.inventoryEnabled
+        : user.inventoryEnabled
+    if (!effectiveInventoryEnabled && data.canManageInventory === undefined) {
+      updateData.canManageInventory = false
+    }
     if (data.isSuperAdmin !== undefined) updateData.isSuperAdmin = data.isSuperAdmin
 
     // Manejar departmentId explícitamente
@@ -481,7 +491,6 @@ export class UserService {
 
     console.log('🔧 [UserService] Datos que se enviarán a Prisma:', updateData)
 
-    const effectiveRole = data.role ?? user.role
     const deptIdForNative =
       (updateData.departmentId as string | null | undefined) !== undefined
         ? (updateData.departmentId as string | null)

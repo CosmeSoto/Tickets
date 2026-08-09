@@ -249,7 +249,7 @@ export default function AdminNewsPage() {
 
     accessChecked.current = true
 
-    if (session.user.role === 'ADMIN' || (session.user as any).isSuperAdmin) {
+    if ((session.user as any).isSuperAdmin) {
       setHasAccess(true)
       loadNews()
       loadUsersAndDepartments()
@@ -261,8 +261,10 @@ export default function AdminNewsPage() {
         const res = await fetch(`/api/users/${session.user.id}`)
         if (res.ok) {
           const data = await res.json()
-          // Panel de gestión: requiere toggle de crear (módulo solo = ver feed)
-          if (data.user?.canManageNews && data.user?.newsEnabled) {
+          const newsOn = data.user?.newsEnabled === true
+          const canManage =
+            session.user.role === 'ADMIN' ? newsOn : data.user?.canManageNews && newsOn
+          if (canManage) {
             setHasAccess(true)
             loadNews()
             loadUsersAndDepartments()
@@ -275,7 +277,11 @@ export default function AdminNewsPage() {
         const res = await fetch(`/api/user/modules?_t=${Date.now()}`)
         if (res.ok) {
           const data = await res.json()
-          if (data.canManageNews && data.news) {
+          const canManage =
+            session.user.role === 'ADMIN'
+              ? data.news === true
+              : data.canManageNews && data.news
+          if (canManage) {
             setHasAccess(true)
             loadNews()
             loadUsersAndDepartments()
@@ -284,7 +290,11 @@ export default function AdminNewsPage() {
         }
       } catch {}
 
-      if ((session.user as any).canManageNews && (session.user as any).newsEnabled) {
+      if (
+        session.user.role === 'ADMIN'
+          ? (session.user as any).newsEnabled
+          : (session.user as any).canManageNews && (session.user as any).newsEnabled
+      ) {
         setHasAccess(true)
         loadNews()
         loadUsersAndDepartments()
@@ -292,7 +302,12 @@ export default function AdminNewsPage() {
       }
 
       setHasAccess(false)
-      const dest = session.user.role === 'TECHNICIAN' ? '/technician' : '/client'
+      const dest =
+        session.user.role === 'ADMIN'
+          ? '/admin'
+          : session.user.role === 'TECHNICIAN'
+            ? '/technician'
+            : '/client'
       router.replace(dest)
     }
 

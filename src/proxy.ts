@@ -336,6 +336,43 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(new URL(dashboardForRole(userRole), request.url))
     }
 
+    // ADMIN de familia: respetar toggles de módulos (Super Admin exento).
+    if (userRole === 'ADMIN' && (token as any).isSuperAdmin !== true) {
+      if (path.startsWith('/admin/news') && (token as any).newsEnabled !== true) {
+        ApplicationLogger.securityEvent(
+          'insufficient_privileges',
+          'medium',
+          { userId, userRole, requiredCapability: 'newsEnabled', path, ip },
+          { requestId }
+        )
+        return NextResponse.redirect(new URL('/admin', request.url))
+      }
+      if (path.startsWith('/admin/forms') && (token as any).formsEnabled !== true) {
+        ApplicationLogger.securityEvent(
+          'insufficient_privileges',
+          'medium',
+          { userId, userRole, requiredCapability: 'formsEnabled', path, ip },
+          { requestId }
+        )
+        return NextResponse.redirect(new URL('/admin', request.url))
+      }
+      if (
+        (path.startsWith('/inventory') ||
+          path === '/settings/inventory' ||
+          path.startsWith('/settings/inventory/')) &&
+        (token as any).inventoryEnabled !== true &&
+        (token as any).canManageInventory !== true
+      ) {
+        ApplicationLogger.securityEvent(
+          'insufficient_privileges',
+          'medium',
+          { userId, userRole, requiredCapability: 'inventoryEnabled', path, ip },
+          { requestId }
+        )
+        return NextResponse.redirect(new URL('/admin', request.url))
+      }
+    }
+
     if (path.startsWith('/technician') && userRole !== 'TECHNICIAN') {
       ApplicationLogger.securityEvent(
         'insufficient_privileges',

@@ -136,7 +136,7 @@ export async function GET(_request: NextRequest) {
         },
       }),
 
-      role === 'ADMIN' || ctx.canManageInventory
+      ctx.canManageInventory
         ? BatchService.getUtilizationOverview().catch(() => null)
         : Promise.resolve(null),
     ])

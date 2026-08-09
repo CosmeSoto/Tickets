@@ -662,7 +662,7 @@ export function hasInventoryReportsAccess(
   isSuperAdmin: boolean,
   canManageInventory: boolean
 ): boolean {
-  return isSuperAdmin || role === 'ADMIN' || canManageInventory
+  return isSuperAdmin || canManageInventory
 }
 
 export function getReportRoleCapabilities(userRole: InventoryReportRole): ReportRoleCapabilities {

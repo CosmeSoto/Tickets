@@ -141,7 +141,7 @@ export default function AdminDashboard() {
       )}
 
       {/* NewsFeed - Noticias y Comunicados */}
-      <NewsFeed />
+      {hasNews && <NewsFeed />}
 
       {/* 1. Contexto del usuario — familias y acceso */}
       {stats.assignedFamilies !== undefined && (

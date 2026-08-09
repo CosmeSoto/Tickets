@@ -409,6 +409,7 @@ export async function getInventoryOperationalFamilyIds(
   const nativeId = await getNativeFamilyId(userId)
 
   if (role === 'ADMIN') {
+    if (!canManageInventory) return []
     return nativeId ? [nativeId] : []
   }
 
@@ -438,7 +439,8 @@ export async function adminCanOperateInventoryFamily(
   isSuperAdmin: boolean
 ): Promise<boolean> {
   if (isSuperAdmin) return true
-  const ids = await getInventoryOperationalFamilyIds(adminId, 'ADMIN', false, false)
+  // Caller ya validó canManageInventory; aquí solo scope de familia nativa.
+  const ids = await getInventoryOperationalFamilyIds(adminId, 'ADMIN', false, true)
   return isFamilyInScope(familyId, ids)
 }
 

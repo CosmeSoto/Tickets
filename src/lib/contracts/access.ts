@@ -12,13 +12,15 @@ export type ContractAccessUser = {
 
 /** Puede crear, editar, asignar clientes y generar actas */
 export async function canManageContracts(user: ContractAccessUser): Promise<boolean> {
-  if (user.role === 'ADMIN') return true
+  if (user.isSuperAdmin) return true
   return canManageInventory(user.id, user.role)
 }
 
-/** Puede eliminar contratos (solo admin con scope) */
-export function canDeleteContracts(user: ContractAccessUser): boolean {
-  return user.role === 'ADMIN'
+/** Puede eliminar contratos (admin con gestión / super admin) */
+export async function canDeleteContracts(user: ContractAccessUser): Promise<boolean> {
+  if (user.isSuperAdmin) return true
+  if (user.role !== 'ADMIN') return false
+  return canManageInventory(user.id, user.role)
 }
 
 /** Cliente con alguna asignación al contrato */
@@ -42,23 +44,17 @@ export async function assertContractViewAccess(
     throw new Error('No tienes acceso a este contrato')
   }
 
-  if (user.role === 'ADMIN' || (await canManageInventory(user.id, user.role))) {
-    const contract = await prisma.contracts.findUnique({
-      where: { id: contractId },
-      select: { familyId: true },
-    })
-    if (!contract) throw new Error('Contrato no encontrado')
-    const allowed = await canManageAsset(
-      user.id,
-      user.role,
-      false,
-      contract.familyId
-    )
-    if (!allowed) throw new Error('Sin permiso para esta familia')
-    return
+  if (!(await canManageInventory(user.id, user.role))) {
+    throw new Error('Sin permiso para ver contratos')
   }
 
-  throw new Error('Sin permiso para ver contratos')
+  const contract = await prisma.contracts.findUnique({
+    where: { id: contractId },
+    select: { familyId: true },
+  })
+  if (!contract) throw new Error('Contrato no encontrado')
+  const allowed = await canManageAsset(user.id, user.role, false, contract.familyId)
+  if (!allowed) throw new Error('Sin permiso para esta familia')
 }
 
 /** Operaciones de escritura sobre contrato en familia */

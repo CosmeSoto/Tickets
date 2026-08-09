@@ -386,7 +386,7 @@ export default function SalesPage() {
   const role = session?.user?.role
   const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
   const canManageInventory = (session?.user as any)?.canManageInventory === true
-  const canAccess = role === 'ADMIN' || isSuperAdmin || canManageInventory
+  const canAccess = isSuperAdmin || canManageInventory
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login')

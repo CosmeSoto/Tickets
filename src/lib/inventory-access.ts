@@ -9,19 +9,18 @@ import {
 
 /**
  * Verifica si un usuario tiene permiso GLOBAL de gestión de inventario.
- * - ADMIN: siempre sí (acceso al módulo; scope por familia aplica aparte)
- * - Otros: canManageInventory en BD
+ * - Super Admin: siempre sí
+ * - Resto (incluido ADMIN de familia): flag canManageInventory en BD
  */
-export async function canManageInventory(userId: string, role: string): Promise<boolean> {
-  if (role === 'ADMIN') return true
-
+export async function canManageInventory(userId: string, _role: string): Promise<boolean> {
   try {
     return await withCache(`perm:inv:${userId}`, 300, async () => {
       const user = await prisma.users.findUnique({
         where: { id: userId },
-        select: { canManageInventory: true, isActive: true },
+        select: { canManageInventory: true, isActive: true, isSuperAdmin: true },
       })
       if (!user || !user.isActive) return false
+      if (user.isSuperAdmin) return true
       return user.canManageInventory === true
     })
   } catch {
@@ -45,12 +44,12 @@ export async function canManageAsset(
     select: { canManageInventory: true, isActive: true },
   })
   if (!user?.isActive) return false
+  if (!user.canManageInventory) return false
 
   if (role === 'ADMIN') {
     return adminCanOperateInventoryFamily(userId, assetFamilyId ?? null, false)
   }
 
-  if (!user.canManageInventory) return false
   return managerCanOperateInventoryFamily(userId, assetFamilyId ?? null, true)
 }
 

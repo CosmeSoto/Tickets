@@ -4,13 +4,12 @@ import { useSession } from 'next-auth/react'
 
 /**
  * Hook centralizado para permisos de inventario en el frontend.
- * Refleja exactamente la misma jerarquía que el backend:
+ * Refleja la jerarquía del backend:
  *
- *   SuperAdmin  → puede todo
- *   Admin       → puede gestionar activos (sus familias o todas si no tiene asignadas)
- *   Gestor      → puede gestionar activos de sus familias (canManageInventory=true)
- *   Técnico     → puede crear/editar (sin gestión de familias)
- *   Cliente     → solo lectura de sus equipos y suscripciones asignadas
+ *   SuperAdmin              → puede todo
+ *   canManageInventory=true → gestión completa (cualquier rol, incluido ADMIN de familia)
+ *   Técnico sin gestión     → crear/editar operativos (API valida familia)
+ *   Cliente sin gestión     → lectura / solicitudes
  */
 export function useInventoryPermissions() {
   const { data: session } = useSession()
@@ -23,34 +22,18 @@ export function useInventoryPermissions() {
   const isTechnician = role === 'TECHNICIAN'
   const isClient = role === 'CLIENT'
 
-  // Puede crear activos nuevos
-  const canCreate = isAdmin || isTechnician || canManageInventory
-
-  // Puede editar activos (el backend verifica además que sea de su familia)
-  const canEdit = isAdmin || isTechnician || canManageInventory
-
-  // Puede retirar/dar de baja activos (el backend verifica además que sea de su familia)
-  const canRetire = isAdmin || canManageInventory
-
-  // Solo superadmin puede eliminar permanentemente
+  const canCreate = isSuperAdmin || canManageInventory || isTechnician
+  const canEdit = isSuperAdmin || canManageInventory || isTechnician
+  const canRetire = isSuperAdmin || canManageInventory
   const canPermanentDelete = isAdmin && isSuperAdmin
-
-  // Puede asignar equipos a usuarios
-  const canAssign = isAdmin || isTechnician || canManageInventory
-
-  // Puede devolver equipos a bodega
-  const canReturn = isAdmin || isTechnician || canManageInventory
-
-  // Puede registrar mantenimientos (no solo solicitarlos)
-  const canManageMaintenance = isAdmin || isTechnician || canManageInventory
-
-  // Cliente puede solicitar mantenimiento de sus equipos asignados
+  const canAssign = isSuperAdmin || canManageInventory || isTechnician
+  const canReturn = isSuperAdmin || canManageInventory || isTechnician
+  const canManageMaintenance = isSuperAdmin || canManageInventory || isTechnician
   const canRequestMaintenance = isClient
 
-  // Contratos / suscripciones
-  const canManageContracts = isAdmin || canManageInventory
+  const canManageContracts = isSuperAdmin || canManageInventory
   const canViewOwnContracts = isClient || canManageContracts
-  const canDeleteContracts = isAdmin
+  const canDeleteContracts = isSuperAdmin || (isAdmin && canManageInventory)
 
   return {
     role,
