@@ -284,8 +284,8 @@ export default function PatrolDashboardPage() {
       subtitle='Qué está ocurriendo hoy, lo próximo y lo ya cumplido'
       loading={loading && !data}
       headerActions={
-        <div className='flex items-center gap-2 flex-wrap justify-end'>
-          <div className='flex rounded-md border p-0.5'>
+        <div className='flex items-center gap-2 flex-wrap w-full min-w-0'>
+          <div className='flex rounded-md border p-0.5 shrink-0'>
             <Button
               type='button'
               size='sm'
@@ -309,7 +309,7 @@ export default function PatrolDashboardPage() {
             value={filterFamilyId || 'all'}
             onValueChange={v => setFilterFamilyId(v === 'all' ? '' : v)}
           >
-            <SelectTrigger className='w-[150px] h-8 text-xs'>
+            <SelectTrigger className='w-full min-w-[9rem] max-w-[12rem] sm:w-[150px] h-8 text-xs'>
               <SelectValue placeholder='Todas las áreas' />
             </SelectTrigger>
             <SelectContent>
@@ -325,7 +325,7 @@ export default function PatrolDashboardPage() {
             value={filterAgentId || 'all'}
             onValueChange={v => setFilterAgentId(v === 'all' ? '' : v)}
           >
-            <SelectTrigger className='w-[150px] h-8 text-xs'>
+            <SelectTrigger className='w-full min-w-[9rem] max-w-[12rem] sm:w-[150px] h-8 text-xs'>
               <SelectValue placeholder='Todos los agentes' />
             </SelectTrigger>
             <SelectContent>
@@ -340,6 +340,7 @@ export default function PatrolDashboardPage() {
           <Button
             variant='outline'
             size='sm'
+            className='shrink-0'
             onClick={() => {
               void fetchDashboard(true)
               void fetchAgenda()

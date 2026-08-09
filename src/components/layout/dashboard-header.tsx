@@ -95,15 +95,82 @@ export function DashboardHeader({
     window.location.href = '/login'
   }
 
+  const utilityCluster = (
+    <>
+      <motion.div
+        whileHover={reduceMotion ? undefined : { y: -1 }}
+        transition={{ duration: 0.15 }}
+      >
+        <Link
+          href='/?preview=true'
+          target='_blank'
+          rel='noopener noreferrer'
+          title='Ver Página Pública'
+          className='flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors border border-border rounded-md px-2 py-1.5 hover:bg-accent flex-shrink-0'
+        >
+          <Globe className='h-3.5 w-3.5 flex-shrink-0' />
+          <span className='hidden sm:inline'>Página Pública</span>
+          <ExternalLink className='h-3 w-3 opacity-60 hidden lg:inline' />
+        </Link>
+      </motion.div>
+
+      <Notifications variant='bell' />
+      <PushSubscriptionManager />
+
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant='ghost' className='relative h-9 w-9 rounded-full p-0'>
+            <Avatar className='h-9 w-9'>
+              <AvatarImage src={user.avatar} alt={user.name} />
+              <AvatarFallback className='bg-primary/10 text-primary text-sm'>
+                {getInitials(user.name)}
+              </AvatarFallback>
+            </Avatar>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align='end' className='w-56'>
+          <DropdownMenuLabel>
+            <div className='flex flex-col space-y-1'>
+              <p className='text-sm font-medium leading-none'>{user.name}</p>
+              <p className='text-xs leading-none text-muted-foreground'>{user.email}</p>
+              <Badge className={`text-xs w-fit mt-1 ${roleBadgeColor}`}>{roleLabel}</Badge>
+            </div>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem asChild>
+            <Link href='/profile'>
+              <User className='h-4 w-4 mr-2' />
+              Mi Perfil
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link href='/settings'>
+              <Settings className='h-4 w-4 mr-2' />
+              Configuración Personal
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={handleLogout} className='text-destructive'>
+            <LogOut className='h-4 w-4 mr-2' />
+            Cerrar Sesión
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </>
+  )
+
   return (
     <header className='sticky top-0 z-40 border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80'>
-      <div className='px-4 sm:px-8 py-3 sm:py-3.5'>
-        <div className='flex items-start sm:items-center justify-between gap-3'>
+      <div className='px-4 sm:px-8 py-3 sm:py-3.5 space-y-2.5'>
+        {/* Fila 1: título + utilidades (nunca se aplastan entre sí) */}
+        <div className='flex items-start justify-between gap-3'>
           <div className='flex items-start gap-3 min-w-0 flex-1'>
             <motion.button
+              type='button'
               onClick={onOpenSidebar}
               className='lg:hidden mt-0.5 p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent flex-shrink-0'
               whileTap={reduceMotion ? undefined : { scale: 0.92 }}
+              aria-label='Abrir menú'
             >
               <Menu className='h-5 w-5' />
             </motion.button>
@@ -112,7 +179,7 @@ export function DashboardHeader({
               {title ? (
                 <motion.h1
                   key={title}
-                  className='text-sm sm:text-xl font-bold text-foreground line-clamp-2 leading-tight'
+                  className='text-sm sm:text-xl font-bold text-foreground line-clamp-2 leading-tight break-words'
                   initial={reduceMotion ? false : { opacity: 0.55, y: 4 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: reduceMotion ? 0 : 0.2, ease: NAV_EASE }}
@@ -120,84 +187,29 @@ export function DashboardHeader({
                   {title}
                 </motion.h1>
               ) : null}
-              {subtitle && (
-                <div className='text-xs text-muted-foreground hidden sm:flex items-center flex-wrap gap-1'>
+              {subtitle ? (
+                <div className='hidden sm:block text-xs text-muted-foreground leading-snug line-clamp-2 break-words max-w-3xl'>
                   {subtitle}
                 </div>
-              )}
+              ) : null}
             </div>
           </div>
 
           <div className='flex items-center gap-2 sm:gap-3 flex-shrink-0 pt-0.5'>
-            {headerActions && <div className='hidden sm:block'>{headerActions}</div>}
-
-            <motion.div
-              whileHover={reduceMotion ? undefined : { y: -1 }}
-              transition={{ duration: 0.15 }}
-            >
-              <Link
-                href='/?preview=true'
-                target='_blank'
-                rel='noopener noreferrer'
-                title='Ver Página Pública'
-                className='flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors border border-border rounded-md px-2 py-1.5 hover:bg-accent flex-shrink-0'
-              >
-                <Globe className='h-3.5 w-3.5 flex-shrink-0' />
-                <span className='hidden sm:inline'>Página Pública</span>
-                <ExternalLink className='h-3 w-3 opacity-60 hidden lg:inline' />
-              </Link>
-            </motion.div>
-
-            <Notifications variant='bell' />
-            <PushSubscriptionManager />
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant='ghost' className='relative h-9 w-9 rounded-full p-0'>
-                  <Avatar className='h-9 w-9'>
-                    <AvatarImage src={user.avatar} alt={user.name} />
-                    <AvatarFallback className='bg-primary/10 text-primary text-sm'>
-                      {getInitials(user.name)}
-                    </AvatarFallback>
-                  </Avatar>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align='end' className='w-56'>
-                <DropdownMenuLabel>
-                  <div className='flex flex-col space-y-1'>
-                    <p className='text-sm font-medium leading-none'>{user.name}</p>
-                    <p className='text-xs leading-none text-muted-foreground'>{user.email}</p>
-                    <Badge className={`text-xs w-fit mt-1 ${roleBadgeColor}`}>{roleLabel}</Badge>
-                  </div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href='/profile'>
-                    <User className='h-4 w-4 mr-2' />
-                    Mi Perfil
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href='/settings'>
-                    <Settings className='h-4 w-4 mr-2' />
-                    Configuración Personal
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleLogout} className='text-destructive'>
-                  <LogOut className='h-4 w-4 mr-2' />
-                  Cerrar Sesión
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {utilityCluster}
           </div>
         </div>
 
-        {headerBreadcrumbs.length > 0 && (
-          <DashboardBreadcrumbs items={headerBreadcrumbs} className='sm:hidden mt-2 pl-11' />
-        )}
+        {/* Fila 2: acciones de página — ancho completo, wrap sin aplastar el título */}
+        {headerActions ? (
+          <div className='flex flex-wrap items-center gap-2 min-w-0 w-full'>
+            {headerActions}
+          </div>
+        ) : null}
 
-        {headerActions && <div className='sm:hidden mt-2'>{headerActions}</div>}
+        {headerBreadcrumbs.length > 0 && (
+          <DashboardBreadcrumbs items={headerBreadcrumbs} className='sm:hidden pl-11' />
+        )}
       </div>
     </header>
   )
