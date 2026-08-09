@@ -59,6 +59,9 @@ export function extractKeywords(text: string): string[] {
     'el', 'la', 'los', 'las', 'un', 'una', 'unos', 'unas',
     'de', 'del', 'al', 'a', 'en', 'con', 'por', 'para',
     'y', 'o', 'pero', 'si', 'no', 'que', 'como', 'cuando',
+    // Verbos / muletillas frecuentes en títulos de tickets (ruido en sugerencias)
+    'puedo', 'puede', 'pueden', 'puedes', 'queria', 'quiero', 'quiere',
+    'tengo', 'tiene', 'tienen', 'necesito', 'necesita', 'ayuda', 'favor',
   ]);
 
   return normalizeText(text)

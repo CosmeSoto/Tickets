@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { ChevronRight, ChevronDown, Folder, FolderOpen } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -12,6 +12,8 @@ export interface CategoryTreeProps {
   selectedPath: string[]
   onSelect: (categoryId: string, level: number) => void
   mode?: 'full' | 'compact'
+  /** IDs a expandir al montar (p. ej. ancestros de coincidencias relacionadas) */
+  defaultExpandedIds?: string[]
 }
 
 interface CategoryTreeNodeData {
@@ -37,9 +39,27 @@ export function CategoryTree({
   selectedPath,
   onSelect,
   mode = 'full',
+  defaultExpandedIds = [],
 }: CategoryTreeProps) {
-  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set(selectedPath))
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(
+    () => new Set([...selectedPath, ...defaultExpandedIds])
+  )
   const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (defaultExpandedIds.length === 0) return
+    setExpandedNodes(prev => {
+      const next = new Set(prev)
+      let changed = false
+      for (const id of defaultExpandedIds) {
+        if (!next.has(id)) {
+          next.add(id)
+          changed = true
+        }
+      }
+      return changed ? next : prev
+    })
+  }, [defaultExpandedIds])
 
   // Build tree structure - memoized for performance
   const buildTree = useMemo(() => {

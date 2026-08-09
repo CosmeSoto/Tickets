@@ -141,7 +141,8 @@ export function CategorySelector({
     selectionStartTime: null,
     interactionMethod: null,
   })
-  const [showManualNavigation, setShowManualNavigation] = useState(false)
+  /** closed | related (filtrado por título/desc) | all (árbol completo del área) */
+  const [treeBrowseMode, setTreeBrowseMode] = useState<'closed' | 'related' | 'all'>('closed')
 
   const [categoryMetadata, setCategoryMetadata] = useState<CategoryMetadata | null>(null)
   const [confidenceScore, setConfidenceScore] = useState<number>(0)
@@ -185,12 +186,38 @@ export function CategorySelector({
 
   const [searchResults, setSearchResults] = useState<SearchResult[]>([])
 
-  const { suggestions, isAnalyzing } = useCategorySuggestions({
+  const { suggestions, relatedMatches, isAnalyzing } = useCategorySuggestions({
     categories,
     title: ticketTitle,
     description: ticketDescription,
     debounceMs: 500,
   })
+
+  const hasTicketContext = Boolean(
+    (ticketTitle && ticketTitle.trim().length >= 3) ||
+      (ticketDescription && ticketDescription.trim().length >= 3)
+  )
+
+  /** Categorías + ancestros con coincidencia al título/descripción (modo experto) */
+  const relatedTreeCategories = useMemo(() => {
+    if (relatedMatches.length === 0) return []
+    const ids = new Set<string>()
+    for (const match of relatedMatches) {
+      ids.add(match.category.id)
+      for (const node of match.path) ids.add(node.id)
+    }
+    return categories.filter(c => ids.has(c.id))
+  }, [relatedMatches, categories])
+
+  const relatedExpandedIds = useMemo(() => {
+    const ids = new Set<string>()
+    for (const match of relatedMatches) {
+      for (const node of match.path) {
+        if (node.id !== match.category.id) ids.add(node.id)
+      }
+    }
+    return [...ids]
+  }, [relatedMatches])
 
   const { frequentCategories: frequentRaw, isLoading: isLoadingFrequent } = useFrequentCategories({
     clientId,
@@ -204,9 +231,6 @@ export function CategorySelector({
     const allowed = new Set(categories.map(c => c.id))
     return frequentRaw.filter(f => allowed.has(f.category.id))
   }, [frequentRaw, categories])
-
-  // El árbol manual permanece cerrado por defecto.
-  // Solo se abre si el usuario pulsa "Ver árbol completo / seleccionar manualmente".
 
   // Build category path from selected category ID
   const buildCategoryPath = useCallback(
@@ -574,37 +598,94 @@ export function CategorySelector({
             </section>
           ) : (
             <div className='space-y-3'>
-              {!showManualNavigation ? (
+              {treeBrowseMode === 'closed' ? (
                 <div className='space-y-2'>
-                  <Button
-                    type='button'
-                    variant='outline'
-                    size='sm'
-                    onClick={() => setShowManualNavigation(true)}
-                    className='w-full text-xs h-8'
-                  >
-                    Ver árbol completo / seleccionar manualmente
-                  </Button>
+                  {hasTicketContext && relatedTreeCategories.length > 0 ? (
+                    <>
+                      <Button
+                        type='button'
+                        variant='outline'
+                        size='sm'
+                        onClick={() => setTreeBrowseMode('related')}
+                        className='w-full text-xs h-8'
+                      >
+                        Explorar relacionadas ({relatedMatches.length})
+                      </Button>
+                      <Button
+                        type='button'
+                        variant='ghost'
+                        size='sm'
+                        onClick={() => setTreeBrowseMode('all')}
+                        className='w-full text-muted-foreground text-xs h-7'
+                      >
+                        Ver todas las categorías del área
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      type='button'
+                      variant='outline'
+                      size='sm'
+                      onClick={() => setTreeBrowseMode('all')}
+                      className='w-full text-xs h-8'
+                    >
+                      Ver árbol completo / seleccionar manualmente
+                    </Button>
+                  )}
                 </div>
               ) : (
                 <div className='space-y-2'>
-                  <Button
-                    type='button'
-                    variant='ghost'
-                    size='sm'
-                    onClick={() => setShowManualNavigation(false)}
-                    className='w-full text-muted-foreground text-xs h-7'
-                  >
-                    Ocultar árbol
-                  </Button>
+                  <div className='flex flex-wrap gap-2'>
+                    <Button
+                      type='button'
+                      variant='ghost'
+                      size='sm'
+                      onClick={() => setTreeBrowseMode('closed')}
+                      className='text-muted-foreground text-xs h-7'
+                    >
+                      Ocultar árbol
+                    </Button>
+                    {treeBrowseMode === 'related' && (
+                      <Button
+                        type='button'
+                        variant='outline'
+                        size='sm'
+                        onClick={() => setTreeBrowseMode('all')}
+                        className='text-xs h-7'
+                      >
+                        Ampliar a todas
+                      </Button>
+                    )}
+                    {treeBrowseMode === 'all' &&
+                      hasTicketContext &&
+                      relatedTreeCategories.length > 0 && (
+                        <Button
+                          type='button'
+                          variant='outline'
+                          size='sm'
+                          onClick={() => setTreeBrowseMode('related')}
+                          className='text-xs h-7'
+                        >
+                          Solo relacionadas
+                        </Button>
+                      )}
+                  </div>
                   <p className='text-xs text-muted-foreground'>
-                    Navega el árbol o usa la búsqueda (Ctrl+K) para elegir la categoría.
+                    {treeBrowseMode === 'related'
+                      ? `Mostrando ${relatedMatches.length} categoría${relatedMatches.length !== 1 ? 's' : ''} relacionadas con el título/descripción (y sus ramas). Usa Ctrl+K para afinar.`
+                      : 'Navega el árbol completo del área o usa la búsqueda (Ctrl+K).'}
                   </p>
                   <CategoryTree
-                    categories={categories}
+                    key={treeBrowseMode}
+                    categories={
+                      treeBrowseMode === 'related' ? relatedTreeCategories : categories
+                    }
                     selectedPath={state.selectedPath}
                     onSelect={handleTreeSelect}
                     mode='full'
+                    defaultExpandedIds={
+                      treeBrowseMode === 'related' ? relatedExpandedIds : undefined
+                    }
                   />
                 </div>
               )}

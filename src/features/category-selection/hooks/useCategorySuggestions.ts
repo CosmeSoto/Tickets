@@ -67,13 +67,15 @@ export interface UseCategorySuggestionsOptions {
 
 /**
  * Valor de retorno del hook useCategorySuggestions
- * 
- * @property {Suggestion[]} suggestions - Array de sugerencias ordenadas por relevancia
+ *
+ * @property {Suggestion[]} suggestions - Top sugerencias para la UI compacta
+ * @property {Suggestion[]} relatedMatches - Todas las categorías con coincidencia (modo experto)
  * @property {boolean} isAnalyzing - Indica si hay un análisis en progreso
  * @property {function} refresh - Función para forzar re-análisis de sugerencias
  */
 export interface UseCategorySuggestionsReturn {
   suggestions: Suggestion[];
+  relatedMatches: Suggestion[];
   isAnalyzing: boolean;
   refresh: () => void;
 }
@@ -103,6 +105,7 @@ export function useCategorySuggestions({
 }: UseCategorySuggestionsOptions): UseCategorySuggestionsReturn {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [relatedMatches, setRelatedMatches] = useState<Suggestion[]>([]);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Construir índice de búsqueda
@@ -202,6 +205,7 @@ export function useCategorySuggestions({
       // Si no hay texto suficiente, no sugerir nada
       if (combinedText.length < 3) {
         setSuggestions([]);
+        setRelatedMatches([]);
         return;
       }
 
@@ -211,6 +215,7 @@ export function useCategorySuggestions({
       // Si no hay keywords significativas, no sugerir nada
       if (textKeywords.length === 0) {
         setSuggestions([]);
+        setRelatedMatches([]);
         return;
       }
 
@@ -225,11 +230,10 @@ export function useCategorySuggestions({
           };
         })
         .filter(item => item.score > 0) // Solo categorías con alguna coincidencia
-        .sort((a, b) => b.score - a.score) // Ordenar por relevancia descendente
-        .slice(0, maxSuggestions); // Limitar a máximo de sugerencias
+        .sort((a, b) => b.score - a.score); // Ordenar por relevancia descendente
 
-      // Construir sugerencias
-      const newSuggestions: Suggestion[] = scoredCategories
+      // Construir todas las coincidencias (modo experto / árbol relacionado)
+      const allMatches: Suggestion[] = scoredCategories
         .map(item => {
           const category = categoriesMap.get(item.categoryIndex.id);
           if (!category) return null;
@@ -247,7 +251,8 @@ export function useCategorySuggestions({
         })
         .filter((suggestion): suggestion is Suggestion => suggestion !== null);
 
-      setSuggestions(newSuggestions);
+      setRelatedMatches(allMatches);
+      setSuggestions(allMatches.slice(0, maxSuggestions));
     } finally {
       setIsAnalyzing(false);
     }
@@ -277,6 +282,7 @@ export function useCategorySuggestions({
 
   return {
     suggestions,
+    relatedMatches,
     isAnalyzing,
     refresh,
   };
