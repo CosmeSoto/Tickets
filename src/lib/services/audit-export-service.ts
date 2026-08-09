@@ -6,6 +6,8 @@
 import {
   translateAction,
   translateEntityType,
+  translateRole,
+  translateSeverity,
   determineSeverity,
   getDateRange,
   getFilterSuffix,
@@ -14,6 +16,10 @@ import {
   getAuditCategory,
 } from './audit-export-helpers'
 import { getAppTimezone } from '@/lib/utils/date-utils'
+import {
+  getAffectedObjectLabel,
+  getEventCode,
+} from '@/components/audit/utils/audit-affected-object'
 
 export interface AuditExportOptions {
   format: 'csv' | 'json' | 'rows'
@@ -161,6 +167,68 @@ export class AuditExportService {
     return csv
   }
 
+  private static formatJsonDateTime(value: Date | string): string {
+    const d = value instanceof Date ? value : new Date(value)
+    return d.toLocaleString('es-EC', {
+      timeZone: getAppTimezone(),
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    })
+  }
+
+  private static translateFiltersForJson(filters: any): Record<string, string> {
+    const active = getActiveFilters(filters)
+    const out: Record<string, string> = {}
+    const labels: Record<string, string> = {
+      days: 'Período (días)',
+      search: 'Búsqueda',
+      action: 'Acción',
+      entityType: 'Módulo',
+      familyId: 'Área / familia',
+      userId: 'Usuario',
+      configModule: 'Config. por módulo',
+      actionPreset: 'Preset',
+      limit: 'Límite',
+      offset: 'Desplazamiento',
+    }
+    for (const [key, value] of Object.entries(active)) {
+      if (key === 'entityType' && value === 'all') continue
+      const label = labels[key] || key
+      if (key === 'entityType') {
+        out[label] = translateEntityType(String(value))
+      } else {
+        out[label] = String(value)
+      }
+    }
+    return out
+  }
+
+  private static columnLabelsEs(keys: string[]): string[] {
+    const map: Record<string, string> = {
+      fecha: 'Fecha',
+      hora: 'Hora',
+      action: 'Acción',
+      entityType: 'Módulo',
+      usuario: 'Usuario',
+      rol: 'Rol',
+      descripcion: 'Descripción',
+      severity: 'Severidad',
+      entityId: 'Objeto afectado',
+      id: 'Código del evento',
+      dispositivo: 'Dispositivo',
+      navegador: 'Navegador',
+      email: 'Email',
+      ip: 'IP',
+      cambios: 'Cambios',
+      userAgent: 'User-Agent',
+    }
+    return keys.map(k => map[k] || k)
+  }
+
   private static generateJSON(
     logs: any[],
     filters: any,
@@ -170,60 +238,70 @@ export class AuditExportService {
     columnKeys: string[]
   ): string {
     const exportData = {
-      metadata: options.includeMetadata
+      metadatos: options.includeMetadata
         ? {
-            reportType: 'audit_logs',
-            generatedAt: new Date().toISOString(),
-            filters: getActiveFilters(filters),
-            recordCount: logs.length,
-            dateRange: getDateRange(logs),
-            version: '3.0',
-            columns: columnKeys,
-            lopdp: { includeSensitive, maskPii },
+            tipoReporte: 'Logs de auditoría',
+            generadoEn: this.formatJsonDateTime(new Date()),
+            filtros: this.translateFiltersForJson(filters),
+            totalRegistros: logs.length,
+            rangoFechas: getDateRange(logs),
+            version: '3.1',
+            columnas: this.columnLabelsEs(columnKeys),
+            lopdp: {
+              incluyeDatosSensibles: includeSensitive,
+              datosEnmascarados: maskPii,
+              exportacionInternaSinMascara: includeSensitive && !maskPii,
+            },
           }
         : undefined,
-      summary: {
-        totalRecords: logs.length,
-        uniqueUsers: new Set(logs.map(l => l.userId).filter(Boolean)).size,
-        uniqueActions: new Set(logs.map(l => l.action)).size,
-        criticalEvents: logs.filter(l => determineSeverity(l.action, l.entityType) === 'CRITICAL')
-          .length,
+      resumen: {
+        totalRegistros: logs.length,
+        usuariosUnicos: new Set(logs.map(l => l.userId).filter(Boolean)).size,
+        accionesUnicas: new Set(logs.map(l => l.action)).size,
+        eventosCriticos: logs.filter(
+          l => determineSeverity(l.action, l.entityType) === 'CRITICAL'
+        ).length,
       },
-      // Sin volcar details completos salvo datos sensibles explícitos
-      logs: includeSensitive
-        ? logs.map(log => ({
-            id: log.id,
-            createdAt: log.createdAt,
-            action: log.action,
-            actionTranslated: translateAction(log.action),
-            entityType: log.entityType,
-            entityTypeTranslated: translateEntityType(log.entityType),
-            entityId: log.entityId,
-            user: log.users
-              ? {
-                  name: log.users.name,
-                  email: maskPii
-                    ? String(log.users.email || '')
-                        .replace(/^(.{0,2}).*(@.*)$/, '$1***$2')
-                    : log.users.email,
-                  role: log.users.role,
-                }
-              : null,
-            ipAddress: maskPii && log.ipAddress ? String(log.ipAddress).replace(/\.\d+$/, '.***') : log.ipAddress,
-            userAgent: maskPii ? undefined : log.userAgent,
-            details: maskPii ? { note: 'Detalle omitido o reducido (maskPii)' } : log.details,
-            severity: determineSeverity(log.action, log.entityType),
-            category: getAuditCategory(log.action, log.entityType),
-          }))
-        : logs.map(log => ({
-            id: log.id,
-            createdAt: log.createdAt,
-            actionTranslated: translateAction(log.action),
-            entityTypeTranslated: translateEntityType(log.entityType),
-            userName: log.users?.name || 'Sistema',
-            role: log.users?.role || null,
-            severity: determineSeverity(log.action, log.entityType),
-          })),
+      registros: includeSensitive
+        ? logs.map(log => {
+            const severity = determineSeverity(log.action, log.entityType)
+            return {
+              codigoEvento: getEventCode(log.id),
+              fechaHora: this.formatJsonDateTime(log.createdAt),
+              accion: translateAction(log.action),
+              modulo: translateEntityType(log.entityType),
+              objetoAfectado: getAffectedObjectLabel(log),
+              usuario: log.users?.name || 'Sistema',
+              email: log.users
+                ? maskPii
+                  ? String(log.users.email || '').replace(/^(.{0,2}).*(@.*)$/, '$1***$2')
+                  : log.users.email
+                : null,
+              rol: log.users?.role ? translateRole(log.users.role) : 'Sistema',
+              severidad: translateSeverity(severity),
+              categoria: getAuditCategory(log.action, log.entityType),
+              ip:
+                maskPii && log.ipAddress
+                  ? String(log.ipAddress).replace(/\.\d+$/, '.***')
+                  : log.ipAddress || null,
+              userAgent: maskPii ? undefined : log.userAgent || null,
+              detalles: maskPii
+                ? { nota: 'Detalle omitido o reducido (datos enmascarados)' }
+                : log.details,
+            }
+          })
+        : logs.map(log => {
+            const severity = determineSeverity(log.action, log.entityType)
+            return {
+              codigoEvento: getEventCode(log.id),
+              fechaHora: this.formatJsonDateTime(log.createdAt),
+              accion: translateAction(log.action),
+              modulo: translateEntityType(log.entityType),
+              usuario: log.users?.name || 'Sistema',
+              rol: log.users?.role ? translateRole(log.users.role) : 'Sistema',
+              severidad: translateSeverity(severity),
+            }
+          }),
     }
 
     return JSON.stringify(exportData, null, 2)

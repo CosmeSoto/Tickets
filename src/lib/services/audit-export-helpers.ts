@@ -10,11 +10,11 @@ export function translateRole(role: string): string {
 
 export function translateSeverity(severity: string): string {
   const severityMap: Record<string, string> = {
-    CRITICAL: '🔴 Crítico',
-    HIGH: '🟠 Alto',
-    MEDIUM: '🟡 Medio',
-    LOW: '🟢 Bajo',
-    INFO: '🔵 Informativo',
+    CRITICAL: 'Crítica',
+    HIGH: 'Alta',
+    MEDIUM: 'Media',
+    LOW: 'Baja',
+    INFO: 'Informativa',
   }
   return severityMap[severity] || severity
 }
