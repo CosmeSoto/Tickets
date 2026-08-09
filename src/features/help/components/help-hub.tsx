@@ -318,7 +318,7 @@ export function HelpHub() {
             Al contactar, envía solo la información necesaria para atender tu caso. El tratamiento de
             datos personales se rige por la{' '}
             <Link
-              href={config?.privacyUrl || '/privacidad'}
+              href={config?.privacyUrl || '/help/privacy'}
               className='underline underline-offset-2'
               target='_blank'
               rel='noopener noreferrer'

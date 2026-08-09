@@ -417,7 +417,7 @@ export default function ContactSupportPage() {
                   <p className='text-xs text-muted-foreground pt-2 border-t leading-relaxed'>
                     Minimiza datos personales en tu mensaje. Consulta la{' '}
                     <a
-                      href={config.privacyUrl || '/privacidad'}
+                      href={config.privacyUrl || '/help/privacy'}
                       className='underline underline-offset-2'
                       target='_blank'
                       rel='noopener noreferrer'

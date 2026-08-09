@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
       statusPageUrl: config.statusPageUrl || null,
       bugReportEnabled: config.bugReportEnabled,
       feedbackEnabled: config.feedbackEnabled,
-      privacyUrl: '/privacidad',
+      privacyUrl: '/help/privacy',
       termsUrl: '/help/terms',
     }
 

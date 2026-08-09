@@ -4,16 +4,20 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { PublicPageLayout } from '@/components/auth/auth-layout'
-import { ArrowLeft, Shield } from 'lucide-react'
+import { LegalDocumentBackButton } from '@/features/help/components/legal-document-back-button'
+import { Shield } from 'lucide-react'
 
-interface PrivacyContact {
+interface OrgContact {
   companyName?: string
   supportEmail?: string | null
-  companyAddress?: string | null
 }
 
+/**
+ * Política de Privacidad alineada a LOPD Ecuador y al uso real del sistema
+ * (tickets, inventario, rondas, documentos, credenciales, auditoría, notificaciones).
+ */
 export default function PrivacyPage() {
-  const [contact, setContact] = useState<PrivacyContact>({})
+  const [contact, setContact] = useState<OrgContact>({})
 
   useEffect(() => {
     fetch('/api/config/help')
@@ -34,12 +38,7 @@ export default function PrivacyPage() {
 
   return (
     <PublicPageLayout>
-      <Button variant='outline' size='sm' asChild>
-        <Link href='/login'>
-          <ArrowLeft className='h-4 w-4 mr-2' />
-          Volver al inicio de sesión
-        </Link>
-      </Button>
+      <LegalDocumentBackButton />
 
       <div className='bg-card border border-border rounded-2xl p-8 space-y-6'>
         <div className='flex items-center gap-3 pb-4 border-b border-border'>
@@ -47,132 +46,185 @@ export default function PrivacyPage() {
           <h1 className='text-2xl font-semibold text-foreground'>Política de Privacidad</h1>
         </div>
 
+        <p className='text-xs text-muted-foreground'>
+          Esta política describe el tratamiento de datos personales en el sistema de gestión de
+          operaciones ({orgName}), de conformidad con la{' '}
+          <strong className='text-foreground'>
+            Ley Orgánica de Protección de Datos Personales (LOPD) de la República del Ecuador
+          </strong>{' '}
+          y su normativa aplicable.
+        </p>
+
         <div className='space-y-6 text-sm text-muted-foreground'>
           <section className='space-y-2'>
             <h2 className='text-base font-semibold text-foreground'>
-              1. Identidad del Responsable del Tratamiento
+              1. Responsable del tratamiento
             </h2>
             <p>
-              <strong>Organización:</strong> {orgName}
+              <strong className='text-foreground'>Organización:</strong> {orgName}
             </p>
             {supportEmail && (
               <p>
-                <strong>Email de contacto:</strong> {supportEmail}
+                <strong className='text-foreground'>Canal de contacto (privacidad/soporte):</strong>{' '}
+                {supportEmail}
               </p>
             )}
             <p>
-              En cumplimiento con la{' '}
-              <strong>Ley Orgánica de Protección de Datos Personales (LOPD) del Ecuador</strong>,
-              somos responsables del tratamiento de sus datos personales en el uso de este sistema.
+              El responsable determina las finalidades y medios del tratamiento de los datos
+              personales tratados a través de esta plataforma.
             </p>
           </section>
 
           <section className='space-y-2'>
             <h2 className='text-base font-semibold text-foreground'>
-              2. Información que Recopilamos
+              2. Datos personales que tratamos
             </h2>
-            <p>Podemos tratar, según el módulo habilitado:</p>
-            <ul className='list-disc list-inside space-y-1 ml-2'>
-              <li>Datos de cuenta: nombre, correo, rol y preferencias de notificación</li>
-              <li>Contenido operativo: tickets, comentarios y adjuntos que usted envíe</li>
-              <li>Inventario/rondas/documentos: solo si su organización activa esos módulos</li>
-              <li>Registros técnicos de seguridad y auditoría de acciones relevantes</li>
-            </ul>
             <p>
-              Aplicamos el principio de minimización: no pedimos ni mostramos más datos de los
-              necesarios para la finalidad del servicio.
+              Aplicamos <strong className='text-foreground'>minimización</strong>: solo lo necesario
+              según módulos habilitados y el rol del usuario. En general:
+            </p>
+            <ul className='list-disc list-inside space-y-1 ml-2'>
+              <li>
+                <strong className='text-foreground'>Cuenta:</strong> nombre, correo electrónico, rol,
+                familia/área, preferencias de notificación y datos de autenticación.
+              </li>
+              <li>
+                <strong className='text-foreground'>Tickets / soporte:</strong> títulos, descripciones,
+                categorías, comentarios y archivos que usted o el personal carguen.
+              </li>
+              <li>
+                <strong className='text-foreground'>Inventario:</strong> datos de activos asignados,
+                mantenimientos, actas, contratos/proveedores vinculados a la operación (según
+                permisos).
+              </li>
+              <li>
+                <strong className='text-foreground'>Rondas:</strong> agenda, checkpoints e incidentes
+                reportados.
+              </li>
+              <li>
+                <strong className='text-foreground'>Documentos / formularios y noticias:</strong>{' '}
+                contenidos y respuestas asociados a su área, si el módulo está activo.
+              </li>
+              <li>
+                <strong className='text-foreground'>Credenciales:</strong> metadatos de entradas; los
+                secretos se almacenan cifrados y el acceso está restringido y auditado.
+              </li>
+              <li>
+                <strong className='text-foreground'>Seguridad y auditoría:</strong> registros de
+                acciones relevantes (quién, cuándo, qué recurso) para trazabilidad y prevención de
+                abuso.
+              </li>
+            </ul>
+          </section>
+
+          <section className='space-y-2'>
+            <h2 className='text-base font-semibold text-foreground'>3. Finalidades</h2>
+            <ul className='list-disc list-inside space-y-1 ml-2'>
+              <li>Autenticar usuarios y aplicar control de acceso por rol y módulo</li>
+              <li>Prestar soporte, inventario, rondas y demás funcionalidades contratadas</li>
+              <li>Enviar notificaciones in-app y por correo según preferencias configuradas</li>
+              <li>Mantener seguridad, continuidad operativa y cumplimiento de obligaciones legales</li>
+              <li>Atender solicitudes de derechos ARCO y comunicaciones de soporte</li>
+            </ul>
+          </section>
+
+          <section className='space-y-2'>
+            <h2 className='text-base font-semibold text-foreground'>4. Base de legitimación</h2>
+            <p>El tratamiento se sustenta, según el caso, en:</p>
+            <ul className='list-disc list-inside space-y-1 ml-2'>
+              <li>Ejecución de la relación laboral/contractual o prestación del servicio</li>
+              <li>Cumplimiento de obligaciones legales aplicables en Ecuador</li>
+              <li>
+                Interés legítimo del responsable en seguridad, auditoría y continuidad del servicio,
+                respetando derechos de los titulares
+              </li>
+              <li>Consentimiento, cuando la normativa lo exija para un tratamiento concreto</li>
+            </ul>
+          </section>
+
+          <section className='space-y-2'>
+            <h2 className='text-base font-semibold text-foreground'>
+              5. Destinatarios y acceso interno
+            </h2>
+            <p>
+              No vendemos datos personales. El acceso interno está limitado por rol (cliente,
+              técnico, administrador) y por módulos/familias habilitados. Personal autorizado solo
+              ve lo necesario para su función. Proveedores tecnológicos (p. ej. correo o
+              infraestructura) pueden tratar datos como encargados, bajo instrucciones y medidas de
+              seguridad adecuadas.
             </p>
           </section>
 
           <section className='space-y-2'>
-            <h2 className='text-base font-semibold text-foreground'>3. Finalidades del Tratamiento</h2>
-            <ul className='list-disc list-inside space-y-1 ml-2'>
-              <li>Autenticación, autorización y prestación del servicio solicitado</li>
-              <li>Gestión de soporte, inventario, rondas u otros módulos contratados</li>
-              <li>Notificaciones in-app y por correo según sus preferencias</li>
-              <li>Seguridad, prevención de abuso y cumplimiento de obligaciones legales</li>
-            </ul>
-          </section>
-
-          <section className='space-y-2'>
-            <h2 className='text-base font-semibold text-foreground'>4. Base Legítima</h2>
+            <h2 className='text-base font-semibold text-foreground'>6. Derechos del titular</h2>
             <p>
-              El tratamiento se fundamenta en la ejecución del servicio, el cumplimiento de
-              obligaciones legales y, cuando corresponda, el consentimiento o el interés legítimo de
-              la organización para la seguridad y continuidad operativa.
+              Conforme a la LOPD, usted puede solicitar acceso, rectificación, actualización,
+              eliminación, oposición, suspensión y portabilidad cuando proceda, así como no ser
+              objeto de decisiones basadas únicamente en valoraciones automatizadas en los términos
+              de la ley.
+            </p>
+            <p>
+              Para ejercerlos, contacte al responsable por el correo de soporte configurado o
+              mediante un ticket interno, acreditando su identidad. También puede presentar una
+              reclamación ante la{' '}
+              <strong className='text-foreground'>
+                Autoridad de Protección de Datos Personales del Ecuador
+              </strong>
+              .
             </p>
           </section>
 
           <section className='space-y-2'>
-            <h2 className='text-base font-semibold text-foreground'>5. Destinatarios y Acceso</h2>
+            <h2 className='text-base font-semibold text-foreground'>7. Conservación</h2>
             <p>
-              El acceso a datos personales está restringido por rol y módulos habilitados.
-              Administradores y personal técnico autorizados solo ven lo necesario para su función.
-              Secretos de la bóveda de credenciales se almacenan cifrados.
-            </p>
-          </section>
-
-          <section className='space-y-2'>
-            <h2 className='text-base font-semibold text-foreground'>6. Derechos del Titular</h2>
-            <p>De acuerdo con la LOPD ecuatoriana, usted tiene derecho a:</p>
-            <ul className='list-disc list-inside space-y-1 ml-2'>
-              <li>Acceso, rectificación, actualización y eliminación cuando proceda</li>
-              <li>Oposición y limitación del tratamiento en los casos previstos</li>
-              <li>Portabilidad cuando sea técnicamente aplicable</li>
-            </ul>
-            <p>
-              Para ejercerlos, contacte al responsable mediante el correo de soporte configurado o
-              un ticket interno, identificándose adecuadamente.
+              Conservamos los datos el tiempo necesario para las finalidades descritas, plazos de
+              auditoría/seguridad y obligaciones legales o contractuales. Luego se eliminan o
+              anonimizan cuando corresponda.
             </p>
           </section>
 
           <section className='space-y-2'>
             <h2 className='text-base font-semibold text-foreground'>
-              7. Plazo de Conservación de Datos
+              8. Transferencias internacionales
             </h2>
             <p>
-              Conservaremos sus datos personales durante el tiempo necesario para cumplir con los
-              fines para los que se recopilaron y con las obligaciones legales aplicables en Ecuador.
+              Preferimos el tratamiento en entornos bajo control de la organización. Si un servicio
+              implica transferencia fuera del Ecuador, se adoptarán salvaguardas adecuadas conforme
+              a la LOPD.
             </p>
           </section>
 
           <section className='space-y-2'>
-            <h2 className='text-base font-semibold text-foreground'>
-              8. Transferencias Internacionales de Datos
-            </h2>
-            <p>
-              No realizamos transferencias internacionales de datos personales fuera del Ecuador,
-              excepto cuando sea necesario para la prestación del servicio y siempre que se
-              garantice un nivel adecuado de protección de datos.
-            </p>
-          </section>
-
-          <section className='space-y-2'>
-            <h2 className='text-base font-semibold text-foreground'>9. Contacto</h2>
-            <p>
-              Si tiene preguntas sobre esta política o desea ejercer sus derechos, puede
-              contactarnos a través de:
-            </p>
+            <h2 className='text-base font-semibold text-foreground'>9. Medidas de seguridad</h2>
             <ul className='list-disc list-inside space-y-1 ml-2'>
-              <li>El sistema de tickets de soporte</li>
-              {supportEmail ? (
-                <li>Email: {supportEmail}</li>
-              ) : (
-                <li>El correo de soporte publicado por su organización en el Centro de Ayuda</li>
-              )}
+              <li>Control de acceso por rol y módulos</li>
+              <li>Cifrado de secretos en la bóveda de credenciales</li>
+              <li>Auditoría de acciones sensibles</li>
+              <li>Sesiones autenticadas y buenas prácticas de contraseña/recuperación</li>
             </ul>
-            <p>
-              También tiene derecho a presentar una queja ante la{' '}
-              <strong>Autoridad de Protección de Datos Personales del Ecuador</strong> si considera
-              que sus derechos han sido vulnerados.
-            </p>
+          </section>
+
+          <section className='space-y-2'>
+            <h2 className='text-base font-semibold text-foreground'>10. Contacto</h2>
+            <ul className='list-disc list-inside space-y-1 ml-2'>
+              <li>
+                <Link href='/help/center' className='underline underline-offset-2'>
+                  Centro de Ayuda
+                </Link>{' '}
+                / tickets de soporte
+              </li>
+              {supportEmail ? <li>Email: {supportEmail}</li> : null}
+            </ul>
           </section>
         </div>
 
-        <div className='pt-4 border-t border-border'>
+        <div className='pt-4 border-t border-border flex flex-wrap gap-3 items-center justify-between'>
           <p className='text-xs text-muted-foreground'>
-            Última actualización: {new Date().toLocaleDateString('es-ES')}
+            Última actualización: {new Date().toLocaleDateString('es-EC')}
           </p>
+          <Button variant='link' size='sm' className='h-auto p-0' asChild>
+            <Link href='/help/terms'>Ver Términos y Condiciones</Link>
+          </Button>
         </div>
       </div>
     </PublicPageLayout>
