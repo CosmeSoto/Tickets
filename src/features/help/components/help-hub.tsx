@@ -61,7 +61,17 @@ function knowledgeHrefForRole(role?: string): string {
 
 export function HelpHub() {
   const { data: session } = useSession()
-  const { modules, loading: modulesLoading } = useUserModules()
+  const {
+    tickets,
+    inventory,
+    patrols,
+    forms,
+    credentials,
+    canRequestAssets,
+    canAccessKnowledge,
+    canManageInventory,
+    loading: modulesLoading,
+  } = useUserModules()
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedModule, setSelectedModule] = useState<HelpModuleId | 'all'>('all')
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -81,21 +91,26 @@ export function HelpHub() {
       .catch(() => {})
   }, [])
 
-  const viewerRole = resolveHelpViewerRole(
-    session?.user?.role,
-    modules.canManageInventory
-  )
+  const viewerRole = resolveHelpViewerRole(session?.user?.role, !!canManageInventory)
 
   const flags: HelpModuleFlags = useMemo(
     () => ({
-      tickets: modules.tickets,
-      inventory: modules.inventory || modules.canRequestAssets,
-      patrols: modules.patrols,
-      forms: modules.forms,
-      credentials: modules.credentials,
-      knowledge: modules.tickets && modules.canAccessKnowledge,
+      tickets: !!tickets,
+      inventory: !!inventory || !!canRequestAssets,
+      patrols: !!patrols,
+      forms: !!forms,
+      credentials: !!credentials,
+      knowledge: !!tickets && !!canAccessKnowledge,
     }),
-    [modules]
+    [
+      tickets,
+      inventory,
+      canRequestAssets,
+      patrols,
+      forms,
+      credentials,
+      canAccessKnowledge,
+    ]
   )
 
   const visibleFaqs = useMemo(
