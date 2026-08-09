@@ -12,6 +12,7 @@ import { authOptions } from '@/lib/auth'
 import { z } from 'zod'
 import { PatrolIncidentService } from '@/lib/services/patrol-incident.service'
 import { getPatrolAccessibleFamilyIds } from '@/lib/patrol/patrol-access'
+import { hasPatrolModuleAccess } from '@/lib/patrol/patrol-helpers'
 
 // ── Esquema de validación POST ────────────────────────────────────────────────
 
@@ -48,10 +49,10 @@ export async function GET(request: NextRequest) {
     const userRole = session.user.role
     const isSuperAdmin = (session.user as any).isSuperAdmin === true
 
-    // Determinar modo: agente vs admin
+    // Determinar modo: agente vs admin/supervisor (TECH con módulo habilitado)
     const isAdminMode =
       userRole === 'ADMIN' ||
-      (userRole === 'TECHNICIAN' && (await hasPatrolSupervisorAccess(session.user.id)))
+      (userRole === 'TECHNICIAN' && (await hasPatrolModuleAccess(session.user.id, userRole)))
 
     const filters: any = {
       page,
@@ -183,16 +184,4 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-/**
- * Verifica si un TECHNICIAN tiene acceso como supervisor de patrullas
- * (tiene asignaciones de familia para el módulo de patrullas).
- */
-async function hasPatrolSupervisorAccess(userId: string): Promise<boolean> {
-  const { getUserModuleFamilyGrantIds } = await import('@/lib/auth/user-family-access')
-  const grants = await getUserModuleFamilyGrantIds(userId, 'patrols')
-  return grants.length > 0
 }

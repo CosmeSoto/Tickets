@@ -335,6 +335,21 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(new URL(dashboardForRole(userRole), request.url))
     }
 
+    // Rondas (agente): TECH/CLIENT requieren patrolsEnabled. ADMIN puede monitorear.
+    if (
+      (path.startsWith('/patrol') || path.startsWith('/patrol-checkpoint-display')) &&
+      userRole !== 'ADMIN' &&
+      (token as any).patrolsEnabled !== true
+    ) {
+      ApplicationLogger.securityEvent(
+        'insufficient_privileges',
+        'medium',
+        { userId, userRole, requiredCapability: 'patrolsEnabled', path, ip },
+        { requestId }
+      )
+      return NextResponse.redirect(new URL(dashboardForRole(userRole), request.url))
+    }
+
     // Rutas de inventario:
     // - ADMIN: acceso total
     // - TECHNICIAN: acceso total (granularidad en API routes)

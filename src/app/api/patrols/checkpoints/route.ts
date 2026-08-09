@@ -54,6 +54,9 @@ export async function GET(request: NextRequest) {
     const session = await getServerSession(authOptions)
     if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
+    const denied = await checkPatrolModuleAccess(session.user.id, session.user.role)
+    if (denied) return denied
+
     const { searchParams } = new URL(request.url)
     const familyId = searchParams.get('familyId')
     const search = searchParams.get('search') ?? ''

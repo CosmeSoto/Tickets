@@ -19,6 +19,7 @@ import {
   canDeletePatrolResource,
   canSoftDeletePatrolResource,
 } from '@/lib/patrol/patrol-access'
+import { checkPatrolModuleAccess } from '@/lib/patrol/patrol-helpers'
 
 const SAFE_CHECKPOINT_SELECT = {
   id: true,
@@ -66,6 +67,9 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     const session = await getServerSession(authOptions)
     if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
+    const denied = await checkPatrolModuleAccess(session.user.id, session.user.role)
+    if (denied) return denied
+
     const { id } = await params
     const checkpoint = await prisma.patrol_checkpoints.findUnique({
       where: { id },
@@ -103,6 +107,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (!['ADMIN', 'TECHNICIAN'].includes(session.user.role)) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
     }
+
+    const denied = await checkPatrolModuleAccess(session.user.id, session.user.role)
+    if (denied) return denied
 
     const { id } = await params
     const existing = await prisma.patrol_checkpoints.findUnique({
@@ -192,6 +199,9 @@ export async function DELETE(
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+
+    const denied = await checkPatrolModuleAccess(session.user.id, session.user.role)
+    if (denied) return denied
 
     const { id } = await params
     const { searchParams } = new URL(request.url)

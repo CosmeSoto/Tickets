@@ -18,6 +18,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { getPatrolAccessibleFamilyIds } from '@/lib/patrol/patrol-access'
+import { checkPatrolModuleAccess } from '@/lib/patrol/patrol-helpers'
 
 // Acceso al modelo patrol_incidents hasta regenerar el Prisma Client
 const db = prisma as any
@@ -33,10 +34,13 @@ export async function GET(request: NextRequest) {
     const userRole = session.user.role
     const isSuperAdmin = (session.user as any).isSuperAdmin === true
 
-    // Require ADMIN or TECHNICIAN with patrol family access
+    // Require ADMIN or TECHNICIAN with patrol module access
     if (userRole !== 'ADMIN' && userRole !== 'TECHNICIAN') {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
     }
+
+    const denied = await checkPatrolModuleAccess(session.user.id, userRole)
+    if (denied) return denied
 
     // For TECHNICIAN, verify patrol family access
     if (userRole === 'TECHNICIAN') {

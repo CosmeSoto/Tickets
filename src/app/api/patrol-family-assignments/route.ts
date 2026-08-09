@@ -147,6 +147,19 @@ export async function DELETE(request: NextRequest) {
     if (!userId || !familyId)
       return NextResponse.json({ error: 'userId y familyId son requeridos' }, { status: 400 })
 
+    const viewer = await prisma.users.findUnique({
+      where: { id: session.user.id },
+      select: { isSuperAdmin: true },
+    })
+
+    if (!viewer?.isSuperAdmin) {
+      const { getUserFamilyScope } = await import('@/lib/auth/admin-scope')
+      const scope = await getUserFamilyScope(session.user.id, 'ADMIN', false)
+      if (scope.familyIds && !scope.familyIds.includes(familyId)) {
+        return NextResponse.json({ error: 'No tienes acceso a esta familia' }, { status: 403 })
+      }
+    }
+
     const target = await prisma.users.findUnique({
       where: { id: userId },
       select: { role: true },

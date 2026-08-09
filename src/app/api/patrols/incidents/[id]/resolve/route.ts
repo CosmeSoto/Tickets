@@ -8,6 +8,7 @@ import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { PatrolIncidentService } from '@/lib/services/patrol-incident.service'
 import { checkPatrolFamilyAccess } from '@/lib/patrol/patrol-access'
+import { checkPatrolModuleAccess } from '@/lib/patrol/patrol-helpers'
 
 // Acceso al modelo patrol_incidents hasta regenerar el Prisma Client
 const db = prisma as any
@@ -23,6 +24,9 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     if (session.user.role !== 'ADMIN' && session.user.role !== 'TECHNICIAN') {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
     }
+
+    const denied = await checkPatrolModuleAccess(session.user.id, session.user.role)
+    if (denied) return denied
 
     const { id } = await params
 

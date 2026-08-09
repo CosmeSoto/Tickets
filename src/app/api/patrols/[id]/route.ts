@@ -14,7 +14,7 @@ import { NotificationService } from '@/lib/services/notification-service'
 import { calculateCompletionPercentage } from '@/lib/patrol/patrol-completion'
 import { applyPatrolClose, computePatrolCloseFromProgress } from '@/lib/patrol/patrol-finalize'
 import { NotificationType } from '@prisma/client'
-import { getPatrolSupervisors } from '@/lib/patrol/patrol-helpers'
+import { getPatrolSupervisors, checkPatrolModuleAccess } from '@/lib/patrol/patrol-helpers'
 import { checkPatrolFamilyAccess } from '@/lib/patrol/patrol-access'
 
 /** Admin/técnico: patrullas solo del área (familia) asignada. */
@@ -278,7 +278,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       return NextResponse.json({ success: true, status: 'MISSED' })
     }
 
-    // Force-close: ADMIN/TECH con acceso — cierra IN_PROGRESS atascada
+    // Force-close: ADMIN/TECH con módulo + acceso — cierra IN_PROGRESS atascada
     if (data.action === 'force_close') {
       if (session.user.role !== 'ADMIN' && session.user.role !== 'TECHNICIAN') {
         return NextResponse.json(
@@ -286,6 +286,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           { status: 403 }
         )
       }
+
+      const denied = await checkPatrolModuleAccess(session.user.id, session.user.role)
+      if (denied) return denied
 
       const ok = await canViewPatrolAsStaff(
         { id: session.user.id, role: session.user.role, isSuperAdmin: sessionUser.isSuperAdmin },

@@ -16,6 +16,7 @@ import {
   canDeletePatrolResource,
   canSoftDeletePatrolResource,
 } from '@/lib/patrol/patrol-access'
+import { checkPatrolModuleAccess } from '@/lib/patrol/patrol-helpers'
 import { NotificationService } from '@/lib/services/notification-service'
 import { NotificationType } from '@prisma/client'
 import { PatrolSchedulerService } from '@/lib/services/patrol-scheduler.service'
@@ -45,6 +46,9 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+
+    const denied = await checkPatrolModuleAccess(session.user.id, session.user.role)
+    if (denied) return denied
 
     const { id } = await params
     const schedule = await prisma.patrol_schedules.findUnique({
@@ -98,6 +102,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (!['ADMIN', 'TECHNICIAN'].includes(session.user.role)) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
     }
+
+    const denied = await checkPatrolModuleAccess(session.user.id, session.user.role)
+    if (denied) return denied
 
     const { id } = await params
     const existing = await prisma.patrol_schedules.findUnique({
@@ -321,6 +328,9 @@ export async function DELETE(
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+
+    const denied = await checkPatrolModuleAccess(session.user.id, session.user.role)
+    if (denied) return denied
 
     const { id } = await params
     const { searchParams } = new URL(request.url)

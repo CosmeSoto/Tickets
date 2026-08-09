@@ -11,6 +11,7 @@ import { z } from 'zod'
 import prisma from '@/lib/prisma'
 import { PatrolIncidentService } from '@/lib/services/patrol-incident.service'
 import { checkPatrolFamilyAccess } from '@/lib/patrol/patrol-access'
+import { checkPatrolModuleAccess } from '@/lib/patrol/patrol-helpers'
 
 const updateIncidentSchema = z.object({
   description: z.string().min(10, 'La descripción debe tener al menos 10 caracteres').optional(),
@@ -52,6 +53,9 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       }
 
       if (session.user.role === 'ADMIN' || session.user.role === 'TECHNICIAN') {
+        const denied = await checkPatrolModuleAccess(session.user.id, session.user.role)
+        if (denied) return denied
+
         const hasAccess = await checkPatrolFamilyAccess(
           session.user.id,
           familyId,
