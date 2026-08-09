@@ -4,7 +4,6 @@ import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { AuditExportService } from '@/lib/services/audit-export-service'
 import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
-import { randomUUID } from 'crypto'
 
 export const maxDuration = 300
 
@@ -81,12 +80,21 @@ export async function POST(request: NextRequest) {
     })
 
     // Meta-auditoría: quién exportó qué (LOPDP / trazabilidad)
+    const clientIp =
+      request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+      request.headers.get('x-real-ip') ||
+      undefined
+    const userAgent = request.headers.get('user-agent') || undefined
+
     try {
       await AuditServiceComplete.log({
         action: 'AUDIT_LOGS_EXPORTED',
         entityType: 'system',
-        entityId: randomUUID(),
+        entityId: 'audit-export',
         userId: session.user.id,
+        request,
+        ipAddress: clientIp,
+        userAgent,
         details: {
           descripcion: `Exportación de auditoría (${format}) — ${logs.length} registros`,
           format,

@@ -61,7 +61,15 @@ function redactChangesText(text: string): string {
     .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, m => maskEmail(m))
 }
 
-function deviceLabel(ua: string): string {
+function deviceLabel(ua: string, contextDevice?: string): string {
+  if (contextDevice && contextDevice !== 'Unknown') {
+    const map: Record<string, string> = {
+      Desktop: 'Escritorio',
+      Mobile: 'Móvil',
+      Tablet: 'Tablet',
+    }
+    return map[contextDevice] || contextDevice
+  }
   const u = (ua || '').toLowerCase()
   if (u.includes('mobile') || u.includes('android') || u.includes('iphone')) return 'Móvil'
   if (u.includes('tablet') || u.includes('ipad')) return 'Tablet'
@@ -70,13 +78,44 @@ function deviceLabel(ua: string): string {
   return ua ? 'Otro' : ''
 }
 
-function browserLabel(ua: string): string {
+function browserLabel(ua: string, contextBrowser?: string): string {
+  if (contextBrowser && contextBrowser !== 'Unknown') return contextBrowser
   const u = (ua || '').toLowerCase()
   if (u.includes('edg/')) return 'Edge'
   if (u.includes('chrome')) return 'Chrome'
   if (u.includes('firefox')) return 'Firefox'
   if (u.includes('safari')) return 'Safari'
   return ''
+}
+
+/** Texto legible del objeto sobre el que se actuó (sin UUID crudo). */
+function buildAffectedObjectLabel(row: any): string {
+  const d = row.details || {}
+  if (d.ticketNumber) return `Ticket #${d.ticketNumber}`
+  if (d.ticketTitle) return `Ticket: ${d.ticketTitle}`
+  if (d.targetUserName) return `Usuario: ${d.targetUserName}`
+  if (d.userName && row.entityType === 'user') return `Usuario: ${d.userName}`
+  if (d.categoryName) return `Categoría: ${d.categoryName}`
+  if (d.familyName) return `Familia: ${d.familyName}`
+  if (d.equipmentName || d.assetName) return `Activo: ${d.equipmentName || d.assetName}`
+  if (d.credentialName) return `Credencial: ${d.credentialName}`
+  if (typeof d.descripcion === 'string' && d.descripcion.trim()) {
+    // Para exportaciones / acciones de sistema: la descripción ya es clara
+    if (row.entityType === 'system' || String(row.action || '').includes('EXPORT')) {
+      return d.descripcion.length > 90 ? `${d.descripcion.slice(0, 87)}…` : d.descripcion
+    }
+  }
+  const typeLabel = translateEntityType(row.entityType || '')
+  if (!row.entityId) return typeLabel || '—'
+  // Último recurso: módulo + referencia corta (no el UUID completo)
+  return `${typeLabel || 'Objeto'} · ref. ${String(row.entityId).slice(0, 8)}`
+}
+
+/** Código corto del evento de auditoría (para soporte), no el UUID completo. */
+function buildEventCode(row: any): string {
+  const id = String(row.id || '')
+  if (!id) return ''
+  return `EVT-${id.slice(0, 8).toUpperCase()}`
 }
 
 function severityLabel(action: string): string {
@@ -138,8 +177,8 @@ export const AUDIT_COLUMN_CATALOG: AuditColumnMeta[] = [
   { key: 'rol', label: 'Rol', defaultVisible: true },
   { key: 'descripcion', label: 'Descripción', defaultVisible: true },
   { key: 'severity', label: 'Severidad', defaultVisible: false },
-  { key: 'entityId', label: 'ID del objeto afectado', defaultVisible: false },
-  { key: 'id', label: 'ID del evento (auditoría)', defaultVisible: false },
+  { key: 'entityId', label: 'Objeto afectado', defaultVisible: false },
+  { key: 'id', label: 'Código del evento', defaultVisible: false },
   { key: 'dispositivo', label: 'Dispositivo', defaultVisible: false },
   { key: 'navegador', label: 'Navegador', defaultVisible: false },
   // Sensibles (LOPDP) — off por defecto
@@ -185,7 +224,7 @@ export function getAuditExportAccessor(
     case 'entityType':
       return (row: any) => translateEntityType(row.entityType)
     case 'entityId':
-      return (row: any) => row.entityId || ''
+      return (row: any) => buildAffectedObjectLabel(row)
     case 'usuario':
       return (row: any) => row.users?.name || row.userEmail || 'Sistema'
     case 'email':
@@ -211,13 +250,20 @@ export function getAuditExportAccessor(
         return maskPii ? maskIp(String(ip)) : String(ip)
       }
     case 'dispositivo':
-      return (row: any) => deviceLabel(row.userAgent || '')
+      return (row: any) =>
+        deviceLabel(row.userAgent || '', row.details?.context?.deviceType) || 'No registrado'
     case 'navegador':
-      return (row: any) => browserLabel(row.userAgent || '')
+      return (row: any) => {
+        const fromCtx = row.details?.context?.browser
+        const version = row.details?.context?.browserVersion
+        const label = browserLabel(row.userAgent || '', fromCtx)
+        if (label && version) return `${label} ${version}`
+        return label || 'No registrado'
+      }
     case 'userAgent':
       return (row: any) => (maskPii ? '[OCULTO]' : row.userAgent || '')
     case 'id':
-      return (row: any) => row.id || ''
+      return (row: any) => buildEventCode(row)
     default:
       return () => ''
   }
