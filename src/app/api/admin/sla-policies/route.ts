@@ -3,10 +3,11 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
+import { buildSlaPolicyListWhere, assertCanMutateSlaPolicy } from '@/lib/tickets/sla-policy-access'
 
 /**
  * GET /api/admin/sla-policies
- * Obtener todas las políticas de SLA
+ * Obtener políticas de SLA (scoped por familia para Admin Normal)
  */
 export async function GET(request: NextRequest) {
   try {
@@ -21,29 +22,25 @@ export async function GET(request: NextRequest) {
     const priority = searchParams.get('priority')
     const categoryId = searchParams.get('categoryId')
 
-    const where: any = {}
+    const base: Record<string, unknown> = {}
 
     if (isActive !== null) {
-      where.isActive = isActive === 'true'
+      base.isActive = isActive === 'true'
     }
 
     if (priority) {
-      where.priority = priority
+      base.priority = priority
     }
 
     if (categoryId) {
-      where.categoryId = categoryId
+      base.categoryId = categoryId
     }
 
-    // Admin Normal: filtrar SLA policies por categorías dentro de su scope de tickets
-    const isSuperAdmin = (session.user as any).isSuperAdmin === true
-    if (!isSuperAdmin) {
-      const { getUserFamilyScope } = await import('@/lib/auth/admin-scope')
-      const scope = await getUserFamilyScope(session.user.id, 'ADMIN', false)
-      if (scope.familyIds && scope.familyIds.length > 0) {
-        where.category = { departments: { familyId: { in: scope.familyIds } } }
-      }
-    }
+    const isSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
+    const where = await buildSlaPolicyListWhere(
+      { id: session.user.id, role: session.user.role, isSuperAdmin },
+      base
+    )
 
     const policies = await prisma.sla_policies.findMany({
       where,
@@ -62,12 +59,7 @@ export async function GET(request: NextRequest) {
           },
         },
       },
-      orderBy: [
-        { isActive: 'desc' },
-        {
-          priority: 'asc', // URGENT, HIGH, MEDIUM, LOW
-        },
-      ],
+      orderBy: [{ isActive: 'desc' }, { priority: 'asc' }],
     })
 
     return NextResponse.json({
@@ -100,8 +92,8 @@ export async function POST(request: NextRequest) {
     }
 
     const data = await request.json()
+    const isSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
 
-    // Validaciones
     if (!data.name?.trim()) {
       return NextResponse.json(
         { success: false, message: 'El nombre es requerido' },
@@ -134,11 +126,17 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Verificar si ya existe una política para esta prioridad y categoría
+    const categoryId = data.categoryId || null
+    const denied = await assertCanMutateSlaPolicy(
+      { id: session.user.id, role: session.user.role, isSuperAdmin },
+      { id: 'new', categoryId }
+    )
+    if (denied) return denied
+
     const existing = await prisma.sla_policies.findFirst({
       where: {
         priority: data.priority,
-        categoryId: data.categoryId || null,
+        categoryId,
         isActive: true,
       },
     })
@@ -149,19 +147,18 @@ export async function POST(request: NextRequest) {
           success: false,
           message:
             'Ya existe una política activa para esta prioridad' +
-            (data.categoryId ? ' y categoría' : ''),
+            (categoryId ? ' y categoría' : ''),
         },
         { status: 400 }
       )
     }
 
-    // Crear política
     const policy = await prisma.sla_policies.create({
       data: {
         id: randomUUID(),
         name: data.name,
         description: data.description || null,
-        categoryId: data.categoryId || null,
+        categoryId,
         priority: data.priority,
         responseTimeHours: parseInt(data.responseTimeHours),
         resolutionTimeHours: parseInt(data.resolutionTimeHours),

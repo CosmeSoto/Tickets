@@ -71,7 +71,27 @@ export async function DELETE(
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    await FileService.deleteFile((await params).id, session.user.id)
+    const attachmentId = (await params).id
+    const attachment = await prisma.attachments.findUnique({
+      where: { id: attachmentId },
+      select: { ticketId: true, uploadedBy: true },
+    })
+    if (!attachment) {
+      return NextResponse.json({ error: 'Archivo no encontrado' }, { status: 404 })
+    }
+
+    const accessUser = toTicketAccessUser(session.user)
+    try {
+      const isUploader = attachment.uploadedBy === session.user.id
+      await assertTicketAccessById(accessUser, attachment.ticketId, isUploader ? 'comment' : 'write')
+    } catch (err) {
+      if (err instanceof TicketAccessError) {
+        return NextResponse.json({ error: err.message }, { status: err.statusCode })
+      }
+      throw err
+    }
+
+    await FileService.deleteFile(attachmentId, session.user.id)
     return NextResponse.json({ message: 'Archivo eliminado exitosamente' })
   } catch (error) {
     console.error('Error al eliminar archivo:', error)

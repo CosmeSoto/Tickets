@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { SLAService } from '@/lib/services/sla-service'
+import { runSLAMonitor } from '@/lib/cron/sla-monitor'
 import { checkTicketVolumeAlerts } from '@/lib/cron/check-ticket-volume-alerts'
 
 /**
- * Cron Job: Verificar deadlines de SLA próximos a vencer
+ * Cron Job: Monitor SLA (avisos, violaciones, métricas) + alertas de volumen
  * Ejecutar cada hora
  */
 export async function GET(request: NextRequest) {
@@ -22,27 +22,26 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 401 })
     }
 
-    console.log('[CRON] Iniciando verificación de deadlines SLA...')
+    console.log('[CRON] Iniciando monitoreo SLA...')
 
-    // Verificar tickets próximos a vencer
-    await SLAService.checkUpcomingDeadlines()
+    await runSLAMonitor()
 
     const volumeResult = await checkTicketVolumeAlerts()
 
-    console.log('[CRON] Verificación de deadlines SLA completada')
+    console.log('[CRON] Monitoreo SLA completado')
 
     return NextResponse.json({
       success: true,
-      message: 'Verificación de deadlines SLA completada',
+      message: 'Monitoreo SLA completado',
       volumeAlertsSent: volumeResult.alertsSent,
       timestamp: new Date().toISOString(),
     })
   } catch (error) {
-    console.error('[CRON] Error verificando deadlines SLA:', error)
+    console.error('[CRON] Error en monitoreo SLA:', error)
     return NextResponse.json(
       {
         success: false,
-        message: 'Error verificando deadlines SLA',
+        message: 'Error en monitoreo SLA',
         error: error instanceof Error ? error.message : 'Error desconocido',
       },
       { status: 500 }

@@ -107,7 +107,7 @@ export function SLAPoliciesTab({ isSuperAdmin = false }: { isSuperAdmin?: boolea
         PRIORITIES.map((priority) => {
           const row = editRows[priority]
           if (!row?.id) return Promise.resolve({ success: true, skipped: true })
-          return fetch(`/api/admin/sla/policies/${row.id}`, {
+          return fetch(`/api/admin/sla-policies/${row.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

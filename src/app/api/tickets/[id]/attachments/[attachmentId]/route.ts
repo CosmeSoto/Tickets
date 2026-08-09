@@ -95,17 +95,20 @@ export async function DELETE(
       return NextResponse.json({ error: 'Archivo no encontrado' }, { status: 404 })
     }
 
-    // Solo el creador del archivo o un admin pueden eliminarlo
-    const isAuthorized = session.user.role === 'ADMIN' || attachment.uploadedBy === session.user.id
-
-    if (!isAuthorized) {
-      return NextResponse.json(
-        { error: 'No tienes permiso para eliminar este archivo' },
-        { status: 403 }
+    try {
+      const isUploader = attachment.uploadedBy === session.user.id
+      await assertTicketAccessById(
+        toTicketAccessUser(session.user),
+        ticketId,
+        isUploader ? 'comment' : 'write'
       )
+    } catch (err) {
+      if (err instanceof TicketAccessError) {
+        return NextResponse.json({ error: err.message }, { status: err.statusCode })
+      }
+      throw err
     }
 
-    // Eliminar el archivo
     await FileService.deleteFile(attachmentId, session.user.id)
 
     return NextResponse.json({ success: true, message: 'Archivo eliminado exitosamente' })
