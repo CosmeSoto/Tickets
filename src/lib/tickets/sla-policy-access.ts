@@ -24,6 +24,7 @@ export async function buildSlaPolicyListWhere(
   if (scope.familyIds && scope.familyIds.length > 0) {
     where.OR = [
       { categoryId: null }, // globales visibles en lectura
+      { category: { familyId: { in: scope.familyIds } } },
       { category: { departments: { familyId: { in: scope.familyIds } } } },
     ]
   } else {
@@ -59,9 +60,12 @@ export async function assertCanMutateSlaPolicy(
 
   const category = await prisma.categories.findUnique({
     where: { id: policy.categoryId },
-    select: { departments: { select: { familyId: true } } },
+    select: {
+      familyId: true,
+      departments: { select: { familyId: true } },
+    },
   })
-  const familyId = category?.departments?.familyId
+  const familyId = category?.familyId ?? category?.departments?.familyId
   if (!familyId) {
     return NextResponse.json(
       { success: false, message: 'Categoría de la política sin familia' },
