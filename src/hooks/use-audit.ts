@@ -80,55 +80,33 @@ export function useAudit() {
 
   const [columnOrder, setColumnOrder] = useState<string[]>(DEFAULT_AUDIT_COLUMN_ORDER)
   const [visibleColumns, setVisibleColumns] = useState<string[]>(DEFAULT_AUDIT_VISIBLE_COLUMNS)
-  const [includeSensitive, setIncludeSensitive] = useState(false)
+  /** Solo afecta JSON: por defecto incluye sensibles enmascarados */
+  const [includeSensitive, setIncludeSensitive] = useState(true)
   const [exporting, setExporting] = useState(false)
 
-  const handleIncludeSensitiveChange = useCallback((value: boolean) => {
-    setIncludeSensitive(value)
+  const tabularExportKeys = useCallback(() => {
+    return resolveAuditExportKeys(
+      columnOrder.filter(
+        k => visibleColumns.includes(k) && !(SENSITIVE_AUDIT_COLUMNS as string[]).includes(k)
+      ),
+      false
+    )
+  }, [columnOrder, visibleColumns])
 
-    setColumnOrder(prev => {
-      if (value) {
-        const missing = (SENSITIVE_AUDIT_COLUMNS as string[]).filter(k => !prev.includes(k))
-        return missing.length ? [...prev, ...missing] : prev
+  const jsonExportKeys = useCallback(
+    (sensitive: boolean) => {
+      if (sensitive) {
+        return resolveAuditExportKeys(DEFAULT_AUDIT_COLUMN_ORDER, true)
       }
-      return prev
-    })
-
-    setVisibleColumns(prev => {
-      const next = value
-        ? [...new Set([...prev, ...SENSITIVE_AUDIT_COLUMNS])]
-        : prev.filter(k => !(SENSITIVE_AUDIT_COLUMNS as string[]).includes(k))
-
-      try {
-        const raw = localStorage.getItem('audit-export-columns-v1')
-        const stored = raw ? (JSON.parse(raw) as { order?: string[] }) : {}
-        const orderBase =
-          stored.order?.length && Array.isArray(stored.order)
-            ? stored.order
-            : DEFAULT_AUDIT_COLUMN_ORDER
-        const order = value
-          ? [
-              ...orderBase,
-              ...(SENSITIVE_AUDIT_COLUMNS as string[]).filter(k => !orderBase.includes(k)),
-            ]
-          : orderBase
-        localStorage.setItem(
-          'audit-export-columns-v1',
-          JSON.stringify({ order, visible: next })
-        )
-      } catch {
-        /* ignore */
-      }
-      return next
-    })
-  }, [])
-
-  const exportKeys = useCallback(() => {
-    const ordered = columnOrder.filter(k => visibleColumns.includes(k))
-    // Si una columna visible no está en el orden (p. ej. sensibles recién activados), incluirla
-    const missing = visibleColumns.filter(k => !ordered.includes(k))
-    return resolveAuditExportKeys([...ordered, ...missing], includeSensitive)
-  }, [columnOrder, visibleColumns, includeSensitive])
+      return resolveAuditExportKeys(
+        columnOrder.filter(
+          k => visibleColumns.includes(k) && !(SENSITIVE_AUDIT_COLUMNS as string[]).includes(k)
+        ),
+        false
+      )
+    },
+    [columnOrder, visibleColumns]
+  )
 
   // ── Init filters from URL or localStorage ──
   useEffect(() => {
@@ -246,16 +224,27 @@ export function useAudit() {
     (
       format: 'csv' | 'json' | 'excel' | 'pdf',
       onSuccess: (message: string) => void,
-      onError: (error: string) => void
+      onError: (error: string) => void,
+      overrides?: {
+        includeSensitive?: boolean
+        maskPii?: boolean
+        columns?: string[]
+      }
     ) => {
+      const isJson = format === 'json'
+      const sensitive = overrides?.includeSensitive ?? (isJson ? includeSensitive : false)
+      const maskPii = overrides?.maskPii ?? true
+      const columns =
+        overrides?.columns ?? (isJson ? jsonExportKeys(sensitive) : tabularExportKeys())
+
       setExporting(true)
       void exportAuditReport(
         format,
         filters,
         {
-          columns: exportKeys(),
-          includeSensitive,
-          maskPii: true,
+          columns,
+          includeSensitive: sensitive,
+          maskPii,
         },
         msg => {
           setExporting(false)
@@ -267,7 +256,7 @@ export function useAudit() {
         }
       )
     },
-    [filters, exportKeys, includeSensitive]
+    [filters, includeSensitive, jsonExportKeys, tabularExportKeys]
   )
 
   const handleExportCSV = useCallback(
@@ -287,6 +276,22 @@ export function useAudit() {
   const handleExportJSON = useCallback(
     (onSuccess: (message: string) => void, onError: (error: string) => void) => {
       runExport('json', onSuccess, onError)
+    },
+    [runExport]
+  )
+
+  /** JSON interno sin enmascarar — solo uso autorizado (Shift+clic / botón oculto) */
+  const handleExportJSONInternal = useCallback(
+    (onSuccess: (message: string) => void, onError: (error: string) => void) => {
+      const ok = window.confirm(
+        'Exportación INTERNA sin protección de datos (PII en claro).\n\nSolo para uso autorizado. Quedará registrado en auditoría.\n\n¿Continuar?'
+      )
+      if (!ok) return
+      runExport('json', onSuccess, onError, {
+        includeSensitive: true,
+        maskPii: false,
+        columns: resolveAuditExportKeys(DEFAULT_AUDIT_COLUMN_ORDER, true),
+      })
     },
     [runExport]
   )
@@ -379,7 +384,7 @@ export function useAudit() {
     includeSensitive,
     setColumnOrder,
     setVisibleColumns,
-    setIncludeSensitive: handleIncludeSensitiveChange,
+    setIncludeSensitive,
     loadAuditData,
     updateFilter,
     clearFilters,
@@ -391,6 +396,7 @@ export function useAudit() {
     handleExportCSV,
     handleExportExcel,
     handleExportJSON,
+    handleExportJSONInternal,
     handleExportPDFFull,
   }
 }

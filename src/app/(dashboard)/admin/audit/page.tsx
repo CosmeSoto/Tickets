@@ -60,6 +60,7 @@ function AuditPageContent() {
     handleExportCSV,
     handleExportExcel,
     handleExportJSON,
+    handleExportJSONInternal,
     handleExportPDFFull,
   } = useAudit()
 
@@ -69,6 +70,12 @@ function AuditPageContent() {
     toast({ title: 'Exportación completada', description: msg })
   const toastErr = (err: string) =>
     toast({ title: 'Error al exportar', description: err, variant: 'destructive' })
+  const toastInternalOk = (msg: string) =>
+    toast({
+      title: 'Exportación interna',
+      description: msg,
+      variant: 'destructive',
+    })
 
   if (status === 'loading') {
     return (
@@ -115,6 +122,7 @@ function AuditPageContent() {
           onExportCSV={() => handleExportCSV(toastOk, toastErr)}
           onExportExcel={() => handleExportExcel(toastOk, toastErr)}
           onExportJSON={() => handleExportJSON(toastOk, toastErr)}
+          onExportJSONInternal={() => handleExportJSONInternal(toastInternalOk, toastErr)}
           onExportPDF={() => handleExportPDFFull(toastOk, toastErr)}
         />
 

@@ -101,6 +101,7 @@ export async function POST(request: NextRequest) {
           columns: result.columnKeys || columns || [],
           includeSensitive: Boolean(includeSensitive),
           maskPii: maskPii !== false,
+          unmaskedInternalExport: includeSensitive === true && maskPii === false,
           exportedRecords: logs.length,
           totalMatching: total,
           filters,

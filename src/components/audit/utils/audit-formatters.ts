@@ -697,6 +697,7 @@ export function getFieldLabel(key: string): string {
     includeSensitive: 'Incluyó datos sensibles',
     exportedRecords: 'Registros exportados',
     totalMatching: 'Total coincidente',
+    unmaskedInternalExport: 'Exportación interna sin enmascarar',
     descripcion: 'Descripción',
   }
   return labels[key] || key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1')

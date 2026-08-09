@@ -3,7 +3,7 @@
  * Handles all filter controls for audit logs
  */
 
-import { Filter, Search, Download, ShieldAlert } from 'lucide-react'
+import { Filter, Search, Download } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -34,6 +34,7 @@ interface AuditFiltersProps {
   exporting?: boolean
   columnOrder: string[]
   visibleColumns: string[]
+  /** Solo JSON: incluir sensibles enmascarados (default true) */
   includeSensitive: boolean
   onColumnOrderChange: (order: string[]) => void
   onVisibleColumnsChange: (visible: string[]) => void
@@ -46,6 +47,8 @@ interface AuditFiltersProps {
   onExportCSV: () => void
   onExportExcel: () => void
   onExportJSON: () => void
+  /** JSON interno sin enmascarar (acceso discreto) */
+  onExportJSONInternal?: () => void
   onExportPDF?: () => void
 }
 
@@ -68,12 +71,14 @@ export function AuditFiltersComponent({
   onExportCSV,
   onExportExcel,
   onExportJSON,
+  onExportJSONInternal,
   onExportPDF,
 }: AuditFiltersProps) {
   const busy = loading || Boolean(exporting)
-  const columnDefs = includeSensitive
-    ? AUDIT_COLUMN_DEFS
-    : AUDIT_COLUMN_DEFS.filter(c => !SENSITIVE_AUDIT_COLUMNS.includes(c.key as never))
+  // CSV/Excel/PDF: solo columnas no sensibles (LOPDP)
+  const columnDefs = AUDIT_COLUMN_DEFS.filter(
+    c => !SENSITIVE_AUDIT_COLUMNS.includes(c.key as never)
+  )
 
   return (
     <Card>
@@ -211,7 +216,7 @@ export function AuditFiltersComponent({
             <div className='min-w-0'>
               <p className='text-sm font-medium'>Exportar</p>
               <p className='text-xs text-muted-foreground'>
-                Elige columnas y formato. Afecta CSV, Excel, PDF y JSON.
+                CSV / Excel / PDF: minimización LOPDP. JSON: opción de datos sensibles.
               </p>
             </div>
             <div className='flex flex-wrap gap-2 items-center'>
@@ -222,13 +227,9 @@ export function AuditFiltersComponent({
                 onOrderChange={onColumnOrderChange}
                 onVisibleChange={onVisibleColumnsChange}
                 storageKey='audit-export-columns-v1'
-                defaultVisible={
-                  includeSensitive
-                    ? DEFAULT_AUDIT_VISIBLE_COLUMNS
-                    : DEFAULT_AUDIT_VISIBLE_COLUMNS.filter(
-                        k => !SENSITIVE_AUDIT_COLUMNS.includes(k as never)
-                      )
-                }
+                defaultVisible={DEFAULT_AUDIT_VISIBLE_COLUMNS.filter(
+                  k => !SENSITIVE_AUDIT_COLUMNS.includes(k as never)
+                )}
               />
               <Button
                 onClick={onExportCSV}
@@ -262,36 +263,49 @@ export function AuditFiltersComponent({
                   PDF
                 </Button>
               )}
-              <Button
-                onClick={onExportJSON}
-                variant='ghost'
-                size='sm'
-                disabled={busy}
-                className='min-h-9 text-xs'
-                title='JSON técnico'
-              >
-                JSON
-              </Button>
+              <div className='flex items-center gap-1.5 rounded-md border px-2 py-1'>
+                <Button
+                  onClick={e => {
+                    if (e.shiftKey && onExportJSONInternal) {
+                      onExportJSONInternal()
+                      return
+                    }
+                    onExportJSON()
+                  }}
+                  variant='ghost'
+                  size='sm'
+                  disabled={busy}
+                  className='min-h-8 h-8 text-xs px-2'
+                  title='JSON. Shift+clic: exportación interna sin enmascarar'
+                >
+                  JSON
+                </Button>
+                <label className='flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none pr-1'>
+                  <input
+                    type='checkbox'
+                    className='rounded border-input'
+                    checked={includeSensitive}
+                    onChange={e => onIncludeSensitiveChange(e.target.checked)}
+                  />
+                  Sensibles
+                </label>
+                {onExportJSONInternal ? (
+                  <button
+                    type='button'
+                    disabled={busy}
+                    onClick={onExportJSONInternal}
+                    className='h-6 w-3 text-[10px] leading-none text-muted-foreground/30 hover:text-amber-600'
+                    title='Exportación interna (PII en claro) — solo uso autorizado'
+                    aria-label='Exportación interna sin enmascarar'
+                  >
+                    ·
+                  </button>
+                ) : null}
+              </div>
               <Button onClick={onClearFilters} variant='outline' size='sm' className='min-h-9'>
                 Limpiar
               </Button>
             </div>
-          </div>
-
-          <div className='flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2'>
-            <ShieldAlert className='h-4 w-4 text-amber-600 shrink-0' />
-            <label className='flex items-center gap-2 cursor-pointer text-sm text-foreground min-w-0'>
-              <input
-                type='checkbox'
-                className='rounded border-input shrink-0'
-                checked={includeSensitive}
-                onChange={e => onIncludeSensitiveChange(e.target.checked)}
-              />
-              <span className='min-w-0'>
-                Incluir datos sensibles en el <strong>archivo</strong> (email, IP, cambios,
-                User-Agent · enmascarados)
-              </span>
-            </label>
           </div>
         </div>
 
