@@ -238,9 +238,9 @@ export async function GET(request: Request) {
           tickets: ticketsEnabled,
           inventory: inventoryEnabled || canManageInventory,
           patrols: patrolsEnabled,
-          news: newsEnabled,
+          news: newsEnabled || canManageNews,
           canManageNews: true,
-          forms: formsEnabled,
+          forms: formsEnabled || canManageForms,
           canManageForms: true,
           canRequestAssets: false,
           canManageInventory: true,
@@ -254,9 +254,9 @@ export async function GET(request: Request) {
         tickets: ticketsEnabled,
         inventory: inventoryEnabled || canManageInventory,
         patrols: patrolsEnabled,
-        news: newsEnabled,
+        news: newsEnabled || canManageNews,
         canManageNews,
-        forms: formsEnabled,
+        forms: formsEnabled || canManageForms,
         canManageForms,
         canRequestAssets,
         canManageInventory,
@@ -399,9 +399,9 @@ export async function GET(request: Request) {
       resolvedTickets = ticketsEnabled
       resolvedInventory = inventoryEnabled || canManageInventory
       resolvedPatrols = patrolsEnabled
-      // Si puede gestionar noticias, también puede verlas (canManageNews implica newsEnabled)
+      // Si puede gestionar noticias/docs, también puede verlos
       resolvedNews = newsEnabled || canManageNews
-      resolvedForms = formsEnabled
+      resolvedForms = formsEnabled || canManageForms
       resolvedCredentials = credentialsEnabled || canManageCredentials
     } else {
       // ADMIN normal y TECHNICIAN: requieren al menos una familia activa en el módulo.
@@ -411,10 +411,9 @@ export async function GET(request: Request) {
         ((inventoryEnabled || canManageInventory) && inventoryFamilyIds.size > 0) ||
         (!!canRequestAssets && inventoryEnabled)
       resolvedPatrols = patrolsEnabled && patrolFamilyIds.size > 0
-      // Noticias y Formularios son globales, no requieren familias - solo el flag del usuario
-      // Si puede gestionar noticias, también puede verlas (canManageNews implica newsEnabled)
+      // Noticias y Documentos son globales, no requieren familias - solo el flag del usuario
       resolvedNews = newsEnabled || canManageNews
-      resolvedForms = formsEnabled
+      resolvedForms = formsEnabled || canManageForms
       // Credenciales: módulo ON basta (bóveda personal). Familias amplían áreas.
       resolvedCredentials = credentialsEnabled || canManageCredentials
     }

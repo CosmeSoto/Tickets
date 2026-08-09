@@ -123,6 +123,36 @@ export function CreateUserModal({
     }
     setLoading(true)
     try {
+      const isAdmin = formData.role === 'ADMIN'
+      const moduleDefaults = isAdmin
+        ? {
+            ticketsEnabled: true,
+            inventoryEnabled: true,
+            patrolsEnabled: true,
+            newsEnabled: true,
+            formsEnabled: true,
+            credentialsEnabled: true,
+            canManageInventory: true,
+            canManageNews: true,
+            canManageForms: true,
+            canManageCredentials: true,
+            canRequestAssets: false,
+          }
+        : {
+            // Técnico / Cliente: solo tickets por defecto (resto se activa en edición)
+            ticketsEnabled: formData.ticketsEnabled,
+            inventoryEnabled: false,
+            patrolsEnabled: false,
+            newsEnabled: false,
+            formsEnabled: false,
+            credentialsEnabled: false,
+            canManageInventory: false,
+            canManageNews: false,
+            canManageForms: false,
+            canManageCredentials: false,
+            canRequestAssets: false,
+          }
+
       const response = await fetch('/api/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -134,13 +164,8 @@ export function CreateUserModal({
           departmentId: formData.departmentId || null,
           phone: formData.phone.trim() || null,
           isActive: true,
-          isSuperAdmin: formData.role === 'ADMIN' ? formData.isSuperAdmin : false,
-          ticketsEnabled: formData.ticketsEnabled,
-          inventoryEnabled: false,
-          patrolsEnabled: false,
-          canManageInventory: false,
-          credentialsEnabled: false,
-          canManageCredentials: false,
+          isSuperAdmin: isAdmin ? formData.isSuperAdmin : false,
+          ...moduleDefaults,
         }),
       })
       const result = await response.json()
@@ -188,9 +213,12 @@ export function CreateUserModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className='max-w-2xl max-h-[90vh]' aria-describedby={undefined}>
+      <DialogContent
+        className='w-[calc(100%-1.5rem)] max-w-2xl sm:max-w-3xl max-h-[92vh] p-4 sm:p-6'
+        aria-describedby={undefined}
+      >
         <DialogHeader>
-          <DialogTitle className='flex items-center gap-2'>
+          <DialogTitle className='flex items-center gap-2 text-base sm:text-lg'>
             <UserPlus className='h-5 w-5 text-primary' />
             Crear Nuevo Usuario
           </DialogTitle>
@@ -205,7 +233,7 @@ export function CreateUserModal({
             void handleSubmit()
           }}
         >
-          <div className='space-y-6 overflow-y-auto max-h-[calc(90vh-120px)]'>
+          <div className='space-y-6 overflow-y-auto max-h-[calc(92vh-120px)] pr-1'>
             <CreateUserHeader
               name={formData.name}
               email={formData.email}

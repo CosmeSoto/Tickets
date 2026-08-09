@@ -54,13 +54,13 @@ export function RoleAndDeptSection({
         <Building className='h-4 w-4 text-muted-foreground' />
         Rol y departamento
       </h3>
-      <div className='grid grid-cols-2 gap-3'>
+      <div className='grid grid-cols-1 sm:grid-cols-2 gap-3'>
         <div className='space-y-1'>
           <Label htmlFor='edit-role'>
             Rol del usuario <span className='text-destructive'>*</span>
           </Label>
           <Select value={role} onValueChange={r => onChange('role', r)} disabled={isCurrentUser}>
-            <SelectTrigger id='edit-role' className='h-9'>
+            <SelectTrigger id='edit-role' className='h-10'>
               <SelectValue placeholder='Seleccionar rol' />
             </SelectTrigger>
             <SelectContent>

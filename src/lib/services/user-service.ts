@@ -284,6 +284,23 @@ export class UserService {
         ? await getDepartmentNativeFamilyId(createDeptId)
         : null
 
+    // Defaults por rol (catálogo): Admin → todos ON; Técnico/Cliente → solo tickets
+    const isAdminRole = data.role === 'ADMIN'
+    const ticketsEnabled = data.ticketsEnabled ?? true
+    const inventoryEnabled = data.inventoryEnabled ?? (isAdminRole ? true : false)
+    const patrolsEnabled = data.patrolsEnabled ?? (isAdminRole ? true : false)
+    const newsEnabled = data.newsEnabled ?? (isAdminRole ? true : false)
+    const formsEnabled = data.formsEnabled ?? (isAdminRole ? true : false)
+    const credentialsEnabled = data.credentialsEnabled ?? (isAdminRole ? true : false)
+    const canManageInventory = data.canManageInventory ?? (isAdminRole ? true : false)
+    const canManageNews = newsEnabled ? (data.canManageNews ?? (isAdminRole ? true : false)) : false
+    const canManageForms = formsEnabled
+      ? (data.canManageForms ?? (isAdminRole ? true : false))
+      : false
+    const canManageCredentials = credentialsEnabled
+      ? (data.canManageCredentials ?? (isAdminRole ? true : false))
+      : false
+
     // Crear el usuario en una transacción para manejar las asignaciones de categorías
     const result = await prisma.$transaction(async tx => {
       const user = await tx.users.create({
@@ -296,19 +313,18 @@ export class UserService {
           departmentId: data.departmentId || data.department || null,
           phone: data.phone || null,
           isActive: true,
-          isSuperAdmin: data.role === 'ADMIN' ? (data.isSuperAdmin ?? false) : false,
-          ticketsEnabled: data.ticketsEnabled ?? true,
-          inventoryEnabled: data.inventoryEnabled ?? false,
-          patrolsEnabled: data.patrolsEnabled ?? false,
-          newsEnabled: data.newsEnabled ?? false,
-          canManageNews: (data.newsEnabled ?? false) ? (data.canManageNews ?? false) : false,
-          canManageInventory: data.canManageInventory ?? false,
+          isSuperAdmin: isAdminRole ? (data.isSuperAdmin ?? false) : false,
+          ticketsEnabled,
+          inventoryEnabled,
+          patrolsEnabled,
+          newsEnabled,
+          canManageNews,
+          canManageInventory,
           canRequestAssets: data.canRequestAssets ?? false,
-          formsEnabled: data.formsEnabled ?? false,
-          canManageForms: (data.formsEnabled ?? false) ? (data.canManageForms ?? false) : false,
-          credentialsEnabled: data.credentialsEnabled ?? false,
-          canManageCredentials:
-            (data.credentialsEnabled ?? false) ? (data.canManageCredentials ?? false) : false,
+          formsEnabled,
+          canManageForms,
+          credentialsEnabled,
+          canManageCredentials,
           isEmailVerified: false,
           createdAt: new Date(),
           updatedAt: new Date(),

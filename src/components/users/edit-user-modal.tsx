@@ -405,9 +405,12 @@ export function EditUserModal({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={handleClose}>
-        <DialogContent className='max-w-2xl max-h-[90vh]' aria-describedby={undefined}>
+        <DialogContent
+          className='w-[calc(100%-1.5rem)] max-w-3xl lg:max-w-4xl max-h-[92vh] p-4 sm:p-6'
+          aria-describedby={undefined}
+        >
           <DialogHeader>
-            <DialogTitle className='flex items-center gap-2'>
+            <DialogTitle className='flex items-center gap-2 text-base sm:text-lg'>
               <User className='h-5 w-5 text-primary' />
               Editar Usuario
             </DialogTitle>
@@ -419,7 +422,7 @@ export function EditUserModal({
               void handleSubmit()
             }}
           >
-            <div className='space-y-6 overflow-y-auto max-h-[calc(90vh-80px)]'>
+            <div className='space-y-6 overflow-y-auto max-h-[calc(92vh-88px)] pr-1'>
               <UserHeaderCard
                 user={user}
                 avatarPreview={avatarPreview}
