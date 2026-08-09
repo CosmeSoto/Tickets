@@ -29,6 +29,36 @@ interface ModelComboboxProps {
   className?: string
 }
 
+function normalizeModelsPayload(data: unknown): ModelOption[] {
+  const raw = Array.isArray(data)
+    ? data
+    : data && typeof data === 'object' && Array.isArray((data as { models?: unknown }).models)
+      ? (data as { models: unknown[] }).models
+      : []
+
+  return raw
+    .map((item): ModelOption | null => {
+      if (!item || typeof item !== 'object') return null
+      const m = item as Record<string, unknown>
+      if (typeof m.id !== 'string') return null
+      const brand =
+        typeof m.brand === 'string'
+          ? m.brand
+          : m.brand && typeof m.brand === 'object' && 'name' in m.brand
+            ? String((m.brand as { name?: unknown }).name ?? '')
+            : ''
+      const modelName = typeof m.model === 'string' ? m.model : ''
+      const category =
+        m.type && typeof m.type === 'object' && 'name' in m.type
+          ? String((m.type as { name?: unknown }).name ?? '')
+          : typeof m.category === 'string'
+            ? m.category
+            : undefined
+      return { id: m.id, brand, model: modelName, category }
+    })
+    .filter((m): m is ModelOption => m != null)
+}
+
 export function ModelCombobox({
   value,
   onValueChange,
@@ -39,27 +69,34 @@ export function ModelCombobox({
   const [open, setOpen] = React.useState(false)
   const [models, setModels] = React.useState<ModelOption[]>([])
   const [loading, setLoading] = React.useState(false)
+  const [loadError, setLoadError] = React.useState<string | null>(null)
 
   React.useEffect(() => {
+    if (!open || models.length > 0 || loading) return
+
     const fetchModels = async () => {
       setLoading(true)
+      setLoadError(null)
       try {
-        const res = await fetch('/api/inventory/models')
-        if (res.ok) {
-          const data = await res.json()
-          setModels(data)
+        const res = await fetch('/api/inventory/models?limit=500&isActive=true')
+        if (!res.ok) {
+          setLoadError('No se pudieron cargar los modelos')
+          setModels([])
+          return
         }
+        const data = await res.json()
+        setModels(normalizeModelsPayload(data))
       } catch (error) {
         console.error('Error fetching models:', error)
+        setLoadError('No se pudieron cargar los modelos')
+        setModels([])
       } finally {
         setLoading(false)
       }
     }
 
-    if (open && models.length === 0) {
-      fetchModels()
-    }
-  }, [open, models.length])
+    void fetchModels()
+  }, [open, models.length, loading])
 
   const selectedModel = models.find(m => m.id === value)
 
@@ -87,14 +124,18 @@ export function ModelCombobox({
           <CommandInput placeholder='Buscar modelo...' />
           <CommandList>
             <CommandEmpty>
-              {loading ? 'Cargando modelos...' : 'No se encontraron modelos'}
+              {loading
+                ? 'Cargando modelos...'
+                : loadError
+                  ? loadError
+                  : 'No se encontraron modelos'}
             </CommandEmpty>
             {models.length > 0 && (
               <CommandGroup>
                 {models.map(model => (
                   <CommandItem
                     key={model.id}
-                    value={`${model.brand} ${model.model}`}
+                    value={`${model.brand} ${model.model} ${model.id}`}
                     onSelect={() => {
                       onValueChange(model.id)
                       setOpen(false)

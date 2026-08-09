@@ -205,7 +205,7 @@ export function MaintenanceListPageContent() {
     columns: [
       { key: 'type', label: 'Tipo', format: v => TYPE_LABELS[v] ?? v },
       { key: 'status', label: 'Estado', format: v => STATUS_CONFIG[v]?.label ?? v },
-      { key: 'equipment', label: 'Equipo', format: v => `${v.brand} ${v.model} (${v.code})` },
+      { key: 'equipment', label: 'Equipo', format: v => (v ? `${v.brand} ${v.model} (${v.code})` : '') },
       { key: 'description', label: 'Descripción' },
       {
         key: 'date',
@@ -428,9 +428,11 @@ export function MaintenanceListPageContent() {
                         </div>
                         <div className='min-w-0'>
                           <div className='flex items-center gap-2 flex-wrap'>
-                            <span className='font-semibold text-sm'>{record.equipment.code}</span>
+                            <span className='font-semibold text-sm'>
+                              {record.equipment?.code ?? 'Sin equipo'}
+                            </span>
                             <span className='text-muted-foreground text-sm'>
-                              {record.equipment.brand} {record.equipment.model}
+                              {record.equipment?.brand} {record.equipment?.model}
                             </span>
                             {needsAction && (
                               <Badge className='bg-primary/10 text-primary text-xs'>

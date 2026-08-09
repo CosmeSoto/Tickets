@@ -44,25 +44,43 @@ export function TechnicianCombobox({
   const [loading, setLoading] = React.useState(false)
 
   React.useEffect(() => {
+    if (!open || technicians.length > 0 || loading) return
+
     const fetchTechnicians = async () => {
       setLoading(true)
       try {
         const res = await fetch('/api/users?role=TECHNICIAN')
         if (res.ok) {
           const data = await res.json()
-          setTechnicians(data)
+          const raw = Array.isArray(data)
+            ? data
+            : Array.isArray(data?.users)
+              ? data.users
+              : Array.isArray(data?.data)
+                ? data.data
+                : []
+          setTechnicians(
+            raw
+              .filter((u: { id?: string }) => typeof u?.id === 'string')
+              .map((u: { id: string; name?: string; email?: string }) => ({
+                id: u.id,
+                name: u.name || u.email || 'Sin nombre',
+                email: u.email || '',
+              }))
+          )
+        } else {
+          setTechnicians([])
         }
       } catch (error) {
         console.error('Error fetching technicians:', error)
+        setTechnicians([])
       } finally {
         setLoading(false)
       }
     }
 
-    if (open && technicians.length === 0) {
-      fetchTechnicians()
-    }
-  }, [open, technicians.length])
+    void fetchTechnicians()
+  }, [open, technicians.length, loading])
 
   const selectedTechnician = technicians.find(t => t.id === value)
 

@@ -544,7 +544,8 @@ export class MaintenanceService {
         status: data.statusFilter
           ? { in: data.statusFilter as any }
           : { notIn: ['RETIRED', 'SOLD'] },
-        ...(data.familyId && { familyId: data.familyId }),
+        // Familia vive en el tipo del equipo (equipment no tiene familyId)
+        ...(data.familyId ? { type: { familyId: data.familyId } } : {}),
       },
       select: { id: true, code: true, status: true },
     })

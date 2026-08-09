@@ -140,7 +140,12 @@ export function CreateByModelDialog({ open, onClose, onCreated }: CreateByModelD
   }
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog
+      open={open}
+      onOpenChange={next => {
+        if (!next) onClose()
+      }}
+    >
       <DialogContent className='max-w-2xl max-h-[90vh]'>
         <DialogHeader>
           <DialogTitle>Crear Mantenimiento por Modelo</DialogTitle>
