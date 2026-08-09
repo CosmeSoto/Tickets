@@ -14,6 +14,7 @@ import { seedWarehouses } from './seeds/warehouses.seed'
 import { seedCustomFields } from './seeds/custom-fields.seed'
 import { seedAttributes } from './seeds/attributes.seed'
 import { seedSupplierTypes } from './seeds/supplier-types.seed'
+import { seedContractServiceTypes } from './seeds/contract-service-types.seed'
 import { seedAssetRequestsFamilySettings } from './seeds/asset-requests-settings.seed'
 import { seedInventoryFamilyConfigs } from './seeds/inventory-family-config.seed'
 import { seedUnitsOfMeasure } from './seeds/units-of-measure.seed'
@@ -43,6 +44,7 @@ export async function ensureInventoryCatalogs(prisma: PrismaClient) {
   await seedCustomFields(prisma, familyMap)
   await seedAttributes(prisma, familyMap)
   await seedSupplierTypes(prisma, familyMap)
+  await seedContractServiceTypes(prisma)
   await seedAssetRequestsFamilySettings(prisma, familyMap)
   await seedUnitsOfMeasure(prisma)
   await seedInventorySettings(prisma)

@@ -17,6 +17,7 @@ import { seedWarehouses } from './seeds/warehouses.seed'
 import { ORGANIGRAM_FAMILIES } from './seeds/family-map'
 import { DEPARTMENT_SEEDS } from './seeds/department-family-map'
 import { seedSupplierTypes } from './seeds/supplier-types.seed'
+import { seedContractServiceTypes } from './seeds/contract-service-types.seed'
 import { seedAssetRequestsFamilySettings } from './seeds/asset-requests-settings.seed'
 import { seedInventoryFamilyConfigs } from './seeds/inventory-family-config.seed'
 import { seedUnitsOfMeasure } from './seeds/units-of-measure.seed'
@@ -107,6 +108,9 @@ async function main() {
 
   // 13b. TIPOS DE PROVEEDOR
   await seedSupplierTypes(prisma, familyMap)
+
+  // 13b2. TIPOS DE SERVICIO (contratos)
+  await seedContractServiceTypes(prisma)
 
   // 13c. CAMPOS PERSONALIZADOS (custom fields por familia)
   await seedCustomFields(prisma, familyMap)

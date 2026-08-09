@@ -1008,6 +1008,7 @@ async function restoreFromJSON(
     'decommission_requests',
     'decommission_acts',
     'decommission_attachments',
+    'contract_service_types',
     'contracts',
     'contract_lines',
     'contract_attachments',

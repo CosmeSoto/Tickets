@@ -280,6 +280,10 @@ export function getActionLabel(action: string): string {
     CREDENTIAL_VAULT_CREATED: 'Bóveda de Credenciales Creada',
     // Inventario — tipos
     TYPE_CLONED: 'Tipo Copiado a Otra Área',
+    contract_service_type_created: 'Tipo de Servicio (Contrato) Creado',
+    contract_service_type_updated: 'Tipo de Servicio (Contrato) Actualizado',
+    contract_service_type_deleted: 'Tipo de Servicio (Contrato) Eliminado',
+    contract_service_type_deactivated: 'Tipo de Servicio (Contrato) Desactivado',
   }
   return actionLabels[action] || action
 }
@@ -314,10 +318,12 @@ export function getEntityLabel(entityType: string): string {
     patrol_incident: 'Novedades de Rondas',
     patrol_checkpoint: 'Checkpoints',
     // Inventario — tipos de activo
+    inventory: 'Inventario',
     equipment_type: 'Tipos de Equipo',
     license_type: 'Tipos de Licencia',
     consumable_type: 'Tipos de Suministro',
     consumable_types: 'Tipos de Suministro',
+    contract: 'Contratos',
     credential_entry: 'Credenciales',
     credential_vault: 'Credenciales',
     credential_share: 'Credenciales',

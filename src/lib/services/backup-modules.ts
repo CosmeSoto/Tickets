@@ -530,6 +530,7 @@ export const INVENTORY_MODULE_RESTORE_ORDER = [
   'license_attachments',
   'consumables',
   'stock_movements',
+  'contract_service_types',
   'contracts',
   'contract_lines',
   'contract_attachments',
@@ -561,6 +562,9 @@ export async function exportInventoryModuleData(): Promise<Record<string, unknow
 
   // Catálogos
   await fetchTable('supplier_types', () => prisma.supplier_types.findMany())
+  await fetchTable('contract_service_types', () =>
+    (prisma as any).contract_service_types.findMany()
+  )
   // findMany sin select: incluye campos comerciales (crédito, banco, plazos).
   // Decimal → string para JSON de módulo estable en restore.
   await fetchTable('suppliers', async () => {

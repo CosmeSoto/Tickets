@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { canManageInventory } from '@/lib/inventory-access'
+import { createAuditLog } from '@/lib/audit'
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -42,6 +43,17 @@ export async function PUT(request: NextRequest, { params }: Ctx) {
       },
     })
 
+    await createAuditLog({
+      entityType: 'inventory',
+      entityId: type.id,
+      action: 'contract_service_type_updated',
+      userId: session.user.id,
+      changes: {
+        code: type.code,
+        name: { from: existing.name, to: type.name },
+      },
+    })
+
     return NextResponse.json(type)
   } catch (error) {
     console.error('PUT contract-service-types:', error)
@@ -73,6 +85,13 @@ export async function DELETE(_request: NextRequest, { params }: Ctx) {
         where: { id },
         data: { isActive: false },
       })
+      await createAuditLog({
+        entityType: 'inventory',
+        entityId: existing.id,
+        action: 'contract_service_type_deactivated',
+        userId: session.user.id,
+        changes: { code: existing.code, name: existing.name, reason: 'in_use' },
+      })
       return NextResponse.json({
         message: 'Desactivado (hay contratos que usan este tipo)',
         softDeleted: true,
@@ -80,6 +99,13 @@ export async function DELETE(_request: NextRequest, { params }: Ctx) {
     }
 
     await prisma.contract_service_types.delete({ where: { id } })
+    await createAuditLog({
+      entityType: 'inventory',
+      entityId: existing.id,
+      action: 'contract_service_type_deleted',
+      userId: session.user.id,
+      changes: { code: existing.code, name: existing.name },
+    })
     return NextResponse.json({ message: 'Eliminado' })
   } catch (error) {
     console.error('DELETE contract-service-types:', error)

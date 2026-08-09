@@ -8,6 +8,7 @@ import {
   getInventorySessionContext,
   hasInventoryModuleAccess,
 } from '@/lib/inventory/inventory-session'
+import { createAuditLog } from '@/lib/audit'
 
 /** GET — listado de tipos de servicio (catálogo contratos) */
 export async function GET(request: NextRequest) {
@@ -81,6 +82,14 @@ export async function POST(request: NextRequest) {
         order: (maxOrder._max.order ?? -1) + 1,
         updatedAt: new Date(),
       },
+    })
+
+    await createAuditLog({
+      entityType: 'inventory',
+      entityId: type.id,
+      action: 'contract_service_type_created',
+      userId: session.user.id,
+      changes: { code: type.code, name: type.name },
     })
 
     return NextResponse.json(type, { status: 201 })
