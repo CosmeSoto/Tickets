@@ -22,11 +22,16 @@ import {
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { DateTimePicker } from '@/components/ui/date-time-picker'
 import { SearchableSelect } from '@/components/ui/searchable-select'
-import { TechnicianCombobox } from '@/components/ui/technician-combobox'
 import { FamilyCombobox } from '@/components/ui/family-combobox'
 import { useFamilyOptions } from '@/hooks/use-family-options'
 import { parseScheduledDateTime, toLocalDateTimeInputValue } from '@/lib/forms/form-date'
 import { toast } from 'sonner'
+import {
+  MaintenanceAssigneeFields,
+  assigneeToApiPayload,
+  emptyAssignee,
+  type MaintenanceAssigneeValue,
+} from '@/components/inventory/maintenance/maintenance-assignee-fields'
 
 interface CreateByTypeDialogProps {
   open: boolean
@@ -55,7 +60,7 @@ export function CreateByTypeDialog({ open, onClose, onCreated }: CreateByTypeDia
   const [maintenanceType, setMaintenanceType] = useState<'PREVENTIVE' | 'CORRECTIVE'>('PREVENTIVE')
   const [description, setDescription] = useState('')
   const [scheduledAt, setScheduledAt] = useState(() => toLocalDateTimeInputValue(new Date()))
-  const [technicianId, setTechnicianId] = useState('')
+  const [assignee, setAssignee] = useState<MaintenanceAssigneeValue>(() => emptyAssignee())
   const [familyId, setFamilyId] = useState('all')
   const [statusFilter, setStatusFilter] = useState<string[]>(['AVAILABLE', 'ASSIGNED'])
   const [equipmentCount, setEquipmentCount] = useState(0)
@@ -165,7 +170,7 @@ export function CreateByTypeDialog({ open, onClose, onCreated }: CreateByTypeDia
     setMaintenanceType('PREVENTIVE')
     setDescription('')
     setScheduledAt(toLocalDateTimeInputValue(new Date()))
-    setTechnicianId('')
+    setAssignee(emptyAssignee())
     setFamilyId('all')
     setStatusFilter(['AVAILABLE', 'ASSIGNED'])
     setEquipmentCount(0)
@@ -189,6 +194,11 @@ export function CreateByTypeDialog({ open, onClose, onCreated }: CreateByTypeDia
       return
     }
 
+    if (assignee.mode === 'external' && !assignee.supplierId) {
+      toast.error('Selecciona el proveedor externo')
+      return
+    }
+
     if (equipmentCount === 0) {
       toast.error('No hay equipos para este tipo con los filtros seleccionados')
       return
@@ -204,7 +214,7 @@ export function CreateByTypeDialog({ open, onClose, onCreated }: CreateByTypeDia
           type: maintenanceType,
           description,
           scheduledDate: when.toISOString(),
-          technicianId: technicianId || undefined,
+          ...assigneeToApiPayload(assignee),
           familyId: familyId !== 'all' ? familyId : undefined,
           statusFilter: statusFilter.length > 0 ? statusFilter : undefined,
         }),
@@ -328,10 +338,11 @@ export function CreateByTypeDialog({ open, onClose, onCreated }: CreateByTypeDia
             <DateTimePicker value={scheduledAt} onChange={setScheduledAt} />
           </div>
 
-          <div className='space-y-2'>
-            <Label>Técnico asignado</Label>
-            <TechnicianCombobox value={technicianId} onValueChange={setTechnicianId} allowNull />
-          </div>
+          <MaintenanceAssigneeFields
+            value={assignee}
+            onChange={setAssignee}
+            familyId={familyId !== 'all' ? familyId : null}
+          />
 
           <div className='space-y-2'>
             <Label>Estados de equipos</Label>

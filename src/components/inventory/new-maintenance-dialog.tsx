@@ -26,6 +26,12 @@ import {
 import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 import { useFamilyOptions } from '@/hooks/use-family-options'
 import { parseScheduledDateTime } from '@/lib/forms/form-date'
+import {
+  MaintenanceAssigneeFields,
+  assigneeToApiPayload,
+  emptyAssignee,
+  type MaintenanceAssigneeValue,
+} from '@/components/inventory/maintenance/maintenance-assignee-fields'
 
 interface Props {
   open: boolean
@@ -83,6 +89,7 @@ export function NewMaintenanceDialog({
   const [description, setDescription] = useState('')
   const [scheduledAt, setScheduledAt] = useState(defaultScheduledLocal)
   const [notes, setNotes] = useState('')
+  const [assignee, setAssignee] = useState<MaintenanceAssigneeValue>(() => emptyAssignee())
 
   useEffect(() => {
     if (!open || preselectedEquipmentId) return
@@ -115,6 +122,7 @@ export function NewMaintenanceDialog({
     setDescription('')
     setScheduledAt(defaultScheduledLocal())
     setNotes('')
+    setAssignee(emptyAssignee())
     onClose()
   }
 
@@ -123,6 +131,15 @@ export function NewMaintenanceDialog({
       toast({
         title: 'Campos requeridos',
         description: 'Completa todos los campos obligatorios.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    if (!isClient && assignee.mode === 'external' && !assignee.supplierId) {
+      toast({
+        title: 'Proveedor requerido',
+        description: 'Selecciona el proveedor que realizará el mantenimiento.',
         variant: 'destructive',
       })
       return
@@ -149,6 +166,7 @@ export function NewMaintenanceDialog({
           description,
           scheduledDate: when.toISOString(),
           notes: notes || undefined,
+          ...(!isClient ? assigneeToApiPayload(assignee) : {}),
         }),
       })
       if (!res.ok) {
@@ -159,7 +177,9 @@ export function NewMaintenanceDialog({
         title: isClient ? 'Solicitud enviada' : 'Mantenimiento programado',
         description: isClient
           ? 'Tu solicitud fue enviada al equipo técnico para su aprobación.'
-          : 'El mantenimiento fue programado y el equipo está en estado de mantenimiento.',
+          : assignee.mode === 'external'
+            ? 'Programado con proveedor externo. El equipo está en mantenimiento.'
+            : 'El mantenimiento fue programado y el equipo está en estado de mantenimiento.',
       })
       handleClose()
       onCreated()
@@ -308,6 +328,14 @@ export function NewMaintenanceDialog({
                 </p>
               )}
             </div>
+
+            {!isClient && (
+              <MaintenanceAssigneeFields
+                value={assignee}
+                onChange={setAssignee}
+                familyId={selectedFamilyId !== '_all' ? selectedFamilyId : null}
+              />
+            )}
 
             <div>
               <Label>Notas adicionales (opcional)</Label>

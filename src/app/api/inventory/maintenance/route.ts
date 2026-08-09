@@ -115,6 +115,7 @@ export async function GET(request: NextRequest) {
           },
           technician: { select: { id: true, name: true } },
           supplier: { select: { id: true, name: true } },
+          contract: { select: { id: true, name: true, contractNumber: true } },
           requestedBy: { select: { id: true, name: true } },
         },
       }),
@@ -148,7 +149,16 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { equipmentId, type, description, scheduledDate, technicianId, supplierId, notes } = body
+    const {
+      equipmentId,
+      type,
+      description,
+      scheduledDate,
+      technicianId,
+      supplierId,
+      contractId,
+      notes,
+    } = body
 
     if (!equipmentId || !type || !description || !scheduledDate) {
       return NextResponse.json(
@@ -159,6 +169,16 @@ export async function POST(request: NextRequest) {
 
     if (!['PREVENTIVE', 'CORRECTIVE'].includes(type)) {
       return NextResponse.json({ error: 'Tipo de mantenimiento inválido' }, { status: 400 })
+    }
+
+    if (supplierId && technicianId) {
+      return NextResponse.json(
+        {
+          error:
+            'Indica técnico interno o proveedor externo, no ambos como responsables del trabajo',
+        },
+        { status: 400 }
+      )
     }
 
     const equipment = await prisma.equipment.findUnique({
@@ -243,8 +263,9 @@ export async function POST(request: NextRequest) {
           type,
           description,
           scheduledDate: when,
-          technicianId: technicianId || session.user.id,
+          technicianId: technicianId || undefined,
           supplierId: supplierId || undefined,
+          contractId: contractId || undefined,
           notes,
         },
         session.user.id
@@ -257,14 +278,33 @@ export async function POST(request: NextRequest) {
         const maintenanceTypeLabel = type === 'PREVENTIVE' ? 'preventivo' : 'correctivo'
         const formattedDate = formatLocalDateTime(when)
         const equipmentLabel = `${equipment.code} (${equipmentDisplayLabel(equipment)})`
+        const supplierName = (maintenance as { supplier?: { name?: string } | null }).supplier?.name
+        const contract = (maintenance as { contract?: { name?: string; contractNumber?: string | null } | null })
+          .contract
+        const performerLine = supplierName
+          ? `Lo realizará el proveedor <strong>${supplierName}</strong>${
+              contract
+                ? ` (contrato ${contract.contractNumber || contract.name})`
+                : ''
+            }.`
+          : 'Lo realizará el equipo técnico interno.'
 
         await notifyUser(
           receiver.id,
           'INFO',
           `Mantenimiento programado — ${equipment.code}`,
-          `El equipo ${equipmentLabel} entrará en mantenimiento ${maintenanceTypeLabel} el ${formattedDate}. Motivo: ${description}`,
+          `El equipo ${equipmentLabel} entrará en mantenimiento ${maintenanceTypeLabel} el ${formattedDate}. ${
+            supplierName
+              ? `Proveedor: ${supplierName}. `
+              : ''
+          }Motivo: ${description}`,
           {
-            metadata: { equipmentId, maintenanceId: maintenance.id },
+            metadata: {
+              equipmentId,
+              maintenanceId: maintenance.id,
+              supplierId: supplierId || null,
+              contractId: contractId || null,
+            },
             email: {
               to: receiver.email,
               subject: `Mantenimiento programado para tu equipo ${equipment.code}`,
@@ -287,10 +327,19 @@ export async function POST(request: NextRequest) {
                       <td style="padding: 8px 12px; border: 1px solid #e5e7eb;">${formattedDate}</td>
                     </tr>
                     <tr>
+                      <td style="padding: 8px 12px; font-weight: bold; border: 1px solid #e5e7eb;">Responsable</td>
+                      <td style="padding: 8px 12px; border: 1px solid #e5e7eb;">${
+                        supplierName
+                          ? `Proveedor: ${supplierName}`
+                          : 'Técnico interno'
+                      }</td>
+                    </tr>
+                    <tr style="background: #f9fafb;">
                       <td style="padding: 8px 12px; font-weight: bold; border: 1px solid #e5e7eb;">Motivo</td>
                       <td style="padding: 8px 12px; border: 1px solid #e5e7eb;">${description}</td>
                     </tr>
                   </table>
+                  <p>${performerLine}</p>
                   <p>Si tienes alguna consulta, contacta al equipo de soporte.</p>
                 </div>
               `,

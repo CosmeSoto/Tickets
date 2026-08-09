@@ -38,6 +38,8 @@ export async function POST(req: NextRequest) {
       description,
       scheduledDate,
       technicianId,
+      supplierId,
+      contractId,
       statusFilter,
       familyId,
       cost,
@@ -47,6 +49,16 @@ export async function POST(req: NextRequest) {
     if (!typeId || !type || !description || !scheduledDate) {
       return NextResponse.json(
         { error: 'Faltan campos requeridos: typeId, type, description, scheduledDate' },
+        { status: 400 }
+      )
+    }
+
+    if (supplierId && technicianId) {
+      return NextResponse.json(
+        {
+          error:
+            'Indica técnico interno o proveedor externo, no ambos como responsables del trabajo',
+        },
         { status: 400 }
       )
     }
@@ -82,6 +94,8 @@ export async function POST(req: NextRequest) {
         description,
         scheduledDate: when,
         technicianId,
+        supplierId,
+        contractId,
         statusFilter,
         familyId,
         cost,

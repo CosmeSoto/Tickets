@@ -4,7 +4,9 @@ export type MaintenanceRecord = Prisma.maintenance_recordsGetPayload<{
   include: {
     equipment: true
     technician: true
+    supplier: true
     ticket: true
+    contract: true
   }
 }>
 
@@ -21,6 +23,8 @@ export interface CreateMaintenanceData {
   technicianId?: string
   /** Proveedor externo que realizará el mantenimiento */
   supplierId?: string
+  /** Contrato de mantenimiento/soporte vinculado (opcional) */
+  contractId?: string
   requestedById?: string
   notes?: string
 }

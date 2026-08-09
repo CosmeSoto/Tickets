@@ -13,6 +13,7 @@ import {
   toInventoryAccessUser,
 } from '@/lib/inventory/inventory-resource-access'
 import { formatLocalDateTime, parseScheduledDateTime } from '@/lib/forms/form-date'
+import prisma from '@/lib/prisma'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -63,6 +64,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       partsReplaced,
       returnTo,
       technicianId,
+      supplierId,
+      contractId,
       notes,
       supplierInvoice,
       warrantyExpiresAt,
@@ -110,25 +113,54 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       }
       if (!scheduledDate)
         return NextResponse.json({ error: 'Fecha requerida para aprobar' }, { status: 400 })
+      if (supplierId && technicianId) {
+        return NextResponse.json(
+          {
+            error:
+              'Indica técnico interno o proveedor externo, no ambos como responsables del trabajo',
+          },
+          { status: 400 }
+        )
+      }
       const when = parseScheduledDateTime(scheduledDate)
       if (Number.isNaN(when.getTime())) {
         return NextResponse.json({ error: 'Fecha y hora inválidas' }, { status: 400 })
       }
       const result = await MaintenanceService.approveMaintenance(
         id,
-        { scheduledDate: when, technicianId, notes },
+        {
+          scheduledDate: when,
+          technicianId,
+          supplierId,
+          contractId,
+          notes,
+        },
         session.user.id
       )
 
       // Notificar al solicitante
       const maintenance = await MaintenanceService.getById(id)
       if (maintenance?.requestedById) {
+        const supplierName = maintenance.supplier?.name
+        const contractLabel = maintenance.contract
+          ? maintenance.contract.contractNumber || maintenance.contract.name
+          : null
+        const performerMsg = supplierName
+          ? ` Lo realizará el proveedor ${supplierName}${contractLabel ? ` (contrato ${contractLabel})` : ''}.`
+          : maintenance.technician
+            ? ` Técnico asignado: ${maintenance.technician.name}.`
+            : ''
         await NotificationService.push({
           userId: maintenance.requestedById,
           type: 'SUCCESS',
           title: `Mantenimiento aprobado — ${maintenance.equipment.code}`,
-          message: `Tu solicitud de mantenimiento fue aprobada. El equipo ${maintenance.equipment.code} entrará en mantenimiento el ${formatLocalDateTime(when)}.`,
-          metadata: { equipmentId: maintenance.equipmentId, maintenanceId: id },
+          message: `Tu solicitud de mantenimiento fue aprobada. El equipo ${maintenance.equipment.code} entrará en mantenimiento el ${formatLocalDateTime(when)}.${performerMsg}`,
+          metadata: {
+            equipmentId: maintenance.equipmentId,
+            maintenanceId: id,
+            supplierId: maintenance.supplierId,
+            contractId: maintenance.contractId,
+          },
         }).catch(() => {})
       }
 
@@ -144,7 +176,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       }
       const result = await MaintenanceService.acceptMaintenance(id, session.user.id)
 
-      // Notificar al técnico asignado
+      // Notificar al técnico asignado (interno) o al staff si es proveedor externo
       const maintenance = await MaintenanceService.getById(id)
       if (maintenance?.technicianId) {
         await NotificationService.push({
@@ -154,6 +186,27 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           message: `El cliente aceptó el mantenimiento del equipo ${maintenance.equipment.code}.`,
           metadata: { equipmentId: maintenance.equipmentId, maintenanceId: id },
         }).catch(() => {})
+      } else if (maintenance?.supplierId) {
+        const staff = await prisma.users.findMany({
+          where: { role: { in: ['ADMIN', 'TECHNICIAN'] }, isActive: true },
+          select: { id: true },
+        })
+        const supplierName = maintenance.supplier?.name || 'proveedor externo'
+        await Promise.all(
+          staff.map(u =>
+            NotificationService.push({
+              userId: u.id,
+              type: 'INFO',
+              title: `Cliente aceptó mantenimiento externo — ${maintenance.equipment.code}`,
+              message: `El cliente aceptó el mantenimiento del equipo ${maintenance.equipment.code} a cargo de ${supplierName}.`,
+              metadata: {
+                equipmentId: maintenance.equipmentId,
+                maintenanceId: id,
+                supplierId: maintenance.supplierId,
+              },
+            }).catch(() => {})
+          )
+        )
       }
 
       return NextResponse.json(result)

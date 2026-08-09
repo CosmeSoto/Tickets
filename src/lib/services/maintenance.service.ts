@@ -65,6 +65,76 @@ export class MaintenanceService {
 
     return { valid: true }
   }
+
+  /**
+   * Resuelve técnico interno vs proveedor externo (+ contrato opcional).
+   * Externo: supplier requerido (o heredado del contrato); no fuerza technicianId al actor.
+   * Interno: technicianId por defecto = actor.
+   */
+  private static async resolveMaintenanceParties(
+    tx: any,
+    data: { technicianId?: string; supplierId?: string; contractId?: string },
+    actorUserId: string
+  ): Promise<{
+    technicianId: string | null
+    supplierId: string | null
+    contractId: string | null
+    contractLabel: string | null
+  }> {
+    let supplierId = data.supplierId?.trim() || null
+    let contractId = data.contractId?.trim() || null
+    let contractLabel: string | null = null
+
+    if (contractId) {
+      const contract = await tx.contracts.findUnique({
+        where: { id: contractId },
+        select: {
+          id: true,
+          name: true,
+          contractNumber: true,
+          supplierId: true,
+          status: true,
+        },
+      })
+      if (!contract) throw new Error('Contrato no encontrado')
+      if (contract.status === 'TERMINATED' || contract.status === 'EXPIRED') {
+        throw new Error('El contrato no está vigente para vincular a un mantenimiento')
+      }
+      contractLabel = contract.contractNumber
+        ? `${contract.contractNumber} — ${contract.name}`
+        : contract.name
+      if (supplierId && contract.supplierId && contract.supplierId !== supplierId) {
+        throw new Error('El contrato no pertenece al proveedor seleccionado')
+      }
+      if (!supplierId && contract.supplierId) {
+        supplierId = contract.supplierId
+      }
+    }
+
+    if (supplierId) {
+      const supplier = await tx.suppliers.findUnique({
+        where: { id: supplierId },
+        select: { id: true, isActive: true },
+      })
+      if (!supplier) throw new Error('Proveedor no encontrado')
+      if (supplier.isActive === false) throw new Error('El proveedor no está activo')
+      // Técnico interno opcional solo como contacto/coordinador; no se asigna por defecto
+      return {
+        technicianId: data.technicianId?.trim() || null,
+        supplierId,
+        contractId,
+        contractLabel,
+      }
+    }
+
+    return {
+      technicianId: data.technicianId?.trim() || actorUserId,
+      supplierId: null,
+      contractId: null,
+      contractLabel: null,
+    }
+  }
+
   /**
    * Admin/Técnico crea un mantenimiento directamente (SCHEDULED)
    * El equipo pasa a MAINTENANCE inmediatamente
@@ -79,6 +149,16 @@ export class MaintenanceService {
       if (!validation.valid) {
         throw new Error(validation.reason)
       }
+
+      const parties = await this.resolveMaintenanceParties(
+        tx,
+        {
+          technicianId: data.technicianId,
+          supplierId: data.supplierId,
+          contractId: data.contractId,
+        },
+        userId
+      )
 
       const equipment = await tx.equipment.findUnique({
         where: { id: data.equipmentId },
@@ -99,21 +179,32 @@ export class MaintenanceService {
           cost: data.cost,
           partsReplaced: data.partsReplaced || [],
           ticketId: data.ticketId,
-          technicianId: data.technicianId || userId,
-          supplierId: data.supplierId || null,
+          technicianId: parties.technicianId,
+          supplierId: parties.supplierId,
+          contractId: parties.contractId,
           requestedById: data.requestedById,
           status: 'SCHEDULED',
           notes: data.notes,
           previousStatus: equipment?.status ?? null,
           previousDepartmentId: equipmentFull?.departmentId ?? null,
         },
-        include: { equipment: true, technician: true, supplier: true, ticket: true },
+        include: {
+          equipment: true,
+          technician: true,
+          supplier: true,
+          contract: true,
+          ticket: true,
+        },
       })
 
       await tx.equipment.update({
         where: { id: data.equipmentId },
         data: { status: 'MAINTENANCE' },
       })
+
+      const performerLabel = parties.supplierId
+        ? `Proveedor externo: ${(maintenance as any).supplier?.name || parties.supplierId}${parties.contractLabel ? ` (contrato ${parties.contractLabel})` : ''}`
+        : `Técnico interno: ${(maintenance as any).technician?.name || parties.technicianId}`
 
       await tx.audit_logs.create({
         data: {
@@ -123,12 +214,15 @@ export class MaintenanceService {
           entityId: maintenance.id,
           userId,
           details: {
-            descripcion: `Se programó mantenimiento ${data.type === 'PREVENTIVE' ? 'preventivo' : 'correctivo'} para el equipo ${(maintenance as any).equipment?.code || data.equipmentId}. Fecha: ${new Date(data.scheduledDate).toLocaleDateString('es-EC')}. Motivo: ${data.description}${validation.warning ? ` NOTA: ${validation.warning}` : ''}`,
+            descripcion: `Se programó mantenimiento ${data.type === 'PREVENTIVE' ? 'preventivo' : 'correctivo'} para el equipo ${(maintenance as any).equipment?.code || data.equipmentId}. Fecha: ${new Date(data.scheduledDate).toLocaleDateString('es-EC')}. ${performerLabel}. Motivo: ${data.description}${validation.warning ? ` NOTA: ${validation.warning}` : ''}`,
             equipmentId: data.equipmentId,
             type: data.type,
             scheduledDate: data.scheduledDate,
-            supplierId: data.supplierId || null,
+            technicianId: parties.technicianId,
+            supplierId: parties.supplierId,
             supplierName: (maintenance as any).supplier?.name || null,
+            contractId: parties.contractId,
+            contractLabel: parties.contractLabel,
             previousStatus: equipment?.status ?? null,
             warning: validation.warning,
           },
@@ -200,7 +294,13 @@ export class MaintenanceService {
    */
   static async approveMaintenance(
     id: string,
-    data: { scheduledDate: Date; technicianId?: string; notes?: string },
+    data: {
+      scheduledDate: Date
+      technicianId?: string
+      supplierId?: string
+      contractId?: string
+      notes?: string
+    },
     userId: string
   ): Promise<MaintenanceRecord> {
     const result = await prisma.$transaction(async tx => {
@@ -212,6 +312,16 @@ export class MaintenanceService {
       if (existing.status !== 'REQUESTED')
         throw new Error('Solo se pueden aprobar solicitudes en estado REQUESTED')
 
+      const parties = await this.resolveMaintenanceParties(
+        tx,
+        {
+          technicianId: data.technicianId,
+          supplierId: data.supplierId,
+          contractId: data.contractId,
+        },
+        userId
+      )
+
       const equipmentFull = await tx.equipment.findUnique({
         where: { id: existing.equipmentId },
         select: { status: true, departmentId: true },
@@ -222,18 +332,30 @@ export class MaintenanceService {
         data: {
           status: 'SCHEDULED',
           date: data.scheduledDate,
-          technicianId: data.technicianId || userId,
+          technicianId: parties.technicianId,
+          supplierId: parties.supplierId,
+          contractId: parties.contractId,
           notes: data.notes,
           previousStatus: existing.equipment.status,
           previousDepartmentId: equipmentFull?.departmentId ?? null,
         },
-        include: { equipment: true, technician: true, ticket: true },
+        include: {
+          equipment: true,
+          technician: true,
+          supplier: true,
+          contract: true,
+          ticket: true,
+        },
       })
 
       await tx.equipment.update({
         where: { id: existing.equipmentId },
         data: { status: 'MAINTENANCE' },
       })
+
+      const performerLabel = parties.supplierId
+        ? `Proveedor externo: ${(maintenance as any).supplier?.name || parties.supplierId}${parties.contractLabel ? ` (contrato ${parties.contractLabel})` : ''}`
+        : `Técnico: ${(maintenance as any).technician?.name || parties.technicianId}`
 
       await tx.audit_logs.create({
         data: {
@@ -243,9 +365,13 @@ export class MaintenanceService {
           entityId: id,
           userId,
           details: {
-            descripcion: `Se aprobó la solicitud de mantenimiento del equipo ${existing.equipment.code}. Fecha programada: ${new Date(data.scheduledDate).toLocaleDateString('es-EC')}. El equipo pasó a estado "En mantenimiento".`,
+            descripcion: `Se aprobó la solicitud de mantenimiento del equipo ${existing.equipment.code}. Fecha programada: ${new Date(data.scheduledDate).toLocaleDateString('es-EC')}. ${performerLabel}. El equipo pasó a estado "En mantenimiento".`,
             scheduledDate: data.scheduledDate,
-            technicianId: data.technicianId || userId,
+            technicianId: parties.technicianId,
+            supplierId: parties.supplierId,
+            supplierName: (maintenance as any).supplier?.name || null,
+            contractId: parties.contractId,
+            contractLabel: parties.contractLabel,
             previousStatus: existing.equipment.status,
           },
         },
@@ -531,6 +657,8 @@ export class MaintenanceService {
       description: string
       scheduledDate: Date
       technicianId?: string
+      supplierId?: string
+      contractId?: string
       statusFilter?: string[]
       familyId?: string
       cost?: number
@@ -562,6 +690,8 @@ export class MaintenanceService {
             description: data.description,
             scheduledDate: data.scheduledDate,
             technicianId: data.technicianId,
+            supplierId: data.supplierId,
+            contractId: data.contractId,
             cost: data.cost,
             notes: data.notes,
           },
@@ -591,6 +721,8 @@ export class MaintenanceService {
           created: created.length,
           skipped: skipped.length,
           scheduledDate: data.scheduledDate,
+          supplierId: data.supplierId || null,
+          contractId: data.contractId || null,
         },
       },
     })
@@ -608,6 +740,8 @@ export class MaintenanceService {
       description: string
       scheduledDate: Date
       technicianId?: string
+      supplierId?: string
+      contractId?: string
       statusFilter?: string[]
       familyId?: string
       cost?: number
@@ -638,6 +772,8 @@ export class MaintenanceService {
             description: data.description,
             scheduledDate: data.scheduledDate,
             technicianId: data.technicianId,
+            supplierId: data.supplierId,
+            contractId: data.contractId,
             cost: data.cost,
             notes: data.notes,
           },
@@ -666,6 +802,8 @@ export class MaintenanceService {
           created: created.length,
           skipped: skipped.length,
           scheduledDate: data.scheduledDate,
+          supplierId: data.supplierId || null,
+          contractId: data.contractId || null,
         },
       },
     })
@@ -683,6 +821,8 @@ export class MaintenanceService {
       description: string
       scheduledDate: Date
       technicianId?: string
+      supplierId?: string
+      contractId?: string
       cost?: number
       notes?: string
     },
@@ -708,6 +848,8 @@ export class MaintenanceService {
             description: data.description,
             scheduledDate: data.scheduledDate,
             technicianId: data.technicianId,
+            supplierId: data.supplierId,
+            contractId: data.contractId,
             cost: data.cost,
             notes: data.notes,
           },
@@ -737,6 +879,8 @@ export class MaintenanceService {
           created: created.length,
           skipped: skipped.length,
           scheduledDate: data.scheduledDate,
+          supplierId: data.supplierId || null,
+          contractId: data.contractId || null,
         },
       },
     })
@@ -850,6 +994,16 @@ export class MaintenanceService {
         },
         technician: { select: { id: true, name: true, email: true } },
         supplier: { select: { id: true, name: true, phone: true, email: true } },
+        contract: {
+          select: {
+            id: true,
+            name: true,
+            contractNumber: true,
+            category: true,
+            status: true,
+            supplierId: true,
+          },
+        },
         requestedBy: { select: { id: true, name: true, email: true } },
         ticket: { select: { id: true, title: true, status: true } },
       },

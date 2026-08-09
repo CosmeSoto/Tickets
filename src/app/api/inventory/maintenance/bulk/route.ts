@@ -75,6 +75,8 @@ export async function POST(req: NextRequest) {
               {
                 scheduledDate: approveWhen,
                 technicianId: data.technicianId,
+                supplierId: data.supplierId,
+                contractId: data.contractId,
                 notes: data.notes,
               },
               session.user.id

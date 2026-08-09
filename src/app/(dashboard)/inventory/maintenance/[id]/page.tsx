@@ -52,6 +52,12 @@ import {
   parseScheduledDateTime,
   toLocalDateTimeInputValue,
 } from '@/lib/forms/form-date'
+import {
+  MaintenanceAssigneeFields,
+  assigneeToApiPayload,
+  emptyAssignee,
+  type MaintenanceAssigneeValue,
+} from '@/components/inventory/maintenance/maintenance-assignee-fields'
 
 interface MaintenanceDetail {
   id: string
@@ -79,6 +85,13 @@ interface MaintenanceDetail {
   }
   technician: { id: string; name: string; email: string } | null
   supplier: { id: string; name: string; phone?: string | null; email?: string | null } | null
+  contract: {
+    id: string
+    name: string
+    contractNumber: string | null
+    category?: string
+    status?: string
+  } | null
   requestedBy: { id: string; name: string; email: string } | null
   ticket: { id: string; title: string; status: string } | null
 }
@@ -127,11 +140,14 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
 
   const [showApprove, setShowApprove] = useState(false)
   const [showReschedule, setShowReschedule] = useState(false)
+  const [approveAt, setApproveAt] = useState('')
+  const [approveNotes, setApproveNotes] = useState('')
+  const [approveAssignee, setApproveAssignee] = useState<MaintenanceAssigneeValue>(() =>
+    emptyAssignee()
+  )
   const [showComplete, setShowComplete] = useState(false)
   const [showCancel, setShowCancel] = useState(false)
 
-  const [approveAt, setApproveAt] = useState('')
-  const [approveNotes, setApproveNotes] = useState('')
   const [newAt, setNewAt] = useState('')
   const [newDescription, setNewDescription] = useState('')
   const [completeCost, setCompleteCost] = useState('')
@@ -189,6 +205,14 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
 
   const handleApprove = async () => {
     if (!approveAt) return
+    if (approveAssignee.mode === 'external' && !approveAssignee.supplierId) {
+      toast({
+        title: 'Proveedor requerido',
+        description: 'Selecciona el proveedor que realizará el mantenimiento.',
+        variant: 'destructive',
+      })
+      return
+    }
     const when = parseScheduledDateTime(approveAt)
     if (Number.isNaN(when.getTime())) {
       toast({
@@ -202,12 +226,17 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
       await doAction('approve', {
         scheduledDate: when.toISOString(),
         notes: approveNotes || undefined,
+        ...assigneeToApiPayload(approveAssignee),
       })
       toast({
         title: 'Solicitud aprobada',
-        description: 'El mantenimiento ha sido programado y el equipo está en mantenimiento.',
+        description:
+          approveAssignee.mode === 'external'
+            ? 'Programado con proveedor externo. El equipo está en mantenimiento.'
+            : 'El mantenimiento ha sido programado y el equipo está en mantenimiento.',
       })
       setShowApprove(false)
+      setApproveAssignee(emptyAssignee())
       fetchMaintenance()
     } catch (e) {
       toast({
@@ -649,6 +678,18 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
                 <span className='text-sm font-medium'>{maintenance.supplier.name}</span>
               </div>
             )}
+            {maintenance.contract && (
+              <div className='flex justify-between items-center'>
+                <span className='text-muted-foreground text-sm'>Contrato vinculado</span>
+                <Button
+                  variant='link'
+                  className='p-0 h-auto text-sm'
+                  onClick={() => router.push(`/inventory/contracts/${maintenance.contract!.id}`)}
+                >
+                  {maintenance.contract.contractNumber || maintenance.contract.name}
+                </Button>
+              </div>
+            )}
             {maintenance.supplierInvoice && (
               <div className='flex justify-between items-center'>
                 <span className='text-muted-foreground text-sm'>Factura proveedor</span>
@@ -699,12 +740,19 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
       </div>
 
       {/* Dialog: Aprobar solicitud */}
-      <Dialog open={showApprove} onOpenChange={setShowApprove}>
-        <DialogContent aria-describedby={undefined}>
+      <Dialog
+        open={showApprove}
+        onOpenChange={open => {
+          setShowApprove(open)
+          if (!open) setApproveAssignee(emptyAssignee())
+        }}
+      >
+        <DialogContent className='max-h-[90vh] overflow-y-auto' aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>Aprobar y Programar Mantenimiento</DialogTitle>
             <DialogDescription>
-              Confirma la fecha y hora, y asigna el técnico. El equipo pasará a estado Mantenimiento.
+              Confirma fecha/hora y quién lo realiza (técnico interno o proveedor externo). El
+              equipo pasará a estado Mantenimiento.
             </DialogDescription>
           </DialogHeader>
           <div className='space-y-4'>
@@ -712,6 +760,7 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
               <Label>Fecha y hora programadas *</Label>
               <DateTimePicker value={approveAt} onChange={setApproveAt} />
             </div>
+            <MaintenanceAssigneeFields value={approveAssignee} onChange={setApproveAssignee} />
             <div>
               <Label>Notas para el cliente (opcional)</Label>
               <Textarea
