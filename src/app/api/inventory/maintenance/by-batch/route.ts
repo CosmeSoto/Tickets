@@ -10,6 +10,7 @@ import {
   inventoryAccessToResponse,
   toInventoryAccessUser,
 } from '@/lib/inventory/inventory-resource-access'
+import { parseScheduledDateTime } from '@/lib/forms/form-date'
 
 /**
  * POST /api/inventory/maintenance/by-batch
@@ -47,12 +48,17 @@ export async function POST(req: NextRequest) {
       throw err
     }
 
+    const when = parseScheduledDateTime(scheduledDate)
+    if (Number.isNaN(when.getTime())) {
+      return NextResponse.json({ error: 'Fecha y hora inválidas' }, { status: 400 })
+    }
+
     const result = await MaintenanceService.createMaintenanceByBatch(
       {
         batchId,
         type,
         description,
-        scheduledDate: new Date(scheduledDate),
+        scheduledDate: when,
         technicianId,
         cost,
         notes,

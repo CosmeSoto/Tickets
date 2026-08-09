@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, use } from 'react'
+import { useState, useEffect, use, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import {
@@ -21,7 +21,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { DateInput } from '@/components/ui/date-input'
+import { DateTimePicker } from '@/components/ui/date-time-picker'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -47,6 +47,11 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
+import {
+  formatLocalDateTime,
+  parseScheduledDateTime,
+  toLocalDateTimeInputValue,
+} from '@/lib/forms/form-date'
 
 interface MaintenanceDetail {
   id: string
@@ -80,7 +85,7 @@ interface MaintenanceDetail {
 
 const TYPE_LABELS: Record<string, string> = { PREVENTIVE: 'Preventivo', CORRECTIVE: 'Correctivo' }
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
+const STATUS_CONFIG: Record<string, { label: string; color: string; icon: ReactNode }> = {
   REQUESTED: {
     label: 'Solicitado',
     color: 'bg-blue-100 text-blue-800',
@@ -125,9 +130,9 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
   const [showComplete, setShowComplete] = useState(false)
   const [showCancel, setShowCancel] = useState(false)
 
-  const [approveDate, setApproveDate] = useState('')
+  const [approveAt, setApproveAt] = useState('')
   const [approveNotes, setApproveNotes] = useState('')
-  const [newDate, setNewDate] = useState('')
+  const [newAt, setNewAt] = useState('')
   const [newDescription, setNewDescription] = useState('')
   const [completeCost, setCompleteCost] = useState('')
   const [completeParts, setCompleteParts] = useState('')
@@ -146,9 +151,9 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
       if (!res.ok) throw new Error('No encontrado')
       const data = await res.json()
       setMaintenance(data)
-      setNewDate(data.date?.split('T')[0] || '')
+      setNewAt(toLocalDateTimeInputValue(data.date))
       setNewDescription(data.description || '')
-      setApproveDate(data.date?.split('T')[0] || '')
+      setApproveAt(toLocalDateTimeInputValue(data.date))
     } catch {
       toast({
         title: 'Error',
@@ -183,9 +188,21 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
   }
 
   const handleApprove = async () => {
-    if (!approveDate) return
+    if (!approveAt) return
+    const when = parseScheduledDateTime(approveAt)
+    if (Number.isNaN(when.getTime())) {
+      toast({
+        title: 'Fecha inválida',
+        description: 'Revisa la fecha y hora programada.',
+        variant: 'destructive',
+      })
+      return
+    }
     try {
-      await doAction('approve', { scheduledDate: approveDate, notes: approveNotes || undefined })
+      await doAction('approve', {
+        scheduledDate: when.toISOString(),
+        notes: approveNotes || undefined,
+      })
       toast({
         title: 'Solicitud aprobada',
         description: 'El mantenimiento ha sido programado y el equipo está en mantenimiento.',
@@ -219,10 +236,19 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
   }
 
   const handleReschedule = async () => {
-    if (!newDate) return
+    if (!newAt) return
+    const when = parseScheduledDateTime(newAt)
+    if (Number.isNaN(when.getTime())) {
+      toast({
+        title: 'Fecha inválida',
+        description: 'Revisa la nueva fecha y hora.',
+        variant: 'destructive',
+      })
+      return
+    }
     try {
       await doAction('reschedule', {
-        scheduledDate: newDate,
+        scheduledDate: when.toISOString(),
         description: newDescription || undefined,
       })
       toast({ title: 'Reagendado', description: 'El mantenimiento ha sido reagendado.' })
@@ -514,15 +540,11 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
               </Badge>
             </div>
             <div className='flex justify-between items-center'>
-              <span className='text-muted-foreground text-sm'>Fecha programada</span>
+              <span className='text-muted-foreground text-sm'>Fecha y hora programadas</span>
               <span
                 className={`text-sm font-medium ${isPast && isActive ? 'text-orange-600' : ''}`}
               >
-                {scheduledDate.toLocaleDateString('es-ES', {
-                  day: 'numeric',
-                  month: 'long',
-                  year: 'numeric',
-                })}
+                {formatLocalDateTime(scheduledDate)}
                 {isPast && isActive && ' ⚠️'}
               </span>
             </div>
@@ -682,13 +704,13 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
           <DialogHeader>
             <DialogTitle>Aprobar y Programar Mantenimiento</DialogTitle>
             <DialogDescription>
-              Confirma la fecha y asigna el técnico. El equipo pasará a estado Mantenimiento.
+              Confirma la fecha y hora, y asigna el técnico. El equipo pasará a estado Mantenimiento.
             </DialogDescription>
           </DialogHeader>
           <div className='space-y-4'>
             <div>
-              <Label>Fecha programada *</Label>
-              <DateInput value={approveDate} onChange={e => setApproveDate(e.target.value)} />
+              <Label>Fecha y hora programadas *</Label>
+              <DateTimePicker value={approveAt} onChange={setApproveAt} />
             </div>
             <div>
               <Label>Notas para el cliente (opcional)</Label>
@@ -704,7 +726,7 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
             <Button variant='outline' onClick={() => setShowApprove(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleApprove} disabled={actionLoading || !approveDate}>
+            <Button onClick={handleApprove} disabled={actionLoading || !approveAt}>
               {actionLoading && <Loader2 className='mr-2 h-4 w-4 animate-spin' />} Aprobar y
               Programar
             </Button>
@@ -720,8 +742,8 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
           </DialogHeader>
           <div className='space-y-4'>
             <div>
-              <Label>Nueva fecha *</Label>
-              <DateInput value={newDate} onChange={e => setNewDate(e.target.value)} />
+              <Label>Nueva fecha y hora *</Label>
+              <DateTimePicker value={newAt} onChange={setNewAt} />
             </div>
             <div>
               <Label>Descripción (opcional)</Label>
@@ -736,7 +758,7 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
             <Button variant='outline' onClick={() => setShowReschedule(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleReschedule} disabled={actionLoading || !newDate}>
+            <Button onClick={handleReschedule} disabled={actionLoading || !newAt}>
               {actionLoading && <Loader2 className='mr-2 h-4 w-4 animate-spin' />} Reagendar
             </Button>
           </DialogFooter>

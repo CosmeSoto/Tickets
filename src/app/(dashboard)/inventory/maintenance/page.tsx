@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Suspense, type ReactNode } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import {
@@ -40,6 +40,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { formatLocalDateTime } from '@/lib/forms/form-date'
 
 interface MaintenanceItem {
   id: string
@@ -60,7 +61,7 @@ interface MaintenanceItem {
   requestedBy: { id: string; name: string } | null
 }
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
+const STATUS_CONFIG: Record<string, { label: string; color: string; icon: ReactNode }> = {
   REQUESTED: {
     label: 'Solicitado',
     color: 'bg-blue-100 text-blue-800',
@@ -90,7 +91,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.
 
 const TYPE_LABELS: Record<string, string> = { PREVENTIVE: 'Preventivo', CORRECTIVE: 'Correctivo' }
 
-export default function MaintenanceListPage() {
+export function MaintenanceListPageContent() {
   const { data: session } = useSession()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -443,11 +444,7 @@ export default function MaintenanceListPage() {
                           <div className='flex items-center gap-3 mt-1.5 text-xs text-muted-foreground flex-wrap'>
                             <span className='flex items-center gap-1'>
                               <Calendar className='h-3 w-3' />
-                              {new Date(record.date).toLocaleDateString('es-EC', {
-                                day: 'numeric',
-                                month: 'short',
-                                year: 'numeric',
-                              })}
+                              {formatLocalDateTime(record.date)}
                             </span>
                             {record.technician && (
                               <span className='flex items-center gap-1'>
@@ -534,5 +531,23 @@ export default function MaintenanceListPage() {
         />
       )}
     </ModuleLayout>
+  )
+}
+
+function MaintenanceListSuspenseFallback() {
+  return (
+    <ModuleLayout title='Mantenimientos' subtitle='Cargando...'>
+      <div className='flex items-center justify-center h-64'>
+        <Loader2 className='h-8 w-8 animate-spin text-primary' />
+      </div>
+    </ModuleLayout>
+  )
+}
+
+export default function MaintenanceListPage() {
+  return (
+    <Suspense fallback={<MaintenanceListSuspenseFallback />}>
+      <MaintenanceListPageContent />
+    </Suspense>
   )
 }

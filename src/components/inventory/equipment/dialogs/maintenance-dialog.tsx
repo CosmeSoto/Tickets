@@ -12,7 +12,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { DateInput } from '@/components/ui/date-input'
+import { DateTimePicker } from '@/components/ui/date-time-picker'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import {
@@ -125,10 +125,10 @@ export function MaintenanceDialog({
             </div>
 
             <div className='space-y-2'>
-              <Label>Fecha Programada *</Label>
-              <DateInput
+              <Label>Fecha y hora programadas *</Label>
+              <DateTimePicker
                 value={form.scheduledDate}
-                onChange={e => onFormChange({ ...form, scheduledDate: e.target.value })}
+                onChange={v => onFormChange({ ...form, scheduledDate: v })}
               />
             </div>
 

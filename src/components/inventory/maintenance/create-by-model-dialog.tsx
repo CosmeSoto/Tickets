@@ -20,11 +20,12 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { DatePicker } from '@/components/ui/date-picker'
+import { DateTimePicker } from '@/components/ui/date-time-picker'
 import { ModelCombobox } from '@/components/ui/model-combobox'
 import { TechnicianCombobox } from '@/components/ui/technician-combobox'
 import { FamilyCombobox } from '@/components/ui/family-combobox'
 import { useFamilyOptions } from '@/hooks/use-family-options'
+import { parseScheduledDateTime, toLocalDateTimeInputValue } from '@/lib/forms/form-date'
 import { toast } from 'sonner'
 
 interface CreateByModelDialogProps {
@@ -38,7 +39,7 @@ export function CreateByModelDialog({ open, onClose, onCreated }: CreateByModelD
   const [modelId, setModelId] = useState('')
   const [type, setType] = useState<'PREVENTIVE' | 'CORRECTIVE'>('PREVENTIVE')
   const [description, setDescription] = useState('')
-  const [scheduledDate, setScheduledDate] = useState<Date>(new Date())
+  const [scheduledAt, setScheduledAt] = useState(() => toLocalDateTimeInputValue(new Date()))
   const [technicianId, setTechnicianId] = useState('')
   const [familyId, setFamilyId] = useState('all')
   const [statusFilter, setStatusFilter] = useState<string[]>(['AVAILABLE', 'ASSIGNED'])
@@ -73,8 +74,14 @@ export function CreateByModelDialog({ open, onClose, onCreated }: CreateByModelD
   }, [modelId, familyId, statusFilter])
 
   const handleSubmit = async () => {
-    if (!modelId || !description || !scheduledDate) {
+    if (!modelId || !description || !scheduledAt) {
       toast.error('Por favor completa todos los campos requeridos')
+      return
+    }
+
+    const when = parseScheduledDateTime(scheduledAt)
+    if (Number.isNaN(when.getTime())) {
+      toast.error('Revisa la fecha y hora programada')
       return
     }
 
@@ -92,7 +99,7 @@ export function CreateByModelDialog({ open, onClose, onCreated }: CreateByModelD
           modelId,
           type,
           description,
-          scheduledDate: scheduledDate.toISOString(),
+          scheduledDate: when.toISOString(),
           technicianId: technicianId || undefined,
           familyId: familyId !== 'all' ? familyId : undefined,
           statusFilter: statusFilter.length > 0 ? statusFilter : undefined,
@@ -125,7 +132,7 @@ export function CreateByModelDialog({ open, onClose, onCreated }: CreateByModelD
     setModelId('')
     setType('PREVENTIVE')
     setDescription('')
-    setScheduledDate(new Date())
+    setScheduledAt(toLocalDateTimeInputValue(new Date()))
     setTechnicianId('')
     setFamilyId('all')
     setStatusFilter(['AVAILABLE', 'ASSIGNED'])
@@ -186,12 +193,12 @@ export function CreateByModelDialog({ open, onClose, onCreated }: CreateByModelD
               />
             </div>
 
-            {/* Fecha */}
+            {/* Fecha y hora */}
             <div className='space-y-2'>
               <Label>
-                Fecha Programada <span className='text-destructive'>*</span>
+                Fecha y hora programadas <span className='text-destructive'>*</span>
               </Label>
-              <DatePicker date={scheduledDate} onDateChange={d => d && setScheduledDate(d)} />
+              <DateTimePicker value={scheduledAt} onChange={setScheduledAt} />
             </div>
 
             {/* Técnico */}

@@ -11,6 +11,7 @@ import {
   inventoryAccessToResponse,
   toInventoryAccessUser,
 } from '@/lib/inventory/inventory-resource-access'
+import { formatLocalDateTime, parseScheduledDateTime } from '@/lib/forms/form-date'
 
 function equipmentDisplayLabel(eq: {
   brand: string
@@ -198,6 +199,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const when = parseScheduledDateTime(scheduledDate)
+    if (Number.isNaN(when.getTime())) {
+      return NextResponse.json({ error: 'Fecha y hora inválidas' }, { status: 400 })
+    }
+
     let maintenance
     if (isClient) {
       // Cliente solicita mantenimiento
@@ -206,7 +212,7 @@ export async function POST(request: NextRequest) {
           equipmentId,
           type,
           description,
-          scheduledDate: new Date(scheduledDate),
+          scheduledDate: when,
           requestedById: session.user.id,
           notes,
         },
@@ -236,7 +242,7 @@ export async function POST(request: NextRequest) {
           equipmentId,
           type,
           description,
-          scheduledDate: new Date(scheduledDate),
+          scheduledDate: when,
           technicianId: technicianId || session.user.id,
           supplierId: supplierId || undefined,
           notes,
@@ -249,12 +255,7 @@ export async function POST(request: NextRequest) {
       if (activeAssignment?.receiver) {
         const receiver = activeAssignment.receiver
         const maintenanceTypeLabel = type === 'PREVENTIVE' ? 'preventivo' : 'correctivo'
-        const formattedDate = new Date(scheduledDate).toLocaleDateString('es-ES', {
-          weekday: 'long',
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-        })
+        const formattedDate = formatLocalDateTime(when)
         const equipmentLabel = `${equipment.code} (${equipmentDisplayLabel(equipment)})`
 
         await notifyUser(

@@ -9,6 +9,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { extractCatchError } from '@/lib/utils/api-error'
+import { parseScheduledDateTime, toLocalDateTimeInputValue } from '@/lib/forms/form-date'
 import type {
   EquipmentDetailResponse,
   AssignmentForm,
@@ -70,7 +71,7 @@ export function useEquipmentDetail({
   const [maintenanceForm, setMaintenanceForm] = useState<MaintenanceForm>({
     type: 'PREVENTIVE',
     description: '',
-    scheduledDate: new Date().toISOString().split('T')[0],
+    scheduledDate: toLocalDateTimeInputValue(new Date()),
     externalProviderId: undefined,
     notes: undefined,
   })
@@ -319,6 +320,11 @@ export function useEquipmentDetail({
       toast.error('Describe el mantenimiento')
       return
     }
+    const when = parseScheduledDateTime(maintenanceForm.scheduledDate)
+    if (Number.isNaN(when.getTime())) {
+      toast.error('Revisa la fecha y hora programadas')
+      return
+    }
     setSubmittingMaintenance(true)
     try {
       const isClient = userRole === 'CLIENT'
@@ -330,7 +336,7 @@ export function useEquipmentDetail({
           equipmentId,
           type: maintenanceForm.type,
           description: maintenanceForm.description,
-          scheduledDate: maintenanceForm.scheduledDate,
+          scheduledDate: when.toISOString(),
           // Proveedor externo como relación real (supplierId)
           supplierId: maintenanceForm.externalProviderId || undefined,
           notes: maintenanceForm.notes?.trim() || undefined,
@@ -354,7 +360,7 @@ export function useEquipmentDetail({
       setMaintenanceForm({
         type: 'PREVENTIVE',
         description: '',
-        scheduledDate: new Date().toISOString().split('T')[0],
+        scheduledDate: toLocalDateTimeInputValue(new Date()),
         externalProviderId: undefined,
         notes: undefined,
       })

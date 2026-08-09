@@ -139,6 +139,7 @@ export interface ReturnForm {
 export interface MaintenanceForm {
   type: 'PREVENTIVE' | 'CORRECTIVE'
   description: string
+  /** "YYYY-MM-DDTHH:mm" (DateTimePicker) o ISO */
   scheduledDate: string
   /** ID del proveedor externo seleccionado de la lista */
   externalProviderId?: string

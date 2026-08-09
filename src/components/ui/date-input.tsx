@@ -180,6 +180,8 @@ export const DateInput = React.forwardRef<HTMLInputElement, DateInputProps>(
           <PopoverContent
             className='z-[200] w-auto p-0 pointer-events-auto'
             align='start'
+            side='bottom'
+            collisionPadding={16}
             onOpenAutoFocus={e => e.preventDefault()}
             onCloseAutoFocus={e => e.preventDefault()}
           >

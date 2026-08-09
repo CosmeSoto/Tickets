@@ -9,6 +9,7 @@ import {
   inventoryAccessToResponse,
   toInventoryAccessUser,
 } from '@/lib/inventory/inventory-resource-access'
+import { parseScheduledDateTime } from '@/lib/forms/form-date'
 
 /**
  * POST /api/inventory/maintenance/bulk
@@ -62,12 +63,17 @@ export async function POST(req: NextRequest) {
           )
         }
 
+        const approveWhen = parseScheduledDateTime(data.scheduledDate)
+        if (Number.isNaN(approveWhen.getTime())) {
+          return NextResponse.json({ error: 'Fecha y hora inválidas' }, { status: 400 })
+        }
+
         const approveResults = await Promise.allSettled(
           ids.map((id: string) =>
             MaintenanceService.approveMaintenance(
               id,
               {
-                scheduledDate: new Date(data.scheduledDate),
+                scheduledDate: approveWhen,
                 technicianId: data.technicianId,
                 notes: data.notes,
               },
@@ -130,12 +136,17 @@ export async function POST(req: NextRequest) {
           )
         }
 
+        const rescheduleWhen = parseScheduledDateTime(data.scheduledDate)
+        if (Number.isNaN(rescheduleWhen.getTime())) {
+          return NextResponse.json({ error: 'Fecha y hora inválidas' }, { status: 400 })
+        }
+
         const rescheduleResults = await Promise.allSettled(
           ids.map((id: string) =>
             MaintenanceService.reschedule(
               id,
               {
-                scheduledDate: new Date(data.scheduledDate),
+                scheduledDate: rescheduleWhen,
                 description: data.description,
               },
               session.user.id

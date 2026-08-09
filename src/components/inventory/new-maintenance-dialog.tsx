@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { Loader2, Wrench } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { DateInput } from '@/components/ui/date-input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import {
@@ -15,6 +14,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { SearchableSelect } from '@/components/ui/searchable-select'
+import { DateTimePicker } from '@/components/ui/date-time-picker'
 import {
   Dialog,
   DialogContent,
@@ -24,8 +24,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
-import { useInventoryFamilies } from '@/contexts/families-context'
 import { useFamilyOptions } from '@/hooks/use-family-options'
+import { parseScheduledDateTime } from '@/lib/forms/form-date'
 
 interface Props {
   open: boolean
@@ -48,6 +48,18 @@ interface FamilyOption {
   name: string
 }
 
+function defaultScheduledLocal(): string {
+  const d = new Date()
+  d.setHours(9, 0, 0, 0)
+  if (d.getTime() < Date.now()) {
+    d.setDate(d.getDate() + 1)
+  }
+  const yyyy = d.getFullYear()
+  const MM = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${yyyy}-${MM}-${dd}T09:00`
+}
+
 export function NewMaintenanceDialog({
   open,
   onClose,
@@ -58,7 +70,6 @@ export function NewMaintenanceDialog({
 }: Props) {
   const [loading, setLoading] = useState(false)
 
-  // Familias de inventario desde el contexto global — sin petición extra (memoizadas)
   const { families, loading: loadingFamilies } = useFamilyOptions()
   const familyList: FamilyOption[] = families.map(f => ({ id: f.id, name: f.name }))
 
@@ -70,10 +81,9 @@ export function NewMaintenanceDialog({
   const [equipmentId, setEquipmentId] = useState(preselectedEquipmentId || '')
   const [type, setType] = useState('PREVENTIVE')
   const [description, setDescription] = useState('')
-  const [scheduledDate, setScheduledDate] = useState('')
+  const [scheduledAt, setScheduledAt] = useState(defaultScheduledLocal)
   const [notes, setNotes] = useState('')
 
-  // Cargar equipos al abrir o al cambiar familia
   useEffect(() => {
     if (!open || preselectedEquipmentId) return
     setLoadingEquipment(true)
@@ -103,13 +113,13 @@ export function NewMaintenanceDialog({
     setEquipmentId('')
     setType('PREVENTIVE')
     setDescription('')
-    setScheduledDate('')
+    setScheduledAt(defaultScheduledLocal())
     setNotes('')
     onClose()
   }
 
   const handleSubmit = async () => {
-    if (!equipmentId || !description || !scheduledDate) {
+    if (!equipmentId || !description || !scheduledAt) {
       toast({
         title: 'Campos requeridos',
         description: 'Completa todos los campos obligatorios.',
@@ -117,6 +127,17 @@ export function NewMaintenanceDialog({
       })
       return
     }
+
+    const when = parseScheduledDateTime(scheduledAt)
+    if (Number.isNaN(when.getTime())) {
+      toast({
+        title: 'Fecha inválida',
+        description: 'Revisa la fecha y hora programada.',
+        variant: 'destructive',
+      })
+      return
+    }
+
     setLoading(true)
     try {
       const res = await fetch('/api/inventory/maintenance', {
@@ -126,7 +147,7 @@ export function NewMaintenanceDialog({
           equipmentId,
           type,
           description,
-          scheduledDate,
+          scheduledDate: when.toISOString(),
           notes: notes || undefined,
         }),
       })
@@ -153,7 +174,8 @@ export function NewMaintenanceDialog({
     }
   }
 
-  const minDate = new Date().toISOString().split('T')[0]
+  const minDate = new Date()
+  minDate.setHours(0, 0, 0, 0)
 
   return (
     <Dialog
@@ -162,7 +184,7 @@ export function NewMaintenanceDialog({
         if (!v) handleClose()
       }}
     >
-      <DialogContent className='max-w-md' aria-describedby={undefined}>
+      <DialogContent className='max-w-md max-h-[90vh] overflow-y-auto' aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle className='flex items-center gap-2'>
             <Wrench className='h-5 w-5' />
@@ -190,7 +212,6 @@ export function NewMaintenanceDialog({
               </div>
             ) : (
               <div className='space-y-3'>
-                {/* Paso 1: Familia — solo admin/técnico */}
                 {!isClient && (
                   <div>
                     <Label>
@@ -214,7 +235,6 @@ export function NewMaintenanceDialog({
                   </div>
                 )}
 
-                {/* Paso 2: Equipo */}
                 <div>
                   <Label>Equipo *</Label>
                   {loadingEquipment ? (
@@ -238,7 +258,6 @@ export function NewMaintenanceDialog({
               </div>
             )}
 
-            {/* Tipo */}
             <div>
               <Label>Tipo de mantenimiento *</Label>
               <Select value={type} onValueChange={setType}>
@@ -266,7 +285,6 @@ export function NewMaintenanceDialog({
               </Select>
             </div>
 
-            {/* Descripción */}
             <div>
               <Label>{isClient ? 'Motivo de la solicitud *' : 'Descripción del trabajo *'}</Label>
               <Textarea
@@ -281,22 +299,16 @@ export function NewMaintenanceDialog({
               />
             </div>
 
-            {/* Fecha */}
             <div>
-              <Label>{isClient ? 'Fecha sugerida *' : 'Fecha programada *'}</Label>
-              <DateInput
-                value={scheduledDate}
-                min={minDate}
-                onChange={e => setScheduledDate(e.target.value)}
-              />
+              <Label>{isClient ? 'Fecha y hora sugeridas *' : 'Fecha y hora programadas *'}</Label>
+              <DateTimePicker value={scheduledAt} onChange={setScheduledAt} minDate={minDate} />
               {isClient && (
                 <p className='text-xs text-muted-foreground mt-1'>
-                  El técnico puede ajustar la fecha al aprobar tu solicitud.
+                  El técnico puede ajustar la fecha y hora al aprobar tu solicitud.
                 </p>
               )}
             </div>
 
-            {/* Notas */}
             <div>
               <Label>Notas adicionales (opcional)</Label>
               <Textarea
@@ -314,7 +326,7 @@ export function NewMaintenanceDialog({
             </Button>
             <Button
               type='submit'
-              disabled={loading || !equipmentId || !description || !scheduledDate}
+              disabled={loading || !equipmentId || !description || !scheduledAt}
             >
               {loading && <Loader2 className='mr-2 h-4 w-4 animate-spin' />}
               {isClient ? 'Enviar Solicitud' : 'Programar Mantenimiento'}

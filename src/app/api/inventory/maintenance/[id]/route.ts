@@ -12,6 +12,7 @@ import {
   inventoryAccessToResponse,
   toInventoryAccessUser,
 } from '@/lib/inventory/inventory-resource-access'
+import { formatLocalDateTime, parseScheduledDateTime } from '@/lib/forms/form-date'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -109,9 +110,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       }
       if (!scheduledDate)
         return NextResponse.json({ error: 'Fecha requerida para aprobar' }, { status: 400 })
+      const when = parseScheduledDateTime(scheduledDate)
+      if (Number.isNaN(when.getTime())) {
+        return NextResponse.json({ error: 'Fecha y hora inválidas' }, { status: 400 })
+      }
       const result = await MaintenanceService.approveMaintenance(
         id,
-        { scheduledDate: new Date(scheduledDate), technicianId, notes },
+        { scheduledDate: when, technicianId, notes },
         session.user.id
       )
 
@@ -122,7 +127,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           userId: maintenance.requestedById,
           type: 'SUCCESS',
           title: `Mantenimiento aprobado — ${maintenance.equipment.code}`,
-          message: `Tu solicitud de mantenimiento fue aprobada. El equipo ${maintenance.equipment.code} entrará en mantenimiento el ${new Date(scheduledDate).toLocaleDateString('es-ES')}.`,
+          message: `Tu solicitud de mantenimiento fue aprobada. El equipo ${maintenance.equipment.code} entrará en mantenimiento el ${formatLocalDateTime(when)}.`,
           metadata: { equipmentId: maintenance.equipmentId, maintenanceId: id },
         }).catch(() => {})
       }
@@ -163,9 +168,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       }
       if (!scheduledDate)
         return NextResponse.json({ error: 'Fecha requerida para reagendar' }, { status: 400 })
+      const when = parseScheduledDateTime(scheduledDate)
+      if (Number.isNaN(when.getTime())) {
+        return NextResponse.json({ error: 'Fecha y hora inválidas' }, { status: 400 })
+      }
       const result = await MaintenanceService.reschedule(
         id,
-        { scheduledDate: new Date(scheduledDate), description },
+        { scheduledDate: when, description },
         session.user.id
       )
       return NextResponse.json(result)

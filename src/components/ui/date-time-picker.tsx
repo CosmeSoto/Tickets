@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { TimePicker } from '@/components/ui/time-picker'
+import { parseScheduledDateTime } from '@/lib/forms/form-date'
 
 // ── DateTimePicker ────────────────────────────────────────────────────────────
 // Acepta/devuelve un string en formato "YYYY-MM-DDTHH:mm" (datetime-local)
@@ -37,11 +38,11 @@ export function DateTimePicker({
 }: DateTimePickerProps) {
   const [open, setOpen] = React.useState(false)
 
-  // Parsear valor actual
+  // Parsear valor actual (local "YYYY-MM-DDTHH:mm" o ISO)
   const selectedDate = React.useMemo(() => {
     if (!value) return undefined
-    const d = new Date(value)
-    return isValid(d) ? d : undefined
+    const d = parseScheduledDateTime(value)
+    return Number.isNaN(d.getTime()) ? undefined : d
   }, [value])
 
   const timeStr = selectedDate
@@ -50,8 +51,8 @@ export function DateTimePicker({
 
   const handleDaySelect = (day: Date | undefined) => {
     if (!day) return
-    // Preservar la hora actual si ya hay una
-    const h = selectedDate?.getHours() ?? 0
+    // Preservar la hora actual; por defecto 09:00 al elegir el primer día
+    const h = selectedDate?.getHours() ?? 9
     const m = selectedDate?.getMinutes() ?? 0
     day.setHours(h, m, 0, 0)
     onChange?.(formatForInput(day))
@@ -71,10 +72,11 @@ export function DateTimePicker({
     : placeholder
 
   return (
-    <Popover open={open} onOpenChange={disabled ? undefined : setOpen}>
+    <Popover modal open={open} onOpenChange={disabled ? undefined : setOpen}>
       <PopoverTrigger asChild>
         <Button
           id={id}
+          type='button'
           variant='outline'
           disabled={disabled}
           className={cn(
@@ -87,18 +89,28 @@ export function DateTimePicker({
           <span className='truncate'>{displayLabel}</span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent className='w-auto p-0' align='start'>
+      <PopoverContent
+        className='z-[200] w-auto p-0 pointer-events-auto'
+        align='start'
+        side='bottom'
+        collisionPadding={16}
+        onOpenAutoFocus={e => e.preventDefault()}
+        onCloseAutoFocus={e => e.preventDefault()}
+      >
         <Calendar
           mode='single'
           selected={selectedDate}
           onSelect={handleDaySelect}
-          initialFocus
+          defaultMonth={selectedDate ?? minDate}
+          captionLayout='dropdown'
+          startMonth={new Date(1990, 0)}
+          endMonth={new Date(new Date().getFullYear() + 15, 11)}
           locale={es}
           disabled={minDate ? day => day < minDate : undefined}
         />
         <div className='border-t px-3 py-2 flex items-center gap-2'>
           <span className='text-xs text-muted-foreground whitespace-nowrap'>Hora:</span>
-          <TimePicker value={timeStr} onChange={handleTimeChange} className='flex-1' />
+          <TimePicker value={timeStr || '09:00'} onChange={handleTimeChange} className='flex-1' />
           <Button size='sm' variant='ghost' onClick={() => setOpen(false)} className='text-xs'>
             OK
           </Button>
@@ -153,9 +165,10 @@ export function DatePickerWithTime({
     : 'Seleccionar fecha'
 
   return (
-    <Popover open={open} onOpenChange={disabled ? undefined : setOpen}>
+    <Popover modal open={open} onOpenChange={disabled ? undefined : setOpen}>
       <PopoverTrigger asChild>
         <Button
+          type='button'
           variant='outline'
           disabled={disabled}
           className={cn(
@@ -168,18 +181,32 @@ export function DatePickerWithTime({
           <span className='truncate'>{displayLabel}</span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent className='w-auto p-0' align='start'>
+      <PopoverContent
+        className='z-[200] w-auto p-0 pointer-events-auto'
+        align='start'
+        side='bottom'
+        collisionPadding={16}
+        onOpenAutoFocus={e => e.preventDefault()}
+        onCloseAutoFocus={e => e.preventDefault()}
+      >
         <Calendar
           mode='single'
           selected={selectedDate}
           onSelect={handleDaySelect}
-          initialFocus
+          defaultMonth={selectedDate}
+          captionLayout='dropdown'
+          startMonth={new Date(1990, 0)}
+          endMonth={new Date(new Date().getFullYear() + 15, 11)}
           locale={es}
         />
         {showTime && (
           <div className='border-t px-3 py-2 flex items-center gap-2'>
             <span className='text-xs text-muted-foreground whitespace-nowrap'>Hora:</span>
-            <TimePicker value={timeValue} onChange={v => onTimeChange?.(v)} className='flex-1' />
+            <TimePicker
+              value={timeValue || '09:00'}
+              onChange={v => onTimeChange?.(v)}
+              className='flex-1'
+            />
             <Button size='sm' variant='ghost' onClick={() => setOpen(false)} className='text-xs'>
               OK
             </Button>
