@@ -93,6 +93,7 @@ export function RoleDashboardLayout({
     news: hasNews,
     forms: hasForms,
     canRequestAssets,
+    canAccessKnowledge,
     canManageInventory: canManageInventoryFromModules,
     canManageNews: canManageNewsFromModules,
     canManageForms: canManageFormsFromModules,
@@ -133,6 +134,7 @@ export function RoleDashboardLayout({
     hasForms,
     hasCredentials,
     canRequestAssets,
+    hasKnowledge: isSuperAdmin || (hasTickets && !!canAccessKnowledge),
   })
 
   const homeHref = roleHomeHref(userRole)

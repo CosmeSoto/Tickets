@@ -616,6 +616,7 @@ export default function ProfilePage() {
               role={session.user.role}
               canManageInventory={(session.user as any).canManageInventory ?? false}
               canRequestAssets={(session.user as any).canRequestAssets ?? false}
+              canAccessKnowledge={(session.user as any).canAccessKnowledge ?? true}
               ticketsEnabled={(session.user as any).ticketsEnabled}
               inventoryEnabled={(session.user as any).inventoryEnabled}
               patrolsEnabled={(session.user as any).patrolsEnabled}

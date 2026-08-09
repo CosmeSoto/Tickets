@@ -365,6 +365,7 @@ export const authOptions: NextAuthOptions = {
                 token.ticketsEnabled = dbUser.ticketsEnabled ?? true
                 token.inventoryEnabled = dbUser.inventoryEnabled ?? true
                 token.canRequestAssets = dbUser.canRequestAssets ?? false
+                token.canAccessKnowledge = (dbUser as any).canAccessKnowledge ?? true
                 token.patrolsEnabled = dbUser.patrolsEnabled ?? false
                 token.newsEnabled = dbUser.newsEnabled ?? false
                 token.canManageNews = dbUser.canManageNews ?? false
@@ -379,6 +380,7 @@ export const authOptions: NextAuthOptions = {
                 token.patrolsEnabled = false
                 token.canManageInventory = false
                 token.canRequestAssets = false
+                token.canAccessKnowledge = true
                 token.newsEnabled = false
                 token.canManageNews = false
                 token.formsEnabled = false
@@ -408,6 +410,7 @@ export const authOptions: NextAuthOptions = {
                   ticketsEnabled: true,
                   inventoryEnabled: true,
                   canRequestAssets: true,
+                  canAccessKnowledge: true,
                   patrolsEnabled: true,
                   newsEnabled: true,
                   canManageNews: true,
@@ -423,6 +426,7 @@ export const authOptions: NextAuthOptions = {
               token.ticketsEnabled = dbUser?.ticketsEnabled ?? true
               token.inventoryEnabled = dbUser?.inventoryEnabled ?? true
               token.canRequestAssets = dbUser?.canRequestAssets ?? false
+              token.canAccessKnowledge = (dbUser as any)?.canAccessKnowledge ?? true
               token.patrolsEnabled = dbUser?.patrolsEnabled ?? false
               token.newsEnabled = dbUser?.newsEnabled ?? false
               token.canManageNews = dbUser?.canManageNews ?? false
@@ -469,6 +473,7 @@ export const authOptions: NextAuthOptions = {
               token.ticketsEnabled = true
               token.inventoryEnabled = true
               token.canRequestAssets = true // Prisma default = true
+              token.canAccessKnowledge = true
               token.patrolsEnabled = false
               token.newsEnabled = false
               token.canManageNews = false
@@ -495,6 +500,7 @@ export const authOptions: NextAuthOptions = {
                   ticketsEnabled: true,
                   inventoryEnabled: true,
                   canRequestAssets: true,
+                  canAccessKnowledge: true,
                   patrolsEnabled: true,
                   newsEnabled: true,
                   canManageNews: true,
@@ -520,6 +526,7 @@ export const authOptions: NextAuthOptions = {
               token.ticketsEnabled = dbUser.ticketsEnabled ?? true
               token.inventoryEnabled = dbUser.inventoryEnabled ?? true
               token.canRequestAssets = dbUser.canRequestAssets ?? false
+              token.canAccessKnowledge = (dbUser as any).canAccessKnowledge ?? true
               token.patrolsEnabled = dbUser.patrolsEnabled ?? false
               token.newsEnabled = dbUser.newsEnabled ?? false
               token.canManageNews = (dbUser as any).canManageNews ?? false
@@ -601,6 +608,7 @@ export const authOptions: NextAuthOptions = {
           ;(session.user as any).ticketsEnabled = (token.ticketsEnabled as boolean) ?? true
           ;(session.user as any).inventoryEnabled = (token.inventoryEnabled as boolean) ?? true
           ;(session.user as any).canRequestAssets = (token.canRequestAssets as boolean) ?? false
+          ;(session.user as any).canAccessKnowledge = (token.canAccessKnowledge as boolean) ?? true
           session.user.patrolsEnabled = (token.patrolsEnabled as boolean) ?? false
           ;(session.user as any).newsEnabled = (token.newsEnabled as boolean) ?? false
           ;(session.user as any).canManageNews = (token.canManageNews as boolean) ?? false

@@ -47,6 +47,7 @@ interface EditUserData {
   isActive: boolean
   canManageInventory: boolean
   canRequestAssets: boolean
+  canAccessKnowledge: boolean
   ticketsEnabled: boolean
   inventoryEnabled: boolean
   patrolsEnabled: boolean
@@ -85,6 +86,7 @@ export function EditUserModal({
     isActive: true,
     canManageInventory: false,
     canRequestAssets: false,
+    canAccessKnowledge: true,
     ticketsEnabled: true,
     inventoryEnabled: false,
     patrolsEnabled: false,
@@ -166,6 +168,7 @@ export function EditUserModal({
         isActive: user.isActive,
         canManageInventory: (user as any).canManageInventory ?? false,
         canRequestAssets: (user as any).canRequestAssets ?? false,
+        canAccessKnowledge: (user as any).canAccessKnowledge ?? true,
         ticketsEnabled: (user as any).ticketsEnabled ?? true,
         inventoryEnabled: (user as any).inventoryEnabled ?? false,
         patrolsEnabled: (user as any).patrolsEnabled ?? false,
@@ -268,6 +271,7 @@ export function EditUserModal({
           isActive: formData.isActive,
           canManageInventory: formData.canManageInventory,
           canRequestAssets: formData.canRequestAssets,
+          canAccessKnowledge: formData.canAccessKnowledge,
           ticketsEnabled: formData.ticketsEnabled,
           inventoryEnabled: formData.inventoryEnabled,
           patrolsEnabled: formData.patrolsEnabled,
@@ -363,7 +367,8 @@ export function EditUserModal({
       | 'credentialsEnabled'
       | 'canManageCredentials'
       | 'canManageInventory'
-      | 'canRequestAssets',
+      | 'canRequestAssets'
+      | 'canAccessKnowledge',
     value: boolean
   ) => {
     if (field === 'inventoryEnabled') {
@@ -374,6 +379,13 @@ export function EditUserModal({
         canManageInventory: p.role === 'TECHNICIAN' ? value : p.canManageInventory,
         // ADMIN normal: al activar inventario, activa ambos permisos automáticamente
         ...(p.role === 'ADMIN' ? { canManageInventory: value, canRequestAssets: value } : {}),
+      }))
+    } else if (field === 'ticketsEnabled') {
+      setFormData(p => ({
+        ...p,
+        ticketsEnabled: value,
+        // Sin Tickets no aplica KB; al desactivar Tickets se apaga también
+        canAccessKnowledge: value ? p.canAccessKnowledge : false,
       }))
     } else if (field === 'newsEnabled') {
       setFormData(p => ({

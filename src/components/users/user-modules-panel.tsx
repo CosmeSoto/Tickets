@@ -19,6 +19,7 @@ interface UserModulesPanelProps {
   credentialsEnabled?: boolean
   canManageCredentials?: boolean
   canRequestAssets?: boolean
+  canAccessKnowledge?: boolean
   /** Vista del propio usuario: copy en 2ª persona y nota de solo lectura */
   selfView?: boolean
   /** Si false, el detalle queda siempre visible (sin acordeón). Default true. */
@@ -41,6 +42,7 @@ interface ModulesData {
   canManageCredentials?: boolean
   canManageInventory?: boolean
   canRequestAssets?: boolean
+  canAccessKnowledge?: boolean
   families: Array<{
     id: string
     name: string
@@ -95,6 +97,7 @@ export function UserModulesPanel({
   credentialsEnabled,
   canManageCredentials,
   canRequestAssets,
+  canAccessKnowledge,
   selfView = false,
   collapsible = true,
   defaultCollapsed = false,
@@ -117,6 +120,7 @@ export function UserModulesPanel({
     userId,
     canManageInventory,
     canRequestAssets,
+    canAccessKnowledge,
     ticketsEnabled,
     inventoryEnabled,
     patrolsEnabled,
@@ -169,6 +173,7 @@ export function UserModulesPanel({
 
   const manageInventory = data.canManageInventory ?? canManageInventory
   const requestAssets = data.canRequestAssets ?? canRequestAssets ?? false
+  const accessKnowledge = data.canAccessKnowledge ?? canAccessKnowledge ?? true
   const manageNews = data.canManageNews ?? canManageNews ?? false
   const manageForms = data.canManageForms ?? canManageForms ?? false
   const manageCredentials = data.canManageCredentials ?? canManageCredentials ?? false
@@ -247,6 +252,9 @@ export function UserModulesPanel({
       : 'Crear y ver propias + las que le compartan'
 
   // Permisos adicionales por módulo
+  const ticketsPerms: Array<{ icon: string; label: string }> = []
+  if (accessKnowledge) ticketsPerms.push({ icon: '📚', label: 'Base de conocimientos' })
+
   const inventoryPerms: Array<{ icon: string; label: string }> = []
   if (manageInventory) inventoryPerms.push({ icon: '🔧', label: 'Gestión completa' })
   if (requestAssets) inventoryPerms.push({ icon: '📋', label: 'Solicitar activos' })
@@ -267,7 +275,7 @@ export function UserModulesPanel({
       emoji: '🎫',
       label: 'Tickets de Soporte',
       cap: ticketsCap,
-      perms: [] as Array<{ icon: string; label: string }>,
+      perms: ticketsPerms,
     },
     {
       key: 'inventory' as const,

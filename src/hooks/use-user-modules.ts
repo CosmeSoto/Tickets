@@ -11,6 +11,7 @@ interface UserModules {
   forms: boolean
   credentials: boolean
   canRequestAssets: boolean
+  canAccessKnowledge: boolean
   canManageInventory: boolean
   canManageNews: boolean
   canManageForms: boolean
@@ -39,6 +40,7 @@ const DEFAULT: UserModules = {
   forms: false,
   credentials: false,
   canRequestAssets: false,
+  canAccessKnowledge: true,
   canManageInventory: false,
   canManageNews: false,
   canManageForms: false,
@@ -97,8 +99,12 @@ export function useUserModules() {
         })
         if (res.ok) {
           const data = await res.json()
-          setModules(data)
-          modulesMemoryCache = { userId, data, at: Date.now() }
+          setModules({ ...DEFAULT, ...data, canAccessKnowledge: data.canAccessKnowledge ?? true })
+          modulesMemoryCache = {
+            userId,
+            data: { ...DEFAULT, ...data, canAccessKnowledge: data.canAccessKnowledge ?? true },
+            at: Date.now(),
+          }
         }
       } catch {
         setModules(DEFAULT)

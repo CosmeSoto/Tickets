@@ -47,6 +47,9 @@ interface ModuleAccessCardProps {
     /** Inventario: solicitar activos */
     canRequestAssets?: boolean
     onToggleRequestAssets?: (v: boolean) => void
+    /** Tickets: Base de conocimientos */
+    canAccessKnowledge?: boolean
+    onToggleAccessKnowledge?: (v: boolean) => void
     /** Noticias: puede crear y publicar noticias */
     canManageNews?: boolean
     onToggleManageNews?: (v: boolean) => void
@@ -207,6 +210,25 @@ export function ModuleAccessCard({
                     onCheckedChange={options.onToggleRequestAssets}
                     disabled={disabled}
                     className='scale-90'
+                  />
+                </div>
+              )}
+              {options.onToggleAccessKnowledge !== undefined && (
+                <div className='flex items-center justify-between gap-2'>
+                  <div className='min-w-0'>
+                    <div className='flex items-center gap-1.5'>
+                      <span className='text-xs'>📚</span>
+                      <p className='text-[11px] font-medium'>Base de conocimientos</p>
+                    </div>
+                    <p className='text-[10px] text-muted-foreground mt-0.5 pl-5'>
+                      Ver y usar artículos de ayuda del módulo Tickets. Independiente del rol.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={options.canAccessKnowledge ?? false}
+                    onCheckedChange={options.onToggleAccessKnowledge}
+                    disabled={disabled}
+                    className='scale-90 shrink-0'
                   />
                 </div>
               )}

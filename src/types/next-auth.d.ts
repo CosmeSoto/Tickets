@@ -18,6 +18,7 @@ declare module 'next-auth' {
       inventoryEnabled?: boolean
       ticketsEnabled?: boolean
       canRequestAssets?: boolean
+      canAccessKnowledge?: boolean
       patrolsEnabled?: boolean
       mustChangePassword?: boolean
       credentialsEnabled?: boolean
@@ -49,6 +50,7 @@ declare module 'next-auth/jwt' {
     inventoryEnabled?: boolean
     ticketsEnabled?: boolean
     canRequestAssets?: boolean
+    canAccessKnowledge?: boolean
     patrolsEnabled?: boolean
     loginTime?: number
     mustChangePassword?: boolean

@@ -21,6 +21,32 @@ export type RoleNavigationInput = {
   hasForms: boolean
   hasCredentials: boolean
   canRequestAssets: boolean
+  /** Tickets + canAccessKnowledge (Super Admin = true) */
+  hasKnowledge: boolean
+}
+
+function isKnowledgeNavChild(child: { name: string; href: string }): boolean {
+  return (
+    child.name === 'Base de Conocimientos' ||
+    child.href === '/knowledge' ||
+    child.href === '/admin/knowledge' ||
+    child.href === '/technician/knowledge' ||
+    child.href.endsWith('/knowledge')
+  )
+}
+
+function filterKnowledgeChildren(
+  items: DashboardNavItem[],
+  hasKnowledge: boolean
+): DashboardNavItem[] {
+  if (hasKnowledge) return items
+  return items.map(item => {
+    if (!item.children?.length) return item
+    return {
+      ...item,
+      children: item.children.filter(c => !isKnowledgeNavChild(c)),
+    }
+  })
 }
 
 export function buildRoleNavigation({
@@ -36,6 +62,7 @@ export function buildRoleNavigation({
   hasForms,
   hasCredentials,
   canRequestAssets,
+  hasKnowledge,
 }: RoleNavigationInput): DashboardNavItem[] {
   const navKey =
     userRole === 'TECHNICIAN' && canManageInventory
@@ -45,7 +72,7 @@ export function buildRoleNavigation({
         : userRole
 
   if (userRole === 'ADMIN') {
-    return navigationByRole['ADMIN'].filter(item => {
+    const adminNav = navigationByRole['ADMIN'].filter(item => {
       if (item.href === '/admin/audit') return isSuperAdmin
       if (isSuperAdmin) return true
       if (item.href === '/admin/tickets' || item.name === 'Tickets') return hasTickets
@@ -56,6 +83,7 @@ export function buildRoleNavigation({
       if (item.href === '/credentials' || item.name === 'Credenciales') return hasCredentials
       return true
     })
+    return filterKnowledgeChildren(adminNav, isSuperAdmin || hasKnowledge)
   }
 
   let navigation = (navigationByRole[navKey] || []).filter(item => {
@@ -122,7 +150,7 @@ export function buildRoleNavigation({
     })
   }
 
-  return navigation
+  return filterKnowledgeChildren(navigation, hasKnowledge)
 }
 
 export function roleHomeHref(userRole: string): string {

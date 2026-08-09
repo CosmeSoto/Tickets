@@ -137,6 +137,7 @@ export function CreateUserModal({
             canManageForms: true,
             canManageCredentials: true,
             canRequestAssets: false,
+            canAccessKnowledge: true,
           }
         : {
             // Técnico / Cliente: solo tickets por defecto (resto se activa en edición)
@@ -151,6 +152,7 @@ export function CreateUserModal({
             canManageForms: false,
             canManageCredentials: false,
             canRequestAssets: false,
+            canAccessKnowledge: true,
           }
 
       const response = await fetch('/api/users', {

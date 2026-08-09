@@ -412,6 +412,28 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(new URL(dashboardForRole(userRole), request.url))
     }
 
+    // Base de conocimientos: requiere Tickets + canAccessKnowledge (Super Admin exento)
+    const isKnowledgePath =
+      path === '/knowledge' ||
+      path.startsWith('/knowledge/') ||
+      path === '/admin/knowledge' ||
+      path.startsWith('/admin/knowledge/') ||
+      path === '/technician/knowledge' ||
+      path.startsWith('/technician/knowledge/')
+    if (
+      isKnowledgePath &&
+      (token as any).isSuperAdmin !== true &&
+      ((token as any).ticketsEnabled !== true || (token as any).canAccessKnowledge === false)
+    ) {
+      ApplicationLogger.securityEvent(
+        'insufficient_privileges',
+        'medium',
+        { userId, userRole, requiredCapability: 'canAccessKnowledge', path, ip },
+        { requestId }
+      )
+      return NextResponse.redirect(new URL(dashboardForRole(userRole), request.url))
+    }
+
     if (path.startsWith('/technician') && userRole !== 'TECHNICIAN') {
       ApplicationLogger.securityEvent(
         'insufficient_privileges',

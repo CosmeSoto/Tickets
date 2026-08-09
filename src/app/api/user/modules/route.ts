@@ -45,6 +45,7 @@ export async function GET(request: Request) {
   let formsEnabled = false
   let canManageForms = false
   let canRequestAssets = false
+  let canAccessKnowledge = true
   let credentialsEnabled = false
   let canManageCredentials = false
 
@@ -64,6 +65,7 @@ export async function GET(request: Request) {
         formsEnabled: true,
         canManageForms: true,
         canRequestAssets: true,
+        canAccessKnowledge: true,
         credentialsEnabled: true,
         canManageCredentials: true,
       },
@@ -81,6 +83,7 @@ export async function GET(request: Request) {
     formsEnabled = targetUser.formsEnabled ?? false
     canManageForms = targetUser.canManageForms ?? false
     canRequestAssets = targetUser.canRequestAssets ?? false
+    canAccessKnowledge = (targetUser as any).canAccessKnowledge ?? true
     credentialsEnabled = targetUser.credentialsEnabled ?? false
     canManageCredentials = targetUser.canManageCredentials ?? false
   } else {
@@ -99,6 +102,7 @@ export async function GET(request: Request) {
         formsEnabled: true,
         canManageForms: true,
         canRequestAssets: true,
+        canAccessKnowledge: true,
         credentialsEnabled: true,
         canManageCredentials: true,
       },
@@ -115,6 +119,7 @@ export async function GET(request: Request) {
       formsEnabled = currentUser.formsEnabled ?? false
       canManageForms = currentUser.canManageForms ?? false
       canRequestAssets = currentUser.canRequestAssets ?? false
+      canAccessKnowledge = (currentUser as any).canAccessKnowledge ?? true
       credentialsEnabled = currentUser.credentialsEnabled ?? false
       canManageCredentials = currentUser.canManageCredentials ?? false
     }
@@ -226,6 +231,7 @@ export async function GET(request: Request) {
           forms: true,
           canManageForms: true,
           canRequestAssets: false,
+          canAccessKnowledge: true,
           canManageInventory: true,
           credentials: true,
           canManageCredentials: true,
@@ -243,6 +249,7 @@ export async function GET(request: Request) {
           forms: formsEnabled || canManageForms,
           canManageForms: true,
           canRequestAssets: false,
+          canAccessKnowledge: ticketsEnabled && canAccessKnowledge,
           canManageInventory: true,
           credentials: credentialsEnabled || canManageCredentials,
           canManageCredentials,
@@ -259,6 +266,7 @@ export async function GET(request: Request) {
         forms: formsEnabled || canManageForms,
         canManageForms,
         canRequestAssets,
+        canAccessKnowledge: ticketsEnabled && canAccessKnowledge,
         canManageInventory,
         credentials: credentialsEnabled || canManageCredentials,
         canManageCredentials,
@@ -428,6 +436,7 @@ export async function GET(request: Request) {
       forms: resolvedForms,
       canManageForms: isSuperAdmin || (role === 'ADMIN' ? formsEnabled : canManageForms),
       canRequestAssets: role === 'ADMIN' ? false : canRequestAssets,
+      canAccessKnowledge: isSuperAdmin ? true : resolvedTickets && canAccessKnowledge,
       // Respetar toggle "Gestión completa" también para ADMIN de familia
       canManageInventory: isSuperAdmin || canManageInventory,
       credentials: resolvedCredentials,

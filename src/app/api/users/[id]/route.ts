@@ -18,6 +18,7 @@ const updateUserSchema = z.object({
   isActive: z.boolean().optional(),
   canManageInventory: z.boolean().optional(),
   canRequestAssets: z.boolean().optional(),
+  canAccessKnowledge: z.boolean().optional(),
   ticketsEnabled: z.boolean().optional(),
   inventoryEnabled: z.boolean().optional(),
   patrolsEnabled: z.boolean().optional(),
@@ -151,6 +152,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       delete validatedData.department
       delete validatedData.isSuperAdmin
       delete validatedData.canRequestAssets
+      delete validatedData.canAccessKnowledge
       delete validatedData.canManageInventory
       delete validatedData.ticketsEnabled
       delete validatedData.inventoryEnabled
@@ -413,7 +415,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         })
       }
 
-      // Si cambia canRequestAssets, notificar para refrescar sesión
+        // Si cambia canRequestAssets, notificar para refrescar sesión
       if (
         (validatedData as any).canRequestAssets !== undefined &&
         (validatedData as any).canRequestAssets !== (currentUser as any).canRequestAssets
@@ -424,6 +426,22 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         }
         oldValues.canRequestAssets = (currentUser as any).canRequestAssets
         newValues.canRequestAssets = (validatedData as any).canRequestAssets
+        NotificationEvents.emit(targetId, {
+          type: 'session_refresh',
+          reason: 'permissions_changed',
+        })
+      }
+
+      if (
+        (validatedData as any).canAccessKnowledge !== undefined &&
+        (validatedData as any).canAccessKnowledge !== (currentUser as any).canAccessKnowledge
+      ) {
+        changes.canAccessKnowledge = {
+          old: (currentUser as any).canAccessKnowledge !== false ? 'KB activa' : 'KB desactivada',
+          new: (validatedData as any).canAccessKnowledge ? 'KB activa' : 'KB desactivada',
+        }
+        oldValues.canAccessKnowledge = (currentUser as any).canAccessKnowledge ?? true
+        newValues.canAccessKnowledge = (validatedData as any).canAccessKnowledge
         NotificationEvents.emit(targetId, {
           type: 'session_refresh',
           reason: 'permissions_changed',

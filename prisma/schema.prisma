@@ -495,6 +495,8 @@ model users {
   updatedAt                                         DateTime
   isSuperAdmin                                      Boolean                         @default(false) @map("is_super_admin")
   canRequestAssets                                  Boolean                         @default(false) @map("can_request_assets")
+  /// Acceso a Base de conocimientos (hijo del módulo Tickets). Default true = comportamiento histórico.
+  canAccessKnowledge                                Boolean                         @default(true) @map("can_access_knowledge")
   accounts                                          accounts[]
   userFamilyAccess                                  user_family_access[]
   article_votes                                     article_votes[]

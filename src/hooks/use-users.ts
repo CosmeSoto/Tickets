@@ -37,6 +37,7 @@ export interface UserData {
   isActive: boolean
   canManageInventory?: boolean
   canRequestAssets?: boolean
+  canAccessKnowledge?: boolean
   ticketsEnabled?: boolean
   inventoryEnabled?: boolean
   patrolsEnabled?: boolean

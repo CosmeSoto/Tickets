@@ -43,6 +43,7 @@ interface PermissionsAndModulesSectionProps {
     canManageCredentials: boolean
     canManageInventory: boolean
     canRequestAssets: boolean
+    canAccessKnowledge: boolean
   }
   /** Departamentos del sistema (con familyId/family) para resolver nativa al cambiar depto */
   departments?: DepartmentOption[]
@@ -81,7 +82,8 @@ interface PermissionsAndModulesSectionProps {
       | 'credentialsEnabled'
       | 'canManageCredentials'
       | 'canManageInventory'
-      | 'canRequestAssets',
+      | 'canRequestAssets'
+      | 'canAccessKnowledge',
     value: boolean
   ) => void
   handlers: {
@@ -256,6 +258,10 @@ export function PermissionsAndModulesSection({
               }
               loading={loadingFamilies}
               disabled={loading}
+              options={{
+                canAccessKnowledge: formData.canAccessKnowledge,
+                onToggleAccessKnowledge: v => onToggle('canAccessKnowledge', v),
+              }}
             />
 
             {/* ── Inventario ── */}
@@ -399,6 +405,7 @@ export function PermissionsAndModulesSection({
           role={formData.role}
           canManageInventory={formData.canManageInventory}
           canRequestAssets={formData.canRequestAssets}
+          canAccessKnowledge={formData.canAccessKnowledge}
           ticketsEnabled={formData.ticketsEnabled}
           inventoryEnabled={formData.inventoryEnabled}
           patrolsEnabled={formData.patrolsEnabled}

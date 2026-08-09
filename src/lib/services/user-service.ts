@@ -50,6 +50,7 @@ export interface CreateUserData {
   canManageNews?: boolean
   canManageInventory?: boolean
   canRequestAssets?: boolean
+  canAccessKnowledge?: boolean
   formsEnabled?: boolean
   canManageForms?: boolean
   credentialsEnabled?: boolean
@@ -73,6 +74,7 @@ export interface UpdateUserData {
   isActive?: boolean
   canManageInventory?: boolean
   canRequestAssets?: boolean
+  canAccessKnowledge?: boolean
   ticketsEnabled?: boolean
   inventoryEnabled?: boolean
   patrolsEnabled?: boolean
@@ -244,6 +246,7 @@ export class UserService {
         isEmailVerified: true,
         canManageInventory: true,
         canRequestAssets: true,
+        canAccessKnowledge: true,
         isSuperAdmin: true,
         ticketsEnabled: true,
         inventoryEnabled: true,
@@ -321,6 +324,7 @@ export class UserService {
           canManageNews,
           canManageInventory,
           canRequestAssets: data.canRequestAssets ?? false,
+          canAccessKnowledge: ticketsEnabled ? (data.canAccessKnowledge ?? true) : false,
           formsEnabled,
           canManageForms,
           credentialsEnabled,
@@ -446,6 +450,8 @@ export class UserService {
     if (data.canManageInventory !== undefined)
       updateData.canManageInventory = data.canManageInventory
     if (data.canRequestAssets !== undefined) updateData.canRequestAssets = data.canRequestAssets
+    if (data.canAccessKnowledge !== undefined)
+      updateData.canAccessKnowledge = data.canAccessKnowledge
     if (data.ticketsEnabled !== undefined) updateData.ticketsEnabled = data.ticketsEnabled
     if (data.inventoryEnabled !== undefined) updateData.inventoryEnabled = data.inventoryEnabled
     if (data.patrolsEnabled !== undefined) updateData.patrolsEnabled = data.patrolsEnabled
