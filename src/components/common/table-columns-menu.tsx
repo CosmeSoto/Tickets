@@ -28,6 +28,8 @@ type Props = {
   onVisibleChange: (visible: string[]) => void
   storageKey?: string
   className?: string
+  /** Si se define, "Predeterminado" restaura estas keys (no todas) */
+  defaultVisible?: string[]
 }
 
 function loadStored(key: string | undefined): { order?: string[]; visible?: string[] } | null {
@@ -58,6 +60,7 @@ export function TableColumnsMenu({
   onVisibleChange,
   storageKey,
   className,
+  defaultVisible,
 }: Props) {
   const [open, setOpen] = useState(false)
 
@@ -105,7 +108,18 @@ export function TableColumnsMenu({
     persist(next, visible)
   }
 
-  const reset = () => {
+  const resetDefault = () => {
+    const defOrder = columns.map(c => c.key)
+    const required = columns.filter(c => c.required).map(c => c.key)
+    const known = new Set(columns.map(c => c.key))
+    const preferred = (defaultVisible ?? columns.map(c => c.key)).filter(k => known.has(k))
+    const nextVis = [...new Set([...required, ...preferred])]
+    onOrderChange(defOrder)
+    onVisibleChange(nextVis)
+    persist(defOrder, nextVis)
+  }
+
+  const showAll = () => {
     const defOrder = columns.map(c => c.key)
     const allVisible = columns.map(c => c.key)
     onOrderChange(defOrder)
@@ -189,13 +203,21 @@ export function TableColumnsMenu({
                 )
               })}
             </ul>
-            <div className='border-t px-3 py-2'>
+            <div className='border-t px-3 py-2 flex gap-2'>
               <button
                 type='button'
                 className='text-xs text-muted-foreground hover:text-foreground'
-                onClick={reset}
+                onClick={resetDefault}
               >
-                Restaurar predeterminado
+                Predeterminado
+              </button>
+              <span className='text-muted-foreground text-xs'>·</span>
+              <button
+                type='button'
+                className='text-xs text-muted-foreground hover:text-foreground'
+                onClick={showAll}
+              >
+                Todas
               </button>
             </div>
           </div>

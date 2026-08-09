@@ -3,8 +3,10 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { AuditExportService } from '@/lib/services/audit-export-service'
+import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
+import { randomUUID } from 'crypto'
 
-export const maxDuration = 300 // 5 minutos máximo para exportaciones grandes
+export const maxDuration = 300
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,10 +17,19 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { format = 'csv', includeHeaders = true, includeMetadata = true, filters = {} } = body
+    const {
+      format = 'csv',
+      includeHeaders = true,
+      includeMetadata = true,
+      filters = {},
+      columns,
+      includeSensitive = false,
+      maskPii = true,
+    } = body
 
-    console.log(`📤 Iniciando exportación de auditoría - Formato: ${format}`)
-    console.log(`🔍 Filtros aplicados:`, filters)
+    if (!['csv', 'json', 'rows'].includes(format)) {
+      return NextResponse.json({ error: 'Formato no soportado' }, { status: 400 })
+    }
 
     const days = parseInt(filters.days || '30', 10)
     const startDate = new Date()
@@ -36,10 +47,8 @@ export async function POST(request: NextRequest) {
       startDate,
     })
 
-    const limit = parseInt(filters.limit || '50000')
-    const offset = parseInt(filters.offset || '0')
-
-    console.log(`📊 Consultando base de datos - Límite: ${limit}, Offset: ${offset}`)
+    const limit = parseInt(filters.limit || '50000', 10)
+    const offset = parseInt(filters.offset || '0', 10)
 
     const [logs, total] = await Promise.all([
       prisma.audit_logs.findMany({
@@ -55,32 +64,44 @@ export async function POST(request: NextRequest) {
           },
         },
         orderBy: { createdAt: 'desc' },
-        take: Math.min(limit, 100000), // Máximo absoluto 100K
+        take: Math.min(limit, 100000),
         skip: offset,
       }),
       prisma.audit_logs.count({ where }),
     ])
 
-    console.log(`✅ Logs obtenidos: ${logs.length} de ${total} total`)
-
-    // Exportar usando el servicio
     const result = await AuditExportService.exportAuditLogs(logs, filters, {
-      format: format as 'csv' | 'json',
+      format: format as 'csv' | 'json' | 'rows',
       includeHeaders,
       includeMetadata,
       filename: filters.filename,
+      columns,
+      includeSensitive: Boolean(includeSensitive),
+      maskPii: maskPii !== false,
     })
 
-    console.log(
-      `✅ Exportación completada - Tamaño: ${(result.content.length / 1024).toFixed(2)}KB`
-    )
-
-    // Si hay advertencias, incluirlas en la respuesta
-    if (result.warnings && result.warnings.length > 0) {
-      console.warn(`⚠️ Advertencias de exportación:`, result.warnings)
+    // Meta-auditoría: quién exportó qué (LOPDP / trazabilidad)
+    try {
+      await AuditServiceComplete.log({
+        action: 'AUDIT_LOGS_EXPORTED',
+        entityType: 'system',
+        entityId: randomUUID(),
+        userId: session.user.id,
+        details: {
+          descripcion: `Exportación de auditoría (${format}) — ${logs.length} registros`,
+          format,
+          columns: result.columnKeys || columns || [],
+          includeSensitive: Boolean(includeSensitive),
+          maskPii: maskPii !== false,
+          exportedRecords: logs.length,
+          totalMatching: total,
+          filters,
+        },
+      })
+    } catch (e) {
+      console.warn('No se pudo registrar meta-auditoría de exportación:', e)
     }
 
-    // Retornar archivo para descarga
     return new NextResponse(result.content, {
       status: 200,
       headers: {
@@ -89,10 +110,11 @@ export async function POST(request: NextRequest) {
         'X-Total-Records': total.toString(),
         'X-Exported-Records': logs.length.toString(),
         'X-Warnings': result.warnings ? JSON.stringify(result.warnings) : '[]',
+        'X-Lopdp-Minimized': includeSensitive ? '0' : '1',
       },
     })
   } catch (error) {
-    console.error('❌ Error en exportación de auditoría:', error)
+    console.error('Error en exportación de auditoría:', error)
     return NextResponse.json(
       {
         error: 'Error al exportar logs de auditoría',

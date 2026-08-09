@@ -3,7 +3,7 @@
  * Handles all filter controls for audit logs
  */
 
-import { Filter, Search, Download } from 'lucide-react'
+import { Filter, Search, Download, ShieldAlert } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -14,10 +14,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { TableColumnsMenu } from '@/components/common/table-columns-menu'
 import type { AuditFilters } from './utils/audit-types'
 import type { Family } from '@/components/reports/utils/report-types'
 import { AUDIT_CONFIG_MODULE_OPTIONS } from '@/lib/services/config-audit-filters'
 import { AUDIT_QUICK_PRESETS } from '@/components/audit/utils/audit-filter-presets'
+import {
+  AUDIT_COLUMN_DEFS,
+  DEFAULT_AUDIT_VISIBLE_COLUMNS,
+  SENSITIVE_AUDIT_COLUMNS,
+} from '@/components/audit/utils/audit-export-columns'
 
 interface AuditFiltersProps {
   filters: AuditFilters
@@ -25,13 +31,21 @@ interface AuditFiltersProps {
   hasActiveFilters: boolean
   activePresetId?: string | null
   loading: boolean
+  exporting?: boolean
+  columnOrder: string[]
+  visibleColumns: string[]
+  includeSensitive: boolean
+  onColumnOrderChange: (order: string[]) => void
+  onVisibleColumnsChange: (visible: string[]) => void
+  onIncludeSensitiveChange: (value: boolean) => void
   onFilterChange: (key: keyof AuditFilters, value: string) => void
   onApplyPreset: (
     presetId: import('@/lib/services/config-audit-filters').AuditQuickPresetId
   ) => void
   onClearFilters: () => void
   onExportCSV: () => void
-  onExportJSON: () => void | Promise<void>
+  onExportExcel: () => void
+  onExportJSON: () => void
   onExportPDF?: () => void
 }
 
@@ -41,13 +55,26 @@ export function AuditFiltersComponent({
   hasActiveFilters,
   activePresetId,
   loading,
+  exporting,
+  columnOrder,
+  visibleColumns,
+  includeSensitive,
+  onColumnOrderChange,
+  onVisibleColumnsChange,
+  onIncludeSensitiveChange,
   onFilterChange,
   onApplyPreset,
   onClearFilters,
   onExportCSV,
+  onExportExcel,
   onExportJSON,
   onExportPDF,
 }: AuditFiltersProps) {
+  const busy = loading || Boolean(exporting)
+  const columnDefs = includeSensitive
+    ? AUDIT_COLUMN_DEFS
+    : AUDIT_COLUMN_DEFS.filter(c => !SENSITIVE_AUDIT_COLUMNS.includes(c.key as never))
+
   return (
     <Card>
       <CardHeader>
@@ -56,12 +83,10 @@ export function AuditFiltersComponent({
           Filtros de Auditoría
         </CardTitle>
         <CardDescription>
-          Filtra los logs de auditoría por diferentes criterios. Máximo 50,000 registros por
-          exportación.
+          Filtra y exporta logs (máx. 50.000). Columnas y datos sensibles siguen minimización LOPDP.
         </CardDescription>
       </CardHeader>
       <CardContent className='space-y-4'>
-        {/* Accesos rápidos */}
         <div className='space-y-2'>
           <label className='text-sm font-medium text-muted-foreground'>Accesos rápidos</label>
           <div className='flex flex-wrap gap-2'>
@@ -82,7 +107,6 @@ export function AuditFiltersComponent({
         </div>
 
         <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4'>
-          {/* Búsqueda */}
           <div className='space-y-2'>
             <label className='text-sm font-medium'>Búsqueda</label>
             <div className='relative'>
@@ -96,74 +120,61 @@ export function AuditFiltersComponent({
             </div>
           </div>
 
-          {/* Tipo de Entidad */}
           <div className='space-y-2'>
             <label className='text-sm font-medium'>Módulo</label>
-            <Select
-              value={filters.entityType}
-              onValueChange={value => onFilterChange('entityType', value)}
-            >
+            <Select value={filters.entityType} onValueChange={v => onFilterChange('entityType', v)}>
               <SelectTrigger>
-                <SelectValue />
+                <SelectValue placeholder='Módulo' />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value='all'>Todos los Módulos</SelectItem>
-                <SelectItem value='ticket'>🎫 Tickets</SelectItem>
-                <SelectItem value='user'>👥 Usuarios</SelectItem>
-                <SelectItem value='category'>📂 Categorías</SelectItem>
-                <SelectItem value='department'>🏢 Departamentos</SelectItem>
-                <SelectItem value='technician'>🔧 Técnicos</SelectItem>
-                <SelectItem value='system'>⚙️ Sistema</SelectItem>
-                <SelectItem value='report'>📊 Reportes</SelectItem>
-                <SelectItem value='settings'>🛠️ Configuración</SelectItem>
-                <SelectItem value='inventory'>📦 Inventario</SelectItem>
-                <SelectItem value='patrol'>🚶 Rondas</SelectItem>
-                <SelectItem value='credential_entry'>🔐 Credenciales</SelectItem>
-                <SelectItem value='backup'>💾 Backups</SelectItem>
-                <SelectItem value='sla'>⏱️ SLA</SelectItem>
+                <SelectItem value='ticket'>Tickets</SelectItem>
+                <SelectItem value='user'>Usuarios</SelectItem>
+                <SelectItem value='equipment'>Inventario</SelectItem>
+                <SelectItem value='patrol'>Rondas</SelectItem>
+                <SelectItem value='settings'>Configuración</SelectItem>
+                <SelectItem value='system'>Sistema</SelectItem>
+                <SelectItem value='backup'>Backups</SelectItem>
+                <SelectItem value='credential_entry'>Credenciales</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          {/* Configuración por módulo */}
           <div className='space-y-2'>
             <label className='text-sm font-medium'>Config. por módulo</label>
             <Select
-              value={filters.configModule || 'all'}
-              onValueChange={value => onFilterChange('configModule', value)}
+              value={filters.configModule}
+              onValueChange={v => onFilterChange('configModule', v)}
             >
               <SelectTrigger>
-                <SelectValue />
+                <SelectValue placeholder='Config' />
               </SelectTrigger>
               <SelectContent>
-                {AUDIT_CONFIG_MODULE_OPTIONS.map(opt => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    {opt.label}
+                {AUDIT_CONFIG_MODULE_OPTIONS.map(o => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
-          {/* Período */}
           <div className='space-y-2'>
             <label className='text-sm font-medium'>Período</label>
-            <Select value={filters.days} onValueChange={value => onFilterChange('days', value)}>
+            <Select value={filters.days} onValueChange={v => onFilterChange('days', v)}>
               <SelectTrigger>
-                <SelectValue />
+                <SelectValue placeholder='Período' />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value='1'>Último día</SelectItem>
                 <SelectItem value='7'>Última semana</SelectItem>
                 <SelectItem value='30'>Último mes</SelectItem>
                 <SelectItem value='90'>Últimos 3 meses</SelectItem>
-                <SelectItem value='180'>Últimos 6 meses</SelectItem>
                 <SelectItem value='365'>Último año</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          {/* Acción */}
           <div className='space-y-2'>
             <label className='text-sm font-medium'>Acción</label>
             <Input
@@ -173,87 +184,93 @@ export function AuditFiltersComponent({
             />
           </div>
 
-          {/* Familia */}
           <div className='space-y-2'>
             <label className='text-sm font-medium'>Familia</label>
             <Select
               value={filters.familyId || 'all'}
-              onValueChange={value => onFilterChange('familyId', value === 'all' ? '' : value)}
+              onValueChange={v => onFilterChange('familyId', v === 'all' ? '' : v)}
             >
               <SelectTrigger>
-                <SelectValue placeholder='Todas las familias' />
+                <SelectValue placeholder='Familia' />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value='all'>Todas las familias</SelectItem>
                 {families.map(f => (
                   <SelectItem key={f.id} value={f.id}>
-                    <div className='flex items-center space-x-2'>
-                      {f.color && (
-                        <div
-                          className='w-2 h-2 rounded-full'
-                          style={{ backgroundColor: f.color }}
-                        />
-                      )}
-                      <span>{f.name}</span>
-                    </div>
+                    {f.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
-          {/* Exportar y Acciones */}
           <div className='space-y-2 lg:col-span-2'>
-            <label className='text-sm font-medium'>Exportar y Acciones</label>
-            <div className='flex flex-wrap gap-2'>
-              <Button
-                onClick={onExportCSV}
-                variant='outline'
-                size='sm'
-                disabled={loading}
-                className='min-h-9 flex-1 min-w-[calc(33%-0.25rem)] sm:min-w-0 sm:flex-initial'
-              >
+            <label className='text-sm font-medium'>Exportar y columnas</label>
+            <div className='flex flex-wrap gap-2 items-center'>
+              <TableColumnsMenu
+                columns={columnDefs}
+                order={columnOrder}
+                visible={visibleColumns}
+                onOrderChange={onColumnOrderChange}
+                onVisibleChange={onVisibleColumnsChange}
+                storageKey='audit-export-columns-v1'
+                defaultVisible={
+                  includeSensitive
+                    ? DEFAULT_AUDIT_VISIBLE_COLUMNS
+                    : DEFAULT_AUDIT_VISIBLE_COLUMNS.filter(
+                        k => !SENSITIVE_AUDIT_COLUMNS.includes(k as never)
+                      )
+                }
+              />
+              <Button onClick={onExportCSV} variant='outline' size='sm' disabled={busy} className='min-h-9'>
                 <Download className='h-4 w-4 mr-1' />
                 CSV
               </Button>
-              <Button
-                onClick={onExportJSON}
-                variant='outline'
-                size='sm'
-                disabled={loading}
-                className='min-h-9 flex-1 min-w-[calc(33%-0.25rem)] sm:min-w-0 sm:flex-initial'
-              >
+              <Button onClick={onExportExcel} variant='outline' size='sm' disabled={busy} className='min-h-9'>
                 <Download className='h-4 w-4 mr-1' />
                 Excel
               </Button>
               {onExportPDF && (
-                <Button
-                  onClick={onExportPDF}
-                  variant='outline'
-                  size='sm'
-                  disabled={loading}
-                  className='min-h-9 flex-1 min-w-[calc(33%-0.25rem)] sm:min-w-0 sm:flex-initial'
-                >
+                <Button onClick={onExportPDF} variant='outline' size='sm' disabled={busy} className='min-h-9'>
                   <Download className='h-4 w-4 mr-1' />
                   PDF
                 </Button>
               )}
               <Button
-                onClick={onClearFilters}
-                variant='outline'
+                onClick={onExportJSON}
+                variant='ghost'
                 size='sm'
-                className='min-h-9 w-full sm:w-auto'
+                disabled={busy}
+                className='min-h-9 text-xs'
+                title='JSON técnico'
               >
+                JSON
+              </Button>
+              <Button onClick={onClearFilters} variant='outline' size='sm' className='min-h-9'>
                 Limpiar
               </Button>
             </div>
-            <p className='text-xs text-muted-foreground'>
-              Exporta los registros según los filtros aplicados
-            </p>
+            <div className='flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-2'>
+              <ShieldAlert className='h-4 w-4 text-amber-600 mt-0.5 shrink-0' />
+              <div className='space-y-1 text-xs text-muted-foreground'>
+                <label className='flex items-center gap-2 cursor-pointer text-foreground'>
+                  <input
+                    type='checkbox'
+                    className='rounded border-input'
+                    checked={includeSensitive}
+                    onChange={e => onIncludeSensitiveChange(e.target.checked)}
+                  />
+                  Incluir datos sensibles (email, IP, cambios, User-Agent)
+                </label>
+                <p>
+                  Por defecto se exporta con minimización LOPDP. Los sensibles se enmascaran. Cada
+                  exportación queda registrada en auditoría.
+                </p>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Información de filtros activos */}
         {hasActiveFilters && (
           <div className='mt-4 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg'>
             <div className='text-sm text-blue-800 dark:text-blue-200 break-words'>

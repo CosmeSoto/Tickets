@@ -4,71 +4,81 @@
  */
 
 import {
-  translateRole,
   translateAction,
   translateEntityType,
-  detectDeviceType,
-  detectBrowser,
-  detectOS,
   determineSeverity,
-  getAuditCategory,
-  extractChanges,
-  extractMetadata,
-  requiresReview,
   getDateRange,
   getFilterSuffix,
   getActiveFilters,
-  getTopActions,
-  getTopUsers,
-  getTopEntities,
-  buildSimpleDescription,
-  buildSimpleChanges,
   escapeCsv,
-  buildActionDescription,
-  buildChangesDescription,
+  getAuditCategory,
 } from './audit-export-helpers'
 import { getAppTimezone } from '@/lib/utils/date-utils'
 
 export interface AuditExportOptions {
-  format: 'csv' | 'json'
+  format: 'csv' | 'json' | 'rows'
   includeHeaders: boolean
   includeMetadata: boolean
   filename?: string
+  /** Keys de columnas a exportar */
+  columns?: string[]
+  /** Permitir columnas sensibles (email, IP, cambios, UA) */
+  includeSensitive?: boolean
+  /** Enmascarar PII en columnas sensibles (default true) */
+  maskPii?: boolean
 }
 
 export class AuditExportService {
   private static readonly EXPORT_LIMITS = {
     csv: 100000,
     json: 50000,
+    rows: 100000,
   }
 
   static async exportAuditLogs(
     logs: any[],
     filters: any,
     options: AuditExportOptions
-  ): Promise<{ content: string; filename: string; contentType: string; warnings?: string[] }> {
+  ): Promise<{
+    content: string
+    filename: string
+    contentType: string
+    warnings?: string[]
+    rows?: Record<string, string>[]
+    columnKeys?: string[]
+  }> {
     const warnings: string[] = []
     const recordCount = logs.length
-    const limit = this.EXPORT_LIMITS[options.format]
+    const limit = this.EXPORT_LIMITS[options.format] ?? 50000
 
     if (recordCount > limit) {
       warnings.push(
-        `⚠️ Archivo grande: ${recordCount} registros exceden el límite recomendado de ${limit.toLocaleString()} para formato ${options.format.toUpperCase()}`
+        `Archivo grande: ${recordCount} registros exceden el límite recomendado de ${limit.toLocaleString()} para ${options.format.toUpperCase()}`
       )
+    }
+
+    const {
+      resolveAuditExportKeys,
+      buildAuditExportColumns,
+      flattenAuditRows,
+      AUDIT_COLUMN_CATALOG,
+    } = await import('@/components/audit/utils/audit-export-columns')
+
+    const includeSensitive = options.includeSensitive === true
+    const maskPii = options.maskPii !== false
+    const columnKeys = resolveAuditExportKeys(options.columns, includeSensitive)
+    const exportColumns = buildAuditExportColumns(columnKeys, { maskPii })
+    const flatRows = flattenAuditRows(logs, columnKeys, { maskPii })
+
+    if (!includeSensitive) {
       warnings.push(
-        `💡 Recomendación: Use filtros más específicos (fecha, módulo, usuario) para reducir el volumen`
+        'LOPDP: exportación con minimización de datos (sin email/IP/cambios/UA). Active “Incluir datos sensibles” si los necesita.'
       )
+    } else if (maskPii) {
+      warnings.push('LOPDP: datos sensibles incluidos con enmascaramiento (email/IP parcialmente ocultos).')
+    } else {
+      warnings.push('LOPDP: datos sensibles en claro. Trate el archivo como confidencial.')
     }
-
-    const estimatedSizeMB = this.estimateFileSizeMB(recordCount, options.format)
-    if (estimatedSizeMB > 100) {
-      warnings.push(`⚠️ Archivo muy grande: Tamaño estimado ${estimatedSizeMB.toFixed(1)}MB`)
-      warnings.push(`💡 Considere exportar por períodos más cortos o filtrar por módulo específico`)
-    }
-
-    console.log(
-      `📤 AuditExportService - Exportando ${recordCount.toLocaleString()} registros (${estimatedSizeMB.toFixed(1)}MB estimado)`
-    )
 
     const timestamp = new Date().toISOString().split('T')[0]
     const filterSuffix = getFilterSuffix(filters)
@@ -78,153 +88,140 @@ export class AuditExportService {
       switch (options.format) {
         case 'csv':
           return {
-            content: this.generateCSV(logs, options),
+            content: this.generateCSVFromColumns(flatRows, exportColumns, options, logs.length),
             filename: `${filename}.csv`,
             contentType: 'text/csv; charset=utf-8',
             warnings,
+            columnKeys,
           }
-        case 'json':
+        case 'rows':
           return {
-            content: this.generateJSON(logs, filters, options),
+            content: JSON.stringify({
+              columns: columnKeys.map(k => ({
+                key: k,
+                header: AUDIT_COLUMN_CATALOG.find(c => c.key === k)?.label || k,
+              })),
+              rows: flatRows,
+              lopdp: { includeSensitive, maskPii },
+            }),
             filename: `${filename}.json`,
             contentType: 'application/json',
             warnings,
+            rows: flatRows,
+            columnKeys,
+          }
+        case 'json':
+          return {
+            content: this.generateJSON(logs, filters, options, includeSensitive, maskPii, columnKeys),
+            filename: `${filename}.json`,
+            contentType: 'application/json',
+            warnings,
+            columnKeys,
           }
         default:
           throw new Error(`Formato no soportado: ${options.format}`)
       }
     } catch (error) {
-      console.error('❌ Error en exportación de auditoría:', error)
+      console.error('Error en exportación de auditoría:', error)
       throw new Error(
         `Error al generar archivo: ${error instanceof Error ? error.message : 'Error desconocido'}`
       )
     }
   }
 
-  private static estimateFileSizeMB(recordCount: number, format: string): number {
-    const bytesPerRecord = {
-      csv: 1500,
-      json: 2500,
-    }
-
-    const bytes = (bytesPerRecord[format as keyof typeof bytesPerRecord] || 1500) * recordCount
-    return bytes / (1024 * 1024)
-  }
-
-  private static generateCSV(logs: any[], options: AuditExportOptions): string {
+  private static generateCSVFromColumns(
+    rows: Record<string, string>[],
+    columns: { key: string; header: string }[],
+    options: AuditExportOptions,
+    total: number
+  ): string {
     let csv = '\uFEFF'
 
     if (options.includeMetadata) {
       const now = new Date()
       csv += `# REGISTRO DE AUDITORÍA DEL SISTEMA\n`
       csv += `# Generado: ${now.toLocaleString('es-ES', { timeZone: getAppTimezone() })}\n`
-      csv += `# Total de Registros: ${logs.length.toLocaleString()}\n`
-      csv += `# Período: ${getDateRange(logs)}\n`
+      csv += `# Total de Registros: ${total.toLocaleString()}\n`
+      csv += `# Columnas: ${columns.map(c => c.header).join(' | ')}\n`
+      csv += `# LOPDP: ${options.includeSensitive ? (options.maskPii !== false ? 'sensibles enmascarados' : 'sensibles en claro') : 'minimización'}\n`
       csv += `\n`
     }
 
     if (options.includeHeaders) {
-      csv +=
-        [
-          'Fecha',
-          'Hora',
-          'Acción',
-          'Módulo',
-          'Usuario',
-          'Email',
-          'Rol',
-          'Descripción',
-          'Cambios',
-          'IP',
-          'Dispositivo',
-        ].join(',') + '\n'
+      csv += columns.map(c => `"${escapeCsv(c.header)}"`).join(',') + '\n'
     }
 
-    logs.forEach((log: any) => {
-      const date = new Date(log.createdAt)
-      const details = log.details || {}
-
-      const fecha = date.toLocaleDateString('es-EC', { timeZone: getAppTimezone() })
-      const hora = date.toLocaleTimeString('es-EC', {
-        timeZone: getAppTimezone(),
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-      })
-
-      const accion = translateAction(log.action)
-      const modulo = translateEntityType(log.entityType)
-      const usuario = log.users?.name || 'Sistema'
-      const email = log.users?.email || ''
-      const rol = translateRole(log.users?.role || 'SYSTEM')
-      const descripcion = buildSimpleDescription(log, details)
-      const cambios = buildSimpleChanges(details)
-      const ip = log.ipAddress && log.ipAddress !== 'Unknown' ? log.ipAddress : ''
-      const dispositivo = detectDeviceType(log.userAgent)
-
-      const row = [
-        fecha,
-        hora,
-        `"${escapeCsv(accion)}"`,
-        `"${escapeCsv(modulo)}"`,
-        `"${escapeCsv(usuario)}"`,
-        email,
-        rol,
-        `"${escapeCsv(descripcion)}"`,
-        `"${escapeCsv(cambios)}"`,
-        ip,
-        dispositivo,
-      ]
-      csv += row.join(',') + '\n'
-    })
+    for (const row of rows) {
+      csv +=
+        columns.map(c => `"${escapeCsv(String(row[c.key] ?? ''))}"`).join(',') + '\n'
+    }
 
     return csv
   }
 
-  private static generateJSON(logs: any[], filters: any, options: AuditExportOptions): string {
+  private static generateJSON(
+    logs: any[],
+    filters: any,
+    options: AuditExportOptions,
+    includeSensitive: boolean,
+    maskPii: boolean,
+    columnKeys: string[]
+  ): string {
     const exportData = {
       metadata: options.includeMetadata
         ? {
             reportType: 'audit_logs',
             generatedAt: new Date().toISOString(),
-            generatedBy: 'Sistema de Auditoría',
             filters: getActiveFilters(filters),
             recordCount: logs.length,
             dateRange: getDateRange(logs),
-            version: '2.0',
-            exportFormat: 'json',
-            systemInfo: {
-              environment: process.env.NODE_ENV || 'production',
-              version: '1.0.0',
-            },
+            version: '3.0',
+            columns: columnKeys,
+            lopdp: { includeSensitive, maskPii },
           }
         : undefined,
       summary: {
         totalRecords: logs.length,
         uniqueUsers: new Set(logs.map(l => l.userId).filter(Boolean)).size,
         uniqueActions: new Set(logs.map(l => l.action)).size,
-        uniqueEntities: new Set(logs.map(l => l.entityType)).size,
-        dateRange: getDateRange(logs),
-        topActions: getTopActions(logs, 5),
-        topUsers: getTopUsers(logs, 5),
-        topEntities: getTopEntities(logs, 5),
         criticalEvents: logs.filter(l => determineSeverity(l.action, l.entityType) === 'CRITICAL')
           .length,
-        errorEvents: logs.filter(l => l.result === 'ERROR').length,
       },
-      logs: logs.map(log => ({
-        ...log,
-        createdAt: log.createdAt,
-        actionTranslated: translateAction(log.action),
-        entityTypeTranslated: translateEntityType(log.entityType),
-        browserInfo: detectBrowser(log.userAgent),
-        osInfo: detectOS(log.userAgent),
-        severity: determineSeverity(log.action, log.entityType),
-        category: getAuditCategory(log.action, log.entityType),
-        requiresReview: requiresReview(log),
-        changes: extractChanges(log.details || {}),
-        metadata: extractMetadata(log.details || {}),
-      })),
+      // Sin volcar details completos salvo datos sensibles explícitos
+      logs: includeSensitive
+        ? logs.map(log => ({
+            id: log.id,
+            createdAt: log.createdAt,
+            action: log.action,
+            actionTranslated: translateAction(log.action),
+            entityType: log.entityType,
+            entityTypeTranslated: translateEntityType(log.entityType),
+            entityId: log.entityId,
+            user: log.users
+              ? {
+                  name: log.users.name,
+                  email: maskPii
+                    ? String(log.users.email || '')
+                        .replace(/^(.{0,2}).*(@.*)$/, '$1***$2')
+                    : log.users.email,
+                  role: log.users.role,
+                }
+              : null,
+            ipAddress: maskPii && log.ipAddress ? String(log.ipAddress).replace(/\.\d+$/, '.***') : log.ipAddress,
+            userAgent: maskPii ? undefined : log.userAgent,
+            details: maskPii ? { note: 'Detalle omitido o reducido (maskPii)' } : log.details,
+            severity: determineSeverity(log.action, log.entityType),
+            category: getAuditCategory(log.action, log.entityType),
+          }))
+        : logs.map(log => ({
+            id: log.id,
+            createdAt: log.createdAt,
+            actionTranslated: translateAction(log.action),
+            entityTypeTranslated: translateEntityType(log.entityType),
+            userName: log.users?.name || 'Sistema',
+            role: log.users?.role || null,
+            severity: determineSeverity(log.action, log.entityType),
+          })),
     }
 
     return JSON.stringify(exportData, null, 2)

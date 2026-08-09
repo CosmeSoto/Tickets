@@ -24,6 +24,12 @@ import {
   getPresetFilters,
   type AuditQuickPresetId,
 } from '@/components/audit/utils/audit-filter-presets'
+import {
+  DEFAULT_AUDIT_COLUMN_ORDER,
+  DEFAULT_AUDIT_VISIBLE_COLUMNS,
+  SENSITIVE_AUDIT_COLUMNS,
+  resolveAuditExportKeys,
+} from '@/components/audit/utils/audit-export-columns'
 
 function mergeAuditFilters(
   base: AuditFilters,
@@ -71,6 +77,21 @@ export function useAudit() {
   })
 
   const [filters, setFilters] = useState<AuditFilters>(DEFAULT_AUDIT_FILTERS)
+
+  const [columnOrder, setColumnOrder] = useState<string[]>(DEFAULT_AUDIT_COLUMN_ORDER)
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(DEFAULT_AUDIT_VISIBLE_COLUMNS)
+  const [includeSensitive, setIncludeSensitive] = useState(false)
+  const [exporting, setExporting] = useState(false)
+
+  const handleIncludeSensitiveChange = useCallback((value: boolean) => {
+    setIncludeSensitive(value)
+    if (!value) {
+      // LOPDP: al desactivar, quitar columnas sensibles de la selección
+      setVisibleColumns(prev =>
+        prev.filter(k => !(SENSITIVE_AUDIT_COLUMNS as string[]).includes(k))
+      )
+    }
+  }, [])
 
   // ── Init filters from URL or localStorage ──
   useEffect(() => {
@@ -184,18 +205,67 @@ export function useAudit() {
     }
   }, [filters, status, session, loadAuditData])
 
+  const exportKeys = useCallback(() => {
+    return resolveAuditExportKeys(
+      columnOrder.filter(k => visibleColumns.includes(k)),
+      includeSensitive
+    )
+  }, [columnOrder, visibleColumns, includeSensitive])
+
+  const runExport = useCallback(
+    (
+      format: 'csv' | 'json' | 'excel' | 'pdf',
+      onSuccess: (message: string) => void,
+      onError: (error: string) => void
+    ) => {
+      setExporting(true)
+      void exportAuditReport(
+        format,
+        filters,
+        {
+          columns: exportKeys(),
+          includeSensitive,
+          maskPii: true,
+        },
+        msg => {
+          setExporting(false)
+          onSuccess(msg)
+        },
+        err => {
+          setExporting(false)
+          onError(err)
+        }
+      )
+    },
+    [filters, exportKeys, includeSensitive]
+  )
+
   const handleExportCSV = useCallback(
     (onSuccess: (message: string) => void, onError: (error: string) => void) => {
-      void exportAuditReport('csv', filters, onSuccess, onError)
+      runExport('csv', onSuccess, onError)
     },
-    [filters]
+    [runExport]
+  )
+
+  const handleExportExcel = useCallback(
+    (onSuccess: (message: string) => void, onError: (error: string) => void) => {
+      runExport('excel', onSuccess, onError)
+    },
+    [runExport]
   )
 
   const handleExportJSON = useCallback(
     (onSuccess: (message: string) => void, onError: (error: string) => void) => {
-      void exportAuditReport('json', filters, onSuccess, onError)
+      runExport('json', onSuccess, onError)
     },
-    [filters]
+    [runExport]
+  )
+
+  const handleExportPDFFull = useCallback(
+    (onSuccess: (message: string) => void, onError: (error: string) => void) => {
+      runExport('pdf', onSuccess, onError)
+    },
+    [runExport]
   )
 
   const clearFilters = useCallback(() => {
@@ -267,12 +337,19 @@ export function useAudit() {
     families,
     selectedLog,
     loading,
+    exporting,
     isDialogOpen,
     pagination,
     filters,
     hasActiveFilters,
     activePresetId,
     criticalActionsCount,
+    columnOrder,
+    visibleColumns,
+    includeSensitive,
+    setColumnOrder,
+    setVisibleColumns,
+    setIncludeSensitive: handleIncludeSensitiveChange,
     loadAuditData,
     updateFilter,
     clearFilters,
@@ -282,6 +359,8 @@ export function useAudit() {
     handlePageChange,
     handleLimitChange,
     handleExportCSV,
+    handleExportExcel,
     handleExportJSON,
+    handleExportPDFFull,
   }
 }
