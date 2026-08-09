@@ -278,34 +278,20 @@ export function AuditFiltersComponent({
             </div>
           </div>
 
-          <div className='flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-3'>
-            <ShieldAlert className='h-4 w-4 text-amber-600 mt-0.5 shrink-0' />
-            <div className='min-w-0 space-y-1.5 text-xs text-muted-foreground'>
-              <label className='flex items-start gap-2 cursor-pointer text-foreground font-medium'>
-                <input
-                  type='checkbox'
-                  className='mt-0.5 rounded border-input shrink-0'
-                  checked={includeSensitive}
-                  onChange={e => onIncludeSensitiveChange(e.target.checked)}
-                />
-                <span>Incluir datos sensibles (email, IP, cambios, User-Agent)</span>
-              </label>
-              {includeSensitive ? (
-                <p>
-                  <strong className='text-foreground'>Activado:</strong> se añaden al export email,
-                  IP, cambios y User-Agent (enmascarados: p. ej.{' '}
-                  <code className='text-[11px]'>in***@gmail.com</code>,{' '}
-                  <code className='text-[11px]'>192.168.10.***</code>). Puedes quitarlas en
-                  «Columnas». No cambia la tabla en pantalla. La descarga queda auditada.
-                </p>
-              ) : (
-                <p>
-                  <strong className='text-foreground'>Desactivado (LOPDP):</strong> esas 4 columnas no
-                  se incluyen en CSV/Excel/PDF/JSON. Solo datos mínimos (fecha, acción, usuario,
-                  módulo…). La tabla en pantalla no cambia.
-                </p>
-              )}
-            </div>
+          <div className='flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2'>
+            <ShieldAlert className='h-4 w-4 text-amber-600 shrink-0' />
+            <label className='flex items-center gap-2 cursor-pointer text-sm text-foreground min-w-0'>
+              <input
+                type='checkbox'
+                className='rounded border-input shrink-0'
+                checked={includeSensitive}
+                onChange={e => onIncludeSensitiveChange(e.target.checked)}
+              />
+              <span className='min-w-0'>
+                Incluir datos sensibles en el <strong>archivo</strong> (email, IP, cambios,
+                User-Agent · enmascarados)
+              </span>
+            </label>
           </div>
         </div>
 

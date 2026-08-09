@@ -85,20 +85,36 @@ export function useAudit() {
 
   const handleIncludeSensitiveChange = useCallback((value: boolean) => {
     setIncludeSensitive(value)
+
+    setColumnOrder(prev => {
+      if (value) {
+        const missing = (SENSITIVE_AUDIT_COLUMNS as string[]).filter(k => !prev.includes(k))
+        return missing.length ? [...prev, ...missing] : prev
+      }
+      return prev
+    })
+
     setVisibleColumns(prev => {
       const next = value
         ? [...new Set([...prev, ...SENSITIVE_AUDIT_COLUMNS])]
         : prev.filter(k => !(SENSITIVE_AUDIT_COLUMNS as string[]).includes(k))
-      // Mantener sync con menú Columnas (localStorage)
+
       try {
         const raw = localStorage.getItem('audit-export-columns-v1')
         const stored = raw ? (JSON.parse(raw) as { order?: string[] }) : {}
+        const orderBase =
+          stored.order?.length && Array.isArray(stored.order)
+            ? stored.order
+            : DEFAULT_AUDIT_COLUMN_ORDER
+        const order = value
+          ? [
+              ...orderBase,
+              ...(SENSITIVE_AUDIT_COLUMNS as string[]).filter(k => !orderBase.includes(k)),
+            ]
+          : orderBase
         localStorage.setItem(
           'audit-export-columns-v1',
-          JSON.stringify({
-            order: stored.order?.length ? stored.order : DEFAULT_AUDIT_COLUMN_ORDER,
-            visible: next,
-          })
+          JSON.stringify({ order, visible: next })
         )
       } catch {
         /* ignore */
@@ -106,6 +122,13 @@ export function useAudit() {
       return next
     })
   }, [])
+
+  const exportKeys = useCallback(() => {
+    const ordered = columnOrder.filter(k => visibleColumns.includes(k))
+    // Si una columna visible no está en el orden (p. ej. sensibles recién activados), incluirla
+    const missing = visibleColumns.filter(k => !ordered.includes(k))
+    return resolveAuditExportKeys([...ordered, ...missing], includeSensitive)
+  }, [columnOrder, visibleColumns, includeSensitive])
 
   // ── Init filters from URL or localStorage ──
   useEffect(() => {
@@ -218,13 +241,6 @@ export function useAudit() {
       loadAuditData()
     }
   }, [filters, status, session, loadAuditData])
-
-  const exportKeys = useCallback(() => {
-    return resolveAuditExportKeys(
-      columnOrder.filter(k => visibleColumns.includes(k)),
-      includeSensitive
-    )
-  }, [columnOrder, visibleColumns, includeSensitive])
 
   const runExport = useCallback(
     (
