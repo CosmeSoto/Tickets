@@ -72,10 +72,12 @@ export class AuditExportService {
 
     if (!includeSensitive) {
       warnings.push(
-        'LOPDP: exportación con minimización de datos (sin email/IP/cambios/UA). Active “Incluir datos sensibles” si los necesita.'
+        'LOPDP: exportación con minimizacion de datos (sin email/IP/cambios/UA). Active "Incluir datos sensibles" si los necesita.'
       )
     } else if (maskPii) {
-      warnings.push('LOPDP: datos sensibles incluidos con enmascaramiento (email/IP parcialmente ocultos).')
+      warnings.push(
+        'LOPDP: datos sensibles incluidos con enmascaramiento (email/IP parcialmente ocultos).'
+      )
     } else {
       warnings.push('LOPDP: datos sensibles en claro. Trate el archivo como confidencial.')
     }

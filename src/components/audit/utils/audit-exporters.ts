@@ -49,6 +49,27 @@ function downloadBlob(blob: Blob, filename: string) {
   if (a.parentNode) a.parentNode.removeChild(a)
 }
 
+function parseWarningsHeader(raw: string | null): string[] {
+  if (!raw) return []
+  try {
+    const decoded = decodeURIComponent(raw)
+    const parsed = JSON.parse(decoded) as unknown
+    return Array.isArray(parsed) ? parsed.map(String) : []
+  } catch {
+    try {
+      const parsed = JSON.parse(raw) as unknown
+      return Array.isArray(parsed) ? parsed.map(String) : []
+    } catch {
+      return []
+    }
+  }
+}
+
+function appendWarnings(message: string, warnings: string[]): string {
+  if (!warnings.length) return message
+  return `${message}\n${warnings[0]}`
+}
+
 /**
  * Export audit logs according to selected columns and LOPDP options.
  */
@@ -83,7 +104,7 @@ export async function exportAuditReport(
 
       const date = new Date().toISOString().split('T')[0]
       const filename = `audit-logs-${date}`
-      const warnings = response.headers.get('X-Warnings')
+      const warnings = parseWarningsHeader(response.headers.get('X-Warnings'))
       const exportedRecords = response.headers.get('X-Exported-Records') || String(rows.length)
 
       if (format === 'excel') {
@@ -104,16 +125,9 @@ export async function exportAuditReport(
         })
       }
 
-      let message = `${exportedRecords} registros exportados (${format.toUpperCase()})`
-      if (warnings) {
-        try {
-          const w = JSON.parse(warnings) as string[]
-          if (w.length) message += `\n${w[0]}`
-        } catch {
-          /* ignore */
-        }
-      }
-      onSuccess(message)
+      onSuccess(
+        appendWarnings(`${exportedRecords} registros exportados (${format.toUpperCase()})`, warnings)
+      )
       return
     }
 
@@ -123,7 +137,7 @@ export async function exportAuditReport(
       throw new Error(error.details || error.error || 'Error desconocido')
     }
 
-    const warnings = response.headers.get('X-Warnings')
+    const warnings = parseWarningsHeader(response.headers.get('X-Warnings'))
     const totalRecords = response.headers.get('X-Total-Records')
     const exportedRecords = response.headers.get('X-Exported-Records')
 
@@ -140,15 +154,7 @@ export async function exportAuditReport(
     if (totalRecords && exportedRecords && totalRecords !== exportedRecords) {
       message += ` de ${totalRecords} total`
     }
-    if (warnings) {
-      try {
-        const w = JSON.parse(warnings) as string[]
-        if (w.length) message += `\n${w[0]}`
-      } catch {
-        /* ignore */
-      }
-    }
-    onSuccess(message)
+    onSuccess(appendWarnings(message, warnings))
   } catch (error) {
     console.error('Error en exportación:', error)
     onError(error instanceof Error ? error.message : 'No se pudo exportar el reporte')

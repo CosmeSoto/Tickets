@@ -102,6 +102,9 @@ export async function POST(request: NextRequest) {
       console.warn('No se pudo registrar meta-auditoría de exportación:', e)
     }
 
+    // Headers HTTP solo admiten ByteString (<=255). Codificar avisos por si hay Unicode.
+    const warningsHeader = encodeURIComponent(JSON.stringify(result.warnings ?? []))
+
     return new NextResponse(result.content, {
       status: 200,
       headers: {
@@ -109,7 +112,7 @@ export async function POST(request: NextRequest) {
         'Content-Disposition': `attachment; filename="${result.filename}"`,
         'X-Total-Records': total.toString(),
         'X-Exported-Records': logs.length.toString(),
-        'X-Warnings': result.warnings ? JSON.stringify(result.warnings) : '[]',
+        'X-Warnings': warningsHeader,
         'X-Lopdp-Minimized': includeSensitive ? '0' : '1',
       },
     })
