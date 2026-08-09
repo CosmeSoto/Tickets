@@ -82,6 +82,11 @@ export async function POST(request: NextRequest) {
     }
 
     const newType = await prisma.$transaction(async tx => {
+      const maxOrder = await tx.consumable_types.aggregate({
+        where: { familyId: targetFamilyId },
+        _max: { order: true },
+      })
+
       const created = await tx.consumable_types.create({
         data: {
           id: randomUUID(),
@@ -91,7 +96,7 @@ export async function POST(request: NextRequest) {
           icon: source.icon,
           family: { connect: { id: targetFamilyId } },
           isActive: source.isActive,
-          order: source.order,
+          order: (maxOrder._max.order ?? -1) + 1,
         },
       })
 

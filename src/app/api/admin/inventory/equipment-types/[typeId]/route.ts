@@ -9,6 +9,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
+import {
+  requireAdminInventoryAccess,
+  assertFamilyInManageScope,
+} from '@/lib/inventory/admin-inventory-auth'
 import { z } from 'zod'
 
 const equipmentTypeUpdateSchema = z.object({
@@ -32,10 +36,8 @@ export async function GET(
 ) {
   try {
     const session = await getServerSession(authOptions)
-
-    if (!session?.user) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-    }
+    const access = await requireAdminInventoryAccess(session)
+    if (!access.ok) return access.response
 
     const { typeId } = await params
 
@@ -63,6 +65,9 @@ export async function GET(
       return NextResponse.json({ error: 'Tipo de equipo no encontrado' }, { status: 404 })
     }
 
+    const denied = assertFamilyInManageScope(access.auth, equipmentType.familyId)
+    if (denied) return denied
+
     return NextResponse.json({ equipmentType })
   } catch (error) {
     console.error('Error obteniendo tipo de equipo:', error)
@@ -79,14 +84,8 @@ export async function PUT(
 ) {
   try {
     const session = await getServerSession(authOptions)
-
-    if (!session?.user) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-    }
-
-    if (session.user.role !== 'ADMIN' && !session.user.isSuperAdmin) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-    }
+    const access = await requireAdminInventoryAccess(session)
+    if (!access.ok) return access.response
 
     const { typeId } = await params
     const body = await request.json()
@@ -107,6 +106,14 @@ export async function PUT(
 
     if (!existing) {
       return NextResponse.json({ error: 'Tipo de equipo no encontrado' }, { status: 404 })
+    }
+
+    const existingDenied = assertFamilyInManageScope(access.auth, existing.familyId)
+    if (existingDenied) return existingDenied
+
+    if (validation.data.familyId !== undefined) {
+      const targetDenied = assertFamilyInManageScope(access.auth, validation.data.familyId)
+      if (targetDenied) return targetDenied
     }
 
     // Si se cambia el código, verificar que no exista otro con el mismo código
@@ -166,14 +173,8 @@ export async function DELETE(
 ) {
   try {
     const session = await getServerSession(authOptions)
-
-    if (!session?.user) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-    }
-
-    if (session.user.role !== 'ADMIN' && !session.user.isSuperAdmin) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-    }
+    const access = await requireAdminInventoryAccess(session)
+    if (!access.ok) return access.response
 
     const { typeId } = await params
 
@@ -192,6 +193,9 @@ export async function DELETE(
     if (!existing) {
       return NextResponse.json({ error: 'Tipo de equipo no encontrado' }, { status: 404 })
     }
+
+    const denied = assertFamilyInManageScope(access.auth, existing.familyId)
+    if (denied) return denied
 
     // Verificar si tiene equipos asignados
     if (existing._count.equipment > 0) {

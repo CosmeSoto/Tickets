@@ -4,6 +4,8 @@ import { useRouter } from 'next/navigation'
 
 export default function WarehousesRedirect() {
   const router = useRouter()
-  useEffect(() => { router.replace('/inventory/catalogs?tab=warehouses') }, [router])
+  useEffect(() => {
+    router.replace('/admin/settings/inventory')
+  }, [router])
   return null
 }

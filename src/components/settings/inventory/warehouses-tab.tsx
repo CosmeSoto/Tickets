@@ -7,6 +7,7 @@ import { useState } from 'react'
 import { useWarehouseManagement, Warehouse } from '@/hooks/inventory/use-warehouse-management'
 import { WarehouseFormDialog } from './warehouse-form-dialog'
 import { CloneCatalogItemDialog } from './clone-catalog-item-dialog'
+import { ReorderRowButtons, moveItemInList } from './reorder-row-buttons'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { DataTable, type Column } from '@/components/ui/data-table'
@@ -58,6 +59,7 @@ export function WarehousesTab({ familyId }: WarehousesTabProps) {
     createWarehouse,
     updateWarehouse,
     deleteWarehouse,
+    reorderWarehouses,
     loadWarehouses,
   } = useWarehouseManagement(familyId)
 
@@ -134,6 +136,12 @@ export function WarehousesTab({ familyId }: WarehousesTabProps) {
       setFormOpen(false)
       setSelectedWarehouse(null)
     }
+  }
+
+  const handleReorder = async (warehouse: Warehouse, direction: 'up' | 'down') => {
+    const moved = moveItemInList(warehouses, warehouse.id, direction)
+    if (!moved) return
+    await reorderWarehouses(moved.ids)
   }
 
   const totalItems = warehouseToDelete
@@ -278,53 +286,62 @@ export function WarehousesTab({ familyId }: WarehousesTabProps) {
             Nueva Bodega
           </Button>
         }
-        rowActions={(warehouse: Warehouse) => (
-          <div className='flex items-center justify-end gap-1'>
-            <Button
-              variant='ghost'
-              size='sm'
-              onClick={() => handleEdit(warehouse)}
-              disabled={saving}
-              title='Editar bodega'
-            >
-              <Pencil className='h-4 w-4' />
-            </Button>
-            <Button
-              variant='ghost'
-              size='sm'
-              onClick={() => updateWarehouse(warehouse.id, { isActive: !warehouse.isActive })}
-              disabled={saving}
-              title={warehouse.isActive ? 'Desactivar bodega' : 'Activar bodega'}
-            >
-              {warehouse.isActive ? (
-                <CheckCircle className='h-4 w-4 text-green-600 dark:text-green-500' />
-              ) : (
-                <XCircle className='h-4 w-4 text-muted-foreground' />
-              )}
-            </Button>
-            <Button
-              variant='ghost'
-              size='sm'
-              onClick={() => handleDelete(warehouse)}
-              disabled={saving}
-              title='Eliminar bodega'
-            >
-              <Trash2 className='h-4 w-4 text-destructive' />
-            </Button>
-            <Button
-              variant='ghost'
-              size='sm'
-              onClick={() => {
-                setWarehouseToClone(warehouse)
-                setCloneDialogOpen(true)
-              }}
-              disabled={saving}
-              title='Copiar a otra área'
-            >
-              <Copy className='h-4 w-4 text-blue-500' />
-            </Button>
-          </div>
-        )}
+        rowActions={(warehouse: Warehouse) => {
+          const index = warehouses.findIndex(w => w.id === warehouse.id)
+          return (
+            <div className='flex items-center justify-end gap-1'>
+              <ReorderRowButtons
+                index={index}
+                total={warehouses.length}
+                disabled={saving}
+                onMove={direction => handleReorder(warehouse, direction)}
+              />
+              <Button
+                variant='ghost'
+                size='sm'
+                onClick={() => handleEdit(warehouse)}
+                disabled={saving}
+                title='Editar bodega'
+              >
+                <Pencil className='h-4 w-4' />
+              </Button>
+              <Button
+                variant='ghost'
+                size='sm'
+                onClick={() => updateWarehouse(warehouse.id, { isActive: !warehouse.isActive })}
+                disabled={saving}
+                title={warehouse.isActive ? 'Desactivar bodega' : 'Activar bodega'}
+              >
+                {warehouse.isActive ? (
+                  <CheckCircle className='h-4 w-4 text-green-600 dark:text-green-500' />
+                ) : (
+                  <XCircle className='h-4 w-4 text-muted-foreground' />
+                )}
+              </Button>
+              <Button
+                variant='ghost'
+                size='sm'
+                onClick={() => handleDelete(warehouse)}
+                disabled={saving}
+                title='Eliminar bodega'
+              >
+                <Trash2 className='h-4 w-4 text-destructive' />
+              </Button>
+              <Button
+                variant='ghost'
+                size='sm'
+                onClick={() => {
+                  setWarehouseToClone(warehouse)
+                  setCloneDialogOpen(true)
+                }}
+                disabled={saving}
+                title='Copiar a otra área'
+              >
+                <Copy className='h-4 w-4 text-blue-500' />
+              </Button>
+            </div>
+          )
+        }}
         emptyState={{
           icon: <WarehouseIcon className='h-12 w-12 text-muted-foreground/30 mb-4' />,
           title: 'No hay bodegas',

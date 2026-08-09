@@ -93,13 +93,22 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    let nextOrder = order
+    if (nextOrder == null) {
+      const maxOrder = await prisma.equipment_types.aggregate({
+        where: { familyId: familyId || null },
+        _max: { order: true },
+      })
+      nextOrder = (maxOrder._max.order ?? -1) + 1
+    }
+
     const newType = await prisma.equipment_types.create({
       data: {
         code: code.toUpperCase(),
         name,
         description,
         icon,
-        order: order || 999,
+        order: nextOrder,
         isActive: true,
         ...(familyId ? { familyId } : {}),
       },

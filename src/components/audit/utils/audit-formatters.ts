@@ -203,6 +203,7 @@ export function getActionLabel(action: string): string {
     PATROL_FAMILY_CONFIG_UPDATED: 'Config. Rondas (Área) Actualizada',
     INVENTORY_FAMILY_CONFIG_UPDATED: 'Config. Inventario (Área) Actualizada',
     inventory_settings_updated: 'Config. Inventario Global Actualizada',
+    asset_request_config_updated: 'Config. Solicitudes de Compras Actualizada',
     sla_policy_created: 'Política SLA Creada',
     sla_policy_updated: 'Política SLA Actualizada',
     sla_policy_deleted: 'Política SLA Eliminada',

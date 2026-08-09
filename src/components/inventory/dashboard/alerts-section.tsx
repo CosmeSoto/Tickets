@@ -26,6 +26,9 @@ interface DashboardAlerts {
   pendingRequests: number
   batchCriticalBatches: number
   batchWarningBatches: number
+  licenseAlertDays?: number
+  contractAlertDays?: number
+  maintenanceAlertDays?: number
 }
 
 export function AlertsSection() {
@@ -140,7 +143,8 @@ export function AlertsSection() {
           <AlertDescription className='flex items-center justify-between'>
             <span>
               {alerts.maintenanceDue} mantenimiento{alerts.maintenanceDue !== 1 ? 's' : ''}{' '}
-              programado{alerts.maintenanceDue !== 1 ? 's' : ''} en los próximos 30 días
+              programado{alerts.maintenanceDue !== 1 ? 's' : ''} en los próximos{' '}
+              {alerts.maintenanceAlertDays ?? 30} días
             </span>
             <Link href='/inventory/maintenance'>
               <Button variant='outline' size='sm'>
@@ -158,7 +162,8 @@ export function AlertsSection() {
           <AlertDescription className='flex items-center justify-between'>
             <span>
               {alerts.expiringContracts} contrato{alerts.expiringContracts !== 1 ? 's' : ''} vence
-              {alerts.expiringContracts !== 1 ? 'n' : ''} en los próximos 30 días
+              {alerts.expiringContracts !== 1 ? 'n' : ''} en los próximos{' '}
+              {alerts.contractAlertDays ?? 30} días
             </span>
             <Link href='/inventory/contracts'>
               <Button variant='outline' size='sm'>
@@ -177,7 +182,8 @@ export function AlertsSection() {
             <span>
               {alerts.expiringRentals} equipo{alerts.expiringRentals !== 1 ? 's' : ''} arrendado
               {alerts.expiringRentals !== 1 ? 's' : ''} vence
-              {alerts.expiringRentals !== 1 ? 'n' : ''} en los próximos 30 días
+              {alerts.expiringRentals !== 1 ? 'n' : ''} en los próximos{' '}
+              {alerts.contractAlertDays ?? 30} días
             </span>
             <Link href='/inventory?ownershipType=RENTAL'>
               <Button variant='outline' size='sm'>
@@ -195,7 +201,8 @@ export function AlertsSection() {
           <AlertDescription className='flex items-center justify-between'>
             <span>
               {alerts.expiringLicenses} licencia{alerts.expiringLicenses !== 1 ? 's' : ''} expira
-              {alerts.expiringLicenses !== 1 ? 'n' : ''} en los próximos 30 días
+              {alerts.expiringLicenses !== 1 ? 'n' : ''} en los próximos{' '}
+              {alerts.licenseAlertDays ?? 30} días
             </span>
             <Link href='/inventory/licenses'>
               <Button variant='outline' size='sm'>

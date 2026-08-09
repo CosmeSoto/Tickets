@@ -3,15 +3,10 @@
 // Importable tanto en cliente como en servidor
 
 import type { FamilyConfig, AssetSubtype, FormSection, SectionsByMode } from './family-config-types'
-import { normalizeSectionsByMode } from './family-config-types'
-
-export const DEFAULT_FAMILY_CONFIG: Omit<FamilyConfig, 'familyId'> = {
-  allowedSubtypes: ['EQUIPMENT', 'MRO', 'LICENSE'],
-  visibleSections: ['FINANCIAL', 'DEPRECIATION', 'CONTRACT', 'STOCK_MRO', 'WAREHOUSE'],
-  requiredSections: [],
-  requireFinancialForNew: true,
-  sectionsByMode: undefined,
-}
+import {
+  DEFAULT_FAMILY_CONFIG,
+  normalizeSectionsByMode,
+} from './family-config-types'
 
 /**
  * Valida si un subtipo de activo está permitido para una familia

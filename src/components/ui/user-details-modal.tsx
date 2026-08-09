@@ -204,7 +204,7 @@ export function UserDetailsModal({
             formsEnabled={(user as any).formsEnabled}
             canManageForms={(user as any).canManageForms}
             showModuleChips
-            defaultCollapsed={false}
+            defaultCollapsed
             hideGuides
           />
 

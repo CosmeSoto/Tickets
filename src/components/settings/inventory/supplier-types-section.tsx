@@ -60,6 +60,7 @@ import {
   XCircle,
   Download,
 } from 'lucide-react'
+import { ReorderRowButtons, moveItemInList } from './reorder-row-buttons'
 
 interface SupplierTypesSectionProps {
   families: Array<{ id: string; name: string; code: string; color: string | null }>
@@ -73,6 +74,7 @@ export function SupplierTypesSection({ families }: SupplierTypesSectionProps) {
     createSupplierType,
     updateSupplierType,
     deleteSupplierType,
+    reorderSupplierTypes,
   } = useSupplierTypeManagement(null, true) // Cargar todos (globales + por familia)
 
   const [formOpen, setFormOpen] = useState(false)
@@ -122,6 +124,12 @@ export function SupplierTypesSection({ families }: SupplierTypesSectionProps) {
       setDeleteDialogOpen(false)
       setTypeToDelete(null)
     }
+  }
+
+  const handleReorder = async (type: SupplierType, direction: 'up' | 'down') => {
+    const moved = moveItemInList(supplierTypes, type.id, direction)
+    if (!moved) return
+    await reorderSupplierTypes(moved.ids)
   }
 
   const validate = () => {
@@ -306,41 +314,50 @@ export function SupplierTypesSection({ families }: SupplierTypesSectionProps) {
             Nuevo Tipo
           </Button>
         }
-        rowActions={(type: SupplierType) => (
-          <div className='flex items-center justify-end gap-1'>
-            <Button
-              variant='ghost'
-              size='sm'
-              onClick={() => handleEdit(type)}
-              disabled={saving}
-              title='Editar tipo'
-            >
-              <Edit className='h-4 w-4' />
-            </Button>
-            <Button
-              variant='ghost'
-              size='sm'
-              onClick={() => updateSupplierType(type.id, { isActive: !type.isActive })}
-              disabled={saving}
-              title={type.isActive ? 'Desactivar tipo' : 'Activar tipo'}
-            >
-              {type.isActive ? (
-                <CheckCircle className='h-4 w-4 text-green-600 dark:text-green-500' />
-              ) : (
-                <XCircle className='h-4 w-4 text-muted-foreground' />
-              )}
-            </Button>
-            <Button
-              variant='ghost'
-              size='sm'
-              onClick={() => handleDelete(type)}
-              disabled={saving}
-              title='Eliminar tipo'
-            >
-              <Trash2 className='h-4 w-4 text-destructive' />
-            </Button>
-          </div>
-        )}
+        rowActions={(type: SupplierType) => {
+          const index = supplierTypes.findIndex(t => t.id === type.id)
+          return (
+            <div className='flex items-center justify-end gap-1'>
+              <ReorderRowButtons
+                index={index}
+                total={supplierTypes.length}
+                disabled={saving}
+                onMove={direction => handleReorder(type, direction)}
+              />
+              <Button
+                variant='ghost'
+                size='sm'
+                onClick={() => handleEdit(type)}
+                disabled={saving}
+                title='Editar tipo'
+              >
+                <Edit className='h-4 w-4' />
+              </Button>
+              <Button
+                variant='ghost'
+                size='sm'
+                onClick={() => updateSupplierType(type.id, { isActive: !type.isActive })}
+                disabled={saving}
+                title={type.isActive ? 'Desactivar tipo' : 'Activar tipo'}
+              >
+                {type.isActive ? (
+                  <CheckCircle className='h-4 w-4 text-green-600 dark:text-green-500' />
+                ) : (
+                  <XCircle className='h-4 w-4 text-muted-foreground' />
+                )}
+              </Button>
+              <Button
+                variant='ghost'
+                size='sm'
+                onClick={() => handleDelete(type)}
+                disabled={saving}
+                title='Eliminar tipo'
+              >
+                <Trash2 className='h-4 w-4 text-destructive' />
+              </Button>
+            </div>
+          )
+        }}
         emptyState={{
           icon: <Truck className='h-12 w-12 text-muted-foreground/30 mb-4' />,
           title: 'No hay tipos de proveedor',

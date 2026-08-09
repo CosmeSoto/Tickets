@@ -11,7 +11,7 @@ import prisma from '@/lib/prisma'
 import { NotificationService } from '@/lib/services/notification-service'
 import { getFamilyScopedAdmins } from '@/lib/notifications/family-recipients'
 import { getRenewalAlertStatus } from '@/lib/inventory/renewal-alert'
-import { withCache, invalidateCache, buildCacheKey } from '@/lib/api-cache'
+import { withCache, invalidateCache, buildCacheKey, getSetting } from '@/lib/api-cache'
 import { resolveInventoryListScope } from '@/lib/inventory/inventory-session'
 
 /**
@@ -100,9 +100,11 @@ export async function GET(request: NextRequest) {
     } else if (validatedFilters.expired === 'active') {
       where.OR = [{ expirationDate: null }, { expirationDate: { gte: now } }]
     } else if (validatedFilters.expired === 'expiring') {
-      const thirtyDays = new Date()
-      thirtyDays.setDate(thirtyDays.getDate() + 30)
-      where.expirationDate = { gte: now, lte: thirtyDays }
+      const alertDaysRaw = await getSetting('inventory.license_alert_days_first', 600, '30')
+      const alertDays = Math.max(1, parseInt(alertDaysRaw ?? '30', 10) || 30)
+      const windowEnd = new Date()
+      windowEnd.setDate(windowEnd.getDate() + alertDays)
+      where.expirationDate = { gte: now, lte: windowEnd }
     }
 
     const page = validatedFilters.page || 1
@@ -148,9 +150,13 @@ export async function GET(request: NextRequest) {
       return { licenses, total }
     })
 
+    const warningDaysRaw = await getSetting('inventory.license_alert_days_first', 600, '30')
+    const warningDays = Math.max(1, parseInt(warningDaysRaw ?? '30', 10) || 30)
+
     const processedLicenses = rawLicenses.map((l: any) => {
       const renewalAlertStatus = getRenewalAlertStatus(
-        l.renewalDate ? new Date(l.renewalDate) : null
+        l.renewalDate ? new Date(l.renewalDate) : null,
+        warningDays
       )
       const base =
         session.user.role === 'ADMIN' || session.user.role === 'TECHNICIAN'

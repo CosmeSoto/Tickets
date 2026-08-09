@@ -23,7 +23,7 @@ export interface CustomFieldFormData {
   fieldType: FieldType
   fieldOptions?: any
   isRequired: boolean
-  order: number
+  order?: number
   helpText?: string
 }
 
@@ -46,7 +46,7 @@ export function CustomFieldForm({
     fieldType: initialData?.fieldType || 'text',
     fieldOptions: initialData?.fieldOptions || null,
     isRequired: initialData?.isRequired || false,
-    order: initialData?.order || 0,
+    order: initialData?.order,
     helpText: initialData?.helpText || '',
   })
 
@@ -281,11 +281,21 @@ export function CustomFieldForm({
         <Input
           id='order'
           type='number'
-          value={formData.order}
-          onChange={e => setFormData({ ...formData, order: Number(e.target.value) })}
+          value={formData.order ?? ''}
+          onChange={e =>
+            setFormData({
+              ...formData,
+              order: e.target.value === '' ? undefined : Number(e.target.value),
+            })
+          }
           min='0'
+          placeholder={isEdit ? undefined : 'Automático (al final)'}
         />
-        <p className='text-xs text-muted-foreground'>Los campos se mostrarán en orden ascendente</p>
+        <p className='text-xs text-muted-foreground'>
+          {isEdit
+            ? 'Los campos se mostrarán en orden ascendente'
+            : 'Vacío = se coloca al final del listado'}
+        </p>
       </div>
 
       {/* Help Text */}

@@ -64,6 +64,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Ya existe un tipo con ese código' }, { status: 409 })
     }
 
+    let nextOrder = order
+    if (nextOrder == null) {
+      const maxOrder = await prisma.supplier_types.aggregate({
+        where: { familyId: familyId || null },
+        _max: { order: true },
+      })
+      nextOrder = (maxOrder._max.order ?? -1) + 1
+    }
+
     const type = await (prisma as any).supplier_types.create({
       data: {
         id: randomUUID(),
@@ -71,7 +80,7 @@ export async function POST(request: NextRequest) {
         name,
         description: description || null,
         familyId: familyId || null,
-        order: order ?? 999,
+        order: nextOrder,
       },
     })
     return NextResponse.json(type, { status: 201 })

@@ -9,6 +9,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
+import {
+  requireAdminInventoryAccess,
+  assertFamilyInManageScope,
+} from '@/lib/inventory/admin-inventory-auth'
 import { z } from 'zod'
 
 const supplierTypeUpdateSchema = z.object({
@@ -24,10 +28,8 @@ const supplierTypeUpdateSchema = z.object({
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
-
-    if (!session?.user) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-    }
+    const access = await requireAdminInventoryAccess(session)
+    if (!access.ok) return access.response
 
     const { id } = await params
 
@@ -54,6 +56,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'Tipo de proveedor no encontrado' }, { status: 404 })
     }
 
+    const denied = assertFamilyInManageScope(access.auth, supplierType.familyId)
+    if (denied) return denied
+
     return NextResponse.json({ supplierType })
   } catch (error) {
     console.error('Error obteniendo tipo de proveedor:', error)
@@ -67,14 +72,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
-
-    if (!session?.user) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-    }
-
-    if (session.user.role !== 'ADMIN' && !session.user.isSuperAdmin) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-    }
+    const access = await requireAdminInventoryAccess(session)
+    if (!access.ok) return access.response
 
     const { id } = await params
     const body = await request.json()
@@ -95,6 +94,14 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     if (!existing) {
       return NextResponse.json({ error: 'Tipo de proveedor no encontrado' }, { status: 404 })
+    }
+
+    const existingDenied = assertFamilyInManageScope(access.auth, existing.familyId)
+    if (existingDenied) return existingDenied
+
+    if (validation.data.familyId !== undefined) {
+      const targetDenied = assertFamilyInManageScope(access.auth, validation.data.familyId)
+      if (targetDenied) return targetDenied
     }
 
     // Si se cambia el nombre, verificar que no exista otro con el mismo nombre en el mismo scope
@@ -159,14 +166,8 @@ export async function DELETE(
 ) {
   try {
     const session = await getServerSession(authOptions)
-
-    if (!session?.user) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-    }
-
-    if (session.user.role !== 'ADMIN' && !session.user.isSuperAdmin) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-    }
+    const access = await requireAdminInventoryAccess(session)
+    if (!access.ok) return access.response
 
     const { id } = await params
 
@@ -185,6 +186,9 @@ export async function DELETE(
     if (!existing) {
       return NextResponse.json({ error: 'Tipo de proveedor no encontrado' }, { status: 404 })
     }
+
+    const denied = assertFamilyInManageScope(access.auth, existing.familyId)
+    if (denied) return denied
 
     // Verificar si tiene proveedores asignados
     if (existing._count.suppliers > 0) {

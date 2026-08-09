@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { getSetting } from '@/lib/api-cache'
 import {
   CONSUMABLE_STATUS_ES,
   DECOMMISSION_REASON_ES,
@@ -474,6 +475,26 @@ async function runExpiringTemplate(
   const familyId = params.familyId || undefined
   const familyIds = familyIdsForQuery(scope)
 
+  const [licenseDaysRaw, contractDaysRaw, warrantyDaysRaw, mroDaysRaw, mroUrgentRaw] =
+    await Promise.all([
+      getSetting('inventory.license_alert_days_first', 600, '30'),
+      getSetting('inventory.contract_alert_days', 600, '30'),
+      getSetting('inventory.warranty_alert_days', 600, '30'),
+      getSetting('inventory.mro_expiry_alert_days', 600, '30'),
+      getSetting('inventory.mro_expiry_alert_days_urgent', 600, '7'),
+    ])
+  const parseDays = (raw: string | null, fallback: number) =>
+    Math.max(1, parseInt(raw ?? String(fallback), 10) || fallback)
+
+  const licenseHigh = parseDays(licenseDaysRaw, 30)
+  const contractHigh = parseDays(contractDaysRaw, 30)
+  const warrantyHigh = parseDays(warrantyDaysRaw, 30)
+  const mroHigh = parseDays(mroDaysRaw, 30)
+  const criticalDays = parseDays(mroUrgentRaw, 7)
+
+  const urgencyFor = (dias: number, highDays: number) =>
+    dias <= criticalDays ? 'Crítico' : dias <= highDays ? 'Alto' : 'Normal'
+
   const now = new Date()
   const cutoff = new Date(now.getTime() + days * 24 * 60 * 60 * 1000)
   const rows: ExpiringRow[] = []
@@ -502,7 +523,7 @@ async function runExpiringTemplate(
       familia: lic.licenseType?.family?.name ?? '—',
       fechaVencimiento: formatDate(lic.expirationDate),
       diasRestantes: dias,
-      urgencia: dias <= 7 ? 'Crítico' : dias <= 30 ? 'Alto' : 'Normal',
+      urgencia: urgencyFor(dias, licenseHigh),
     })
   }
 
@@ -528,7 +549,7 @@ async function runExpiringTemplate(
       familia: c.consumableType?.family?.name ?? '—',
       fechaVencimiento: formatDate(c.expirationDate),
       diasRestantes: dias,
-      urgencia: dias <= 7 ? 'Crítico' : dias <= 30 ? 'Alto' : 'Normal',
+      urgencia: urgencyFor(dias, mroHigh),
     })
   }
 
@@ -559,7 +580,7 @@ async function runExpiringTemplate(
       familia: eq.type?.family?.name ?? '—',
       fechaVencimiento: formatDate(eq.warrantyExpiration),
       diasRestantes: dias,
-      urgencia: dias <= 7 ? 'Crítico' : dias <= 30 ? 'Alto' : 'Normal',
+      urgencia: urgencyFor(dias, warrantyHigh),
     })
   }
 
@@ -591,7 +612,7 @@ async function runExpiringTemplate(
       familia: eq.type?.family?.name ?? '—',
       fechaVencimiento: formatDate(eq.rentalEndDate),
       diasRestantes: dias,
-      urgencia: dias <= 7 ? 'Crítico' : dias <= 30 ? 'Alto' : 'Normal',
+      urgencia: urgencyFor(dias, contractHigh),
     })
   }
 
@@ -599,7 +620,8 @@ async function runExpiringTemplate(
 
   const criticos = rows.filter(r => r.urgencia === 'Crítico').length
   const altos = rows.filter(r => r.urgencia === 'Alto').length
-  const vencenEsteMes = rows.filter(r => r.diasRestantes <= 30).length
+  const highBand = Math.max(licenseHigh, contractHigh, warrantyHigh, mroHigh)
+  const enVentanaAlerta = rows.filter(r => r.diasRestantes <= highBand).length
 
   const summary = [
     {
@@ -610,12 +632,12 @@ async function runExpiringTemplate(
     {
       title: 'Vencimientos críticos',
       value: criticos,
-      description: 'Vencen en 7 días o menos — requieren atención inmediata',
+      description: `Vencen en ${criticalDays} días o menos — requieren atención inmediata`,
     },
     {
-      title: 'Vencen este mes',
-      value: vencenEsteMes,
-      description: `${altos} con prioridad alta (8-30 días)`,
+      title: 'Dentro de ventana de alerta',
+      value: enVentanaAlerta,
+      description: `${altos} con prioridad alta (según reglas de inventario)`,
     },
   ]
 

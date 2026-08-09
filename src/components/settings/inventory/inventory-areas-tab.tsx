@@ -14,6 +14,7 @@ import {
   FileText,
   Box,
   Settings,
+  SlidersHorizontal,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -35,6 +36,7 @@ import { FamilyIcon } from '@/components/inventory/family-badge'
 import { SectionTable } from '@/components/families/section-table'
 import { CatalogsTab } from './catalogs-tab'
 import { WarehousesTab } from './warehouses-tab'
+import { InventoryCustomFieldsTab } from './inventory-custom-fields-tab'
 import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 import type {
   AcquisitionMode,
@@ -290,9 +292,9 @@ export function InventoryAreasTab({
               </div>
             </div>
 
-            {/* Sub-tabs: Configuración | Catálogos | Bodegas */}
+            {/* Sub-tabs: Configuración | Catálogos | Bodegas | Campos */}
             <Tabs value={activeSubTab} onValueChange={v => setActiveSubTab(v as any)}>
-              <TabsList className='w-full grid grid-cols-3'>
+              <TabsList className='w-full grid grid-cols-2 sm:grid-cols-4 h-auto'>
                 <TabsTrigger value='config' className='flex items-center gap-2'>
                   <Settings className='h-4 w-4' />
                   Configuración
@@ -304,6 +306,10 @@ export function InventoryAreasTab({
                 <TabsTrigger value='warehouses' className='flex items-center gap-2'>
                   <Box className='h-4 w-4' />
                   Bodegas
+                </TabsTrigger>
+                <TabsTrigger value='custom-fields' className='flex items-center gap-2'>
+                  <SlidersHorizontal className='h-4 w-4' />
+                  Campos
                 </TabsTrigger>
               </TabsList>
 
@@ -636,7 +642,8 @@ export function InventoryAreasTab({
                       <p className='text-xs text-muted-foreground'>
                         Ejemplo:{' '}
                         <span className='font-mono'>
-                          {form.codePrefix || selectedFamily?.code || 'IT'}-2026-0001
+                          {(form.codePrefix || selectedFamily?.code || 'IT').slice(0, 4)}-EQ-FA-
+                          {new Date().getFullYear()}-0001
                         </span>
                       </p>
                     </div>
@@ -650,6 +657,18 @@ export function InventoryAreasTab({
 
               <TabsContent value='warehouses' className='mt-4'>
                 <WarehousesTab familyId={selectedFamilyId} />
+              </TabsContent>
+
+              <TabsContent value='custom-fields' className='mt-4'>
+                <InventoryCustomFieldsTab
+                  families={families.map(f => ({
+                    id: f.id,
+                    name: f.name,
+                    code: f.code,
+                    color: f.color ?? undefined,
+                  }))}
+                  selectedFamilyId={selectedFamilyId}
+                />
               </TabsContent>
             </Tabs>
           </>

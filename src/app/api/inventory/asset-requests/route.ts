@@ -85,9 +85,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    // Verificar que el usuario tenga permiso para crear solicitudes
-    // Por defecto false para compatibilidad con sesiones antiguas
-    const canRequestAssets = session.user.canRequestAssets ?? false
+    // ADMIN / gestores pueden crear; el resto requiere canRequestAssets
+    const canRequestAssets =
+      session.user.role === 'ADMIN' ||
+      session.user.canRequestAssets === true ||
+      (session.user as { canManageAssetRequests?: boolean }).canManageAssetRequests === true
     if (!canRequestAssets) {
       return NextResponse.json(
         {

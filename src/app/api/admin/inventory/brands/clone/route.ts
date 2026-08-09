@@ -88,6 +88,12 @@ export async function POST(request: NextRequest) {
     for (const target of targetFamilies) {
       if (target.id === sourceFamilyId) continue
 
+      const maxOrder = await prisma.equipment_brands.aggregate({
+        where: { familyId: target.id },
+        _max: { order: true },
+      })
+      let nextOrder = (maxOrder._max.order ?? -1) + 1
+
       for (const brand of sourceBrands) {
         const code = uniqueCode(brand.code, target.code)
         const existing = await prisma.equipment_brands.findUnique({ where: { code } })
@@ -103,7 +109,7 @@ export async function POST(request: NextRequest) {
             name: brand.name,
             description: brand.description,
             logoUrl: brand.logoUrl,
-            order: brand.order,
+            order: nextOrder++,
             familyId: target.id,
             isActive: true,
           },

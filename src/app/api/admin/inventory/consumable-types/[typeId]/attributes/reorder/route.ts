@@ -7,6 +7,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
+import {
+  requireAdminInventoryAccess,
+  assertFamilyInManageScope,
+} from '@/lib/inventory/admin-inventory-auth'
 import { z } from 'zod'
 
 const reorderSchema = z.object({
@@ -22,17 +26,22 @@ export async function PATCH(
 ) {
   try {
     const session = await getServerSession(authOptions)
-
-    if (!session?.user) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-    }
-
-    if (session.user.role !== 'ADMIN' && !session.user.isSuperAdmin) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-    }
+    const access = await requireAdminInventoryAccess(session)
+    if (!access.ok) return access.response
 
     const params = await context.params
     const { typeId } = params
+
+    const type = await prisma.consumable_types.findUnique({
+      where: { id: typeId },
+      select: { familyId: true },
+    })
+    if (!type) {
+      return NextResponse.json({ error: 'Tipo de suministro no encontrado' }, { status: 404 })
+    }
+    const denied = assertFamilyInManageScope(access.auth, type.familyId)
+    if (denied) return denied
+
     const body = await request.json()
 
     // Validar

@@ -19,9 +19,10 @@ import {
  *   listados de tipos/bodegas para formularios de operación). Auth: inventory-access.
  *
  * `/api/admin/inventory/*` — configuración de catálogo por familia (CRUD tipos,
- *   marcas, atributos, clone entre áreas, bodegas de settings). Auth: admin + scope.
+ *   marcas, atributos, clone entre áreas, bodegas de settings). Auth: ADMIN/super-admin
+ *   o gestores (canManageInventory) con scope de familias operativas.
  *
- * Settings UI → admin. Asset forms / ops → inventory.
+ * Settings UI → admin (managers con scope permitidos). Asset forms / ops → inventory.
  */
 
 export async function getAccessibleFamilyIds(

@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { ContractPaymentService } from '@/lib/services/contract-payment.service'
 import { requireInventoryModuleAccess } from '@/lib/inventory/require-inventory-api'
+import { getSetting } from '@/lib/api-cache'
 
 /**
  * GET /api/inventory/contracts/payments/upcoming
@@ -19,7 +20,14 @@ export async function GET(request: NextRequest) {
     if (denied) return denied
 
     const { searchParams } = new URL(request.url)
-    const days = parseInt(searchParams.get('days') || '30')
+    const daysParam = searchParams.get('days')
+    let days: number
+    if (daysParam != null) {
+      days = parseInt(daysParam, 10)
+    } else {
+      const raw = await getSetting('inventory.contract_alert_days', 600, '30')
+      days = Math.max(1, parseInt(raw ?? '30', 10) || 30)
+    }
     const familyId = searchParams.get('familyId') || undefined
 
     const payments = await ContractPaymentService.getUpcomingPayments(days, familyId)

@@ -70,9 +70,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const isClient = session.user.role === 'CLIENT'
     const isAdminOrTech = session.user.role === 'ADMIN' || session.user.role === 'TECHNICIAN'
 
-    // Permisos por acción — acciones de gestión requieren permiso de inventario
+    // ADMIN/TECHNICIAN gestionan por rol; CLIENT gestores vía canManageInventory
     if (action === 'approve' || action === 'reschedule' || action === 'complete') {
-      if (!(await canManageInventory(session.user.id, session.user.role))) {
+      if (
+        !isAdminOrTech &&
+        !(await canManageInventory(session.user.id, session.user.role))
+      ) {
         return inventoryForbidden()
       }
     }

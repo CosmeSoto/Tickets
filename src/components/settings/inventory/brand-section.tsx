@@ -36,6 +36,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { useExport } from '@/hooks/common/use-export'
 import { EquipmentBrandInlineForm } from '@/components/inventory/asset-forms/EquipmentBrandInlineForm'
 import { CloneCatalogItemDialog } from './clone-catalog-item-dialog'
+import { ReorderRowButtons, moveItemInList } from './reorder-row-buttons'
 import type { EquipmentBrand } from '@/hooks/inventory/use-brand-management'
 
 interface BrandSectionProps {
@@ -48,6 +49,7 @@ interface BrandSectionProps {
   onEditBrand: (brand: EquipmentBrand) => void
   onDeleteBrand: (brandId: string) => Promise<void>
   onToggleActive: (brandId: string) => Promise<void>
+  onReorder?: (ids: string[]) => Promise<boolean>
   onCloneSuccess?: () => void
 }
 
@@ -61,6 +63,7 @@ export function BrandSection({
   onEditBrand,
   onDeleteBrand,
   onToggleActive,
+  onReorder,
   onCloneSuccess,
 }: BrandSectionProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -121,6 +124,13 @@ export function BrandSection({
     } catch (e) {
       console.error(e)
     }
+  }
+
+  const handleReorder = async (brand: EquipmentBrand, direction: 'up' | 'down') => {
+    if (!onReorder) return
+    const moved = moveItemInList(brands, brand.id, direction)
+    if (!moved) return
+    await onReorder(moved.ids)
   }
 
   // Configuración de columnas para DataTable
@@ -200,49 +210,60 @@ export function BrandSection({
             Nueva Marca
           </Button>
         }
-        rowActions={(brand: EquipmentBrand) => (
-          <div className='flex items-center justify-end gap-1'>
-            <Button
-              variant='ghost'
-              size='sm'
-              onClick={() => handleEditBrand(brand)}
-              disabled={saving}
-              title='Editar'
-            >
-              <Edit2 className='h-4 w-4' />
-            </Button>
-            <Button
-              variant='ghost'
-              size='sm'
-              onClick={() => onToggleActive(brand.id)}
-              disabled={saving}
-              title={brand.isActive ? 'Desactivar' : 'Activar'}
-            >
-              {brand.isActive ? <EyeOff className='h-4 w-4' /> : <Eye className='h-4 w-4' />}
-            </Button>
-            <Button
-              variant='ghost'
-              size='sm'
-              onClick={() => handleDeleteClick(brand)}
-              disabled={saving}
-              title='Eliminar'
-            >
-              <Trash2 className='h-4 w-4 text-destructive' />
-            </Button>
-            <Button
-              variant='ghost'
-              size='sm'
-              onClick={() => {
-                setBrandToClone(brand)
-                setCloneDialogOpen(true)
-              }}
-              disabled={saving}
-              title='Copiar a otra área'
-            >
-              <Copy className='h-4 w-4 text-blue-500' />
-            </Button>
-          </div>
-        )}
+        rowActions={(brand: EquipmentBrand) => {
+          const index = brands.findIndex(b => b.id === brand.id)
+          return (
+            <div className='flex items-center justify-end gap-1'>
+              {onReorder && (
+                <ReorderRowButtons
+                  index={index}
+                  total={brands.length}
+                  disabled={saving}
+                  onMove={direction => handleReorder(brand, direction)}
+                />
+              )}
+              <Button
+                variant='ghost'
+                size='sm'
+                onClick={() => handleEditBrand(brand)}
+                disabled={saving}
+                title='Editar'
+              >
+                <Edit2 className='h-4 w-4' />
+              </Button>
+              <Button
+                variant='ghost'
+                size='sm'
+                onClick={() => onToggleActive(brand.id)}
+                disabled={saving}
+                title={brand.isActive ? 'Desactivar' : 'Activar'}
+              >
+                {brand.isActive ? <EyeOff className='h-4 w-4' /> : <Eye className='h-4 w-4' />}
+              </Button>
+              <Button
+                variant='ghost'
+                size='sm'
+                onClick={() => handleDeleteClick(brand)}
+                disabled={saving}
+                title='Eliminar'
+              >
+                <Trash2 className='h-4 w-4 text-destructive' />
+              </Button>
+              <Button
+                variant='ghost'
+                size='sm'
+                onClick={() => {
+                  setBrandToClone(brand)
+                  setCloneDialogOpen(true)
+                }}
+                disabled={saving}
+                title='Copiar a otra área'
+              >
+                <Copy className='h-4 w-4 text-blue-500' />
+              </Button>
+            </div>
+          )
+        }}
         emptyState={{
           title: 'No hay marcas configuradas',
           description: 'Crea la primera marca para comenzar',

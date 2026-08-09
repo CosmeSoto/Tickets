@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import { withCache, buildCacheKey } from '@/lib/api-cache'
+import { withCache, buildCacheKey, getSetting } from '@/lib/api-cache'
 import { getInventorySessionContext } from '@/lib/inventory/inventory-session'
 import {
   buildDeliveryActFamilyWhere,
@@ -87,6 +87,10 @@ export async function GET(_request: NextRequest) {
     })
 
     const stats = await withCache(cacheKey, 120, async () => {
+      const licenseDaysRaw = await getSetting('inventory.license_alert_days_first', 600, '30')
+      const licenseDays = Math.max(1, parseInt(licenseDaysRaw ?? '30', 10) || 30)
+      const licenseWindow = new Date(Date.now() + licenseDays * 24 * 60 * 60 * 1000)
+
       const [
         totalAssets,
         availableAssets,
@@ -137,7 +141,7 @@ export async function GET(_request: NextRequest) {
             licenseType: { familyId: { in: activeFamilyIds } },
             expirationDate: {
               gte: new Date(),
-              lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+              lte: licenseWindow,
             },
           },
         }),

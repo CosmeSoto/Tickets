@@ -14,7 +14,8 @@ export class ContractAlertService {
   private static async getAlertThresholds(): Promise<
     Array<{ days: number; upper: number; flag: AlertFlag }>
   > {
-    const raw = await getSetting('contract_alert_days', 600, '30')
+    // UI /api/settings/inventory guarda con prefijo inventory.*
+    const raw = await getSetting('inventory.contract_alert_days', 600, '30')
     const base = Math.max(7, parseInt(raw ?? '30', 10) || 30)
     const urgent = Math.max(7, Math.round(base / 2))
     const early = Math.min(365, base * 2)
@@ -175,13 +176,20 @@ Por favor, revise el contrato y considere su renovación.
   }
 
   /**
-   * Obtiene estadísticas de contratos próximos a vencer
+   * Obtiene estadísticas de contratos próximos a vencer.
+   * Buckets derivados de inventory.contract_alert_days (urgente / base / temprano).
+   * Las claves in15Days/in30Days/in60Days se conservan por compatibilidad de API.
    */
   static async getExpiringStats(familyId?: string) {
     const now = new Date()
-    const in15Days = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000)
-    const in30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
-    const in60Days = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000)
+    const thresholds = await this.getAlertThresholds()
+    const urgentDays = thresholds[2].days
+    const baseDays = thresholds[1].days
+    const earlyDays = thresholds[0].days
+
+    const inUrgent = new Date(now.getTime() + urgentDays * 24 * 60 * 60 * 1000)
+    const inBase = new Date(now.getTime() + baseDays * 24 * 60 * 60 * 1000)
+    const inEarly = new Date(now.getTime() + earlyDays * 24 * 60 * 60 * 1000)
 
     const where: any = {
       status: 'ACTIVE',
@@ -192,13 +200,13 @@ Por favor, revise el contrato y considere su renovación.
       where.familyId = familyId
     }
 
-    const [expiring15, expiring30, expiring60, active] = await Promise.all([
+    const [expiringUrgent, expiringBase, expiringEarly, active] = await Promise.all([
       prisma.contracts.count({
         where: {
           ...where,
           endDate: {
             gte: now,
-            lte: in15Days,
+            lte: inUrgent,
           },
         },
       }),
@@ -207,7 +215,7 @@ Por favor, revise el contrato y considere su renovación.
           ...where,
           endDate: {
             gte: now,
-            lte: in30Days,
+            lte: inBase,
           },
         },
       }),
@@ -216,7 +224,7 @@ Por favor, revise el contrato y considere su renovación.
           ...where,
           endDate: {
             gte: now,
-            lte: in60Days,
+            lte: inEarly,
           },
         },
       }),
@@ -227,19 +235,25 @@ Por favor, revise el contrato y considere su renovación.
 
     return {
       active,
-      total: expiring60,
-      in15Days: expiring15,
-      in30Days: expiring30,
-      in60Days: expiring60,
+      total: expiringEarly,
+      in15Days: expiringUrgent,
+      in30Days: expiringBase,
+      in60Days: expiringEarly,
+      thresholds: { urgentDays, baseDays, earlyDays },
     }
   }
 
   /**
    * Obtiene lista de contratos próximos a vencer
    */
-  static async getExpiringContracts(familyId?: string, days: number = 60) {
+  static async getExpiringContracts(familyId?: string, days?: number) {
     const now = new Date()
-    const targetDate = new Date(now.getTime() + days * 24 * 60 * 60 * 1000)
+    let windowDays = days
+    if (windowDays == null || Number.isNaN(windowDays)) {
+      const raw = await getSetting('inventory.contract_alert_days', 600, '30')
+      windowDays = Math.max(1, parseInt(raw ?? '30', 10) || 30)
+    }
+    const targetDate = new Date(now.getTime() + windowDays * 24 * 60 * 60 * 1000)
 
     const where: any = {
       status: 'ACTIVE',

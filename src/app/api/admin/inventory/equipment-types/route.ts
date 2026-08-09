@@ -8,6 +8,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
+import {
+  requireAdminInventoryAccess,
+  assertFamilyInManageScope,
+} from '@/lib/inventory/admin-inventory-auth'
 import { z } from 'zod'
 
 const equipmentTypeSchema = z.object({
@@ -17,7 +21,7 @@ const equipmentTypeSchema = z.object({
   icon: z.string().optional().nullable(),
   familyId: z.string().uuid('ID de familia inválido').optional().nullable(),
   isActive: z.boolean().default(true),
-  order: z.number().int().min(0).optional().default(999),
+  order: z.number().int().min(0).optional(),
   // Configuración de atributos
   trackMaintenance: z.boolean().default(false),
 })
@@ -30,21 +34,19 @@ const equipmentTypeSchema = z.object({
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-
-    if (!session?.user) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-    }
-
-    if (session.user.role !== 'ADMIN' && !session.user.isSuperAdmin) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-    }
+    const access = await requireAdminInventoryAccess(session)
+    if (!access.ok) return access.response
 
     const { searchParams } = new URL(request.url)
     const familyId = searchParams.get('familyId')
 
     const where: any = {}
     if (familyId) {
+      const denied = assertFamilyInManageScope(access.auth, familyId)
+      if (denied) return denied
       where.familyId = familyId
+    } else if (access.auth.manageFamilyIds) {
+      where.familyId = { in: access.auth.manageFamilyIds }
     }
 
     const equipmentTypes = await prisma.equipment_types.findMany({
@@ -81,14 +83,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-
-    if (!session?.user) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-    }
-
-    if (session.user.role !== 'ADMIN' && !session.user.isSuperAdmin) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-    }
+    const access = await requireAdminInventoryAccess(session)
+    if (!access.ok) return access.response
 
     const body = await request.json()
 
@@ -100,6 +96,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    const denied = assertFamilyInManageScope(access.auth, validation.data.familyId)
+    if (denied) return denied
 
     // Si se especifica familyId, verificar que existe
     if (validation.data.familyId) {
@@ -125,6 +124,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Crear tipo de equipo
+    let order = validation.data.order
+    if (order == null) {
+      const maxOrder = await prisma.equipment_types.aggregate({
+        where: { familyId: validation.data.familyId || null },
+        _max: { order: true },
+      })
+      order = (maxOrder._max.order ?? -1) + 1
+    }
+
     const equipmentType = await prisma.equipment_types.create({
       data: {
         code: validation.data.code,
@@ -133,7 +141,7 @@ export async function POST(request: NextRequest) {
         icon: validation.data.icon || null,
         familyId: validation.data.familyId || null,
         isActive: validation.data.isActive,
-        order: validation.data.order ?? 999,
+        order,
         // Configuración de atributos
         trackMaintenance: validation.data.trackMaintenance ?? false,
       },

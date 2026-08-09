@@ -19,6 +19,7 @@ export interface SupplierType {
   description: string | null
   familyId: string | null
   isActive: boolean
+  order?: number
   createdAt: string
   updatedAt: string
   family?: SupplierTypeFamily | null
@@ -214,6 +215,45 @@ export function useSupplierTypeManagement(familyId?: string | null, includeGloba
     [updateSupplierType]
   )
 
+  const reorderSupplierTypes = useCallback(
+    async (ids: string[]): Promise<boolean> => {
+      const reordered = ids
+        .map(id => supplierTypes.find(t => t.id === id))
+        .filter(Boolean)
+        .map((t, index) => ({ ...(t as SupplierType), order: index }))
+      setSupplierTypes(reordered)
+
+      setSaving(true)
+      setError(null)
+      try {
+        const response = await fetch('/api/admin/inventory/supplier-types/reorder', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids }),
+        })
+        const result = await response.json()
+        if (response.ok && result.success) {
+          toast.success('Orden actualizado correctamente')
+          return true
+        }
+        await loadSupplierTypes()
+        const message = result.error || 'Error al reordenar tipos'
+        setError(message)
+        toast.error(message)
+        return false
+      } catch (err) {
+        await loadSupplierTypes()
+        const message = err instanceof Error ? err.message : 'Error al reordenar tipos'
+        setError(message)
+        toast.error(message)
+        return false
+      } finally {
+        setSaving(false)
+      }
+    },
+    [loadSupplierTypes, supplierTypes]
+  )
+
   /**
    * Auto-load cuando cambian los parámetros
    */
@@ -231,5 +271,6 @@ export function useSupplierTypeManagement(familyId?: string | null, includeGloba
     updateSupplierType,
     deleteSupplierType,
     toggleActive,
+    reorderSupplierTypes,
   }
 }

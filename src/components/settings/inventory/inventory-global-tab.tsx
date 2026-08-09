@@ -15,7 +15,6 @@ interface InventoryGlobalTabProps {
   isSuperAdmin: boolean
   globalRules: GlobalRules
   savingGlobal: boolean
-  families: Array<{ id: string; name: string; code: string; color: string | null }>
   onSetGlobal: <K extends keyof GlobalRules>(key: K, value: GlobalRules[K]) => void
   onSave: () => void
 }
@@ -24,7 +23,6 @@ export function InventoryGlobalTab({
   isSuperAdmin,
   globalRules,
   savingGlobal,
-  families,
   onSetGlobal,
   onSave,
 }: InventoryGlobalTabProps) {
@@ -188,6 +186,91 @@ export function InventoryGlobalTab({
 
           <Separator />
 
+          {/* Mantenimientos programados (dashboard) */}
+          <div className='space-y-3'>
+            <div className='p-3 border rounded-lg space-y-3'>
+              <div>
+                <p className='text-sm font-medium'>Ventana de mantenimientos programados</p>
+                <p className='text-xs text-muted-foreground'>
+                  Cuántos días hacia adelante muestra el dashboard de inventario
+                </p>
+              </div>
+              <div className='flex items-center gap-2'>
+                <Input
+                  type='number'
+                  min='1'
+                  max='365'
+                  value={globalRules.maintenanceAlertDays}
+                  onChange={e =>
+                    onSetGlobal('maintenanceAlertDays', parseInt(e.target.value) || 30)
+                  }
+                  className='w-24 h-8 text-sm font-mono'
+                  disabled={readOnly}
+                />
+                <span className='text-xs text-muted-foreground'>días</span>
+              </div>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Caducidad MRO / suministros */}
+          <div className='space-y-3'>
+            <div className='flex items-center justify-between p-3 border rounded-lg'>
+              <div>
+                <p className='text-sm font-medium'>Alertas de caducidad de suministros (MRO)</p>
+                <p className='text-xs text-muted-foreground'>
+                  Notificar antes de que caduquen materiales con fecha de vencimiento
+                </p>
+              </div>
+              <Switch
+                checked={globalRules.mroExpiryAlertEnabled}
+                onCheckedChange={v => onSetGlobal('mroExpiryAlertEnabled', v)}
+                disabled={readOnly}
+              />
+            </div>
+            {globalRules.mroExpiryAlertEnabled && (
+              <div className='grid grid-cols-1 sm:grid-cols-2 gap-4 pl-4 border-l-2 border-muted'>
+                <div>
+                  <Label className='text-xs'>Primera alerta (días antes)</Label>
+                  <div className='flex items-center gap-2 mt-1'>
+                    <Input
+                      type='number'
+                      min='1'
+                      max='365'
+                      value={globalRules.mroExpiryAlertDays}
+                      onChange={e =>
+                        onSetGlobal('mroExpiryAlertDays', parseInt(e.target.value) || 30)
+                      }
+                      className='w-24 h-8 text-sm font-mono'
+                      disabled={readOnly}
+                    />
+                    <span className='text-xs text-muted-foreground'>días</span>
+                  </div>
+                </div>
+                <div>
+                  <Label className='text-xs'>Alerta urgente (días antes)</Label>
+                  <div className='flex items-center gap-2 mt-1'>
+                    <Input
+                      type='number'
+                      min='1'
+                      max='365'
+                      value={globalRules.mroExpiryAlertDaysUrgent}
+                      onChange={e =>
+                        onSetGlobal('mroExpiryAlertDaysUrgent', parseInt(e.target.value) || 7)
+                      }
+                      className='w-24 h-8 text-sm font-mono'
+                      disabled={readOnly}
+                    />
+                    <span className='text-xs text-muted-foreground'>días</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <Separator />
+
           {/* Lotes de equipos */}
           <div className='space-y-3'>
             <div className='flex items-center justify-between p-3 border rounded-lg'>
@@ -208,7 +291,7 @@ export function InventoryGlobalTab({
               <div className='space-y-3 pl-4 border-l-2 border-muted'>
                 <div className='flex items-center justify-between p-3 border rounded-lg'>
                   <div>
-                    <p className='text-sm font-medium'>Email en alertas críticas</p>
+                    <p className='text-sm font-medium'>Email en alertas críticas de lotes</p>
                     <p className='text-xs text-muted-foreground'>Sin stock o utilización ≥ 95 %</p>
                   </div>
                   <Switch
@@ -219,7 +302,7 @@ export function InventoryGlobalTab({
                 </div>
                 <div className='flex items-center justify-between p-3 border rounded-lg'>
                   <div>
-                    <p className='text-sm font-medium'>Email en alertas de advertencia</p>
+                    <p className='text-sm font-medium'>Email en alertas de advertencia de lotes</p>
                     <p className='text-xs text-muted-foreground'>Stock bajo o utilización ≥ 80 %</p>
                   </div>
                   <Switch

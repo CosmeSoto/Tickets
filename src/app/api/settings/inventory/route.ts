@@ -6,9 +6,11 @@ import { z } from 'zod'
 import { requireSuperAdmin } from '@/lib/auth/require-super-admin'
 import { invalidateBatchAlertSettingsCache } from '@/lib/inventory/batch-alert-settings'
 import { logConfigAudit } from '@/lib/services/config-audit'
+import { invalidateSettings } from '@/lib/api-cache'
 
 const inventorySettingsSchema = z.object({
-  manager_ids: z.array(z.string()).optional().default([]),
+  // Sin default []: si el cliente no envía manager_ids, no se pisan en BD
+  manager_ids: z.array(z.string()).optional(),
   act_expiration_days: z.number().min(1).max(30),
   low_stock_alert_enabled: z.boolean(),
   license_alert_enabled: z.boolean(),
@@ -18,6 +20,7 @@ const inventorySettingsSchema = z.object({
   mro_expiry_alert_days_urgent: z.number().min(1).max(365).optional(),
   warranty_alert_days: z.number().min(1).max(365).optional(),
   contract_alert_days: z.number().min(1).max(365).optional(),
+  maintenance_alert_days: z.number().min(1).max(365).optional(),
   mro_expiry_alert_enabled: z.boolean().optional(),
   warranty_alert_enabled: z.boolean().optional(),
   batch_utilization_alert_enabled: z.boolean().optional(),
@@ -37,6 +40,7 @@ const DEFAULT_SETTINGS: Record<string, string> = {
   mro_expiry_alert_days_urgent: '7',
   warranty_alert_days: '30',
   contract_alert_days: '30',
+  maintenance_alert_days: '30',
   mro_expiry_alert_enabled: 'true',
   warranty_alert_enabled: 'true',
   batch_utilization_alert_enabled: 'true',
@@ -63,6 +67,7 @@ const NUMBER_FIELDS = [
   'mro_expiry_alert_days_urgent',
   'warranty_alert_days',
   'contract_alert_days',
+  'maintenance_alert_days',
   'batch_low_stock_threshold_pct',
 ]
 
@@ -99,8 +104,15 @@ export async function GET(_request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-    if (session.user.role !== 'ADMIN')
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+
+    const role = session.user.role
+    if (role !== 'ADMIN') {
+      const { canManageInventory } = await import('@/lib/inventory-access')
+      const manages = await canManageInventory(session.user.id, role)
+      if (!manages) {
+        return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+      }
+    }
 
     const settings = await loadInventorySettings()
 
@@ -123,7 +135,9 @@ export async function PUT(request: NextRequest) {
     const settings = inventorySettingsSchema.parse(body)
     const oldValues = await loadInventorySettings()
 
+    const updatedKeys: string[] = []
     for (const [key, value] of Object.entries(settings)) {
+      if (value === undefined) continue
       const serialized = JSON_FIELDS.includes(key) ? JSON.stringify(value) : String(value)
 
       await prisma.system_settings.upsert({
@@ -138,9 +152,13 @@ export async function PUT(request: NextRequest) {
         },
         update: { value: serialized, updatedAt: new Date() },
       })
+      updatedKeys.push(`inventory.${key}`)
     }
 
     invalidateBatchAlertSettingsCache()
+    if (updatedKeys.length > 0) {
+      await invalidateSettings(updatedKeys)
+    }
 
     await logConfigAudit({
       action: 'inventory_settings_updated',
@@ -174,6 +192,7 @@ function getSettingDescription(key: string): string {
     mro_expiry_alert_days_urgent: 'Días antes de caducidad MRO para alerta urgente',
     warranty_alert_days: 'Días antes de vencimiento de garantía para alerta',
     contract_alert_days: 'Días antes de vencimiento de contrato para alerta',
+    maintenance_alert_days: 'Días de anticipación para mantenimientos programados en el dashboard',
     mro_expiry_alert_enabled: 'Habilita alertas de caducidad MRO',
     warranty_alert_enabled: 'Habilita alertas de garantía de equipos',
     batch_utilization_alert_enabled: 'Habilita alertas de utilización y stock en lotes',

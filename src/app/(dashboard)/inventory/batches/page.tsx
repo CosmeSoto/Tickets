@@ -30,7 +30,7 @@ async function getBatchesData(filters: SearchParams) {
       typeId: filters.typeId,
       departmentId: filters.departmentId,
     }),
-    prisma.equipment_types.findMany({ where: { isActive: true }, orderBy: { name: 'asc' } }),
+    prisma.equipment_types.findMany({ where: { isActive: true }, orderBy: [{ order: 'asc' }, { name: 'asc' }] }),
     prisma.departments.findMany({ where: { isActive: true }, orderBy: { name: 'asc' } }),
   ])
 

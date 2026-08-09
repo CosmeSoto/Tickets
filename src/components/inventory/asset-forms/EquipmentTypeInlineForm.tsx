@@ -48,7 +48,9 @@ export function EquipmentTypeInlineForm({ familyId, item, onSuccess, onCancel }:
     }
     setLoading(true)
     try {
-      const url = isEdit ? `/api/admin/equipment-types/${item!.id}` : '/api/admin/equipment-types'
+      const url = isEdit
+        ? `/api/inventory/equipment-types/${item!.id}`
+        : '/api/inventory/equipment-types'
       const method = isEdit ? 'PUT' : 'POST'
       const body = isEdit
         ? { name: name.trim() }

@@ -80,6 +80,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    let nextOrder = order
+    if (nextOrder == null || nextOrder === '') {
+      const maxOrder = await prisma.units_of_measure.aggregate({ _max: { order: true } })
+      nextOrder = (maxOrder._max.order ?? -1) + 1
+    }
+
     const unit = await prisma.units_of_measure.create({
       data: {
         id: randomUUID(),
@@ -87,7 +93,7 @@ export async function POST(request: NextRequest) {
         name,
         symbol,
         description,
-        order: order || 999,
+        order: Number(nextOrder) || 0,
         isActive: true,
       },
     })

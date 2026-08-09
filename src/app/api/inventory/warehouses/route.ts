@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
         manager: { select: { id: true, name: true, email: true } },
         family: { select: { id: true, name: true, color: true, icon: true } },
       },
-      orderBy: [{ familyId: 'asc' }, { name: 'asc' }],
+      orderBy: [{ familyId: 'asc' }, { order: 'asc' }, { name: 'asc' }],
     })
 
     return NextResponse.json({ warehouses })
@@ -93,6 +93,11 @@ export async function POST(request: NextRequest) {
     const family = await prisma.families.findUnique({ where: { id: familyId } })
     if (!family) return NextResponse.json({ error: 'Familia no encontrada' }, { status: 404 })
 
+    const maxOrder = await prisma.warehouses.aggregate({
+      where: { familyId },
+      _max: { order: true },
+    })
+
     const warehouse = await (prisma.warehouses.create as any)({
       data: {
         id: randomUUID(),
@@ -101,6 +106,7 @@ export async function POST(request: NextRequest) {
         description: description ?? null,
         managerId: managerId ?? null,
         familyId: familyId,
+        order: (maxOrder._max.order ?? -1) + 1,
       },
       include: {
         manager: { select: { id: true, name: true, email: true } },

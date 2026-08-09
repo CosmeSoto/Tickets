@@ -8,6 +8,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
+import {
+  requireAdminInventoryAccess,
+  assertFamilyInManageScope,
+} from '@/lib/inventory/admin-inventory-auth'
 import { z } from 'zod'
 
 const warehouseSchema = z.object({
@@ -27,16 +31,12 @@ export async function GET(
 ) {
   try {
     const session = await getServerSession(authOptions)
-
-    if (!session?.user) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-    }
-
-    if (session.user.role !== 'ADMIN' && !session.user.isSuperAdmin) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-    }
+    const access = await requireAdminInventoryAccess(session)
+    if (!access.ok) return access.response
 
     const { familyId } = await params
+    const denied = assertFamilyInManageScope(access.auth, familyId)
+    if (denied) return denied
 
     const warehouses = await prisma.warehouses.findMany({
       where: { familyId },
@@ -55,7 +55,7 @@ export async function GET(
           },
         },
       },
-      orderBy: { name: 'asc' },
+      orderBy: [{ order: 'asc' }, { name: 'asc' }],
     })
 
     return NextResponse.json({ warehouses })
@@ -74,16 +74,13 @@ export async function POST(
 ) {
   try {
     const session = await getServerSession(authOptions)
-
-    if (!session?.user) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-    }
-
-    if (session.user.role !== 'ADMIN' && !session.user.isSuperAdmin) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-    }
+    const access = await requireAdminInventoryAccess(session)
+    if (!access.ok) return access.response
 
     const { familyId } = await params
+    const denied = assertFamilyInManageScope(access.auth, familyId)
+    if (denied) return denied
+
     const body = await request.json()
 
     // Validar
@@ -122,7 +119,12 @@ export async function POST(
       }
     }
 
-    // Crear bodega
+    // Crear bodega al final del orden actual del área
+    const maxOrder = await prisma.warehouses.aggregate({
+      where: { familyId },
+      _max: { order: true },
+    })
+
     const warehouse = await prisma.warehouses.create({
       data: {
         name: validation.data.name,
@@ -131,6 +133,7 @@ export async function POST(
         managerId: validation.data.managerId || null,
         familyId,
         isActive: validation.data.isActive,
+        order: (maxOrder._max.order ?? -1) + 1,
       },
       include: {
         manager: {

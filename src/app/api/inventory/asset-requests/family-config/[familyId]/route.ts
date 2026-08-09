@@ -5,15 +5,15 @@ import { authOptions } from '@/lib/auth'
 import { getSetting, invalidateSettings } from '@/lib/api-cache'
 import { updateFamilyConfigSchema } from '@/lib/validations/inventory/asset-request'
 import { prisma } from '@/lib/prisma'
-import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
+import { logConfigAudit } from '@/lib/services/config-audit'
 import { ZodError } from 'zod'
 
 /**
  * GET /api/inventory/asset-requests/family-config/[familyId]
- * Obtiene la configuraci?n del m?dulo para una familia
+ * Obtiene la configuración del módulo para una familia
  */
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ familyId: string }> }
 ) {
   try {
@@ -24,27 +24,33 @@ export async function GET(
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    // Leer configuraci?n desde system_settings
-    const enabled = await getSetting(
-      `asset_requests_enabled_${familyId}`,
-      600, // TTL 10 min
-      'false'
-    )
+    const enabled = await getSetting(`asset_requests_enabled_${familyId}`, 600, '')
+    let assetRequestsEnabled: boolean
+    if (enabled === 'true') assetRequestsEnabled = true
+    else if (enabled === 'false') assetRequestsEnabled = false
+    else {
+      // Misma regla que AssetRequestService.isAssetRequestsEnabledForFamily
+      const cfg = await prisma.inventory_family_config.findUnique({
+        where: { familyId },
+        select: { inventoryEnabled: true },
+      })
+      assetRequestsEnabled = cfg?.inventoryEnabled !== false
+    }
 
     return NextResponse.json({
       familyId,
-      assetRequestsEnabled: enabled === 'true',
+      assetRequestsEnabled,
     })
   } catch (error) {
     console.error('[API] Error getting family config:', error)
-    return NextResponse.json({ error: 'Error al obtener la configuraci?n' }, { status: 500 })
+    return NextResponse.json({ error: 'Error al obtener la configuración' }, { status: 500 })
   }
 }
 
 /**
  * PUT /api/inventory/asset-requests/family-config/[familyId]
- * Actualiza la configuraci?n del m?dulo para una familia
- * Solo Super Admin puede modificar esta configuraci?n
+ * Actualiza la configuración del módulo para una familia
+ * Solo Super Admin puede modificar esta configuración
  */
 export async function PUT(
   request: NextRequest,
@@ -58,19 +64,16 @@ export async function PUT(
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    // Solo Super Admin puede modificar la configuraci?n
     if (session.user.role !== 'ADMIN' || !session.user.isSuperAdmin) {
       return NextResponse.json(
-        { error: 'Solo el Super Admin puede modificar esta configuraci?n' },
+        { error: 'Solo el Super Admin puede modificar esta configuración' },
         { status: 403 }
       )
     }
 
-    // Parsear y validar body
     const body = await request.json()
     const validatedData = updateFamilyConfigSchema.parse(body)
 
-    // Obtener nombre de la familia para el log
     const family = await prisma.families.findUnique({
       where: { id: familyId },
       select: { name: true },
@@ -80,7 +83,12 @@ export async function PUT(
       return NextResponse.json({ error: 'Familia no encontrada' }, { status: 404 })
     }
 
-    // Escribir en system_settings
+    const previousRow = await prisma.system_settings.findUnique({
+      where: { key: `asset_requests_enabled_${familyId}` },
+      select: { value: true },
+    })
+    const previousEnabled = previousRow?.value === 'true'
+
     await prisma.system_settings.upsert({
       where: { key: `asset_requests_enabled_${familyId}` },
       update: {
@@ -95,21 +103,19 @@ export async function PUT(
       },
     })
 
-    // Invalidar cach? de configuraci?n
     await invalidateSettings(`asset_requests_enabled_${familyId}`)
 
-    // Registrar en audit_logs
-    const ipAddress =
-      request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
-
-    await AuditServiceComplete.log({
+    await logConfigAudit({
       action: 'asset_request_config_updated',
       entityType: 'inventory',
       entityId: familyId,
       userId: session.user.id,
-      ipAddress,
-      details: {
-        familyId,
+      userEmail: session.user.email ?? null,
+      oldValues: {
+        familyName: family.name,
+        assetRequestsEnabled: previousEnabled,
+      },
+      newValues: {
         familyName: family.name,
         assetRequestsEnabled: validatedData.assetRequestsEnabled,
       },
@@ -120,19 +126,13 @@ export async function PUT(
       assetRequestsEnabled: validatedData.assetRequestsEnabled,
     })
   } catch (error) {
-    console.error('[API] Error updating family config:', error)
-
-    // Errores de validaci?n Zod
     if (error instanceof ZodError) {
       return NextResponse.json(
-        {
-          error: 'VALIDATION_ERROR',
-          details: error.errors,
-        },
+        { error: 'Datos inválidos', details: error.errors },
         { status: 400 }
       )
     }
-
-    return NextResponse.json({ error: 'Error al actualizar la configuraci?n' }, { status: 500 })
+    console.error('[API] Error updating family config:', error)
+    return NextResponse.json({ error: 'Error al actualizar la configuración' }, { status: 500 })
   }
 }

@@ -1580,7 +1580,7 @@ model supplier_types {
   description String?
   familyId    String?     @map("family_id")
   isActive    Boolean     @default(true) @map("is_active")
-  order       Int         @default(999)
+  order       Int         @default(0)
   createdAt   DateTime    @default(now()) @map("created_at")
   updatedAt   DateTime    @updatedAt @map("updated_at")
   family      families?   @relation(fields: [familyId], references: [id])
@@ -1732,6 +1732,7 @@ model warehouses {
   managerId   String?             @map("manager_id")
   familyId    String              @map("family_id")
   isActive    Boolean             @default(true) @map("is_active")
+  order       Int                 @default(0)
   createdAt   DateTime            @default(now()) @map("created_at")
   updatedAt   DateTime            @updatedAt @map("updated_at")
   consumables consumables[]
@@ -1742,6 +1743,7 @@ model warehouses {
 
   @@index([isActive])
   @@index([familyId, isActive])
+  @@index([familyId, order])
   @@map("warehouses")
 }
 

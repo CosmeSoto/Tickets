@@ -62,6 +62,15 @@ export async function POST(
     const { familyId } = await params
     const body = await request.json()
 
+    let order = typeof body.order === 'number' ? body.order : undefined
+    if (order == null) {
+      const maxOrder = await prisma.family_custom_fields.aggregate({
+        where: { familyId },
+        _max: { order: true },
+      })
+      order = (maxOrder._max.order ?? -1) + 1
+    }
+
     const field = await prisma.family_custom_fields.create({
       data: {
         familyId,
@@ -71,7 +80,7 @@ export async function POST(
         fieldOptions: body.fieldOptions || null,
         isRequired: body.isRequired || false,
         helpText: body.helpText || null,
-        order: body.order || 0,
+        order,
       },
     })
 

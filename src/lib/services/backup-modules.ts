@@ -502,6 +502,7 @@ export async function exportUsersModuleData(): Promise<Record<UsersModuleTable, 
 
 /** Orden de inserción respetando FKs del módulo inventario. */
 export const INVENTORY_MODULE_RESTORE_ORDER = [
+  'inventory_family_config',
   'supplier_types',
   'suppliers',
   'units_of_measure',
@@ -554,6 +555,9 @@ export async function exportInventoryModuleData(): Promise<Record<string, unknow
       data[name] = []
     }
   }
+
+  // Config por área (paridad con patrol_family_config)
+  await fetchTable('inventory_family_config', () => prisma.inventory_family_config.findMany())
 
   // Catálogos
   await fetchTable('supplier_types', () => prisma.supplier_types.findMany())

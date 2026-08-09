@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { InventoryReportService } from '@/lib/services/inventory-report.service'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
-import { withReportCache } from '@/lib/api-cache'
+import { withReportCache, getSetting } from '@/lib/api-cache'
 
 /**
  * GET /api/inventory/reports
@@ -30,7 +30,14 @@ export async function GET(request: NextRequest) {
       : undefined
     const endDate = searchParams.get('endDate') ? new Date(searchParams.get('endDate')!) : undefined
     const departmentId = searchParams.get('departmentId') || undefined
-    const days = parseInt(searchParams.get('days') || '30')
+    const daysParam = searchParams.get('days')
+    let days: number
+    if (daysParam) {
+      days = parseInt(daysParam, 10)
+    } else {
+      const daysRaw = await getSetting('inventory.license_alert_days_first', 600, '30')
+      days = Math.max(1, parseInt(daysRaw ?? '30', 10) || 30)
+    }
 
     // Admin Normal: resolver scope de inventario
     const isSuperAdmin = (session.user as any).isSuperAdmin === true

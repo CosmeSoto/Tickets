@@ -66,6 +66,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    let nextOrder = order
+    if (nextOrder == null) {
+      const maxOrder = await prisma.consumable_types.aggregate({
+        where: { familyId: familyId || null },
+        _max: { order: true },
+      })
+      nextOrder = (maxOrder._max.order ?? -1) + 1
+    }
+
     const newType = await prisma.consumable_types.create({
       data: {
         id: randomUUID(),
@@ -73,7 +82,7 @@ export async function POST(request: NextRequest) {
         name,
         description,
         icon,
-        order: order || 999,
+        order: nextOrder,
         isActive: true,
         ...(familyId ? { familyId } : {}),
       },

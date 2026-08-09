@@ -39,15 +39,15 @@ export async function GET(
       include: {
         equipmentTypes: {
           where: { isActive: true },
-          orderBy: { name: 'asc' },
+          orderBy: [{ order: 'asc' }, { name: 'asc' }],
         },
         consumableTypes: {
           where: { isActive: true },
-          orderBy: { name: 'asc' },
+          orderBy: [{ order: 'asc' }, { name: 'asc' }],
         },
         licenseTypes: {
           where: { isActive: true },
-          orderBy: { name: 'asc' },
+          orderBy: [{ order: 'asc' }, { name: 'asc' }],
         },
       },
     })

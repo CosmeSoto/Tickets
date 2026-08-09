@@ -60,7 +60,7 @@ export const navigationByRole: Record<string, DashboardNavItem[]> = {
         { name: 'Actas', href: '/inventory/acts', icon: FileText },
         { name: 'Proveedores', href: '/inventory/suppliers', icon: Building2 },
         { name: 'Reportes', href: '/inventory/reports', icon: BarChart3 },
-        { name: 'Configuración', href: '/admin/settings/inventory', icon: Settings },
+        { name: 'Configuración', href: '/inventory/settings', icon: Settings },
       ],
     },
     {
@@ -175,6 +175,7 @@ export const navigationByRole: Record<string, DashboardNavItem[]> = {
         { name: 'Contratos', href: '/inventory/contracts', icon: FileSignature },
         { name: 'Actas', href: '/inventory/acts', icon: FileText },
         { name: 'Reportes', href: '/inventory/reports', icon: BarChart3 },
+        { name: 'Configuración', href: '/inventory/settings', icon: Settings },
       ],
     },
     {
@@ -279,6 +280,7 @@ export const navigationByRole: Record<string, DashboardNavItem[]> = {
         { name: 'Contratos', href: '/inventory/contracts', icon: FileSignature },
         { name: 'Actas', href: '/inventory/acts', icon: FileText },
         { name: 'Reportes', href: '/inventory/reports', icon: BarChart3 },
+        { name: 'Configuración', href: '/inventory/settings', icon: Settings },
       ],
     },
     {

@@ -6,12 +6,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import prisma from '@/lib/prisma'
 import {
   updateBrand,
   deleteBrand,
   type UpdateBrandInput,
 } from '@/lib/services/equipment-brands.service'
-import { isAdminInventorySession } from '@/lib/inventory/admin-inventory-auth'
+import {
+  requireAdminInventoryAccess,
+  assertFamilyInManageScope,
+} from '@/lib/inventory/admin-inventory-auth'
 import { z } from 'zod'
 
 const updateBrandSchema = z.object({
@@ -30,11 +34,21 @@ export async function PUT(
 ) {
   try {
     const session = await getServerSession(authOptions)
-    if (!isAdminInventorySession(session)) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-    }
+    const access = await requireAdminInventoryAccess(session)
+    if (!access.ok) return access.response
 
     const { id } = await params
+    const existing = await prisma.equipment_brands.findUnique({
+      where: { id },
+      select: { familyId: true },
+    })
+    if (!existing) {
+      return NextResponse.json({ error: 'Marca no encontrada' }, { status: 404 })
+    }
+
+    const existingDenied = assertFamilyInManageScope(access.auth, existing.familyId)
+    if (existingDenied) return existingDenied
+
     const body = await request.json()
     const validation = updateBrandSchema.safeParse(body)
     if (!validation.success) {
@@ -42,6 +56,11 @@ export async function PUT(
         { error: 'Datos inválidos', details: validation.error.errors },
         { status: 400 }
       )
+    }
+
+    if (validation.data.familyId !== undefined) {
+      const targetDenied = assertFamilyInManageScope(access.auth, validation.data.familyId)
+      if (targetDenied) return targetDenied
     }
 
     const brand = await updateBrand(id, validation.data as UpdateBrandInput)
@@ -60,11 +79,21 @@ export async function DELETE(
 ) {
   try {
     const session = await getServerSession(authOptions)
-    if (!isAdminInventorySession(session)) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-    }
+    const access = await requireAdminInventoryAccess(session)
+    if (!access.ok) return access.response
 
     const { id } = await params
+    const existing = await prisma.equipment_brands.findUnique({
+      where: { id },
+      select: { familyId: true },
+    })
+    if (!existing) {
+      return NextResponse.json({ error: 'Marca no encontrada' }, { status: 404 })
+    }
+
+    const denied = assertFamilyInManageScope(access.auth, existing.familyId)
+    if (denied) return denied
+
     const result = await deleteBrand(id)
     return NextResponse.json(result)
   } catch (error: unknown) {

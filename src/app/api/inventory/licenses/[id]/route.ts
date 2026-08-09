@@ -14,6 +14,7 @@ import {
 } from '@/lib/inventory/inventory-resource-access'
 import prisma from '@/lib/prisma'
 import { getRenewalAlertStatus } from '@/lib/inventory/renewal-alert'
+import { getSetting } from '@/lib/api-cache'
 import {
   getLinkedBusinessContractIdForLicense,
   syncLicenseContractLink,
@@ -55,8 +56,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       },
     })
 
+    const warningDaysRaw = await getSetting('inventory.license_alert_days_first', 600, '30')
+    const warningDays = Math.max(1, parseInt(warningDaysRaw ?? '30', 10) || 30)
     const renewalAlertStatus = getRenewalAlertStatus(
-      (license as any).renewalDate ? new Date((license as any).renewalDate) : null
+      (license as any).renewalDate ? new Date((license as any).renewalDate) : null,
+      warningDays
     )
 
     const linkedContractId = await getLinkedBusinessContractIdForLicense(id)

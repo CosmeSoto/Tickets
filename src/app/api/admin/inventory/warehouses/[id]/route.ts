@@ -9,6 +9,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
+import {
+  requireAdminInventoryAccess,
+  assertFamilyInManageScope,
+} from '@/lib/inventory/admin-inventory-auth'
 import { z } from 'zod'
 
 const warehouseUpdateSchema = z.object({
@@ -28,10 +32,8 @@ export async function GET(
 ) {
   try {
     const session = await getServerSession(authOptions)
-
-    if (!session?.user) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-    }
+    const access = await requireAdminInventoryAccess(session)
+    if (!access.ok) return access.response
 
     const { id } = await params
 
@@ -66,6 +68,9 @@ export async function GET(
       return NextResponse.json({ error: 'Bodega no encontrada' }, { status: 404 })
     }
 
+    const denied = assertFamilyInManageScope(access.auth, warehouse.familyId)
+    if (denied) return denied
+
     return NextResponse.json({ warehouse })
   } catch (error) {
     console.error('Error obteniendo bodega:', error)
@@ -82,14 +87,8 @@ export async function PUT(
 ) {
   try {
     const session = await getServerSession(authOptions)
-
-    if (!session?.user) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-    }
-
-    if (session.user.role !== 'ADMIN' && !session.user.isSuperAdmin) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-    }
+    const access = await requireAdminInventoryAccess(session)
+    if (!access.ok) return access.response
 
     const { id } = await params
     const body = await request.json()
@@ -111,6 +110,9 @@ export async function PUT(
     if (!existing) {
       return NextResponse.json({ error: 'Bodega no encontrada' }, { status: 404 })
     }
+
+    const denied = assertFamilyInManageScope(access.auth, existing.familyId)
+    if (denied) return denied
 
     // Si se especifica manager, verificar que existe y tiene permisos
     if (validation.data.managerId) {
@@ -161,14 +163,8 @@ export async function DELETE(
 ) {
   try {
     const session = await getServerSession(authOptions)
-
-    if (!session?.user) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-    }
-
-    if (session.user.role !== 'ADMIN' && !session.user.isSuperAdmin) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-    }
+    const access = await requireAdminInventoryAccess(session)
+    if (!access.ok) return access.response
 
     const { id } = await params
 
@@ -188,6 +184,9 @@ export async function DELETE(
     if (!existing) {
       return NextResponse.json({ error: 'Bodega no encontrada' }, { status: 404 })
     }
+
+    const denied = assertFamilyInManageScope(access.auth, existing.familyId)
+    if (denied) return denied
 
     // Verificar si tiene items asignados
     const hasItems = existing._count.equipment > 0 || existing._count.consumables > 0

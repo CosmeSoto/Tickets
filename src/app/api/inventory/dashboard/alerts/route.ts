@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { getInventorySessionContext } from '@/lib/inventory/inventory-session'
 import { BatchService } from '@/lib/services/batch-inventory.service'
+import { getSetting } from '@/lib/api-cache'
 import {
   buildConsumableFamilyWhere,
   buildDeliveryActFamilyWhere,
@@ -22,6 +23,9 @@ const EMPTY_ALERTS = {
   pendingRequests: 0,
   batchCriticalBatches: 0,
   batchWarningBatches: 0,
+  licenseAlertDays: 30,
+  contractAlertDays: 30,
+  maintenanceAlertDays: 30,
 }
 
 /**
@@ -54,7 +58,18 @@ export async function GET(_request: NextRequest) {
     const actsScope = buildDeliveryActFamilyWhere(familyIds)
 
     const now = new Date()
-    const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
+    const [licenseDaysRaw, contractDaysRaw, maintenanceDaysRaw] = await Promise.all([
+      getSetting('inventory.license_alert_days_first', 600, '30'),
+      getSetting('inventory.contract_alert_days', 600, '30'),
+      getSetting('inventory.maintenance_alert_days', 600, '30'),
+    ])
+    const licenseDays = Math.max(1, parseInt(licenseDaysRaw ?? '30', 10) || 30)
+    const contractDays = Math.max(1, parseInt(contractDaysRaw ?? '30', 10) || 30)
+    const maintenanceDays = Math.max(1, parseInt(maintenanceDaysRaw ?? '30', 10) || 30)
+
+    const licenseWindow = new Date(now.getTime() + licenseDays * 24 * 60 * 60 * 1000)
+    const contractWindow = new Date(now.getTime() + contractDays * 24 * 60 * 60 * 1000)
+    const maintenanceWindow = new Date(now.getTime() + maintenanceDays * 24 * 60 * 60 * 1000)
 
     const [
       lowStockConsumables,
@@ -78,7 +93,7 @@ export async function GET(_request: NextRequest) {
         where: {
           equipment: equipmentScope,
           status: 'SCHEDULED',
-          date: { lte: thirtyDaysFromNow },
+          date: { lte: maintenanceWindow },
         },
       }),
 
@@ -86,7 +101,7 @@ export async function GET(_request: NextRequest) {
         where: {
           ...directFamilyScope,
           status: 'ACTIVE',
-          endDate: { lte: thirtyDaysFromNow, gte: now },
+          endDate: { lte: contractWindow, gte: now },
         },
       }),
 
@@ -95,14 +110,14 @@ export async function GET(_request: NextRequest) {
           ...equipmentScope,
           ownershipType: 'RENTAL',
           status: { not: 'RETIRED' },
-          rentalEndDate: { lte: thirtyDaysFromNow, gte: now },
+          rentalEndDate: { lte: contractWindow, gte: now },
         },
       }),
 
       prisma.software_licenses.count({
         where: {
           ...licenseScope,
-          expirationDate: { lte: thirtyDaysFromNow, gte: now },
+          expirationDate: { lte: licenseWindow, gte: now },
         },
       }),
 
@@ -136,6 +151,9 @@ export async function GET(_request: NextRequest) {
       pendingRequests,
       batchCriticalBatches: batchOverview?.summary.criticalCount ?? 0,
       batchWarningBatches: batchOverview?.summary.warningCount ?? 0,
+      licenseAlertDays: licenseDays,
+      contractAlertDays: contractDays,
+      maintenanceAlertDays: maintenanceDays,
     })
   } catch (error) {
     console.error('Error obteniendo alertas del dashboard:', error)

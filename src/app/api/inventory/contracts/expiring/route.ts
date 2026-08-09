@@ -20,7 +20,8 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const familyId = searchParams.get('familyId') || undefined
-    const days = parseInt(searchParams.get('days') || '60')
+    const daysParam = searchParams.get('days')
+    const days = daysParam != null ? parseInt(daysParam, 10) : undefined
 
     const contracts = await ContractAlertService.getExpiringContracts(familyId, days)
 

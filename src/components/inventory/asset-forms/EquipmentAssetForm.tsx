@@ -953,7 +953,7 @@ export function EquipmentAssetForm({
               />
             )}
             onDelete={async id => {
-              const res = await fetch(`/api/admin/equipment-types/${id}`, { method: 'DELETE' })
+              const res = await fetch(`/api/inventory/equipment-types/${id}`, { method: 'DELETE' })
               if (!res.ok) {
                 const d = await res.json()
                 throw new Error(d.error || 'Error al eliminar')

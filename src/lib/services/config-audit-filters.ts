@@ -27,6 +27,7 @@ const CONFIG_CHANGE_ACTIONS = [
   'PATROL_FAMILY_CONFIG_UPDATED',
   'INVENTORY_FAMILY_CONFIG_UPDATED',
   'inventory_settings_updated',
+  'asset_request_config_updated',
   'backup_config_updated',
   'sla_policy_created',
   'sla_policy_updated',
@@ -38,7 +39,11 @@ const MODULE_ACTIONS: Record<Exclude<AuditConfigModule, 'all'>, readonly string[
   system: ['settings_updated'],
   tickets: ['TICKET_FAMILY_CONFIG_UPDATED'],
   patrols: ['PATROL_FAMILY_CONFIG_UPDATED'],
-  inventory: ['INVENTORY_FAMILY_CONFIG_UPDATED', 'inventory_settings_updated'],
+  inventory: [
+    'INVENTORY_FAMILY_CONFIG_UPDATED',
+    'inventory_settings_updated',
+    'asset_request_config_updated',
+  ],
   backups: [
     'backup_config_updated',
     'backup_created',

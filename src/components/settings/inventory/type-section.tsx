@@ -42,6 +42,7 @@ import {
 import { useExport } from '@/hooks/common/use-export'
 import type { AnyType, TypeKind } from '@/hooks/inventory/use-type-management'
 import { CloneTypeDialog } from './clone-type-dialog'
+import { ReorderRowButtons, moveItemInList } from './reorder-row-buttons'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -58,6 +59,7 @@ interface TypeSectionProps<T extends AnyType> {
   onDeleteType: (typeId: string) => Promise<boolean>
   onToggleActive: (typeId: string) => Promise<boolean>
   onManageAttributes: (type: T) => void
+  onReorder?: (ids: string[]) => Promise<boolean>
   /** Callback tras clonar exitosamente un tipo a otra área */
   onCloneSuccess?: () => void
 }
@@ -82,6 +84,7 @@ export function TypeSection<T extends AnyType>({
   onDeleteType,
   onToggleActive,
   onManageAttributes,
+  onReorder,
   onCloneSuccess,
 }: TypeSectionProps<T>) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -122,6 +125,13 @@ export function TypeSection<T extends AnyType>({
       setDeleteDialogOpen(false)
       setTypeToDelete(null)
     }
+  }
+
+  const handleReorder = async (type: T, direction: 'up' | 'down') => {
+    if (!onReorder) return
+    const moved = moveItemInList(types, type.id, direction)
+    if (!moved) return
+    await onReorder(moved.ids)
   }
 
   // Configuración de columnas para DataTable
@@ -214,58 +224,69 @@ export function TypeSection<T extends AnyType>({
             Nuevo Tipo
           </Button>
         }
-        rowActions={(type: T) => (
-          <div className='flex items-center justify-end gap-1'>
-            <Button
-              variant='ghost'
-              size='sm'
-              onClick={() => onEditType(type)}
-              disabled={saving}
-              title='Editar'
-            >
-              <Edit2 className='h-4 w-4' />
-            </Button>
-            <Button
-              variant='ghost'
-              size='sm'
-              onClick={() => onManageAttributes(type)}
-              disabled={saving}
-              title='Gestionar atributos'
-            >
-              <Settings className='h-4 w-4' />
-            </Button>
-            <Button
-              variant='ghost'
-              size='sm'
-              onClick={() => onToggleActive(type.id)}
-              disabled={saving}
-              title={type.isActive ? 'Desactivar' : 'Activar'}
-            >
-              {type.isActive ? <EyeOff className='h-4 w-4' /> : <Eye className='h-4 w-4' />}
-            </Button>
-            <Button
-              variant='ghost'
-              size='sm'
-              onClick={() => handleDeleteClick(type)}
-              disabled={saving}
-              title='Eliminar'
-            >
-              <Trash2 className='h-4 w-4 text-destructive' />
-            </Button>
-            <Button
-              variant='ghost'
-              size='sm'
-              onClick={() => {
-                setTypeToClone(type)
-                setCloneDialogOpen(true)
-              }}
-              disabled={saving}
-              title='Copiar a otra área'
-            >
-              <Copy className='h-4 w-4 text-blue-500' />
-            </Button>
-          </div>
-        )}
+        rowActions={(type: T) => {
+          const index = types.findIndex(t => t.id === type.id)
+          return (
+            <div className='flex items-center justify-end gap-1'>
+              {onReorder && (
+                <ReorderRowButtons
+                  index={index}
+                  total={types.length}
+                  disabled={saving}
+                  onMove={direction => handleReorder(type, direction)}
+                />
+              )}
+              <Button
+                variant='ghost'
+                size='sm'
+                onClick={() => onEditType(type)}
+                disabled={saving}
+                title='Editar'
+              >
+                <Edit2 className='h-4 w-4' />
+              </Button>
+              <Button
+                variant='ghost'
+                size='sm'
+                onClick={() => onManageAttributes(type)}
+                disabled={saving}
+                title='Gestionar atributos'
+              >
+                <Settings className='h-4 w-4' />
+              </Button>
+              <Button
+                variant='ghost'
+                size='sm'
+                onClick={() => onToggleActive(type.id)}
+                disabled={saving}
+                title={type.isActive ? 'Desactivar' : 'Activar'}
+              >
+                {type.isActive ? <EyeOff className='h-4 w-4' /> : <Eye className='h-4 w-4' />}
+              </Button>
+              <Button
+                variant='ghost'
+                size='sm'
+                onClick={() => handleDeleteClick(type)}
+                disabled={saving}
+                title='Eliminar'
+              >
+                <Trash2 className='h-4 w-4 text-destructive' />
+              </Button>
+              <Button
+                variant='ghost'
+                size='sm'
+                onClick={() => {
+                  setTypeToClone(type)
+                  setCloneDialogOpen(true)
+                }}
+                disabled={saving}
+                title='Copiar a otra área'
+              >
+                <Copy className='h-4 w-4 text-blue-500' />
+              </Button>
+            </div>
+          )
+        }}
         emptyState={{
           title: 'No hay tipos configurados',
           description: 'Crea el primer tipo para comenzar',

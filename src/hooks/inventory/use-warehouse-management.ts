@@ -20,6 +20,7 @@ export interface Warehouse {
   managerId: string | null
   familyId: string
   isActive: boolean
+  order?: number
   createdAt: string
   updatedAt: string
   manager?: WarehouseManager | null
@@ -89,7 +90,9 @@ export function useWarehouseManagement(familyId: string | null) {
    */
   const loadAvailableManagers = useCallback(async () => {
     try {
-      const response = await fetch('/api/admin/users?canManageInventory=true')
+      const params = new URLSearchParams()
+      if (familyId) params.set('familyId', familyId)
+      const response = await fetch(`/api/inventory/assignable-users?${params.toString()}`)
 
       if (!response.ok) {
         throw new Error('Error al cargar managers')
@@ -107,7 +110,7 @@ export function useWarehouseManagement(familyId: string | null) {
       console.error('Error cargando managers:', err)
       // No mostrar toast, es un error silencioso
     }
-  }, [])
+  }, [familyId])
 
   /**
    * Crear bodega
@@ -243,6 +246,56 @@ export function useWarehouseManagement(familyId: string | null) {
   )
 
   /**
+   * Reordenar bodegas (persistente)
+   */
+  const reorderWarehouses = useCallback(
+    async (ids: string[]): Promise<boolean> => {
+      if (!familyId) return false
+
+      const reordered = ids
+        .map(id => warehouses.find(w => w.id === id))
+        .filter(Boolean)
+        .map((w, index) => ({ ...(w as Warehouse), order: index }))
+      setWarehouses(reordered)
+
+      setSaving(true)
+      setError(null)
+
+      try {
+        const response = await fetch(
+          `/api/admin/inventory/families/${familyId}/warehouses/reorder`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids }),
+          }
+        )
+        const result = await response.json()
+
+        if (response.ok && result.success) {
+          toast.success('Orden actualizado correctamente')
+          return true
+        }
+
+        await loadWarehouses()
+        const message = result.error || 'Error al reordenar bodegas'
+        setError(message)
+        toast.error(message)
+        return false
+      } catch (err) {
+        await loadWarehouses()
+        const message = err instanceof Error ? err.message : 'Error al reordenar bodegas'
+        setError(message)
+        toast.error(message)
+        return false
+      } finally {
+        setSaving(false)
+      }
+    },
+    [familyId, loadWarehouses, warehouses]
+  )
+
+  /**
    * Auto-load cuando cambia familyId
    */
   useEffect(() => {
@@ -268,5 +321,6 @@ export function useWarehouseManagement(familyId: string | null) {
     updateWarehouse,
     deleteWarehouse,
     toggleActive,
+    reorderWarehouses,
   }
 }

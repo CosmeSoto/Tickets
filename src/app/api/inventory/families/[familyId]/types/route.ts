@@ -45,15 +45,15 @@ export async function GET(
     const [equipmentTypes, consumableTypes, licenseTypes] = await Promise.all([
       prisma.equipment_types.findMany({
         where: { familyId, isActive: true },
-        orderBy: { name: 'asc' },
+        orderBy: [{ order: 'asc' }, { name: 'asc' }],
       }),
       prisma.consumable_types.findMany({
         where: { familyId, isActive: true },
-        orderBy: { name: 'asc' },
+        orderBy: [{ order: 'asc' }, { name: 'asc' }],
       }),
       prisma.license_types.findMany({
         where: { familyId, isActive: true },
-        orderBy: { name: 'asc' },
+        orderBy: [{ order: 'asc' }, { name: 'asc' }],
       }),
     ])
 

@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
         isActive: true,
         ...(warehouseIds?.length ? { id: { in: warehouseIds } } : {}),
       },
-      orderBy: { name: 'asc' },
+      orderBy: [{ order: 'asc' }, { name: 'asc' }],
     })
 
     if (sourceWarehouses.length === 0) {
@@ -91,6 +91,12 @@ export async function POST(request: NextRequest) {
     for (const target of targetFamilies) {
       if (target.id === sourceFamilyId) continue
 
+      const maxOrder = await prisma.warehouses.aggregate({
+        where: { familyId: target.id },
+        _max: { order: true },
+      })
+      let nextOrder = (maxOrder._max.order ?? -1) + 1
+
       for (const warehouse of sourceWarehouses) {
         const existing = await prisma.warehouses.findFirst({
           where: { familyId: target.id, name: warehouse.name },
@@ -109,6 +115,7 @@ export async function POST(request: NextRequest) {
             familyId: target.id,
             managerId: admin?.id ?? warehouse.managerId,
             isActive: true,
+            order: nextOrder++,
           },
         })
         created++

@@ -35,6 +35,7 @@ export interface BaseType {
   description?: string | null
   familyId: string
   isActive: boolean
+  order?: number
   createdAt?: string
   updatedAt?: string
 }
@@ -264,6 +265,54 @@ export function useTypeManagement<T extends AnyType = AnyType>(
     [types, updateType]
   )
 
+  // ── Reorder types ──
+  const reorderTypes = useCallback(
+    async (ids: string[]): Promise<boolean> => {
+      const reordered = ids
+        .map(id => types.find(t => t.id === id))
+        .filter(Boolean)
+        .map((t, index) => ({ ...(t as T), order: index }))
+      setTypes(reordered)
+
+      setSaving(true)
+      try {
+        const res = await fetch(`${getEndpoint()}/reorder`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids }),
+        })
+        const result = await res.json()
+
+        if (res.ok && result.success) {
+          toast({
+            title: 'Éxito',
+            description: 'Orden actualizado correctamente',
+          })
+          return true
+        }
+
+        await loadTypes()
+        toast({
+          title: 'Error',
+          description: result.error || 'Error al reordenar tipos',
+          variant: 'destructive',
+        })
+        return false
+      } catch {
+        await loadTypes()
+        toast({
+          title: 'Error',
+          description: 'Error de conexión al reordenar tipos',
+          variant: 'destructive',
+        })
+        return false
+      } finally {
+        setSaving(false)
+      }
+    },
+    [getEndpoint, loadTypes, toast, types]
+  )
+
   // Auto-load when familyId changes
   useEffect(() => {
     if (familyId) {
@@ -285,5 +334,6 @@ export function useTypeManagement<T extends AnyType = AnyType>(
     updateType,
     deleteType,
     toggleActive,
+    reorderTypes,
   }
 }

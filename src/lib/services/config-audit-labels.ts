@@ -89,12 +89,18 @@ export const INVENTORY_GLOBAL_SETTINGS_LABELS: Record<string, string> = {
   mro_expiry_alert_days_urgent: 'MRO — alerta urgente (días)',
   warranty_alert_days: 'Garantía — alerta (días)',
   contract_alert_days: 'Contratos — alerta (días)',
+  maintenance_alert_days: 'Mantenimientos programados — ventana dashboard (días)',
   mro_expiry_alert_enabled: 'Alertas caducidad MRO',
   warranty_alert_enabled: 'Alertas garantía',
   batch_utilization_alert_enabled: 'Alertas utilización lotes',
   batch_utilization_email_critical: 'Email crítico lotes',
   batch_utilization_email_warning: 'Email advertencia lotes',
   batch_low_stock_threshold_pct: 'Umbral stock bajo lotes (%)',
+}
+
+export const ASSET_REQUEST_CONFIG_LABELS: Record<string, string> = {
+  familyName: 'Área',
+  assetRequestsEnabled: 'Solicitudes de compras habilitadas',
 }
 
 export const SLA_POLICY_LABELS: Record<string, string> = {
@@ -122,6 +128,7 @@ const ACTION_LABEL_MAPS: Record<string, Record<string, string>> = {
   INVENTORY_FAMILY_CONFIG_UPDATED: INVENTORY_FAMILY_CONFIG_LABELS,
   inventory_family_config_updated: INVENTORY_FAMILY_CONFIG_LABELS,
   inventory_settings_updated: INVENTORY_GLOBAL_SETTINGS_LABELS,
+  asset_request_config_updated: ASSET_REQUEST_CONFIG_LABELS,
   sla_policy_updated: SLA_POLICY_LABELS,
   sla_policy_created: SLA_POLICY_LABELS,
   sla_policy_deleted: SLA_POLICY_LABELS,
@@ -138,6 +145,7 @@ const ACTION_MODULE_NAMES: Record<string, string> = {
   INVENTORY_FAMILY_CONFIG_UPDATED: 'Inventario (por área)',
   inventory_family_config_updated: 'Inventario (por área)',
   inventory_settings_updated: 'Inventario (global)',
+  asset_request_config_updated: 'Inventario (solicitudes)',
   sla_policy_updated: 'SLA Tickets',
   sla_policy_created: 'SLA Tickets',
   sla_policy_deleted: 'SLA Tickets',
@@ -152,6 +160,7 @@ export const CONFIG_AUDIT_ACTIONS = new Set([
   'PATROL_FAMILY_CONFIG_UPDATED',
   'INVENTORY_FAMILY_CONFIG_UPDATED',
   'inventory_settings_updated',
+  'asset_request_config_updated',
   'sla_policy_updated',
   'sla_policy_created',
   'sla_policy_deleted',

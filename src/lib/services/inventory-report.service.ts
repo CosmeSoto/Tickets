@@ -1,5 +1,6 @@
 import prisma from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
+import { getSetting } from '@/lib/api-cache'
 import {
   buildConsumableFamilyWhere,
   buildEquipmentFamilyWhere,
@@ -630,10 +631,15 @@ export class InventoryReportService {
   /**
    * Reporte de licencias próximas a expirar
    */
-  static async getLicenseExpirationReport(days: number = 30, familyIds?: string[]) {
+  static async getLicenseExpirationReport(days?: number, familyIds?: string[]) {
     try {
+      let alertDays = days
+      if (alertDays == null || Number.isNaN(alertDays)) {
+        const daysRaw = await getSetting('inventory.license_alert_days_first', 600, '30')
+        alertDays = Math.max(1, parseInt(daysRaw ?? '30', 10) || 30)
+      }
       const targetDate = new Date()
-      targetDate.setDate(targetDate.getDate() + days)
+      targetDate.setDate(targetDate.getDate() + alertDays)
       const licenseScope = buildLicenseFamilyWhere(familyIds)
 
       const [expiring, expired, byType] = await Promise.all([
@@ -844,13 +850,15 @@ export class InventoryReportService {
       })
 
       const now = new Date()
-      const thirtyDaysFromNow = new Date()
-      thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30)
+      const daysRaw = await getSetting('inventory.contract_alert_days', 600, '30')
+      const alertDays = Math.max(1, parseInt(daysRaw ?? '30', 10) || 30)
+      const windowEnd = new Date()
+      windowEnd.setDate(windowEnd.getDate() + alertDays)
 
       const expiringContracts = rentals.filter(
         r =>
           r.rentalEndDate &&
-          new Date(r.rentalEndDate) <= thirtyDaysFromNow &&
+          new Date(r.rentalEndDate) <= windowEnd &&
           new Date(r.rentalEndDate) >= now
       )
 

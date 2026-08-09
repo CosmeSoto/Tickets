@@ -8,6 +8,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
+import {
+  requireAdminInventoryAccess,
+  assertFamilyInManageScope,
+  type AdminInventorySession,
+} from '@/lib/inventory/admin-inventory-auth'
 import { z } from 'zod'
 
 const attributeUpdateSchema = z.object({
@@ -24,23 +29,52 @@ const attributeUpdateSchema = z.object({
   helpText: z.string().optional(),
 })
 
+async function resolveAttributeFamilyScope(
+  auth: AdminInventorySession,
+  id: string
+): Promise<NextResponse | null> {
+  const equipmentAttr = await prisma.equipment_type_attributes.findUnique({
+    where: { id },
+    select: { equipmentType: { select: { familyId: true } } },
+  })
+  if (equipmentAttr) {
+    return assertFamilyInManageScope(auth, equipmentAttr.equipmentType.familyId)
+  }
+
+  const licenseAttr = await prisma.license_type_attributes.findUnique({
+    where: { id },
+    select: { licenseType: { select: { familyId: true } } },
+  })
+  if (licenseAttr) {
+    return assertFamilyInManageScope(auth, licenseAttr.licenseType.familyId)
+  }
+
+  const consumableAttr = await prisma.consumable_type_attributes.findUnique({
+    where: { id },
+    select: { consumableType: { select: { familyId: true } } },
+  })
+  if (consumableAttr) {
+    return assertFamilyInManageScope(auth, consumableAttr.consumableType.familyId)
+  }
+
+  return NextResponse.json({ error: 'Atributo no encontrado' }, { status: 404 })
+}
+
 /**
  * PUT - Actualizar atributo
  */
 export async function PUT(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
-
-    if (!session?.user) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-    }
-
-    if (session.user.role !== 'ADMIN' && !session.user.isSuperAdmin) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-    }
+    const access = await requireAdminInventoryAccess(session)
+    if (!access.ok) return access.response
 
     const params = await context.params
     const { id } = params
+
+    const denied = await resolveAttributeFamilyScope(access.auth, id)
+    if (denied) return denied
+
     const body = await request.json()
 
     // Validar
@@ -87,17 +121,14 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
 export async function DELETE(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
-
-    if (!session?.user) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-    }
-
-    if (session.user.role !== 'ADMIN' && !session.user.isSuperAdmin) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-    }
+    const access = await requireAdminInventoryAccess(session)
+    if (!access.ok) return access.response
 
     const params = await context.params
     const { id } = params
+
+    const denied = await resolveAttributeFamilyScope(access.auth, id)
+    if (denied) return denied
 
     // Eliminar (intentar en las 3 tablas)
     try {

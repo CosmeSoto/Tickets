@@ -11,7 +11,10 @@ import {
   listBrandsForFamily,
   type CreateBrandInput,
 } from '@/lib/services/equipment-brands.service'
-import { isAdminInventorySession } from '@/lib/inventory/admin-inventory-auth'
+import {
+  requireAdminInventoryAccess,
+  assertFamilyInManageScope,
+} from '@/lib/inventory/admin-inventory-auth'
 import { z } from 'zod'
 
 const brandSchema = z.object({
@@ -27,14 +30,16 @@ const brandSchema = z.object({
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    if (!isAdminInventorySession(session)) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-    }
+    const access = await requireAdminInventoryAccess(session)
+    if (!access.ok) return access.response
 
     const familyId = request.nextUrl.searchParams.get('familyId')
     if (!familyId) {
       return NextResponse.json({ error: 'familyId es requerido' }, { status: 400 })
     }
+
+    const denied = assertFamilyInManageScope(access.auth, familyId)
+    if (denied) return denied
 
     const includeInactive = request.nextUrl.searchParams.get('includeInactive') === 'true'
     const brands = await listBrandsForFamily(familyId, includeInactive)
@@ -48,9 +53,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    if (!isAdminInventorySession(session)) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-    }
+    const access = await requireAdminInventoryAccess(session)
+    if (!access.ok) return access.response
 
     const body = await request.json()
     const validation = brandSchema.safeParse(body)
@@ -60,6 +64,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    const denied = assertFamilyInManageScope(access.auth, validation.data.familyId)
+    if (denied) return denied
 
     const brand = await createBrand(validation.data as CreateBrandInput)
     return NextResponse.json(brand, { status: 201 })

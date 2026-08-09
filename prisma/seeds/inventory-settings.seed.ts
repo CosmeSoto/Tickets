@@ -15,7 +15,7 @@ const INVENTORY_SETTINGS = [
   {
     key: 'inventory.license_alert_enabled',
     value: 'true',
-    description: 'Habilitar alertas de vencimiento de licencias',
+    description: 'Habilitar alertas de vencimiento de licencias y contratos',
   },
   {
     key: 'inventory.license_alert_days_first',
@@ -28,9 +28,24 @@ const INVENTORY_SETTINGS = [
     description: 'Días antes para segunda alerta de licencias',
   },
   {
+    key: 'inventory.contract_alert_days',
+    value: '30',
+    description: 'Días antes de vencimiento de contrato/renta para alerta',
+  },
+  {
+    key: 'inventory.maintenance_alert_days',
+    value: '30',
+    description: 'Días de anticipación para mantenimientos programados (dashboard)',
+  },
+  {
     key: 'inventory.warranty_alert_days',
     value: '30',
     description: 'Días antes de vencimiento de garantía',
+  },
+  {
+    key: 'inventory.warranty_alert_enabled',
+    value: 'true',
+    description: 'Habilita alertas de garantía de equipos',
   },
   {
     key: 'inventory.mro_expiry_alert_enabled',
@@ -38,11 +53,35 @@ const INVENTORY_SETTINGS = [
     description: 'Habilita alertas de caducidad MRO',
   },
   {
-    key: 'inventory.warranty_alert_enabled',
-    value: 'true',
-    description: 'Habilita alertas de garantía de equipos',
+    key: 'inventory.mro_expiry_alert_days',
+    value: '30',
+    description: 'Días antes de caducidad MRO para primera alerta',
   },
-  { key: 'inventory.default_warehouse_id', value: '', description: 'ID de bodega por defecto' },
+  {
+    key: 'inventory.mro_expiry_alert_days_urgent',
+    value: '7',
+    description: 'Días antes de caducidad MRO para alerta urgente',
+  },
+  {
+    key: 'inventory.batch_utilization_alert_enabled',
+    value: 'true',
+    description: 'Habilita alertas de utilización y stock en lotes',
+  },
+  {
+    key: 'inventory.batch_utilization_email_critical',
+    value: 'true',
+    description: 'Envía email en alertas críticas de lotes',
+  },
+  {
+    key: 'inventory.batch_utilization_email_warning',
+    value: 'false',
+    description: 'Envía email en alertas de advertencia de lotes',
+  },
+  {
+    key: 'inventory.batch_low_stock_threshold_pct',
+    value: '15',
+    description: 'Porcentaje mínimo de stock disponible en lote antes de alertar',
+  },
 ]
 
 // ── Configuración de seguridad de contraseñas ──────────────────────────────

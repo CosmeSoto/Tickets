@@ -169,6 +169,50 @@ export function useBrandManagement({ familyId }: UseBrandManagementOptions = {})
     [updateBrand]
   )
 
+  const reorderBrands = useCallback(
+    async (ids: string[]): Promise<boolean> => {
+      const reordered = ids
+        .map(id => brands.find(b => b.id === id))
+        .filter(Boolean)
+        .map((b, index) => ({ ...(b as EquipmentBrand), order: index }))
+      setBrands(reordered)
+
+      setSaving(true)
+      try {
+        const response = await fetch('/api/admin/inventory/brands/reorder', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids }),
+        })
+        const result = await response.json()
+
+        if (response.ok && result.success) {
+          toast({ title: 'Éxito', description: 'Orden actualizado correctamente' })
+          return true
+        }
+
+        await loadBrands()
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: result.error || 'Error al reordenar marcas',
+        })
+        return false
+      } catch {
+        await loadBrands()
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Error de conexión al reordenar marcas',
+        })
+        return false
+      } finally {
+        setSaving(false)
+      }
+    },
+    [brands, loadBrands, toast]
+  )
+
   const activeBrands = useMemo(() => brands.filter(b => b.isActive), [brands])
 
   return {
@@ -181,5 +225,6 @@ export function useBrandManagement({ familyId }: UseBrandManagementOptions = {})
     updateBrand,
     deleteBrand,
     toggleActive,
+    reorderBrands,
   }
 }

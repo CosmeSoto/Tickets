@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import { NotificationService } from '@/lib/services/notification-service'
+import { ContractAlertService } from '@/lib/services/contract-alert.service'
 import { getFamilyScopedAdmins } from '@/lib/notifications/family-recipients'
 import type { NotificationType } from '@prisma/client'
 
@@ -27,44 +28,12 @@ async function notifyFamilyAdmins(
   )
 }
 
+/**
+ * Alertas de contratos comerciales (tabla contracts).
+ * Antes consultaba software_licenses y duplicaba el job de licencias.
+ */
 export async function checkContractAlerts(): Promise<void> {
-  const alertDaysSetting = await prisma.system_settings.findUnique({
-    where: { key: 'inventory.contract_alert_days' },
-  })
-  const alertDays = alertDaysSetting ? parseInt(alertDaysSetting.value, 10) : 30
-
-  const today = new Date()
-  const alertDate = new Date()
-  alertDate.setDate(alertDate.getDate() + alertDays)
-
-  const expiringContracts = await prisma.software_licenses.findMany({
-    where: { expirationDate: { gte: today, lte: alertDate } },
-    select: {
-      id: true,
-      name: true,
-      expirationDate: true,
-      licenseType: { select: { familyId: true } },
-    },
-  })
-
-  for (const contract of expiringContracts) {
-    await notifyFamilyAdmins(contract.licenseType.familyId, {
-      type: 'WARNING',
-      title: 'Contrato próximo a vencer',
-      message: `El contrato "${contract.name}" vence el ${contract.expirationDate?.toLocaleDateString('es-CL') ?? 'fecha desconocida'}.`,
-      metadata: { link: '/inventory/licenses' },
-    })
-
-    await prisma.audit_logs.create({
-      data: {
-        id: randomUUID(),
-        action: 'NOTIFICATION_SENT',
-        entityType: 'contract',
-        entityId: contract.id,
-        details: { type: 'CONTRACT_EXPIRY_ALERT', alertDays },
-      },
-    })
-  }
+  await ContractAlertService.checkExpirations()
 }
 
 export async function checkStockAlerts(): Promise<void> {
@@ -81,7 +50,21 @@ export async function checkStockAlerts(): Promise<void> {
 
   const lowStockItems = consumables.filter(item => item.currentStock <= item.minStock)
 
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
   for (const item of lowStockItems) {
+    const alreadySent = await prisma.audit_logs.findFirst({
+      where: {
+        action: 'NOTIFICATION_SENT',
+        entityType: 'asset',
+        entityId: item.id,
+        createdAt: { gte: today },
+        details: { path: ['alertType'], equals: 'LOW_STOCK_ALERT' },
+      },
+    })
+    if (alreadySent) continue
+
     await notifyFamilyAdmins(item.consumableType?.familyId ?? null, {
       type: 'WARNING',
       title: 'Stock bajo de suministro',
@@ -96,7 +79,7 @@ export async function checkStockAlerts(): Promise<void> {
         entityType: 'asset',
         entityId: item.id,
         details: {
-          type: 'LOW_STOCK_ALERT',
+          alertType: 'LOW_STOCK_ALERT',
           currentStock: item.currentStock,
           minStock: item.minStock,
         },

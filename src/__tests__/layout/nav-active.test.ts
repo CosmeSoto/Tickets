@@ -15,7 +15,7 @@ const nav = [
     href: '/inventory',
     children: [
       { name: 'Activos', href: '/inventory' },
-      { name: 'Configuración', href: '/admin/settings/inventory' },
+      { name: 'Configuración', href: '/inventory/settings' },
     ],
   },
   {
@@ -36,10 +36,13 @@ describe('isLeafNavActive — configs de módulo vs sistema', () => {
     )
   })
 
-  it('no marca Configuración Sistema en /admin/settings/inventory', () => {
-    expect(isLeafNavActive('/admin/settings', '/admin/settings/inventory', leafHrefs)).toBe(false)
+  it('no marca Configuración Sistema en /inventory/settings', () => {
+    expect(isLeafNavActive('/admin/settings', '/inventory/settings', leafHrefs)).toBe(false)
+  })
+
+  it('marca Configuración de inventario en /inventory/settings', () => {
     expect(
-      isLeafNavActive('/admin/settings/inventory', '/admin/settings/inventory', leafHrefs)
+      isLeafNavActive('/inventory/settings', '/inventory/settings', leafHrefs)
     ).toBe(true)
   })
 

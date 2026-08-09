@@ -2,8 +2,11 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
+/** Catálogos viven en Configuración de Inventario (Por área → Catálogos/Bodegas). */
 export default function UnitsOfMeasureRedirect() {
   const router = useRouter()
-  useEffect(() => { router.replace('/inventory/catalogs?tab=units-of-measure') }, [router])
+  useEffect(() => {
+    router.replace('/admin/settings/inventory')
+  }, [router])
   return null
 }

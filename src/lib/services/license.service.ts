@@ -1,5 +1,6 @@
 import prisma from '@/lib/prisma'
 import { EncryptionService } from './encryption.service'
+import { getSetting } from '@/lib/api-cache'
 import type {
   SoftwareLicense,
   CreateLicenseData,
@@ -189,9 +190,11 @@ export class LicenseService {
     } else if (filters.expired === 'active') {
       where.OR = [{ expirationDate: null }, { expirationDate: { gte: now } }]
     } else if (filters.expired === 'expiring') {
-      const thirtyDays = new Date()
-      thirtyDays.setDate(thirtyDays.getDate() + 30)
-      where.expirationDate = { gte: now, lte: thirtyDays }
+      const daysRaw = await getSetting('inventory.license_alert_days_first', 600, '30')
+      const alertDays = Math.max(1, parseInt(daysRaw ?? '30', 10) || 30)
+      const windowEnd = new Date()
+      windowEnd.setDate(windowEnd.getDate() + alertDays)
+      where.expirationDate = { gte: now, lte: windowEnd }
     }
 
     const [licenses, total] = await Promise.all([
@@ -228,8 +231,10 @@ export class LicenseService {
     const scopeWhere = buildLicenseFamilyWhere(familyIds)
 
     const now = new Date()
-    const thirtyDays = new Date()
-    thirtyDays.setDate(thirtyDays.getDate() + 30)
+    const daysRaw = await getSetting('inventory.license_alert_days_first', 600, '30')
+    const alertDays = Math.max(1, parseInt(daysRaw ?? '30', 10) || 30)
+    const soonWindow = new Date()
+    soonWindow.setDate(soonWindow.getDate() + alertDays)
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
 
     const [total, expired, expiringSoon, expiringThisMonth, unassigned, totalCostAgg, byType] =
@@ -237,7 +242,7 @@ export class LicenseService {
         prisma.software_licenses.count({ where: scopeWhere }),
         prisma.software_licenses.count({ where: { ...scopeWhere, expirationDate: { lt: now } } }),
         prisma.software_licenses.count({
-          where: { ...scopeWhere, expirationDate: { gte: now, lte: thirtyDays } },
+          where: { ...scopeWhere, expirationDate: { gte: now, lte: soonWindow } },
         }),
         prisma.software_licenses.count({
           where: { ...scopeWhere, expirationDate: { gte: now, lte: endOfMonth } },

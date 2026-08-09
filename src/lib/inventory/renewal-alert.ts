@@ -2,19 +2,21 @@
  * Returns the renewal alert status for a license or contract.
  *
  * - 'expired'  → renewalDate is in the past
- * - 'warning'  → renewalDate is within the next 30 days
- * - 'none'     → renewalDate is null or more than 30 days away
+ * - 'warning'  → renewalDate is within the next `warningDays` days
+ * - 'none'     → renewalDate is null or beyond the warning window
  */
 export function getRenewalAlertStatus(
-  renewalDate: Date | null
+  renewalDate: Date | null,
+  warningDays = 30
 ): 'none' | 'warning' | 'expired' {
-  if (renewalDate === null) return 'none';
+  if (renewalDate === null) return 'none'
 
-  const now = new Date();
-  const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const days = Math.max(1, warningDays)
+  const now = new Date()
+  const warningUntil = new Date(now.getTime() + days * 24 * 60 * 60 * 1000)
 
-  if (renewalDate < now) return 'expired';
-  if (renewalDate <= thirtyDaysFromNow) return 'warning';
+  if (renewalDate < now) return 'expired'
+  if (renewalDate <= warningUntil) return 'warning'
 
-  return 'none';
+  return 'none'
 }

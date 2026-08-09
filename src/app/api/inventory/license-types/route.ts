@@ -79,6 +79,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const maxOrder = await prisma.license_types.aggregate({
+      where: { familyId: familyId || null },
+      _max: { order: true },
+    })
+
     const newType = await prisma.license_types.create({
       data: {
         id: randomUUID(),
@@ -87,7 +92,7 @@ export async function POST(request: NextRequest) {
         description,
         icon,
         isActive: true,
-        order: 999,
+        order: (maxOrder._max.order ?? -1) + 1,
         ...(familyId ? { familyId } : {}),
       },
     })

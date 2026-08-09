@@ -84,6 +84,10 @@ export interface GlobalRules {
   warrantyAlertEnabled: boolean
   warrantyAlertDays: number
   contractAlertDays: number
+  maintenanceAlertDays: number
+  mroExpiryAlertEnabled: boolean
+  mroExpiryAlertDays: number
+  mroExpiryAlertDaysUrgent: number
   batchUtilizationAlertEnabled: boolean
   batchUtilizationEmailCritical: boolean
   batchUtilizationEmailWarning: boolean
@@ -99,6 +103,10 @@ const DEFAULT_GLOBAL_RULES: GlobalRules = {
   warrantyAlertEnabled: true,
   warrantyAlertDays: 30,
   contractAlertDays: 30,
+  maintenanceAlertDays: 30,
+  mroExpiryAlertEnabled: true,
+  mroExpiryAlertDays: 30,
+  mroExpiryAlertDaysUrgent: 7,
   batchUtilizationAlertEnabled: true,
   batchUtilizationEmailCritical: true,
   batchUtilizationEmailWarning: false,
@@ -130,6 +138,17 @@ function apiSettingsToGlobalRules(settings: Record<string, unknown>): GlobalRule
       Number(settings.warranty_alert_days) || DEFAULT_GLOBAL_RULES.warrantyAlertDays,
     contractAlertDays:
       Number(settings.contract_alert_days) || DEFAULT_GLOBAL_RULES.contractAlertDays,
+    maintenanceAlertDays:
+      Number(settings.maintenance_alert_days) || DEFAULT_GLOBAL_RULES.maintenanceAlertDays,
+    mroExpiryAlertEnabled:
+      settings.mro_expiry_alert_enabled !== undefined
+        ? settings.mro_expiry_alert_enabled === true
+        : DEFAULT_GLOBAL_RULES.mroExpiryAlertEnabled,
+    mroExpiryAlertDays:
+      Number(settings.mro_expiry_alert_days) || DEFAULT_GLOBAL_RULES.mroExpiryAlertDays,
+    mroExpiryAlertDaysUrgent:
+      Number(settings.mro_expiry_alert_days_urgent) ||
+      DEFAULT_GLOBAL_RULES.mroExpiryAlertDaysUrgent,
     batchUtilizationAlertEnabled:
       settings.batch_utilization_alert_enabled !== undefined
         ? settings.batch_utilization_alert_enabled === true
@@ -158,6 +177,10 @@ function globalRulesToApiPayload(rules: GlobalRules): Record<string, number | bo
     warranty_alert_enabled: rules.warrantyAlertEnabled,
     warranty_alert_days: rules.warrantyAlertDays,
     contract_alert_days: rules.contractAlertDays,
+    maintenance_alert_days: rules.maintenanceAlertDays,
+    mro_expiry_alert_enabled: rules.mroExpiryAlertEnabled,
+    mro_expiry_alert_days: rules.mroExpiryAlertDays,
+    mro_expiry_alert_days_urgent: rules.mroExpiryAlertDaysUrgent,
     batch_utilization_alert_enabled: rules.batchUtilizationAlertEnabled,
     batch_utilization_email_critical: rules.batchUtilizationEmailCritical,
     batch_utilization_email_warning: rules.batchUtilizationEmailWarning,

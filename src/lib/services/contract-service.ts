@@ -14,6 +14,7 @@ import { createAuditLog } from '@/lib/audit'
 import { NotificationService } from '@/lib/services/notification-service'
 import { getFamilyScopedAdmins } from '@/lib/notifications/family-recipients'
 import { EXPIRING_DAYS, type ContractStatus } from '@/types/contracts'
+import { getSetting } from '@/lib/api-cache'
 import {
   CONTRACT_CATEGORY_VALUES,
   CONTRACT_BILLING_CYCLE_VALUES,
@@ -60,7 +61,10 @@ function toValidLineType(value: unknown): (typeof CONTRACT_LINE_TYPE_VALUES)[num
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-export function computeContractStatus(endDate?: Date | null): {
+export function computeContractStatus(
+  endDate?: Date | null,
+  expiringDays: number = EXPIRING_DAYS
+): {
   status: ContractStatus
   daysUntilExpiry?: number
 } {
@@ -68,8 +72,13 @@ export function computeContractStatus(endDate?: Date | null): {
   const now = new Date()
   const diff = Math.floor((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
   if (diff < 0) return { status: 'EXPIRED', daysUntilExpiry: 0 }
-  if (diff <= EXPIRING_DAYS) return { status: 'EXPIRING', daysUntilExpiry: diff }
+  if (diff <= expiringDays) return { status: 'EXPIRING', daysUntilExpiry: diff }
   return { status: 'ACTIVE', daysUntilExpiry: diff }
+}
+
+async function getContractExpiringDays(): Promise<number> {
+  const daysRaw = await getSetting('inventory.contract_alert_days', 600, String(EXPIRING_DAYS))
+  return Math.max(1, parseInt(daysRaw ?? String(EXPIRING_DAYS), 10) || EXPIRING_DAYS)
 }
 
 // Selector reutilizable para incluir relaciones en queries
@@ -245,8 +254,12 @@ export class ContractService {
     ])
 
     // Recalcular status dinámicamente (puede haber cambiado desde el último guardado)
+    const expiringDays = await getContractExpiringDays()
     const contracts = rawContracts.map(c => {
-      const { status: computedStatus, daysUntilExpiry } = computeContractStatus(c.endDate)
+      const { status: computedStatus, daysUntilExpiry } = computeContractStatus(
+        c.endDate,
+        expiringDays
+      )
       return { ...c, status: computedStatus, daysUntilExpiry }
     })
 
@@ -261,7 +274,7 @@ export class ContractService {
 
     const stats = allForStats.reduce(
       (acc, c) => {
-        const { status } = computeContractStatus(c.endDate)
+        const { status } = computeContractStatus(c.endDate, expiringDays)
         acc.total++
         if (status === 'ACTIVE') acc.active++
         if (status === 'EXPIRING') acc.expiring++
@@ -290,7 +303,8 @@ export class ContractService {
       include: CONTRACT_INCLUDE,
     })
     if (!contract) return null
-    const { status, daysUntilExpiry } = computeContractStatus(contract.endDate)
+    const expiringDays = await getContractExpiringDays()
+    const { status, daysUntilExpiry } = computeContractStatus(contract.endDate, expiringDays)
     return { ...contract, status, daysUntilExpiry }
   }
 
@@ -592,9 +606,11 @@ export class ContractService {
 
   static async checkExpirations() {
     const now = new Date()
-    const alertThreshold = new Date(now.getTime() + EXPIRING_DAYS * 24 * 60 * 60 * 1000)
+    const daysRaw = await getSetting('inventory.contract_alert_days', 600, String(EXPIRING_DAYS))
+    const expiringDays = Math.max(1, parseInt(daysRaw ?? String(EXPIRING_DAYS), 10) || EXPIRING_DAYS)
+    const alertThreshold = new Date(now.getTime() + expiringDays * 24 * 60 * 60 * 1000)
 
-    // Contratos que vencen en los próximos EXPIRING_DAYS días y no han sido alertados
+    // Contratos que vencen en la ventana configurada y no han sido alertados
     const expiring = await prisma.contracts.findMany({
       where: {
         status: { in: ['ACTIVE', 'EXPIRING'] },
@@ -609,7 +625,7 @@ export class ContractService {
     })
 
     for (const contract of expiring) {
-      const { daysUntilExpiry } = computeContractStatus(contract.endDate)
+      const { daysUntilExpiry } = computeContractStatus(contract.endDate, expiringDays)
       const supplierName = contract.supplier?.name ?? 'Sin proveedor'
       const familyName = contract.family?.name ?? ''
 
@@ -683,9 +699,10 @@ export class ContractService {
       select: { status: true, monthlyCost: true, totalValue: true, endDate: true },
     })
 
+    const expiringDays = await getContractExpiringDays()
     const stats = contracts.reduce(
       (acc, c) => {
-        const { status } = computeContractStatus(c.endDate)
+        const { status } = computeContractStatus(c.endDate, expiringDays)
         acc.total++
         if (status === 'ACTIVE') acc.active++
         if (status === 'EXPIRING') acc.expiring++
@@ -708,9 +725,10 @@ export class ContractService {
       select: { status: true, monthlyCost: true, totalValue: true, endDate: true },
     })
 
+    const expiringDays = await getContractExpiringDays()
     const stats = contracts.reduce(
       (acc, c) => {
-        const { status } = computeContractStatus(c.endDate)
+        const { status } = computeContractStatus(c.endDate, expiringDays)
         acc.total++
         if (status === 'ACTIVE') acc.active++
         if (status === 'EXPIRING') acc.expiring++

@@ -43,6 +43,15 @@ export async function createBrand(data: CreateBrandInput) {
       throw new Error('familyId es requerido')
     }
 
+    let order = data.order
+    if (order == null) {
+      const maxOrder = await prisma.equipment_brands.aggregate({
+        where: { familyId: data.familyId },
+        _max: { order: true },
+      })
+      order = (maxOrder._max.order ?? -1) + 1
+    }
+
     // Crear la marca
     const brand = await prisma.equipment_brands.create({
       data: {
@@ -51,7 +60,7 @@ export async function createBrand(data: CreateBrandInput) {
         description: data.description || null,
         logoUrl: data.logoUrl || null,
         isActive: data.isActive ?? true,
-        order: data.order ?? 0,
+        order,
         familyId: data.familyId,
       },
     })

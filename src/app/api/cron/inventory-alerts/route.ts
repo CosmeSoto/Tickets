@@ -28,14 +28,16 @@ export async function GET(request: NextRequest) {
       isInventoryAlertEnabled('inventory.warranty_alert_enabled'),
     ])
 
-    const tasks: Promise<unknown>[] = [
-      checkContractAlerts(),
-      CheckRentalExpirationJob.run(),
-      CheckAssignmentExpirationJob.run(),
-    ]
+    // Asignaciones siempre (no es alerta de vencimiento de catálogo).
+    const tasks: Promise<unknown>[] = [CheckAssignmentExpirationJob.run()]
 
     if (lowStockEnabled) tasks.push(checkStockAlerts())
-    if (licenseEnabled) tasks.push(CheckLicenseExpirationJob.run())
+    // Licencias + contratos comerciales + rentas: mismo toggle de Reglas generales
+    if (licenseEnabled) {
+      tasks.push(CheckLicenseExpirationJob.run())
+      tasks.push(checkContractAlerts())
+      tasks.push(CheckRentalExpirationJob.run())
+    }
     if (mroEnabled) tasks.push(checkMROExpiryAlerts())
     if (warrantyEnabled) tasks.push(checkWarrantyAlerts())
 

@@ -13,8 +13,7 @@ import { randomUUID } from 'crypto'
 import { createAuditLog } from '@/lib/audit'
 import { NotificationService } from '@/lib/services/notification-service'
 import { getFamilyScopedAdmins } from '@/lib/notifications/family-recipients'
-
-const EXPIRING_DAYS = 30 // Alertar 30 días antes del vencimiento
+import { getSetting } from '@/lib/api-cache'
 
 export class RentalAlertService {
   /**
@@ -23,9 +22,11 @@ export class RentalAlertService {
    */
   static async checkExpirations() {
     const now = new Date()
-    const alertThreshold = new Date(now.getTime() + EXPIRING_DAYS * 24 * 60 * 60 * 1000)
+    const daysRaw = await getSetting('inventory.contract_alert_days', 600, '30')
+    const expiringDays = Math.max(1, parseInt(daysRaw ?? '30', 10) || 30)
+    const alertThreshold = new Date(now.getTime() + expiringDays * 24 * 60 * 60 * 1000)
 
-    // Equipos arrendados que vencen en los próximos EXPIRING_DAYS días
+    // Equipos arrendados que vencen en los próximos días configurados
     const expiringRentals = await prisma.equipment.findMany({
       where: {
         ownershipType: 'RENTAL',
@@ -193,14 +194,16 @@ export class RentalAlertService {
     if (familyId) where.familyId = familyId
 
     const now = new Date()
-    const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
+    const daysRaw = await getSetting('inventory.contract_alert_days', 600, '30')
+    const alertDays = Math.max(1, parseInt(daysRaw ?? '30', 10) || 30)
+    const windowEnd = new Date(now.getTime() + alertDays * 24 * 60 * 60 * 1000)
 
     const [total, expiringSoon, expired, totalMonthlyCost] = await Promise.all([
       prisma.equipment.count({ where }),
       prisma.equipment.count({
         where: {
           ...where,
-          rentalEndDate: { lte: thirtyDaysFromNow, gte: now },
+          rentalEndDate: { lte: windowEnd, gte: now },
         },
       }),
       prisma.equipment.count({

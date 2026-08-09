@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getSetting } from '@/lib/api-cache'
 
-const EXPIRING_DAYS = 30
-
-function contractStatus(endDate?: Date | null): {
+function contractStatus(
+  endDate: Date | null | undefined,
+  expiringDays: number
+): {
   status: 'ACTIVE' | 'EXPIRING' | 'EXPIRED'
   daysUntilExpiry?: number
 } {
@@ -13,7 +15,7 @@ function contractStatus(endDate?: Date | null): {
   const now = new Date()
   const diff = Math.floor((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
   if (diff < 0) return { status: 'EXPIRED', daysUntilExpiry: 0 }
-  if (diff <= EXPIRING_DAYS) return { status: 'EXPIRING', daysUntilExpiry: diff }
+  if (diff <= expiringDays) return { status: 'EXPIRING', daysUntilExpiry: diff }
   return { status: 'ACTIVE', daysUntilExpiry: diff }
 }
 
@@ -27,6 +29,9 @@ export async function GET(req: NextRequest) {
   if (!session?.user) {
     return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
   }
+
+  const contractDaysRaw = await getSetting('inventory.contract_alert_days', 600, '30')
+  const expiringDays = Math.max(1, parseInt(contractDaysRaw ?? '30', 10) || 30)
 
   const { searchParams } = new URL(req.url)
   const familyId = searchParams.get('familyId') || undefined
@@ -94,7 +99,7 @@ export async function GET(req: NextRequest) {
 
   const equipmentItems = equipmentContracts.map(eq => {
     const endDate = eq.rentalEndDate ?? eq.contractEndDate
-    const { status, daysUntilExpiry } = contractStatus(endDate)
+    const { status, daysUntilExpiry } = contractStatus(endDate, expiringDays)
     return {
       id: eq.id,
       name: `${eq.brand} ${eq.model}`,
@@ -110,7 +115,7 @@ export async function GET(req: NextRequest) {
   })
 
   const licenseItems = licenseContracts.map(lic => {
-    const { status, daysUntilExpiry } = contractStatus(lic.expirationDate)
+    const { status, daysUntilExpiry } = contractStatus(lic.expirationDate, expiringDays)
     return {
       id: lic.id,
       name: lic.name,
@@ -132,5 +137,5 @@ export async function GET(req: NextRequest) {
     return 0
   })
 
-  return NextResponse.json({ items, total: items.length })
+  return NextResponse.json({ items, total: items.length, expiringDays })
 }

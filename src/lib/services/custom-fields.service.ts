@@ -99,6 +99,15 @@ export class CustomFieldsService {
       throw new Error('Los campos de tipo "select" requieren un array de opciones')
     }
 
+    let order = data.order
+    if (order == null) {
+      const maxOrder = await prisma.family_custom_fields.aggregate({
+        where: { familyId: data.familyId },
+        _max: { order: true },
+      })
+      order = (maxOrder._max.order ?? -1) + 1
+    }
+
     const field = await prisma.family_custom_fields.create({
       data: {
         id: randomUUID(),
@@ -108,7 +117,7 @@ export class CustomFieldsService {
         fieldType: data.fieldType,
         fieldOptions: data.fieldOptions || null,
         isRequired: data.isRequired || false,
-        order: data.order || 0,
+        order,
         helpText: data.helpText || null,
       },
     })

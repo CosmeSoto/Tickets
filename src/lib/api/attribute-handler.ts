@@ -24,7 +24,7 @@ const attributeSchema = z.object({
     .optional(),
   isRequired: z.boolean().default(false),
   isVisible: z.boolean().default(true),
-  order: z.number().int().min(0).default(0),
+  order: z.number().int().min(0).optional(),
   helpText: z.string().optional(),
 })
 
@@ -93,11 +93,20 @@ export class AttributeHandler {
         return NextResponse.json({ error: 'Ya existe un atributo con ese nombre' }, { status: 409 })
       }
 
-      // Crear atributo
+      let order = validation.data.order
+      if (order == null) {
+        const maxOrder = await (prisma as any)[this.attributeTable].aggregate({
+          where: { [this.typeIdField]: typeId },
+          _max: { order: true },
+        })
+        order = (maxOrder._max.order ?? -1) + 1
+      }
+
       const attribute = await (prisma as any)[this.attributeTable].create({
         data: {
           [this.typeIdField]: typeId,
           ...validation.data,
+          order,
         },
       })
 

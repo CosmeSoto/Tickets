@@ -43,7 +43,7 @@ export async function PUT(request: NextRequest, { params }: Ctx) {
         name,
         description: description || null,
         familyId: familyId !== undefined ? familyId || null : existing.familyId,
-        order: order ?? 999,
+        ...(order !== undefined ? { order } : {}),
       },
     })
     return NextResponse.json(type)
