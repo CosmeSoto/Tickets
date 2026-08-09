@@ -106,8 +106,8 @@ export function AuditFiltersComponent({
           </div>
         </div>
 
-        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4'>
-          <div className='space-y-2'>
+        <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4'>
+          <div className='space-y-2 sm:col-span-2 lg:col-span-1 xl:col-span-2'>
             <label className='text-sm font-medium'>Búsqueda</label>
             <div className='relative'>
               <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4' />
@@ -203,9 +203,17 @@ export function AuditFiltersComponent({
               </SelectContent>
             </Select>
           </div>
+        </div>
 
-          <div className='space-y-2 lg:col-span-2'>
-            <label className='text-sm font-medium'>Exportar y columnas</label>
+        {/* Exportación a ancho completo — evita que Columnas quede aplastado en el grid */}
+        <div className='space-y-3 rounded-lg border bg-muted/20 p-3 sm:p-4'>
+          <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
+            <div className='min-w-0'>
+              <p className='text-sm font-medium'>Exportar</p>
+              <p className='text-xs text-muted-foreground'>
+                Elige columnas y formato. Afecta CSV, Excel, PDF y JSON.
+              </p>
+            </div>
             <div className='flex flex-wrap gap-2 items-center'>
               <TableColumnsMenu
                 columns={columnDefs}
@@ -222,16 +230,34 @@ export function AuditFiltersComponent({
                       )
                 }
               />
-              <Button onClick={onExportCSV} variant='outline' size='sm' disabled={busy} className='min-h-9'>
+              <Button
+                onClick={onExportCSV}
+                variant='outline'
+                size='sm'
+                disabled={busy}
+                className='min-h-9'
+              >
                 <Download className='h-4 w-4 mr-1' />
                 CSV
               </Button>
-              <Button onClick={onExportExcel} variant='outline' size='sm' disabled={busy} className='min-h-9'>
+              <Button
+                onClick={onExportExcel}
+                variant='outline'
+                size='sm'
+                disabled={busy}
+                className='min-h-9'
+              >
                 <Download className='h-4 w-4 mr-1' />
                 Excel
               </Button>
               {onExportPDF && (
-                <Button onClick={onExportPDF} variant='outline' size='sm' disabled={busy} className='min-h-9'>
+                <Button
+                  onClick={onExportPDF}
+                  variant='outline'
+                  size='sm'
+                  disabled={busy}
+                  className='min-h-9'
+                >
                   <Download className='h-4 w-4 mr-1' />
                   PDF
                 </Button>
@@ -250,23 +276,35 @@ export function AuditFiltersComponent({
                 Limpiar
               </Button>
             </div>
-            <div className='flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-2'>
-              <ShieldAlert className='h-4 w-4 text-amber-600 mt-0.5 shrink-0' />
-              <div className='space-y-1 text-xs text-muted-foreground'>
-                <label className='flex items-center gap-2 cursor-pointer text-foreground'>
-                  <input
-                    type='checkbox'
-                    className='rounded border-input'
-                    checked={includeSensitive}
-                    onChange={e => onIncludeSensitiveChange(e.target.checked)}
-                  />
-                  Incluir datos sensibles (email, IP, cambios, User-Agent)
-                </label>
+          </div>
+
+          <div className='flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-3'>
+            <ShieldAlert className='h-4 w-4 text-amber-600 mt-0.5 shrink-0' />
+            <div className='min-w-0 space-y-1.5 text-xs text-muted-foreground'>
+              <label className='flex items-start gap-2 cursor-pointer text-foreground font-medium'>
+                <input
+                  type='checkbox'
+                  className='mt-0.5 rounded border-input shrink-0'
+                  checked={includeSensitive}
+                  onChange={e => onIncludeSensitiveChange(e.target.checked)}
+                />
+                <span>Incluir datos sensibles (email, IP, cambios, User-Agent)</span>
+              </label>
+              {includeSensitive ? (
                 <p>
-                  Por defecto se exporta con minimización LOPDP. Los sensibles se enmascaran. Cada
-                  exportación queda registrada en auditoría.
+                  <strong className='text-foreground'>Activado:</strong> en «Columnas» puedes marcar
+                  email, IP, cambios y User-Agent para la <em>exportación</em>. Salen enmascarados
+                  (ej. <code className='text-[11px]'>in***@gmail.com</code>,{' '}
+                  <code className='text-[11px]'>192.168.10.***</code>). No cambia la tabla en pantalla.
+                  La descarga queda registrada en auditoría.
                 </p>
-              </div>
+              ) : (
+                <p>
+                  <strong className='text-foreground'>Desactivado (LOPDP):</strong> esas 4 columnas no
+                  se incluyen en CSV/Excel/PDF/JSON. Solo datos mínimos (fecha, acción, usuario,
+                  módulo…). La tabla en pantalla no cambia.
+                </p>
+              )}
             </div>
           </div>
         </div>

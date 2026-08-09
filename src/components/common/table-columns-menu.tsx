@@ -2,13 +2,13 @@
 
 /**
  * Menú de columnas: visibilidad + orden (↑ ↓).
- * Úsalo junto a ExportButton en la barra superior de la tabla.
- * El orden/visibilidad también se aplica a la exportación.
+ * Usa Popover (portal) para no quedar cortado por overflow del layout.
  */
 
 import { useEffect, useState } from 'react'
 import { Check, ChevronDown, ChevronUp, SlidersHorizontal } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
 
 export type TableColumnDef = {
@@ -132,97 +132,98 @@ export function TableColumnsMenu({
     .filter((c): c is TableColumnDef => Boolean(c))
 
   return (
-    <div className={cn('relative', className)}>
-      <Button
-        type='button'
-        variant='outline'
-        size='sm'
-        onClick={() => setOpen(o => !o)}
-        title='Ordenar y mostrar columnas'
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type='button'
+          variant='outline'
+          size='sm'
+          className={cn('min-h-9 shrink-0', className)}
+          title='Ordenar y mostrar columnas'
+        >
+          <SlidersHorizontal className='h-4 w-4 mr-1.5' />
+          Columnas
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        align='start'
+        side='bottom'
+        sideOffset={6}
+        collisionPadding={12}
+        className='w-[min(20rem,calc(100vw-1.5rem))] p-0'
+        onOpenAutoFocus={e => e.preventDefault()}
       >
-        <SlidersHorizontal className='h-4 w-4 mr-1.5' />
-        Columnas
-      </Button>
-      {open && (
-        <>
-          <div className='fixed inset-0 z-10' onClick={() => setOpen(false)} />
-          <div className='absolute right-0 z-20 mt-1 w-64 max-w-[calc(100vw-1rem)] rounded-md border bg-popover shadow-lg overflow-hidden'>
-            <p className='px-3 py-2 text-xs font-semibold text-muted-foreground border-b'>
-              Visibilidad y orden (afecta exportar)
-            </p>
-            <ul className='max-h-72 overflow-y-auto py-1'>
-              {orderedDefs.map((col, index) => {
-                const isOn = visible.includes(col.key)
-                return (
-                  <li
-                    key={col.key}
-                    className='flex items-center gap-1 px-2 py-1 hover:bg-accent/60'
+        <p className='px-3 py-2 text-xs font-semibold text-muted-foreground border-b'>
+          Visibilidad y orden (afecta exportar)
+        </p>
+        <ul className='max-h-[min(20rem,50vh)] overflow-y-auto overscroll-contain py-1'>
+          {orderedDefs.map((col, index) => {
+            const isOn = visible.includes(col.key)
+            return (
+              <li key={col.key} className='flex items-center gap-1 px-2 py-1 hover:bg-accent/60'>
+                <button
+                  type='button'
+                  className='flex min-w-0 flex-1 items-center gap-2 px-1 py-1 text-sm text-left'
+                  onClick={() => toggleVisible(col.key)}
+                  disabled={col.required}
+                >
+                  <span
+                    className={cn(
+                      'h-4 w-4 shrink-0 rounded border flex items-center justify-center',
+                      isOn ? 'bg-primary border-primary' : 'border-border bg-background'
+                    )}
                   >
-                    <button
-                      type='button'
-                      className='flex flex-1 items-center gap-2 px-1 py-1 text-sm text-left'
-                      onClick={() => toggleVisible(col.key)}
-                      disabled={col.required}
-                    >
-                      <span
-                        className={cn(
-                          'h-4 w-4 shrink-0 rounded border flex items-center justify-center',
-                          isOn ? 'bg-primary border-primary' : 'border-border bg-background'
-                        )}
-                      >
-                        {isOn && <Check className='h-2.5 w-2.5 text-primary-foreground' />}
-                      </span>
-                      <span className='truncate'>{col.label}</span>
-                      {col.required ? (
-                        <span className='text-[10px] text-muted-foreground'>fija</span>
-                      ) : null}
-                    </button>
-                    <Button
-                      type='button'
-                      variant='ghost'
-                      size='icon'
-                      className='h-7 w-7'
-                      disabled={index === 0}
-                      onClick={() => move(col.key, -1)}
-                      title='Subir'
-                    >
-                      <ChevronUp className='h-3.5 w-3.5' />
-                    </Button>
-                    <Button
-                      type='button'
-                      variant='ghost'
-                      size='icon'
-                      className='h-7 w-7'
-                      disabled={index === orderedDefs.length - 1}
-                      onClick={() => move(col.key, 1)}
-                      title='Bajar'
-                    >
-                      <ChevronDown className='h-3.5 w-3.5' />
-                    </Button>
-                  </li>
-                )
-              })}
-            </ul>
-            <div className='border-t px-3 py-2 flex gap-2'>
-              <button
-                type='button'
-                className='text-xs text-muted-foreground hover:text-foreground'
-                onClick={resetDefault}
-              >
-                Predeterminado
-              </button>
-              <span className='text-muted-foreground text-xs'>·</span>
-              <button
-                type='button'
-                className='text-xs text-muted-foreground hover:text-foreground'
-                onClick={showAll}
-              >
-                Todas
-              </button>
-            </div>
-          </div>
-        </>
-      )}
-    </div>
+                    {isOn && <Check className='h-2.5 w-2.5 text-primary-foreground' />}
+                  </span>
+                  <span className='min-w-0 flex-1 truncate'>{col.label}</span>
+                  {col.required ? (
+                    <span className='shrink-0 text-[10px] text-muted-foreground'>fija</span>
+                  ) : null}
+                </button>
+                <Button
+                  type='button'
+                  variant='ghost'
+                  size='icon'
+                  className='h-7 w-7 shrink-0'
+                  disabled={index === 0}
+                  onClick={() => move(col.key, -1)}
+                  title='Subir'
+                >
+                  <ChevronUp className='h-3.5 w-3.5' />
+                </Button>
+                <Button
+                  type='button'
+                  variant='ghost'
+                  size='icon'
+                  className='h-7 w-7 shrink-0'
+                  disabled={index === orderedDefs.length - 1}
+                  onClick={() => move(col.key, 1)}
+                  title='Bajar'
+                >
+                  <ChevronDown className='h-3.5 w-3.5' />
+                </Button>
+              </li>
+            )
+          })}
+        </ul>
+        <div className='border-t px-3 py-2 flex flex-wrap gap-x-2 gap-y-1'>
+          <button
+            type='button'
+            className='text-xs text-muted-foreground hover:text-foreground'
+            onClick={resetDefault}
+          >
+            Predeterminado
+          </button>
+          <span className='text-muted-foreground text-xs'>·</span>
+          <button
+            type='button'
+            className='text-xs text-muted-foreground hover:text-foreground'
+            onClick={showAll}
+          >
+            Todas
+          </button>
+        </div>
+      </PopoverContent>
+    </Popover>
   )
 }
