@@ -2,13 +2,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import {
-  canReadModuleFamilyConfig,
-  canWriteModuleFamilyConfig,
-} from '@/lib/auth/module-config-access'
+import { canReadModuleFamilyConfig } from '@/lib/auth/module-config-access'
+
+const GONE_BODY = {
+  error: 'Campos personalizados por familia fueron retirados. Usa atributos por tipo en Catálogos.',
+  code: 'CUSTOM_FIELDS_REMOVED',
+  replacement: 'Catálogos → atributos del tipo de activo',
+}
 
 /**
- * @deprecated Preferir atributos por tipo bajo /api/admin/inventory/{type}-types/...
+ * @deprecated Preferir atributos por tipo. Solo lectura residual; escrituras → 410.
  *
  * GET /api/inventory/families/[familyId]/custom-fields
  */
@@ -51,62 +54,8 @@ export async function GET(
 }
 
 /**
- * POST /api/inventory/families/[familyId]/custom-fields
- * @deprecated
+ * POST retirado — usar atributos por tipo.
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ familyId: string }> }
-) {
-  try {
-    const session = await getServerSession(authOptions)
-
-    if (!session?.user) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-    }
-
-    const { familyId } = await params
-    const isSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
-    const canWrite = await canWriteModuleFamilyConfig(
-      session.user.id,
-      session.user.role,
-      isSuperAdmin,
-      familyId,
-      'inventory'
-    )
-    if (!canWrite) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-    }
-
-    const body = await request.json()
-
-    let order = typeof body.order === 'number' ? body.order : undefined
-    if (order == null) {
-      const maxOrder = await prisma.family_custom_fields.aggregate({
-        where: { familyId },
-        _max: { order: true },
-      })
-      order = (maxOrder._max.order ?? -1) + 1
-    }
-
-    const field = await prisma.family_custom_fields.create({
-      data: {
-        familyId,
-        fieldName: body.fieldName,
-        fieldLabel: body.fieldLabel,
-        fieldType: body.fieldType,
-        fieldOptions: body.fieldOptions || null,
-        isRequired: body.isRequired || false,
-        helpText: body.helpText || null,
-        order,
-      },
-    })
-
-    const response = NextResponse.json(field, { status: 201 })
-    response.headers.set('X-Deprecated', 'true')
-    return response
-  } catch (error) {
-    console.error('Error en POST /api/inventory/families/[familyId]/custom-fields:', error)
-    return NextResponse.json({ error: 'Error al crear campo personalizado' }, { status: 500 })
-  }
+export async function POST() {
+  return NextResponse.json(GONE_BODY, { status: 410 })
 }
