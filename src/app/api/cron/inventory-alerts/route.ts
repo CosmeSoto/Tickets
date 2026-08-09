@@ -17,7 +17,11 @@ export async function GET(request: NextRequest) {
     const authHeader = request.headers.get('authorization')
     const cronSecret = process.env.CRON_SECRET
 
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    if (!cronSecret) {
+      console.error('[CRON] CRON_SECRET no configurado — rechazando inventory-alerts')
+      return NextResponse.json({ error: 'CRON_SECRET no configurado' }, { status: 503 })
+    }
+    if (authHeader !== `Bearer ${cronSecret}`) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 

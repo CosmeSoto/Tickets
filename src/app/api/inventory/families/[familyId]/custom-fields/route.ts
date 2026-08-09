@@ -2,15 +2,59 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import {
+  canReadModuleFamilyConfig,
+  canWriteModuleFamilyConfig,
+} from '@/lib/auth/module-config-access'
 
 /**
- * @deprecated Este endpoint está deprecado y será eliminado el 2026-06-08.
- * Usa en su lugar: GET /api/admin/inventory/{type}-types/[typeId]/attributes
- * 
+ * @deprecated Preferir atributos por tipo bajo /api/admin/inventory/{type}-types/...
+ *
  * GET /api/inventory/families/[familyId]/custom-fields
- * Obtiene los campos personalizados de una familia
  */
 export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<{ familyId: string }> }
+) {
+  try {
+    const session = await getServerSession(authOptions)
+
+    if (!session?.user) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    }
+
+    const { familyId } = await params
+    const isSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
+    const allowed = await canReadModuleFamilyConfig(
+      session.user.id,
+      session.user.role,
+      isSuperAdmin,
+      familyId,
+      'inventory'
+    )
+    if (!allowed) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+    }
+
+    const fields = await prisma.family_custom_fields.findMany({
+      where: { familyId },
+      orderBy: { order: 'asc' },
+    })
+
+    const response = NextResponse.json(fields)
+    response.headers.set('X-Deprecated', 'true')
+    return response
+  } catch (error) {
+    console.error('Error en GET /api/inventory/families/[familyId]/custom-fields:', error)
+    return NextResponse.json({ error: 'Error al obtener campos personalizados' }, { status: 500 })
+  }
+}
+
+/**
+ * POST /api/inventory/families/[familyId]/custom-fields
+ * @deprecated
+ */
+export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ familyId: string }> }
 ) {
@@ -22,44 +66,18 @@ export async function GET(
     }
 
     const { familyId } = await params
-
-    const fields = await prisma.family_custom_fields.findMany({
-      where: { familyId },
-      orderBy: { order: 'asc' },
-    })
-
-    const response = NextResponse.json(fields)
-    response.headers.set('X-Deprecated', 'true')
-    response.headers.set('X-Deprecated-Date', '2026-06-08')
-    response.headers.set('X-Deprecated-Replacement', 'GET /api/admin/inventory/{type}-types/[typeId]/attributes')
-    response.headers.set('Warning', '299 - "Este endpoint está deprecado. Usa /api/admin/inventory/{type}-types/[typeId]/attributes"')
-    
-    return response
-  } catch (error) {
-    console.error('Error en GET /api/inventory/families/[familyId]/custom-fields:', error)
-    return NextResponse.json({ error: 'Error al obtener campos personalizados' }, { status: 500 })
-  }
-}
-
-/**
- * @deprecated Este endpoint está deprecado y será eliminado el 2026-06-08.
- * Usa en su lugar: POST /api/admin/inventory/{type}-types/[typeId]/attributes
- * 
- * POST /api/inventory/families/[familyId]/custom-fields
- * Crea un nuevo campo personalizado
- */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ familyId: string }> }
-) {
-  try {
-    const session = await getServerSession(authOptions)
-
-    if (!session?.user || session.user.role !== 'ADMIN') {
+    const isSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
+    const canWrite = await canWriteModuleFamilyConfig(
+      session.user.id,
+      session.user.role,
+      isSuperAdmin,
+      familyId,
+      'inventory'
+    )
+    if (!canWrite) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
     }
 
-    const { familyId } = await params
     const body = await request.json()
 
     let order = typeof body.order === 'number' ? body.order : undefined
@@ -86,10 +104,6 @@ export async function POST(
 
     const response = NextResponse.json(field, { status: 201 })
     response.headers.set('X-Deprecated', 'true')
-    response.headers.set('X-Deprecated-Date', '2026-06-08')
-    response.headers.set('X-Deprecated-Replacement', 'POST /api/admin/inventory/{type}-types/[typeId]/attributes')
-    response.headers.set('Warning', '299 - "Este endpoint está deprecado. Usa /api/admin/inventory/{type}-types/[typeId]/attributes"')
-    
     return response
   } catch (error) {
     console.error('Error en POST /api/inventory/families/[familyId]/custom-fields:', error)

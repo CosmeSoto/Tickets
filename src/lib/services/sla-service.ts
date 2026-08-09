@@ -6,6 +6,7 @@
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import { WebhookService } from './webhook-service'
+import { NotificationService } from './notification-service'
 
 export interface SLAPolicy {
   id: string
@@ -633,10 +634,32 @@ export class SLAService {
 
       await WebhookService.trigger(WebhookService.EVENTS.SLA_VIOLATED, webhookPayload)
 
-      // Enviar email de alerta (solo para violaciones críticas)
+      // Notificar al asignado (tickets) o a admins vía in-app + push
       if (severity === 'CRITICAL' || severity === 'HIGH') {
-        // TODO: Implementar template de email para violación SLA
-        console.log(`[SLA] Email de alerta enviado para violación ${severity}`)
+        const assigneeId = entityData.ticket?.users_tickets_assigneeIdTousers?.id as
+          | string
+          | undefined
+        const title =
+          severity === 'CRITICAL' ? 'Violación SLA crítica' : 'Violación SLA alta'
+        const message = ticketId
+          ? `El ticket "${entityData.ticket?.title ?? ticketId}" incumplió el SLA de ${violationType === 'RESPONSE' ? 'respuesta' : 'resolución'} (${delayHours}h de retraso).`
+          : `La solicitud "${entityData.assetRequest?.code ?? assetRequestId}" incumplió el SLA.`
+
+        if (assigneeId) {
+          await NotificationService.push({
+            userId: assigneeId,
+            type: 'WARNING',
+            title,
+            message,
+            metadata: {
+              kind: 'SLA_VIOLATION',
+              ticketId: ticketId ?? null,
+              assetRequestId: assetRequestId ?? null,
+              severity,
+              link: ticketId ? `/technician/tickets/${ticketId}` : '/inventory/asset-requests',
+            },
+          }).catch(() => {})
+        }
       }
     } catch (error) {
       console.error('[SLA] Error registrando violación:', error)
@@ -698,12 +721,20 @@ export class SLAService {
           },
         })
 
-        // Enviar email al técnico asignado
+        // Notificar al técnico asignado (in-app + push; email según preferencias)
         if (metrics.ticket.users_tickets_assigneeIdTousers) {
-          // TODO: Implementar template de email para advertencia SLA
-          console.log(
-            `[SLA] Email de advertencia enviado a ${metrics.ticket.users_tickets_assigneeIdTousers.name}`
-          )
+          const assignee = metrics.ticket.users_tickets_assigneeIdTousers
+          await NotificationService.push({
+            userId: assignee.id,
+            type: 'WARNING',
+            title: 'SLA próximo a vencer',
+            message: `El ticket "${metrics.ticket.title}" vence su SLA en menos de 1 hora.`,
+            metadata: {
+              kind: 'SLA_WARNING',
+              ticketId: metrics.ticketId,
+              link: `/technician/tickets/${metrics.ticketId}`,
+            },
+          }).catch(() => {})
         }
       }
 

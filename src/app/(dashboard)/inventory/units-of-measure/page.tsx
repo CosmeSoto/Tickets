@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 export default function UnitsOfMeasureRedirect() {
   const router = useRouter()
   useEffect(() => {
-    router.replace('/admin/settings/inventory')
+    router.replace('/inventory/settings')
   }, [router])
   return null
 }

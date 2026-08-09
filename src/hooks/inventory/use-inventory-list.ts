@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
+import { useSearchParams } from 'next/navigation'
 import { safeFetch } from '@/lib/auth-fetch'
 import {
   getAssetStatusLabel,
@@ -113,11 +114,15 @@ interface UseInventoryListProps {
 
 export function useInventoryList({ initialFamilyId, personalOnly = false }: UseInventoryListProps) {
   const { status } = useSession()
+  const searchParams = useSearchParams()
   const { families } = useFamilyOptions()
 
   // ── Filtros ──────────────────────────────────────────────────────────────
   const [selectedFamilyId, setSelectedFamilyId] = useState<string | null>(initialFamilyId ?? null)
-  const [selectedSubtype, setSelectedSubtype] = useState<AssetSubtype | ''>('')
+  const [selectedSubtype, setSelectedSubtype] = useState<AssetSubtype | ''>(() => {
+    const s = searchParams.get('subtype')
+    return s === 'EQUIPMENT' || s === 'MRO' || s === 'LICENSE' ? s : ''
+  })
   const [selectedStatus, setSelectedStatus] = useState('')
   const [selectedCondition, setSelectedCondition] = useState('')
   const [selectedBatchFilter, setSelectedBatchFilter] = useState('')

@@ -13,6 +13,7 @@ export type RoleNavigationInput = {
   isSuperAdmin: boolean
   canManageInventory: boolean
   canManageNews: boolean
+  canManageForms: boolean
   hasTickets: boolean
   hasInventory: boolean
   hasPatrols: boolean
@@ -27,6 +28,7 @@ export function buildRoleNavigation({
   isSuperAdmin,
   canManageInventory,
   canManageNews,
+  canManageForms,
   hasTickets,
   hasInventory,
   hasPatrols,
@@ -84,6 +86,17 @@ export function buildRoleNavigation({
       return hasCredentials
     }
     return true
+  })
+
+  // Gestores de formularios: consola admin; resto: biblioteca de lectura
+  navigation = navigation.map(item => {
+    if (item.name !== 'Documentos' && item.href !== '/forms' && item.href !== '/admin/forms') {
+      return item
+    }
+    return {
+      ...item,
+      href: canManageForms ? '/admin/forms' : '/forms',
+    }
   })
 
   const assetRequestParents: Record<string, string> = {

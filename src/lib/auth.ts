@@ -364,13 +364,27 @@ export const authOptions: NextAuthOptions = {
                 token.isSuperAdmin = (dbUser as any).isSuperAdmin ?? false
                 token.ticketsEnabled = dbUser.ticketsEnabled ?? true
                 token.inventoryEnabled = dbUser.inventoryEnabled ?? true
-                token.canRequestAssets = dbUser.canRequestAssets ?? true
+                token.canRequestAssets = dbUser.canRequestAssets ?? false
                 token.patrolsEnabled = dbUser.patrolsEnabled ?? false
+                token.newsEnabled = dbUser.newsEnabled ?? false
+                token.canManageNews = dbUser.canManageNews ?? false
+                token.formsEnabled = dbUser.formsEnabled ?? false
+                token.canManageForms = dbUser.canManageForms ?? false
+                token.credentialsEnabled = dbUser.credentialsEnabled ?? false
+                token.canManageCredentials = dbUser.canManageCredentials ?? false
                 token.isOAuth = true
               } else {
                 token.role = 'CLIENT'
                 token.isOAuth = true
                 token.patrolsEnabled = false
+                token.canManageInventory = false
+                token.canRequestAssets = false
+                token.newsEnabled = false
+                token.canManageNews = false
+                token.formsEnabled = false
+                token.canManageForms = false
+                token.credentialsEnabled = false
+                token.canManageCredentials = false
               }
             } catch (error) {
               console.error('Error obteniendo usuario OAuth:', error)
@@ -505,7 +519,7 @@ export const authOptions: NextAuthOptions = {
               token.isSuperAdmin = (dbUser as any).isSuperAdmin ?? false
               token.ticketsEnabled = dbUser.ticketsEnabled ?? true
               token.inventoryEnabled = dbUser.inventoryEnabled ?? true
-              token.canRequestAssets = dbUser.canRequestAssets ?? true
+              token.canRequestAssets = dbUser.canRequestAssets ?? false
               token.patrolsEnabled = dbUser.patrolsEnabled ?? false
               token.newsEnabled = dbUser.newsEnabled ?? false
               token.canManageNews = (dbUser as any).canManageNews ?? false
@@ -586,7 +600,7 @@ export const authOptions: NextAuthOptions = {
           // Agregar ticketsEnabled e inventoryEnabled desde el token
           ;(session.user as any).ticketsEnabled = (token.ticketsEnabled as boolean) ?? true
           ;(session.user as any).inventoryEnabled = (token.inventoryEnabled as boolean) ?? true
-          ;(session.user as any).canRequestAssets = (token.canRequestAssets as boolean) ?? true
+          ;(session.user as any).canRequestAssets = (token.canRequestAssets as boolean) ?? false
           session.user.patrolsEnabled = (token.patrolsEnabled as boolean) ?? false
           ;(session.user as any).newsEnabled = (token.newsEnabled as boolean) ?? false
           ;(session.user as any).canManageNews = (token.canManageNews as boolean) ?? false
@@ -651,7 +665,7 @@ export const authOptions: NextAuthOptions = {
   pages: {
     signIn: '/login',
     error: '/login',
-    newUser: '/client', // Redirigir nuevos usuarios OAuth al dashboard de cliente
+    newUser: '/', // Home redirige al dashboard según rol
   },
   events: {
     async signIn({ user, account, isNewUser }) {

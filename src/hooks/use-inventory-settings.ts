@@ -6,7 +6,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
+import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 import {
@@ -239,6 +239,7 @@ function buildForm(cfg: RawConfig | null, assetRequestsEnabled = false): FormSta
 export function useInventorySettings() {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const pathname = usePathname()
   const { data: session } = useSession()
   const isSuperAdmin = (session?.user as { isSuperAdmin?: boolean })?.isSuperAdmin === true
 
@@ -614,9 +615,15 @@ export function useInventorySettings() {
   const handleSelectFamily = useCallback(
     (familyId: string) => {
       setSelectedFamilyId(familyId)
-      router.replace(`/admin/settings/inventory?familyId=${familyId}`, { scroll: false })
+      // Mantener la ruta actual (/inventory/settings o /admin/settings/inventory)
+      // para no expulsar gestores del gate /admin/*
+      const base =
+        pathname?.startsWith('/admin/settings/inventory')
+          ? '/admin/settings/inventory'
+          : '/inventory/settings'
+      router.replace(`${base}?familyId=${familyId}`, { scroll: false })
     },
-    [router]
+    [router, pathname]
   )
 
   const selectedFamily = families.find(f => f.id === selectedFamilyId)

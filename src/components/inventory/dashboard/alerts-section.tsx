@@ -204,7 +204,7 @@ export function AlertsSection() {
               {alerts.expiringLicenses !== 1 ? 'n' : ''} en los próximos{' '}
               {alerts.licenseAlertDays ?? 30} días
             </span>
-            <Link href='/inventory/licenses'>
+            <Link href='/inventory?subtype=LICENSE'>
               <Button variant='outline' size='sm'>
                 Ver
               </Button>

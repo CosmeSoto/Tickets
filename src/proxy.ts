@@ -338,35 +338,32 @@ export async function proxy(request: NextRequest) {
     // Rutas de inventario:
     // - ADMIN: acceso total
     // - TECHNICIAN: acceso total (granularidad en API routes)
-    // - CLIENT gestor (canManageInventory): acceso a rutas operativas de sus familias
-    // - CLIENT sin gestión: solo puede ver sus equipos asignados, licencias, actas y mantenimientos
-    if (path.startsWith('/inventory')) {
+    // - CLIENT gestor (canManageInventory): acceso operativo + /inventory/settings
+    // - CLIENT sin gestión: activos asignados, licencias, actas, mantenimientos,
+    //   contratos (Mis Suscripciones) y solicitudes si canRequestAssets
+    if (path.startsWith('/inventory') || path === '/settings/inventory' || path.startsWith('/settings/inventory/')) {
       if (userRole === 'CLIENT') {
         const canManage = (token as any).canManageInventory === true
-        if (!canManage) {
+        const canRequest = (token as any).canRequestAssets === true
+
+        if (canManage) {
+          // Redirects legacy de catálogo → /inventory/settings (permitir el hop)
+          // Bloquear solo rutas de sistema no aplicables a gestores cliente
+        } else {
           const clientAllowed = [
-            '/inventory', // lista de equipos asignados
-            '/inventory/equipment', // detalle de equipo
-            '/inventory/licenses', // sus licencias
-            '/inventory/acts', // sus actas
-            '/inventory/maintenance', // sus mantenimientos
+            '/inventory',
+            '/inventory/equipment',
+            '/inventory/license',
+            '/inventory/suministros',
+            '/inventory/acts',
+            '/inventory/maintenance',
+            '/inventory/contracts',
           ]
+          if (canRequest) {
+            clientAllowed.push('/inventory/asset-requests')
+          }
           const isAllowed = clientAllowed.some(r => path === r || path.startsWith(r + '/'))
           if (!isAllowed) {
-            return NextResponse.redirect(new URL('/client', request.url))
-          }
-        } else {
-          // Cliente gestor: puede acceder a rutas operativas pero no a configuración del sistema
-          const clientManagerBlocked = [
-            '/inventory/equipment-types',
-            '/inventory/consumable-types',
-            '/inventory/license-types',
-            '/inventory/units-of-measure',
-            '/inventory/warehouses',
-            '/settings/inventory',
-          ]
-          const isBlocked = clientManagerBlocked.some(r => path === r || path.startsWith(r + '/'))
-          if (isBlocked) {
             return NextResponse.redirect(new URL('/client', request.url))
           }
         }

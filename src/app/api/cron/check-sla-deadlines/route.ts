@@ -8,11 +8,17 @@ import { checkTicketVolumeAlerts } from '@/lib/cron/check-ticket-volume-alerts'
  */
 export async function GET(request: NextRequest) {
   try {
-    // Verificar que la petición viene del cron (seguridad)
     const authHeader = request.headers.get('authorization')
     const cronSecret = process.env.CRON_SECRET
 
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    if (!cronSecret) {
+      console.error('[CRON] CRON_SECRET no configurado — rechazando check-sla-deadlines')
+      return NextResponse.json(
+        { success: false, message: 'CRON_SECRET no configurado' },
+        { status: 503 }
+      )
+    }
+    if (authHeader !== `Bearer ${cronSecret}`) {
       return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 401 })
     }
 

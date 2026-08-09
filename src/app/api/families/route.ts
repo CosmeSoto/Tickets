@@ -82,6 +82,31 @@ export async function GET(request: NextRequest) {
 
     // ── Clientes: scope consumer (nativa + user_family_access; TECHNOLOGY remapeado) ──
     if (session.user.role === 'CLIENT') {
+      const moduleFilter = searchParams.get('module')
+      // Configuración de inventario: gestores ven familias operativas (mismo criterio que TECH)
+      if (moduleFilter === 'inventory') {
+        const { canManageInventory } = await import('@/lib/inventory-access')
+        const { getInventoryManageFamilyIds } = await import('@/lib/inventory/family-access')
+        const manages = await canManageInventory(session.user.id, session.user.role)
+        if (!manages) {
+          return NextResponse.json({ success: true, data: [] })
+        }
+        const manageIds = await getInventoryManageFamilyIds(
+          session.user.id,
+          session.user.role,
+          false,
+          true
+        )
+        if (!manageIds || manageIds.length === 0) {
+          return NextResponse.json({ success: true, data: [] })
+        }
+        const includeInactiveInv = searchParams.get('includeInactive') === 'true'
+        let families = await FamilyService.findAll(includeInactiveInv)
+        const allowed = new Set(manageIds)
+        families = families.filter((f: { id: string }) => allowed.has(f.id))
+        return NextResponse.json({ success: true, data: families })
+      }
+
       // Documentos/Noticias: solo familia nativa (o asignaciones si no hay nativa)
       if (searchParams.get('scope') === 'content') {
         const { getContentVisibilityScope } = await import('@/lib/content/visibility-scope')

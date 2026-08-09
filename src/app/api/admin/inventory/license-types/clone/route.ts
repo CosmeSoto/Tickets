@@ -68,6 +68,10 @@ export async function POST(request: NextRequest) {
     })
     if (!source) return NextResponse.json({ error: 'Tipo origen no encontrado' }, { status: 404 })
 
+    if (manageable !== undefined && source.familyId && !manageable.includes(source.familyId)) {
+      return NextResponse.json({ error: 'Sin acceso a la familia origen' }, { status: 403 })
+    }
+
     const finalName = newName?.trim() || source.name
     const baseCode = slugify(finalName)
     const existing = await prisma.license_types.findMany({

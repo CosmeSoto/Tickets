@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { canWriteModuleFamilyConfig } from '@/lib/auth/module-config-access'
 
 /**
  * PUT /api/inventory/families/[familyId]/custom-fields/[fieldId]
@@ -14,12 +15,31 @@ export async function PUT(
   try {
     const session = await getServerSession(authOptions)
 
-    if (!session?.user || session.user.role !== 'ADMIN') {
+    if (!session?.user) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    }
+
+    const { familyId, fieldId } = await params
+    const isSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
+    const canWrite = await canWriteModuleFamilyConfig(
+      session.user.id,
+      session.user.role,
+      isSuperAdmin,
+      familyId,
+      'inventory'
+    )
+    if (!canWrite) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
     }
 
-    const { fieldId } = await params
     const body = await request.json()
+
+    const existing = await prisma.family_custom_fields.findFirst({
+      where: { id: fieldId, familyId },
+    })
+    if (!existing) {
+      return NextResponse.json({ error: 'Campo no encontrado' }, { status: 404 })
+    }
 
     const field = await prisma.family_custom_fields.update({
       where: { id: fieldId },
@@ -51,11 +71,29 @@ export async function DELETE(
   try {
     const session = await getServerSession(authOptions)
 
-    if (!session?.user || session.user.role !== 'ADMIN') {
+    if (!session?.user) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    }
+
+    const { familyId, fieldId } = await params
+    const isSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
+    const canWrite = await canWriteModuleFamilyConfig(
+      session.user.id,
+      session.user.role,
+      isSuperAdmin,
+      familyId,
+      'inventory'
+    )
+    if (!canWrite) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
     }
 
-    const { fieldId } = await params
+    const existing = await prisma.family_custom_fields.findFirst({
+      where: { id: fieldId, familyId },
+    })
+    if (!existing) {
+      return NextResponse.json({ error: 'Campo no encontrado' }, { status: 404 })
+    }
 
     await prisma.family_custom_fields.delete({
       where: { id: fieldId },

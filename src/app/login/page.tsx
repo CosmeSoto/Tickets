@@ -393,7 +393,7 @@ export default function LoginPage() {
                         type='button'
                         variant='outline'
                         className='w-full h-10 bg-background'
-                        onClick={() => signIn('google', { callbackUrl: '/client' })}
+                        onClick={() => signIn('google', { callbackUrl: '/' })}
                         disabled={isLoading}
                       >
                         <svg className='mr-2 h-4 w-4' viewBox='0 0 24 24'>
@@ -428,7 +428,7 @@ export default function LoginPage() {
                         type='button'
                         variant='outline'
                         className='w-full h-10 bg-background'
-                        onClick={() => signIn('azure-ad', { callbackUrl: '/client' })}
+                        onClick={() => signIn('azure-ad', { callbackUrl: '/' })}
                         disabled={isLoading}
                       >
                         <svg className='mr-2 h-4 w-4' viewBox='0 0 23 23'>

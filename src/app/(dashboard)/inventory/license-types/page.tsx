@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 export default function LicenseTypesRedirect() {
   const router = useRouter()
   useEffect(() => {
-    router.replace('/admin/settings/inventory')
+    router.replace('/inventory/settings')
   }, [router])
   return null
 }
