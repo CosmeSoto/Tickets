@@ -138,8 +138,8 @@ export const AUDIT_COLUMN_CATALOG: AuditColumnMeta[] = [
   { key: 'rol', label: 'Rol', defaultVisible: true },
   { key: 'descripcion', label: 'Descripción', defaultVisible: true },
   { key: 'severity', label: 'Severidad', defaultVisible: false },
-  { key: 'entityId', label: 'ID entidad', defaultVisible: false },
-  { key: 'id', label: 'ID registro', defaultVisible: false },
+  { key: 'entityId', label: 'ID del objeto afectado', defaultVisible: false },
+  { key: 'id', label: 'ID del evento (auditoría)', defaultVisible: false },
   { key: 'dispositivo', label: 'Dispositivo', defaultVisible: false },
   { key: 'navegador', label: 'Navegador', defaultVisible: false },
   // Sensibles (LOPDP) — off por defecto
