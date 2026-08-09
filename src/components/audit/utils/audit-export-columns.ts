@@ -7,6 +7,10 @@ import type { ExportColumn } from '@/lib/utils/export'
 import type { TableColumnDef } from '@/components/common/table-columns-menu'
 import { translateAction, translateEntityType } from '@/lib/services/audit-export-helpers'
 import { getAppTimezone } from '@/lib/utils/date-utils'
+import {
+  getAffectedObjectLabel,
+  getEventCode,
+} from '@/components/audit/utils/audit-affected-object'
 
 const ROLES: Record<string, string> = {
   ADMIN: 'Administrador',
@@ -86,36 +90,6 @@ function browserLabel(ua: string, contextBrowser?: string): string {
   if (u.includes('firefox')) return 'Firefox'
   if (u.includes('safari')) return 'Safari'
   return ''
-}
-
-/** Texto legible del objeto sobre el que se actuó (sin UUID crudo). */
-function buildAffectedObjectLabel(row: any): string {
-  const d = row.details || {}
-  if (d.ticketNumber) return `Ticket #${d.ticketNumber}`
-  if (d.ticketTitle) return `Ticket: ${d.ticketTitle}`
-  if (d.targetUserName) return `Usuario: ${d.targetUserName}`
-  if (d.userName && row.entityType === 'user') return `Usuario: ${d.userName}`
-  if (d.categoryName) return `Categoría: ${d.categoryName}`
-  if (d.familyName) return `Familia: ${d.familyName}`
-  if (d.equipmentName || d.assetName) return `Activo: ${d.equipmentName || d.assetName}`
-  if (d.credentialName) return `Credencial: ${d.credentialName}`
-  if (typeof d.descripcion === 'string' && d.descripcion.trim()) {
-    // Para exportaciones / acciones de sistema: la descripción ya es clara
-    if (row.entityType === 'system' || String(row.action || '').includes('EXPORT')) {
-      return d.descripcion.length > 90 ? `${d.descripcion.slice(0, 87)}…` : d.descripcion
-    }
-  }
-  const typeLabel = translateEntityType(row.entityType || '')
-  if (!row.entityId) return typeLabel || '—'
-  // Último recurso: módulo + referencia corta (no el UUID completo)
-  return `${typeLabel || 'Objeto'} · ref. ${String(row.entityId).slice(0, 8)}`
-}
-
-/** Código corto del evento de auditoría (para soporte), no el UUID completo. */
-function buildEventCode(row: any): string {
-  const id = String(row.id || '')
-  if (!id) return ''
-  return `EVT-${id.slice(0, 8).toUpperCase()}`
 }
 
 function severityLabel(action: string): string {
@@ -224,7 +198,7 @@ export function getAuditExportAccessor(
     case 'entityType':
       return (row: any) => translateEntityType(row.entityType)
     case 'entityId':
-      return (row: any) => buildAffectedObjectLabel(row)
+      return (row: any) => getAffectedObjectLabel(row)
     case 'usuario':
       return (row: any) => row.users?.name || row.userEmail || 'Sistema'
     case 'email':
@@ -263,7 +237,7 @@ export function getAuditExportAccessor(
     case 'userAgent':
       return (row: any) => (maskPii ? '[OCULTO]' : row.userAgent || '')
     case 'id':
-      return (row: any) => buildEventCode(row)
+      return (row: any) => getEventCode(row.id)
     default:
       return () => ''
   }

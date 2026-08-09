@@ -294,6 +294,7 @@ export function translateAction(action: string): string {
     uploaded: 'Subido',
     downloaded: 'Descargado',
     exported: 'Exportado',
+    AUDIT_LOGS_EXPORTED: 'Exportación de auditoría',
     generated: 'Generado',
     backup: 'Respaldo',
     restore: 'Restauración',
@@ -320,8 +321,12 @@ export function translateAction(action: string): string {
     reactivated: 'Reactivado',
   }
 
-  for (const [key, value] of Object.entries(actionMap)) {
-    if (action.toLowerCase().includes(key)) {
+  if (actionMap[action]) return actionMap[action]
+
+  // Preferir coincidencias más largas (evita que "exported" gane a "AUDIT_LOGS_EXPORTED")
+  const ranked = Object.entries(actionMap).sort((a, b) => b[0].length - a[0].length)
+  for (const [key, value] of ranked) {
+    if (action.toLowerCase().includes(key.toLowerCase())) {
       return value
     }
   }

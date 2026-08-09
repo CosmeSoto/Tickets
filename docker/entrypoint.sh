@@ -141,17 +141,48 @@ const { PrismaClient } = require('@prisma/client');
 const p = new PrismaClient();
 (async () => {
   try {
-    const [types, brands, warehouses, supplierTypes] = await Promise.all([
+    const [types, brands, warehouses, supplierTypes, contractServiceTypes] = await Promise.all([
       p.equipment_types.count(),
       p.equipment_brands.count(),
       p.warehouses.count(),
       p.supplier_types.count(),
+      p.contract_service_types.count(),
     ]);
-    if (types === 0 || brands === 0 || warehouses === 0 || supplierTypes === 0) {
-      console.log('  → Catálogos incompletos (tipos=' + types + ', marcas=' + brands + ', bodegas=' + warehouses + ', tipos proveedor=' + supplierTypes + ')');
+    if (
+      types === 0 ||
+      brands === 0 ||
+      warehouses === 0 ||
+      supplierTypes === 0 ||
+      contractServiceTypes === 0
+    ) {
+      console.log(
+        '  → Catálogos incompletos (tipos=' +
+          types +
+          ', marcas=' +
+          brands +
+          ', bodegas=' +
+          warehouses +
+          ', tipos proveedor=' +
+          supplierTypes +
+          ', tipos servicio contrato=' +
+          contractServiceTypes +
+          ')'
+      );
       process.exit(2);
     }
-    console.log('  → Catálogos OK (tipos=' + types + ', marcas=' + brands + ', bodegas=' + warehouses + ', tipos proveedor=' + supplierTypes + ')');
+    console.log(
+      '  → Catálogos OK (tipos=' +
+        types +
+        ', marcas=' +
+        brands +
+        ', bodegas=' +
+        warehouses +
+        ', tipos proveedor=' +
+        supplierTypes +
+        ', tipos servicio contrato=' +
+        contractServiceTypes +
+        ')'
+    );
     process.exit(0);
   } catch (e) {
     console.error('  → Error verificando catálogos:', e.message);

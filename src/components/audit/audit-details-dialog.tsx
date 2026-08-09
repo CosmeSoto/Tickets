@@ -14,6 +14,11 @@ import {
 } from '@/components/ui/dialog'
 import type { AuditLog } from './utils/audit-types'
 import { getActionLabel, getEntityLabel } from './utils/audit-formatters'
+import {
+  getAffectedObjectFieldLabel,
+  getAffectedObjectLabel,
+  getEventCode,
+} from './utils/audit-affected-object'
 import { AuditDetailsResolver } from './audit-details-resolver'
 
 interface AuditDetailsDialogProps {
@@ -24,6 +29,12 @@ interface AuditDetailsDialogProps {
 
 export function AuditDetailsDialog({ log, isOpen, onClose }: AuditDetailsDialogProps) {
   if (!log) return null
+
+  const affectedLabel = getAffectedObjectLabel(log)
+  const eventCode = getEventCode(log.id)
+  const device = log.details?.context?.deviceType
+  const browser = log.details?.context?.browser
+  const browserVersion = log.details?.context?.browserVersion
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -40,9 +51,8 @@ export function AuditDetailsDialog({ log, isOpen, onClose }: AuditDetailsDialogP
         </DialogHeader>
 
         <div className='space-y-4 mt-4'>
-          {/* Información básica */}
           <div className='bg-muted/30 p-4 rounded-lg space-y-3'>
-            <div className='flex items-center gap-2'>
+            <div className='flex items-center gap-2 flex-wrap'>
               <span className='font-semibold'>Acción:</span>
               <Badge className='bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'>
                 {getActionLabel(log.action)}
@@ -52,48 +62,18 @@ export function AuditDetailsDialog({ log, isOpen, onClose }: AuditDetailsDialogP
               <span className='font-semibold'>Módulo:</span>{' '}
               <span className='text-muted-foreground'>{getEntityLabel(log.entityType)}</span>
             </div>
-            {log.entityId && (
+            <div>
+              <span className='font-semibold'>{getAffectedObjectFieldLabel(log.entityType)}:</span>{' '}
+              <span className='text-muted-foreground font-medium text-blue-600 dark:text-blue-400'>
+                {affectedLabel}
+              </span>
+            </div>
+            {eventCode ? (
               <div>
-                <span className='font-semibold'>
-                  {log.entityType === 'user'
-                    ? 'Usuario Afectado:'
-                    : log.entityType === 'ticket'
-                      ? 'Ticket:'
-                      : log.entityType === 'category'
-                        ? 'Categoría:'
-                        : log.entityType === 'department'
-                          ? 'Departamento:'
-                          : log.entityType === 'System'
-                            ? 'Elemento:'
-                            : 'Elemento Afectado:'}
-                </span>{' '}
-                {/* PRIORIDAD 1: Usar entityName si está disponible (ya resuelto) */}
-                {log.details?.entityName ? (
-                  <span className='text-muted-foreground font-medium text-blue-600 dark:text-blue-400'>
-                    {log.details.entityName}
-                  </span>
-                ) : /* PRIORIDAD 2: Usar nombres específicos del details */
-                log.entityType === 'user' && log.details?.userName ? (
-                  <span className='text-muted-foreground'>
-                    {log.details.userName}
-                    {log.details.userEmail && (
-                      <span className='text-xs ml-2'>({log.details.userEmail})</span>
-                    )}
-                  </span>
-                ) : log.entityType === 'ticket' && log.details?.ticketTitle ? (
-                  <span className='text-muted-foreground'>{log.details.ticketTitle}</span>
-                ) : log.entityType === 'category' && log.details?.categoryName ? (
-                  <span className='text-muted-foreground'>{log.details.categoryName}</span>
-                ) : log.entityType === 'department' && log.details?.departmentName ? (
-                  <span className='text-muted-foreground'>{log.details.departmentName}</span>
-                ) : (
-                  /* FALLBACK: Mostrar UUID solo si no hay nada más */
-                  <code className='text-xs bg-muted px-2 py-1 rounded font-mono'>
-                    {log.entityId}
-                  </code>
-                )}
+                <span className='font-semibold'>Código del evento:</span>{' '}
+                <span className='text-muted-foreground'>{eventCode}</span>
               </div>
-            )}
+            ) : null}
             <div>
               <span className='font-semibold'>Fecha:</span>{' '}
               <span className='text-muted-foreground'>
@@ -115,6 +95,25 @@ export function AuditDetailsDialog({ log, isOpen, onClose }: AuditDetailsDialogP
                 </span>
               </div>
             )}
+            {(device || browser) && (
+              <div>
+                <span className='font-semibold'>Dispositivo:</span>{' '}
+                <span className='text-muted-foreground'>
+                  {[
+                    device === 'Desktop'
+                      ? 'Escritorio'
+                      : device === 'Mobile'
+                        ? 'Móvil'
+                        : device === 'Tablet'
+                          ? 'Tablet'
+                          : device,
+                    browser ? `${browser}${browserVersion ? ` ${browserVersion}` : ''}` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </span>
+              </div>
+            )}
             {log.ipAddress && (
               <div>
                 <span className='font-semibold'>IP:</span>{' '}
@@ -125,7 +124,6 @@ export function AuditDetailsDialog({ log, isOpen, onClose }: AuditDetailsDialogP
             )}
           </div>
 
-          {/* Detalles formateados */}
           {log.details && (
             <div className='border-t pt-4'>
               <AuditDetailsResolver details={log.details} action={log.action} />

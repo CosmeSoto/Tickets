@@ -70,6 +70,50 @@ npx tsx prisma/ensure-departments.ts || \
   node ./node_modules/tsx/dist/cli.mjs prisma/ensure-departments.ts || \
   echo "==> ADVERTENCIA: ensure-departments falló — npm run db:seed-departments"
 
+# Catálogos inventario (incluye tipos de servicio de contratos) — idempotente
+echo "==> [dev] Verificando catálogos de inventario..."
+CATALOG_CHECK=0
+node - <<'NODESCRIPT' || CATALOG_CHECK=$?
+const { PrismaClient } = require('@prisma/client');
+const p = new PrismaClient();
+(async () => {
+  try {
+    const [types, brands, warehouses, supplierTypes, contractServiceTypes] = await Promise.all([
+      p.equipment_types.count(),
+      p.equipment_brands.count(),
+      p.warehouses.count(),
+      p.supplier_types.count(),
+      p.contract_service_types.count(),
+    ]);
+    if (
+      types === 0 ||
+      brands === 0 ||
+      warehouses === 0 ||
+      supplierTypes === 0 ||
+      contractServiceTypes === 0
+    ) {
+      console.log(
+        '  → Catálogos incompletos (tipos servicio contrato=' + contractServiceTypes + ')'
+      );
+      process.exit(2);
+    }
+    process.exit(0);
+  } catch (e) {
+    console.error('  → Error verificando catálogos:', e.message);
+    process.exit(1);
+  } finally {
+    await p.$disconnect();
+  }
+})();
+NODESCRIPT
+
+if [ "$CATALOG_CHECK" = "2" ]; then
+  echo "==> [dev] Ejecutando ensure-catalogs..."
+  npx tsx prisma/ensure-catalogs.ts || \
+    node ./node_modules/tsx/dist/cli.mjs prisma/ensure-catalogs.ts || \
+    echo "==> ADVERTENCIA: ensure-catalogs falló — npm run db:seed-catalogs"
+fi
+
 echo "==> [dev] Sincronizando user_family_access..."
 npx tsx prisma/sync-user-family-access.ts || \
   node ./node_modules/tsx/dist/cli.mjs prisma/sync-user-family-access.ts || \

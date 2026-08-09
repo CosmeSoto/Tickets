@@ -199,6 +199,7 @@ export function getActionLabel(action: string): string {
     // Configuración
     settings_updated: 'Config. Sistema Actualizada',
     settings_viewed: 'Configuración Visualizada',
+    AUDIT_LOGS_EXPORTED: 'Exportación de Auditoría',
     TICKET_FAMILY_CONFIG_UPDATED: 'Config. Tickets (Área) Actualizada',
     PATROL_FAMILY_CONFIG_UPDATED: 'Config. Rondas (Área) Actualizada',
     INVENTORY_FAMILY_CONFIG_UPDATED: 'Config. Inventario (Área) Actualizada',
@@ -530,12 +531,65 @@ export function formatValue(key: string, value: any): string {
   // Formatear booleanos
   if (typeof value === 'boolean') {
     if (key === 'createdOnBehalf') return value ? 'Sí (en nombre de otro usuario)' : 'No'
+    if (key === 'maskPii' || key === 'includeSensitive') return value ? 'Sí' : 'No'
     return value ? 'Sí' : 'No'
   }
 
   // Formatear números
   if (typeof value === 'number') {
+    if (key === 'exportedRecords' || key === 'totalMatching') {
+      return `${value.toLocaleString('es-ES')} registros`
+    }
     return String(value)
+  }
+
+  // Columnas de exportación: claves técnicas → etiquetas
+  if (key === 'columns' && Array.isArray(value)) {
+    const colLabels: Record<string, string> = {
+      fecha: 'Fecha',
+      hora: 'Hora',
+      action: 'Acción',
+      entityType: 'Módulo',
+      usuario: 'Usuario',
+      rol: 'Rol',
+      descripcion: 'Descripción',
+      severity: 'Severidad',
+      entityId: 'Objeto afectado',
+      id: 'Código del evento',
+      dispositivo: 'Dispositivo',
+      navegador: 'Navegador',
+      email: 'Email',
+      ip: 'IP',
+      cambios: 'Cambios',
+      userAgent: 'User-Agent',
+    }
+    return value.map((c: string) => colLabels[c] || c).join(', ')
+  }
+
+  // Filtros de exportación: resumen legible
+  if (key === 'filters' && value && typeof value === 'object' && !Array.isArray(value)) {
+    const f = value as Record<string, unknown>
+    const parts: string[] = []
+    if (f.days) parts.push(`Últimos ${f.days} días`)
+    if (f.entityType && f.entityType !== 'all') parts.push(`Módulo: ${f.entityType}`)
+    if (f.search) parts.push(`Búsqueda: "${f.search}"`)
+    if (f.action) parts.push(`Acción: ${f.action}`)
+    if (f.actionPreset) parts.push(`Preset: ${f.actionPreset}`)
+    if (f.configModule && f.configModule !== 'all') parts.push(`Config: ${f.configModule}`)
+    if (f.familyId) parts.push('Con filtro de área')
+    return parts.length > 0 ? parts.join(' · ') : 'Sin filtros especiales (todos)'
+  }
+
+  // Formato de archivo
+  if (key === 'format') {
+    const formats: Record<string, string> = {
+      csv: 'CSV',
+      excel: 'Excel',
+      pdf: 'PDF',
+      json: 'JSON',
+      rows: 'Datos tabulares (Excel/PDF)',
+    }
+    return formats[String(value)] || String(value)
   }
 
   // Formatear objetos
@@ -635,6 +689,15 @@ export function getFieldLabel(key: string): string {
     attributesCopied: 'Atributos copiados',
     newTypeName: 'Nombre del nuevo tipo',
     targetFamilyName: 'Área de destino',
+    // Exportación de auditoría
+    format: 'Formato',
+    columns: 'Columnas exportadas',
+    filters: 'Filtros aplicados',
+    maskPii: 'Datos personales enmascarados',
+    includeSensitive: 'Incluyó datos sensibles',
+    exportedRecords: 'Registros exportados',
+    totalMatching: 'Total coincidente',
+    descripcion: 'Descripción',
   }
   return labels[key] || key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1')
 }
