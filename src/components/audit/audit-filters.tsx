@@ -216,7 +216,7 @@ export function AuditFiltersComponent({
             <div className='min-w-0'>
               <p className='text-sm font-medium'>Exportar</p>
               <p className='text-xs text-muted-foreground'>
-                CSV / Excel / PDF: minimización LOPDP. JSON: opción de datos sensibles.
+                LOPDP. JSON: opción de datos sensibles.
               </p>
             </div>
             <div className='flex flex-wrap gap-2 items-center'>
