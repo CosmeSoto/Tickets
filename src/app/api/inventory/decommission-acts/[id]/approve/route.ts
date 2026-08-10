@@ -321,6 +321,9 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
           to: requesterEmail,
           subject: `Solicitud de Baja Aprobada - ${act.folio}`,
           html: buildApprovalEmail(requesterName, assetName, act.folio, adminName, systemName),
+          module: 'inventory',
+          event: 'inventoryAct',
+          priority: 'important',
         },
       }
     )

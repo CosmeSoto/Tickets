@@ -124,6 +124,9 @@ export async function POST(
           adminName,
           systemName
         ),
+        module: 'inventory',
+        event: 'inventoryAct',
+        priority: 'important',
       },
     }
   )

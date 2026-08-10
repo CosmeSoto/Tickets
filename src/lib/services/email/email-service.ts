@@ -7,11 +7,14 @@ import nodemailer from 'nodemailer'
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import { AuditServiceComplete, AuditActionsComplete } from '../audit-service-complete'
-import { getUnifiedSmtpConfig, isSystemEmailEnabled } from './smtp-config'
-import {
-  canSendTicketEmail,
-  type TicketEmailEvent,
-} from '@/lib/notifications/ticket-email-prefs'
+import { getUnifiedSmtpConfig } from './smtp-config'
+import type { TicketEmailEvent } from '@/lib/notifications/email-prefs'
+import { queueNotificationEmail } from '@/lib/notifications/queue-notification-email'
+import type {
+  EmailModule,
+  EmailPriority,
+  NotificationEmailEvent,
+} from '@/lib/notifications/email-policy'
 
 export interface EmailOptions {
   to: string | string[]
@@ -20,12 +23,19 @@ export interface EmailOptions {
   text?: string
   template?: string
   templateData?: Record<string, any>
+  /** Prioridad SMTP/nodemailer (legacy); no confundir con notificationPriority */
   priority?: 'high' | 'normal' | 'low'
   scheduledAt?: Date
-  /** Destinatario (usuario) para respetar preferencias de tickets */
+  /** Destinatario (usuario) para respetar preferencias */
   recipientUserId?: string
-  /** Evento de ticket; si se omite no se aplican prefs finas de tickets */
+  /** Evento de ticket (compat); implica module=tickets */
   ticketEmailEvent?: TicketEmailEvent
+  /** Módulo de política global */
+  module?: EmailModule
+  /** Evento de política global */
+  event?: NotificationEmailEvent
+  /** Prioridad de política (critical | important | optional) */
+  notificationPriority?: EmailPriority
 }
 
 export interface EmailQueueItem {
@@ -174,29 +184,10 @@ export class EmailService {
   }
 
   /**
-   * Agrega un email a la cola para envío posterior
+   * Agrega un email a la cola (vía puerta global: SMTP + prefs + prioridad).
    */
   static async queueEmail(options: EmailOptions, userId?: string): Promise<string> {
     try {
-      if (!(await isSystemEmailEnabled())) {
-        console.log('[EMAIL-SERVICE] Cola omitida: SMTP desactivado o sin configurar')
-        return ''
-      }
-
-      if (options.ticketEmailEvent && options.recipientUserId) {
-        const allowed = await canSendTicketEmail(
-          options.recipientUserId,
-          options.ticketEmailEvent
-        )
-        if (!allowed) {
-          console.log(
-            `[EMAIL-SERVICE] Cola omitida por preferencias (${options.ticketEmailEvent}) user=${options.recipientUserId}`
-          )
-          return ''
-        }
-      }
-
-      // Preparar contenido
       let html = options.html || ''
       let text = options.text || ''
 
@@ -206,30 +197,26 @@ export class EmailService {
         text = rendered.text
       }
 
-      const recipients = Array.isArray(options.to) ? options.to : [options.to]
-      const queueIds: string[] = []
+      const module: EmailModule =
+        options.module || (options.ticketEmailEvent ? 'tickets' : 'system')
+      const event: NotificationEmailEvent =
+        options.event || options.ticketEmailEvent || (module === 'auth' ? 'security' : 'generic')
 
-      // Crear entrada en cola para cada destinatario
-      for (const recipient of recipients) {
-        const queueItem = await prisma.email_queue.create({
-          data: {
-            id: randomUUID(),
-            toEmail: recipient,
-            subject: options.subject,
-            body: html || text,
-            templateName: options.template,
-            templateData: options.templateData ? JSON.stringify(options.templateData) : null,
-            status: 'pending',
-            attempts: 0,
-            maxAttempts: 3,
-            scheduledAt: options.scheduledAt || new Date()
-          }
-        })
+      const queueIds = await queueNotificationEmail({
+        to: options.to,
+        subject: options.subject,
+        html: html || text,
+        text,
+        recipientUserId: options.recipientUserId,
+        module,
+        event,
+        priority: options.notificationPriority,
+        templateName: options.template,
+        templateData: options.templateData,
+        scheduledAt: options.scheduledAt,
+        actorUserId: userId,
+      })
 
-        queueIds.push(queueItem.id)
-      }
-
-      // Registrar en auditoría
       if (userId && queueIds[0]) {
         await AuditServiceComplete.logAction({
           userId,
@@ -237,12 +224,14 @@ export class EmailService {
           entityType: 'system',
           entityId: queueIds[0],
           details: {
-            to: recipients,
+            to: Array.isArray(options.to) ? options.to : [options.to],
             subject: options.subject,
             template: options.template,
             queueIds,
+            module,
+            event,
             ticketEmailEvent: options.ticketEmailEvent,
-          }
+          },
         })
       }
 

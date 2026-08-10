@@ -6,7 +6,6 @@ import { randomUUID } from 'crypto'
 import { auditTicketChange } from '@/lib/audit'
 import { WebhookService } from '@/lib/services/webhook-service'
 import { SLAService } from '@/lib/services/sla-service'
-import { EmailService } from '@/lib/services/email/email-service'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 import { NotificationService } from '@/lib/services/notification-service'
 import { invalidateCache } from '@/lib/api-cache'
@@ -574,32 +573,20 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
               select: { name: true, email: true, role: true },
             })
             if (rater?.email) {
-              const rolePrefix =
-                rater.role === 'ADMIN'
-                  ? 'admin'
-                  : rater.role === 'TECHNICIAN'
-                    ? 'technician'
-                    : 'client'
-              await EmailService.queueEmail(
-                {
-                  to: rater.email,
-                  subject: isPatrolResolved
-                    ? `Ticket escalado resuelto — califica el servicio`
-                    : `Ticket #${finalId.substring(0, 8)} resuelto`,
-                  template: 'ticket-resolved',
-                  templateData: {
-                    ticketId: finalId,
-                    title: updatedTicket.title,
-                    clientName: rater.name,
-                    technicianName: session.user.name,
-                    ticketUrl: `/${rolePrefix}/tickets/${finalId}`,
-                    isPatrolEscalation: isPatrolResolved,
-                  },
-                  recipientUserId: raterId,
-                  ticketEmailEvent: 'statusChanged',
-                },
-                session.user.id
-              ).catch(err => {
+              const { queueTicketResolvedRaterEmail } = await import(
+                '@/lib/notifications/ticket-resolved-email'
+              )
+              await queueTicketResolvedRaterEmail({
+                ticketId: finalId,
+                title: updatedTicket.title,
+                raterId,
+                raterName: rater.name,
+                raterEmail: rater.email,
+                raterRole: rater.role,
+                technicianName: session.user.name,
+                actorUserId: session.user.id,
+                isPatrolEscalation: isPatrolResolved,
+              }).catch(err => {
                 console.error('[EMAIL] Error enviando email de ticket resuelto:', err)
               })
             }
@@ -887,6 +874,10 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
             console.error('[NOTIFICATION] Error enviando notificaciones de ticket asignado:', err)
           }
         )
+        const { triggerTicketAssignedToTechnicianEmail, triggerTicketAssignedToClientEmail } =
+          await import('@/lib/email-triggers')
+        void triggerTicketAssignedToTechnicianEmail(finalId)
+        void triggerTicketAssignedToClientEmail(finalId)
       }
 
       // ⭐ AUDITORÍA: Registrar actualización de ticket por admin

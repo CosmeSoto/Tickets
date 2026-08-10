@@ -148,6 +148,11 @@ export class BatchAlertService {
               batchId: batch.id,
               systemName,
             }),
+            recipientUserId: admin.id,
+            module: 'inventory',
+            event: 'inventoryAlert',
+            // Crítico = important; aviso de uso = optional (menos ruido)
+            priority: primary.level === 'critical' ? 'important' : 'optional',
           }).catch(() => {})
           emailsSent++
         }

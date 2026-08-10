@@ -3,7 +3,7 @@
  *
  * Centraliza el patrón repetido en 40+ rutas:
  *   await NotificationService.push({ userId, type, title, message, metadata })
- *   await prisma.email_queue.create({ data: { id: randomUUID(), toEmail, subject, body, ... } })
+ *   await enqueueEmail({ to, subject, html, module, event, priority, recipientUserId })
  *
  * Uso:
  *   import { notifyUser, notifyAdmins, notifyMany, enqueueEmail } from '@/lib/api/notify'
@@ -29,13 +29,16 @@ import {
   getFamilyScopedAdmins,
   getFamilyScopedAdminsForFamilies,
 } from '@/lib/notifications/family-recipients'
-import { randomUUID } from 'crypto'
 import type { NotificationType } from '@prisma/client'
 
 export interface EmailPayload {
   to: string
   subject: string
   html: string
+  recipientUserId?: string
+  module?: import('@/lib/notifications/email-policy').EmailModule
+  event?: import('@/lib/notifications/email-policy').NotificationEmailEvent
+  priority?: import('@/lib/notifications/email-policy').EmailPriority
 }
 
 export interface NotifyOptions {
@@ -65,7 +68,13 @@ export async function notifyUser(
   }).catch(() => {})
 
   if (email) {
-    await enqueueEmail(email).catch(() => {})
+    await enqueueEmail({
+      ...email,
+      recipientUserId: userId,
+      module: email.module || 'system',
+      event: email.event || 'generic',
+      priority: email.priority || 'optional',
+    }).catch(() => {})
   }
 }
 
@@ -189,61 +198,24 @@ export async function notifyMany(
 
 // ─── Encolar email ────────────────────────────────────────────────────────────
 
-export async function enqueueEmail(payload: EmailPayload): Promise<void> {
-  const { isSystemEmailEnabled } = await import('@/lib/services/email/smtp-config')
-  if (!(await isSystemEmailEnabled())) {
-    console.log('[NOTIFY] Email omitido: SMTP desactivado o sin configurar')
-    return
+export async function enqueueEmail(
+  payload: EmailPayload & {
+    recipientUserId?: string
+    module?: import('@/lib/notifications/email-policy').EmailModule
+    event?: import('@/lib/notifications/email-policy').NotificationEmailEvent
+    priority?: import('@/lib/notifications/email-policy').EmailPriority
   }
-
-  await prisma.email_queue.create({
-    data: {
-      id: randomUUID(),
-      toEmail: payload.to,
-      subject: payload.subject,
-      body: payload.html,
-      status: 'pending',
-      attempts: 0,
-      maxAttempts: 3,
-      scheduledAt: new Date(),
-    },
-  })
-}
-
-// ─── Notificar usuario + encolar email en una sola llamada ───────────────────
-
-export async function notifyUserWithEmail(
-  userId: string,
-  type: NotificationType,
-  title: string,
-  message: string,
-  email: EmailPayload,
-  metadata?: Record<string, any>
 ): Promise<void> {
-  await Promise.allSettled([
-    NotificationService.push({ userId, type, title, message, metadata }),
-    enqueueEmail(email),
-  ])
-}
-
-// ─── Notificar admins + encolar email a uno específico ───────────────────────
-
-export async function notifyAdminsWithEmail(
-  type: NotificationType,
-  title: string,
-  message: string,
-  email: EmailPayload,
-  metadata?: Record<string, any>
-): Promise<void> {
-  const admins = await prisma.users.findMany({
-    where: { role: 'ADMIN', isActive: true },
-    select: { id: true },
+  const { queueNotificationEmail } = await import(
+    '@/lib/notifications/queue-notification-email'
+  )
+  await queueNotificationEmail({
+    to: payload.to,
+    subject: payload.subject,
+    html: payload.html,
+    recipientUserId: payload.recipientUserId,
+    module: payload.module || 'system',
+    event: payload.event || 'generic',
+    priority: payload.priority || 'optional',
   })
-
-  await Promise.allSettled([
-    ...admins.map(admin =>
-      NotificationService.push({ userId: admin.id, type, title, message, metadata })
-    ),
-    enqueueEmail(email),
-  ])
 }

@@ -1,4 +1,3 @@
-import { randomUUID } from 'crypto'
 import { generateDeliveryActCreatedEmail } from '../email-templates/inventory/delivery-act-created'
 import { generateDeliveryActReminderEmail } from '../email-templates/inventory/delivery-act-reminder'
 import { generateDeliveryActAcceptedEmail } from '../email-templates/inventory/delivery-act-accepted'
@@ -9,6 +8,48 @@ import { NotificationService } from './notification-service'
 import { getFamilyScopedAdmins } from '@/lib/notifications/family-recipients'
 import { db as prisma } from '@/lib/server'
 import { getSystemBranding } from '@/lib/branding'
+import { queueNotificationEmail } from '@/lib/notifications/queue-notification-email'
+
+/**
+ * Compat: sustituye email_queue.create directo por la puerta global
+ * (SMTP + prefs inventario + prioridad).
+ */
+async function legacyQueueCreate(args: {
+  data: {
+    id?: string
+    toEmail: string
+    subject: string
+    body: string
+    status?: string
+    templateName?: string
+    templateData?: string | null
+  }
+  recipientUserId?: string | null
+}): Promise<void> {
+  const d = args.data
+  const name = d.templateName || ''
+  const optional =
+    name.includes('reminder') || name.includes('expired') || name.includes('accepted')
+  let templateData: Record<string, unknown> | undefined
+  if (d.templateData) {
+    try {
+      templateData = JSON.parse(d.templateData) as Record<string, unknown>
+    } catch {
+      templateData = undefined
+    }
+  }
+  await queueNotificationEmail({
+    to: d.toEmail,
+    subject: d.subject,
+    html: d.body,
+    recipientUserId: args.recipientUserId,
+    module: 'inventory',
+    event: optional ? 'generic' : 'inventoryAct',
+    priority: optional ? 'optional' : 'important',
+    templateName: d.templateName,
+    templateData,
+  })
+}
 
 async function notifyDeliveryActFamilyAdmins(
   familyId: string | null | undefined,
@@ -103,9 +144,9 @@ export class InventoryNotificationService {
       })
 
       // Agregar a cola de emails
-      await prisma.email_queue.create({
+      await legacyQueueCreate({
+        recipientUserId: receiverInfo.id,
         data: {
-          id: randomUUID(),
           toEmail: receiverInfo.email,
           subject: emailData.subject,
           body: emailData.html,
@@ -207,9 +248,9 @@ export class InventoryNotificationService {
       })
 
       // Agregar a cola de emails
-      await prisma.email_queue.create({
+      await legacyQueueCreate({
+        recipientUserId: receiverInfo.id,
         data: {
-          id: randomUUID(),
           toEmail: receiverInfo.email,
           subject: emailData.subject,
           body: emailData.html,
@@ -308,9 +349,9 @@ export class InventoryNotificationService {
       })
 
       await Promise.all([
-        prisma.email_queue.create({
+        legacyQueueCreate({
+          recipientUserId: receiverInfo.id,
           data: {
-            id: randomUUID(),
             toEmail: receiverInfo.email,
             subject: receiverEmailData.subject,
             body: receiverEmailData.html,
@@ -325,9 +366,9 @@ export class InventoryNotificationService {
             }),
           },
         }),
-        prisma.email_queue.create({
+        legacyQueueCreate({
+          recipientUserId: delivererInfo.id,
           data: {
-            id: randomUUID(),
             toEmail: delivererInfo.email,
             subject: delivererEmailData.subject,
             body: delivererEmailData.html,
@@ -445,9 +486,9 @@ export class InventoryNotificationService {
         rejectedAt: act.rejectedAt!,
       })
 
-      await prisma.email_queue.create({
+      await legacyQueueCreate({
+        recipientUserId: delivererInfo.id,
         data: {
-          id: randomUUID(),
           toEmail: delivererInfo.email,
           subject: emailData.subject,
           body: emailData.html,
@@ -555,9 +596,9 @@ export class InventoryNotificationService {
       })
 
       // Email al receptor
-      await prisma.email_queue.create({
+      await legacyQueueCreate({
+        recipientUserId: receiverInfo.id,
         data: {
-          id: randomUUID(),
           toEmail: receiverInfo.email,
           subject: emailData.subject,
           body: emailData.html,
@@ -572,9 +613,9 @@ export class InventoryNotificationService {
       })
 
       // Email al entregador
-      await prisma.email_queue.create({
+      await legacyQueueCreate({
+        recipientUserId: delivererInfo.id,
         data: {
-          id: randomUUID(),
           toEmail: delivererInfo.email,
           subject: `Acta Expirada - ${act.folio}`,
           body: emailData.html.replace(receiverInfo.name, delivererInfo.name),
@@ -679,9 +720,9 @@ export class InventoryNotificationService {
         expirationDate: act.expirationDate,
       })
 
-      await prisma.email_queue.create({
+      await legacyQueueCreate({
+        recipientUserId: receiverInfo.id,
         data: {
-          id: randomUUID(),
           toEmail: receiverInfo.email,
           subject: emailData.subject.replace('Entrega', 'Asignación de suscripción'),
           body: emailData.html
@@ -783,9 +824,9 @@ export class InventoryNotificationService {
       const acceptanceUrl = `${baseUrl}/acts/contract-return/${act.id}/accept?token=${act.acceptanceToken}`
       const expirationStr = new Date(act.expirationDate).toLocaleDateString('es-ES')
 
-      await prisma.email_queue.create({
+      await legacyQueueCreate({
+        recipientUserId: receiverInfo.id,
         data: {
-          id: randomUUID(),
           toEmail: receiverInfo.email,
           subject: `Acta de retiro de suscripción — ${act.folio}`,
           body: `<p>Hola ${receiverInfo.name},</p><p>Debes firmar el acta de retiro ${act.folio} para la suscripción <strong>${contractRef}</strong> antes del ${expirationStr}.</p><p><a href="${acceptanceUrl}">Revisar y firmar acta</a></p>`,

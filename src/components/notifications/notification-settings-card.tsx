@@ -161,8 +161,8 @@ export function NotificationSettingsCard({
                 <span>Notificaciones por email</span>
               </Label>
               <p className='text-sm text-muted-foreground'>
-                Master de correo: creación, asignación, plan, resolución, calificación y
-                comentarios (si SMTP está activo en Admin). Desactívalo para no recibir ninguno.
+                Master de correo (SMTP en Admin). Prioridad: seguridad, tickets e inventario
+                operativo, fallos de backup. Noticias, documentos y credenciales solo in-app.
               </p>
             </div>
             <Switch
@@ -232,8 +232,8 @@ export function NotificationSettingsCard({
                 <span>Tickets</span>
               </Label>
               <p className='text-sm text-muted-foreground'>
-                También aplica al correo: creación, asignación, comentarios, plan y cambios de
-                estado
+                Correo: creación, asignación y resolución. Comentarios/plan son opcionales (prefs
+                finas)
               </p>
             </div>
             <Switch
@@ -251,7 +251,8 @@ export function NotificationSettingsCard({
                 <span>Inventario</span>
               </Label>
               <p className='text-sm text-muted-foreground'>
-                Actas, equipos, mantenimiento y alertas de stock
+                Correo: actas, bajas, mantenimiento, solicitudes, vencimientos y reportes
+                programados
               </p>
             </div>
             <Switch
@@ -269,7 +270,7 @@ export function NotificationSettingsCard({
                 <span>Rondas</span>
               </Label>
               <p className='text-sm text-muted-foreground'>
-                Asignaciones, rondas omitidas/incompletas y sync offline
+                Solo in-app (asignaciones, omitidas, sync). Sin correo por diseño
               </p>
             </div>
             <Switch

@@ -1,3 +1,9 @@
+/**
+ * Reportes programados de inventario.
+ * Adjuntos requieren SMTP directo (email_queue no soporta attachments).
+ * Igual respeta SMTP unificado + prefs inventario.
+ */
+
 import nodemailer from 'nodemailer'
 import type { ReportExportFormat } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
@@ -9,24 +15,38 @@ import {
   frequencyLabel,
 } from '@/lib/inventory/reports/schedule-utils'
 import { AuditActionsComplete, AuditServiceComplete } from '@/lib/services/audit-service-complete'
+import { getUnifiedSmtpConfig, isSystemEmailEnabled } from '@/lib/services/email/smtp-config'
+import { canSendNotificationEmail } from '@/lib/notifications/email-prefs'
 
-async function getSmtpConfig() {
-  const settings = await prisma.system_settings.findMany({
+async function filterReportRecipients(emails: string[]): Promise<string[]> {
+  const unique = [...new Set(emails.map(e => e.trim().toLowerCase()).filter(Boolean))]
+  if (!unique.length) return []
+
+  const users = await prisma.users.findMany({
     where: {
-      key: { in: ['smtp_host', 'smtp_port', 'smtp_user', 'smtp_password', 'smtp_secure', 'email_from'] },
+      isActive: true,
+      OR: unique.map(email => ({ email: { equals: email, mode: 'insensitive' as const } })),
     },
+    select: { id: true, email: true },
   })
-  if (!settings.length) return null
-  const config: Record<string, string> = {}
-  for (const s of settings) config[s.key] = s.value
-  return {
-    host: config.smtp_host,
-    port: parseInt(config.smtp_port || '587', 10),
-    secure: config.smtp_secure === 'true',
-    user: config.smtp_user,
-    password: config.smtp_password,
-    from: config.email_from || config.smtp_user,
+  const byEmail = new Map(users.map(u => [u.email.toLowerCase(), u.id]))
+
+  const allowed: string[] = []
+  for (const email of unique) {
+    const userId = byEmail.get(email)
+    if (userId) {
+      const ok = await canSendNotificationEmail(userId, {
+        module: 'inventory',
+        event: 'inventoryReport',
+        priority: 'important',
+      })
+      if (ok) allowed.push(email)
+    } else {
+      // Destinatario externo configurado en el schedule
+      allowed.push(email)
+    }
   }
+  return allowed
 }
 
 async function sendReportEmail(options: {
@@ -38,7 +58,10 @@ async function sendReportEmail(options: {
   baseFilename: string
   exportFormat: ReportExportFormat
 }) {
-  const smtp = await getSmtpConfig()
+  if (!(await isSystemEmailEnabled())) {
+    throw new Error('SMTP desactivado o sin configurar')
+  }
+  const smtp = await getUnifiedSmtpConfig()
   if (!smtp?.host) {
     throw new Error('SMTP no configurado')
   }
@@ -47,7 +70,7 @@ async function sendReportEmail(options: {
     host: smtp.host,
     port: smtp.port,
     secure: smtp.secure,
-    auth: { user: smtp.user, pass: smtp.password },
+    auth: smtp.password ? { user: smtp.user, pass: smtp.password } : undefined,
   })
 
   const safeName =
@@ -79,7 +102,12 @@ async function sendReportEmail(options: {
     throw new Error('No hay archivos para adjuntar según el formato configurado')
   }
 
-  for (const recipient of options.to) {
+  const recipients = await filterReportRecipients(options.to)
+  if (!recipients.length) {
+    throw new Error('Sin destinatarios tras preferencias de correo / inventario')
+  }
+
+  for (const recipient of recipients) {
     await transporter.sendMail({
       from: smtp.from,
       to: recipient,

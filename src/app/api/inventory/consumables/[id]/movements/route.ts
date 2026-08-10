@@ -9,7 +9,7 @@ import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit
 import prisma from '@/lib/prisma'
 import { NotificationService } from '@/lib/services/notification-service'
 import { getFamilyScopedAdmins } from '@/lib/notifications/family-recipients'
-import { randomUUID } from 'crypto'
+import { queueNotificationEmail } from '@/lib/notifications/queue-notification-email'
 import {
   assertInventoryResourceManage,
   assertInventoryResourceRead,
@@ -157,27 +157,22 @@ async function checkLowStockAndNotify(consumableId: string) {
       metadata: { link: '/inventory?subtype=MRO' },
     }).catch(() => {})
 
-    // Email en cola
+    // Email en cola (agotado = important; stock bajo = optional)
     if (!admin.email) continue
-    await prisma.email_queue
-      .create({
-        data: {
-          id: randomUUID(),
-          toEmail: admin.email,
-          subject: title,
-          body: generateLowStockEmail(
-            consumable,
-            admin.name ?? 'Administrador',
-            isOutOfStock,
-            systemName
-          ),
-          status: 'pending',
-          attempts: 0,
-          maxAttempts: 3,
-          scheduledAt: new Date(),
-        },
-      })
-      .catch(() => {})
+    await queueNotificationEmail({
+      to: admin.email,
+      subject: title,
+      html: generateLowStockEmail(
+        consumable,
+        admin.name ?? 'Administrador',
+        isOutOfStock,
+        systemName
+      ),
+      recipientUserId: admin.id,
+      module: 'inventory',
+      event: 'inventoryAlert',
+      priority: isOutOfStock ? 'important' : 'optional',
+    }).catch(() => {})
   }
 }
 

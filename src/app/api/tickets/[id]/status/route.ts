@@ -211,33 +211,28 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           select: { id: true, name: true, email: true, role: true },
         })
         if (rater?.email) {
-          const { EmailService } = await import('@/lib/services/email/email-service')
-          const rolePrefix =
-            rater.role === 'ADMIN' ? 'admin' : rater.role === 'TECHNICIAN' ? 'technician' : 'client'
-          await EmailService.queueEmail(
-            {
-              to: rater.email,
-              subject: isPatrol
-                ? `Ticket escalado resuelto — califica el servicio`
-                : `Ticket #${ticketId.substring(0, 8)} resuelto`,
-              template: 'ticket-resolved',
-              templateData: {
-                ticketId,
-                title: ticket.title,
-                clientName: rater.name,
-                technicianName: session.user.name,
-                ticketUrl: `/${rolePrefix}/tickets/${ticketId}`,
-                isPatrolEscalation: isPatrol,
-              },
-              recipientUserId: raterId,
-              ticketEmailEvent: 'statusChanged',
-            },
-            session.user.id
-          ).catch(err => {
+          const { queueTicketResolvedRaterEmail } = await import(
+            '@/lib/notifications/ticket-resolved-email'
+          )
+          await queueTicketResolvedRaterEmail({
+            ticketId,
+            title: ticket.title,
+            raterId,
+            raterName: rater.name,
+            raterEmail: rater.email,
+            raterRole: rater.role,
+            technicianName: session.user.name,
+            actorUserId: session.user.id,
+            isPatrolEscalation: isPatrol,
+          }).catch(err => {
             console.error('[EMAIL] Error enviando email de ticket resuelto:', err)
           })
         }
       }
+
+      // Digest opcional a admins (alineado con PUT técnico)
+      const { triggerTicketResolvedToAdminEmail } = await import('@/lib/email-triggers')
+      void triggerTicketResolvedToAdminEmail(ticketId)
 
       await AuditServiceComplete.log({
         action: AuditActionsComplete.TICKET_RESOLVED,

@@ -80,6 +80,10 @@ export async function POST(request: NextRequest) {
           resetUrl,
           expiryTime: '1 hora',
         },
+        recipientUserId: user.id,
+        module: 'auth',
+        event: 'security',
+        notificationPriority: 'critical',
       }, 'system')
 
       console.log(`[FORGOT PASSWORD] Email de recuperación enviado a: ${user.email}`)

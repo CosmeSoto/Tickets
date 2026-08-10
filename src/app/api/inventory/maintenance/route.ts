@@ -343,6 +343,9 @@ export async function POST(request: NextRequest) {
                   <p>Si tienes alguna consulta, contacta al equipo de soporte.</p>
                 </div>
               `,
+              module: 'inventory',
+              event: 'inventoryAct',
+              priority: 'important',
             },
           }
         )

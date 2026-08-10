@@ -274,6 +274,10 @@ export async function runWeeklyNotificationDigest(): Promise<WeeklyDigestResult>
         to: user.email,
         subject: `[${branding.systemName}] Resumen semanal · ${periodLabel}`,
         html,
+        recipientUserId: user.id,
+        module: 'system',
+        event: 'digest',
+        priority: 'optional',
       })
 
       await prisma.user_settings.update({

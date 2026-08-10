@@ -1352,11 +1352,15 @@ export class AssetRequestService {
         metadata: { requestId, code },
       })
 
-      // Email al solicitante
+      // Email al solicitante (importante: aprobación operativa)
       await EmailService.queueEmail({
         to: requesterEmail,
         subject: `Solicitud ${code} aprobada`,
         text: `Hola ${requesterName},\n\nTu solicitud ${code} ha sido aprobada. Unidades: ${quantity}.\nEquipos asignados: ${equipmentCodes}${comment ? `\n\nComentario: ${comment}` : ''}`,
+        recipientUserId: requesterId,
+        module: 'inventory',
+        event: 'inventoryAct',
+        notificationPriority: 'important',
       })
     } catch (error) {
       console.error('[ASSET_REQUEST] Error notifying approval with equipment:', error)

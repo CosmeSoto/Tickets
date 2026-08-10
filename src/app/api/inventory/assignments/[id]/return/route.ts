@@ -180,6 +180,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             systemName,
             actUrl
           ),
+          module: 'inventory',
+          event: 'inventoryAct',
+          priority: 'important',
         },
       }
     )

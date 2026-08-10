@@ -126,24 +126,102 @@ export async function getBackupConfig(): Promise<BackupConfig> {
   }
 }
 
-export async function sendBackupNotification(type: 'success' | 'error', data: any) {
+export async function sendBackupNotification(
+  type: 'success' | 'error',
+  data: { filename?: string; size?: number; type?: string; error?: string }
+) {
   try {
     const emailSetting = await prisma.system_settings.findUnique({
       where: { key: 'backupEmailNotifications' },
     })
 
     if (!emailSetting?.value) {
-      console.log(`Notificación de backup ${type} (sin emails configurados):`, data)
+      console.log(`[BACKUP] Notificación ${type} omitida (sin emails configurados)`)
       return
     }
 
-    const emails = JSON.parse(emailSetting.value)
+    let emails: string[] = []
+    try {
+      const parsed = JSON.parse(emailSetting.value)
+      emails = Array.isArray(parsed) ? parsed.filter((e: unknown) => typeof e === 'string') : []
+    } catch {
+      emails = []
+    }
     if (!emails.length) {
-      console.log(`Notificación de backup ${type} (sin emails):`, data)
+      console.log(`[BACKUP] Notificación ${type} omitida (lista vacía)`)
       return
     }
 
-    console.log(`Notificación de backup ${type}:`, data, 'a emails:', emails)
+    const { queueNotificationEmail } = await import(
+      '@/lib/notifications/queue-notification-email'
+    )
+    const { getSystemBranding } = await import('@/lib/branding')
+    const { systemName } = await getSystemBranding()
+
+    const users = await prisma.users.findMany({
+      where: {
+        isActive: true,
+        OR: emails.map(email => ({
+          email: { equals: email, mode: 'insensitive' as const },
+        })),
+      },
+      select: { id: true, email: true },
+    })
+    const byEmail = new Map(users.map(u => [u.email.toLowerCase(), u.id]))
+
+    const isError = type === 'error'
+    const subject = isError
+      ? `[${systemName}] Error en backup`
+      : `[${systemName}] Backup completado`
+    const sizeLabel =
+      typeof data.size === 'number' ? `${(data.size / (1024 * 1024)).toFixed(2)} MB` : '—'
+    const html = isError
+      ? `<p>Falló un backup del sistema.</p>
+         <ul>
+           <li><strong>Archivo:</strong> ${data.filename || 'n/a'}</li>
+           <li><strong>Tipo:</strong> ${data.type || 'n/a'}</li>
+           <li><strong>Error:</strong> ${data.error || 'desconocido'}</li>
+         </ul>
+         <p>Revisa Admin → Backups.</p>`
+      : `<p>Backup completado correctamente.</p>
+         <ul>
+           <li><strong>Archivo:</strong> ${data.filename || 'n/a'}</li>
+           <li><strong>Tipo:</strong> ${data.type || 'n/a'}</li>
+           <li><strong>Tamaño:</strong> ${sizeLabel}</li>
+         </ul>`
+
+    const recipients = emails
+      .map(email => {
+        const id = byEmail.get(email.toLowerCase())
+        return id ? { userId: id, email } : null
+      })
+      .filter((r): r is { userId: string; email: string } => !!r)
+
+    // Usuarios conocidos: respetan prefs (éxito = optional; fallo = important)
+    if (recipients.length) {
+      await queueNotificationEmail({
+        to: recipients.map(r => r.email),
+        recipients,
+        subject,
+        html,
+        module: 'backups',
+        event: isError ? 'backupFailure' : 'backupSuccess',
+        priority: isError ? 'important' : 'optional',
+      })
+    }
+
+    // Emails de la lista sin cuenta: solo en fallo (operativo)
+    const orphanEmails = emails.filter(e => !byEmail.has(e.toLowerCase()))
+    if (isError && orphanEmails.length) {
+      await queueNotificationEmail({
+        to: orphanEmails,
+        subject,
+        html,
+        module: 'backups',
+        event: 'backupFailure',
+        priority: 'important',
+      })
+    }
   } catch (error) {
     console.error('Error al enviar notificación de backup:', error)
   }

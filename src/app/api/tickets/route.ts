@@ -732,10 +732,10 @@ export async function POST(request: NextRequest) {
 
       if (wasAutoAssigned) {
         try {
-          const { triggerTicketAssignedToTechnicianEmail, triggerTicketAssignedToClientEmail } =
+          const { triggerTicketAssignedToTechnicianEmail } =
             await import('@/lib/email-triggers')
           void triggerTicketAssignedToTechnicianEmail(ticketAfterAssign.id)
-          void triggerTicketAssignedToClientEmail(ticketAfterAssign.id)
+          // Cliente ya recibe "ticket creado"; no duplicar con "asignado" en el mismo flujo
         } catch (emailAssignErr) {
           console.error('[EMAIL] Error disparando emails de asignación:', emailAssignErr)
         }
