@@ -595,6 +595,8 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
                     ticketUrl: `/${rolePrefix}/tickets/${finalId}`,
                     isPatrolEscalation: isPatrolResolved,
                   },
+                  recipientUserId: raterId,
+                  ticketEmailEvent: 'statusChanged',
                 },
                 session.user.id
               ).catch(err => {
@@ -699,25 +701,12 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
           console.error('[WEBHOOK] Error disparando evento TICKET_ASSIGNED:', err)
         })
 
-        // Enviar email al técnico asignado
+        // Email al técnico: lo cubren triggerTicketAssigned* (evita duplicar con cola)
         if (updatedTicket.users_tickets_assigneeIdTousers) {
-          await EmailService.queueEmail(
-            {
-              to: updatedTicket.users_tickets_assigneeIdTousers.email,
-              subject: `Ticket #${finalId.substring(0, 8)} asignado`,
-              template: 'ticket-assigned',
-              templateData: {
-                ticketId: finalId,
-                title: updatedTicket.title,
-                technicianName: updatedTicket.users_tickets_assigneeIdTousers.name,
-                priority: updatedTicket.priority,
-                clientName: updatedTicket.users_tickets_clientIdTousers?.name || 'Cliente',
-              },
-            },
-            session.user.id
-          ).catch(err => {
-            console.error('[EMAIL] Error enviando email de ticket asignado:', err)
-          })
+          const { triggerTicketAssignedToTechnicianEmail, triggerTicketAssignedToClientEmail } =
+            await import('@/lib/email-triggers')
+          void triggerTicketAssignedToTechnicianEmail(finalId)
+          void triggerTicketAssignedToClientEmail(finalId)
         }
       }
 

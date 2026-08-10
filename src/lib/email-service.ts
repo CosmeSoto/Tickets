@@ -1,18 +1,12 @@
 import nodemailer from 'nodemailer'
 import prisma from './prisma'
 import { getFamilyScopedAdmins } from '@/lib/notifications/family-recipients'
-import { DEFAULT_SYSTEM_NAME, getSystemBranding } from '@/lib/branding'
-
-// Configuración por defecto — el campo `from` se construye dinámicamente
-// desde systemName (Configuración General) si emailFrom no está configurado.
-const DEFAULT_EMAIL_CONFIG = {
-  host: 'smtp.gmail.com',
-  port: 587,
-  secure: false,
-  user: 'internet.freecom@gmail.com',
-  from: '', // se rellena en getEmailConfig() con el nombre dinámico
-  enabled: true,
-}
+import { getSystemBranding } from '@/lib/branding'
+import { getUnifiedSmtpConfig } from '@/lib/services/email/smtp-config'
+import {
+  canSendTicketEmail,
+  filterUserIdsForTicketEmail,
+} from '@/lib/notifications/ticket-email-prefs'
 
 interface EmailConfig {
   host: string
@@ -24,70 +18,27 @@ interface EmailConfig {
   enabled: boolean
 }
 
-// Obtener configuración de email desde BD o usar valores por defecto
+// Obtener configuración de email unificada (camelCase + snake_case + emailEnabled)
 async function getEmailConfig(): Promise<EmailConfig> {
-  try {
-    const settings = await prisma.system_settings.findMany({
-      where: {
-        key: {
-          in: [
-            'smtpHost',
-            'smtpPort',
-            'smtpUser',
-            'smtpPassword',
-            'smtpSecure',
-            'emailFrom',
-            'emailEnabled',
-            'systemName',
-          ],
-        },
-      },
-    })
-
-    const config: any = { ...DEFAULT_EMAIL_CONFIG }
-
-    // Leer systemName primero para usarlo como fallback del from
-    const systemNameSetting = settings.find(s => s.key === 'systemName')
-    const systemName = systemNameSetting?.value || DEFAULT_SYSTEM_NAME
-
-    settings.forEach(setting => {
-      switch (setting.key) {
-        case 'smtpHost':
-          config.host = setting.value || DEFAULT_EMAIL_CONFIG.host
-          break
-        case 'smtpPort':
-          config.port = parseInt(setting.value) || DEFAULT_EMAIL_CONFIG.port
-          break
-        case 'smtpUser':
-          config.user = setting.value || DEFAULT_EMAIL_CONFIG.user
-          break
-        case 'smtpPassword':
-          config.password = setting.value
-          break
-        case 'smtpSecure':
-          config.secure = setting.value === 'true'
-          break
-        case 'emailFrom':
-          config.from = setting.value || ''
-          break
-        case 'emailEnabled':
-          config.enabled = setting.value === 'true'
-          break
-      }
-    })
-
-    // Si emailFrom no está configurado, construir desde systemName + user
-    if (!config.from) {
-      config.from = `${systemName} <${config.user}>`
-    }
-
-    return config
-  } catch (error) {
-    console.error('Error loading email config:', error)
+  const unified = await getUnifiedSmtpConfig()
+  if (!unified) {
     return {
-      ...DEFAULT_EMAIL_CONFIG,
-      from: `${DEFAULT_SYSTEM_NAME} <${DEFAULT_EMAIL_CONFIG.user}>`,
+      host: '',
+      port: 587,
+      secure: false,
+      user: '',
+      from: '',
+      enabled: false,
     }
+  }
+  return {
+    host: unified.host,
+    port: unified.port,
+    secure: unified.secure,
+    user: unified.user,
+    password: unified.password || undefined,
+    from: unified.from,
+    enabled: unified.enabled,
   }
 }
 
@@ -555,9 +506,13 @@ export async function sendTicketCreatedToAdminEmail(ticketId: string) {
 
     if (admins.length === 0) return false
 
+    const allowedIds = await filterUserIdsForTicketEmail(
+      admins.map(a => a.id),
+      'ticketCreated'
+    )
     const adminEmails = admins
-      .map(admin => admin.email)
-      .filter((email): email is string => Boolean(email))
+      .filter(a => allowedIds.includes(a.id) && a.email)
+      .map(a => a.email as string)
     if (adminEmails.length === 0) return false
 
     const { systemName } = await getSystemBranding()
@@ -675,6 +630,13 @@ export async function sendTicketAssignedToTechnicianEmail(ticketId: string) {
     })
 
     if (!ticket || !ticket.users_tickets_assigneeIdTousers?.email) return false
+
+    if (
+      ticket.assigneeId &&
+      !(await canSendTicketEmail(ticket.assigneeId, 'ticketAssigned'))
+    ) {
+      return false
+    }
 
     const { systemName } = await getSystemBranding()
 
@@ -799,6 +761,13 @@ export async function sendTicketAssignedToClientEmail(ticketId: string) {
     )
       return false
 
+    if (
+      ticket.clientId &&
+      !(await canSendTicketEmail(ticket.clientId, 'ticketAssigned'))
+    ) {
+      return false
+    }
+
     const { systemName } = await getSystemBranding()
 
     const html = `
@@ -907,9 +876,13 @@ export async function sendTicketResolvedToAdminEmail(ticketId: string) {
 
     if (admins.length === 0) return false
 
+    const allowedIds = await filterUserIdsForTicketEmail(
+      admins.map(a => a.id),
+      'statusChanged'
+    )
     const adminEmails = admins
-      .map(admin => admin.email)
-      .filter((email): email is string => Boolean(email))
+      .filter(a => allowedIds.includes(a.id) && a.email)
+      .map(a => a.email as string)
     if (adminEmails.length === 0) return false
 
     // Calcular tiempo de resolución
@@ -1045,9 +1018,13 @@ export async function sendRatingToAdminEmail(ticketId: string, rating: number) {
 
     if (admins.length === 0) return false
 
+    const allowedIds = await filterUserIdsForTicketEmail(
+      admins.map(a => a.id),
+      'statusChanged'
+    )
     const adminEmails = admins
-      .map(admin => admin.email)
-      .filter((email): email is string => Boolean(email))
+      .filter(a => allowedIds.includes(a.id) && a.email)
+      .map(a => a.email as string)
     if (adminEmails.length === 0) return false
 
     const stars = '⭐'.repeat(rating)

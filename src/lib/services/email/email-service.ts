@@ -7,6 +7,11 @@ import nodemailer from 'nodemailer'
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import { AuditServiceComplete, AuditActionsComplete } from '../audit-service-complete'
+import { getUnifiedSmtpConfig, isSystemEmailEnabled } from './smtp-config'
+import {
+  canSendTicketEmail,
+  type TicketEmailEvent,
+} from '@/lib/notifications/ticket-email-prefs'
 
 export interface EmailOptions {
   to: string | string[]
@@ -17,6 +22,10 @@ export interface EmailOptions {
   templateData?: Record<string, any>
   priority?: 'high' | 'normal' | 'low'
   scheduledAt?: Date
+  /** Destinatario (usuario) para respetar preferencias de tickets */
+  recipientUserId?: string
+  /** Evento de ticket; si se omite no se aplican prefs finas de tickets */
+  ticketEmailEvent?: TicketEmailEvent
 }
 
 export interface EmailQueueItem {
@@ -38,72 +47,56 @@ export class EmailService {
   private static transporter: nodemailer.Transporter | null = null
   private static isConfigured = false
 
+  private static async getSMTPConfig() {
+    const cfg = await getUnifiedSmtpConfig()
+    if (!cfg) return null
+    return {
+      host: cfg.host,
+      port: cfg.port,
+      secure: cfg.secure,
+      user: cfg.user,
+      password: cfg.password,
+      from: cfg.from,
+    }
+  }
+
   /**
    * Inicializa el transporter de email
    */
   private static async getTransporter(): Promise<nodemailer.Transporter> {
+    const smtpConfig = await this.getSMTPConfig()
+
+    if (!smtpConfig) {
+      this.transporter = null
+      this.isConfigured = false
+      throw new Error(
+        'Configuración SMTP no encontrada o correo desactivado. Configure en Admin > Configuración'
+      )
+    }
+
     if (this.transporter && this.isConfigured) {
       return this.transporter
     }
 
-    // Obtener configuración SMTP desde la base de datos
-    const smtpConfig = await this.getSMTPConfig()
-
-    if (!smtpConfig) {
-      throw new Error('Configuración SMTP no encontrada. Configure el email en Admin > Configuración')
-    }
-
-    this.transporter = nodemailer.createTransport({
+    const transportOpts: any = {
       host: smtpConfig.host,
       port: smtpConfig.port,
       secure: smtpConfig.secure,
-      auth: {
-        user: smtpConfig.user,
-        pass: smtpConfig.password
-      },
-      pool: true, // Usar pool de conexiones
+      pool: true,
       maxConnections: 5,
-      maxMessages: 100
-    })
+      maxMessages: 100,
+    }
 
+    if (smtpConfig.password) {
+      transportOpts.auth = {
+        user: smtpConfig.user,
+        pass: smtpConfig.password,
+      }
+    }
+
+    this.transporter = nodemailer.createTransport(transportOpts)
     this.isConfigured = true
     return this.transporter
-  }
-
-  /**
-   * Obtiene configuración SMTP desde la base de datos
-   */
-  private static async getSMTPConfig() {
-    try {
-      const settings = await prisma.system_settings.findMany({
-        where: {
-          key: {
-            in: ['smtp_host', 'smtp_port', 'smtp_user', 'smtp_password', 'smtp_secure', 'email_from']
-          }
-        }
-      })
-
-      if (settings.length === 0) {
-        return null
-      }
-
-      const config: Record<string, any> = {}
-      settings.forEach(setting => {
-        config[setting.key] = setting.value
-      })
-
-      return {
-        host: config.smtp_host,
-        port: parseInt(config.smtp_port || '587'),
-        secure: config.smtp_secure === 'true',
-        user: config.smtp_user,
-        password: config.smtp_password,
-        from: config.email_from || config.smtp_user
-      }
-    } catch (error) {
-      console.error('[EMAIL-SERVICE] Error getting SMTP config:', error)
-      return null
-    }
   }
 
   /**
@@ -185,6 +178,24 @@ export class EmailService {
    */
   static async queueEmail(options: EmailOptions, userId?: string): Promise<string> {
     try {
+      if (!(await isSystemEmailEnabled())) {
+        console.log('[EMAIL-SERVICE] Cola omitida: SMTP desactivado o sin configurar')
+        return ''
+      }
+
+      if (options.ticketEmailEvent && options.recipientUserId) {
+        const allowed = await canSendTicketEmail(
+          options.recipientUserId,
+          options.ticketEmailEvent
+        )
+        if (!allowed) {
+          console.log(
+            `[EMAIL-SERVICE] Cola omitida por preferencias (${options.ticketEmailEvent}) user=${options.recipientUserId}`
+          )
+          return ''
+        }
+      }
+
       // Preparar contenido
       let html = options.html || ''
       let text = options.text || ''
@@ -219,7 +230,7 @@ export class EmailService {
       }
 
       // Registrar en auditoría
-      if (userId) {
+      if (userId && queueIds[0]) {
         await AuditServiceComplete.logAction({
           userId,
           action: AuditActionsComplete.EMAIL_QUEUED,
@@ -229,12 +240,13 @@ export class EmailService {
             to: recipients,
             subject: options.subject,
             template: options.template,
-            queueIds
+            queueIds,
+            ticketEmailEvent: options.ticketEmailEvent,
           }
         })
       }
 
-      return queueIds[0]
+      return queueIds[0] || ''
     } catch (error) {
       console.error('[EMAIL-SERVICE] Error queueing email:', error)
       throw error

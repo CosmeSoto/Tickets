@@ -190,6 +190,12 @@ export async function notifyMany(
 // ─── Encolar email ────────────────────────────────────────────────────────────
 
 export async function enqueueEmail(payload: EmailPayload): Promise<void> {
+  const { isSystemEmailEnabled } = await import('@/lib/services/email/smtp-config')
+  if (!(await isSystemEmailEnabled())) {
+    console.log('[NOTIFY] Email omitido: SMTP desactivado o sin configurar')
+    return
+  }
+
   await prisma.email_queue.create({
     data: {
       id: randomUUID(),

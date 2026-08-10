@@ -443,6 +443,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             subject: `Plan de Resolución Creado - Ticket #${ticketId.substring(0, 8)}`,
             html: emailBody,
             text: `Plan de Resolución Creado\n\nHola ${client.name},\n\nSe ha creado un plan de resolución para tu ticket #${ticketId.substring(0, 8)}.\n\nTítulo: ${plan.title}\n${plan.description ? `Descripción: ${plan.description}\n` : ''}${formattedStartDate ? `Inicio: ${formattedStartDate}\n` : ''}${formattedTargetDate ? `Objetivo: ${formattedTargetDate}\n` : ''}${plan.estimatedHours ? `Horas estimadas: ${plan.estimatedHours}\n` : ''}\n\nVer ticket: ${process.env.NEXTAUTH_URL}/client/tickets/${ticketId}`,
+            recipientUserId: ticket.clientId,
+            ticketEmailEvent: 'ticketUpdated',
           },
           session.user.id
         )

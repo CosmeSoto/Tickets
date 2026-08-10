@@ -702,6 +702,8 @@ export async function POST(request: NextRequest) {
           priority: ticketAfterAssign.priority,
           category: ticketAfterAssign.categories.name,
         },
+        recipientUserId: ticketAfterAssign.clientId,
+        ticketEmailEvent: 'ticketCreated',
       },
       session.user.id
     ).catch(err => {

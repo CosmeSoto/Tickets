@@ -229,6 +229,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
                 ticketUrl: `/${rolePrefix}/tickets/${ticketId}`,
                 isPatrolEscalation: isPatrol,
               },
+              recipientUserId: raterId,
+              ticketEmailEvent: 'statusChanged',
             },
             session.user.id
           ).catch(err => {

@@ -161,7 +161,8 @@ export function NotificationSettingsCard({
                 <span>Notificaciones por email</span>
               </Label>
               <p className='text-sm text-muted-foreground'>
-                Recibe notificaciones importantes en tu correo
+                Master de correo: creación, asignación, plan, resolución, calificación y
+                comentarios (si SMTP está activo en Admin). Desactívalo para no recibir ninguno.
               </p>
             </div>
             <Switch
@@ -231,7 +232,8 @@ export function NotificationSettingsCard({
                 <span>Tickets</span>
               </Label>
               <p className='text-sm text-muted-foreground'>
-                Creación, asignación, comentarios y cambios de estado
+                También aplica al correo: creación, asignación, comentarios, plan y cambios de
+                estado
               </p>
             </div>
             <Switch

@@ -287,6 +287,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                 subject: `Nuevo comentario en Ticket #${ticketId.substring(0, 8)} - ${ticketWithUsers.title}`,
                 html: emailBody,
                 text: `Nuevo comentario de ${authorName} (${authorRole}) en ticket #${ticketId.substring(0, 8)}:\n\n${newComment.content}`,
+                recipientUserId: recipient.id,
+                ticketEmailEvent: 'newComments',
               } as any,
               session.user.id
             )
