@@ -14,6 +14,13 @@ import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   Settings,
   Mail,
   Shield,
@@ -102,7 +109,11 @@ function SettingsPage() {
   const { toast } = useToast()
   // Estado UI de Telegram (testing, webhook, visibilidad de campos sensibles)
   const [telegramTesting, setTelegramTesting] = useState(false)
-  const [telegramBotInfo, setTelegramBotInfo] = useState<{id: number; username: string; firstName: string} | null>(null)
+  const [telegramBotInfo, setTelegramBotInfo] = useState<{
+    id: number
+    username: string
+    firstName: string
+  } | null>(null)
   const [registeringWebhook, setRegisteringWebhook] = useState(false)
   const [showBotToken, setShowBotToken] = useState(false)
   const [showWebhookSecret, setShowWebhookSecret] = useState(false)
@@ -298,7 +309,11 @@ function SettingsPage() {
         })
       }
     } catch {
-      toast({ title: 'Error de red', description: 'No se pudo conectar con el servidor.', variant: 'destructive' })
+      toast({
+        title: 'Error de red',
+        description: 'No se pudo conectar con el servidor.',
+        variant: 'destructive',
+      })
     } finally {
       setTelegramTesting(false)
     }
@@ -350,7 +365,11 @@ function SettingsPage() {
         })
       }
     } catch {
-      toast({ title: 'Error de red', description: 'No se pudo conectar con el servidor.', variant: 'destructive' })
+      toast({
+        title: 'Error de red',
+        description: 'No se pudo conectar con el servidor.',
+        variant: 'destructive',
+      })
     } finally {
       setRegisteringWebhook(false)
     }
@@ -565,42 +584,141 @@ function SettingsPage() {
 
                 {settings.emailEnabled && (
                   <>
-                    <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+                    {/* Selector de proveedor */}
+                    <div className='rounded-lg border border-border bg-muted/40 p-4 space-y-3'>
                       <div>
+                        <Label className='text-sm font-medium'>Proveedor de correo</Label>
+                        <p className='text-xs text-muted-foreground mt-0.5'>
+                          Selecciona tu proveedor para autocompletar la configuración del servidor
+                        </p>
+                      </div>
+                      <div className='grid grid-cols-1 sm:grid-cols-3 gap-2'>
+                        {[
+                          {
+                            id: 'outlook',
+                            label: 'Outlook / Office 365',
+                            description:
+                              'outlook.com, hotmail.com, dominios corporativos Microsoft',
+                            host: 'smtp-mail.outlook.com',
+                            port: 587,
+                            secure: false,
+                          },
+                          {
+                            id: 'gmail',
+                            label: 'Gmail / Google Workspace',
+                            description: 'gmail.com, dominios de Google Workspace',
+                            host: 'smtp.gmail.com',
+                            port: 587,
+                            secure: false,
+                          },
+                          {
+                            id: 'custom',
+                            label: 'Otro / Personalizado',
+                            description: 'Configura manualmente los datos de tu servidor',
+                            host: '',
+                            port: 587,
+                            secure: false,
+                          },
+                        ].map(provider => {
+                          const isActive =
+                            provider.id === 'outlook'
+                              ? settings.smtpHost === 'smtp-mail.outlook.com'
+                              : provider.id === 'gmail'
+                                ? settings.smtpHost === 'smtp.gmail.com'
+                                : settings.smtpHost !== 'smtp-mail.outlook.com' &&
+                                  settings.smtpHost !== 'smtp.gmail.com'
+                          return (
+                            <button
+                              key={provider.id}
+                              type='button'
+                              onClick={() => {
+                                if (provider.id !== 'custom') {
+                                  setSettings({
+                                    ...settings,
+                                    smtpHost: provider.host,
+                                    smtpPort: provider.port,
+                                    smtpSecure: provider.secure,
+                                  })
+                                }
+                              }}
+                              className={`text-left rounded-md border p-3 transition-colors ${
+                                isActive
+                                  ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                                  : 'border-border hover:border-primary/50 hover:bg-muted/60'
+                              }`}
+                            >
+                              <p className='text-sm font-medium leading-none'>{provider.label}</p>
+                              <p className='text-xs text-muted-foreground mt-1 leading-snug'>
+                                {provider.description}
+                              </p>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Servidor y puerto */}
+                    <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+                      <div className='space-y-1.5'>
                         <Label htmlFor='smtpHost'>Servidor SMTP</Label>
                         <Input
                           id='smtpHost'
                           value={settings.smtpHost}
                           onChange={e => setSettings({ ...settings, smtpHost: e.target.value })}
-                          placeholder='smtp.gmail.com'
+                          placeholder='smtp-mail.outlook.com'
                         />
+                        <p className='text-xs text-muted-foreground'>
+                          Dirección del servidor de salida de tu proveedor de correo
+                        </p>
                       </div>
-                      <div>
+                      <div className='space-y-1.5'>
                         <Label htmlFor='smtpPort'>Puerto SMTP</Label>
-                        <Input
-                          id='smtpPort'
-                          type='number'
-                          value={settings.smtpPort}
-                          onChange={e => {
-                            const value = parseInt(e.target.value)
-                            setSettings({ ...settings, smtpPort: isNaN(value) ? 587 : value })
+                        <Select
+                          value={String(settings.smtpPort)}
+                          onValueChange={val => {
+                            const port = parseInt(val)
+                            setSettings({
+                              ...settings,
+                              smtpPort: port,
+                              // 465 → SSL directo; 587/25 → STARTTLS
+                              smtpSecure: port === 465,
+                            })
                           }}
-                          placeholder='587'
-                        />
+                        >
+                          <SelectTrigger id='smtpPort'>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value='587'>587 — STARTTLS (recomendado)</SelectItem>
+                            <SelectItem value='465'>465 — SSL/TLS directo</SelectItem>
+                            <SelectItem value='25'>25 — Sin cifrado (no recomendado)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <p className='text-xs text-muted-foreground'>
+                          {settings.smtpPort === 465
+                            ? 'SSL/TLS directo: la conexión cifra desde el inicio'
+                            : settings.smtpPort === 587
+                              ? 'STARTTLS: la conexión comienza sin cifrar y sube a TLS'
+                              : 'Sin cifrado: no recomendado para producción'}
+                        </p>
                       </div>
                     </div>
 
+                    {/* Usuario y contraseña */}
                     <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-                      <div>
+                      <div className='space-y-1.5'>
                         <Label htmlFor='smtpUser'>Usuario SMTP</Label>
                         <Input
                           id='smtpUser'
                           value={settings.smtpUser}
                           onChange={e => setSettings({ ...settings, smtpUser: e.target.value })}
-                          placeholder='usuario@gmail.com'
+                          placeholder='cosme.soto@empresa.com'
                         />
+                        <p className='text-xs text-muted-foreground'>
+                          Tu dirección de correo completa (es el nombre de usuario SMTP)
+                        </p>
                       </div>
-                      <div>
+                      <div className='space-y-1.5'>
                         <Label htmlFor='smtpPassword'>Contraseña SMTP</Label>
                         <Input
                           id='smtpPassword'
@@ -613,42 +731,89 @@ function SettingsPage() {
                               : '••••••••'
                           }
                         />
-                        {settings.smtpPasswordConfigured && !settings.smtpPassword && (
-                          <p className='text-xs text-muted-foreground mt-1'>
+                        {settings.smtpPasswordConfigured && !settings.smtpPassword ? (
+                          <p className='text-xs text-muted-foreground'>
                             Hay una contraseña guardada. Escribe una nueva solo si deseas cambiarla.
+                          </p>
+                        ) : settings.smtpHost === 'smtp.gmail.com' ? (
+                          <div className='rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 mt-1'>
+                            <p className='text-xs font-medium text-amber-800 dark:text-amber-300'>
+                              Gmail requiere una contraseña de aplicación
+                            </p>
+                            <p className='text-xs text-amber-700 dark:text-amber-400 mt-0.5'>
+                              No uses tu contraseña de Google normal. Ve a{' '}
+                              <a
+                                href='https://myaccount.google.com/apppasswords'
+                                target='_blank'
+                                rel='noopener noreferrer'
+                                className='underline font-medium hover:text-amber-900 dark:hover:text-amber-200'
+                              >
+                                myaccount.google.com/apppasswords
+                              </a>{' '}
+                              y genera una contraseña de 16 caracteres para esta app.
+                            </p>
+                          </div>
+                        ) : (
+                          <p className='text-xs text-muted-foreground'>
+                            Tu contraseña de correo habitual
                           </p>
                         )}
                       </div>
                     </div>
 
-                    <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-                      <div>
-                        <Label htmlFor='emailFrom'>Email Remitente</Label>
-                        <Input
-                          id='emailFrom'
-                          type='email'
-                          value={settings.emailFrom}
-                          onChange={e => setSettings({ ...settings, emailFrom: e.target.value })}
-                          placeholder='noreply@empresa.com'
-                        />
-                      </div>
-                      <div className='flex items-center space-x-2 pt-6'>
-                        <Switch
-                          id='smtpSecure'
-                          checked={settings.smtpSecure}
-                          onCheckedChange={checked =>
-                            setSettings({ ...settings, smtpSecure: checked })
-                          }
-                        />
-                        <Label htmlFor='smtpSecure'>Conexión Segura (SSL/TLS)</Label>
-                      </div>
+                    {/* Email remitente */}
+                    <div className='space-y-1.5'>
+                      <Label htmlFor='emailFrom'>Email Remitente</Label>
+                      <Input
+                        id='emailFrom'
+                        type='email'
+                        value={settings.emailFrom}
+                        onChange={e => setSettings({ ...settings, emailFrom: e.target.value })}
+                        placeholder='cosme.soto@empresa.com'
+                        className='max-w-sm'
+                      />
+                      <p className='text-xs text-muted-foreground'>
+                        Dirección que verán los destinatarios en el campo &quot;De:&quot;.
+                        Normalmente igual al usuario SMTP.
+                      </p>
                     </div>
 
-                    <div className='pt-4'>
+                    {/* Resumen de la configuración activa */}
+                    {settings.smtpHost && (
+                      <div className='rounded-md border border-border bg-muted/30 px-4 py-3 text-xs text-muted-foreground space-y-1'>
+                        <p className='font-medium text-foreground text-sm mb-1'>
+                          Resumen de configuración
+                        </p>
+                        <p>
+                          <span className='font-medium text-foreground'>Servidor:</span>{' '}
+                          {settings.smtpHost}:{settings.smtpPort}
+                        </p>
+                        <p>
+                          <span className='font-medium text-foreground'>Cifrado:</span>{' '}
+                          {settings.smtpPort === 465
+                            ? 'SSL/TLS directo'
+                            : settings.smtpPort === 587
+                              ? 'STARTTLS'
+                              : 'Sin cifrado'}
+                        </p>
+                        {settings.smtpUser && (
+                          <p>
+                            <span className='font-medium text-foreground'>Usuario:</span>{' '}
+                            {settings.smtpUser}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    <div className='pt-2'>
                       <Button variant='outline' onClick={testEmailConnection}>
                         <Mail className='h-4 w-4 mr-2' />
                         Probar Conexión
                       </Button>
+                      <p className='text-xs text-muted-foreground mt-2'>
+                        Envía un email de prueba a tu cuenta para verificar que la configuración es
+                        correcta
+                      </p>
                     </div>
                   </>
                 )}
@@ -1003,7 +1168,6 @@ function SettingsPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className='space-y-6'>
-
                   {/* Switch principal */}
                   <div className='flex items-center justify-between p-4 border rounded-lg'>
                     <div className='space-y-0.5'>
@@ -1011,8 +1175,8 @@ function SettingsPage() {
                         Habilitar bot de Telegram
                       </Label>
                       <p className='text-sm text-muted-foreground'>
-                        Activa el canal Telegram para todo el sistema. Los usuarios podrán
-                        vincular sus cuentas y recibir alertas.
+                        Activa el canal Telegram para todo el sistema. Los usuarios podrán vincular
+                        sus cuentas y recibir alertas.
                       </p>
                     </div>
                     <Switch
@@ -1040,7 +1204,7 @@ function SettingsPage() {
                             type={showBotToken ? 'text' : 'password'}
                             value={settings.telegramBotToken}
                             onChange={e =>
-                              setSettings({ ...settings, telegramBotToken: e.target.value, })
+                              setSettings({ ...settings, telegramBotToken: e.target.value })
                             }
                             placeholder={
                               settings.telegramBotTokenConfigured
@@ -1054,7 +1218,11 @@ function SettingsPage() {
                             onClick={() => setShowBotToken(v => !v)}
                             className='absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground'
                           >
-                            {showBotToken ? <EyeOff className='h-4 w-4' /> : <Eye className='h-4 w-4' />}
+                            {showBotToken ? (
+                              <EyeOff className='h-4 w-4' />
+                            ) : (
+                              <Eye className='h-4 w-4' />
+                            )}
                           </button>
                         </div>
                         {settings.telegramBotTokenConfigured && !settings.telegramBotToken && (
@@ -1114,14 +1282,19 @@ function SettingsPage() {
                             onClick={() => setShowWebhookSecret(v => !v)}
                             className='absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground'
                           >
-                            {showWebhookSecret ? <EyeOff className='h-4 w-4' /> : <Eye className='h-4 w-4' />}
+                            {showWebhookSecret ? (
+                              <EyeOff className='h-4 w-4' />
+                            ) : (
+                              <Eye className='h-4 w-4' />
+                            )}
                           </button>
                         </div>
-                        {settings.telegramWebhookSecretConfigured && !settings.telegramWebhookSecret && (
-                          <p className='text-xs text-muted-foreground'>
-                            Hay un secret guardado. Cámbialo solo si quieres rotar el secreto.
-                          </p>
-                        )}
+                        {settings.telegramWebhookSecretConfigured &&
+                          !settings.telegramWebhookSecret && (
+                            <p className='text-xs text-muted-foreground'>
+                              Hay un secret guardado. Cámbialo solo si quieres rotar el secreto.
+                            </p>
+                          )}
                       </div>
 
                       {/* Bot info tras verificar */}
@@ -1164,8 +1337,8 @@ function SettingsPage() {
                                 ./docker/scripts/setup-telegram-poll-cron.sh
                               </code>
                               <p className='text-xs text-blue-700 dark:text-blue-400'>
-                                El botón &quot;Registrar Webhook&quot; funcionará cuando tengas un dominio
-                                público con HTTPS.
+                                El botón &quot;Registrar Webhook&quot; funcionará cuando tengas un
+                                dominio público con HTTPS.
                               </p>
                             </div>
                           </div>
@@ -1192,7 +1365,9 @@ function SettingsPage() {
                           disabled={registeringWebhook}
                           title={
                             typeof window !== 'undefined' &&
-                            /192\.168\.|127\.0\.0\.1|localhost|^10\.|172\.(1[6-9]|2\d|3[01])\./.test(window.location.origin)
+                            /192\.168\.|127\.0\.0\.1|localhost|^10\.|172\.(1[6-9]|2\d|3[01])\./.test(
+                              window.location.origin
+                            )
                               ? 'No disponible en red local — usa el cron de polling'
                               : undefined
                           }
@@ -1227,11 +1402,10 @@ function SettingsPage() {
                       >
                         @BotFather <ExternalLink className='h-3 w-3' />
                       </a>
-                      . Escribe <code className='font-mono text-xs'>/newbot</code> y sigue las instrucciones.
+                      . Escribe <code className='font-mono text-xs'>/newbot</code> y sigue las
+                      instrucciones.
                     </li>
-                    <li>
-                      Copia el token que te da BotFather y pégalo en el campo de arriba.
-                    </li>
+                    <li>Copia el token que te da BotFather y pégalo en el campo de arriba.</li>
                     <li>
                       Pulsa <strong>Probar conexión</strong> para verificar el token.
                     </li>
@@ -1240,8 +1414,10 @@ function SettingsPage() {
                     </li>
                     <li>
                       <strong>Red local:</strong> ejecuta en tu terminal:{' '}
-                      <code className='font-mono text-xs'>./docker/scripts/setup-telegram-poll-cron.sh</code>
-                      {' '}— activa el polling cada 30 s sin necesitar URL pública.
+                      <code className='font-mono text-xs'>
+                        ./docker/scripts/setup-telegram-poll-cron.sh
+                      </code>{' '}
+                      — activa el polling cada 30 s sin necesitar URL pública.
                       <br />
                       <strong>Producción (hosting):</strong> pulsa{' '}
                       <strong>Registrar Webhook</strong> para recibir mensajes en tiempo real.
