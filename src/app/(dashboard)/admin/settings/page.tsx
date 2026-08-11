@@ -712,7 +712,7 @@ function SettingsPage() {
                           id='smtpUser'
                           value={settings.smtpUser}
                           onChange={e => setSettings({ ...settings, smtpUser: e.target.value })}
-                          placeholder='cosme.soto@empresa.com'
+                          placeholder='usuario@empresa.com'
                         />
                         <p className='text-xs text-muted-foreground'>
                           Tu dirección de correo completa (es el nombre de usuario SMTP)
@@ -769,7 +769,7 @@ function SettingsPage() {
                         type='email'
                         value={settings.emailFrom}
                         onChange={e => setSettings({ ...settings, emailFrom: e.target.value })}
-                        placeholder='cosme.soto@empresa.com'
+                        placeholder='usuario@empresa.com'
                         className='max-w-sm'
                       />
                       <p className='text-xs text-muted-foreground'>
