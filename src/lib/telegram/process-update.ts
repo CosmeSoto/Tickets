@@ -61,6 +61,8 @@ export async function processUpdate(update: TelegramUpdateMessage): Promise<void
     else if (text.startsWith('/noticias'))      await handleNoticias(chatId)
     else if (text.startsWith('/catalogo'))      await handleCatalogo(chatId)
     else if (text.startsWith('/mis_contratos')) await handleMisContratos(chatId)
+    else if (text.startsWith('/como_funciona')) await handleComoFunciona(chatId)
+    else if (text.startsWith('/centro_ayuda'))  await handleCentroAyuda(chatId)
     else if (text.startsWith('/ayuda') || text.startsWith('/help')) await handleAyuda(chatId)
     else await sendTelegramMessage(chatId, `No reconozco ese comando\\. Escribe /ayuda para ver los comandos disponibles\\.`)
   } catch (err) {
@@ -562,10 +564,12 @@ async function handleAyuda(chatId: string) {
 
   // ── Sección cuenta (siempre visible) ────────────────────────────────────────
   const cuentaCmds =
-    `*/start* — Bienvenida\n` +
+    `*/start* — Bienvenido\n` +
     `*/vincular \\<código\\>* — Vincular cuenta\n` +
     `*/estado* — Ver tu cuenta y alertas\n` +
     `*/desvincular* — Desconectar\n` +
+    `*/como\\_funciona* — Cómo usar el sistema según tu rol\n` +
+    `*/centro\\_ayuda* — Enlace al Centro de Ayuda\n` +
     `*/ayuda* — Esta ayuda`
 
   if (!user) {
@@ -938,4 +942,103 @@ async function handleBajas(chatId: string) {
     : `⚠️ *Solicitudes de baja en revisión \\(${requests.length}\\)*`
 
   await sendTelegramMessage(chatId, `${header}\n\n${lines.join('\n\n')}\n\n_Gestiona desde Inventario → Bajas_\\.`)
+}
+
+// ─── Handlers: ayuda y centro de ayuda ───────────────────────────────────────
+
+/**
+ * /centro_ayuda — enlace directo al Centro de Ayuda del sistema.
+ * Disponible para todos los roles.
+ */
+async function handleCentroAyuda(chatId: string) {
+  const user = await getLinkedUser(chatId)
+  if (!user) {
+    await sendTelegramMessage(chatId,
+      `❌ Vincula tu cuenta primero con /vincular \\<código\\> para acceder al Centro de Ayuda\\.`)
+    return
+  }
+
+  const appUrl = process.env.NEXTAUTH_URL ?? ''
+  const helpUrl = appUrl ? `${appUrl}/help/center` : '/help/center'
+  const urlEscaped = escapeMdV2(helpUrl)
+
+  await sendTelegramMessage(chatId,
+    `📚 *Centro de Ayuda*\n\n` +
+    `Encuentra guías, tutoriales y respuestas a preguntas frecuentes del sistema\\.\n\n` +
+    `[Abrir Centro de Ayuda](${urlEscaped})\n\n` +
+    `También puedes escribir /como\\_funciona para ver un resumen de tu rol en el sistema\\.`)
+}
+
+/**
+ * /como_funciona — explica el sistema según el rol del usuario.
+ * Cada rol ve solo lo que le aplica y cómo usar el sistema eficientemente.
+ */
+async function handleComoFunciona(chatId: string) {
+  const user = await getLinkedUser(chatId)
+  if (!user) {
+    await sendTelegramMessage(chatId,
+      `❌ Vincula tu cuenta primero con /vincular \\<código\\>\\.`)
+    return
+  }
+
+  const isAdmin  = user.role === 'ADMIN'
+  const isTech   = user.role === 'TECHNICIAN'
+  const isClient = user.role === 'CLIENT'
+
+  let msg = `📖 *Cómo funciona el sistema — ${escapeMdV2(ROLE_LABEL[user.role] ?? user.role)}*\n\n`
+
+  if (isAdmin) {
+    msg +=
+      `Eres *Administrador*\\. Tienes acceso completo a todos los módulos de tu área\\.\n\n` +
+      `🎫 *Tickets*\n` +
+      `Gestiona las solicitudes de soporte de tu área\\. Puedes asignar técnicos, cambiar prioridades, cerrar tickets y ver reportes\\. Los tickets urgentes llegan también por Telegram y correo\\.\n\n` +
+      `📦 *Inventario*\n` +
+      `Controla equipos, licencias, suministros y contratos de tu área\\. Las actas de entrega y devolución quedan registradas digitalmente con firma electrónica\\.\n\n` +
+      `🔒 *Rondas*\n` +
+      `Programa y supervisa las rondas de seguridad\\. Recibirás alertas si una ronda no se inicia o se cierra incompleta\\.\n\n` +
+      `📰 *Noticias*\n` +
+      `Publica comunicados, eventos y avisos para tu equipo\\.\n\n` +
+      `📑 *Contratos y Proveedores*\n` +
+      `Gestiona contratos de servicio, licencias y proveedores\\. Recibirás alertas de vencimiento próximo\\.\n\n` +
+      `⚙️ *Configuración*\n` +
+      `Configura categorías, SLA, usuarios, familias de área y módulos activos\\.\n\n` +
+      `💡 _Tip: usa /sistema para ver el estado en tiempo real del centro comercial\\._`
+  } else if (isTech) {
+    msg +=
+      `Eres *Técnico*\\. Atiendes tickets asignados y ejecutas rondas de seguridad\\.\n\n` +
+      `🎫 *Tickets*\n` +
+      `Recibirás tickets asignados por tu administrador\\. Cuando el cliente comenta, te llega alerta por Telegram\\. Al resolver un ticket, el cliente lo califica\\.\n\n` +
+      `Flujo básico:\n` +
+      `1\\. Te asignan el ticket → recibes Telegram\n` +
+      `2\\. Atiendes y añades comentarios\n` +
+      `3\\. Marcas como resuelto\n` +
+      `4\\. El cliente califica\n\n` +
+      `🔒 *Rondas*\n` +
+      `Recibirás recordatorio antes de que inicie tu ronda\\. Ejecuta el recorrido desde la app escaneando los QR de cada checkpoint\\. Si no inicias a tiempo, tu supervisor es notificado\\.\n\n` +
+      `📦 *Equipos*\n` +
+      `Puedes ver los equipos asignados a ti y registrar mantenimientos\\.\n\n` +
+      `💡 _Tip: usa /mis\\_tickets para ver tus asignaciones pendientes y /mis\\_rondas para tu agenda\\._ `
+  } else if (isClient) {
+    msg +=
+      `Eres *Usuario/Cliente*\\. Puedes crear tickets de soporte y ver el estado de tus equipos\\.\n\n` +
+      `🎫 *Tickets de soporte*\n` +
+      `Crea un ticket cuando necesites ayuda técnica\\. Un técnico será asignado y recibirás notificación\\. Puedes comentar y seguir el estado desde el sistema o por Telegram\\.\n\n` +
+      `Flujo:\n` +
+      `1\\. Creas el ticket en el sistema\n` +
+      `2\\. Se asigna un técnico → recibes aviso\n` +
+      `3\\. El técnico responde → recibes Telegram\n` +
+      `4\\. Cuando se resuelve → lo calificas\n\n` +
+      `📦 *Mis equipos*\n` +
+      `Ve los equipos asignados a ti, sus mantenimientos y las actas de entrega que debes firmar\\.\n\n` +
+      `📑 *Mis suscripciones*\n` +
+      `Consulta los contratos o suscripciones de servicio asociadas a tu cuenta\\.\n\n` +
+      `💡 _Tip: usa /mi\\_tecnico para ver quién atiende tu ticket activo y cómo contactarlo\\._`
+  }
+
+  const appUrl = process.env.NEXTAUTH_URL ?? ''
+  const helpUrl = appUrl ? `${appUrl}/help/center` : ''
+
+  msg += `\n\n📚 Guías detalladas en el [Centro de Ayuda](${escapeMdV2(helpUrl || '/help/center')})\\.\n\nEscribe /ayuda para ver los comandos disponibles\\.`
+
+  await sendTelegramMessage(chatId, msg)
 }
