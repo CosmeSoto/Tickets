@@ -523,8 +523,8 @@ export function TabGeneral({
               className='h-8 text-sm'
             />
             <p className='text-[10px] text-muted-foreground'>
-              Número de WhatsApp para contacto de activos en venta de esta familia. Lo pueden editar
-              el admin y los gestores asignados a esta familia.
+              Número con código de país (ej. 593987654321). Se usa en el catálogo público de
+              equipos en desuso de esta familia. Si está vacío, se usa el WhatsApp del landing.
             </p>
           </div>
 

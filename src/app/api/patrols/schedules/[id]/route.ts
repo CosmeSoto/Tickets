@@ -20,6 +20,7 @@ import { checkPatrolModuleAccess } from '@/lib/patrol/patrol-helpers'
 import { NotificationService } from '@/lib/services/notification-service'
 import { NotificationType } from '@prisma/client'
 import { PatrolSchedulerService } from '@/lib/services/patrol-scheduler.service'
+import { queueTelegramNotification } from '@/lib/notifications/queue-notification-telegram'
 import {
   assertScheduleAgent,
   assertScheduleRoute,
@@ -293,7 +294,20 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         metadata: { scheduleId: id, familyId: existing.familyId },
       })
 
-      // Si el agente cambió, notificar también al agente anterior
+      // Telegram: nuevo agente (o mismo agente si solo cambió el horario/ruta)
+      queueTelegramNotification({
+        recipientUserId: notifyAgentId,
+        title: agentChanged ? 'Ronda reasignada a ti' : 'Tu ronda fue reprogramada',
+        body: agentChanged
+          ? `Se te ha asignado una ronda. Ruta: ${routeName}\nRevisa "Mis Rondas" para ver el horario.`
+          : `Tu ronda ha sido reprogramada. Ruta: ${routeName}\nRevisa "Mis Rondas" para el nuevo horario.`,
+        module: 'patrols',
+        event: 'patrolAssigned',
+        link: '/patrol',
+        telegramModule: 'patrols',
+      }).catch(err => console.error('[patrol/schedules PATCH] Telegram agente nuevo:', err))
+
+      // Si el agente cambió, notificar también al agente anterior — in-app + Telegram
       if (agentChanged && existing.agentId !== notifyAgentId) {
         await NotificationService.push({
           userId: existing.agentId,
@@ -302,6 +316,15 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           message: `Una de tus rondas programadas ha sido reasignada a otro agente.`,
           metadata: { scheduleId: id, familyId: existing.familyId },
         })
+        queueTelegramNotification({
+          recipientUserId: existing.agentId,
+          title: 'Ronda desasignada',
+          body: `Una de tus rondas programadas ha sido reasignada a otro agente.\nRevisa tu agenda en "Mis Rondas".`,
+          module: 'patrols',
+          event: 'patrolAssigned',
+          link: '/patrol',
+          telegramModule: 'patrols',
+        }).catch(err => console.error('[patrol/schedules PATCH] Telegram agente anterior:', err))
       }
     }
 
@@ -443,6 +466,21 @@ export async function DELETE(
           message: 'Se cancelaron rondas pendientes asociadas a una programación desactivada.',
           metadata: { link: '/patrol' },
         })
+      )
+    )
+
+    // Telegram: mismo aviso a cada agente afectado
+    await Promise.allSettled(
+      uniqueAgentIds.map(agentId =>
+        queueTelegramNotification({
+          recipientUserId: agentId,
+          title: 'Programación de ronda cancelada',
+          body: `Se han cancelado tus rondas pendientes de esta programación.\nRevisa "Mis Rondas" para ver tu agenda actualizada.`,
+          module: 'patrols',
+          event: 'patrolCancelled',
+          link: '/patrol',
+          telegramModule: 'patrols',
+        }).catch(err => console.error('[patrol/schedules DELETE] Telegram:', err))
       )
     )
 

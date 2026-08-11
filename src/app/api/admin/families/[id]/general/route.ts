@@ -49,6 +49,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       }
     }
 
+    const { normalizeWhatsAppPhone } = await import('@/lib/sales-whatsapp-contact')
+    const normalizedWhatsapp =
+      contactWhatsapp === undefined
+        ? undefined
+        : contactWhatsapp === null || contactWhatsapp === ''
+          ? null
+          : normalizeWhatsAppPhone(String(contactWhatsapp)) || String(contactWhatsapp).replace(/\D/g, '').slice(0, 30) || null
+
     const updated = await prisma.families.update({
       where: { id },
       data: {
@@ -59,7 +67,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         ...(icon !== undefined && { icon }),
         ...(isActive !== undefined && { isActive }),
         ...(order !== undefined && { order }),
-        ...(contactWhatsapp !== undefined && { contactWhatsapp }),
+        ...(normalizedWhatsapp !== undefined && { contactWhatsapp: normalizedWhatsapp }),
       },
     })
 

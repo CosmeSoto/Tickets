@@ -8,6 +8,8 @@ export interface NotificationPreferences {
   // ===== NIVEL BÁSICO (Todos los roles) =====
   emailNotifications: boolean
   pushNotifications: boolean
+  /** Master switch: alertas operativas por Telegram (requiere cuenta vinculada) */
+  telegramNotifications: boolean
 
   // ===== MÓDULOS (master switches) =====
   /** Notificaciones del módulo Tickets */
@@ -62,6 +64,7 @@ export const NOTIFICATION_FIELDS_BY_LEVEL: Record<
   basic: [
     'emailNotifications',
     'pushNotifications',
+    'telegramNotifications',
     'soundEnabled',
     'notifyTickets',
     'notifyInventory',
@@ -70,6 +73,7 @@ export const NOTIFICATION_FIELDS_BY_LEVEL: Record<
   intermediate: [
     'emailNotifications',
     'pushNotifications',
+    'telegramNotifications',
     'soundEnabled',
     'notifyTickets',
     'notifyInventory',
@@ -82,6 +86,7 @@ export const NOTIFICATION_FIELDS_BY_LEVEL: Record<
   advanced: [
     'emailNotifications',
     'pushNotifications',
+    'telegramNotifications',
     'soundEnabled',
     'notifyTickets',
     'notifyInventory',
@@ -102,6 +107,7 @@ export const NOTIFICATION_FIELDS_BY_LEVEL: Record<
 export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   emailNotifications: true,
   pushNotifications: true,
+  telegramNotifications: true,
   notifyTickets: true,
   notifyInventory: true,
   notifyPatrols: true,

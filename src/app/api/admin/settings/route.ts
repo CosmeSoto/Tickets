@@ -33,9 +33,15 @@ const settingsSchema = z.object({
   backupEnabled: z.boolean().optional(),
   backupFrequency: z.enum(['daily', 'weekly', 'monthly']).optional(),
   backupRetention: z.coerce.number().min(7).max(365).optional(),
+  // Telegram Bot
+  telegramEnabled: z.boolean().optional(),
+  telegramBotToken: z.string().optional(),
+  telegramBotUsername: z.string().optional(),
+  telegramWebhookSecret: z.string().optional(),
+  telegramNotificationsEnabled: z.boolean().optional(),
 })
 
-const SENSITIVE_SETTING_KEYS = new Set(['smtpPassword'])
+const SENSITIVE_SETTING_KEYS = new Set(['smtpPassword', 'telegramBotToken', 'telegramWebhookSecret'])
 
 // Configuración por defecto
 const defaultSettings = {
@@ -73,6 +79,12 @@ const defaultSettings = {
   backupEnabled: false,
   backupFrequency: 'daily' as const,
   backupRetention: 30,
+  // Telegram Bot
+  telegramEnabled: false,
+  telegramBotToken: '',
+  telegramBotUsername: '',
+  telegramWebhookSecret: '',
+  telegramNotificationsEnabled: true,
 }
 
 function parseSystemSettingsFromRows(
@@ -106,6 +118,8 @@ function parseSystemSettingsFromRows(
         'browserNotifications',
         'requirePasswordChange',
         'backupEnabled',
+        'telegramEnabled',
+        'telegramNotificationsEnabled',
       ].includes(setting.key)
     ) {
       result[setting.key] = value === 'true'
@@ -164,6 +178,8 @@ export async function GET() {
             'browserNotifications',
             'requirePasswordChange',
             'backupEnabled',
+            'telegramEnabled',
+            'telegramNotificationsEnabled',
           ].includes(setting.key)
         ) {
           result[setting.key] = value === 'true'
@@ -180,8 +196,12 @@ export async function GET() {
     const safeSettings = {
       ...settings,
       smtpPasswordConfigured: Boolean(settings.smtpPassword),
+      telegramBotTokenConfigured: Boolean(settings.telegramBotToken),
+      telegramWebhookSecretConfigured: Boolean(settings.telegramWebhookSecret),
     }
     delete safeSettings.smtpPassword
+    delete safeSettings.telegramBotToken
+    delete safeSettings.telegramWebhookSecret
     if (!isSuperAdmin) {
       for (const key of SENSITIVE_SETTING_KEYS) {
         delete safeSettings[key]

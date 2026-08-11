@@ -375,6 +375,162 @@ curl -fsS -X POST "${NEXTAUTH_URL%/}/api/cron/weekly-digest" \
 Requiere que la cola de email esté activa (`/api/cron/process-email-queue`).  
 Log: `tail -f logs/weekly-digest-cron.log`
 
+---
+
+### Bot de Telegram (alertas operativas)
+
+Canal adicional paralelo al email. El email **no se toca** — Telegram se añade encima.
+
+#### Configuración inicial (una sola vez)
+
+1. En Telegram, abre **@BotFather** → `/newbot` → sigue los pasos → copia el token.
+2. En el sistema: **Admin → Configuración del Sistema → tab Telegram**
+   - Activa el switch **Habilitar bot**
+   - Pega el token en **Token del Bot**
+   - Escribe el username sin `@` en **Username del bot**
+   - Guarda con el botón **Guardar**
+   - Pulsa **Probar conexión** — debe mostrar el badge verde con el nombre del bot
+
+#### Red local (sin URL pública) — Modo Polling
+
+Telegram no acepta IPs privadas para webhooks. Usa el cron de polling:
+
+```bash
+chmod +x ./docker/scripts/setup-telegram-poll-cron.sh
+./docker/scripts/setup-telegram-poll-cron.sh
+```
+
+Instala dos entradas crontab que llaman al endpoint cada 30 s.
+
+```bash
+# Verificar que funciona (debe devolver {"success":true,"processed":N})
+CRON_SECRET=$(grep '^CRON_SECRET=' .env.production | cut -d= -f2 | tr -d '"')
+curl -sk "${NEXTAUTH_URL}/api/cron/telegram-poll" -H "Authorization: Bearer $CRON_SECRET"
+
+# Ver log en tiempo real
+tail -f logs/telegram-poll-cron.log
+```
+
+#### Producción (hosting con dominio público)
+
+```bash
+# 1. Pulsar "Registrar Webhook" en Admin → Configuración → Telegram
+#    (o llamar la API directamente):
+curl -s -X POST "${NEXTAUTH_URL}/api/telegram/register-webhook" \
+  -H "Cookie: <sesión-admin>" \
+  -H "Content-Type: application/json"
+
+# 2. Desinstalar el cron de polling (ya no hace falta):
+./docker/scripts/setup-telegram-poll-cron.sh --remove
+```
+
+#### Vincular una cuenta de usuario
+
+Cada usuario (admin, técnico o cliente) vincula su cuenta desde:
+- **Perfil → sección Telegram** — genera un código de 6 caracteres
+- **Configuración → Notificaciones → Telegram** — misma card
+
+Luego en el bot escriben `/vincular CÓDIGO`. El código caduca en 15 minutos.
+
+#### Notificaciones Telegram — matriz completa de eventos
+
+| Evento | Canal Telegram | Destinatarios | Prioridad | Implementado en |
+|---|---|---|---|---|
+| **Tickets** | | | | |
+| Ticket creado | ✅ | Admins de la familia | important | `NotificationService.notifyTicketCreated` |
+| Ticket asignado | ✅ | Técnico asignado | important | `NotificationService.notifyTicketAssigned` |
+| Ticket resuelto | ✅ | Técnico asignado | important | `NotificationService.notifyTicketResolved` |
+| Ticket transferido de área | ✅ | Admins de ambas familias | important | `NotificationService.notifyFamilyChange` |
+| Cliente comenta en ticket | ✅ | Técnico asignado | important\* | `NotificationService.notifyNewComment` |
+| Técnico comenta en ticket | ❌ | — | optional → omitido | In-app + WebPush cubren este caso |
+| **Inventario** | | | | |
+| Acta pendiente de firma | ✅ | Admins de la familia | important | `NotificationService.push` directo |
+| Alerta de stock bajo/crítico | ✅ | Admins de la familia | important | `BatchAlertService` |
+| Backup fallido | ✅ | Admins configurados | critical | `backup-utils.ts` |
+| **Rondas** | | | | |
+| Ronda asignada (schedule nuevo) | ✅ | Agente asignado | important | `schedules/route.ts` POST |
+| Ronda reasignada (agente nuevo) | ✅ | Agente nuevo + agente anterior | important | `schedules/[id]/route.ts` PATCH |
+| Ronda reprogramada (mismo agente) | ✅ | Agente asignado | important | `schedules/[id]/route.ts` PATCH |
+| Programación cancelada | ✅ | Todos los agentes afectados | important | `schedules/[id]/route.ts` DELETE |
+| Recordatorio pre-ronda | ✅ | Agente asignado | important | `PatrolReminderService` |
+| Ronda no iniciada (MISSED) | ✅ | Supervisores + agente | important | `PatrolSchedulerService.notifyMissed` |
+| Ronda cerrada automáticamente | ✅ | Supervisores + agente | important | `PatrolSchedulerService.notifyAutoClose` |
+
+\* `priority: 'important'` explícita — override de la política `optional` para `newComments`.
+
+#### Lógica del recordatorio pre-ronda
+
+El cron `/api/cron/patrol` (cada 5 min) ejecuta `PatrolReminderService.sendPendingReminders()`:
+
+1. Lee todas las familias con `reminderMinutesBefore > 0` desde `patrol_family_config`
+2. Busca patrullas `PENDING` sin `reminderSentAt` cuyo `scheduledStart` esté dentro de la ventana
+3. Envía notificación in-app + **Telegram** al agente
+4. Marca `reminderSentAt` en la patrulla (idempotencia — no se envía dos veces)
+
+La ventana se configura en **Rondas → Configuración → Recordatorio (minutos antes)** por área.
+
+#### Configurar el cron de patrol
+
+```bash
+# El cron de patrol ya debería estar instalado — verificar:
+crontab -l | grep cron/patrol
+
+# Si no está, instalarlo manualmente (cada 5 min):
+CRON_SECRET=$(grep '^CRON_SECRET=' .env.production | cut -d= -f2 | tr -d '"')
+(crontab -l 2>/dev/null; echo "*/5 * * * * curl -fsS \"${NEXTAUTH_URL}/api/cron/patrol\" -H \"Authorization: Bearer ${CRON_SECRET}\" >> logs/patrol-cron.log 2>&1 # tickets-patrol-cron") | crontab -
+```
+
+| Comando | Acceso | Descripción |
+|---|---|---|
+| `/start` | Todos | Bienvenida y estado de vinculación |
+| `/vincular <código>` | Todos | Vincular cuenta del sistema |
+| `/estado` | Todos | Nombre, email, teléfono, rol y estado de alertas |
+| `/desvincular` | Todos | Desconectar cuenta |
+| `/ayuda` | Todos | Lista dinámica filtrada por módulos activos del usuario |
+| **— Tickets —** | | |
+| `/mis_tickets` | ticketsEnabled | Tickets activos filtrados por rol |
+| `/mi_tecnico` | Cliente | Técnico asignado al ticket abierto más reciente |
+| `/pendientes` | Admin / Técnico | Tickets OPEN ordenados por prioridad |
+| **— Inventario —** | | |
+| `/mis_equipos` | Todos (con asignaciones) | Equipos asignados actualmente |
+| `/mis_actas` | Todos | Actas de entrega y devolución propias (últimos 90 días) |
+| `/mis_mantenimientos` | inventoryEnabled | Equipos propios en mantenimiento o registros asignados |
+| `/mis_solicitudes` | canRequestAssets / Admin | Solicitudes de activos activas |
+| `/inventario` | inventoryEnabled / Admin | Resumen global de equipos por estado |
+| `/bajas` | Admin / Técnico | Solicitudes de baja pendientes de revisión |
+| `/actas` | Admin | Todas las actas pendientes de firma del sistema |
+| `/catalogo` | Todos | Equipos disponibles para la venta |
+| **— Rondas —** | | |
+| `/mis_rondas` | patrolsEnabled | Rondas activas y programadas (agente o supervisor) |
+| **— Noticias —** | | |
+| `/noticias` | newsEnabled | Últimas 5 noticias publicadas ordenadas por prioridad |
+| **— Contratos —** | | |
+| `/mis_contratos` | Custodio / Admin | Contratos activos asignados como custodio |
+| **— Admin —** | | |
+| `/sistema` | Admin | Resumen: tickets, rondas, actas, mantenimientos, backup |
+
+#### Limpieza de tokens expirados
+
+Los tokens de vinculación se acumulan en `telegram_link_tokens`. Un cron los limpia:
+
+```bash
+# Añadir al mismo crontab (una vez al día a las 03:00)
+CRON_SECRET=$(grep '^CRON_SECRET=' .env.production | cut -d= -f2 | tr -d '"')
+(crontab -l 2>/dev/null; echo "0 3 * * * curl -fsS \"${NEXTAUTH_URL}/api/cron/telegram-cleanup\" -H \"Authorization: Bearer ${CRON_SECRET}\" >> logs/telegram-cleanup.log 2>&1") | crontab -
+```
+
+#### Solución de problemas Telegram
+
+| Problema | Solución |
+|---|---|
+| Card muestra "bot no habilitado" | Admin → Configuración → Telegram → verificar token y switch activo → Guardar |
+| `/vincular` no responde en 30 s | Verificar que el cron de polling está activo: `crontab -l \| grep telegram` |
+| `bad webhook: IP address is reserved` | Esperado en red local — usa el modo polling, no "Registrar Webhook" |
+| Webhook activo pero polling no funciona | Desregistrar webhook primero desde @BotFather: `/deletewebhook` |
+| Bot responde pero no vincula | Verificar que el código no esté expirado (15 min) — generar uno nuevo |
+
+---
+
 ### Auditoría y cumplimiento
 
 - **UI:** Admin → Backups → **Dashboard** → tarjeta _Guía de auditoría_ (checklist en vivo + **Exportar informe** JSON)
@@ -763,6 +919,9 @@ Referencias ya migradas: Credenciales, Familias, Proveedores, Contratos, Manteni
 | Dashboard rondas vacío                                           | Verificar que hay patrullas programadas para hoy (UTC-5)                                                                                                            |
 | Técnico no aparece en categorías                                 | Verificar `technician_family_assignments` para esa familia                                                                                                          |
 | Agente no aparece en programación                                | Verificar `patrol_family_assignments` + `patrolsEnabled=true`                                                                                                       |
+| Telegram: card muestra "bot no habilitado"                       | Admin → Configuración → Telegram → verificar token y switch → Guardar                                                                                              |
+| Telegram: `/vincular` no responde                                | Verificar cron de polling: `crontab -l \| grep telegram-poll` — si falta, ejecutar `setup-telegram-poll-cron.sh`                                                   |
+| Telegram: `bad webhook: IP address is reserved`                  | Normal en red local — no pulsar "Registrar Webhook"; usar modo polling                                                                                              |
 
 ---
 
@@ -778,3 +937,4 @@ Referencias ya migradas: Credenciales, Familias, Proveedores, Contratos, Manteni
 | `docker/entrypoint.sh`    | Migraciones + seed + arranque (producción) |
 | `docker/nginx.local.conf` | Proxy reverso + SSL                        |
 | `start-production.sh`     | Script automático de despliegue            |
+| `docker/scripts/setup-telegram-poll-cron.sh` | Instala/desinstala cron polling Telegram (red local) |

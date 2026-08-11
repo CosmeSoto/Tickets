@@ -222,6 +222,23 @@ export async function sendBackupNotification(
         priority: 'important',
       })
     }
+
+    // Telegram: solo en fallos (critical) a usuarios con chatId vinculado
+    if (isError && recipients.length) {
+      const { queueTelegramNotification } = await import(
+        '@/lib/notifications/queue-notification-telegram'
+      )
+      queueTelegramNotification({
+        recipients: recipients.map(r => ({ userId: r.userId })),
+        title: 'Error en backup',
+        body: `Falló un backup del sistema.\nArchivo: ${data.filename || 'n/a'}\nError: ${data.error || 'desconocido'}`,
+        module: 'backups',
+        event: 'backupFailure',
+        priority: 'critical',
+        link: '/admin/backups',
+        telegramModule: 'backups',
+      }).catch(() => {})
+    }
   } catch (error) {
     console.error('Error al enviar notificación de backup:', error)
   }

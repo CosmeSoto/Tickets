@@ -8,6 +8,7 @@ import {
   getFamilyScopedAdminsForFamilies,
 } from '@/lib/notifications/family-recipients'
 import { evaluateDelivery, type NotificationSpecificType } from '@/lib/notifications/delivery'
+import { queueTelegramNotification } from '@/lib/notifications/queue-notification-telegram'
 
 export interface CreateNotificationData {
   userId: string
@@ -232,6 +233,17 @@ export class NotificationService {
         )
       )
 
+      // Telegram: alertar a los mismos admins que reciben la notificación in-app
+      queueTelegramNotification({
+        recipients: uniqueRecipients.map(r => ({ userId: r.id })),
+        title: 'Nuevo ticket creado',
+        body: notificationMessage,
+        module: 'tickets',
+        event: 'ticketCreated',
+        link: `/admin/tickets/${ticket.id}`,
+        telegramModule: 'tickets',
+      }).catch(err => console.error('[TELEGRAM] notifyTicketCreated:', err))
+
       return notifications
     } catch (error) {
       console.error('[NOTIFICATION] Error en notifyTicketCreated:', error)
@@ -315,6 +327,23 @@ export class NotificationService {
           })
         )
       )
+
+      // Telegram: solo a admins de ambas familias (no al cliente — es ruido para él)
+      // El cambio de familia es un evento operativo que los admins deben conocer de inmediato
+      const adminRecipientIds = recipientIds.filter(id => id !== ticket.clientId)
+      if (adminRecipientIds.length > 0) {
+        queueTelegramNotification({
+          recipients: adminRecipientIds.map(id => ({ userId: id })),
+          title: 'Ticket transferido de área',
+          body: `Ticket: "${ticket.title}"\nDe: ${oldFamilyName}\nA: ${newFamilyName}`,
+          module: 'tickets',
+          event: 'statusChanged',
+          link: ticket.assigneeId
+            ? `/technician/tickets/${ticket.id}`
+            : `/admin/tickets/${ticket.id}`,
+          telegramModule: 'tickets',
+        }).catch(err => console.error('[TELEGRAM] notifyFamilyChange:', err))
+      }
     } catch (error) {
       console.error('[NOTIFICATION] Error en notifyFamilyChange:', error)
       throw error
@@ -399,6 +428,17 @@ export class NotificationService {
         })
         if (clientNotification) notifications.push(clientNotification)
       }
+
+      // Telegram: alertar al técnico asignado
+      queueTelegramNotification({
+        recipientUserId: technicianId,
+        title: 'Nuevo ticket asignado',
+        body: `Se te ha asignado el ticket "${ticket.title}" (${ticket.priority})`,
+        module: 'tickets',
+        event: 'ticketAssigned',
+        link: `/technician/tickets/${ticket.id}`,
+        telegramModule: 'tickets',
+      }).catch(err => console.error('[TELEGRAM] notifyTicketAssigned:', err))
 
       return notifications
     } catch (error) {
@@ -504,6 +544,18 @@ export class NotificationService {
           specificType: 'newComments',
         })
         if (techNotification) notifications.push(techNotification)
+
+        // Telegram al técnico: el cliente esperando respuesta es operativamente importante
+        // Se usa priority 'important' explícita porque 'newComments' es 'optional' en política
+        queueTelegramNotification({
+          recipientUserId: ticket.assigneeId,
+          title: 'El cliente respondió en tu ticket',
+          body: `${author.name} ha añadido un comentario en "${ticket.title}".\nRevisa el ticket para responder.`,
+          module: 'tickets',
+          priority: 'important',
+          link: `/technician/tickets/${ticket.id}`,
+          telegramModule: 'tickets',
+        }).catch(err => console.error('[TELEGRAM] notifyNewComment técnico:', err))
       }
 
       return notifications
@@ -576,6 +628,19 @@ export class NotificationService {
           specificType: 'statusChanged',
           metadata: { link: `/client/tickets/${ticket.id}` },
         }).catch(() => {})
+      }
+
+      // Telegram: alertar al resolvedor (admin/técnico que resolvió) con push hacia el técnico asignado
+      if (ticket.assigneeId) {
+        queueTelegramNotification({
+          recipientUserId: ticket.assigneeId,
+          title: 'Ticket resuelto',
+          body: `El ticket "${ticket.title}" ha sido marcado como resuelto y está pendiente de calificación`,
+          module: 'tickets',
+          event: 'statusChanged',
+          link: `/technician/tickets/${ticket.id}`,
+          telegramModule: 'tickets',
+        }).catch(err => console.error('[TELEGRAM] notifyTicketResolved:', err))
       }
 
       return notification

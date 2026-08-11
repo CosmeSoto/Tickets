@@ -410,6 +410,8 @@ model user_settings {
   notifyInventory      Boolean  @default(true)
   /// Master switch: notificaciones del módulo Rondas
   notifyPatrols        Boolean  @default(true)
+  /// Master switch: alertas por Telegram (requiere telegramChatId en users)
+  telegramNotifications Boolean @default(true) @map("telegram_notifications")
   /// Último digest semanal enviado (idempotencia del cron)
   lastWeeklyDigestAt   DateTime?
   quietHoursEnabled    Boolean  @default(false)
@@ -497,6 +499,8 @@ model users {
   canRequestAssets                                  Boolean                         @default(false) @map("can_request_assets")
   /// Acceso a Base de conocimientos (hijo del módulo Tickets). Default true = comportamiento histórico.
   canAccessKnowledge                                Boolean                         @default(true) @map("can_access_knowledge")
+  /// ID de chat de Telegram vinculado (opcional). Necesario para recibir alertas del bot.
+  telegramChatId                                    String?                         @map("telegram_chat_id")
   accounts                                          accounts[]
   userFamilyAccess                                  user_family_access[]
   article_votes                                     article_votes[]
@@ -579,6 +583,7 @@ model users {
   credentialEntriesCreated                        credential_entries[]            @relation("CredentialEntryCreator")
   credentialEntriesUpdated                        credential_entries[]            @relation("CredentialEntryUpdater")
   credentialShares                                credential_shares[]
+  telegramLinkTokens                              telegram_link_tokens[]
 
   @@index([departmentId])
   @@index([name, email])
@@ -591,6 +596,22 @@ model verification_tokens {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+/// Tokens de vinculación de cuenta Telegram (vida: 15 min; invalidados al usar)
+model telegram_link_tokens {
+  id        String    @id
+  userId    String    @map("user_id")
+  /// Código de 6 caracteres que el usuario escribe en el bot
+  token     String    @unique
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  user      users     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, usedAt])
+  @@index([token, expiresAt])
+  @@map("telegram_link_tokens")
 }
 
 model password_reset_tokens {

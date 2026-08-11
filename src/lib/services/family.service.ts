@@ -176,6 +176,19 @@ export class FamilyService {
    * Actualiza los datos base de la familia (no modifica las configs).
    */
   static async update(id: string, data: UpdateFamilyData): Promise<families> {
+    const { normalizeWhatsAppPhone } = await import('@/lib/sales-whatsapp-contact')
+    let contactWhatsapp = data.contactWhatsapp
+    if (contactWhatsapp !== undefined) {
+      if (contactWhatsapp === null || contactWhatsapp === '') {
+        contactWhatsapp = null as unknown as string
+      } else {
+        contactWhatsapp =
+          normalizeWhatsAppPhone(contactWhatsapp) ||
+          contactWhatsapp.replace(/\D/g, '').slice(0, 30) ||
+          undefined
+      }
+    }
+
     return prisma.families.update({
       where: { id },
       data: {
@@ -184,7 +197,9 @@ export class FamilyService {
         ...(data.color !== undefined && { color: data.color }),
         ...(data.icon !== undefined && { icon: data.icon }),
         ...(data.order !== undefined && { order: data.order }),
-        ...(data.contactWhatsapp !== undefined && { contactWhatsapp: data.contactWhatsapp }),
+        ...(contactWhatsapp !== undefined && {
+          contactWhatsapp: contactWhatsapp === null || contactWhatsapp === '' ? null : contactWhatsapp,
+        }),
       },
     })
   }

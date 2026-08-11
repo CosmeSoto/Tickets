@@ -12,6 +12,7 @@ import prisma from '@/lib/prisma'
 import { NotificationService } from '@/lib/services/notification-service'
 import { NotificationType } from '@prisma/client'
 import { getAppTimezone } from '@/lib/utils/date-utils'
+import { queueTelegramNotification } from '@/lib/notifications/queue-notification-telegram'
 
 // Acceso a campos de patrols que aún no están en el Prisma Client generado
 // (reminderSentAt, route, family, agent) — eliminar cast cuando se regenere el client
@@ -92,6 +93,19 @@ export class PatrolReminderService {
               familyId: patrol.familyId,
             },
           })
+
+          // Telegram: mismo recordatorio al agente (canal operativo de seguridad)
+          queueTelegramNotification({
+            recipientUserId: patrol.agentId,
+            title: 'Tu ronda está por iniciar 🔒',
+            body: `Ruta: ${patrol.route.name} (${patrol.family.name})\nHora: ${formattedTime}\n\nDirígete al punto de inicio.`,
+            module: 'patrols',
+            event: 'patrolReminder',
+            link: `/patrol/${patrol.id}`,
+            telegramModule: 'patrols',
+          }).catch(err =>
+            console.error(`[PatrolReminderService] Error Telegram patrol=${patrol.id}:`, err)
+          )
 
           // Marcar como enviado — idempotencia para no enviar doble
           await db.patrols.update({

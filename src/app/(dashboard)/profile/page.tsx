@@ -54,6 +54,7 @@ import {
   LayoutGrid,
 } from 'lucide-react'
 import { UserModulesPanel } from '@/components/users/user-modules-panel'
+import { TelegramLinkCard } from '@/components/notifications/telegram-link-card'
 
 export default function ProfilePage() {
   const { data: session, status, update } = useSession()
@@ -632,6 +633,9 @@ export default function ProfilePage() {
             />
           </CardContent>
         </Card>
+
+        {/* Telegram — vincular cuenta para recibir alertas operativas */}
+        <TelegramLinkCard />
 
         {/* Seguridad */}
         <Card>

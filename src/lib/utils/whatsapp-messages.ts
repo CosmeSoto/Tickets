@@ -40,9 +40,9 @@ export function generateGroupContactMessage(group: EquipmentGroup): string {
 
   // Agregar precio si está disponible
   if (saleListingPrice !== null) {
-    const priceFormatted = new Intl.NumberFormat('es-MX', {
+    const priceFormatted = new Intl.NumberFormat('es-EC', {
       style: 'currency',
-      currency: 'MXN',
+      currency: 'USD',
     }).format(saleListingPrice)
     message += `\nPrecio: ${priceFormatted}`
   }
@@ -97,9 +97,9 @@ export function generateUnitContactMessage(unit: PublicEquipmentItem): string {
 
   // Agregar precio si está disponible
   if (saleListingPrice !== null) {
-    const priceFormatted = new Intl.NumberFormat('es-MX', {
+    const priceFormatted = new Intl.NumberFormat('es-EC', {
       style: 'currency',
-      currency: 'MXN',
+      currency: 'USD',
     }).format(saleListingPrice)
     message += `\nPrecio: ${priceFormatted}`
   }
@@ -118,12 +118,15 @@ export function generateUnitContactMessage(unit: PublicEquipmentItem): string {
  */
 function getConditionText(condition: string): string {
   const conditionMap: Record<string, string> = {
+    NEW: 'Nuevo',
+    USED: 'Usado',
+    DAMAGED: 'Dañado',
     EXCELLENT: 'Excelente',
     GOOD: 'Bueno',
     FAIR: 'Regular',
     POOR: 'Malo',
-    DAMAGED: 'Dañado',
-    FOR_PARTS: 'Para Refacciones',
+    LIKE_NEW: 'Como nuevo',
+    FOR_PARTS: 'Para repuestos',
   }
 
   return conditionMap[condition] || condition
@@ -142,18 +145,17 @@ function getConditionText(condition: string): string {
  * // "https://wa.me/525512345678?text=Hola%2C%20estoy%20interesado..."
  * ```
  */
-export function generateWhatsAppUrl(message: string, phoneNumber?: string): string {
-  // Codificar mensaje para URL
+export function generateWhatsAppUrl(message: string, phoneNumber?: string | null): string {
   const encodedMessage = encodeURIComponent(message)
 
-  // Si hay número de teléfono, generar URL con número
   if (phoneNumber) {
-    // Limpiar número de teléfono (remover espacios, guiones, paréntesis)
-    const cleanPhone = phoneNumber.replace(/[\s\-\(\)]/g, '')
-    return `https://wa.me/${cleanPhone}?text=${encodedMessage}`
+    const cleanPhone = phoneNumber.replace(/\D/g, '')
+    if (cleanPhone.length >= 8) {
+      return `https://wa.me/${cleanPhone}?text=${encodedMessage}`
+    }
   }
 
-  // Si no hay número, generar URL genérica (abre WhatsApp con el mensaje)
+  // Sin número válido no abrir chat “huérfano”: el caller debe deshabilitar el CTA
   return `https://wa.me/?text=${encodedMessage}`
 }
 

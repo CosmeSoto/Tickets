@@ -17,6 +17,8 @@ export interface UserSettings {
   soundEnabled: boolean
   emailNotifications: boolean
   pushNotifications: boolean
+  /** Master switch: alertas por Telegram (requiere telegramChatId vinculado) */
+  telegramNotifications: boolean
   /** Master: módulo Tickets */
   notifyTickets: boolean
   /** Master: módulo Inventario */
@@ -48,6 +50,7 @@ const DEFAULTS: UserSettings = {
   soundEnabled: true,
   emailNotifications: true,
   pushNotifications: true,
+  telegramNotifications: true,
   notifyTickets: true,
   notifyInventory: true,
   notifyPatrols: true,
@@ -96,6 +99,7 @@ async function loadSettings() {
       soundEnabled: s.soundEnabled ?? DEFAULTS.soundEnabled,
       emailNotifications: s.emailNotifications ?? DEFAULTS.emailNotifications,
       pushNotifications: s.pushNotifications ?? DEFAULTS.pushNotifications,
+      telegramNotifications: s.telegramNotifications ?? DEFAULTS.telegramNotifications,
       notifyTickets: s.notifyTickets ?? DEFAULTS.notifyTickets,
       notifyInventory: s.notifyInventory ?? DEFAULTS.notifyInventory,
       notifyPatrols: s.notifyPatrols ?? DEFAULTS.notifyPatrols,

@@ -799,8 +799,8 @@ export default function FamiliesPage() {
                     maxLength={30}
                   />
                   <p className='text-xs text-muted-foreground mt-1'>
-                    Número de WhatsApp para contacto de activos en venta de esta familia. Lo pueden
-                    editar el admin y los gestores asignados a esta familia.
+                    Número con código de país (ej. 593987654321). Catálogo público de equipos en
+                    desuso de esta familia; si está vacío, se usa el WhatsApp del landing.
                   </p>
                 </div>
               </div>

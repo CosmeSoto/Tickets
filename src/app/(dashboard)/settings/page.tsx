@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/use-toast'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { PersonalSettings } from '@/components/settings/personal-settings'
 import { NotificationSettingsCard } from '@/components/notifications/notification-settings-card'
+import { TelegramLinkCard } from '@/components/notifications/telegram-link-card'
 import { useUserSettings } from '@/hooks/use-user-settings'
 import type { NotificationPreferences } from '@/types/notification-preferences'
 
@@ -37,6 +38,7 @@ export default function SettingsPage() {
   const notificationPrefs: NotificationPreferences = {
     emailNotifications: settings.emailNotifications,
     pushNotifications: settings.pushNotifications,
+    telegramNotifications: settings.telegramNotifications,
     notifyTickets: settings.notifyTickets,
     notifyInventory: settings.notifyInventory,
     notifyPatrols: settings.notifyPatrols,
@@ -112,6 +114,7 @@ export default function SettingsPage() {
               onSave={handleNotificationSave}
               loading={saving}
             />
+            <TelegramLinkCard />
           </TabsContent>
         </Tabs>
       </div>

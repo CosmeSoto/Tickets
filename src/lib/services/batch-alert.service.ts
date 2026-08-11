@@ -156,6 +156,23 @@ export class BatchAlertService {
           }).catch(() => {})
           emailsSent++
         }
+
+        // Telegram: solo alertas críticas de inventario
+        if (primary.level === 'critical') {
+          const { queueTelegramNotification } = await import(
+            '@/lib/notifications/queue-notification-telegram'
+          )
+          queueTelegramNotification({
+            recipientUserId: admin.id,
+            title: `Lote ${batch.batchCode}: ${primary.title}`,
+            body: `${brandModel} — ${primary.message}`,
+            module: 'inventory',
+            event: 'inventoryAlert',
+            priority: 'important',
+            link: `/inventory/batches/${batch.id}`,
+            telegramModule: 'inventory',
+          }).catch(() => {})
+        }
       }
     }
 

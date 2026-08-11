@@ -1,8 +1,13 @@
 /**
  * API Endpoint: GET /api/public/assets-for-sale
  *
- * Lista equipos en venta (FOR_SALE) agrupados por modelo
- * Endpoint público - no requiere autenticación
+ * Lista equipos en venta (FOR_SALE) agrupados por modelo.
+ * Endpoint público - no requiere autenticación.
+ *
+ * Contacto WhatsApp por ítem:
+ *   1) families.contact_whatsapp
+ *   2) landing CMS socialWhatsapp / contactPhone
+ *   3) system_settings (legacy)
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -10,18 +15,12 @@ import prisma from '@/lib/prisma'
 import { groupByModel } from '@/lib/services/equipment-grouping.service'
 import type { PublicEquipmentItem } from '@/types/equipment-grouping'
 import type { EquipmentCondition } from '@prisma/client'
+import { resolveSalesWhatsAppPhone } from '@/lib/sales-whatsapp-contact'
 
 export const dynamic = 'force-dynamic'
 
-// Solo 3 condiciones válidas (enum EquipmentCondition definitivo)
 const CONDITIONS: EquipmentCondition[] = ['NEW', 'USED', 'DAMAGED']
 
-/**
- * GET /api/public/assets-for-sale
- *
- * Retorna equipos en venta agrupados por modelo.
- * `request` es opcional para compatibilidad con tests que llaman sin argumentos.
- */
 export async function GET(request?: NextRequest) {
   try {
     const sp = request?.nextUrl?.searchParams
@@ -36,8 +35,7 @@ export async function GET(request?: NextRequest) {
         ? (conditionParam as EquipmentCondition)
         : undefined
 
-    // Obtener settings para WhatsApp
-    const [equipment, settings] = await Promise.all([
+    const [equipment, settings, landing] = await Promise.all([
       prisma.equipment.findMany({
         where: {
           status: 'FOR_SALE',
@@ -76,15 +74,23 @@ export async function GET(request?: NextRequest) {
           key: { in: ['landing.social_whatsapp', 'contact.phone'] },
         },
       }),
+      prisma.landing_page_content.findFirst({
+        select: {
+          socialWhatsapp: true,
+          contactPhone: true,
+        },
+      }),
     ])
 
-    // Obtener WhatsApp de settings
-    const whatsAppSetting =
-      settings.find(s => s.key === 'landing.social_whatsapp') ||
-      settings.find(s => s.key === 'contact.phone')
-    const contactWhatsapp = whatsAppSetting?.value || null
+    const settingsSocial = settings.find(s => s.key === 'landing.social_whatsapp')?.value ?? null
+    const settingsPhone = settings.find(s => s.key === 'contact.phone')?.value ?? null
+    const globalFallback = resolveSalesWhatsAppPhone({
+      landingSocialWhatsapp: landing?.socialWhatsapp,
+      landingContactPhone: landing?.contactPhone,
+      settingsSocialWhatsapp: settingsSocial,
+      settingsContactPhone: settingsPhone,
+    })
 
-    // Obtener todos los custom fields legacy de las familias involucradas (fallback)
     const familyIds = [
       ...new Set(equipment.map(eq => eq.type?.familyId).filter(Boolean)),
     ] as string[]
@@ -97,7 +103,6 @@ export async function GET(request?: NextRequest) {
           })
         : []
 
-    // Crear un mapa de fieldName -> field info por familia (legacy)
     const legacyFieldsByFamily = new Map<string, Map<string, (typeof legacyCustomFields)[0]>>()
     legacyCustomFields.forEach(field => {
       if (!legacyFieldsByFamily.has(field.familyId)) {
@@ -106,7 +111,6 @@ export async function GET(request?: NextRequest) {
       legacyFieldsByFamily.get(field.familyId)!.set(field.fieldName, field)
     })
 
-    // Transformar a formato PublicEquipmentItem
     const publicItems: PublicEquipmentItem[] = equipment
       .map(eq => {
         try {
@@ -164,6 +168,17 @@ export async function GET(request?: NextRequest) {
             publicImageUrl = eq.photoUrl
           }
 
+          const familyWhatsapp =
+            (eq.type.family as { contactWhatsapp?: string | null } | null)?.contactWhatsapp ?? null
+          const contactWhatsapp =
+            resolveSalesWhatsAppPhone({
+              familyWhatsapp,
+              landingSocialWhatsapp: landing?.socialWhatsapp,
+              landingContactPhone: landing?.contactPhone,
+              settingsSocialWhatsapp: settingsSocial,
+              settingsContactPhone: settingsPhone,
+            }) || globalFallback
+
           return {
             id: eq.id,
             code: eq.code,
@@ -198,12 +213,12 @@ export async function GET(request?: NextRequest) {
       })
       .filter((item): item is NonNullable<typeof item> => item !== null) as PublicEquipmentItem[]
 
-    // Agrupar equipos por modelo
     const groups = groupByModel(publicItems)
 
     return NextResponse.json(
       {
         items: groups,
+        contactWhatsapp: globalFallback,
       },
       {
         status: 200,

@@ -13,6 +13,7 @@ import { NotificationService } from '@/lib/services/notification-service'
 import { NotificationType, PatrolRecurrence } from '@prisma/client'
 import { getPatrolSupervisors } from '@/lib/patrol/patrol-helpers'
 import { getAppTimezone } from '@/lib/utils/date-utils'
+import { queueTelegramNotification } from '@/lib/notifications/queue-notification-telegram'
 
 export class PatrolSchedulerService {
   // ── Generación de patrullas ─────────────────────────────────────────────────
@@ -629,7 +630,29 @@ export class PatrolSchedulerService {
           missedCheckpoints: missedCount,
         },
       })
+
+      // Telegram al supervisor — ronda incompleta es operativamente relevante
+      queueTelegramNotification({
+        recipientUserId: supervisor.id,
+        title: '⚠️ Ronda cerrada incompleta',
+        body: `Ruta: ${patrol.route.name}\nAgente: ${patrol.agent.name}\nCerrada a las: ${endTime}\nCompletitud: ${completionPct}% (${missedCount} checkpoint(s) sin visitar)`,
+        module: 'patrols',
+        event: 'patrolMissed',
+        link: '/patrol',
+        telegramModule: 'patrols',
+      }).catch(err => console.error('[PatrolSchedulerService] Telegram autoClose supervisor:', err))
     }
+
+    // Telegram al agente — sabe que su ronda fue cerrada y cuántos checkpoints le faltaron
+    queueTelegramNotification({
+      recipientUserId: patrol.agentId,
+      title: 'Tu ronda fue cerrada automáticamente',
+      body: `Ruta: ${patrol.route.name}\nCerrada a las: ${endTime}\nCompletitud: ${completionPct}%\n${missedCount > 0 ? `${missedCount} checkpoint(s) sin registrar.` : 'Todos los checkpoints obligatorios completados.'}`,
+      module: 'patrols',
+      event: 'patrolMissed',
+      link: `/patrol/${patrol.id}`,
+      telegramModule: 'patrols',
+    }).catch(err => console.error('[PatrolSchedulerService] Telegram autoClose agente:', err))
   }
 
   /**
@@ -669,7 +692,29 @@ export class PatrolSchedulerService {
             familyId: patrol.familyId,
           },
         })
+
+        // Telegram al supervisor — canal operativo de seguridad
+        queueTelegramNotification({
+          recipientUserId: supervisor.id,
+          title: '⚠️ Ronda no iniciada',
+          body: `Ruta: ${patrol.route.name}\nAgente: ${patrol.agent.name}\nHora programada: ${scheduledTime}\n\nRevisar en Rondas → Dashboard.`,
+          module: 'patrols',
+          event: 'patrolMissed',
+          link: '/patrol',
+          telegramModule: 'patrols',
+        }).catch(err => console.error('[PatrolSchedulerService] Telegram MISSED supervisor:', err))
       }
+
+      // Telegram también al agente — para que sepa que quedó registrada la ausencia
+      queueTelegramNotification({
+        recipientUserId: patrol.agentId,
+        title: 'Ronda marcada como no iniciada',
+        body: `Tu ronda "${patrol.route.name}" programada para ${scheduledTime} fue marcada como no iniciada.\nContacta a tu supervisor si hubo un inconveniente.`,
+        module: 'patrols',
+        event: 'patrolMissed',
+        link: '/patrol',
+        telegramModule: 'patrols',
+      }).catch(err => console.error('[PatrolSchedulerService] Telegram MISSED agente:', err))
     }
   }
 }

@@ -97,6 +97,10 @@ export function groupByModel(equipment: PublicEquipmentItem[]): EquipmentGroup[]
       commonAttributes: Object.keys(commonAttributes).length > 0 ? commonAttributes : undefined,
       units,
       availableUnits: units.length,
+      contactWhatsapp:
+        units.find(u => u.contactWhatsapp)?.contactWhatsapp ??
+        representative.contactWhatsapp ??
+        null,
       createdAt: representative.createdAt,
       updatedAt: new Date(), // Fecha actual como última actualización del grupo
     })

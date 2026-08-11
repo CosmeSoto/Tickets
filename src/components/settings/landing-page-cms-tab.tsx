@@ -650,8 +650,12 @@ export function LandingPageCMSTab({ isSuperAdmin = false }: { isSuperAdmin?: boo
                       isSuperAdmin && setContent({ ...content, socialWhatsapp: e.target.value })
                     }
                     disabled={!isSuperAdmin}
-                    placeholder='https://wa.me/56912345678'
+                    placeholder='https://wa.me/593987654321'
                   />
+                  <p className='text-xs text-muted-foreground'>
+                    URL del footer y fallback del catálogo de equipos en desuso (si la familia no
+                    tiene WhatsApp propio).
+                  </p>
                 </div>
               </div>
             </TabsContent>

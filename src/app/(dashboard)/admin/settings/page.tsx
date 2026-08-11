@@ -25,6 +25,12 @@ import {
   Key,
   Crown,
   Timer,
+  Send,
+  CheckCircle2,
+  XCircle,
+  ExternalLink,
+  Eye,
+  EyeOff,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { invalidateLandingCache } from '@/hooks/use-landing-data'
@@ -69,6 +75,16 @@ interface SystemSettings {
   backupEnabled: boolean
   backupFrequency: 'daily' | 'weekly' | 'monthly'
   backupRetention: number
+
+  // Configuración de Telegram Bot
+  telegramEnabled: boolean
+  telegramBotToken: string
+  telegramBotUsername: string
+  telegramWebhookSecret: string
+  telegramNotificationsEnabled: boolean
+  // Solo lectura desde API
+  telegramBotTokenConfigured?: boolean
+  telegramWebhookSecretConfigured?: boolean
 }
 
 const SETTINGS_PAGE_SUBTITLE = 'Administra la configuración global del sistema de tickets'
@@ -84,6 +100,12 @@ function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') || 'general')
   const { toast } = useToast()
+  // Estado UI de Telegram (testing, webhook, visibilidad de campos sensibles)
+  const [telegramTesting, setTelegramTesting] = useState(false)
+  const [telegramBotInfo, setTelegramBotInfo] = useState<{id: number; username: string; firstName: string} | null>(null)
+  const [registeringWebhook, setRegisteringWebhook] = useState(false)
+  const [showBotToken, setShowBotToken] = useState(false)
+  const [showWebhookSecret, setShowWebhookSecret] = useState(false)
 
   useEffect(() => {
     if (status === 'loading') return
@@ -107,6 +129,12 @@ function SettingsPage() {
         setSettings({
           ...data,
           smtpPassword: '',
+          // Los tokens sensibles llegan vacíos — la API solo devuelve el flag *Configured
+          telegramBotToken: '',
+          telegramWebhookSecret: '',
+          telegramEnabled: data.telegramEnabled ?? false,
+          telegramBotUsername: data.telegramBotUsername ?? '',
+          telegramNotificationsEnabled: data.telegramNotificationsEnabled ?? true,
         })
       } else {
         toast({
@@ -133,11 +161,20 @@ function SettingsPage() {
 
     setSaving(true)
     try {
-      const { smtpPassword, ...rest } = settings
+      const { smtpPassword, telegramBotToken, telegramWebhookSecret, ...rest } = settings
       const payload: Record<string, unknown> = { ...rest }
       if (smtpPassword?.trim()) {
         payload.smtpPassword = smtpPassword
       }
+      // Solo enviar tokens Telegram si el admin escribió un nuevo valor
+      if (telegramBotToken?.trim()) {
+        payload.telegramBotToken = telegramBotToken
+      }
+      if (telegramWebhookSecret?.trim()) {
+        payload.telegramWebhookSecret = telegramWebhookSecret
+      }
+      // Resetear bot info al guardar (podría cambiar el token)
+      setTelegramBotInfo(null)
 
       const response = await fetch('/api/admin/settings', {
         method: 'PUT',
@@ -227,6 +264,98 @@ function SettingsPage() {
     }
   }
 
+  const testTelegramConnection = async () => {
+    if (!settings) return
+    const token = settings.telegramBotToken?.trim()
+    if (!token) {
+      toast({
+        title: 'Token requerido',
+        description: 'Escribe el token del bot antes de probar la conexión.',
+        variant: 'destructive',
+      })
+      return
+    }
+    setTelegramTesting(true)
+    setTelegramBotInfo(null)
+    try {
+      const res = await fetch('/api/admin/settings/test-telegram', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ botToken: token }),
+      })
+      const data = await res.json()
+      if (res.ok && data.success) {
+        setTelegramBotInfo(data.bot)
+        toast({
+          title: 'Bot verificado',
+          description: `@${data.bot.username} (${data.bot.firstName}) conectado correctamente.`,
+        })
+      } else {
+        toast({
+          title: 'Token inválido',
+          description: data.error || 'No se pudo conectar con la Bot API de Telegram.',
+          variant: 'destructive',
+        })
+      }
+    } catch {
+      toast({ title: 'Error de red', description: 'No se pudo conectar con el servidor.', variant: 'destructive' })
+    } finally {
+      setTelegramTesting(false)
+    }
+  }
+
+  const registerTelegramWebhook = async () => {
+    if (!settings) return
+
+    // Detectar URL local/privada antes de intentar el registro
+    const appUrl = window.location.origin
+    const isLocal =
+      appUrl.includes('localhost') ||
+      appUrl.includes('127.0.0.1') ||
+      /https?:\/\/192\.168\.\d+\.\d+/.test(appUrl) ||
+      /https?:\/\/10\.\d+\.\d+\.\d+/.test(appUrl) ||
+      /https?:\/\/172\.(1[6-9]|2\d|3[01])\.\d+\.\d+/.test(appUrl)
+
+    if (isLocal) {
+      toast({
+        title: 'URL local detectada',
+        description:
+          'Telegram no acepta IPs privadas. Usa el cron de polling mientras estés en red local. ' +
+          'El webhook funcionará cuando tengas un dominio público.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    setRegisteringWebhook(true)
+    try {
+      const body: Record<string, unknown> = {}
+      if (settings.telegramBotToken?.trim()) body.botToken = settings.telegramBotToken.trim()
+      const res = await fetch('/api/telegram/register-webhook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const data = await res.json()
+      if (res.ok && data.success) {
+        toast({
+          title: 'Webhook registrado',
+          description: `URL: ${data.webhookUrl}`,
+        })
+      } else {
+        toast({
+          title: 'Error al registrar webhook',
+          description: data.error || 'No se pudo registrar el webhook.',
+          variant: 'destructive',
+        })
+      }
+    } catch {
+      toast({ title: 'Error de red', description: 'No se pudo conectar con el servidor.', variant: 'destructive' })
+    } finally {
+      setRegisteringWebhook(false)
+    }
+  }
+
   if (status === 'loading') {
     return (
       <ModuleLayout title='Configuración del Sistema' subtitle={SETTINGS_PAGE_SUBTITLE} loading>
@@ -288,7 +417,7 @@ function SettingsPage() {
         value={activeTab}
         className='space-y-6'
         onValueChange={tab => {
-          const superAdminTabs = ['email', 'security', 'oauth', 'sla']
+          const superAdminTabs = ['email', 'security', 'oauth', 'sla', 'telegram']
           if (superAdminTabs.includes(tab) && !isSuperAdmin) return
           setActiveTab(tab)
         }}
@@ -326,6 +455,13 @@ function SettingsPage() {
               {!isSuperAdmin && <Crown className='h-3 w-3 text-amber-500' />}
               <Key className='h-4 w-4 hidden sm:inline' />
               OAuth
+            </span>
+          </TabsTrigger>
+          <TabsTrigger value='telegram' className='flex-1 min-w-[80px]' disabled={!isSuperAdmin}>
+            <span className='flex items-center gap-1'>
+              {!isSuperAdmin && <Crown className='h-3 w-3 text-amber-500' />}
+              <Send className='h-4 w-4 hidden sm:inline' />
+              <span>Telegram</span>
             </span>
           </TabsTrigger>
         </TabsList>
@@ -570,6 +706,34 @@ function SettingsPage() {
                   />
                 </div>
 
+                <div className='flex items-center justify-between p-4 border rounded-lg'>
+                  <div className='space-y-0.5'>
+                    <Label
+                      htmlFor='telegramNotificationsEnabled'
+                      className='text-base font-medium flex items-center gap-2'
+                    >
+                      <Send className='h-4 w-4 text-blue-500' />
+                      Alertas por Telegram
+                      {!isSuperAdmin && (
+                        <Crown className='h-3 w-3 text-amber-500' aria-label='Solo Super Admin' />
+                      )}
+                    </Label>
+                    <p className='text-sm text-muted-foreground'>
+                      Canal Telegram para alertas operativas globales (tickets, inventario,
+                      backups). Configura el bot en el tab Telegram.
+                    </p>
+                  </div>
+                  <Switch
+                    id='telegramNotificationsEnabled'
+                    checked={settings.telegramNotificationsEnabled ?? true}
+                    disabled={!isSuperAdmin}
+                    onCheckedChange={checked =>
+                      isSuperAdmin &&
+                      setSettings({ ...settings, telegramNotificationsEnabled: checked })
+                    }
+                  />
+                </div>
+
                 {!settings.notificationsEnabled && (
                   <div className='rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20 p-4'>
                     <div className='flex items-start space-x-3'>
@@ -807,6 +971,287 @@ function SettingsPage() {
                       Ir a Backups
                     </Button>
                   </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* ─── Tab Telegram Bot ──────────────────────────────────────────── */}
+        <TabsContent value='telegram'>
+          {!isSuperAdmin ? (
+            <div className='flex flex-col items-center justify-center py-16 text-center'>
+              <Crown className='h-12 w-12 text-amber-500 mb-4' />
+              <h3 className='text-lg font-semibold text-foreground mb-2'>Acceso restringido</h3>
+              <p className='text-muted-foreground max-w-sm'>
+                Esta sección solo está disponible para Administradores Principales (Super Admin).
+              </p>
+            </div>
+          ) : (
+            <div className='space-y-6'>
+              {/* Card principal */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className='flex items-center gap-2'>
+                    <Send className='h-5 w-5 text-blue-500' />
+                    Bot de Telegram
+                  </CardTitle>
+                  <CardDescription>
+                    Configura el bot para enviar alertas operativas al staff (tickets, inventario,
+                    backups) y permitir que los usuarios vinculen sus cuentas. El email sigue
+                    funcionando en paralelo — Telegram es un canal adicional.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className='space-y-6'>
+
+                  {/* Switch principal */}
+                  <div className='flex items-center justify-between p-4 border rounded-lg'>
+                    <div className='space-y-0.5'>
+                      <Label htmlFor='telegramEnabled' className='text-base font-medium'>
+                        Habilitar bot de Telegram
+                      </Label>
+                      <p className='text-sm text-muted-foreground'>
+                        Activa el canal Telegram para todo el sistema. Los usuarios podrán
+                        vincular sus cuentas y recibir alertas.
+                      </p>
+                    </div>
+                    <Switch
+                      id='telegramEnabled'
+                      checked={settings.telegramEnabled ?? false}
+                      onCheckedChange={checked =>
+                        setSettings({ ...settings, telegramEnabled: checked })
+                      }
+                    />
+                  </div>
+
+                  {settings.telegramEnabled && (
+                    <>
+                      {/* Token del bot */}
+                      <div className='space-y-2'>
+                        <Label htmlFor='telegramBotToken'>
+                          Token del Bot{' '}
+                          <span className='text-xs text-muted-foreground font-normal'>
+                            (obtenido de @BotFather)
+                          </span>
+                        </Label>
+                        <div className='relative'>
+                          <Input
+                            id='telegramBotToken'
+                            type={showBotToken ? 'text' : 'password'}
+                            value={settings.telegramBotToken}
+                            onChange={e =>
+                              setSettings({ ...settings, telegramBotToken: e.target.value, })
+                            }
+                            placeholder={
+                              settings.telegramBotTokenConfigured
+                                ? 'Dejar vacío para mantener el actual'
+                                : '123456789:AABBccDDeeffGGhh...'
+                            }
+                            className='pr-10'
+                          />
+                          <button
+                            type='button'
+                            onClick={() => setShowBotToken(v => !v)}
+                            className='absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground'
+                          >
+                            {showBotToken ? <EyeOff className='h-4 w-4' /> : <Eye className='h-4 w-4' />}
+                          </button>
+                        </div>
+                        {settings.telegramBotTokenConfigured && !settings.telegramBotToken && (
+                          <p className='text-xs text-muted-foreground'>
+                            Hay un token guardado. Escribe uno nuevo solo si deseas cambiarlo.
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Username del bot */}
+                      <div className='space-y-2'>
+                        <Label htmlFor='telegramBotUsername'>
+                          Username del bot{' '}
+                          <span className='text-xs text-muted-foreground font-normal'>
+                            (sin @, ej: mi_sistema_bot)
+                          </span>
+                        </Label>
+                        <Input
+                          id='telegramBotUsername'
+                          value={settings.telegramBotUsername}
+                          onChange={e =>
+                            setSettings({ ...settings, telegramBotUsername: e.target.value })
+                          }
+                          placeholder='mi_sistema_bot'
+                        />
+                        <p className='text-xs text-muted-foreground'>
+                          Se usa para generar el enlace directo al bot en la UI de vinculación.
+                        </p>
+                      </div>
+
+                      {/* Webhook secret */}
+                      <div className='space-y-2'>
+                        <Label htmlFor='telegramWebhookSecret'>
+                          Webhook Secret{' '}
+                          <span className='text-xs text-muted-foreground font-normal'>
+                            (recomendado — genera con{' '}
+                            <code className='font-mono'>openssl rand -hex 32</code>)
+                          </span>
+                        </Label>
+                        <div className='relative'>
+                          <Input
+                            id='telegramWebhookSecret'
+                            type={showWebhookSecret ? 'text' : 'password'}
+                            value={settings.telegramWebhookSecret}
+                            onChange={e =>
+                              setSettings({ ...settings, telegramWebhookSecret: e.target.value })
+                            }
+                            placeholder={
+                              settings.telegramWebhookSecretConfigured
+                                ? 'Dejar vacío para mantener el actual'
+                                : 'a1b2c3d4e5f6...'
+                            }
+                            className='pr-10'
+                          />
+                          <button
+                            type='button'
+                            onClick={() => setShowWebhookSecret(v => !v)}
+                            className='absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground'
+                          >
+                            {showWebhookSecret ? <EyeOff className='h-4 w-4' /> : <Eye className='h-4 w-4' />}
+                          </button>
+                        </div>
+                        {settings.telegramWebhookSecretConfigured && !settings.telegramWebhookSecret && (
+                          <p className='text-xs text-muted-foreground'>
+                            Hay un secret guardado. Cámbialo solo si quieres rotar el secreto.
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Bot info tras verificar */}
+                      {telegramBotInfo && (
+                        <div className='flex items-start gap-3 rounded-lg border border-green-200 bg-green-50 dark:bg-green-900/10 dark:border-green-800 p-4'>
+                          <CheckCircle2 className='h-5 w-5 text-green-600 mt-0.5 flex-shrink-0' />
+                          <div className='space-y-0.5'>
+                            <p className='text-sm font-medium text-green-800 dark:text-green-300'>
+                              Bot verificado: @{telegramBotInfo.username}
+                            </p>
+                            <p className='text-xs text-green-700 dark:text-green-400'>
+                              {telegramBotInfo.firstName} · ID {telegramBotInfo.id}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Banner modo local / polling */}
+                      {(() => {
+                        const origin = typeof window !== 'undefined' ? window.location.origin : ''
+                        const isLocal =
+                          origin.includes('localhost') ||
+                          origin.includes('127.0.0.1') ||
+                          /192\.168\.\d+\.\d+/.test(origin) ||
+                          /10\.\d+\.\d+\.\d+/.test(origin) ||
+                          /172\.(1[6-9]|2\d|3[01])\.\d+\.\d+/.test(origin)
+                        if (!isLocal) return null
+                        return (
+                          <div className='flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-900/10 dark:border-blue-800 p-4'>
+                            <AlertTriangle className='h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0' />
+                            <div className='space-y-1.5'>
+                              <p className='text-sm font-medium text-blue-900 dark:text-blue-200'>
+                                Red local — usa Polling en lugar de Webhook
+                              </p>
+                              <p className='text-xs text-blue-800 dark:text-blue-300'>
+                                Telegram no acepta IPs privadas para webhooks. Activa el cron de
+                                polling ejecutando en tu terminal:
+                              </p>
+                              <code className='block text-xs font-mono bg-blue-100 dark:bg-blue-900/30 rounded px-2 py-1 text-blue-900 dark:text-blue-200'>
+                                ./docker/scripts/setup-telegram-poll-cron.sh
+                              </code>
+                              <p className='text-xs text-blue-700 dark:text-blue-400'>
+                                El botón &quot;Registrar Webhook&quot; funcionará cuando tengas un dominio
+                                público con HTTPS.
+                              </p>
+                            </div>
+                          </div>
+                        )
+                      })()}
+
+                      {/* Acciones */}
+                      <div className='flex flex-wrap gap-3 pt-2'>
+                        <Button
+                          variant='outline'
+                          onClick={testTelegramConnection}
+                          disabled={telegramTesting}
+                        >
+                          {telegramTesting ? (
+                            <RefreshCw className='h-4 w-4 mr-2 animate-spin' />
+                          ) : (
+                            <Send className='h-4 w-4 mr-2' />
+                          )}
+                          Probar conexión
+                        </Button>
+                        <Button
+                          variant='outline'
+                          onClick={registerTelegramWebhook}
+                          disabled={registeringWebhook}
+                          title={
+                            typeof window !== 'undefined' &&
+                            /192\.168\.|127\.0\.0\.1|localhost|^10\.|172\.(1[6-9]|2\d|3[01])\./.test(window.location.origin)
+                              ? 'No disponible en red local — usa el cron de polling'
+                              : undefined
+                          }
+                        >
+                          {registeringWebhook ? (
+                            <RefreshCw className='h-4 w-4 mr-2 animate-spin' />
+                          ) : (
+                            <ExternalLink className='h-4 w-4 mr-2' />
+                          )}
+                          Registrar Webhook
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Card de instrucciones */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className='text-base'>Guía de configuración</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ol className='space-y-3 text-sm text-muted-foreground list-decimal list-inside'>
+                    <li>
+                      Abre Telegram y busca{' '}
+                      <a
+                        href='https://t.me/BotFather'
+                        target='_blank'
+                        rel='noopener noreferrer'
+                        className='text-primary hover:underline inline-flex items-center gap-1'
+                      >
+                        @BotFather <ExternalLink className='h-3 w-3' />
+                      </a>
+                      . Escribe <code className='font-mono text-xs'>/newbot</code> y sigue las instrucciones.
+                    </li>
+                    <li>
+                      Copia el token que te da BotFather y pégalo en el campo de arriba.
+                    </li>
+                    <li>
+                      Pulsa <strong>Probar conexión</strong> para verificar el token.
+                    </li>
+                    <li>
+                      Guarda la configuración con el botón <strong>Guardar</strong>.
+                    </li>
+                    <li>
+                      <strong>Red local:</strong> ejecuta en tu terminal:{' '}
+                      <code className='font-mono text-xs'>./docker/scripts/setup-telegram-poll-cron.sh</code>
+                      {' '}— activa el polling cada 30 s sin necesitar URL pública.
+                      <br />
+                      <strong>Producción (hosting):</strong> pulsa{' '}
+                      <strong>Registrar Webhook</strong> para recibir mensajes en tiempo real.
+                    </li>
+                    <li>
+                      Los usuarios pueden vincular sus cuentas desde{' '}
+                      <strong>Configuración → Notificaciones → Telegram</strong> o desde su{' '}
+                      <strong>Perfil</strong>.
+                    </li>
+                  </ol>
                 </CardContent>
               </Card>
             </div>

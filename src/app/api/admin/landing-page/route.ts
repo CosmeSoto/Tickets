@@ -236,6 +236,46 @@ export async function PUT(request: NextRequest) {
       )
     }
 
+    // Sync WhatsApp de catálogo (dígitos) para API pública / legacy settings
+    if (body.socialWhatsapp !== undefined || body.contactPhone !== undefined) {
+      const { normalizeWhatsAppPhone } = await import('@/lib/sales-whatsapp-contact')
+      const phone =
+        normalizeWhatsAppPhone(body.socialWhatsapp) ||
+        normalizeWhatsAppPhone(body.contactPhone) ||
+        ''
+      syncPromises.push(
+        prisma.system_settings.upsert({
+          where: { key: 'landing.social_whatsapp' },
+          update: { value: phone, updatedAt: new Date() },
+          create: {
+            id: randomUUID(),
+            key: 'landing.social_whatsapp',
+            value: phone,
+            description: 'WhatsApp (dígitos) para catálogo de equipos en venta',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        })
+      )
+      if (body.contactPhone !== undefined) {
+        const contactDigits = normalizeWhatsAppPhone(body.contactPhone) || body.contactPhone || ''
+        syncPromises.push(
+          prisma.system_settings.upsert({
+            where: { key: 'contact.phone' },
+            update: { value: contactDigits, updatedAt: new Date() },
+            create: {
+              id: randomUUID(),
+              key: 'contact.phone',
+              value: contactDigits,
+              description: 'Teléfono de contacto general',
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+          })
+        )
+      }
+    }
+
     if (syncPromises.length > 0) {
       await Promise.all(syncPromises)
     }

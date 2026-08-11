@@ -14,6 +14,7 @@ import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
 import { NotificationType } from '@prisma/client'
 import { randomUUID } from 'crypto'
 import { checkPatrolModuleAccess } from '@/lib/patrol/patrol-helpers'
+import { queueTelegramNotification } from '@/lib/notifications/queue-notification-telegram'
 import {
   assertScheduleAgent,
   assertScheduleFamilyAccess,
@@ -203,7 +204,7 @@ export async function POST(request: NextRequest) {
       data.repeatIntervalMinutes ?? null
     )
 
-    // Notificar al agente
+    // Notificar al agente — in-app
     await NotificationService.push({
       userId: data.agentId,
       type: NotificationType.PATROL_ASSIGNED,
@@ -211,6 +212,20 @@ export async function POST(request: NextRequest) {
       message: `Se te ha asignado la ruta "${route?.name ?? 'Ronda'}" programada para ${start.toLocaleString('es-EC', { timeZone: getAppTimezone() })}.`,
       metadata: { scheduleId: schedule.id, routeId: data.routeId, familyId: data.familyId },
     })
+
+    // Telegram: misma alerta al agente por canal operativo
+    const recStr = data.recurrence && data.recurrence !== 'NONE'
+      ? ` (recurrencia: ${data.recurrence.toLowerCase()})`
+      : ''
+    queueTelegramNotification({
+      recipientUserId: data.agentId,
+      title: 'Nueva ronda asignada',
+      body: `Ruta: ${route?.name ?? 'Ronda'}${recStr}\nInicio: ${start.toLocaleString('es-EC', { timeZone: getAppTimezone() })}`,
+      module: 'patrols',
+      event: 'patrolAssigned',
+      link: '/patrol',
+      telegramModule: 'patrols',
+    }).catch(err => console.error('[patrol/schedules POST] Telegram:', err))
 
     await AuditServiceComplete.log({
       action: 'PATROL_SCHEDULE_CREATED',

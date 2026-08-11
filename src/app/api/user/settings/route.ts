@@ -48,6 +48,9 @@ const userSettingsSchema = z.object({
   // Privacidad
   profileVisible: z.boolean().optional(),
   activityVisible: z.boolean().optional(),
+
+  // Telegram
+  telegramNotifications: z.boolean().optional(),
 })
 
 /**
@@ -78,6 +81,7 @@ export async function GET(request: NextRequest) {
           settings: {
             emailNotifications: true,
             pushNotifications: true,
+            telegramNotifications: true,
             notifyTickets: true,
             notifyInventory: true,
             notifyPatrols: true,
@@ -204,6 +208,7 @@ export async function GET(request: NextRequest) {
         settings: {
           emailNotifications: settings.emailNotifications,
           pushNotifications: settings.pushNotifications,
+          telegramNotifications: settings.telegramNotifications ?? true,
           notifyTickets: settings.notifyTickets ?? true,
           notifyInventory: settings.notifyInventory ?? true,
           notifyPatrols: settings.notifyPatrols ?? true,
@@ -316,6 +321,10 @@ export async function PUT(request: NextRequest) {
     if (data.language !== undefined) updateData.language = data.language
     if (data.timezone !== undefined) updateData.timezone = data.timezone
 
+    // Telegram
+    if (data.telegramNotifications !== undefined)
+      updateData.telegramNotifications = data.telegramNotifications
+
     // Actualizar o crear configuración de notificaciones
     const settings = await prisma.user_settings.upsert({
       where: { userId },
@@ -360,6 +369,7 @@ export async function PUT(request: NextRequest) {
       settings: {
         emailNotifications: settings.emailNotifications,
         pushNotifications: settings.pushNotifications,
+        telegramNotifications: settings.telegramNotifications ?? true,
         notifyTickets: settings.notifyTickets ?? true,
         notifyInventory: settings.notifyInventory ?? true,
         notifyPatrols: settings.notifyPatrols ?? true,

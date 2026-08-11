@@ -10,6 +10,10 @@ jest.mock('@/lib/prisma', () => {
   const p = {
     equipment: { findMany: jest.fn() },
     family_custom_fields: { findMany: jest.fn().mockResolvedValue([]) },
+    system_settings: { findMany: jest.fn().mockResolvedValue([]) },
+    landing_page_content: {
+      findFirst: jest.fn().mockResolvedValue({ socialWhatsapp: null, contactPhone: null }),
+    },
   }
   return { __esModule: true, default: p, prisma: p }
 })
@@ -98,7 +102,16 @@ describe('GET /api/public/assets-for-sale', () => {
   it('skips invalid equipment rows and still returns 200', async () => {
     ;(prisma.equipment.findMany as jest.Mock).mockResolvedValue([
       baseEquipmentRow({ type: null }),
-      baseEquipmentRow({ id: '2', code: 'TEST-002', type: { ...baseEquipmentRow().type, family: null, familyId: null, attributes: undefined } }),
+      baseEquipmentRow({
+        id: '2',
+        code: 'TEST-002',
+        type: {
+          ...baseEquipmentRow().type,
+          family: null,
+          familyId: null,
+          attributes: undefined,
+        },
+      }),
     ])
 
     const res = await GET()
@@ -106,5 +119,41 @@ describe('GET /api/public/assets-for-sale', () => {
     const data = await res.json()
     expect(data.items).toBeDefined()
     expect(Array.isArray(data.items)).toBe(true)
+  })
+
+  it('uses family contactWhatsapp on grouped units', async () => {
+    ;(prisma.equipment.findMany as jest.Mock).mockResolvedValue([baseEquipmentRow()])
+
+    const res = await GET()
+    const data = await res.json()
+    const unit = data.items[0].units[0]
+    expect(unit.contactWhatsapp).toBe('593987654321')
+    expect(data.items[0].contactWhatsapp).toBe('593987654321')
+  })
+
+  it('falls back to landing WhatsApp when family has none', async () => {
+    ;(prisma.equipment.findMany as jest.Mock).mockResolvedValue([
+      baseEquipmentRow({
+        type: {
+          ...baseEquipmentRow().type,
+          family: {
+            id: 'family-1',
+            name: 'Tecnología',
+            icon: null,
+            color: null,
+            contactWhatsapp: null,
+          },
+        },
+      }),
+    ])
+    ;(prisma.landing_page_content.findFirst as jest.Mock).mockResolvedValue({
+      socialWhatsapp: 'https://wa.me/593111122233',
+      contactPhone: null,
+    })
+
+    const res = await GET()
+    const data = await res.json()
+    expect(data.items[0].units[0].contactWhatsapp).toBe('593111122233')
+    expect(data.contactWhatsapp).toBe('593111122233')
   })
 })

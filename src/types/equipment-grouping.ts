@@ -85,6 +85,9 @@ export interface EquipmentGroup {
   /** Count of available units */
   availableUnits: number
 
+  /** WhatsApp de contacto (familia o fallback global) */
+  contactWhatsapp?: string | null
+
   /** Metadata */
   createdAt: Date
   updatedAt: Date

@@ -30,9 +30,9 @@ export interface GroupedEquipmentCardProps {
  */
 function formatPrice(price: number | null): string {
   if (price === null) return 'Precio no disponible'
-  return new Intl.NumberFormat('es-MX', {
+  return new Intl.NumberFormat('es-EC', {
     style: 'currency',
-    currency: 'MXN',
+    currency: 'USD',
   }).format(price)
 }
 
@@ -74,10 +74,11 @@ export function GroupedEquipmentCard({
   const isGrouped = group.availableUnits > 1
 
   const handleContact = () => {
+    if (!group.contactWhatsapp) return
     setIsLoadingContact(true)
     try {
       const message = generateGroupContactMessage(group)
-      const whatsappUrl = generateWhatsAppUrl(message)
+      const whatsappUrl = generateWhatsAppUrl(message, group.contactWhatsapp)
       window.open(whatsappUrl, '_blank')
       onContactGeneral(group)
     } finally {
@@ -189,12 +190,21 @@ export function GroupedEquipmentCard({
         {/* Botón "Contactar" */}
         <Button
           variant='default'
-          className='w-full bg-green-600 hover:bg-green-700'
+          className='w-full bg-green-600 hover:bg-green-700 disabled:opacity-60'
           onClick={handleContact}
-          disabled={isLoadingContact}
+          disabled={isLoadingContact || !group.contactWhatsapp}
+          title={
+            group.contactWhatsapp
+              ? undefined
+              : 'Sin WhatsApp configurado (familia o landing)'
+          }
         >
           <MessageCircle className='mr-2 h-4 w-4' />
-          {isLoadingContact ? 'Abriendo...' : 'Contactar Depto. de Compras'}
+          {isLoadingContact
+            ? 'Abriendo...'
+            : group.contactWhatsapp
+              ? 'Contactar por WhatsApp'
+              : 'WhatsApp no configurado'}
         </Button>
       </CardFooter>
     </Card>

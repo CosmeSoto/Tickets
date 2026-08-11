@@ -81,10 +81,12 @@ export function UnitsListSheet({ group, open, onClose, onContactUnit }: UnitsLis
   const [loadingUnitId, setLoadingUnitId] = useState<string | null>(null)
 
   const handleContactUnit = (unit: PublicEquipmentItem) => {
+    const phone = unit.contactWhatsapp || group.contactWhatsapp
+    if (!phone) return
     setLoadingUnitId(unit.id)
     try {
       const message = generateUnitContactMessage(unit)
-      const whatsappUrl = generateWhatsAppUrl(message)
+      const whatsappUrl = generateWhatsAppUrl(message, phone)
       window.open(whatsappUrl, '_blank')
       onContactUnit(unit)
     } finally {
@@ -118,9 +120,9 @@ export function UnitsListSheet({ group, open, onClose, onContactUnit }: UnitsLis
               <div className='flex items-center justify-between'>
                 <span className='text-sm font-medium text-gray-700'>Precio por unidad:</span>
                 <span className='text-lg font-bold text-green-600'>
-                  {new Intl.NumberFormat('es-MX', {
+                  {new Intl.NumberFormat('es-EC', {
                     style: 'currency',
-                    currency: 'MXN',
+                    currency: 'USD',
                   }).format(group.saleListingPrice)}
                 </span>
               </div>
@@ -175,7 +177,15 @@ export function UnitsListSheet({ group, open, onClose, onContactUnit }: UnitsLis
                         variant='outline'
                         className='text-green-600 hover:text-green-700 hover:bg-green-50'
                         onClick={() => handleContactUnit(unit)}
-                        disabled={loadingUnitId === unit.id}
+                        disabled={
+                          loadingUnitId === unit.id ||
+                          !(unit.contactWhatsapp || group.contactWhatsapp)
+                        }
+                        title={
+                          unit.contactWhatsapp || group.contactWhatsapp
+                            ? undefined
+                            : 'Sin WhatsApp configurado'
+                        }
                       >
                         <MessageCircle className='mr-2 h-4 w-4' />
                         {loadingUnitId === unit.id ? 'Abriendo...' : 'Contactar'}
