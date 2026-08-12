@@ -34,10 +34,10 @@ import {
   Timer,
   Send,
   CheckCircle2,
-  XCircle,
   ExternalLink,
   Eye,
   EyeOff,
+  Inbox,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { invalidateLandingCache } from '@/hooks/use-landing-data'
@@ -107,6 +107,13 @@ function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') || 'general')
   const { toast } = useToast()
+  // Estado UI de cola de email
+  const [emailQueueStats, setEmailQueueStats] = useState<{
+    pending: number
+    failed: number
+  } | null>(null)
+  const [emailQueueLoading, setEmailQueueLoading] = useState(false)
+  const [emailQueueProcessing, setEmailQueueProcessing] = useState(false)
   // Estado UI de Telegram (testing, webhook, visibilidad de campos sensibles)
   const [telegramTesting, setTelegramTesting] = useState(false)
   const [telegramBotInfo, setTelegramBotInfo] = useState<{
@@ -272,6 +279,47 @@ function SettingsPage() {
         description: 'No se pudo conectar con el servidor. Verifica tu red.',
         variant: 'destructive',
       })
+    }
+  }
+
+  const loadEmailQueue = async () => {
+    setEmailQueueLoading(true)
+    try {
+      const res = await fetch('/api/admin/settings/email-queue')
+      const data = await res.json()
+      if (data.success) {
+        setEmailQueueStats(data.stats)
+      }
+    } catch {
+      // silencioso — no interrumpir la carga general
+    } finally {
+      setEmailQueueLoading(false)
+    }
+  }
+
+  const processEmailQueue = async (retryFailed = false) => {
+    setEmailQueueProcessing(true)
+    try {
+      const res = await fetch('/api/admin/settings/email-queue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ retryFailed }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast({ title: 'Cola procesada', description: data.message })
+        await loadEmailQueue()
+      } else {
+        toast({ title: 'Error', description: data.error, variant: 'destructive' })
+      }
+    } catch {
+      toast({
+        title: 'Error de red',
+        description: 'No se pudo conectar con el servidor.',
+        variant: 'destructive',
+      })
+    } finally {
+      setEmailQueueProcessing(false)
     }
   }
 
@@ -813,6 +861,82 @@ function SettingsPage() {
                       <p className='text-xs text-muted-foreground mt-2'>
                         Envía un email de prueba a tu cuenta para verificar que la configuración es
                         correcta
+                      </p>
+                    </div>
+
+                    {/* Panel de cola de emails */}
+                    <div className='rounded-lg border border-border bg-muted/30 p-4 space-y-3 mt-2'>
+                      <div className='flex items-center justify-between'>
+                        <div className='flex items-center gap-2'>
+                          <Inbox className='h-4 w-4 text-muted-foreground' />
+                          <span className='text-sm font-medium'>Cola de emails</span>
+                        </div>
+                        <Button
+                          variant='ghost'
+                          size='sm'
+                          onClick={loadEmailQueue}
+                          disabled={emailQueueLoading}
+                        >
+                          <RefreshCw
+                            className={`h-3.5 w-3.5 mr-1.5 ${emailQueueLoading ? 'animate-spin' : ''}`}
+                          />
+                          Actualizar
+                        </Button>
+                      </div>
+
+                      {emailQueueStats === null ? (
+                        <p className='text-xs text-muted-foreground'>
+                          Pulsa Actualizar para ver el estado de la cola.
+                        </p>
+                      ) : (
+                        <div className='grid grid-cols-2 gap-3'>
+                          <div className='rounded-md border border-border bg-background px-3 py-2 text-center'>
+                            <p className='text-xl font-semibold'>{emailQueueStats.pending}</p>
+                            <p className='text-xs text-muted-foreground'>Pendientes</p>
+                          </div>
+                          <div
+                            className={`rounded-md border px-3 py-2 text-center ${emailQueueStats.failed > 0 ? 'border-destructive/40 bg-destructive/5' : 'border-border bg-background'}`}
+                          >
+                            <p
+                              className={`text-xl font-semibold ${emailQueueStats.failed > 0 ? 'text-destructive' : ''}`}
+                            >
+                              {emailQueueStats.failed}
+                            </p>
+                            <p className='text-xs text-muted-foreground'>Fallidos</p>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className='flex gap-2 flex-wrap'>
+                        <Button
+                          variant='outline'
+                          size='sm'
+                          onClick={() => processEmailQueue(false)}
+                          disabled={emailQueueProcessing}
+                        >
+                          {emailQueueProcessing ? (
+                            <RefreshCw className='h-3.5 w-3.5 mr-1.5 animate-spin' />
+                          ) : (
+                            <Send className='h-3.5 w-3.5 mr-1.5' />
+                          )}
+                          Procesar cola ahora
+                        </Button>
+                        {emailQueueStats && emailQueueStats.failed > 0 && (
+                          <Button
+                            variant='outline'
+                            size='sm'
+                            onClick={() => processEmailQueue(true)}
+                            disabled={emailQueueProcessing}
+                          >
+                            <RefreshCw className='h-3.5 w-3.5 mr-1.5' />
+                            Reintentar {emailQueueStats.failed} fallido
+                            {emailQueueStats.failed !== 1 ? 's' : ''}
+                          </Button>
+                        )}
+                      </div>
+                      <p className='text-xs text-muted-foreground'>
+                        Los emails de notificaciones (tickets, etc.) se encolan y se envían en lote.
+                        Si hay pendientes o fallidos, procésalos manualmente desde aquí.
                       </p>
                     </div>
                   </>

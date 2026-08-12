@@ -56,6 +56,8 @@ export interface EmailQueueItem {
 export class EmailService {
   private static transporter: nodemailer.Transporter | null = null
   private static isConfigured = false
+  // Hash de la última config usada para detectar cambios y forzar reconexión
+  private static configHash: string = ''
 
   private static async getSMTPConfig() {
     const cfg = await getUnifiedSmtpConfig()
@@ -70,8 +72,16 @@ export class EmailService {
     }
   }
 
+  /** Hash simple de la config para detectar si cambió desde la última conexión */
+  private static hashConfig(
+    cfg: NonNullable<Awaited<ReturnType<typeof EmailService.getSMTPConfig>>>
+  ): string {
+    return `${cfg.host}:${cfg.port}:${cfg.secure}:${cfg.user}:${cfg.password}`
+  }
+
   /**
-   * Inicializa el transporter de email
+   * Inicializa el transporter de email.
+   * Siempre refresca si la config de BD cambió respecto a la última conexión.
    */
   private static async getTransporter(): Promise<nodemailer.Transporter> {
     const smtpConfig = await this.getSMTPConfig()
@@ -79,26 +89,44 @@ export class EmailService {
     if (!smtpConfig) {
       this.transporter = null
       this.isConfigured = false
+      this.configHash = ''
       throw new Error(
         'Configuración SMTP no encontrada o correo desactivado. Configure en Admin > Configuración'
       )
     }
 
-    if (this.transporter && this.isConfigured) {
+    const currentHash = this.hashConfig(smtpConfig)
+
+    // Reutilizar solo si el transporter existe Y la config no cambió
+    if (this.transporter && this.isConfigured && this.configHash === currentHash) {
       return this.transporter
     }
 
-    const transportOpts: any = {
+    // Cerrar conexión anterior si existe
+    if (this.transporter) {
+      try {
+        this.transporter.close()
+      } catch {
+        /* ignorar */
+      }
+    }
+
+    const transportOpts: nodemailer.TransportOptions = {
       host: smtpConfig.host,
       port: smtpConfig.port,
       secure: smtpConfig.secure,
       pool: true,
       maxConnections: 5,
       maxMessages: 100,
-    }
+      // STARTTLS: puerto 587 siempre requiere upgrade aunque secure=false
+      ...(smtpConfig.port === 587 && { requireTLS: true }),
+      connectionTimeout: 15000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000,
+    } as nodemailer.TransportOptions
 
     if (smtpConfig.password) {
-      transportOpts.auth = {
+      ;(transportOpts as any).auth = {
         user: smtpConfig.user,
         pass: smtpConfig.password,
       }
@@ -106,6 +134,7 @@ export class EmailService {
 
     this.transporter = nodemailer.createTransport(transportOpts)
     this.isConfigured = true
+    this.configHash = currentHash
     return this.transporter
   }
 
@@ -134,7 +163,7 @@ export class EmailService {
 
       // Enviar email
       const recipients = Array.isArray(options.to) ? options.to : [options.to]
-      
+
       for (const recipient of recipients) {
         await transporter.sendMail({
           from: smtpConfig.from,
@@ -142,7 +171,7 @@ export class EmailService {
           subject: options.subject,
           html,
           text,
-          priority: options.priority || 'normal'
+          priority: options.priority || 'normal',
         })
       }
 
@@ -156,15 +185,15 @@ export class EmailService {
           details: {
             to: recipients,
             subject: options.subject,
-            template: options.template
-          }
+            template: options.template,
+          },
         })
       }
 
       return true
     } catch (error) {
       console.error('[EMAIL-SERVICE] Error sending email:', error)
-      
+
       // Registrar error en auditoría
       if (userId) {
         await AuditServiceComplete.logAction({
@@ -174,8 +203,8 @@ export class EmailService {
           entityId: randomUUID(),
           details: {
             error: error instanceof Error ? error.message : 'Unknown error',
-            success: false
-          }
+            success: false,
+          },
         }).catch(console.error)
       }
 
@@ -197,10 +226,12 @@ export class EmailService {
         text = rendered.text
       }
 
-      const module: EmailModule =
+      const emailModule: EmailModule =
         options.module || (options.ticketEmailEvent ? 'tickets' : 'system')
       const event: NotificationEmailEvent =
-        options.event || options.ticketEmailEvent || (module === 'auth' ? 'security' : 'generic')
+        options.event ||
+        options.ticketEmailEvent ||
+        (emailModule === 'auth' ? 'security' : 'generic')
 
       const queueIds = await queueNotificationEmail({
         to: options.to,
@@ -208,7 +239,7 @@ export class EmailService {
         html: html || text,
         text,
         recipientUserId: options.recipientUserId,
-        module,
+        module: emailModule,
         event,
         priority: options.notificationPriority,
         templateName: options.template,
@@ -248,68 +279,85 @@ export class EmailService {
   static async processQueue(): Promise<{ sent: number; failed: number }> {
     try {
       const now = new Date()
-      
-      // Obtener emails pendientes que deben enviarse
+
+      // Obtener emails pendientes que deben enviarse.
+      // NOTA: no comparamos attempts < maxAttempts en el where de Prisma porque
+      // prisma.email_queue.fields.maxAttempts es el descriptor del campo, no un valor.
+      // Filtramos con una condición raw equivalente a: attempts < maxAttempts
       const pendingEmails = await prisma.email_queue.findMany({
         where: {
           status: 'pending',
           scheduledAt: { lte: now },
-          attempts: { lt: prisma.email_queue.fields.maxAttempts }
         },
-        take: 50, // Procesar máximo 50 por lote
-        orderBy: { scheduledAt: 'asc' }
+        take: 50,
+        orderBy: { scheduledAt: 'asc' },
       })
+
+      // Filtrar en memoria los que aún tienen reintentos disponibles
+      const actionable = pendingEmails.filter(e => e.attempts < e.maxAttempts)
 
       let sent = 0
       let failed = 0
 
-      for (const email of pendingEmails) {
+      for (const email of actionable) {
         try {
-          // Marcar como enviando
-          await prisma.email_queue.update({
-            where: { id: email.id },
-            data: { 
-              status: 'sending',
-              attempts: { increment: 1 }
-            }
-          })
-
-          // Intentar enviar
-          const success = await this.sendEmail({
-            to: email.toEmail,
-            subject: email.subject,
-            html: email.body
-          })
-
-          if (success) {
-            // Marcar como enviado
-            await prisma.email_queue.update({
-              where: { id: email.id },
-              data: {
-                status: 'sent',
-                sentAt: new Date()
-              }
-            })
-            sent++
-          } else {
-            throw new Error('Failed to send email')
-          }
-        } catch (error) {
-          // Marcar como fallido o pendiente para reintentar
-          const attempts = email.attempts + 1
-          const status = attempts >= email.maxAttempts ? 'failed' : 'pending'
-          
+          // Marcar como enviando e incrementar intentos
           await prisma.email_queue.update({
             where: { id: email.id },
             data: {
-              status,
-              errorMessage: error instanceof Error ? error.message : 'Unknown error'
-            }
+              status: 'sending',
+              attempts: { increment: 1 },
+            },
           })
 
-          if (status === 'failed') {
-            failed++
+          // Renderizar template si corresponde
+          let html = email.body
+          let text: string | undefined
+          if (email.templateName && email.templateData) {
+            try {
+              const data =
+                typeof email.templateData === 'string'
+                  ? JSON.parse(email.templateData)
+                  : (email.templateData as Record<string, unknown>)
+              const rendered = await this.renderTemplate(email.templateName, data)
+              html = rendered.html
+              text = rendered.text
+            } catch {
+              // Usar body crudo si el template falla
+            }
           }
+
+          const success = await this.sendEmail({
+            to: email.toEmail,
+            subject: email.subject,
+            html,
+            text,
+          })
+
+          if (success) {
+            await prisma.email_queue.update({
+              where: { id: email.id },
+              data: { status: 'sent', sentAt: new Date() },
+            })
+            sent++
+          } else {
+            throw new Error('sendEmail devolvió false')
+          }
+        } catch (error) {
+          // attempts ya fue incrementado en BD; releer para decidir si fallar definitivamente
+          const current = await prisma.email_queue.findUnique({
+            where: { id: email.id },
+            select: { attempts: true, maxAttempts: true },
+          })
+          const exhausted = current ? current.attempts >= current.maxAttempts : true
+          await prisma.email_queue.update({
+            where: { id: email.id },
+            data: {
+              status: exhausted ? 'failed' : 'pending',
+              errorMessage: error instanceof Error ? error.message : 'Unknown error',
+            },
+          })
+          if (exhausted) failed++
         }
       }
 
@@ -345,7 +393,7 @@ export class EmailService {
       // Fallback a template básico
       return {
         html: `<p>${data.message || 'Notificación del sistema'}</p>`,
-        text: data.message || 'Notificación del sistema'
+        text: data.message || 'Notificación del sistema',
       }
     }
   }
@@ -361,7 +409,7 @@ export class EmailService {
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
       }
     }
   }
@@ -378,9 +426,9 @@ export class EmailService {
         where: {
           OR: [
             { status: 'sent', sentAt: { lt: cutoffDate } },
-            { status: 'failed', createdAt: { lt: cutoffDate } }
-          ]
-        }
+            { status: 'failed', createdAt: { lt: cutoffDate } },
+          ],
+        },
       })
 
       return result.count

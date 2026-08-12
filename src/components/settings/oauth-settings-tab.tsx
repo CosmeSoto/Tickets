@@ -39,7 +39,6 @@ export function OAuthSettingsTab() {
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [configs, setConfigs] = useState<OAuthConfig[]>([])
   const [copiedField, setCopiedField] = useState<string | null>(null)
   const [testingProvider, setTestingProvider] = useState<string | null>(null)
 
@@ -72,8 +71,6 @@ export function OAuthSettingsTab() {
       const data = await response.json()
 
       if (data.success) {
-        setConfigs(data.data)
-
         // Cargar configuración de Google
         const google = data.data.find((c: OAuthConfig) => c.provider === 'google')
         if (google) {
@@ -233,6 +230,11 @@ export function OAuthSettingsTab() {
     }
   }
 
+  const PROVIDER_LABELS: Record<string, string> = {
+    google: 'Google',
+    'azure-ad': 'Microsoft',
+  }
+
   const testOAuthConfig = async (provider: string) => {
     setTestingProvider(provider)
     try {
@@ -245,79 +247,17 @@ export function OAuthSettingsTab() {
 
       if (!res.ok || !data.success) {
         toast({
-          title: 'No se puede probar',
+          title: `Error en configuración de ${PROVIDER_LABELS[provider] ?? provider}`,
           description: data.error || 'Error al verificar la configuración.',
           variant: 'destructive',
         })
         return
       }
 
-      // Abrir popup con el flujo real de autorización
-      const label = data.label as string
-      const width = 520
-      const height = 640
-      const left = window.screenX + (window.outerWidth - width) / 2
-      const top = window.screenY + (window.outerHeight - height) / 2
-      const popup = window.open(
-        data.authUrl,
-        `oauth_test_${provider}`,
-        `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no,scrollbars=yes,resizable=yes`
-      )
-
-      if (!popup) {
-        toast({
-          title: 'Popup bloqueado',
-          description: 'Permite popups para este sitio y vuelve a intentarlo.',
-          variant: 'destructive',
-        })
-        return
-      }
-
       toast({
-        title: `Probando ${label} OAuth`,
-        description:
-          'Se abrió una ventana con el flujo de login. Si ves la pantalla de inicio de sesión, la configuración es correcta.',
+        title: `${data.label} OAuth verificado`,
+        description: `Credenciales correctas. Confirma que esta Redirect URI esté registrada en el portal: ${data.redirectUri}`,
       })
-
-      // Monitorear el popup: si el proveedor redirige de vuelta al callback
-      // significa que el App ID es reconocido (aunque el flujo no complete por ser un test)
-      const timer = setInterval(() => {
-        try {
-          if (popup.closed) {
-            clearInterval(timer)
-            return
-          }
-          const url = popup.location.href
-          // El popup llegó a nuestro dominio → el proveedor aceptó la app
-          if (url && url.includes('/api/auth/callback')) {
-            clearInterval(timer)
-            popup.close()
-            toast({
-              title: `${label} OAuth verificado`,
-              description: 'El proveedor reconoció la aplicación y redirigió correctamente.',
-            })
-          }
-          // Error conocido de Azure/Google: redirect_uri_mismatch
-          if (
-            url &&
-            (url.includes('error=redirect_uri_mismatch') || url.includes('error=access_denied'))
-          ) {
-            clearInterval(timer)
-            popup.close()
-            toast({
-              title: 'Error de configuración en el proveedor',
-              description:
-                'El proveedor rechazó la Redirect URI. Asegúrate de que esté registrada en el portal.',
-              variant: 'destructive',
-            })
-          }
-        } catch {
-          // cross-origin: el popup está en el dominio del proveedor, es normal
-        }
-      }, 800)
-
-      // Limpiar después de 3 minutos si no hubo actividad
-      setTimeout(() => clearInterval(timer), 3 * 60 * 1000)
     } catch {
       toast({
         title: 'Error de red',

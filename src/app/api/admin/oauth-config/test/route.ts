@@ -2,31 +2,138 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-
-const PROVIDER_AUTH_URLS: Record<string, (tenantId?: string | null) => string> = {
-  google: () => 'https://accounts.google.com/o/oauth2/v2/auth',
-  'azure-ad': tenantId => {
-    const tenant =
-      tenantId && tenantId !== 'common' && tenantId !== 'consumers'
-        ? tenantId
-        : tenantId || 'common'
-    return `https://login.microsoftonline.com/${tenant}/v2.0/authorize`
-  },
-}
-
-const PROVIDER_SCOPES: Record<string, string> = {
-  google: 'openid profile email',
-  'azure-ad': 'openid profile email User.Read',
-}
+import { decrypt } from '@/lib/crypto'
 
 const PROVIDER_LABELS: Record<string, string> = {
   google: 'Google',
   'azure-ad': 'Microsoft',
 }
 
+// Verifica que el tenant de Azure AD existe y es accesible
+async function verifyAzureTenant(tenantId: string): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const metadataUrl = `https://login.microsoftonline.com/${tenantId}/v2.0/.well-known/openid-configuration`
+    const res = await fetch(metadataUrl, { signal: AbortSignal.timeout(8000) })
+    if (!res.ok) {
+      return {
+        ok: false,
+        error: `Tenant ID no reconocido por Microsoft (HTTP ${res.status}). Verifica el Id. de directorio en Azure Portal.`,
+      }
+    }
+    return { ok: true }
+  } catch {
+    return {
+      ok: false,
+      error: 'No se pudo contactar con login.microsoftonline.com. Verifica la red.',
+    }
+  }
+}
+
+// Verifica clientId + clientSecret contra Azure AD usando client_credentials
+// (no requiere usuario, es una verificación pura de las credenciales de la app)
+async function verifyAzureCredentials(
+  tenantId: string,
+  clientId: string,
+  clientSecret: string
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`
+    const body = new URLSearchParams({
+      grant_type: 'client_credentials',
+      client_id: clientId,
+      client_secret: clientSecret,
+      scope: 'https://graph.microsoft.com/.default',
+    })
+
+    const res = await fetch(tokenUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+      signal: AbortSignal.timeout(10000),
+    })
+
+    const data = await res.json()
+
+    if (res.ok && data.access_token) {
+      return { ok: true }
+    }
+
+    // Interpretar errores comunes de Azure AD
+    const azureError = data.error as string | undefined
+    const azureDesc = data.error_description as string | undefined
+
+    if (azureError === 'invalid_client') {
+      if (azureDesc?.includes('secret')) {
+        return {
+          ok: false,
+          error:
+            'Client Secret incorrecto o expirado. Genera uno nuevo en Azure Portal → Certificados y secretos.',
+        }
+      }
+      return {
+        ok: false,
+        error: `Application (Client) ID no válido para este tenant. Verifica que la app esté registrada en el directorio correcto.`,
+      }
+    }
+    if (azureError === 'unauthorized_client') {
+      return {
+        ok: false,
+        error: 'La aplicación no tiene permisos de client_credentials en este tenant.',
+      }
+    }
+    if (azureError === 'invalid_resource' || azureError === 'invalid_scope') {
+      // El scope de Graph puede no estar habilitado, pero las credenciales son válidas
+      return { ok: true }
+    }
+
+    return { ok: false, error: azureDesc || azureError || 'Credenciales rechazadas por Microsoft.' }
+  } catch {
+    return { ok: false, error: 'Tiempo de espera agotado al contactar con Microsoft.' }
+  }
+}
+
+// Verifica clientId + clientSecret de Google usando el token info endpoint
+async function verifyGoogleCredentials(
+  clientId: string,
+  clientSecret: string
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    // Google no tiene un endpoint de validación directa de credenciales sin usuario,
+    // pero podemos intentar un token request que fallará de forma predecible si son inválidas
+    const res = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        client_id: clientId,
+        client_secret: clientSecret,
+        code: 'test_invalid_code',
+        redirect_uri: 'http://localhost',
+      }).toString(),
+      signal: AbortSignal.timeout(8000),
+    })
+
+    const data = await res.json()
+
+    // Si el error es sobre el código (no las credenciales), las credenciales son válidas
+    if (data.error === 'invalid_grant' || data.error === 'redirect_uri_mismatch') {
+      return { ok: true }
+    }
+    if (data.error === 'invalid_client') {
+      return {
+        ok: false,
+        error: 'Client ID o Client Secret de Google inválidos. Verifica en Google Cloud Console.',
+      }
+    }
+
+    // Cualquier otro error de flujo (no de credenciales) se considera OK
+    return { ok: true }
+  } catch {
+    return { ok: false, error: 'No se pudo contactar con Google OAuth. Verifica la red.' }
+  }
+}
+
 // POST /api/admin/oauth-config/test
-// Valida que la configuración del proveedor esté completa y habilitada,
-// y devuelve la URL de autorización para iniciar el flujo real en el cliente.
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -39,11 +146,10 @@ export async function POST(request: NextRequest) {
     const { provider } = body
 
     if (!provider || !['google', 'azure-ad'].includes(provider)) {
-      return NextResponse.json(
-        { success: false, error: 'Proveedor inválido. Usa "google" o "azure-ad".' },
-        { status: 400 }
-      )
+      return NextResponse.json({ success: false, error: 'Proveedor inválido.' }, { status: 400 })
     }
+
+    const label = PROVIDER_LABELS[provider]
 
     // Leer config desde BD
     const config = await prisma.oauth_configs.findUnique({ where: { provider } })
@@ -52,7 +158,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: `No hay configuración guardada para ${PROVIDER_LABELS[provider]}. Guarda los datos primero.`,
+          error: `No hay configuración guardada para ${label}. Guarda los datos primero.`,
         },
         { status: 404 }
       )
@@ -60,10 +166,7 @@ export async function POST(request: NextRequest) {
 
     if (!config.isEnabled) {
       return NextResponse.json(
-        {
-          success: false,
-          error: `${PROVIDER_LABELS[provider]} OAuth está deshabilitado. Actívalo antes de probar.`,
-        },
+        { success: false, error: `${label} OAuth está deshabilitado. Actívalo antes de probar.` },
         { status: 400 }
       )
     }
@@ -72,40 +175,87 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: `La configuración de ${PROVIDER_LABELS[provider]} está incompleta. Verifica Client ID y Client Secret.`,
+          error: `La configuración de ${label} está incompleta. Verifica Client ID y Client Secret.`,
         },
         { status: 400 }
       )
     }
 
-    // Construir la URL de autorización real (mismo flujo que usaría NextAuth)
+    // Desencriptar secret para las verificaciones
+    let plainSecret: string
+    try {
+      plainSecret = decrypt(config.clientSecret)
+    } catch {
+      return NextResponse.json(
+        { success: false, error: 'Error al leer el Client Secret guardado. Vuelve a ingresarlo.' },
+        { status: 500 }
+      )
+    }
+
+    const diagnostics: string[] = []
+
+    if (provider === 'azure-ad') {
+      const tenant = config.tenantId || 'common'
+
+      // Paso 1: verificar que el tenant existe
+      const tenantCheck = await verifyAzureTenant(tenant)
+      if (!tenantCheck.ok) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: tenantCheck.error,
+            step: 'tenant',
+            diagnostics: [`Tenant ID usado: ${tenant}`],
+          },
+          { status: 400 }
+        )
+      }
+      diagnostics.push(`Tenant verificado: ${tenant}`)
+
+      // Paso 2: verificar clientId + clientSecret
+      const credsCheck = await verifyAzureCredentials(tenant, config.clientId, plainSecret)
+      if (!credsCheck.ok) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: credsCheck.error,
+            step: 'credentials',
+            diagnostics,
+          },
+          { status: 400 }
+        )
+      }
+      diagnostics.push('Client ID y Client Secret verificados correctamente')
+    }
+
+    if (provider === 'google') {
+      const credsCheck = await verifyGoogleCredentials(config.clientId, plainSecret)
+      if (!credsCheck.ok) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: credsCheck.error,
+            step: 'credentials',
+            diagnostics,
+          },
+          { status: 400 }
+        )
+      }
+      diagnostics.push('Client ID y Client Secret de Google verificados correctamente')
+    }
+
+    // Todo OK — devolver también la redirect URI para que el usuario confirme que está en el portal
     const baseUrl =
       request.headers.get('origin') || request.headers.get('referer')?.split('/admin')[0] || ''
     const redirectUri = config.redirectUri || `${baseUrl}/api/auth/callback/${provider}`
-    const scopes = config.scopes || PROVIDER_SCOPES[provider]
-    const authBaseUrl = PROVIDER_AUTH_URLS[provider](config.tenantId)
-
-    const params = new URLSearchParams({
-      client_id: config.clientId,
-      response_type: 'code',
-      redirect_uri: redirectUri,
-      scope: scopes,
-      // state aleatorio para CSRF — el popup no completará el flow real,
-      // pero si el proveedor devuelve la pantalla de login, la config es correcta
-      state: `oauth_test_${Date.now()}`,
-      prompt: 'select_account',
-    })
-
-    const authUrl = `${authBaseUrl}?${params.toString()}`
 
     return NextResponse.json({
       success: true,
+      label,
       provider,
-      label: PROVIDER_LABELS[provider],
-      authUrl,
-      clientId: config.clientId,
-      tenantId: config.tenantId,
+      diagnostics,
       redirectUri,
+      message: `Credenciales de ${label} verificadas correctamente. Asegúrate de que la Redirect URI esté registrada en el portal.`,
     })
   } catch (error) {
     console.error('Error testing OAuth config:', error)
