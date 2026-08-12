@@ -7,7 +7,18 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
-import { Save, Eye, EyeOff, Loader2, Shield, Globe, Copy, Check, Key } from 'lucide-react'
+import {
+  Save,
+  Eye,
+  EyeOff,
+  Loader2,
+  Shield,
+  Globe,
+  Copy,
+  Check,
+  Key,
+  FlaskConical,
+} from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { Switch } from '@/components/ui/switch'
 
@@ -30,6 +41,7 @@ export function OAuthSettingsTab() {
   const [saving, setSaving] = useState(false)
   const [configs, setConfigs] = useState<OAuthConfig[]>([])
   const [copiedField, setCopiedField] = useState<string | null>(null)
+  const [testingProvider, setTestingProvider] = useState<string | null>(null)
 
   // Estados para Google
   const [googleConfig, setGoogleConfig] = useState({
@@ -221,6 +233,102 @@ export function OAuthSettingsTab() {
     }
   }
 
+  const testOAuthConfig = async (provider: string) => {
+    setTestingProvider(provider)
+    try {
+      const res = await fetch('/api/admin/oauth-config/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider }),
+      })
+      const data = await res.json()
+
+      if (!res.ok || !data.success) {
+        toast({
+          title: 'No se puede probar',
+          description: data.error || 'Error al verificar la configuración.',
+          variant: 'destructive',
+        })
+        return
+      }
+
+      // Abrir popup con el flujo real de autorización
+      const label = data.label as string
+      const width = 520
+      const height = 640
+      const left = window.screenX + (window.outerWidth - width) / 2
+      const top = window.screenY + (window.outerHeight - height) / 2
+      const popup = window.open(
+        data.authUrl,
+        `oauth_test_${provider}`,
+        `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no,scrollbars=yes,resizable=yes`
+      )
+
+      if (!popup) {
+        toast({
+          title: 'Popup bloqueado',
+          description: 'Permite popups para este sitio y vuelve a intentarlo.',
+          variant: 'destructive',
+        })
+        return
+      }
+
+      toast({
+        title: `Probando ${label} OAuth`,
+        description:
+          'Se abrió una ventana con el flujo de login. Si ves la pantalla de inicio de sesión, la configuración es correcta.',
+      })
+
+      // Monitorear el popup: si el proveedor redirige de vuelta al callback
+      // significa que el App ID es reconocido (aunque el flujo no complete por ser un test)
+      const timer = setInterval(() => {
+        try {
+          if (popup.closed) {
+            clearInterval(timer)
+            return
+          }
+          const url = popup.location.href
+          // El popup llegó a nuestro dominio → el proveedor aceptó la app
+          if (url && url.includes('/api/auth/callback')) {
+            clearInterval(timer)
+            popup.close()
+            toast({
+              title: `${label} OAuth verificado`,
+              description: 'El proveedor reconoció la aplicación y redirigió correctamente.',
+            })
+          }
+          // Error conocido de Azure/Google: redirect_uri_mismatch
+          if (
+            url &&
+            (url.includes('error=redirect_uri_mismatch') || url.includes('error=access_denied'))
+          ) {
+            clearInterval(timer)
+            popup.close()
+            toast({
+              title: 'Error de configuración en el proveedor',
+              description:
+                'El proveedor rechazó la Redirect URI. Asegúrate de que esté registrada en el portal.',
+              variant: 'destructive',
+            })
+          }
+        } catch {
+          // cross-origin: el popup está en el dominio del proveedor, es normal
+        }
+      }, 800)
+
+      // Limpiar después de 3 minutos si no hubo actividad
+      setTimeout(() => clearInterval(timer), 3 * 60 * 1000)
+    } catch {
+      toast({
+        title: 'Error de red',
+        description: 'No se pudo conectar con el servidor.',
+        variant: 'destructive',
+      })
+    } finally {
+      setTestingProvider(null)
+    }
+  }
+
   const fallbackCopy = (text: string) => {
     const el = document.createElement('textarea')
     el.value = text
@@ -408,28 +516,51 @@ export function OAuthSettingsTab() {
             />
           </div>
 
-          {/* Save Button */}
-          <Button
-            onClick={saveGoogleConfig}
-            disabled={
-              saving ||
-              !googleConfig.clientId ||
-              (!googleConfig.clientSecret && !googleConfig.hasExistingSecret)
-            }
-            className='w-full'
-          >
-            {saving ? (
-              <>
+          {/* Save + Test Buttons — Google */}
+          <div className='flex flex-col sm:flex-row gap-2'>
+            <Button
+              onClick={saveGoogleConfig}
+              disabled={
+                saving ||
+                !googleConfig.clientId ||
+                (!googleConfig.clientSecret && !googleConfig.hasExistingSecret)
+              }
+              className='flex-1'
+            >
+              {saving ? (
+                <>
+                  <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                  Guardando...
+                </>
+              ) : (
+                <>
+                  <Save className='mr-2 h-4 w-4' />
+                  Guardar Configuración de Google
+                </>
+              )}
+            </Button>
+            <Button
+              variant='outline'
+              onClick={() => testOAuthConfig('google')}
+              disabled={
+                testingProvider === 'google' || !googleConfig.isEnabled || !googleConfig.clientId
+              }
+              title={
+                !googleConfig.isEnabled
+                  ? 'Activa Google OAuth para poder probarlo'
+                  : !googleConfig.clientId
+                    ? 'Guarda la configuración primero'
+                    : 'Abre un popup con el flujo real de login de Google'
+              }
+            >
+              {testingProvider === 'google' ? (
                 <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                Guardando...
-              </>
-            ) : (
-              <>
-                <Save className='mr-2 h-4 w-4' />
-                Guardar Configuración de Google
-              </>
-            )}
-          </Button>
+              ) : (
+                <FlaskConical className='mr-2 h-4 w-4' />
+              )}
+              Probar conexión
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
@@ -580,28 +711,53 @@ export function OAuthSettingsTab() {
             />
           </div>
 
-          {/* Save Button */}
-          <Button
-            onClick={saveMicrosoftConfig}
-            disabled={
-              saving ||
-              !microsoftConfig.clientId ||
-              (!microsoftConfig.clientSecret && !microsoftConfig.hasExistingSecret)
-            }
-            className='w-full'
-          >
-            {saving ? (
-              <>
+          {/* Save + Test Buttons — Microsoft */}
+          <div className='flex flex-col sm:flex-row gap-2'>
+            <Button
+              onClick={saveMicrosoftConfig}
+              disabled={
+                saving ||
+                !microsoftConfig.clientId ||
+                (!microsoftConfig.clientSecret && !microsoftConfig.hasExistingSecret)
+              }
+              className='flex-1'
+            >
+              {saving ? (
+                <>
+                  <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                  Guardando...
+                </>
+              ) : (
+                <>
+                  <Save className='mr-2 h-4 w-4' />
+                  Guardar Configuración de Microsoft
+                </>
+              )}
+            </Button>
+            <Button
+              variant='outline'
+              onClick={() => testOAuthConfig('azure-ad')}
+              disabled={
+                testingProvider === 'azure-ad' ||
+                !microsoftConfig.isEnabled ||
+                !microsoftConfig.clientId
+              }
+              title={
+                !microsoftConfig.isEnabled
+                  ? 'Activa Microsoft OAuth para poder probarlo'
+                  : !microsoftConfig.clientId
+                    ? 'Guarda la configuración primero'
+                    : 'Abre un popup con el flujo real de login de Microsoft'
+              }
+            >
+              {testingProvider === 'azure-ad' ? (
                 <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                Guardando...
-              </>
-            ) : (
-              <>
-                <Save className='mr-2 h-4 w-4' />
-                Guardar Configuración de Microsoft
-              </>
-            )}
-          </Button>
+              ) : (
+                <FlaskConical className='mr-2 h-4 w-4' />
+              )}
+              Probar conexión
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
