@@ -184,6 +184,7 @@ export const DateInput = React.forwardRef<HTMLInputElement, DateInputProps>(
             collisionPadding={16}
             onOpenAutoFocus={e => e.preventDefault()}
             onCloseAutoFocus={e => e.preventDefault()}
+            onFocusOutside={e => e.preventDefault()}
           >
             <Calendar
               mode='single'

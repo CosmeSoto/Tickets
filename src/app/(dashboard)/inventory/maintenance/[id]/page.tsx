@@ -747,7 +747,7 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
           if (!open) setApproveAssignee(emptyAssignee())
         }}
       >
-        <DialogContent className='max-h-[90vh] overflow-y-auto' aria-describedby={undefined}>
+        <DialogContent className='w-[min(98vw,38rem)] max-w-none max-h-[90vh] overflow-y-auto' aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>Aprobar y Programar Mantenimiento</DialogTitle>
             <DialogDescription>

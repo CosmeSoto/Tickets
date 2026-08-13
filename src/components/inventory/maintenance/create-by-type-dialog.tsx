@@ -251,7 +251,7 @@ export function CreateByTypeDialog({ open, onClose, onCreated }: CreateByTypeDia
         if (!next) handleClose()
       }}
     >
-      <DialogContent className='max-w-2xl max-h-[90vh] overflow-y-auto'>
+      <DialogContent className='w-[min(98vw,38rem)] max-w-none max-h-[90vh] overflow-y-auto'>
         <DialogHeader>
           <DialogTitle>Crear Mantenimiento por Tipo</DialogTitle>
           <DialogDescription>

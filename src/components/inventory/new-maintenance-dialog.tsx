@@ -204,7 +204,7 @@ export function NewMaintenanceDialog({
         if (!v) handleClose()
       }}
     >
-      <DialogContent className='max-w-md max-h-[90vh] overflow-y-auto' aria-describedby={undefined}>
+      <DialogContent className='w-[min(98vw,38rem)] max-w-none max-h-[90vh] overflow-y-auto' aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle className='flex items-center gap-2'>
             <Wrench className='h-5 w-5' />
