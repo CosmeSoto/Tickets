@@ -5,6 +5,10 @@ import type { DropdownProps } from 'react-day-picker'
 
 import { useCalendarContainer } from '@/components/ui/calendar-container-context'
 import {
+  calendarSelectClosed,
+  calendarSelectOpened,
+} from '@/lib/ui/calendar-select-open'
+import {
   Select,
   SelectContent,
   SelectGroup,
@@ -28,7 +32,14 @@ export function CalendarSelectDropdown(props: DropdownProps) {
   }
 
   return (
-    <Select value={value?.toString()} onValueChange={handleValueChange}>
+    <Select
+      value={value?.toString()}
+      onValueChange={handleValueChange}
+      onOpenChange={open => {
+        if (open) calendarSelectOpened()
+        else calendarSelectClosed()
+      }}
+    >
       <SelectTrigger
         aria-label={ariaLabel}
         className='h-8 w-fit min-w-[5rem] gap-1 border px-2 py-0 text-sm font-medium shadow-xs'

@@ -2,9 +2,13 @@
  * Evita que capas dismissable de Radix (Dialog, Popover) cierren al interactuar
  * con el calendario o los Select de mes/año (portaleados fuera del Popover).
  */
+import { isCalendarSelectOpen } from '@/lib/ui/calendar-select-open'
+
 export function isCalendarOrSelectInteraction(event: {
   target: EventTarget | null
 }): boolean {
+  if (isCalendarSelectOpen()) return true
+
   const target = event.target as HTMLElement | null
 
   if (target) {

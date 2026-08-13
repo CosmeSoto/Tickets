@@ -18,6 +18,7 @@ import { es } from 'date-fns/locale'
 import { CalendarIcon, X } from 'lucide-react'
 
 import { preventDismissOnCalendarInteraction } from '@/lib/ui/calendar-dismiss'
+import { isCalendarSelectOpen } from '@/lib/ui/calendar-select-open'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
@@ -137,13 +138,10 @@ export const DateInput = React.forwardRef<HTMLInputElement, DateInputProps>(
       commit('')
     }
 
-    const displayLabel = selectedDate
-      ? format(selectedDate, 'dd/MM/yyyy', { locale: es })
-      : placeholder
-
     const handleOpenChange = (next: boolean) => {
       if (disabled) return
       if (!next) {
+        if (isCalendarSelectOpen()) return
         const active = document.activeElement as HTMLElement | null
         if (
           active?.closest('[data-slot=calendar]') ||
@@ -154,6 +152,27 @@ export const DateInput = React.forwardRef<HTMLInputElement, DateInputProps>(
       }
       setOpen(next)
     }
+
+    const displayLabel = selectedDate
+      ? format(selectedDate, 'dd/MM/yyyy', { locale: es })
+      : placeholder
+
+    const calendarNode = (
+      <Calendar
+        mode='single'
+        selected={selectedDate}
+        onSelect={handleSelect}
+        defaultMonth={selectedDate ?? minDate ?? maxDate}
+        captionLayout='dropdown'
+        startMonth={new Date(1990, 0)}
+        endMonth={new Date(new Date().getFullYear() + 15, 11)}
+        disabled={day => {
+          if (minDate && day < minDate) return true
+          if (maxDate && day > maxDate) return true
+          return false
+        }}
+      />
+    )
 
     return (
       <>
@@ -203,20 +222,7 @@ export const DateInput = React.forwardRef<HTMLInputElement, DateInputProps>(
             onFocusOutside={preventDismissOnCalendarInteraction}
             onInteractOutside={preventDismissOnCalendarInteraction}
           >
-            <Calendar
-              mode='single'
-              selected={selectedDate}
-              onSelect={handleSelect}
-              defaultMonth={selectedDate ?? minDate ?? maxDate}
-              captionLayout='dropdown'
-              startMonth={new Date(1990, 0)}
-              endMonth={new Date(new Date().getFullYear() + 15, 11)}
-              disabled={day => {
-                if (minDate && day < minDate) return true
-                if (maxDate && day > maxDate) return true
-                return false
-              }}
-            />
+            {calendarNode}
           </PopoverContent>
         </Popover>
       </>
