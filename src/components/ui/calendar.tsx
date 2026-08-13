@@ -4,92 +4,10 @@ import * as React from 'react'
 import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from 'lucide-react'
 import { DayButton, DayPicker, getDefaultClassNames } from 'react-day-picker'
 import { es } from 'date-fns/locale'
-import * as SelectPrimitive from '@radix-ui/react-select'
 
 import { cn } from '@/lib/utils'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { DEFAULT_TIMEZONE } from '@/lib/constants'
-
-// ── Dropdown personalizado con Radix Select ───────────────────────────────────
-// Reemplaza el <select> nativo de react-day-picker para evitar problemas de
-// cierre de Popovers/Dialogs cuando el dropdown de mes/año se abre en Linux/Mac.
-type DropdownProps = React.ComponentProps<'select'>
-
-function CalendarDropdown({ value, onChange, children, className }: DropdownProps) {
-  // Convertir children de <option> a items para Radix Select
-  const options = React.Children.toArray(children)
-    .filter((child): child is React.ReactElement<React.OptionHTMLAttributes<HTMLOptionElement>> =>
-      React.isValidElement(child) && child.type === 'option'
-    )
-    .map(opt => ({
-      value: String(opt.props.value ?? ''),
-      label: String(opt.props.children ?? ''),
-      disabled: Boolean(opt.props.disabled),
-    }))
-
-  const handleValueChange = (val: string) => {
-    // Simular un ChangeEvent del <select> nativo que espera react-day-picker
-    const syntheticEvent = {
-      target: { value: val },
-    } as React.ChangeEvent<HTMLSelectElement>
-    onChange?.(syntheticEvent)
-  }
-
-  return (
-    <SelectPrimitive.Root value={String(value ?? '')} onValueChange={handleValueChange}>
-      <SelectPrimitive.Trigger
-        className={cn(
-          'flex h-8 items-center justify-between gap-1 rounded-md px-2 py-1 text-sm font-medium',
-          'border border-input bg-background hover:bg-accent hover:text-accent-foreground',
-          'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1',
-          'data-[placeholder]:text-muted-foreground',
-          className
-        )}
-      >
-        <SelectPrimitive.Value />
-        <SelectPrimitive.Icon asChild>
-          <ChevronDownIcon className='size-3.5 opacity-50' />
-        </SelectPrimitive.Icon>
-      </SelectPrimitive.Trigger>
-      <SelectPrimitive.Portal>
-        <SelectPrimitive.Content
-          className={cn(
-            'relative z-[300] max-h-60 min-w-[6rem] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md',
-            'data-[state=open]:animate-in data-[state=closed]:animate-out',
-            'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
-            'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
-            'data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2',
-          )}
-          position='popper'
-          sideOffset={4}
-        >
-          <SelectPrimitive.ScrollUpButton className='flex cursor-default items-center justify-center py-1'>
-            <ChevronDownIcon className='size-4 rotate-180' />
-          </SelectPrimitive.ScrollUpButton>
-          <SelectPrimitive.Viewport className='p-1'>
-            {options.map(opt => (
-              <SelectPrimitive.Item
-                key={opt.value}
-                value={opt.value}
-                disabled={opt.disabled}
-                className={cn(
-                  'relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-2 pr-6 text-sm outline-none',
-                  'focus:bg-accent focus:text-accent-foreground',
-                  'data-[disabled]:pointer-events-none data-[disabled]:opacity-50'
-                )}
-              >
-                <SelectPrimitive.ItemText>{opt.label}</SelectPrimitive.ItemText>
-              </SelectPrimitive.Item>
-            ))}
-          </SelectPrimitive.Viewport>
-          <SelectPrimitive.ScrollDownButton className='flex cursor-default items-center justify-center py-1'>
-            <ChevronDownIcon className='size-4' />
-          </SelectPrimitive.ScrollDownButton>
-        </SelectPrimitive.Content>
-      </SelectPrimitive.Portal>
-    </SelectPrimitive.Root>
-  )
-}
 
 function Calendar({
   className,
@@ -148,10 +66,10 @@ function Calendar({
           defaultClassNames.dropdowns
         ),
         dropdown_root: cn(
-          'relative',
+          'has-focus:border-ring border-input shadow-xs has-focus:ring-ring/50 has-focus:ring-[3px] relative rounded-md border',
           defaultClassNames.dropdown_root
         ),
-        dropdown: cn('hidden', defaultClassNames.dropdown),
+        dropdown: cn('bg-popover absolute inset-0 opacity-0', defaultClassNames.dropdown),
         caption_label: cn(
           'select-none font-semibold text-lg',
           captionLayout === 'label'
@@ -206,7 +124,6 @@ function Calendar({
           return <ChevronDownIcon className={cn('size-5', className)} {...props} />
         },
         DayButton: CalendarDayButton,
-        Dropdown: CalendarDropdown,
         WeekNumber: ({ children, ...props }) => {
           return (
             <td {...props}>

@@ -96,16 +96,6 @@ export function DateTimePicker({
         collisionPadding={16}
         onOpenAutoFocus={e => e.preventDefault()}
         onCloseAutoFocus={e => e.preventDefault()}
-        onPointerDownOutside={e => {
-          const target = e.target as HTMLElement | null
-          if (
-            target?.closest('[data-radix-select-content]') ||
-            target?.closest('[role=option]') ||
-            target?.closest('[data-slot=calendar]')
-          ) {
-            e.preventDefault()
-          }
-        }}
       >
         <Calendar
           mode='single'
@@ -198,16 +188,6 @@ export function DatePickerWithTime({
         collisionPadding={16}
         onOpenAutoFocus={e => e.preventDefault()}
         onCloseAutoFocus={e => e.preventDefault()}
-        onPointerDownOutside={e => {
-          const target = e.target as HTMLElement | null
-          if (
-            target?.closest('[data-radix-select-content]') ||
-            target?.closest('[role=option]') ||
-            target?.closest('[data-slot=calendar]')
-          ) {
-            e.preventDefault()
-          }
-        }}
       >
         <Calendar
           mode='single'

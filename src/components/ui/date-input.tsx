@@ -184,18 +184,7 @@ export const DateInput = React.forwardRef<HTMLInputElement, DateInputProps>(
             collisionPadding={16}
             onOpenAutoFocus={e => e.preventDefault()}
             onCloseAutoFocus={e => e.preventDefault()}
-            onPointerDownOutside={e => {
-              // El Radix Select del CalendarDropdown se renderiza fuera del Popover (portal).
-              // Evitar que el Popover se cierre cuando el usuario hace click en ese Select.
-              const target = e.target as HTMLElement | null
-              if (
-                target?.closest('[data-radix-select-content]') ||
-                target?.closest('[role=option]') ||
-                target?.closest('[data-slot=calendar]')
-              ) {
-                e.preventDefault()
-              }
-            }}
+            onFocusOutside={e => e.preventDefault()}
           >
             <Calendar
               mode='single'
