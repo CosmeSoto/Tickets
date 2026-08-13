@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { checkPaymentAlerts } from '@/lib/cron/check-payment-alerts'
+import { verifyCronAuth } from '@/lib/cron/verify-cron-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,13 +11,8 @@ export const dynamic = 'force-dynamic'
  */
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url)
-    const secret = searchParams.get('secret')
-
-    // Verificar secret
-    if (secret !== process.env.CRON_SECRET) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    }
+    const unauthorized = verifyCronAuth(request)
+    if (unauthorized) return unauthorized
 
     const result = await checkPaymentAlerts()
 

@@ -9,18 +9,15 @@
 
 import { NextResponse } from 'next/server'
 import { runWeeklyNotificationDigest } from '@/lib/cron/weekly-notification-digest'
+import { verifyCronAuth } from '@/lib/cron/verify-cron-auth'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
 
 async function handle(request: Request) {
   try {
-    const authHeader = request.headers.get('authorization')
-    const cronSecret = process.env.CRON_SECRET || 'change-me-in-production'
-
-    if (authHeader !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ success: false, error: 'No autorizado' }, { status: 401 })
-    }
+    const unauthorized = verifyCronAuth(request)
+    if (unauthorized) return unauthorized
 
     console.log('[CRON] Ejecutando digest semanal de notificaciones...')
     const result = await runWeeklyNotificationDigest()

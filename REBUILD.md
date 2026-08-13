@@ -414,6 +414,10 @@ tail -f logs/telegram-poll-cron.log
 #### Producción (hosting con dominio público)
 
 ```bash
+# 0. Webhook Secret (obligatorio en producción):
+openssl rand -hex 32
+# Pegar en Admin → Telegram → Webhook Secret → Guardar
+
 # 1. Pulsar "Registrar Webhook" en Admin → Configuración → Telegram
 #    (o llamar la API directamente):
 curl -s -X POST "${NEXTAUTH_URL}/api/telegram/register-webhook" \
@@ -444,7 +448,7 @@ Luego en el bot escriben `/vincular CÓDIGO`. El código caduca en 15 minutos.
 | Cliente comenta en ticket | ✅ | Técnico asignado | important\* | `NotificationService.notifyNewComment` |
 | Técnico comenta en ticket | ❌ | — | optional → omitido | In-app + WebPush cubren este caso |
 | **Inventario** | | | | |
-| Acta pendiente de firma | ✅ | Admins de la familia | important | `NotificationService.push` directo |
+| Acta pendiente de firma | ✅ | Admins de la familia | important | `InventoryNotificationService.notifyDeliveryActFamilyAdmins` |
 | Alerta de stock bajo/crítico | ✅ | Admins de la familia | important | `BatchAlertService` |
 | Backup fallido | ✅ | Admins configurados | critical | `backup-utils.ts` |
 | **Rondas** | | | | |
@@ -455,8 +459,43 @@ Luego en el bot escriben `/vincular CÓDIGO`. El código caduca en 15 minutos.
 | Recordatorio pre-ronda | ✅ | Agente asignado | important | `PatrolReminderService` |
 | Ronda no iniciada (MISSED) | ✅ | Supervisores + agente | important | `PatrolSchedulerService.notifyMissed` |
 | Ronda cerrada automáticamente | ✅ | Supervisores + agente | important | `PatrolSchedulerService.notifyAutoClose` |
+| **Seguridad** | | | | |
+| Cuenta bloqueada (login fallido) | ✅ | Super admins | critical | `SecurityConfigService.recordFailedLogin` |
 
 \* `priority: 'important'` explícita — override de la política `optional` para `newComments`.
+
+#### Cola de alertas salientes (`telegram_queue`)
+
+Las alertas **no se envían síncronamente** — se encolan en BD y un cron las procesa con reintentos (hasta 3 intentos, backoff 60 s):
+
+```bash
+# Procesar cola manualmente
+curl -sk "${NEXTAUTH_URL}/api/cron/process-telegram-queue" \
+  -H "Authorization: Bearer $CRON_SECRET"
+
+# Instalar crons de limpieza + cola (recomendado en producción)
+chmod +x ./docker/scripts/setup-telegram-cleanup-cron.sh
+./docker/scripts/setup-telegram-cleanup-cron.sh
+```
+
+Frecuencia recomendada de la cola: **cada 1–5 minutos** (el script instala cada 2 min).
+
+Las alertas **`critical`** (p. ej. backup fallido, cuenta bloqueada) disparan un procesamiento inmediato de la cola tras encolar, además del cron periódico.
+
+En **Admin → Configuración → Telegram** hay un panel **Cola de alertas Telegram** (pendientes/fallidos, procesar ahora, reintentar fallidos) — API: `/api/admin/settings/telegram-queue`.
+
+#### Checklist de cierre (Telegram listo para producción)
+
+| Paso | Verificación |
+|------|--------------|
+| 1. Migraciones | `npx prisma migrate deploy` — incluye `telegram_chat_id` unique y tabla `telegram_queue` |
+| 2. Bot configurado | Admin → Telegram: token, username, switch habilitado, **Probar conexión** OK |
+| 3. Webhook Secret | Generar (`openssl rand -hex 32`), guardar en Admin → Telegram → **Webhook Secret** |
+| 4. Alertas globales | Admin → Notificaciones: switch **Alertas Telegram** activo |
+| 5. Inbound (elige uno) | **Red local:** `setup-telegram-poll-cron.sh` · **Producción:** Registrar Webhook + quitar polling |
+| 6. Cola saliente | `setup-telegram-cleanup-cron.sh` (cola cada 2 min + limpieza tokens diaria) |
+| 7. Vincular usuarios | Perfil → Telegram → `/vincular CÓDIGO` en el bot |
+| 8. Smoke test | Crear ticket de prueba o pulsar **Procesar cola ahora** en el panel admin |
 
 #### Lógica del recordatorio pre-ronda
 
@@ -511,10 +550,14 @@ CRON_SECRET=$(grep '^CRON_SECRET=' .env.production | cut -d= -f2 | tr -d '"')
 
 #### Limpieza de tokens expirados
 
-Los tokens de vinculación se acumulan en `telegram_link_tokens`. Un cron los limpia:
+Los tokens de vinculación se acumulan en `telegram_link_tokens`. Instala limpieza diaria + cola de alertas con:
 
 ```bash
-# Añadir al mismo crontab (una vez al día a las 03:00)
+chmod +x ./docker/scripts/setup-telegram-cleanup-cron.sh
+./docker/scripts/setup-telegram-cleanup-cron.sh
+```
+
+O manualmente (solo limpieza, una vez al día a las 03:00):
 CRON_SECRET=$(grep '^CRON_SECRET=' .env.production | cut -d= -f2 | tr -d '"')
 (crontab -l 2>/dev/null; echo "0 3 * * * curl -fsS \"${NEXTAUTH_URL}/api/cron/telegram-cleanup\" -H \"Authorization: Bearer ${CRON_SECRET}\" >> logs/telegram-cleanup.log 2>&1") | crontab -
 ```
@@ -528,6 +571,8 @@ CRON_SECRET=$(grep '^CRON_SECRET=' .env.production | cut -d= -f2 | tr -d '"')
 | `bad webhook: IP address is reserved` | Esperado en red local — usa el modo polling, no "Registrar Webhook" |
 | Webhook activo pero polling no funciona | Desregistrar webhook primero desde @BotFather: `/deletewebhook` |
 | Bot responde pero no vincula | Verificar que el código no esté expirado (15 min) — generar uno nuevo |
+| Alertas tardan en llegar | Verificar cron de cola: `crontab -l \| grep telegram-queue` o ejecutar `process-telegram-queue` manualmente |
+| Demasiados intentos `/vincular` | Rate limit: 8 intentos / 15 min por chat — esperar o vincular desde otro chat |
 
 ---
 

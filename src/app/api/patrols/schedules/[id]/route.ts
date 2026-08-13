@@ -304,7 +304,6 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         module: 'patrols',
         event: 'patrolAssigned',
         link: '/patrol',
-        telegramModule: 'patrols',
       }).catch(err => console.error('[patrol/schedules PATCH] Telegram agente nuevo:', err))
 
       // Si el agente cambió, notificar también al agente anterior — in-app + Telegram
@@ -323,7 +322,6 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           module: 'patrols',
           event: 'patrolAssigned',
           link: '/patrol',
-          telegramModule: 'patrols',
         }).catch(err => console.error('[patrol/schedules PATCH] Telegram agente anterior:', err))
       }
     }
@@ -479,7 +477,6 @@ export async function DELETE(
           module: 'patrols',
           event: 'patrolCancelled',
           link: '/patrol',
-          telegramModule: 'patrols',
         }).catch(err => console.error('[patrol/schedules DELETE] Telegram:', err))
       )
     )

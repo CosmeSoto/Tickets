@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { CheckActExpirationJob } from '@/lib/jobs/check-act-expiration.job'
+import { verifyCronAuth } from '@/lib/cron/verify-cron-auth'
 
 /**
  * Endpoint para ejecutar el job de verificación de actas expiradas
@@ -11,16 +12,8 @@ import { CheckActExpirationJob } from '@/lib/jobs/check-act-expiration.job'
  */
 export async function GET(request: NextRequest) {
   try {
-    // Verificar token de seguridad para cron jobs
-    const authHeader = request.headers.get('authorization')
-    const cronSecret = process.env.CRON_SECRET
-    
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-      return NextResponse.json(
-        { error: 'No autorizado' },
-        { status: 401 }
-      )
-    }
+    const unauthorized = verifyCronAuth(request)
+    if (unauthorized) return unauthorized
     
     console.log('[CRON] Ejecutando check-act-expiration job...')
     

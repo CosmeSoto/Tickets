@@ -36,16 +36,6 @@ const PRIORITY_EMOJI: Record<TelegramPriority, string> = {
 }
 
 /**
- * ¿Está el bot configurado? (token en BD o ENV).
- * @deprecated Usar isTelegramEnabled() de telegram-config.ts en código nuevo.
- *   Se mantiene para compatibilidad con imports existentes en webhook/route.ts.
- */
-export function isTelegramConfigured(): boolean {
-  // Comprobación síncrona rápida contra ENV (conserva compatibilidad)
-  return !!process.env.TELEGRAM_BOT_TOKEN
-}
-
-/**
  * Escapa caracteres especiales para MarkdownV2 de Telegram.
  * https://core.telegram.org/bots/api#markdownv2-style
  */

@@ -449,6 +449,29 @@ model email_queue {
   @@index([toEmail])
 }
 
+model telegram_queue {
+  id           String    @id
+  userId       String?   @map("user_id")
+  chatId       String    @map("chat_id")
+  title        String
+  body         String
+  priority     String    @default("important")
+  module       String?
+  link         String?
+  status       String    @default("pending")
+  attempts     Int       @default(0)
+  maxAttempts  Int       @default(3) @map("max_attempts")
+  scheduledAt  DateTime  @default(now()) @map("scheduled_at")
+  sentAt       DateTime? @map("sent_at")
+  errorMessage String?   @map("error_message")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  @@index([status, scheduledAt])
+  @@index([chatId])
+  @@index([createdAt(sort: Desc)])
+  @@map("telegram_queue")
+}
+
 /// Catálogo de módulos del sistema — define qué módulos existen y sus defaults por rol
 model system_modules {
   key              String   @id // 'tickets' | 'inventory' | 'contracts' | ...
@@ -500,7 +523,7 @@ model users {
   /// Acceso a Base de conocimientos (hijo del módulo Tickets). Default true = comportamiento histórico.
   canAccessKnowledge                                Boolean                         @default(true) @map("can_access_knowledge")
   /// ID de chat de Telegram vinculado (opcional). Necesario para recibir alertas del bot.
-  telegramChatId                                    String?                         @map("telegram_chat_id")
+  telegramChatId                                    String?                         @unique @map("telegram_chat_id")
   accounts                                          accounts[]
   userFamilyAccess                                  user_family_access[]
   article_votes                                     article_votes[]

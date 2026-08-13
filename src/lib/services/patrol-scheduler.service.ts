@@ -639,7 +639,6 @@ export class PatrolSchedulerService {
         module: 'patrols',
         event: 'patrolMissed',
         link: '/patrol',
-        telegramModule: 'patrols',
       }).catch(err => console.error('[PatrolSchedulerService] Telegram autoClose supervisor:', err))
     }
 
@@ -651,7 +650,6 @@ export class PatrolSchedulerService {
       module: 'patrols',
       event: 'patrolMissed',
       link: `/patrol/${patrol.id}`,
-      telegramModule: 'patrols',
     }).catch(err => console.error('[PatrolSchedulerService] Telegram autoClose agente:', err))
   }
 
@@ -701,7 +699,6 @@ export class PatrolSchedulerService {
           module: 'patrols',
           event: 'patrolMissed',
           link: '/patrol',
-          telegramModule: 'patrols',
         }).catch(err => console.error('[PatrolSchedulerService] Telegram MISSED supervisor:', err))
       }
 
@@ -713,7 +710,6 @@ export class PatrolSchedulerService {
         module: 'patrols',
         event: 'patrolMissed',
         link: '/patrol',
-        telegramModule: 'patrols',
       }).catch(err => console.error('[PatrolSchedulerService] Telegram MISSED agente:', err))
     }
   }

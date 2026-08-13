@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { runSLAMonitor } from '@/lib/cron/sla-monitor'
 import { checkTicketVolumeAlerts } from '@/lib/cron/check-ticket-volume-alerts'
+import { verifyCronAuth } from '@/lib/cron/verify-cron-auth'
 
 /**
  * Cron Job: Monitor SLA (avisos, violaciones, métricas) + alertas de volumen
@@ -8,19 +9,8 @@ import { checkTicketVolumeAlerts } from '@/lib/cron/check-ticket-volume-alerts'
  */
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization')
-    const cronSecret = process.env.CRON_SECRET
-
-    if (!cronSecret) {
-      console.error('[CRON] CRON_SECRET no configurado — rechazando check-sla-deadlines')
-      return NextResponse.json(
-        { success: false, message: 'CRON_SECRET no configurado' },
-        { status: 503 }
-      )
-    }
-    if (authHeader !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 401 })
-    }
+    const unauthorized = verifyCronAuth(request)
+    if (unauthorized) return unauthorized
 
     console.log('[CRON] Iniciando monitoreo SLA...')
 

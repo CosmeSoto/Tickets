@@ -8,22 +8,12 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { runPatrolMaintenanceJobs } from '@/lib/cron/patrol-maintenance'
+import { verifyCronAuth } from '@/lib/cron/verify-cron-auth'
 
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization')
-    const cronSecret = process.env.CRON_SECRET
-
-    if (!cronSecret) {
-      console.error('[CRON] CRON_SECRET no configurado — rechazando cron/patrol')
-      return NextResponse.json(
-        { success: false, message: 'CRON_SECRET no configurado' },
-        { status: 503 }
-      )
-    }
-    if (authHeader !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 401 })
-    }
+    const unauthorized = verifyCronAuth(request)
+    if (unauthorized) return unauthorized
 
     console.log('[CRON] Iniciando mantenimiento de patrullas...')
 

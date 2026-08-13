@@ -100,6 +100,7 @@ function SettingsPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const searchParams = useSearchParams()
+  const isSuperAdmin = (session?.user as { isSuperAdmin?: boolean } | undefined)?.isSuperAdmin === true
   const [settings, setSettings] = useState<SystemSettings | null>(null)
   const [loading, setLoading] = useState(false)
   /** Evita un frame de “error” antes del primer fetch cuando ya hay sesión admin */
@@ -124,6 +125,33 @@ function SettingsPage() {
   const [registeringWebhook, setRegisteringWebhook] = useState(false)
   const [showBotToken, setShowBotToken] = useState(false)
   const [showWebhookSecret, setShowWebhookSecret] = useState(false)
+  const [telegramQueueStats, setTelegramQueueStats] = useState<{
+    pending: number
+    failed: number
+    sending: number
+  } | null>(null)
+  const [telegramQueueRecent, setTelegramQueueRecent] = useState<{
+    sent: Array<{
+      id: string
+      title: string
+      module: string | null
+      priority: string
+      sentAt: string | null
+      attempts: number
+    }>
+    failed: Array<{
+      id: string
+      title: string
+      module: string | null
+      priority: string
+      scheduledAt: string
+      attempts: number
+      maxAttempts: number
+      errorMessage: string | null
+    }>
+  } | null>(null)
+  const [telegramQueueLoading, setTelegramQueueLoading] = useState(false)
+  const [telegramQueueProcessing, setTelegramQueueProcessing] = useState(false)
 
   useEffect(() => {
     if (status === 'loading') return
@@ -323,6 +351,57 @@ function SettingsPage() {
     }
   }
 
+  const loadTelegramQueue = async () => {
+    setTelegramQueueLoading(true)
+    try {
+      const res = await fetch('/api/admin/settings/telegram-queue')
+      const data = await res.json()
+      if (data.success) {
+        setTelegramQueueStats(data.stats)
+        setTelegramQueueRecent({
+          sent: data.recentSent ?? [],
+          failed: data.recentFailed ?? [],
+        })
+      }
+    } catch {
+      // silencioso
+    } finally {
+      setTelegramQueueLoading(false)
+    }
+  }
+
+  const processTelegramQueue = async (retryFailed = false) => {
+    setTelegramQueueProcessing(true)
+    try {
+      const res = await fetch('/api/admin/settings/telegram-queue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ retryFailed, purgeOld: true }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast({ title: 'Cola Telegram procesada', description: data.message })
+        await loadTelegramQueue()
+      } else {
+        toast({ title: 'Error', description: data.error, variant: 'destructive' })
+      }
+    } catch {
+      toast({
+        title: 'Error de red',
+        description: 'No se pudo conectar con el servidor.',
+        variant: 'destructive',
+      })
+    } finally {
+      setTelegramQueueProcessing(false)
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === 'telegram' && settings?.telegramEnabled && isSuperAdmin) {
+      void loadTelegramQueue()
+    }
+  }, [activeTab, settings?.telegramEnabled, isSuperAdmin]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const testTelegramConnection = async () => {
     if (!settings) return
     const token = settings.telegramBotToken?.trim()
@@ -390,6 +469,18 @@ function SettingsPage() {
       return
     }
 
+    const hasWebhookSecret =
+      settings.telegramWebhookSecretConfigured || Boolean(settings.telegramWebhookSecret?.trim())
+    if (!hasWebhookSecret) {
+      toast({
+        title: 'Webhook Secret requerido',
+        description:
+          'Configura y guarda un Webhook Secret antes de registrar el webhook. En producción el bot rechazará updates sin él.',
+        variant: 'destructive',
+      })
+      return
+    }
+
     setRegisteringWebhook(true)
     try {
       const body: Record<string, unknown> = {}
@@ -434,8 +525,6 @@ function SettingsPage() {
   if (!session || session.user.role !== 'ADMIN') {
     return null
   }
-
-  const isSuperAdmin = (session.user as any).isSuperAdmin === true
 
   if (!settings && (!initialFetchDone || loading)) {
     return (
@@ -1008,8 +1097,8 @@ function SettingsPage() {
                       )}
                     </Label>
                     <p className='text-sm text-muted-foreground'>
-                      Canal Telegram para alertas operativas globales (tickets, inventario,
-                      backups). Configura el bot en el tab Telegram.
+                      Interruptor global de alertas salientes (tickets, inventario, rondas,
+                      backups). Requiere bot habilitado en el tab Telegram.
                     </p>
                   </div>
                   <Switch
@@ -1299,8 +1388,8 @@ function SettingsPage() {
                         Habilitar bot de Telegram
                       </Label>
                       <p className='text-sm text-muted-foreground'>
-                        Activa el canal Telegram para todo el sistema. Los usuarios podrán vincular
-                        sus cuentas y recibir alertas.
+                        Activa el bot (token, webhook/polling y vinculación de cuentas). Las
+                        alertas salientes se controlan aparte en Notificaciones.
                       </p>
                     </div>
                     <Switch
@@ -1419,7 +1508,47 @@ function SettingsPage() {
                               Hay un secret guardado. Cámbialo solo si quieres rotar el secreto.
                             </p>
                           )}
+                        {!settings.telegramWebhookSecretConfigured &&
+                          !settings.telegramWebhookSecret && (
+                            <p className='text-xs text-amber-700 dark:text-amber-400'>
+                              Sin Webhook Secret, cualquiera podría enviar updates falsos al bot en
+                              producción. Genera uno y guárdalo antes de registrar el webhook.
+                            </p>
+                          )}
                       </div>
+
+                      {/* Aviso producción sin secret guardado */}
+                      {(() => {
+                        const origin = typeof window !== 'undefined' ? window.location.origin : ''
+                        const isLocal =
+                          origin.includes('localhost') ||
+                          origin.includes('127.0.0.1') ||
+                          /192\.168\.\d+\.\d+/.test(origin) ||
+                          /10\.\d+\.\d+\.\d+/.test(origin) ||
+                          /172\.(1[6-9]|2\d|3[01])\.\d+\.\d+/.test(origin)
+                        if (
+                          isLocal ||
+                          settings.telegramWebhookSecretConfigured ||
+                          settings.telegramWebhookSecret?.trim()
+                        ) {
+                          return null
+                        }
+                        return (
+                          <div className='flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-900/10 dark:border-amber-800 p-4'>
+                            <AlertTriangle className='h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0' />
+                            <div className='space-y-1'>
+                              <p className='text-sm font-medium text-amber-900 dark:text-amber-200'>
+                                Webhook Secret pendiente
+                              </p>
+                              <p className='text-xs text-amber-800 dark:text-amber-300'>
+                                En producción el endpoint{' '}
+                                <code className='font-mono'>/api/telegram/webhook</code> rechazará
+                                updates hasta que configures y guardes un secret.
+                              </p>
+                            </div>
+                          </div>
+                        )
+                      })()}
 
                       {/* Bot info tras verificar */}
                       {telegramBotInfo && (
@@ -1486,9 +1615,11 @@ function SettingsPage() {
                         <Button
                           variant='outline'
                           onClick={registerTelegramWebhook}
-                          disabled={registeringWebhook}
+                          disabled={registeringWebhook || !isSuperAdmin}
                           title={
-                            typeof window !== 'undefined' &&
+                            !isSuperAdmin
+                              ? 'Solo Super Admin puede registrar el webhook'
+                              : typeof window !== 'undefined' &&
                             /192\.168\.|127\.0\.0\.1|localhost|^10\.|172\.(1[6-9]|2\d|3[01])\./.test(
                               window.location.origin
                             )
@@ -1503,6 +1634,155 @@ function SettingsPage() {
                           )}
                           Registrar Webhook
                         </Button>
+                      </div>
+
+                      {/* Cola de alertas salientes */}
+                      <div className='rounded-lg border border-border bg-muted/30 p-4 space-y-3 mt-2'>
+                        <div className='flex items-center justify-between'>
+                          <div className='flex items-center gap-2'>
+                            <Inbox className='h-4 w-4 text-muted-foreground' />
+                            <span className='text-sm font-medium'>Cola de alertas Telegram</span>
+                          </div>
+                          <Button
+                            variant='ghost'
+                            size='sm'
+                            onClick={loadTelegramQueue}
+                            disabled={telegramQueueLoading}
+                          >
+                            <RefreshCw
+                              className={`h-3.5 w-3.5 mr-1.5 ${telegramQueueLoading ? 'animate-spin' : ''}`}
+                            />
+                            Actualizar
+                          </Button>
+                        </div>
+
+                        {telegramQueueStats === null ? (
+                          <p className='text-xs text-muted-foreground'>
+                            Pulsa Actualizar para ver pendientes y fallidos. El cron recomendado
+                            procesa la cola cada 2 minutos.
+                          </p>
+                        ) : (
+                          <div className='grid grid-cols-2 gap-3'>
+                            <div className='rounded-md border border-border bg-background px-3 py-2 text-center'>
+                              <p className='text-xl font-semibold'>{telegramQueueStats.pending}</p>
+                              <p className='text-xs text-muted-foreground'>Pendientes</p>
+                            </div>
+                            <div
+                              className={`rounded-md border px-3 py-2 text-center ${telegramQueueStats.failed > 0 ? 'border-destructive/40 bg-destructive/5' : 'border-border bg-background'}`}
+                            >
+                              <p
+                                className={`text-xl font-semibold ${telegramQueueStats.failed > 0 ? 'text-destructive' : ''}`}
+                              >
+                                {telegramQueueStats.failed}
+                              </p>
+                              <p className='text-xs text-muted-foreground'>Fallidos</p>
+                            </div>
+                          </div>
+                        )}
+
+                        {telegramQueueStats && telegramQueueStats.sending > 0 && (
+                          <p className='text-xs text-muted-foreground'>
+                            {telegramQueueStats.sending} en envío ahora mismo.
+                          </p>
+                        )}
+
+                        <div className='flex gap-2 flex-wrap'>
+                          <Button
+                            variant='outline'
+                            size='sm'
+                            onClick={() => processTelegramQueue(false)}
+                            disabled={telegramQueueProcessing}
+                          >
+                            {telegramQueueProcessing ? (
+                              <RefreshCw className='h-3.5 w-3.5 mr-1.5 animate-spin' />
+                            ) : (
+                              <Send className='h-3.5 w-3.5 mr-1.5' />
+                            )}
+                            Procesar cola ahora
+                          </Button>
+                          {telegramQueueStats && telegramQueueStats.failed > 0 && (
+                            <Button
+                              variant='outline'
+                              size='sm'
+                              onClick={() => processTelegramQueue(true)}
+                              disabled={telegramQueueProcessing}
+                            >
+                              <RefreshCw className='h-3.5 w-3.5 mr-1.5' />
+                              Reintentar {telegramQueueStats.failed} fallido
+                              {telegramQueueStats.failed !== 1 ? 's' : ''}
+                            </Button>
+                          )}
+                        </div>
+                        <p className='text-xs text-muted-foreground'>
+                          Las alertas (tickets, rondas, inventario) se encolan y se envían con
+                          reintentos automáticos. Instala el cron con{' '}
+                          <code className='font-mono text-[10px]'>
+                            setup-telegram-cleanup-cron.sh
+                          </code>
+                          .
+                        </p>
+
+                        {telegramQueueRecent &&
+                          (telegramQueueRecent.failed.length > 0 ||
+                            telegramQueueRecent.sent.length > 0) && (
+                            <div className='space-y-3 pt-1 border-t border-border'>
+                              {telegramQueueRecent.failed.length > 0 && (
+                                <div className='space-y-1.5'>
+                                  <p className='text-xs font-medium text-destructive'>
+                                    Fallidos recientes
+                                  </p>
+                                  <ul className='space-y-1 max-h-32 overflow-y-auto'>
+                                    {telegramQueueRecent.failed.map(row => (
+                                      <li
+                                        key={row.id}
+                                        className='text-xs rounded-md border border-destructive/30 bg-destructive/5 px-2 py-1.5'
+                                      >
+                                        <span className='font-medium'>{row.title}</span>
+                                        {row.module && (
+                                          <span className='text-muted-foreground'>
+                                            {' '}
+                                            · {row.module}
+                                          </span>
+                                        )}
+                                        <span className='block text-muted-foreground truncate'>
+                                          {row.errorMessage ?? 'Error desconocido'} (
+                                          {row.attempts}/{row.maxAttempts})
+                                        </span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                              {telegramQueueRecent.sent.length > 0 && (
+                                <div className='space-y-1.5'>
+                                  <p className='text-xs font-medium text-muted-foreground'>
+                                    Enviados recientemente
+                                  </p>
+                                  <ul className='space-y-1 max-h-32 overflow-y-auto'>
+                                    {telegramQueueRecent.sent.map(row => (
+                                      <li
+                                        key={row.id}
+                                        className='text-xs rounded-md border border-border bg-background px-2 py-1.5'
+                                      >
+                                        <span className='font-medium'>{row.title}</span>
+                                        {row.module && (
+                                          <span className='text-muted-foreground'>
+                                            {' '}
+                                            · {row.module}
+                                          </span>
+                                        )}
+                                        {row.sentAt && (
+                                          <span className='block text-muted-foreground'>
+                                            {new Date(row.sentAt).toLocaleString()}
+                                          </span>
+                                        )}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                            </div>
+                          )}
                       </div>
                     </>
                   )}

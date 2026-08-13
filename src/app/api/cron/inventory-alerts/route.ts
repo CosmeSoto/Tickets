@@ -11,19 +11,12 @@ import { CheckAssignmentExpirationJob } from '@/lib/jobs/check-assignment-expira
 import { isInventoryAlertEnabled } from '@/lib/settings/runtime-settings'
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
+import { verifyCronAuth } from '@/lib/cron/verify-cron-auth'
 
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization')
-    const cronSecret = process.env.CRON_SECRET
-
-    if (!cronSecret) {
-      console.error('[CRON] CRON_SECRET no configurado — rechazando inventory-alerts')
-      return NextResponse.json({ error: 'CRON_SECRET no configurado' }, { status: 503 })
-    }
-    if (authHeader !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    }
+    const unauthorized = verifyCronAuth(request)
+    if (unauthorized) return unauthorized
 
     const [lowStockEnabled, licenseEnabled, mroEnabled, warrantyEnabled] = await Promise.all([
       isInventoryAlertEnabled('inventory.low_stock_alert_enabled'),

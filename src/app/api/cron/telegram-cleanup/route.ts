@@ -12,18 +12,14 @@
 
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { verifyCronAuth } from '@/lib/cron/verify-cron-auth'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
 
 export async function GET(request: Request) {
-  // ── Autenticación ────────────────────────────────────────────────────────
-  const authHeader = request.headers.get('authorization')
-  const cronSecret = process.env.CRON_SECRET ?? 'change-me-in-production'
-
-  if (authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ success: false, error: 'No autorizado' }, { status: 401 })
-  }
+  const unauthorized = verifyCronAuth(request)
+  if (unauthorized) return unauthorized
 
   try {
     const now = new Date()

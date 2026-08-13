@@ -15,6 +15,11 @@
  *   contratos           /mis_contratos
  */
 
+import { getUserFamilyScope } from '@/lib/auth/admin-scope'
+import {
+  checkTelegramVincularRateLimit,
+  resetTelegramVincularRateLimit,
+} from '@/lib/telegram/vincular-rate-limit'
 import prisma from '@/lib/prisma'
 import { sendTelegramMessage, escapeMdV2 } from '@/lib/services/telegram.service'
 
@@ -140,6 +145,14 @@ async function handleVincular(chatId: string, _fromId: number, _firstName: strin
       `⚠️ Indica tu código:\n\n*/vincular \\<código\\>*\n\nObtén el código en *Perfil* o *Configuración → Notificaciones*\\.`)
     return
   }
+
+  const rate = await checkTelegramVincularRateLimit(chatId)
+  if (!rate.allowed) {
+    await sendTelegramMessage(chatId,
+      `⏳ Demasiados intentos de vinculación\\. Espera unos minutos e inténtalo de nuevo\\.`)
+    return
+  }
+
   const linkToken = await prisma.telegram_link_tokens.findFirst({
     where: { token: code.toUpperCase(), usedAt: null, expiresAt: { gt: new Date() } },
     include: { user: { select: { id: true, name: true, phone: true } } },
@@ -149,10 +162,27 @@ async function handleVincular(chatId: string, _fromId: number, _firstName: strin
       `❌ Código inválido o expirado\\.\n\nGenera uno nuevo en *Perfil* o *Configuración → Notificaciones → Telegram*\\.`)
     return
   }
+
+  const chatTaken = await prisma.users.findFirst({
+    where: { telegramChatId: chatId, id: { not: linkToken.userId }, isActive: true },
+    select: { id: true, name: true },
+  })
+  if (chatTaken) {
+    await sendTelegramMessage(chatId,
+      `⚠️ Este chat ya está vinculado a *${escapeMdV2(chatTaken.name)}*\\.\n\n` +
+      `Desvincula con /desvincular desde esa cuenta o usa otro chat de Telegram\\.`)
+    return
+  }
+
   await prisma.$transaction([
+    prisma.users.updateMany({
+      where: { telegramChatId: chatId, id: { not: linkToken.userId } },
+      data: { telegramChatId: null },
+    }),
     prisma.telegram_link_tokens.update({ where: { id: linkToken.id }, data: { usedAt: new Date() } }),
     prisma.users.update({ where: { id: linkToken.userId }, data: { telegramChatId: chatId } }),
   ])
+  await resetTelegramVincularRateLimit(chatId)
   const phoneHint = linkToken.user.phone ? `\n📱 *Teléfono:* ${escapeMdV2(linkToken.user.phone)}` : ''
   await sendTelegramMessage(chatId,
     `✅ *¡Cuenta vinculada\\!*\n\nRecibirás alertas como *${escapeMdV2(linkToken.user.name)}*\\.` +
@@ -252,7 +282,21 @@ async function handlePendientes(chatId: string) {
   if (user.role !== 'ADMIN' && user.role !== 'TECHNICIAN') {
     await sendTelegramMessage(chatId, `⚠️ Solo disponible para técnicos y administradores\\.`); return
   }
-  const where = user.role === 'TECHNICIAN' ? { assigneeId: user.id, status: 'OPEN' as const } : { status: 'OPEN' as const }
+
+  let where: { status: 'OPEN'; assigneeId?: string; familyId?: { in: string[] } } = { status: 'OPEN' }
+  if (user.role === 'TECHNICIAN') {
+    where = { assigneeId: user.id, status: 'OPEN' }
+  } else {
+    const scope = await getUserFamilyScope(user.id, user.role, user.isSuperAdmin)
+    if (scope.familyIds !== undefined) {
+      if (scope.familyIds.length === 0) {
+        await sendTelegramMessage(chatId, `ℹ️ No tienes familias asignadas para consultar tickets\\.`)
+        return
+      }
+      where = { status: 'OPEN', familyId: { in: scope.familyIds } }
+    }
+  }
+
   const [tickets, count] = await Promise.all([
     prisma.tickets.findMany({ where, take: 10, orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }], select: { ticketCode: true, title: true, priority: true } }),
     prisma.tickets.count({ where }),
@@ -273,8 +317,29 @@ async function handleActas(chatId: string) {
   if (!user) { await sendTelegramMessage(chatId, `❌ Vincula tu cuenta con /vincular \\<código\\>\\.`); return }
   if (user.role !== 'ADMIN') { await sendTelegramMessage(chatId, `⚠️ Solo disponible para administradores\\.`); return }
 
+  const scope = await getUserFamilyScope(user.id, user.role, user.isSuperAdmin)
+  const familyFilter =
+    scope.familyIds !== undefined
+      ? scope.familyIds.length > 0
+        ? {
+            assignment: {
+              equipment: { type: { familyId: { in: scope.familyIds } } },
+            },
+          }
+        : null
+      : {}
+
+  if (familyFilter === null) {
+    await sendTelegramMessage(chatId, `ℹ️ No tienes familias asignadas para consultar actas\\.`)
+    return
+  }
+
   const acts = await prisma.delivery_acts.findMany({
-    where: { status: 'PENDING', expirationDate: { gt: new Date() } },
+    where: {
+      status: 'PENDING',
+      expirationDate: { gt: new Date() },
+      ...familyFilter,
+    },
     orderBy: { expirationDate: 'asc' }, take: 10,
     select: { folio: true, expirationDate: true, actType: true },
   })
@@ -293,20 +358,58 @@ async function handleSistema(chatId: string) {
   if (!user) { await sendTelegramMessage(chatId, `❌ Vincula tu cuenta con /vincular \\<código\\>\\.`); return }
   if (user.role !== 'ADMIN') { await sendTelegramMessage(chatId, `⚠️ Solo disponible para administradores\\.`); return }
 
+  const scope = await getUserFamilyScope(user.id, user.role, user.isSuperAdmin)
+  const ticketFilter =
+    scope.familyIds !== undefined
+      ? scope.familyIds.length > 0
+        ? { familyId: { in: scope.familyIds } }
+        : null
+      : {}
+  const actFamilyFilter =
+    scope.familyIds !== undefined
+      ? scope.familyIds.length > 0
+        ? {
+            assignment: {
+              equipment: { type: { familyId: { in: scope.familyIds } } },
+            },
+          }
+        : null
+      : {}
+  const patrolFamilyFilter =
+    scope.familyIds !== undefined
+      ? scope.familyIds.length > 0
+        ? { route: { familyId: { in: scope.familyIds } } }
+        : null
+      : {}
+
+  if (ticketFilter === null || actFamilyFilter === null || patrolFamilyFilter === null) {
+    await sendTelegramMessage(chatId, `ℹ️ No tienes familias asignadas para ver el resumen del sistema\\.`)
+    return
+  }
+
   const [open, inProgress, lastBackup, pendingActs, openPatrols] = await Promise.all([
-    prisma.tickets.count({ where: { status: 'OPEN' } }),
-    prisma.tickets.count({ where: { status: 'IN_PROGRESS' } }),
+    prisma.tickets.count({ where: { status: 'OPEN', ...ticketFilter } }),
+    prisma.tickets.count({ where: { status: 'IN_PROGRESS', ...ticketFilter } }),
     prisma.backups.findFirst({ where: { status: 'completed' }, orderBy: { createdAt: 'desc' }, select: { createdAt: true } }),
-    prisma.delivery_acts.count({ where: { status: 'PENDING', expirationDate: { gt: new Date() } } }),
-    prisma.patrols.count({ where: { status: { in: ['PENDING', 'IN_PROGRESS'] } } }),
+    prisma.delivery_acts.count({
+      where: { status: 'PENDING', expirationDate: { gt: new Date() }, ...actFamilyFilter },
+    }),
+    prisma.patrols.count({
+      where: { status: { in: ['PENDING', 'IN_PROGRESS'] }, ...patrolFamilyFilter },
+    }),
   ])
+
+  const scopeLabel =
+    scope.familyIds === undefined
+      ? 'Resumen del sistema'
+      : `Resumen de tus áreas \\(${scope.familyIds.length}\\)`
 
   const bkLine = lastBackup
     ? `💾 *Último backup:* ${escapeMdV2(new Date(lastBackup.createdAt).toLocaleDateString('es-ES'))}`
     : `💾 *Último backup:* sin registros`
 
   await sendTelegramMessage(chatId,
-    `⚙️ *Resumen del sistema*\n\n` +
+    `⚙️ *${scopeLabel}*\n\n` +
     `🎫 Tickets abiertos: *${escapeMdV2(String(open))}*\n` +
     `🔵 En progreso: *${escapeMdV2(String(inProgress))}*\n` +
     `📝 Actas pendientes: *${escapeMdV2(String(pendingActs))}*\n` +

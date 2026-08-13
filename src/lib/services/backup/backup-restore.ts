@@ -1024,6 +1024,7 @@ async function restoreFromJSON(
     'landing_page_services',
     'landing_page_banners',
     'email_queue',
+    'telegram_queue',
     'category_analytics',
     'backups',
     'verification_tokens',

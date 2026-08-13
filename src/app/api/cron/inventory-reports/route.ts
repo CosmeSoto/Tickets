@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { runScheduledInventoryReports } from '@/lib/cron/run-scheduled-reports'
+import { verifyCronAuth } from '@/lib/cron/verify-cron-auth'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
@@ -10,12 +11,8 @@ export const maxDuration = 120
  */
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization')
-    const cronSecret = process.env.CRON_SECRET
-
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    }
+    const unauthorized = verifyCronAuth(request)
+    if (unauthorized) return unauthorized
 
     const result = await runScheduledInventoryReports()
 

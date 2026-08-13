@@ -1,12 +1,15 @@
 /**
- * GET  /api/admin/settings/email-queue  — estado de la cola (pendientes, fallidos, recientes)
- * POST /api/admin/settings/email-queue  — procesar cola ahora + opción de reintentar fallidos
+ * GET  /api/admin/settings/telegram-queue — estado de la cola (pendientes, fallidos, recientes)
+ * POST /api/admin/settings/telegram-queue — procesar cola ahora + opción de reintentar fallidos
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { requireSuperAdmin } from '@/lib/auth/require-super-admin'
-import { EmailService } from '@/lib/services/email/email-service'
+import {
+  processTelegramQueue,
+  purgeOldTelegramQueueRows,
+} from '@/lib/services/telegram-queue.service'
 import prisma from '@/lib/prisma'
 
 export async function GET(request: NextRequest) {
@@ -18,29 +21,34 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const limit = Math.min(parseInt(searchParams.get('limit') ?? '20'), 100)
 
-    const [pending, failed, recentSent, recentFailed] = await Promise.all([
-      prisma.email_queue.count({ where: { status: 'pending' } }),
-      prisma.email_queue.count({ where: { status: 'failed' } }),
-      prisma.email_queue.findMany({
+    const [pending, failed, sending, recentSent, recentFailed] = await Promise.all([
+      prisma.telegram_queue.count({ where: { status: 'pending' } }),
+      prisma.telegram_queue.count({ where: { status: 'failed' } }),
+      prisma.telegram_queue.count({ where: { status: 'sending' } }),
+      prisma.telegram_queue.findMany({
         where: { status: 'sent' },
         orderBy: { sentAt: 'desc' },
         take: limit,
         select: {
           id: true,
-          toEmail: true,
-          subject: true,
+          chatId: true,
+          title: true,
+          module: true,
+          priority: true,
           sentAt: true,
           attempts: true,
         },
       }),
-      prisma.email_queue.findMany({
+      prisma.telegram_queue.findMany({
         where: { status: 'failed' },
         orderBy: { scheduledAt: 'desc' },
         take: limit,
         select: {
           id: true,
-          toEmail: true,
-          subject: true,
+          chatId: true,
+          title: true,
+          module: true,
+          priority: true,
           scheduledAt: true,
           attempts: true,
           maxAttempts: true,
@@ -51,12 +59,12 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      stats: { pending, failed },
+      stats: { pending, failed, sending },
       recentSent,
       recentFailed,
     })
   } catch (error) {
-    console.error('[EMAIL-QUEUE API] GET error:', error)
+    console.error('[TELEGRAM-QUEUE API] GET error:', error)
     return NextResponse.json({ error: 'Error interno' }, { status: 500 })
   }
 }
@@ -69,31 +77,38 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json().catch(() => ({}))
     const retryFailed = body?.retryFailed === true
+    const purgeOld = body?.purgeOld === true
 
-    // Si se pidió reintentar fallidos, resetearlos a pending primero
     let resetCount = 0
     if (retryFailed) {
-      const result = await prisma.email_queue.updateMany({
+      const result = await prisma.telegram_queue.updateMany({
         where: { status: 'failed' },
-        data: { status: 'pending', attempts: 0, errorMessage: null },
+        data: {
+          status: 'pending',
+          attempts: 0,
+          errorMessage: null,
+          scheduledAt: new Date(),
+        },
       })
       resetCount = result.count
     }
 
-    const result = await EmailService.processQueue()
+    const result = await processTelegramQueue()
+    const purged = purgeOld ? await purgeOldTelegramQueueRows(7) : 0
 
     return NextResponse.json({
       success: true,
       sent: result.sent,
       failed: result.failed,
       retriedReset: resetCount,
+      purged,
       message:
         result.sent === 0 && resetCount === 0
-          ? 'No había emails pendientes en la cola'
-          : `${result.sent} enviados, ${result.failed} fallidos${resetCount ? `, ${resetCount} fallidos reintentados` : ''}`,
+          ? 'No había alertas pendientes en la cola'
+          : `${result.sent} enviadas, ${result.failed} fallidas${resetCount ? `, ${resetCount} reencoladas` : ''}${purged ? `, ${purged} antiguas purgadas` : ''}`,
     })
   } catch (error) {
-    console.error('[EMAIL-QUEUE API] POST error:', error)
+    console.error('[TELEGRAM-QUEUE API] POST error:', error)
     return NextResponse.json({ error: 'Error interno al procesar la cola' }, { status: 500 })
   }
 }

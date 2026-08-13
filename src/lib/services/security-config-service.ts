@@ -170,6 +170,8 @@ export class SecurityConfigService {
    */
   static async recordFailedLogin(email: string, _ipAddress: string): Promise<void> {
     try {
+      const config = await this.getConfig()
+      const maxAttempts = config.maxLoginAttempts || 5
       const key = `failed_login:${email.toLowerCase()}`
       const now = Date.now()
 
@@ -177,12 +179,24 @@ export class SecurityConfigService {
 
       if (record) {
         const data = JSON.parse(record.value as string)
-        data.attempts = (data.attempts || 0) + 1
+        const previousAttempts = data.attempts || 0
+        data.attempts = previousAttempts + 1
         data.lastAttempt = now
         await prisma.system_settings.update({
           where: { key },
           data: { value: JSON.stringify(data) },
         })
+
+        if (previousAttempts < maxAttempts && data.attempts >= maxAttempts) {
+          const { notifySuperAdminsSecurityAlert } = await import(
+            '@/lib/notifications/security-telegram'
+          )
+          notifySuperAdminsSecurityAlert({
+            title: 'Cuenta bloqueada por intentos fallidos',
+            body: `Email: ${email}\nIntentos: ${data.attempts}/${maxAttempts}\nBloqueo temporal activo (15 min).`,
+            link: '/admin/audit',
+          }).catch(() => {})
+        }
       } else {
         await prisma.system_settings.create({
           data: {

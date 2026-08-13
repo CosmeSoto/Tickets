@@ -24,7 +24,9 @@
 
 import { NextResponse } from 'next/server'
 import { randomUUID } from 'crypto'
+import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { verifyCronAuth } from '@/lib/cron/verify-cron-auth'
 import { getTelegramConfig, buildApiBase } from '@/lib/services/telegram-config'
 import { processUpdate, type TelegramUpdateMessage } from '@/lib/telegram/process-update'
 
@@ -35,12 +37,8 @@ export const maxDuration = 55 // justo por debajo del límite de 60 s de Next.js
 const OFFSET_KEY = 'telegramPollOffset'
 
 export async function GET(request: Request) {
-  // ── Auth ────────────────────────────────────────────────────────────────────
-  const authHeader = request.headers.get('authorization')
-  const cronSecret = process.env.CRON_SECRET ?? 'change-me-in-production'
-  if (authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ success: false, error: 'No autorizado' }, { status: 401 })
-  }
+  const unauthorized = verifyCronAuth(request)
+  if (unauthorized) return unauthorized
 
   // ── Config del bot ──────────────────────────────────────────────────────────
   const cfg = await getTelegramConfig()

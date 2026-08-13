@@ -5,23 +5,16 @@
  */
 
 import { NextResponse } from 'next/server'
+import { verifyCronAuth } from '@/lib/cron/verify-cron-auth'
 import { EmailService } from '@/lib/services/email/email-service'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 60 // 60 segundos máximo
+export const maxDuration = 60
 
 export async function GET(request: Request) {
   try {
-    // Verificar autorización (token secreto o Vercel Cron header)
-    const authHeader = request.headers.get('authorization')
-    const cronSecret = process.env.CRON_SECRET || 'change-me-in-production'
-    
-    if (authHeader !== `Bearer ${cronSecret}`) {
-      return NextResponse.json(
-        { success: false, error: 'No autorizado' },
-        { status: 401 }
-      )
-    }
+    const unauthorized = verifyCronAuth(request)
+    if (unauthorized) return unauthorized
 
     console.log('[CRON] Procesando cola de emails...')
     

@@ -6,6 +6,7 @@ import { generateDeliveryActExpiredEmail } from '../email-templates/inventory/de
 import type { DeliveryAct } from '@/types/inventory/delivery-act'
 import { NotificationService } from './notification-service'
 import { getFamilyScopedAdmins } from '@/lib/notifications/family-recipients'
+import { queueTelegramNotification } from '@/lib/notifications/queue-notification-telegram'
 import { db as prisma } from '@/lib/server'
 import { getSystemBranding } from '@/lib/branding'
 import { queueNotificationEmail } from '@/lib/notifications/queue-notification-email'
@@ -75,6 +76,19 @@ async function notifyDeliveryActFamilyAdmins(
       })
     )
   )
+
+  const link =
+    typeof notification.metadata.link === 'string' ? notification.metadata.link : undefined
+
+  queueTelegramNotification({
+    recipients: recipients.map(admin => ({ userId: admin.id })),
+    title: notification.title,
+    body: notification.message,
+    module: 'inventory',
+    event: 'inventoryAct',
+    priority: 'important',
+    link,
+  }).catch(err => console.error('[TELEGRAM] Error acta inventario:', err))
 }
 
 async function getActFamilyId(act: {

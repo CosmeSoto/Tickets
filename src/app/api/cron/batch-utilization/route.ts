@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { checkBatchUtilization } from '@/lib/cron/check-batch-utilization'
+import { verifyCronAuth } from '@/lib/cron/verify-cron-auth'
 
 /**
  * GET /api/cron/batch-utilization
@@ -10,12 +11,8 @@ import { checkBatchUtilization } from '@/lib/cron/check-batch-utilization'
  */
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url)
-    const secret = searchParams.get('secret')
-
-    if (secret !== process.env.CRON_SECRET) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    }
+    const unauthorized = verifyCronAuth(request)
+    if (unauthorized) return unauthorized
 
     const result = await checkBatchUtilization()
 

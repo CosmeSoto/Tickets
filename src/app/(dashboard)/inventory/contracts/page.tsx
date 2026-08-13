@@ -50,6 +50,7 @@ import { useFetch } from '@/hooks/common/use-fetch'
 import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 import { ContractForm } from '@/components/contracts/contract-form'
 import { RenewContractDialog } from '@/components/inventory/contracts/renew-contract-dialog'
+import { isCalendarOrSelectInteraction } from '@/lib/ui/calendar-dismiss'
 import { ContractHistoryTimeline } from '@/components/inventory/contracts/contract-history-timeline'
 import { useTableSort } from '@/hooks/common/use-table-sort'
 import { useInventoryPermissions } from '@/hooks/use-inventory-permissions'
@@ -662,6 +663,7 @@ export default function ContractsPage() {
 
       {/* ── Modal formulario ──────────────────────────────────────────────── */}
       <Dialog
+        modal={false}
         open={formOpen}
         onOpenChange={open => {
           if (!open) {
@@ -672,8 +674,14 @@ export default function ContractsPage() {
       >
         <DialogContent
           className='w-[min(98vw,90rem)] max-w-[90rem] h-[min(94vh,56rem)] max-h-[94vh] p-0 gap-0 overflow-hidden flex flex-col'
-          onPointerDownOutside={e => e.preventDefault()}
-          onInteractOutside={e => e.preventDefault()}
+          onPointerDownOutside={e => {
+            if (isCalendarOrSelectInteraction(e)) return
+            e.preventDefault()
+          }}
+          onInteractOutside={e => {
+            if (isCalendarOrSelectInteraction(e)) return
+            e.preventDefault()
+          }}
         >
           <DialogHeader className='px-6 pt-6 pb-3 border-b shrink-0'>
             <DialogTitle>

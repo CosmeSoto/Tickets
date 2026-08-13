@@ -1,23 +1,26 @@
 /**
- * Única puerta de entrada para enviar alertas de Telegram.
+ * Única puerta de entrada para encolar alertas de Telegram.
  *
- * Paralelo exacto de queue-notification-email:
- *   - Comprueba que el bot esté configurado (TELEGRAM_BOT_TOKEN)
- *   - Aplica la política (solo critical + important)
- *   - Respeta el master switch del usuario (telegramNotifications)
- *   - Resuelve telegramChatId del usuario desde la BD
- *   - No lanza excepciones: fallo silencioso para no romper el flujo principal
+ * Paralelo de queue-notification-email:
+ *   - Comprueba bot habilitado + switch global de alertas
+ *   - Aplica política (solo critical + important)
+ *   - Respeta preferencias de usuario
+ *   - Encola en telegram_queue (envío async vía cron)
  */
 
 import prisma from '@/lib/prisma'
-import { sendTelegramAlert } from '@/lib/services/telegram.service'
-import { isTelegramEnabled } from '@/lib/services/telegram-config'
+import {
+  getTelegramConfig,
+  isTelegramEnabled,
+  isTelegramNotificationsEnabled,
+} from '@/lib/services/telegram-config'
+import { enqueueTelegramAlert, processTelegramQueue } from '@/lib/services/telegram-queue.service'
 import type { TelegramModule, TelegramEvent } from './telegram-policy'
 import type { TelegramPriority } from '@/lib/services/telegram.service'
 import { resolveTelegramPriority, shouldSendViaTelegram } from './telegram-policy'
+import { filterUserIdsForTelegramNotification } from './telegram-prefs'
 
 export type QueueTelegramNotificationInput = {
-  /** Un userId o array de userIds destino */
   recipientUserId?: string | null
   recipients?: Array<{ userId: string }>
   title: string
@@ -25,19 +28,13 @@ export type QueueTelegramNotificationInput = {
   module: TelegramModule
   event?: TelegramEvent
   priority?: TelegramPriority
-  /** Link relativo o absoluto al backoffice */
   link?: string
-  /** Para herencia de tipo de módulo en el emoji */
-  telegramModule?: 'tickets' | 'inventory' | 'backups' | 'patrols' | 'system'
 }
 
-/**
- * Resuelve el módulo Telegram a partir del TelegramModule.
- */
 function resolveTgModule(
   module: TelegramModule
-): QueueTelegramNotificationInput['telegramModule'] {
-  const map: Record<TelegramModule, QueueTelegramNotificationInput['telegramModule']> = {
+): 'tickets' | 'inventory' | 'backups' | 'patrols' | 'system' {
+  const map = {
     tickets: 'tickets',
     inventory: 'inventory',
     system: 'system',
@@ -46,19 +43,26 @@ function resolveTgModule(
     patrols: 'patrols',
     content: 'system',
     credentials: 'system',
-  }
+  } as const
   return map[module]
 }
 
 /**
- * Envía alertas de Telegram a uno o varios usuarios.
- * Retorna los userIds que recibieron la alerta correctamente.
+ * Encola alertas de Telegram para uno o varios usuarios.
+ * Retorna los userIds encolados correctamente.
  */
 export async function queueTelegramNotification(
   input: QueueTelegramNotificationInput
 ): Promise<string[]> {
   if (!(await isTelegramEnabled())) {
     console.log(`[TELEGRAM] Bot no habilitado — omitiendo (${input.module}/${input.event ?? 'n/a'})`)
+    return []
+  }
+
+  if (!(await isTelegramNotificationsEnabled())) {
+    console.log(
+      `[TELEGRAM] Alertas globales desactivadas — omitiendo (${input.module}/${input.event ?? 'n/a'})`
+    )
     return []
   }
 
@@ -69,7 +73,6 @@ export async function queueTelegramNotification(
     return []
   }
 
-  // Construir lista de userIds a notificar
   const userIds: string[] = []
   if (input.recipients?.length) {
     userIds.push(...input.recipients.map(r => r.userId))
@@ -79,47 +82,59 @@ export async function queueTelegramNotification(
 
   if (userIds.length === 0) return []
 
-  const sent: string[] = []
+  const allowedUserIds = await filterUserIdsForTelegramNotification(userIds, {
+    module: input.module,
+    event: input.event,
+    priority,
+  })
 
-  for (const userId of userIds) {
+  if (allowedUserIds.length === 0) return []
+
+  const users = await prisma.users.findMany({
+    where: { id: { in: allowedUserIds } },
+    select: { id: true, telegramChatId: true },
+  })
+
+  const queued: string[] = []
+  const tgModule = resolveTgModule(input.module)
+
+  for (const user of users) {
+    if (!user.telegramChatId) {
+      console.log(`[TELEGRAM] User ${user.id} no tiene chatId vinculado — omitido`)
+      continue
+    }
+
     try {
-      // Leer chatId + preferencia en una sola query
-      const user = await prisma.users.findUnique({
-        where: { id: userId },
-        select: {
-          telegramChatId: true,
-          user_settings: {
-            select: { telegramNotifications: true },
-          },
-        },
-      })
-
-      if (!user?.telegramChatId) {
-        console.log(`[TELEGRAM] User ${userId} no tiene chatId vinculado — omitido`)
-        continue
-      }
-
-      const telegramEnabled = user.user_settings?.telegramNotifications ?? true
-      if (!telegramEnabled) {
-        console.log(`[TELEGRAM] User ${userId} tiene Telegram desactivado — omitido`)
-        continue
-      }
-
-      const ok = await sendTelegramAlert({
+      await enqueueTelegramAlert({
+        userId: user.id,
         chatId: user.telegramChatId,
         title: input.title,
         body: input.body,
         priority,
         link: input.link,
-        module: input.telegramModule ?? resolveTgModule(input.module),
+        module: tgModule,
       })
-
-      if (ok) sent.push(userId)
+      queued.push(user.id)
     } catch (err) {
-      console.error(`[TELEGRAM] Error enviando a user=${userId}:`, err)
-      // Continuar con el siguiente — no bloquear
+      console.error(`[TELEGRAM] Error encolando user=${user.id}:`, err)
     }
   }
 
-  return sent
+  if (priority === 'critical' && queued.length > 0) {
+    void processTelegramQueue().catch(err =>
+      console.error('[TELEGRAM] Error en envío inmediato critical:', err)
+    )
+  }
+
+  return queued
+}
+
+export async function getTelegramRuntimeStatus() {
+  const cfg = await getTelegramConfig()
+  const pending = await prisma.telegram_queue.count({ where: { status: 'pending' } }).catch(() => 0)
+  return {
+    botEnabled: Boolean(cfg?.enabled && cfg?.botToken),
+    notificationsEnabled: Boolean(cfg?.notificationsEnabled),
+    pendingQueue: pending,
+  }
 }

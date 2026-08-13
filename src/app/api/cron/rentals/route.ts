@@ -1,22 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { checkRentalExpiration } from '@/lib/cron/check-rental-expiration'
+import { verifyCronAuth } from '@/lib/cron/verify-cron-auth'
 
 /**
  * GET /api/cron/rentals
  * Cron job para verificar vencimientos de arrendamientos
  *
  * Configurar en cron:
- * 0 9 * * * curl https://tu-dominio.com/api/cron/rentals?secret=TU_SECRET
+ * 0 9 * * * curl -H "Authorization: Bearer $CRON_SECRET" https://tu-dominio.com/api/cron/rentals
  */
 export async function GET(request: NextRequest) {
   try {
-    // Verificar secret para seguridad
-    const { searchParams } = new URL(request.url)
-    const secret = searchParams.get('secret')
-
-    if (secret !== process.env.CRON_SECRET) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    }
+    const unauthorized = verifyCronAuth(request)
+    if (unauthorized) return unauthorized
 
     const result = await checkRentalExpiration()
 

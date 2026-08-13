@@ -241,7 +241,6 @@ export class NotificationService {
         module: 'tickets',
         event: 'ticketCreated',
         link: `/admin/tickets/${ticket.id}`,
-        telegramModule: 'tickets',
       }).catch(err => console.error('[TELEGRAM] notifyTicketCreated:', err))
 
       return notifications
@@ -341,7 +340,6 @@ export class NotificationService {
           link: ticket.assigneeId
             ? `/technician/tickets/${ticket.id}`
             : `/admin/tickets/${ticket.id}`,
-          telegramModule: 'tickets',
         }).catch(err => console.error('[TELEGRAM] notifyFamilyChange:', err))
       }
     } catch (error) {
@@ -437,7 +435,6 @@ export class NotificationService {
         module: 'tickets',
         event: 'ticketAssigned',
         link: `/technician/tickets/${ticket.id}`,
-        telegramModule: 'tickets',
       }).catch(err => console.error('[TELEGRAM] notifyTicketAssigned:', err))
 
       return notifications
@@ -554,7 +551,6 @@ export class NotificationService {
           module: 'tickets',
           priority: 'important',
           link: `/technician/tickets/${ticket.id}`,
-          telegramModule: 'tickets',
         }).catch(err => console.error('[TELEGRAM] notifyNewComment técnico:', err))
       }
 
@@ -639,7 +635,6 @@ export class NotificationService {
           module: 'tickets',
           event: 'statusChanged',
           link: `/technician/tickets/${ticket.id}`,
-          telegramModule: 'tickets',
         }).catch(err => console.error('[TELEGRAM] notifyTicketResolved:', err))
       }
 

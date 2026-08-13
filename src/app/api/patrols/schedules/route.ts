@@ -224,7 +224,6 @@ export async function POST(request: NextRequest) {
       module: 'patrols',
       event: 'patrolAssigned',
       link: '/patrol',
-      telegramModule: 'patrols',
     }).catch(err => console.error('[patrol/schedules POST] Telegram:', err))
 
     await AuditServiceComplete.log({

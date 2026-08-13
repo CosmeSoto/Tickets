@@ -4,6 +4,7 @@ import { stat, unlink, createReadStream } from 'fs'
 import { createHash, randomBytes } from 'crypto'
 import { join } from 'path'
 import prisma from '@/lib/prisma'
+import { queueTelegramNotification } from '@/lib/notifications/queue-notification-telegram'
 import { BackupConfig, DatabaseConfig } from './backup-types'
 
 const execAsync = promisify(exec)
@@ -225,9 +226,6 @@ export async function sendBackupNotification(
 
     // Telegram: solo en fallos (critical) a usuarios con chatId vinculado
     if (isError && recipients.length) {
-      const { queueTelegramNotification } = await import(
-        '@/lib/notifications/queue-notification-telegram'
-      )
       queueTelegramNotification({
         recipients: recipients.map(r => ({ userId: r.userId })),
         title: 'Error en backup',
@@ -236,7 +234,6 @@ export async function sendBackupNotification(
         event: 'backupFailure',
         priority: 'critical',
         link: '/admin/backups',
-        telegramModule: 'backups',
       }).catch(() => {})
     }
   } catch (error) {

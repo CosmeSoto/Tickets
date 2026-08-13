@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { CheckRentalExpirationJob } from '@/lib/jobs/check-rental-expiration.job'
 import { isInventoryAlertEnabled } from '@/lib/settings/runtime-settings'
+import { verifyCronAuth } from '@/lib/cron/verify-cron-auth'
 
 /**
  * Endpoint para ejecutar el job de verificación de contratos de renta próximos a expirar
@@ -12,12 +13,8 @@ import { isInventoryAlertEnabled } from '@/lib/settings/runtime-settings'
  */
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization')
-    const cronSecret = process.env.CRON_SECRET
-
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    }
+    const unauthorized = verifyCronAuth(request)
+    if (unauthorized) return unauthorized
 
     // Mismo toggle de Reglas: licencias y contratos (incluye rentas)
     const enabled = await isInventoryAlertEnabled('inventory.license_alert_enabled')

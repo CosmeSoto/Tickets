@@ -3,6 +3,7 @@
  * Ejecutado por cron diario; notifica a admins de la familia del modelo.
  */
 
+import { queueTelegramNotification } from '@/lib/notifications/queue-notification-telegram'
 import { prisma } from '@/lib/prisma'
 import { NotificationService } from '@/lib/services/notification-service'
 import { getFamilyScopedAdmins } from '@/lib/notifications/family-recipients'
@@ -159,9 +160,6 @@ export class BatchAlertService {
 
         // Telegram: solo alertas críticas de inventario
         if (primary.level === 'critical') {
-          const { queueTelegramNotification } = await import(
-            '@/lib/notifications/queue-notification-telegram'
-          )
           queueTelegramNotification({
             recipientUserId: admin.id,
             title: `Lote ${batch.batchCode}: ${primary.title}`,
@@ -170,7 +168,6 @@ export class BatchAlertService {
             event: 'inventoryAlert',
             priority: 'important',
             link: `/inventory/batches/${batch.id}`,
-            telegramModule: 'inventory',
           }).catch(() => {})
         }
       }

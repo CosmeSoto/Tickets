@@ -81,6 +81,40 @@ const EMPTY_LINE = {
   order: 0,
 }
 
+function buildContractDraftSnapshot(v: ContractFormData) {
+  return {
+    name: v.name ?? '',
+    contractNumber: v.contractNumber ?? '',
+    description: v.description ?? '',
+    category: v.category ?? 'SERVICE',
+    serviceSubtype: v.serviceSubtype ?? '',
+    supplierId: v.supplierId ?? '',
+    familyId: v.familyId ?? '',
+    startDate: v.startDate ?? '',
+    endDate: v.endDate ?? '',
+    autoRenew: !!v.autoRenew,
+    renewalNoticeDays: v.renewalNoticeDays ?? 30,
+    billingCycle: v.billingCycle ?? 'MONTHLY',
+    totalValue: v.totalValue ?? '',
+    monthlyCost: v.monthlyCost ?? '',
+    currency: v.currency ?? 'USD',
+    contactName: v.contactName ?? '',
+    contactEmail: v.contactEmail ?? '',
+    contactPhone: v.contactPhone ?? '',
+    notes: v.notes ?? '',
+    termsUrl: v.termsUrl ?? '',
+    paymentMethodType: v.paymentMethodType ?? 'CORPORATE_CARD',
+    lines: (v.lines ?? []).map(l => ({
+      type: l.type,
+      description: l.description,
+      quantity: l.quantity,
+      unitPrice: l.unitPrice,
+      notes: l.notes,
+      order: l.order,
+    })),
+  }
+}
+
 export function ContractForm({
   contract,
   onSuccess,
@@ -334,41 +368,23 @@ export function ContractForm({
       ? FormDraftKeys.contractEdit(contract.id)
       : FormDraftKeys.contractNew())
 
-  const watchedDraft = watch()
-  const draftSnapshot = useMemo(() => {
-    const v = watchedDraft
-    return {
-      name: v.name ?? '',
-      contractNumber: v.contractNumber ?? '',
-      description: v.description ?? '',
-      category: v.category ?? 'SERVICE',
-      serviceSubtype: v.serviceSubtype ?? '',
-      supplierId: v.supplierId ?? '',
-      familyId: v.familyId ?? '',
-      startDate: v.startDate ?? '',
-      endDate: v.endDate ?? '',
-      autoRenew: !!v.autoRenew,
-      renewalNoticeDays: v.renewalNoticeDays ?? 30,
-      billingCycle: v.billingCycle ?? 'MONTHLY',
-      totalValue: v.totalValue ?? '',
-      monthlyCost: v.monthlyCost ?? '',
-      currency: v.currency ?? 'USD',
-      contactName: v.contactName ?? '',
-      contactEmail: v.contactEmail ?? '',
-      contactPhone: v.contactPhone ?? '',
-      notes: v.notes ?? '',
-      termsUrl: v.termsUrl ?? '',
-      paymentMethodType: v.paymentMethodType ?? 'CORPORATE_CARD',
-      lines: (v.lines ?? []).map(l => ({
-        type: l.type,
-        description: l.description,
-        quantity: l.quantity,
-        unitPrice: l.unitPrice,
-        notes: l.notes,
-        order: l.order,
-      })),
+  const [draftSnapshot, setDraftSnapshot] = useState(() =>
+    buildContractDraftSnapshot(getValues())
+  )
+
+  useEffect(() => {
+    let debounceTimer: ReturnType<typeof setTimeout>
+    const sub = watch(values => {
+      clearTimeout(debounceTimer)
+      debounceTimer = setTimeout(() => {
+        setDraftSnapshot(buildContractDraftSnapshot(values as ContractFormData))
+      }, 700)
+    })
+    return () => {
+      sub.unsubscribe()
+      clearTimeout(debounceTimer)
     }
-  }, [watchedDraft])
+  }, [watch])
 
   const { clearDraft, wasRestored, dismissRestoredBanner } = useFormDraft({
     key: resolvedDraftKey,
@@ -395,6 +411,7 @@ export function ContractForm({
   const selectedSupplierId = watch('supplierId')
   const billingCycle = watch('billingCycle')
   const startDateValue = watch('startDate')
+  const endDateValue = watch('endDate')
   const isRecurringBilling = billingCycle !== 'ONE_TIME'
 
   const recurringCostLabel =
@@ -789,7 +806,7 @@ export function ContractForm({
             <div className='space-y-1'>
               <Label>Fecha de vencimiento</Label>
               <DateInput
-                value={watch('endDate')}
+                value={endDateValue}
                 onChange={e =>
                   setValue('endDate', e.target.value, {
                     shouldValidate: true,

@@ -102,7 +102,6 @@ export class PatrolReminderService {
             module: 'patrols',
             event: 'patrolReminder',
             link: `/patrol/${patrol.id}`,
-            telegramModule: 'patrols',
           }).catch(err =>
             console.error(`[PatrolReminderService] Error Telegram patrol=${patrol.id}:`, err)
           )
