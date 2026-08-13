@@ -198,7 +198,7 @@ export function EditUserModal({
   }
 
   const handleResetPassword = async (newPassword: string) => {
-    if (!user || newPassword.length < 6) return
+    if (!user) return
     const res = await fetch(`/api/users/${user.id}/reset-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

@@ -12,7 +12,8 @@ export interface BaseUserFormData {
 
 export function validateUserForm(
   formData: Partial<BaseUserFormData> & { password?: string },
-  isCreate: boolean = false
+  isCreate: boolean = false,
+  passwordMinLength: number = 8
 ): { isValid: boolean; errors: Record<string, string> } {
   const newErrors: Record<string, string> = {}
 
@@ -30,8 +31,8 @@ export function validateUserForm(
 
   if (isCreate && !formData.password?.trim()) {
     newErrors.password = 'La contraseña es requerida'
-  } else if (isCreate && formData.password && formData.password.length < 6) {
-    newErrors.password = 'Mínimo 6 caracteres'
+  } else if (isCreate && formData.password && formData.password.length < passwordMinLength) {
+    newErrors.password = `Mínimo ${passwordMinLength} caracteres`
   }
 
   if (formData.phone && !/^[\d\s\-\+\(\)]+$/.test(formData.phone)) {

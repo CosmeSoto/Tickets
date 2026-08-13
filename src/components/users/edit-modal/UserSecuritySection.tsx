@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Lock, Unlock, X } from 'lucide-react'
+import { usePasswordPolicy } from '@/hooks/use-password-policy'
+import { useToast } from '@/hooks/use-toast'
 
 interface UserSecuritySectionProps {
   isLocked: boolean
@@ -16,13 +18,22 @@ export function UserSecuritySection({
   onResetPassword,
   onUnlock,
 }: UserSecuritySectionProps) {
+  const { minLength } = usePasswordPolicy()
+  const { toast } = useToast()
   const [showResetPassword, setShowResetPassword] = useState(false)
   const [newPassword, setNewPassword] = useState('')
   const [resetPasswordLoading, setResetPasswordLoading] = useState(false)
   const [unlockLoading, setUnlockLoading] = useState(false)
 
   const handleResetPassword = async () => {
-    if (newPassword.length < 6) return
+    if (newPassword.length < minLength) {
+      toast({
+        title: 'Contraseña muy corta',
+        description: `Mínimo ${minLength} caracteres`,
+        variant: 'destructive',
+      })
+      return
+    }
     setResetPasswordLoading(true)
     try {
       await onResetPassword(newPassword)
@@ -79,7 +90,7 @@ export function UserSecuritySection({
           <div className='flex items-center gap-2 w-full'>
             <Input
               type='password'
-              placeholder='Nueva contraseña (mín. 6 caracteres)'
+              placeholder={`Nueva contraseña (mín. ${minLength} caracteres)`}
               value={newPassword}
               onChange={e => setNewPassword(e.target.value)}
               className='flex-1 h-8 text-sm'
@@ -89,7 +100,7 @@ export function UserSecuritySection({
               type='button'
               size='sm'
               onClick={handleResetPassword}
-              disabled={resetPasswordLoading || newPassword.length < 6}
+              disabled={resetPasswordLoading || newPassword.length < minLength}
               className='bg-amber-600 hover:bg-amber-700 text-white shrink-0'
             >
               {resetPasswordLoading ? 'Guardando...' : 'Confirmar'}

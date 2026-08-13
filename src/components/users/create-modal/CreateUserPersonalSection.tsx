@@ -11,6 +11,7 @@ interface CreateUserPersonalSectionProps {
   password: string
   phone: string
   showPassword: boolean
+  passwordMinLength: number
   errors: Record<string, string>
   onNameChange: (value: string) => void
   onEmailChange: (value: string) => void
@@ -25,6 +26,7 @@ export function CreateUserPersonalSection({
   password,
   phone,
   showPassword,
+  passwordMinLength,
   errors,
   onNameChange,
   onEmailChange,
@@ -109,7 +111,7 @@ export function CreateUserPersonalSection({
               type={showPassword ? 'text' : 'password'}
               value={password}
               onChange={e => onPasswordChange(e.target.value)}
-              placeholder='Mínimo 6 caracteres'
+              placeholder={`Mínimo ${passwordMinLength} caracteres`}
               className={errors.password ? 'border-destructive pr-10' : 'pr-10'}
             />
             <Button

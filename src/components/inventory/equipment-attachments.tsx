@@ -35,6 +35,7 @@ import {
 import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 import { FileInputWithCamera } from '@/components/common/file-input-with-camera'
 import { extractCatchError } from '@/lib/utils/api-error'
+import { useUploadLimits } from '@/hooks/use-upload-limits'
 
 interface Attachment {
   id: string
@@ -329,6 +330,8 @@ function PreviewModal({
 // ── Componente principal ─────────────────────────────────────────────────────
 
 export function EquipmentAttachments({ equipmentId, canManage }: EquipmentAttachmentsProps) {
+  const { maxFileSizeMB } = useUploadLimits()
+  const maxBytes = maxFileSizeMB * 1024 * 1024
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
@@ -360,10 +363,10 @@ export function EquipmentAttachments({ equipmentId, canManage }: EquipmentAttach
     const file = e.target.files?.[0]
     if (!file) return
 
-    if (file.size > 20 * 1024 * 1024) {
+    if (file.size > maxBytes) {
       toast({
         title: 'Archivo muy grande',
-        description: 'El límite es 20 MB',
+        description: `El límite es ${maxFileSizeMB} MB`,
         variant: 'destructive',
       })
       return

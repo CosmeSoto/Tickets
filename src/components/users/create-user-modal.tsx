@@ -15,6 +15,7 @@ import { UserPlus, Save, Info } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { USER_ROLE_FORM_OPTIONS, type UserRole } from '@/lib/constants/user-constants'
 import { validateUserForm, useUserAvatarHandler } from './user-utils'
+import { usePasswordPolicy } from '@/hooks/use-password-policy'
 import { CreateUserHeader } from './create-modal/CreateUserHeader'
 import { CreateUserPersonalSection } from './create-modal/CreateUserPersonalSection'
 import { CreateUserRoleSection } from './create-modal/CreateUserRoleSection'
@@ -60,6 +61,7 @@ export function CreateUserModal({
 }: CreateUserModalProps) {
   const { data: session } = useSession()
   const { toast } = useToast()
+  const { minLength: passwordMinLength } = usePasswordPolicy()
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
@@ -108,7 +110,7 @@ export function CreateUserModal({
   }
 
   const handleSubmit = async () => {
-    const { isValid, errors: validationErrors } = validateUserForm(formData, true)
+    const { isValid, errors: validationErrors } = validateUserForm(formData, true, passwordMinLength)
     if (!isValid) {
       const errorList = Object.values(validationErrors).filter(Boolean)
       if (errorList.length > 0) {
@@ -271,6 +273,7 @@ export function CreateUserModal({
               password={formData.password}
               phone={formData.phone}
               showPassword={showPassword}
+              passwordMinLength={passwordMinLength}
               errors={errors}
               onNameChange={value => setFormData(p => ({ ...p, name: value }))}
               onEmailChange={value => setFormData(p => ({ ...p, email: value }))}

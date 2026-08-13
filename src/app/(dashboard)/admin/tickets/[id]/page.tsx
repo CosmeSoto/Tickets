@@ -464,7 +464,6 @@ export default function AdminTicketDetailPage() {
                 ticketId={ticket.id}
                 onUploadComplete={loadTicket}
                 disabled={ticket.status === 'CLOSED'}
-                maxFileSize={10}
                 refreshKey={fileKey}
               />
             </TabsContent>

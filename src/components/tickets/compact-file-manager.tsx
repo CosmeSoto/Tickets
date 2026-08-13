@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
+import { useUploadLimits } from '@/hooks/use-upload-limits'
 import { cn } from '@/lib/utils'
 import { FilePreviewModal } from './file-preview-modal'
 import { FileInputWithCamera } from '@/components/common/file-input-with-camera'
@@ -66,12 +67,14 @@ export function CompactFileManager({
   onUploadComplete,
   onAttachmentsChange,
   disabled = false,
-  maxFileSize = 10,
+  maxFileSize: maxFileSizeProp,
   canDelete = false,
   canUpload = true,
   refreshKey = 0,
 }: CompactFileManagerProps) {
   const { toast } = useToast()
+  const { maxFileSizeMB } = useUploadLimits()
+  const maxFileSize = maxFileSizeProp ?? maxFileSizeMB
   const [isDragOver, setIsDragOver] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [previewFile, setPreviewFile] = useState<(Attachment & { url: string }) | null>(null)

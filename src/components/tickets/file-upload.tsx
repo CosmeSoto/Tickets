@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { useToast } from '@/hooks/use-toast'
+import { useUploadLimits } from '@/hooks/use-upload-limits'
 import { cn } from '@/lib/utils'
 
 interface FileUploadProps {
@@ -39,16 +40,18 @@ const ALLOWED_TYPES = [
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
 ]
 
-const MAX_FILE_SIZE = 10 // MB
+const MAX_FILE_SIZE = 10 // MB — fallback si aún no cargó la config
 
 export function FileUpload({
   ticketId,
   onUploadComplete,
   disabled = false,
   maxFiles = 5,
-  maxFileSize = MAX_FILE_SIZE,
+  maxFileSize: maxFileSizeProp,
 }: FileUploadProps) {
   const { toast } = useToast()
+  const { maxFileSizeMB } = useUploadLimits()
+  const maxFileSize = maxFileSizeProp ?? maxFileSizeMB ?? MAX_FILE_SIZE
   const [isDragOver, setIsDragOver] = useState(false)
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([])
 
