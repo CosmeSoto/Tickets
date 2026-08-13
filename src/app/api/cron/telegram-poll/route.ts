@@ -35,6 +35,25 @@ export const maxDuration = 55 // justo por debajo del límite de 60 s de Next.js
 // Clave donde se guarda el último offset procesado
 const OFFSET_KEY = 'telegramPollOffset'
 
+/** Evita llenar logs cuando la red no llega a api.telegram.org (LAN sin salida, firewall, etc.) */
+let lastNetworkWarnAt = 0
+const NETWORK_WARN_INTERVAL_MS = 5 * 60 * 1000
+
+function logNetworkPollError(err: unknown) {
+  const now = Date.now()
+  if (now - lastNetworkWarnAt < NETWORK_WARN_INTERVAL_MS) return
+  lastNetworkWarnAt = now
+  const code =
+    err instanceof Error && err.cause && typeof err.cause === 'object' && 'code' in err.cause
+      ? String((err.cause as { code?: string }).code)
+      : undefined
+  console.warn(
+    `[TELEGRAM poll] Sin conexión a api.telegram.org${code ? ` (${code})` : ''}. ` +
+      'El cron reintentará; no afecta al resto del sistema. En LAN sin internet es normal; ' +
+      'en hosting con salida HTTPS desaparece (o usa webhook en producción).'
+  )
+}
+
 export async function GET(request: Request) {
   const unauthorized = verifyCronAuth(request)
   if (unauthorized) return unauthorized
@@ -99,7 +118,7 @@ export async function GET(request: Request) {
     updates = data.result ?? []
   } catch (err) {
     // Timeout o error de red — no es crítico, el próximo ciclo lo reintentará
-    console.warn('[TELEGRAM poll] Error de red:', err)
+    logNetworkPollError(err)
     return NextResponse.json({ success: true, processed: 0, reason: 'error de red' })
   }
 

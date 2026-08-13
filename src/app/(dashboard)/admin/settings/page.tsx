@@ -113,7 +113,11 @@ function SettingsPage() {
   /** Evita un frame de “error” antes del primer fetch cuando ya hay sesión admin */
   const [initialFetchDone, setInitialFetchDone] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') || 'general')
+  const [activeTab, setActiveTab] = useState(() => {
+    const tab = searchParams.get('tab') || 'general'
+    // Mantenimiento vive en Seguridad (antes tab propio)
+    return tab === 'maintenance' ? 'security' : tab
+  })
   const { toast } = useToast()
   // Estado UI de cola de email
   const [emailQueueStats, setEmailQueueStats] = useState<{
@@ -628,20 +632,21 @@ function SettingsPage() {
         value={activeTab}
         className='space-y-6'
         onValueChange={tab => {
-          const superAdminTabs = ['email', 'security', 'oauth', 'sla', 'telegram', 'maintenance']
+          const superAdminTabs = ['email', 'security', 'oauth', 'sla', 'telegram']
           if (superAdminTabs.includes(tab) && !isSuperAdmin) return
           setActiveTab(tab)
         }}
       >
-        <TabsList className='flex flex-wrap h-auto gap-1 p-1 w-full'>
-          <TabsTrigger value='general' className='flex-1 min-w-[80px]'>
+        <div className='w-full overflow-x-auto pb-1 -mx-1 px-1'>
+          <TabsList className='inline-flex h-auto w-max max-w-none flex-nowrap gap-1 p-1'>
+          <TabsTrigger value='general' className='shrink-0 px-3'>
             General
           </TabsTrigger>
-          <TabsTrigger value='notifications' className='flex-1 min-w-[110px]'>
+          <TabsTrigger value='notifications' className='shrink-0 px-3'>
             Notificaciones
           </TabsTrigger>
           {/* Tabs solo para Super Admin */}
-          <TabsTrigger value='sla' className='flex-1 min-w-[60px]' disabled={!isSuperAdmin}>
+          <TabsTrigger value='sla' className='shrink-0 px-3' disabled={!isSuperAdmin}>
             <span className='flex items-center gap-1'>
               {!isSuperAdmin && <Crown className='h-3 w-3 text-amber-500' />}
               <Timer className='h-4 w-4 hidden sm:inline' />
@@ -649,40 +654,34 @@ function SettingsPage() {
               <span className='sm:hidden'>SLA</span>
             </span>
           </TabsTrigger>
-          <TabsTrigger value='email' className='flex-1 min-w-[60px]' disabled={!isSuperAdmin}>
+          <TabsTrigger value='email' className='shrink-0 px-3' disabled={!isSuperAdmin}>
             <span className='flex items-center gap-1'>
               {!isSuperAdmin && <Crown className='h-3 w-3 text-amber-500' />}
               Email
             </span>
           </TabsTrigger>
-          <TabsTrigger value='security' className='flex-1 min-w-[80px]' disabled={!isSuperAdmin}>
+          <TabsTrigger value='security' className='shrink-0 px-3' disabled={!isSuperAdmin}>
             <span className='flex items-center gap-1'>
               {!isSuperAdmin && <Crown className='h-3 w-3 text-amber-500' />}
               Seguridad
             </span>
           </TabsTrigger>
-          <TabsTrigger value='oauth' className='flex-1 min-w-[70px]' disabled={!isSuperAdmin}>
+          <TabsTrigger value='oauth' className='shrink-0 px-3' disabled={!isSuperAdmin}>
             <span className='flex items-center gap-1'>
               {!isSuperAdmin && <Crown className='h-3 w-3 text-amber-500' />}
               <Key className='h-4 w-4 hidden sm:inline' />
               OAuth
             </span>
           </TabsTrigger>
-          <TabsTrigger value='telegram' className='flex-1 min-w-[80px]' disabled={!isSuperAdmin}>
+          <TabsTrigger value='telegram' className='shrink-0 px-3' disabled={!isSuperAdmin}>
             <span className='flex items-center gap-1'>
               {!isSuperAdmin && <Crown className='h-3 w-3 text-amber-500' />}
               <Send className='h-4 w-4 hidden sm:inline' />
               <span>Telegram</span>
             </span>
           </TabsTrigger>
-          <TabsTrigger value='maintenance' className='flex-1 min-w-[90px]' disabled={!isSuperAdmin}>
-            <span className='flex items-center gap-1'>
-              {!isSuperAdmin && <Crown className='h-3 w-3 text-amber-500' />}
-              <Wrench className='h-4 w-4 hidden sm:inline' />
-              <span>Mantenimiento</span>
-            </span>
-          </TabsTrigger>
         </TabsList>
+        </div>
 
         {/* Configuración General */}
         <TabsContent value='general'>
@@ -1469,6 +1468,89 @@ function SettingsPage() {
                   </div>
                 </CardContent>
               </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className='flex items-center'>
+                    <Wrench className='h-5 w-5 mr-2' />
+                    Modo mantenimiento
+                  </CardTitle>
+                  <CardDescription>
+                    Bloquea el acceso a usuarios finales durante actualizaciones. Los administradores
+                    pueden seguir entrando si lo permites abajo.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className='space-y-6'>
+                  <div className='flex items-center justify-between rounded-lg border p-4'>
+                    <div className='space-y-1'>
+                      <Label htmlFor='maintenanceMode'>Activar modo mantenimiento</Label>
+                      <p className='text-sm text-muted-foreground'>
+                        Los clientes y técnicos verán una pantalla informativa al intentar usar el
+                        sistema
+                      </p>
+                    </div>
+                    <Switch
+                      id='maintenanceMode'
+                      checked={settings.maintenanceMode}
+                      onCheckedChange={checked =>
+                        setSettings({ ...settings, maintenanceMode: checked })
+                      }
+                    />
+                  </div>
+
+                  <div className='space-y-2'>
+                    <Label htmlFor='maintenanceMessage'>Mensaje para usuarios</Label>
+                    <Textarea
+                      id='maintenanceMessage'
+                      rows={4}
+                      value={settings.maintenanceMessage}
+                      onChange={e =>
+                        setSettings({ ...settings, maintenanceMessage: e.target.value })
+                      }
+                      placeholder='Ej.: Estamos actualizando el sistema. Volveremos en aproximadamente 30 minutos.'
+                    />
+                    <p className='text-xs text-muted-foreground'>
+                      Se muestra en la página /maintenance y al redirigir usuarios bloqueados
+                    </p>
+                  </div>
+
+                  <div className='flex items-center space-x-2'>
+                    <Switch
+                      id='maintenanceAllowAdmins'
+                      checked={settings.maintenanceAllowAdmins}
+                      onCheckedChange={checked =>
+                        setSettings({ ...settings, maintenanceAllowAdmins: checked })
+                      }
+                    />
+                    <Label htmlFor='maintenanceAllowAdmins'>
+                      Permitir acceso a usuarios con rol Administrador
+                    </Label>
+                  </div>
+                  <p className='text-xs text-muted-foreground -mt-4 ml-0'>
+                    Los Super Administradores siempre pueden acceder. Guarda con el botón
+                    &quot;Guardar&quot; superior.
+                  </p>
+
+                  {settings.maintenanceMode && (
+                    <div className='rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 p-4'>
+                      <p className='text-sm text-amber-900 dark:text-amber-200 font-medium'>
+                        Modo mantenimiento activo
+                      </p>
+                      <p className='text-sm text-amber-800 dark:text-amber-300 mt-1'>
+                        Recuerda desactivarlo cuando termines. Vista previa:{' '}
+                        <a
+                          href='/maintenance'
+                          target='_blank'
+                          rel='noopener noreferrer'
+                          className='underline font-medium'
+                        >
+                          /maintenance
+                        </a>
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </div>
           )}
         </TabsContent>
@@ -1953,102 +2035,6 @@ function SettingsPage() {
                 </CardContent>
               </Card>
             </div>
-          )}
-        </TabsContent>
-
-        {/* Modo mantenimiento del sistema */}
-        <TabsContent value='maintenance'>
-          {!isSuperAdmin ? (
-            <div className='flex flex-col items-center justify-center py-16 text-center'>
-              <Crown className='h-12 w-12 text-amber-500 mb-4' />
-              <h3 className='text-lg font-semibold text-foreground mb-2'>Acceso restringido</h3>
-              <p className='text-muted-foreground max-w-sm'>
-                Esta sección solo está disponible para Administradores Principales (Super Admin).
-              </p>
-            </div>
-          ) : (
-            <Card>
-              <CardHeader>
-                <CardTitle className='flex items-center'>
-                  <Wrench className='h-5 w-5 mr-2' />
-                  Mantenimiento del Sistema
-                </CardTitle>
-                <CardDescription>
-                  Bloquea el acceso a usuarios finales mientras realizas actualizaciones o cambios
-                  críticos. Los administradores pueden seguir entrando si lo permites abajo.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className='space-y-6'>
-                <div className='flex items-center justify-between rounded-lg border p-4'>
-                  <div className='space-y-1'>
-                    <Label htmlFor='maintenanceMode'>Activar modo mantenimiento</Label>
-                    <p className='text-sm text-muted-foreground'>
-                      Los clientes y técnicos verán una pantalla informativa al intentar usar el
-                      sistema
-                    </p>
-                  </div>
-                  <Switch
-                    id='maintenanceMode'
-                    checked={settings.maintenanceMode}
-                    onCheckedChange={checked =>
-                      setSettings({ ...settings, maintenanceMode: checked })
-                    }
-                  />
-                </div>
-
-                <div className='space-y-2'>
-                  <Label htmlFor='maintenanceMessage'>Mensaje para usuarios</Label>
-                  <Textarea
-                    id='maintenanceMessage'
-                    rows={4}
-                    value={settings.maintenanceMessage}
-                    onChange={e =>
-                      setSettings({ ...settings, maintenanceMessage: e.target.value })
-                    }
-                    placeholder='Ej.: Estamos actualizando el sistema. Volveremos en aproximadamente 30 minutos.'
-                  />
-                  <p className='text-xs text-muted-foreground'>
-                    Se muestra en la página /maintenance y al redirigir usuarios bloqueados
-                  </p>
-                </div>
-
-                <div className='flex items-center space-x-2'>
-                  <Switch
-                    id='maintenanceAllowAdmins'
-                    checked={settings.maintenanceAllowAdmins}
-                    onCheckedChange={checked =>
-                      setSettings({ ...settings, maintenanceAllowAdmins: checked })
-                    }
-                  />
-                  <Label htmlFor='maintenanceAllowAdmins'>
-                    Permitir acceso a usuarios con rol Administrador
-                  </Label>
-                </div>
-                <p className='text-xs text-muted-foreground -mt-4 ml-0'>
-                  Los Super Administradores siempre pueden acceder. Guarda los cambios con el botón
-                  superior &quot;Guardar&quot;.
-                </p>
-
-                {settings.maintenanceMode && (
-                  <div className='rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 p-4'>
-                    <p className='text-sm text-amber-900 dark:text-amber-200 font-medium'>
-                      Modo mantenimiento activo
-                    </p>
-                    <p className='text-sm text-amber-800 dark:text-amber-300 mt-1'>
-                      Recuerda desactivarlo cuando termines. Vista previa:{' '}
-                      <a
-                        href='/maintenance'
-                        target='_blank'
-                        rel='noopener noreferrer'
-                        className='underline font-medium'
-                      >
-                        /maintenance
-                      </a>
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
           )}
         </TabsContent>
 
