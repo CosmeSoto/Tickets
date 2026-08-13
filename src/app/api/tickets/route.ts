@@ -693,14 +693,18 @@ export async function POST(request: NextRequest) {
     await EmailService.queueEmail(
       {
         to: ticketAfterAssign.users_tickets_clientIdTousers.email,
-        subject: `Ticket #${(ticketAfterAssign as any).ticketCode ?? ticketAfterAssign.id.substring(0, 8)} creado`,
+        subject: `Ticket #${(ticketAfterAssign as any).ticketCode ?? ticketAfterAssign.id.substring(0, 8)} registrado`,
         template: 'ticket-created',
         templateData: {
           ticketId: ticketAfterAssign.id,
+          ticketNumber: (ticketAfterAssign as any).ticketCode ?? ticketAfterAssign.id.substring(0, 8),
+          ticketTitle: ticketAfterAssign.title,
           title: ticketAfterAssign.title,
           clientName: ticketAfterAssign.users_tickets_clientIdTousers.name,
           priority: ticketAfterAssign.priority,
           category: ticketAfterAssign.categories.name,
+          description: ticketAfterAssign.description,
+          ticketUrl: `/client/tickets/${ticketAfterAssign.id}`,
         },
         recipientUserId: ticketAfterAssign.clientId,
         ticketEmailEvent: 'ticketCreated',

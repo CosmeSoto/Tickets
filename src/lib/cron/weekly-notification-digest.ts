@@ -5,7 +5,7 @@
 
 import prisma from '@/lib/prisma'
 import { enqueueEmail } from '@/lib/api/notify'
-import { getSystemBranding } from '@/lib/branding'
+import { getEmailBranding } from '@/lib/services/email/email-branding'
 import { getAppTimezone } from '@/lib/utils/date-utils'
 import weeklyDigestTemplate from '@/lib/services/email/templates/weekly-digest'
 
@@ -214,10 +214,18 @@ function alreadySentThisWeek(last: Date | null | undefined, weekKey: string): bo
  */
 export async function runWeeklyNotificationDigest(): Promise<WeeklyDigestResult> {
   const weekKey = isoWeekKey(new Date())
-  const branding = await getSystemBranding().catch(() => ({
+  const branding = await getEmailBranding().catch(() => ({
     systemName: 'Sistema',
+    heroTitle: '',
+    companyName: 'Sistema',
+    logoUrl: null,
+    primaryColor: '#EAB308',
+    baseUrl: (process.env.NEXTAUTH_URL || 'http://localhost:3000').replace(/\/$/, ''),
+    privacyUrl: '/help/privacy',
+    termsUrl: '/help/terms',
+    loginUrl: '/login',
   }))
-  const baseUrl = (process.env.NEXTAUTH_URL || 'http://localhost:3000').replace(/\/$/, '')
+  const baseUrl = branding.baseUrl
 
   const users = await prisma.users.findMany({
     where: {
@@ -259,8 +267,8 @@ export async function runWeeklyNotificationDigest(): Promise<WeeklyDigestResult>
     try {
       const { stats, highlights } = await buildStatsForUser(user)
       const prefix = rolePrefix(user.role)
-      const html = weeklyDigestTemplate({
-        systemName: branding.systemName,
+      const { html, text } = weeklyDigestTemplate({
+        ...branding,
         userName: user.name || user.email,
         roleLabel: roleLabel(user.role),
         periodLabel,
@@ -274,6 +282,7 @@ export async function runWeeklyNotificationDigest(): Promise<WeeklyDigestResult>
         to: user.email,
         subject: `[${branding.systemName}] Resumen semanal · ${periodLabel}`,
         html,
+        text,
         recipientUserId: user.id,
         module: 'system',
         event: 'digest',

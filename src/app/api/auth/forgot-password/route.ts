@@ -72,12 +72,12 @@ export async function POST(request: NextRequest) {
     let emailSent = false
     let emailError = ''
     try {
-      const { getSystemBranding } = await import('@/lib/branding')
-      const { systemName } = await getSystemBranding()
+      const { getEmailBranding } = await import('@/lib/services/email/email-branding')
+      const { systemName } = await getEmailBranding()
 
       emailSent = await EmailService.sendEmail({
         to: user.email,
-        subject: `Recuperación de Contraseña - ${systemName}`,
+        subject: `Restablecer contraseña — ${systemName}`,
         template: 'password-reset',
         templateData: {
           userName: user.name,

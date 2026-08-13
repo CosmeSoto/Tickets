@@ -35,6 +35,7 @@ export interface EmailPayload {
   to: string
   subject: string
   html: string
+  text?: string
   recipientUserId?: string
   module?: import('@/lib/notifications/email-policy').EmailModule
   event?: import('@/lib/notifications/email-policy').NotificationEmailEvent
@@ -213,6 +214,7 @@ export async function enqueueEmail(
     to: payload.to,
     subject: payload.subject,
     html: payload.html,
+    text: payload.text,
     recipientUserId: payload.recipientUserId,
     module: payload.module || 'system',
     event: payload.event || 'generic',

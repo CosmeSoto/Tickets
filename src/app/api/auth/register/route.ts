@@ -4,6 +4,8 @@ import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 import { randomUUID } from 'crypto'
 import { SecurityConfigService } from '@/lib/services/security-config-service'
+import { EmailService } from '@/lib/services/email/email-service'
+import { getEmailBranding } from '@/lib/services/email/email-branding'
 
 export async function POST(request: NextRequest) {
   try {
@@ -141,6 +143,26 @@ export async function POST(request: NextRequest) {
         createdAt: new Date(),
       },
     })
+
+    // Correo de bienvenida (transaccional; no bloquea el registro si falla SMTP)
+    try {
+      const { systemName } = await getEmailBranding()
+      await EmailService.sendEmail(
+        {
+          to: user.email,
+          subject: `Bienvenido/a a ${systemName}`,
+          template: 'welcome',
+          templateData: { userName: user.name },
+          module: 'auth',
+          event: 'security',
+          notificationPriority: 'critical',
+          recipientUserId: user.id,
+        },
+        user.id
+      )
+    } catch (welcomeErr) {
+      console.error('[REGISTER] Error enviando email de bienvenida:', welcomeErr)
+    }
 
     return NextResponse.json(
       {

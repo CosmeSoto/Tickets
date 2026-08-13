@@ -5,7 +5,10 @@
 
 import prisma from './prisma'
 import { getFamilyScopedAdmins } from '@/lib/notifications/family-recipients'
-import { getSystemBranding } from '@/lib/branding'
+import { buildOperationalEmail } from '@/lib/services/email/operational-email'
+import ticketAssignedTemplate from '@/lib/services/email/templates/ticket-assigned'
+import { getEmailBranding } from '@/lib/services/email/email-branding'
+import { escapeHtml } from '@/lib/services/email/email-layout'
 import { queueNotificationEmail } from '@/lib/notifications/queue-notification-email'
 import type {
   EmailModule,
@@ -51,18 +54,17 @@ export async function sendEmail(options: SendEmailOptions): Promise<boolean> {
   }
 }
 
-// ⭐ NUEVO: Email al administrador cuando se crea un ticket
+function ticketCode(ticket: { id: string; ticketCode?: string | null }): string {
+  return ticket.ticketCode || ticket.id.substring(0, 8)
+}
+
 export async function sendTicketCreatedToAdminEmail(ticketId: string) {
   try {
     const ticket = await prisma.tickets.findUnique({
       where: { id: ticketId },
       include: {
-        users_tickets_clientIdTousers: {
-          select: { name: true, email: true },
-        },
-        categories: {
-          select: { name: true },
-        },
+        users_tickets_clientIdTousers: { select: { name: true, email: true } },
+        categories: { select: { name: true } },
       },
     })
 
@@ -73,7 +75,6 @@ export async function sendTicketCreatedToAdminEmail(ticketId: string) {
       email: true,
       name: true,
     })
-
     if (admins.length === 0) return false
 
     const adminRecipients = admins
@@ -81,96 +82,31 @@ export async function sendTicketCreatedToAdminEmail(ticketId: string) {
       .map(a => ({ userId: a.id, email: a.email as string }))
     if (adminRecipients.length === 0) return false
 
-    const { systemName } = await getSystemBranding()
-
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: #dc2626; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
-          .content { background: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; }
-          .ticket-info { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; }
-          .info-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #e5e7eb; }
-          .label { font-weight: bold; color: #6b7280; }
-          .value { color: #111827; }
-          .priority-badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: bold; }
-          .priority-HIGH { background: #fee2e2; color: #991b1b; }
-          .priority-MEDIUM { background: #fef3c7; color: #92400e; }
-          .priority-LOW { background: #dbeafe; color: #1e40af; }
-          .footer { background: #f3f4f6; padding: 20px; text-align: center; font-size: 12px; color: #6b7280; border-radius: 0 0 8px 8px; }
-          .button { display: inline-block; padding: 12px 24px; background: #dc2626; color: white; text-decoration: none; border-radius: 6px; margin: 20px 0; }
-          .action-required { background: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0; border-radius: 4px; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>🎫 Nuevo Ticket Requiere Asignación</h1>
-          </div>
-          <div class="content">
-            <div class="action-required">
-              <strong>⚠️ Acción Requerida:</strong> Un nuevo ticket ha sido creado y necesita ser asignado a un técnico.
-            </div>
-            
-            <div class="ticket-info">
-              <div class="info-row">
-                <span class="label">Ticket ID:</span>
-                <span class="value">#${ticket.id.substring(0, 8)}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">Título:</span>
-                <span class="value">${ticket.title}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">Categoría:</span>
-                <span class="value">${ticket.categories.name}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">Prioridad:</span>
-                <span class="value">
-                  <span class="priority-badge priority-${ticket.priority}">${ticket.priority}</span>
-                </span>
-              </div>
-              <div class="info-row">
-                <span class="label">Cliente:</span>
-                <span class="value">${ticket.users_tickets_clientIdTousers.name}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">Email Cliente:</span>
-                <span class="value">${ticket.users_tickets_clientIdTousers.email}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">Fecha Creación:</span>
-                <span class="value">${new Date(ticket.createdAt).toLocaleString('es-ES')}</span>
-              </div>
-            </div>
-            
-            <p><strong>Descripción del Problema:</strong></p>
-            <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #e5e7eb;">
-              ${ticket.description}
-            </div>
-            
-            <center>
-              <a href="${process.env.NEXTAUTH_URL}/admin/tickets/${ticket.id}" class="button">Asignar Técnico</a>
-            </center>
-          </div>
-          <div class="footer">
-            <p>Este es un mensaje automático de ${systemName}</p>
-            <p>Por favor asigne este ticket lo antes posible</p>
-          </div>
-        </div>
-      </body>
-      </html>
-    `
+    const branding = await getEmailBranding()
+    const code = ticketCode(ticket as { id: string; ticketCode?: string | null })
+    const { html, text } = await buildOperationalEmail({
+      headline: 'Nuevo ticket sin asignar',
+      preheader: `Ticket #${code} requiere asignación.`,
+      introHtml: `<p style="margin:0 0 8px;">Se registró un ticket que requiere asignación de técnico.</p>`,
+      infoRows: [
+        { label: 'Ticket', value: `#${code}` },
+        { label: 'Título', value: ticket.title },
+        { label: 'Cliente', value: ticket.users_tickets_clientIdTousers.name },
+        { label: 'Categoría', value: ticket.categories.name },
+        { label: 'Prioridad', value: ticket.priority },
+      ],
+      cta: {
+        href: `${branding.baseUrl}/admin/tickets/${ticket.id}`,
+        label: 'Asignar técnico',
+      },
+    })
 
     return await sendEmail({
       to: adminRecipients.map(r => r.email),
       recipients: adminRecipients,
-      subject: `[ADMIN] Nuevo Ticket #${ticket.id.substring(0, 8)} - ${ticket.priority} - Requiere Asignación`,
+      subject: `[Admin] Ticket #${code} — asignación pendiente`,
       html,
+      text,
       module: 'tickets',
       event: 'ticketCreated',
       priority: 'important',
@@ -181,21 +117,14 @@ export async function sendTicketCreatedToAdminEmail(ticketId: string) {
   }
 }
 
-// ⭐ NUEVO: Email al técnico cuando se le asigna un ticket
 export async function sendTicketAssignedToTechnicianEmail(ticketId: string) {
   try {
     const ticket = await prisma.tickets.findUnique({
       where: { id: ticketId },
       include: {
-        users_tickets_clientIdTousers: {
-          select: { name: true, email: true, phone: true },
-        },
-        users_tickets_assigneeIdTousers: {
-          select: { name: true, email: true },
-        },
-        categories: {
-          select: { name: true },
-        },
+        users_tickets_clientIdTousers: { select: { name: true, email: true } },
+        users_tickets_assigneeIdTousers: { select: { name: true, email: true } },
+        categories: { select: { name: true } },
       },
     })
 
@@ -203,98 +132,27 @@ export async function sendTicketAssignedToTechnicianEmail(ticketId: string) {
       return false
     }
 
-    const { systemName } = await getSystemBranding()
-
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: #0891b2; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
-          .content { background: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; }
-          .ticket-info { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; }
-          .info-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #e5e7eb; }
-          .label { font-weight: bold; color: #6b7280; }
-          .value { color: #111827; }
-          .priority-badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: bold; }
-          .priority-HIGH { background: #fee2e2; color: #991b1b; }
-          .priority-MEDIUM { background: #fef3c7; color: #92400e; }
-          .priority-LOW { background: #dbeafe; color: #1e40af; }
-          .footer { background: #f3f4f6; padding: 20px; text-align: center; font-size: 12px; color: #6b7280; border-radius: 0 0 8px 8px; }
-          .button { display: inline-block; padding: 12px 24px; background: #0891b2; color: white; text-decoration: none; border-radius: 6px; margin: 20px 0; }
-          .client-info { background: #ecfeff; border-left: 4px solid #0891b2; padding: 15px; margin: 20px 0; border-radius: 4px; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>🎯 Nuevo Ticket Asignado</h1>
-          </div>
-          <div class="content">
-            <p>Hola <strong>${ticket.users_tickets_assigneeIdTousers.name}</strong>,</p>
-            <p>Se te ha asignado un nuevo ticket. Por favor revisa los detalles y comienza a trabajar en él:</p>
-            
-            <div class="ticket-info">
-              <div class="info-row">
-                <span class="label">Ticket ID:</span>
-                <span class="value">#${ticket.id.substring(0, 8)}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">Título:</span>
-                <span class="value"><strong>${ticket.title}</strong></span>
-              </div>
-              <div class="info-row">
-                <span class="label">Categoría:</span>
-                <span class="value">${ticket.categories.name}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">Prioridad:</span>
-                <span class="value">
-                  <span class="priority-badge priority-${ticket.priority}">${ticket.priority}</span>
-                </span>
-              </div>
-              <div class="info-row">
-                <span class="label">Fecha Creación:</span>
-                <span class="value">${new Date(ticket.createdAt).toLocaleString('es-ES')}</span>
-              </div>
-            </div>
-            
-            <div class="client-info">
-              <strong>📋 Información del Cliente:</strong><br>
-              <strong>Nombre:</strong> ${ticket.users_tickets_clientIdTousers.name}<br>
-              <strong>Email:</strong> ${ticket.users_tickets_clientIdTousers.email}<br>
-              ${ticket.users_tickets_clientIdTousers.phone ? `<strong>Teléfono:</strong> ${ticket.users_tickets_clientIdTousers.phone}<br>` : ''}
-            </div>
-            
-            <p><strong>Descripción del Problema:</strong></p>
-            <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #e5e7eb;">
-              ${ticket.description}
-            </div>
-            
-            <center>
-              <a href="${process.env.NEXTAUTH_URL}/tickets/${ticket.id}" class="button">Ver Ticket y Responder</a>
-            </center>
-            
-            <p style="margin-top: 20px; font-size: 14px; color: #6b7280;">
-              💡 <strong>Tip:</strong> Responde al cliente lo antes posible para mantener una buena comunicación.
-            </p>
-          </div>
-          <div class="footer">
-            <p>Este es un mensaje automático de ${systemName}</p>
-            <p>Por favor no responda a este email</p>
-          </div>
-        </div>
-      </body>
-      </html>
-    `
+    const branding = await getEmailBranding()
+    const code = ticketCode(ticket as { id: string; ticketCode?: string | null })
+    const { html, text } = ticketAssignedTemplate({
+      ...branding,
+      ticketId: ticket.id,
+      ticketNumber: code,
+      ticketTitle: ticket.title,
+      technicianName: ticket.users_tickets_assigneeIdTousers.name,
+      clientName: ticket.users_tickets_clientIdTousers.name,
+      category: ticket.categories.name,
+      priority: ticket.priority,
+      description: ticket.description,
+      ticketUrl: `/technician/tickets/${ticket.id}`,
+    })
 
     return await sendEmail({
       to: ticket.users_tickets_assigneeIdTousers.email,
       recipientUserId: ticket.assigneeId,
-      subject: `[ASIGNADO] Ticket #${ticket.id.substring(0, 8)} - ${ticket.title}`,
+      subject: `[Asignado] Ticket #${code} — ${ticket.title}`,
       html,
+      text,
       module: 'tickets',
       event: 'ticketAssigned',
       priority: 'important',
@@ -305,21 +163,14 @@ export async function sendTicketAssignedToTechnicianEmail(ticketId: string) {
   }
 }
 
-// ⭐ NUEVO: Email al cliente cuando se le asigna un técnico a su ticket
 export async function sendTicketAssignedToClientEmail(ticketId: string) {
   try {
     const ticket = await prisma.tickets.findUnique({
       where: { id: ticketId },
       include: {
-        users_tickets_clientIdTousers: {
-          select: { name: true, email: true },
-        },
-        users_tickets_assigneeIdTousers: {
-          select: { name: true, email: true },
-        },
-        categories: {
-          select: { name: true },
-        },
+        users_tickets_clientIdTousers: { select: { name: true, email: true } },
+        users_tickets_assigneeIdTousers: { select: { name: true, email: true } },
+        categories: { select: { name: true } },
       },
     })
 
@@ -332,80 +183,29 @@ export async function sendTicketAssignedToClientEmail(ticketId: string) {
       return false
     }
 
-    const { systemName } = await getSystemBranding()
-
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: #10b981; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
-          .content { background: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; }
-          .ticket-info { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; }
-          .info-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #e5e7eb; }
-          .label { font-weight: bold; color: #6b7280; }
-          .value { color: #111827; }
-          .footer { background: #f3f4f6; padding: 20px; text-align: center; font-size: 12px; color: #6b7280; border-radius: 0 0 8px 8px; }
-          .button { display: inline-block; padding: 12px 24px; background: #10b981; color: white; text-decoration: none; border-radius: 6px; margin: 20px 0; }
-          .tech-info { background: #d1fae5; border-left: 4px solid #10b981; padding: 15px; margin: 20px 0; border-radius: 4px; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>✅ Técnico Asignado a tu Ticket</h1>
-          </div>
-          <div class="content">
-            <p>Hola <strong>${ticket.users_tickets_clientIdTousers.name}</strong>,</p>
-            <p>Buenas noticias! Tu ticket ha sido asignado a un técnico especializado que comenzará a trabajar en tu solicitud.</p>
-            
-            <div class="tech-info">
-              <strong>👨‍💻 Técnico Asignado:</strong><br>
-              <strong>${ticket.users_tickets_assigneeIdTousers.name}</strong><br>
-              ${ticket.users_tickets_assigneeIdTousers.email}
-            </div>
-            
-            <div class="ticket-info">
-              <div class="info-row">
-                <span class="label">Ticket ID:</span>
-                <span class="value">#${ticket.id.substring(0, 8)}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">Título:</span>
-                <span class="value">${ticket.title}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">Categoría:</span>
-                <span class="value">${ticket.categories.name}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">Estado:</span>
-                <span class="value">En Progreso</span>
-              </div>
-            </div>
-            
-            <p>El técnico revisará tu solicitud y se pondrá en contacto contigo pronto. Recibirás notificaciones por email cuando haya actualizaciones.</p>
-            
-            <center>
-              <a href="${process.env.NEXTAUTH_URL}/tickets/${ticket.id}" class="button">Ver Estado del Ticket</a>
-            </center>
-          </div>
-          <div class="footer">
-            <p>Este es un mensaje automático de ${systemName}</p>
-            <p>Por favor no responda a este email</p>
-          </div>
-        </div>
-      </body>
-      </html>
-    `
+    const branding = await getEmailBranding()
+    const code = ticketCode(ticket as { id: string; ticketCode?: string | null })
+    const { html, text } = await buildOperationalEmail({
+      headline: 'Técnico asignado',
+      preheader: `Ticket #${code}: ${ticket.users_tickets_assigneeIdTousers.name} atenderá su solicitud.`,
+      greetingName: ticket.users_tickets_clientIdTousers.name,
+      introHtml: `<p style="margin:0 0 8px;">Su ticket fue asignado a <strong>${escapeHtml(ticket.users_tickets_assigneeIdTousers.name)}</strong>.</p>`,
+      infoRows: [
+        { label: 'Ticket', value: `#${code}` },
+        { label: 'Título', value: ticket.title },
+      ],
+      cta: {
+        href: `${branding.baseUrl}/client/tickets/${ticket.id}`,
+        label: 'Ver ticket',
+      },
+    })
 
     return await sendEmail({
       to: ticket.users_tickets_clientIdTousers.email,
       recipientUserId: ticket.clientId,
-      subject: `Técnico asignado a tu ticket: ${ticket.title}`,
+      subject: `Técnico asignado — Ticket #${code}`,
       html,
+      text,
       module: 'tickets',
       event: 'ticketAssigned',
       priority: 'important',
@@ -416,21 +216,14 @@ export async function sendTicketAssignedToClientEmail(ticketId: string) {
   }
 }
 
-// ⭐ NUEVO: Email al administrador cuando se resuelve un ticket
 export async function sendTicketResolvedToAdminEmail(ticketId: string) {
   try {
     const ticket = await prisma.tickets.findUnique({
       where: { id: ticketId },
       include: {
-        users_tickets_clientIdTousers: {
-          select: { name: true, email: true },
-        },
-        users_tickets_assigneeIdTousers: {
-          select: { name: true, email: true },
-        },
-        categories: {
-          select: { name: true },
-        },
+        users_tickets_clientIdTousers: { select: { name: true, email: true } },
+        users_tickets_assigneeIdTousers: { select: { name: true, email: true } },
+        categories: { select: { name: true } },
       },
     })
 
@@ -441,98 +234,42 @@ export async function sendTicketResolvedToAdminEmail(ticketId: string) {
       email: true,
       name: true,
     })
-
     if (admins.length === 0) return false
 
-    // Digest admin = optional (ticketUpdated); el correo crítico va al calificador
     const adminRecipients = admins
       .filter(a => a.email)
       .map(a => ({ userId: a.id, email: a.email as string }))
     if (adminRecipients.length === 0) return false
 
-    // Calcular tiempo de resolución
-    const resolutionTime = ticket.resolvedAt
+    const branding = await getEmailBranding()
+    const code = ticketCode(ticket as { id: string; ticketCode?: string | null })
+    const resolutionHours = ticket.resolvedAt
       ? Math.round((ticket.resolvedAt.getTime() - ticket.createdAt.getTime()) / (1000 * 60 * 60))
       : 0
 
-    const { systemName } = await getSystemBranding()
-
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: #059669; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
-          .content { background: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; }
-          .ticket-info { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; }
-          .info-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #e5e7eb; }
-          .label { font-weight: bold; color: #6b7280; }
-          .value { color: #111827; }
-          .footer { background: #f3f4f6; padding: 20px; text-align: center; font-size: 12px; color: #6b7280; border-radius: 0 0 8px 8px; }
-          .button { display: inline-block; padding: 12px 24px; background: #059669; color: white; text-decoration: none; border-radius: 6px; margin: 20px 0; }
-          .success-badge { background: #d1fae5; border-left: 4px solid #059669; padding: 15px; margin: 20px 0; border-radius: 4px; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>✅ Ticket Resuelto</h1>
-          </div>
-          <div class="content">
-            <div class="success-badge">
-              <strong>✓ Ticket Completado:</strong> El ticket ha sido marcado como resuelto.
-            </div>
-            
-            <div class="ticket-info">
-              <div class="info-row">
-                <span class="label">Ticket ID:</span>
-                <span class="value">#${ticket.id.substring(0, 8)}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">Título:</span>
-                <span class="value">${ticket.title}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">Categoría:</span>
-                <span class="value">${ticket.categories.name}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">Cliente:</span>
-                <span class="value">${ticket.users_tickets_clientIdTousers.name}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">Técnico:</span>
-                <span class="value">${ticket.users_tickets_assigneeIdTousers?.name || 'No asignado'}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">Tiempo de Resolución:</span>
-                <span class="value">${resolutionTime} horas</span>
-              </div>
-              <div class="info-row">
-                <span class="label">Fecha Resolución:</span>
-                <span class="value">${ticket.resolvedAt ? new Date(ticket.resolvedAt).toLocaleString('es-ES') : 'N/A'}</span>
-              </div>
-            </div>
-            
-            <center>
-              <a href="${process.env.NEXTAUTH_URL}/admin/tickets/${ticket.id}" class="button">Ver Detalles</a>
-            </center>
-          </div>
-          <div class="footer">
-            <p>Este es un mensaje automático de ${systemName}</p>
-          </div>
-        </div>
-      </body>
-      </html>
-    `
+    const { html, text } = await buildOperationalEmail({
+      headline: 'Ticket resuelto',
+      preheader: `Ticket #${code} marcado como resuelto.`,
+      introHtml: `<p style="margin:0 0 8px;">Un ticket fue resuelto en el sistema.</p>`,
+      infoRows: [
+        { label: 'Ticket', value: `#${code}` },
+        { label: 'Título', value: ticket.title },
+        { label: 'Cliente', value: ticket.users_tickets_clientIdTousers.name },
+        { label: 'Técnico', value: ticket.users_tickets_assigneeIdTousers?.name || '—' },
+        { label: 'Tiempo', value: `${resolutionHours} h` },
+      ],
+      cta: {
+        href: `${branding.baseUrl}/admin/tickets/${ticket.id}`,
+        label: 'Ver ticket',
+      },
+    })
 
     return await sendEmail({
       to: adminRecipients.map(r => r.email),
       recipients: adminRecipients,
-      subject: `[ADMIN] Ticket Resuelto #${ticket.id.substring(0, 8)} - ${ticket.title}`,
+      subject: `[Admin] Ticket #${code} resuelto`,
       html,
+      text,
       module: 'tickets',
       event: 'ticketUpdated',
       priority: 'optional',
@@ -543,162 +280,63 @@ export async function sendTicketResolvedToAdminEmail(ticketId: string) {
   }
 }
 
-// ⭐ NUEVO: Email al administrador cuando el cliente califica el servicio
 export async function sendRatingToAdminEmail(ticketId: string, rating: number) {
   try {
     const ticket = await prisma.tickets.findUnique({
       where: { id: ticketId },
       include: {
-        users_tickets_clientIdTousers: {
-          select: { name: true, email: true },
-        },
-        users_tickets_assigneeIdTousers: {
-          select: { name: true, email: true },
-        },
-        categories: {
-          select: { name: true },
-        },
+        users_tickets_clientIdTousers: { select: { name: true, email: true } },
+        users_tickets_assigneeIdTousers: { select: { name: true, email: true } },
+        categories: { select: { name: true } },
       },
     })
 
     if (!ticket) return false
 
-    // Obtener la calificación
     const ratingData = await prisma.ticket_ratings.findUnique({
       where: { ticketId },
-      select: {
-        rating: true,
-        feedback: true,
-        responseTime: true,
-        technicalSkill: true,
-        communication: true,
-        problemResolution: true,
-      },
+      select: { rating: true, feedback: true },
     })
-
     if (!ratingData) return false
 
-    // Obtener administradores con scope de familia del ticket
     const admins = await getFamilyScopedAdmins(ticket.familyId, {
       id: true,
       email: true,
       name: true,
     })
-
     if (admins.length === 0) return false
 
-    // Digest de calificación a admins = optional
     const adminRecipients = admins
       .filter(a => a.email)
       .map(a => ({ userId: a.id, email: a.email as string }))
     if (adminRecipients.length === 0) return false
 
-    const stars = '⭐'.repeat(rating)
-    const ratingColor = rating >= 4 ? '#059669' : rating >= 3 ? '#f59e0b' : '#dc2626'
+    const branding = await getEmailBranding()
+    const code = ticketCode(ticket as { id: string; ticketCode?: string | null })
+    const feedback = ratingData.feedback?.trim() || 'Sin comentario'
 
-    const { systemName } = await getSystemBranding()
-
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: ${ratingColor}; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
-          .content { background: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; }
-          .ticket-info { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; }
-          .info-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #e5e7eb; }
-          .label { font-weight: bold; color: #6b7280; }
-          .value { color: #111827; }
-          .rating-box { background: #fef3c7; border-left: 4px solid #f59e0b; padding: 20px; margin: 20px 0; border-radius: 4px; text-align: center; }
-          .rating-stars { font-size: 32px; margin: 10px 0; }
-          .rating-details { background: white; padding: 15px; border-radius: 8px; margin: 15px 0; }
-          .rating-item { display: flex; justify-content: space-between; padding: 8px 0; }
-          .footer { background: #f3f4f6; padding: 20px; text-align: center; font-size: 12px; color: #6b7280; border-radius: 0 0 8px 8px; }
-          .button { display: inline-block; padding: 12px 24px; background: ${ratingColor}; color: white; text-decoration: none; border-radius: 6px; margin: 20px 0; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>⭐ Nueva Calificación Recibida</h1>
-          </div>
-          <div class="content">
-            <p>Un cliente ha calificado el servicio recibido:</p>
-            
-            <div class="rating-box">
-              <div class="rating-stars">${stars}</div>
-              <h2 style="margin: 10px 0; color: ${ratingColor};">${rating}/5</h2>
-            </div>
-            
-            <div class="ticket-info">
-              <div class="info-row">
-                <span class="label">Ticket ID:</span>
-                <span class="value">#${ticket.id.substring(0, 8)}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">Título:</span>
-                <span class="value">${ticket.title}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">Cliente:</span>
-                <span class="value">${ticket.users_tickets_clientIdTousers.name}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">Técnico:</span>
-                <span class="value">${ticket.users_tickets_assigneeIdTousers?.name || 'No asignado'}</span>
-              </div>
-            </div>
-            
-            <div class="rating-details">
-              <h3 style="margin-top: 0;">Detalles de la Calificación:</h3>
-              <div class="rating-item">
-                <span>Tiempo de Respuesta:</span>
-                <span><strong>${ratingData.responseTime}/5</strong></span>
-              </div>
-              <div class="rating-item">
-                <span>Habilidad Técnica:</span>
-                <span><strong>${ratingData.technicalSkill}/5</strong></span>
-              </div>
-              <div class="rating-item">
-                <span>Comunicación:</span>
-                <span><strong>${ratingData.communication}/5</strong></span>
-              </div>
-              <div class="rating-item">
-                <span>Resolución del Problema:</span>
-                <span><strong>${ratingData.problemResolution}/5</strong></span>
-              </div>
-            </div>
-            
-            ${
-              ratingData.feedback
-                ? `
-              <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #e5e7eb; margin: 20px 0;">
-                <strong>Comentarios del Cliente:</strong>
-                <p style="margin: 10px 0 0 0;">${ratingData.feedback}</p>
-              </div>
-            `
-                : ''
-            }
-            
-            <center>
-              <a href="${process.env.NEXTAUTH_URL}/admin/tickets/${ticket.id}" class="button">Ver Ticket Completo</a>
-            </center>
-          </div>
-          <div class="footer">
-            <p>Este es un mensaje automático de ${systemName}</p>
-          </div>
-        </div>
-      </body>
-      </html>
-    `
+    const { html, text } = await buildOperationalEmail({
+      headline: 'Nueva calificación',
+      preheader: `Ticket #${code}: ${rating}/5 estrellas.`,
+      introHtml: `<p style="margin:0 0 8px;">El cliente calificó un ticket resuelto.</p>`,
+      infoRows: [
+        { label: 'Ticket', value: `#${code}` },
+        { label: 'Calificación', value: `${rating}/5` },
+        { label: 'Técnico', value: ticket.users_tickets_assigneeIdTousers?.name || '—' },
+        { label: 'Comentario', value: feedback.slice(0, 120) },
+      ],
+      cta: {
+        href: `${branding.baseUrl}/admin/tickets/${ticket.id}`,
+        label: 'Ver ticket',
+      },
+    })
 
     return await sendEmail({
       to: adminRecipients.map(r => r.email),
       recipients: adminRecipients,
-      subject: `[ADMIN] Nueva Calificación ${stars} - Ticket #${ticket.id.substring(0, 8)}`,
+      subject: `[Admin] Calificación ${rating}/5 — Ticket #${code}`,
       html,
+      text,
       module: 'tickets',
       event: 'ticketUpdated',
       priority: 'optional',

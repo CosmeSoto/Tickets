@@ -15,6 +15,7 @@ export async function queueTicketResolvedRaterEmail(params: {
   technicianName: string
   actorUserId: string
   isPatrolEscalation: boolean
+  resolution?: string | null
 }): Promise<void> {
   const rolePrefix =
     params.raterRole === 'ADMIN'
@@ -23,19 +24,25 @@ export async function queueTicketResolvedRaterEmail(params: {
         ? 'technician'
         : 'client'
 
+  const ticketShort = params.ticketId.substring(0, 8)
+
   await EmailService.queueEmail(
     {
       to: params.raterEmail,
       subject: params.isPatrolEscalation
-        ? 'Ticket escalado resuelto — califica el servicio'
-        : `Ticket #${params.ticketId.substring(0, 8)} resuelto`,
+        ? `Ticket escalado resuelto — califique el servicio`
+        : `Ticket #${ticketShort} resuelto — ${params.title}`,
       template: 'ticket-resolved',
       templateData: {
         ticketId: params.ticketId,
+        ticketTitle: params.title,
         title: params.title,
         clientName: params.raterName,
         technicianName: params.technicianName,
+        resolution: params.resolution || 'Consulte el detalle en el sistema.',
+        rolePrefix,
         ticketUrl: `/${rolePrefix}/tickets/${params.ticketId}`,
+        ratingUrl: `/${rolePrefix}/tickets/${params.ticketId}?rate=1`,
         isPatrolEscalation: params.isPatrolEscalation,
       },
       recipientUserId: params.raterId,

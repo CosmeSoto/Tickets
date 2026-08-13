@@ -377,13 +377,19 @@ export class EmailService {
   ): Promise<{ html: string; text: string }> {
     // Importar template dinámicamente e inyectar branding del sistema
     try {
-      const { getSystemBranding } = await import('@/lib/branding')
-      const branding = await getSystemBranding()
+      const { getEmailBranding } = await import('./email-branding')
+      const emailBranding = await getEmailBranding()
       const enrichedData = {
         ...data,
-        systemName: data.systemName || branding.systemName,
-        heroTitle: data.heroTitle || branding.heroTitle,
-        companyName: data.companyName || branding.companyName,
+        systemName: data.systemName || emailBranding.systemName,
+        heroTitle: data.heroTitle || emailBranding.heroTitle,
+        companyName: data.companyName || emailBranding.companyName,
+        logoUrl: data.logoUrl ?? emailBranding.logoUrl,
+        primaryColor: data.primaryColor || emailBranding.primaryColor,
+        baseUrl: data.baseUrl || emailBranding.baseUrl,
+        privacyUrl: data.privacyUrl || emailBranding.privacyUrl,
+        termsUrl: data.termsUrl || emailBranding.termsUrl,
+        loginUrl: data.loginUrl || emailBranding.loginUrl,
       }
 
       const template = await import(`./templates/${templateName}`)
