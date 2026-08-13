@@ -6,6 +6,7 @@
 
 import prisma from '@/lib/prisma'
 import { DEFAULT_SYSTEM_NAME } from '@/lib/branding'
+import { resolveSmtpSecure } from '@/lib/email/smtp-settings-validation'
 
 export type UnifiedSmtpConfig = {
   enabled: boolean
@@ -16,6 +17,15 @@ export type UnifiedSmtpConfig = {
   password: string
   from: string
 }
+
+export {
+  ALLOWED_SMTP_HOSTS,
+  MICROSOFT_SMTP_HOSTS,
+  isAllowedSmtpHost,
+  isMicrosoftSmtpHost,
+  resolveSmtpSecure,
+  validateEnabledEmailSettings,
+} from '@/lib/email/smtp-settings-validation'
 
 function pick(
   map: Record<string, string>,
@@ -69,8 +79,10 @@ export async function getUnifiedSmtpConfig(): Promise<UnifiedSmtpConfig | null> 
 
     const user = pick(map, 'smtpUser', 'smtp_user') || ''
     const password = pick(map, 'smtpPassword', 'smtp_password') || ''
-    const port = parseInt(pick(map, 'smtpPort', 'smtp_port') || '587', 10)
-    const secure = pick(map, 'smtpSecure', 'smtp_secure') === 'true'
+    const portRaw = parseInt(pick(map, 'smtpPort', 'smtp_port') || '587', 10)
+    const port = portRaw === 25 ? 587 : portRaw
+    const secureRaw = pick(map, 'smtpSecure', 'smtp_secure') === 'true'
+    const secure = resolveSmtpSecure(port, secureRaw)
     const systemName = pick(map, 'systemName') || DEFAULT_SYSTEM_NAME
     let from = pick(map, 'emailFrom', 'email_from') || ''
     if (!from && user) from = `${systemName} <${user}>`

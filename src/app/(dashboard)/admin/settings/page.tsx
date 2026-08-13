@@ -41,6 +41,7 @@ import {
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { invalidateLandingCache } from '@/hooks/use-landing-data'
+import { validateEnabledEmailSettings } from '@/lib/email/smtp-settings-validation'
 import { OAuthSettingsTab } from '@/components/settings/oauth-settings-tab'
 import { SLAPoliciesTab } from '@/components/settings/sla-policies-tab'
 
@@ -175,6 +176,7 @@ function SettingsPage() {
         setSettings({
           ...data,
           smtpPassword: '',
+          smtpPort: data.smtpPort === 25 ? 587 : (data.smtpPort ?? 587),
           // Los tokens sensibles llegan vacíos — la API solo devuelve el flag *Configured
           telegramBotToken: '',
           telegramWebhookSecret: '',
@@ -204,6 +206,23 @@ function SettingsPage() {
 
   const saveSettings = async () => {
     if (!settings) return
+
+    if (settings.emailEnabled) {
+      const emailError = validateEnabledEmailSettings({
+        smtpHost: settings.smtpHost,
+        smtpUser: settings.smtpUser,
+        smtpPassword: settings.smtpPassword,
+        hasStoredPassword: settings.smtpPasswordConfigured,
+      })
+      if (emailError) {
+        toast({
+          title: 'Configuración de email incompleta',
+          description: emailError,
+          variant: 'destructive',
+        })
+        return
+      }
+    }
 
     setSaving(true)
     try {
@@ -264,10 +283,19 @@ function SettingsPage() {
     if (!settings) return
 
     // Validar campos antes de enviar
-    if (!settings.smtpHost || !settings.smtpUser || !settings.smtpPassword) {
+    if (!settings.smtpHost || !settings.smtpUser) {
       toast({
         title: 'Campos incompletos',
-        description: 'Completa el servidor SMTP, usuario y contraseña antes de probar.',
+        description: 'Completa el servidor SMTP y usuario antes de probar.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    if (!settings.smtpPassword && !settings.smtpPasswordConfigured) {
+      toast({
+        title: 'Contraseña requerida',
+        description: 'Escribe la contraseña SMTP o guárdala primero en la configuración.',
         variant: 'destructive',
       })
       return
@@ -281,8 +309,11 @@ function SettingsPage() {
           smtpHost: settings.smtpHost,
           smtpPort: Number(settings.smtpPort),
           smtpUser: settings.smtpUser,
-          smtpPassword: settings.smtpPassword,
+          ...(settings.smtpPassword?.trim()
+            ? { smtpPassword: settings.smtpPassword }
+            : {}),
           smtpSecure: settings.smtpSecure,
+          emailFrom: settings.emailFrom,
         }),
       })
 
@@ -729,13 +760,13 @@ function SettingsPage() {
                           Selecciona tu proveedor para autocompletar la configuración del servidor
                         </p>
                       </div>
-                      <div className='grid grid-cols-1 sm:grid-cols-3 gap-2'>
+                      <div className='grid grid-cols-1 sm:grid-cols-2 gap-2'>
                         {[
                           {
                             id: 'outlook',
-                            label: 'Outlook / Office 365',
+                            label: 'Microsoft (Outlook / M365)',
                             description:
-                              'outlook.com, hotmail.com, dominios corporativos Microsoft',
+                              'Outlook.com, Hotmail y cuentas corporativas Microsoft 365',
                             host: 'smtp-mail.outlook.com',
                             port: 587,
                             secure: false,
@@ -743,40 +774,31 @@ function SettingsPage() {
                           {
                             id: 'gmail',
                             label: 'Gmail / Google Workspace',
-                            description: 'gmail.com, dominios de Google Workspace',
+                            description: 'gmail.com y dominios de Google Workspace',
                             host: 'smtp.gmail.com',
-                            port: 587,
-                            secure: false,
-                          },
-                          {
-                            id: 'custom',
-                            label: 'Otro / Personalizado',
-                            description: 'Configura manualmente los datos de tu servidor',
-                            host: '',
                             port: 587,
                             secure: false,
                           },
                         ].map(provider => {
                           const isActive =
-                            provider.id === 'outlook'
-                              ? settings.smtpHost === 'smtp-mail.outlook.com'
-                              : provider.id === 'gmail'
-                                ? settings.smtpHost === 'smtp.gmail.com'
-                                : settings.smtpHost !== 'smtp-mail.outlook.com' &&
-                                  settings.smtpHost !== 'smtp.gmail.com'
+                            provider.id === 'gmail'
+                              ? settings.smtpHost === 'smtp.gmail.com'
+                              : settings.smtpHost === 'smtp-mail.outlook.com' ||
+                                settings.smtpHost === 'smtp.office365.com'
                           return (
                             <button
                               key={provider.id}
                               type='button'
                               onClick={() => {
-                                if (provider.id !== 'custom') {
-                                  setSettings({
-                                    ...settings,
-                                    smtpHost: provider.host,
-                                    smtpPort: provider.port,
-                                    smtpSecure: provider.secure,
-                                  })
-                                }
+                                setSettings({
+                                  ...settings,
+                                  smtpHost: provider.host,
+                                  smtpPort: provider.port,
+                                  smtpSecure: provider.secure,
+                                  emailFrom: settings.emailFrom?.trim()
+                                    ? settings.emailFrom
+                                    : settings.smtpUser?.trim() || '',
+                                })
                               }}
                               className={`text-left rounded-md border p-3 transition-colors ${
                                 isActive
@@ -805,8 +827,33 @@ function SettingsPage() {
                           placeholder='smtp-mail.outlook.com'
                         />
                         <p className='text-xs text-muted-foreground'>
-                          Dirección del servidor de salida de tu proveedor de correo
+                          Outlook personal:{' '}
+                          <code className='font-mono text-[11px]'>smtp-mail.outlook.com</code>
+                          {' · '}
+                          Microsoft 365:{' '}
+                          <code className='font-mono text-[11px]'>smtp.office365.com</code>
                         </p>
+                        {(settings.smtpHost === 'smtp-mail.outlook.com' ||
+                          settings.smtpHost === 'smtp.office365.com') && (
+                          <button
+                            type='button'
+                            className='text-xs text-primary underline-offset-2 hover:underline'
+                            onClick={() =>
+                              setSettings({
+                                ...settings,
+                                smtpHost:
+                                  settings.smtpHost === 'smtp.office365.com'
+                                    ? 'smtp-mail.outlook.com'
+                                    : 'smtp.office365.com',
+                              })
+                            }
+                          >
+                            Cambiar a{' '}
+                            {settings.smtpHost === 'smtp.office365.com'
+                              ? 'smtp-mail.outlook.com (Outlook personal)'
+                              : 'smtp.office365.com (Microsoft 365)'}
+                          </button>
+                        )}
                       </div>
                       <div className='space-y-1.5'>
                         <Label htmlFor='smtpPort'>Puerto SMTP</Label>
@@ -828,15 +875,12 @@ function SettingsPage() {
                           <SelectContent>
                             <SelectItem value='587'>587 — STARTTLS (recomendado)</SelectItem>
                             <SelectItem value='465'>465 — SSL/TLS directo</SelectItem>
-                            <SelectItem value='25'>25 — Sin cifrado (no recomendado)</SelectItem>
                           </SelectContent>
                         </Select>
                         <p className='text-xs text-muted-foreground'>
                           {settings.smtpPort === 465
                             ? 'SSL/TLS directo: la conexión cifra desde el inicio'
-                            : settings.smtpPort === 587
-                              ? 'STARTTLS: la conexión comienza sin cifrar y sube a TLS'
-                              : 'Sin cifrado: no recomendado para producción'}
+                            : 'STARTTLS: la conexión comienza sin cifrar y sube a TLS'}
                         </p>
                       </div>
                     </div>
@@ -890,6 +934,26 @@ function SettingsPage() {
                               y genera una contraseña de 16 caracteres para esta app.
                             </p>
                           </div>
+                        ) : settings.smtpHost === 'smtp-mail.outlook.com' ||
+                          settings.smtpHost === 'smtp.office365.com' ? (
+                          <div className='rounded-md border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 px-3 py-2 mt-1'>
+                            <p className='text-xs font-medium text-blue-800 dark:text-blue-300'>
+                              Microsoft puede requerir contraseña de aplicación
+                            </p>
+                            <p className='text-xs text-blue-700 dark:text-blue-400 mt-0.5'>
+                              Si la autenticación básica está habilitada en tu tenant, usa una
+                              contraseña de app desde{' '}
+                              <a
+                                href='https://account.microsoft.com/security'
+                                target='_blank'
+                                rel='noopener noreferrer'
+                                className='underline font-medium'
+                              >
+                                account.microsoft.com/security
+                              </a>
+                              . Algunas organizaciones desactivan SMTP básico — consulta con TI.
+                            </p>
+                          </div>
                         ) : (
                           <p className='text-xs text-muted-foreground'>
                             Tu contraseña de correo habitual
@@ -901,14 +965,29 @@ function SettingsPage() {
                     {/* Email remitente */}
                     <div className='space-y-1.5'>
                       <Label htmlFor='emailFrom'>Email Remitente</Label>
-                      <Input
-                        id='emailFrom'
-                        type='email'
-                        value={settings.emailFrom}
-                        onChange={e => setSettings({ ...settings, emailFrom: e.target.value })}
-                        placeholder='usuario@empresa.com'
-                        className='max-w-sm'
-                      />
+                      <div className='flex flex-wrap gap-2 items-start max-w-md'>
+                        <Input
+                          id='emailFrom'
+                          type='email'
+                          value={settings.emailFrom}
+                          onChange={e => setSettings({ ...settings, emailFrom: e.target.value })}
+                          placeholder='usuario@empresa.com'
+                          className='flex-1 min-w-[200px]'
+                        />
+                        {settings.smtpUser?.trim() && (
+                          <Button
+                            type='button'
+                            variant='outline'
+                            size='sm'
+                            className='shrink-0'
+                            onClick={() =>
+                              setSettings({ ...settings, emailFrom: settings.smtpUser.trim() })
+                            }
+                          >
+                            Usar usuario SMTP
+                          </Button>
+                        )}
+                      </div>
                       <p className='text-xs text-muted-foreground'>
                         Dirección que verán los destinatarios en el campo &quot;De:&quot;.
                         Normalmente igual al usuario SMTP.

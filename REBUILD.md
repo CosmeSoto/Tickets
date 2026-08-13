@@ -375,6 +375,35 @@ curl -fsS -X POST "${NEXTAUTH_URL%/}/api/cron/weekly-digest" \
 Requiere que la cola de email esté activa (`/api/cron/process-email-queue`).  
 Log: `tail -f logs/weekly-digest-cron.log`
 
+### Configuración SMTP (Admin → Email)
+
+Solo se admiten **Gmail** y **Microsoft** (Outlook personal + Microsoft 365):
+
+| Host | Uso |
+|------|-----|
+| `smtp.gmail.com` | Gmail / Google Workspace |
+| `smtp-mail.outlook.com` | Outlook.com / Hotmail personal |
+| `smtp.office365.com` | Microsoft 365 corporativo |
+
+Puerto recomendado: **587** (STARTTLS). Alternativa: **465** (SSL directo).
+
+#### Checklist de cierre (email listo para producción)
+
+| Paso | Verificación |
+|------|--------------|
+| 1 | Admin → Email: switch **Habilitar envío de emails** activo |
+| 2 | Elegir proveedor (Microsoft o Gmail) y completar usuario + contraseña de aplicación |
+| 3 | **Email remitente** = mismo que usuario SMTP (botón «Usar usuario SMTP») |
+| 4 | **Guardar** → **Probar conexión** (funciona aunque la contraseña ya esté guardada) |
+| 5 | Cron de cola cada 1–5 min: `GET /api/cron/process-email-queue` con `Authorization: Bearer $CRON_SECRET` |
+| 6 | Smoke test: crear ticket y confirmar email en cola / bandeja |
+
+```bash
+# Procesar cola manualmente
+curl -sk "${NEXTAUTH_URL}/api/cron/process-email-queue" \
+  -H "Authorization: Bearer $CRON_SECRET"
+```
+
 ---
 
 ### Bot de Telegram (alertas operativas)

@@ -7,7 +7,7 @@ import nodemailer from 'nodemailer'
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import { AuditServiceComplete, AuditActionsComplete } from '../audit-service-complete'
-import { getUnifiedSmtpConfig } from './smtp-config'
+import { getUnifiedSmtpConfig, resolveSmtpSecure } from './smtp-config'
 import type { TicketEmailEvent } from '@/lib/notifications/email-prefs'
 import { queueNotificationEmail } from '@/lib/notifications/queue-notification-email'
 import type {
@@ -114,7 +114,7 @@ export class EmailService {
     const transportOpts: nodemailer.TransportOptions = {
       host: smtpConfig.host,
       port: smtpConfig.port,
-      secure: smtpConfig.secure,
+      secure: resolveSmtpSecure(smtpConfig.port, smtpConfig.secure),
       pool: true,
       maxConnections: 5,
       maxMessages: 100,
@@ -436,5 +436,19 @@ export class EmailService {
       console.error('[EMAIL-SERVICE] Error cleaning up emails:', error)
       return 0
     }
+  }
+
+  /** Cierra el pool SMTP para forzar reconexión tras cambiar configuración en Admin. */
+  static resetTransporter(): void {
+    if (this.transporter) {
+      try {
+        this.transporter.close()
+      } catch {
+        /* ignorar */
+      }
+    }
+    this.transporter = null
+    this.isConfigured = false
+    this.configHash = ''
   }
 }

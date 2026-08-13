@@ -55,7 +55,7 @@ const defaultSettings = {
   smtpPort: 587,
   smtpUser: '',
   smtpPassword: '',
-  smtpSecure: true,
+  smtpSecure: false,
   emailFrom: '',
   notificationsEnabled: true,
   emailNotifications: true,
@@ -255,6 +255,47 @@ export async function PUT(request: NextRequest) {
     const validatedData = validation.data
     const oldValues = await loadCurrentSystemSettings()
 
+    const willEnableEmail =
+      validatedData.emailEnabled ?? (oldValues.emailEnabled as boolean) === true
+
+    if (willEnableEmail) {
+      const mergedHost = String(validatedData.smtpHost ?? oldValues.smtpHost ?? '').trim()
+      const mergedUser = String(validatedData.smtpUser ?? oldValues.smtpUser ?? '').trim()
+      const mergedPassword =
+        validatedData.smtpPassword?.trim() ||
+        String(oldValues.smtpPassword ?? '').trim() ||
+        undefined
+
+      const { validateEnabledEmailSettings } = await import('@/lib/email/smtp-settings-validation')
+      const emailError = validateEnabledEmailSettings({
+        smtpHost: mergedHost,
+        smtpUser: mergedUser,
+        smtpPassword: mergedPassword,
+        hasStoredPassword: Boolean(mergedPassword),
+      })
+      if (emailError) {
+        return NextResponse.json({ error: emailError }, { status: 400 })
+      }
+
+      // Normalizar puerto legacy 25 → 587
+      const mergedPort = validatedData.smtpPort ?? (oldValues.smtpPort as number) ?? 587
+      if (mergedPort === 25) {
+        validatedData.smtpPort = 587
+        validatedData.smtpSecure = false
+      }
+    }
+
+    const smtpSettingKeys = [
+      'emailEnabled',
+      'smtpHost',
+      'smtpPort',
+      'smtpUser',
+      'smtpPassword',
+      'smtpSecure',
+      'emailFrom',
+    ]
+    const smtpChanged = Object.keys(validatedData).some(k => smtpSettingKeys.includes(k))
+
     // Actualizar configuraciones en la base de datos
     const updatePromises = Object.entries(validatedData)
       .map(([key, value]) => {
@@ -330,6 +371,15 @@ export async function PUT(request: NextRequest) {
       .filter(Boolean) // Remove null entries
 
     await Promise.all(updatePromises)
+
+    if (smtpChanged) {
+      try {
+        const { EmailService } = await import('@/lib/services/email/email-service')
+        EmailService.resetTransporter()
+      } catch (err) {
+        console.warn('[SETTINGS] No se pudo resetear transporter SMTP:', err)
+      }
+    }
 
     // Sincronizar también con la landing page
     const landingPageUpdates: any = {}

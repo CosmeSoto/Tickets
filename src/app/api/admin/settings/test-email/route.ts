@@ -4,13 +4,16 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import nodemailer from 'nodemailer'
 import { z } from 'zod'
+import prisma from '@/lib/prisma'
+import { resolveSmtpSecure } from '@/lib/email/smtp-settings-validation'
 
 const testEmailSchema = z.object({
   smtpHost: z.string().min(1, 'El servidor SMTP es requerido'),
   smtpPort: z.number().int().min(1).max(65535),
   smtpUser: z.string().min(1, 'El usuario SMTP es requerido'),
-  smtpPassword: z.string().min(1, 'La contraseña SMTP es requerida'),
+  smtpPassword: z.string().optional(),
   smtpSecure: z.boolean(),
+  emailFrom: z.string().email().optional().or(z.literal('')),
 })
 
 export async function POST(request: NextRequest) {
@@ -39,11 +42,26 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { smtpHost, smtpPort, smtpUser, smtpPassword, smtpSecure } = parsed.data
+    const { smtpHost, smtpPort, smtpUser, smtpSecure, emailFrom } = parsed.data
+    let smtpPassword = parsed.data.smtpPassword?.trim() ?? ''
 
-    // Para puerto 587 (STARTTLS), smtpSecure debe ser false aunque el usuario active SSL/TLS
-    // Para puerto 465 (SSL directo), smtpSecure debe ser true
-    const useSecure = smtpPort === 465 ? true : smtpPort === 587 ? false : smtpSecure
+    if (!smtpPassword) {
+      const stored = await prisma.system_settings.findUnique({
+        where: { key: 'smtpPassword' },
+        select: { value: true },
+      })
+      smtpPassword = stored?.value?.trim() ?? ''
+    }
+
+    if (!smtpPassword) {
+      return NextResponse.json(
+        { error: 'Datos incompletos: La contraseña SMTP es requerida' },
+        { status: 422 }
+      )
+    }
+
+    const useSecure = resolveSmtpSecure(smtpPort, smtpSecure)
+    const fromAddress = emailFrom?.trim() || smtpUser
 
     const transportConfig: nodemailer.TransportOptions = {
       host: smtpHost,
@@ -69,7 +87,7 @@ export async function POST(request: NextRequest) {
     // Enviar email de prueba
     const { systemName } = await getSystemBranding()
     await transporter.sendMail({
-      from: smtpUser,
+      from: fromAddress,
       to: session.user.email,
       subject: `Prueba de Configuración SMTP - ${systemName}`,
       html: `
