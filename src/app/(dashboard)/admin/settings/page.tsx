@@ -107,7 +107,8 @@ function SettingsPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const isSuperAdmin = (session?.user as { isSuperAdmin?: boolean } | undefined)?.isSuperAdmin === true
+  const isSuperAdmin =
+    (session?.user as { isSuperAdmin?: boolean } | undefined)?.isSuperAdmin === true
   const [settings, setSettings] = useState<SystemSettings | null>(null)
   const [loading, setLoading] = useState(false)
   /** Evita un frame de “error” antes del primer fetch cuando ya hay sesión admin */
@@ -328,9 +329,7 @@ function SettingsPage() {
           smtpHost: settings.smtpHost,
           smtpPort: Number(settings.smtpPort),
           smtpUser: settings.smtpUser,
-          ...(settings.smtpPassword?.trim()
-            ? { smtpPassword: settings.smtpPassword }
-            : {}),
+          ...(settings.smtpPassword?.trim() ? { smtpPassword: settings.smtpPassword } : {}),
           smtpSecure: settings.smtpSecure,
           emailFrom: settings.emailFrom,
         }),
@@ -639,48 +638,48 @@ function SettingsPage() {
       >
         <div className='w-full overflow-x-auto pb-1 -mx-1 px-1'>
           <TabsList className='inline-flex h-auto w-max max-w-none flex-nowrap gap-1 p-1'>
-          <TabsTrigger value='general' className='shrink-0 px-3'>
-            General
-          </TabsTrigger>
-          <TabsTrigger value='notifications' className='shrink-0 px-3'>
-            Notificaciones
-          </TabsTrigger>
-          {/* Tabs solo para Super Admin */}
-          <TabsTrigger value='sla' className='shrink-0 px-3' disabled={!isSuperAdmin}>
-            <span className='flex items-center gap-1'>
-              {!isSuperAdmin && <Crown className='h-3 w-3 text-amber-500' />}
-              <Timer className='h-4 w-4 hidden sm:inline' />
-              <span className='hidden sm:inline'>SLA</span>
-              <span className='sm:hidden'>SLA</span>
-            </span>
-          </TabsTrigger>
-          <TabsTrigger value='email' className='shrink-0 px-3' disabled={!isSuperAdmin}>
-            <span className='flex items-center gap-1'>
-              {!isSuperAdmin && <Crown className='h-3 w-3 text-amber-500' />}
-              Email
-            </span>
-          </TabsTrigger>
-          <TabsTrigger value='security' className='shrink-0 px-3' disabled={!isSuperAdmin}>
-            <span className='flex items-center gap-1'>
-              {!isSuperAdmin && <Crown className='h-3 w-3 text-amber-500' />}
-              Seguridad
-            </span>
-          </TabsTrigger>
-          <TabsTrigger value='oauth' className='shrink-0 px-3' disabled={!isSuperAdmin}>
-            <span className='flex items-center gap-1'>
-              {!isSuperAdmin && <Crown className='h-3 w-3 text-amber-500' />}
-              <Key className='h-4 w-4 hidden sm:inline' />
-              OAuth
-            </span>
-          </TabsTrigger>
-          <TabsTrigger value='telegram' className='shrink-0 px-3' disabled={!isSuperAdmin}>
-            <span className='flex items-center gap-1'>
-              {!isSuperAdmin && <Crown className='h-3 w-3 text-amber-500' />}
-              <Send className='h-4 w-4 hidden sm:inline' />
-              <span>Telegram</span>
-            </span>
-          </TabsTrigger>
-        </TabsList>
+            <TabsTrigger value='general' className='shrink-0 px-3'>
+              General
+            </TabsTrigger>
+            <TabsTrigger value='notifications' className='shrink-0 px-3'>
+              Notificaciones
+            </TabsTrigger>
+            {/* Tabs solo para Super Admin */}
+            <TabsTrigger value='sla' className='shrink-0 px-3' disabled={!isSuperAdmin}>
+              <span className='flex items-center gap-1'>
+                {!isSuperAdmin && <Crown className='h-3 w-3 text-amber-500' />}
+                <Timer className='h-4 w-4 hidden sm:inline' />
+                <span className='hidden sm:inline'>SLA</span>
+                <span className='sm:hidden'>SLA</span>
+              </span>
+            </TabsTrigger>
+            <TabsTrigger value='email' className='shrink-0 px-3' disabled={!isSuperAdmin}>
+              <span className='flex items-center gap-1'>
+                {!isSuperAdmin && <Crown className='h-3 w-3 text-amber-500' />}
+                Email
+              </span>
+            </TabsTrigger>
+            <TabsTrigger value='security' className='shrink-0 px-3' disabled={!isSuperAdmin}>
+              <span className='flex items-center gap-1'>
+                {!isSuperAdmin && <Crown className='h-3 w-3 text-amber-500' />}
+                Seguridad
+              </span>
+            </TabsTrigger>
+            <TabsTrigger value='oauth' className='shrink-0 px-3' disabled={!isSuperAdmin}>
+              <span className='flex items-center gap-1'>
+                {!isSuperAdmin && <Crown className='h-3 w-3 text-amber-500' />}
+                <Key className='h-4 w-4 hidden sm:inline' />
+                OAuth
+              </span>
+            </TabsTrigger>
+            <TabsTrigger value='telegram' className='shrink-0 px-3' disabled={!isSuperAdmin}>
+              <span className='flex items-center gap-1'>
+                {!isSuperAdmin && <Crown className='h-3 w-3 text-amber-500' />}
+                <Send className='h-4 w-4 hidden sm:inline' />
+                <span>Telegram</span>
+              </span>
+            </TabsTrigger>
+          </TabsList>
         </div>
 
         {/* Configuración General */}
@@ -922,7 +921,20 @@ function SettingsPage() {
                         <Input
                           id='smtpUser'
                           value={settings.smtpUser}
-                          onChange={e => setSettings({ ...settings, smtpUser: e.target.value })}
+                          onChange={e => {
+                            const newUser = e.target.value
+                            setSettings(prev => {
+                              if (!prev) return prev
+                              const prevUser = prev.smtpUser.trim()
+                              const prevFrom = prev.emailFrom.trim()
+                              const syncFrom = !prevFrom || prevFrom === prevUser
+                              return {
+                                ...prev,
+                                smtpUser: newUser,
+                                ...(syncFrom ? { emailFrom: newUser } : {}),
+                              }
+                            })
+                          }}
                           placeholder='usuario@empresa.com'
                         />
                         <p className='text-xs text-muted-foreground'>
@@ -992,35 +1004,22 @@ function SettingsPage() {
                       </div>
                     </div>
 
-                    {/* Email remitente */}
-                    <div className='space-y-1.5'>
-                      <Label htmlFor='emailFrom'>Email Remitente</Label>
-                      <div className='flex flex-wrap gap-2 items-start max-w-md'>
-                        <Input
-                          id='emailFrom'
-                          type='email'
-                          value={settings.emailFrom}
-                          onChange={e => setSettings({ ...settings, emailFrom: e.target.value })}
-                          placeholder='usuario@empresa.com'
-                          className='flex-1 min-w-[200px]'
-                        />
-                        {settings.smtpUser?.trim() && (
-                          <Button
-                            type='button'
-                            variant='outline'
-                            size='sm'
-                            className='shrink-0'
-                            onClick={() =>
-                              setSettings({ ...settings, emailFrom: settings.smtpUser.trim() })
-                            }
-                          >
-                            Usar usuario SMTP
-                          </Button>
-                        )}
-                      </div>
+                    {/* Email remitente (opcional; si está vacío se usa el usuario SMTP) */}
+                    <div className='space-y-1.5 max-w-md'>
+                      <Label htmlFor='emailFrom'>
+                        Email Remitente{' '}
+                        <span className='font-normal text-muted-foreground'>(opcional)</span>
+                      </Label>
+                      <Input
+                        id='emailFrom'
+                        type='email'
+                        value={settings.emailFrom}
+                        onChange={e => setSettings({ ...settings, emailFrom: e.target.value })}
+                        placeholder={settings.smtpUser?.trim() || 'usuario@empresa.com'}
+                      />
                       <p className='text-xs text-muted-foreground'>
-                        Dirección que verán los destinatarios en el campo &quot;De:&quot;.
-                        Normalmente igual al usuario SMTP.
+                        Dirección que verán los destinatarios en &quot;De:&quot;. Se sincroniza con
+                        el usuario SMTP; déjalo vacío para usar el usuario automáticamente.
                       </p>
                     </div>
 
@@ -1476,8 +1475,8 @@ function SettingsPage() {
                     Modo mantenimiento
                   </CardTitle>
                   <CardDescription>
-                    Bloquea el acceso a usuarios finales durante actualizaciones. Los administradores
-                    pueden seguir entrando si lo permites abajo.
+                    Bloquea el acceso a usuarios finales durante actualizaciones. Los
+                    administradores pueden seguir entrando si lo permites abajo.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className='space-y-6'>
@@ -1588,8 +1587,8 @@ function SettingsPage() {
                         Habilitar bot de Telegram
                       </Label>
                       <p className='text-sm text-muted-foreground'>
-                        Activa el bot (token, webhook/polling y vinculación de cuentas). Las
-                        alertas salientes se controlan aparte en Notificaciones.
+                        Activa el bot (token, webhook/polling y vinculación de cuentas). Las alertas
+                        salientes se controlan aparte en Notificaciones.
                       </p>
                     </div>
                     <Switch
@@ -1820,11 +1819,11 @@ function SettingsPage() {
                             !isSuperAdmin
                               ? 'Solo Super Admin puede registrar el webhook'
                               : typeof window !== 'undefined' &&
-                            /192\.168\.|127\.0\.0\.1|localhost|^10\.|172\.(1[6-9]|2\d|3[01])\./.test(
-                              window.location.origin
-                            )
-                              ? 'No disponible en red local — usa el cron de polling'
-                              : undefined
+                                  /192\.168\.|127\.0\.0\.1|localhost|^10\.|172\.(1[6-9]|2\d|3[01])\./.test(
+                                    window.location.origin
+                                  )
+                                ? 'No disponible en red local — usa el cron de polling'
+                                : undefined
                           }
                         >
                           {registeringWebhook ? (
@@ -1945,8 +1944,8 @@ function SettingsPage() {
                                           </span>
                                         )}
                                         <span className='block text-muted-foreground truncate'>
-                                          {row.errorMessage ?? 'Error desconocido'} (
-                                          {row.attempts}/{row.maxAttempts})
+                                          {row.errorMessage ?? 'Error desconocido'} ({row.attempts}/
+                                          {row.maxAttempts})
                                         </span>
                                       </li>
                                     ))}
