@@ -670,8 +670,12 @@ export default function ContractsPage() {
           }
         }}
       >
-        <DialogContent className='w-[min(98vw,90rem)] max-w-[90rem] max-h-[94vh]'>
-          <DialogHeader>
+        <DialogContent
+          className='w-[min(98vw,90rem)] max-w-[90rem] h-[min(94vh,56rem)] max-h-[94vh] p-0 gap-0 overflow-hidden flex flex-col'
+          onPointerDownOutside={e => e.preventDefault()}
+          onInteractOutside={e => e.preventDefault()}
+        >
+          <DialogHeader className='px-6 pt-6 pb-3 border-b shrink-0'>
             <DialogTitle>
               {isClientOnly
                 ? `Ver suscripción — ${editingContract?.name ?? ''}`
@@ -680,7 +684,7 @@ export default function ContractsPage() {
                   : 'Nuevo contrato'}
             </DialogTitle>
           </DialogHeader>
-          <div className='overflow-y-auto max-h-[calc(90vh-80px)]'>
+          <div className='overflow-y-auto flex-1 min-h-0 px-6 py-4'>
             <ContractForm
               contract={editingContract}
               readOnly={isClientOnly}

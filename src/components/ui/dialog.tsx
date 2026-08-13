@@ -4,6 +4,7 @@ import * as React from 'react'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { X } from 'lucide-react'
 
+import { isCalendarOrSelectInteraction } from '@/lib/ui/calendar-dismiss'
 import { cn } from '@/lib/utils'
 
 const Dialog = DialogPrimitive.Root
@@ -37,16 +38,14 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, onPointerDownOutside, onInteractOutside, ...props }, ref) => {
+>(({ className, children, onPointerDownOutside, onInteractOutside, onFocusOutside, ...props }, ref) => {
   const allowPortaledOverlay = (event: { target: EventTarget | null; preventDefault: () => void }) => {
     const target = event.target as HTMLElement | null
-    if (!target) return false
     // Calendarios, selects y combobox portaleados viven fuera del Dialog
     if (
-      target.closest('[data-radix-popper-content-wrapper]') ||
-      target.closest('[data-radix-select-content]') ||
-      target.closest('[data-slot=calendar]') ||
-      target.closest('[role=listbox]')
+      isCalendarOrSelectInteraction(event) ||
+      target?.closest('[data-radix-select-content]') ||
+      target?.closest('[role=listbox]')
     ) {
       event.preventDefault()
       return true
@@ -77,6 +76,10 @@ const DialogContent = React.forwardRef<
       onInteractOutside={e => {
         if (allowPortaledOverlay(e)) return
         onInteractOutside?.(e)
+      }}
+      onFocusOutside={e => {
+        if (allowPortaledOverlay(e)) return
+        onFocusOutside?.(e)
       }}
     >
       <DialogPrimitive.Close className='absolute right-4 top-4 z-10 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground'>

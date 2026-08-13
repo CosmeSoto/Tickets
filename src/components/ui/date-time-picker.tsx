@@ -5,6 +5,7 @@ import { format, parse, isValid } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { CalendarIcon } from 'lucide-react'
 
+import { preventDismissOnCalendarInteraction } from '@/lib/ui/calendar-dismiss'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
@@ -72,7 +73,7 @@ export function DateTimePicker({
     : placeholder
 
   return (
-    <Popover modal open={open} onOpenChange={disabled ? undefined : setOpen}>
+    <Popover modal={false} open={open} onOpenChange={disabled ? undefined : setOpen}>
       <PopoverTrigger asChild>
         <Button
           id={id}
@@ -96,6 +97,9 @@ export function DateTimePicker({
         collisionPadding={16}
         onOpenAutoFocus={e => e.preventDefault()}
         onCloseAutoFocus={e => e.preventDefault()}
+        onPointerDownOutside={preventDismissOnCalendarInteraction}
+        onFocusOutside={preventDismissOnCalendarInteraction}
+        onInteractOutside={preventDismissOnCalendarInteraction}
       >
         <Calendar
           mode='single'
@@ -165,7 +169,7 @@ export function DatePickerWithTime({
     : 'Seleccionar fecha'
 
   return (
-    <Popover modal open={open} onOpenChange={disabled ? undefined : setOpen}>
+    <Popover modal={false} open={open} onOpenChange={disabled ? undefined : setOpen}>
       <PopoverTrigger asChild>
         <Button
           type='button'
@@ -188,6 +192,9 @@ export function DatePickerWithTime({
         collisionPadding={16}
         onOpenAutoFocus={e => e.preventDefault()}
         onCloseAutoFocus={e => e.preventDefault()}
+        onPointerDownOutside={preventDismissOnCalendarInteraction}
+        onFocusOutside={preventDismissOnCalendarInteraction}
+        onInteractOutside={preventDismissOnCalendarInteraction}
       >
         <Calendar
           mode='single'

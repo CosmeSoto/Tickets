@@ -18,7 +18,8 @@ interface ContractFormSectionProps {
 }
 
 /**
- * Sección de formulario de contrato: fija o colapsable para formularios extensos.
+ * Sección de formulario de contrato: fija o colapsable.
+ * Usa botón en lugar de <details> para no interferir con Popover/Select anidados.
  */
 export function ContractFormSection({
   title,
@@ -65,15 +66,16 @@ export function ContractFormSection({
   }
 
   return (
-    <details
-      open={open}
-      onToggle={e => setOpen((e.currentTarget as HTMLDetailsElement).open)}
-      className={cn('rounded-lg border bg-card group/section', className)}
-    >
-      <summary className='cursor-pointer list-none px-4 py-3 select-none [&::-webkit-details-marker]:hidden'>
+    <section className={cn('rounded-lg border bg-card group/section', className)}>
+      <button
+        type='button'
+        aria-expanded={open}
+        onClick={() => setOpen(prev => !prev)}
+        className='w-full cursor-pointer px-4 py-3 select-none text-left'
+      >
         {header}
-      </summary>
-      <div className='border-t p-4'>{children}</div>
-    </details>
+      </button>
+      {open ? <div className='border-t p-4'>{children}</div> : null}
+    </section>
   )
 }

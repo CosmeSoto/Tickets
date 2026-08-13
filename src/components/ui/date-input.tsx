@@ -17,6 +17,7 @@ import { format, parse, isValid } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { CalendarIcon, X } from 'lucide-react'
 
+import { preventDismissOnCalendarInteraction } from '@/lib/ui/calendar-dismiss'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
@@ -140,6 +141,20 @@ export const DateInput = React.forwardRef<HTMLInputElement, DateInputProps>(
       ? format(selectedDate, 'dd/MM/yyyy', { locale: es })
       : placeholder
 
+    const handleOpenChange = (next: boolean) => {
+      if (disabled) return
+      if (!next) {
+        const active = document.activeElement as HTMLElement | null
+        if (
+          active?.closest('[data-slot=calendar]') ||
+          active?.closest('[data-radix-select-content]')
+        ) {
+          return
+        }
+      }
+      setOpen(next)
+    }
+
     return (
       <>
         <input
@@ -154,7 +169,7 @@ export const DateInput = React.forwardRef<HTMLInputElement, DateInputProps>(
           aria-hidden
           {...(rest as React.InputHTMLAttributes<HTMLInputElement>)}
         />
-        <Popover modal open={open} onOpenChange={disabled ? undefined : setOpen}>
+        <Popover modal={false} open={open} onOpenChange={handleOpenChange}>
           <PopoverTrigger asChild>
             <Button
               type='button'
@@ -184,7 +199,9 @@ export const DateInput = React.forwardRef<HTMLInputElement, DateInputProps>(
             collisionPadding={16}
             onOpenAutoFocus={e => e.preventDefault()}
             onCloseAutoFocus={e => e.preventDefault()}
-            onFocusOutside={e => e.preventDefault()}
+            onPointerDownOutside={preventDismissOnCalendarInteraction}
+            onFocusOutside={preventDismissOnCalendarInteraction}
+            onInteractOutside={preventDismissOnCalendarInteraction}
           >
             <Calendar
               mode='single'

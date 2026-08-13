@@ -1,12 +1,13 @@
 'use client'
 
 import * as React from 'react'
-import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from 'lucide-react'
 import { DayButton, DayPicker, getDefaultClassNames } from 'react-day-picker'
 import { es } from 'date-fns/locale'
 
 import { cn } from '@/lib/utils'
 import { Button, buttonVariants } from '@/components/ui/button'
+import { calendarDefaultComponents } from '@/components/ui/calendar-parts'
+import { CalendarSelectDropdown } from '@/components/ui/calendar-select-dropdown'
 import { DEFAULT_TIMEZONE } from '@/lib/constants'
 
 function Calendar({
@@ -65,11 +66,8 @@ function Calendar({
           'flex h-[--cell-size] w-full items-center justify-center gap-1.5 text-sm font-medium',
           defaultClassNames.dropdowns
         ),
-        dropdown_root: cn(
-          'has-focus:border-ring border-input shadow-xs has-focus:ring-ring/50 has-focus:ring-[3px] relative rounded-md border',
-          defaultClassNames.dropdown_root
-        ),
-        dropdown: cn('bg-popover absolute inset-0 opacity-0', defaultClassNames.dropdown),
+        dropdown_root: cn('relative', defaultClassNames.dropdown_root),
+        dropdown: cn('relative', defaultClassNames.dropdown),
         caption_label: cn(
           'select-none font-semibold text-lg',
           captionLayout === 'label'
@@ -109,30 +107,9 @@ function Calendar({
         ...classNames,
       }}
       components={{
-        Root: ({ className, rootRef, ...props }) => {
-          return <div data-slot='calendar' ref={rootRef} className={cn(className)} {...props} />
-        },
-        Chevron: ({ className, orientation, ...props }) => {
-          if (orientation === 'left') {
-            return <ChevronLeftIcon className={cn('size-5', className)} {...props} />
-          }
-
-          if (orientation === 'right') {
-            return <ChevronRightIcon className={cn('size-5', className)} {...props} />
-          }
-
-          return <ChevronDownIcon className={cn('size-5', className)} {...props} />
-        },
+        ...calendarDefaultComponents,
         DayButton: CalendarDayButton,
-        WeekNumber: ({ children, ...props }) => {
-          return (
-            <td {...props}>
-              <div className='flex size-[--cell-size] items-center justify-center text-center'>
-                {children}
-              </div>
-            </td>
-          )
-        },
+        Dropdown: CalendarSelectDropdown,
         ...components,
       }}
       {...props}
