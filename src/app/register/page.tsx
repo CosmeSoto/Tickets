@@ -33,6 +33,7 @@ import {
 } from 'lucide-react'
 import { DepartmentSelector } from '@/components/ui/department-selector'
 import { getNextAuthErrorMessage } from '@/lib/auth/nextauth-error-messages'
+import { validatePhoneInput } from '@/lib/auth/profile-completion'
 
 interface FormErrors {
   name?: string
@@ -136,8 +137,8 @@ export default function RegisterPage() {
     else if (formData.password !== formData.confirmPassword)
       errors.confirmPassword = 'Las contraseñas no coinciden'
 
-    if (formData.phone && !/^\+?[\d\s\-()]+$/.test(formData.phone))
-      errors.phone = 'Formato de teléfono inválido. Usa solo números, espacios, +, - o paréntesis'
+    const phoneError = validatePhoneInput(formData.phone)
+    if (phoneError) errors.phone = phoneError
 
     if (!formData.departmentId) errors.departmentId = 'Debes seleccionar un departamento'
     setFormErrors(errors)
@@ -171,7 +172,7 @@ export default function RegisterPage() {
           name: formData.name.trim(),
           email: formData.email.trim().toLowerCase(),
           password: formData.password,
-          phone: formData.phone.trim() || null,
+          phone: formData.phone.trim(),
           departmentId: formData.departmentId,
         }),
       })
@@ -204,12 +205,49 @@ export default function RegisterPage() {
   }
 
   const handleOAuth = async (provider: 'google' | 'azure-ad') => {
+    if (!formData.departmentId) {
+      setFormErrors(prev => ({
+        ...prev,
+        departmentId: 'Selecciona tu departamento antes de continuar con Google o Microsoft',
+      }))
+      setError('Debes elegir un departamento antes de registrarte con OAuth.')
+      return
+    }
+
+    const phoneError = validatePhoneInput(formData.phone)
+    if (phoneError) {
+      setFormErrors(prev => ({ ...prev, phone: phoneError }))
+      setError('Debes ingresar tu teléfono celular antes de registrarte con OAuth.')
+      return
+    }
+
     setIsOAuthLoading(true)
-    await signIn(provider, { callbackUrl: '/client', redirect: true })
-    setIsOAuthLoading(false)
+    setError(null)
+    try {
+      const ctxRes = await fetch('/api/auth/oauth-register-context', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          departmentId: formData.departmentId,
+          phone: formData.phone.trim(),
+        }),
+      })
+      const ctxData = await ctxRes.json()
+      if (!ctxRes.ok || !ctxData.success) {
+        setError(ctxData.error || 'No se pudo preparar el registro con OAuth')
+        return
+      }
+
+      await signIn(provider, { callbackUrl: '/client', redirect: true })
+    } catch {
+      setError('Error de conexión al iniciar registro con OAuth')
+    } finally {
+      setIsOAuthLoading(false)
+    }
   }
 
   const hasOAuth = !loadingProviders && (oauthProviders.google || oauthProviders.microsoft)
+  const oauthReady = Boolean(formData.departmentId && formData.phone.trim())
 
   const FieldError = ({ msg }: { msg?: string }) =>
     msg ? (
@@ -364,7 +402,7 @@ export default function RegisterPage() {
 
                   <div className='space-y-1.5'>
                     <Label htmlFor='phone'>
-                      Teléfono <span className='text-muted-foreground text-xs'>(opcional)</span>
+                      Teléfono celular <span className='text-destructive'>*</span>
                     </Label>
                     <div className='relative'>
                       <Phone className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
@@ -378,6 +416,9 @@ export default function RegisterPage() {
                         className='pl-9 h-11'
                       />
                     </div>
+                    <p className='text-xs text-muted-foreground'>
+                      Se usará para vincular alertas por Telegram.
+                    </p>
                     <FieldError msg={formErrors.phone} />
                   </div>
 
@@ -430,12 +471,17 @@ export default function RegisterPage() {
                     className={`grid gap-3 ${oauthProviders.google && oauthProviders.microsoft ? 'grid-cols-2' : 'grid-cols-1'}`}
                   >
                     {oauthProviders.google && (
-                      <AuthPressable disabled={isOAuthLoading}>
+                      <AuthPressable disabled={isOAuthLoading || !oauthReady}>
                         <Button
                           variant='outline'
                           className='w-full h-10'
                           onClick={() => handleOAuth('google')}
-                          disabled={isOAuthLoading}
+                          disabled={isOAuthLoading || !oauthReady}
+                          title={
+                            !oauthReady
+                              ? 'Completa departamento y teléfono arriba para continuar'
+                              : undefined
+                          }
                         >
                           <svg className='mr-2 h-4 w-4' viewBox='0 0 24 24'>
                             <path
@@ -460,12 +506,17 @@ export default function RegisterPage() {
                       </AuthPressable>
                     )}
                     {oauthProviders.microsoft && (
-                      <AuthPressable disabled={isOAuthLoading}>
+                      <AuthPressable disabled={isOAuthLoading || !oauthReady}>
                         <Button
                           variant='outline'
                           className='w-full h-10'
                           onClick={() => handleOAuth('azure-ad')}
-                          disabled={isOAuthLoading}
+                          disabled={isOAuthLoading || !oauthReady}
+                          title={
+                            !oauthReady
+                              ? 'Completa departamento y teléfono arriba para continuar'
+                              : undefined
+                          }
                         >
                           <svg className='mr-2 h-4 w-4' viewBox='0 0 23 23'>
                             <path fill='#f3f3f3' d='M0 0h23v23H0z' />
@@ -479,6 +530,12 @@ export default function RegisterPage() {
                       </AuthPressable>
                     )}
                   </div>
+                  {!oauthReady && (
+                    <p className='text-xs text-muted-foreground text-center'>
+                      Completa departamento y teléfono celular arriba para habilitar el registro con
+                      Google o Microsoft.
+                    </p>
+                  )}
                 </motion.div>
               )}
 

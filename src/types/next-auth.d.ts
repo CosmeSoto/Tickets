@@ -21,6 +21,7 @@ declare module 'next-auth' {
       canAccessKnowledge?: boolean
       patrolsEnabled?: boolean
       mustChangePassword?: boolean
+      needsProfileCompletion?: boolean
       credentialsEnabled?: boolean
       canManageCredentials?: boolean
     }
@@ -54,6 +55,7 @@ declare module 'next-auth/jwt' {
     patrolsEnabled?: boolean
     loginTime?: number
     mustChangePassword?: boolean
+    needsProfileCompletion?: boolean
     credentialsEnabled?: boolean
     canManageCredentials?: boolean
   }

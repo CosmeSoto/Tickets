@@ -7,179 +7,175 @@ import { randomUUID } from 'crypto'
 import { DEFAULT_TIMEZONE } from '@/lib/constants'
 import { getCachedOAuthProviders, invalidateOAuthProvidersCache } from './auth/load-oauth-providers'
 import { LOCKOUT_DURATION_MINUTES } from './services/security-config-service'
+import { clientNeedsProfileCompletion } from './auth/profile-completion'
 
 export { invalidateOAuthProvidersCache }
 
 const credentialsProvider = CredentialsProvider({
-      name: 'credentials',
-      credentials: {
-        email: { label: 'Email', type: 'email' },
-        password: { label: 'Contraseña', type: 'password' },
-      },
-      async authorize(credentials, req) {
-        if (!credentials?.email || !credentials?.password) {
-          throw new Error('Email y contraseña son requeridos')
-        }
+  name: 'credentials',
+  credentials: {
+    email: { label: 'Email', type: 'email' },
+    password: { label: 'Contraseña', type: 'password' },
+  },
+  async authorize(credentials, req) {
+    if (!credentials?.email || !credentials?.password) {
+      throw new Error('Email y contraseña son requeridos')
+    }
 
+    try {
+      // NUEVO: Verificar si la cuenta está bloqueada por intentos fallidos
+      const { SecurityConfigService } = await import('./services/security-config-service')
+
+      // Extraer IP real del request (soporta proxies y load balancers)
+      const ipAddress =
+        (req?.headers?.['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
+        (req?.headers?.['x-real-ip'] as string) ||
+        'unknown'
+
+      const lockStatus = await SecurityConfigService.isAccountLocked(credentials.email, ipAddress)
+
+      if (lockStatus.locked) {
+        // Registrar intento de acceso a cuenta bloqueada
         try {
-          // NUEVO: Verificar si la cuenta está bloqueada por intentos fallidos
-          const { SecurityConfigService } = await import('./services/security-config-service')
-
-          // Extraer IP real del request (soporta proxies y load balancers)
-          const ipAddress =
-            (req?.headers?.['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
-            (req?.headers?.['x-real-ip'] as string) ||
-            'unknown'
-
-          const lockStatus = await SecurityConfigService.isAccountLocked(
-            credentials.email,
-            ipAddress
-          )
-
-          if (lockStatus.locked) {
-            // Registrar intento de acceso a cuenta bloqueada
-            try {
-              const { AuditServiceComplete } = await import('./services/audit-service-complete')
-              await AuditServiceComplete.log({
-                action: 'login_failed',
-                entityType: 'user',
-                entityId: 'unknown',
-                userId: 'system',
-                details: {
-                  email: credentials.email,
-                  reason: 'account_locked',
-                  timestamp: new Date().toISOString(),
-                },
-                result: 'ERROR',
-                errorCode: 'AUTH_ACCOUNT_LOCKED',
-                errorMessage: 'Cuenta bloqueada por múltiples intentos fallidos',
-              })
-            } catch (auditError) {
-              console.error('[AUTH] Error registrando intento bloqueado:', auditError)
-            }
-
-            throw new Error(
-              `Cuenta bloqueada temporalmente por múltiples intentos fallidos. Intenta de nuevo en ${LOCKOUT_DURATION_MINUTES} minutos.`
-            )
-          }
-
-          const user = await prisma.users.findUnique({
-            where: {
+          const { AuditServiceComplete } = await import('./services/audit-service-complete')
+          await AuditServiceComplete.log({
+            action: 'login_failed',
+            entityType: 'user',
+            entityId: 'unknown',
+            userId: 'system',
+            details: {
               email: credentials.email,
+              reason: 'account_locked',
+              timestamp: new Date().toISOString(),
             },
-            include: {
-              departments: true,
-            },
+            result: 'ERROR',
+            errorCode: 'AUTH_ACCOUNT_LOCKED',
+            errorMessage: 'Cuenta bloqueada por múltiples intentos fallidos',
           })
-
-          // Usuario no encontrado
-          if (!user) {
-            // NUEVO: Registrar intento fallido
-            await SecurityConfigService.recordFailedLogin(credentials.email, ipAddress)
-            throw new Error('Credenciales inválidas')
-          }
-
-          // Sin contraseña configurada (usuario OAuth o creado sin password)
-          if (!user.passwordHash) {
-            console.error(`[AUTH] Usuario ${credentials.email} no tiene passwordHash configurado`)
-            throw new Error(
-              'Esta cuenta no tiene contraseña configurada. Contacta al administrador.'
-            )
-          }
-
-          // Usuario desactivado
-          if (!user.isActive) {
-            // Registrar intento de acceso a cuenta desactivada
-            try {
-              const { AuditServiceComplete } = await import('./services/audit-service-complete')
-              await AuditServiceComplete.log({
-                action: 'login_failed',
-                entityType: 'user',
-                entityId: user.id,
-                userId: user.id,
-                details: {
-                  email: credentials.email,
-                  reason: 'account_disabled',
-                  timestamp: new Date().toISOString(),
-                },
-                result: 'ERROR',
-                errorCode: 'AUTH_ACCOUNT_DISABLED',
-                errorMessage: 'Intento de acceso a cuenta desactivada',
-              })
-            } catch (auditError) {
-              console.error('[AUTH] Error registrando intento fallido:', auditError)
-            }
-
-            throw new Error('Usuario desactivado')
-          }
-
-          // Verificar contraseña
-          const isPasswordValid = await bcrypt.compare(credentials.password, user.passwordHash)
-
-          if (!isPasswordValid) {
-            // NUEVO: Registrar intento fallido
-            await SecurityConfigService.recordFailedLogin(credentials.email, ipAddress)
-
-            // Obtener intentos restantes
-            const updatedLockStatus = await SecurityConfigService.isAccountLocked(
-              credentials.email,
-              ipAddress
-            )
-
-            // Registrar contraseña incorrecta
-            try {
-              const { AuditServiceComplete } = await import('./services/audit-service-complete')
-              await AuditServiceComplete.log({
-                action: 'login_failed',
-                entityType: 'user',
-                entityId: user.id,
-                userId: user.id,
-                details: {
-                  email: credentials.email,
-                  reason: 'invalid_password',
-                  attemptsRemaining: updatedLockStatus.attemptsRemaining,
-                  timestamp: new Date().toISOString(),
-                },
-                result: 'ERROR',
-                errorCode: 'AUTH_INVALID_PASSWORD',
-                errorMessage: 'Contraseña incorrecta',
-              })
-            } catch (auditError) {
-              console.error('[AUTH] Error registrando intento fallido:', auditError)
-            }
-
-            const remainingMessage = updatedLockStatus.attemptsRemaining
-              ? ` (${updatedLockStatus.attemptsRemaining} intentos restantes)`
-              : ''
-
-            throw new Error(`Credenciales inválidas${remainingMessage}`)
-          }
-
-          // NUEVO: Login exitoso - limpiar intentos fallidos
-          await SecurityConfigService.clearFailedLogins(credentials.email, ipAddress)
-
-          // Login exitoso - actualizar último login
-          await prisma.users.update({
-            where: { id: user.id },
-            data: { lastLogin: new Date() },
-          })
-
-          return {
-            id: user.id,
-            email: user.email,
-            name: user.name,
-            role: user.role,
-            departmentId: user.departmentId || undefined,
-            department: user.departments?.name || undefined,
-            phone: user.phone || undefined,
-            avatar: user.avatar || undefined,
-          }
-        } catch (error) {
-          console.error('Auth error:', error)
-          throw error
+        } catch (auditError) {
+          console.error('[AUTH] Error registrando intento bloqueado:', auditError)
         }
-      },
-    })
+
+        throw new Error(
+          `Cuenta bloqueada temporalmente por múltiples intentos fallidos. Intenta de nuevo en ${LOCKOUT_DURATION_MINUTES} minutos.`
+        )
+      }
+
+      const user = await prisma.users.findUnique({
+        where: {
+          email: credentials.email,
+        },
+        include: {
+          departments: true,
+        },
+      })
+
+      // Usuario no encontrado
+      if (!user) {
+        // NUEVO: Registrar intento fallido
+        await SecurityConfigService.recordFailedLogin(credentials.email, ipAddress)
+        throw new Error('Credenciales inválidas')
+      }
+
+      // Sin contraseña configurada (usuario OAuth o creado sin password)
+      if (!user.passwordHash) {
+        console.error(`[AUTH] Usuario ${credentials.email} no tiene passwordHash configurado`)
+        throw new Error('Esta cuenta no tiene contraseña configurada. Contacta al administrador.')
+      }
+
+      // Usuario desactivado
+      if (!user.isActive) {
+        // Registrar intento de acceso a cuenta desactivada
+        try {
+          const { AuditServiceComplete } = await import('./services/audit-service-complete')
+          await AuditServiceComplete.log({
+            action: 'login_failed',
+            entityType: 'user',
+            entityId: user.id,
+            userId: user.id,
+            details: {
+              email: credentials.email,
+              reason: 'account_disabled',
+              timestamp: new Date().toISOString(),
+            },
+            result: 'ERROR',
+            errorCode: 'AUTH_ACCOUNT_DISABLED',
+            errorMessage: 'Intento de acceso a cuenta desactivada',
+          })
+        } catch (auditError) {
+          console.error('[AUTH] Error registrando intento fallido:', auditError)
+        }
+
+        throw new Error('Usuario desactivado')
+      }
+
+      // Verificar contraseña
+      const isPasswordValid = await bcrypt.compare(credentials.password, user.passwordHash)
+
+      if (!isPasswordValid) {
+        // NUEVO: Registrar intento fallido
+        await SecurityConfigService.recordFailedLogin(credentials.email, ipAddress)
+
+        // Obtener intentos restantes
+        const updatedLockStatus = await SecurityConfigService.isAccountLocked(
+          credentials.email,
+          ipAddress
+        )
+
+        // Registrar contraseña incorrecta
+        try {
+          const { AuditServiceComplete } = await import('./services/audit-service-complete')
+          await AuditServiceComplete.log({
+            action: 'login_failed',
+            entityType: 'user',
+            entityId: user.id,
+            userId: user.id,
+            details: {
+              email: credentials.email,
+              reason: 'invalid_password',
+              attemptsRemaining: updatedLockStatus.attemptsRemaining,
+              timestamp: new Date().toISOString(),
+            },
+            result: 'ERROR',
+            errorCode: 'AUTH_INVALID_PASSWORD',
+            errorMessage: 'Contraseña incorrecta',
+          })
+        } catch (auditError) {
+          console.error('[AUTH] Error registrando intento fallido:', auditError)
+        }
+
+        const remainingMessage = updatedLockStatus.attemptsRemaining
+          ? ` (${updatedLockStatus.attemptsRemaining} intentos restantes)`
+          : ''
+
+        throw new Error(`Credenciales inválidas${remainingMessage}`)
+      }
+
+      // NUEVO: Login exitoso - limpiar intentos fallidos
+      await SecurityConfigService.clearFailedLogins(credentials.email, ipAddress)
+
+      // Login exitoso - actualizar último login
+      await prisma.users.update({
+        where: { id: user.id },
+        data: { lastLogin: new Date() },
+      })
+
+      return {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        departmentId: user.departmentId || undefined,
+        department: user.departments?.name || undefined,
+        phone: user.phone || undefined,
+        avatar: user.avatar || undefined,
+      }
+    } catch (error) {
+      console.error('Auth error:', error)
+      throw error
+    }
+  },
+})
 
 const sharedAuthOptions: Omit<NextAuthOptions, 'providers'> = {
   session: {
@@ -227,12 +223,37 @@ const sharedAuthOptions: Omit<NextAuthOptions, 'providers'> = {
               return true
             } else {
               // Usuario nuevo, crear cuenta como CLIENT
+              let oauthDepartmentId: string | null = null
+              let oauthPhone: string | null = null
+              try {
+                const { cookies } = await import('next/headers')
+                const cookieStore = await cookies()
+                const deptCookie = cookieStore.get('oauth_register_dept')?.value?.trim()
+                const phoneCookie = cookieStore.get('oauth_register_phone')?.value?.trim()
+                if (deptCookie) {
+                  const dept = await prisma.departments.findFirst({
+                    where: { id: deptCookie, isActive: true },
+                    select: { id: true },
+                  })
+                  if (dept) oauthDepartmentId = dept.id
+                  cookieStore.delete('oauth_register_dept')
+                }
+                if (phoneCookie) {
+                  oauthPhone = phoneCookie
+                  cookieStore.delete('oauth_register_phone')
+                }
+              } catch {
+                /* cookie no disponible en este contexto */
+              }
+
               const newUser = await prisma.users.create({
                 data: {
                   id: randomUUID(),
                   email: user.email!,
                   name: user.name || user.email!.split('@')[0],
                   role: 'CLIENT',
+                  departmentId: oauthDepartmentId,
+                  phone: oauthPhone,
                   avatar: user.image,
                   isActive: true,
                   isEmailVerified: true,
@@ -325,6 +346,11 @@ const sharedAuthOptions: Omit<NextAuthOptions, 'providers'> = {
                 token.credentialsEnabled = dbUser.credentialsEnabled ?? false
                 token.canManageCredentials = dbUser.canManageCredentials ?? false
                 token.isOAuth = true
+                token.needsProfileCompletion = clientNeedsProfileCompletion({
+                  role: dbUser.role,
+                  departmentId: dbUser.departmentId,
+                  phone: dbUser.phone,
+                })
               } else {
                 token.role = 'CLIENT'
                 token.isOAuth = true
@@ -352,6 +378,11 @@ const sharedAuthOptions: Omit<NextAuthOptions, 'providers'> = {
             token.phone = user.phone
             token.avatar = user.avatar
             token.isOAuth = false
+            token.needsProfileCompletion = clientNeedsProfileCompletion({
+              role: user.role || 'CLIENT',
+              departmentId: user.departmentId,
+              phone: user.phone,
+            })
             try {
               const dbUser = await prisma.users.findUnique({
                 where: { id: user.id },
@@ -460,6 +491,7 @@ const sharedAuthOptions: Omit<NextAuthOptions, 'providers'> = {
                   credentialsEnabled: true,
                   canManageCredentials: true,
                   departmentId: true,
+                  phone: true,
                   passwordChangedAt: true,
                   passwordHash: true,
                   oauthProvider: true,
@@ -487,6 +519,12 @@ const sharedAuthOptions: Omit<NextAuthOptions, 'providers'> = {
               token.canManageCredentials = dbUser.canManageCredentials ?? false
               token.departmentId = dbUser.departmentId || undefined
               token.department = dbUser.departments?.name || undefined
+              token.phone = dbUser.phone || undefined
+              token.needsProfileCompletion = clientNeedsProfileCompletion({
+                role: dbUser.role,
+                departmentId: dbUser.departmentId,
+                phone: dbUser.phone,
+              })
 
               // Re-evaluar política de contraseña en refrescos (caducidad por días)
               try {
@@ -512,6 +550,8 @@ const sharedAuthOptions: Omit<NextAuthOptions, 'providers'> = {
               } catch {
                 // Mantener valor previo del token
               }
+            } else {
+              return { ...token, error: 'UserDeleted' }
             }
           } catch {
             // Si falla la BD, continuar con el token existente
@@ -530,6 +570,23 @@ const sharedAuthOptions: Omit<NextAuthOptions, 'providers'> = {
             token.mustChangePassword = (
               session as { mustChangePassword: boolean }
             ).mustChangePassword
+          }
+          if (
+            typeof (session as { needsProfileCompletion?: boolean }).needsProfileCompletion ===
+            'boolean'
+          ) {
+            token.needsProfileCompletion = (
+              session as { needsProfileCompletion: boolean }
+            ).needsProfileCompletion
+          }
+          if (typeof (session as { departmentId?: string }).departmentId === 'string') {
+            token.departmentId = (session as { departmentId: string }).departmentId
+          }
+          if (typeof (session as { department?: string }).department === 'string') {
+            token.department = (session as { department: string }).department
+          }
+          if (typeof (session as { phone?: string }).phone === 'string') {
+            token.phone = (session as { phone: string }).phone
           }
         }
 
@@ -566,8 +623,15 @@ const sharedAuthOptions: Omit<NextAuthOptions, 'providers'> = {
           if ((token as any).error === 'UserDeactivated') {
             return { ...session, user: { ...session.user }, error: 'UserDeactivated' } as any
           }
+          if ((token as any).error === 'UserDeleted') {
+            return { ...session, expires: new Date(0).toISOString(), error: 'UserDeleted' } as any
+          }
           if ((token as any).error === 'SessionExpired') {
-            return { ...session, expires: new Date(0).toISOString(), error: 'SessionExpired' } as any
+            return {
+              ...session,
+              expires: new Date(0).toISOString(),
+              error: 'SessionExpired',
+            } as any
           }
 
           session.user.id = token.sub!
@@ -596,6 +660,8 @@ const sharedAuthOptions: Omit<NextAuthOptions, 'providers'> = {
 
           // Política de cambio de contraseña
           ;(session.user as any).mustChangePassword = (token.mustChangePassword as boolean) ?? false
+          ;(session.user as any).needsProfileCompletion =
+            (token.needsProfileCompletion as boolean) ?? false
 
           // IMPORTANTE: Pasar loginTime a la sesión para el monitor de timeout
           if (token.loginTime) {

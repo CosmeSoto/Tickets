@@ -19,14 +19,39 @@ export function SessionTimeoutMonitor() {
   const sessionTimeoutMinutes = useRef<number>(1440) // Default 24 horas
   const JWT_SYNC_THROTTLE_MS = 60_000
 
-  // Cerrar sesión si el servidor marcó SessionExpired en el JWT
+  // Cerrar sesión si el servidor marcó error en el JWT (expirada, eliminada, desactivada)
   useEffect(() => {
-    if ((session as { error?: string } | null)?.error === 'SessionExpired') {
+    const sessionError = (session as { error?: string } | null)?.error
+    if (sessionError === 'SessionExpired') {
       void signOut({ redirect: false }).then(() => {
         window.location.href = '/login?reason=timeout'
       })
+      return
+    }
+    if (sessionError === 'UserDeleted') {
+      void signOut({ redirect: false }).then(() => {
+        window.location.href = '/login?reason=deleted'
+      })
+      return
+    }
+    if (sessionError === 'UserDeactivated') {
+      void signOut({ redirect: false }).then(() => {
+        window.location.href = '/login?reason=deactivated'
+      })
     }
   }, [session])
+
+  // Verificar periódicamente que la sesión siga siendo válida en el servidor
+  useEffect(() => {
+    if (status !== 'authenticated') return
+    const interval = setInterval(
+      () => {
+        void update()
+      },
+      2 * 60 * 1000
+    )
+    return () => clearInterval(interval)
+  }, [status, update])
 
   // Obtener configuración de timeout desde el servidor
   const fetchSessionTimeout = useCallback(async () => {

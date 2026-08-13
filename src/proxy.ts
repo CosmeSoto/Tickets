@@ -148,12 +148,53 @@ export async function proxy(request: NextRequest) {
       // Leer userId del JWT si existe (sin bloquear — getToken es async pero ligero)
       let userId: string | undefined
       let mustChangePassword = false
+      let needsProfileCompletion = false
+      let sessionError: string | undefined
       try {
         const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET })
         userId = token?.sub ?? undefined
         mustChangePassword = token?.mustChangePassword === true
+        needsProfileCompletion = token?.needsProfileCompletion === true
+        sessionError = token?.error as string | undefined
       } catch {
         /* sin token — usar IP */
+      }
+
+      if (
+        sessionError === 'UserDeleted' ||
+        sessionError === 'UserDeactivated' ||
+        sessionError === 'SessionExpired'
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              sessionError === 'UserDeleted'
+                ? 'Tu cuenta fue eliminada'
+                : sessionError === 'UserDeactivated'
+                  ? 'Tu cuenta fue desactivada'
+                  : 'Tu sesión expiró',
+            code: sessionError,
+          },
+          { status: 401, headers: { 'X-Request-ID': requestId } }
+        )
+      }
+
+      // Completar perfil: bloquear APIs excepto el endpoint de completar perfil
+      if (
+        needsProfileCompletion &&
+        !path.startsWith('/api/user/complete-profile') &&
+        !path.startsWith('/api/departments') &&
+        !path.startsWith('/api/auth/')
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Debes completar tu departamento y teléfono celular antes de continuar',
+            code: 'PROFILE_COMPLETION_REQUIRED',
+          },
+          { status: 403, headers: { 'X-Request-ID': requestId } }
+        )
       }
 
       // Forzar cambio de contraseña: bloquear APIs excepto el propio endpoint de cambio
@@ -271,11 +312,36 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(loginUrl)
     }
 
+    const tokenError = token.error as string | undefined
+    if (
+      tokenError === 'UserDeleted' ||
+      tokenError === 'UserDeactivated' ||
+      tokenError === 'SessionExpired'
+    ) {
+      const loginUrl = new URL('/login', request.url)
+      loginUrl.searchParams.set(
+        'reason',
+        tokenError === 'UserDeleted'
+          ? 'deleted'
+          : tokenError === 'UserDeactivated'
+            ? 'deactivated'
+            : 'timeout'
+      )
+      return NextResponse.redirect(loginUrl)
+    }
+
     // Política: forzar cambio de contraseña antes de usar el sistema
     if (token.mustChangePassword === true && path !== '/change-password') {
       const changePasswordUrl = new URL('/change-password', request.url)
       changePasswordUrl.searchParams.set('callbackUrl', request.nextUrl.pathname)
       return NextResponse.redirect(changePasswordUrl)
+    }
+
+    // Política: completar departamento antes de usar el sistema (OAuth / registro)
+    if (token.needsProfileCompletion === true && path !== '/complete-profile') {
+      const completeProfileUrl = new URL('/complete-profile', request.url)
+      completeProfileUrl.searchParams.set('callbackUrl', request.nextUrl.pathname)
+      return NextResponse.redirect(completeProfileUrl)
     }
 
     // Modo mantenimiento — redirigir usuarios bloqueados (admins/super admin pueden pasar)
@@ -345,10 +411,7 @@ export async function proxy(request: NextRequest) {
     }
 
     // Auditoría: solo Super Admin (la UI ya filtra; el proxy cierra la URL directa)
-    if (
-      path.startsWith('/admin/audit') &&
-      (token as any).isSuperAdmin !== true
-    ) {
+    if (path.startsWith('/admin/audit') && (token as any).isSuperAdmin !== true) {
       ApplicationLogger.securityEvent(
         'insufficient_privileges',
         'medium',
@@ -527,7 +590,11 @@ export async function proxy(request: NextRequest) {
     // Rutas de inventario:
     // - Super Admin: acceso total
     // - ADMIN/TECH/CLIENT: inventoryEnabled o canManageInventory; CLIENT sin gestión → allowlist
-    if (path.startsWith('/inventory') || path === '/settings/inventory' || path.startsWith('/settings/inventory/')) {
+    if (
+      path.startsWith('/inventory') ||
+      path === '/settings/inventory' ||
+      path.startsWith('/settings/inventory/')
+    ) {
       const isSuper = (token as any).isSuperAdmin === true
       const invOn = (token as any).inventoryEnabled === true
       const canManage = (token as any).canManageInventory === true

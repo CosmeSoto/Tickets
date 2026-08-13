@@ -17,6 +17,7 @@ export const publicRoutes = [
   '/forgot-password',
   '/reset-password',
   '/change-password',
+  '/complete-profile',
   '/unauthorized',
   '/maintenance',
   '/help/terms',
@@ -42,6 +43,7 @@ export const publicRoutes = [
   '/api/auth/check-oauth',
   '/api/auth/validate-reset-token',
   '/api/auth/oauth-providers',
+  '/api/auth/oauth-register-context',
   '/api/auth/password-policy',
   '/api/config/maintenance',
 ]

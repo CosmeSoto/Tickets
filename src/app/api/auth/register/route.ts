@@ -6,6 +6,7 @@ import { randomUUID } from 'crypto'
 import { SecurityConfigService } from '@/lib/services/security-config-service'
 import { EmailService } from '@/lib/services/email/email-service'
 import { getEmailBranding } from '@/lib/services/email/email-branding'
+import { normalizePhoneInput, validatePhoneInput } from '@/lib/auth/profile-completion'
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,16 +27,8 @@ export async function POST(request: NextRequest) {
           `La contraseña debe tener al menos ${securityConfig.passwordMinLength} caracteres`
         )
         .max(100, 'La contraseña es demasiado larga'),
-      phone: z
-        .string()
-        .optional()
-        .nullable()
-        .transform(val => val || null),
-      departmentId: z
-        .string()
-        .optional()
-        .nullable()
-        .transform(val => val || null),
+      phone: z.string().min(1, 'El teléfono celular es requerido'),
+      departmentId: z.string().min(1, 'Debes seleccionar un departamento'),
     })
 
     // Parsear el body
@@ -62,6 +55,16 @@ export async function POST(request: NextRequest) {
 
     const { name, email, password, phone, departmentId } = validationResult.data
 
+    const phoneError = validatePhoneInput(phone)
+    if (phoneError) {
+      return NextResponse.json(
+        { success: false, error: phoneError, field: 'phone' },
+        { status: 400 }
+      )
+    }
+
+    const normalizedPhone = normalizePhoneInput(phone)
+
     // Verificar si el email ya existe
     const existingUser = await prisma.users.findUnique({
       where: { email },
@@ -78,22 +81,20 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Si se proporciona departmentId, verificar que existe
-    if (departmentId) {
-      const department = await prisma.departments.findUnique({
-        where: { id: departmentId },
-      })
+    // Verificar que el departamento existe
+    const department = await prisma.departments.findFirst({
+      where: { id: departmentId, isActive: true },
+    })
 
-      if (!department) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: 'El departamento seleccionado no existe',
-            field: 'departmentId',
-          },
-          { status: 400 }
-        )
-      }
+    if (!department) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'El departamento seleccionado no existe',
+          field: 'departmentId',
+        },
+        { status: 400 }
+      )
     }
 
     // Hash de la contraseña
@@ -106,8 +107,8 @@ export async function POST(request: NextRequest) {
         name: name.trim(),
         email: email.toLowerCase().trim(),
         passwordHash,
-        phone: phone || null,
-        departmentId: departmentId || null,
+        phone: normalizedPhone,
+        departmentId,
         role: 'CLIENT',
         isActive: true,
         isEmailVerified: false,
