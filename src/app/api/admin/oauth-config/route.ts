@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { authOptions, invalidateOAuthProvidersCache } from '@/lib/auth'
+import { requireSuperAdmin } from '@/lib/auth/require-super-admin'
 import prisma from '@/lib/prisma'
 import { encrypt, decrypt } from '@/lib/crypto'
 import { randomUUID } from 'crypto'
@@ -9,9 +10,9 @@ import { randomUUID } from 'crypto'
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-
-    if (!session || session.user.role !== 'ADMIN') {
-      return NextResponse.json({ success: false, error: 'No autorizado' }, { status: 401 })
+    const check = await requireSuperAdmin(session)
+    if (!check.ok) {
+      return NextResponse.json({ success: false, error: check.error }, { status: check.status })
     }
 
     const configs = await prisma.oauth_configs.findMany({
@@ -31,7 +32,8 @@ export async function GET(request: NextRequest) {
       id: config.id,
       provider: config.provider,
       clientId: config.clientId,
-      clientSecret: config.clientSecret ? '••••••••' : '',
+      clientSecret: '',
+      hasClientSecret: Boolean(config.clientSecret),
       tenantId: config.tenantId,
       isEnabled: config.isEnabled,
       redirectUri: config.redirectUri,
@@ -61,9 +63,9 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-
-    if (!session || session.user.role !== 'ADMIN') {
-      return NextResponse.json({ success: false, error: 'No autorizado' }, { status: 401 })
+    const check = await requireSuperAdmin(session)
+    if (!check.ok) {
+      return NextResponse.json({ success: false, error: check.error }, { status: check.status })
     }
 
     const body = await request.json()
@@ -93,6 +95,16 @@ export async function POST(request: NextRequest) {
     if (!existingConfig && !clientSecret) {
       return NextResponse.json(
         { success: false, error: 'Client Secret es requerido para nueva configuración' },
+        { status: 400 }
+      )
+    }
+
+    if (isEnabled && (!clientId || (!clientSecret && !existingConfig?.clientSecret))) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'No puedes activar OAuth sin Client ID y Client Secret configurados',
+        },
         { status: 400 }
       )
     }
@@ -153,6 +165,8 @@ export async function POST(request: NextRequest) {
       /* no interrumpir */
     }
 
+    invalidateOAuthProvidersCache()
+
     return NextResponse.json({
       success: true,
       message: `Configuración de ${provider} guardada exitosamente`,
@@ -175,9 +189,9 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-
-    if (!session || session.user.role !== 'ADMIN') {
-      return NextResponse.json({ success: false, error: 'No autorizado' }, { status: 401 })
+    const check = await requireSuperAdmin(session)
+    if (!check.ok) {
+      return NextResponse.json({ success: false, error: check.error }, { status: check.status })
     }
 
     const body = await request.json()
@@ -210,6 +224,8 @@ export async function PUT(request: NextRequest) {
       /* no interrumpir */
     }
 
+    invalidateOAuthProvidersCache()
+
     return NextResponse.json({
       success: true,
       message: `Proveedor ${provider} ${isEnabled ? 'activado' : 'desactivado'}`,
@@ -231,9 +247,9 @@ export async function PUT(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-
-    if (!session || session.user.role !== 'ADMIN') {
-      return NextResponse.json({ success: false, error: 'No autorizado' }, { status: 401 })
+    const check = await requireSuperAdmin(session)
+    if (!check.ok) {
+      return NextResponse.json({ success: false, error: check.error }, { status: check.status })
     }
 
     const { searchParams } = new URL(request.url)
@@ -261,6 +277,8 @@ export async function DELETE(request: NextRequest) {
     } catch {
       /* no interrumpir */
     }
+
+    invalidateOAuthProvidersCache()
 
     return NextResponse.json({
       success: true,

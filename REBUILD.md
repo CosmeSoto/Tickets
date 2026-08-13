@@ -406,6 +406,22 @@ curl -sk "${NEXTAUTH_URL}/api/cron/process-email-queue" \
 
 ---
 
+### OAuth (Google + Microsoft)
+
+La configuración se guarda en **Admin → OAuth** (`oauth_configs`). NextAuth carga credenciales desde BD al iniciar sesión (no hace falta reiniciar tras guardar).
+
+| Paso | Verificación |
+|------|--------------|
+| 1 | `ENCRYPTION_KEY` definido en `.env.production` (cifra Client Secrets) |
+| 2 | Google Cloud / Azure Portal: Redirect URI exacta (`/api/auth/callback/google` o `/azure-ad`) |
+| 3 | Admin → OAuth: Client ID + Secret → **Guardar** → activar switch → **Probar conexión** |
+| 4 | Login/registro: botones Google/Microsoft visibles solo si el proveedor está **Activo** en BD |
+| 5 | Usuario nuevo OAuth → rol **CLIENT** automático |
+
+Red local (`192.168.x.x`): registrar la URL HTTPS completa en los portales OAuth (ver banner en Admin → OAuth).
+
+---
+
 ### Bot de Telegram (alertas operativas)
 
 Canal adicional paralelo al email. El email **no se toca** — Telegram se añade encima.

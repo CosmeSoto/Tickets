@@ -1,20 +1,15 @@
 import { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
-import GoogleProvider from 'next-auth/providers/google'
-import AzureADProvider from 'next-auth/providers/azure-ad'
 import prisma from './prisma'
 import bcrypt from 'bcryptjs'
 import { UserRole } from '@prisma/client'
 import { randomUUID } from 'crypto'
 import { DEFAULT_TIMEZONE } from '@/lib/constants'
+import { getCachedOAuthProviders, invalidateOAuthProvidersCache } from './auth/load-oauth-providers'
 
-export const authOptions: NextAuthOptions = {
-  // IMPORTANTE: No usar PrismaAdapter con strategy: 'jwt'
-  // El adapter solo es necesario para strategy: 'database'
-  // Con JWT, la sesión se almacena en el token, no en la base de datos
-  providers: [
-    // Proveedor de credenciales (login tradicional)
-    CredentialsProvider({
+export { invalidateOAuthProvidersCache }
+
+const credentialsProvider = CredentialsProvider({
       name: 'credentials',
       credentials: {
         email: { label: 'Email', type: 'email' },
@@ -183,61 +178,9 @@ export const authOptions: NextAuthOptions = {
           throw error
         }
       },
-    }),
+    })
 
-    // Proveedor de Google OAuth (solo si está configurado)
-    ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
-      ? [
-          GoogleProvider({
-            clientId: process.env.GOOGLE_CLIENT_ID,
-            clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-            authorization: {
-              params: {
-                prompt: 'consent',
-                access_type: 'offline',
-                response_type: 'code',
-              },
-            },
-            profile(profile) {
-              return {
-                id: profile.sub,
-                name: profile.name,
-                email: profile.email,
-                image: profile.picture,
-                role: 'CLIENT' as UserRole, // Por defecto, los usuarios OAuth son clientes
-                emailVerified: profile.email_verified,
-              }
-            },
-          }),
-        ]
-      : []),
-
-    // Proveedor de Microsoft/Outlook OAuth (solo si está configurado)
-    ...(process.env.AZURE_AD_CLIENT_ID && process.env.AZURE_AD_CLIENT_SECRET
-      ? [
-          AzureADProvider({
-            clientId: process.env.AZURE_AD_CLIENT_ID,
-            clientSecret: process.env.AZURE_AD_CLIENT_SECRET,
-            tenantId: process.env.AZURE_AD_TENANT_ID || 'common', // 'common' permite cuentas personales y organizacionales
-            authorization: {
-              params: {
-                scope: 'openid profile email User.Read',
-              },
-            },
-            profile(profile) {
-              return {
-                id: profile.sub || profile.oid,
-                name: profile.name,
-                email: profile.email || profile.preferred_username,
-                image: profile.picture,
-                role: 'CLIENT' as UserRole,
-                emailVerified: true,
-              }
-            },
-          }),
-        ]
-      : []),
-  ],
+const sharedAuthOptions: Omit<NextAuthOptions, 'providers'> = {
   session: {
     strategy: 'jwt',
     maxAge: 24 * 60 * 60, // 24 horas (máximo permitido, se validará en middleware)
@@ -251,6 +194,11 @@ export const authOptions: NextAuthOptions = {
       try {
         // Si es login con OAuth (Google o Microsoft)
         if (account?.provider === 'google' || account?.provider === 'azure-ad') {
+          if (!user.email?.trim()) {
+            console.error('[AUTH] OAuth rechazado: cuenta sin email')
+            return false
+          }
+
           try {
             // Buscar si el usuario ya existe
             const existingUser = await prisma.users.findUnique({
@@ -355,6 +303,7 @@ export const authOptions: NextAuthOptions = {
               })
 
               if (dbUser) {
+                token.sub = dbUser.id
                 token.role = dbUser.role
                 token.departmentId = dbUser.departmentId || undefined
                 token.department = dbUser.departments?.name || undefined
@@ -681,11 +630,19 @@ export const authOptions: NextAuthOptions = {
       try {
         const { AuditServiceComplete } = await import('./services/audit-service-complete')
 
+        const dbUser = user.email
+          ? await prisma.users.findUnique({
+              where: { email: user.email },
+              select: { id: true },
+            })
+          : null
+        const auditUserId = dbUser?.id ?? user.id
+
         await AuditServiceComplete.log({
           action: isNewUser ? 'user_registered' : 'login',
           entityType: 'user',
-          entityId: user.id,
-          userId: user.id,
+          entityId: auditUserId,
+          userId: auditUserId,
           details: {
             provider: account?.provider || 'credentials',
             isNewUser: isNewUser || false,
@@ -741,4 +698,19 @@ export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
   /** Evita ruido en consola; activar solo al depurar flujos de auth (`NEXTAUTH_DEBUG=true`). */
   debug: process.env.NEXTAUTH_DEBUG === 'true',
+}
+
+/** Opciones estáticas (solo credentials) — válidas para getServerSession. */
+export const authOptions: NextAuthOptions = {
+  ...sharedAuthOptions,
+  providers: [credentialsProvider],
+}
+
+/** Opciones completas con OAuth desde BD (usar en /api/auth/[...nextauth]). */
+export async function getAuthOptions(): Promise<NextAuthOptions> {
+  const oauthProviders = await getCachedOAuthProviders()
+  return {
+    ...sharedAuthOptions,
+    providers: [credentialsProvider, ...oauthProviders],
+  }
 }

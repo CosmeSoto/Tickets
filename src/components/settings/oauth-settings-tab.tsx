@@ -27,6 +27,7 @@ interface OAuthConfig {
   provider: string
   clientId: string
   clientSecret: string
+  hasClientSecret?: boolean
   tenantId?: string
   isEnabled: boolean
   redirectUri?: string
@@ -79,7 +80,7 @@ export function OAuthSettingsTab() {
             clientSecret: '', // No mostrar el secret completo
             isEnabled: google.isEnabled,
             showSecret: false,
-            hasExistingSecret: !!google.clientSecret, // Marcar que existe un secret
+            hasExistingSecret: Boolean(google.hasClientSecret),
           })
         }
 
@@ -92,7 +93,7 @@ export function OAuthSettingsTab() {
             tenantId: microsoft.tenantId || 'common',
             isEnabled: microsoft.isEnabled,
             showSecret: false,
-            hasExistingSecret: !!microsoft.clientSecret, // Marcar que existe un secret
+            hasExistingSecret: Boolean(microsoft.hasClientSecret),
           })
         }
       }
@@ -320,6 +321,30 @@ export function OAuthSettingsTab() {
           <strong>CLIENT</strong>.
         </AlertDescription>
       </Alert>
+
+      {(() => {
+        const origin = typeof window !== 'undefined' ? window.location.origin : ''
+        const isLocal =
+          origin.includes('localhost') ||
+          origin.includes('127.0.0.1') ||
+          /192\.168\.\d+\.\d+/.test(origin) ||
+          /10\.\d+\.\d+\.\d+/.test(origin)
+        if (!isLocal) return null
+        return (
+          <Alert className='border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800'>
+            <AlertDescription className='text-amber-900 dark:text-amber-200 text-sm space-y-1'>
+              <p className='font-medium'>Red local — registra la Redirect URI exacta</p>
+              <p>
+                En Google Cloud Console y Azure Portal agrega{' '}
+                <code className='font-mono text-xs'>{baseUrl}/api/auth/callback/google</code> y{' '}
+                <code className='font-mono text-xs'>{baseUrl}/api/auth/callback/azure-ad</code>.
+                Google exige HTTPS; con certificado autofirmado puede pedir aceptar la excepción en
+                el navegador antes del login OAuth.
+              </p>
+            </AlertDescription>
+          </Alert>
+        )
+      })()}
 
       {/* Google OAuth Configuration */}
       <Card>

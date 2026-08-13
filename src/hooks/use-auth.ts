@@ -8,6 +8,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { signIn, signOut, useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
+import { getNextAuthErrorMessage } from '@/lib/auth/nextauth-error-messages'
 
 export interface AuthError {
   type: 'credentials' | 'network' | 'server' | 'validation' | 'account' | 'session'
@@ -116,6 +117,20 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
     }
   }, [enableNetworkDetection])
 
+  // Errores OAuth / NextAuth redirigidos a ?error= (p. ej. AccessDenied, Configuration)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const params = new URLSearchParams(window.location.search)
+    const mapped = getNextAuthErrorMessage(params.get('error'))
+    if (!mapped) return
+
+    setAuthState(prev => ({ ...prev, error: mapped }))
+    params.delete('error')
+    const qs = params.toString()
+    router.replace(window.location.pathname + (qs ? `?${qs}` : ''))
+  }, [router])
+
   // Función para crear errores específicos
   const createAuthError = useCallback(
     (error: any, result?: any): AuthError => {
@@ -129,45 +144,8 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
       }
 
       if (result?.error) {
-        switch (result.error) {
-          case 'CredentialsSignin':
-            return {
-              type: 'credentials',
-              message: 'Email o contraseña incorrectos',
-              suggestion: 'Verifica tus credenciales e intenta de nuevo',
-              code: 'INVALID_CREDENTIALS',
-            }
-          case 'AccessDenied':
-            return {
-              type: 'account',
-              message: 'Cuenta desactivada o sin permisos',
-              suggestion: 'Contacta al administrador del sistema',
-              code: 'ACCESS_DENIED',
-            }
-          case 'Configuration':
-            return {
-              type: 'server',
-              message: 'Error de configuración del servidor',
-              suggestion: 'Contacta al soporte técnico',
-              code: 'SERVER_CONFIG',
-            }
-          case 'OAuthSignin':
-          case 'OAuthCallback':
-          case 'OAuthCreateAccount':
-            return {
-              type: 'server',
-              message: 'Error en autenticación OAuth',
-              suggestion: 'Intenta con otro método de inicio de sesión',
-              code: result.error,
-            }
-          default:
-            return {
-              type: 'server',
-              message: 'Error de autenticación',
-              suggestion: 'Intenta de nuevo en unos momentos',
-              code: result.error,
-            }
-        }
+        const mapped = getNextAuthErrorMessage(result.error)
+        if (mapped) return mapped
       }
 
       if (error instanceof TypeError && error.message.includes('fetch')) {

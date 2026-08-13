@@ -24,7 +24,6 @@
 
 import { NextResponse } from 'next/server'
 import { randomUUID } from 'crypto'
-import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { verifyCronAuth } from '@/lib/cron/verify-cron-auth'
 import { getTelegramConfig, buildApiBase } from '@/lib/services/telegram-config'

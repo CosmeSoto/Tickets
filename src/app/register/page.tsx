@@ -32,6 +32,7 @@ import {
   EyeOff,
 } from 'lucide-react'
 import { DepartmentSelector } from '@/components/ui/department-selector'
+import { getNextAuthErrorMessage } from '@/lib/auth/nextauth-error-messages'
 
 interface FormErrors {
   name?: string
@@ -101,6 +102,19 @@ export default function RegisterPage() {
       })
       .catch(() => {})
   }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const params = new URLSearchParams(window.location.search)
+    const mapped = getNextAuthErrorMessage(params.get('error'))
+    if (!mapped) return
+
+    setError(mapped.message + (mapped.suggestion ? ` ${mapped.suggestion}` : ''))
+    params.delete('error')
+    const qs = params.toString()
+    router.replace(window.location.pathname + (qs ? `?${qs}` : ''))
+  }, [router])
 
   const validate = (): boolean => {
     const errors: FormErrors = {}
