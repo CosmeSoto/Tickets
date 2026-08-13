@@ -3,6 +3,7 @@ import type { NextRequest } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 import { ApplicationLogger } from '@/lib/logging'
 import { isPublicRoute, isProtectedRoute } from './middleware-config'
+import { checkMaintenanceForApi } from '@/lib/api/check-maintenance-api'
 
 // Rate limiting store (en producción usar Redis)
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>()
@@ -114,6 +115,9 @@ export async function proxy(request: NextRequest) {
 
   // Para APIs, solo aplicar rate limiting y headers de seguridad
   if (request.nextUrl.pathname.startsWith('/api/')) {
+    const maintenanceBlock = await checkMaintenanceForApi(request)
+    if (maintenanceBlock) return maintenanceBlock
+
     const response = NextResponse.next()
 
     // Rutas que sirven archivos para vista previa en iframe (mismo origen).
@@ -268,6 +272,20 @@ export async function proxy(request: NextRequest) {
       const changePasswordUrl = new URL('/change-password', request.url)
       changePasswordUrl.searchParams.set('callbackUrl', request.nextUrl.pathname)
       return NextResponse.redirect(changePasswordUrl)
+    }
+
+    // Modo mantenimiento — redirigir usuarios bloqueados (admins/super admin pueden pasar)
+    try {
+      const { MaintenanceModeService } = await import('@/lib/services/maintenance-mode-service')
+      const maintenance = await MaintenanceModeService.shouldBlockUser({
+        role: token.role as string,
+        isSuperAdmin: token.isSuperAdmin === true,
+      })
+      if (maintenance.block && !path.startsWith('/admin/settings')) {
+        return NextResponse.redirect(new URL('/maintenance', request.url))
+      }
+    } catch {
+      /* continuar si falla la lectura */
     }
 
     // Verificar permisos por rol

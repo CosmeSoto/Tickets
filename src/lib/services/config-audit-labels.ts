@@ -27,6 +27,9 @@ export const SYSTEM_SETTINGS_LABELS: Record<string, string> = {
   backupEnabled: 'Backups automáticos',
   backupFrequency: 'Frecuencia de backup',
   backupRetention: 'Retención backup (días)',
+  maintenanceMode: 'Modo mantenimiento',
+  maintenanceMessage: 'Mensaje de mantenimiento',
+  maintenanceAllowAdmins: 'Permitir acceso a administradores',
 }
 
 export const TICKET_FAMILY_CONFIG_LABELS: Record<string, string> = {

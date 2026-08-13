@@ -8,8 +8,6 @@ import { existsSync } from 'fs'
 import { randomUUID } from 'crypto'
 import { getUploadDir } from '@/lib/upload-path'
 
-const DEFAULT_MAX_SIZE = 10 * 1024 * 1024 // 10MB
-
 /**
  * GET /api/inventory/licenses/[id]/attachments
  * Lista adjuntos de una licencia
@@ -52,17 +50,14 @@ export async function POST(
   const license = await prisma.software_licenses.findUnique({ where: { id: licenseId } })
   if (!license) return NextResponse.json({ error: 'Licencia no encontrada' }, { status: 404 })
 
-  // Leer límite de tamaño desde system_settings
-  const setting = await prisma.system_settings.findUnique({ where: { key: 'max_file_size' } })
-  const maxSize = setting?.value ? parseInt(setting.value, 10) : DEFAULT_MAX_SIZE
-
   const formData = await req.formData()
   const file = formData.get('file') as File | null
   if (!file) return NextResponse.json({ error: 'No se proporcionó archivo' }, { status: 400 })
 
-  if (file.size > maxSize) {
-    const limitMB = Math.round(maxSize / (1024 * 1024))
-    return NextResponse.json({ error: `El archivo supera el límite de ${limitMB}MB` }, { status: 400 })
+  const { SecurityConfigService } = await import('@/lib/services/security-config-service')
+  const sizeCheck = await SecurityConfigService.validateFileSize(file.size)
+  if (!sizeCheck.valid) {
+    return NextResponse.json({ error: sizeCheck.message }, { status: 400 })
   }
 
   const uploadDir = getUploadDir('licenses', licenseId)

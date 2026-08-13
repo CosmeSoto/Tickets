@@ -2,7 +2,7 @@
 
 // NOTA: La configuración de la "Página Pública" YA EXISTE en su propia página
 // en el sidebar: /admin/help-config, NO ES NECESARIO AGREGARLA AQUÍ
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
@@ -38,6 +38,7 @@ import {
   Eye,
   EyeOff,
   Inbox,
+  Wrench,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { invalidateLandingCache } from '@/hooks/use-landing-data'
@@ -93,6 +94,11 @@ interface SystemSettings {
   // Solo lectura desde API
   telegramBotTokenConfigured?: boolean
   telegramWebhookSecretConfigured?: boolean
+
+  // Modo mantenimiento
+  maintenanceMode: boolean
+  maintenanceMessage: string
+  maintenanceAllowAdmins: boolean
 }
 
 const SETTINGS_PAGE_SUBTITLE = 'Administra la configuración global del sistema de tickets'
@@ -153,6 +159,8 @@ function SettingsPage() {
   } | null>(null)
   const [telegramQueueLoading, setTelegramQueueLoading] = useState(false)
   const [telegramQueueProcessing, setTelegramQueueProcessing] = useState(false)
+  /** Evita recargar el formulario cada 5 min cuando NextAuth refresca la sesión */
+  const settingsLoadedRef = useRef(false)
 
   useEffect(() => {
     if (status === 'loading') return
@@ -164,8 +172,10 @@ function SettingsPage() {
       router.push('/login')
       return
     }
+    if (settingsLoadedRef.current) return
+    settingsLoadedRef.current = true
     loadSettings()
-  }, [session, status, router]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [status, session?.user?.id, session?.user?.role, router]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadSettings = async () => {
     setLoading(true)
@@ -183,6 +193,11 @@ function SettingsPage() {
           telegramEnabled: data.telegramEnabled ?? false,
           telegramBotUsername: data.telegramBotUsername ?? '',
           telegramNotificationsEnabled: data.telegramNotificationsEnabled ?? true,
+          maintenanceMode: data.maintenanceMode ?? false,
+          maintenanceMessage:
+            data.maintenanceMessage ??
+            'El sistema está en mantenimiento programado. Vuelve a intentarlo más tarde o contacta al administrador.',
+          maintenanceAllowAdmins: data.maintenanceAllowAdmins ?? true,
         })
       } else {
         toast({
@@ -580,7 +595,16 @@ function SettingsPage() {
 
   const headerActions = (
     <div className='flex flex-wrap items-center gap-2'>
-      <Button variant='outline' onClick={loadSettings} disabled={loading}>
+      <Button
+        variant='outline'
+        onClick={() => {
+          settingsLoadedRef.current = false
+          void loadSettings().finally(() => {
+            settingsLoadedRef.current = true
+          })
+        }}
+        disabled={loading}
+      >
         <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
         Recargar
       </Button>
@@ -604,7 +628,7 @@ function SettingsPage() {
         value={activeTab}
         className='space-y-6'
         onValueChange={tab => {
-          const superAdminTabs = ['email', 'security', 'oauth', 'sla', 'telegram']
+          const superAdminTabs = ['email', 'security', 'oauth', 'sla', 'telegram', 'maintenance']
           if (superAdminTabs.includes(tab) && !isSuperAdmin) return
           setActiveTab(tab)
         }}
@@ -649,6 +673,13 @@ function SettingsPage() {
               {!isSuperAdmin && <Crown className='h-3 w-3 text-amber-500' />}
               <Send className='h-4 w-4 hidden sm:inline' />
               <span>Telegram</span>
+            </span>
+          </TabsTrigger>
+          <TabsTrigger value='maintenance' className='flex-1 min-w-[90px]' disabled={!isSuperAdmin}>
+            <span className='flex items-center gap-1'>
+              {!isSuperAdmin && <Crown className='h-3 w-3 text-amber-500' />}
+              <Wrench className='h-4 w-4 hidden sm:inline' />
+              <span>Mantenimiento</span>
             </span>
           </TabsTrigger>
         </TabsList>
@@ -1278,7 +1309,8 @@ function SettingsPage() {
                           max='10'
                         />
                         <p className='text-sm text-muted-foreground'>
-                          {settings.maxLoginAttempts} intentos antes de bloquear
+                          {settings.maxLoginAttempts} intentos antes de bloquear (15 minutos de
+                          bloqueo)
                         </p>
                       </div>
                     </div>
@@ -1388,13 +1420,20 @@ function SettingsPage() {
                     <ul className='text-sm text-muted-foreground space-y-1'>
                       <li>
                         • El cierre automático de sesión se activa después del tiempo configurado
-                        sin actividad
+                        sin actividad (también en el servidor)
                       </li>
                       <li>• Se mostrará una advertencia 5 minutos antes de cerrar la sesión</li>
                       <li>
                         • Cualquier acción del usuario (click, tecla, scroll) reinicia el contador
                       </li>
-                      <li>• Los cambios requieren reiniciar sesión para aplicarse</li>
+                      <li>
+                        • Los cambios de tiempo de sesión aplican en el próximo minuto de actividad
+                        (no hace falta cerrar sesión manualmente)
+                      </li>
+                      <li>
+                        • Longitud mínima de contraseña y tamaño de archivo se aplican al registrar,
+                        cambiar contraseña y subir adjuntos
+                      </li>
                     </ul>
                   </div>
                 </CardContent>
@@ -1914,6 +1953,102 @@ function SettingsPage() {
                 </CardContent>
               </Card>
             </div>
+          )}
+        </TabsContent>
+
+        {/* Modo mantenimiento del sistema */}
+        <TabsContent value='maintenance'>
+          {!isSuperAdmin ? (
+            <div className='flex flex-col items-center justify-center py-16 text-center'>
+              <Crown className='h-12 w-12 text-amber-500 mb-4' />
+              <h3 className='text-lg font-semibold text-foreground mb-2'>Acceso restringido</h3>
+              <p className='text-muted-foreground max-w-sm'>
+                Esta sección solo está disponible para Administradores Principales (Super Admin).
+              </p>
+            </div>
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle className='flex items-center'>
+                  <Wrench className='h-5 w-5 mr-2' />
+                  Mantenimiento del Sistema
+                </CardTitle>
+                <CardDescription>
+                  Bloquea el acceso a usuarios finales mientras realizas actualizaciones o cambios
+                  críticos. Los administradores pueden seguir entrando si lo permites abajo.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className='space-y-6'>
+                <div className='flex items-center justify-between rounded-lg border p-4'>
+                  <div className='space-y-1'>
+                    <Label htmlFor='maintenanceMode'>Activar modo mantenimiento</Label>
+                    <p className='text-sm text-muted-foreground'>
+                      Los clientes y técnicos verán una pantalla informativa al intentar usar el
+                      sistema
+                    </p>
+                  </div>
+                  <Switch
+                    id='maintenanceMode'
+                    checked={settings.maintenanceMode}
+                    onCheckedChange={checked =>
+                      setSettings({ ...settings, maintenanceMode: checked })
+                    }
+                  />
+                </div>
+
+                <div className='space-y-2'>
+                  <Label htmlFor='maintenanceMessage'>Mensaje para usuarios</Label>
+                  <Textarea
+                    id='maintenanceMessage'
+                    rows={4}
+                    value={settings.maintenanceMessage}
+                    onChange={e =>
+                      setSettings({ ...settings, maintenanceMessage: e.target.value })
+                    }
+                    placeholder='Ej.: Estamos actualizando el sistema. Volveremos en aproximadamente 30 minutos.'
+                  />
+                  <p className='text-xs text-muted-foreground'>
+                    Se muestra en la página /maintenance y al redirigir usuarios bloqueados
+                  </p>
+                </div>
+
+                <div className='flex items-center space-x-2'>
+                  <Switch
+                    id='maintenanceAllowAdmins'
+                    checked={settings.maintenanceAllowAdmins}
+                    onCheckedChange={checked =>
+                      setSettings({ ...settings, maintenanceAllowAdmins: checked })
+                    }
+                  />
+                  <Label htmlFor='maintenanceAllowAdmins'>
+                    Permitir acceso a usuarios con rol Administrador
+                  </Label>
+                </div>
+                <p className='text-xs text-muted-foreground -mt-4 ml-0'>
+                  Los Super Administradores siempre pueden acceder. Guarda los cambios con el botón
+                  superior &quot;Guardar&quot;.
+                </p>
+
+                {settings.maintenanceMode && (
+                  <div className='rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 p-4'>
+                    <p className='text-sm text-amber-900 dark:text-amber-200 font-medium'>
+                      Modo mantenimiento activo
+                    </p>
+                    <p className='text-sm text-amber-800 dark:text-amber-300 mt-1'>
+                      Recuerda desactivarlo cuando termines. Vista previa:{' '}
+                      <a
+                        href='/maintenance'
+                        target='_blank'
+                        rel='noopener noreferrer'
+                        className='underline font-medium'
+                      >
+                        /maintenance
+                      </a>
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           )}
         </TabsContent>
 

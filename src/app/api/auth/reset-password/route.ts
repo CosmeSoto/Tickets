@@ -18,9 +18,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Validar longitud de contraseña
-    if (newPassword.length < 8) {
+    const { SecurityConfigService } = await import('@/lib/services/security-config-service')
+    const passwordCheck = await SecurityConfigService.validatePasswordLength(newPassword)
+    if (!passwordCheck.valid) {
       return NextResponse.json(
-        { success: false, message: 'La contraseña debe tener al menos 8 caracteres' },
+        { success: false, message: passwordCheck.message },
         { status: 400 }
       )
     }

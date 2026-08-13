@@ -408,6 +408,8 @@ curl -sk "${NEXTAUTH_URL}/api/cron/process-email-queue" \
 
 ### OAuth (Google + Microsoft)
 
+Guía detallada para principiantes: [`docs/OAUTH_SETUP_GUIDE.md`](docs/OAUTH_SETUP_GUIDE.md)
+
 La configuración se guarda en **Admin → OAuth** (`oauth_configs`). NextAuth carga credenciales desde BD al iniciar sesión (no hace falta reiniciar tras guardar).
 
 | Paso | Verificación |
@@ -419,6 +421,33 @@ La configuración se guarda en **Admin → OAuth** (`oauth_configs`). NextAuth c
 | 5 | Usuario nuevo OAuth → rol **CLIENT** automático |
 
 Red local (`192.168.x.x`): registrar la URL HTTPS completa en los portales OAuth (ver banner en Admin → OAuth).
+
+---
+
+### Seguridad y sesión (Admin → Seguridad)
+
+| Campo | Efecto real |
+|-------|-------------|
+| **Tiempo de sesión** | Cierre por **inactividad** (cliente + JWT en servidor). Aviso 5 min antes. |
+| **Máx. intentos login** | Bloqueo temporal **15 min** tras superar el límite |
+| **Longitud mínima contraseña** | Registro, cambio/reset de contraseña, creación de usuarios admin |
+| **Requerir cambio contraseña** | Redirige a `/change-password` hasta cumplir política |
+| **Tamaño máximo archivo** | Adjuntos de tickets, equipos, licencias e imports |
+
+La pestaña **Configuración** ya no recarga sola cada 5 min (solo con **Recargar** manual).
+
+---
+
+### Modo mantenimiento (Admin → Mantenimiento)
+
+| Paso | Acción |
+|------|--------|
+| 1 | Super Admin → **Configuración → Mantenimiento** |
+| 2 | Activar switch + mensaje personalizado → **Guardar** |
+| 3 | Usuarios normales ven `/maintenance`; admins pueden seguir si está permitido |
+| 4 | Al terminar: desactivar y **Guardar** |
+
+Super Admin siempre accede. Las APIs operativas responden **503** durante mantenimiento (auth y cron siguen activos).
 
 ---
 

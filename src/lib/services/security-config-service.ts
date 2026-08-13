@@ -16,6 +16,9 @@ export interface SecurityConfig {
   allowedFileTypes: string[]
 }
 
+/** Duración del bloqueo tras superar maxLoginAttempts (minutos) */
+export const LOCKOUT_DURATION_MINUTES = 15
+
 export class SecurityConfigService {
   private static cache: SecurityConfig | null = null
   private static cacheTime: number = 0
@@ -193,7 +196,7 @@ export class SecurityConfigService {
           )
           notifySuperAdminsSecurityAlert({
             title: 'Cuenta bloqueada por intentos fallidos',
-            body: `Email: ${email}\nIntentos: ${data.attempts}/${maxAttempts}\nBloqueo temporal activo (15 min).`,
+            body: `Email: ${email}\nIntentos: ${data.attempts}/${maxAttempts}\nBloqueo temporal activo (${LOCKOUT_DURATION_MINUTES} min).`,
             link: '/admin/audit',
           }).catch(() => {})
         }
@@ -238,8 +241,7 @@ export class SecurityConfigService {
       const lastAttempt = data.lastAttempt || 0
       const now = Date.now()
 
-      // Resetear después de 15 minutos (reducido de 30)
-      const LOCKOUT_DURATION = 15 * 60 * 1000
+      const LOCKOUT_DURATION = LOCKOUT_DURATION_MINUTES * 60 * 1000
       if (now - lastAttempt > LOCKOUT_DURATION) {
         await prisma.system_settings.delete({ where: { key } }).catch(() => {})
         return { locked: false, attemptsRemaining: maxAttempts }

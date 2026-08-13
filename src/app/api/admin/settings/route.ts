@@ -39,6 +39,9 @@ const settingsSchema = z.object({
   telegramBotUsername: z.string().optional(),
   telegramWebhookSecret: z.string().optional(),
   telegramNotificationsEnabled: z.boolean().optional(),
+  maintenanceMode: z.boolean().optional(),
+  maintenanceMessage: z.string().max(1000).optional(),
+  maintenanceAllowAdmins: z.boolean().optional(),
 })
 
 const SENSITIVE_SETTING_KEYS = new Set(['smtpPassword', 'telegramBotToken', 'telegramWebhookSecret'])
@@ -85,6 +88,10 @@ const defaultSettings = {
   telegramBotUsername: '',
   telegramWebhookSecret: '',
   telegramNotificationsEnabled: true,
+  maintenanceMode: false,
+  maintenanceMessage:
+    'El sistema está en mantenimiento programado. Vuelve a intentarlo más tarde o contacta al administrador.',
+  maintenanceAllowAdmins: true,
 }
 
 function parseSystemSettingsFromRows(
@@ -120,6 +127,8 @@ function parseSystemSettingsFromRows(
         'backupEnabled',
         'telegramEnabled',
         'telegramNotificationsEnabled',
+        'maintenanceMode',
+        'maintenanceAllowAdmins',
       ].includes(setting.key)
     ) {
       result[setting.key] = value === 'true'
@@ -180,6 +189,8 @@ export async function GET() {
             'backupEnabled',
             'telegramEnabled',
             'telegramNotificationsEnabled',
+            'maintenanceMode',
+            'maintenanceAllowAdmins',
           ].includes(setting.key)
         ) {
           result[setting.key] = value === 'true'
@@ -423,6 +434,13 @@ export async function PUT(request: NextRequest) {
       SecurityConfigService.clearCache()
     } catch (error) {
       console.warn('No se pudo limpiar caché de seguridad:', error)
+    }
+
+    try {
+      const { MaintenanceModeService } = await import('@/lib/services/maintenance-mode-service')
+      MaintenanceModeService.clearCache()
+    } catch (error) {
+      console.warn('No se pudo limpiar caché de mantenimiento:', error)
     }
 
     // Solo al ACTIVAR el toggle (false → true): forzar cambio en próximo login.

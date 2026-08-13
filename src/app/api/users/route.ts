@@ -5,10 +5,10 @@ import { authOptions } from '@/lib/auth'
 import { UserService } from '@/lib/services/user-service'
 import { z } from 'zod'
 import { buildCacheKey } from '@/lib/api-cache'
-const createUserSchema = z.object({
+const createUserSchemaBase = z.object({
   email: z.string().email('Email inválido'),
   name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres'),
-  password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres'),
+  password: z.string().max(100, 'La contraseña es demasiado larga'),
   role: z.enum(['ADMIN', 'TECHNICIAN', 'CLIENT']),
   departmentId: z.string().optional(),
   department: z.string().optional(), // Deprecated, usar departmentId
@@ -502,6 +502,21 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
+
+    const { SecurityConfigService } = await import('@/lib/services/security-config-service')
+    const securityConfig = await SecurityConfigService.getConfig()
+    const createUserSchema = createUserSchemaBase.superRefine((data, ctx) => {
+      if (data.password.length < securityConfig.passwordMinLength) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.too_small,
+          minimum: securityConfig.passwordMinLength,
+          type: 'string',
+          inclusive: true,
+          message: `La contraseña debe tener al menos ${securityConfig.passwordMinLength} caracteres`,
+          path: ['password'],
+        })
+      }
+    })
 
     // Validar datos de entrada
     const validatedData = createUserSchema.parse(body)

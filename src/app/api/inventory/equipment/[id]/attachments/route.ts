@@ -17,7 +17,6 @@ const ALLOWED_TYPES = [
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   'text/plain',
 ]
-const MAX_SIZE = 20 * 1024 * 1024 // 20MB
 
 /**
  * GET /api/inventory/equipment/[id]/attachments
@@ -68,8 +67,11 @@ export async function POST(
   if (!ALLOWED_TYPES.includes(file.type)) {
     return NextResponse.json({ error: 'Tipo de archivo no permitido' }, { status: 400 })
   }
-  if (file.size > MAX_SIZE) {
-    return NextResponse.json({ error: 'El archivo supera el límite de 20MB' }, { status: 400 })
+
+  const { SecurityConfigService } = await import('@/lib/services/security-config-service')
+  const sizeCheck = await SecurityConfigService.validateFileSize(file.size)
+  if (!sizeCheck.valid) {
+    return NextResponse.json({ error: sizeCheck.message }, { status: 400 })
   }
 
   const uploadDir = getUploadDir('equipment', equipmentId)

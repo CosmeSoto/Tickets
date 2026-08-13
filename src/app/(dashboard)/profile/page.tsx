@@ -12,6 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { useToast } from '@/hooks/use-toast'
+import { usePasswordPolicy } from '@/hooks/use-password-policy'
 import {
   getRoleLabel as getRoleLabelFn,
   getRoleColor as getRoleColorFn,
@@ -60,6 +61,7 @@ export default function ProfilePage() {
   const { data: session, status, update } = useSession()
   const router = useRouter()
   const { toast } = useToast()
+  const { minLength: minPasswordLength } = usePasswordPolicy()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useSyncDashboardPageMeta({
@@ -359,10 +361,10 @@ export default function ProfilePage() {
       return
     }
 
-    if (passwordForm.newPassword.length < 6) {
+    if (passwordForm.newPassword.length < minPasswordLength) {
       toast({
         title: 'Contraseña muy corta',
-        description: 'La contraseña debe tener al menos 6 caracteres',
+        description: `La contraseña debe tener al menos ${minPasswordLength} caracteres`,
         variant: 'destructive',
       })
       return

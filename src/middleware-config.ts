@@ -18,6 +18,7 @@ export const publicRoutes = [
   '/reset-password',
   '/change-password',
   '/unauthorized',
+  '/maintenance',
   '/help/terms',
   '/help/privacy',
   '/terminos',
@@ -42,6 +43,7 @@ export const publicRoutes = [
   '/api/auth/validate-reset-token',
   '/api/auth/oauth-providers',
   '/api/auth/password-policy',
+  '/api/config/maintenance',
 ]
 
 /**

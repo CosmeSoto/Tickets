@@ -18,6 +18,7 @@ import {
   AUTH_EASE,
 } from '@/components/auth/auth-layout'
 import { useToast } from '@/hooks/use-toast'
+import { usePasswordPolicy } from '@/hooks/use-password-policy'
 import { Loader2, Eye, EyeOff, CheckCircle, AlertCircle, Key, Lock, Shield } from 'lucide-react'
 
 function PasswordStrength({ password }: { password: string }) {
@@ -64,6 +65,7 @@ function ResetPasswordForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { toast } = useToast()
+  const { minLength: minPasswordLength } = usePasswordPolicy()
   const reduceMotion = useReducedMotion()
   const [token, setToken] = useState<string | null>(null)
   const [password, setPassword] = useState('')
@@ -101,8 +103,8 @@ function ResetPasswordForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
-    if (password.length < 8) {
-      setError('Mínimo 8 caracteres')
+    if (password.length < minPasswordLength) {
+      setError(`Mínimo ${minPasswordLength} caracteres`)
       return
     }
     if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password)) {

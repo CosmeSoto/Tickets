@@ -6,6 +6,7 @@ import { UserRole } from '@prisma/client'
 import { randomUUID } from 'crypto'
 import { DEFAULT_TIMEZONE } from '@/lib/constants'
 import { getCachedOAuthProviders, invalidateOAuthProvidersCache } from './auth/load-oauth-providers'
+import { LOCKOUT_DURATION_MINUTES } from './services/security-config-service'
 
 export { invalidateOAuthProvidersCache }
 
@@ -58,7 +59,7 @@ const credentialsProvider = CredentialsProvider({
             }
 
             throw new Error(
-              'Cuenta bloqueada temporalmente por múltiples intentos fallidos. Intenta de nuevo en 30 minutos.'
+              `Cuenta bloqueada temporalmente por múltiples intentos fallidos. Intenta de nuevo en ${LOCKOUT_DURATION_MINUTES} minutos.`
             )
           }
 
@@ -291,8 +292,9 @@ const sharedAuthOptions: Omit<NextAuthOptions, 'providers'> = {
       try {
         // Si es un nuevo login, agregar datos del usuario al token
         if (user) {
-          // Agregar timestamp de login para validar timeout
+          // Timestamps para timeout por inactividad (Admin → Seguridad)
           token.loginTime = Date.now()
+          token.lastActivityAt = Date.now()
 
           // Para OAuth, obtener el usuario de la base de datos
           if (account?.provider === 'google' || account?.provider === 'azure-ad') {
@@ -519,6 +521,9 @@ const sharedAuthOptions: Omit<NextAuthOptions, 'providers'> = {
         // Si es una actualización de sesión explícita, aplicar los datos
         if (trigger === 'update' && session) {
           token = { ...token, ...session }
+          if (typeof (session as { lastActivityAt?: number }).lastActivityAt === 'number') {
+            token.lastActivityAt = (session as { lastActivityAt: number }).lastActivityAt
+          }
           if (
             typeof (session as { mustChangePassword?: boolean }).mustChangePassword === 'boolean'
           ) {
@@ -526,6 +531,25 @@ const sharedAuthOptions: Omit<NextAuthOptions, 'providers'> = {
               session as { mustChangePassword: boolean }
             ).mustChangePassword
           }
+        }
+
+        // Timeout por inactividad según system_settings.sessionTimeout
+        try {
+          const { SecurityConfigService } = await import('./services/security-config-service')
+          const secCfg = await SecurityConfigService.getConfig()
+          const timeoutMs = secCfg.sessionTimeout * 60 * 1000
+          const lastActivity =
+            typeof token.lastActivityAt === 'number'
+              ? token.lastActivityAt
+              : typeof token.loginTime === 'number'
+                ? token.loginTime
+                : null
+
+          if (lastActivity !== null && Date.now() - lastActivity > timeoutMs) {
+            return { ...token, error: 'SessionExpired' }
+          }
+        } catch {
+          // Si falla la lectura de config, mantener sesión
         }
 
         return token
@@ -541,6 +565,9 @@ const sharedAuthOptions: Omit<NextAuthOptions, 'providers'> = {
           // Si el usuario fue desactivado, retornar sesión sin datos para forzar logout
           if ((token as any).error === 'UserDeactivated') {
             return { ...session, user: { ...session.user }, error: 'UserDeactivated' } as any
+          }
+          if ((token as any).error === 'SessionExpired') {
+            return { ...session, expires: new Date(0).toISOString(), error: 'SessionExpired' } as any
           }
 
           session.user.id = token.sub!
@@ -709,8 +736,21 @@ export const authOptions: NextAuthOptions = {
 /** Opciones completas con OAuth desde BD (usar en /api/auth/[...nextauth]). */
 export async function getAuthOptions(): Promise<NextAuthOptions> {
   const oauthProviders = await getCachedOAuthProviders()
+  const { SecurityConfigService } = await import('./services/security-config-service')
+  const config = await SecurityConfigService.getConfig()
+  const maxAge = config.sessionTimeout * 60
+
   return {
     ...sharedAuthOptions,
+    session: {
+      ...sharedAuthOptions.session,
+      maxAge,
+      updateAge: Math.min(3600, maxAge),
+    },
+    jwt: {
+      ...sharedAuthOptions.jwt,
+      maxAge,
+    },
     providers: [credentialsProvider, ...oauthProviders],
   }
 }

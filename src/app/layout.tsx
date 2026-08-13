@@ -9,6 +9,7 @@ import { Toaster } from '@/components/ui/toaster'
 import { Toaster as SonnerToaster } from 'sonner'
 import { ThemeScript } from '@/components/theme-script'
 import { SessionTimeoutMonitor } from '@/components/auth/session-timeout-monitor'
+import { MaintenanceGuard } from '@/components/auth/maintenance-guard'
 import { GlobalFavicon } from '@/components/common/global-favicon'
 import { DynamicPageTitle } from '@/components/common/dynamic-page-title'
 import { DEFAULT_PAGE_TITLE, getSystemBranding } from '@/lib/branding'
@@ -56,6 +57,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <GlobalFavicon />
                 <DynamicPageTitle defaultTitle={DEFAULT_PAGE_TITLE} />
                 <SessionTimeoutMonitor />
+                <MaintenanceGuard />
                 {children}
               </AppDataProvider>
             </SessionProviderWrapper>

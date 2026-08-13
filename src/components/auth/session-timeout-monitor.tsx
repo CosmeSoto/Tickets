@@ -9,13 +9,22 @@ import { useToast } from '@/hooks/use-toast'
  * cuando se excede el tiempo configurado SIN ACTIVIDAD
  */
 export function SessionTimeoutMonitor() {
-  const { data: session, status } = useSession()
+  const { data: session, status, update } = useSession()
   const { toast } = useToast()
   const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const warningTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const lastActivityRef = useRef<number>(Date.now())
   const warningShownRef = useRef(false)
   const sessionTimeoutMinutes = useRef<number>(1440) // Default 24 horas
+
+  // Cerrar sesión si el servidor marcó SessionExpired en el JWT
+  useEffect(() => {
+    if ((session as { error?: string } | null)?.error === 'SessionExpired') {
+      void signOut({ redirect: false }).then(() => {
+        window.location.href = '/login?reason=timeout'
+      })
+    }
+  }, [session])
 
   // Obtener configuración de timeout desde el servidor
   const fetchSessionTimeout = useCallback(async () => {
@@ -80,6 +89,11 @@ export function SessionTimeoutMonitor() {
     // Actualizar última actividad
     lastActivityRef.current = Date.now()
 
+    // Sincronizar actividad con el JWT en servidor (timeout real en API)
+    if (status === 'authenticated') {
+      void update({ lastActivityAt: Date.now() })
+    }
+
     // Resetear advertencia
     warningShownRef.current = false
 
@@ -113,7 +127,7 @@ export function SessionTimeoutMonitor() {
     timeoutRef.current = setTimeout(() => {
       handleAutoLogout()
     }, timeoutMs)
-  }, [status, handleAutoLogout, showWarning])
+  }, [status, handleAutoLogout, showWarning, update])
 
   // Iniciar monitoreo cuando hay sesión activa
   useEffect(() => {
@@ -189,7 +203,7 @@ export function SessionTimeoutMonitor() {
       window.removeEventListener('mousemove', handleActivity)
       window.removeEventListener('settings-updated', handleSettingsUpdated)
     }
-  }, [status, resetInactivityTimer, fetchSessionTimeout])
+  }, [status, resetInactivityTimer, fetchSessionTimeout, update])
 
   // Este componente no renderiza nada
   return null

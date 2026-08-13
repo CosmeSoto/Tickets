@@ -123,10 +123,26 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
 
     const params = new URLSearchParams(window.location.search)
     const mapped = getNextAuthErrorMessage(params.get('error'))
-    if (!mapped) return
+    const reason = params.get('reason')
 
-    setAuthState(prev => ({ ...prev, error: mapped }))
+    if (reason === 'timeout') {
+      setAuthState(prev => ({
+        ...prev,
+        error: {
+          type: 'session',
+          message: 'Tu sesión expiró por inactividad',
+          suggestion: 'Inicia sesión nuevamente para continuar',
+          code: 'SESSION_TIMEOUT',
+        },
+      }))
+    } else if (mapped) {
+      setAuthState(prev => ({ ...prev, error: mapped }))
+    } else {
+      return
+    }
+
     params.delete('error')
+    params.delete('reason')
     const qs = params.toString()
     router.replace(window.location.pathname + (qs ? `?${qs}` : ''))
   }, [router])

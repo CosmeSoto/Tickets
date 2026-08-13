@@ -139,19 +139,15 @@ export class FileService {
   // ── Validación ──────────────────────────────────────────────────────────────
 
   static async validateFile(file: File): Promise<FileValidationResult> {
-    if (file.size > MAX_FILE_SIZE_BYTES) {
-      return {
-        isValid: false,
-        error: `El archivo supera el límite de ${MAX_FILE_SIZE_BYTES / (1024 * 1024)}MB`,
-      }
+    const { SecurityConfigService } = await import('@/lib/services/security-config-service')
+    const sizeCheck = await SecurityConfigService.validateFileSize(file.size)
+    if (!sizeCheck.valid) {
+      return { isValid: false, error: sizeCheck.message }
     }
 
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      return {
-        isValid: false,
-        error:
-          'Tipo de archivo no permitido. Se aceptan: imágenes, PDF, documentos Office y texto plano',
-      }
+    const typeCheck = await SecurityConfigService.validateFileType(file.type)
+    if (!typeCheck.valid) {
+      return { isValid: false, error: typeCheck.message ?? 'Tipo de archivo no permitido' }
     }
 
     if (file.name.length > 255) {
@@ -287,13 +283,12 @@ export class FileService {
     const raw = params.base64.replace(/^data:[^;]+;base64,/, '')
     const buffer = Buffer.from(raw, 'base64') as Buffer
 
-    if (buffer.length > MAX_FILE_SIZE_BYTES) {
-      throw new Error(`El archivo supera el límite de ${MAX_FILE_SIZE_BYTES / (1024 * 1024)}MB`)
-    }
+    const { SecurityConfigService } = await import('@/lib/services/security-config-service')
+    const sizeCheck = await SecurityConfigService.validateFileSize(buffer.length)
+    if (!sizeCheck.valid) throw new Error(sizeCheck.message)
 
-    if (!ALLOWED_TYPES.includes(params.mimeType)) {
-      throw new Error('Tipo de archivo no permitido')
-    }
+    const typeCheck = await SecurityConfigService.validateFileType(params.mimeType)
+    if (!typeCheck.valid) throw new Error(typeCheck.message ?? 'Tipo de archivo no permitido')
 
     const quota = await this.checkTicketQuota(params.ticketId)
     if (!quota.ok) throw new Error(quota.error)
