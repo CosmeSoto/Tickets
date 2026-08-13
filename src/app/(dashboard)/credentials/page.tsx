@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { KeyRound, Plus, Eye, Loader2, ExternalLink, Trash2, Copy, Share2 } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
@@ -33,6 +33,7 @@ import {
 import type { ExportColumn } from '@/lib/utils/export'
 import { exportToExcelMulti } from '@/lib/utils/export'
 import { cn } from '@/lib/utils'
+import { dedupedFetch } from '@/lib/auth-fetch'
 
 type Vault = {
   id: string
@@ -155,6 +156,14 @@ export default function CredentialsPage() {
   const [copyingId, setCopyingId] = useState<string | null>(null)
   const [columnOrder, setColumnOrder] = useState<string[]>(DEFAULT_ORDER)
   const [visibleColumns, setVisibleColumns] = useState<string[]>(DEFAULT_VISIBLE)
+  const loadInFlightRef = useRef(false)
+  const toastRef = useRef(toast)
+  const routerRef = useRef(router)
+
+  useEffect(() => {
+    toastRef.current = toast
+    routerRef.current = router
+  }, [toast, router])
 
   const isSuperAdmin = (session?.user as { isSuperAdmin?: boolean })?.isSuperAdmin === true
   const credentialsEnabled =
@@ -163,15 +172,26 @@ export default function CredentialsPage() {
   const canCreate = credentialsEnabled
 
   const loadData = useCallback(async () => {
+    if (loadInFlightRef.current) return
+    loadInFlightRef.current = true
     setLoading(true)
     try {
       const [vaultRes, entryRes] = await Promise.all([
-        fetch('/api/credentials/vaults'),
-        fetch('/api/credentials/entries'),
+        dedupedFetch('/api/credentials/vaults'),
+        dedupedFetch('/api/credentials/entries'),
       ])
 
       if (vaultRes.status === 403 || entryRes.status === 403) {
-        router.push('/')
+        routerRef.current.push('/')
+        return
+      }
+
+      if (vaultRes.status === 429 || entryRes.status === 429) {
+        toastRef.current({
+          title: 'Demasiadas solicitudes',
+          description: 'Espere un momento y pulse Actualizar.',
+          variant: 'destructive',
+        })
         return
       }
 
@@ -184,29 +204,40 @@ export default function CredentialsPage() {
         setEntries(data.entries ?? [])
       }
     } catch {
-      toast({
+      toastRef.current({
         title: 'Error',
         description: 'No se pudieron cargar las credenciales',
         variant: 'destructive',
       })
     } finally {
+      loadInFlightRef.current = false
       setLoading(false)
     }
-  }, [router, toast])
+  }, [])
 
   useEffect(() => {
     if (status === 'unauthenticated') {
-      router.push('/login')
+      routerRef.current.replace('/login')
       return
     }
-    if (status === 'authenticated') {
-      if (!credentialsEnabled) {
-        router.push('/')
-        return
-      }
-      loadData()
+    if (status !== 'authenticated') return
+    if (!credentialsEnabled) {
+      routerRef.current.replace('/')
+      return
     }
-  }, [status, loadData, router, credentialsEnabled])
+    void loadData()
+  }, [status, credentialsEnabled, loadData])
+
+  const headerActions = useMemo(
+    () =>
+      canCreate ? (
+        <Button onClick={() => setCreateOpen(true)} size='sm'>
+          <Plus className='h-4 w-4 mr-1.5' />
+          Nueva credencial
+        </Button>
+      ) : undefined,
+    [canCreate]
+  )
 
   const rows = useMemo(() => entries.map(toRow), [entries])
 
@@ -562,14 +593,7 @@ export default function CredentialsPage() {
     <ModuleLayout
       title='Credenciales'
       subtitle='Bóveda de credenciales por área'
-      headerActions={
-        canCreate ? (
-          <Button onClick={() => setCreateOpen(true)} size='sm'>
-            <Plus className='h-4 w-4 mr-1.5' />
-            Nueva credencial
-          </Button>
-        ) : undefined
-      }
+      headerActions={headerActions}
     >
       <div className='space-y-4'>
         <FilterBar

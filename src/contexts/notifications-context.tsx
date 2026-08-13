@@ -113,6 +113,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const readOverrides = useRef<Map<string, boolean>>(new Map())
   const pendingOps = useRef(0)
   const nextCursorRef = useRef<string | null>(null)
+  const notificationsLoadInFlightRef = useRef(false)
 
   const { data: session, status } = useSession()
   const { toast } = useToast()
@@ -152,7 +153,9 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     async (force = false) => {
       if (status !== 'authenticated' || !session?.user?.id) return
       if (!force && pendingOps.current > 0) return
+      if (notificationsLoadInFlightRef.current) return
 
+      notificationsLoadInFlightRef.current = true
       setLoading(true)
       setError(null)
       try {
@@ -160,7 +163,10 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
           cache: 'no-store',
           headers: { 'Cache-Control': 'no-cache' },
         })
-        if (!res) return
+        if (!res) {
+          setError('No se pudieron cargar las notificaciones')
+          return
+        }
         const data = (await res.json()) as NotificationsPageResponse | NotificationData[]
 
         // Compat: respuesta antigua (array) o nueva (página)
@@ -180,11 +186,17 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Error desconocido')
       } finally {
+        notificationsLoadInFlightRef.current = false
         setLoading(false)
       }
     },
     [status, session?.user?.id, buildQuery, applyLocalOverrides]
   )
+
+  const loadNotificationsRef = useRef(loadNotifications)
+  useEffect(() => {
+    loadNotificationsRef.current = loadNotifications
+  }, [loadNotifications])
 
   const loadMore = useCallback(async () => {
     if (status !== 'authenticated' || !session?.user?.id) return
@@ -214,8 +226,8 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   // Recargar al autenticar o al cambiar filtros/búsqueda
   useEffect(() => {
     if (status !== 'authenticated' || !session?.user?.id) return
-    loadNotifications(true)
-  }, [status, session?.user?.id, filterRead, filterType, debouncedSearch, loadNotifications])
+    void loadNotificationsRef.current(true)
+  }, [status, session?.user?.id, filterRead, filterType, debouncedSearch])
 
   const markAsRead = useCallback(async (id: string) => {
     let shouldUpdate = false

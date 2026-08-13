@@ -10,9 +10,8 @@
  */
 
 /**
- * safeFetch — fetch que no lanza error en 401/403.
- * Útil para pollings donde la sesión puede expirar entre requests.
- * Retorna null si la respuesta es 401 o 403.
+ * safeFetch — fetch que no lanza error en 401/403/429.
+ * Retorna null si la sesión expiró, no hay permiso o hay rate limit.
  */
 export async function safeFetch(
   input: RequestInfo | URL,
@@ -20,9 +19,30 @@ export async function safeFetch(
 ): Promise<Response | null> {
   try {
     const res = await fetch(input, init)
-    if (res.status === 401 || res.status === 403) return null
+    if (res.status === 401 || res.status === 403 || res.status === 429) return null
     return res
   } catch {
     return null
   }
+}
+
+const inFlightGets = new Map<string, Promise<Response>>()
+
+/** Evita N peticiones GET idénticas simultáneas (p. ej. varios hooks al montar). */
+export async function dedupedFetch(
+  input: RequestInfo | URL,
+  init?: RequestInit
+): Promise<Response> {
+  const url = typeof input === 'string' ? input : input.toString()
+  const method = init?.method ?? 'GET'
+  const key = `${method}:${url}`
+
+  const existing = inFlightGets.get(key)
+  if (existing) return existing
+
+  const promise = fetch(input, init).finally(() => {
+    setTimeout(() => inFlightGets.delete(key), 100)
+  })
+  inFlightGets.set(key, promise)
+  return promise
 }

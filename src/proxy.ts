@@ -12,22 +12,26 @@ const rateLimitStore = new Map<string, { count: number; resetTime: number }>()
 const RATE_LIMITS = {
   // Endpoints de autenticación — más restrictivos (prevenir brute force)
   auth: { window: 15 * 60 * 1000, max: 30 },
-  // APIs normales autenticadas — por usuario, límite generoso
-  authenticated: { window: 60 * 1000, max: 300 }, // 300 req/min por usuario
+  // APIs normales autenticadas — por usuario (SPA con varios contextos en paralelo)
+  authenticated: { window: 60 * 1000, max: 600 },
   // APIs públicas sin sesión — por IP
-  public: { window: 60 * 1000, max: 60 }, // 60 req/min por IP
+  public: { window: 60 * 1000, max: 120 },
 }
 
-// Rutas excluidas del rate limiting (SSE, streams, endpoints de config pública)
+// Rutas excluidas del rate limiting (SSE, streams, datos de referencia, inbox)
 const RATE_LIMIT_EXCLUDED = [
   '/api/notifications/stream',
+  '/api/notifications', // campana / inbox (SSE ya excluido arriba)
   '/api/auth/',
-  '/api/config/session-timeout', // consultado cada 2 min por todos los usuarios
-  '/api/families', // datos de referencia — cacheados en Redis, se leen en cada página
-  '/api/inventory/families', // ídem para el endpoint de inventario
-  '/api/inventory/suppliers', // datos de referencia — consultado frecuentemente en formularios
-  '/api/users', // datos de referencia — cacheados en Redis, queries pesadas
-  '/api/departments', // datos de referencia — cacheados en Redis
+  '/api/config/session-timeout',
+  '/api/config/maintenance',
+  '/api/families',
+  '/api/inventory/families',
+  '/api/inventory/suppliers',
+  '/api/users',
+  '/api/departments',
+  '/api/credentials/vaults',
+  '/api/credentials/entries',
 ]
 
 function getRateLimitKey(

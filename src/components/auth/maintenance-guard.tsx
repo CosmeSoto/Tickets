@@ -74,7 +74,7 @@ export function MaintenanceGuard() {
         /* no bloquear si falla la consulta */
       }
     })()
-  }, [pathname, status, session?.user?.id, session?.user?.role, router, session?.user])
+  }, [pathname, status, session?.user?.id, session?.user?.role, router, (session?.user as { isSuperAdmin?: boolean } | undefined)?.isSuperAdmin])
 
   return null
 }

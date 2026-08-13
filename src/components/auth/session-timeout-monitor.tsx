@@ -14,8 +14,10 @@ export function SessionTimeoutMonitor() {
   const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const warningTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const lastActivityRef = useRef<number>(Date.now())
+  const lastJwtSyncRef = useRef<number>(0)
   const warningShownRef = useRef(false)
   const sessionTimeoutMinutes = useRef<number>(1440) // Default 24 horas
+  const JWT_SYNC_THROTTLE_MS = 60_000
 
   // Cerrar sesión si el servidor marcó SessionExpired en el JWT
   useEffect(() => {
@@ -89,9 +91,13 @@ export function SessionTimeoutMonitor() {
     // Actualizar última actividad
     lastActivityRef.current = Date.now()
 
-    // Sincronizar actividad con el JWT en servidor (timeout real en API)
+    // Sincronizar actividad con el JWT (como máximo 1× por minuto; el timer local sigue en cada actividad)
     if (status === 'authenticated') {
-      void update({ lastActivityAt: Date.now() })
+      const now = Date.now()
+      if (now - lastJwtSyncRef.current >= JWT_SYNC_THROTTLE_MS) {
+        lastJwtSyncRef.current = now
+        void update({ lastActivityAt: now })
+      }
     }
 
     // Resetear advertencia
