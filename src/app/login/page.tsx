@@ -370,7 +370,11 @@ export default function LoginPage() {
                 initial={{ opacity: 0, y: offset(10) }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
-                transition={{ duration: duration(0.35), ease: EASE, delay: reduceMotion ? 0 : 0.05 }}
+                transition={{
+                  duration: duration(0.35),
+                  ease: EASE,
+                  delay: reduceMotion ? 0 : 0.05,
+                }}
               >
                 <div className='relative'>
                   <div className='absolute inset-0 flex items-center'>
@@ -393,7 +397,7 @@ export default function LoginPage() {
                         type='button'
                         variant='outline'
                         className='w-full h-10 bg-background'
-                        onClick={() => signIn('google', { callbackUrl: '/' })}
+                        onClick={() => signIn('google', { callbackUrl: '/client' })}
                         disabled={isLoading}
                       >
                         <svg className='mr-2 h-4 w-4' viewBox='0 0 24 24'>
@@ -428,7 +432,7 @@ export default function LoginPage() {
                         type='button'
                         variant='outline'
                         className='w-full h-10 bg-background'
-                        onClick={() => signIn('azure-ad', { callbackUrl: '/' })}
+                        onClick={() => signIn('azure-ad', { callbackUrl: '/client' })}
                         disabled={isLoading}
                       >
                         <svg className='mr-2 h-4 w-4' viewBox='0 0 23 23'>

@@ -43,7 +43,6 @@ export const publicRoutes = [
   '/api/auth/check-oauth',
   '/api/auth/validate-reset-token',
   '/api/auth/oauth-providers',
-  '/api/auth/oauth-register-context',
   '/api/auth/password-policy',
   '/api/config/maintenance',
 ]

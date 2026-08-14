@@ -205,49 +205,18 @@ export default function RegisterPage() {
   }
 
   const handleOAuth = async (provider: 'google' | 'azure-ad') => {
-    if (!formData.departmentId) {
-      setFormErrors(prev => ({
-        ...prev,
-        departmentId: 'Selecciona tu departamento antes de continuar con Google o Microsoft',
-      }))
-      setError('Debes elegir un departamento antes de registrarte con OAuth.')
-      return
-    }
-
-    const phoneError = validatePhoneInput(formData.phone)
-    if (phoneError) {
-      setFormErrors(prev => ({ ...prev, phone: phoneError }))
-      setError('Debes ingresar tu teléfono celular antes de registrarte con OAuth.')
-      return
-    }
-
     setIsOAuthLoading(true)
     setError(null)
     try {
-      const ctxRes = await fetch('/api/auth/oauth-register-context', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          departmentId: formData.departmentId,
-          phone: formData.phone.trim(),
-        }),
-      })
-      const ctxData = await ctxRes.json()
-      if (!ctxRes.ok || !ctxData.success) {
-        setError(ctxData.error || 'No se pudo preparar el registro con OAuth')
-        return
-      }
-
+      // OAuth primero; si falta departamento/teléfono, el middleware envía a /complete-profile
       await signIn(provider, { callbackUrl: '/client', redirect: true })
     } catch {
       setError('Error de conexión al iniciar registro con OAuth')
-    } finally {
       setIsOAuthLoading(false)
     }
   }
 
   const hasOAuth = !loadingProviders && (oauthProviders.google || oauthProviders.microsoft)
-  const oauthReady = Boolean(formData.departmentId && formData.phone.trim())
 
   const FieldError = ({ msg }: { msg?: string }) =>
     msg ? (
@@ -471,17 +440,12 @@ export default function RegisterPage() {
                     className={`grid gap-3 ${oauthProviders.google && oauthProviders.microsoft ? 'grid-cols-2' : 'grid-cols-1'}`}
                   >
                     {oauthProviders.google && (
-                      <AuthPressable disabled={isOAuthLoading || !oauthReady}>
+                      <AuthPressable disabled={isOAuthLoading}>
                         <Button
                           variant='outline'
                           className='w-full h-10'
                           onClick={() => handleOAuth('google')}
-                          disabled={isOAuthLoading || !oauthReady}
-                          title={
-                            !oauthReady
-                              ? 'Completa departamento y teléfono arriba para continuar'
-                              : undefined
-                          }
+                          disabled={isOAuthLoading}
                         >
                           <svg className='mr-2 h-4 w-4' viewBox='0 0 24 24'>
                             <path
@@ -506,17 +470,12 @@ export default function RegisterPage() {
                       </AuthPressable>
                     )}
                     {oauthProviders.microsoft && (
-                      <AuthPressable disabled={isOAuthLoading || !oauthReady}>
+                      <AuthPressable disabled={isOAuthLoading}>
                         <Button
                           variant='outline'
                           className='w-full h-10'
                           onClick={() => handleOAuth('azure-ad')}
-                          disabled={isOAuthLoading || !oauthReady}
-                          title={
-                            !oauthReady
-                              ? 'Completa departamento y teléfono arriba para continuar'
-                              : undefined
-                          }
+                          disabled={isOAuthLoading}
                         >
                           <svg className='mr-2 h-4 w-4' viewBox='0 0 23 23'>
                             <path fill='#f3f3f3' d='M0 0h23v23H0z' />
@@ -530,12 +489,10 @@ export default function RegisterPage() {
                       </AuthPressable>
                     )}
                   </div>
-                  {!oauthReady && (
-                    <p className='text-xs text-muted-foreground text-center'>
-                      Completa departamento y teléfono celular arriba para habilitar el registro con
-                      Google o Microsoft.
-                    </p>
-                  )}
+                  <p className='text-xs text-muted-foreground text-center'>
+                    Tras autenticarte con Google o Microsoft, te pediremos departamento y teléfono
+                    si aún no los tienes.
+                  </p>
                 </motion.div>
               )}
 

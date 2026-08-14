@@ -222,38 +222,14 @@ const sharedAuthOptions: Omit<NextAuthOptions, 'providers'> = {
 
               return true
             } else {
-              // Usuario nuevo, crear cuenta como CLIENT
-              let oauthDepartmentId: string | null = null
-              let oauthPhone: string | null = null
-              try {
-                const { cookies } = await import('next/headers')
-                const cookieStore = await cookies()
-                const deptCookie = cookieStore.get('oauth_register_dept')?.value?.trim()
-                const phoneCookie = cookieStore.get('oauth_register_phone')?.value?.trim()
-                if (deptCookie) {
-                  const dept = await prisma.departments.findFirst({
-                    where: { id: deptCookie, isActive: true },
-                    select: { id: true },
-                  })
-                  if (dept) oauthDepartmentId = dept.id
-                  cookieStore.delete('oauth_register_dept')
-                }
-                if (phoneCookie) {
-                  oauthPhone = phoneCookie
-                  cookieStore.delete('oauth_register_phone')
-                }
-              } catch {
-                /* cookie no disponible en este contexto */
-              }
-
+              // Usuario nuevo: se crea sin departamento/teléfono;
+              // el middleware redirige a /complete-profile tras el login OAuth.
               const newUser = await prisma.users.create({
                 data: {
                   id: randomUUID(),
                   email: user.email!,
                   name: user.name || user.email!.split('@')[0],
                   role: 'CLIENT',
-                  departmentId: oauthDepartmentId,
-                  phone: oauthPhone,
                   avatar: user.image,
                   isActive: true,
                   isEmailVerified: true,
@@ -715,7 +691,7 @@ const sharedAuthOptions: Omit<NextAuthOptions, 'providers'> = {
   pages: {
     signIn: '/login',
     error: '/login',
-    newUser: '/', // Home redirige al dashboard según rol
+    newUser: '/complete-profile',
   },
   events: {
     async signIn({ user, account, isNewUser }) {
