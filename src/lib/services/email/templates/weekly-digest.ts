@@ -28,7 +28,7 @@ export interface WeeklyDigestData {
 }
 
 export default function weeklyDigestTemplate(data: WeeklyDigestData) {
-  const branding = brandingFromTemplateData(data as Record<string, unknown>)
+  const branding = brandingFromTemplateData(data as unknown as Record<string, unknown>)
   const statsRows = data.stats.map(s => ({
     label: s.label,
     value: String(s.value),
@@ -65,7 +65,9 @@ export default function weeklyDigestTemplate(data: WeeklyDigestData) {
 
   const statsText = data.stats.map(s => `- ${s.label}: ${s.value}`).join('\n')
   const highlightsText =
-    data.highlights.length > 0 ? data.highlights.map(h => `- ${h}`).join('\n') : 'Sin novedades destacadas.'
+    data.highlights.length > 0
+      ? data.highlights.map(h => `- ${h}`).join('\n')
+      : 'Sin novedades destacadas.'
 
   const text = `${branding.systemName} — Resumen semanal
 

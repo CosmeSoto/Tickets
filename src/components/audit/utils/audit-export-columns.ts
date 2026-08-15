@@ -61,7 +61,10 @@ function maskIp(ip: string): string {
 
 function redactChangesText(text: string): string {
   return text
-    .replace(/(password|token|secret|authorization|api[_-]?key)\s*[:=]\s*[^\s|]+/gi, '$1: [REDACTADO]')
+    .replace(
+      /(password|token|secret|authorization|api[_-]?key)\s*[:=]\s*[^\s|]+/gi,
+      '$1: [REDACTADO]'
+    )
     .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, m => maskEmail(m))
 }
 
@@ -77,7 +80,12 @@ function deviceLabel(ua: string, contextDevice?: string): string {
   const u = (ua || '').toLowerCase()
   if (u.includes('mobile') || u.includes('android') || u.includes('iphone')) return 'Móvil'
   if (u.includes('tablet') || u.includes('ipad')) return 'Tablet'
-  if (u.includes('mozilla') || u.includes('chrome') || u.includes('safari') || u.includes('firefox'))
+  if (
+    u.includes('mozilla') ||
+    u.includes('chrome') ||
+    u.includes('safari') ||
+    u.includes('firefox')
+  )
     return 'Escritorio'
   return ua ? 'Otro' : ''
 }
@@ -250,7 +258,7 @@ export function buildAuditExportColumns(
 ): ExportColumn[] {
   const byKey = new Map(AUDIT_COLUMN_CATALOG.map(c => [c.key, c]))
   return keys
-    .map(key => {
+    .map((key): ExportColumn | null => {
       const meta = byKey.get(key as AuditColumnKey)
       if (!meta) return null
       return {

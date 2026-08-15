@@ -75,6 +75,7 @@ interface SystemSettings {
 
   // Configuración de archivos
   maxFileSize: number
+  maxPersonalImageSize: number
   allowedFileTypes: string[]
 
   // Solo lectura desde API
@@ -1391,7 +1392,30 @@ function SettingsPage() {
                   </div>
 
                   <div>
-                    <Label htmlFor='maxFileSize'>Tamaño Máximo de Archivo</Label>
+                    <Label htmlFor='maxPersonalImageSize'>Fotos personales y avatares</Label>
+                    <div className='space-y-2'>
+                      <Input
+                        id='maxPersonalImageSize'
+                        type='number'
+                        value={settings.maxPersonalImageSize}
+                        onChange={e => {
+                          const value = parseInt(e.target.value)
+                          setSettings({
+                            ...settings,
+                            maxPersonalImageSize: isNaN(value) ? 5 : value,
+                          })
+                        }}
+                        min='1'
+                        max='20'
+                      />
+                      <p className='text-sm text-muted-foreground'>
+                        Máximo {settings.maxPersonalImageSize} MB por avatar o foto de acceso
+                      </p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor='maxFileSize'>Adjuntos generales</Label>
                     <div className='space-y-2'>
                       <Input
                         id='maxFileSize'
@@ -1405,7 +1429,7 @@ function SettingsPage() {
                         max='100'
                       />
                       <p className='text-sm text-muted-foreground'>
-                        Máximo {settings.maxFileSize} MB por archivo
+                        Máximo {settings.maxFileSize} MB por archivo adjunto
                       </p>
                     </div>
                   </div>
@@ -1429,8 +1453,7 @@ function SettingsPage() {
                         (no hace falta cerrar sesión manualmente)
                       </li>
                       <li>
-                        • Longitud mínima de contraseña y tamaño de archivo se aplican al registrar,
-                        cambiar contraseña y subir adjuntos
+                        • Los límites de fotos personales y adjuntos se aplican al subir archivos
                       </li>
                     </ul>
                   </div>

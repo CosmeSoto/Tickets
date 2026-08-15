@@ -5,20 +5,21 @@ import prisma from '@/lib/prisma'
 import { writeFile, unlink } from 'fs/promises'
 import { existsSync, mkdirSync } from 'fs'
 import { getUploadDir } from '@/lib/upload-path'
+import { SecurityConfigService } from '@/lib/services/security-config-service'
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
     const { id } = await params
 
     if (!session) {
-      return NextResponse.json({ 
-        success: false,
-        error: 'No autorizado' 
-      }, { status: 401 })
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'No autorizado',
+        },
+        { status: 401 }
+      )
     }
 
     // Solo el propio usuario o un admin en su ámbito puede cambiar el avatar
@@ -30,51 +31,69 @@ export async function POST(
         id
       )
       if (!scopeCheck.allowed) {
-        return NextResponse.json({ success: false, error: scopeCheck.error }, { status: scopeCheck.status })
+        return NextResponse.json(
+          { success: false, error: scopeCheck.error },
+          { status: scopeCheck.status }
+        )
       }
     } else if (session.user.id !== id && session.user.role !== 'ADMIN') {
-      return NextResponse.json({ 
-        success: false,
-        error: 'No tienes permisos para realizar esta acción' 
-      }, { status: 403 })
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'No tienes permisos para realizar esta acción',
+        },
+        { status: 403 }
+      )
     }
 
     const formData = await request.formData()
     const file = formData.get('avatar') as File
 
     if (!file) {
-      return NextResponse.json({ 
-        success: false,
-        error: 'No se proporcionó ningún archivo' 
-      }, { status: 400 })
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'No se proporcionó ningún archivo',
+        },
+        { status: 400 }
+      )
     }
 
     // Validar tipo de archivo
     if (!file.type.startsWith('image/')) {
-      return NextResponse.json({ 
-        success: false,
-        error: 'El archivo debe ser una imagen válida (JPG, PNG, GIF, WebP)' 
-      }, { status: 400 })
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'El archivo debe ser una imagen válida (JPG, PNG, GIF, WebP)',
+        },
+        { status: 400 }
+      )
     }
 
-    // Validar tamaño (máximo 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      return NextResponse.json({ 
-        success: false,
-        error: 'La imagen debe ser menor a 5MB' 
-      }, { status: 400 })
+    const sizeCheck = await SecurityConfigService.validatePersonalImageSize(file.size)
+    if (!sizeCheck.valid) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: sizeCheck.message,
+        },
+        { status: 400 }
+      )
     }
 
     // Verificar que el usuario existe
     const user = await prisma.users.findUnique({
-      where: { id }
+      where: { id },
     })
 
     if (!user) {
-      return NextResponse.json({ 
-        success: false,
-        error: 'Usuario no encontrado' 
-      }, { status: 404 })
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Usuario no encontrado',
+        },
+        { status: 404 }
+      )
     }
 
     // Crear directorio de avatares si no existe
@@ -112,16 +131,16 @@ export async function POST(
     const avatarUrl = `/uploads/avatars/${filename}`
     const updatedUser = await prisma.users.update({
       where: { id },
-      data: { 
+      data: {
         avatar: avatarUrl,
-        updatedAt: new Date()
+        updatedAt: new Date(),
       },
       select: {
         id: true,
         name: true,
         email: true,
-        avatar: true
-      }
+        avatar: true,
+      },
     })
 
     return NextResponse.json({
@@ -129,16 +148,18 @@ export async function POST(
       message: 'Avatar actualizado exitosamente',
       data: {
         avatarUrl,
-        user: updatedUser
-      }
+        user: updatedUser,
+      },
     })
-
   } catch (error) {
     console.error('Error uploading avatar:', error)
-    return NextResponse.json({
-      success: false,
-      error: 'Error interno del servidor al subir el avatar'
-    }, { status: 500 })
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Error interno del servidor al subir el avatar',
+      },
+      { status: 500 }
+    )
   }
 }
 
@@ -151,10 +172,13 @@ export async function DELETE(
     const { id } = await params
 
     if (!session) {
-      return NextResponse.json({ 
-        success: false,
-        error: 'No autorizado' 
-      }, { status: 401 })
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'No autorizado',
+        },
+        { status: 401 }
+      )
     }
 
     // Solo el propio usuario o un admin en su ámbito puede eliminar el avatar
@@ -166,25 +190,34 @@ export async function DELETE(
         id
       )
       if (!scopeCheck.allowed) {
-        return NextResponse.json({ success: false, error: scopeCheck.error }, { status: scopeCheck.status })
+        return NextResponse.json(
+          { success: false, error: scopeCheck.error },
+          { status: scopeCheck.status }
+        )
       }
     } else if (session.user.id !== id && session.user.role !== 'ADMIN') {
-      return NextResponse.json({ 
-        success: false,
-        error: 'No tienes permisos para realizar esta acción' 
-      }, { status: 403 })
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'No tienes permisos para realizar esta acción',
+        },
+        { status: 403 }
+      )
     }
 
     // Verificar que el usuario existe
     const user = await prisma.users.findUnique({
-      where: { id }
+      where: { id },
     })
 
     if (!user) {
-      return NextResponse.json({ 
-        success: false,
-        error: 'Usuario no encontrado' 
-      }, { status: 404 })
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Usuario no encontrado',
+        },
+        { status: 404 }
+      )
     }
 
     // Eliminar archivo del servidor si existe
@@ -203,31 +236,33 @@ export async function DELETE(
     // Actualizar la base de datos
     const updatedUser = await prisma.users.update({
       where: { id },
-      data: { 
+      data: {
         avatar: null,
-        updatedAt: new Date()
+        updatedAt: new Date(),
       },
       select: {
         id: true,
         name: true,
         email: true,
-        avatar: true
-      }
+        avatar: true,
+      },
     })
 
     return NextResponse.json({
       success: true,
       message: 'Avatar eliminado exitosamente',
       data: {
-        user: updatedUser
-      }
+        user: updatedUser,
+      },
     })
-
   } catch (error) {
     console.error('Error deleting avatar:', error)
-    return NextResponse.json({
-      success: false,
-      error: 'Error interno del servidor al eliminar el avatar'
-    }, { status: 500 })
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Error interno del servidor al eliminar el avatar',
+      },
+      { status: 500 }
+    )
   }
 }

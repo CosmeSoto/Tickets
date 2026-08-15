@@ -1,5 +1,6 @@
 import { type UserRole } from '@/lib/constants/user-constants'
 import { useToast } from '@/hooks/use-toast'
+import { useUploadLimits } from '@/hooks/use-upload-limits'
 
 export interface BaseUserFormData {
   name: string
@@ -48,6 +49,7 @@ export function validateUserForm(
 
 export function useUserAvatarHandler() {
   const { toast } = useToast()
+  const { maxPersonalImageSizeMB } = useUploadLimits()
 
   const handleAvatarChange = (
     e: React.ChangeEvent<HTMLInputElement>,
@@ -66,10 +68,10 @@ export function useUserAvatarHandler() {
       return
     }
 
-    if (file.size > 5 * 1024 * 1024) {
+    if (file.size > maxPersonalImageSizeMB * 1024 * 1024) {
       toast({
         title: 'Archivo muy grande',
-        description: 'La imagen debe ser menor a 5MB',
+        description: `La imagen debe ser menor a ${maxPersonalImageSizeMB} MB`,
         variant: 'destructive',
       })
       return

@@ -62,7 +62,7 @@ SelectScrollDownButton.displayName = SelectPrimitive.ScrollDownButton.displayNam
 const SelectContent = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content> & {
-    container?: SelectPrimitive.PortalProps['container']
+    container?: React.ComponentPropsWithoutRef<typeof SelectPrimitive.Portal>['container']
   }
 >(({ className, children, position = 'popper', container, ...props }, ref) => (
   <SelectPrimitive.Portal container={container}>
@@ -123,7 +123,7 @@ const SelectItem = React.forwardRef<
       </SelectPrimitive.ItemIndicator>
     </span>
 
-    <SelectPrimitive.ItemText className="text-foreground">{children}</SelectPrimitive.ItemText>
+    <SelectPrimitive.ItemText className='text-foreground'>{children}</SelectPrimitive.ItemText>
   </SelectPrimitive.Item>
 ))
 SelectItem.displayName = SelectPrimitive.Item.displayName

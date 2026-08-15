@@ -4,10 +4,7 @@
  */
 
 // Dynamic import wrapper with error handling
-export async function dynamicImport<T>(
-  importFn: () => Promise<T>,
-  fallback?: T
-): Promise<T> {
+export async function dynamicImport<T>(importFn: () => Promise<T>, fallback?: T): Promise<T> {
   try {
     return await importFn()
   } catch (error) {
@@ -57,10 +54,10 @@ export class BundleAnalyzer {
   trackModuleLoad(moduleName: string, startTime: number = performance.now()) {
     const endTime = performance.now()
     const loadTime = endTime - startTime
-    
+
     this.loadedModules.add(moduleName)
     this.moduleLoadTimes.set(moduleName, loadTime)
-    
+
     if (process.env.NODE_ENV === 'development') {
       // Log silencioso en desarrollo
     }
@@ -69,15 +66,17 @@ export class BundleAnalyzer {
   // Get loading statistics
   getStats() {
     const totalModules = this.loadedModules.size
-    const totalLoadTime = Array.from(this.moduleLoadTimes.values())
-      .reduce((sum, time) => sum + time, 0)
+    const totalLoadTime = Array.from(this.moduleLoadTimes.values()).reduce(
+      (sum, time) => sum + time,
+      0
+    )
     const avgLoadTime = totalLoadTime / totalModules
 
     return {
       totalModules,
       totalLoadTime: Math.round(totalLoadTime * 100) / 100,
       avgLoadTime: Math.round(avgLoadTime * 100) / 100,
-      slowestModules: this.getSlowestModules(5)
+      slowestModules: this.getSlowestModules(5),
     }
   }
 
@@ -99,27 +98,27 @@ export class BundleAnalyzer {
 // Route-based code splitting utilities
 export const RouteModules = {
   // Admin routes
-  AdminDashboard: () => dynamicImport(() => import('@/app/admin/page')),
-  AdminUsers: () => dynamicImport(() => import('@/app/admin/users/page')),
-  AdminTickets: () => dynamicImport(() => import('@/app/admin/tickets/page')),
-  AdminReports: () => dynamicImport(() => import('@/app/admin/reports/page')),
-  AdminSettings: () => dynamicImport(() => import('@/app/admin/settings/page')),
-  
+  AdminDashboard: () => dynamicImport(() => import('@/app/(dashboard)/admin/page')),
+  AdminUsers: () => dynamicImport(() => import('@/app/(dashboard)/admin/users/page')),
+  AdminTickets: () => dynamicImport(() => import('@/app/(dashboard)/admin/tickets/page')),
+  AdminReports: () => dynamicImport(() => import('@/app/(dashboard)/admin/reports/page')),
+  AdminSettings: () => dynamicImport(() => import('@/app/(dashboard)/admin/settings/page')),
+
   // Client routes
-  ClientDashboard: () => dynamicImport(() => import('@/app/client/page')),
-  ClientTickets: () => dynamicImport(() => import('@/app/client/tickets/page')),
-  CreateTicket: () => dynamicImport(() => import('@/app/client/tickets/create/page')),
-  
+  ClientDashboard: () => dynamicImport(() => import('@/app/(dashboard)/client/page')),
+  ClientTickets: () => dynamicImport(() => import('@/app/(dashboard)/client/tickets/page')),
+  CreateTicket: () => dynamicImport(() => import('@/app/(dashboard)/client/tickets/create/page')),
+
   // Technician routes
-  TechnicianDashboard: () => dynamicImport(() => import('@/app/technician/page')),
-  TechnicianTickets: () => dynamicImport(() => import('@/app/technician/tickets/page'))
+  TechnicianDashboard: () => dynamicImport(() => import('@/app/(dashboard)/technician/page')),
+  TechnicianTickets: () => dynamicImport(() => import('@/app/(dashboard)/technician/tickets/page')),
 }
 
 // Component-based code splitting
 export const ComponentModules = {
   // Charts and visualizations
   Charts: () => dynamicImport(() => import('recharts')),
-  
+
   // File upload
   FileUpload: () => dynamicImport(() => import('@/components/tickets/file-upload')),
 }
@@ -141,7 +140,7 @@ export class PerformanceMonitor {
     const start = performance.now()
     const result = fn()
     const end = performance.now()
-    
+
     this.recordMetric(name, end - start)
     return result
   }
@@ -151,7 +150,7 @@ export class PerformanceMonitor {
     const start = performance.now()
     const result = await fn()
     const end = performance.now()
-    
+
     this.recordMetric(name, end - start)
     return result
   }
@@ -180,7 +179,7 @@ export class PerformanceMonitor {
       avg: Math.round(avg * 100) / 100,
       min: Math.round(min * 100) / 100,
       max: Math.round(max * 100) / 100,
-      median: Math.round(median * 100) / 100
+      median: Math.round(median * 100) / 100,
     }
   }
 
@@ -204,10 +203,10 @@ export function measureWebVitals() {
   if (typeof window === 'undefined') return
 
   // Measure Core Web Vitals
-  const observer = new PerformanceObserver((list) => {
+  const observer = new PerformanceObserver(list => {
     for (const entry of list.getEntries()) {
       const monitor = PerformanceMonitor.getInstance()
-      
+
       switch (entry.entryType) {
         case 'largest-contentful-paint':
           monitor.recordMetric('LCP', entry.startTime)
@@ -234,10 +233,10 @@ export function optimizeResourceLoading() {
   // Preload critical resources
   preloadResource('/fonts/inter.woff2', 'font')
   preloadResource('/api/dashboard/stats', 'fetch')
-  
+
   // Prefetch likely next pages
   const currentPath = window.location.pathname
-  
+
   if (currentPath === '/') {
     prefetchResource('/login')
   } else if (currentPath === '/login') {
@@ -257,8 +256,8 @@ export function getBundleOptimizationTips() {
         'Use dynamic imports for route-based code splitting',
         'Lazy load non-critical components',
         'Split vendor libraries into separate chunks',
-        'Use React.lazy() for component-level splitting'
-      ]
+        'Use React.lazy() for component-level splitting',
+      ],
     },
     {
       category: 'Tree Shaking',
@@ -266,8 +265,8 @@ export function getBundleOptimizationTips() {
         'Import only specific functions from libraries',
         'Use ES6 modules instead of CommonJS',
         'Avoid importing entire libraries when only using parts',
-        'Configure webpack to eliminate dead code'
-      ]
+        'Configure webpack to eliminate dead code',
+      ],
     },
     {
       category: 'Asset Optimization',
@@ -275,8 +274,8 @@ export function getBundleOptimizationTips() {
         'Optimize images with Next.js Image component',
         'Use WebP format for images when possible',
         'Compress and minify CSS and JavaScript',
-        'Use CDN for static assets'
-      ]
+        'Use CDN for static assets',
+      ],
     },
     {
       category: 'Caching',
@@ -284,9 +283,9 @@ export function getBundleOptimizationTips() {
         'Implement proper HTTP caching headers',
         'Use service workers for offline caching',
         'Cache API responses with appropriate TTL',
-        'Leverage browser caching for static assets'
-      ]
-    }
+        'Leverage browser caching for static assets',
+      ],
+    },
   ]
 }
 

@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { useToast } from '@/hooks/use-toast'
 import { usePasswordPolicy } from '@/hooks/use-password-policy'
+import { useUploadLimits } from '@/hooks/use-upload-limits'
 import {
   getRoleLabel as getRoleLabelFn,
   getRoleColor as getRoleColorFn,
@@ -62,6 +63,7 @@ export default function ProfilePage() {
   const router = useRouter()
   const { toast } = useToast()
   const { minLength: minPasswordLength } = usePasswordPolicy()
+  const { maxPersonalImageSizeMB } = useUploadLimits()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useSyncDashboardPageMeta({
@@ -172,11 +174,10 @@ export default function ProfilePage() {
       return
     }
 
-    // Validar tamaño (máximo 5MB)
-    if (file.size > 5 * 1024 * 1024) {
+    if (file.size > maxPersonalImageSizeMB * 1024 * 1024) {
       toast({
         title: 'Archivo muy grande',
-        description: 'La imagen debe ser menor a 5MB',
+        description: `La imagen debe ser menor a ${maxPersonalImageSizeMB} MB`,
         variant: 'destructive',
       })
       return

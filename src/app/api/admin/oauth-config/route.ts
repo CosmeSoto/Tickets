@@ -152,7 +152,7 @@ export async function POST(request: NextRequest) {
           : AuditActionsComplete.OAUTH_CONFIG_UPDATED,
         entityType: 'settings',
         entityId: config.id,
-        userId: session.user.id,
+        userId: session!.user.id,
         details: {
           provider,
           isEnabled: isEnabled ?? false,
@@ -217,7 +217,7 @@ export async function PUT(request: NextRequest) {
         action: AuditActionsComplete.OAUTH_CONFIG_UPDATED,
         entityType: 'settings',
         entityId: config.id,
-        userId: session.user.id,
+        userId: session!.user.id,
         details: { provider, isEnabled, action: 'toggle' },
       })
     } catch {
@@ -271,7 +271,7 @@ export async function DELETE(request: NextRequest) {
         action: AuditActionsComplete.OAUTH_CONFIG_UPDATED,
         entityType: 'settings',
         entityId: provider,
-        userId: session.user.id,
+        userId: session!.user.id,
         details: { provider, action: 'deleted' },
       })
     } catch {

@@ -79,9 +79,12 @@ export function ShareCredentialDialog({ entry, onClose }: ShareCredentialDialogP
   }
 
   const loadCandidates = async () => {
+    if (!entry) return
     setLoadingCandidates(true)
     try {
-      const res = await fetch(`/api/credentials/share-candidates?entryId=${encodeURIComponent(entry.id)}`)
+      const res = await fetch(
+        `/api/credentials/share-candidates?entryId=${encodeURIComponent(entry.id)}`
+      )
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error || 'No se pudieron cargar usuarios')
       setCandidates(data.users ?? [])

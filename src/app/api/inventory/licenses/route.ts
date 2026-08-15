@@ -203,6 +203,10 @@ export async function POST(request: NextRequest) {
     const license = await LicenseService.createLicense(
       {
         ...rest,
+        supplierId: rest.supplierId ?? undefined,
+        assignedToEquipment: rest.assignedToEquipment ?? undefined,
+        assignedToUser: rest.assignedToUser ?? undefined,
+        assignedToDepartment: rest.assignedToDepartment ?? undefined,
         typeId: rest.typeId || licenseTypeId!,
         licenseScope: mapLicenseScope(scope),
         customValues: customValues && customValues.length > 0 ? customValues : undefined,

@@ -12,7 +12,8 @@ export interface SecurityConfig {
   passwordMinLength: number
   requirePasswordChange: boolean
   passwordChangeIntervalDays: number // 0 = sin expiración automática
-  maxFileSize: number // MB
+  maxFileSize: number // MB para adjuntos generales
+  maxPersonalImageSize: number // MB para avatares y fotos de acceso
   allowedFileTypes: string[]
 }
 
@@ -46,6 +47,7 @@ export class SecurityConfigService {
               'requirePasswordChange',
               'passwordChangeIntervalDays',
               'maxFileSize',
+              'maxPersonalImageSize',
               'allowedFileTypes',
             ],
           },
@@ -72,6 +74,7 @@ export class SecurityConfigService {
         requirePasswordChange: configMap.requirePasswordChange || false,
         passwordChangeIntervalDays: configMap.passwordChangeIntervalDays ?? 0,
         maxFileSize: configMap.maxFileSize || 10, // MB
+        maxPersonalImageSize: configMap.maxPersonalImageSize || 5, // MB
         allowedFileTypes: configMap.allowedFileTypes || [
           'image/jpeg',
           'image/png',
@@ -101,6 +104,7 @@ export class SecurityConfigService {
         requirePasswordChange: false,
         passwordChangeIntervalDays: 0,
         maxFileSize: 10,
+        maxPersonalImageSize: 5,
         allowedFileTypes: ['image/jpeg', 'image/png', 'image/gif', 'application/pdf', 'text/plain'],
       }
     }
@@ -152,6 +156,25 @@ export class SecurityConfigService {
   }
 
   /**
+   * Validar fotos personales (avatares y credenciales) según configuración.
+   */
+  static async validatePersonalImageSize(
+    fileSizeBytes: number
+  ): Promise<{ valid: boolean; message?: string }> {
+    const config = await this.getConfig()
+    const maxSizeBytes = config.maxPersonalImageSize * 1024 * 1024
+
+    if (fileSizeBytes > maxSizeBytes) {
+      return {
+        valid: false,
+        message: `La imagen excede el tamaño máximo permitido de ${config.maxPersonalImageSize} MB`,
+      }
+    }
+
+    return { valid: true }
+  }
+
+  /**
    * Validar tipo de archivo según configuración
    */
   static async validateFileType(mimeType: string): Promise<{ valid: boolean; message?: string }> {
@@ -191,9 +214,8 @@ export class SecurityConfigService {
         })
 
         if (previousAttempts < maxAttempts && data.attempts >= maxAttempts) {
-          const { notifySuperAdminsSecurityAlert } = await import(
-            '@/lib/notifications/security-telegram'
-          )
+          const { notifySuperAdminsSecurityAlert } =
+            await import('@/lib/notifications/security-telegram')
           notifySuperAdminsSecurityAlert({
             title: 'Cuenta bloqueada por intentos fallidos',
             body: `Email: ${email}\nIntentos: ${data.attempts}/${maxAttempts}\nBloqueo temporal activo (${LOCKOUT_DURATION_MINUTES} min).`,

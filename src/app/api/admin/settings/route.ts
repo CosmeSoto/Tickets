@@ -28,6 +28,7 @@ const settingsSchema = z.object({
   requirePasswordChange: z.boolean().optional(),
   passwordChangeIntervalDays: z.coerce.number().min(0).max(365).optional(),
   maxFileSize: z.coerce.number().min(1).max(100).optional(),
+  maxPersonalImageSize: z.coerce.number().min(1).max(20).optional(),
   autoCloseDays: z.coerce.number().min(1).max(30).optional(),
   allowedFileTypes: z.array(z.string()).optional(),
   backupEnabled: z.boolean().optional(),
@@ -44,7 +45,11 @@ const settingsSchema = z.object({
   maintenanceAllowAdmins: z.boolean().optional(),
 })
 
-const SENSITIVE_SETTING_KEYS = new Set(['smtpPassword', 'telegramBotToken', 'telegramWebhookSecret'])
+const SENSITIVE_SETTING_KEYS = new Set([
+  'smtpPassword',
+  'telegramBotToken',
+  'telegramWebhookSecret',
+])
 
 // Configuración por defecto
 const defaultSettings = {
@@ -69,6 +74,7 @@ const defaultSettings = {
   requirePasswordChange: false,
   passwordChangeIntervalDays: 0,
   maxFileSize: 10, // MB
+  maxPersonalImageSize: 5, // MB
   autoCloseDays: 3, // Días para auto-cierre de tickets resueltos sin calificación
   allowedFileTypes: [
     'image/jpeg',
@@ -110,6 +116,7 @@ function parseSystemSettingsFromRows(
         'passwordMinLength',
         'passwordChangeIntervalDays',
         'maxFileSize',
+        'maxPersonalImageSize',
         'backupRetention',
         'autoCloseDays',
       ].includes(setting.key)
@@ -172,6 +179,7 @@ export async function GET() {
             'passwordMinLength',
             'passwordChangeIntervalDays',
             'maxFileSize',
+            'maxPersonalImageSize',
             'backupRetention',
             'autoCloseDays',
           ].includes(setting.key)

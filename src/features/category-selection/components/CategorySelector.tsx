@@ -195,7 +195,7 @@ export function CategorySelector({
 
   const hasTicketContext = Boolean(
     (ticketTitle && ticketTitle.trim().length >= 3) ||
-      (ticketDescription && ticketDescription.trim().length >= 3)
+    (ticketDescription && ticketDescription.trim().length >= 3)
   )
 
   /** Categorías + ancestros con coincidencia al título/descripción (modo experto) */
@@ -677,9 +677,7 @@ export function CategorySelector({
                   </p>
                   <CategoryTree
                     key={treeBrowseMode}
-                    categories={
-                      treeBrowseMode === 'related' ? relatedTreeCategories : categories
-                    }
+                    categories={treeBrowseMode === 'related' ? relatedTreeCategories : categories}
                     selectedPath={state.selectedPath}
                     onSelect={handleTreeSelect}
                     mode='full'
@@ -745,7 +743,6 @@ export function CategorySelector({
                           selectionStartTime: Date.now(),
                           interactionMethod: null,
                         })
-                        setShowManualNavigation(false)
                         setCategoryMetadata(null)
                         setConfidenceScore(0)
                         onChange('')

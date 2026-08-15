@@ -96,7 +96,15 @@ export class AuditExportService {
       switch (options.format) {
         case 'csv':
           return {
-            content: this.generateCSVFromColumns(flatRows, exportColumns, options, logs.length),
+            content: this.generateCSVFromColumns(
+              flatRows,
+              exportColumns.map(column => ({
+                key: column.key!,
+                header: column.header ?? column.key!,
+              })),
+              options,
+              logs.length
+            ),
             filename: `${filename}.csv`,
             contentType: 'text/csv; charset=utf-8',
             warnings,
@@ -120,7 +128,14 @@ export class AuditExportService {
           }
         case 'json':
           return {
-            content: this.generateJSON(logs, filters, options, includeSensitive, maskPii, columnKeys),
+            content: this.generateJSON(
+              logs,
+              filters,
+              options,
+              includeSensitive,
+              maskPii,
+              columnKeys
+            ),
             filename: `${filename}.json`,
             contentType: 'application/json',
             warnings,
@@ -160,8 +175,7 @@ export class AuditExportService {
     }
 
     for (const row of rows) {
-      csv +=
-        columns.map(c => `"${escapeCsv(String(row[c.key] ?? ''))}"`).join(',') + '\n'
+      csv += columns.map(c => `"${escapeCsv(String(row[c.key] ?? ''))}"`).join(',') + '\n'
     }
 
     return csv
@@ -258,9 +272,8 @@ export class AuditExportService {
         totalRegistros: logs.length,
         usuariosUnicos: new Set(logs.map(l => l.userId).filter(Boolean)).size,
         accionesUnicas: new Set(logs.map(l => l.action)).size,
-        eventosCriticos: logs.filter(
-          l => determineSeverity(l.action, l.entityType) === 'CRITICAL'
-        ).length,
+        eventosCriticos: logs.filter(l => determineSeverity(l.action, l.entityType) === 'CRITICAL')
+          .length,
       },
       registros: includeSensitive
         ? logs.map(log => {

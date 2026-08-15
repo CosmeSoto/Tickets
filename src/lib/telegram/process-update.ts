@@ -22,6 +22,7 @@ import {
 } from '@/lib/telegram/vincular-rate-limit'
 import prisma from '@/lib/prisma'
 import { sendTelegramMessage, escapeMdV2 } from '@/lib/services/telegram.service'
+import { DecommissionStatus, MaintenanceStatus, TicketStatus } from '@prisma/client'
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -41,35 +42,40 @@ export async function processUpdate(update: TelegramUpdateMessage): Promise<void
   const message = update.message
   if (!message?.text || !message.from) return
 
-  const chatId    = String(message.chat.id)
-  const text      = message.text.trim()
-  const fromId    = message.from.id
+  const chatId = String(message.chat.id)
+  const text = message.text.trim()
+  const fromId = message.from.id
   const firstName = message.from.first_name ?? 'usuario'
 
   try {
-    if      (text.startsWith('/start'))         await handleStart(chatId, firstName)
-    else if (text.startsWith('/vincular'))      await handleVincular(chatId, fromId, firstName, text.split(/\s+/)[1] ?? '')
-    else if (text.startsWith('/desvincular'))   await handleDesvincular(chatId)
-    else if (text.startsWith('/estado'))        await handleEstado(chatId)
-    else if (text.startsWith('/mis_tickets'))   await handleMisTickets(chatId)
-    else if (text.startsWith('/mi_tecnico'))    await handleMiTecnico(chatId)
-    else if (text.startsWith('/pendientes'))    await handlePendientes(chatId)
-    else if (text.startsWith('/actas'))         await handleActas(chatId)
-    else if (text.startsWith('/mis_actas'))     await handleMisActas(chatId)
-    else if (text.startsWith('/sistema'))       await handleSistema(chatId)
-    else if (text.startsWith('/mis_rondas'))    await handleMisRondas(chatId)
-    else if (text.startsWith('/mis_equipos'))   await handleMisEquipos(chatId)
-    else if (text.startsWith('/inventario'))    await handleInventario(chatId)
+    if (text.startsWith('/start')) await handleStart(chatId, firstName)
+    else if (text.startsWith('/vincular'))
+      await handleVincular(chatId, fromId, firstName, text.split(/\s+/)[1] ?? '')
+    else if (text.startsWith('/desvincular')) await handleDesvincular(chatId)
+    else if (text.startsWith('/estado')) await handleEstado(chatId)
+    else if (text.startsWith('/mis_tickets')) await handleMisTickets(chatId)
+    else if (text.startsWith('/mi_tecnico')) await handleMiTecnico(chatId)
+    else if (text.startsWith('/pendientes')) await handlePendientes(chatId)
+    else if (text.startsWith('/actas')) await handleActas(chatId)
+    else if (text.startsWith('/mis_actas')) await handleMisActas(chatId)
+    else if (text.startsWith('/sistema')) await handleSistema(chatId)
+    else if (text.startsWith('/mis_rondas')) await handleMisRondas(chatId)
+    else if (text.startsWith('/mis_equipos')) await handleMisEquipos(chatId)
+    else if (text.startsWith('/inventario')) await handleInventario(chatId)
     else if (text.startsWith('/mis_mantenimientos')) await handleMisMantenimientos(chatId)
     else if (text.startsWith('/mis_solicitudes')) await handleMisSolicitudes(chatId)
-    else if (text.startsWith('/bajas'))         await handleBajas(chatId)
-    else if (text.startsWith('/noticias'))      await handleNoticias(chatId)
-    else if (text.startsWith('/catalogo'))      await handleCatalogo(chatId)
+    else if (text.startsWith('/bajas')) await handleBajas(chatId)
+    else if (text.startsWith('/noticias')) await handleNoticias(chatId)
+    else if (text.startsWith('/catalogo')) await handleCatalogo(chatId)
     else if (text.startsWith('/mis_contratos')) await handleMisContratos(chatId)
     else if (text.startsWith('/como_funciona')) await handleComoFunciona(chatId)
-    else if (text.startsWith('/centro_ayuda'))  await handleCentroAyuda(chatId)
+    else if (text.startsWith('/centro_ayuda')) await handleCentroAyuda(chatId)
     else if (text.startsWith('/ayuda') || text.startsWith('/help')) await handleAyuda(chatId)
-    else await sendTelegramMessage(chatId, `No reconozco ese comando\\. Escribe /ayuda para ver los comandos disponibles\\.`)
+    else
+      await sendTelegramMessage(
+        chatId,
+        `No reconozco ese comando\\. Escribe /ayuda para ver los comandos disponibles\\.`
+      )
   } catch (err) {
     console.error(`[TELEGRAM] Error update ${update.update_id}:`, err)
   }
@@ -81,8 +87,12 @@ async function getLinkedUser(chatId: string) {
   return prisma.users.findFirst({
     where: { telegramChatId: chatId, isActive: true },
     select: {
-      id: true, name: true, email: true, phone: true,
-      role: true, isSuperAdmin: true,
+      id: true,
+      name: true,
+      email: true,
+      phone: true,
+      role: true,
+      isSuperAdmin: true,
       ticketsEnabled: true,
       inventoryEnabled: true,
       patrolsEnabled: true,
@@ -96,28 +106,51 @@ async function getLinkedUser(chatId: string) {
 // ─── Constantes de formato ────────────────────────────────────────────────────
 
 const ROLE_LABEL: Record<string, string> = {
-  ADMIN: 'Admin', TECHNICIAN: 'Técnico', CLIENT: 'Cliente',
+  ADMIN: 'Admin',
+  TECHNICIAN: 'Técnico',
+  CLIENT: 'Cliente',
 }
 
 const STATUS_EMOJI: Record<string, string> = {
-  OPEN: '🟡', IN_PROGRESS: '🔵', RESOLVED: '✅', CLOSED: '⚫',
+  OPEN: '🟡',
+  IN_PROGRESS: '🔵',
+  RESOLVED: '✅',
+  CLOSED: '⚫',
 }
 
 const PRIO_EMOJI: Record<string, string> = {
-  URGENT: '🔴', HIGH: '🟠', MEDIUM: '🟡', LOW: '🟢',
+  URGENT: '🔴',
+  HIGH: '🟠',
+  MEDIUM: '🟡',
+  LOW: '🟢',
 }
 
 const PATROL_STATUS: Record<string, string> = {
-  PENDING: '⏳', IN_PROGRESS: '🔵', COMPLETED: '✅', MISSED: '❌', INCOMPLETE: '⚠️',
+  PENDING: '⏳',
+  IN_PROGRESS: '🔵',
+  COMPLETED: '✅',
+  MISSED: '❌',
+  INCOMPLETE: '⚠️',
 }
 
 const CONTRACT_STATUS: Record<string, string> = {
-  ACTIVE: '🟢', EXPIRING: '🟠', EXPIRED: '🔴', DRAFT: '⚪', TERMINATED: '⚫', RENEWED: '🔄',
+  ACTIVE: '🟢',
+  EXPIRING: '🟠',
+  EXPIRED: '🔴',
+  DRAFT: '⚪',
+  TERMINATED: '⚫',
+  RENEWED: '🔄',
 }
 
 const NEWS_TYPE: Record<string, string> = {
-  NEWS: '📰', ANNOUNCEMENT: '📢', EVENT: '🗓️', BIRTHDAY: '🎂',
-  HOLIDAY: '🏖️', ALERT: '🚨', INTERNAL_AD: '📋', RECOGNITION: '🏆',
+  NEWS: '📰',
+  ANNOUNCEMENT: '📢',
+  EVENT: '🗓️',
+  BIRTHDAY: '🎂',
+  HOLIDAY: '🏖️',
+  ALERT: '🚨',
+  INTERNAL_AD: '📋',
+  RECOGNITION: '🏆',
 }
 
 // ─── Handlers: cuenta ─────────────────────────────────────────────────────────
@@ -125,31 +158,39 @@ const NEWS_TYPE: Record<string, string> = {
 async function handleStart(chatId: string, firstName: string) {
   const existing = await getLinkedUser(chatId)
   if (existing) {
-    await sendTelegramMessage(chatId,
+    await sendTelegramMessage(
+      chatId,
       `👋 Bienvenido de vuelta, *${escapeMdV2(existing.name)}*\\!\n\n` +
-      `Tu cuenta ya está vinculada\\. Escribe /ayuda para ver los comandos\\.`)
+        `Tu cuenta ya está vinculada\\. Escribe /ayuda para ver los comandos\\.`
+    )
     return
   }
-  await sendTelegramMessage(chatId,
+  await sendTelegramMessage(
+    chatId,
     `👋 Hola *${escapeMdV2(firstName)}*\\!\n\n` +
-    `Soy el bot del sistema de gestión del centro comercial\\.\n\n` +
-    `Para recibir alertas y usar comandos, vincula tu cuenta:\n` +
-    `*/vincular \\<código\\>*\n\n` +
-    `Obtén tu código en *Perfil* o *Configuración → Notificaciones → Telegram*\\.\n\n` +
-    `Escribe /ayuda para ver todos los comandos\\.`)
+      `Soy el bot del sistema de gestión del centro comercial\\.\n\n` +
+      `Para recibir alertas y usar comandos, vincula tu cuenta:\n` +
+      `*/vincular \\<código\\>*\n\n` +
+      `Obtén tu código en *Perfil* o *Configuración → Notificaciones → Telegram*\\.\n\n` +
+      `Escribe /ayuda para ver todos los comandos\\.`
+  )
 }
 
 async function handleVincular(chatId: string, _fromId: number, _firstName: string, code: string) {
   if (!code) {
-    await sendTelegramMessage(chatId,
-      `⚠️ Indica tu código:\n\n*/vincular \\<código\\>*\n\nObtén el código en *Perfil* o *Configuración → Notificaciones*\\.`)
+    await sendTelegramMessage(
+      chatId,
+      `⚠️ Indica tu código:\n\n*/vincular \\<código\\>*\n\nObtén el código en *Perfil* o *Configuración → Notificaciones*\\.`
+    )
     return
   }
 
   const rate = await checkTelegramVincularRateLimit(chatId)
   if (!rate.allowed) {
-    await sendTelegramMessage(chatId,
-      `⏳ Demasiados intentos de vinculación\\. Espera unos minutos e inténtalo de nuevo\\.`)
+    await sendTelegramMessage(
+      chatId,
+      `⏳ Demasiados intentos de vinculación\\. Espera unos minutos e inténtalo de nuevo\\.`
+    )
     return
   }
 
@@ -158,8 +199,10 @@ async function handleVincular(chatId: string, _fromId: number, _firstName: strin
     include: { user: { select: { id: true, name: true, phone: true } } },
   })
   if (!linkToken) {
-    await sendTelegramMessage(chatId,
-      `❌ Código inválido o expirado\\.\n\nGenera uno nuevo en *Perfil* o *Configuración → Notificaciones → Telegram*\\.`)
+    await sendTelegramMessage(
+      chatId,
+      `❌ Código inválido o expirado\\.\n\nGenera uno nuevo en *Perfil* o *Configuración → Notificaciones → Telegram*\\.`
+    )
     return
   }
 
@@ -168,9 +211,11 @@ async function handleVincular(chatId: string, _fromId: number, _firstName: strin
     select: { id: true, name: true },
   })
   if (chatTaken) {
-    await sendTelegramMessage(chatId,
+    await sendTelegramMessage(
+      chatId,
       `⚠️ Este chat ya está vinculado a *${escapeMdV2(chatTaken.name)}*\\.\n\n` +
-      `Desvincula con /desvincular desde esa cuenta o usa otro chat de Telegram\\.`)
+        `Desvincula con /desvincular desde esa cuenta o usa otro chat de Telegram\\.`
+    )
     return
   }
 
@@ -179,14 +224,22 @@ async function handleVincular(chatId: string, _fromId: number, _firstName: strin
       where: { telegramChatId: chatId, id: { not: linkToken.userId } },
       data: { telegramChatId: null },
     }),
-    prisma.telegram_link_tokens.update({ where: { id: linkToken.id }, data: { usedAt: new Date() } }),
+    prisma.telegram_link_tokens.update({
+      where: { id: linkToken.id },
+      data: { usedAt: new Date() },
+    }),
     prisma.users.update({ where: { id: linkToken.userId }, data: { telegramChatId: chatId } }),
   ])
   await resetTelegramVincularRateLimit(chatId)
-  const phoneHint = linkToken.user.phone ? `\n📱 *Teléfono:* ${escapeMdV2(linkToken.user.phone)}` : ''
-  await sendTelegramMessage(chatId,
+  const phoneHint = linkToken.user.phone
+    ? `\n📱 *Teléfono:* ${escapeMdV2(linkToken.user.phone)}`
+    : ''
+  await sendTelegramMessage(
+    chatId,
     `✅ *¡Cuenta vinculada\\!*\n\nRecibirás alertas como *${escapeMdV2(linkToken.user.name)}*\\.` +
-    phoneHint + `\n\nEscribe /ayuda para ver los comandos\\.`)
+      phoneHint +
+      `\n\nEscribe /ayuda para ver los comandos\\.`
+  )
 }
 
 async function handleDesvincular(chatId: string) {
@@ -196,101 +249,157 @@ async function handleDesvincular(chatId: string) {
     return
   }
   await prisma.users.update({ where: { id: user.id }, data: { telegramChatId: null } })
-  await sendTelegramMessage(chatId,
-    `🔓 Cuenta de *${escapeMdV2(user.name)}* desvinculada\\.\n\nUsa /vincular para reconectar cuando quieras\\.`)
+  await sendTelegramMessage(
+    chatId,
+    `🔓 Cuenta de *${escapeMdV2(user.name)}* desvinculada\\.\n\nUsa /vincular para reconectar cuando quieras\\.`
+  )
 }
 
 async function handleEstado(chatId: string) {
   const user = await getLinkedUser(chatId)
   if (!user) {
-    await sendTelegramMessage(chatId, `❌ Chat no vinculado\\. Usa /vincular \\<código\\> para conectar tu cuenta\\.`)
+    await sendTelegramMessage(
+      chatId,
+      `❌ Chat no vinculado\\. Usa /vincular \\<código\\> para conectar tu cuenta\\.`
+    )
     return
   }
   const tgEnabled = user.user_settings?.telegramNotifications ?? true
   const phoneLine = user.phone ? `\n📱 *Teléfono:* ${escapeMdV2(user.phone)}` : ''
-  await sendTelegramMessage(chatId,
+  await sendTelegramMessage(
+    chatId,
     `✅ *Cuenta vinculada*\n\n` +
-    `👤 *Nombre:* ${escapeMdV2(user.name)}\n` +
-    `📧 *Email:* ${escapeMdV2(user.email)}` + phoneLine + `\n` +
-    `🏷️ *Rol:* ${escapeMdV2(ROLE_LABEL[user.role] ?? user.role)}\n` +
-    `${tgEnabled ? '🟢' : '🔴'} *Alertas:* ${escapeMdV2(tgEnabled ? 'Activadas' : 'Desactivadas')}\n\n` +
-    `Escribe /ayuda para ver los comandos\\.`)
+      `👤 *Nombre:* ${escapeMdV2(user.name)}\n` +
+      `📧 *Email:* ${escapeMdV2(user.email)}` +
+      phoneLine +
+      `\n` +
+      `🏷️ *Rol:* ${escapeMdV2(ROLE_LABEL[user.role] ?? user.role)}\n` +
+      `${tgEnabled ? '🟢' : '🔴'} *Alertas:* ${escapeMdV2(tgEnabled ? 'Activadas' : 'Desactivadas')}\n\n` +
+      `Escribe /ayuda para ver los comandos\\.`
+  )
 }
 
 // ─── Handlers: tickets ────────────────────────────────────────────────────────
 
 async function handleMisTickets(chatId: string) {
   const user = await getLinkedUser(chatId)
-  if (!user) { await sendTelegramMessage(chatId, `❌ Vincula tu cuenta con /vincular \\<código\\>\\.`); return }
-  if (!user.ticketsEnabled && user.role === 'CLIENT') {
-    await sendTelegramMessage(chatId, `⚠️ No tienes el módulo de Tickets activado\\.`); return
+  if (!user) {
+    await sendTelegramMessage(chatId, `❌ Vincula tu cuenta con /vincular \\<código\\>\\.`)
+    return
   }
-  const isAdmin = user.role === 'ADMIN', isTech = user.role === 'TECHNICIAN'
+  if (!user.ticketsEnabled && user.role === 'CLIENT') {
+    await sendTelegramMessage(chatId, `⚠️ No tienes el módulo de Tickets activado\\.`)
+    return
+  }
+  const isAdmin = user.role === 'ADMIN',
+    isTech = user.role === 'TECHNICIAN'
+  const activeStatuses: TicketStatus[] = ['OPEN', 'IN_PROGRESS']
   const where = isAdmin
-    ? { status: { in: ['OPEN', 'IN_PROGRESS'] as const } }
-    : isTech ? { assigneeId: user.id, status: { in: ['OPEN', 'IN_PROGRESS'] as const } }
-    : { clientId: user.id, status: { in: ['OPEN', 'IN_PROGRESS'] as const } }
+    ? { status: { in: activeStatuses } }
+    : isTech
+      ? { assigneeId: user.id, status: { in: activeStatuses } }
+      : { clientId: user.id, status: { in: activeStatuses } }
 
   const tickets = await prisma.tickets.findMany({
-    where, orderBy: { updatedAt: 'desc' }, take: 8,
+    where,
+    orderBy: { updatedAt: 'desc' },
+    take: 8,
     select: { ticketCode: true, title: true, status: true, priority: true },
   })
-  if (!tickets.length) { await sendTelegramMessage(chatId, `✅ No tienes tickets activos en este momento\\.`); return }
+  if (!tickets.length) {
+    await sendTelegramMessage(chatId, `✅ No tienes tickets activos en este momento\\.`)
+    return
+  }
 
   const lines = tickets.map(t => {
     const code = t.ticketCode ? `\\[${escapeMdV2(t.ticketCode)}\\] ` : ''
     return `${STATUS_EMOJI[t.status] ?? '❓'} ${code}${escapeMdV2(t.title.substring(0, 45) + (t.title.length > 45 ? '…' : ''))}`
   })
-  const header = isAdmin ? `📋 *Tickets activos \\(${tickets.length}\\)*`
-    : isTech ? `📋 *Mis asignados \\(${tickets.length}\\)*`
-    : `📋 *Mis tickets \\(${tickets.length}\\)*`
-  await sendTelegramMessage(chatId, `${header}\n\n${lines.join('\n')}\n\n_Detalle completo en el sistema_\\.`)
+  const header = isAdmin
+    ? `📋 *Tickets activos \\(${tickets.length}\\)*`
+    : isTech
+      ? `📋 *Mis asignados \\(${tickets.length}\\)*`
+      : `📋 *Mis tickets \\(${tickets.length}\\)*`
+  await sendTelegramMessage(
+    chatId,
+    `${header}\n\n${lines.join('\n')}\n\n_Detalle completo en el sistema_\\.`
+  )
 }
 
 async function handleMiTecnico(chatId: string) {
   const user = await getLinkedUser(chatId)
-  if (!user) { await sendTelegramMessage(chatId, `❌ Vincula tu cuenta con /vincular \\<código\\>\\.`); return }
+  if (!user) {
+    await sendTelegramMessage(chatId, `❌ Vincula tu cuenta con /vincular \\<código\\>\\.`)
+    return
+  }
   if (user.role !== 'CLIENT') {
-    await sendTelegramMessage(chatId, `ℹ️ Este comando es para clientes\\. Tú ves tus asignaciones con /mis\\_tickets\\.`); return
+    await sendTelegramMessage(
+      chatId,
+      `ℹ️ Este comando es para clientes\\. Tú ves tus asignaciones con /mis\\_tickets\\.`
+    )
+    return
   }
   const ticket = await prisma.tickets.findFirst({
-    where: { clientId: user.id, status: { in: ['OPEN', 'IN_PROGRESS'] }, assigneeId: { not: null } },
+    where: {
+      clientId: user.id,
+      status: { in: ['OPEN', 'IN_PROGRESS'] },
+      assigneeId: { not: null },
+    },
     orderBy: { updatedAt: 'desc' },
     select: {
-      ticketCode: true, title: true, status: true,
+      ticketCode: true,
+      title: true,
+      status: true,
       users_tickets_assigneeIdTousers: { select: { name: true, email: true, phone: true } },
     },
   })
   if (!ticket || !ticket.users_tickets_assigneeIdTousers) {
-    await sendTelegramMessage(chatId, `ℹ️ No tienes tickets activos con técnico asignado en este momento\\.`); return
+    await sendTelegramMessage(
+      chatId,
+      `ℹ️ No tienes tickets activos con técnico asignado en este momento\\.`
+    )
+    return
   }
   const tech = ticket.users_tickets_assigneeIdTousers
   const code = ticket.ticketCode ? ` \\[${escapeMdV2(ticket.ticketCode)}\\]` : ''
   const phoneLine = tech.phone ? `\n📱 *Teléfono:* ${escapeMdV2(tech.phone)}` : ''
-  await sendTelegramMessage(chatId,
+  await sendTelegramMessage(
+    chatId,
     `🔧 *Tu técnico asignado*\n\n` +
-    `🎫 *Ticket:*${code} ${escapeMdV2(ticket.title.substring(0, 50))}\n` +
-    `${STATUS_EMOJI[ticket.status] ?? '❓'} *Estado:* ${escapeMdV2(ticket.status.replace('_', ' '))}\n\n` +
-    `👤 *Técnico:* ${escapeMdV2(tech.name)}\n` +
-    `📧 *Email:* ${escapeMdV2(tech.email)}` + phoneLine + `\n\n` +
-    `_Puedes contactarlo directamente o añadir un comentario en el ticket_\\.`)
+      `🎫 *Ticket:*${code} ${escapeMdV2(ticket.title.substring(0, 50))}\n` +
+      `${STATUS_EMOJI[ticket.status] ?? '❓'} *Estado:* ${escapeMdV2(ticket.status.replace('_', ' '))}\n\n` +
+      `👤 *Técnico:* ${escapeMdV2(tech.name)}\n` +
+      `📧 *Email:* ${escapeMdV2(tech.email)}` +
+      phoneLine +
+      `\n\n` +
+      `_Puedes contactarlo directamente o añadir un comentario en el ticket_\\.`
+  )
 }
 
 async function handlePendientes(chatId: string) {
   const user = await getLinkedUser(chatId)
-  if (!user) { await sendTelegramMessage(chatId, `❌ Vincula tu cuenta con /vincular \\<código\\>\\.`); return }
+  if (!user) {
+    await sendTelegramMessage(chatId, `❌ Vincula tu cuenta con /vincular \\<código\\>\\.`)
+    return
+  }
   if (user.role !== 'ADMIN' && user.role !== 'TECHNICIAN') {
-    await sendTelegramMessage(chatId, `⚠️ Solo disponible para técnicos y administradores\\.`); return
+    await sendTelegramMessage(chatId, `⚠️ Solo disponible para técnicos y administradores\\.`)
+    return
   }
 
-  let where: { status: 'OPEN'; assigneeId?: string; familyId?: { in: string[] } } = { status: 'OPEN' }
+  let where: { status: 'OPEN'; assigneeId?: string; familyId?: { in: string[] } } = {
+    status: 'OPEN',
+  }
   if (user.role === 'TECHNICIAN') {
     where = { assigneeId: user.id, status: 'OPEN' }
   } else {
     const scope = await getUserFamilyScope(user.id, user.role, user.isSuperAdmin)
     if (scope.familyIds !== undefined) {
       if (scope.familyIds.length === 0) {
-        await sendTelegramMessage(chatId, `ℹ️ No tienes familias asignadas para consultar tickets\\.`)
+        await sendTelegramMessage(
+          chatId,
+          `ℹ️ No tienes familias asignadas para consultar tickets\\.`
+        )
         return
       }
       where = { status: 'OPEN', familyId: { in: scope.familyIds } }
@@ -298,24 +407,41 @@ async function handlePendientes(chatId: string) {
   }
 
   const [tickets, count] = await Promise.all([
-    prisma.tickets.findMany({ where, take: 10, orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }], select: { ticketCode: true, title: true, priority: true } }),
+    prisma.tickets.findMany({
+      where,
+      take: 10,
+      orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }],
+      select: { ticketCode: true, title: true, priority: true },
+    }),
     prisma.tickets.count({ where }),
   ])
-  if (!tickets.length) { await sendTelegramMessage(chatId, `✅ No hay tickets pendientes\\.`); return }
+  if (!tickets.length) {
+    await sendTelegramMessage(chatId, `✅ No hay tickets pendientes\\.`)
+    return
+  }
   const lines = tickets.map(t => {
     const code = t.ticketCode ? `\\[${escapeMdV2(t.ticketCode)}\\] ` : ''
     return `${PRIO_EMOJI[t.priority] ?? '⚪'} ${code}${escapeMdV2(t.title.substring(0, 40) + (t.title.length > 40 ? '…' : ''))}`
   })
   const extra = count > 10 ? `\n_\\.\\.\\. y ${count - 10} más_` : ''
-  await sendTelegramMessage(chatId, `🎫 *Pendientes \\(${count}\\)*\n\n${lines.join('\n')}${extra}\n\n_Gestiona desde el sistema_\\.`)
+  await sendTelegramMessage(
+    chatId,
+    `🎫 *Pendientes \\(${count}\\)*\n\n${lines.join('\n')}${extra}\n\n_Gestiona desde el sistema_\\.`
+  )
 }
 
 // ─── Handlers: admin ─────────────────────────────────────────────────────────
 
 async function handleActas(chatId: string) {
   const user = await getLinkedUser(chatId)
-  if (!user) { await sendTelegramMessage(chatId, `❌ Vincula tu cuenta con /vincular \\<código\\>\\.`); return }
-  if (user.role !== 'ADMIN') { await sendTelegramMessage(chatId, `⚠️ Solo disponible para administradores\\.`); return }
+  if (!user) {
+    await sendTelegramMessage(chatId, `❌ Vincula tu cuenta con /vincular \\<código\\>\\.`)
+    return
+  }
+  if (user.role !== 'ADMIN') {
+    await sendTelegramMessage(chatId, `⚠️ Solo disponible para administradores\\.`)
+    return
+  }
 
   const scope = await getUserFamilyScope(user.id, user.role, user.isSuperAdmin)
   const familyFilter =
@@ -340,23 +466,39 @@ async function handleActas(chatId: string) {
       expirationDate: { gt: new Date() },
       ...familyFilter,
     },
-    orderBy: { expirationDate: 'asc' }, take: 10,
+    orderBy: { expirationDate: 'asc' },
+    take: 10,
     select: { folio: true, expirationDate: true, actType: true },
   })
-  if (!acts.length) { await sendTelegramMessage(chatId, `✅ No hay actas pendientes de firma\\.`); return }
+  if (!acts.length) {
+    await sendTelegramMessage(chatId, `✅ No hay actas pendientes de firma\\.`)
+    return
+  }
 
   const lines = acts.map(a => {
-    const exp = new Date(a.expirationDate).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })
+    const exp = new Date(a.expirationDate).toLocaleDateString('es-ES', {
+      day: '2-digit',
+      month: '2-digit',
+    })
     const tipo = escapeMdV2(a.actType.replace('_', ' ').toLowerCase())
     return `📄 ${escapeMdV2(a.folio)} \\(${tipo}\\) — vence ${escapeMdV2(exp)}`
   })
-  await sendTelegramMessage(chatId, `📝 *Actas pendientes \\(${acts.length}\\)*\n\n${lines.join('\n')}\n\n_Inventario → Actas_\\.`)
+  await sendTelegramMessage(
+    chatId,
+    `📝 *Actas pendientes \\(${acts.length}\\)*\n\n${lines.join('\n')}\n\n_Inventario → Actas_\\.`
+  )
 }
 
 async function handleSistema(chatId: string) {
   const user = await getLinkedUser(chatId)
-  if (!user) { await sendTelegramMessage(chatId, `❌ Vincula tu cuenta con /vincular \\<código\\>\\.`); return }
-  if (user.role !== 'ADMIN') { await sendTelegramMessage(chatId, `⚠️ Solo disponible para administradores\\.`); return }
+  if (!user) {
+    await sendTelegramMessage(chatId, `❌ Vincula tu cuenta con /vincular \\<código\\>\\.`)
+    return
+  }
+  if (user.role !== 'ADMIN') {
+    await sendTelegramMessage(chatId, `⚠️ Solo disponible para administradores\\.`)
+    return
+  }
 
   const scope = await getUserFamilyScope(user.id, user.role, user.isSuperAdmin)
   const ticketFilter =
@@ -383,14 +525,21 @@ async function handleSistema(chatId: string) {
       : {}
 
   if (ticketFilter === null || actFamilyFilter === null || patrolFamilyFilter === null) {
-    await sendTelegramMessage(chatId, `ℹ️ No tienes familias asignadas para ver el resumen del sistema\\.`)
+    await sendTelegramMessage(
+      chatId,
+      `ℹ️ No tienes familias asignadas para ver el resumen del sistema\\.`
+    )
     return
   }
 
   const [open, inProgress, lastBackup, pendingActs, openPatrols] = await Promise.all([
     prisma.tickets.count({ where: { status: 'OPEN', ...ticketFilter } }),
     prisma.tickets.count({ where: { status: 'IN_PROGRESS', ...ticketFilter } }),
-    prisma.backups.findFirst({ where: { status: 'completed' }, orderBy: { createdAt: 'desc' }, select: { createdAt: true } }),
+    prisma.backups.findFirst({
+      where: { status: 'completed' },
+      orderBy: { createdAt: 'desc' },
+      select: { createdAt: true },
+    }),
     prisma.delivery_acts.count({
       where: { status: 'PENDING', expirationDate: { gt: new Date() }, ...actFamilyFilter },
     }),
@@ -408,27 +557,35 @@ async function handleSistema(chatId: string) {
     ? `💾 *Último backup:* ${escapeMdV2(new Date(lastBackup.createdAt).toLocaleDateString('es-ES'))}`
     : `💾 *Último backup:* sin registros`
 
-  await sendTelegramMessage(chatId,
+  await sendTelegramMessage(
+    chatId,
     `⚙️ *${scopeLabel}*\n\n` +
-    `🎫 Tickets abiertos: *${escapeMdV2(String(open))}*\n` +
-    `🔵 En progreso: *${escapeMdV2(String(inProgress))}*\n` +
-    `📝 Actas pendientes: *${escapeMdV2(String(pendingActs))}*\n` +
-    `🔒 Rondas activas: *${escapeMdV2(String(openPatrols))}*\n` +
-    bkLine + `\n\n_Panel completo en Admin → Dashboard_\\.`)
+      `🎫 Tickets abiertos: *${escapeMdV2(String(open))}*\n` +
+      `🔵 En progreso: *${escapeMdV2(String(inProgress))}*\n` +
+      `📝 Actas pendientes: *${escapeMdV2(String(pendingActs))}*\n` +
+      `🔒 Rondas activas: *${escapeMdV2(String(openPatrols))}*\n` +
+      bkLine +
+      `\n\n_Panel completo en Admin → Dashboard_\\.`
+  )
 }
 
 // ─── Handlers: rondas ────────────────────────────────────────────────────────
 
 async function handleMisRondas(chatId: string) {
   const user = await getLinkedUser(chatId)
-  if (!user) { await sendTelegramMessage(chatId, `❌ Vincula tu cuenta con /vincular \\<código\\>\\.`); return }
+  if (!user) {
+    await sendTelegramMessage(chatId, `❌ Vincula tu cuenta con /vincular \\<código\\>\\.`)
+    return
+  }
   if (!user.patrolsEnabled) {
-    await sendTelegramMessage(chatId, `⚠️ No tienes el módulo de Rondas activado\\.`); return
+    await sendTelegramMessage(chatId, `⚠️ No tienes el módulo de Rondas activado\\.`)
+    return
   }
 
   const patrols = await prisma.patrols.findMany({
     where: { agentId: user.id, status: { in: ['PENDING', 'IN_PROGRESS'] } },
-    orderBy: { scheduledStart: 'asc' }, take: 6,
+    orderBy: { scheduledStart: 'asc' },
+    take: 6,
     select: {
       status: true,
       scheduledStart: true,
@@ -442,9 +599,12 @@ async function handleMisRondas(chatId: string) {
   if (!patrols.length && (user.role === 'ADMIN' || user.role === 'TECHNICIAN')) {
     const allPatrols = await prisma.patrols.findMany({
       where: { status: { in: ['PENDING', 'IN_PROGRESS'] } },
-      orderBy: { scheduledStart: 'asc' }, take: 6,
+      orderBy: { scheduledStart: 'asc' },
+      take: 6,
       select: {
-        status: true, scheduledStart: true, scheduledEnd: true,
+        status: true,
+        scheduledStart: true,
+        scheduledEnd: true,
         completionPercentage: true,
         route: { select: { name: true } },
         agent: { select: { name: true } },
@@ -455,39 +615,58 @@ async function handleMisRondas(chatId: string) {
       return
     }
     const lines = allPatrols.map(p => {
-      const hora = new Date(p.scheduledStart).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+      const hora = new Date(p.scheduledStart).toLocaleTimeString('es-ES', {
+        hour: '2-digit',
+        minute: '2-digit',
+      })
       const ruta = p.route?.name ?? 'Sin ruta'
       const agente = (p as typeof p & { agent?: { name: string } }).agent?.name ?? '—'
       const pct = p.completionPercentage > 0 ? ` ${Math.round(p.completionPercentage)}%` : ''
       return `${PATROL_STATUS[p.status] ?? '❓'} ${escapeMdV2(ruta)} — ${escapeMdV2(hora)}${escapeMdV2(pct)} \\(${escapeMdV2(agente)}\\)`
     })
-    await sendTelegramMessage(chatId, `🔒 *Rondas activas \\(${allPatrols.length}\\)*\n\n${lines.join('\n')}\n\n_Rondas → Dashboard_\\.`)
+    await sendTelegramMessage(
+      chatId,
+      `🔒 *Rondas activas \\(${allPatrols.length}\\)*\n\n${lines.join('\n')}\n\n_Rondas → Dashboard_\\.`
+    )
     return
   }
 
   if (!patrols.length) {
-    await sendTelegramMessage(chatId, `✅ No tienes rondas activas o programadas en este momento\\.`)
+    await sendTelegramMessage(
+      chatId,
+      `✅ No tienes rondas activas o programadas en este momento\\.`
+    )
     return
   }
 
   const lines = patrols.map(p => {
-    const hora = new Date(p.scheduledStart).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+    const hora = new Date(p.scheduledStart).toLocaleTimeString('es-ES', {
+      hour: '2-digit',
+      minute: '2-digit',
+    })
     const ruta = p.route?.name ?? 'Sin ruta'
     const pct = p.completionPercentage > 0 ? ` ${Math.round(p.completionPercentage)}%` : ''
     return `${PATROL_STATUS[p.status] ?? '❓'} *${escapeMdV2(ruta)}* — ${escapeMdV2(hora)}${escapeMdV2(pct)}`
   })
-  await sendTelegramMessage(chatId, `🔒 *Mis rondas \\(${patrols.length}\\)*\n\n${lines.join('\n')}\n\n_Rondas → Mis Rondas_\\.`)
+  await sendTelegramMessage(
+    chatId,
+    `🔒 *Mis rondas \\(${patrols.length}\\)*\n\n${lines.join('\n')}\n\n_Rondas → Mis Rondas_\\.`
+  )
 }
 
 // ─── Handlers: inventario ─────────────────────────────────────────────────────
 
 async function handleMisEquipos(chatId: string) {
   const user = await getLinkedUser(chatId)
-  if (!user) { await sendTelegramMessage(chatId, `❌ Vincula tu cuenta con /vincular \\<código\\>\\.`); return }
+  if (!user) {
+    await sendTelegramMessage(chatId, `❌ Vincula tu cuenta con /vincular \\<código\\>\\.`)
+    return
+  }
 
   const assignments = await prisma.equipment_assignments.findMany({
     where: { receiverId: user.id, isActive: true },
-    orderBy: { startDate: 'desc' }, take: 8,
+    orderBy: { startDate: 'desc' },
+    take: 8,
     select: {
       assignmentType: true,
       startDate: true,
@@ -509,10 +688,17 @@ async function handleMisEquipos(chatId: string) {
   }
 
   const EQUIP_STATUS: Record<string, string> = {
-    AVAILABLE: '🟢', ASSIGNED: '🔵', MAINTENANCE: '🔧', RETIRED: '⚫', FOR_SALE: '🏷️', SOLD: '✅',
+    AVAILABLE: '🟢',
+    ASSIGNED: '🔵',
+    MAINTENANCE: '🔧',
+    RETIRED: '⚫',
+    FOR_SALE: '🏷️',
+    SOLD: '✅',
   }
   const ASSIGN_TYPE: Record<string, string> = {
-    PERMANENT: 'Permanente', TEMPORARY: 'Temporal', LOAN: 'Préstamo',
+    PERMANENT: 'Permanente',
+    TEMPORARY: 'Temporal',
+    LOAN: 'Préstamo',
   }
 
   const lines = assignments.map(a => {
@@ -525,30 +711,31 @@ async function handleMisEquipos(chatId: string) {
     return `${st} *${escapeMdV2(brand + name)}*${code} — ${tipo}`
   })
 
-  await sendTelegramMessage(chatId,
-    `📦 *Mis equipos asignados \\(${assignments.length}\\)*\n\n${lines.join('\n')}\n\n_Detalle en Inventario → Mis Equipos_\\.`)
+  await sendTelegramMessage(
+    chatId,
+    `📦 *Mis equipos asignados \\(${assignments.length}\\)*\n\n${lines.join('\n')}\n\n_Detalle en Inventario → Mis Equipos_\\.`
+  )
 }
 
 // ─── Handlers: noticias, catálogo, contratos ─────────────────────────────────
 
 async function handleNoticias(chatId: string) {
   const user = await getLinkedUser(chatId)
-  if (!user) { await sendTelegramMessage(chatId, `❌ Vincula tu cuenta con /vincular \\<código\\>\\.`); return }
+  if (!user) {
+    await sendTelegramMessage(chatId, `❌ Vincula tu cuenta con /vincular \\<código\\>\\.`)
+    return
+  }
   if (!user.newsEnabled && user.role === 'CLIENT') {
-    await sendTelegramMessage(chatId, `⚠️ No tienes el módulo de Noticias activado\\.`); return
+    await sendTelegramMessage(chatId, `⚠️ No tienes el módulo de Noticias activado\\.`)
+    return
   }
 
   const now = new Date()
   const news = await prisma.news.findMany({
     where: {
       status: 'PUBLISHED',
-      OR: [
-        { startDate: null },
-        { startDate: { lte: now } },
-      ],
-      AND: [
-        { OR: [{ endDate: null }, { endDate: { gte: now } }] },
-      ],
+      OR: [{ startDate: null }, { startDate: { lte: now } }],
+      AND: [{ OR: [{ endDate: null }, { endDate: { gte: now } }] }],
     },
     orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
     take: 5,
@@ -562,22 +749,33 @@ async function handleNoticias(chatId: string) {
 
   const lines = news.map(n => {
     const typeEmoji = NEWS_TYPE[n.type] ?? '📄'
-    const fecha = new Date(n.createdAt).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })
-    const summary = n.summary ? `\n   _${escapeMdV2(n.summary.substring(0, 80) + (n.summary.length > 80 ? '…' : ''))}_` : ''
+    const fecha = new Date(n.createdAt).toLocaleDateString('es-ES', {
+      day: '2-digit',
+      month: '2-digit',
+    })
+    const summary = n.summary
+      ? `\n   _${escapeMdV2(n.summary.substring(0, 80) + (n.summary.length > 80 ? '…' : ''))}_`
+      : ''
     return `${typeEmoji} *${escapeMdV2(n.title)}* \\(${escapeMdV2(fecha)}\\)${summary}`
   })
 
-  await sendTelegramMessage(chatId,
-    `📰 *Últimas noticias \\(${news.length}\\)*\n\n${lines.join('\n\n')}\n\n_Ver todas en Noticias_\\.`)
+  await sendTelegramMessage(
+    chatId,
+    `📰 *Últimas noticias \\(${news.length}\\)*\n\n${lines.join('\n\n')}\n\n_Ver todas en Noticias_\\.`
+  )
 }
 
 async function handleCatalogo(chatId: string) {
   const user = await getLinkedUser(chatId)
-  if (!user) { await sendTelegramMessage(chatId, `❌ Vincula tu cuenta con /vincular \\<código\\>\\.`); return }
+  if (!user) {
+    await sendTelegramMessage(chatId, `❌ Vincula tu cuenta con /vincular \\<código\\>\\.`)
+    return
+  }
 
   const sales = await prisma.equipment_sales.findMany({
     where: { status: 'PENDING' },
-    orderBy: { createdAt: 'desc' }, take: 8,
+    orderBy: { createdAt: 'desc' },
+    take: 8,
     select: {
       salePrice: true,
       equipment: {
@@ -593,8 +791,10 @@ async function handleCatalogo(chatId: string) {
   })
 
   if (!sales.length) {
-    await sendTelegramMessage(chatId,
-      `ℹ️ No hay equipos disponibles para la venta en este momento\\.\n\n_Consulta con administración para más información_\\.`)
+    await sendTelegramMessage(
+      chatId,
+      `ℹ️ No hay equipos disponibles para la venta en este momento\\.\n\n_Consulta con administración para más información_\\.`
+    )
     return
   }
 
@@ -609,24 +809,27 @@ async function handleCatalogo(chatId: string) {
     return `🏷️ *${escapeMdV2(brand + name)}*${code} — ${price}`
   })
 
-  await sendTelegramMessage(chatId,
+  await sendTelegramMessage(
+    chatId,
     `🛒 *Equipos en venta \\(${sales.length}\\)*\n\n${lines.join('\n')}\n\n` +
-    `_Para adquirir un equipo contacta a administración\\._`)
+      `_Para adquirir un equipo contacta a administración\\._`
+  )
 }
 
 async function handleMisContratos(chatId: string) {
   const user = await getLinkedUser(chatId)
-  if (!user) { await sendTelegramMessage(chatId, `❌ Vincula tu cuenta con /vincular \\<código\\>\\.`); return }
+  if (!user) {
+    await sendTelegramMessage(chatId, `❌ Vincula tu cuenta con /vincular \\<código\\>\\.`)
+    return
+  }
 
   const contracts = await prisma.contracts.findMany({
     where: {
       status: { in: ['ACTIVE', 'EXPIRING'] },
-      OR: [
-        { custodianUserId: user.id },
-        { backupCustodianUserId: user.id },
-      ],
+      OR: [{ custodianUserId: user.id }, { backupCustodianUserId: user.id }],
     },
-    orderBy: { endDate: 'asc' }, take: 8,
+    orderBy: { endDate: 'asc' },
+    take: 8,
     select: {
       contractNumber: true,
       name: true,
@@ -638,8 +841,7 @@ async function handleMisContratos(chatId: string) {
   })
 
   if (!contracts.length) {
-    await sendTelegramMessage(chatId,
-      `ℹ️ No tienes contratos activos asignados como custodio\\.`)
+    await sendTelegramMessage(chatId, `ℹ️ No tienes contratos activos asignados como custodio\\.`)
     return
   }
 
@@ -649,20 +851,24 @@ async function handleMisContratos(chatId: string) {
     const end = c.endDate
       ? ` — vence ${escapeMdV2(new Date(c.endDate).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' }))}`
       : ''
-    const cost = c.monthlyCost ? `\n   💰 ${escapeMdV2(c.currency)} ${escapeMdV2(c.monthlyCost.toFixed(2))}/mes` : ''
+    const cost = c.monthlyCost
+      ? `\n   💰 ${escapeMdV2(c.currency)} ${escapeMdV2(c.monthlyCost.toFixed(2))}/mes`
+      : ''
     return `${st} *${escapeMdV2(c.name.substring(0, 45))}*${num}${escapeMdV2(end)}${cost}`
   })
 
-  await sendTelegramMessage(chatId,
-    `📑 *Mis contratos \\(${contracts.length}\\)*\n\n${lines.join('\n\n')}\n\n_Detalle completo en Contratos_\\.`)
+  await sendTelegramMessage(
+    chatId,
+    `📑 *Mis contratos \\(${contracts.length}\\)*\n\n${lines.join('\n\n')}\n\n_Detalle completo en Contratos_\\.`
+  )
 }
 
 // ─── Handler: ayuda dinámica por módulos y rol ────────────────────────────────
 
 async function handleAyuda(chatId: string) {
   const user = await getLinkedUser(chatId)
-  const isAdmin  = user?.role === 'ADMIN'
-  const isTech   = user?.role === 'TECHNICIAN'
+  const isAdmin = user?.role === 'ADMIN'
+  const isTech = user?.role === 'TECHNICIAN'
   const isClient = user?.role === 'CLIENT'
 
   // ── Sección cuenta (siempre visible) ────────────────────────────────────────
@@ -676,9 +882,11 @@ async function handleAyuda(chatId: string) {
     `*/ayuda* — Esta ayuda`
 
   if (!user) {
-    await sendTelegramMessage(chatId,
+    await sendTelegramMessage(
+      chatId,
       `📖 *Comandos disponibles*\n\n🔗 *Cuenta:*\n${cuentaCmds}\n\n` +
-      `_Vincula tu cuenta para ver los comandos operativos\\._ `)
+        `_Vincula tu cuenta para ver los comandos operativos\\._ `
+    )
     return
   }
 
@@ -697,7 +905,8 @@ async function handleAyuda(chatId: string) {
   inventarioCmds += `*/mis\\_equipos* — Equipos asignados a ti\n`
   inventarioCmds += `*/mis\\_actas* — Tus actas de entrega y devolución\n`
   inventarioCmds += `*/catalogo* — Equipos disponibles para la venta\n`
-  if (user.canRequestAssets || isAdmin) inventarioCmds += `*/mis\\_solicitudes* — Tus solicitudes de activos\n`
+  if (user.canRequestAssets || isAdmin)
+    inventarioCmds += `*/mis\\_solicitudes* — Tus solicitudes de activos\n`
   if (user.inventoryEnabled || isAdmin) {
     inventarioCmds += `*/mis\\_mantenimientos* — Equipos tuyos en mantenimiento\n`
     inventarioCmds += `*/inventario* — Resumen de equipos por estado\n`
@@ -727,10 +936,17 @@ async function handleAyuda(chatId: string) {
 
   const footer = `\n\n💡 _Las alertas llegan automáticamente para tickets, inventario y backups\\._ `
 
-  await sendTelegramMessage(chatId,
+  await sendTelegramMessage(
+    chatId,
     `📖 *Comandos disponibles*\n\n🔗 *Cuenta:*\n${cuentaCmds}` +
-    ticketsCmds + inventarioCmds + contratosCmds + rondasCmds + noticiasCmds + adminCmds +
-    footer)
+      ticketsCmds +
+      inventarioCmds +
+      contratosCmds +
+      rondasCmds +
+      noticiasCmds +
+      adminCmds +
+      footer
+  )
 }
 
 // ─── Handlers: inventario extendido (todos los roles) ────────────────────────
@@ -742,7 +958,10 @@ async function handleAyuda(chatId: string) {
  */
 async function handleMisActas(chatId: string) {
   const user = await getLinkedUser(chatId)
-  if (!user) { await sendTelegramMessage(chatId, `❌ Vincula tu cuenta con /vincular \\<código\\>\\.`); return }
+  if (!user) {
+    await sendTelegramMessage(chatId, `❌ Vincula tu cuenta con /vincular \\<código\\>\\.`)
+    return
+  }
 
   // Las actas se vinculan al usuario a través de equipment_assignments
   // Buscar asignaciones activas O inactivas recientes (últimos 90 días) del usuario
@@ -753,17 +972,18 @@ async function handleMisActas(chatId: string) {
     prisma.delivery_acts.findMany({
       where: {
         assignment: {
-          OR: [
-            { receiverId: user.id },
-            { delivererId: user.id },
-          ],
+          OR: [{ receiverId: user.id }, { delivererId: user.id }],
           createdAt: { gte: cutoff },
         },
       },
-      orderBy: { createdAt: 'desc' }, take: 6,
+      orderBy: { createdAt: 'desc' },
+      take: 6,
       select: {
-        folio: true, status: true, actType: true,
-        expirationDate: true, acceptedAt: true,
+        folio: true,
+        status: true,
+        actType: true,
+        expirationDate: true,
+        acceptedAt: true,
         assignment: {
           select: {
             equipment: { select: { code: true, brand: true, modelDeprecated: true } },
@@ -775,16 +995,17 @@ async function handleMisActas(chatId: string) {
     prisma.return_acts.findMany({
       where: {
         assignment: {
-          OR: [
-            { receiverId: user.id },
-            { delivererId: user.id },
-          ],
+          OR: [{ receiverId: user.id }, { delivererId: user.id }],
           createdAt: { gte: cutoff },
         },
       },
-      orderBy: { createdAt: 'desc' }, take: 4,
+      orderBy: { createdAt: 'desc' },
+      take: 4,
       select: {
-        folio: true, status: true, returnDate: true, acceptedAt: true,
+        folio: true,
+        status: true,
+        returnDate: true,
+        acceptedAt: true,
         assignment: {
           select: {
             equipment: { select: { code: true, brand: true, modelDeprecated: true } },
@@ -795,18 +1016,26 @@ async function handleMisActas(chatId: string) {
   ])
 
   if (!deliveryActs.length && !returnActs.length) {
-    await sendTelegramMessage(chatId,
-      `ℹ️ No tienes actas de entrega o devolución en los últimos 90 días\\.`)
+    await sendTelegramMessage(
+      chatId,
+      `ℹ️ No tienes actas de entrega o devolución en los últimos 90 días\\.`
+    )
     return
   }
 
   const ACT_STATUS: Record<string, string> = {
-    PENDING: '⏳ Pendiente', ACCEPTED: '✅ Firmada', REJECTED: '❌ Rechazada', EXPIRED: '🔴 Expirada',
+    PENDING: '⏳ Pendiente',
+    ACCEPTED: '✅ Firmada',
+    REJECTED: '❌ Rechazada',
+    EXPIRED: '🔴 Expirada',
   }
   const ACT_TYPE_SHORT: Record<string, string> = {
-    EQUIPMENT_ASSIGNMENT: 'Entrega', MRO_DELIVERY: 'Entrega MRO',
-    SERVICE_COMPLETION: 'Servicio', ASSET_TRANSFER: 'Transferencia',
-    CONTRACT_RENEWAL: 'Renovación', SUBSCRIPTION_ASSIGNMENT: 'Suscripción',
+    EQUIPMENT_ASSIGNMENT: 'Entrega',
+    MRO_DELIVERY: 'Entrega MRO',
+    SERVICE_COMPLETION: 'Servicio',
+    ASSET_TRANSFER: 'Transferencia',
+    CONTRACT_RENEWAL: 'Renovación',
+    SUBSCRIPTION_ASSIGNMENT: 'Suscripción',
   }
 
   const lines: string[] = []
@@ -816,22 +1045,29 @@ async function handleMisActas(chatId: string) {
     const nombre = eq ? `${eq.brand ?? ''} ${eq.modelDeprecated ?? eq.code ?? ''}`.trim() : '—'
     const tipo = ACT_TYPE_SHORT[a.actType] ?? a.actType
     const st = ACT_STATUS[a.status] ?? a.status
-    const pending = a.status === 'PENDING'
-      ? ` \\(vence ${escapeMdV2(new Date(a.expirationDate).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' }))}\\)`
-      : ''
-    lines.push(`📋 *${escapeMdV2(a.folio)}* — ${escapeMdV2(tipo)}\n   ${escapeMdV2(nombre)} — ${escapeMdV2(st)}${pending}`)
+    const pending =
+      a.status === 'PENDING'
+        ? ` \\(vence ${escapeMdV2(new Date(a.expirationDate).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' }))}\\)`
+        : ''
+    lines.push(
+      `📋 *${escapeMdV2(a.folio)}* — ${escapeMdV2(tipo)}\n   ${escapeMdV2(nombre)} — ${escapeMdV2(st)}${pending}`
+    )
   }
 
   for (const r of returnActs) {
     const eq = r.assignment?.equipment
     const nombre = eq ? `${eq.brand ?? ''} ${eq.modelDeprecated ?? eq.code ?? ''}`.trim() : '—'
     const st = ACT_STATUS[r.status] ?? r.status
-    lines.push(`🔄 *${escapeMdV2(r.folio)}* — Devolución\n   ${escapeMdV2(nombre)} — ${escapeMdV2(st)}`)
+    lines.push(
+      `🔄 *${escapeMdV2(r.folio)}* — Devolución\n   ${escapeMdV2(nombre)} — ${escapeMdV2(st)}`
+    )
   }
 
   const total = deliveryActs.length + returnActs.length
-  await sendTelegramMessage(chatId,
-    `📋 *Mis actas \\(${total}\\)*\n\n${lines.join('\n\n')}\n\n_Detalle completo en Inventario → Actas_\\.`)
+  await sendTelegramMessage(
+    chatId,
+    `📋 *Mis actas \\(${total}\\)*\n\n${lines.join('\n\n')}\n\n_Detalle completo en Inventario → Actas_\\.`
+  )
 }
 
 /**
@@ -841,46 +1077,59 @@ async function handleMisActas(chatId: string) {
  */
 async function handleMisMantenimientos(chatId: string) {
   const user = await getLinkedUser(chatId)
-  if (!user) { await sendTelegramMessage(chatId, `❌ Vincula tu cuenta con /vincular \\<código\\>\\.`); return }
+  if (!user) {
+    await sendTelegramMessage(chatId, `❌ Vincula tu cuenta con /vincular \\<código\\>\\.`)
+    return
+  }
 
   const isTechOrAdmin = user.role === 'ADMIN' || user.role === 'TECHNICIAN'
+  const activeMaintenanceStatuses: MaintenanceStatus[] = ['REQUESTED', 'SCHEDULED', 'ACCEPTED']
 
   // Para técnicos/admins: mantenimientos asignados a ellos
   // Para clientes: equipos que les asignaron y están en mantenimiento
   const where = isTechOrAdmin
     ? {
-        OR: [
-          { technicianId: user.id },
-          { requestedById: user.id },
-        ],
-        status: { in: ['REQUESTED', 'SCHEDULED', 'ACCEPTED'] as const },
+        OR: [{ technicianId: user.id }, { requestedById: user.id }],
+        status: { in: activeMaintenanceStatuses },
       }
     : {
-        status: { in: ['REQUESTED', 'SCHEDULED', 'ACCEPTED'] as const },
+        status: { in: activeMaintenanceStatuses },
         equipment: {
-          equipmentAssignments: {
-            some: { receiverId: user.id, isActive: true },
+          is: {
+            assignments: {
+              some: { receiverId: user.id, isActive: true },
+            },
           },
         },
       }
 
   const records = await prisma.maintenance_records.findMany({
     where,
-    orderBy: { date: 'asc' }, take: 8,
+    orderBy: { date: 'asc' },
+    take: 8,
     select: {
-      type: true, status: true, date: true, description: true,
+      type: true,
+      status: true,
+      date: true,
+      description: true,
       equipment: { select: { code: true, brand: true, modelDeprecated: true } },
     },
   })
 
   if (!records.length) {
-    await sendTelegramMessage(chatId, `✅ No tienes equipos en mantenimiento activo en este momento\\.`)
+    await sendTelegramMessage(
+      chatId,
+      `✅ No tienes equipos en mantenimiento activo en este momento\\.`
+    )
     return
   }
 
   const MAINT_STATUS: Record<string, string> = {
-    REQUESTED: '📥 Solicitado', SCHEDULED: '📅 Programado',
-    ACCEPTED: '🔧 En proceso', COMPLETED: '✅ Completado', CANCELLED: '⚫ Cancelado',
+    REQUESTED: '📥 Solicitado',
+    SCHEDULED: '📅 Programado',
+    ACCEPTED: '🔧 En proceso',
+    COMPLETED: '✅ Completado',
+    CANCELLED: '⚫ Cancelado',
   }
   const MAINT_TYPE: Record<string, string> = { PREVENTIVE: 'Preventivo', CORRECTIVE: 'Correctivo' }
 
@@ -894,8 +1143,10 @@ async function handleMisMantenimientos(chatId: string) {
     return `🔧 *${escapeMdV2(nombre)}* \\[${escapeMdV2(eq.code)}\\]\n   ${escapeMdV2(tipo)} — ${escapeMdV2(st)} — ${escapeMdV2(fecha)}\n   _${escapeMdV2(desc)}_`
   })
 
-  await sendTelegramMessage(chatId,
-    `🔧 *Mantenimientos activos \\(${records.length}\\)*\n\n${lines.join('\n\n')}\n\n_Detalle en Inventario → Mantenimiento_\\.`)
+  await sendTelegramMessage(
+    chatId,
+    `🔧 *Mantenimientos activos \\(${records.length}\\)*\n\n${lines.join('\n\n')}\n\n_Detalle en Inventario → Mantenimiento_\\.`
+  )
 }
 
 /**
@@ -904,9 +1155,13 @@ async function handleMisMantenimientos(chatId: string) {
  */
 async function handleMisSolicitudes(chatId: string) {
   const user = await getLinkedUser(chatId)
-  if (!user) { await sendTelegramMessage(chatId, `❌ Vincula tu cuenta con /vincular \\<código\\>\\.`); return }
+  if (!user) {
+    await sendTelegramMessage(chatId, `❌ Vincula tu cuenta con /vincular \\<código\\>\\.`)
+    return
+  }
   if (!user.canRequestAssets && user.role !== 'ADMIN') {
-    await sendTelegramMessage(chatId, `⚠️ No tienes permiso para solicitar activos\\.`); return
+    await sendTelegramMessage(chatId, `⚠️ No tienes permiso para solicitar activos\\.`)
+    return
   }
 
   const requests = await prisma.asset_requests.findMany({
@@ -914,21 +1169,37 @@ async function handleMisSolicitudes(chatId: string) {
       requesterId: user.id,
       status: { in: ['PENDING', 'UNDER_REVIEW', 'APPROVED'] as const },
     },
-    orderBy: { createdAt: 'desc' }, take: 8,
-    select: { code: true, assetType: true, status: true, description: true, createdAt: true, slaDeadline: true },
+    orderBy: { createdAt: 'desc' },
+    take: 8,
+    select: {
+      code: true,
+      assetType: true,
+      status: true,
+      description: true,
+      createdAt: true,
+      slaDeadline: true,
+    },
   })
 
   if (!requests.length) {
-    await sendTelegramMessage(chatId, `ℹ️ No tienes solicitudes de activos activas\\.\n\nPuedes crear una desde el sistema: Inventario → Solicitudes\\.`)
+    await sendTelegramMessage(
+      chatId,
+      `ℹ️ No tienes solicitudes de activos activas\\.\n\nPuedes crear una desde el sistema: Inventario → Solicitudes\\.`
+    )
     return
   }
 
   const REQ_STATUS: Record<string, string> = {
-    PENDING: '⏳ Pendiente', UNDER_REVIEW: '🔍 En revisión',
-    APPROVED: '✅ Aprobada', REJECTED: '❌ Rechazada', FULFILLED: '📦 Entregada',
+    PENDING: '⏳ Pendiente',
+    UNDER_REVIEW: '🔍 En revisión',
+    APPROVED: '✅ Aprobada',
+    REJECTED: '❌ Rechazada',
+    FULFILLED: '📦 Entregada',
   }
   const ASSET_TYPE: Record<string, string> = {
-    EQUIPMENT: 'Equipo', LICENSE: 'Licencia', OTHER: 'Otro',
+    EQUIPMENT: 'Equipo',
+    LICENSE: 'Licencia',
+    OTHER: 'Otro',
   }
 
   const lines = requests.map(r => {
@@ -941,8 +1212,10 @@ async function handleMisSolicitudes(chatId: string) {
     return `📦 *\\[${escapeMdV2(r.code)}\\]* ${escapeMdV2(tipo)} — ${escapeMdV2(st)}\n   _${escapeMdV2(desc)}_${sla}`
   })
 
-  await sendTelegramMessage(chatId,
-    `📦 *Mis solicitudes \\(${requests.length}\\)*\n\n${lines.join('\n\n')}\n\n_Gestiona desde Inventario → Solicitudes_\\.`)
+  await sendTelegramMessage(
+    chatId,
+    `📦 *Mis solicitudes \\(${requests.length}\\)*\n\n${lines.join('\n\n')}\n\n_Gestiona desde Inventario → Solicitudes_\\.`
+  )
 }
 
 /**
@@ -952,9 +1225,13 @@ async function handleMisSolicitudes(chatId: string) {
  */
 async function handleInventario(chatId: string) {
   const user = await getLinkedUser(chatId)
-  if (!user) { await sendTelegramMessage(chatId, `❌ Vincula tu cuenta con /vincular \\<código\\>\\.`); return }
+  if (!user) {
+    await sendTelegramMessage(chatId, `❌ Vincula tu cuenta con /vincular \\<código\\>\\.`)
+    return
+  }
   if (!user.inventoryEnabled && user.role !== 'ADMIN') {
-    await sendTelegramMessage(chatId, `⚠️ No tienes el módulo de Inventario activado\\.`); return
+    await sendTelegramMessage(chatId, `⚠️ No tienes el módulo de Inventario activado\\.`)
+    return
   }
 
   // Contar equipos por estado (global para admin, del área para técnico)
@@ -971,29 +1248,37 @@ async function handleInventario(chatId: string) {
 
   // Mantenimientos activos y solicitudes pendientes de activos
   const [pendingMaint, pendingRequests, pendingDecomm] = await Promise.all([
-    prisma.maintenance_records.count({ where: { status: { in: ['REQUESTED', 'SCHEDULED', 'ACCEPTED'] } } }),
+    prisma.maintenance_records.count({
+      where: { status: { in: ['REQUESTED', 'SCHEDULED', 'ACCEPTED'] } },
+    }),
     prisma.asset_requests.count({ where: { status: { in: ['PENDING', 'UNDER_REVIEW'] } } }),
     user.role === 'ADMIN'
-      ? prisma.decommission_requests.count({ where: { status: { in: ['PENDING', 'TECHNICAL_REVIEW', 'MANAGER_REVIEW'] } } })
+      ? prisma.decommission_requests.count({
+          where: { status: { in: ['PENDING', 'TECHNICAL_REVIEW', 'MANAGER_REVIEW'] } },
+        })
       : Promise.resolve(0),
   ])
 
-  const adminLines = user.role === 'ADMIN'
-    ? `\n📥 *Solicitudes activos pendientes:* ${escapeMdV2(String(pendingRequests))}\n` +
-      `⚠️ *Bajas en revisión:* ${escapeMdV2(String(pendingDecomm))}`
-    : ''
+  const adminLines =
+    user.role === 'ADMIN'
+      ? `\n📥 *Solicitudes activos pendientes:* ${escapeMdV2(String(pendingRequests))}\n` +
+        `⚠️ *Bajas en revisión:* ${escapeMdV2(String(pendingDecomm))}`
+      : ''
 
-  await sendTelegramMessage(chatId,
+  await sendTelegramMessage(
+    chatId,
     `📦 *Resumen de inventario*\n\n` +
-    `📊 *Total equipos:* ${escapeMdV2(String(total))}\n\n` +
-    `🟢 Disponibles: *${escapeMdV2(String(available))}*\n` +
-    `🔵 Asignados: *${escapeMdV2(String(assigned))}*\n` +
-    `🔧 Mantenimiento: *${escapeMdV2(String(maintenance))}*\n` +
-    `🏷️ En venta: *${escapeMdV2(String(forSale))}*\n` +
-    `🟠 Dañados: *${escapeMdV2(String(damaged))}*\n` +
-    `⚫ Retirados: *${escapeMdV2(String(retired))}*\n\n` +
-    `🔧 *Mant\\. activos:* ${escapeMdV2(String(pendingMaint))}` +
-    adminLines + `\n\n_Detalle completo en Inventario_\\.`)
+      `📊 *Total equipos:* ${escapeMdV2(String(total))}\n\n` +
+      `🟢 Disponibles: *${escapeMdV2(String(available))}*\n` +
+      `🔵 Asignados: *${escapeMdV2(String(assigned))}*\n` +
+      `🔧 Mantenimiento: *${escapeMdV2(String(maintenance))}*\n` +
+      `🏷️ En venta: *${escapeMdV2(String(forSale))}*\n` +
+      `🟠 Dañados: *${escapeMdV2(String(damaged))}*\n` +
+      `⚫ Retirados: *${escapeMdV2(String(retired))}*\n\n` +
+      `🔧 *Mant\\. activos:* ${escapeMdV2(String(pendingMaint))}` +
+      adminLines +
+      `\n\n_Detalle completo en Inventario_\\.`
+  )
 }
 
 /**
@@ -1002,19 +1287,32 @@ async function handleInventario(chatId: string) {
  */
 async function handleBajas(chatId: string) {
   const user = await getLinkedUser(chatId)
-  if (!user) { await sendTelegramMessage(chatId, `❌ Vincula tu cuenta con /vincular \\<código\\>\\.`); return }
+  if (!user) {
+    await sendTelegramMessage(chatId, `❌ Vincula tu cuenta con /vincular \\<código\\>\\.`)
+    return
+  }
   if (user.role !== 'ADMIN' && user.role !== 'TECHNICIAN') {
-    await sendTelegramMessage(chatId, `⚠️ Solo disponible para técnicos y administradores\\.`); return
+    await sendTelegramMessage(chatId, `⚠️ Solo disponible para técnicos y administradores\\.`)
+    return
   }
 
-  const where = user.role === 'TECHNICIAN'
-    ? { technicianId: user.id, status: { in: ['TECHNICAL_REVIEW'] as const } }
-    : { status: { in: ['PENDING', 'TECHNICAL_REVIEW', 'MANAGER_REVIEW'] as const } }
+  const where =
+    user.role === 'TECHNICIAN'
+      ? { technicianId: user.id, status: { in: ['TECHNICAL_REVIEW'] as DecommissionStatus[] } }
+      : {
+          status: { in: ['PENDING', 'TECHNICAL_REVIEW', 'MANAGER_REVIEW'] as DecommissionStatus[] },
+        }
 
   const requests = await prisma.decommission_requests.findMany({
-    where, orderBy: { createdAt: 'asc' }, take: 8,
+    where,
+    orderBy: { createdAt: 'asc' },
+    take: 8,
     select: {
-      id: true, status: true, reason: true, assetType: true, createdAt: true,
+      id: true,
+      status: true,
+      reason: true,
+      assetType: true,
+      createdAt: true,
       equipment: { select: { code: true, brand: true, modelDeprecated: true } },
     },
   })
@@ -1025,8 +1323,11 @@ async function handleBajas(chatId: string) {
   }
 
   const DECOMM_STATUS: Record<string, string> = {
-    PENDING: '⏳ Pendiente', TECHNICAL_REVIEW: '🔍 Dictamen técnico',
-    MANAGER_REVIEW: '👤 Revisión gestor', APPROVED: '✅ Aprobada', REJECTED: '❌ Rechazada',
+    PENDING: '⏳ Pendiente',
+    TECHNICAL_REVIEW: '🔍 Dictamen técnico',
+    MANAGER_REVIEW: '👤 Revisión gestor',
+    APPROVED: '✅ Aprobada',
+    REJECTED: '❌ Rechazada',
   }
   const ASSET_TYPE: Record<string, string> = { EQUIPMENT: 'Equipo', LICENSE: 'Licencia' }
 
@@ -1034,17 +1335,23 @@ async function handleBajas(chatId: string) {
     const st = DECOMM_STATUS[r.status] ?? r.status
     const tipo = ASSET_TYPE[r.assetType] ?? r.assetType
     const eq = r.equipment
-    const nombre = eq ? `${eq.brand ?? ''} ${eq.modelDeprecated ?? eq.code ?? ''}`.trim() : 'Sin equipo'
+    const nombre = eq
+      ? `${eq.brand ?? ''} ${eq.modelDeprecated ?? eq.code ?? ''}`.trim()
+      : 'Sin equipo'
     const code = eq?.code ? ` \\[${escapeMdV2(eq.code)}\\]` : ''
     const motivo = r.reason.substring(0, 50) + (r.reason.length > 50 ? '…' : '')
     return `⚠️ *${escapeMdV2(tipo)}:* ${escapeMdV2(nombre)}${code}\n   ${escapeMdV2(st)}\n   _${escapeMdV2(motivo)}_`
   })
 
-  const header = user.role === 'TECHNICIAN'
-    ? `⚠️ *Bajas pendientes de dictamen \\(${requests.length}\\)*`
-    : `⚠️ *Solicitudes de baja en revisión \\(${requests.length}\\)*`
+  const header =
+    user.role === 'TECHNICIAN'
+      ? `⚠️ *Bajas pendientes de dictamen \\(${requests.length}\\)*`
+      : `⚠️ *Solicitudes de baja en revisión \\(${requests.length}\\)*`
 
-  await sendTelegramMessage(chatId, `${header}\n\n${lines.join('\n\n')}\n\n_Gestiona desde Inventario → Bajas_\\.`)
+  await sendTelegramMessage(
+    chatId,
+    `${header}\n\n${lines.join('\n\n')}\n\n_Gestiona desde Inventario → Bajas_\\.`
+  )
 }
 
 // ─── Handlers: ayuda y centro de ayuda ───────────────────────────────────────
@@ -1056,8 +1363,10 @@ async function handleBajas(chatId: string) {
 async function handleCentroAyuda(chatId: string) {
   const user = await getLinkedUser(chatId)
   if (!user) {
-    await sendTelegramMessage(chatId,
-      `❌ Vincula tu cuenta primero con /vincular \\<código\\> para acceder al Centro de Ayuda\\.`)
+    await sendTelegramMessage(
+      chatId,
+      `❌ Vincula tu cuenta primero con /vincular \\<código\\> para acceder al Centro de Ayuda\\.`
+    )
     return
   }
 
@@ -1065,11 +1374,13 @@ async function handleCentroAyuda(chatId: string) {
   const helpUrl = appUrl ? `${appUrl}/help/center` : '/help/center'
   const urlEscaped = escapeMdV2(helpUrl)
 
-  await sendTelegramMessage(chatId,
+  await sendTelegramMessage(
+    chatId,
     `📚 *Centro de Ayuda*\n\n` +
-    `Encuentra guías, tutoriales y respuestas a preguntas frecuentes del sistema\\.\n\n` +
-    `[Abrir Centro de Ayuda](${urlEscaped})\n\n` +
-    `También puedes escribir /como\\_funciona para ver un resumen de tu rol en el sistema\\.`)
+      `Encuentra guías, tutoriales y respuestas a preguntas frecuentes del sistema\\.\n\n` +
+      `[Abrir Centro de Ayuda](${urlEscaped})\n\n` +
+      `También puedes escribir /como\\_funciona para ver un resumen de tu rol en el sistema\\.`
+  )
 }
 
 /**
@@ -1079,13 +1390,12 @@ async function handleCentroAyuda(chatId: string) {
 async function handleComoFunciona(chatId: string) {
   const user = await getLinkedUser(chatId)
   if (!user) {
-    await sendTelegramMessage(chatId,
-      `❌ Vincula tu cuenta primero con /vincular \\<código\\>\\.`)
+    await sendTelegramMessage(chatId, `❌ Vincula tu cuenta primero con /vincular \\<código\\>\\.`)
     return
   }
 
-  const isAdmin  = user.role === 'ADMIN'
-  const isTech   = user.role === 'TECHNICIAN'
+  const isAdmin = user.role === 'ADMIN'
+  const isTech = user.role === 'TECHNICIAN'
   const isClient = user.role === 'CLIENT'
 
   let msg = `📖 *Cómo funciona el sistema — ${escapeMdV2(ROLE_LABEL[user.role] ?? user.role)}*\n\n`

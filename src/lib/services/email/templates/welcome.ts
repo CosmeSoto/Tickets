@@ -24,7 +24,7 @@ interface WelcomeEmailData {
 }
 
 export default function welcomeEmailTemplate(data: WelcomeEmailData) {
-  const branding = brandingFromTemplateData(data as Record<string, unknown>)
+  const branding = brandingFromTemplateData(data as unknown as Record<string, unknown>)
   const userName = String(data.userName || 'Usuario')
 
   const bodyHtml = `

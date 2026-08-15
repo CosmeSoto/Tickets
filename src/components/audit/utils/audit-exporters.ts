@@ -92,11 +92,14 @@ export async function exportAuditReport(
       const rows: Record<string, string>[] = data.rows || []
       const exportColumns = buildAuditExportColumns(columnKeys, {
         maskPii: opts.maskPii !== false,
-      }).map(c => ({
-        ...c,
-        // Filas ya aplanadas: accessor lee por key
-        accessor: (row: any) => row[c.key] ?? '',
-      }))
+      }).map(c => {
+        const key = c.key ?? ''
+        return {
+          ...c,
+          // Filas ya aplanadas: accessor lee por key
+          accessor: (row: any) => row[key] ?? '',
+        }
+      })
 
       if (rows.length === 0) {
         throw new Error('No hay registros para exportar con los filtros actuales')
@@ -126,7 +129,10 @@ export async function exportAuditReport(
       }
 
       onSuccess(
-        appendWarnings(`${exportedRecords} registros exportados (${format.toUpperCase()})`, warnings)
+        appendWarnings(
+          `${exportedRecords} registros exportados (${format.toUpperCase()})`,
+          warnings
+        )
       )
       return
     }

@@ -10,10 +10,14 @@ export async function GET() {
   }
 
   try {
-    const value = await getSetting('maxFileSize', 600, '10')
-    const maxFileSizeMB = parseInt(value ?? '10') || 10
-    return NextResponse.json({ maxFileSizeMB })
+    const [fileSizeValue, personalImageSizeValue] = await Promise.all([
+      getSetting('maxFileSize', 600, '10'),
+      getSetting('maxPersonalImageSize', 600, '5'),
+    ])
+    const maxFileSizeMB = parseInt(fileSizeValue ?? '10') || 10
+    const maxPersonalImageSizeMB = parseInt(personalImageSizeValue ?? '5') || 5
+    return NextResponse.json({ maxFileSizeMB, maxPersonalImageSizeMB })
   } catch {
-    return NextResponse.json({ maxFileSizeMB: 10 })
+    return NextResponse.json({ maxFileSizeMB: 10, maxPersonalImageSizeMB: 5 })
   }
 }

@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useRef, useState, useEffect } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -110,7 +110,7 @@ export function SupplierForm({
     getValues,
     formState: { errors, isDirty },
   } = useForm<SupplierFormInput>({
-    resolver: zodResolver(supplierFormSchema),
+    resolver: zodResolver(supplierFormSchema) as Resolver<SupplierFormInput>,
     defaultValues: {
       name: supplier?.name || '',
       legalName: supplier?.legalName || '',
@@ -168,7 +168,9 @@ export function SupplierForm({
       reset({
         ...getValues(),
         ...formFields,
-        creditLimit: (formFields.creditLimit != null ? String(formFields.creditLimit) : '') as never,
+        creditLimit: (formFields.creditLimit != null
+          ? String(formFields.creditLimit)
+          : '') as never,
       })
       if (typeof draftTypeId === 'string') setTypeId(draftTypeId)
       if (typeof draftFamilyId === 'string') setFamilyId(draftFamilyId)
@@ -252,9 +254,7 @@ export function SupplierForm({
           <div className='space-y-1'>
             <Label>
               Familia / área{' '}
-              <span className='text-xs font-normal text-muted-foreground'>
-                (vacío = global)
-              </span>
+              <span className='text-xs font-normal text-muted-foreground'>(vacío = global)</span>
             </Label>
             <SearchableSelect
               options={families}
@@ -307,7 +307,12 @@ export function SupplierForm({
 
           <div className='space-y-1'>
             <Label htmlFor='taxId'>RUC / NIT</Label>
-            <Input id='taxId' {...register('taxId')} placeholder='Ej: 1234567890001' maxLength={20} />
+            <Input
+              id='taxId'
+              {...register('taxId')}
+              placeholder='Ej: 1234567890001'
+              maxLength={20}
+            />
           </div>
         </div>
       </ContractFormSection>
@@ -509,11 +514,7 @@ export function SupplierForm({
         </div>
       </ContractFormSection>
 
-      <ContractFormSection
-        title='5. Notas internas'
-        badge='Opcional'
-        defaultOpen={false}
-      >
+      <ContractFormSection title='5. Notas internas' badge='Opcional' defaultOpen={false}>
         <div className='space-y-1'>
           <Label htmlFor='notes'>Observaciones</Label>
           <Textarea

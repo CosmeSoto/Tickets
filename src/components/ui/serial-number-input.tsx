@@ -5,13 +5,7 @@ import { Input, InputProps } from './input'
 import { Button } from './button'
 import { Barcode, Camera, X, AlertCircle, RefreshCw } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from './dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './dialog'
 import { Alert, AlertDescription } from './alert'
 
 export interface SerialNumberInputProps extends InputProps {
@@ -33,7 +27,7 @@ const SerialNumberInput = React.forwardRef<HTMLInputElement, SerialNumberInputPr
 
     React.useEffect(() => {
       if (typeof window !== 'undefined') {
-        import('@zxing/library').then((module) => {
+        import('@zxing/library').then(module => {
           setCodeReader(new module.BrowserMultiFormatReader())
         })
       }
@@ -49,17 +43,17 @@ const SerialNumberInput = React.forwardRef<HTMLInputElement, SerialNumberInputPr
 
     const startCameraScan = async () => {
       if (!codeReader) return
-      
+
       try {
         setIsLoadingCamera(true)
         setCameraError(null)
         setIsCameraScanning(true)
-        
+
         await new Promise(resolve => setTimeout(resolve, 100))
-        
+
         const result = await codeReader.decodeFromVideoDevice(
-          undefined, 
-          videoRef.current!, 
+          undefined,
+          videoRef.current!,
           (result: any, err: any) => {
             if (result) {
               const scannedValue = result.getText()
@@ -76,7 +70,7 @@ const SerialNumberInput = React.forwardRef<HTMLInputElement, SerialNumberInputPr
         )
       } catch (error: any) {
         console.error('Error accessing camera:', error)
-        
+
         if (error.name === 'NotAllowedError') {
           setCameraError('permission')
         } else if (error.name === 'NotFoundError') {
@@ -136,12 +130,13 @@ const SerialNumberInput = React.forwardRef<HTMLInputElement, SerialNumberInputPr
             <div className='space-y-2'>
               <p className='font-medium'>Permiso de cámara denegado</p>
               <p className='text-sm text-gray-600'>
-                Por favor, habilita el acceso a la cámara en la configuración de tu navegador y vuelve a intentarlo.
+                Por favor, habilita el acceso a la cámara en la configuración de tu navegador y
+                vuelve a intentarlo.
               </p>
               <ol className='text-sm text-gray-600 list-decimal list-inside space-y-1'>
                 <li>Haz clic en el ícono de candado en la barra de direcciones</li>
-                <li>Busca la opción "Cámara" o "Permisos"</li>
-                <li>Cambia el acceso a "Permitir"</li>
+                <li>Busca la opción &quot;Cámara&quot; o &quot;Permisos&quot;</li>
+                <li>Cambia el acceso a &quot;Permitir&quot;</li>
                 <li>Actualiza la página y vuelve a intentar</li>
               </ol>
             </div>
@@ -151,7 +146,8 @@ const SerialNumberInput = React.forwardRef<HTMLInputElement, SerialNumberInputPr
             <div className='space-y-2'>
               <p className='font-medium'>No se encontró la cámara</p>
               <p className='text-sm text-gray-600'>
-                Asegúrate de que tu dispositivo tenga una cámara conectada y que no esté siendo utilizada por otra aplicación.
+                Asegúrate de que tu dispositivo tenga una cámara conectada y que no esté siendo
+                utilizada por otra aplicación.
               </p>
             </div>
           )
@@ -160,7 +156,8 @@ const SerialNumberInput = React.forwardRef<HTMLInputElement, SerialNumberInputPr
             <div className='space-y-2'>
               <p className='font-medium'>Error al acceder a la cámara</p>
               <p className='text-sm text-gray-600'>
-                Ocurrió un error inesperado al intentar acceder a la cámara. Por favor, vuelve a intentarlo.
+                Ocurrió un error inesperado al intentar acceder a la cámara. Por favor, vuelve a
+                intentarlo.
               </p>
             </div>
           )
@@ -170,7 +167,7 @@ const SerialNumberInput = React.forwardRef<HTMLInputElement, SerialNumberInputPr
     return (
       <div className='relative'>
         <Input
-          ref={(node) => {
+          ref={node => {
             if (typeof ref === 'function') {
               ref(node)
             } else if (ref) {
@@ -198,7 +195,9 @@ const SerialNumberInput = React.forwardRef<HTMLInputElement, SerialNumberInputPr
               isKeyboardScanning && 'bg-blue-100 text-blue-700 hover:bg-blue-200'
             )}
             onClick={handleKeyboardScanButtonClick}
-            title={isKeyboardScanning ? 'Desactivar modo lector físico' : 'Activar modo lector físico'}
+            title={
+              isKeyboardScanning ? 'Desactivar modo lector físico' : 'Activar modo lector físico'
+            }
           >
             <Barcode className={cn('h-4 w-4', isKeyboardScanning && 'animate-pulse')} />
           </Button>
@@ -214,9 +213,12 @@ const SerialNumberInput = React.forwardRef<HTMLInputElement, SerialNumberInputPr
           </Button>
         </div>
 
-        <Dialog open={isCameraScanning} onOpenChange={(open) => {
-          if (!open) stopCameraScan()
-        }}>
+        <Dialog
+          open={isCameraScanning}
+          onOpenChange={open => {
+            if (!open) stopCameraScan()
+          }}
+        >
           <DialogContent className='sm:max-w-md'>
             <DialogHeader>
               <DialogTitle>Escanear código de barras</DialogTitle>
@@ -224,7 +226,7 @@ const SerialNumberInput = React.forwardRef<HTMLInputElement, SerialNumberInputPr
                 Apunta la cámara al código de barras para escanearlo
               </DialogDescription>
             </DialogHeader>
-            
+
             {cameraError ? (
               <div className='space-y-4'>
                 <Alert variant='destructive'>
@@ -232,16 +234,11 @@ const SerialNumberInput = React.forwardRef<HTMLInputElement, SerialNumberInputPr
                   <AlertDescription>{getErrorMessage()}</AlertDescription>
                 </Alert>
                 <div className='flex justify-end gap-2'>
-                  <Button
-                    variant='outline'
-                    onClick={stopCameraScan}
-                  >
+                  <Button variant='outline' onClick={stopCameraScan}>
                     <X className='h-4 w-4 mr-2' />
                     Cerrar
                   </Button>
-                  <Button
-                    onClick={startCameraScan}
-                  >
+                  <Button onClick={startCameraScan}>
                     <RefreshCw className='h-4 w-4 mr-2' />
                     Reintentar
                   </Button>
@@ -258,18 +255,11 @@ const SerialNumberInput = React.forwardRef<HTMLInputElement, SerialNumberInputPr
                       </div>
                     </div>
                   ) : (
-                    <video
-                      ref={videoRef}
-                      className='w-full h-full object-cover'
-                      playsInline
-                    />
+                    <video ref={videoRef} className='w-full h-full object-cover' playsInline />
                   )}
                 </div>
                 <div className='flex justify-end'>
-                  <Button
-                    variant='outline'
-                    onClick={stopCameraScan}
-                  >
+                  <Button variant='outline' onClick={stopCameraScan}>
                     <X className='h-4 w-4 mr-2' />
                     Cancelar
                   </Button>

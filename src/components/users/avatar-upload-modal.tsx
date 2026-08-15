@@ -23,13 +23,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { useToast } from '@/hooks/use-toast'
-import {
-  Camera,
-  Upload,
-  Loader2,
-  Trash2,
-  X
-} from 'lucide-react'
+import { useUploadLimits } from '@/hooks/use-upload-limits'
+import { Camera, Upload, Loader2, Trash2, X } from 'lucide-react'
 
 interface AvatarUploadModalProps {
   userId: string
@@ -46,12 +41,13 @@ export function AvatarUploadModal({
   currentAvatar,
   isOpen,
   onClose,
-  onAvatarUpdated
+  onAvatarUpdated,
 }: AvatarUploadModalProps) {
   const { toast } = useToast()
   const { data: session } = useSession()
+  const { maxPersonalImageSizeMB } = useUploadLimits()
   const fileInputRef = useRef<HTMLInputElement>(null)
-  
+
   const [uploading, setUploading] = useState(false)
   const [showUploadDialog, setShowUploadDialog] = useState(false)
   const [showRemoveDialog, setShowRemoveDialog] = useState(false)
@@ -72,21 +68,20 @@ export function AvatarUploadModal({
       return
     }
 
-    // Validar tamaño (máximo 5MB)
-    if (file.size > 5 * 1024 * 1024) {
+    if (file.size > maxPersonalImageSizeMB * 1024 * 1024) {
       toast({
         title: 'Archivo muy grande',
-        description: 'La imagen debe ser menor a 5MB',
+        description: `La imagen debe ser menor a ${maxPersonalImageSizeMB} MB`,
         variant: 'destructive',
       })
       return
     }
 
     setSelectedFile(file)
-    
+
     // Crear preview
     const reader = new FileReader()
-    reader.onload = (e) => {
+    reader.onload = e => {
       setPreviewAvatar(e.target?.result as string)
       setShowUploadDialog(true)
     }
@@ -114,14 +109,16 @@ export function AvatarUploadModal({
         setSelectedFile(null)
         setPreviewAvatar(null)
         onClose()
-        
+
         // Si es el usuario actual, disparar evento para actualizar header
         if (session?.user?.id === userId) {
-          window.dispatchEvent(new CustomEvent('avatarUpdated', { 
-            detail: { avatarUrl: result.data.avatarUrl } 
-          }))
+          window.dispatchEvent(
+            new CustomEvent('avatarUpdated', {
+              detail: { avatarUrl: result.data.avatarUrl },
+            })
+          )
         }
-        
+
         toast({
           title: 'Avatar actualizado',
           description: `La foto de perfil de ${userName} se ha actualizado correctamente`,
@@ -158,14 +155,16 @@ export function AvatarUploadModal({
         onAvatarUpdated(null)
         setShowRemoveDialog(false)
         onClose()
-        
+
         // Si es el usuario actual, disparar evento para actualizar header
         if (session?.user?.id === userId) {
-          window.dispatchEvent(new CustomEvent('avatarUpdated', { 
-            detail: { avatarUrl: null } 
-          }))
+          window.dispatchEvent(
+            new CustomEvent('avatarUpdated', {
+              detail: { avatarUrl: null },
+            })
+          )
         }
-        
+
         toast({
           title: 'Avatar eliminado',
           description: `La foto de perfil de ${userName} se ha eliminado correctamente`,
@@ -193,56 +192,54 @@ export function AvatarUploadModal({
     <>
       {/* Modal principal */}
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-md" aria-describedby={undefined}>
+        <DialogContent className='sm:max-w-md' aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>Gestionar Avatar</DialogTitle>
-            <DialogDescription>
-              Actualiza la foto de perfil de {userName}
-            </DialogDescription>
+            <DialogDescription>Actualiza la foto de perfil de {userName}</DialogDescription>
           </DialogHeader>
-          
-          <div className="flex flex-col items-center space-y-4 py-4">
-            <Avatar className="h-24 w-24">
+
+          <div className='flex flex-col items-center space-y-4 py-4'>
+            <Avatar className='h-24 w-24'>
               <AvatarImage src={currentAvatar || undefined} alt={userName} />
-              <AvatarFallback className="text-lg">
-                {userName.split(' ').map(n => n[0]).join('').toUpperCase()}
+              <AvatarFallback className='text-lg'>
+                {userName
+                  .split(' ')
+                  .map(n => n[0])
+                  .join('')
+                  .toUpperCase()}
               </AvatarFallback>
             </Avatar>
-            
-            <div className="flex space-x-2">
-              <Button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-                size="sm"
-              >
-                <Camera className="h-4 w-4 mr-2" />
+
+            <div className='flex space-x-2'>
+              <Button onClick={() => fileInputRef.current?.click()} disabled={uploading} size='sm'>
+                <Camera className='h-4 w-4 mr-2' />
                 {currentAvatar ? 'Cambiar Foto' : 'Subir Foto'}
               </Button>
-              
+
               {currentAvatar && (
                 <Button
-                  variant="outline"
+                  variant='outline'
                   onClick={() => setShowRemoveDialog(true)}
                   disabled={uploading}
-                  size="sm"
+                  size='sm'
                 >
-                  <Trash2 className="h-4 w-4 mr-2" />
+                  <Trash2 className='h-4 w-4 mr-2' />
                   Eliminar
                 </Button>
               )}
             </div>
-            
+
             <input
               ref={fileInputRef}
-              type="file"
-              accept="image/*"
+              type='file'
+              accept='image/*'
               onChange={handleFileSelect}
-              className="hidden"
+              className='hidden'
             />
           </div>
-          
+
           <DialogFooter>
-            <Button variant="outline" onClick={onClose}>
+            <Button variant='outline' onClick={onClose}>
               Cerrar
             </Button>
           </DialogFooter>
@@ -251,24 +248,26 @@ export function AvatarUploadModal({
 
       {/* Modal de confirmación de subida */}
       <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
-        <DialogContent className="sm:max-w-md" aria-describedby={undefined}>
+        <DialogContent className='sm:max-w-md' aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>Confirmar nueva foto</DialogTitle>
-            <DialogDescription>
-              ¿Te gusta cómo se ve la nueva foto de perfil?
-            </DialogDescription>
+            <DialogDescription>¿Te gusta cómo se ve la nueva foto de perfil?</DialogDescription>
           </DialogHeader>
-          <div className="flex justify-center py-4">
-            <Avatar className="h-32 w-32">
-              <AvatarImage src={previewAvatar || undefined} alt="Preview" />
-              <AvatarFallback className="text-xl">
-                {userName.split(' ').map(n => n[0]).join('').toUpperCase()}
+          <div className='flex justify-center py-4'>
+            <Avatar className='h-32 w-32'>
+              <AvatarImage src={previewAvatar || undefined} alt='Preview' />
+              <AvatarFallback className='text-xl'>
+                {userName
+                  .split(' ')
+                  .map(n => n[0])
+                  .join('')
+                  .toUpperCase()}
               </AvatarFallback>
             </Avatar>
           </div>
-          <DialogFooter className="flex-col sm:flex-row gap-2">
+          <DialogFooter className='flex-col sm:flex-row gap-2'>
             <Button
-              variant="outline"
+              variant='outline'
               onClick={() => {
                 setShowUploadDialog(false)
                 setPreviewAvatar(null)
@@ -276,12 +275,12 @@ export function AvatarUploadModal({
               }}
               disabled={uploading}
             >
-              <X className="h-4 w-4 mr-2" />
+              <X className='h-4 w-4 mr-2' />
               Cancelar
             </Button>
             <Button onClick={handleUpload} disabled={uploading}>
-              {uploading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              <Upload className="h-4 w-4 mr-2" />
+              {uploading && <Loader2 className='h-4 w-4 mr-2 animate-spin' />}
+              <Upload className='h-4 w-4 mr-2' />
               Subir Foto
             </Button>
           </DialogFooter>
@@ -294,19 +293,18 @@ export function AvatarUploadModal({
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar foto de perfil?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción eliminará la foto de perfil de {userName}. Esta acción no se puede deshacer.
+              Esta acción eliminará la foto de perfil de {userName}. Esta acción no se puede
+              deshacer.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={uploading}>
-              Cancelar
-            </AlertDialogCancel>
+            <AlertDialogCancel disabled={uploading}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleRemove}
               disabled={uploading}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className='bg-destructive text-destructive-foreground hover:bg-destructive/90'
             >
-              {uploading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {uploading && <Loader2 className='h-4 w-4 mr-2 animate-spin' />}
               Eliminar
             </AlertDialogAction>
           </AlertDialogFooter>

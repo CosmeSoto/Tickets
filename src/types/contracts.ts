@@ -58,18 +58,7 @@ export type PaymentMethodType =
   | 'BANK_TRANSFER'
   | 'PROVIDER_INVOICE'
   | 'OTHER'
-export type SubscriptionServiceType =
-  | 'SOCIAL_MEDIA'
-  | 'CONTENT'
-  | 'AUDIOVISUAL'
-  | 'ARTIFICIAL_INTELLIGENCE'
-  | 'EDUCATION_LMS'
-  | 'CLOUD_SERVICES'
-  | 'DESIGN'
-  | 'COMMUNICATIONS'
-  | 'DIGITAL_ADS'
-  | 'OTHER'
-  | (string & {})
+export type SubscriptionServiceType = string
 
 export const PAYMENT_METHOD_TYPE_LABELS: Record<PaymentMethodType, string> = {
   CORPORATE_CARD: 'Tarjeta corporativa',

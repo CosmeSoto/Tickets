@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { DateInput } from '@/components/ui/date-input'
 import { DateTimePicker } from '@/components/ui/date-time-picker'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -747,7 +748,10 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
           if (!open) setApproveAssignee(emptyAssignee())
         }}
       >
-        <DialogContent className='w-[min(98vw,38rem)] max-w-none max-h-[90vh] overflow-y-auto' aria-describedby={undefined}>
+        <DialogContent
+          className='w-[min(98vw,38rem)] max-w-none max-h-[90vh] overflow-y-auto'
+          aria-describedby={undefined}
+        >
           <DialogHeader>
             <DialogTitle>Aprobar y Programar Mantenimiento</DialogTitle>
             <DialogDescription>

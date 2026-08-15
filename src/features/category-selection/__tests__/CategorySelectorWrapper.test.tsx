@@ -1,30 +1,32 @@
 /**
  * Tests for CategorySelectorWrapper
- * 
+ *
  * Verifies feature flag integration and fallback behavior
  */
 
-import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { SessionProvider } from 'next-auth/react';
-import { CategorySelectorWrapper } from '../components/CategorySelectorWrapper';
-import * as featureFlags from '../config/feature-flags';
-import * as useFeatureFlagsHook from '../hooks/useFeatureFlags';
+import React from 'react'
+import { render, screen, waitFor } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { SessionProvider } from 'next-auth/react'
+import { CategorySelectorWrapper } from '../components/CategorySelectorWrapper'
+import * as featureFlags from '../config/feature-flags'
+import * as useFeatureFlagsHook from '../hooks/useFeatureFlags'
+import { useCategoriesQuery } from '../hooks/useCategoriesQuery'
 
 // Mock the hooks and modules
-jest.mock('../hooks/useFeatureFlags');
-jest.mock('../hooks/useCategoriesQuery');
+jest.mock('../hooks/useFeatureFlags')
+jest.mock('../hooks/useCategoriesQuery')
 jest.mock('../config/feature-flags', () => ({
   ...jest.requireActual('../config/feature-flags'),
   initializeCategorySelectorFlags: jest.fn(),
-}));
+}))
 
-const mockUseCategorySelectorFeatureFlags = useFeatureFlagsHook.useCategorySelectorFeatureFlags as jest.MockedFunction<
-  typeof useFeatureFlagsHook.useCategorySelectorFeatureFlags
->;
+const mockUseCategorySelectorFeatureFlags =
+  useFeatureFlagsHook.useCategorySelectorFeatureFlags as jest.MockedFunction<
+    typeof useFeatureFlagsHook.useCategorySelectorFeatureFlags
+  >
 
-const mockUseCategoriesQuery = require('../hooks/useCategoriesQuery').useCategoriesQuery as jest.MockedFunction<any>;
+const mockUseCategoriesQuery = useCategoriesQuery as jest.MockedFunction<typeof useCategoriesQuery>
 
 const mockCategories = [
   {
@@ -33,8 +35,12 @@ const mockCategories = [
     description: 'Problemas de infraestructura',
     level: 1,
     parentId: null,
+    departmentId: null,
+    order: 1,
     color: '#FF0000',
     isActive: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
   },
   {
     id: '2',
@@ -42,37 +48,38 @@ const mockCategories = [
     description: 'Problemas de red',
     level: 2,
     parentId: '1',
+    departmentId: null,
+    order: 2,
     color: '#FF0000',
     isActive: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
   },
-];
+]
 
 describe('CategorySelectorWrapper', () => {
-  let queryClient: QueryClient;
+  let queryClient: QueryClient
 
   beforeEach(() => {
     queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
       },
-    });
+    })
 
     // Reset mocks
-    jest.clearAllMocks();
-  });
+    jest.clearAllMocks()
+  })
 
   const renderWrapper = (props: any = {}) => {
     return render(
       <SessionProvider session={null}>
         <QueryClientProvider client={queryClient}>
-          <CategorySelectorWrapper
-            onChange={jest.fn()}
-            {...props}
-          />
+          <CategorySelectorWrapper onChange={jest.fn()} {...props} />
         </QueryClientProvider>
       </SessionProvider>
-    );
-  };
+    )
+  }
 
   it('should initialize feature flags on mount', () => {
     mockUseCategorySelectorFeatureFlags.mockReturnValue({
@@ -93,19 +100,19 @@ describe('CategorySelectorWrapper', () => {
         supportsGrid: true,
       },
       fallbackMode: false,
-    });
+    })
 
     mockUseCategoriesQuery.mockReturnValue({
       categories: mockCategories,
       isLoading: false,
       error: null,
       refetch: jest.fn(),
-    });
+    })
 
-    renderWrapper();
+    renderWrapper()
 
-    expect(featureFlags.initializeCategorySelectorFlags).toHaveBeenCalled();
-  });
+    expect(featureFlags.initializeCategorySelectorFlags).toHaveBeenCalled()
+  })
 
   it('should show loading state while categories are loading', () => {
     mockUseCategorySelectorFeatureFlags.mockReturnValue({
@@ -126,19 +133,19 @@ describe('CategorySelectorWrapper', () => {
         supportsGrid: true,
       },
       fallbackMode: false,
-    });
+    })
 
     mockUseCategoriesQuery.mockReturnValue({
       categories: [],
       isLoading: true,
       error: null,
       refetch: jest.fn(),
-    });
+    })
 
-    renderWrapper();
+    renderWrapper()
 
-    expect(screen.getByText('Cargando categorías...')).toBeInTheDocument();
-  });
+    expect(screen.getByText('Cargando categorías...')).toBeInTheDocument()
+  })
 
   it('should render fallback selector when fallbackMode is true', async () => {
     mockUseCategorySelectorFeatureFlags.mockReturnValue({
@@ -159,21 +166,25 @@ describe('CategorySelectorWrapper', () => {
         supportsGrid: false,
       },
       fallbackMode: true,
-    });
+    })
 
     mockUseCategoriesQuery.mockReturnValue({
       categories: mockCategories,
       isLoading: false,
       error: null,
       refetch: jest.fn(),
-    });
+    })
 
-    renderWrapper();
+    renderWrapper()
 
     await waitFor(() => {
-      expect(screen.getByText('Modo de compatibilidad activado. Selecciona la categoría navegando por los niveles.')).toBeInTheDocument();
-    });
-  });
+      expect(
+        screen.getByText(
+          'Modo de compatibilidad activado. Selecciona la categoría navegando por los niveles.'
+        )
+      ).toBeInTheDocument()
+    })
+  })
 
   it('should render enhanced selector when feature is enabled and browser supports it', async () => {
     mockUseCategorySelectorFeatureFlags.mockReturnValue({
@@ -194,26 +205,26 @@ describe('CategorySelectorWrapper', () => {
         supportsGrid: true,
       },
       fallbackMode: false,
-    });
+    })
 
     mockUseCategoriesQuery.mockReturnValue({
       categories: mockCategories,
       isLoading: false,
       error: null,
       refetch: jest.fn(),
-    });
+    })
 
-    renderWrapper({ clientId: 'test-user' });
+    renderWrapper({ clientId: 'test-user' })
 
     // Enhanced selector should be rendered (it has tabs)
     await waitFor(() => {
-      expect(screen.queryByText('Modo de compatibilidad activado')).not.toBeInTheDocument();
-    });
-  });
+      expect(screen.queryByText('Modo de compatibilidad activado')).not.toBeInTheDocument()
+    })
+  })
 
   it('should pass props correctly to enhanced selector', () => {
-    const mockOnChange = jest.fn();
-    
+    const mockOnChange = jest.fn()
+
     mockUseCategorySelectorFeatureFlags.mockReturnValue({
       useEnhancedSelector: true,
       smartSearch: true,
@@ -232,14 +243,14 @@ describe('CategorySelectorWrapper', () => {
         supportsGrid: true,
       },
       fallbackMode: false,
-    });
+    })
 
     mockUseCategoriesQuery.mockReturnValue({
       categories: mockCategories,
       isLoading: false,
       error: null,
       refetch: jest.fn(),
-    });
+    })
 
     renderWrapper({
       value: '1',
@@ -249,9 +260,9 @@ describe('CategorySelectorWrapper', () => {
       clientId: 'test-user',
       error: 'Test error',
       disabled: false,
-    });
+    })
 
     // Component should render without errors
-    expect(screen.queryByText('Cargando categorías...')).not.toBeInTheDocument();
-  });
-});
+    expect(screen.queryByText('Cargando categorías...')).not.toBeInTheDocument()
+  })
+})

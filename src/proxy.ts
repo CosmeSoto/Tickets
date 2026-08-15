@@ -597,6 +597,22 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(new URL(dashboardForRole(userRole), request.url))
     }
 
+    // Accesos (pases QR): requiere accessEnabled o canManageAccess (Super Admin exento).
+    if (
+      path.startsWith('/access') &&
+      (token as any).isSuperAdmin !== true &&
+      (token as any).accessEnabled !== true &&
+      (token as any).canManageAccess !== true
+    ) {
+      ApplicationLogger.securityEvent(
+        'insufficient_privileges',
+        'medium',
+        { userId, userRole, requiredCapability: 'accessEnabled', path, ip },
+        { requestId }
+      )
+      return NextResponse.redirect(new URL(dashboardForRole(userRole), request.url))
+    }
+
     // Credenciales: requieren credentialsEnabled (SuperAdmin exento).
     if (
       path.startsWith('/credentials') &&

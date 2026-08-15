@@ -3,11 +3,7 @@
  */
 
 import type { EmailBranding } from '../email-branding'
-import {
-  buildBrandedEmailHtml,
-  buildPrimaryButton,
-  escapeHtml,
-} from '../email-layout'
+import { buildBrandedEmailHtml, buildPrimaryButton, escapeHtml } from '../email-layout'
 import { DEFAULT_SYSTEM_NAME } from '@/lib/branding-constants'
 
 interface PasswordResetData {
@@ -19,7 +15,10 @@ interface PasswordResetData {
   companyName?: string
   logoUrl?: string | null
   primaryColor?: string
+  baseUrl?: string
   privacyUrl?: string
+  termsUrl?: string
+  loginUrl?: string
 }
 
 export default function passwordResetTemplate(data: PasswordResetData) {

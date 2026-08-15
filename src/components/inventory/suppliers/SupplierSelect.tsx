@@ -28,16 +28,9 @@ import { cn } from '@/lib/utils'
 import { SupplierForm } from './SupplierForm'
 import { extractCatchError } from '@/lib/utils/api-error'
 import { toast } from 'sonner'
+import type { Supplier } from '@/types/inventory/supplier'
 
 const PAGE_SIZE = 30
-
-interface Supplier {
-  id: string
-  name: string
-  taxId?: string | null
-  type: string
-  isActive?: boolean
-}
 
 interface SupplierSelectProps {
   value?: string | null
@@ -417,7 +410,10 @@ export function SupplierSelect({
           closeForm()
         }}
       >
-        <DialogContent className='w-[min(98vw,56rem)] max-w-4xl max-h-[92vh] overflow-y-auto' aria-describedby={undefined}>
+        <DialogContent
+          className='w-[min(98vw,56rem)] max-w-4xl max-h-[92vh] overflow-y-auto'
+          aria-describedby={undefined}
+        >
           <DialogHeader>
             <DialogTitle>{editingSupplier ? 'Editar proveedor' : 'Nuevo proveedor'}</DialogTitle>
           </DialogHeader>

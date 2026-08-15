@@ -82,7 +82,7 @@ export class MaintenanceService {
     contractLabel: string | null
   }> {
     let supplierId = data.supplierId?.trim() || null
-    let contractId = data.contractId?.trim() || null
+    const contractId = data.contractId?.trim() || null
     let contractLabel: string | null = null
 
     if (contractId) {
