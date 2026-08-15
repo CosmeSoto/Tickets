@@ -15,6 +15,8 @@ export type EmailModule =
   | 'patrols'
   | 'content'
   | 'credentials'
+  | 'processes'
+  | 'access'
 
 /** critical = seguridad/SMTP; important = operativo; optional = ruido / prefs finas */
 export type EmailPriority = 'critical' | 'important' | 'optional'
@@ -33,6 +35,11 @@ export type NotificationEmailEvent =
   | 'digest'
   | 'security'
   | 'generic'
+  | 'processReview'
+  | 'processPublished'
+  | 'processReviewDue'
+  | 'accessPassIssued'
+  | 'accessPassExpiring'
 
 export const EMAIL_EVENT_PRIORITY: Record<NotificationEmailEvent, EmailPriority> = {
   security: 'critical',
@@ -48,6 +55,11 @@ export const EMAIL_EVENT_PRIORITY: Record<NotificationEmailEvent, EmailPriority>
   ticketUpdated: 'optional',
   digest: 'optional',
   generic: 'optional',
+  processReview: 'important',
+  processPublished: 'optional',
+  processReviewDue: 'important',
+  accessPassIssued: 'important',
+  accessPassExpiring: 'important',
 }
 
 export function resolveEmailPriority(

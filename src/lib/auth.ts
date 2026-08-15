@@ -321,6 +321,8 @@ const sharedAuthOptions: Omit<NextAuthOptions, 'providers'> = {
                 token.canManageForms = dbUser.canManageForms ?? false
                 token.credentialsEnabled = dbUser.credentialsEnabled ?? false
                 token.canManageCredentials = dbUser.canManageCredentials ?? false
+                token.processesEnabled = dbUser.processesEnabled ?? false
+                token.canManageProcesses = dbUser.canManageProcesses ?? false
                 token.isOAuth = true
                 token.needsProfileCompletion = clientNeedsProfileCompletion({
                   role: dbUser.role,
@@ -340,6 +342,8 @@ const sharedAuthOptions: Omit<NextAuthOptions, 'providers'> = {
                 token.canManageForms = false
                 token.credentialsEnabled = false
                 token.canManageCredentials = false
+                token.processesEnabled = false
+                token.canManageProcesses = false
               }
             } catch (error) {
               console.error('Error obteniendo usuario OAuth:', error)
@@ -376,6 +380,8 @@ const sharedAuthOptions: Omit<NextAuthOptions, 'providers'> = {
                   canManageForms: true,
                   credentialsEnabled: true,
                   canManageCredentials: true,
+                  processesEnabled: true,
+                  canManageProcesses: true,
                   passwordChangedAt: true,
                 },
               })
@@ -392,6 +398,8 @@ const sharedAuthOptions: Omit<NextAuthOptions, 'providers'> = {
               token.canManageForms = dbUser?.canManageForms ?? false
               token.credentialsEnabled = dbUser?.credentialsEnabled ?? false
               token.canManageCredentials = dbUser?.canManageCredentials ?? false
+              token.processesEnabled = dbUser?.processesEnabled ?? false
+              token.canManageProcesses = dbUser?.canManageProcesses ?? false
 
               // ── Política de cambio de contraseña ───────────────────────
               try {
@@ -466,6 +474,8 @@ const sharedAuthOptions: Omit<NextAuthOptions, 'providers'> = {
                   canManageForms: true,
                   credentialsEnabled: true,
                   canManageCredentials: true,
+                  processesEnabled: true,
+                  canManageProcesses: true,
                   departmentId: true,
                   phone: true,
                   passwordChangedAt: true,
@@ -493,6 +503,8 @@ const sharedAuthOptions: Omit<NextAuthOptions, 'providers'> = {
               token.canManageForms = dbUser.canManageForms ?? false
               token.credentialsEnabled = dbUser.credentialsEnabled ?? false
               token.canManageCredentials = dbUser.canManageCredentials ?? false
+              token.processesEnabled = dbUser.processesEnabled ?? false
+              token.canManageProcesses = dbUser.canManageProcesses ?? false
               token.departmentId = dbUser.departmentId || undefined
               token.department = dbUser.departments?.name || undefined
               token.phone = dbUser.phone || undefined
@@ -633,6 +645,8 @@ const sharedAuthOptions: Omit<NextAuthOptions, 'providers'> = {
           ;(session.user as any).credentialsEnabled = (token.credentialsEnabled as boolean) ?? false
           ;(session.user as any).canManageCredentials =
             (token.canManageCredentials as boolean) ?? false
+          ;(session.user as any).processesEnabled = (token.processesEnabled as boolean) ?? false
+          ;(session.user as any).canManageProcesses = (token.canManageProcesses as boolean) ?? false
 
           // Política de cambio de contraseña
           ;(session.user as any).mustChangePassword = (token.mustChangePassword as boolean) ?? false

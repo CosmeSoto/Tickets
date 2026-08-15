@@ -396,6 +396,9 @@ export async function proxy(request: NextRequest) {
         (path.startsWith('/admin/forms') &&
           (token as any).canManageForms === true &&
           (token as any).formsEnabled === true) ||
+        (path.startsWith('/admin/processes') &&
+          (token as any).canManageProcesses === true &&
+          (token as any).processesEnabled === true) ||
         techPatrolSuperviseAllowed
       ) {
         // Permitir acceso a gestión de noticias, formularios o supervisión de rondas
@@ -419,6 +422,18 @@ export async function proxy(request: NextRequest) {
         { requestId }
       )
       return NextResponse.redirect(new URL(dashboardForRole(userRole), request.url))
+    }
+
+    // Configuración de Procesos: solo Super Admin escribe política; la UI de settings
+    // queda cerrada a gestores vía nav + proxy (API GET sí permite gestores).
+    if (path.startsWith('/admin/processes/settings') && (token as any).isSuperAdmin !== true) {
+      ApplicationLogger.securityEvent(
+        'insufficient_privileges',
+        'medium',
+        { userId, userRole, requiredCapability: 'isSuperAdmin', path, ip },
+        { requestId }
+      )
+      return NextResponse.redirect(new URL('/admin/processes', request.url))
     }
 
     // ADMIN de familia: respetar toggles de módulos (Super Admin exento).
@@ -449,6 +464,15 @@ export async function proxy(request: NextRequest) {
           'insufficient_privileges',
           'medium',
           { userId, userRole, requiredCapability: 'formsEnabled', path, ip },
+          { requestId }
+        )
+        return NextResponse.redirect(new URL('/admin', request.url))
+      }
+      if (path.startsWith('/admin/processes') && (token as any).processesEnabled !== true) {
+        ApplicationLogger.securityEvent(
+          'insufficient_privileges',
+          'medium',
+          { userId, userRole, requiredCapability: 'processesEnabled', path, ip },
           { requestId }
         )
         return NextResponse.redirect(new URL('/admin', request.url))
@@ -552,6 +576,22 @@ export async function proxy(request: NextRequest) {
         'insufficient_privileges',
         'medium',
         { userId, userRole, requiredCapability: 'formsEnabled', path, ip },
+        { requestId }
+      )
+      return NextResponse.redirect(new URL(dashboardForRole(userRole), request.url))
+    }
+
+    // Procesos y procedimientos: requiere habilitación del módulo (Super Admin exento).
+    if (
+      path.startsWith('/processes') &&
+      (token as any).isSuperAdmin !== true &&
+      (token as any).processesEnabled !== true &&
+      (token as any).canManageProcesses !== true
+    ) {
+      ApplicationLogger.securityEvent(
+        'insufficient_privileges',
+        'medium',
+        { userId, userRole, requiredCapability: 'processesEnabled', path, ip },
         { requestId }
       )
       return NextResponse.redirect(new URL(dashboardForRole(userRole), request.url))

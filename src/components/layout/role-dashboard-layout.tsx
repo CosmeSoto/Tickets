@@ -97,7 +97,9 @@ export function RoleDashboardLayout({
     canManageInventory: canManageInventoryFromModules,
     canManageNews: canManageNewsFromModules,
     canManageForms: canManageFormsFromModules,
+    canManageProcesses: canManageProcessesFromModules,
     credentials: hasCredentials,
+    processes: hasProcesses,
   } = useUserModules()
 
   if (status === 'unauthenticated') {
@@ -116,6 +118,8 @@ export function RoleDashboardLayout({
 
   const canManageNews = canManageNewsFromModules || (session.user as any)?.canManageNews === true
   const canManageForms = canManageFormsFromModules || (session.user as any)?.canManageForms === true
+  const canManageProcesses =
+    canManageProcessesFromModules || (session.user as any)?.canManageProcesses === true
   const userRole = session.user.role as string
   const canManageInventory =
     canManageInventoryFromModules || (session.user as any).canManageInventory
@@ -127,12 +131,14 @@ export function RoleDashboardLayout({
     canManageInventory,
     canManageNews,
     canManageForms,
+    canManageProcesses,
     hasTickets,
     hasInventory,
     hasPatrols,
     hasNews,
     hasForms,
     hasCredentials,
+    hasProcesses,
     canRequestAssets,
     hasKnowledge: isSuperAdmin || (hasTickets && !!canAccessKnowledge),
   })

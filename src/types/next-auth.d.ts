@@ -24,6 +24,8 @@ declare module 'next-auth' {
       needsProfileCompletion?: boolean
       credentialsEnabled?: boolean
       canManageCredentials?: boolean
+      processesEnabled?: boolean
+      canManageProcesses?: boolean
     }
   }
 
@@ -58,5 +60,7 @@ declare module 'next-auth/jwt' {
     needsProfileCompletion?: boolean
     credentialsEnabled?: boolean
     canManageCredentials?: boolean
+    processesEnabled?: boolean
+    canManageProcesses?: boolean
   }
 }

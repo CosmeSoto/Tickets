@@ -15,6 +15,7 @@ export type BackupModuleId =
   | 'configurations'
   | 'inventory'
   | 'credentials'
+  | 'processes'
 
 export interface BackupModuleDefinition {
   id: BackupModuleId
@@ -74,6 +75,12 @@ export const BACKUP_MODULE_REGISTRY: Record<BackupModuleId, BackupModuleDefiniti
     label: 'Credenciales',
     description:
       'Bóvedas, entradas y compartidos del módulo Credenciales. Los secretos se exportan cifrados (AES-GCM / secretEncrypted); nunca en claro. Tras restaurar hace falta la misma ENCRYPTION_KEY del entorno original para poder revelar.',
+  },
+  processes: {
+    id: 'processes',
+    label: 'Procesos y Procedimientos',
+    description:
+      'Catálogo de procesos, versiones, diagramas, adjuntos, eventos de aprobación y evidencias de revisión externa (DPD). Los archivos en disco deben respaldarse junto con las rutas de process_attachments.',
   },
 }
 
@@ -600,12 +607,8 @@ export async function exportInventoryModuleData(): Promise<Record<string, unknow
   await fetchTable('contract_lines', () => prisma.contract_lines.findMany())
   await fetchTable('contract_attachments', () => prisma.contract_attachments.findMany())
   await fetchTable('contract_payments', () => prisma.contract_payments.findMany())
-  await fetchTable('contract_assignments', () =>
-    (prisma as any).contract_assignments.findMany()
-  )
-  await fetchTable('contract_amendments', () =>
-    (prisma as any).contract_amendments.findMany()
-  )
+  await fetchTable('contract_assignments', () => (prisma as any).contract_assignments.findMany())
+  await fetchTable('contract_amendments', () => (prisma as any).contract_amendments.findMany())
 
   await fetchTable('maintenance_records', () => prisma.maintenance_records.findMany())
   await fetchTable('delivery_acts', () => prisma.delivery_acts.findMany())
@@ -655,5 +658,60 @@ export async function exportCredentialsModuleData(): Promise<
     credential_vaults,
     credential_entries,
     credential_shares,
+  }
+}
+
+/** Orden FK: proceso → versión → diagramas/revisiones/eventos/adjuntos. */
+export const PROCESSES_MODULE_RESTORE_ORDER = [
+  'processes',
+  'process_versions',
+  'process_diagrams',
+  'process_attachments',
+  'process_approval_events',
+  'process_external_reviews',
+] as const
+
+export type ProcessesModuleTable = (typeof PROCESSES_MODULE_RESTORE_ORDER)[number]
+
+export async function exportProcessesModuleData(): Promise<
+  Record<ProcessesModuleTable, unknown[]>
+> {
+  const processes = await (prisma as any).processes.findMany()
+  const processIds = processes.map((row: { id: string }) => row.id)
+  if (processIds.length === 0) {
+    return {
+      processes: [],
+      process_versions: [],
+      process_diagrams: [],
+      process_attachments: [],
+      process_approval_events: [],
+      process_external_reviews: [],
+    }
+  }
+
+  const [process_versions, process_attachments, process_approval_events] = await Promise.all([
+    (prisma as any).process_versions.findMany({ where: { processId: { in: processIds } } }),
+    (prisma as any).process_attachments.findMany({ where: { processId: { in: processIds } } }),
+    (prisma as any).process_approval_events.findMany({ where: { processId: { in: processIds } } }),
+  ])
+  const versionIds = process_versions.map((row: { id: string }) => row.id)
+  const [process_diagrams, process_external_reviews] = await Promise.all([
+    versionIds.length
+      ? (prisma as any).process_diagrams.findMany({ where: { versionId: { in: versionIds } } })
+      : Promise.resolve([]),
+    versionIds.length
+      ? (prisma as any).process_external_reviews.findMany({
+          where: { versionId: { in: versionIds } },
+        })
+      : Promise.resolve([]),
+  ])
+
+  return {
+    processes,
+    process_versions,
+    process_diagrams,
+    process_attachments,
+    process_approval_events,
+    process_external_reviews,
   }
 }

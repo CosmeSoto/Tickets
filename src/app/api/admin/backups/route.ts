@@ -22,9 +22,9 @@ export async function POST(request: NextRequest) {
     if (errorResponse) return errorResponse
 
     const body = await request.json()
-    const { type = 'manual', mode = 'infrastructure', backupKind } = body
+    const { type = 'manual', mode = 'infrastructure', backupKind, module } = body
 
-    const validModes: BackupCreateMode[] = ['infrastructure', 'export']
+    const validModes: BackupCreateMode[] = ['infrastructure', 'export', 'module']
     const createMode: BackupCreateMode = validModes.includes(mode) ? mode : 'infrastructure'
 
     const validKinds: BackupKind[] = ['full', 'diff', 'incr', 'export']
@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
     const backup = await BackupService.createBackup(type, {
       mode: createMode,
       backupKind: kind,
+      module,
       userId: session?.user?.id,
       userEmail: session?.user?.email ?? null,
     })

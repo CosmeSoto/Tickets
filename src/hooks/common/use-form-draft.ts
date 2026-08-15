@@ -149,7 +149,7 @@ export const FormDraftKeys = {
   contractEdit: (id: string) => `draft:contract:edit:${id}`,
   contractEmbed: (context: string, parentKey: string) =>
     `draft:contract:embed:${context}:${parentKey}`,
-  supplierNew: (familyId?: string) =>
-    `draft:supplier:new:${familyId || 'global'}`,
+  supplierNew: (familyId?: string) => `draft:supplier:new:${familyId || 'global'}`,
   supplierEdit: (id: string) => `draft:supplier:edit:${id}`,
+  processNew: () => `draft:process:new`,
 } as const

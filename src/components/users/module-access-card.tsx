@@ -59,6 +59,9 @@ interface ModuleAccessCardProps {
     /** Credenciales: ver/editar de roles inferiores (no es requisito para crear propias) */
     canManageCredentials?: boolean
     onToggleManageCredentials?: (v: boolean) => void
+    /** Procesos: puede crear, versionar y gobernar procedimientos */
+    canManageProcesses?: boolean
+    onToggleManageProcesses?: (v: boolean) => void
   }
   /** Familias de solo lectura (fuera del scope del admin) */
   readOnlyFamilyIds?: string[]
@@ -290,6 +293,25 @@ export function ModuleAccessCard({
                   <Switch
                     checked={options.canManageCredentials ?? false}
                     onCheckedChange={options.onToggleManageCredentials}
+                    disabled={disabled}
+                    className='scale-90 shrink-0'
+                  />
+                </div>
+              )}
+              {options.onToggleManageProcesses !== undefined && (
+                <div className='flex items-center justify-between gap-2'>
+                  <div className='min-w-0'>
+                    <div className='flex items-center gap-1.5'>
+                      <span className='text-xs'>🔀</span>
+                      <p className='text-[11px] font-medium'>Crear y gestionar procesos</p>
+                    </div>
+                    <p className='text-[10px] text-muted-foreground mt-0.5 pl-5'>
+                      Sin esto, solo puede consultar procedimientos publicados.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={options.canManageProcesses ?? false}
+                    onCheckedChange={options.onToggleManageProcesses}
                     disabled={disabled}
                     className='scale-90 shrink-0'
                   />

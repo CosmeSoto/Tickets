@@ -18,6 +18,8 @@ interface UserModulesPanelProps {
   canManageForms?: boolean
   credentialsEnabled?: boolean
   canManageCredentials?: boolean
+  processesEnabled?: boolean
+  canManageProcesses?: boolean
   canRequestAssets?: boolean
   canAccessKnowledge?: boolean
   /** Vista del propio usuario: copy en 2ª persona y nota de solo lectura */
@@ -37,9 +39,11 @@ interface ModulesData {
   news: boolean
   forms: boolean
   credentials: boolean
+  processes: boolean
   canManageNews?: boolean
   canManageForms?: boolean
   canManageCredentials?: boolean
+  canManageProcesses?: boolean
   canManageInventory?: boolean
   canRequestAssets?: boolean
   canAccessKnowledge?: boolean
@@ -55,6 +59,7 @@ interface ModulesData {
       news: boolean
       forms: boolean
       credentials: boolean
+      processes: boolean
     }
   }>
 }
@@ -64,6 +69,7 @@ const MODULE_CHIP_LABELS = [
   { key: 'inventory' as const, label: '📦 Inventario' },
   { key: 'patrols' as const, label: '🛡️ Rondas' },
   { key: 'credentials' as const, label: '🔐 Credenciales' },
+  { key: 'processes' as const, label: '🔀 Procesos' },
   { key: 'news' as const, label: '📰 Noticias' },
   { key: 'forms' as const, label: '📄 Documentos' },
 ]
@@ -96,6 +102,8 @@ export function UserModulesPanel({
   canManageForms,
   credentialsEnabled,
   canManageCredentials,
+  processesEnabled,
+  canManageProcesses,
   canRequestAssets,
   canAccessKnowledge,
   selfView = false,
@@ -130,6 +138,8 @@ export function UserModulesPanel({
     canManageForms,
     credentialsEnabled,
     canManageCredentials,
+    processesEnabled,
+    canManageProcesses,
   ])
 
   if (loading) {
@@ -169,6 +179,7 @@ export function UserModulesPanel({
     news: data.news,
     forms: data.forms,
     credentials: data.credentials ?? false,
+    processes: data.processes ?? false,
   }
 
   const manageInventory = data.canManageInventory ?? canManageInventory
@@ -251,6 +262,15 @@ export function UserModulesPanel({
       ? 'Crear y ver las tuyas + las que te compartan'
       : 'Crear y ver propias + las que le compartan'
 
+  const manageProcesses = data?.canManageProcesses ?? canManageProcesses ?? false
+  const processesCap = manageProcesses
+    ? selfView
+      ? 'Consultas y gestionas procesos/procedimientos de tus áreas'
+      : 'Consulta y gestiona procesos/procedimientos de sus áreas'
+    : selfView
+      ? 'Consultas procedimientos publicados de tus áreas'
+      : 'Consulta procedimientos publicados de sus áreas'
+
   // Permisos adicionales por módulo
   const ticketsPerms: Array<{ icon: string; label: string }> = []
   if (accessKnowledge) ticketsPerms.push({ icon: '📚', label: 'Base de conocimientos' })
@@ -266,8 +286,7 @@ export function UserModulesPanel({
   if (manageForms) formsPerms.push({ icon: '✏️', label: 'Crear y gestionar documentos' })
 
   const credentialsPerms: Array<{ icon: string; label: string }> = []
-  if (manageCredentials)
-    credentialsPerms.push({ icon: '🔐', label: 'Ver credenciales inferiores' })
+  if (manageCredentials) credentialsPerms.push({ icon: '🔐', label: 'Ver credenciales inferiores' })
 
   const allModules = [
     {
@@ -299,6 +318,15 @@ export function UserModulesPanel({
       label: 'Credenciales',
       cap: credentialsCap,
       perms: credentialsPerms,
+    },
+    {
+      key: 'processes' as const,
+      emoji: '🔀',
+      label: 'Procesos',
+      cap: processesCap,
+      perms: manageProcesses
+        ? [{ icon: '✏️', label: 'Crear y gestionar procesos' }]
+        : ([] as Array<{ icon: string; label: string }>),
     },
   ]
 

@@ -214,7 +214,11 @@ export function useBackups() {
 
   // ── Create backup ──
   const createBackup = useCallback(
-    async (options?: { mode?: 'infrastructure' | 'export'; backupKind?: string }) => {
+    async (options?: {
+      mode?: 'infrastructure' | 'export' | 'module'
+      backupKind?: string
+      module?: string
+    }) => {
       setCreating(true)
       try {
         const response = await fetch('/api/admin/backups', {
@@ -224,11 +228,16 @@ export function useBackups() {
             type: 'manual',
             mode: options?.mode ?? 'infrastructure',
             backupKind: options?.backupKind,
+            module: options?.module,
           }),
         })
         if (response.ok) {
           const label =
-            options?.mode === 'export' ? 'Exportación creada' : 'Respaldo pgBackRest iniciado'
+            options?.mode === 'module'
+              ? `Exportación del módulo ${options.module || ''} creada`
+              : options?.mode === 'export'
+                ? 'Exportación creada'
+                : 'Respaldo pgBackRest iniciado'
           toast({ title: 'Éxito', description: label })
           loadBackups(false)
           loadStats()

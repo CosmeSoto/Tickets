@@ -57,6 +57,8 @@ interface EditUserData {
   canManageForms: boolean
   credentialsEnabled: boolean
   canManageCredentials: boolean
+  processesEnabled: boolean
+  canManageProcesses: boolean
   isSuperAdmin: boolean
   avatar?: File
 }
@@ -96,6 +98,8 @@ export function EditUserModal({
     canManageForms: false,
     credentialsEnabled: false,
     canManageCredentials: false,
+    processesEnabled: false,
+    canManageProcesses: false,
     isSuperAdmin: false,
   })
 
@@ -108,11 +112,13 @@ export function EditUserModal({
     inventoryFamilies,
     patrolFamilies,
     credentialsFamilies,
+    processesFamilies,
     technicianFamilyIds,
     clientFamilyIds,
     inventoryFamilyIds,
     patrolFamilyIds,
     credentialsFamilyIds,
+    processesFamilyIds,
     adminFamilyIds,
     contentFamilyIds,
     adminScopeIds,
@@ -126,6 +132,7 @@ export function EditUserModal({
     inventoryReadOnlyIds,
     patrolReadOnlyIds,
     credentialsReadOnlyIds,
+    processesReadOnlyIds,
     adminScopeReadOnlyIds,
 
     // Handlers
@@ -140,6 +147,8 @@ export function EditUserModal({
     handleUnassignPatrolFamily,
     handleAssignCredentialsFamily,
     handleUnassignCredentialsFamily,
+    handleAssignProcessesFamily,
+    handleUnassignProcessesFamily,
     handleAssignAdminFamily,
     handleUnassignAdminFamily,
     handleAssignContentFamily,
@@ -178,6 +187,8 @@ export function EditUserModal({
         canManageForms: (user as any).canManageForms ?? false,
         credentialsEnabled: (user as any).credentialsEnabled ?? false,
         canManageCredentials: (user as any).canManageCredentials ?? false,
+        processesEnabled: (user as any).processesEnabled ?? false,
+        canManageProcesses: (user as any).canManageProcesses ?? false,
         isSuperAdmin: user.isSuperAdmin ?? false,
         avatar: undefined,
       })
@@ -366,6 +377,8 @@ export function EditUserModal({
       | 'canManageForms'
       | 'credentialsEnabled'
       | 'canManageCredentials'
+      | 'processesEnabled'
+      | 'canManageProcesses'
       | 'canManageInventory'
       | 'canRequestAssets'
       | 'canAccessKnowledge',
@@ -405,6 +418,12 @@ export function EditUserModal({
         ...p,
         credentialsEnabled: value,
         canManageCredentials: value ? p.canManageCredentials : false,
+      }))
+    } else if (field === 'processesEnabled') {
+      setFormData(p => ({
+        ...p,
+        processesEnabled: value,
+        canManageProcesses: value ? (p.role === 'ADMIN' ? true : p.canManageProcesses) : false,
       }))
     } else {
       setFormData(p => ({ ...p, [field]: value }))
@@ -494,17 +513,20 @@ export function EditUserModal({
                 inventoryFamilies={inventoryFamilies}
                 patrolFamilies={patrolFamilies}
                 credentialsFamilies={credentialsFamilies}
+                processesFamilies={processesFamilies}
                 technicianFamilyIds={technicianFamilyIds}
                 clientFamilyIds={clientFamilyIds}
                 inventoryFamilyIds={inventoryFamilyIds}
                 patrolFamilyIds={patrolFamilyIds}
                 credentialsFamilyIds={credentialsFamilyIds}
+                processesFamilyIds={processesFamilyIds}
                 adminFamilyIds={adminFamilyIds}
                 contentFamilyIds={contentFamilyIds}
                 ticketReadOnlyIds={ticketReadOnlyIds}
                 inventoryReadOnlyIds={inventoryReadOnlyIds}
                 patrolReadOnlyIds={patrolReadOnlyIds}
                 credentialsReadOnlyIds={credentialsReadOnlyIds}
+                processesReadOnlyIds={processesReadOnlyIds}
                 adminScopeReadOnlyIds={adminScopeReadOnlyIds}
                 onToggle={handleToggle}
                 handlers={{
@@ -518,6 +540,8 @@ export function EditUserModal({
                   handleUnassignPatrolFamily,
                   handleAssignCredentialsFamily,
                   handleUnassignCredentialsFamily,
+                  handleAssignProcessesFamily,
+                  handleUnassignProcessesFamily,
                   handleAssignAdminFamily,
                   handleUnassignAdminFamily,
                   handleAssignContentFamily,

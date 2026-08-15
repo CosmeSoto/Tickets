@@ -14,12 +14,14 @@ export type RoleNavigationInput = {
   canManageInventory: boolean
   canManageNews: boolean
   canManageForms: boolean
+  canManageProcesses: boolean
   hasTickets: boolean
   hasInventory: boolean
   hasPatrols: boolean
   hasNews: boolean
   hasForms: boolean
   hasCredentials: boolean
+  hasProcesses: boolean
   canRequestAssets: boolean
   /** Tickets + canAccessKnowledge (Super Admin = true) */
   hasKnowledge: boolean
@@ -55,12 +57,14 @@ export function buildRoleNavigation({
   canManageInventory,
   canManageNews,
   canManageForms,
+  canManageProcesses,
   hasTickets,
   hasInventory,
   hasPatrols,
   hasNews,
   hasForms,
   hasCredentials,
+  hasProcesses,
   canRequestAssets,
   hasKnowledge,
 }: RoleNavigationInput): DashboardNavItem[] {
@@ -81,9 +85,26 @@ export function buildRoleNavigation({
       if (item.href === '/admin/news' || item.name === 'Noticias') return hasNews
       if (item.href === '/admin/forms' || item.name === 'Documentos') return hasForms
       if (item.href === '/credentials' || item.name === 'Credenciales') return hasCredentials
+      if (
+        item.href === '/admin/processes' ||
+        item.href === '/processes' ||
+        item.name === 'Procesos'
+      )
+        return hasProcesses
       return true
     })
-    return filterKnowledgeChildren(adminNav, isSuperAdmin || hasKnowledge)
+    return filterKnowledgeChildren(
+      adminNav.map(item => {
+        if (item.name !== 'Procesos' || !item.children?.length) return item
+        return {
+          ...item,
+          children: item.children.filter(
+            child => child.href !== '/admin/processes/settings' || isSuperAdmin
+          ),
+        }
+      }),
+      isSuperAdmin || hasKnowledge
+    )
   }
 
   let navigation = (navigationByRole[navKey] || []).filter(item => {
@@ -113,6 +134,13 @@ export function buildRoleNavigation({
     if (item.href === '/credentials' || item.name === 'Credenciales') {
       return hasCredentials
     }
+    if (
+      item.href === '/processes' ||
+      item.href === '/admin/processes' ||
+      item.name === 'Procesos'
+    ) {
+      return hasProcesses
+    }
     return true
   })
 
@@ -124,6 +152,21 @@ export function buildRoleNavigation({
     return {
       ...item,
       href: canManageForms ? '/admin/forms' : '/forms',
+    }
+  })
+
+  // Gestores de procesos: consola admin; resto: catálogo publicado
+  navigation = navigation.map(item => {
+    if (
+      item.name !== 'Procesos' &&
+      item.href !== '/processes' &&
+      item.href !== '/admin/processes'
+    ) {
+      return item
+    }
+    return {
+      ...item,
+      href: canManageProcesses ? '/admin/processes' : '/processes',
     }
   })
 
@@ -154,6 +197,7 @@ export function buildRoleNavigation({
 }
 
 export function roleHomeHref(userRole: string): string {
-  const role = userRole.toLowerCase() === 'technician_manager' ? 'technician' : userRole.toLowerCase()
+  const role =
+    userRole.toLowerCase() === 'technician_manager' ? 'technician' : userRole.toLowerCase()
   return `/${role}`
 }

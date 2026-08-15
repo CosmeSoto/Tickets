@@ -1,6 +1,6 @@
 import { exec } from 'child_process'
 import { promisify } from 'util'
-import { stat, mkdir } from 'fs/promises'
+import { stat, mkdir, writeFile } from 'fs/promises'
 import { join } from 'path'
 import { randomUUID } from 'crypto'
 import prisma from '@/lib/prisma'
@@ -23,6 +23,21 @@ import {
   buildPgBackRestFileRef,
   syncPgBackRestToDatabase,
 } from './backup-engine'
+import {
+  isBackupModuleId,
+  type BackupModuleId,
+  exportProcessesModuleData,
+  exportTicketsModuleData,
+  exportNewsModuleData,
+  exportPatrolsModuleData,
+  exportFamiliesModuleData,
+  exportUsersModuleData,
+  exportAuditsModuleData,
+  exportConfigurationsModuleData,
+  exportInventoryModuleData,
+  exportCredentialsModuleData,
+  BACKUP_MODULE_REGISTRY,
+} from '../backup-modules'
 
 const execAsync = promisify(exec)
 
@@ -45,6 +60,7 @@ export async function createBackup(
   options?: {
     mode?: BackupCreateMode
     backupKind?: BackupKind
+    module?: BackupModuleId | string | null
     userId?: string | null
     userEmail?: string | null
   }
@@ -56,11 +72,152 @@ export async function createBackup(
   const mode: BackupCreateMode = options?.mode ?? 'infrastructure'
   const backupKind = options?.backupKind ?? resolveInfrastructureKind(mode, type)
 
+  if (mode === 'module') {
+    if (!options?.module || !isBackupModuleId(options.module)) {
+      throw new Error('Debe indicar un módulo válido para la exportación parcial.')
+    }
+    return createModuleJsonBackup(type, options.module, options)
+  }
+
   if (mode === 'export') {
     return createExportBackup(type, options)
   }
 
   return createInfrastructureBackup(type, backupKind, options)
+}
+
+async function exportModulePayload(moduleId: BackupModuleId): Promise<Record<string, unknown[]>> {
+  switch (moduleId) {
+    case 'tickets':
+      return exportTicketsModuleData()
+    case 'news':
+      return exportNewsModuleData()
+    case 'patrols':
+      return exportPatrolsModuleData()
+    case 'families':
+      return exportFamiliesModuleData()
+    case 'users':
+      return exportUsersModuleData()
+    case 'audits':
+      return exportAuditsModuleData()
+    case 'configurations':
+      return exportConfigurationsModuleData()
+    case 'inventory':
+      return exportInventoryModuleData()
+    case 'credentials':
+      return exportCredentialsModuleData()
+    case 'processes':
+      return exportProcessesModuleData()
+    default:
+      throw new Error(`Módulo no soportado para exportación: ${moduleId}`)
+  }
+}
+
+async function createModuleJsonBackup(
+  type: 'manual' | 'automatic',
+  moduleId: BackupModuleId,
+  actor?: { userId?: string | null; userEmail?: string | null }
+): Promise<BackupInfo> {
+  await ensureBackupDirectory()
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+  const filename = `${moduleId}-${timestamp}.json`
+  const filepath = join(BACKUP_DIR, filename)
+  const backupRecord = await prisma.backups.create({
+    data: {
+      id: randomUUID(),
+      filename,
+      filepath,
+      size: 0,
+      type,
+      status: 'in_progress',
+      engine: 'export',
+      backupKind: 'export',
+      module: moduleId,
+      createdAt: new Date(),
+    },
+  })
+
+  try {
+    const data = await exportModulePayload(moduleId)
+    const tableCounts = Object.fromEntries(
+      Object.entries(data).map(([table, rows]) => [table, rows.length])
+    )
+    const totalRecords = Object.values(tableCounts).reduce((sum, count) => sum + count, 0)
+    const payload = {
+      metadata: {
+        version: '3.0',
+        createdAt: new Date().toISOString(),
+        module: moduleId,
+        modules: [moduleId],
+        dumpFormat: 'json' as const,
+        tableCounts,
+        totalRecords,
+        label: BACKUP_MODULE_REGISTRY[moduleId].label,
+      },
+      data,
+    }
+    await writeFile(filepath, JSON.stringify(payload), 'utf8')
+    const fileStats = await stat(filepath)
+    const checksum = await calculateChecksum(filepath).catch(() => undefined)
+    await prisma.backups.update({
+      where: { id: backupRecord.id },
+      data: {
+        size: fileStats.size,
+        status: 'completed',
+        checksum: checksum ?? null,
+        compressed: false,
+        encrypted: false,
+        metadata: JSON.stringify({ ...payload.metadata, fileSize: fileStats.size }),
+      },
+    })
+    await cleanOldBackups()
+    await prisma.audit_logs
+      .create({
+        data: {
+          id: randomUUID(),
+          action: 'backup_created',
+          entityType: 'System',
+          entityId: backupRecord.id,
+          userId: actor?.userId ?? null,
+          userEmail: actor?.userEmail ?? null,
+          createdAt: new Date(),
+          details: {
+            engine: 'export',
+            backupKind: 'export',
+            module: moduleId,
+            filename,
+            size: fileStats.size,
+            type,
+            format: 'json',
+          },
+        },
+      })
+      .catch(() => {})
+
+    return {
+      id: backupRecord.id,
+      filename,
+      size: fileStats.size,
+      createdAt: backupRecord.createdAt,
+      type,
+      status: 'completed',
+      checksum,
+      compressed: false,
+      encrypted: false,
+      engine: 'export',
+      backupKind: 'export',
+      module: moduleId,
+    }
+  } catch (error) {
+    await prisma.backups.update({
+      where: { id: backupRecord.id },
+      data: {
+        status: 'failed',
+        error: error instanceof Error ? error.message : 'Error desconocido',
+      },
+    })
+    throw error
+  }
 }
 
 async function createInfrastructureBackup(

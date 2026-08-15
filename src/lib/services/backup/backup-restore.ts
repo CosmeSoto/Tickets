@@ -16,6 +16,7 @@ import {
   USERS_MODULE_RESTORE_ORDER,
   CREDENTIALS_MODULE_RESTORE_ORDER,
   INVENTORY_MODULE_RESTORE_ORDER,
+  PROCESSES_MODULE_RESTORE_ORDER,
 } from '../backup-modules'
 
 const execAsync = promisify(exec)
@@ -733,6 +734,7 @@ function getTablesForModules(modules: string[]): string[] {
     inventory: INVENTORY_MODULE_RESTORE_ORDER,
     // Secretos viajan cifrados (secretEncrypted); no hay plaintext en el dump filtrado.
     credentials: CREDENTIALS_MODULE_RESTORE_ORDER,
+    processes: PROCESSES_MODULE_RESTORE_ORDER,
   }
 
   const tables: string[] = []
@@ -939,6 +941,9 @@ async function restoreFromJSON(
           // Restaura ciphertext AES-GCM tal cual; revelar requiere ENCRYPTION_KEY del origen.
           restoreOrder = CREDENTIALS_MODULE_RESTORE_ORDER
           break
+        case 'processes':
+          restoreOrder = PROCESSES_MODULE_RESTORE_ORDER
+          break
         default:
           throw new Error(`Módulo no soportado para restauración: ${effectiveModule}`)
       }
@@ -1028,6 +1033,12 @@ async function restoreFromJSON(
     'category_analytics',
     'backups',
     'verification_tokens',
+    'processes',
+    'process_versions',
+    'process_diagrams',
+    'process_attachments',
+    'process_approval_events',
+    'process_external_reviews',
   ]
 
   await prisma.$transaction(

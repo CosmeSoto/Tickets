@@ -1,6 +1,6 @@
 export type BackupEngine = 'pgbackrest' | 'export' | 'import'
 export type BackupKind = 'full' | 'diff' | 'incr' | 'export'
-export type BackupCreateMode = 'infrastructure' | 'export'
+export type BackupCreateMode = 'infrastructure' | 'export' | 'module'
 
 export interface BackupInfo {
   id: string
@@ -123,3 +123,4 @@ export type BackupModuleId =
   | 'users'
   | 'inventory'
   | 'credentials'
+  | 'processes'

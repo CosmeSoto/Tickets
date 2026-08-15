@@ -378,6 +378,8 @@ export async function GET(request: NextRequest) {
         canManageForms: true,
         credentialsEnabled: true,
         canManageCredentials: true,
+        processesEnabled: true,
+        canManageProcesses: true,
         isSuperAdmin: true,
         createdAt: true,
         lastLogin: true,

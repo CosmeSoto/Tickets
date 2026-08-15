@@ -110,7 +110,8 @@ sudo ./start-production.sh
 #      coincida al mover el proyecto a otro equipo/servidor.
 #   3) Seed COMPLETO solo si la BD no tiene usuarios (típicamente tras --clean).
 #   4) ensure-departments SIEMPRE (idempotente) → crea/actualiza TI, Telefonía, etc.
-#   5) ensure-catalogs / ensure-categories si están incompletos.
+#   5) ensure-system-modules SIEMPRE → asegura módulos nuevos y habilita ADMINs existentes.
+#   6) ensure-catalogs / ensure-categories si están incompletos.
 #
 # Por eso `sudo ./start-production.sh` (sin --clean) ya sincroniza schema + organigrama
 # sin borrar datos. `--clean` borra volúmenes y vuelve a seedear desde cero.
@@ -375,28 +376,65 @@ curl -fsS -X POST "${NEXTAUTH_URL%/}/api/cron/weekly-digest" \
 Requiere que la cola de email esté activa (`/api/cron/process-email-queue`).  
 Log: `tail -f logs/weekly-digest-cron.log`
 
+### Revisiones vencidas de Procesos y Procedimientos
+
+Ejecuta diariamente el control de procesos publicados cuya fecha `nextReviewAt` ya venció.
+Envía aviso in-app, email y Telegram al responsable y, mientras no se actualice el
+procedimiento, repite el recordatorio cada siete días.
+
+```bash
+chmod +x ./docker/scripts/setup-process-reviews-cron.sh
+./docker/scripts/setup-process-reviews-cron.sh
+
+# Prueba manual
+source .env.production 2>/dev/null || export $(grep -E '^CRON_SECRET=' .env.production | xargs)
+curl -fsS "${NEXTAUTH_URL%/}/api/cron/process-reviews" \
+  -H "Authorization: Bearer $CRON_SECRET"
+```
+
+El cron requiere `CRON_SECRET` y la cola de email activa (`/api/cron/process-email-queue`).
+Log: `tail -f logs/process-reviews-cron.log`
+
+#### Checklist de cierre (módulo Procesos — entorno de prueba)
+
+No se siembran procesos de práctica: crear uno o dos casos reales solo en test.
+
+| Paso | Verificación                                                                                                        |
+| ---- | ------------------------------------------------------------------------------------------------------------------- |
+| 1    | Super Admin: habilitar módulo `processes` y flags `processesEnabled` / `canManageProcesses` en el usuario de prueba |
+| 2    | Admin → Procesos → Configuración: meses de revisión por defecto y (opcional) DPD obligatorio para críticos          |
+| 3    | Crear N0 o N1; si N2, elegir padre de la misma área; confirmar que el plazo de revisión toma el default             |
+| 4    | Editar versión: ficha FR-MC-01 + diagrama secuencia/swimlane; guardar (publicado vuelve a borrador)                 |
+| 5    | Flujo de estados: borrador → revisión de área → (opcional DPD con evidencia) → publicar                             |
+| 6    | Usuario solo lectura (`processesEnabled`): ve catálogo publicado, ficha y diagramas; no crea ni cambia estado       |
+| 7    | Gestor de otra familia: no ve ni edita procesos fuera de su alcance                                                 |
+| 8    | Backup módulo `processes` export/import en test si usáis respaldos por módulo                                       |
+| 9    | Cron: `GET /api/cron/process-reviews` con `CRON_SECRET` (sin errores; con `nextReviewAt` vencido avisa al owner)    |
+
+Tras validar en test: `sudo ./start-production.sh` según esta guía (`db push` / rebuild de app).
+
 ### Configuración SMTP (Admin → Email)
 
 Solo se admiten **Gmail** y **Microsoft** (Outlook personal + Microsoft 365):
 
-| Host | Uso |
-|------|-----|
-| `smtp.gmail.com` | Gmail / Google Workspace |
+| Host                    | Uso                            |
+| ----------------------- | ------------------------------ |
+| `smtp.gmail.com`        | Gmail / Google Workspace       |
 | `smtp-mail.outlook.com` | Outlook.com / Hotmail personal |
-| `smtp.office365.com` | Microsoft 365 corporativo |
+| `smtp.office365.com`    | Microsoft 365 corporativo      |
 
 Puerto recomendado: **587** (STARTTLS). Alternativa: **465** (SSL directo).
 
 #### Checklist de cierre (email listo para producción)
 
-| Paso | Verificación |
-|------|--------------|
-| 1 | Admin → Email: switch **Habilitar envío de emails** activo |
-| 2 | Elegir proveedor (Microsoft o Gmail) y completar usuario + contraseña de aplicación |
-| 3 | **Email remitente** = mismo que usuario SMTP (botón «Usar usuario SMTP») |
-| 4 | **Guardar** → **Probar conexión** (funciona aunque la contraseña ya esté guardada) |
-| 5 | Cron de cola cada 1–5 min: `GET /api/cron/process-email-queue` con `Authorization: Bearer $CRON_SECRET` |
-| 6 | Smoke test: crear ticket y confirmar email en cola / bandeja |
+| Paso | Verificación                                                                                            |
+| ---- | ------------------------------------------------------------------------------------------------------- |
+| 1    | Admin → Email: switch **Habilitar envío de emails** activo                                              |
+| 2    | Elegir proveedor (Microsoft o Gmail) y completar usuario + contraseña de aplicación                     |
+| 3    | **Email remitente** = mismo que usuario SMTP (botón «Usar usuario SMTP»)                                |
+| 4    | **Guardar** → **Probar conexión** (funciona aunque la contraseña ya esté guardada)                      |
+| 5    | Cron de cola cada 1–5 min: `GET /api/cron/process-email-queue` con `Authorization: Bearer $CRON_SECRET` |
+| 6    | Smoke test: crear ticket y confirmar email en cola / bandeja                                            |
 
 ```bash
 # Procesar cola manualmente
@@ -412,13 +450,13 @@ Guía detallada para principiantes: [`docs/OAUTH_SETUP_GUIDE.md`](docs/OAUTH_SET
 
 La configuración se guarda en **Admin → OAuth** (`oauth_configs`). NextAuth carga credenciales desde BD al iniciar sesión (no hace falta reiniciar tras guardar).
 
-| Paso | Verificación |
-|------|--------------|
-| 1 | `ENCRYPTION_KEY` definido en `.env.production` (cifra Client Secrets) |
-| 2 | Google Cloud / Azure Portal: Redirect URI exacta (`/api/auth/callback/google` o `/azure-ad`) |
-| 3 | Admin → OAuth: Client ID + Secret → **Guardar** → activar switch → **Probar conexión** |
-| 4 | Login/registro: botones Google/Microsoft visibles solo si el proveedor está **Activo** en BD |
-| 5 | Usuario nuevo OAuth → rol **CLIENT** automático |
+| Paso | Verificación                                                                                 |
+| ---- | -------------------------------------------------------------------------------------------- |
+| 1    | `ENCRYPTION_KEY` definido en `.env.production` (cifra Client Secrets)                        |
+| 2    | Google Cloud / Azure Portal: Redirect URI exacta (`/api/auth/callback/google` o `/azure-ad`) |
+| 3    | Admin → OAuth: Client ID + Secret → **Guardar** → activar switch → **Probar conexión**       |
+| 4    | Login/registro: botones Google/Microsoft visibles solo si el proveedor está **Activo** en BD |
+| 5    | Usuario nuevo OAuth → rol **CLIENT** automático                                              |
 
 Red local (`192.168.x.x`): registrar la URL HTTPS completa en los portales OAuth (ver banner en Admin → OAuth).
 
@@ -426,13 +464,13 @@ Red local (`192.168.x.x`): registrar la URL HTTPS completa en los portales OAuth
 
 ### Seguridad y sesión (Admin → Seguridad)
 
-| Campo | Efecto real |
-|-------|-------------|
-| **Tiempo de sesión** | Cierre por **inactividad** (cliente + JWT en servidor). Aviso 5 min antes. |
-| **Máx. intentos login** | Bloqueo temporal **15 min** tras superar el límite |
-| **Longitud mínima contraseña** | Registro, cambio/reset de contraseña, creación de usuarios admin |
-| **Requerir cambio contraseña** | Redirige a `/change-password` hasta cumplir política |
-| **Tamaño máximo archivo** | Adjuntos de tickets, equipos, licencias e imports |
+| Campo                          | Efecto real                                                                |
+| ------------------------------ | -------------------------------------------------------------------------- |
+| **Tiempo de sesión**           | Cierre por **inactividad** (cliente + JWT en servidor). Aviso 5 min antes. |
+| **Máx. intentos login**        | Bloqueo temporal **15 min** tras superar el límite                         |
+| **Longitud mínima contraseña** | Registro, cambio/reset de contraseña, creación de usuarios admin           |
+| **Requerir cambio contraseña** | Redirige a `/change-password` hasta cumplir política                       |
+| **Tamaño máximo archivo**      | Adjuntos de tickets, equipos, licencias e imports                          |
 
 La pestaña **Configuración** ya no recarga sola cada 5 min (solo con **Recargar** manual).
 
@@ -440,12 +478,12 @@ La pestaña **Configuración** ya no recarga sola cada 5 min (solo con **Recarga
 
 ### Modo mantenimiento (Admin → Mantenimiento)
 
-| Paso | Acción |
-|------|--------|
-| 1 | Super Admin → **Configuración → Mantenimiento** |
-| 2 | Activar switch + mensaje personalizado → **Guardar** |
-| 3 | Usuarios normales ven `/maintenance`; admins pueden seguir si está permitido |
-| 4 | Al terminar: desactivar y **Guardar** |
+| Paso | Acción                                                                       |
+| ---- | ---------------------------------------------------------------------------- |
+| 1    | Super Admin → **Configuración → Mantenimiento**                              |
+| 2    | Activar switch + mensaje personalizado → **Guardar**                         |
+| 3    | Usuarios normales ven `/maintenance`; admins pueden seguir si está permitido |
+| 4    | Al terminar: desactivar y **Guardar**                                        |
 
 Super Admin siempre accede. Las APIs operativas responden **503** durante mantenimiento (auth y cron siguen activos).
 
@@ -505,6 +543,7 @@ curl -s -X POST "${NEXTAUTH_URL}/api/telegram/register-webhook" \
 #### Vincular una cuenta de usuario
 
 Cada usuario (admin, técnico o cliente) vincula su cuenta desde:
+
 - **Perfil → sección Telegram** — genera un código de 6 caracteres
 - **Configuración → Notificaciones → Telegram** — misma card
 
@@ -512,29 +551,29 @@ Luego en el bot escriben `/vincular CÓDIGO`. El código caduca en 15 minutos.
 
 #### Notificaciones Telegram — matriz completa de eventos
 
-| Evento | Canal Telegram | Destinatarios | Prioridad | Implementado en |
-|---|---|---|---|---|
-| **Tickets** | | | | |
-| Ticket creado | ✅ | Admins de la familia | important | `NotificationService.notifyTicketCreated` |
-| Ticket asignado | ✅ | Técnico asignado | important | `NotificationService.notifyTicketAssigned` |
-| Ticket resuelto | ✅ | Técnico asignado | important | `NotificationService.notifyTicketResolved` |
-| Ticket transferido de área | ✅ | Admins de ambas familias | important | `NotificationService.notifyFamilyChange` |
-| Cliente comenta en ticket | ✅ | Técnico asignado | important\* | `NotificationService.notifyNewComment` |
-| Técnico comenta en ticket | ❌ | — | optional → omitido | In-app + WebPush cubren este caso |
-| **Inventario** | | | | |
-| Acta pendiente de firma | ✅ | Admins de la familia | important | `InventoryNotificationService.notifyDeliveryActFamilyAdmins` |
-| Alerta de stock bajo/crítico | ✅ | Admins de la familia | important | `BatchAlertService` |
-| Backup fallido | ✅ | Admins configurados | critical | `backup-utils.ts` |
-| **Rondas** | | | | |
-| Ronda asignada (schedule nuevo) | ✅ | Agente asignado | important | `schedules/route.ts` POST |
-| Ronda reasignada (agente nuevo) | ✅ | Agente nuevo + agente anterior | important | `schedules/[id]/route.ts` PATCH |
-| Ronda reprogramada (mismo agente) | ✅ | Agente asignado | important | `schedules/[id]/route.ts` PATCH |
-| Programación cancelada | ✅ | Todos los agentes afectados | important | `schedules/[id]/route.ts` DELETE |
-| Recordatorio pre-ronda | ✅ | Agente asignado | important | `PatrolReminderService` |
-| Ronda no iniciada (MISSED) | ✅ | Supervisores + agente | important | `PatrolSchedulerService.notifyMissed` |
-| Ronda cerrada automáticamente | ✅ | Supervisores + agente | important | `PatrolSchedulerService.notifyAutoClose` |
-| **Seguridad** | | | | |
-| Cuenta bloqueada (login fallido) | ✅ | Super admins | critical | `SecurityConfigService.recordFailedLogin` |
+| Evento                            | Canal Telegram | Destinatarios                  | Prioridad          | Implementado en                                              |
+| --------------------------------- | -------------- | ------------------------------ | ------------------ | ------------------------------------------------------------ |
+| **Tickets**                       |                |                                |                    |                                                              |
+| Ticket creado                     | ✅             | Admins de la familia           | important          | `NotificationService.notifyTicketCreated`                    |
+| Ticket asignado                   | ✅             | Técnico asignado               | important          | `NotificationService.notifyTicketAssigned`                   |
+| Ticket resuelto                   | ✅             | Técnico asignado               | important          | `NotificationService.notifyTicketResolved`                   |
+| Ticket transferido de área        | ✅             | Admins de ambas familias       | important          | `NotificationService.notifyFamilyChange`                     |
+| Cliente comenta en ticket         | ✅             | Técnico asignado               | important\*        | `NotificationService.notifyNewComment`                       |
+| Técnico comenta en ticket         | ❌             | —                              | optional → omitido | In-app + WebPush cubren este caso                            |
+| **Inventario**                    |                |                                |                    |                                                              |
+| Acta pendiente de firma           | ✅             | Admins de la familia           | important          | `InventoryNotificationService.notifyDeliveryActFamilyAdmins` |
+| Alerta de stock bajo/crítico      | ✅             | Admins de la familia           | important          | `BatchAlertService`                                          |
+| Backup fallido                    | ✅             | Admins configurados            | critical           | `backup-utils.ts`                                            |
+| **Rondas**                        |                |                                |                    |                                                              |
+| Ronda asignada (schedule nuevo)   | ✅             | Agente asignado                | important          | `schedules/route.ts` POST                                    |
+| Ronda reasignada (agente nuevo)   | ✅             | Agente nuevo + agente anterior | important          | `schedules/[id]/route.ts` PATCH                              |
+| Ronda reprogramada (mismo agente) | ✅             | Agente asignado                | important          | `schedules/[id]/route.ts` PATCH                              |
+| Programación cancelada            | ✅             | Todos los agentes afectados    | important          | `schedules/[id]/route.ts` DELETE                             |
+| Recordatorio pre-ronda            | ✅             | Agente asignado                | important          | `PatrolReminderService`                                      |
+| Ronda no iniciada (MISSED)        | ✅             | Supervisores + agente          | important          | `PatrolSchedulerService.notifyMissed`                        |
+| Ronda cerrada automáticamente     | ✅             | Supervisores + agente          | important          | `PatrolSchedulerService.notifyAutoClose`                     |
+| **Seguridad**                     |                |                                |                    |                                                              |
+| Cuenta bloqueada (login fallido)  | ✅             | Super admins                   | critical           | `SecurityConfigService.recordFailedLogin`                    |
 
 \* `priority: 'important'` explícita — override de la política `optional` para `newComments`.
 
@@ -560,16 +599,16 @@ En **Admin → Configuración → Telegram** hay un panel **Cola de alertas Tele
 
 #### Checklist de cierre (Telegram listo para producción)
 
-| Paso | Verificación |
-|------|--------------|
-| 1. Migraciones | `npx prisma migrate deploy` — incluye `telegram_chat_id` unique y tabla `telegram_queue` |
-| 2. Bot configurado | Admin → Telegram: token, username, switch habilitado, **Probar conexión** OK |
-| 3. Webhook Secret | Generar (`openssl rand -hex 32`), guardar en Admin → Telegram → **Webhook Secret** |
-| 4. Alertas globales | Admin → Notificaciones: switch **Alertas Telegram** activo |
+| Paso                   | Verificación                                                                                      |
+| ---------------------- | ------------------------------------------------------------------------------------------------- |
+| 1. Migraciones         | `npx prisma migrate deploy` — incluye `telegram_chat_id` unique y tabla `telegram_queue`          |
+| 2. Bot configurado     | Admin → Telegram: token, username, switch habilitado, **Probar conexión** OK                      |
+| 3. Webhook Secret      | Generar (`openssl rand -hex 32`), guardar en Admin → Telegram → **Webhook Secret**                |
+| 4. Alertas globales    | Admin → Notificaciones: switch **Alertas Telegram** activo                                        |
 | 5. Inbound (elige uno) | **Red local:** `setup-telegram-poll-cron.sh` · **Producción:** Registrar Webhook + quitar polling |
-| 6. Cola saliente | `setup-telegram-cleanup-cron.sh` (cola cada 2 min + limpieza tokens diaria) |
-| 7. Vincular usuarios | Perfil → Telegram → `/vincular CÓDIGO` en el bot |
-| 8. Smoke test | Crear ticket de prueba o pulsar **Procesar cola ahora** en el panel admin |
+| 6. Cola saliente       | `setup-telegram-cleanup-cron.sh` (cola cada 2 min + limpieza tokens diaria)                       |
+| 7. Vincular usuarios   | Perfil → Telegram → `/vincular CÓDIGO` en el bot                                                  |
+| 8. Smoke test          | Crear ticket de prueba o pulsar **Procesar cola ahora** en el panel admin                         |
 
 #### Lógica del recordatorio pre-ronda
 
@@ -593,34 +632,34 @@ CRON_SECRET=$(grep '^CRON_SECRET=' .env.production | cut -d= -f2 | tr -d '"')
 (crontab -l 2>/dev/null; echo "*/5 * * * * curl -fsS \"${NEXTAUTH_URL}/api/cron/patrol\" -H \"Authorization: Bearer ${CRON_SECRET}\" >> logs/patrol-cron.log 2>&1 # tickets-patrol-cron") | crontab -
 ```
 
-| Comando | Acceso | Descripción |
-|---|---|---|
-| `/start` | Todos | Bienvenida y estado de vinculación |
-| `/vincular <código>` | Todos | Vincular cuenta del sistema |
-| `/estado` | Todos | Nombre, email, teléfono, rol y estado de alertas |
-| `/desvincular` | Todos | Desconectar cuenta |
-| `/ayuda` | Todos | Lista dinámica filtrada por módulos activos del usuario |
-| **— Tickets —** | | |
-| `/mis_tickets` | ticketsEnabled | Tickets activos filtrados por rol |
-| `/mi_tecnico` | Cliente | Técnico asignado al ticket abierto más reciente |
-| `/pendientes` | Admin / Técnico | Tickets OPEN ordenados por prioridad |
-| **— Inventario —** | | |
-| `/mis_equipos` | Todos (con asignaciones) | Equipos asignados actualmente |
-| `/mis_actas` | Todos | Actas de entrega y devolución propias (últimos 90 días) |
-| `/mis_mantenimientos` | inventoryEnabled | Equipos propios en mantenimiento o registros asignados |
-| `/mis_solicitudes` | canRequestAssets / Admin | Solicitudes de activos activas |
-| `/inventario` | inventoryEnabled / Admin | Resumen global de equipos por estado |
-| `/bajas` | Admin / Técnico | Solicitudes de baja pendientes de revisión |
-| `/actas` | Admin | Todas las actas pendientes de firma del sistema |
-| `/catalogo` | Todos | Equipos disponibles para la venta |
-| **— Rondas —** | | |
-| `/mis_rondas` | patrolsEnabled | Rondas activas y programadas (agente o supervisor) |
-| **— Noticias —** | | |
-| `/noticias` | newsEnabled | Últimas 5 noticias publicadas ordenadas por prioridad |
-| **— Contratos —** | | |
-| `/mis_contratos` | Custodio / Admin | Contratos activos asignados como custodio |
-| **— Admin —** | | |
-| `/sistema` | Admin | Resumen: tickets, rondas, actas, mantenimientos, backup |
+| Comando               | Acceso                   | Descripción                                             |
+| --------------------- | ------------------------ | ------------------------------------------------------- |
+| `/start`              | Todos                    | Bienvenida y estado de vinculación                      |
+| `/vincular <código>`  | Todos                    | Vincular cuenta del sistema                             |
+| `/estado`             | Todos                    | Nombre, email, teléfono, rol y estado de alertas        |
+| `/desvincular`        | Todos                    | Desconectar cuenta                                      |
+| `/ayuda`              | Todos                    | Lista dinámica filtrada por módulos activos del usuario |
+| **— Tickets —**       |                          |                                                         |
+| `/mis_tickets`        | ticketsEnabled           | Tickets activos filtrados por rol                       |
+| `/mi_tecnico`         | Cliente                  | Técnico asignado al ticket abierto más reciente         |
+| `/pendientes`         | Admin / Técnico          | Tickets OPEN ordenados por prioridad                    |
+| **— Inventario —**    |                          |                                                         |
+| `/mis_equipos`        | Todos (con asignaciones) | Equipos asignados actualmente                           |
+| `/mis_actas`          | Todos                    | Actas de entrega y devolución propias (últimos 90 días) |
+| `/mis_mantenimientos` | inventoryEnabled         | Equipos propios en mantenimiento o registros asignados  |
+| `/mis_solicitudes`    | canRequestAssets / Admin | Solicitudes de activos activas                          |
+| `/inventario`         | inventoryEnabled / Admin | Resumen global de equipos por estado                    |
+| `/bajas`              | Admin / Técnico          | Solicitudes de baja pendientes de revisión              |
+| `/actas`              | Admin                    | Todas las actas pendientes de firma del sistema         |
+| `/catalogo`           | Todos                    | Equipos disponibles para la venta                       |
+| **— Rondas —**        |                          |                                                         |
+| `/mis_rondas`         | patrolsEnabled           | Rondas activas y programadas (agente o supervisor)      |
+| **— Noticias —**      |                          |                                                         |
+| `/noticias`           | newsEnabled              | Últimas 5 noticias publicadas ordenadas por prioridad   |
+| **— Contratos —**     |                          |                                                         |
+| `/mis_contratos`      | Custodio / Admin         | Contratos activos asignados como custodio               |
+| **— Admin —**         |                          |                                                         |
+| `/sistema`            | Admin                    | Resumen: tickets, rondas, actas, mantenimientos, backup |
 
 #### Limpieza de tokens expirados
 
@@ -634,7 +673,8 @@ chmod +x ./docker/scripts/setup-telegram-cleanup-cron.sh
 O manualmente (solo limpieza, una vez al día a las 03:00):
 CRON_SECRET=$(grep '^CRON_SECRET=' .env.production | cut -d= -f2 | tr -d '"')
 (crontab -l 2>/dev/null; echo "0 3 * * * curl -fsS \"${NEXTAUTH_URL}/api/cron/telegram-cleanup\" -H \"Authorization: Bearer ${CRON_SECRET}\" >> logs/telegram-cleanup.log 2>&1") | crontab -
-```
+
+````
 
 #### Solución de problemas Telegram
 
@@ -658,7 +698,7 @@ CRON_SECRET=$(grep '^CRON_SECRET=' .env.production | cut -d= -f2 | tr -d '"')
 ```bash
 ./docker/scripts/disaster-recovery.sh check
 ./docker/scripts/disaster-recovery.sh info
-```
+````
 
 - **Mensual recomendado:** Export .dump desde UI + guardar informe JSON + copia off-site de volumen `pgbackrest_repo`
 
@@ -1038,22 +1078,22 @@ Referencias ya migradas: Credenciales, Familias, Proveedores, Contratos, Manteni
 | Dashboard rondas vacío                                           | Verificar que hay patrullas programadas para hoy (UTC-5)                                                                                                            |
 | Técnico no aparece en categorías                                 | Verificar `technician_family_assignments` para esa familia                                                                                                          |
 | Agente no aparece en programación                                | Verificar `patrol_family_assignments` + `patrolsEnabled=true`                                                                                                       |
-| Telegram: card muestra "bot no habilitado"                       | Admin → Configuración → Telegram → verificar token y switch → Guardar                                                                                              |
-| Telegram: `/vincular` no responde                                | Verificar cron de polling: `crontab -l \| grep telegram-poll` — si falta, ejecutar `setup-telegram-poll-cron.sh`                                                   |
+| Telegram: card muestra "bot no habilitado"                       | Admin → Configuración → Telegram → verificar token y switch → Guardar                                                                                               |
+| Telegram: `/vincular` no responde                                | Verificar cron de polling: `crontab -l \| grep telegram-poll` — si falta, ejecutar `setup-telegram-poll-cron.sh`                                                    |
 | Telegram: `bad webhook: IP address is reserved`                  | Normal en red local — no pulsar "Registrar Webhook"; usar modo polling                                                                                              |
 
 ---
 
 ## Archivos de Configuración
 
-| Archivo                   | Propósito                                  |
-| ------------------------- | ------------------------------------------ |
-| `.env.local`              | Variables desarrollo (npm run dev)         |
-| `.env.production`         | Variables producción (Docker)              |
-| `docker-compose.yml`      | Solo postgres + redis (dev sin Docker)     |
-| `docker-compose.dev.yml`  | Todo en Docker (desarrollo)                |
-| `docker-compose.prod.yml` | Producción con nginx + SSL                 |
-| `docker/entrypoint.sh`    | Migraciones + seed + arranque (producción) |
-| `docker/nginx.local.conf` | Proxy reverso + SSL                        |
-| `start-production.sh`     | Script automático de despliegue            |
+| Archivo                                      | Propósito                                            |
+| -------------------------------------------- | ---------------------------------------------------- |
+| `.env.local`                                 | Variables desarrollo (npm run dev)                   |
+| `.env.production`                            | Variables producción (Docker)                        |
+| `docker-compose.yml`                         | Solo postgres + redis (dev sin Docker)               |
+| `docker-compose.dev.yml`                     | Todo en Docker (desarrollo)                          |
+| `docker-compose.prod.yml`                    | Producción con nginx + SSL                           |
+| `docker/entrypoint.sh`                       | Migraciones + seed + arranque (producción)           |
+| `docker/nginx.local.conf`                    | Proxy reverso + SSL                                  |
+| `start-production.sh`                        | Script automático de despliegue                      |
 | `docker/scripts/setup-telegram-poll-cron.sh` | Instala/desinstala cron polling Telegram (red local) |

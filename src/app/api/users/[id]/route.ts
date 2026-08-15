@@ -28,6 +28,8 @@ const updateUserSchema = z.object({
   canManageForms: z.boolean().optional(),
   credentialsEnabled: z.boolean().optional(),
   canManageCredentials: z.boolean().optional(),
+  processesEnabled: z.boolean().optional(),
+  canManageProcesses: z.boolean().optional(),
   isSuperAdmin: z.boolean().optional(),
   assignedCategories: z
     .array(
@@ -163,6 +165,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       delete validatedData.canManageForms
       delete validatedData.credentialsEnabled
       delete validatedData.canManageCredentials
+      delete validatedData.processesEnabled
+      delete validatedData.canManageProcesses
     }
 
     // Un admin no puede desactivar su propia cuenta
@@ -415,7 +419,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         })
       }
 
-        // Si cambia canRequestAssets, notificar para refrescar sesión
+      // Si cambia canRequestAssets, notificar para refrescar sesión
       if (
         (validatedData as any).canRequestAssets !== undefined &&
         (validatedData as any).canRequestAssets !== (currentUser as any).canRequestAssets
@@ -466,7 +470,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         (validatedData.credentialsEnabled !== undefined &&
           validatedData.credentialsEnabled !== (currentUser as any).credentialsEnabled) ||
         (validatedData.canManageCredentials !== undefined &&
-          validatedData.canManageCredentials !== (currentUser as any).canManageCredentials)
+          validatedData.canManageCredentials !== (currentUser as any).canManageCredentials) ||
+        (validatedData.processesEnabled !== undefined &&
+          validatedData.processesEnabled !== (currentUser as any).processesEnabled) ||
+        (validatedData.canManageProcesses !== undefined &&
+          validatedData.canManageProcesses !== (currentUser as any).canManageProcesses)
 
       if (modulesActuallyChanged) {
         NotificationEvents.emit(targetId, {

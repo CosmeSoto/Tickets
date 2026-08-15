@@ -297,6 +297,14 @@ elif [ "$DEPTS_CHECK" != "0" ]; then
   $TSX_CLI prisma/ensure-departments.ts || true
 fi
 
+# Catálogo de módulos que debe existir también cuando el seed completo se omite.
+echo "==> Asegurando módulos del sistema..."
+if $TSX_CLI prisma/ensure-system-modules.ts; then
+  echo "==> Módulos del sistema sincronizados."
+else
+  echo "==> ADVERTENCIA: ensure-system-modules falló."
+fi
+
 # Acceso unificado a áreas (user_family_access) — sync idempotente desde tablas legacy
 echo "==> Sincronizando user_family_access (áreas por módulo)..."
 if $TSX_CLI prisma/sync-user-family-access.ts; then

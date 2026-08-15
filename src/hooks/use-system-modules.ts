@@ -101,6 +101,19 @@ const FALLBACK: SystemModule[] = [
     requiresManager: true,
     familyScoped: true,
   },
+  {
+    key: 'processes',
+    name: 'Procesos y Procedimientos',
+    description: 'Catálogo interno, versiones y diagramas de procesos por área',
+    icon: 'Workflow',
+    isActive: true,
+    order: 7,
+    defaultForAdmin: true,
+    defaultForTech: false,
+    defaultForClient: false,
+    requiresManager: true,
+    familyScoped: true,
+  },
 ]
 
 export function useSystemModules() {
@@ -157,6 +170,11 @@ export function getModuleRoleDescription(moduleKey: string, role: string): strin
         'Crear y ver propias + compartidas · con «Ver inferiores», también las de clientes del área',
       CLIENT: 'Crear y ver propias + las que te compartan otros usuarios',
     },
+    processes: {
+      ADMIN: 'Gestionar catálogo, versiones y diagramas en sus áreas',
+      TECHNICIAN: 'Ver publicados · con gestión puede crear y versionar en áreas asignadas',
+      CLIENT: 'Consultar procedimientos publicados de sus áreas',
+    },
   }
   return descriptions[moduleKey]?.[role] ?? 'Acceso al módulo'
 }
@@ -195,6 +213,11 @@ export function getAdditionalFamilyHint(moduleKey: string, role: string): string
       TECHNICIAN: 'Áreas donde guarda credenciales y, con «Ver inferiores», ve las de clientes.',
       CLIENT: 'Áreas donde puede guardar y consultar sus credenciales.',
     },
+    processes: {
+      ADMIN: 'Áreas adicionales donde puede gobernar procesos y procedimientos.',
+      TECHNICIAN: 'Áreas adicionales donde puede gestionar o consultar procesos.',
+      CLIENT: 'Áreas adicionales donde puede consultar procedimientos publicados.',
+    },
   }
   return hints[moduleKey]?.[role] ?? null
 }
@@ -210,6 +233,7 @@ export function getModuleEmoji(moduleKey: string): string {
     news: '📰',
     forms: '📋',
     credentials: '🔐',
+    processes: '🔀',
     contracts: '📄',
     reports: '📊',
     knowledge: '📚',

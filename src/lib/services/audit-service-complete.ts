@@ -32,6 +32,10 @@ export interface AuditLogData {
     | 'credential_entry'
     | 'credential_vault'
     | 'credential_share'
+    | 'process'
+    | 'access_subject'
+    | 'access_pass'
+    | 'access_scan'
   entityId?: string
   userId: string
   details?: Record<string, any>
@@ -936,6 +940,21 @@ export const AuditActionsComplete = {
   FORM_CREATED: 'form_created',
   FORM_UPDATED: 'form_updated',
   FORM_DELETED: 'form_deleted',
+
+  // Procesos y procedimientos
+  PROCESS_CREATED: 'process_created',
+  PROCESS_UPDATED: 'process_updated',
+  PROCESS_STATUS_CHANGED: 'process_status_changed',
+  PROCESS_VERSION_CREATED: 'process_version_created',
+  PROCESS_DIAGRAM_UPDATED: 'process_diagram_updated',
+  PROCESS_EXTERNAL_REVIEW_RECORDED: 'process_external_review_recorded',
+
+  // Accesos (nunca registrar tokens QR ni PII completa)
+  ACCESS_PASS_CREATED: 'access_pass_created',
+  ACCESS_PASS_UPDATED: 'access_pass_updated',
+  ACCESS_PASS_REVOKED: 'access_pass_revoked',
+  ACCESS_PASS_QR_REISSUED: 'access_pass_qr_reissued',
+  ACCESS_PASS_SCANNED: 'access_pass_scanned',
 
   // Credenciales (nunca registrar secretos en details)
   CREDENTIAL_CREATED: 'credential_created',

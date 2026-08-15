@@ -76,6 +76,16 @@ export const FAMILY_ACCESS_MODULES: Record<string, FamilyAccessModuleDefinition>
       CLIENT: { canConsume: false, canOperate: true, canView: true },
     },
   },
+  processes: {
+    key: 'processes',
+    label: 'Procesos y procedimientos',
+    description: 'Áreas adicionales para consultar o gestionar procesos internos.',
+    defaultsByRole: {
+      ADMIN: { canConsume: false, canOperate: true, canView: true },
+      TECHNICIAN: { canConsume: false, canOperate: true, canView: true },
+      CLIENT: { canConsume: false, canOperate: false, canView: true },
+    },
+  },
 }
 
 export const BUILTIN_FAMILY_ACCESS_MODULE_KEYS = Object.keys(FAMILY_ACCESS_MODULES)

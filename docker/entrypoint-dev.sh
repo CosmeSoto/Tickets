@@ -70,6 +70,11 @@ npx tsx prisma/ensure-departments.ts || \
   node ./node_modules/tsx/dist/cli.mjs prisma/ensure-departments.ts || \
   echo "==> ADVERTENCIA: ensure-departments falló — npm run db:seed-departments"
 
+echo "==> [dev] Asegurando módulos del sistema..."
+npx tsx prisma/ensure-system-modules.ts || \
+  node ./node_modules/tsx/dist/cli.mjs prisma/ensure-system-modules.ts || \
+  echo "==> ADVERTENCIA: ensure-system-modules falló"
+
 # Catálogos inventario (incluye tipos de servicio de contratos) — idempotente
 echo "==> [dev] Verificando catálogos de inventario..."
 CATALOG_CHECK=0

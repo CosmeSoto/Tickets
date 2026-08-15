@@ -60,6 +60,7 @@ export const protectedRoutes = [
   '/inventory',
   '/credentials',
   '/forms',
+  '/processes',
   '/knowledge',
   '/help/center',
   '/help/documentation',

@@ -10,12 +10,14 @@ interface UserModules {
   news: boolean
   forms: boolean
   credentials: boolean
+  processes: boolean
   canRequestAssets: boolean
   canAccessKnowledge: boolean
   canManageInventory: boolean
   canManageNews: boolean
   canManageForms: boolean
   canManageCredentials: boolean
+  canManageProcesses: boolean
   families: Array<{
     id: string
     name: string
@@ -28,6 +30,7 @@ interface UserModules {
       news: boolean
       forms: boolean
       credentials: boolean
+      processes: boolean
     }
   }>
 }
@@ -39,12 +42,14 @@ const DEFAULT: UserModules = {
   news: false,
   forms: false,
   credentials: false,
+  processes: false,
   canRequestAssets: false,
   canAccessKnowledge: true,
   canManageInventory: false,
   canManageNews: false,
   canManageForms: false,
   canManageCredentials: false,
+  canManageProcesses: false,
   families: [],
 }
 

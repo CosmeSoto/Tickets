@@ -29,6 +29,7 @@ import {
   CalendarDays,
   KeyRound,
   ScrollText,
+  Workflow,
 } from 'lucide-react'
 import type { DashboardNavItem } from '@/components/layout/dashboard-nav-types'
 
@@ -92,6 +93,15 @@ export const navigationByRole: Record<string, DashboardNavItem[]> = {
       href: '/credentials',
       icon: KeyRound,
     },
+    {
+      name: 'Procesos',
+      href: '/admin/processes',
+      icon: Workflow,
+      children: [
+        { name: 'Catálogo', href: '/admin/processes', icon: Workflow },
+        { name: 'Configuración', href: '/admin/processes/settings', icon: Settings },
+      ],
+    },
     { name: 'Familias', href: '/admin/families', icon: Layers },
     { name: 'Usuarios', href: '/admin/users', icon: Users },
     { name: 'Auditoría', href: '/admin/audit', icon: ScrollText },
@@ -150,6 +160,11 @@ export const navigationByRole: Record<string, DashboardNavItem[]> = {
       href: '/credentials',
       icon: KeyRound,
     },
+    {
+      name: 'Procesos',
+      href: '/processes',
+      icon: Workflow,
+    },
     { name: 'Centro de Ayuda', href: '/help/center', icon: HelpCircle },
   ],
 
@@ -206,6 +221,11 @@ export const navigationByRole: Record<string, DashboardNavItem[]> = {
       href: '/credentials',
       icon: KeyRound,
     },
+    {
+      name: 'Procesos',
+      href: '/processes',
+      icon: Workflow,
+    },
     { name: 'Centro de Ayuda', href: '/help/center', icon: HelpCircle },
   ],
 
@@ -256,6 +276,11 @@ export const navigationByRole: Record<string, DashboardNavItem[]> = {
       name: 'Credenciales',
       href: '/credentials',
       icon: KeyRound,
+    },
+    {
+      name: 'Procesos',
+      href: '/processes',
+      icon: Workflow,
     },
     { name: 'Centro de Ayuda', href: '/help/center', icon: HelpCircle },
   ],
@@ -308,6 +333,11 @@ export const navigationByRole: Record<string, DashboardNavItem[]> = {
       name: 'Credenciales',
       href: '/credentials',
       icon: KeyRound,
+    },
+    {
+      name: 'Procesos',
+      href: '/processes',
+      icon: Workflow,
     },
     { name: 'Centro de Ayuda', href: '/help/center', icon: HelpCircle },
   ],

@@ -710,6 +710,19 @@ async function seedSystemModules() {
       requiresManager: true,
       familyScoped: true,
     },
+    {
+      key: 'processes',
+      name: 'Procesos y Procedimientos',
+      description: 'Catálogo interno, versiones y diagramas de procesos por área',
+      icon: 'Workflow',
+      isActive: true,
+      order: 7,
+      defaultForAdmin: true,
+      defaultForTech: false,
+      defaultForClient: false,
+      requiresManager: true,
+      familyScoped: true,
+    },
   ]
 
   for (const mod of modules) {
@@ -719,7 +732,7 @@ async function seedSystemModules() {
       create: mod,
     })
   }
-  console.log('✅ Módulos del sistema (tickets, inventory, patrols, news, credentials)')
+  console.log('✅ Módulos del sistema (tickets, inventory, patrols, news, credentials, processes)')
 }
 
 // ============================================

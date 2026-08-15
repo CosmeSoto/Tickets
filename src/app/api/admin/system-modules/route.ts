@@ -90,6 +90,19 @@ const FALLBACK_MODULES = [
     requiresManager: true,
     familyScoped: true,
   },
+  {
+    key: 'processes',
+    name: 'Procesos y Procedimientos',
+    description: 'Catálogo interno, versiones y diagramas de procesos por área',
+    icon: 'Workflow',
+    isActive: true,
+    order: 7,
+    defaultForAdmin: true,
+    defaultForTech: false,
+    defaultForClient: false,
+    requiresManager: true,
+    familyScoped: true,
+  },
 ]
 
 export async function GET() {

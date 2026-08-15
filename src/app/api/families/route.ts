@@ -167,6 +167,22 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ success: true, data: families })
       }
 
+      if (moduleFilter === 'processes') {
+        const { getProcessAccess } = await import('@/lib/processes/access')
+        const access = await getProcessAccess(session.user.id, session.user.role)
+        if (!access.canView && !access.canManage) {
+          return NextResponse.json({ success: true, data: [] })
+        }
+        const scopeIds = access.familyIds
+        if (!scopeIds || scopeIds.length === 0) {
+          return NextResponse.json({ success: true, data: [] })
+        }
+        let families = await FamilyService.findAll(includeInactive)
+        const allowed = new Set(scopeIds)
+        families = families.filter((f: { id: string }) => allowed.has(f.id))
+        return NextResponse.json({ success: true, data: families })
+      }
+
       // Documentos/Noticias: familias del scope del usuario (no org-wide)
       if (searchParams.get('scope') === 'content') {
         const { getContentVisibilityScope } = await import('@/lib/content/visibility-scope')
@@ -293,13 +309,21 @@ export async function GET(request: NextRequest) {
           const { getCredentialsFamilyScopeIds } = await import('@/lib/credentials/access')
           const allowedIds = new Set(await getCredentialsFamilyScopeIds(userId))
           families = families.filter(f => allowedIds.has(f.id))
+        } else if (moduleFilter === 'processes') {
+          const { resolveModuleFamilyScopeIds } = await import('@/lib/auth/user-family-access')
+          const allowedIds = new Set(
+            await resolveModuleFamilyScopeIds(userId, 'processes', 'canOperate')
+          )
+          families = families.filter(f => allowedIds.has(f.id))
         } else {
           // Default (sin módulo específico): calcular Union_Scope
-          // Union_Scope = General_Scope + Inventory families + Patrols families + Nativa (deduplicado)
+          // Union_Scope = General_Scope + Inventory families + Patrols families + Processes + Nativa (deduplicado)
           const { getAdminFamilyScope, getModuleFamilyIds } = await import('@/lib/auth/admin-scope')
+          const { resolveModuleFamilyScopeIds } = await import('@/lib/auth/user-family-access')
           const scope = await getAdminFamilyScope(userId, false)
           const inventoryFamilyIds = await getModuleFamilyIds(userId, 'inventory')
           const patrolFamilyIds = await getModuleFamilyIds(userId, 'patrols')
+          const processFamilyIds = await resolveModuleFamilyScopeIds(userId, 'processes', 'canView')
 
           // Combinar todos los IDs de familias (deduplicado)
           const unionSet = new Set<string>()
@@ -308,6 +332,7 @@ export async function GET(request: NextRequest) {
           }
           inventoryFamilyIds.forEach(id => unionSet.add(id))
           patrolFamilyIds.forEach(id => unionSet.add(id))
+          processFamilyIds.forEach(id => unionSet.add(id))
 
           if (unionSet.size > 0) {
             families = families.filter(f => unionSet.has(f.id))

@@ -60,6 +60,7 @@ export class BackupService {
     options?: {
       mode?: BackupCreateMode
       backupKind?: BackupKind
+      module?: string | null
       userId?: string | null
       userEmail?: string | null
     }

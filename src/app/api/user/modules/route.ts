@@ -48,6 +48,8 @@ export async function GET(request: Request) {
   let canAccessKnowledge = true
   let credentialsEnabled = false
   let canManageCredentials = false
+  let processesEnabled = false
+  let canManageProcesses = false
 
   if (targetUserId && targetUserId !== session.user.id) {
     const targetUser = await prisma.users.findUnique({
@@ -68,6 +70,8 @@ export async function GET(request: Request) {
         canAccessKnowledge: true,
         credentialsEnabled: true,
         canManageCredentials: true,
+        processesEnabled: true,
+        canManageProcesses: true,
       },
     })
     if (!targetUser) return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 })
@@ -86,6 +90,8 @@ export async function GET(request: Request) {
     canAccessKnowledge = (targetUser as any).canAccessKnowledge ?? true
     credentialsEnabled = targetUser.credentialsEnabled ?? false
     canManageCredentials = targetUser.canManageCredentials ?? false
+    processesEnabled = (targetUser as any).processesEnabled ?? false
+    canManageProcesses = (targetUser as any).canManageProcesses ?? false
   } else {
     // Cargar flags del usuario actual desde DB (la sesión puede estar desactualizada)
     const currentUser = await prisma.users.findUnique({
@@ -105,6 +111,8 @@ export async function GET(request: Request) {
         canAccessKnowledge: true,
         credentialsEnabled: true,
         canManageCredentials: true,
+        processesEnabled: true,
+        canManageProcesses: true,
       },
     })
     if (currentUser) {
@@ -122,6 +130,8 @@ export async function GET(request: Request) {
       canAccessKnowledge = (currentUser as any).canAccessKnowledge ?? true
       credentialsEnabled = currentUser.credentialsEnabled ?? false
       canManageCredentials = currentUser.canManageCredentials ?? false
+      processesEnabled = (currentUser as any).processesEnabled ?? false
+      canManageProcesses = (currentUser as any).canManageProcesses ?? false
     }
   }
 
@@ -182,6 +192,10 @@ export async function GET(request: Request) {
         const credIds = await getCredentialsFamilyScopeIds(userId)
         familyIds = [...new Set([...familyIds, ...credIds])]
       }
+      if (processesEnabled || canManageProcesses) {
+        const processIds = await getUserModuleFamilyGrantIds(userId, 'processes')
+        familyIds = [...new Set([...familyIds, ...processIds])]
+      }
     } else if (role === 'CLIENT') {
       const explicitIds = await getUserModuleFamilyGrantIds(userId, 'tickets')
 
@@ -207,6 +221,10 @@ export async function GET(request: Request) {
         const { getCredentialsFamilyScopeIds } = await import('@/lib/credentials/access')
         const credIds = await getCredentialsFamilyScopeIds(userId)
         familyIds = [...new Set([...familyIds, ...credIds])]
+      }
+      if (processesEnabled || canManageProcesses) {
+        const processIds = await getUserModuleFamilyGrantIds(userId, 'processes')
+        familyIds = [...new Set([...familyIds, ...processIds])]
       }
     }
 
@@ -235,6 +253,8 @@ export async function GET(request: Request) {
           canManageInventory: true,
           credentials: true,
           canManageCredentials: true,
+          processes: true,
+          canManageProcesses: true,
           families: [],
         }
       }
@@ -253,6 +273,8 @@ export async function GET(request: Request) {
           canManageInventory: true,
           credentials: credentialsEnabled || canManageCredentials,
           canManageCredentials,
+          processes: processesEnabled || canManageProcesses,
+          canManageProcesses: true,
           families: [],
         }
       }
@@ -270,6 +292,8 @@ export async function GET(request: Request) {
         canManageInventory,
         credentials: credentialsEnabled || canManageCredentials,
         canManageCredentials,
+        processes: processesEnabled || canManageProcesses,
+        canManageProcesses,
         families: [],
       }
     }
@@ -299,6 +323,7 @@ export async function GET(request: Request) {
     const inventoryFamilyIds: Set<string> = new Set()
     const patrolFamilyIds: Set<string> = new Set()
     const credentialsFamilyIds: Set<string> = new Set()
+    const processesFamilyIds: Set<string> = new Set()
 
     if (isSuperAdmin) {
       const allActive = await prisma.families.findMany({
@@ -310,6 +335,7 @@ export async function GET(request: Request) {
         inventoryFamilyIds.add(f.id)
         patrolFamilyIds.add(f.id)
         credentialsFamilyIds.add(f.id)
+        processesFamilyIds.add(f.id)
       })
     } else {
       const ticketGrants = await getUserModuleFamilyGrantIds(userId, 'tickets')
@@ -328,12 +354,17 @@ export async function GET(request: Request) {
         const credScope = await getCredentialsFamilyScopeIds(userId)
         credScope.forEach(id => credentialsFamilyIds.add(id))
       }
+      if (processesEnabled || canManageProcesses) {
+        const processGrants = await getUserModuleFamilyGrantIds(userId, 'processes')
+        processGrants.forEach(id => processesFamilyIds.add(id))
+      }
 
       if (nativeFamilyId) {
         if (ticketsEnabled) ticketFamilyIds.add(nativeFamilyId)
         if (inventoryEnabled || canManageInventory) inventoryFamilyIds.add(nativeFamilyId)
         if (patrolsEnabled) patrolFamilyIds.add(nativeFamilyId)
         if (credentialsEnabled || canManageCredentials) credentialsFamilyIds.add(nativeFamilyId)
+        if (processesEnabled || canManageProcesses) processesFamilyIds.add(nativeFamilyId)
       }
     }
 
@@ -344,6 +375,7 @@ export async function GET(request: Request) {
         ...inventoryFamilyIds,
         ...patrolFamilyIds,
         ...credentialsFamilyIds,
+        ...processesFamilyIds,
       ]),
     ]
     const families =
@@ -368,6 +400,9 @@ export async function GET(request: Request) {
         credentials: isSuperAdmin
           ? true
           : credentialsFamilyIds.has(f.id) && (credentialsEnabled || canManageCredentials),
+        processes: isSuperAdmin
+          ? true
+          : processesFamilyIds.has(f.id) && (processesEnabled || canManageProcesses),
       },
     }))
 
@@ -392,6 +427,7 @@ export async function GET(request: Request) {
     let resolvedNews: boolean
     let resolvedForms: boolean
     let resolvedCredentials: boolean
+    let resolvedProcesses: boolean
 
     if (role === 'ADMIN' && isSuperAdmin) {
       resolvedTickets = true
@@ -400,6 +436,7 @@ export async function GET(request: Request) {
       resolvedNews = true
       resolvedForms = true
       resolvedCredentials = true
+      resolvedProcesses = true
     } else if (role === 'CLIENT') {
       // Para CLIENT: el flag del usuario es suficiente para mostrar el módulo.
       // No bloqueamos por falta de familias — el usuario verá el módulo vacío
@@ -411,6 +448,7 @@ export async function GET(request: Request) {
       resolvedNews = newsEnabled || canManageNews
       resolvedForms = formsEnabled || canManageForms
       resolvedCredentials = credentialsEnabled || canManageCredentials
+      resolvedProcesses = processesEnabled || canManageProcesses
     } else {
       // ADMIN normal y TECHNICIAN: requieren al menos una familia activa en el módulo.
       // canRequestAssets basta para mostrar Inventario (menú de solicitudes de compras).
@@ -424,6 +462,8 @@ export async function GET(request: Request) {
       resolvedForms = formsEnabled || canManageForms
       // Credenciales: módulo ON basta (bóveda personal). Familias amplían áreas.
       resolvedCredentials = credentialsEnabled || canManageCredentials
+      // Procesos: flag del usuario basta; el alcance por familia se aplica en la API.
+      resolvedProcesses = processesEnabled || canManageProcesses
     }
 
     return {
@@ -442,6 +482,9 @@ export async function GET(request: Request) {
       credentials: resolvedCredentials,
       // Ver inferiores: flag explícito; no forzar true en ADMIN
       canManageCredentials,
+      processes: resolvedProcesses,
+      canManageProcesses:
+        isSuperAdmin || (role === 'ADMIN' ? processesEnabled : canManageProcesses),
       families: enrichedFamilies,
     }
   })

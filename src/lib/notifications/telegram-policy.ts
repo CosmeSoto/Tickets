@@ -27,35 +27,39 @@ export type TelegramModule = EmailModule
 export type TelegramEvent =
   | NotificationEmailEvent
   // Rondas
-  | 'patrolAssigned'    // Schedule creado o agente modificado
-  | 'patrolReminder'    // Recordatorio pre-ronda (X min antes del scheduledStart)
-  | 'patrolMissed'      // Ronda marcada como MISSED o auto-cerrada como INCOMPLETE
-  | 'patrolCancelled'   // Schedule desactivado → rondas pendientes canceladas
+  | 'patrolAssigned' // Schedule creado o agente modificado
+  | 'patrolReminder' // Recordatorio pre-ronda (X min antes del scheduledStart)
+  | 'patrolMissed' // Ronda marcada como MISSED o auto-cerrada como INCOMPLETE
+  | 'patrolCancelled' // Schedule desactivado → rondas pendientes canceladas
 
 // ─── Tabla de prioridades ─────────────────────────────────────────────────────
 
 export const TELEGRAM_EVENT_PRIORITY: Record<TelegramEvent, TelegramPriority> = {
   // Tickets
-  security:         'critical',
-  ticketCreated:    'important',
-  ticketAssigned:   'important',
-  statusChanged:    'important',
-  newComments:      'optional',
-  ticketUpdated:    'optional',
-  digest:           'optional',
-  generic:          'optional',
+  security: 'critical',
+  ticketCreated: 'important',
+  ticketAssigned: 'important',
+  statusChanged: 'important',
+  newComments: 'optional',
+  ticketUpdated: 'optional',
+  digest: 'optional',
+  generic: 'optional',
   // Inventario
-  inventoryAct:     'important',
-  inventoryAlert:   'important',
-  inventoryReport:  'optional',
+  inventoryAct: 'important',
+  inventoryAlert: 'important',
+  inventoryReport: 'optional',
   // Backups
-  backupFailure:    'critical',   // más urgente en Telegram que en email
-  backupSuccess:    'optional',
+  backupFailure: 'critical', // más urgente en Telegram que en email
+  backupSuccess: 'optional',
+  // Procesos y procedimientos
+  processReview: 'important',
+  processReviewDue: 'important',
+  processPublished: 'optional',
   // Rondas — todas important (canal operativo del staff de seguridad)
-  patrolAssigned:   'important',
-  patrolReminder:   'important',
-  patrolMissed:     'important',
-  patrolCancelled:  'important',
+  patrolAssigned: 'important',
+  patrolReminder: 'important',
+  patrolMissed: 'important',
+  patrolCancelled: 'important',
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

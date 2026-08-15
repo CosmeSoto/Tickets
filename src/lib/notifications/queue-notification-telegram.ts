@@ -43,6 +43,7 @@ function resolveTgModule(
     patrols: 'patrols',
     content: 'system',
     credentials: 'system',
+    processes: 'system',
   } as const
   return map[module]
 }
@@ -55,7 +56,9 @@ export async function queueTelegramNotification(
   input: QueueTelegramNotificationInput
 ): Promise<string[]> {
   if (!(await isTelegramEnabled())) {
-    console.log(`[TELEGRAM] Bot no habilitado — omitiendo (${input.module}/${input.event ?? 'n/a'})`)
+    console.log(
+      `[TELEGRAM] Bot no habilitado — omitiendo (${input.module}/${input.event ?? 'n/a'})`
+    )
     return []
   }
 

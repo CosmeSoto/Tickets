@@ -672,6 +672,70 @@ export class FileService {
     return { success: true }
   }
 
+  // ── Métodos para Procesos y Procedimientos ─────────────────────────────────
+
+  static async uploadProcessFile(data: { file: File; processId: string; uploadedById: string }) {
+    const { file, processId, uploadedById } = data
+    const validation = await this.validateFile(file)
+    if (!validation.isValid) throw new Error(validation.error)
+
+    const process = await (prisma as any).processes.findUnique({ where: { id: processId } })
+    if (!process) throw new Error('Proceso no encontrado')
+
+    const originalBuffer = Buffer.from(await file.arrayBuffer()) as Buffer
+    let finalBuffer = originalBuffer
+    let finalExt = file.name.split('.').pop()?.toLowerCase() || 'bin'
+    let compressed = false
+
+    if (IMAGE_TYPES.has(file.type)) {
+      const result = await compressImage(originalBuffer, file.type, file.name)
+      finalBuffer = result.buffer
+      finalExt = result.ext
+      compressed = result.compressed
+    }
+
+    const uploadDir = getUploadDir('processes', processId)
+    if (!existsSync(uploadDir)) await mkdir(uploadDir, { recursive: true })
+    const uniqueFilename = `${randomUUID()}.${finalExt}`
+    const filePath = getUploadDir('processes', processId, uniqueFilename)
+    await writeFile(filePath, finalBuffer)
+
+    return (prisma as any).process_attachments.create({
+      data: {
+        id: randomUUID(),
+        filename: uniqueFilename,
+        originalName: file.name,
+        mimeType: compressed ? (finalExt === 'webp' ? 'image/webp' : 'image/jpeg') : file.type,
+        size: finalBuffer.length,
+        path: filePath,
+        processId,
+        uploadedById,
+        createdAt: new Date(),
+      },
+    })
+  }
+
+  static async getFilesByProcess(processId: string) {
+    return (prisma as any).process_attachments.findMany({
+      where: { processId },
+      orderBy: { createdAt: 'desc' },
+    })
+  }
+
+  static async deleteProcessFile(fileId: string) {
+    const attachment = await (prisma as any).process_attachments.findUnique({
+      where: { id: fileId },
+    })
+    if (!attachment) throw new Error('Archivo no encontrado')
+    try {
+      if (existsSync(attachment.path)) await unlink(attachment.path)
+    } catch {
+      // El registro sigue eliminándose para no dejar una referencia inválida.
+    }
+    await (prisma as any).process_attachments.delete({ where: { id: fileId } })
+    return { success: true }
+  }
+
   /** Constantes expuestas para uso en frontend */
   static readonly LIMITS = {
     maxFileSizeMB: MAX_FILE_SIZE_BYTES / (1024 * 1024),
