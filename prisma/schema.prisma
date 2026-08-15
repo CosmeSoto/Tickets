@@ -2136,7 +2136,7 @@ model process_external_reviews {
   @@map("process_external_reviews")
 }
 
-/// Catálogo opcional de arrendatarios (legado); la emisión usa texto libre en el pase.
+/// Catálogo reutilizable de arrendatarios y empresas para emitir pases de acceso.
 model access_organizations {
   id          String   @id @default(uuid())
   code        String   @unique @db.VarChar(50)

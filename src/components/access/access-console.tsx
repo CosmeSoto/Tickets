@@ -17,6 +17,8 @@ import { ExportButton } from '@/components/common/export-button'
 import { TableColumnsMenu } from '@/components/common/table-columns-menu'
 import { useUploadLimits } from '@/hooks/use-upload-limits'
 import type { ExportColumn } from '@/lib/utils/export'
+import { InlineCreateSelect, type InlineSelectOption } from '@/components/ui/inline-create-select'
+import { CatalogTypeInlineForm } from '@/components/inventory/asset-forms/CatalogTypeInlineForm'
 
 type ScanResponse = {
   result: string
@@ -84,7 +86,7 @@ function buildInitialForm() {
     firstName: '',
     lastName: '',
     email: '',
-    organization: '',
+    organizationId: '',
     accessType: 'AUTHORIZED_VISITOR',
     purpose: '',
     validFrom: toLocalDateTimeInputValue(now),
@@ -102,6 +104,7 @@ export function AccessConsole() {
   const [canManage, setCanManage] = useState(false)
   const [passes, setPasses] = useState<AccessPass[]>([])
   const [families, setFamilies] = useState<Family[]>([])
+  const [organizations, setOrganizations] = useState<InlineSelectOption[]>([])
   const [form, setForm] = useState(buildInitialForm)
   const [pendingPhotos, setPendingPhotos] = useState<PendingFile[]>([])
   const [tableFilters, setTableFilters] = useState<Record<string, string>>({})
@@ -143,6 +146,21 @@ export function AccessConsole() {
     [tableFilters]
   )
 
+  const loadOrganizations = useCallback(async () => {
+    const response = await fetch('/api/access-organizations')
+    if (!response.ok) return
+    const data = await response.json()
+    setOrganizations(
+      Array.isArray(data)
+        ? data.map((organization: { id: string; name: string; description?: string | null }) => ({
+            id: organization.id,
+            name: organization.name,
+            description: organization.description || undefined,
+          }))
+        : []
+    )
+  }, [])
+
   useEffect(() => {
     void loadPasses()
   }, [loadPasses])
@@ -152,7 +170,8 @@ export function AccessConsole() {
     void fetch('/api/access-passes/families')
       .then(response => (response.ok ? response.json() : { families: [] }))
       .then(data => setFamilies(data.families || []))
-  }, [canManage])
+    void loadOrganizations()
+  }, [canManage, loadOrganizations])
 
   const verify = useCallback(
     async (value: string) => {
@@ -210,7 +229,7 @@ export function AccessConsole() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...form,
-          organization: form.organization.trim() || null,
+          organizationId: form.organizationId || null,
           validFrom: parseScheduledDateTime(form.validFrom).toISOString(),
           validUntil: parseScheduledDateTime(form.validUntil).toISOString(),
           sendEmail: true,
@@ -333,60 +352,66 @@ export function AccessConsole() {
   }
 
   const photoUrl = result?.pass?.photoUrl || null
-  const allPassColumns: Column<AccessPass>[] = [
-    {
-      key: 'subject',
-      label: 'Persona',
-      sortable: true,
-      render: pass => (
-        <div>
-          <p className='font-medium'>
-            {pass.subject.firstName} {pass.subject.lastName}
-          </p>
-          <p className='text-xs text-muted-foreground'>
-            {pass.subject.organization || 'Sin arrendatario'}
-          </p>
-        </div>
-      ),
-    },
-    { key: 'family.name', label: 'Área', sortable: true, render: pass => pass.family.name },
-    { key: 'credentialCode', label: 'Credencial', sortable: true },
-    {
-      key: 'status',
-      label: 'Estado',
-      sortable: true,
-      render: pass => {
-        const badge = effectivePassLabel(pass)
-        return <Badge variant={badge.variant}>{badge.label}</Badge>
+  const allPassColumns = useMemo<Column<AccessPass>[]>(
+    () => [
+      {
+        key: 'subject',
+        label: 'Persona',
+        sortable: true,
+        render: pass => (
+          <div>
+            <p className='font-medium'>
+              {pass.subject.firstName} {pass.subject.lastName}
+            </p>
+            <p className='text-xs text-muted-foreground'>
+              {pass.subject.organization || 'Sin arrendatario'}
+            </p>
+          </div>
+        ),
       },
-    },
-    {
-      key: 'validUntil',
-      label: 'Vigente hasta',
-      sortable: true,
-      render: pass => new Date(pass.validUntil).toLocaleDateString('es-CO'),
-    },
-  ]
-  const exportColumnByKey: Record<string, ExportColumn> = {
-    subject: {
-      label: 'Persona',
-      accessor: pass => `${pass.subject.firstName} ${pass.subject.lastName}`,
-    },
-    'family.name': { label: 'Área', accessor: pass => pass.family.name },
-    credentialCode: { label: 'Credencial', accessor: pass => pass.credentialCode },
-    status: { label: 'Estado', accessor: pass => effectivePassLabel(pass).label },
-    validUntil: {
-      label: 'Vigente hasta',
-      accessor: pass => new Date(pass.validUntil).toLocaleString('es-CO'),
-    },
-  }
+      { key: 'family.name', label: 'Área', sortable: true, render: pass => pass.family.name },
+      { key: 'credentialCode', label: 'Credencial', sortable: true },
+      {
+        key: 'status',
+        label: 'Estado',
+        sortable: true,
+        render: pass => {
+          const badge = effectivePassLabel(pass)
+          return <Badge variant={badge.variant}>{badge.label}</Badge>
+        },
+      },
+      {
+        key: 'validUntil',
+        label: 'Vigente hasta',
+        sortable: true,
+        render: pass => new Date(pass.validUntil).toLocaleDateString('es-CO'),
+      },
+    ],
+    []
+  )
+  const exportColumnByKey = useMemo<Record<string, ExportColumn>>(
+    () => ({
+      subject: {
+        label: 'Persona',
+        accessor: pass => `${pass.subject.firstName} ${pass.subject.lastName}`,
+      },
+      'family.name': { label: 'Área', accessor: pass => pass.family.name },
+      credentialCode: { label: 'Credencial', accessor: pass => pass.credentialCode },
+      status: { label: 'Estado', accessor: pass => effectivePassLabel(pass).label },
+      validUntil: {
+        label: 'Vigente hasta',
+        accessor: pass => new Date(pass.validUntil).toLocaleString('es-CO'),
+      },
+    }),
+    []
+  )
   const passColumns = useMemo(
     () =>
       columnOrder
         .filter(key => visibleColumns.includes(key))
         .map(key => allPassColumns.find(column => column.key === key))
         .filter((column): column is Column<AccessPass> => Boolean(column)),
-    [columnOrder, visibleColumns]
+    [allPassColumns, columnOrder, visibleColumns]
   )
   const exportColumns = useMemo(
     () =>
@@ -394,7 +419,7 @@ export function AccessConsole() {
         .filter(key => visibleColumns.includes(key))
         .map(key => exportColumnByKey[key])
         .filter((column): column is ExportColumn => Boolean(column)),
-    [columnOrder, visibleColumns]
+    [columnOrder, exportColumnByKey, visibleColumns]
   )
   const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
     filename: 'pases-de-acceso',
@@ -689,16 +714,46 @@ export function AccessConsole() {
             </p>
 
             <div className='space-y-1.5'>
-              <Label htmlFor='access-tenant'>Arrendatario (opcional)</Label>
-              <Input
-                id='access-tenant'
-                value={form.organization}
-                onChange={event => setForm({ ...form, organization: event.target.value })}
-                placeholder='Ej. Marathon, Fybeca o Farmacias Cruz Azul'
-                maxLength={200}
+              <Label>Arrendatario / empresa</Label>
+              <InlineCreateSelect
+                options={organizations}
+                value={form.organizationId}
+                onChange={organizationId => setForm({ ...form, organizationId })}
+                placeholder='Selecciona un arrendatario...'
+                allowClear
+                createLabel='Crear arrendatario / empresa'
+                createTitle='Nuevo arrendatario / empresa'
+                editTitle='Editar arrendatario / empresa'
+                deleteConfirmMessage='Si ya tiene pases asociados, se desactivará en lugar de eliminarse.'
+                createForm={({ item, onSuccess, onCancel }) => (
+                  <CatalogTypeInlineForm
+                    apiEndpoint='/api/access-organizations'
+                    item={item}
+                    entityLabel='arrendatario / empresa'
+                    namePlaceholder='Ej: Marathon, Fybeca o Farmacias Cruz Azul'
+                    codePlaceholder='Ej: MARATHON'
+                    onSuccess={async saved => {
+                      await loadOrganizations()
+                      onSuccess(saved)
+                    }}
+                    onCancel={onCancel}
+                  />
+                )}
+                onAfterSave={() => void loadOrganizations()}
+                onDelete={async id => {
+                  const response = await fetch(`/api/access-organizations/${id}`, {
+                    method: 'DELETE',
+                  })
+                  if (!response.ok) {
+                    const data = await response.json().catch(() => ({}))
+                    throw new Error(data.error || 'No se pudo eliminar el arrendatario.')
+                  }
+                  await loadOrganizations()
+                }}
               />
               <p className='text-xs text-muted-foreground'>
-                Texto libre para identificar el local o empresa; no crea un catálogo adicional.
+                Catálogo compartido: crea, edita o desactiva arrendatarios sin introducir texto
+                libre.
               </p>
             </div>
 
@@ -713,9 +768,7 @@ export function AccessConsole() {
                 <option value='TENANT_EMPLOYEE'>Empleado de arrendatario</option>
                 <option value='CONTRACTOR'>Contratista</option>
               </select>
-              <p className='text-[11px] text-muted-foreground'>
-                Lista fija del sistema (no requiere catálogo adicional).
-              </p>
+              <p className='text-[11px] text-muted-foreground'>Lista fija del sistema.</p>
             </div>
 
             <div className='space-y-1.5'>

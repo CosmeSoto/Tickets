@@ -28,7 +28,6 @@ const createSchema = z
     email: z.string().trim().email().max(320).optional().nullable(),
     phone: z.string().trim().max(40).optional().nullable(),
     organizationId: z.string().uuid().optional().nullable(),
-    organization: z.string().trim().max(200).optional().nullable(),
     accessType: z.enum(['TENANT_EMPLOYEE', 'AUTHORIZED_VISITOR', 'CONTRACTOR']),
     purpose: z.string().trim().max(1000).optional().nullable(),
     documentLast4: z
@@ -155,7 +154,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'El área seleccionada no está activa.' }, { status: 400 })
   }
 
-  let organizationName = data.organization?.trim() || null
+  let organizationName: string | null = null
   let organizationId = data.organizationId || null
   if (organizationId) {
     const org = await (prisma as any).access_organizations.findFirst({

@@ -13,9 +13,22 @@ interface Props {
   item?: InlineSelectOption // si viene → modo edición
   onSuccess: (item: InlineSelectOption) => void
   onCancel: () => void
+  /** Etiqueta de la entidad que se está creando, p. ej. “arrendatario”. */
+  entityLabel?: string
+  namePlaceholder?: string
+  codePlaceholder?: string
 }
 
-export function CatalogTypeInlineForm({ apiEndpoint, familyId, item, onSuccess, onCancel }: Props) {
+export function CatalogTypeInlineForm({
+  apiEndpoint,
+  familyId,
+  item,
+  onSuccess,
+  onCancel,
+  entityLabel = 'tipo',
+  namePlaceholder = 'Ej: Laptop, Aceite, Microsoft 365...',
+  codePlaceholder = 'Ej: LAPTOP',
+}: Props) {
   const isEdit = !!item
   const [name, setName] = useState(item?.name ?? '')
   const [code, setCode] = useState('') // código no se edita (es único)
@@ -74,12 +87,12 @@ export function CatalogTypeInlineForm({ apiEndpoint, familyId, item, onSuccess, 
     <form data-inline-create-form onSubmit={handleSubmit} className='space-y-4'>
       <div className='space-y-1'>
         <Label>
-          Nombre <span className='text-destructive'>*</span>
+          Nombre de {entityLabel} <span className='text-destructive'>*</span>
         </Label>
         <Input
           value={name}
           onChange={e => handleNameChange(e.target.value)}
-          placeholder='Ej: Laptop, Aceite, Microsoft 365...'
+          placeholder={namePlaceholder}
           autoFocus
         />
       </div>
@@ -98,7 +111,7 @@ export function CatalogTypeInlineForm({ apiEndpoint, familyId, item, onSuccess, 
                   .replace(/[^A-Z0-9_]/g, '')
               )
             }
-            placeholder='Ej: LAPTOP'
+            placeholder={codePlaceholder}
             maxLength={20}
           />
           <p className='text-xs text-muted-foreground'>

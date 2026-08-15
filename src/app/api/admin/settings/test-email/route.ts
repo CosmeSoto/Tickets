@@ -122,7 +122,8 @@ export async function POST(request: NextRequest) {
       } else if (error.message.includes('ECONNREFUSED')) {
         errorMessage = 'No se pudo conectar al servidor SMTP. Verifica host y puerto.'
       } else if (error.message.includes('ETIMEDOUT') || error.message.includes('timeout')) {
-        errorMessage = 'Tiempo de conexión agotado. Verifica host, puerto y firewall.'
+        errorMessage =
+          'No se pudo abrir la conexión TCP al servidor SMTP (timeout). Desde este servidor/Docker no hay salida al puerto (p. ej. 587/465). Revisa firewall, proxy corporativo o políticas de red; no es un error de usuario/contraseña.'
       } else if (error.message.includes('ENOTFOUND')) {
         errorMessage = 'Servidor SMTP no encontrado. Verifica el nombre del host.'
       } else if (

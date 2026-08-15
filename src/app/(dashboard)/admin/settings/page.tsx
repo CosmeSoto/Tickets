@@ -138,6 +138,7 @@ function SettingsPage() {
   const [registeringWebhook, setRegisteringWebhook] = useState(false)
   const [showBotToken, setShowBotToken] = useState(false)
   const [showWebhookSecret, setShowWebhookSecret] = useState(false)
+  const [showSmtpPassword, setShowSmtpPassword] = useState(false)
   const [telegramQueueStats, setTelegramQueueStats] = useState<{
     pending: number
     failed: number
@@ -944,17 +945,43 @@ function SettingsPage() {
                       </div>
                       <div className='space-y-1.5'>
                         <Label htmlFor='smtpPassword'>Contraseña SMTP</Label>
-                        <Input
-                          id='smtpPassword'
-                          type='password'
-                          value={settings.smtpPassword}
-                          onChange={e => setSettings({ ...settings, smtpPassword: e.target.value })}
-                          placeholder={
-                            settings.smtpPasswordConfigured
-                              ? 'Dejar vacío para mantener la actual'
-                              : '••••••••'
-                          }
-                        />
+                        <div className='relative'>
+                          <Input
+                            id='smtpPassword'
+                            type={showSmtpPassword ? 'text' : 'password'}
+                            value={settings.smtpPassword}
+                            onChange={e => {
+                              const next = e.target.value
+                              setSettings({ ...settings, smtpPassword: next })
+                              if (!next) setShowSmtpPassword(false)
+                            }}
+                            placeholder={
+                              settings.smtpPasswordConfigured
+                                ? 'Dejar vacío para mantener la actual'
+                                : '••••••••'
+                            }
+                            className='pr-10'
+                            autoComplete='new-password'
+                          />
+                          {settings.smtpPassword ? (
+                            <button
+                              type='button'
+                              onClick={() => setShowSmtpPassword(v => !v)}
+                              className='absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground'
+                              aria-label={
+                                showSmtpPassword
+                                  ? 'Ocultar contraseña SMTP'
+                                  : 'Mostrar contraseña SMTP'
+                              }
+                            >
+                              {showSmtpPassword ? (
+                                <EyeOff className='h-4 w-4' />
+                              ) : (
+                                <Eye className='h-4 w-4' />
+                              )}
+                            </button>
+                          ) : null}
+                        </div>
                         {settings.smtpPasswordConfigured && !settings.smtpPassword ? (
                           <p className='text-xs text-muted-foreground'>
                             Hay una contraseña guardada. Escribe una nueva solo si deseas cambiarla.
@@ -1460,37 +1487,7 @@ function SettingsPage() {
                 </CardContent>
               </Card>
 
-              {/* Enlace al módulo de backups */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className='flex items-center'>
-                    <Database className='h-5 w-5 mr-2' />
-                    Gestión de Backups
-                  </CardTitle>
-                  <CardDescription>
-                    La configuración de backups se ha movido a un módulo dedicado
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between p-4 bg-muted border border-border rounded-lg'>
-                    <div className='min-w-0'>
-                      <h4 className='font-medium text-foreground'>Sistema de Backups</h4>
-                      <p className='text-sm text-muted-foreground mt-1'>
-                        Accede al módulo completo de gestión de backups con configuración avanzada,
-                        monitoreo en tiempo real y herramientas de restauración.
-                      </p>
-                    </div>
-                    <Button
-                      className='w-full sm:w-auto flex-shrink-0'
-                      onClick={() => router.push('/admin/backups')}
-                    >
-                      <Database className='h-4 w-4 mr-2' />
-                      Ir a Backups
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
+              {/* Mantenimiento */}
               <Card>
                 <CardHeader>
                   <CardTitle className='flex items-center'>
@@ -1571,6 +1568,36 @@ function SettingsPage() {
                       </p>
                     </div>
                   )}
+                </CardContent>
+              </Card>
+              {/* Enlace al módulo de backups */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className='flex items-center'>
+                    <Database className='h-5 w-5 mr-2' />
+                    Gestión de Backups
+                  </CardTitle>
+                  <CardDescription>
+                    La configuración de backups se ha movido a un módulo dedicado
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between p-4 bg-muted border border-border rounded-lg'>
+                    <div className='min-w-0'>
+                      <h4 className='font-medium text-foreground'>Sistema de Backups</h4>
+                      <p className='text-sm text-muted-foreground mt-1'>
+                        Accede al módulo completo de gestión de backups con configuración avanzada,
+                        monitoreo en tiempo real y herramientas de restauración.
+                      </p>
+                    </div>
+                    <Button
+                      className='w-full sm:w-auto flex-shrink-0'
+                      onClick={() => router.push('/admin/backups')}
+                    >
+                      <Database className='h-4 w-4 mr-2' />
+                      Ir a Backups
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             </div>
