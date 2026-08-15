@@ -41,6 +41,8 @@ function moduleMaster(prefs: PrefsRow, module: TelegramModule): boolean {
       return true
     case 'content':
     case 'credentials':
+    case 'processes':
+    case 'access':
       return true
     default:
       return true

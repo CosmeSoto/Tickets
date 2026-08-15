@@ -35,6 +35,8 @@ function moduleMaster(prefs: PrefsRow, module: EmailModule): boolean {
       return true
     case 'content':
     case 'credentials':
+    case 'processes':
+    case 'access':
       // Sin master dedicado aún; el master emailNotifications basta
       return true
     default:

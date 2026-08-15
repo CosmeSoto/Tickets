@@ -723,6 +723,20 @@ async function seedSystemModules() {
       requiresManager: true,
       familyScoped: true,
     },
+    {
+      key: 'access',
+      name: 'Accesos',
+      description:
+        'Pases QR verificables para personal externo, visitantes y contratistas por área',
+      icon: 'ScanLine',
+      isActive: true,
+      order: 8,
+      defaultForAdmin: true,
+      defaultForTech: false,
+      defaultForClient: false,
+      requiresManager: true,
+      familyScoped: true,
+    },
   ]
 
   for (const mod of modules) {
@@ -732,7 +746,9 @@ async function seedSystemModules() {
       create: mod,
     })
   }
-  console.log('✅ Módulos del sistema (tickets, inventory, patrols, news, credentials, processes)')
+  console.log(
+    '✅ Módulos del sistema (tickets, inventory, patrols, news, credentials, processes, access)'
+  )
 }
 
 // ============================================

@@ -413,6 +413,58 @@ No se siembran procesos de práctica: crear uno o dos casos reales solo en test.
 
 Tras validar en test: `sudo ./start-production.sh` según esta guía (`db push` / rebuild de app).
 
+### Módulo Accesos (pases QR)
+
+Los pases no crean cuentas de aplicación. El QR contiene un token opaco; la base de datos
+guarda únicamente su hash. La verificación siempre se hace por un usuario autenticado y queda
+auditada, incluso si el código no existe.
+
+**Privacidad:** la emisión crea un pase `PENDING_PRIVACY`, no utilizable. La persona recibe un
+enlace personal que expira en 7 días, revisa el aviso publicado en `/help/privacy` y acepta
+expresamente. Solo entonces se activa el pase y se envía el QR. Se conserva evidencia de fecha,
+IP, user-agent, versión del aviso y hash de la aceptación; el token del enlace solo se guarda
+como hash. El gestor puede reenviar la invitación, invalidando el enlace anterior.
+
+**Reenvíos seguros:** la tabla permite reenviar la invitación pendiente o un QR activo. El
+reenvío de QR crea un código nuevo e invalida el QR anterior inmediatamente; úsalo solo
+cuando la persona no pueda usar el código original.
+
+**Correo del QR:** `start-production.sh` no instala el procesador de cola. Tras emitir un pase
+con correo, instala el cron (una sola vez) o dispara la cola a mano:
+
+```bash
+chmod +x ./docker/scripts/setup-email-queue-cron.sh
+./docker/scripts/setup-email-queue-cron.sh
+# o prueba inmediata:
+curl -sk "${NEXTAUTH_URL}/api/cron/process-email-queue" \
+  -H "Authorization: Bearer $CRON_SECRET"
+```
+
+**Backup parcial `access`:** exporta `access_organizations`, `access_subjects`, `access_passes`
+y `access_scan_events`.
+No incluye usuarios ni familias referenciados. Restaura solo sobre un destino que ya tenga
+los mismos IDs de usuarios/familias (p. ej. tras restaurar Usuarios + Familias, o un dump
+completo). Las fotos de sujetos viven en disco (`uploads/access-subjects/…`) y **no** van
+en el backup selectivo: tras restaurar, conviene re-subir fotos o copiar ese directorio
+junto con el dump.
+
+**Retención / LOPDP:** el módulo aún no ejecuta purga ni anonimización automática. Define
+plazos internos y un proceso operativo de borrado/anonimizado de sujetos, fotos y eventos
+de escaneo vencidos; no activar reconocimiento facial automático sin evaluación jurídica.
+
+#### Checklist de cierre (módulo Accesos — entorno de prueba)
+
+| Paso | Verificación                                                                                                                                                                                                                                                          |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | Ejecutar `sudo ./start-production.sh`; el entrypoint aplica `schema.prisma` y `ensure-system-modules` habilita Accesos para ADMIN existentes.                                                                                                                         |
+| 2    | Asignar al gestor `accessEnabled` + `canManageAccess`, y al agente `accessEnabled`; limitar ambos a las familias autorizadas mediante `user_family_access.module = access`.                                                                                           |
+| 3    | Emitir un pase con vigencia y correo; confirmar que llega la invitación, aceptar el aviso desde el enlace y comprobar que recién entonces llega el QR (sin datos personales).                                                                                         |
+| 4    | Escanear con usuario autorizado: debe mostrar nombre, área y vigencia, y crear un evento `access_scan_events` con resultado `VALID`.                                                                                                                                  |
+| 5    | Revocar o suspender el pase desde la consola Accesos y escanear de nuevo: debe responder `REVOKED` o `SUSPENDED` inmediatamente.                                                                                                                                      |
+| 6    | Escanear desde un usuario de otra familia: debe rechazar con `OUT_OF_SCOPE` y conservar la trazabilidad.                                                                                                                                                              |
+| 7    | Probar backup parcial `access` en entorno de prueba con usuarios/familias ya presentes; valida sujetos, pases y eventos. Copia también `uploads/access-subjects` si necesitas fotos. Los QR emitidos antes de restaurar se conservan porque solo se almacena el hash. |
+| 8    | Definir plazos de retención y un procedimiento de purga/anonimización (aún no automatizado); no activar reconocimiento facial automático sin evaluación jurídica específica.                                                                                          |
+
 ### Configuración SMTP (Admin → Email)
 
 Solo se admiten **Gmail** y **Microsoft** (Outlook personal + Microsoft 365):
@@ -427,16 +479,20 @@ Puerto recomendado: **587** (STARTTLS). Alternativa: **465** (SSL directo).
 
 #### Checklist de cierre (email listo para producción)
 
-| Paso | Verificación                                                                                            |
-| ---- | ------------------------------------------------------------------------------------------------------- |
-| 1    | Admin → Email: switch **Habilitar envío de emails** activo                                              |
-| 2    | Elegir proveedor (Microsoft o Gmail) y completar usuario + contraseña de aplicación                     |
-| 3    | **Email remitente** = mismo que usuario SMTP (botón «Usar usuario SMTP»)                                |
-| 4    | **Guardar** → **Probar conexión** (funciona aunque la contraseña ya esté guardada)                      |
-| 5    | Cron de cola cada 1–5 min: `GET /api/cron/process-email-queue` con `Authorization: Bearer $CRON_SECRET` |
-| 6    | Smoke test: crear ticket y confirmar email en cola / bandeja                                            |
+| Paso | Verificación                                                                                                                                             |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | Admin → Email: switch **Habilitar envío de emails** activo                                                                                               |
+| 2    | Elegir proveedor (Microsoft o Gmail) y completar usuario + contraseña de aplicación                                                                      |
+| 3    | **Email remitente** = mismo que usuario SMTP (botón «Usar usuario SMTP»)                                                                                 |
+| 4    | **Guardar** → **Probar conexión** (funciona aunque la contraseña ya esté guardada)                                                                       |
+| 5    | Cron de cola cada 1–5 min: `./docker/scripts/setup-email-queue-cron.sh` (o `GET /api/cron/process-email-queue` con `Authorization: Bearer $CRON_SECRET`) |
+| 6    | Smoke test: crear ticket y confirmar email en cola / bandeja                                                                                             |
 
 ```bash
+# Instalar cron (recomendado en producción)
+chmod +x ./docker/scripts/setup-email-queue-cron.sh
+./docker/scripts/setup-email-queue-cron.sh
+
 # Procesar cola manualmente
 curl -sk "${NEXTAUTH_URL}/api/cron/process-email-queue" \
   -H "Authorization: Bearer $CRON_SECRET"

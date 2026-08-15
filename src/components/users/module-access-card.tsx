@@ -62,6 +62,9 @@ interface ModuleAccessCardProps {
     /** Procesos: puede crear, versionar y gobernar procedimientos */
     canManageProcesses?: boolean
     onToggleManageProcesses?: (v: boolean) => void
+    /** Accesos: puede emitir y revocar pases QR */
+    canManageAccess?: boolean
+    onToggleManageAccess?: (v: boolean) => void
   }
   /** Familias de solo lectura (fuera del scope del admin) */
   readOnlyFamilyIds?: string[]
@@ -312,6 +315,25 @@ export function ModuleAccessCard({
                   <Switch
                     checked={options.canManageProcesses ?? false}
                     onCheckedChange={options.onToggleManageProcesses}
+                    disabled={disabled}
+                    className='scale-90 shrink-0'
+                  />
+                </div>
+              )}
+              {options.onToggleManageAccess !== undefined && (
+                <div className='flex items-center justify-between gap-2'>
+                  <div className='min-w-0'>
+                    <div className='flex items-center gap-1.5'>
+                      <span className='text-xs'>🪪</span>
+                      <p className='text-[11px] font-medium'>Emitir y revocar pases</p>
+                    </div>
+                    <p className='text-[10px] text-muted-foreground mt-0.5 pl-5'>
+                      Sin esto, solo puede verificar QR de personas autorizadas.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={options.canManageAccess ?? false}
+                    onCheckedChange={options.onToggleManageAccess}
                     disabled={disabled}
                     className='scale-90 shrink-0'
                   />

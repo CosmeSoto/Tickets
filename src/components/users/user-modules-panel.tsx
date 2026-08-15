@@ -20,6 +20,8 @@ interface UserModulesPanelProps {
   canManageCredentials?: boolean
   processesEnabled?: boolean
   canManageProcesses?: boolean
+  accessEnabled?: boolean
+  canManageAccess?: boolean
   canRequestAssets?: boolean
   canAccessKnowledge?: boolean
   /** Vista del propio usuario: copy en 2ª persona y nota de solo lectura */
@@ -40,10 +42,12 @@ interface ModulesData {
   forms: boolean
   credentials: boolean
   processes: boolean
+  access: boolean
   canManageNews?: boolean
   canManageForms?: boolean
   canManageCredentials?: boolean
   canManageProcesses?: boolean
+  canManageAccess?: boolean
   canManageInventory?: boolean
   canRequestAssets?: boolean
   canAccessKnowledge?: boolean
@@ -60,6 +64,7 @@ interface ModulesData {
       forms: boolean
       credentials: boolean
       processes: boolean
+      access: boolean
     }
   }>
 }
@@ -70,6 +75,7 @@ const MODULE_CHIP_LABELS = [
   { key: 'patrols' as const, label: '🛡️ Rondas' },
   { key: 'credentials' as const, label: '🔐 Credenciales' },
   { key: 'processes' as const, label: '🔀 Procesos' },
+  { key: 'access' as const, label: '🪪 Accesos' },
   { key: 'news' as const, label: '📰 Noticias' },
   { key: 'forms' as const, label: '📄 Documentos' },
 ]
@@ -104,6 +110,8 @@ export function UserModulesPanel({
   canManageCredentials,
   processesEnabled,
   canManageProcesses,
+  accessEnabled,
+  canManageAccess,
   canRequestAssets,
   canAccessKnowledge,
   selfView = false,
@@ -140,6 +148,8 @@ export function UserModulesPanel({
     canManageCredentials,
     processesEnabled,
     canManageProcesses,
+    accessEnabled,
+    canManageAccess,
   ])
 
   if (loading) {
@@ -180,6 +190,7 @@ export function UserModulesPanel({
     forms: data.forms,
     credentials: data.credentials ?? false,
     processes: data.processes ?? false,
+    access: data.access ?? false,
   }
 
   const manageInventory = data.canManageInventory ?? canManageInventory
@@ -271,6 +282,15 @@ export function UserModulesPanel({
       ? 'Consultas procedimientos publicados de tus áreas'
       : 'Consulta procedimientos publicados de sus áreas'
 
+  const manageAccess = data?.canManageAccess ?? canManageAccess ?? false
+  const accessCap = manageAccess
+    ? selfView
+      ? 'Emites, revocas y verificas pases QR de personal externo'
+      : 'Emite, revoca y verifica pases QR de personal externo'
+    : selfView
+      ? 'Verificas pases QR de personas autorizadas'
+      : 'Verifica pases QR de personas autorizadas'
+
   // Permisos adicionales por módulo
   const ticketsPerms: Array<{ icon: string; label: string }> = []
   if (accessKnowledge) ticketsPerms.push({ icon: '📚', label: 'Base de conocimientos' })
@@ -326,6 +346,15 @@ export function UserModulesPanel({
       cap: processesCap,
       perms: manageProcesses
         ? [{ icon: '✏️', label: 'Crear y gestionar procesos' }]
+        : ([] as Array<{ icon: string; label: string }>),
+    },
+    {
+      key: 'access' as const,
+      emoji: '🪪',
+      label: 'Accesos',
+      cap: accessCap,
+      perms: manageAccess
+        ? [{ icon: '✏️', label: 'Emitir y revocar pases' }]
         : ([] as Array<{ icon: string; label: string }>),
     },
   ]

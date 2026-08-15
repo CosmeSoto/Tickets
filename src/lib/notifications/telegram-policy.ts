@@ -55,6 +55,9 @@ export const TELEGRAM_EVENT_PRIORITY: Record<TelegramEvent, TelegramPriority> = 
   processReview: 'important',
   processReviewDue: 'important',
   processPublished: 'optional',
+  // Accesos
+  accessPassIssued: 'important',
+  accessPassExpiring: 'important',
   // Rondas — todas important (canal operativo del staff de seguridad)
   patrolAssigned: 'important',
   patrolReminder: 'important',

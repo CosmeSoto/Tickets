@@ -100,13 +100,17 @@ export function RoleDashboardLayout({
     canManageProcesses: canManageProcessesFromModules,
     credentials: hasCredentials,
     processes: hasProcesses,
+    access: hasAccess,
   } = useUserModules()
 
   if (status === 'unauthenticated') {
     return null
   }
 
-  if (status === 'loading' || !session) {
+  // Durante una revalidación de NextAuth puede existir sesión previa aunque `status`
+  // pase transitoriamente a loading. No desmontar el dashboard evita perder formularios
+  // en curso; solo mostrar el estado de carga cuando todavía no hay sesión utilizable.
+  if (!session) {
     return (
       <div className='min-h-screen bg-background'>
         <div className='flex items-center justify-center h-screen'>
@@ -139,6 +143,7 @@ export function RoleDashboardLayout({
     hasForms,
     hasCredentials,
     hasProcesses,
+    hasAccess,
     canRequestAssets,
     hasKnowledge: isSuperAdmin || (hasTickets && !!canAccessKnowledge),
   })

@@ -16,6 +16,7 @@ export type BackupModuleId =
   | 'inventory'
   | 'credentials'
   | 'processes'
+  | 'access'
 
 export interface BackupModuleDefinition {
   id: BackupModuleId
@@ -81,6 +82,12 @@ export const BACKUP_MODULE_REGISTRY: Record<BackupModuleId, BackupModuleDefiniti
     label: 'Procesos y Procedimientos',
     description:
       'Catálogo de procesos, versiones, diagramas, adjuntos, eventos de aprobación y evidencias de revisión externa (DPD). Los archivos en disco deben respaldarse junto con las rutas de process_attachments.',
+  },
+  access: {
+    id: 'access',
+    label: 'Accesos',
+    description:
+      'Personas externas, pases QR y trazabilidad de verificaciones. Los secretos QR se respaldan solo como hashes no reversibles.',
   },
 }
 
@@ -714,4 +721,25 @@ export async function exportProcessesModuleData(): Promise<
     process_approval_events,
     process_external_reviews,
   }
+}
+
+/** Orden FK: organizaciones → sujeto → pase → eventos de verificación. */
+export const ACCESS_MODULE_RESTORE_ORDER = [
+  'access_organizations',
+  'access_subjects',
+  'access_passes',
+  'access_scan_events',
+] as const
+
+export type AccessModuleTable = (typeof ACCESS_MODULE_RESTORE_ORDER)[number]
+
+export async function exportAccessModuleData(): Promise<Record<AccessModuleTable, unknown[]>> {
+  const [access_organizations, access_subjects, access_passes, access_scan_events] =
+    await Promise.all([
+      (prisma as any).access_organizations.findMany(),
+      (prisma as any).access_subjects.findMany(),
+      (prisma as any).access_passes.findMany(),
+      (prisma as any).access_scan_events.findMany(),
+    ])
+  return { access_organizations, access_subjects, access_passes, access_scan_events }
 }

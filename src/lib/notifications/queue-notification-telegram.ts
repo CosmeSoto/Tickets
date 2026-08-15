@@ -44,6 +44,7 @@ function resolveTgModule(
     content: 'system',
     credentials: 'system',
     processes: 'system',
+    access: 'system',
   } as const
   return map[module]
 }

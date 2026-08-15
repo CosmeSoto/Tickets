@@ -30,6 +30,8 @@ const updateUserSchema = z.object({
   canManageCredentials: z.boolean().optional(),
   processesEnabled: z.boolean().optional(),
   canManageProcesses: z.boolean().optional(),
+  accessEnabled: z.boolean().optional(),
+  canManageAccess: z.boolean().optional(),
   isSuperAdmin: z.boolean().optional(),
   assignedCategories: z
     .array(
@@ -167,6 +169,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       delete validatedData.canManageCredentials
       delete validatedData.processesEnabled
       delete validatedData.canManageProcesses
+      delete validatedData.accessEnabled
+      delete validatedData.canManageAccess
     }
 
     // Un admin no puede desactivar su propia cuenta
@@ -247,6 +251,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
             credentialsEnabled: (currentUser as any).credentialsEnabled ?? false,
             canManageCredentials: (currentUser as any).canManageCredentials ?? false,
             canRequestAssets: (currentUser as any).canRequestAssets ?? false,
+            processesEnabled: (currentUser as any).processesEnabled ?? false,
+            canManageProcesses: (currentUser as any).canManageProcesses ?? false,
+            accessEnabled: (currentUser as any).accessEnabled ?? false,
+            canManageAccess: (currentUser as any).canManageAccess ?? false,
           },
           incoming: {
             ticketsEnabled: validatedData.ticketsEnabled,
@@ -259,6 +267,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
             credentialsEnabled: validatedData.credentialsEnabled,
             canManageCredentials: validatedData.canManageCredentials,
             canRequestAssets: (validatedData as any).canRequestAssets,
+            processesEnabled: validatedData.processesEnabled,
+            canManageProcesses: validatedData.canManageProcesses,
+            accessEnabled: validatedData.accessEnabled,
+            canManageAccess: validatedData.canManageAccess,
           },
         })
       } catch (guardErr: any) {
@@ -474,7 +486,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         (validatedData.processesEnabled !== undefined &&
           validatedData.processesEnabled !== (currentUser as any).processesEnabled) ||
         (validatedData.canManageProcesses !== undefined &&
-          validatedData.canManageProcesses !== (currentUser as any).canManageProcesses)
+          validatedData.canManageProcesses !== (currentUser as any).canManageProcesses) ||
+        (validatedData.accessEnabled !== undefined &&
+          validatedData.accessEnabled !== (currentUser as any).accessEnabled) ||
+        (validatedData.canManageAccess !== undefined &&
+          validatedData.canManageAccess !== (currentUser as any).canManageAccess)
 
       if (modulesActuallyChanged) {
         NotificationEvents.emit(targetId, {

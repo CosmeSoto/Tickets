@@ -190,6 +190,40 @@ async function checkTechnicianAssignments(userId: string): Promise<ModuleBlocker
   return blockers
 }
 
+/**
+ * Revisa pases de Accesos emitidos por el usuario que siguen operativos.
+ */
+async function checkAccessPasses(userId: string): Promise<ModuleBlocker[]> {
+  const blockers: ModuleBlocker[] = []
+  const activePasses = await prisma.access_passes.count({
+    where: {
+      createdById: userId,
+      status: { in: ['ACTIVE', 'SUSPENDED'] },
+      validUntil: { gte: new Date() },
+    },
+  })
+  if (activePasses > 0) {
+    blockers.push({
+      module: 'Accesos',
+      count: activePasses,
+      reason: `Emitió ${activePasses} ${p(
+        activePasses,
+        'pase de acceso aún vigente',
+        'pases de acceso aún vigentes'
+      )}`,
+      instructions: [
+        `Revocar o dejar vencer los ${activePasses} ${p(
+          activePasses,
+          'pase activo/suspendido',
+          'pases activos/suspendidos'
+        )} emitidos por este usuario.`,
+        'Ir a Accesos → Pases emitidos → Revocar los que aún estén vigentes, o reasignar la emisión a otro gestor.',
+      ],
+    })
+  }
+  return blockers
+}
+
 // ── Servicio ─────────────────────────────────────────────────────────────────
 
 export class UserModuleGuardService {
@@ -237,6 +271,10 @@ export class UserModuleGuardService {
       blockers.push(...(await checkPatrols(userId)))
     }
 
+    if (disabling.includes('accessEnabled') || disabling.includes('canManageAccess')) {
+      blockers.push(...(await checkAccessPasses(userId)))
+    }
+
     if (blockers.length > 0) {
       throw new ModuleDisableBlockedError(blockers, userId, userName, 'module')
     }
@@ -275,6 +313,8 @@ export class UserModuleGuardService {
         canRequestAssets: true,
         credentialsEnabled: true,
         canManageCredentials: true,
+        accessEnabled: true,
+        canManageAccess: true,
       },
     })
 
@@ -313,6 +353,11 @@ export class UserModuleGuardService {
       blockers.push(...(await checkPatrols(userId)))
     }
 
+    // ── Accesos ───────────────────────────────────────────────────────────────
+    if (user.accessEnabled || user.canManageAccess) {
+      blockers.push(...(await checkAccessPasses(userId)))
+    }
+
     // ── Asignaciones de categorías (solo técnicos) ────────────────────────────
     if (currentRole === 'TECHNICIAN') {
       blockers.push(...(await checkTechnicianAssignments(userId)))
@@ -337,6 +382,10 @@ export interface ModuleFlags {
   credentialsEnabled: boolean
   canManageCredentials: boolean
   canRequestAssets: boolean
+  processesEnabled: boolean
+  canManageProcesses: boolean
+  accessEnabled: boolean
+  canManageAccess: boolean
 }
 
 const MODULE_FLAG_KEYS: (keyof ModuleFlags)[] = [
@@ -350,4 +399,8 @@ const MODULE_FLAG_KEYS: (keyof ModuleFlags)[] = [
   'credentialsEnabled',
   'canManageCredentials',
   'canRequestAssets',
+  'processesEnabled',
+  'canManageProcesses',
+  'accessEnabled',
+  'canManageAccess',
 ]

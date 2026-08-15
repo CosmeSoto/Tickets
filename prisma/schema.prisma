@@ -622,6 +622,7 @@ model users {
   accessPassesUpdated                             access_passes[]                @relation("AccessPassUpdater")
   accessPassesRevoked                             access_passes[]                @relation("AccessPassRevoker")
   accessScanEvents                                access_scan_events[]           @relation("AccessScanAgent")
+  accessPrivacyAcceptances                        access_subjects[]              @relation("AccessPrivacyAccepter")
 
   @@index([departmentId])
   @@index([name, email])
@@ -1785,6 +1786,9 @@ model families {
   credentialVaults            credential_vaults[]
   credentialShares            credential_shares[]
   processes                   processes[]
+  accessSubjects              access_subjects[]
+  accessPasses                access_passes[]
+  accessScanEvents            access_scan_events[]
 
   @@index([isActive, order])
   @@map("families")
@@ -2132,6 +2136,23 @@ model process_external_reviews {
   @@map("process_external_reviews")
 }
 
+/// Catálogo opcional de arrendatarios (legado); la emisión usa texto libre en el pase.
+model access_organizations {
+  id          String   @id @default(uuid())
+  code        String   @unique @db.VarChar(50)
+  name        String   @db.VarChar(200)
+  description String?  @db.VarChar(500)
+  isActive    Boolean  @default(true) @map("is_active")
+  order       Int      @default(0)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  subjects access_subjects[]
+
+  @@index([isActive, order])
+  @@map("access_organizations")
+}
+
 /// Persona externa autorizable; no representa una cuenta ni puede iniciar sesión.
 model access_subjects {
   id                   String             @id @default(uuid())
@@ -2141,22 +2162,28 @@ model access_subjects {
   email                String?            @db.VarChar(320)
   phone                String?            @db.VarChar(40)
   photoPath            String?            @map("photo_path") @db.VarChar(500)
+  organizationId       String?            @map("organization_id")
   organization         String?            @db.VarChar(200)
   accessType           AccessSubjectType  @default(AUTHORIZED_VISITOR) @map("access_type")
   purpose              String?            @db.VarChar(1000)
   documentLast4        String?            @map("document_last4") @db.VarChar(4)
   privacyAcceptedAt    DateTime?          @map("privacy_accepted_at")
   privacyNoticeVersion String?            @map("privacy_notice_version") @db.VarChar(50)
+  /// Quién registró la aceptación (gestor) — la persona no firma aún en el correo.
+  privacyAcceptedById  String?            @map("privacy_accepted_by_id")
   isActive             Boolean            @default(true) @map("is_active")
   createdAt            DateTime           @default(now()) @map("created_at")
   updatedAt            DateTime           @updatedAt @map("updated_at")
 
-  family families      @relation(fields: [familyId], references: [id], onDelete: Restrict)
-  passes access_passes[]
+  family             families              @relation(fields: [familyId], references: [id], onDelete: Restrict)
+  organizationRef    access_organizations? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  privacyAcceptedBy  users?                @relation("AccessPrivacyAccepter", fields: [privacyAcceptedById], references: [id], onDelete: SetNull)
+  passes             access_passes[]
 
   @@index([familyId, isActive])
   @@index([familyId, lastName, firstName])
   @@index([email])
+  @@index([organizationId])
   @@map("access_subjects")
 }
 
@@ -2168,6 +2195,13 @@ model access_passes {
   credentialCode String           @unique @map("credential_code") @db.VarChar(40)
   tokenHash      String           @unique @map("token_hash") @db.VarChar(128)
   status         AccessPassStatus @default(ACTIVE)
+  /// Hash SHA-256 del token de aceptación pública. El valor original nunca se persiste.
+  privacyAcceptanceTokenHash String?   @unique @map("privacy_acceptance_token_hash") @db.VarChar(128)
+  privacyAcceptanceExpiresAt DateTime? @map("privacy_acceptance_expires_at")
+  privacyAcceptedAt          DateTime? @map("privacy_accepted_at")
+  privacyAcceptedIp          String?   @map("privacy_accepted_ip") @db.VarChar(64)
+  privacyAcceptedUserAgent   String?   @map("privacy_accepted_user_agent") @db.VarChar(1000)
+  privacyAcceptanceHash      String?   @map("privacy_acceptance_hash") @db.VarChar(128)
   validFrom      DateTime         @map("valid_from")
   validUntil     DateTime         @map("valid_until")
   issuedAt       DateTime         @default(now()) @map("issued_at")
@@ -2190,6 +2224,7 @@ model access_passes {
 
   @@index([familyId, status, validUntil])
   @@index([subjectId, status])
+  @@index([privacyAcceptanceExpiresAt])
   @@index([lastScannedAt])
   @@map("access_passes")
 }
@@ -2285,6 +2320,7 @@ enum AccessSubjectType {
 }
 
 enum AccessPassStatus {
+  PENDING_PRIVACY
   ACTIVE
   SUSPENDED
   REVOKED

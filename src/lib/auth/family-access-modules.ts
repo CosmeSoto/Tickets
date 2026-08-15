@@ -86,6 +86,16 @@ export const FAMILY_ACCESS_MODULES: Record<string, FamilyAccessModuleDefinition>
       CLIENT: { canConsume: false, canOperate: false, canView: true },
     },
   },
+  access: {
+    key: 'access',
+    label: 'Accesos',
+    description: 'Áreas donde puede verificar o gestionar pases QR de personal externo.',
+    defaultsByRole: {
+      ADMIN: { canConsume: false, canOperate: true, canView: true },
+      TECHNICIAN: { canConsume: false, canOperate: false, canView: true },
+      CLIENT: { canConsume: false, canOperate: false, canView: true },
+    },
+  },
 }
 
 export const BUILTIN_FAMILY_ACCESS_MODULE_KEYS = Object.keys(FAMILY_ACCESS_MODULES)

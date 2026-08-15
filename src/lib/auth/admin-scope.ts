@@ -97,7 +97,7 @@ export async function getDepartmentIdsForScope(
  */
 export async function getModuleFamilyIds(
   userId: string,
-  module: 'inventory' | 'patrols'
+  module: 'inventory' | 'patrols' | 'processes' | 'access' | 'credentials'
 ): Promise<string[]> {
   const { resolveModuleFamilyScopeIds } = await import('@/lib/auth/user-family-access')
   // canView: listados/visibilidad de módulo (incluye nativa)
@@ -105,7 +105,8 @@ export async function getModuleFamilyIds(
 }
 
 /**
- * Departamentos visibles para un admin no-super (Union_Scope: tickets + inventario + rondas).
+ * Departamentos visibles para un admin no-super
+ * (Union_Scope: tickets + inventario + rondas + procesos + accesos).
  * undefined = sin restricción (super admin). [] = sin acceso a ningún usuario.
  */
 export async function getAdminUnionDepartmentIds(
@@ -118,6 +119,8 @@ export async function getAdminUnionDepartmentIds(
   const unionSet = new Set<string>(scope.familyIds ?? [])
   for (const id of await getModuleFamilyIds(adminId, 'inventory')) unionSet.add(id)
   for (const id of await getModuleFamilyIds(adminId, 'patrols')) unionSet.add(id)
+  for (const id of await getModuleFamilyIds(adminId, 'processes')) unionSet.add(id)
+  for (const id of await getModuleFamilyIds(adminId, 'access')) unionSet.add(id)
 
   if (unionSet.size === 0) return []
 
@@ -180,6 +183,8 @@ export async function getAdminUnionFamilyIds(
   const unionSet = new Set<string>(scope.familyIds ?? [])
   for (const id of await getModuleFamilyIds(adminId, 'inventory')) unionSet.add(id)
   for (const id of await getModuleFamilyIds(adminId, 'patrols')) unionSet.add(id)
+  for (const id of await getModuleFamilyIds(adminId, 'processes')) unionSet.add(id)
+  for (const id of await getModuleFamilyIds(adminId, 'access')) unionSet.add(id)
 
   return Array.from(unionSet)
 }

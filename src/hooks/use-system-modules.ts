@@ -114,6 +114,19 @@ const FALLBACK: SystemModule[] = [
     requiresManager: true,
     familyScoped: true,
   },
+  {
+    key: 'access',
+    name: 'Accesos',
+    description: 'Pases QR verificables para personal externo, visitantes y contratistas por área',
+    icon: 'ScanLine',
+    isActive: true,
+    order: 8,
+    defaultForAdmin: true,
+    defaultForTech: false,
+    defaultForClient: false,
+    requiresManager: true,
+    familyScoped: true,
+  },
 ]
 
 export function useSystemModules() {
@@ -175,6 +188,11 @@ export function getModuleRoleDescription(moduleKey: string, role: string): strin
       TECHNICIAN: 'Ver publicados · con gestión puede crear y versionar en áreas asignadas',
       CLIENT: 'Consultar procedimientos publicados de sus áreas',
     },
+    access: {
+      ADMIN: 'Emitir, revocar y verificar pases QR de personal externo en sus áreas',
+      TECHNICIAN: 'Verificar pases · con gestión puede emitir y revocar en áreas asignadas',
+      CLIENT: 'Verificar pases · con gestión puede emitir y revocar en su área',
+    },
   }
   return descriptions[moduleKey]?.[role] ?? 'Acceso al módulo'
 }
@@ -218,6 +236,11 @@ export function getAdditionalFamilyHint(moduleKey: string, role: string): string
       TECHNICIAN: 'Áreas adicionales donde puede gestionar o consultar procesos.',
       CLIENT: 'Áreas adicionales donde puede consultar procedimientos publicados.',
     },
+    access: {
+      ADMIN: 'Áreas adicionales donde puede gestionar o verificar pases QR.',
+      TECHNICIAN: 'Áreas adicionales donde puede verificar o gestionar pases QR.',
+      CLIENT: 'Áreas adicionales donde puede verificar o gestionar pases QR.',
+    },
   }
   return hints[moduleKey]?.[role] ?? null
 }
@@ -234,6 +257,7 @@ export function getModuleEmoji(moduleKey: string): string {
     forms: '📋',
     credentials: '🔐',
     processes: '🔀',
+    access: '🪪',
     contracts: '📄',
     reports: '📊',
     knowledge: '📚',

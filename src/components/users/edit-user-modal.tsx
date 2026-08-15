@@ -59,6 +59,8 @@ interface EditUserData {
   canManageCredentials: boolean
   processesEnabled: boolean
   canManageProcesses: boolean
+  accessEnabled: boolean
+  canManageAccess: boolean
   isSuperAdmin: boolean
   avatar?: File
 }
@@ -100,6 +102,8 @@ export function EditUserModal({
     canManageCredentials: false,
     processesEnabled: false,
     canManageProcesses: false,
+    accessEnabled: false,
+    canManageAccess: false,
     isSuperAdmin: false,
   })
 
@@ -113,12 +117,14 @@ export function EditUserModal({
     patrolFamilies,
     credentialsFamilies,
     processesFamilies,
+    accessFamilies,
     technicianFamilyIds,
     clientFamilyIds,
     inventoryFamilyIds,
     patrolFamilyIds,
     credentialsFamilyIds,
     processesFamilyIds,
+    accessFamilyIds,
     adminFamilyIds,
     contentFamilyIds,
     adminScopeIds,
@@ -133,6 +139,7 @@ export function EditUserModal({
     patrolReadOnlyIds,
     credentialsReadOnlyIds,
     processesReadOnlyIds,
+    accessReadOnlyIds,
     adminScopeReadOnlyIds,
 
     // Handlers
@@ -149,6 +156,8 @@ export function EditUserModal({
     handleUnassignCredentialsFamily,
     handleAssignProcessesFamily,
     handleUnassignProcessesFamily,
+    handleAssignAccessFamily,
+    handleUnassignAccessFamily,
     handleAssignAdminFamily,
     handleUnassignAdminFamily,
     handleAssignContentFamily,
@@ -189,6 +198,8 @@ export function EditUserModal({
         canManageCredentials: (user as any).canManageCredentials ?? false,
         processesEnabled: (user as any).processesEnabled ?? false,
         canManageProcesses: (user as any).canManageProcesses ?? false,
+        accessEnabled: (user as any).accessEnabled ?? false,
+        canManageAccess: (user as any).canManageAccess ?? false,
         isSuperAdmin: user.isSuperAdmin ?? false,
         avatar: undefined,
       })
@@ -292,6 +303,10 @@ export function EditUserModal({
           canManageForms: formData.canManageForms,
           credentialsEnabled: formData.credentialsEnabled,
           canManageCredentials: formData.canManageCredentials,
+          processesEnabled: formData.processesEnabled,
+          canManageProcesses: formData.canManageProcesses,
+          accessEnabled: formData.accessEnabled,
+          canManageAccess: formData.canManageAccess,
           isSuperAdmin: formData.role === 'ADMIN' ? formData.isSuperAdmin : false,
         }),
       })
@@ -379,6 +394,8 @@ export function EditUserModal({
       | 'canManageCredentials'
       | 'processesEnabled'
       | 'canManageProcesses'
+      | 'accessEnabled'
+      | 'canManageAccess'
       | 'canManageInventory'
       | 'canRequestAssets'
       | 'canAccessKnowledge',
@@ -424,6 +441,12 @@ export function EditUserModal({
         ...p,
         processesEnabled: value,
         canManageProcesses: value ? (p.role === 'ADMIN' ? true : p.canManageProcesses) : false,
+      }))
+    } else if (field === 'accessEnabled') {
+      setFormData(p => ({
+        ...p,
+        accessEnabled: value,
+        canManageAccess: value ? (p.role === 'ADMIN' ? true : p.canManageAccess) : false,
       }))
     } else {
       setFormData(p => ({ ...p, [field]: value }))
@@ -514,12 +537,14 @@ export function EditUserModal({
                 patrolFamilies={patrolFamilies}
                 credentialsFamilies={credentialsFamilies}
                 processesFamilies={processesFamilies}
+                accessFamilies={accessFamilies}
                 technicianFamilyIds={technicianFamilyIds}
                 clientFamilyIds={clientFamilyIds}
                 inventoryFamilyIds={inventoryFamilyIds}
                 patrolFamilyIds={patrolFamilyIds}
                 credentialsFamilyIds={credentialsFamilyIds}
                 processesFamilyIds={processesFamilyIds}
+                accessFamilyIds={accessFamilyIds}
                 adminFamilyIds={adminFamilyIds}
                 contentFamilyIds={contentFamilyIds}
                 ticketReadOnlyIds={ticketReadOnlyIds}
@@ -527,6 +552,7 @@ export function EditUserModal({
                 patrolReadOnlyIds={patrolReadOnlyIds}
                 credentialsReadOnlyIds={credentialsReadOnlyIds}
                 processesReadOnlyIds={processesReadOnlyIds}
+                accessReadOnlyIds={accessReadOnlyIds}
                 adminScopeReadOnlyIds={adminScopeReadOnlyIds}
                 onToggle={handleToggle}
                 handlers={{
@@ -542,6 +568,8 @@ export function EditUserModal({
                   handleUnassignCredentialsFamily,
                   handleAssignProcessesFamily,
                   handleUnassignProcessesFamily,
+                  handleAssignAccessFamily,
+                  handleUnassignAccessFamily,
                   handleAssignAdminFamily,
                   handleUnassignAdminFamily,
                   handleAssignContentFamily,

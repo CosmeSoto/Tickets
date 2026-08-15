@@ -42,6 +42,7 @@ export async function importBackupFromFile(
     'inventory',
     'credentials',
     'processes',
+    'access',
   ]
 
   for (const mod of moduleNames) {

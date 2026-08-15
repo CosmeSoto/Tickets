@@ -30,6 +30,8 @@ jest.mock('@/lib/auth/user-family-access', () => ({
 
 jest.mock('@/lib/auth/admin-scope', () => ({
   getUserFamilyScope: jest.fn(),
+  assertAdminCanManageUser: jest.fn(),
+  assertAdminCanAccessFamily: jest.fn(),
 }))
 
 jest.mock('next/server', () => ({
@@ -50,7 +52,11 @@ import {
   unassignUserModuleFamily,
   setUserModuleFamilies,
 } from '@/lib/auth/user-family-access'
-import { getUserFamilyScope } from '@/lib/auth/admin-scope'
+import {
+  getUserFamilyScope,
+  assertAdminCanManageUser,
+  assertAdminCanAccessFamily,
+} from '@/lib/auth/admin-scope'
 
 const mockSession = getServerSession as jest.MockedFunction<typeof getServerSession>
 const userId = 'user-target-1'
@@ -92,6 +98,13 @@ describe('/api/admin/users/[id]/family-access', () => {
       familyIds: ['fam-a', 'fam-b'],
       nativeFamilyId: 'fam-native',
     })
+    ;(assertAdminCanManageUser as jest.Mock).mockResolvedValue({ allowed: true })
+    ;(assertAdminCanAccessFamily as jest.Mock).mockImplementation(
+      async (_adminId: string, isSuperAdmin: boolean, familyId: string) =>
+        isSuperAdmin || ['fam-a', 'fam-b'].includes(familyId)
+          ? { allowed: true }
+          : { allowed: false, status: 403, error: 'Fuera de ámbito' }
+    )
     ;(assignUserModuleFamily as jest.Mock).mockResolvedValue(undefined)
     ;(unassignUserModuleFamily as jest.Mock).mockResolvedValue(undefined)
     ;(setUserModuleFamilies as jest.Mock).mockResolvedValue(['fam-a'])
@@ -162,6 +175,28 @@ describe('/api/admin/users/[id]/family-access', () => {
       )
       const body = await res.json()
       expect(body.data.module).toBe('content')
+    })
+
+    it('asigna una familia del módulo access', async () => {
+      mockSession.mockResolvedValue(adminSession(true))
+      const res = await POST(
+        makeRequest('/api', {
+          method: 'POST',
+          body: { module: 'access', familyId: 'fam-a' },
+        }),
+        { params }
+      )
+
+      expect(res.status).toBe(200)
+      expect(assignUserModuleFamily).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId,
+          familyId: 'fam-a',
+          moduleInput: 'access',
+          role: 'TECHNICIAN',
+        })
+      )
+      expect((await res.json()).data.module).toBe('access')
     })
 
     it('403 admin normal fuera de scope', async () => {

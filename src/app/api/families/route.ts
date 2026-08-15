@@ -183,6 +183,22 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ success: true, data: families })
       }
 
+      if (moduleFilter === 'access') {
+        const { getAccessModulePermission } = await import('@/lib/access/access-control')
+        const permission = await getAccessModulePermission(session.user.id, session.user.role)
+        if (!permission.canScan && !permission.canManage) {
+          return NextResponse.json({ success: true, data: [] })
+        }
+        const scopeIds = permission.familyIds
+        if (!scopeIds || scopeIds.length === 0) {
+          return NextResponse.json({ success: true, data: [] })
+        }
+        let families = await FamilyService.findAll(includeInactive)
+        const allowed = new Set(scopeIds)
+        families = families.filter((f: { id: string }) => allowed.has(f.id))
+        return NextResponse.json({ success: true, data: families })
+      }
+
       // Documentos/Noticias: familias del scope del usuario (no org-wide)
       if (searchParams.get('scope') === 'content') {
         const { getContentVisibilityScope } = await import('@/lib/content/visibility-scope')
@@ -315,15 +331,21 @@ export async function GET(request: NextRequest) {
             await resolveModuleFamilyScopeIds(userId, 'processes', 'canOperate')
           )
           families = families.filter(f => allowedIds.has(f.id))
+        } else if (moduleFilter === 'access') {
+          const { resolveModuleFamilyScopeIds } = await import('@/lib/auth/user-family-access')
+          const allowedIds = new Set(
+            await resolveModuleFamilyScopeIds(userId, 'access', 'canOperate')
+          )
+          families = families.filter(f => allowedIds.has(f.id))
         } else {
           // Default (sin módulo específico): calcular Union_Scope
-          // Union_Scope = General_Scope + Inventory families + Patrols families + Processes + Nativa (deduplicado)
+          // Union_Scope = tickets + inventory + patrols + processes + access (+ nativa)
           const { getAdminFamilyScope, getModuleFamilyIds } = await import('@/lib/auth/admin-scope')
-          const { resolveModuleFamilyScopeIds } = await import('@/lib/auth/user-family-access')
           const scope = await getAdminFamilyScope(userId, false)
           const inventoryFamilyIds = await getModuleFamilyIds(userId, 'inventory')
           const patrolFamilyIds = await getModuleFamilyIds(userId, 'patrols')
-          const processFamilyIds = await resolveModuleFamilyScopeIds(userId, 'processes', 'canView')
+          const processFamilyIds = await getModuleFamilyIds(userId, 'processes')
+          const accessFamilyIds = await getModuleFamilyIds(userId, 'access')
 
           // Combinar todos los IDs de familias (deduplicado)
           const unionSet = new Set<string>()
@@ -333,6 +355,7 @@ export async function GET(request: NextRequest) {
           inventoryFamilyIds.forEach(id => unionSet.add(id))
           patrolFamilyIds.forEach(id => unionSet.add(id))
           processFamilyIds.forEach(id => unionSet.add(id))
+          accessFamilyIds.forEach(id => unionSet.add(id))
 
           if (unionSet.size > 0) {
             families = families.filter(f => unionSet.has(f.id))

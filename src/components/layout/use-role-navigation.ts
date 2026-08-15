@@ -4,7 +4,7 @@
  * Construye la navegación filtrada según rol, módulos activos y permisos.
  */
 
-import { FileText } from 'lucide-react'
+import { FileText, ScanLine } from 'lucide-react'
 import { navigationByRole } from '@/components/layout/dashboard-nav-config'
 import type { DashboardNavItem } from '@/components/layout/dashboard-nav-types'
 
@@ -22,6 +22,7 @@ export type RoleNavigationInput = {
   hasForms: boolean
   hasCredentials: boolean
   hasProcesses: boolean
+  hasAccess: boolean
   canRequestAssets: boolean
   /** Tickets + canAccessKnowledge (Super Admin = true) */
   hasKnowledge: boolean
@@ -51,6 +52,25 @@ function filterKnowledgeChildren(
   })
 }
 
+/** Inserta Accesos justo debajo de Rondas (o Mis Rondas). */
+function withAccessNav(items: DashboardNavItem[], hasAccess: boolean): DashboardNavItem[] {
+  if (!hasAccess) return items
+  if (items.some(item => item.href === '/access')) return items
+
+  const accessItem: DashboardNavItem = { name: 'Accesos', href: '/access', icon: ScanLine }
+  const anchor = items.findIndex(
+    item =>
+      item.name === 'Rondas' ||
+      item.name === 'Mis Rondas' ||
+      item.href === '/admin/patrols' ||
+      item.href === '/patrol'
+  )
+  if (anchor < 0) return [...items, accessItem]
+  const next = [...items]
+  next.splice(anchor + 1, 0, accessItem)
+  return next
+}
+
 export function buildRoleNavigation({
   userRole,
   isSuperAdmin,
@@ -65,6 +85,7 @@ export function buildRoleNavigation({
   hasForms,
   hasCredentials,
   hasProcesses,
+  hasAccess,
   canRequestAssets,
   hasKnowledge,
 }: RoleNavigationInput): DashboardNavItem[] {
@@ -93,7 +114,7 @@ export function buildRoleNavigation({
         return hasProcesses
       return true
     })
-    return filterKnowledgeChildren(
+    const navigation = filterKnowledgeChildren(
       adminNav.map(item => {
         if (item.name !== 'Procesos' || !item.children?.length) return item
         return {
@@ -105,6 +126,7 @@ export function buildRoleNavigation({
       }),
       isSuperAdmin || hasKnowledge
     )
+    return withAccessNav(navigation, hasAccess)
   }
 
   let navigation = (navigationByRole[navKey] || []).filter(item => {
@@ -193,7 +215,8 @@ export function buildRoleNavigation({
     })
   }
 
-  return filterKnowledgeChildren(navigation, hasKnowledge)
+  const filtered = filterKnowledgeChildren(navigation, hasKnowledge)
+  return withAccessNav(filtered, hasAccess)
 }
 
 export function roleHomeHref(userRole: string): string {

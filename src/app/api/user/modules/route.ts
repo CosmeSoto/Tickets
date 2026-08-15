@@ -50,6 +50,8 @@ export async function GET(request: Request) {
   let canManageCredentials = false
   let processesEnabled = false
   let canManageProcesses = false
+  let accessEnabled = false
+  let canManageAccess = false
 
   if (targetUserId && targetUserId !== session.user.id) {
     const targetUser = await prisma.users.findUnique({
@@ -72,6 +74,8 @@ export async function GET(request: Request) {
         canManageCredentials: true,
         processesEnabled: true,
         canManageProcesses: true,
+        accessEnabled: true,
+        canManageAccess: true,
       },
     })
     if (!targetUser) return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 })
@@ -92,6 +96,8 @@ export async function GET(request: Request) {
     canManageCredentials = targetUser.canManageCredentials ?? false
     processesEnabled = (targetUser as any).processesEnabled ?? false
     canManageProcesses = (targetUser as any).canManageProcesses ?? false
+    accessEnabled = (targetUser as any).accessEnabled ?? false
+    canManageAccess = (targetUser as any).canManageAccess ?? false
   } else {
     // Cargar flags del usuario actual desde DB (la sesión puede estar desactualizada)
     const currentUser = await prisma.users.findUnique({
@@ -113,6 +119,8 @@ export async function GET(request: Request) {
         canManageCredentials: true,
         processesEnabled: true,
         canManageProcesses: true,
+        accessEnabled: true,
+        canManageAccess: true,
       },
     })
     if (currentUser) {
@@ -132,6 +140,8 @@ export async function GET(request: Request) {
       canManageCredentials = currentUser.canManageCredentials ?? false
       processesEnabled = (currentUser as any).processesEnabled ?? false
       canManageProcesses = (currentUser as any).canManageProcesses ?? false
+      accessEnabled = (currentUser as any).accessEnabled ?? false
+      canManageAccess = (currentUser as any).canManageAccess ?? false
     }
   }
 
@@ -196,6 +206,10 @@ export async function GET(request: Request) {
         const processIds = await getUserModuleFamilyGrantIds(userId, 'processes')
         familyIds = [...new Set([...familyIds, ...processIds])]
       }
+      if (accessEnabled || canManageAccess) {
+        const accessIds = await getUserModuleFamilyGrantIds(userId, 'access')
+        familyIds = [...new Set([...familyIds, ...accessIds])]
+      }
     } else if (role === 'CLIENT') {
       const explicitIds = await getUserModuleFamilyGrantIds(userId, 'tickets')
 
@@ -226,6 +240,10 @@ export async function GET(request: Request) {
         const processIds = await getUserModuleFamilyGrantIds(userId, 'processes')
         familyIds = [...new Set([...familyIds, ...processIds])]
       }
+      if (accessEnabled || canManageAccess) {
+        const accessIds = await getUserModuleFamilyGrantIds(userId, 'access')
+        familyIds = [...new Set([...familyIds, ...accessIds])]
+      }
     }
 
     // Familia nativa (Super Admin ya tiene todas)
@@ -255,6 +273,8 @@ export async function GET(request: Request) {
           canManageCredentials: true,
           processes: true,
           canManageProcesses: true,
+          access: true,
+          canManageAccess: true,
           families: [],
         }
       }
@@ -275,6 +295,8 @@ export async function GET(request: Request) {
           canManageCredentials,
           processes: processesEnabled || canManageProcesses,
           canManageProcesses: true,
+          access: accessEnabled || canManageAccess,
+          canManageAccess: true,
           families: [],
         }
       }
@@ -294,6 +316,8 @@ export async function GET(request: Request) {
         canManageCredentials,
         processes: processesEnabled || canManageProcesses,
         canManageProcesses,
+        access: accessEnabled || canManageAccess,
+        canManageAccess,
         families: [],
       }
     }
@@ -324,6 +348,7 @@ export async function GET(request: Request) {
     const patrolFamilyIds: Set<string> = new Set()
     const credentialsFamilyIds: Set<string> = new Set()
     const processesFamilyIds: Set<string> = new Set()
+    const accessFamilyIds: Set<string> = new Set()
 
     if (isSuperAdmin) {
       const allActive = await prisma.families.findMany({
@@ -336,6 +361,7 @@ export async function GET(request: Request) {
         patrolFamilyIds.add(f.id)
         credentialsFamilyIds.add(f.id)
         processesFamilyIds.add(f.id)
+        accessFamilyIds.add(f.id)
       })
     } else {
       const ticketGrants = await getUserModuleFamilyGrantIds(userId, 'tickets')
@@ -358,6 +384,10 @@ export async function GET(request: Request) {
         const processGrants = await getUserModuleFamilyGrantIds(userId, 'processes')
         processGrants.forEach(id => processesFamilyIds.add(id))
       }
+      if (accessEnabled || canManageAccess) {
+        const accessGrants = await getUserModuleFamilyGrantIds(userId, 'access')
+        accessGrants.forEach(id => accessFamilyIds.add(id))
+      }
 
       if (nativeFamilyId) {
         if (ticketsEnabled) ticketFamilyIds.add(nativeFamilyId)
@@ -365,6 +395,7 @@ export async function GET(request: Request) {
         if (patrolsEnabled) patrolFamilyIds.add(nativeFamilyId)
         if (credentialsEnabled || canManageCredentials) credentialsFamilyIds.add(nativeFamilyId)
         if (processesEnabled || canManageProcesses) processesFamilyIds.add(nativeFamilyId)
+        if (accessEnabled || canManageAccess) accessFamilyIds.add(nativeFamilyId)
       }
     }
 
@@ -376,6 +407,7 @@ export async function GET(request: Request) {
         ...patrolFamilyIds,
         ...credentialsFamilyIds,
         ...processesFamilyIds,
+        ...accessFamilyIds,
       ]),
     ]
     const families =
@@ -403,6 +435,9 @@ export async function GET(request: Request) {
         processes: isSuperAdmin
           ? true
           : processesFamilyIds.has(f.id) && (processesEnabled || canManageProcesses),
+        access: isSuperAdmin
+          ? true
+          : accessFamilyIds.has(f.id) && (accessEnabled || canManageAccess),
       },
     }))
 
@@ -428,6 +463,7 @@ export async function GET(request: Request) {
     let resolvedForms: boolean
     let resolvedCredentials: boolean
     let resolvedProcesses: boolean
+    let resolvedAccess: boolean
 
     if (role === 'ADMIN' && isSuperAdmin) {
       resolvedTickets = true
@@ -437,6 +473,7 @@ export async function GET(request: Request) {
       resolvedForms = true
       resolvedCredentials = true
       resolvedProcesses = true
+      resolvedAccess = true
     } else if (role === 'CLIENT') {
       // Para CLIENT: el flag del usuario es suficiente para mostrar el módulo.
       // No bloqueamos por falta de familias — el usuario verá el módulo vacío
@@ -449,6 +486,7 @@ export async function GET(request: Request) {
       resolvedForms = formsEnabled || canManageForms
       resolvedCredentials = credentialsEnabled || canManageCredentials
       resolvedProcesses = processesEnabled || canManageProcesses
+      resolvedAccess = accessEnabled || canManageAccess
     } else {
       // ADMIN normal y TECHNICIAN: requieren al menos una familia activa en el módulo.
       // canRequestAssets basta para mostrar Inventario (menú de solicitudes de compras).
@@ -464,6 +502,8 @@ export async function GET(request: Request) {
       resolvedCredentials = credentialsEnabled || canManageCredentials
       // Procesos: flag del usuario basta; el alcance por familia se aplica en la API.
       resolvedProcesses = processesEnabled || canManageProcesses
+      // Accesos: el alcance se aplica en la API y un agente puede abrir el scanner sin gestionar.
+      resolvedAccess = accessEnabled || canManageAccess
     }
 
     return {
@@ -485,6 +525,8 @@ export async function GET(request: Request) {
       processes: resolvedProcesses,
       canManageProcesses:
         isSuperAdmin || (role === 'ADMIN' ? processesEnabled : canManageProcesses),
+      access: resolvedAccess,
+      canManageAccess: isSuperAdmin || (role === 'ADMIN' ? accessEnabled : canManageAccess),
       families: enrichedFamilies,
     }
   })

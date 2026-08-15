@@ -27,6 +27,7 @@ export const publicRoutes = [
   // Aceptación de actas por token (email / link externo)
   '/acts/*/accept',
   '/acts/contract-return/*/accept',
+  '/access/passes/*/accept',
   // Verificación pública (QR)
   '/verify/equipment/*',
   '/api/public',
@@ -61,6 +62,7 @@ export const protectedRoutes = [
   '/credentials',
   '/forms',
   '/processes',
+  '/access',
   '/knowledge',
   '/help/center',
   '/help/documentation',

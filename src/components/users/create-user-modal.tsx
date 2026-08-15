@@ -110,7 +110,11 @@ export function CreateUserModal({
   }
 
   const handleSubmit = async () => {
-    const { isValid, errors: validationErrors } = validateUserForm(formData, true, passwordMinLength)
+    const { isValid, errors: validationErrors } = validateUserForm(
+      formData,
+      true,
+      passwordMinLength
+    )
     if (!isValid) {
       const errorList = Object.values(validationErrors).filter(Boolean)
       if (errorList.length > 0) {
@@ -138,6 +142,10 @@ export function CreateUserModal({
             canManageNews: true,
             canManageForms: true,
             canManageCredentials: true,
+            processesEnabled: true,
+            canManageProcesses: true,
+            accessEnabled: true,
+            canManageAccess: true,
             canRequestAssets: false,
             canAccessKnowledge: true,
           }
@@ -153,6 +161,10 @@ export function CreateUserModal({
             canManageNews: false,
             canManageForms: false,
             canManageCredentials: false,
+            processesEnabled: false,
+            canManageProcesses: false,
+            accessEnabled: false,
+            canManageAccess: false,
             canRequestAssets: false,
             canAccessKnowledge: true,
           }

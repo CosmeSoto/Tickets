@@ -23,6 +23,10 @@ const createUserSchemaBase = z.object({
   canAccessKnowledge: z.boolean().optional(),
   credentialsEnabled: z.boolean().optional(),
   canManageCredentials: z.boolean().optional(),
+  processesEnabled: z.boolean().optional(),
+  canManageProcesses: z.boolean().optional(),
+  accessEnabled: z.boolean().optional(),
+  canManageAccess: z.boolean().optional(),
 })
 
 export async function GET(request: NextRequest) {
@@ -380,6 +384,8 @@ export async function GET(request: NextRequest) {
         canManageCredentials: true,
         processesEnabled: true,
         canManageProcesses: true,
+        accessEnabled: true,
+        canManageAccess: true,
         isSuperAdmin: true,
         createdAt: true,
         lastLogin: true,
