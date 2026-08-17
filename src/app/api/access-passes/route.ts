@@ -5,11 +5,13 @@ import { randomUUID } from 'crypto'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import {
+  assertCanDeleteAccess,
   assertCanManageAccess,
   getAccessModulePermission,
   isAccessFamilyAllowed,
   generateAccessQrSecret,
 } from '@/lib/access/access-control'
+import { hardDeleteAccessPasses } from '@/lib/access/delete-access-passes'
 import { AuditActionsComplete, AuditServiceComplete } from '@/lib/services/audit-service-complete'
 import { queueNotificationEmail } from '@/lib/notifications/queue-notification-email'
 import { getEmailBranding } from '@/lib/services/email/email-branding'
@@ -126,7 +128,7 @@ export async function GET(request: NextRequest) {
     orderBy: [{ validUntil: 'asc' }, { createdAt: 'desc' }],
     take: 500,
   })
-  return NextResponse.json({ passes })
+  return NextResponse.json({ passes, canDelete: permission.canDelete === true })
 }
 
 export async function POST(request: NextRequest) {
@@ -266,4 +268,58 @@ export async function POST(request: NextRequest) {
     },
     { status: 201 }
   )
+}
+
+const bulkDeleteSchema = z.object({
+  ids: z.array(z.string().uuid()).min(1).max(100),
+})
+
+export async function DELETE(request: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+  const denied = await assertCanDeleteAccess(session.user.id, session.user.role)
+  if (denied) return denied
+
+  const parsed = bulkDeleteSchema.safeParse(await request.json().catch(() => null))
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: 'Selecciona uno o más pases válidos para eliminar.' },
+      { status: 400 }
+    )
+  }
+
+  const { deleted, subjectsRemoved } = await hardDeleteAccessPasses(parsed.data.ids)
+  if (deleted.length === 0) {
+    return NextResponse.json({ error: 'No se encontraron pases para eliminar.' }, { status: 404 })
+  }
+
+  await Promise.all(
+    deleted.map(pass =>
+      AuditServiceComplete.log({
+        action: AuditActionsComplete.ACCESS_PASS_DELETED,
+        entityType: 'access_pass',
+        entityId: pass.id,
+        userId: session.user.id,
+        details: {
+          source: 'access_module',
+          credentialCode: pass.credentialCode,
+          familyId: pass.familyId,
+          status: pass.status,
+          subjectsRemoved,
+          deletedCount: deleted.length,
+        },
+        request,
+      })
+    )
+  )
+
+  return NextResponse.json({
+    success: true,
+    deleted: deleted.length,
+    subjectsRemoved,
+    message:
+      deleted.length === 1
+        ? 'Pase eliminado de forma permanente.'
+        : `${deleted.length} pases eliminados de forma permanente.`,
+  })
 }

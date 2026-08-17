@@ -70,6 +70,9 @@ interface DataTableProps<T> {
   actions?: ReactNode
   rowActions?: (item: T) => ReactNode
   onRowClick?: (item: T) => void
+  selectable?: boolean
+  selectedIds?: string[]
+  onSelectedIdsChange?: (ids: string[]) => void
 
   // Vista
   viewMode?: 'table' | 'cards'
@@ -107,6 +110,9 @@ export function DataTable<T extends { id: string }>({
   actions,
   rowActions,
   onRowClick,
+  selectable = false,
+  selectedIds,
+  onSelectedIdsChange,
   viewMode = 'table',
   onViewModeChange,
   cardRenderer,
@@ -223,6 +229,30 @@ export function DataTable<T extends { id: string }>({
   }
 
   const totalPages = pagination ? Math.ceil(pagination.total / pagination.limit) : 1
+
+  const selectedSet = useMemo(() => new Set(selectedIds || []), [selectedIds])
+  const pageIds = useMemo(() => paginatedData.map(item => item.id), [paginatedData])
+  const selectedOnPage = pageIds.filter(id => selectedSet.has(id))
+  const allPageSelected = pageIds.length > 0 && selectedOnPage.length === pageIds.length
+  const somePageSelected = selectedOnPage.length > 0 && !allPageSelected
+
+  const toggleAllOnPage = () => {
+    if (!onSelectedIdsChange) return
+    if (allPageSelected) {
+      onSelectedIdsChange((selectedIds || []).filter(id => !pageIds.includes(id)))
+      return
+    }
+    onSelectedIdsChange([...new Set([...(selectedIds || []), ...pageIds])])
+  }
+
+  const toggleRow = (id: string) => {
+    if (!onSelectedIdsChange) return
+    if (selectedSet.has(id)) {
+      onSelectedIdsChange((selectedIds || []).filter(itemId => itemId !== id))
+      return
+    }
+    onSelectedIdsChange([...(selectedIds || []), id])
+  }
 
   return (
     <Card>
@@ -397,6 +427,20 @@ export function DataTable<T extends { id: string }>({
             <Table>
               <TableHeader>
                 <TableRow>
+                  {selectable && (
+                    <TableHead className='w-10'>
+                      <input
+                        type='checkbox'
+                        className='h-4 w-4 accent-primary'
+                        checked={allPageSelected}
+                        ref={el => {
+                          if (el) el.indeterminate = somePageSelected
+                        }}
+                        onChange={toggleAllOnPage}
+                        aria-label='Seleccionar todos'
+                      />
+                    </TableHead>
+                  )}
                   {columns.map(col => (
                     <TableHead
                       key={String(col.key)}
@@ -419,7 +463,9 @@ export function DataTable<T extends { id: string }>({
                       </div>
                     </TableHead>
                   ))}
-                  {rowActions && <TableHead className='w-[70px] text-right'>Acciones</TableHead>}
+                  {rowActions && (
+                    <TableHead className='w-[1%] text-right whitespace-nowrap'>Acciones</TableHead>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -429,6 +475,17 @@ export function DataTable<T extends { id: string }>({
                     className={cn(onRowClick && 'cursor-pointer')}
                     onClick={() => onRowClick?.(item)}
                   >
+                    {selectable && (
+                      <TableCell onClick={e => e.stopPropagation()}>
+                        <input
+                          type='checkbox'
+                          className='h-4 w-4 accent-primary'
+                          checked={selectedSet.has(item.id)}
+                          onChange={() => toggleRow(item.id)}
+                          aria-label='Seleccionar fila'
+                        />
+                      </TableCell>
+                    )}
                     {columns.map(col => (
                       <TableCell key={String(col.key)}>
                         {col.render ? col.render(item) : String((item as any)[col.key] ?? '—')}

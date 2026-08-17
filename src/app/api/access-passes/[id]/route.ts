@@ -4,11 +4,13 @@ import { z } from 'zod'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import {
+  assertCanDeleteAccess,
   assertCanManageAccess,
   getAccessModulePermission,
   isAccessFamilyAllowed,
   generateAccessQrSecret,
 } from '@/lib/access/access-control'
+import { hardDeleteAccessPasses } from '@/lib/access/delete-access-passes'
 import { AuditActionsComplete, AuditServiceComplete } from '@/lib/services/audit-service-complete'
 
 const updateSchema = z
@@ -131,5 +133,42 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   return NextResponse.json({
     pass,
     qrPayload: reissued ? `ACCESS:${reissued.token}` : undefined,
+  })
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+  const denied = await assertCanDeleteAccess(session.user.id, session.user.role)
+  if (denied) return denied
+
+  const id = (await params).id
+  const { deleted, subjectsRemoved } = await hardDeleteAccessPasses([id])
+  if (deleted.length === 0) {
+    return NextResponse.json({ error: 'Pase no encontrado.' }, { status: 404 })
+  }
+  const pass = deleted[0]
+  await AuditServiceComplete.log({
+    action: AuditActionsComplete.ACCESS_PASS_DELETED,
+    entityType: 'access_pass',
+    entityId: pass.id,
+    userId: session.user.id,
+    details: {
+      source: 'access_module',
+      credentialCode: pass.credentialCode,
+      familyId: pass.familyId,
+      status: pass.status,
+      subjectRemoved: subjectsRemoved > 0,
+    },
+    request,
+  })
+  return NextResponse.json({
+    success: true,
+    deleted: 1,
+    subjectsRemoved,
+    message: 'Pase eliminado de forma permanente.',
   })
 }

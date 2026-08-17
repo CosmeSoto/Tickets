@@ -6,6 +6,8 @@ import { resolveModuleFamilyScopeIds } from '@/lib/auth/user-family-access'
 export type AccessModulePermission = {
   canScan: boolean
   canManage: boolean
+  /** Borrado permanente: solo Super Admin. */
+  canDelete: boolean
   /** undefined is global scope (Super Admin). */
   familyIds?: string[]
 }
@@ -24,23 +26,28 @@ export async function getAccessModulePermission(
       canManageAccess: true,
     },
   })
-  if (!user?.isActive) return { canScan: false, canManage: false, familyIds: [] }
-  // Super Admin y admin con gestión: alcance global (verificar cualquier área).
+  if (!user?.isActive) {
+    return { canScan: false, canManage: false, canDelete: false, familyIds: [] }
+  }
+  if (user.isSuperAdmin) {
+    return { canScan: true, canManage: true, canDelete: true }
+  }
+  // Admin con gestión: alcance global (verificar cualquier área), sin borrar.
   const isAdmin = (user.role || role) === 'ADMIN'
-  if (user.isSuperAdmin || (isAdmin && user.canManageAccess)) {
-    return { canScan: true, canManage: true }
+  if (isAdmin && user.canManageAccess) {
+    return { canScan: true, canManage: true, canDelete: false }
   }
 
   const canManage = user.canManageAccess
   const canScan = user.accessEnabled || canManage
-  if (!canScan) return { canScan: false, canManage: false, familyIds: [] }
+  if (!canScan) return { canScan: false, canManage: false, canDelete: false, familyIds: [] }
 
   const familyIds = await resolveModuleFamilyScopeIds(
     userId,
     'access',
     canManage ? 'canOperate' : 'canView'
   )
-  return { canScan, canManage, familyIds }
+  return { canScan, canManage, canDelete: false, familyIds }
 }
 
 export async function assertCanScanAccess(userId: string, role: string) {
@@ -56,6 +63,17 @@ export async function assertCanManageAccess(userId: string, role: string) {
   if (!permission.canManage) {
     return NextResponse.json(
       { error: 'No tienes permiso para gestionar pases de acceso.' },
+      { status: 403 }
+    )
+  }
+  return null
+}
+
+export async function assertCanDeleteAccess(userId: string, role: string) {
+  const permission = await getAccessModulePermission(userId, role)
+  if (!permission.canDelete) {
+    return NextResponse.json(
+      { error: 'Solo Super Admin puede eliminar pases de acceso.' },
       { status: 403 }
     )
   }

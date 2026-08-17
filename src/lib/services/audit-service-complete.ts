@@ -955,6 +955,7 @@ export const AuditActionsComplete = {
   ACCESS_PASS_REVOKED: 'access_pass_revoked',
   ACCESS_PASS_QR_REISSUED: 'access_pass_qr_reissued',
   ACCESS_PASS_SCANNED: 'access_pass_scanned',
+  ACCESS_PASS_DELETED: 'access_pass_deleted',
 
   // Credenciales (nunca registrar secretos en details)
   CREDENTIAL_CREATED: 'credential_created',
@@ -982,13 +983,6 @@ export const AuditActionsComplete = {
   // Super admin
   SUPER_ADMIN_GRANTED: 'super_admin_granted',
   SUPER_ADMIN_REVOKED: 'super_admin_revoked',
-
-  // Accesos (pases QR)
-  ACCESS_PASS_CREATED: 'access_pass_created',
-  ACCESS_PASS_UPDATED: 'access_pass_updated',
-  ACCESS_PASS_REVOKED: 'access_pass_revoked',
-  ACCESS_PASS_QR_REISSUED: 'access_pass_qr_reissued',
-  ACCESS_PASS_SCANNED: 'access_pass_scanned',
 } as const
 
 // Helpers para registrar acciones específicas con valores anteriores y nuevos

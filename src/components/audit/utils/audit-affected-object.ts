@@ -5,8 +5,7 @@
 
 import { translateEntityType } from '@/lib/services/audit-export-helpers'
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export function isUuidLike(value: unknown): boolean {
   return typeof value === 'string' && UUID_RE.test(value.trim())
@@ -34,6 +33,7 @@ export function getAffectedObjectLabel(row: AuditAffectedSource): string {
   if (d.familyName) return `Área: ${d.familyName}`
   if (d.equipmentName || d.assetName) return `Activo: ${d.equipmentName || d.assetName}`
   if (d.credentialName) return `Credencial: ${d.credentialName}`
+  if (d.credentialCode) return `Pase de acceso ${d.credentialCode}`
   if (d.entityName && !isUuidLike(d.entityName)) return String(d.entityName)
 
   if (typeof d.descripcion === 'string' && d.descripcion.trim()) {
@@ -81,6 +81,10 @@ export function getAffectedObjectFieldLabel(entityType?: string | null): string 
       return 'Categoría'
     case 'department':
       return 'Departamento'
+    case 'access_pass':
+    case 'access_scan':
+    case 'access_subject':
+      return 'Pase de acceso'
     case 'system':
       return 'Qué se registró'
     default:

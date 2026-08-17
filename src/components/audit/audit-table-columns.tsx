@@ -342,6 +342,22 @@ export function getAuditColumns(onViewDetails: (log: AuditLog) => void) {
         } else if (action.includes('logout')) {
           icon = '🚪'
           mainDescription = 'Cerró sesión'
+        } else if (action.startsWith('access_pass_')) {
+          icon = '🪪'
+          const code = details?.credentialCode ? ` ${details.credentialCode}` : ''
+          if (action === 'access_pass_deleted') {
+            mainDescription = `Eliminó el pase de acceso${code}`
+          } else if (action === 'access_pass_created') {
+            mainDescription = `Emitió el pase de acceso${code}`
+          } else if (action === 'access_pass_revoked') {
+            mainDescription = `Revocó el pase de acceso${code}`
+          } else if (action === 'access_pass_scanned') {
+            mainDescription = `Verificó el pase de acceso${code}`
+          } else if (action === 'access_pass_qr_reissued') {
+            mainDescription = `Reemitió el QR del pase${code}`
+          } else {
+            mainDescription = `Actualizó el pase de acceso${code}`
+          }
         } else {
           // Fallback genérico
           const actionTranslated = translateAction(action)

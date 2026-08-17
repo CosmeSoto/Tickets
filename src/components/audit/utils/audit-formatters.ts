@@ -78,6 +78,10 @@ export function translateEntityType(entityType: string): string {
     credential_entry: '🔐 Credencial',
     credential_vault: '🔐 Bóveda de credenciales',
     credential_share: '🔐 Compartido de credencial',
+    process: '📋 Proceso',
+    access_pass: '🪪 Pase de acceso',
+    access_scan: '🪪 Escaneo de acceso',
+    access_subject: '🪪 Persona de acceso',
   }
   return entityMap[entityType.toLowerCase()] || entityType
 }
@@ -196,6 +200,13 @@ export function getActionLabel(action: string): string {
     credential_shared: 'Credencial Compartida',
     credential_share_revoked: 'Compartido de Credencial Revocado',
     credential_vault_created: 'Bóveda de Credenciales Creada',
+    // Accesos
+    access_pass_created: 'Pase de Acceso Creado',
+    access_pass_updated: 'Pase de Acceso Actualizado',
+    access_pass_revoked: 'Pase de Acceso Revocado',
+    access_pass_qr_reissued: 'QR de Acceso Reemitido',
+    access_pass_scanned: 'Pase de Acceso Escaneado',
+    access_pass_deleted: 'Pase de Acceso Eliminado',
     // Configuración
     settings_updated: 'Config. Sistema Actualizada',
     settings_viewed: 'Configuración Visualizada',
@@ -279,6 +290,12 @@ export function getActionLabel(action: string): string {
     CREDENTIAL_SHARED: 'Credencial Compartida',
     CREDENTIAL_SHARE_REVOKED: 'Compartido de Credencial Revocado',
     CREDENTIAL_VAULT_CREATED: 'Bóveda de Credenciales Creada',
+    ACCESS_PASS_CREATED: 'Pase de Acceso Creado',
+    ACCESS_PASS_UPDATED: 'Pase de Acceso Actualizado',
+    ACCESS_PASS_REVOKED: 'Pase de Acceso Revocado',
+    ACCESS_PASS_QR_REISSUED: 'QR de Acceso Reemitido',
+    ACCESS_PASS_SCANNED: 'Pase de Acceso Escaneado',
+    ACCESS_PASS_DELETED: 'Pase de Acceso Eliminado',
     // Inventario — tipos
     TYPE_CLONED: 'Tipo Copiado a Otra Área',
     contract_service_type_created: 'Tipo de Servicio (Contrato) Creado',
@@ -328,6 +345,10 @@ export function getEntityLabel(entityType: string): string {
     credential_entry: 'Credenciales',
     credential_vault: 'Credenciales',
     credential_share: 'Credenciales',
+    process: 'Procesos',
+    access_pass: 'Accesos',
+    access_scan: 'Accesos',
+    access_subject: 'Accesos',
     SUPPLIER: 'Proveedores',
     supplier: 'Proveedores',
   }
@@ -370,6 +391,14 @@ export function getFieldDisplayName(fieldName: string): string {
     rentalClientResponse: 'Respuesta del cliente (renta)',
     rentalEndDate: 'Fin de renta',
     rentalMonthlyCost: 'Costo mensual de renta',
+    credentialCode: 'Código de credencial',
+    familyId: 'Área',
+    subjectRemoved: 'Persona eliminada',
+    subjectsRemoved: 'Personas eliminadas',
+    qrReissued: 'QR reemitido',
+    restoredFromRevoked: 'Restaurado desde revocado',
+    revocationReason: 'Motivo de revocación',
+    deletedCount: 'Pases eliminados',
     // Proveedores
     legalName: 'Razón social',
     taxId: 'RUC / NIT',
@@ -458,7 +487,7 @@ export function formatValue(key: string, value: any): string {
   }
 
   // Formatear estados
-  if (key === 'status' && typeof value === 'string') {
+  if ((key === 'status' || key === 'result') && typeof value === 'string') {
     const statuses: Record<string, string> = {
       OPEN: 'Abierto',
       IN_PROGRESS: 'En Progreso',
@@ -468,6 +497,14 @@ export function formatValue(key: string, value: any): string {
       COMPLETED: 'Completado',
       MISSED: 'Omitido',
       INCOMPLETE: 'Incompleto',
+      PENDING_PRIVACY: 'Pendiente de privacidad',
+      ACTIVE: 'Activo',
+      SUSPENDED: 'Suspendido',
+      REVOKED: 'Revocado',
+      VALID: 'Válido',
+      EXPIRED: 'Vencido',
+      OUT_OF_SCOPE: 'Fuera de alcance',
+      NOT_FOUND: 'No encontrado',
     }
     return statuses[value] || value
   }
@@ -481,6 +518,13 @@ export function formatValue(key: string, value: any): string {
       CUSTOM: 'Personalizada',
     }
     return recurrences[value] || value
+  }
+
+  if (key === 'source' && typeof value === 'string') {
+    const sources: Record<string, string> = {
+      access_module: 'Módulo de accesos',
+    }
+    return sources[value] || value
   }
 
   // Formatear tamaños de archivo

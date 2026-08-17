@@ -193,6 +193,21 @@ export function buildActionDescription(log: any, changes: any, details: any): st
     } else {
       description = `${userName} modificó un departamento`
     }
+  } else if (log.entityType === 'access_pass' || log.entityType === 'access_scan') {
+    const code = details?.credentialCode ? ` ${details.credentialCode}` : ''
+    if (action.includes('deleted')) {
+      description = `${userName} eliminó el pase de acceso${code}`
+    } else if (action.includes('created')) {
+      description = `${userName} emitió el pase de acceso${code}`
+    } else if (action.includes('revoked')) {
+      description = `${userName} revocó el pase de acceso${code}`
+    } else if (action.includes('scanned')) {
+      description = `${userName} verificó el pase de acceso${code}`
+    } else if (action.includes('qr_reissued')) {
+      description = `${userName} reemitió el QR del pase${code}`
+    } else {
+      description = `${userName} actualizó el pase de acceso${code}`
+    }
   } else {
     const actionTranslated = translateAction(log.action)
     const entityTranslated = translateEntityType(log.entityType)
@@ -319,6 +334,12 @@ export function translateAction(action: string): string {
     cancelled: 'Cancelado',
     suspended: 'Suspendido',
     reactivated: 'Reactivado',
+    access_pass_created: 'Pase de acceso creado',
+    access_pass_updated: 'Pase de acceso actualizado',
+    access_pass_revoked: 'Pase de acceso revocado',
+    access_pass_qr_reissued: 'QR de acceso reemitido',
+    access_pass_scanned: 'Pase de acceso escaneado',
+    access_pass_deleted: 'Pase de acceso eliminado',
   }
 
   if (actionMap[action]) return actionMap[action]
@@ -370,6 +391,10 @@ export function translateEntityType(entityType: string): string {
     queue: 'Cola',
     job: 'Tarea',
     schedule: 'Programación',
+    access_pass: 'Pase de acceso',
+    access_scan: 'Escaneo de acceso',
+    access_subject: 'Persona de acceso',
+    process: 'Proceso',
   }
   return entityMap[entityType.toLowerCase()] || entityType
 }

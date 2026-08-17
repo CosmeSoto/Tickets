@@ -2,7 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BrowserMultiFormatReader } from '@zxing/library'
-import { Camera, CheckCircle2, ClipboardPaste, Plus, ScanLine, XCircle } from 'lucide-react'
+import { Camera, CheckCircle2, ClipboardPaste, Plus, ScanLine, Trash2, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -19,6 +19,16 @@ import { useUploadLimits } from '@/hooks/use-upload-limits'
 import type { ExportColumn } from '@/lib/utils/export'
 import { InlineCreateSelect, type InlineSelectOption } from '@/components/ui/inline-create-select'
 import { CatalogTypeInlineForm } from '@/components/inventory/asset-forms/CatalogTypeInlineForm'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 type ScanResponse = {
   result: string
@@ -62,9 +72,9 @@ function effectivePassLabel(pass: AccessPass): {
   variant: 'default' | 'secondary' | 'destructive' | 'outline'
 } {
   if (pass.status === 'PENDING_PRIVACY')
-    return { label: 'PENDIENTE PRIVACIDAD', variant: 'outline' }
-  if (pass.status === 'REVOKED') return { label: 'REVOKED', variant: 'destructive' }
-  if (pass.status === 'SUSPENDED') return { label: 'SUSPENDED', variant: 'outline' }
+    return { label: 'PENDIENTE DE PRIVACIDAD', variant: 'outline' }
+  if (pass.status === 'REVOKED') return { label: 'REVOCADO', variant: 'destructive' }
+  if (pass.status === 'SUSPENDED') return { label: 'SUSPENDIDO', variant: 'outline' }
   if (!pass.subject.isActive) return { label: 'INACTIVO', variant: 'secondary' }
   const now = Date.now()
   const until = new Date(pass.validUntil).getTime()
@@ -103,7 +113,10 @@ export function AccessConsole() {
   const [scanning, setScanning] = useState(false)
   const [cameraOpen, setCameraOpen] = useState(false)
   const [canManage, setCanManage] = useState(false)
+  const [canDelete, setCanDelete] = useState(false)
   const [passes, setPasses] = useState<AccessPass[]>([])
+  const [selectedPassIds, setSelectedPassIds] = useState<string[]>([])
+  const [deletePassIds, setDeletePassIds] = useState<string[] | null>(null)
   const [families, setFamilies] = useState<Family[]>([])
   const [organizations, setOrganizations] = useState<InlineSelectOption[]>([])
   const [form, setForm] = useState(buildInitialForm)
@@ -138,11 +151,15 @@ export function AccessConsole() {
       const response = await fetch(query ? `/api/access-passes?${query}` : '/api/access-passes')
       if (!response.ok) {
         setCanManage(false)
+        setCanDelete(false)
         return
       }
       const data = await response.json()
       setCanManage(true)
-      setPasses(data.passes || [])
+      setCanDelete(data.canDelete === true)
+      const nextPasses: AccessPass[] = data.passes || []
+      setPasses(nextPasses)
+      setSelectedPassIds(ids => ids.filter(id => nextPasses.some(pass => pass.id === id)))
     },
     [tableFilters]
   )
@@ -352,6 +369,38 @@ export function AccessConsole() {
     }
   }
 
+  const confirmDeletePasses = async () => {
+    if (!deletePassIds?.length || !canDelete) return
+    const ids = deletePassIds
+    setBusyPassId(ids.length === 1 ? ids[0] : 'bulk')
+    try {
+      const response =
+        ids.length === 1
+          ? await fetch(`/api/access-passes/${ids[0]}`, { method: 'DELETE' })
+          : await fetch('/api/access-passes', {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ids }),
+            })
+      const data = await response.json().catch(() => ({}))
+      setResult({
+        result: response.ok ? 'DELETED' : 'DELETE_ERROR',
+        valid: response.ok,
+        message:
+          data.message ||
+          data.error ||
+          (response.ok ? 'Pase eliminado.' : 'No se pudo eliminar el pase.'),
+      })
+      if (response.ok) {
+        setSelectedPassIds([])
+        setDeletePassIds(null)
+        await loadPasses()
+      }
+    } finally {
+      setBusyPassId(null)
+    }
+  }
+
   const photoUrl = result?.pass?.photoUrl || null
   const allPassColumns = useMemo<Column<AccessPass>[]>(
     () => [
@@ -552,6 +601,9 @@ export function AccessConsole() {
             ]}
             onFiltersChange={setTableFilters}
             onRefresh={() => void loadPasses()}
+            selectable={canDelete}
+            selectedIds={selectedPassIds}
+            onSelectedIdsChange={setSelectedPassIds}
             onExport={
               <ExportButton
                 onExportCSV={exportCSV}
@@ -561,18 +613,31 @@ export function AccessConsole() {
               />
             }
             actions={
-              <TableColumnsMenu
-                columns={allPassColumns.map(column => ({
-                  key: String(column.key),
-                  label: column.label,
-                  required: column.key === 'subject',
-                }))}
-                order={columnOrder}
-                visible={visibleColumns}
-                onOrderChange={setColumnOrder}
-                onVisibleChange={setVisibleColumns}
-                storageKey='table-columns:access-passes'
-              />
+              <>
+                {canDelete && selectedPassIds.length > 0 && (
+                  <Button
+                    size='sm'
+                    variant='destructive'
+                    disabled={busyPassId !== null}
+                    onClick={() => setDeletePassIds(selectedPassIds)}
+                  >
+                    <Trash2 className='mr-2 h-4 w-4' />
+                    Eliminar ({selectedPassIds.length})
+                  </Button>
+                )}
+                <TableColumnsMenu
+                  columns={allPassColumns.map(column => ({
+                    key: String(column.key),
+                    label: column.label,
+                    required: column.key === 'subject',
+                  }))}
+                  order={columnOrder}
+                  visible={visibleColumns}
+                  onOrderChange={setColumnOrder}
+                  onVisibleChange={setVisibleColumns}
+                  storageKey='table-columns:access-passes'
+                />
+              </>
             }
             rowActions={pass => (
               <div className='flex justify-end gap-1'>
@@ -639,6 +704,18 @@ export function AccessConsole() {
                     }}
                   >
                     Revocar
+                  </Button>
+                )}
+                {canDelete && (
+                  <Button
+                    size='sm'
+                    variant='destructive'
+                    disabled={busyPassId === pass.id}
+                    title='Eliminar permanentemente'
+                    onClick={() => setDeletePassIds([pass.id])}
+                  >
+                    <Trash2 className='h-4 w-4' />
+                    <span className='sr-only'>Eliminar</span>
                   </Button>
                 )}
               </div>
@@ -809,6 +886,52 @@ export function AccessConsole() {
           </form>
         </aside>
       )}
+
+      <AlertDialog
+        open={Boolean(deletePassIds?.length)}
+        onOpenChange={open => {
+          if (!open && busyPassId === null) setDeletePassIds(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {deletePassIds?.length === 1
+                ? '¿Eliminar este pase de forma permanente?'
+                : `¿Eliminar ${deletePassIds?.length || 0} pases de forma permanente?`}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Se borra el pase, el QR deja de servir y, si la
+              persona no tiene otros pases, también se elimina su registro. Los eventos de escaneo
+              se conservan sin el código.
+              {deletePassIds && deletePassIds.length > 0 && (
+                <span className='mt-2 block font-medium text-foreground'>
+                  {passes
+                    .filter(pass => deletePassIds.includes(pass.id))
+                    .map(
+                      pass =>
+                        `${pass.subject.firstName} ${pass.subject.lastName} (${pass.credentialCode})`
+                    )
+                    .join(', ')}
+                </span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busyPassId !== null}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className='bg-destructive text-destructive-foreground hover:bg-destructive/90'
+              disabled={busyPassId !== null}
+              onClick={event => {
+                event.preventDefault()
+                void confirmDeletePasses()
+              }}
+            >
+              {busyPassId !== null ? 'Eliminando...' : 'Eliminar definitivamente'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

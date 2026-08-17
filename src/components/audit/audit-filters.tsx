@@ -141,6 +141,7 @@ export function AuditFiltersComponent({
                 <SelectItem value='system'>Sistema</SelectItem>
                 <SelectItem value='backup'>Backups</SelectItem>
                 <SelectItem value='credential_entry'>Credenciales</SelectItem>
+                <SelectItem value='access_pass'>Accesos</SelectItem>
               </SelectContent>
             </Select>
           </div>
