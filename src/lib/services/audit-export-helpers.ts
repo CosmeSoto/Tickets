@@ -203,6 +203,9 @@ export function buildActionDescription(log: any, changes: any, details: any): st
       description = `${userName} revocó el pase de acceso${code}`
     } else if (action.includes('scanned')) {
       description = `${userName} verificó el pase de acceso${code}`
+      if (details?.result === 'PENDING_PRIVACY') {
+        description = `${userName} verificó un pase pendiente de aceptación de privacidad${code}`
+      }
     } else if (action.includes('qr_reissued')) {
       description = `${userName} reemitió el QR del pase${code}`
     } else {

@@ -15,6 +15,7 @@ import {
   accessTypeLabel,
   buildAccessPrivacyInvitationEmail,
 } from '@/lib/services/email/templates/access-pass-issued'
+import { formatAccessDateTime } from '@/lib/access/access-dates'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions)
@@ -73,8 +74,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     recipientName,
     familyName: pass.family.name,
     credentialCode: pass.credentialCode,
-    validFromLabel: pass.validFrom.toLocaleString('es-CO'),
-    validUntilLabel: pass.validUntil.toLocaleString('es-CO'),
+    validFromLabel: formatAccessDateTime(pass.validFrom),
+    validUntilLabel: formatAccessDateTime(pass.validUntil),
     organizationName: pass.subject.organization,
     accessTypeLabel: accessTypeLabel(pass.subject.accessType),
     privacyUrl: branding.privacyUrl,

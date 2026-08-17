@@ -32,11 +32,6 @@ export async function getAccessModulePermission(
   if (user.isSuperAdmin) {
     return { canScan: true, canManage: true, canDelete: true }
   }
-  // Admin con gestión: alcance global (verificar cualquier área), sin borrar.
-  const isAdmin = (user.role || role) === 'ADMIN'
-  if (isAdmin && user.canManageAccess) {
-    return { canScan: true, canManage: true, canDelete: false }
-  }
 
   const canManage = user.canManageAccess
   const canScan = user.accessEnabled || canManage
@@ -101,6 +96,10 @@ export function normalizeAccessQrPayload(value: string): string | null {
   const trimmed = value.trim()
   if (!trimmed) return null
   if (trimmed.startsWith('ACCESS:')) return trimmed.slice('ACCESS:'.length)
+
+  const accMatch = trimmed.match(/ACC-\d{4}-[A-Z0-9]{8}/i)
+  if (accMatch) return accMatch[0]
+
   return trimmed
 }
 
@@ -109,11 +108,12 @@ export function resolveAccessPassState(pass: {
   validFrom: Date
   validUntil: Date
   subject: { isActive: boolean }
-}): 'VALID' | 'EXPIRED' | 'REVOKED' | 'SUSPENDED' | 'INACTIVE_SUBJECT' {
+}): 'VALID' | 'EXPIRED' | 'REVOKED' | 'SUSPENDED' | 'PENDING_PRIVACY' | 'INACTIVE_SUBJECT' {
   const now = new Date()
   if (!pass.subject.isActive) return 'INACTIVE_SUBJECT'
   if (pass.status === 'REVOKED') return 'REVOKED'
-  if (pass.status === 'SUSPENDED' || pass.status === 'PENDING_PRIVACY') return 'SUSPENDED'
+  if (pass.status === 'PENDING_PRIVACY') return 'PENDING_PRIVACY'
+  if (pass.status === 'SUSPENDED') return 'SUSPENDED'
   // Inválido desde el instante de vencimiento (validUntil inclusive como límite).
   if (pass.validFrom > now || pass.validUntil <= now) return 'EXPIRED'
   return 'VALID'
@@ -129,7 +129,8 @@ export const ACCESS_SCAN_MESSAGES: Record<string, string> = {
   VALID: 'Acceso autorizado',
   EXPIRED: 'Credencial vencida o aún no vigente',
   REVOKED: 'Credencial revocada',
-  SUSPENDED: 'Credencial suspendida o pendiente de aviso de privacidad',
+  SUSPENDED: 'Credencial suspendida',
+  PENDING_PRIVACY: 'Credencial pendiente: la persona aún no ha aceptado el aviso de privacidad.',
   INACTIVE_SUBJECT: 'La persona de esta credencial está inactiva',
   NOT_FOUND: 'Credencial no reconocida. Usa el QR o el código ACC-… de la tabla.',
   OUT_OF_SCOPE: 'No tienes autorización para verificar esta área.',

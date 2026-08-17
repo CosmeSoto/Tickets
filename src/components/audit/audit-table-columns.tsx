@@ -352,7 +352,12 @@ export function getAuditColumns(onViewDetails: (log: AuditLog) => void) {
           } else if (action === 'access_pass_revoked') {
             mainDescription = `Revocó el pase de acceso${code}`
           } else if (action === 'access_pass_scanned') {
-            mainDescription = `Verificó el pase de acceso${code}`
+            const scanResult = details?.result
+            if (scanResult === 'PENDING_PRIVACY') {
+              mainDescription = `Verificó pase pendiente de privacidad${code}`
+            } else {
+              mainDescription = `Verificó el pase de acceso${code}`
+            }
           } else if (action === 'access_pass_qr_reissued') {
             mainDescription = `Reemitió el QR del pase${code}`
           } else {

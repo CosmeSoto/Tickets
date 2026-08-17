@@ -16,6 +16,7 @@ import {
   accessTypeLabel,
   buildAccessPassIssuedEmail,
 } from '@/lib/services/email/templates/access-pass-issued'
+import { formatAccessDateTime } from '@/lib/access/access-dates'
 
 /** Reemite un QR nuevo por correo; el QR anterior queda inmediatamente inválido. */
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -63,8 +64,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     recipientName: `${pass.subject.firstName} ${pass.subject.lastName}`,
     familyName: pass.family.name,
     credentialCode: pass.credentialCode,
-    validFromLabel: pass.validFrom.toLocaleString('es-CO'),
-    validUntilLabel: pass.validUntil.toLocaleString('es-CO'),
+    validFromLabel: formatAccessDateTime(pass.validFrom),
+    validUntilLabel: formatAccessDateTime(pass.validUntil),
     organizationName: pass.subject.organization,
     accessTypeLabel: accessTypeLabel(pass.subject.accessType),
     qrDataUrl: qrCode,

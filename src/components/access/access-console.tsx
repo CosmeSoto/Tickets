@@ -2,7 +2,17 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BrowserMultiFormatReader } from '@zxing/library'
-import { Camera, CheckCircle2, ClipboardPaste, Plus, ScanLine, Trash2, XCircle } from 'lucide-react'
+import {
+  Camera,
+  CheckCircle2,
+  ClipboardPaste,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  ScanLine,
+  Trash2,
+  XCircle,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -29,6 +39,23 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { Checkbox } from '@/components/ui/checkbox'
+import { formatAccessDateTime } from '@/lib/access/access-dates'
 
 type ScanResponse = {
   result: string
@@ -71,15 +98,15 @@ function effectivePassLabel(pass: AccessPass): {
   label: string
   variant: 'default' | 'secondary' | 'destructive' | 'outline'
 } {
-  if (pass.status === 'PENDING_PRIVACY')
-    return { label: 'PENDIENTE DE PRIVACIDAD', variant: 'outline' }
   if (pass.status === 'REVOKED') return { label: 'REVOCADO', variant: 'destructive' }
-  if (pass.status === 'SUSPENDED') return { label: 'SUSPENDIDO', variant: 'outline' }
-  if (!pass.subject.isActive) return { label: 'INACTIVO', variant: 'secondary' }
   const now = Date.now()
   const until = new Date(pass.validUntil).getTime()
   const from = new Date(pass.validFrom).getTime()
   if (from > now || until <= now) return { label: 'EXPIRADO', variant: 'secondary' }
+  if (pass.status === 'PENDING_PRIVACY')
+    return { label: 'PENDIENTE DE PRIVACIDAD', variant: 'outline' }
+  if (pass.status === 'SUSPENDED') return { label: 'SUSPENDIDO', variant: 'outline' }
+  if (!pass.subject.isActive) return { label: 'INACTIVO', variant: 'secondary' }
   const hoursLeft = (until - now) / (1000 * 60 * 60)
   if (hoursLeft <= 24) return { label: 'POR VENCER', variant: 'outline' }
   return { label: 'VIGENTE', variant: 'default' }
@@ -117,11 +144,17 @@ export function AccessConsole() {
   const [passes, setPasses] = useState<AccessPass[]>([])
   const [selectedPassIds, setSelectedPassIds] = useState<string[]>([])
   const [deletePassIds, setDeletePassIds] = useState<string[] | null>(null)
+  const [editingPass, setEditingPass] = useState<AccessPass | null>(null)
+  const [editValidFrom, setEditValidFrom] = useState('')
+  const [editValidUntil, setEditValidUntil] = useState('')
   const [families, setFamilies] = useState<Family[]>([])
   const [organizations, setOrganizations] = useState<InlineSelectOption[]>([])
   const [form, setForm] = useState(buildInitialForm)
   const [pendingPhotos, setPendingPhotos] = useState<PendingFile[]>([])
   const [tableFilters, setTableFilters] = useState<Record<string, string>>({})
+  const [tablePage, setTablePage] = useState(1)
+  const [tableLimit, setTableLimit] = useState(10)
+  const [viewMode, setViewMode] = useState<'table' | 'cards'>('cards')
   const [submitting, setSubmitting] = useState(false)
   const [busyPassId, setBusyPassId] = useState<string | null>(null)
   const [columnOrder, setColumnOrder] = useState([
@@ -182,6 +215,19 @@ export function AccessConsole() {
   useEffect(() => {
     void loadPasses()
   }, [loadPasses])
+
+  useEffect(() => {
+    const maxPage = Math.max(1, Math.ceil(passes.length / tableLimit))
+    if (tablePage > maxPage) setTablePage(maxPage)
+  }, [passes.length, tableLimit, tablePage])
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)')
+    const syncView = () => setViewMode(mq.matches ? 'cards' : 'table')
+    syncView()
+    mq.addEventListener('change', syncView)
+    return () => mq.removeEventListener('change', syncView)
+  }, [])
 
   useEffect(() => {
     if (!canManage) return
@@ -401,6 +447,211 @@ export function AccessConsole() {
     }
   }
 
+  const openEditPass = (pass: AccessPass) => {
+    setEditingPass(pass)
+    setEditValidFrom(toLocalDateTimeInputValue(pass.validFrom))
+    setEditValidUntil(toLocalDateTimeInputValue(pass.validUntil))
+  }
+
+  const saveEditPass = async () => {
+    if (!editingPass) return
+    const validFrom = parseScheduledDateTime(editValidFrom)
+    const validUntil = parseScheduledDateTime(editValidUntil)
+    if (Number.isNaN(validFrom.getTime()) || Number.isNaN(validUntil.getTime())) {
+      setResult({
+        result: 'UPDATE_ERROR',
+        valid: false,
+        message: 'Indica fechas de vigencia válidas.',
+      })
+      return
+    }
+    if (validUntil <= validFrom) {
+      setResult({
+        result: 'UPDATE_ERROR',
+        valid: false,
+        message: 'La vigencia final debe ser posterior al inicio.',
+      })
+      return
+    }
+    await updatePass(
+      editingPass.id,
+      {
+        validFrom: validFrom.toISOString(),
+        validUntil: validUntil.toISOString(),
+      },
+      'Vigencia del pase actualizada.'
+    )
+    setEditingPass(null)
+  }
+
+  const handleTableFiltersChange = useCallback((filters: Record<string, string>) => {
+    setTableFilters(filters)
+    setTablePage(1)
+  }, [])
+
+  const togglePassSelection = useCallback((passId: string, checked: boolean) => {
+    setSelectedPassIds(ids =>
+      checked ? [...new Set([...ids, passId])] : ids.filter(id => id !== passId)
+    )
+  }, [])
+
+  const renderPassActions = useCallback(
+    (pass: AccessPass) => (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            size='sm'
+            variant='outline'
+            disabled={busyPassId === pass.id}
+            onClick={e => e.stopPropagation()}
+          >
+            <MoreHorizontal className='h-4 w-4' />
+            <span className='sr-only'>Acciones</span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align='end' className='w-52'>
+          {pass.status !== 'REVOKED' && (
+            <DropdownMenuItem
+              onClick={e => {
+                e.stopPropagation()
+                openEditPass(pass)
+              }}
+            >
+              <Pencil className='mr-2 h-4 w-4' />
+              Editar vigencia
+            </DropdownMenuItem>
+          )}
+          {pass.status === 'PENDING_PRIVACY' && (
+            <DropdownMenuItem
+              onClick={e => {
+                e.stopPropagation()
+                void resendPrivacyInvitation(pass.id)
+              }}
+            >
+              Reenviar invitación
+            </DropdownMenuItem>
+          )}
+          {pass.status === 'ACTIVE' && (
+            <>
+              <DropdownMenuItem
+                onClick={e => {
+                  e.stopPropagation()
+                  void updatePass(pass.id, { status: 'SUSPENDED' }, 'Pase suspendido.')
+                }}
+              >
+                Suspender
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={e => {
+                  e.stopPropagation()
+                  void resendCredentialEmail(pass.id)
+                }}
+              >
+                Reenviar QR
+              </DropdownMenuItem>
+            </>
+          )}
+          {pass.status === 'SUSPENDED' && (
+            <DropdownMenuItem
+              onClick={e => {
+                e.stopPropagation()
+                void updatePass(pass.id, { status: 'ACTIVE' }, 'Pase reactivado.')
+              }}
+            >
+              Reactivar
+            </DropdownMenuItem>
+          )}
+          {pass.status !== 'REVOKED' && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className='text-destructive focus:text-destructive'
+                onClick={e => {
+                  e.stopPropagation()
+                  const reason = window.prompt(
+                    'Motivo de revocación (obligatorio):',
+                    'Acceso retirado por el área'
+                  )
+                  if (reason?.trim() && reason.trim().length >= 3)
+                    void updatePass(
+                      pass.id,
+                      { status: 'REVOKED', revokedReason: reason.trim() },
+                      'Pase revocado.'
+                    )
+                }}
+              >
+                Revocar
+              </DropdownMenuItem>
+            </>
+          )}
+          {canDelete && (
+            <DropdownMenuItem
+              className='text-destructive focus:text-destructive'
+              onClick={e => {
+                e.stopPropagation()
+                setDeletePassIds([pass.id])
+              }}
+            >
+              <Trash2 className='mr-2 h-4 w-4' />
+              Eliminar
+            </DropdownMenuItem>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    ),
+    [busyPassId, canDelete, resendCredentialEmail, resendPrivacyInvitation, updatePass]
+  )
+
+  const renderPassCard = useCallback(
+    (pass: AccessPass) => {
+      const badge = effectivePassLabel(pass)
+      return (
+        <div className='rounded-lg border bg-card p-4 space-y-3'>
+          <div className='flex items-start gap-3'>
+            {canDelete && (
+              <Checkbox
+                checked={selectedPassIds.includes(pass.id)}
+                onCheckedChange={checked => togglePassSelection(pass.id, checked === true)}
+                aria-label='Seleccionar pase'
+              />
+            )}
+            <div className='min-w-0 flex-1 space-y-2'>
+              <div className='flex items-start justify-between gap-2'>
+                <div className='min-w-0'>
+                  <p className='font-medium truncate'>
+                    {pass.subject.firstName} {pass.subject.lastName}
+                  </p>
+                  <p className='text-xs text-muted-foreground truncate'>
+                    {pass.subject.organization || 'Sin arrendatario'}
+                  </p>
+                </div>
+                <Badge variant={badge.variant} className='shrink-0'>
+                  {badge.label}
+                </Badge>
+              </div>
+              <div className='text-sm space-y-1 break-words'>
+                <p>
+                  <span className='text-muted-foreground'>Área: </span>
+                  {pass.family.name}
+                </p>
+                <p>
+                  <span className='text-muted-foreground'>Credencial: </span>
+                  {pass.credentialCode}
+                </p>
+                <p>
+                  <span className='text-muted-foreground'>Vigente hasta: </span>
+                  {formatAccessDateTime(pass.validUntil)}
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className='flex justify-end'>{renderPassActions(pass)}</div>
+        </div>
+      )
+    },
+    [canDelete, renderPassActions, selectedPassIds, togglePassSelection]
+  )
+
   const photoUrl = result?.pass?.photoUrl || null
   const allPassColumns = useMemo<Column<AccessPass>[]>(
     () => [
@@ -434,7 +685,7 @@ export function AccessConsole() {
         key: 'validUntil',
         label: 'Vigente hasta',
         sortable: true,
-        render: pass => new Date(pass.validUntil).toLocaleDateString('es-CO'),
+        render: pass => formatAccessDateTime(pass.validUntil),
       },
     ],
     []
@@ -450,7 +701,7 @@ export function AccessConsole() {
       status: { label: 'Estado', accessor: pass => effectivePassLabel(pass).label },
       validUntil: {
         label: 'Vigente hasta',
-        accessor: pass => new Date(pass.validUntil).toLocaleString('es-CO'),
+        accessor: pass => formatAccessDateTime(pass.validUntil),
       },
     }),
     []
@@ -480,20 +731,20 @@ export function AccessConsole() {
   })
 
   return (
-    <div className='grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]'>
-      <section className='space-y-4'>
+    <div className='grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_380px]'>
+      <section className='min-w-0 space-y-4'>
         <div className='rounded-xl border bg-card p-4'>
-          <div className='flex items-start justify-between gap-4'>
-            <div>
+          <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
+            <div className='min-w-0'>
               <h2 className='font-semibold flex items-center gap-2'>
-                <ScanLine className='h-5 w-5 text-primary' /> Verificar acceso
+                <ScanLine className='h-5 w-5 text-primary shrink-0' /> Verificar acceso
               </h2>
               <p className='text-sm text-muted-foreground mt-1'>
                 El resultado se consulta en línea y deja trazabilidad del escaneo. Puedes escanear
                 el QR o escribir el código de credencial (ACC-…).
               </p>
             </div>
-            <Button onClick={startCamera} disabled={scanning}>
+            <Button className='w-full sm:w-auto shrink-0' onClick={startCamera} disabled={scanning}>
               <Camera className='mr-2 h-4 w-4' />
               Escanear
             </Button>
@@ -507,19 +758,26 @@ export function AccessConsole() {
             />
           )}
           <form
-            className='mt-4 flex gap-2'
+            className='mt-4 flex flex-col gap-2 sm:flex-row'
             onSubmit={event => {
               event.preventDefault()
               void verify(payload)
             }}
           >
             <Input
+              className='min-w-0'
               value={payload}
               onChange={e => setPayload(e.target.value)}
-              placeholder='QR, ACCESS:… o código ACC-2026-XXXXXXXX'
+              placeholder='QR, ACCESS:… o ACC-2026-XXXXXXXX'
             />
-            <Button type='submit' variant='outline' disabled={scanning}>
-              <ClipboardPaste className='h-4 w-4' />
+            <Button
+              type='submit'
+              variant='outline'
+              disabled={scanning}
+              className='shrink-0 sm:w-auto w-full'
+            >
+              <ClipboardPaste className='h-4 w-4 sm:mr-0 mr-2' />
+              <span className='sm:hidden'>Verificar</span>
             </Button>
           </form>
         </div>
@@ -563,7 +821,7 @@ export function AccessConsole() {
                         {result.pass.family.name}
                       </p>
                       <p className='text-muted-foreground'>
-                        Vigente hasta {new Date(result.pass.validUntil).toLocaleString('es-CO')}
+                        Vigente hasta {formatAccessDateTime(result.pass.validUntil)}
                       </p>
                       <Badge variant='outline'>{result.pass.credentialCode}</Badge>
                     </div>
@@ -599,9 +857,21 @@ export function AccessConsole() {
                 options: families.map(family => ({ value: family.id, label: family.name })),
               },
             ]}
-            onFiltersChange={setTableFilters}
+            onFiltersChange={handleTableFiltersChange}
             onRefresh={() => void loadPasses()}
-            selectable={canDelete}
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            cardRenderer={renderPassCard}
+            pagination={{
+              page: tablePage,
+              limit: tableLimit,
+              onPageChange: setTablePage,
+              onLimitChange: limit => {
+                setTableLimit(limit)
+                setTablePage(1)
+              },
+            }}
+            selectable={canDelete && viewMode === 'table'}
             selectedIds={selectedPassIds}
             onSelectedIdsChange={setSelectedPassIds}
             onExport={
@@ -639,87 +909,7 @@ export function AccessConsole() {
                 />
               </>
             }
-            rowActions={pass => (
-              <div className='flex justify-end gap-1'>
-                {pass.status === 'PENDING_PRIVACY' && (
-                  <Button
-                    size='sm'
-                    variant='secondary'
-                    disabled={busyPassId === pass.id}
-                    onClick={() => void resendPrivacyInvitation(pass.id)}
-                  >
-                    Reenviar
-                  </Button>
-                )}
-                {pass.status === 'ACTIVE' && (
-                  <Button
-                    size='sm'
-                    variant='outline'
-                    disabled={busyPassId === pass.id}
-                    onClick={() =>
-                      void updatePass(pass.id, { status: 'SUSPENDED' }, 'Pase suspendido.')
-                    }
-                  >
-                    Suspender
-                  </Button>
-                )}
-                {pass.status === 'ACTIVE' && (
-                  <Button
-                    size='sm'
-                    variant='secondary'
-                    disabled={busyPassId === pass.id}
-                    onClick={() => void resendCredentialEmail(pass.id)}
-                  >
-                    Reenviar QR
-                  </Button>
-                )}
-                {pass.status === 'SUSPENDED' && (
-                  <Button
-                    size='sm'
-                    variant='outline'
-                    disabled={busyPassId === pass.id}
-                    onClick={() =>
-                      void updatePass(pass.id, { status: 'ACTIVE' }, 'Pase reactivado.')
-                    }
-                  >
-                    Reactivar
-                  </Button>
-                )}
-                {pass.status !== 'REVOKED' && (
-                  <Button
-                    size='sm'
-                    variant='destructive'
-                    disabled={busyPassId === pass.id}
-                    onClick={() => {
-                      const reason = window.prompt(
-                        'Motivo de revocación (obligatorio):',
-                        'Acceso retirado por el área'
-                      )
-                      if (reason?.trim() && reason.trim().length >= 3)
-                        void updatePass(
-                          pass.id,
-                          { status: 'REVOKED', revokedReason: reason.trim() },
-                          'Pase revocado.'
-                        )
-                    }}
-                  >
-                    Revocar
-                  </Button>
-                )}
-                {canDelete && (
-                  <Button
-                    size='sm'
-                    variant='destructive'
-                    disabled={busyPassId === pass.id}
-                    title='Eliminar permanentemente'
-                    onClick={() => setDeletePassIds([pass.id])}
-                  >
-                    <Trash2 className='h-4 w-4' />
-                    <span className='sr-only'>Eliminar</span>
-                  </Button>
-                )}
-              </div>
-            )}
+            rowActions={renderPassActions}
             emptyState={{
               title: 'Sin pases',
               description: 'No hay pases que coincidan con los filtros actuales.',
@@ -729,7 +919,7 @@ export function AccessConsole() {
       </section>
 
       {canManage && (
-        <aside className='rounded-xl border bg-card p-4 h-fit'>
+        <aside className='min-w-0 rounded-xl border bg-card p-4 h-fit xl:sticky xl:top-4'>
           <h2 className='font-semibold flex items-center gap-2'>
             <Plus className='h-5 w-5 text-primary' /> Emitir pase
           </h2>
@@ -886,6 +1076,44 @@ export function AccessConsole() {
           </form>
         </aside>
       )}
+
+      <Dialog open={Boolean(editingPass)} onOpenChange={open => !open && setEditingPass(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar vigencia del pase</DialogTitle>
+            <DialogDescription>
+              {editingPass && (
+                <>
+                  {editingPass.subject.firstName} {editingPass.subject.lastName} ·{' '}
+                  {editingPass.credentialCode}
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className='space-y-3 py-2'>
+            <div className='space-y-1.5'>
+              <Label>Inicio</Label>
+              <DateTimePicker value={editValidFrom} onChange={setEditValidFrom} />
+            </div>
+            <div className='space-y-1.5'>
+              <Label>Fin</Label>
+              <DateTimePicker
+                value={editValidUntil}
+                onChange={setEditValidUntil}
+                minDate={editValidFrom ? parseScheduledDateTime(editValidFrom) : undefined}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant='outline' onClick={() => setEditingPass(null)}>
+              Cancelar
+            </Button>
+            <Button disabled={busyPassId !== null} onClick={() => void saveEditPass()}>
+              {busyPassId !== null ? 'Guardando...' : 'Guardar cambios'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog
         open={Boolean(deletePassIds?.length)}

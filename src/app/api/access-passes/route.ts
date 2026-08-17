@@ -12,6 +12,7 @@ import {
   generateAccessQrSecret,
 } from '@/lib/access/access-control'
 import { hardDeleteAccessPasses } from '@/lib/access/delete-access-passes'
+import { formatAccessDateTime } from '@/lib/access/access-dates'
 import { AuditActionsComplete, AuditServiceComplete } from '@/lib/services/audit-service-complete'
 import { queueNotificationEmail } from '@/lib/notifications/queue-notification-email'
 import { getEmailBranding } from '@/lib/services/email/email-branding'
@@ -108,7 +109,7 @@ export async function GET(request: NextRequest) {
 
   const where: Record<string, unknown> = {}
   if (familyId) where.familyId = familyId
-  else if (permission.familyIds) where.familyId = { in: permission.familyIds }
+  else if (permission.familyIds !== undefined) where.familyId = { in: permission.familyIds }
   if (state && ['PENDING_PRIVACY', 'ACTIVE', 'SUSPENDED', 'REVOKED'].includes(state)) {
     where.status = state
   }
@@ -215,8 +216,8 @@ export async function POST(request: NextRequest) {
     const { html } = await buildAccessPrivacyInvitationEmail({
       recipientName: `${data.firstName} ${data.lastName}`,
       familyName: family.name,
-      validFromLabel: data.validFrom.toLocaleString('es-CO'),
-      validUntilLabel: data.validUntil.toLocaleString('es-CO'),
+      validFromLabel: formatAccessDateTime(data.validFrom),
+      validUntilLabel: formatAccessDateTime(data.validUntil),
       organizationName,
       accessTypeLabel: accessTypeLabel(data.accessType),
       privacyUrl: branding.privacyUrl,

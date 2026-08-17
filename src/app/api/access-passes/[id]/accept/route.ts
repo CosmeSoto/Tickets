@@ -14,6 +14,7 @@ import {
   accessTypeLabel,
   buildAccessPassIssuedEmail,
 } from '@/lib/services/email/templates/access-pass-issued'
+import { formatAccessDateTime } from '@/lib/access/access-dates'
 
 const acceptanceSchema = z.object({
   token: z.string().regex(/^[A-Za-z0-9_-]{43}$/, 'El enlace de aceptación no es válido.'),
@@ -181,8 +182,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       recipientName: `${activatedPass.subject.firstName} ${activatedPass.subject.lastName}`,
       familyName: activatedPass.family.name,
       credentialCode: activatedPass.credentialCode,
-      validFromLabel: activatedPass.validFrom.toLocaleString('es-CO'),
-      validUntilLabel: activatedPass.validUntil.toLocaleString('es-CO'),
+      validFromLabel: formatAccessDateTime(activatedPass.validFrom),
+      validUntilLabel: formatAccessDateTime(activatedPass.validUntil),
       organizationName: activatedPass.subject.organization,
       accessTypeLabel: accessTypeLabel(activatedPass.subject.accessType),
       qrDataUrl: qrCode,

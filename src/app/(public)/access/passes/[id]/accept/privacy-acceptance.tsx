@@ -6,6 +6,7 @@ import { CheckCircle2, Clock3, Loader2, ShieldCheck } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
+import { formatAccessDateTime } from '@/lib/access/access-dates'
 
 type PublicPass = {
   credentialCode: string
@@ -71,7 +72,7 @@ export function PrivacyAcceptance({ passId, token }: { passId: string; token: st
     }
   }
 
-  const date = (value: string) => new Date(value).toLocaleString('es-CO')
+  const date = (value: string) => formatAccessDateTime(value)
   return (
     <main className='min-h-screen bg-muted/30 px-4 py-10'>
       <section className='mx-auto max-w-xl rounded-xl border bg-card p-6 shadow-sm space-y-6'>

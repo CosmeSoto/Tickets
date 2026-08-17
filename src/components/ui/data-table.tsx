@@ -61,7 +61,8 @@ interface DataTableProps<T> {
   pagination?: {
     page: number
     limit: number
-    total: number
+    /** Si se omite, usa el total filtrado en cliente (sortedData.length). */
+    total?: number
     onPageChange: (page: number) => void
     onLimitChange: (limit: number) => void
   }
@@ -228,7 +229,10 @@ export function DataTable<T extends { id: string }>({
     setFilterValues({})
   }
 
-  const totalPages = pagination ? Math.ceil(pagination.total / pagination.limit) : 1
+  const totalPages = pagination
+    ? Math.max(1, Math.ceil((pagination.total ?? sortedData.length) / pagination.limit))
+    : 1
+  const paginationTotal = pagination ? (pagination.total ?? sortedData.length) : sortedData.length
 
   const selectedSet = useMemo(() => new Set(selectedIds || []), [selectedIds])
   const pageIds = useMemo(() => paginatedData.map(item => item.id), [paginatedData])
@@ -255,7 +259,7 @@ export function DataTable<T extends { id: string }>({
   }
 
   return (
-    <Card>
+    <Card className='min-w-0 overflow-hidden'>
       {/* ── Header ── */}
       {(title ||
         description ||
@@ -417,7 +421,7 @@ export function DataTable<T extends { id: string }>({
             {emptyState?.action && <div className='mt-4'>{emptyState.action}</div>}
           </div>
         ) : viewMode === 'cards' && cardRenderer ? (
-          <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'>
+          <div className='grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3'>
             {paginatedData.map(item => (
               <div key={item.id}>{cardRenderer(item)}</div>
             ))}
@@ -507,9 +511,9 @@ export function DataTable<T extends { id: string }>({
         {pagination && !loading && sortedData.length > 0 && (
           <div className='flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mt-4 pt-4 border-t'>
             <p className='text-sm text-muted-foreground'>
-              {pagination.total === 0
+              {paginationTotal === 0
                 ? 'Sin resultados'
-                : `${(pagination.page - 1) * pagination.limit + 1}–${Math.min(pagination.page * pagination.limit, pagination.total)} de ${pagination.total}`}
+                : `${(pagination.page - 1) * pagination.limit + 1}–${Math.min(pagination.page * pagination.limit, paginationTotal)} de ${paginationTotal}`}
             </p>
             <div className='flex items-center gap-2'>
               <Select
