@@ -1160,8 +1160,9 @@ function SettingsPage() {
                         )}
                       </div>
                       <p className='text-xs text-muted-foreground'>
-                        Los emails de notificaciones (tickets, etc.) se encolan y se envían en lote.
-                        Si hay pendientes o fallidos, procésalos manualmente desde aquí.
+                        Los correos se envían al momento. Esta cola solo guarda reintentos cuando
+                        SMTP falla (o envíos programados). Si hay pendientes o fallidos, procésalos
+                        aquí.
                       </p>
                     </div>
                   </>

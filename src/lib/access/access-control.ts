@@ -12,14 +12,24 @@ export type AccessModulePermission = {
 
 export async function getAccessModulePermission(
   userId: string,
-  _role: string
+  role: string
 ): Promise<AccessModulePermission> {
   const user = await prisma.users.findUnique({
     where: { id: userId },
-    select: { isActive: true, isSuperAdmin: true, accessEnabled: true, canManageAccess: true },
+    select: {
+      isActive: true,
+      isSuperAdmin: true,
+      role: true,
+      accessEnabled: true,
+      canManageAccess: true,
+    },
   })
   if (!user?.isActive) return { canScan: false, canManage: false, familyIds: [] }
-  if (user.isSuperAdmin) return { canScan: true, canManage: true }
+  // Super Admin y admin con gestión: alcance global (verificar cualquier área).
+  const isAdmin = (user.role || role) === 'ADMIN'
+  if (user.isSuperAdmin || (isAdmin && user.canManageAccess)) {
+    return { canScan: true, canManage: true }
+  }
 
   const canManage = user.canManageAccess
   const canScan = user.accessEnabled || canManage
@@ -89,4 +99,62 @@ export function resolveAccessPassState(pass: {
   // Inválido desde el instante de vencimiento (validUntil inclusive como límite).
   if (pass.validFrom > now || pass.validUntil <= now) return 'EXPIRED'
   return 'VALID'
+}
+
+const CREDENTIAL_CODE_RE = /^ACC-\d{4}-[A-Z0-9]{8}$/i
+
+export function isAccessCredentialCode(value: string): boolean {
+  return CREDENTIAL_CODE_RE.test(value.trim())
+}
+
+export const ACCESS_SCAN_MESSAGES: Record<string, string> = {
+  VALID: 'Acceso autorizado',
+  EXPIRED: 'Credencial vencida o aún no vigente',
+  REVOKED: 'Credencial revocada',
+  SUSPENDED: 'Credencial suspendida o pendiente de aviso de privacidad',
+  INACTIVE_SUBJECT: 'La persona de esta credencial está inactiva',
+  NOT_FOUND: 'Credencial no reconocida. Usa el QR o el código ACC-… de la tabla.',
+  OUT_OF_SCOPE: 'No tienes autorización para verificar esta área.',
+  FORBIDDEN: 'No tienes acceso al módulo de Accesos.',
+}
+
+const PASS_SCAN_INCLUDE = {
+  subject: {
+    select: {
+      firstName: true,
+      lastName: true,
+      accessType: true,
+      organization: true,
+      photoPath: true,
+      isActive: true,
+    },
+  },
+  family: { select: { id: true, name: true, code: true } },
+}
+
+/** Busca por token QR (ACCESS:…) o por código visible ACC-YYYY-XXXXXXXX. */
+export async function findAccessPassByScanPayload(raw: string) {
+  const token = normalizeAccessQrPayload(raw)
+  if (!token) return null
+  const db = prisma as any
+
+  if (token.length >= 32 && !isAccessCredentialCode(token)) {
+    const byToken = await db.access_passes.findUnique({
+      where: { tokenHash: hashAccessQrSecret(token) },
+      include: PASS_SCAN_INCLUDE,
+    })
+    if (byToken) return byToken
+  }
+
+  if (isAccessCredentialCode(token)) {
+    return db.access_passes.findFirst({
+      where: { credentialCode: token.trim().toUpperCase() },
+      include: PASS_SCAN_INCLUDE,
+    })
+  }
+
+  return db.access_passes.findUnique({
+    where: { tokenHash: hashAccessQrSecret(token) },
+    include: PASS_SCAN_INCLUDE,
+  })
 }

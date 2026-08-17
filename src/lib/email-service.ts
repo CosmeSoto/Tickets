@@ -31,7 +31,7 @@ interface SendEmailOptions {
 /** Encola (no envía SMTP directo) respetando política global. */
 export async function sendEmail(options: SendEmailOptions): Promise<boolean> {
   try {
-    const ids = await queueNotificationEmail({
+    const result = await queueNotificationEmail({
       to: options.to,
       subject: options.subject,
       html: options.html,
@@ -42,11 +42,19 @@ export async function sendEmail(options: SendEmailOptions): Promise<boolean> {
       event: options.event || 'generic',
       priority: options.priority,
     })
-    if (ids.length === 0) {
-      console.log('[EMAIL] No encolado (SMTP off o prefs)')
+    if (result.sent === 0 && result.queuedIds.length === 0) {
+      console.log('[EMAIL] No enviado (SMTP off o prefs)')
       return false
     }
-    console.log(`[EMAIL] Encolado (${ids.length}) → ${Array.isArray(options.to) ? options.to.join(',') : options.to}`)
+    if (result.queuedIds.length > 0) {
+      console.log(
+        `[EMAIL] Encolado para reintento (${result.queuedIds.length}) → ${Array.isArray(options.to) ? options.to.join(',') : options.to}`
+      )
+    } else {
+      console.log(
+        `[EMAIL] Enviado de inmediato (${result.sent}) → ${Array.isArray(options.to) ? options.to.join(',') : options.to}`
+      )
+    }
     return true
   } catch (error) {
     console.error('Error queueing email:', error)

@@ -4,12 +4,14 @@
  */
 
 import nodemailer from 'nodemailer'
+import type { Attachment } from 'nodemailer/lib/mailer'
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import { AuditServiceComplete, AuditActionsComplete } from '../audit-service-complete'
 import { getUnifiedSmtpConfig, resolveSmtpSecure } from './smtp-config'
 import type { TicketEmailEvent } from '@/lib/notifications/email-prefs'
 import { queueNotificationEmail } from '@/lib/notifications/queue-notification-email'
+import { inlineAppImagesForEmail, parseQueuedAttachments } from './email-inline-images'
 import type {
   EmailModule,
   EmailPriority,
@@ -36,6 +38,8 @@ export interface EmailOptions {
   event?: NotificationEmailEvent
   /** Prioridad de política (critical | important | optional) */
   notificationPriority?: EmailPriority
+  /** Adjuntos (QR CID, PDF, etc.) */
+  attachments?: Attachment[]
 }
 
 export interface EmailQueueItem {
@@ -161,6 +165,10 @@ export class EmailService {
         text = rendered.text
       }
 
+      const inlined = html ? await inlineAppImagesForEmail(html) : { html, attachments: [] }
+      html = inlined.html
+      const attachments = [...(options.attachments || []), ...inlined.attachments]
+
       // Enviar email
       const recipients = Array.isArray(options.to) ? options.to : [options.to]
 
@@ -171,6 +179,7 @@ export class EmailService {
           subject: options.subject,
           html,
           text,
+          attachments: attachments.length ? attachments : undefined,
           priority: options.priority || 'normal',
         })
       }
@@ -233,7 +242,7 @@ export class EmailService {
         options.ticketEmailEvent ||
         (emailModule === 'auth' ? 'security' : 'generic')
 
-      const queueIds = await queueNotificationEmail({
+      const { sent, queuedIds } = await queueNotificationEmail({
         to: options.to,
         subject: options.subject,
         html: html || text,
@@ -246,27 +255,31 @@ export class EmailService {
         templateData: options.templateData,
         scheduledAt: options.scheduledAt,
         actorUserId: userId,
+        attachments: options.attachments,
       })
 
-      if (userId && queueIds[0]) {
+      if (userId && (queuedIds[0] || sent > 0)) {
         await AuditServiceComplete.logAction({
           userId,
-          action: AuditActionsComplete.EMAIL_QUEUED,
+          action: queuedIds[0]
+            ? AuditActionsComplete.EMAIL_QUEUED
+            : AuditActionsComplete.EMAIL_SENT,
           entityType: 'system',
-          entityId: queueIds[0],
+          entityId: queuedIds[0] || randomUUID(),
           details: {
             to: Array.isArray(options.to) ? options.to : [options.to],
             subject: options.subject,
             template: options.template,
-            queueIds,
-            module,
+            queuedIds,
+            sent,
+            module: emailModule,
             event,
             ticketEmailEvent: options.ticketEmailEvent,
           },
         })
       }
 
-      return queueIds[0] || ''
+      return queuedIds[0] || (sent > 0 ? 'sent' : '')
     } catch (error) {
       console.error('[EMAIL-SERVICE] Error queueing email:', error)
       throw error
@@ -313,13 +326,10 @@ export class EmailService {
           // Renderizar template si corresponde
           let html = email.body
           let text: string | undefined
-          if (email.templateName && email.templateData) {
+          const queued = parseQueuedAttachments(email.templateData)
+          if (email.templateName && Object.keys(queued.rest).length > 0) {
             try {
-              const data =
-                typeof email.templateData === 'string'
-                  ? JSON.parse(email.templateData)
-                  : (email.templateData as Record<string, unknown>)
-              const rendered = await this.renderTemplate(email.templateName, data)
+              const rendered = await this.renderTemplate(email.templateName, queued.rest)
               html = rendered.html
               text = rendered.text
             } catch {
@@ -332,6 +342,7 @@ export class EmailService {
             subject: email.subject,
             html,
             text,
+            attachments: queued.attachments,
           })
 
           if (success) {

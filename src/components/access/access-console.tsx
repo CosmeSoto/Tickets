@@ -24,6 +24,7 @@ type ScanResponse = {
   result: string
   valid: boolean
   message?: string
+  error?: string
   pass?: {
     id: string
     credentialCode: string
@@ -439,7 +440,8 @@ export function AccessConsole() {
                 <ScanLine className='h-5 w-5 text-primary' /> Verificar acceso
               </h2>
               <p className='text-sm text-muted-foreground mt-1'>
-                El resultado se consulta en línea y deja trazabilidad del escaneo.
+                El resultado se consulta en línea y deja trazabilidad del escaneo. Puedes escanear
+                el QR o escribir el código de credencial (ACC-…).
               </p>
             </div>
             <Button onClick={startCamera} disabled={scanning}>
@@ -465,7 +467,7 @@ export function AccessConsole() {
             <Input
               value={payload}
               onChange={e => setPayload(e.target.value)}
-              placeholder='Pega el contenido del QR si no usas cámara'
+              placeholder='QR, ACCESS:… o código ACC-2026-XXXXXXXX'
             />
             <Button type='submit' variant='outline' disabled={scanning}>
               <ClipboardPaste className='h-4 w-4' />
@@ -490,8 +492,8 @@ export function AccessConsole() {
               <div>
                 <p className='font-semibold'>
                   {result.valid
-                    ? result.message || 'Acceso válido'
-                    : result.message || 'Acceso no autorizado'}
+                    ? result.message || 'Acceso autorizado'
+                    : result.message || result.error || 'Acceso no autorizado'}
                 </p>
                 {result.pass && (
                   <div className='mt-2 flex gap-3 text-sm'>
