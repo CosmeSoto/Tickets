@@ -1,17 +1,35 @@
 import prisma from '@/lib/prisma'
+import { formatYmdCompact } from '@/lib/utils/date-utils'
+import {
+  exampleTicketCode,
+  formatTicketCode,
+  parseTicketCode,
+} from '@/lib/tickets/ticket-code-format'
+
+export {
+  exampleTicketCode,
+  formatTicketCode,
+  parseTicketCode,
+} from '@/lib/tickets/ticket-code-format'
+export type { ParsedTicketCode } from '@/lib/tickets/ticket-code-format'
 
 export class TicketCodeService {
   /**
    * Genera código automático con transacción atómica.
    * Usa SELECT ... FOR UPDATE en ticket_code_counters para evitar race conditions.
-   * Formato: {codePrefix}-{year}-{sequence padded to 4 digits}
-   * Ej: "TI-2026-0001"
+   * Formato: {codePrefix}-{YYYYMMDD}-{sequence padded to 4 digits}
+   * Ej: "ADM-20260818-0001"
+   * La secuencia sigue siendo anual por familia (el mes-día identifica el día de creación).
    */
-  static async generateCode(familyId: string, year?: number): Promise<string> {
-    const currentYear = year ?? new Date().getFullYear()
+  static async generateCode(
+    familyId: string,
+    year?: number,
+    now: Date = new Date()
+  ): Promise<string> {
+    const dateStamp = formatYmdCompact(now)
+    const currentYear = year ?? parseInt(dateStamp.slice(0, 4), 10)
 
     return await prisma.$transaction(async tx => {
-      // Obtener config y familia para el prefijo
       const config = await tx.ticket_family_config.findUnique({
         where: { familyId },
         select: { codePrefix: true },
@@ -28,7 +46,6 @@ export class TicketCodeService {
 
       const prefix = config?.codePrefix ?? family.code
 
-      // Bloquear fila del contador para esta familia+año con SELECT ... FOR UPDATE
       const counters = await tx.$queryRaw<Array<{ last_sequence: number }>>`
         SELECT last_sequence FROM ticket_code_counters
         WHERE family_id = ${familyId} AND year = ${currentYear}
@@ -37,51 +54,49 @@ export class TicketCodeService {
 
       const counterSeq = counters[0]?.last_sequence ?? 0
 
-      // Sincronizar con el máximo real en tickets para evitar colisiones
-      // cuando el contador esté desincronizado con los datos reales
+      // Códigos nuevos (PREF-YYYYMMDD-0001) y legacy (PREF-YYYY-0001) del mismo año
+      const yearPrefix = `${prefix}-${currentYear}`
       const maxInDb = await tx.$queryRaw<Array<{ max_seq: number | null }>>`
         SELECT MAX(
           CAST(SPLIT_PART(ticket_code, '-', ARRAY_LENGTH(STRING_TO_ARRAY(ticket_code, '-'), 1)) AS INTEGER)
         ) AS max_seq
         FROM tickets
         WHERE family_id = ${familyId}
-          AND ticket_code LIKE ${prefix + '-' + currentYear + '-%'}
+          AND ticket_code LIKE ${yearPrefix + '%'}
+          AND ticket_code ~ '[0-9]+$'
       `
 
       const dbMaxSeq = maxInDb[0]?.max_seq ?? 0
       const nextSeq = Math.max(counterSeq, dbMaxSeq) + 1
 
-      // Upsert del contador con el valor sincronizado
       await tx.ticket_code_counters.upsert({
         where: { familyId_year: { familyId, year: currentYear } },
         update: { lastSequence: nextSeq },
         create: { familyId, year: currentYear, lastSequence: nextSeq },
       })
 
-      return `${prefix}-${currentYear}-${String(nextSeq).padStart(4, '0')}`
+      return formatTicketCode(prefix, dateStamp, nextSeq)
     })
   }
 
   /**
    * Valida que el código manual:
-   * 1. Siga el formato {PREFIJO}-{AÑO}-{SECUENCIA}
-   * 2. El prefijo corresponda a la familia (ticket_family_config.codePrefix o families.code)
-   * 3. No esté ya en uso en tickets
+   * 1. Siga el formato {PREFIJO}-{YYYYMMDD}-{SECUENCIA} (o el legado {PREFIJO}-{AÑO}-{SECUENCIA})
+   * 2. El prefijo corresponda a la familia
+   * 3. No esté ya en uso
    */
   static async validateManualCode(
     code: string,
     familyId: string
   ): Promise<{ valid: boolean; error?: string }> {
-    // 1. Validar formato
-    const formatRegex = /^[A-Z0-9]+-\d{4}-\d{4}$/
-    if (!formatRegex.test(code)) {
+    const parsed = parseTicketCode(code)
+    if (!parsed) {
       return {
         valid: false,
-        error: 'El código debe seguir el formato {PREFIJO}-{AÑO}-{SECUENCIA} (ej: TI-2026-0001)',
+        error: `El código debe seguir el formato {PREFIJO}-{AÑOMESDÍA}-{SECUENCIA} (ej: ${exampleTicketCode('TI')})`,
       }
     }
 
-    // 2. Obtener prefijo esperado de la familia
     const [config, family] = await Promise.all([
       prisma.ticket_family_config.findUnique({
         where: { familyId },
@@ -98,18 +113,16 @@ export class TicketCodeService {
     }
 
     const expectedPrefix = config?.codePrefix ?? family.code
-    const codePrefix = code.split('-')[0]
 
-    if (codePrefix !== expectedPrefix) {
+    if (parsed.prefix !== expectedPrefix) {
       return {
         valid: false,
-        error: `El prefijo "${codePrefix}" no corresponde a la familia (prefijo esperado: "${expectedPrefix}")`,
+        error: `El prefijo "${parsed.prefix}" no corresponde a la familia (prefijo esperado: "${expectedPrefix}")`,
       }
     }
 
-    // 3. Verificar que no esté en uso
     const existing = await prisma.tickets.findUnique({
-      where: { ticketCode: code },
+      where: { ticketCode: code.trim().toUpperCase() },
       select: { id: true },
     })
 

@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { TicketCodeService } from '@/lib/services/ticket-code.service'
 
-// GET /api/tickets/validate-code?code=TI-2026-0001&familyId=xxx
+// GET /api/tickets/validate-code?code=TI-20260818-0001&familyId=xxx
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)

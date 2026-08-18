@@ -11,11 +11,101 @@ import {
   TicketAccessError,
   toTicketAccessUser,
 } from '@/lib/tickets/ticket-access'
+import { notifyTicketChanged } from '@/lib/tickets/notify-ticket-changed'
 
 /**
  * GET /api/tickets/[id]/resolution-plan
  * Obtiene el plan de resolución de un ticket
  */
+function serializePlan(plan: {
+  id: string
+  ticketId: string
+  title: string
+  description: string | null
+  status: string
+  totalTasks: number
+  completedTasks: number
+  estimatedHours: number
+  actualHours: number
+  startDate: Date | null
+  targetDate: Date | null
+  completedDate: Date | null
+  createdAt: Date
+  updatedAt: Date
+  creator: { id: string; name: string; email: string; role?: string }
+  tasks: Array<{
+    id: string
+    title: string
+    description: string | null
+    status: string
+    priority: string
+    estimatedHours: number | null
+    actualHours: number | null
+    startTime: string | null
+    endTime: string | null
+    assignee: { id: string; name: string; email: string } | null
+    dueDate: Date | null
+    completedAt: Date | null
+    notes: string | null
+    createdAt: Date
+    updatedAt: Date
+  }>
+}) {
+  const totalTasks = plan.tasks.length
+  const completedTasks = plan.tasks.filter(t => t.status === 'completed').length
+  const percentage = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
+  return {
+    id: plan.id,
+    ticketId: plan.ticketId,
+    title: plan.title,
+    description: plan.description,
+    status: plan.status,
+    totalTasks: plan.totalTasks,
+    completedTasks: plan.completedTasks,
+    estimatedHours: plan.estimatedHours,
+    actualHours: plan.actualHours,
+    startDate: plan.startDate?.toISOString() || null,
+    targetDate: plan.targetDate?.toISOString() || null,
+    completedDate: plan.completedDate?.toISOString() || null,
+    createdBy: plan.creator,
+    tasks: plan.tasks.map(task => ({
+      id: task.id,
+      title: task.title,
+      description: task.description,
+      status: task.status,
+      priority: task.priority,
+      estimatedHours: task.estimatedHours,
+      actualHours: task.actualHours,
+      startTime: task.startTime,
+      endTime: task.endTime,
+      assignedTo: task.assignee,
+      dueDate: task.dueDate?.toISOString() || null,
+      completedAt: task.completedAt?.toISOString() || null,
+      notes: task.notes,
+      createdAt: task.createdAt.toISOString(),
+      updatedAt: task.updatedAt.toISOString(),
+    })),
+    progress: {
+      totalTasks,
+      completedTasks,
+      percentage,
+      estimatedCompletion: plan.targetDate?.toISOString() || null,
+    },
+    createdAt: plan.createdAt.toISOString(),
+    updatedAt: plan.updatedAt.toISOString(),
+  }
+}
+
+const PLAN_INCLUDE = {
+  creator: { select: { id: true, name: true, email: true, role: true } },
+  tasks: {
+    include: {
+      assignee: { select: { id: true, name: true, email: true } },
+    },
+    orderBy: { createdAt: 'asc' as const },
+  },
+}
+
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   let session
   let ticketId
@@ -56,93 +146,28 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       throw err
     }
 
-    // Buscar plan de resolución
-    const plan = await prisma.resolution_plans.findFirst({
+    // Buscar planes de resolución (puede haber varios a lo largo del ticket)
+    const plans = await prisma.resolution_plans.findMany({
       where: { ticketId },
-      include: {
-        creator: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true,
-          },
-        },
-        tasks: {
-          include: {
-            assignee: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-              },
-            },
-          },
-          orderBy: {
-            createdAt: 'asc',
-          },
-        },
-      },
+      include: PLAN_INCLUDE,
+      orderBy: { createdAt: 'desc' },
     })
 
-    if (!plan) {
-      // No hay plan, retornar null (esto es válido, no es un error)
+    if (plans.length === 0) {
       return NextResponse.json({
         success: true,
         data: null,
+        plans: [],
       })
     }
 
-    // Calcular progreso
-    const totalTasks = plan.tasks.length
-    const completedTasks = plan.tasks.filter(t => t.status === 'completed').length
-    const percentage = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
-
-    // Formatear respuesta
-    const response = {
-      id: plan.id,
-      ticketId: plan.ticketId,
-      title: plan.title,
-      description: plan.description,
-      status: plan.status,
-      totalTasks: plan.totalTasks,
-      completedTasks: plan.completedTasks,
-      estimatedHours: plan.estimatedHours,
-      actualHours: plan.actualHours,
-      startDate: plan.startDate?.toISOString() || null,
-      targetDate: plan.targetDate?.toISOString() || null,
-      completedDate: plan.completedDate?.toISOString() || null,
-      createdBy: plan.creator,
-      tasks: plan.tasks.map(task => ({
-        id: task.id,
-        title: task.title,
-        description: task.description,
-        status: task.status,
-        priority: task.priority,
-        estimatedHours: task.estimatedHours,
-        actualHours: task.actualHours,
-        startTime: task.startTime,
-        endTime: task.endTime,
-        assignedTo: task.assignee,
-        dueDate: task.dueDate?.toISOString() || null,
-        completedAt: task.completedAt?.toISOString() || null,
-        notes: task.notes,
-        createdAt: task.createdAt.toISOString(),
-        updatedAt: task.updatedAt.toISOString(),
-      })),
-      progress: {
-        totalTasks,
-        completedTasks,
-        percentage,
-        estimatedCompletion: plan.targetDate?.toISOString() || null,
-      },
-      createdAt: plan.createdAt.toISOString(),
-      updatedAt: plan.updatedAt.toISOString(),
-    }
+    const current = plans.find(p => p.status === 'draft' || p.status === 'active') ?? plans[0]
+    const serialized = plans.map(serializePlan)
 
     return NextResponse.json({
       success: true,
-      data: response,
+      data: serialized.find(p => p.id === current.id) ?? serialized[0],
+      plans: serialized,
     })
   } catch (error) {
     console.error('[API] Error in resolution plan GET:', error)
@@ -202,6 +227,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       )
     }
 
+    if (ticket.status !== 'IN_PROGRESS') {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Pon el ticket En progreso antes de crear un plan de resolución',
+        },
+        { status: 400 }
+      )
+    }
+
     try {
       await assertTicketAccess(toTicketAccessUser(session.user), ticket, 'resolution_plan')
     } catch (err) {
@@ -220,14 +255,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       throw err
     }
 
-    // Verificar que no exista ya un plan
+    // Solo un plan abierto a la vez; se puede crear otro cuando el anterior está completado/cancelado
     const existingPlan = await prisma.resolution_plans.findFirst({
-      where: { ticketId },
+      where: { ticketId, status: { in: ['draft', 'active'] } },
     })
 
     if (existingPlan) {
       return NextResponse.json(
-        { success: false, message: 'Ya existe un plan de resolución para este ticket' },
+        {
+          success: false,
+          message: 'Ya hay un plan en curso. Complétalo o elimínalo para crear otro.',
+        },
         { status: 400 }
       )
     }
@@ -458,6 +496,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       }
     }
 
+    notifyTicketChanged(ticketId, 'plan_created')
+
     return NextResponse.json({
       success: true,
       data: {
@@ -513,15 +553,23 @@ export async function DELETE(
     }
 
     const { id: ticketId } = await params
+    const planId = new URL(request.url).searchParams.get('planId')
 
     // Buscar plan existente
-    const existingPlan = await prisma.resolution_plans.findFirst({
-      where: { ticketId },
-      include: {
-        ticket: true,
-        tasks: true,
-      },
-    })
+    const existingPlan = planId
+      ? await prisma.resolution_plans.findFirst({
+          where: { id: planId, ticketId },
+          include: { ticket: true, tasks: true },
+        })
+      : ((await prisma.resolution_plans.findFirst({
+          where: { ticketId, status: { in: ['draft', 'active'] } },
+          include: { ticket: true, tasks: true },
+        })) ??
+        (await prisma.resolution_plans.findFirst({
+          where: { ticketId },
+          include: { ticket: true, tasks: true },
+          orderBy: { createdAt: 'desc' },
+        })))
 
     if (!existingPlan) {
       return NextResponse.json(
@@ -617,13 +665,23 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const { id: ticketId } = await params
     const body = await request.json()
 
-    // Buscar plan existente
-    const existingPlan = await prisma.resolution_plans.findFirst({
-      where: { ticketId },
-      include: {
-        ticket: true,
-      },
-    })
+    const planId = typeof body.planId === 'string' ? body.planId : null
+
+    // Buscar plan existente (el abierto, o el indicado)
+    const existingPlan = planId
+      ? await prisma.resolution_plans.findFirst({
+          where: { id: planId, ticketId },
+          include: { ticket: true },
+        })
+      : ((await prisma.resolution_plans.findFirst({
+          where: { ticketId, status: { in: ['draft', 'active'] } },
+          include: { ticket: true },
+        })) ??
+        (await prisma.resolution_plans.findFirst({
+          where: { ticketId },
+          include: { ticket: true },
+          orderBy: { createdAt: 'desc' },
+        })))
 
     if (!existingPlan) {
       return NextResponse.json(
@@ -815,6 +873,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const totalTasks = updatedPlan.tasks.length
     const completedTasks = updatedPlan.tasks.filter(t => t.status === 'completed').length
     const percentage = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
+
+    notifyTicketChanged(ticketId, 'plan_updated')
 
     return NextResponse.json({
       success: true,

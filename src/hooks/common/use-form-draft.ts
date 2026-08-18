@@ -153,4 +153,7 @@ export const FormDraftKeys = {
   supplierEdit: (id: string) => `draft:supplier:edit:${id}`,
   processNew: () => `draft:process:new`,
   ticketNew: (userId?: string) => `draft:ticket:new:${userId || 'pending'}`,
+  ticketComment: (ticketId: string) => `draft:ticket:comment:${ticketId}`,
+  ticketPlan: (ticketId: string) => `draft:ticket:plan:${ticketId}`,
+  ticketPlanTask: (ticketId: string) => `draft:ticket:plan-task:${ticketId}`,
 } as const

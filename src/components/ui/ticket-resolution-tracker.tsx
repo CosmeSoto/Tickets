@@ -2,13 +2,17 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './card'
 import { Button } from './button'
-import { Plus, Target } from 'lucide-react'
+import { Badge } from './badge'
+import { Alert, AlertDescription } from './alert'
+import { Plus, Target, PlayCircle } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './tooltip'
 import { useResolutionPlan } from '@/hooks/use-resolution-plan'
 import { PlanSummary } from './resolution-plan/plan-summary'
 import { TaskList } from './resolution-plan/task-list'
 import { PlanFormDialog } from './resolution-plan/plan-form-dialog'
 import { PlanDialogs } from './resolution-plan/plan-dialogs'
+import { FormDraftBanner } from '@/components/common/form-draft-banner'
+import { getStatusLabel, getStatusColor } from './resolution-plan/plan-helpers'
 
 interface TicketResolutionTrackerProps {
   ticketId: string
@@ -27,13 +31,19 @@ export function TicketResolutionTracker({
 }: TicketResolutionTrackerProps) {
   const hook = useResolutionPlan(ticketId, onPlanChange)
 
-  // Calcular permisos efectivos según estado del ticket y del plan
   const isTicketClosed = ticketStatus === 'CLOSED'
-  const isPlanCompleted = hook.plan?.status === 'completed'
-  const isPlanCancelled = hook.plan?.status === 'cancelled'
+  const isInProgress = ticketStatus === 'IN_PROGRESS'
+  const openPlan =
+    hook.plan && (hook.plan.status === 'draft' || hook.plan.status === 'active') ? hook.plan : null
+  const pastPlans = hook.plans.filter(
+    p => p.status === 'completed' || p.status === 'cancelled' || (openPlan && p.id !== openPlan.id)
+  )
+  const isPlanCompleted = openPlan?.status === 'completed'
+  const isPlanCancelled = openPlan?.status === 'cancelled'
 
-  // No se puede hacer nada si el ticket está cerrado o el plan está completado/cancelado
-  const effectiveCanEdit = canEdit && !isTicketClosed && !isPlanCompleted && !isPlanCancelled
+  const effectiveCanEdit =
+    canEdit && !isTicketClosed && isInProgress && !isPlanCompleted && !isPlanCancelled
+  const canCreatePlan = canEdit && !isTicketClosed && isInProgress && !openPlan
 
   if (hook.loading) {
     return (
@@ -47,27 +57,62 @@ export function TicketResolutionTracker({
     )
   }
 
-  if (!hook.plan) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className='flex items-center space-x-2'>
-            <Target className='h-5 w-5' />
-            <span>Plan de Resolución</span>
-          </CardTitle>
-          <CardDescription>Crea un plan estructurado para resolver este ticket</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {!hook.showCreatePlan ? (
+  return (
+    <div className='space-y-6'>
+      {canEdit && !isInProgress && !isTicketClosed && (
+        <Alert>
+          <PlayCircle className='h-4 w-4' />
+          <AlertDescription>
+            Pon el ticket <strong>En progreso</strong> para crear o editar un plan de resolución.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {hook.showCreatePlan && canCreatePlan ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className='flex items-center space-x-2'>
+              <Target className='h-5 w-5' />
+              <span>Plan de Resolución</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className='space-y-3'>
+            <FormDraftBanner
+              visible={hook.planDraftRestored}
+              onDismiss={hook.dismissPlanDraft}
+              onDiscard={hook.discardPlanDraft}
+            />
+            <PlanFormDialog
+              planForm={hook.planForm}
+              setPlanForm={hook.setPlanForm}
+              onSubmit={hook.createResolutionPlan}
+              onCancel={() => {
+                hook.setShowCreatePlan(false)
+                hook.resetPlanForm()
+              }}
+              mode='create'
+            />
+          </CardContent>
+        </Card>
+      ) : !openPlan ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className='flex items-center space-x-2'>
+              <Target className='h-5 w-5' />
+              <span>Plan de Resolución</span>
+            </CardTitle>
+            <CardDescription>Crea un plan estructurado para resolver este ticket</CardDescription>
+          </CardHeader>
+          <CardContent>
             <div className='text-center py-8'>
               <Target className='h-12 w-12 mx-auto mb-4 text-muted-foreground' />
-              <h3 className='text-lg font-medium text-foreground mb-2'>
-                No hay plan de resolución
-              </h3>
+              <h3 className='text-lg font-medium text-foreground mb-2'>No hay plan en curso</h3>
               <p className='text-muted-foreground mb-4'>
-                Crea un plan para organizar las tareas necesarias para resolver este ticket
+                {pastPlans.length > 0
+                  ? 'El plan anterior ya está cerrado. Puedes crear uno nuevo.'
+                  : 'Crea un plan para organizar las tareas necesarias para resolver este ticket'}
               </p>
-              {effectiveCanEdit && (
+              {canCreatePlan && (
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -83,66 +128,78 @@ export function TicketResolutionTracker({
                 </TooltipProvider>
               )}
             </div>
-          ) : (
-            <PlanFormDialog
-              planForm={hook.planForm}
-              setPlanForm={hook.setPlanForm}
-              onSubmit={hook.createResolutionPlan}
-              onCancel={() => {
-                hook.setShowCreatePlan(false)
-                hook.resetPlanForm()
-              }}
-              mode='create'
-            />
-          )}
-        </CardContent>
-      </Card>
-    )
-  }
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          <PlanSummary
+            plan={openPlan}
+            canEdit={effectiveCanEdit}
+            progress={hook.calculateProgress()}
+            openPlanMenu={hook.openPlanMenu}
+            setOpenPlanMenu={hook.setOpenPlanMenu}
+            onActivate={hook.activatePlan}
+            onComplete={hook.completePlan}
+            onEdit={() => {
+              hook.loadPlanToForm()
+              hook.setShowEditPlan(true)
+            }}
+            onDelete={() => hook.setShowDeletePlan(true)}
+          />
 
-  return (
-    <div className='space-y-6'>
-      <PlanSummary
-        plan={hook.plan}
-        canEdit={effectiveCanEdit}
-        progress={hook.calculateProgress()}
-        openPlanMenu={hook.openPlanMenu}
-        setOpenPlanMenu={hook.setOpenPlanMenu}
-        onActivate={hook.activatePlan}
-        onComplete={hook.completePlan}
-        onEdit={() => {
-          hook.loadPlanToForm()
-          hook.setShowEditPlan(true)
-        }}
-        onDelete={() => hook.setShowDeletePlan(true)}
-      />
+          <TaskList
+            plan={openPlan}
+            canEdit={effectiveCanEdit}
+            showAddTask={hook.showAddTask}
+            setShowAddTask={hook.setShowAddTask}
+            newTask={hook.newTask}
+            setNewTask={hook.setNewTask}
+            onAddTask={hook.addTask}
+            onUpdateTaskStatus={hook.updateTaskStatus}
+            onDeleteTask={hook.setTaskToDelete}
+          />
 
-      <TaskList
-        plan={hook.plan}
-        canEdit={effectiveCanEdit}
-        showAddTask={hook.showAddTask}
-        setShowAddTask={hook.setShowAddTask}
-        newTask={hook.newTask}
-        setNewTask={hook.setNewTask}
-        onAddTask={hook.addTask}
-        onUpdateTaskStatus={hook.updateTaskStatus}
-        onDeleteTask={hook.setTaskToDelete}
-      />
+          <PlanDialogs
+            showEditPlan={hook.showEditPlan}
+            setShowEditPlan={hook.setShowEditPlan}
+            showDeletePlan={hook.showDeletePlan}
+            setShowDeletePlan={hook.setShowDeletePlan}
+            taskToDelete={hook.taskToDelete}
+            setTaskToDelete={hook.setTaskToDelete}
+            planForm={hook.planForm}
+            setPlanForm={hook.setPlanForm}
+            plan={openPlan}
+            onUpdatePlan={hook.updatePlan}
+            onDeletePlan={hook.deletePlan}
+            onDeleteTask={hook.deleteTask}
+          />
+        </>
+      )}
 
-      <PlanDialogs
-        showEditPlan={hook.showEditPlan}
-        setShowEditPlan={hook.setShowEditPlan}
-        showDeletePlan={hook.showDeletePlan}
-        setShowDeletePlan={hook.setShowDeletePlan}
-        taskToDelete={hook.taskToDelete}
-        setTaskToDelete={hook.setTaskToDelete}
-        planForm={hook.planForm}
-        setPlanForm={hook.setPlanForm}
-        plan={hook.plan}
-        onUpdatePlan={hook.updatePlan}
-        onDeletePlan={hook.deletePlan}
-        onDeleteTask={hook.deleteTask}
-      />
+      {pastPlans.length > 0 && (
+        <Card>
+          <CardHeader className='pb-2'>
+            <CardTitle className='text-sm'>Planes anteriores</CardTitle>
+            <CardDescription>Historial de planes completados o cerrados</CardDescription>
+          </CardHeader>
+          <CardContent className='space-y-2'>
+            {pastPlans.map(p => (
+              <div
+                key={p.id}
+                className='flex items-center justify-between rounded-lg border px-3 py-2 text-sm'
+              >
+                <div className='min-w-0'>
+                  <p className='font-medium truncate'>{p.title}</p>
+                  <p className='text-xs text-muted-foreground'>
+                    {p.completedTasks}/{p.totalTasks} tareas
+                  </p>
+                </div>
+                <Badge className={getStatusColor(p.status)}>{getStatusLabel(p.status)}</Badge>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

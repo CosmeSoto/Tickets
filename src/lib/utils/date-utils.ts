@@ -80,3 +80,13 @@ export function formatDateTimeShort(
     ...options,
   })
 }
+
+/**
+ * Fecha compacta YYYYMMDD en la zona horaria del sistema.
+ * Resultado ejemplo: "20260818"
+ */
+export function formatYmdCompact(date: Date | string = new Date()): string {
+  return new Date(date)
+    .toLocaleDateString('en-CA', { timeZone: getAppTimezone() })
+    .replace(/-/g, '')
+}

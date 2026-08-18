@@ -6,14 +6,28 @@
 
 type Subscriber = (data: string) => void
 
-// Clave única en globalThis para evitar colisiones
 const GLOBAL_KEY = '__ticketEventSubscribers__'
+
+/** Canal de métricas / listados: cualquier mutación de ticket avisa a dashboards y listas. */
+export const TICKET_METRICS_CHANNEL = '__ticket_metrics__'
 
 function getSubscribers(): Map<string, Set<Subscriber>> {
   if (!(globalThis as any)[GLOBAL_KEY]) {
     ;(globalThis as any)[GLOBAL_KEY] = new Map<string, Set<Subscriber>>()
   }
   return (globalThis as any)[GLOBAL_KEY]
+}
+
+function notify(channel: string, payload: string) {
+  const subs = getSubscribers().get(channel)
+  if (!subs || subs.size === 0) return
+  subs.forEach(fn => {
+    try {
+      fn(payload)
+    } catch {
+      /* cliente desconectado */
+    }
+  })
 }
 
 export const TicketEvents = {
@@ -34,12 +48,13 @@ export const TicketEvents = {
   },
 
   emit(ticketId: string, event: { type: string; [key: string]: unknown }) {
-    const subscribers = getSubscribers()
-    const subs = subscribers.get(ticketId)
-    if (!subs || subs.size === 0) return
+    const payload = `data: ${JSON.stringify({ ...event, ticketId })}\n\n`
+    notify(ticketId, payload)
+    notify(TICKET_METRICS_CHANNEL, payload)
+  },
+
+  emitMetrics(event: { type: string; [key: string]: unknown }) {
     const payload = `data: ${JSON.stringify(event)}\n\n`
-    subs.forEach(fn => {
-      try { fn(payload) } catch { /* cliente desconectado */ }
-    })
+    notify(TICKET_METRICS_CHANNEL, payload)
   },
 }

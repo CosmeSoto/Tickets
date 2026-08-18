@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { BackToTickets } from '@/components/tickets/back-to-tickets'
 import { SymmetricStatsCard } from '@/components/shared/stats-card'
+import { useLiveTicketRefresh } from '@/hooks/use-live-ticket-refresh'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -47,9 +48,11 @@ export default function TechnicianStatsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const loadStats = async () => {
-    setLoading(true)
-    setError(null)
+  const loadStats = useCallback(async (silent = false) => {
+    if (!silent) {
+      setLoading(true)
+      setError(null)
+    }
     try {
       const res = await fetch('/api/technician/stats', { cache: 'no-store' })
       if (!res.ok) throw new Error(`Error ${res.status}`)
@@ -65,14 +68,20 @@ export default function TechnicianStatsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  useLiveTicketRefresh(
+    useCallback(() => {
+      void loadStats(true)
+    }, [loadStats])
+  )
 
   // useEffect siempre se llama — la carga real solo ocurre si hay sesión válida
   useEffect(() => {
     if (status === 'loading') return
     if (!session || session.user.role !== 'TECHNICIAN') return
-    loadStats()
-  }, [status, session?.user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+    void loadStats(false)
+  }, [status, session?.user?.id, loadStats])
 
   // ── Returns condicionales DESPUÉS de todos los hooks ─────────────────────
   if (status === 'loading') return null

@@ -6,6 +6,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useLiveTicketRefresh } from '@/hooks/use-live-ticket-refresh'
 
 /** El endpoint de stats puede ser pesado en cold start; timeout generoso para evitar aborts falsos. */
 const DASHBOARD_FETCH_TIMEOUT_MS = 45_000
@@ -118,104 +119,99 @@ export function useDashboardData(role: Role): UseDashboardDataReturn {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const loadData = useCallback(async () => {
-    setIsLoading(true)
-    setError(null)
+  const loadData = useCallback(
+    async (silent = false) => {
+      if (!silent) {
+        setIsLoading(true)
+        setError(null)
+      }
 
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), DASHBOARD_FETCH_TIMEOUT_MS)
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), DASHBOARD_FETCH_TIMEOUT_MS)
+      const freshQuery = silent ? '&fresh=1' : ''
 
-    try {
-      // Cargar estadísticas y tickets en paralelo con timeout compartido
-      const [statsResponse, ticketsResponse] = await Promise.all([
-        fetch(`/api/dashboard/stats?role=${role}`, {
-          signal: controller.signal,
-          headers: {
-            'Cache-Control': 'max-age=60', // Cache por 1 minuto
-          },
-        }),
-        fetch(`/api/dashboard/tickets?role=${role}&limit=5`, {
-          signal: controller.signal,
-          headers: {
-            'Cache-Control': 'max-age=30', // Cache por 30 segundos
-          },
-        }),
-      ])
+      try {
+        const [statsResponse, ticketsResponse] = await Promise.all([
+          fetch(`/api/dashboard/stats?role=${role}${freshQuery}`, {
+            signal: controller.signal,
+            cache: 'no-store',
+          }),
+          fetch(`/api/dashboard/tickets?role=${role}&limit=5`, {
+            signal: controller.signal,
+            cache: 'no-store',
+          }),
+        ])
 
-      // Procesar estadísticas
-      if (statsResponse.ok) {
-        const statsData = await statsResponse.json()
-        setStats(statsData)
+        // Procesar estadísticas
+        if (statsResponse.ok) {
+          const statsData = await statsResponse.json()
+          setStats(statsData)
 
-        // Si hay actividad reciente en la respuesta
-        if (statsData.recentActivity) {
-          setRecentActivity(statsData.recentActivity)
+          // Si hay actividad reciente en la respuesta
+          if (statsData.recentActivity) {
+            setRecentActivity(statsData.recentActivity)
+          }
+        } else {
+          console.warn('Error al cargar estadísticas:', statsResponse.status)
+          // No lanzar error — mostrar dashboard con datos parciales
         }
-      } else {
-        console.warn('Error al cargar estadísticas:', statsResponse.status)
-        // No lanzar error — mostrar dashboard con datos parciales
-      }
 
-      // Procesar tickets
-      if (ticketsResponse.ok) {
-        const ticketsData = await ticketsResponse.json()
-        const ticketsList = Array.isArray(ticketsData.tickets)
-          ? ticketsData.tickets
-          : Array.isArray(ticketsData)
-            ? ticketsData
-            : []
-        setTickets(ticketsList)
+        // Procesar tickets
+        if (ticketsResponse.ok) {
+          const ticketsData = await ticketsResponse.json()
+          const ticketsList = Array.isArray(ticketsData.tickets)
+            ? ticketsData.tickets
+            : Array.isArray(ticketsData)
+              ? ticketsData
+              : []
+          setTickets(ticketsList)
 
-        // Agregar estadísticas adicionales de tickets si existen
-        if (ticketsData.pendingAssignment !== undefined) {
-          setStats(prev => ({
-            ...prev,
-            pendingAssignment: ticketsData.pendingAssignment,
-            overdueTickets: ticketsData.overdueTickets,
-          }))
+          // Agregar estadísticas adicionales de tickets si existen
+          if (ticketsData.pendingAssignment !== undefined) {
+            setStats(prev => ({
+              ...prev,
+              pendingAssignment: ticketsData.pendingAssignment,
+              overdueTickets: ticketsData.overdueTickets,
+            }))
+          }
+        } else {
+          console.warn('Error al cargar tickets:', ticketsResponse.status)
+          setTickets([])
         }
-      } else {
-        console.warn('Error al cargar tickets:', ticketsResponse.status)
-        setTickets([])
+      } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') {
+          setError('Tiempo de espera agotado. Por favor, intenta de nuevo.')
+        } else {
+          const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
+          setError(errorMessage)
+          console.error('Dashboard data error:', err)
+        }
+      } finally {
+        clearTimeout(timeoutId)
+        setIsLoading(false)
       }
-    } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') {
-        setError('Tiempo de espera agotado. Por favor, intenta de nuevo.')
-      } else {
-        const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
-        setError(errorMessage)
-        console.error('Dashboard data error:', err)
-      }
-    } finally {
-      clearTimeout(timeoutId)
-      setIsLoading(false)
-    }
-  }, [role])
+    },
+    [role]
+  )
+
+  const silentRefetch = useCallback(() => {
+    void loadData(true)
+  }, [loadData])
+
+  useLiveTicketRefresh(silentRefetch)
 
   useEffect(() => {
-    loadData()
+    void loadData(false)
 
-    // Auto-refresh cada 5 minutos — pero solo si la pestaña está visible
     const interval = setInterval(
       () => {
-        if (!document.hidden) loadData()
+        if (!document.hidden) void loadData(true)
       },
       5 * 60 * 1000
     )
 
-    // Recargar cuando la pestaña vuelve a ser visible (si pasaron > 2 min)
-    let lastLoad = Date.now()
-    const handleVisibilityChange = () => {
-      if (!document.hidden && Date.now() - lastLoad > 2 * 60 * 1000) {
-        lastLoad = Date.now()
-        loadData()
-      }
-    }
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-
     return () => {
       clearInterval(interval)
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, [loadData])
 
@@ -245,11 +241,9 @@ export function useDashboardStats(role: Role) {
     const timeoutId = setTimeout(() => controller.abort(), DASHBOARD_SINGLE_FETCH_TIMEOUT_MS)
 
     try {
-      const response = await fetch(`/api/dashboard/stats?role=${role}`, {
+      const response = await fetch(`/api/dashboard/stats?role=${role}&fresh=1`, {
         signal: controller.signal,
-        headers: {
-          'Cache-Control': 'max-age=60',
-        },
+        cache: 'no-store',
       })
 
       if (response.ok) {

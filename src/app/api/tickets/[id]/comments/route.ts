@@ -11,6 +11,7 @@ import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit
 import { NotificationService } from '@/lib/services/notification-service'
 import { FileService } from '@/lib/services/file-service'
 import { TicketEvents } from '@/lib/ticket-events'
+import { invalidateTicketCaches } from '@/lib/tickets/notify-ticket-changed'
 import {
   assertTicketAccess,
   TicketAccessError,
@@ -86,8 +87,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     const isAdmin = session.user.role === 'ADMIN'
+    const isTechnician = session.user.role === 'TECHNICIAN'
     const isClient = ticket.clientId === session.user.id
     const isAssignee = ticket.assigneeId === session.user.id
+
+    if ((isAdmin || isTechnician) && ticket.status === 'OPEN') {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Pon el ticket En progreso para comentar y registrar actividad en el historial',
+        },
+        { status: 400 }
+      )
+    }
 
     let isCollaborator = false
     if (session.user.role === 'TECHNICIAN' && !isAssignee) {
@@ -304,6 +316,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     // Emitir evento SSE a todos los clientes suscritos a este ticket (instantáneo)
     TicketEvents.emit(ticketId, { type: 'comment_added' })
+    void invalidateTicketCaches()
 
     return NextResponse.json({
       success: true,

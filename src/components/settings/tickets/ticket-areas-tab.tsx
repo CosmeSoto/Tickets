@@ -25,6 +25,7 @@ import { FamilyIcon } from '@/components/inventory/family-badge'
 import { TimePicker } from '@/components/ui/time-picker'
 import type { Family, TicketFamilyConfig, SlaRow } from '@/hooks/use-ticket-settings'
 import { DAY_OPTIONS, PRIORITY_LABELS, PRIORITY_COLORS } from '@/hooks/use-ticket-settings'
+import { exampleTicketCode } from '@/lib/tickets/ticket-code-format'
 
 interface TicketAreasTabProps {
   families: Family[]
@@ -199,7 +200,7 @@ export function TicketAreasTab({
                     <p className='text-xs text-muted-foreground mt-1'>
                       Ejemplo:{' '}
                       <span className='font-mono'>
-                        {config.codePrefix || selectedFamily?.code || 'TI'}-2026-0001
+                        {exampleTicketCode(config.codePrefix || selectedFamily?.code || 'TI')}
                       </span>
                     </p>
                   </div>

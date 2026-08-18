@@ -515,7 +515,7 @@ export const formatDate = (dateString: string): string => {
 
 /**
  * Retorna el código legible del ticket:
- * - Si tiene ticketCode (ej: "TI-2026-0001") → lo usa
+ * - Si tiene ticketCode (ej: "TI-20260818-0001") → lo usa
  * - Fallback: últimos 8 chars del UUID en mayúsculas
  */
 export const getTicketDisplayCode = (ticket: Pick<Ticket, 'id' | 'ticketCode'>): string => {

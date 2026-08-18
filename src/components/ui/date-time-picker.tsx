@@ -159,6 +159,7 @@ export function DatePickerWithTime({
   const handleDaySelect = (day: Date | undefined) => {
     if (!day) return
     onDateChange?.(format(day, 'yyyy-MM-dd'))
+    if (showTime && !timeValue) onTimeChange?.('09:00')
     if (!showTime) setOpen(false)
   }
 
@@ -211,7 +212,10 @@ export function DatePickerWithTime({
             <span className='text-xs text-muted-foreground whitespace-nowrap'>Hora:</span>
             <TimePicker
               value={timeValue || '09:00'}
-              onChange={v => onTimeChange?.(v)}
+              onChange={v => {
+                if (!dateValue) onDateChange?.(format(new Date(), 'yyyy-MM-dd'))
+                onTimeChange?.(v)
+              }}
               className='flex-1'
             />
             <Button size='sm' variant='ghost' onClick={() => setOpen(false)} className='text-xs'>

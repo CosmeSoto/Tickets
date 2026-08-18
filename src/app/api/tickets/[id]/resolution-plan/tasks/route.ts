@@ -16,6 +16,7 @@ import {
   TicketAccessError,
   toTicketAccessUser,
 } from '@/lib/tickets/ticket-access'
+import { notifyTicketChanged } from '@/lib/tickets/notify-ticket-changed'
 
 /**
  * POST /api/tickets/[id]/resolution-plan/tasks
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     // Buscar plan de resolución
     const plan = await prisma.resolution_plans.findFirst({
-      where: { ticketId },
+      where: { ticketId, status: { in: ['draft', 'active'] } },
       include: {
         ticket: true,
       },
@@ -188,6 +189,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         console.error('[API] Error creating notification for task:', notificationError)
       }
     }
+
+    notifyTicketChanged(ticketId, 'plan_task_created')
 
     return NextResponse.json({
       success: true,

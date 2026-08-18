@@ -19,13 +19,20 @@ export async function GET(request: NextRequest) {
 
     const ttl = role === 'CLIENT' ? 180 : 120
     const cacheKey = buildCacheKey('dashboard', { role, uid: userId })
+    const fresh = request.nextUrl.searchParams.get('fresh') === '1'
 
-    try {
-      const { getCached } = await import('@/lib/redis')
-      const cached = await getCached<any>(cacheKey)
-      if (cached) return NextResponse.json(cached)
-    } catch {
-      /* Redis no disponible — continuar sin caché */
+    if (!fresh) {
+      try {
+        const { getCached } = await import('@/lib/redis')
+        const cached = await getCached<any>(cacheKey)
+        if (cached) {
+          return NextResponse.json(cached, {
+            headers: { 'Cache-Control': 'no-store' },
+          })
+        }
+      } catch {
+        /* Redis no disponible — continuar sin caché */
+      }
     }
 
     let stats: any
@@ -48,15 +55,20 @@ export async function GET(request: NextRequest) {
       /* Redis no disponible */
     }
 
-    return NextResponse.json(stats)
+    return NextResponse.json(stats, {
+      headers: { 'Cache-Control': 'no-store' },
+    })
   } catch (error) {
     console.error('[/api/dashboard/stats] Error:', error)
     // Devolver stats vacías en vez de 500 para no romper el dashboard
-    return NextResponse.json({
-      totalTickets: 0,
-      openTickets: 0,
-      closedTickets: 0,
-      avgResponseTime: '0',
-    })
+    return NextResponse.json(
+      {
+        totalTickets: 0,
+        openTickets: 0,
+        closedTickets: 0,
+        avgResponseTime: '0',
+      },
+      { headers: { 'Cache-Control': 'no-store' } }
+    )
   }
 }

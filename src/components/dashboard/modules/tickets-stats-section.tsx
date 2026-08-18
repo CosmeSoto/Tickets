@@ -357,6 +357,70 @@ export function TicketsStatsSection({
   }
 
   // ── CLIENT ─────────────────────────────────────────────────────────────────
-  // Actualmente el bloque CLIENT no tiene métricas activas — retornar null.
-  return null
+  const openCount = stats.openTickets ?? 0
+  const inProgressCount = stats.inProgressTickets ?? 0
+  const resolvedCount = stats.resolvedTickets ?? 0
+  const totalCount = stats.totalTickets ?? 0
+  const toRate = stats.ticketsToRate ?? 0
+  const thisMonth = stats.thisMonthTickets ?? 0
+
+  return (
+    <div className='mb-8'>
+      <div className='flex items-center justify-between mb-4'>
+        <div className='flex items-center gap-2'>
+          <Ticket className='h-5 w-5 text-muted-foreground' />
+          <h3 className='text-sm font-semibold text-foreground'>Módulo de Tickets</h3>
+          {openCount > 0 && (
+            <Badge variant='outline' className='text-xs h-5 px-1.5'>
+              {openCount} abiertos
+            </Badge>
+          )}
+        </div>
+        <Button variant='ghost' size='sm' asChild>
+          <Link href={ticketsLink} className='gap-1 text-xs'>
+            Ver tickets <ArrowRight className='h-3 w-3' />
+          </Link>
+        </Button>
+      </div>
+
+      <StaggerGrid className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
+        <SymmetricStatsCard
+          title='Total Tickets'
+          value={totalCount}
+          icon={Ticket}
+          color='blue'
+          role='CLIENT'
+          badge={{ text: `${thisMonth} este mes`, variant: 'secondary' }}
+        />
+        <SymmetricStatsCard
+          title='Abiertos'
+          value={openCount}
+          icon={AlertCircle}
+          color='orange'
+          role='CLIENT'
+          status={openCount > 3 ? 'warning' : 'normal'}
+        />
+        <SymmetricStatsCard
+          title='En Progreso'
+          value={inProgressCount}
+          icon={Clock}
+          color='orange'
+          role='CLIENT'
+        />
+        <SymmetricStatsCard
+          title='Resueltos'
+          value={resolvedCount}
+          icon={CheckCircle}
+          color='green'
+          role='CLIENT'
+          status='success'
+          badge={
+            toRate > 0
+              ? { text: `${toRate} por calificar`, variant: 'outline' }
+              : { text: `${stats.satisfactionRating ?? 0}/5`, variant: 'default' }
+          }
+        />
+      </StaggerGrid>
+    </div>
+  )
 }

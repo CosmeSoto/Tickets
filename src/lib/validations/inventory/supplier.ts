@@ -3,11 +3,11 @@ import { PAYMENT_METHOD_TYPE_VALUES } from '@/lib/validations/contracts'
 
 export const SUPPLIER_PAYMENT_TERMS_OPTIONS = [
   { value: 0, label: 'Contado / inmediato' },
-  { value: 15, label: 'Net 15 (15 días)' },
-  { value: 30, label: 'Net 30 (30 días)' },
-  { value: 45, label: 'Net 45 (45 días)' },
-  { value: 60, label: 'Net 60 (60 días)' },
-  { value: 90, label: 'Net 90 (90 días)' },
+  { value: 15, label: '15 días' },
+  { value: 30, label: '30 días' },
+  { value: 45, label: '45 días' },
+  { value: 60, label: '60 días' },
+  { value: 90, label: '90 días' },
 ] as const
 
 export const SUPPLIER_BANK_ACCOUNT_TYPES = ['CHECKING', 'SAVINGS', 'OTHER'] as const
@@ -26,48 +26,44 @@ const emptyToNull = (v: unknown) => (v === '' || v === undefined ? null : v)
 const optionalString = (max: number) =>
   z.preprocess(emptyToNull, z.string().max(max).nullable().optional())
 
-export const supplierFormSchema = z
-  .object({
-    name: z.string().min(1, 'El nombre del proveedor es obligatorio').max(200),
-    legalName: optionalString(200),
-    typeId: optionalString(50),
-    familyId: optionalString(50),
-    taxId: optionalString(20),
-    email: z.preprocess(
-      emptyToNull,
-      z.string().email('Email inválido').max(200).nullable().optional()
-    ),
-    phone: optionalString(50),
-    contactName: optionalString(200),
-    website: optionalString(500),
-    address: optionalString(500),
-    city: optionalString(100),
-    country: optionalString(100),
-    paymentTermsDays: z.preprocess(
-      v => (v === '' || v === undefined || v === null ? null : Number(v)),
-      z.number().int().min(0).max(365).nullable().optional()
-    ),
-    creditLimit: z.preprocess(
-      v => (v === '' || v === undefined || v === null ? null : Number(String(v).replace(',', '.'))),
-      z.number().min(0).nullable().optional()
-    ),
-    creditCurrency: z.preprocess(
-      emptyToNull,
-      z.string().length(3).nullable().optional()
-    ),
-    preferredPaymentMethod: z.preprocess(
-      emptyToNull,
-      z.enum(PAYMENT_METHOD_TYPE_VALUES).nullable().optional()
-    ),
-    bankName: optionalString(100),
-    bankAccountNumber: optionalString(80),
-    bankAccountType: z.preprocess(
-      emptyToNull,
-      z.enum(SUPPLIER_BANK_ACCOUNT_TYPES).nullable().optional()
-    ),
-    bankSwift: optionalString(30),
-    notes: optionalString(5000),
-  })
+export const supplierFormSchema = z.object({
+  name: z.string().min(1, 'El nombre del proveedor es obligatorio').max(200),
+  legalName: optionalString(200),
+  typeId: optionalString(50),
+  familyId: optionalString(50),
+  taxId: optionalString(20),
+  email: z.preprocess(
+    emptyToNull,
+    z.string().email('Email inválido').max(200).nullable().optional()
+  ),
+  phone: optionalString(50),
+  contactName: optionalString(200),
+  website: optionalString(500),
+  address: optionalString(500),
+  city: optionalString(100),
+  country: optionalString(100),
+  paymentTermsDays: z.preprocess(
+    v => (v === '' || v === undefined || v === null ? null : Number(v)),
+    z.number().int().min(0).max(365).nullable().optional()
+  ),
+  creditLimit: z.preprocess(
+    v => (v === '' || v === undefined || v === null ? null : Number(String(v).replace(',', '.'))),
+    z.number().min(0).nullable().optional()
+  ),
+  creditCurrency: z.preprocess(emptyToNull, z.string().length(3).nullable().optional()),
+  preferredPaymentMethod: z.preprocess(
+    emptyToNull,
+    z.enum(PAYMENT_METHOD_TYPE_VALUES).nullable().optional()
+  ),
+  bankName: optionalString(100),
+  bankAccountNumber: optionalString(80),
+  bankAccountType: z.preprocess(
+    emptyToNull,
+    z.enum(SUPPLIER_BANK_ACCOUNT_TYPES).nullable().optional()
+  ),
+  bankSwift: optionalString(30),
+  notes: optionalString(5000),
+})
 
 export type SupplierFormInput = z.infer<typeof supplierFormSchema>
 

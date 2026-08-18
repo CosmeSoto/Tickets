@@ -5,6 +5,7 @@ import { NotificationService } from './notification-service'
 import { ApplicationLogger } from '@/lib/logging'
 import { randomUUID } from 'crypto'
 import { TicketCodeService } from './ticket-code.service'
+import { parseTicketCode } from '@/lib/tickets/ticket-code-format'
 import { TicketFamilyConfigService } from './ticket-family-config.service'
 
 export interface TicketFilters {
@@ -218,16 +219,14 @@ export class TicketService {
         if (!validation.valid) {
           throw new Error(validation.error ?? 'Código de ticket inválido')
         }
-        ticketCode = data.ticketCode
+        ticketCode = data.ticketCode.trim().toUpperCase()
         codeIsManual = true
-        const parts = ticketCode.split('-')
-        const sequence = parseInt(parts[parts.length - 1], 10)
-        const year = parseInt(parts[parts.length - 2], 10)
-        if (!isNaN(sequence) && !isNaN(year)) {
-          await TicketCodeService.updateCounterIfNeeded(familyId, year, sequence)
+        const parsed = parseTicketCode(ticketCode)
+        if (parsed) {
+          await TicketCodeService.updateCounterIfNeeded(familyId, parsed.year, parsed.sequence)
         }
       } else {
-        ticketCode = await TicketCodeService.generateCode(familyId, new Date().getFullYear())
+        ticketCode = await TicketCodeService.generateCode(familyId)
       }
 
       const historyUserId = data.historyUserId ?? data.clientId

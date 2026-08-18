@@ -23,9 +23,9 @@ export function PlanFormDialog({
 }: PlanFormDialogProps) {
   // Calcular horas estimadas automáticamente
   const calculateEstimatedHours = () => {
-    if (planForm.startDate && planForm.startTime && planForm.targetDate && planForm.targetTime) {
-      const start = new Date(`${planForm.startDate}T${planForm.startTime}`)
-      const target = new Date(`${planForm.targetDate}T${planForm.targetTime}`)
+    if (planForm.startDate && planForm.targetDate) {
+      const start = new Date(`${planForm.startDate}T${planForm.startTime || '09:00'}`)
+      const target = new Date(`${planForm.targetDate}T${planForm.targetTime || '09:00'}`)
       const diffMs = target.getTime() - start.getTime()
       const diffHours = diffMs / (1000 * 60 * 60)
       return diffHours

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import React from 'react'
 import { useSession } from 'next-auth/react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './card'
@@ -28,12 +28,16 @@ import {
   File as FileIcon,
   Lock,
   Globe,
+  PlayCircle,
 } from 'lucide-react'
 import { useTimeline, type TimelineEvent } from '@/hooks/use-timeline'
 import { formatTimeAgo } from '@/hooks/use-ticket-data'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './tooltip'
 import { FilePreviewModal } from '@/components/tickets/file-preview-modal'
 import { formatDuration } from '@/lib/utils/time-utils'
+import { FormDraftBanner } from '@/components/common/form-draft-banner'
+import { FormDraftKeys, useFormDraft } from '@/hooks/common/use-form-draft'
+import { Alert, AlertDescription } from './alert'
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -52,6 +56,9 @@ interface TicketTimelineProps {
   refreshKey?: number
   onCommentAdded?: () => void
   onStopPolling?: (stopFn: () => void) => void
+  ticketStatus?: string
+  /** Admin/técnico: exige En progreso para comentar */
+  requireInProgress?: boolean
 }
 
 // ─── Helpers globales (sin estado, reutilizables) ─────────────────────────────
@@ -147,6 +154,8 @@ export function TicketTimeline({
   refreshKey = 0,
   onCommentAdded,
   onStopPolling,
+  ticketStatus,
+  requireInProgress = false,
 }: TicketTimelineProps) {
   const { data: session } = useSession()
   const { events, loading, addComment, loadTimeline, setEvents, stopPolling } =
@@ -168,6 +177,23 @@ export function TicketTimeline({
     size: number
     url: string
   } | null>(null)
+
+  const needsInProgress = requireInProgress && ticketStatus === 'OPEN' && canAddComments
+  const canWriteComment = canAddComments && !needsInProgress
+
+  const commentDraftValues = useMemo(
+    () => ({ content: newComment, isInternal }),
+    [newComment, isInternal]
+  )
+  const { clearDraft, wasRestored, dismissRestoredBanner } = useFormDraft({
+    key: FormDraftKeys.ticketComment(ticketId),
+    values: commentDraftValues,
+    enabled: canWriteComment && !submitting,
+    onRestore: d => {
+      if (typeof d.content === 'string') setNewComment(d.content)
+      if (typeof d.isInternal === 'boolean') setIsInternal(d.isInternal)
+    },
+  })
 
   // Recargar cuando el padre lo pida (cambio de estado, asignación, etc.)
   useEffect(() => {
@@ -227,6 +253,7 @@ export function TicketTimeline({
     setNewComment('')
     setIsInternal(false)
     setAttachments([])
+    clearDraft()
     setEvents(prev => [optimisticEvent, ...prev])
 
     const result = await addComment(commentContent, commentIsInternal, commentAttachments)
@@ -618,7 +645,16 @@ export function TicketTimeline({
         </CardHeader>
         <CardContent>
           {/* Formulario de comentario */}
-          {canAddComments && (
+          {needsInProgress && (
+            <Alert className='mb-6'>
+              <PlayCircle className='h-4 w-4' />
+              <AlertDescription>
+                Pon el ticket <strong>En progreso</strong> para escribir comentarios y registrar
+                actividad en el historial.
+              </AlertDescription>
+            </Alert>
+          )}
+          {canWriteComment && (
             <div
               className={`mb-6 p-4 border rounded-lg space-y-3 transition-colors ${
                 isInternal
@@ -626,6 +662,16 @@ export function TicketTimeline({
                   : 'bg-muted border-border'
               }`}
             >
+              <FormDraftBanner
+                visible={wasRestored}
+                onDismiss={dismissRestoredBanner}
+                onDiscard={() => {
+                  clearDraft()
+                  dismissRestoredBanner()
+                  setNewComment('')
+                  setIsInternal(false)
+                }}
+              />
               {isInternal && (
                 <div className='flex items-center gap-2 text-xs font-medium text-amber-700 dark:text-amber-400'>
                   <Lock className='h-3.5 w-3.5' />

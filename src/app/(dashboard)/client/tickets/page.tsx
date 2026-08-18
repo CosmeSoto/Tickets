@@ -23,6 +23,7 @@ import type { Ticket as TicketType } from '@/hooks/use-ticket-data'
 import { filterTicketsClient } from '@/lib/utils/ticket-filters'
 import { CLIENT_TICKET_EXPORT_COLUMNS } from '@/lib/utils/ticket-utils'
 import { useFamilies } from '@/contexts/families-context'
+import { useLiveTicketRefresh } from '@/hooks/use-live-ticket-refresh'
 
 interface FamilyOption {
   id: string
@@ -44,10 +45,13 @@ export default function ClientTicketsPage() {
     loading,
     error,
     reload,
+    reloadSilent,
   } = useModuleData<TicketType>({
     endpoint: '/api/tickets?limit=500',
     initialLoad: true,
   })
+
+  useLiveTicketRefresh(reloadSilent)
 
   // Familias ya disponibles desde el contexto global
 
@@ -89,7 +93,7 @@ export default function ClientTicketsPage() {
   const pagination = usePagination(filteredTickets, { pageSize: 20 })
 
   const stats = useMemo(() => {
-    const respondedTickets = filteredTickets.filter(
+    const respondedTickets = allTickets.filter(
       t => t.status !== 'OPEN' && t.updatedAt !== t.createdAt
     )
     let avgResponseTime = 'N/A'
@@ -105,13 +109,13 @@ export default function ClientTicketsPage() {
       else avgResponseTime = `${Math.round(avgMinutes / 1440)}d`
     }
     return {
-      total: filteredTickets.length,
-      open: filteredTickets.filter(t => t.status === 'OPEN').length,
-      inProgress: filteredTickets.filter(t => t.status === 'IN_PROGRESS').length,
-      resolved: filteredTickets.filter(t => t.status === 'RESOLVED').length,
+      total: allTickets.length,
+      open: allTickets.filter(t => t.status === 'OPEN').length,
+      inProgress: allTickets.filter(t => t.status === 'IN_PROGRESS').length,
+      resolved: allTickets.filter(t => t.status === 'RESOLVED' || t.status === 'CLOSED').length,
       avgResponseTime,
     }
-  }, [filteredTickets])
+  }, [allTickets])
 
   const handleViewTicket = (ticket: TicketType) => router.push(`/client/tickets/${ticket.id}`)
 

@@ -20,6 +20,7 @@ import {
 import { assertTechnicianActiveInFamily } from '@/lib/tickets/assignee-validation'
 import { FileService } from '@/lib/services/file-service'
 import { getAutoAssignmentEnabled, getMaxTicketsPerUser } from '@/lib/settings/runtime-settings'
+import { notifyTicketChanged } from '@/lib/tickets/notify-ticket-changed'
 
 export async function GET(request: NextRequest) {
   try {
@@ -72,15 +73,14 @@ export async function GET(request: NextRequest) {
     const andParts: any[] = []
 
     if (search) {
+      const searchTerm = search.replace(/^#/, '').trim()
       const searchConditions: any[] = [
-        { title: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
-        { users_tickets_clientIdTousers: { name: { contains: search, mode: 'insensitive' } } },
-        { users_tickets_clientIdTousers: { email: { contains: search, mode: 'insensitive' } } },
+        { title: { contains: searchTerm, mode: 'insensitive' } },
+        { description: { contains: searchTerm, mode: 'insensitive' } },
+        { users_tickets_clientIdTousers: { name: { contains: searchTerm, mode: 'insensitive' } } },
+        { users_tickets_clientIdTousers: { email: { contains: searchTerm, mode: 'insensitive' } } },
+        { ticketCode: { contains: searchTerm, mode: 'insensitive' } },
       ]
-      if (search.includes('-')) {
-        searchConditions.push({ ticketCode: { contains: search, mode: 'insensitive' } })
-      }
       andParts.push({ OR: searchConditions })
     }
 
@@ -697,7 +697,8 @@ export async function POST(request: NextRequest) {
         template: 'ticket-created',
         templateData: {
           ticketId: ticketAfterAssign.id,
-          ticketNumber: (ticketAfterAssign as any).ticketCode ?? ticketAfterAssign.id.substring(0, 8),
+          ticketNumber:
+            (ticketAfterAssign as any).ticketCode ?? ticketAfterAssign.id.substring(0, 8),
           ticketTitle: ticketAfterAssign.title,
           title: ticketAfterAssign.title,
           clientName: ticketAfterAssign.users_tickets_clientIdTousers.name,
@@ -736,8 +737,7 @@ export async function POST(request: NextRequest) {
 
       if (wasAutoAssigned) {
         try {
-          const { triggerTicketAssignedToTechnicianEmail } =
-            await import('@/lib/email-triggers')
+          const { triggerTicketAssignedToTechnicianEmail } = await import('@/lib/email-triggers')
           void triggerTicketAssignedToTechnicianEmail(ticketAfterAssign.id)
           // Cliente ya recibe "ticket creado"; no duplicar con "asignado" en el mismo flujo
         } catch (emailAssignErr) {
@@ -771,6 +771,8 @@ export async function POST(request: NextRequest) {
       category: ticketAfterAssign.categories,
       family: (ticketAfterAssign as any).family,
     }
+
+    notifyTicketChanged(mappedTicket.id, 'ticket_created')
 
     return NextResponse.json({
       success: true,

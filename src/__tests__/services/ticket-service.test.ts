@@ -47,7 +47,7 @@ jest.mock('@/lib/services/notification-service', () => ({
 
 jest.mock('@/lib/services/ticket-code.service', () => ({
   TicketCodeService: {
-    generateCode: jest.fn().mockResolvedValue('TI-2026-0001'),
+    generateCode: jest.fn().mockResolvedValue('TI-20260818-0001'),
     validateManualCode: jest.fn().mockResolvedValue({ valid: true }),
     updateCounterIfNeeded: jest.fn().mockResolvedValue(undefined),
   },

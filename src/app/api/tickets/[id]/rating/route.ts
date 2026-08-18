@@ -11,6 +11,7 @@ import {
   TicketAccessError,
   toTicketAccessUser,
 } from '@/lib/tickets/ticket-access'
+import { invalidateTicketCaches } from '@/lib/tickets/notify-ticket-changed'
 
 const ratingSchema = z.object({
   rating: z.number().min(1).max(5),
@@ -372,6 +373,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
       status: ticket.status === 'RESOLVED' ? 'CLOSED' : ticket.status,
       rating: data.rating,
     })
+    void invalidateTicketCaches()
 
     return NextResponse.json({
       success: true,

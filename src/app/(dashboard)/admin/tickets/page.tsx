@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useEffect, useRef } from 'react'
+import { useMemo, useState, useEffect, useRef, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Plus, Ticket, AlertCircle, Clock, UserX, Send, CheckCircle } from 'lucide-react'
@@ -25,6 +25,7 @@ import type { Ticket as TicketType } from '@/hooks/use-ticket-data'
 import { filterTicketsAdmin, filterTicketsCreatedBy } from '@/lib/utils/ticket-filters'
 import { ADMIN_TICKET_EXPORT_COLUMNS } from '@/lib/utils/ticket-utils'
 import { useFamilies } from '@/contexts/families-context'
+import { useLiveTicketRefresh } from '@/hooks/use-live-ticket-refresh'
 
 export default function AdminTicketsPage() {
   const { data: session } = useSession()
@@ -58,6 +59,7 @@ export default function AdminTicketsPage() {
     loading: loadingAll,
     error: errorAll,
     reload: reloadAll,
+    reloadSilent: reloadAllSilent,
   } = useModuleData<TicketType>({
     endpoint: '/api/tickets?limit=500',
     initialLoad: true,
@@ -69,10 +71,18 @@ export default function AdminTicketsPage() {
     loading: loadingCreated,
     error: errorCreated,
     reload: reloadCreated,
+    reloadSilent: reloadCreatedSilent,
   } = useModuleData<TicketType>({
     endpoint: '/api/tickets?viewMode=created&limit=500',
     initialLoad: true,
   })
+
+  useLiveTicketRefresh(
+    useCallback(() => {
+      void reloadAllSilent()
+      void reloadCreatedSilent()
+    }, [reloadAllSilent, reloadCreatedSilent])
+  )
 
   const { filters, debouncedFilters, setFilter, clearFilters, hasActiveFilters } =
     useTicketFilters()

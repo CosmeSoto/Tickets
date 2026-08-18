@@ -121,6 +121,7 @@ export async function getAdminStats(userId: string, isSuperAdmin: boolean) {
       select: { createdAt: true, resolvedAt: true },
     }),
     prisma.resolution_plans.aggregate({
+      where: isSuperAdmin ? {} : { ticket: ticketFamilyFilter },
       _count: { id: true },
       _avg: {
         estimatedHours: true,

@@ -28,6 +28,7 @@ export interface UseModuleDataReturn<T> {
   update: (id: string, item: Partial<T>) => Promise<T | null>
   remove: (id: string) => Promise<boolean>
   reload: () => Promise<void>
+  reloadSilent: () => Promise<void>
   findById: (id: string) => T | undefined
   setData: React.Dispatch<React.SetStateAction<T[]>>
 }
@@ -117,6 +118,11 @@ export function useModuleData<T extends { id: string }>(
   const reload = useCallback(async () => {
     cache.delete(endpoint)
     await loadData(true)
+  }, [loadData, endpoint])
+
+  const reloadSilent = useCallback(async () => {
+    cache.delete(endpoint)
+    await loadData(false)
   }, [loadData, endpoint])
 
   // ── create ─────────────────────────────────────────────────────────────────
@@ -238,5 +244,5 @@ export function useModuleData<T extends { id: string }>(
     if (initialLoad) loadData(true)
   }, []) // Solo en mount // eslint-disable-line react-hooks/exhaustive-deps
 
-  return { data, loading, error, create, update, remove, reload, findById, setData }
+  return { data, loading, error, create, update, remove, reload, reloadSilent, findById, setData }
 }

@@ -8,7 +8,7 @@ import { WebhookService } from '@/lib/services/webhook-service'
 import { SLAService } from '@/lib/services/sla-service'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 import { NotificationService } from '@/lib/services/notification-service'
-import { invalidateCache } from '@/lib/api-cache'
+import { notifyTicketChanged, invalidateTicketCaches } from '@/lib/tickets/notify-ticket-changed'
 import { translateFieldNames } from '@/lib/constants/ticket-labels'
 import { assertTechnicianActiveInFamily } from '@/lib/tickets/assignee-validation'
 import {
@@ -16,16 +16,6 @@ import {
   TicketAccessError,
   toTicketAccessUser,
 } from '@/lib/tickets/ticket-access'
-
-// Helper: invalida caché de tickets y dashboard cuando un ticket cambia
-async function invalidateTicketCaches() {
-  await invalidateCache([
-    'tickets:role=ADMIN*',
-    'tickets:role=TECHNICIAN*',
-    'tickets:role=CLIENT*',
-    'dashboard:*',
-  ]).catch(() => {})
-}
 
 export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
@@ -399,6 +389,8 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
         category: updatedTicket.categories,
       }
 
+      notifyTicketChanged(finalId, 'ticket_updated')
+
       return NextResponse.json({
         success: true,
         data: transformedTicket,
@@ -573,9 +565,8 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
               select: { name: true, email: true, role: true },
             })
             if (rater?.email) {
-              const { queueTicketResolvedRaterEmail } = await import(
-                '@/lib/notifications/ticket-resolved-email'
-              )
+              const { queueTicketResolvedRaterEmail } =
+                await import('@/lib/notifications/ticket-resolved-email')
               await queueTicketResolvedRaterEmail({
                 ticketId: finalId,
                 title: updatedTicket.title,
@@ -739,6 +730,8 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
         assignee: updatedTicket.users_tickets_assigneeIdTousers,
         category: updatedTicket.categories,
       }
+
+      notifyTicketChanged(finalId, 'ticket_updated')
 
       return NextResponse.json({
         success: true,
@@ -911,6 +904,8 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
         category: updatedTicket.categories,
       }
 
+      notifyTicketChanged(finalId, 'ticket_updated')
+
       return NextResponse.json({
         success: true,
         data: transformedTicket,
@@ -1019,6 +1014,8 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
       },
       request: request,
     })
+
+    notifyTicketChanged(finalId, 'ticket_deleted')
 
     return NextResponse.json({
       success: true,

@@ -354,7 +354,11 @@ export default function ClientTicketDetailPage() {
               <TabsTrigger value='timeline'>Historial</TabsTrigger>
               <TabsTrigger value='files'>Archivos</TabsTrigger>
             </TabsList>
-            <TabsContent value='timeline' className='space-y-4'>
+            <TabsContent
+              value='timeline'
+              forceMount
+              className='space-y-4 data-[state=inactive]:hidden'
+            >
               <TicketTimeline
                 ticketId={ticket.id}
                 canAddComments={ticket.status !== 'CLOSED'}

@@ -60,6 +60,24 @@ export function combineLocalDateAndTime(dateYmd: string, timeHm = '09:00'): Date
 }
 
 /**
+ * ISO a partir de fecha local + hora (si falta la hora usa 09:00).
+ */
+export function localDateAndTimeToIso(dateYmd: string, timeHm?: string): string | null {
+  if (!dateYmd?.trim()) return null
+  const d = combineLocalDateAndTime(dateYmd, timeHm?.trim() || '09:00')
+  if (Number.isNaN(d.getTime())) return null
+  return d.toISOString()
+}
+
+/** Partes fecha/hora locales para inputs (sin fallback de hora si no hay valor). */
+export function toLocalDateAndTimeParts(value: unknown): { date: string; time: string } {
+  if (value == null || value === '') return { date: '', time: '' }
+  const date = toLocalDateInputValue(value)
+  if (!date) return { date: '', time: '' }
+  return { date, time: toLocalTimeInputValue(value, '') }
+}
+
+/**
  * Parsea valor de programación: ISO, "YYYY-MM-DDTHH:mm" o solo fecha.
  * Preferir siempre enviar ISO desde el cliente.
  */

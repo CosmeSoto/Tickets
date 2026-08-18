@@ -19,7 +19,7 @@ import { Badge } from '@/components/ui/badge'
 interface TicketDetailLayoutProps {
   /** Título completo del ticket */
   title: string
-  /** Código legible, ej: TI-2026-0001 */
+  /** Código legible, ej: TI-20260818-0001 */
   ticketCode: string
   /** Config de estado: label + color */
   status: { label: string; color: string }
@@ -46,8 +46,8 @@ export function TicketDetailLayout({
     <ModuleLayout
       title={title}
       subtitle={
-        <span className="flex items-center gap-1.5 flex-wrap">
-          <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded border select-all">
+        <span className='flex items-center gap-1.5 flex-wrap'>
+          <span className='font-mono text-xs bg-muted px-1.5 py-0.5 rounded border select-all'>
             #{ticketCode}
           </span>
           <Badge className={`text-xs h-5 ${status.color}`}>{status.label}</Badge>

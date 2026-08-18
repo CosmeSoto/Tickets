@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useToast } from '@/hooks/use-toast'
 import { formatDuration } from '@/lib/utils/time-utils'
+import { localDateAndTimeToIso, toLocalDateAndTimeParts } from '@/lib/forms/form-date'
+import { FormDraftKeys, peekFormDraft, useFormDraft } from '@/hooks/common/use-form-draft'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -60,13 +62,45 @@ export interface PlanFormData {
   estimatedHours: string
 }
 
-export interface TaskFormData {
-  title: string
-  description: string
-  priority: 'low' | 'medium' | 'high'
-  dueDate: string
-  startTime: string
-  endTime: string
+const EMPTY_PLAN_FORM: PlanFormData = {
+  title: '',
+  description: '',
+  startDate: '',
+  startTime: '',
+  targetDate: '',
+  targetTime: '',
+  estimatedHours: '',
+}
+
+const EMPTY_TASK_FORM: TaskFormData = {
+  title: '',
+  description: '',
+  priority: 'medium',
+  dueDate: '',
+  startTime: '',
+  endTime: '',
+}
+
+function buildPlanDates(form: PlanFormData): {
+  startDate: string | null
+  targetDate: string | null
+  estimatedHours?: number
+  error?: string
+} {
+  const startDate = localDateAndTimeToIso(form.startDate, form.startTime)
+  const targetDate = localDateAndTimeToIso(form.targetDate, form.targetTime)
+  if (startDate && targetDate) {
+    const diffHours = (new Date(targetDate).getTime() - new Date(startDate).getTime()) / 3600000
+    if (diffHours <= 0) {
+      return {
+        startDate,
+        targetDate,
+        error: 'La fecha/hora de cierre debe ser posterior a la de inicio',
+      }
+    }
+    return { startDate, targetDate, estimatedHours: parseFloat(diffHours.toFixed(1)) }
+  }
+  return { startDate, targetDate }
 }
 
 // ── Hook ───────────────────────────────────────────────────────────────────
@@ -80,34 +114,56 @@ export function useResolutionPlan(ticketId: string, onPlanChange?: () => void) {
 
   // Estado del plan
   const [plan, setPlan] = useState<ResolutionPlan | null>(null)
+  const [plans, setPlans] = useState<ResolutionPlan[]>([])
   const [loading, setLoading] = useState(true)
 
   // Estados de UI
   const [showAddTask, setShowAddTask] = useState(false)
-  const [showCreatePlan, setShowCreatePlan] = useState(false)
+  const [showCreatePlan, setShowCreatePlan] = useState(() => {
+    const d = peekFormDraft<PlanFormData>(FormDraftKeys.ticketPlan(ticketId))
+    return Boolean(d?.title || d?.description || d?.startDate || d?.targetDate)
+  })
   const [showEditPlan, setShowEditPlan] = useState(false)
   const [showDeletePlan, setShowDeletePlan] = useState(false)
   const [taskToDelete, setTaskToDelete] = useState<string | null>(null)
   const [openPlanMenu, setOpenPlanMenu] = useState(false)
 
   // Formularios
-  const [planForm, setPlanForm] = useState<PlanFormData>({
-    title: '',
-    description: '',
-    startDate: '',
-    startTime: '',
-    targetDate: '',
-    targetTime: '',
-    estimatedHours: '',
+  const [planForm, setPlanForm] = useState<PlanFormData>(EMPTY_PLAN_FORM)
+
+  const [newTask, setNewTask] = useState<TaskFormData>(EMPTY_TASK_FORM)
+
+  const planDraft = useFormDraft({
+    key: FormDraftKeys.ticketPlan(ticketId),
+    values: planForm as unknown as Record<string, unknown>,
+    enabled: true,
+    onRestore: d => {
+      setPlanForm({
+        title: typeof d.title === 'string' ? d.title : '',
+        description: typeof d.description === 'string' ? d.description : '',
+        startDate: typeof d.startDate === 'string' ? d.startDate : '',
+        startTime: typeof d.startTime === 'string' ? d.startTime : '',
+        targetDate: typeof d.targetDate === 'string' ? d.targetDate : '',
+        targetTime: typeof d.targetTime === 'string' ? d.targetTime : '',
+        estimatedHours: typeof d.estimatedHours === 'string' ? d.estimatedHours : '',
+      })
+    },
   })
 
-  const [newTask, setNewTask] = useState<TaskFormData>({
-    title: '',
-    description: '',
-    priority: 'medium',
-    dueDate: '',
-    startTime: '',
-    endTime: '',
+  const taskDraft = useFormDraft({
+    key: FormDraftKeys.ticketPlanTask(ticketId),
+    values: newTask as unknown as Record<string, unknown>,
+    enabled: showAddTask,
+    onRestore: d => {
+      setNewTask({
+        title: typeof d.title === 'string' ? d.title : '',
+        description: typeof d.description === 'string' ? d.description : '',
+        priority: (d.priority as TaskFormData['priority']) || 'medium',
+        dueDate: typeof d.dueDate === 'string' ? d.dueDate : '',
+        startTime: typeof d.startTime === 'string' ? d.startTime : '',
+        endTime: typeof d.endTime === 'string' ? d.endTime : '',
+      })
+    },
   })
 
   // ── Cargar plan ──────────────────────────────────────────────────────────
@@ -122,9 +178,11 @@ export function useResolutionPlan(ticketId: string, onPlanChange?: () => void) {
           const data = await response.json()
           if (data.success && data.data) {
             setPlan(data.data)
+            setPlans(Array.isArray(data.plans) ? data.plans : [data.data])
             if (notifyChange) onPlanChangeRef.current?.()
           } else {
             setPlan(null)
+            setPlans([])
           }
         } else {
           console.error('Error loading resolution plan: HTTP', response.status)
@@ -158,33 +216,14 @@ export function useResolutionPlan(ticketId: string, onPlanChange?: () => void) {
     }
 
     try {
-      let startDate = null
-      if (planForm.startDate && planForm.startTime) {
-        startDate = new Date(`${planForm.startDate}T${planForm.startTime}:00`).toISOString()
-      }
-
-      let targetDate = null
-      if (planForm.targetDate && planForm.targetTime) {
-        targetDate = new Date(`${planForm.targetDate}T${planForm.targetTime}:00`).toISOString()
-      }
-
-      let estimatedHours = undefined
-      if (startDate && targetDate) {
-        const start = new Date(startDate)
-        const target = new Date(targetDate)
-        const diffMs = target.getTime() - start.getTime()
-        const diffHours = diffMs / (1000 * 60 * 60)
-
-        if (diffHours > 0) {
-          estimatedHours = parseFloat(diffHours.toFixed(1))
-        } else {
-          toast({
-            variant: 'destructive',
-            title: 'Fechas inválidas',
-            description: 'La fecha objetivo debe ser posterior a la fecha de inicio',
-          })
-          return
-        }
+      const { startDate, targetDate, estimatedHours, error } = buildPlanDates(planForm)
+      if (error) {
+        toast({
+          variant: 'destructive',
+          title: 'Fechas inválidas',
+          description: error,
+        })
+        return
       }
 
       const response = await fetch(`/api/tickets/${ticketId}/resolution-plan`, {
@@ -207,17 +246,11 @@ export function useResolutionPlan(ticketId: string, onPlanChange?: () => void) {
       const data = await response.json()
       if (data.success) {
         setPlan(data.data)
+        setPlans(prev => [data.data, ...prev.filter(p => p.id !== data.data.id)])
         onPlanChangeRef.current?.()
         setShowCreatePlan(false)
-        setPlanForm({
-          title: '',
-          description: '',
-          startDate: '',
-          startTime: '',
-          targetDate: '',
-          targetTime: '',
-          estimatedHours: '',
-        })
+        setPlanForm(EMPTY_PLAN_FORM)
+        planDraft.clearDraft()
         toast({
           title: 'Plan de resolución creado',
           description: `Plan creado con ${estimatedHours ? formatDuration(estimatedHours) + ' estimadas' : 'éxito'}. Se ha notificado al cliente.`,
@@ -249,39 +282,21 @@ export function useResolutionPlan(ticketId: string, onPlanChange?: () => void) {
     }
 
     try {
-      let startDate = null
-      if (planForm.startDate && planForm.startTime) {
-        startDate = new Date(`${planForm.startDate}T${planForm.startTime}:00`).toISOString()
-      }
-
-      let targetDate = null
-      if (planForm.targetDate && planForm.targetTime) {
-        targetDate = new Date(`${planForm.targetDate}T${planForm.targetTime}:00`).toISOString()
-      }
-
-      let estimatedHours = undefined
-      if (startDate && targetDate) {
-        const start = new Date(startDate)
-        const target = new Date(targetDate)
-        const diffMs = target.getTime() - start.getTime()
-        const diffHours = diffMs / (1000 * 60 * 60)
-
-        if (diffHours > 0) {
-          estimatedHours = parseFloat(diffHours.toFixed(1))
-        } else {
-          toast({
-            variant: 'destructive',
-            title: 'Fechas inválidas',
-            description: 'La fecha objetivo debe ser posterior a la fecha de inicio',
-          })
-          return
-        }
+      const { startDate, targetDate, estimatedHours, error } = buildPlanDates(planForm)
+      if (error) {
+        toast({
+          variant: 'destructive',
+          title: 'Fechas inválidas',
+          description: error,
+        })
+        return
       }
 
       const response = await fetch(`/api/tickets/${ticketId}/resolution-plan`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          planId: plan?.id,
           title: planForm.title.trim(),
           description: planForm.description.trim() || undefined,
           startDate,
@@ -300,6 +315,7 @@ export function useResolutionPlan(ticketId: string, onPlanChange?: () => void) {
         setPlan(data.data)
         onPlanChangeRef.current?.()
         setShowEditPlan(false)
+        planDraft.clearDraft()
         toast({
           title: 'Plan actualizado',
           description: 'El plan de resolución ha sido actualizado exitosamente',
@@ -318,9 +334,10 @@ export function useResolutionPlan(ticketId: string, onPlanChange?: () => void) {
 
   const deletePlan = async () => {
     try {
-      const response = await fetch(`/api/tickets/${ticketId}/resolution-plan`, {
-        method: 'DELETE',
-      })
+      const response = await fetch(
+        `/api/tickets/${ticketId}/resolution-plan${plan?.id ? `?planId=${plan.id}` : ''}`,
+        { method: 'DELETE' }
+      )
 
       if (!response.ok) {
         const error = await response.json()
@@ -330,6 +347,7 @@ export function useResolutionPlan(ticketId: string, onPlanChange?: () => void) {
       const data = await response.json()
       if (data.success) {
         setPlan(null)
+        setPlans(prev => prev.filter(p => p.id !== plan?.id))
         setShowDeletePlan(false)
         onPlanChangeRef.current?.()
         toast({
@@ -353,7 +371,7 @@ export function useResolutionPlan(ticketId: string, onPlanChange?: () => void) {
       const response = await fetch(`/api/tickets/${ticketId}/resolution-plan`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'active' }),
+        body: JSON.stringify({ status: 'active', planId: plan?.id }),
       })
 
       if (!response.ok) throw new Error('Error al activar plan')
@@ -384,6 +402,7 @@ export function useResolutionPlan(ticketId: string, onPlanChange?: () => void) {
         body: JSON.stringify({
           status: 'completed',
           completedDate: new Date().toISOString(),
+          planId: plan?.id,
         }),
       })
 
@@ -466,15 +485,9 @@ export function useResolutionPlan(ticketId: string, onPlanChange?: () => void) {
           onPlanChangeRef.current?.()
         }
         const taskTitle = newTask.title
-        setNewTask({
-          title: '',
-          description: '',
-          priority: 'medium',
-          dueDate: '',
-          startTime: '',
-          endTime: '',
-        })
+        setNewTask(EMPTY_TASK_FORM)
         setShowAddTask(false)
+        taskDraft.clearDraft()
         toast({
           title: 'Tarea agregada exitosamente',
           description: `"${taskTitle}" ha sido agregada al plan de resolución`,
@@ -603,26 +616,21 @@ export function useResolutionPlan(ticketId: string, onPlanChange?: () => void) {
   }
 
   const resetPlanForm = () => {
-    setPlanForm({
-      title: '',
-      description: '',
-      startDate: '',
-      startTime: '',
-      targetDate: '',
-      targetTime: '',
-      estimatedHours: '',
-    })
+    setPlanForm(EMPTY_PLAN_FORM)
+    planDraft.clearDraft()
   }
 
   const loadPlanToForm = () => {
     if (!plan) return
+    const start = toLocalDateAndTimeParts(plan.startDate)
+    const target = toLocalDateAndTimeParts(plan.targetDate)
     setPlanForm({
       title: plan.title,
       description: plan.description || '',
-      startDate: plan.startDate ? new Date(plan.startDate).toISOString().split('T')[0] : '',
-      startTime: plan.startDate ? new Date(plan.startDate).toTimeString().slice(0, 5) : '',
-      targetDate: plan.targetDate ? new Date(plan.targetDate).toISOString().split('T')[0] : '',
-      targetTime: plan.targetDate ? new Date(plan.targetDate).toTimeString().slice(0, 5) : '',
+      startDate: start.date,
+      startTime: start.time,
+      targetDate: target.date,
+      targetTime: target.time,
       estimatedHours: plan.estimatedHours?.toString() || '',
     })
   }
@@ -630,7 +638,15 @@ export function useResolutionPlan(ticketId: string, onPlanChange?: () => void) {
   return {
     // Estado
     plan,
+    plans,
     loading,
+    planDraftRestored: planDraft.wasRestored,
+    dismissPlanDraft: planDraft.dismissRestoredBanner,
+    discardPlanDraft: () => {
+      planDraft.clearDraft()
+      planDraft.dismissRestoredBanner()
+      setPlanForm(EMPTY_PLAN_FORM)
+    },
 
     // UI
     showAddTask,

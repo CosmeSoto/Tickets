@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useEffect, useRef } from 'react'
+import { useMemo, useState, useEffect, useRef, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import {
@@ -34,6 +34,7 @@ import type { Ticket as TicketType } from '@/hooks/use-ticket-data'
 import { filterTicketsTechnician, filterTicketsCreatedBy } from '@/lib/utils/ticket-filters'
 import { TECHNICIAN_TICKET_EXPORT_COLUMNS } from '@/lib/utils/ticket-utils'
 import { useFamilies } from '@/contexts/families-context'
+import { useLiveTicketRefresh } from '@/hooks/use-live-ticket-refresh'
 
 export default function TechnicianTicketsPage() {
   const { data: session } = useSession()
@@ -48,6 +49,7 @@ export default function TechnicianTicketsPage() {
     loading: loadingAssigned,
     error: errorAssigned,
     reload: reloadAssigned,
+    reloadSilent: reloadAssignedSilent,
   } = useModuleData<TicketType>({
     endpoint: '/api/tickets?limit=500',
     initialLoad: true,
@@ -59,10 +61,18 @@ export default function TechnicianTicketsPage() {
     loading: loadingCreated,
     error: errorCreated,
     reload: reloadCreated,
+    reloadSilent: reloadCreatedSilent,
   } = useModuleData<TicketType>({
     endpoint: '/api/tickets?viewMode=created&limit=500',
     initialLoad: true,
   })
+
+  useLiveTicketRefresh(
+    useCallback(() => {
+      void reloadAssignedSilent()
+      void reloadCreatedSilent()
+    }, [reloadAssignedSilent, reloadCreatedSilent])
+  )
 
   const { filters, debouncedFilters, setFilter, clearFilters, hasActiveFilters } =
     useTicketFilters()

@@ -388,17 +388,27 @@ export default function TechnicianTicketDetailPage() {
               <TabsTrigger value='files'>Archivos</TabsTrigger>
             </TabsList>
 
-            <TabsContent value='timeline' className='space-y-4'>
+            <TabsContent
+              value='timeline'
+              forceMount
+              className='space-y-4 data-[state=inactive]:hidden'
+            >
               <TicketTimeline
                 ticketId={ticket.id}
                 canAddComments={ticket.status !== 'CLOSED'}
                 canViewInternal
+                ticketStatus={ticket.status}
+                requireInProgress
                 refreshKey={timelineKey}
                 onCommentAdded={() => setFileKey(k => k + 1)}
               />
             </TabsContent>
 
-            <TabsContent value='resolution' className='space-y-4'>
+            <TabsContent
+              value='resolution'
+              forceMount
+              className='space-y-4 data-[state=inactive]:hidden'
+            >
               <TicketResolutionTracker
                 ticketId={ticket.id}
                 ticketStatus={ticket.status}

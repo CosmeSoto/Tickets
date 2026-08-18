@@ -10,6 +10,7 @@ import {
   TicketAccessError,
   toTicketAccessUser,
 } from '@/lib/tickets/ticket-access'
+import { notifyTicketChanged } from '@/lib/tickets/notify-ticket-changed'
 
 /**
  * PATCH /api/tickets/[id]/resolution-plan/tasks/[taskId]
@@ -253,6 +254,8 @@ export async function PATCH(
       await auditTaskChange(taskId, task.planId, session.user.id, 'updated', changes)
     }
 
+    notifyTicketChanged(ticketId, 'plan_task_updated')
+
     return NextResponse.json({
       success: true,
       data: {
@@ -370,6 +373,8 @@ export async function DELETE(
       title: task.title,
       status: task.status,
     })
+
+    notifyTicketChanged(ticketId, 'plan_task_deleted')
 
     return NextResponse.json({
       success: true,
