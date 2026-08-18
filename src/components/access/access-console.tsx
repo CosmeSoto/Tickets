@@ -167,8 +167,8 @@ export function AccessConsole() {
   const [columnOrder, setColumnOrder] = useState([
     'subject',
     'family.name',
-    'subject.organization',
     'subject.accessType',
+    'subject.organization',
     'subject.purpose',
     'status',
     'validUntil',
@@ -177,8 +177,8 @@ export function AccessConsole() {
   const [visibleColumns, setVisibleColumns] = useState([
     'subject',
     'family.name',
-    'subject.organization',
     'subject.accessType',
+    'subject.organization',
     'subject.purpose',
     'status',
     'validUntil',
@@ -643,12 +643,12 @@ export function AccessConsole() {
               </div>
               <div className='text-sm space-y-1 break-words'>
                 <p>
-                  <span className='text-muted-foreground'>Tipo: </span>
-                  {accessTypeLabel(pass.subject.accessType)}
-                </p>
-                <p>
                   <span className='text-muted-foreground'>Motivo: </span>
                   {formatAccessPurpose(pass.subject.purpose)}
+                </p>
+                <p>
+                  <span className='text-muted-foreground'>Tipo: </span>
+                  {accessTypeLabel(pass.subject.accessType)}
                 </p>
                 <p>
                   <span className='text-muted-foreground'>Credencial: </span>
@@ -689,12 +689,6 @@ export function AccessConsole() {
         render: pass => pass.subject.organization?.trim() || '—',
       },
       {
-        key: 'subject.accessType',
-        label: 'Tipo de acceso',
-        sortable: true,
-        render: pass => accessTypeLabel(pass.subject.accessType),
-      },
-      {
         key: 'subject.purpose',
         label: 'Motivo',
         sortable: true,
@@ -703,6 +697,12 @@ export function AccessConsole() {
             {formatAccessPurpose(pass.subject.purpose)}
           </p>
         ),
+      },
+      {
+        key: 'subject.accessType',
+        label: 'Tipo de acceso',
+        sortable: true,
+        render: pass => accessTypeLabel(pass.subject.accessType),
       },
       { key: 'credentialCode', label: 'Credencial', sortable: true },
       {
@@ -730,13 +730,13 @@ export function AccessConsole() {
         accessor: pass => `${pass.subject.firstName} ${pass.subject.lastName}`,
       },
       'family.name': { label: 'Área', accessor: pass => pass.family.name },
-      'subject.organization': {
-        label: 'Arrendatario',
-        accessor: pass => pass.subject.organization?.trim() || '—',
-      },
       'subject.accessType': {
         label: 'Tipo de acceso',
         accessor: pass => accessTypeLabel(pass.subject.accessType),
+      },
+      'subject.organization': {
+        label: 'Arrendatario',
+        accessor: pass => pass.subject.organization?.trim() || '—',
       },
       'subject.purpose': {
         label: 'Motivo',
@@ -862,16 +862,16 @@ export function AccessConsole() {
                         {result.pass.subject.firstName} {result.pass.subject.lastName}
                       </p>
                       <p className='text-muted-foreground'>
-                        {formatAccessBelongsTo(
-                          result.pass.family.name,
-                          result.pass.subject.organization
-                        )}
-                      </p>
-                      <p className='text-muted-foreground'>
                         {accessTypeLabel(result.pass.subject.accessType)}
                         {result.pass.subject.purpose?.trim()
                           ? ` · ${result.pass.subject.purpose.trim()}`
                           : ''}
+                      </p>
+                      <p className='text-muted-foreground'>
+                        {formatAccessBelongsTo(
+                          result.pass.family.name,
+                          result.pass.subject.organization
+                        )}
                       </p>
                       <p className='text-muted-foreground'>
                         Vigente hasta {formatAccessDateTime(result.pass.validUntil)}
