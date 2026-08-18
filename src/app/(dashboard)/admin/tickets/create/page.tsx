@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
@@ -49,8 +49,12 @@ import { CategorySelectorWrapper } from '@/features/category-selection'
 import { FileInputWithCamera } from '@/components/common/file-input-with-camera'
 import { useUsers } from '@/contexts/users-context'
 import { TicketSupportAreaField } from '@/components/tickets/ticket-support-area-field'
-import { ticketRequestFamiliesUrl } from '@/lib/utils/ticket-family'
-import { pickDefaultTicketFamilyId } from '@/hooks/use-ticket-request-families'
+import {
+  pickDefaultTicketFamilyId,
+  useTicketRequestFamilies,
+} from '@/hooks/use-ticket-request-families'
+import { FormDraftBanner } from '@/components/common/form-draft-banner'
+import { FormDraftKeys, useFormDraft } from '@/hooks/common/use-form-draft'
 
 interface User {
   id: string
@@ -89,7 +93,7 @@ export default function CreateTicketPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const { toast } = useToast()
-  const [isLoading, setIsLoading] = useState(false)
+  const hasAuthenticated = useRef(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitSuccess, setSubmitSuccess] = useState(false)
   const [selectedClient, setSelectedClient] = useState<User | null>(null)
@@ -99,12 +103,8 @@ export default function CreateTicketPage() {
   // ✅ Usuarios desde contexto global — sin petición extra
   const { users: allUsers } = useUsers()
 
-  // Familias disponibles para el cliente seleccionado
-  const [clientFamilies, setClientFamilies] = useState<
-    Array<{ id: string; name: string; code: string; color?: string | null; isOwnFamily?: boolean }>
-  >([])
   const [selectedFamilyId, setSelectedFamilyId] = useState<string>('')
-  const [loadingFamilies, setLoadingFamilies] = useState(false)
+  const skipCategoryResetRef = useRef(false)
   const isSuperAdmin = !!(session?.user as any)?.isSuperAdmin
 
   // Estados para archivos
@@ -128,7 +128,69 @@ export default function CreateTicketPage() {
   const selectedCategoryId = watch('categoryId')
   const ticketTitle = watch('title')
   const ticketDescription = watch('description')
+  const ticketLocation = watch('location')
   const clientId = watch('clientId')
+
+  const forClientId =
+    clientId && session?.user?.id && clientId !== session.user.id ? clientId : null
+  const { families: clientFamilies, loading: loadingFamilies } = useTicketRequestFamilies({
+    forClientId,
+    enabled: Boolean(clientId),
+  })
+
+  const draftKey = FormDraftKeys.ticketNew(session?.user?.id)
+  const draftValues = useMemo(
+    () => ({
+      title: ticketTitle ?? '',
+      description: ticketDescription ?? '',
+      location: ticketLocation ?? '',
+      priority: selectedPriority ?? TicketPriority.MEDIUM,
+      categoryId: selectedCategoryId ?? '',
+      familyId: selectedFamilyId ?? '',
+      clientId: clientId ?? '',
+      clientName: selectedClient?.name ?? '',
+      clientEmail: selectedClient?.email ?? '',
+      clientRole: selectedClient?.role ?? '',
+    }),
+    [
+      ticketTitle,
+      ticketDescription,
+      ticketLocation,
+      selectedPriority,
+      selectedCategoryId,
+      selectedFamilyId,
+      clientId,
+      selectedClient,
+    ]
+  )
+
+  const { clearDraft, wasRestored, dismissRestoredBanner } = useFormDraft({
+    key: draftKey,
+    values: draftValues,
+    enabled: !isSubmitting && !submitSuccess,
+    onRestore: d => {
+      skipCategoryResetRef.current = true
+      if (typeof d.title === 'string') setValue('title', d.title)
+      if (typeof d.description === 'string') setValue('description', d.description)
+      if (typeof d.location === 'string') setValue('location', d.location)
+      if (typeof d.priority === 'string') setValue('priority', d.priority as TicketPriority)
+      if (typeof d.categoryId === 'string') setValue('categoryId', d.categoryId)
+      if (typeof d.familyId === 'string') setSelectedFamilyId(d.familyId)
+      if (typeof d.clientId === 'string' && d.clientId) {
+        setValue('clientId', d.clientId)
+        setSelectedClient({
+          id: d.clientId,
+          name: typeof d.clientName === 'string' ? d.clientName : 'Usuario',
+          email: typeof d.clientEmail === 'string' ? d.clientEmail : '',
+          role: typeof d.clientRole === 'string' ? d.clientRole : 'CLIENT',
+        })
+      }
+    },
+  })
+
+  useEffect(() => {
+    if (status === 'authenticated') hasAuthenticated.current = true
+  }, [status])
 
   useEffect(() => {
     if (status === 'loading') return
@@ -153,6 +215,12 @@ export default function CreateTicketPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.user?.id])
+
+  useEffect(() => {
+    if (!clientId || selectedFamilyId) return
+    const defaultId = pickDefaultTicketFamilyId(clientFamilies)
+    if (defaultId) setSelectedFamilyId(defaultId)
+  }, [clientFamilies, clientId, selectedFamilyId])
 
   // Manejar selección de archivos
   const processFiles = (files: FileList | File[]) => {
@@ -263,6 +331,7 @@ export default function CreateTicketPage() {
         // Subir archivos si hay
         await uploadFiles(ticketId)
 
+        clearDraft()
         setSubmitSuccess(true)
 
         // Disparar evento para actualizar notificaciones inmediatamente
@@ -354,42 +423,13 @@ export default function CreateTicketPage() {
       })
     }
     setValue('clientId', nextClientId)
-    // Limpiar familia y categoría al cambiar solicitante
-    setSelectedFamilyId('')
-    setValue('categoryId', '')
-    setClientFamilies([])
-
-    // Cargar familias del solicitante / scope del admin
-    if (nextClientId) {
-      setLoadingFamilies(true)
-      try {
-        const isOwnTicket = nextClientId === session?.user?.id
-        const url = ticketRequestFamiliesUrl({
-          forClientId: isOwnTicket ? null : nextClientId,
-        })
-        const res = await fetch(url)
-        if (res.ok) {
-          const json = await res.json()
-          const families: Array<{
-            id: string
-            name: string
-            code: string
-            color?: string | null
-            isOwnFamily?: boolean
-          }> = json.data ?? []
-          setClientFamilies(families)
-          const defaultId = pickDefaultTicketFamilyId(families)
-          if (defaultId) setSelectedFamilyId(defaultId)
-        }
-      } catch {
-        /* silencioso */
-      } finally {
-        setLoadingFamilies(false)
-      }
+    if (nextClientId !== clientId) {
+      setSelectedFamilyId('')
+      setValue('categoryId', '')
     }
   }
 
-  if (status === 'loading' || isLoading) {
+  if ((status === 'loading' && !hasAuthenticated.current) || !session) {
     return (
       <ModuleLayout title='Crear Ticket' subtitle='Nueva solicitud de soporte' loading={true}>
         <div />
@@ -477,6 +517,21 @@ export default function CreateTicketPage() {
                   </CardHeader>
                   <CardContent>
                     <form onSubmit={handleSubmit(onSubmit)} className='space-y-6'>
+                      <FormDraftBanner
+                        visible={wasRestored}
+                        onDismiss={dismissRestoredBanner}
+                        onDiscard={() => {
+                          clearDraft()
+                          dismissRestoredBanner()
+                          setSelectedFamilyId('')
+                          setValue('title', '')
+                          setValue('description', '')
+                          setValue('location', '')
+                          setValue('priority', TicketPriority.MEDIUM)
+                          setValue('categoryId', '')
+                          if (session?.user?.id) void handleClientSelect(session.user.id)
+                        }}
+                      />
                       {/* Solicitante: combobox único. Default = tú; otro usuario = en su nombre */}
                       <div className='space-y-2'>
                         <Label htmlFor='clientId' className='flex items-center'>
@@ -529,8 +584,11 @@ export default function CreateTicketPage() {
                           loading={loadingFamilies}
                           value={selectedFamilyId}
                           onValueChange={v => {
+                            if (v !== selectedFamilyId && !skipCategoryResetRef.current) {
+                              setValue('categoryId', '')
+                            }
+                            skipCategoryResetRef.current = false
                             setSelectedFamilyId(v)
-                            setValue('categoryId', '')
                           }}
                         />
                       )}

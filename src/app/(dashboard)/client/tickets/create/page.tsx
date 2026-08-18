@@ -1,9 +1,8 @@
 'use client'
 
-import { Suspense } from 'react'
+import { Suspense, useEffect, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useEffect } from 'react'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft } from 'lucide-react'
@@ -28,6 +27,11 @@ function CreateClientTicketContent() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const searchParams = useSearchParams()
+  const hasAuthenticated = useRef(false)
+
+  useEffect(() => {
+    if (status === 'authenticated') hasAuthenticated.current = true
+  }, [status])
 
   useEffect(() => {
     if (status === 'loading') return
@@ -41,7 +45,7 @@ function CreateClientTicketContent() {
     }
   }, [session, status, router])
 
-  if (status === 'loading' || !session) {
+  if ((status === 'loading' && !hasAuthenticated.current) || !session) {
     return (
       <ModuleLayout title='Crear Ticket' subtitle='Nueva solicitud de soporte' loading={true}>
         <div />
@@ -80,6 +84,11 @@ function CreateClientTicketContent() {
             submitLabel='Crear Ticket'
             cardTitle='Nueva Solicitud de Soporte'
             showTips={false}
+            initialValues={{
+              title: preTitle,
+              description: preDescription,
+              location: preLocation,
+            }}
             extraData={{
               ...(equipmentId ? { equipmentId } : {}),
             }}

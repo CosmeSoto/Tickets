@@ -152,4 +152,5 @@ export const FormDraftKeys = {
   supplierNew: (familyId?: string) => `draft:supplier:new:${familyId || 'global'}`,
   supplierEdit: (id: string) => `draft:supplier:edit:${id}`,
   processNew: () => `draft:process:new`,
+  ticketNew: (userId?: string) => `draft:ticket:new:${userId || 'pending'}`,
 } as const

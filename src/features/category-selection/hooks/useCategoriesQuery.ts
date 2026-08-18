@@ -73,8 +73,8 @@ export function useCategoriesQuery({
     queryFn: () => fetchCategories(familyId),
     enabled: enabled && (familyId ? Boolean(familyId) : true),
     ...categoryQueryOptions.active,
-    // Al cambiar de área siempre debe pedir de nuevo
-    refetchOnMount: Boolean(familyId),
+    // El queryKey ya incluye familyId; no forzar refetch al remount (p. ej. revalidación de sesión)
+    refetchOnMount: false,
   })
 
   return {

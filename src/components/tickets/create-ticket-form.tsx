@@ -11,7 +11,7 @@
  *   - infoAlert: mensaje informativo opcional (ej: aviso para técnicos)
  */
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouter } from 'next/navigation'
@@ -49,12 +49,13 @@ import { useToast } from '@/hooks/use-toast'
 import { CategorySelectorWrapper } from '@/features/category-selection'
 import { FilePreviewList } from '@/components/tickets/file-preview-list'
 import { FileInputWithCamera } from '@/components/common/file-input-with-camera'
+import { TicketSupportAreaField } from '@/components/tickets/ticket-support-area-field'
 import {
-  TicketSupportAreaField,
-  type TicketSupportAreaFamily,
-} from '@/components/tickets/ticket-support-area-field'
-import { ticketRequestFamiliesUrl } from '@/lib/utils/ticket-family'
-import { pickDefaultTicketFamilyId } from '@/hooks/use-ticket-request-families'
+  pickDefaultTicketFamilyId,
+  useTicketRequestFamilies,
+} from '@/hooks/use-ticket-request-families'
+import { FormDraftBanner } from '@/components/common/form-draft-banner'
+import { FormDraftKeys, useFormDraft } from '@/hooks/common/use-form-draft'
 
 export interface CreateTicketFormProps {
   /** URL del endpoint para cargar familias disponibles */
@@ -75,8 +76,12 @@ export interface CreateTicketFormProps {
   cardTitle?: string
   /** Texto de la descripción de la card */
   cardDescription?: string
-  /** Mostrar consejos para crear un buen ticket */
-  showTips?: boolean
+  /** Valores iniciales (p. ej. query string desde inventario) */
+  initialValues?: {
+    title?: string
+    description?: string
+    location?: string
+  }
 }
 
 const PRIORITY_LABELS: Record<string, string> = {
@@ -103,7 +108,7 @@ const PRIORITY_DESCRIPTIONS: Record<string, string> = {
 }
 
 export function CreateTicketForm({
-  familiesEndpoint = ticketRequestFamiliesUrl(),
+  familiesEndpoint: _familiesEndpoint,
   clientId,
   extraData,
   afterSuccessHref,
@@ -113,6 +118,7 @@ export function CreateTicketForm({
   cardTitle = 'Nueva Solicitud de Soporte',
   cardDescription = 'Completa el formulario con los detalles de tu problema o solicitud',
   showTips = true,
+  initialValues,
 }: CreateTicketFormProps) {
   const { data: session } = useSession()
   const router = useRouter()
@@ -122,10 +128,10 @@ export function CreateTicketForm({
   const [submitSuccess, setSubmitSuccess] = useState(false)
   const [createdTicketId, setCreatedTicketId] = useState<string | null>(null)
 
-  const [availableFamilies, setAvailableFamilies] = useState<TicketSupportAreaFamily[]>([])
+  const { families: availableFamilies, loading: loadingFamilies } = useTicketRequestFamilies()
   const [selectedFamilyId, setSelectedFamilyId] = useState<string | null>(null)
-  const [loadingFamilies, setLoadingFamilies] = useState(true)
   const prevFamilyIdRef = useRef<string | null>(null)
+  const skipCategoryResetRef = useRef(false)
 
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const [isDragging, setIsDragging] = useState(false)
@@ -138,43 +144,73 @@ export function CreateTicketForm({
     formState: { errors },
   } = useForm<CreateTicketData>({
     resolver: zodResolver(createTicketSchema),
-    defaultValues: { priority: TicketPriority.MEDIUM },
+    defaultValues: {
+      priority: TicketPriority.MEDIUM,
+      title: initialValues?.title ?? '',
+      description: initialValues?.description ?? '',
+      location: initialValues?.location ?? '',
+    },
   })
 
   const selectedPriority = watch('priority')
   const selectedCategoryId = watch('categoryId')
   const ticketTitle = watch('title')
   const ticketDescription = watch('description')
+  const ticketLocation = watch('location')
 
-  // Cargar familias disponibles
-  useEffect(() => {
-    setLoadingFamilies(true)
-    fetch(familiesEndpoint)
-      .then(r => r.json())
-      .then(d => {
-        if (d.success && Array.isArray(d.data)) {
-          const families: TicketSupportAreaFamily[] = d.data.map((f: any) => ({
-            id: f.id,
-            name: f.name,
-            code: f.code,
-            color: f.color,
-            isOwnFamily: f.isOwnFamily ?? false,
-            isUserFamily: f.isOwnFamily ?? false,
-          }))
-          setAvailableFamilies(families)
-          const defaultId = pickDefaultTicketFamilyId(families)
-          if (defaultId) setSelectedFamilyId(defaultId)
-        }
-      })
-      .catch(() => {})
-      .finally(() => setLoadingFamilies(false))
-  }, [familiesEndpoint])
+  const draftKey = FormDraftKeys.ticketNew(session?.user?.id)
+  const draftValues = useMemo(
+    () => ({
+      title: ticketTitle ?? '',
+      description: ticketDescription ?? '',
+      location: ticketLocation ?? '',
+      priority: selectedPriority ?? TicketPriority.MEDIUM,
+      categoryId: selectedCategoryId ?? '',
+      familyId: selectedFamilyId ?? '',
+    }),
+    [
+      ticketTitle,
+      ticketDescription,
+      ticketLocation,
+      selectedPriority,
+      selectedCategoryId,
+      selectedFamilyId,
+    ]
+  )
 
-  // Resetear categoría al cambiar familia
+  const { clearDraft, wasRestored, dismissRestoredBanner } = useFormDraft({
+    key: draftKey,
+    values: draftValues,
+    enabled: !isSubmitting && !submitSuccess,
+    onRestore: d => {
+      skipCategoryResetRef.current = true
+      if (typeof d.title === 'string') setValue('title', d.title)
+      if (typeof d.description === 'string') setValue('description', d.description)
+      if (typeof d.location === 'string') setValue('location', d.location)
+      if (typeof d.priority === 'string') setValue('priority', d.priority as TicketPriority)
+      if (typeof d.categoryId === 'string') setValue('categoryId', d.categoryId)
+      if (typeof d.familyId === 'string' && d.familyId) setSelectedFamilyId(d.familyId)
+    },
+  })
+
+  // Prefill área nativa solo si el usuario no eligió (ni restauró) una
   useEffect(() => {
-    if (prevFamilyIdRef.current !== selectedFamilyId) {
-      prevFamilyIdRef.current = selectedFamilyId
-      if (selectedCategoryId) setValue('categoryId', '')
+    if (selectedFamilyId) return
+    const defaultId = pickDefaultTicketFamilyId(availableFamilies)
+    if (defaultId) setSelectedFamilyId(defaultId)
+  }, [availableFamilies, selectedFamilyId])
+
+  // Resetear categoría solo si el usuario cambia de área (no al restaurar borrador)
+  useEffect(() => {
+    if (prevFamilyIdRef.current === selectedFamilyId) return
+    const prev = prevFamilyIdRef.current
+    prevFamilyIdRef.current = selectedFamilyId
+    if (skipCategoryResetRef.current) {
+      skipCategoryResetRef.current = false
+      return
+    }
+    if (prev && selectedFamilyId && prev !== selectedFamilyId && selectedCategoryId) {
+      setValue('categoryId', '')
     }
   }, [selectedFamilyId, selectedCategoryId, setValue])
 
@@ -264,6 +300,7 @@ export function CreateTicketForm({
         const ticketId = result.data.id
         setCreatedTicketId(ticketId)
         await uploadFiles(ticketId)
+        clearDraft()
         setSubmitSuccess(true)
         window.dispatchEvent(new CustomEvent('ticket-created'))
         toast({ title: 'Ticket creado', description: 'Tu solicitud fue registrada correctamente' })
@@ -322,6 +359,21 @@ export function CreateTicketForm({
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className='space-y-4'>
+            <FormDraftBanner
+              visible={wasRestored}
+              onDismiss={dismissRestoredBanner}
+              onDiscard={() => {
+                clearDraft()
+                dismissRestoredBanner()
+                setSelectedFamilyId(null)
+                prevFamilyIdRef.current = null
+                setValue('title', initialValues?.title ?? '')
+                setValue('description', initialValues?.description ?? '')
+                setValue('location', initialValues?.location ?? '')
+                setValue('priority', TicketPriority.MEDIUM)
+                setValue('categoryId', '')
+              }}
+            />
             {/* ── Área de soporte (primero: define categorías y sugerencias) ── */}
             <TicketSupportAreaField
               families={availableFamilies}

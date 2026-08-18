@@ -2,7 +2,7 @@
 
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft } from 'lucide-react'
@@ -12,6 +12,11 @@ import { CreateTicketForm } from '@/components/tickets/create-ticket-form'
 export default function TechnicianCreateTicketPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const hasAuthenticated = useRef(false)
+
+  useEffect(() => {
+    if (status === 'authenticated') hasAuthenticated.current = true
+  }, [status])
 
   useEffect(() => {
     if (status === 'loading') return
@@ -25,7 +30,7 @@ export default function TechnicianCreateTicketPage() {
     }
   }, [session, status, router])
 
-  if (status === 'loading' || !session) {
+  if ((status === 'loading' && !hasAuthenticated.current) || !session) {
     return (
       <ModuleLayout title='Crear Ticket' subtitle='Cargando...' loading={true}>
         <div />

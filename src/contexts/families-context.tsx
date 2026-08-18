@@ -56,12 +56,14 @@ export function FamiliesProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     mountedRef.current = true
-    return () => { mountedRef.current = false }
+    return () => {
+      mountedRef.current = false
+    }
   }, [])
 
   const load = useCallback(async () => {
     if (status !== 'authenticated' || !session?.user) return
-    setLoading(true)
+    setLoading(prev => (families.length === 0 ? true : prev))
     try {
       // Ambas peticiones en paralelo — una sola vez por sesión
       const [ticketRes, inventoryRes] = await Promise.allSettled([
