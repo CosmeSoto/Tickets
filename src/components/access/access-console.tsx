@@ -56,6 +56,11 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Checkbox } from '@/components/ui/checkbox'
 import { formatAccessDateTime } from '@/lib/access/access-dates'
+import {
+  accessTypeLabel,
+  formatAccessBelongsTo,
+  formatAccessPurpose,
+} from '@/lib/access/access-labels'
 
 type ScanResponse = {
   result: string
@@ -72,6 +77,7 @@ type ScanResponse = {
       lastName: string
       accessType: string
       organization?: string | null
+      purpose?: string | null
     }
     family: { name: string; code: string }
     photoUrl?: string | null
@@ -89,6 +95,7 @@ type AccessPass = {
     lastName: string
     organization?: string | null
     accessType: string
+    purpose?: string | null
     isActive: boolean
   }
   family: { id?: string; name: string; color?: string | null }
@@ -160,14 +167,19 @@ export function AccessConsole() {
   const [columnOrder, setColumnOrder] = useState([
     'subject',
     'family.name',
-    'credentialCode',
+    'subject.organization',
+    'subject.accessType',
+    'subject.purpose',
     'status',
     'validUntil',
+    'credentialCode',
   ])
   const [visibleColumns, setVisibleColumns] = useState([
     'subject',
     'family.name',
-    'credentialCode',
+    'subject.organization',
+    'subject.accessType',
+    'subject.purpose',
     'status',
     'validUntil',
   ])
@@ -622,7 +634,7 @@ export function AccessConsole() {
                     {pass.subject.firstName} {pass.subject.lastName}
                   </p>
                   <p className='text-xs text-muted-foreground truncate'>
-                    {pass.subject.organization || 'Sin arrendatario'}
+                    {formatAccessBelongsTo(pass.family.name, pass.subject.organization)}
                   </p>
                 </div>
                 <Badge variant={badge.variant} className='shrink-0'>
@@ -631,8 +643,12 @@ export function AccessConsole() {
               </div>
               <div className='text-sm space-y-1 break-words'>
                 <p>
-                  <span className='text-muted-foreground'>Área: </span>
-                  {pass.family.name}
+                  <span className='text-muted-foreground'>Tipo: </span>
+                  {accessTypeLabel(pass.subject.accessType)}
+                </p>
+                <p>
+                  <span className='text-muted-foreground'>Motivo: </span>
+                  {formatAccessPurpose(pass.subject.purpose)}
                 </p>
                 <p>
                   <span className='text-muted-foreground'>Credencial: </span>
@@ -660,17 +676,34 @@ export function AccessConsole() {
         label: 'Persona',
         sortable: true,
         render: pass => (
-          <div>
-            <p className='font-medium'>
-              {pass.subject.firstName} {pass.subject.lastName}
-            </p>
-            <p className='text-xs text-muted-foreground'>
-              {pass.subject.organization || 'Sin arrendatario'}
-            </p>
-          </div>
+          <p className='font-medium'>
+            {pass.subject.firstName} {pass.subject.lastName}
+          </p>
         ),
       },
       { key: 'family.name', label: 'Área', sortable: true, render: pass => pass.family.name },
+      {
+        key: 'subject.organization',
+        label: 'Arrendatario',
+        sortable: true,
+        render: pass => pass.subject.organization?.trim() || '—',
+      },
+      {
+        key: 'subject.accessType',
+        label: 'Tipo de acceso',
+        sortable: true,
+        render: pass => accessTypeLabel(pass.subject.accessType),
+      },
+      {
+        key: 'subject.purpose',
+        label: 'Motivo',
+        sortable: true,
+        render: pass => (
+          <p className='max-w-[220px] truncate' title={formatAccessPurpose(pass.subject.purpose)}>
+            {formatAccessPurpose(pass.subject.purpose)}
+          </p>
+        ),
+      },
       { key: 'credentialCode', label: 'Credencial', sortable: true },
       {
         key: 'status',
@@ -697,6 +730,18 @@ export function AccessConsole() {
         accessor: pass => `${pass.subject.firstName} ${pass.subject.lastName}`,
       },
       'family.name': { label: 'Área', accessor: pass => pass.family.name },
+      'subject.organization': {
+        label: 'Arrendatario',
+        accessor: pass => pass.subject.organization?.trim() || '—',
+      },
+      'subject.accessType': {
+        label: 'Tipo de acceso',
+        accessor: pass => accessTypeLabel(pass.subject.accessType),
+      },
+      'subject.purpose': {
+        label: 'Motivo',
+        accessor: pass => formatAccessPurpose(pass.subject.purpose),
+      },
       credentialCode: { label: 'Credencial', accessor: pass => pass.credentialCode },
       status: { label: 'Estado', accessor: pass => effectivePassLabel(pass).label },
       validUntil: {
@@ -817,8 +862,16 @@ export function AccessConsole() {
                         {result.pass.subject.firstName} {result.pass.subject.lastName}
                       </p>
                       <p className='text-muted-foreground'>
-                        {result.pass.subject.organization || 'Sin arrendatario'} ·{' '}
-                        {result.pass.family.name}
+                        {formatAccessBelongsTo(
+                          result.pass.family.name,
+                          result.pass.subject.organization
+                        )}
+                      </p>
+                      <p className='text-muted-foreground'>
+                        {accessTypeLabel(result.pass.subject.accessType)}
+                        {result.pass.subject.purpose?.trim()
+                          ? ` · ${result.pass.subject.purpose.trim()}`
+                          : ''}
                       </p>
                       <p className='text-muted-foreground'>
                         Vigente hasta {formatAccessDateTime(result.pass.validUntil)}
@@ -905,7 +958,7 @@ export function AccessConsole() {
                   visible={visibleColumns}
                   onOrderChange={setColumnOrder}
                   onVisibleChange={setVisibleColumns}
-                  storageKey='table-columns:access-passes'
+                  storageKey='table-columns:access-passes-v2'
                 />
               </>
             }

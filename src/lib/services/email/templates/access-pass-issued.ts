@@ -1,6 +1,8 @@
 import { buildOperationalEmail } from '@/lib/services/email/operational-email'
 import { escapeHtml } from '@/lib/services/email/email-layout'
 
+export { accessTypeLabel } from '@/lib/access/access-labels'
+
 export type AccessPassIssuedEmailData = {
   recipientName: string
   familyName: string
@@ -39,17 +41,6 @@ export async function buildAccessPassIssuedEmail(data: AccessPassIssuedEmailData
     footnote:
       'Tus datos personales se tratan conforme a la LOPDP Ecuador. Si no solicitaste este acceso, ignora este mensaje y avisa al área emisora.',
   })
-}
-
-export function accessTypeLabel(type: string): string {
-  switch (type) {
-    case 'TENANT_EMPLOYEE':
-      return 'Empleado de arrendatario'
-    case 'CONTRACTOR':
-      return 'Contratista'
-    default:
-      return 'Visitante autorizado'
-  }
 }
 
 export function accessPassEmailSubject(familyName: string): string {

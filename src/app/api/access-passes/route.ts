@@ -53,7 +53,7 @@ const createSchema = z
     path: ['email'],
   })
 
-/** Campos mínimos para listado de gestores (sin teléfono, propósito ni rutas internas). */
+/** Campos para listado de gestores: persona, pertenencia, tipo y motivo del acceso. */
 const PASS_LIST_INCLUDE = {
   subject: {
     select: {
@@ -63,6 +63,7 @@ const PASS_LIST_INCLUDE = {
       organization: true,
       organizationId: true,
       accessType: true,
+      purpose: true,
       isActive: true,
     },
   },
@@ -120,6 +121,7 @@ export async function GET(request: NextRequest) {
       { subject: { lastName: { contains: search, mode: 'insensitive' } } },
       { subject: { email: { contains: search, mode: 'insensitive' } } },
       { subject: { organization: { contains: search, mode: 'insensitive' } } },
+      { subject: { purpose: { contains: search, mode: 'insensitive' } } },
     ]
   }
 

@@ -144,6 +144,7 @@ const PASS_SCAN_INCLUDE = {
       lastName: true,
       accessType: true,
       organization: true,
+      purpose: true,
       photoPath: true,
       isActive: true,
     },
