@@ -7,9 +7,9 @@ import { useSession } from 'next-auth/react'
  * Refleja la jerarquía del backend:
  *
  *   SuperAdmin              → puede todo
- *   canManageInventory=true → gestión completa (cualquier rol, incluido ADMIN de familia)
- *   Técnico sin gestión     → crear/editar operativos (API valida familia)
- *   Cliente sin gestión     → lectura / solicitudes
+ *   Admin / Técnico + flag  → gestión completa
+ *   Técnico sin gestión     → operativa limitada (API valida familia)
+ *   Cliente                 → nunca gestor: lectura / solicitudes
  */
 export function useInventoryPermissions() {
   const { data: session } = useSession()

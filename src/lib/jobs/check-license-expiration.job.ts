@@ -2,7 +2,10 @@ import { getSystemBranding } from '@/lib/branding'
 import prisma from '@/lib/prisma'
 import { LicenseService } from '../services/license.service'
 import { NotificationService } from '../services/notification-service'
-import { getFamilyScopedAdmins } from '@/lib/notifications/family-recipients'
+import {
+  getFamilyScopedAdmins,
+  getAreaEmailRecipients,
+} from '@/lib/notifications/family-recipients'
 import { queueNotificationEmail } from '@/lib/notifications/queue-notification-email'
 
 /**
@@ -32,13 +35,18 @@ export class CheckLicenseExpirationJob {
 
       for (const license of expiringLicenses) {
         const familyId = (license as any).licenseType?.familyId ?? null
-        const admins = await getFamilyScopedAdmins(familyId, {
+
+        // In-app: superadmin + admin nativo (getFamilyScopedAdmins)
+        const pushAdmins = await getFamilyScopedAdmins(familyId, {
           id: true,
           email: true,
           name: true,
         })
 
-        if (admins.length === 0) continue
+        // Email: solo admin nativo del área (sin superadmin)
+        const emailAdmins = await getAreaEmailRecipients(familyId)
+
+        if (pushAdmins.length === 0 && emailAdmins.length === 0) continue
 
         const daysRemaining = Math.ceil(
           (new Date(license.expirationDate!).getTime() - new Date().getTime()) /
@@ -55,8 +63,8 @@ export class CheckLicenseExpirationJob {
 
         const typeName = license.licenseType?.name || 'Sin tipo'
 
-        // Crear notificaciones in-app para cada admin
-        for (const admin of admins) {
+        // In-app para todos (incluye superadmin)
+        for (const admin of pushAdmins) {
           try {
             await NotificationService.push({
               userId: admin.id,
@@ -68,12 +76,19 @@ export class CheckLicenseExpirationJob {
               message: `La licencia "${license.name}" (${typeName}) expira en ${daysRemaining} ${daysRemaining === 1 ? 'día' : 'días'}. ${assignedTo}`,
               metadata: { link: `/inventory/licenses` },
             })
+            notificationsSent++
+          } catch (error) {
+            console.error(
+              `[CheckLicenseExpirationJob] Error enviando notificación in-app para ${license.name}:`,
+              error
+            )
+          }
+        }
 
-            if (!admin.email) {
-              notificationsSent++
-              continue
-            }
-
+        // Email solo a admins del área (sin superadmin)
+        for (const admin of emailAdmins) {
+          if (!admin.email) continue
+          try {
             // Crear email en cola (alerta operativa importante)
             await queueNotificationEmail({
               to: admin.email,
@@ -93,11 +108,9 @@ export class CheckLicenseExpirationJob {
               event: 'inventoryAlert',
               priority: 'important',
             })
-
-            notificationsSent++
           } catch (error) {
             console.error(
-              `[CheckLicenseExpirationJob] Error enviando notificación para ${license.name}:`,
+              `[CheckLicenseExpirationJob] Error enviando email para ${license.name}:`,
               error
             )
           }

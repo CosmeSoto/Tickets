@@ -193,7 +193,7 @@ export function UserModulesPanel({
     access: data.access ?? false,
   }
 
-  const manageInventory = data.canManageInventory ?? canManageInventory
+  const manageInventory = role !== 'CLIENT' && (data.canManageInventory ?? canManageInventory)
   const requestAssets = data.canRequestAssets ?? canRequestAssets ?? false
   const accessKnowledge = data.canAccessKnowledge ?? canAccessKnowledge ?? true
   const manageNews = data.canManageNews ?? canManageNews ?? false

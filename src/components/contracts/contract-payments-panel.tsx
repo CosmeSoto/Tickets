@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { CalendarClock, CheckCircle, RefreshCw, Sparkles } from 'lucide-react'
+import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -83,6 +84,7 @@ export function ContractPaymentsPanel({ contractId, hasBillingDates }: Props) {
   const [stats, setStats] = useState<PaymentStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
+  const [recalculating, setRecalculating] = useState(false)
 
   // Estado del modal "Marcar como pagado"
   const [markingPayment, setMarkingPayment] = useState<ContractPayment | null>(null)
@@ -167,6 +169,30 @@ export function ContractPaymentsPanel({ contractId, hasBillingDates }: Props) {
     }
   }
 
+  const handleRecalculate = async () => {
+    setRecalculating(true)
+    try {
+      const res = await fetch(`/api/inventory/contracts/${contractId}/payments/recalculate`, {
+        method: 'POST',
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error ?? 'No se pudo recalcular')
+      toast({
+        title: 'Cuotas actualizadas',
+        description: `Ajustadas: ${json.updated ?? 0}. Canceladas (sin renta): ${json.cancelled ?? 0}.`,
+      })
+      await load()
+    } catch (err: unknown) {
+      toast({
+        title: 'Error al recalcular',
+        description: err instanceof Error ? err.message : 'Error desconocido',
+        variant: 'destructive',
+      })
+    } finally {
+      setRecalculating(false)
+    }
+  }
+
   const openMarkModal = (p: ContractPayment) => {
     setMarkingPayment(p)
     setPaidDate(todayISO())
@@ -240,13 +266,26 @@ export function ContractPaymentsPanel({ contractId, hasBillingDates }: Props) {
                 Pagos programados
               </CardTitle>
               <p className='text-xs text-muted-foreground mt-1'>
-                Genera cuotas según el ciclo de facturación del contrato.
+                Cada cuota cobra solo los equipos aún en renta esa fecha.{' '}
+                <Link href='/inventory/payments' className='underline underline-offset-2'>
+                  Ver todos los pagos
+                </Link>
               </p>
             </div>
             <div className='flex gap-2'>
               <Button type='button' variant='outline' size='sm' onClick={load} disabled={loading}>
                 <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${loading ? 'animate-spin' : ''}`} />
                 Actualizar
+              </Button>
+              <Button
+                type='button'
+                variant='outline'
+                size='sm'
+                onClick={handleRecalculate}
+                disabled={recalculating || loading}
+              >
+                {recalculating ? <RefreshCw className='h-3.5 w-3.5 mr-1.5 animate-spin' /> : null}
+                Recalcular pendientes
               </Button>
               <Button
                 type='button'

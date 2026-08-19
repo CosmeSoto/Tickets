@@ -341,6 +341,8 @@ export class ContractService {
         equipmentId?: string
         licenseId?: string
         notes?: string
+        serviceStartDate?: string | null
+        serviceEndDate?: string | null
         order?: number
       }>
       createdBy: string
@@ -375,7 +377,10 @@ export class ContractService {
         contactPhone: contractData.contactPhone || null,
         notes: contractData.notes || null,
         termsUrl: contractData.termsUrl || null,
-        ...mapBillingFields(contractData),
+        ...mapBillingFields({
+          ...contractData,
+          custodianUserId: contractData.custodianUserId || createdBy,
+        }),
         createdBy,
         lines:
           lines.length > 0
@@ -390,6 +395,8 @@ export class ContractService {
                   equipmentId: l.equipmentId || null,
                   licenseId: l.licenseId || null,
                   notes: l.notes || null,
+                  serviceStartDate: l.serviceStartDate ? new Date(l.serviceStartDate) : null,
+                  serviceEndDate: l.serviceEndDate ? new Date(l.serviceEndDate) : null,
                   order: l.order ?? i,
                 })),
               }
@@ -559,6 +566,8 @@ export class ContractService {
       equipmentId?: string
       licenseId?: string
       notes?: string
+      serviceStartDate?: string | null
+      serviceEndDate?: string | null
       order?: number
     }>,
     updatedBy: string
@@ -579,6 +588,8 @@ export class ContractService {
           equipmentId: l.equipmentId || null,
           licenseId: l.licenseId || null,
           notes: l.notes || null,
+          serviceStartDate: l.serviceStartDate ? new Date(l.serviceStartDate) : null,
+          serviceEndDate: l.serviceEndDate ? new Date(l.serviceEndDate) : null,
           order: l.order ?? i,
         })),
       })
@@ -607,7 +618,10 @@ export class ContractService {
   static async checkExpirations() {
     const now = new Date()
     const daysRaw = await getSetting('inventory.contract_alert_days', 600, String(EXPIRING_DAYS))
-    const expiringDays = Math.max(1, parseInt(daysRaw ?? String(EXPIRING_DAYS), 10) || EXPIRING_DAYS)
+    const expiringDays = Math.max(
+      1,
+      parseInt(daysRaw ?? String(EXPIRING_DAYS), 10) || EXPIRING_DAYS
+    )
     const alertThreshold = new Date(now.getTime() + expiringDays * 24 * 60 * 60 * 1000)
 
     // Contratos que vencen en la ventana configurada y no han sido alertados

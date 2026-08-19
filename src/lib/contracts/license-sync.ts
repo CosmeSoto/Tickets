@@ -11,7 +11,12 @@ export async function syncContractLicenseLines(contractId: string): Promise<numb
       monthlyCost: true,
       lines: {
         where: { licenseId: { not: null } },
-        select: { licenseId: true, unitPrice: true, totalPrice: true },
+        select: {
+          licenseId: true,
+          unitPrice: true,
+          totalPrice: true,
+          serviceEndDate: true,
+        },
       },
     },
   })
@@ -22,13 +27,14 @@ export async function syncContractLicenseLines(contractId: string): Promise<numb
   for (const line of contract.lines) {
     if (!line.licenseId) continue
     const renewalCost = line.unitPrice ?? line.totalPrice ?? contract.monthlyCost ?? undefined
+    const end = line.serviceEndDate ?? contract.endDate
     await prisma.software_licenses.update({
       where: { id: line.licenseId },
       data: {
         ...(renewalCost != null && { renewalCost }),
-        ...(contract.endDate && {
-          renewalDate: contract.endDate,
-          expirationDate: contract.endDate,
+        ...(end && {
+          renewalDate: end,
+          expirationDate: end,
         }),
       },
     })

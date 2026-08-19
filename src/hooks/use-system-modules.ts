@@ -159,7 +159,7 @@ export function getModuleRoleDescription(moduleKey: string, role: string): strin
     inventory: {
       ADMIN: 'Módulo ON = ver inventario · «Gestión completa» = CRUD de activos',
       TECHNICIAN: 'Ver · con gestión completa opera activos · puede solicitar si está habilitado',
-      CLIENT: 'Ver asignados · solicitar activos/mantenimientos según toggles',
+      CLIENT: 'Ver asignados y solicitar · nunca gestor de inventario',
     },
     patrols: {
       ADMIN: 'Ver reportes y supervisar rondas de sus familias',

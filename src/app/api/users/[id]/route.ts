@@ -335,6 +335,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       await Promise.all([
         invalidateCache(`auth:user:${targetId}`),
         invalidateCache(`perm:inv:${targetId}`),
+        invalidateCache(`perm:inv:v2:${targetId}`),
         invalidateCache(`user:settings:${targetId}`),
         invalidateCache(`user:modules:${targetId}`),
         invalidateCache(`inv:families:*`),
@@ -654,6 +655,7 @@ export async function DELETE(
       await Promise.all([
         invalidateCache(`auth:user:${deletedId}`),
         invalidateCache(`perm:inv:${deletedId}`),
+        invalidateCache(`perm:inv:v2:${deletedId}`),
         invalidateCache(`user:settings:${deletedId}`),
         invalidateCache(`user:modules:${deletedId}`),
         invalidateCache(`users:list:*`), // Invalidar todas las listas de usuarios

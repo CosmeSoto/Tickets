@@ -3,6 +3,7 @@ import { UserRole } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { randomUUID } from 'crypto'
 import { getDepartmentNativeFamilyId } from '@/lib/auth/family-scope'
+import { roleCanBeInventoryManager } from '@/lib/inventory/manager-eligibility'
 import { AuditServiceComplete, AuditActionsComplete } from './audit-service-complete'
 
 // Función helper para obtener el nombre del nivel
@@ -309,7 +310,9 @@ export class UserService {
     const credentialsEnabled = data.credentialsEnabled ?? (isAdminRole ? true : false)
     const processesEnabled = data.processesEnabled ?? (isAdminRole ? true : false)
     const accessEnabled = data.accessEnabled ?? (isAdminRole ? true : false)
-    const canManageInventory = data.canManageInventory ?? (isAdminRole ? true : false)
+    const canManageInventory = roleCanBeInventoryManager(data.role)
+      ? (data.canManageInventory ?? (isAdminRole ? true : false))
+      : false
     const canManageNews = newsEnabled ? (data.canManageNews ?? (isAdminRole ? true : false)) : false
     const canManageForms = formsEnabled
       ? (data.canManageForms ?? (isAdminRole ? true : false))
@@ -523,7 +526,9 @@ export class UserService {
       updateData.inventoryEnabled !== undefined
         ? updateData.inventoryEnabled
         : user.inventoryEnabled
-    if (!effectiveInventoryEnabled && data.canManageInventory === undefined) {
+    if (!roleCanBeInventoryManager(effectiveRole)) {
+      updateData.canManageInventory = false
+    } else if (!effectiveInventoryEnabled && data.canManageInventory === undefined) {
       updateData.canManageInventory = false
     }
     if (data.isSuperAdmin !== undefined) updateData.isSuperAdmin = data.isSuperAdmin

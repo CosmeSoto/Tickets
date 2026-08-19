@@ -12,6 +12,7 @@ import {
   toInventoryAccessUser,
   inventoryAccessToResponse,
 } from '@/lib/inventory/inventory-resource-access'
+import { amountDueOnDate, linesHavePricedItems } from '@/lib/contracts/line-billing'
 
 /**
  * POST /api/inventory/contracts/[id]/payments/generate
@@ -44,6 +45,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         monthlyCost: true,
         totalValue: true,
         currency: true,
+        lines: {
+          select: {
+            quantity: true,
+            unitPrice: true,
+            totalPrice: true,
+            serviceStartDate: true,
+            serviceEndDate: true,
+          },
+        },
       },
     })
 
@@ -58,28 +68,26 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       )
     }
 
-    // Determinar monto del pago
-    let amount: number
-    if (contract.billingCycle === 'ONE_TIME') {
-      amount = contract.totalValue || 0
-    } else {
-      amount = contract.monthlyCost || 0
-    }
+    const headerAmount =
+      contract.billingCycle === 'ONE_TIME' ? contract.totalValue || 0 : contract.monthlyCost || 0
 
-    if (amount <= 0) {
+    if (!linesHavePricedItems(contract.lines) && headerAmount <= 0) {
       return NextResponse.json(
-        { error: 'El contrato debe tener un monto válido (monthlyCost o totalValue)' },
+        {
+          error:
+            'Indica un costo en el contrato o precios en las líneas (equipos) para generar pagos.',
+        },
         { status: 400 }
       )
     }
 
-    // Generar pagos
     const payments = await ContractPaymentService.generateScheduledPayments({
       contractId: id,
       startDate: contract.startDate,
       endDate: contract.endDate,
       billingCycle: contract.billingCycle,
-      amount,
+      amount: headerAmount,
+      amountForDueDate: due => amountDueOnDate(contract.lines, contract, due),
       currency: contract.currency,
       createdBy: session.user.id,
     })

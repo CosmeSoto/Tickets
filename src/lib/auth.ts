@@ -8,6 +8,7 @@ import { DEFAULT_TIMEZONE } from '@/lib/constants'
 import { getCachedOAuthProviders, invalidateOAuthProvidersCache } from './auth/load-oauth-providers'
 import { LOCKOUT_DURATION_MINUTES } from './services/security-config-service'
 import { clientNeedsProfileCompletion } from './auth/profile-completion'
+import { effectiveCanManageInventory } from './inventory/manager-eligibility'
 
 export { invalidateOAuthProvidersCache }
 
@@ -308,7 +309,11 @@ const sharedAuthOptions: Omit<NextAuthOptions, 'providers'> = {
                 token.department = dbUser.departments?.name || undefined
                 token.phone = dbUser.phone || undefined
                 token.avatar = dbUser.avatar || user.image || undefined
-                token.canManageInventory = dbUser.canManageInventory ?? false
+                token.canManageInventory = effectiveCanManageInventory({
+                  role: dbUser.role,
+                  isSuperAdmin: (dbUser as any).isSuperAdmin,
+                  canManageInventory: dbUser.canManageInventory,
+                })
                 token.isSuperAdmin = (dbUser as any).isSuperAdmin ?? false
                 token.ticketsEnabled = dbUser.ticketsEnabled ?? true
                 token.inventoryEnabled = dbUser.inventoryEnabled ?? true
@@ -391,7 +396,11 @@ const sharedAuthOptions: Omit<NextAuthOptions, 'providers'> = {
                   passwordChangedAt: true,
                 },
               })
-              token.canManageInventory = dbUser?.canManageInventory ?? false
+              token.canManageInventory = effectiveCanManageInventory({
+                role: user.role || 'CLIENT',
+                isSuperAdmin: dbUser?.isSuperAdmin,
+                canManageInventory: dbUser?.canManageInventory,
+              })
               token.isSuperAdmin = dbUser?.isSuperAdmin ?? false
               token.ticketsEnabled = dbUser?.ticketsEnabled ?? true
               token.inventoryEnabled = dbUser?.inventoryEnabled ?? true
@@ -500,7 +509,11 @@ const sharedAuthOptions: Omit<NextAuthOptions, 'providers'> = {
                 return { ...token, error: 'UserDeactivated' }
               }
               token.role = dbUser.role
-              token.canManageInventory = dbUser.canManageInventory ?? false
+              token.canManageInventory = effectiveCanManageInventory({
+                role: dbUser.role,
+                isSuperAdmin: (dbUser as any).isSuperAdmin,
+                canManageInventory: dbUser.canManageInventory,
+              })
               token.isSuperAdmin = (dbUser as any).isSuperAdmin ?? false
               token.ticketsEnabled = dbUser.ticketsEnabled ?? true
               token.inventoryEnabled = dbUser.inventoryEnabled ?? true
@@ -641,7 +654,11 @@ const sharedAuthOptions: Omit<NextAuthOptions, 'providers'> = {
           session.user.phone = token.phone as string | undefined
           session.user.avatar = token.avatar as string | undefined
           session.user.isOAuth = (token.isOAuth as boolean) || false
-          ;(session.user as any).canManageInventory = (token.canManageInventory as boolean) || false
+          ;(session.user as any).canManageInventory = effectiveCanManageInventory({
+            role: session.user.role,
+            isSuperAdmin: (token.isSuperAdmin as boolean) || false,
+            canManageInventory: (token.canManageInventory as boolean) || false,
+          })
           ;(session.user as any).isSuperAdmin = (token.isSuperAdmin as boolean) || false
 
           // Agregar ticketsEnabled e inventoryEnabled desde el token

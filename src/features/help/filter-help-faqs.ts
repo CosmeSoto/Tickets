@@ -1,7 +1,7 @@
 import type { HelpFaqItem, HelpModuleId } from './data/faq-by-module'
 import { HELP_FAQS, HELP_MODULE_SECTIONS } from './data/faq-by-module'
 
-export type HelpViewerRole = 'ADMIN' | 'TECHNICIAN' | 'CLIENT' | 'CLIENT_MANAGER'
+export type HelpViewerRole = 'ADMIN' | 'TECHNICIAN' | 'CLIENT'
 
 export type HelpModuleFlags = {
   tickets: boolean
@@ -13,20 +13,13 @@ export type HelpModuleFlags = {
   knowledge: boolean
 }
 
-export function resolveHelpViewerRole(
-  role: string | undefined,
-  canManageInventory: boolean
-): HelpViewerRole {
+export function resolveHelpViewerRole(role: string | undefined): HelpViewerRole {
   if (role === 'ADMIN') return 'ADMIN'
   if (role === 'TECHNICIAN') return 'TECHNICIAN'
-  if (role === 'CLIENT' && canManageInventory) return 'CLIENT_MANAGER'
   return 'CLIENT'
 }
 
-export function isHelpModuleEnabled(
-  moduleId: HelpModuleId,
-  flags: HelpModuleFlags
-): boolean {
+export function isHelpModuleEnabled(moduleId: HelpModuleId, flags: HelpModuleFlags): boolean {
   switch (moduleId) {
     case 'account':
       return true
@@ -59,25 +52,15 @@ export function filterHelpFaqs(
   })
 }
 
-export function visibleHelpSections(
-  flags: HelpModuleFlags,
-  faqs: HelpFaqItem[]
-) {
+export function visibleHelpSections(flags: HelpModuleFlags, faqs: HelpFaqItem[]) {
   const used = new Set(faqs.map(f => f.module))
-  return HELP_MODULE_SECTIONS.filter(
-    s => used.has(s.id) && isHelpModuleEnabled(s.id, flags)
-  )
+  return HELP_MODULE_SECTIONS.filter(s => used.has(s.id) && isHelpModuleEnabled(s.id, flags))
 }
 
 export function faqMatchesQuery(faq: HelpFaqItem, query: string): boolean {
   const q = query.trim().toLowerCase()
   if (!q) return true
-  const hay = [
-    faq.question,
-    faq.answer,
-    faq.category,
-    ...(faq.keywords || []),
-  ]
+  const hay = [faq.question, faq.answer, faq.category, ...(faq.keywords || [])]
     .join(' ')
     .toLowerCase()
   return hay.includes(q)

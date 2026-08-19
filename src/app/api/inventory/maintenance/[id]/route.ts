@@ -74,12 +74,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const isClient = session.user.role === 'CLIENT'
     const isAdminOrTech = session.user.role === 'ADMIN' || session.user.role === 'TECHNICIAN'
 
-    // ADMIN/TECHNICIAN gestionan por rol; CLIENT gestores vía canManageInventory
+    // ADMIN/TECHNICIAN gestionan por rol; Cliente no es gestor de inventario
     if (action === 'approve' || action === 'reschedule' || action === 'complete') {
-      if (
-        !isAdminOrTech &&
-        !(await canManageInventory(session.user.id, session.user.role))
-      ) {
+      if (!isAdminOrTech && !(await canManageInventory(session.user.id, session.user.role))) {
         return inventoryForbidden()
       }
     }

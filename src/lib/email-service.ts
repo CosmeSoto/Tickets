@@ -79,9 +79,12 @@ export async function sendTicketCreatedToAdminEmail(ticketId: string) {
 
     if (!ticket) return false
 
+    // El superadmin recibe in-app y Telegram, pero no necesita el email de cada ticket.
+    // Solo los admins del área (nativos + con acceso asignado) reciben el correo.
     const admins = await getTicketOversightAdmins(ticket.familyId, {
       select: { id: true, email: true, name: true },
       excludeUserIds: [ticket.clientId, ticket.createdById, ticket.assigneeId],
+      includeSuperAdmins: false,
     })
     const adminRecipients = admins
       .filter(a => a.email)
@@ -245,9 +248,12 @@ export async function sendTicketResolvedToAdminEmail(ticketId: string, actorUser
 
     if (!ticket) return false
 
+    // El superadmin recibe in-app y Telegram, pero no necesita el email de cada ticket.
+    // Solo los admins del área (nativos + con acceso asignado) reciben el correo.
     const admins = await getTicketOversightAdmins(ticket.familyId, {
       select: { id: true, email: true, name: true },
       excludeUserIds: [ticket.clientId, ticket.assigneeId, ticket.createdById, actorUserId],
+      includeSuperAdmins: false,
     })
     const adminRecipients = admins
       .filter(a => a.email)

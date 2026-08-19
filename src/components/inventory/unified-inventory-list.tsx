@@ -258,11 +258,11 @@ export function UnifiedInventoryList({
             <>
               <div className='fixed inset-0 z-10' onClick={() => setShowColumnPicker(false)} />
               {/* max-w evita que se salga del viewport en móvil */}
-              <div className='absolute right-0 z-20 mt-1 w-52 max-w-[calc(100vw-1rem)] rounded-md border border-border bg-popover shadow-lg overflow-hidden'>
+              <div className='absolute right-0 z-20 mt-1 w-60 max-w-[calc(100vw-1rem)] rounded-md border border-border bg-popover shadow-lg overflow-hidden'>
                 <p className='px-3 py-2 text-xs font-semibold text-muted-foreground border-b border-border'>
                   Columnas visibles
                 </p>
-                <div className='max-h-64 overflow-y-auto py-1'>
+                <div className='max-h-80 overflow-y-auto py-1'>
                   {OPTIONAL_COLUMNS.map(c => (
                     <button
                       key={c.key}
@@ -422,6 +422,37 @@ export function UnifiedInventoryList({
                   Lote
                 </th>
               )}
+              {col('asignado') && (
+                <th
+                  className='px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap'
+                  onClick={() => requestSort('assignedToName')}
+                >
+                  Asignado a {renderSortIcon('assignedToName')}
+                </th>
+              )}
+              {col('fechaAsignacion') && (
+                <th
+                  className='px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap'
+                  onClick={() => requestSort('assignedAt')}
+                >
+                  F. Asignación {renderSortIcon('assignedAt')}
+                </th>
+              )}
+              {col('asignadoPor') && (
+                <th className='px-4 py-3 text-left font-medium text-muted-foreground select-none whitespace-nowrap'>
+                  Asignado por
+                </th>
+              )}
+              {col('serial') && (
+                <th className='px-4 py-3 text-left font-medium text-muted-foreground select-none whitespace-nowrap'>
+                  N° Serie
+                </th>
+              )}
+              {col('bodega') && (
+                <th className='px-4 py-3 text-left font-medium text-muted-foreground select-none whitespace-nowrap'>
+                  Bodega
+                </th>
+              )}
               {col('creado') && (
                 <th
                   className='px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap'
@@ -545,6 +576,35 @@ export function UnifiedInventoryList({
                       ) : (
                         <span className='text-xs text-muted-foreground'>—</span>
                       )}
+                    </td>
+                  )}
+                  {col('asignado') && (
+                    <td className='px-4 py-3 text-sm'>
+                      {asset.assignedToName ? (
+                        <span className='text-foreground'>{asset.assignedToName}</span>
+                      ) : (
+                        <span className='text-xs text-muted-foreground'>—</span>
+                      )}
+                    </td>
+                  )}
+                  {col('fechaAsignacion') && (
+                    <td className='px-4 py-3 text-muted-foreground text-xs'>
+                      {asset.assignedAt ? formatDate(asset.assignedAt) : '—'}
+                    </td>
+                  )}
+                  {col('asignadoPor') && (
+                    <td className='px-4 py-3 text-muted-foreground text-xs'>
+                      {asset.assignedByName ?? '—'}
+                    </td>
+                  )}
+                  {col('serial') && (
+                    <td className='px-4 py-3 text-muted-foreground text-xs font-mono'>
+                      {asset.serialNumber ?? '—'}
+                    </td>
+                  )}
+                  {col('bodega') && (
+                    <td className='px-4 py-3 text-muted-foreground text-xs'>
+                      {asset.warehouseName ?? '—'}
                     </td>
                   )}
                   {col('creado') && (

@@ -6,7 +6,10 @@
 import { queueTelegramNotification } from '@/lib/notifications/queue-notification-telegram'
 import { prisma } from '@/lib/prisma'
 import { NotificationService } from '@/lib/services/notification-service'
-import { getFamilyScopedAdmins } from '@/lib/notifications/family-recipients'
+import {
+  getFamilyScopedAdmins,
+  getAreaEmailRecipients,
+} from '@/lib/notifications/family-recipients'
 import { getBatchUtilizationAlerts } from '@/lib/inventory/batch-alerts'
 import { buildBatchAlertEmailHtml } from '@/lib/inventory/batch-alert-email'
 import { getBatchAlertSettings } from '@/lib/inventory/batch-alert-settings'
@@ -95,7 +98,9 @@ export class BatchAlertService {
       if (alerts.length === 0) continue
 
       const admins = await getFamilyScopedAdmins(familyId, { id: true, name: true, email: true })
-      if (admins.length === 0) continue
+      // Email: solo admin nativo del área (sin superadmin)
+      const emailAdmins = await getAreaEmailRecipients(familyId)
+      if (admins.length === 0 && emailAdmins.length === 0) continue
 
       const primary = alerts[0]
       const brandModel = `${batch.model.brand?.name ?? ''} ${batch.model.model}`.trim()
@@ -103,6 +108,7 @@ export class BatchAlertService {
         (primary.level === 'critical' && settings.emailOnCritical) ||
         (primary.level === 'warning' && settings.emailOnWarning)
 
+      // ── In-app + Telegram: todos los admins (incluye superadmin) ──────────
       for (const admin of admins) {
         const recent = await prisma.notifications.findFirst({
           where: {
@@ -134,7 +140,37 @@ export class BatchAlertService {
         })
         alertsSent++
 
-        if (sendEmail && admin.email) {
+        // Telegram: solo alertas críticas de inventario
+        if (primary.level === 'critical') {
+          queueTelegramNotification({
+            recipientUserId: admin.id,
+            title: `Lote ${batch.batchCode}: ${primary.title}`,
+            body: `${brandModel} — ${primary.message}`,
+            module: 'inventory',
+            event: 'inventoryAlert',
+            priority: 'important',
+            link: `/inventory/batches/${batch.id}`,
+          }).catch(() => {})
+        }
+      }
+
+      // ── Email: solo admins nativos del área (sin superadmin) ──────────────
+      if (sendEmail) {
+        for (const admin of emailAdmins) {
+          if (!admin.email) continue
+          // Dedup: ya se verificó arriba en el loop de push; aquí solo chequeamos email
+          const recent = await prisma.notifications.findFirst({
+            where: {
+              userId: admin.id,
+              createdAt: { gte: since },
+              AND: [
+                { metadata: { path: ['type'], equals: 'batch_utilization' } },
+                { metadata: { path: ['batchId'], equals: batch.id } },
+              ],
+            },
+          })
+          if (recent) continue
+
           const subjectPrefix =
             primary.level === 'critical' ? '[Inventario - Urgente]' : '[Inventario - Aviso]'
           await enqueueEmail({
@@ -156,19 +192,6 @@ export class BatchAlertService {
             priority: primary.level === 'critical' ? 'important' : 'optional',
           }).catch(() => {})
           emailsSent++
-        }
-
-        // Telegram: solo alertas críticas de inventario
-        if (primary.level === 'critical') {
-          queueTelegramNotification({
-            recipientUserId: admin.id,
-            title: `Lote ${batch.batchCode}: ${primary.title}`,
-            body: `${brandModel} — ${primary.message}`,
-            module: 'inventory',
-            event: 'inventoryAlert',
-            priority: 'important',
-            link: `/inventory/batches/${batch.id}`,
-          }).catch(() => {})
         }
       }
     }

@@ -2,8 +2,8 @@
  * Acceso a configuración por familia (gobernanza vs operación).
  *
  * - Lectura: Super Admin, admin con visibilidad del módulo, gestor inventario (solo inventario).
- * - Escritura reglas de negocio inventario: Super Admin, admin operativo, o gestor
- *   (TECHNICIAN/CLIENT con canManageInventory) en familias asignadas.
+ * - Escritura reglas de negocio inventario: Super Admin, admin operativo, o técnico
+ *   gestor (canManageInventory) en familias asignadas.
  * - Escritura tickets/patrols: Super Admin o admin nativo (operational).
  * - Flags de módulo (inventoryEnabled, ticketsEnabled, patrolsEnabled): solo Super Admin.
  */
@@ -34,7 +34,7 @@ export async function canReadModuleFamilyConfig(
       const manages = await canManageInventory(userId, role)
       return checkFamilyAccess(userId, familyId, role, false, manages)
     }
-    if (role === 'TECHNICIAN' || role === 'CLIENT') {
+    if (role === 'TECHNICIAN') {
       const manages = await canManageInventory(userId, role)
       if (!manages) return false
       return checkFamilyAccess(userId, familyId, role, false, true)
@@ -67,7 +67,7 @@ export async function canWriteModuleFamilyConfig(
     if (role === 'ADMIN') {
       return adminCanOperateInventoryFamily(userId, familyId, false)
     }
-    if (role === 'TECHNICIAN' || role === 'CLIENT') {
+    if (role === 'TECHNICIAN') {
       const manages = await canManageInventory(userId, role)
       if (!manages) return false
       return checkFamilyManageAccess(userId, familyId, role, false, true)

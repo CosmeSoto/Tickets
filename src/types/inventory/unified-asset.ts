@@ -27,6 +27,9 @@ export interface UnifiedAsset {
   notes?: string
   batchId?: string | null
   batchCode?: string | null
+  assignedToName?: string
+  assignedAt?: string
+  assignedByName?: string
 }
 
 export interface UnifiedAssetsResponse {
@@ -73,11 +76,16 @@ export type ColumnKey =
   | 'estado'
   | 'condicion'
   | 'propiedad'
+  | 'asignado'
+  | 'fechaAsignacion'
+  | 'asignadoPor'
   | 'creado'
   | 'fechaCompra'
   | 'factura'
   | 'ordenCompra'
   | 'precio'
+  | 'serial'
+  | 'bodega'
   | 'atributos'
   | 'accesorios'
   | 'lote'
@@ -89,6 +97,11 @@ export const OPTIONAL_COLUMNS: { key: ColumnKey; label: string }[] = [
   { key: 'condicion', label: 'Condición' },
   { key: 'propiedad', label: 'Propiedad' },
   { key: 'lote', label: 'Lote' },
+  { key: 'asignado', label: 'Asignado a' },
+  { key: 'fechaAsignacion', label: 'Fecha de asignación' },
+  { key: 'asignadoPor', label: 'Asignado por' },
+  { key: 'serial', label: 'N° Serie' },
+  { key: 'bodega', label: 'Bodega' },
   { key: 'creado', label: 'Fecha Creación' },
   { key: 'fechaCompra', label: 'Fecha de Compra' },
   { key: 'factura', label: 'N° Factura' },
@@ -104,6 +117,7 @@ export const DEFAULT_VISIBLE_COLUMNS: ColumnKey[] = [
   'estado',
   'condicion',
   'lote',
+  'asignado',
   'propiedad',
   'creado',
 ]
@@ -115,11 +129,16 @@ export const COLUMN_KEY_TO_ASSET_KEY: Record<ColumnKey, string> = {
   estado: 'status',
   condicion: 'condition',
   propiedad: 'acquisitionMode',
+  asignado: 'assignedToName',
+  fechaAsignacion: 'assignedAt',
+  asignadoPor: 'assignedByName',
   creado: 'createdAt',
   fechaCompra: 'purchaseDate',
   factura: 'invoiceNumber',
   ordenCompra: 'purchaseOrderNumber',
   precio: 'purchasePrice',
+  serial: 'serialNumber',
+  bodega: 'warehouseName',
   atributos: 'attributes',
   accesorios: 'accessories',
   lote: 'batchCode',

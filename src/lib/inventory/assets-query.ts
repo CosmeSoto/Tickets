@@ -13,6 +13,26 @@ const EQUIPMENT_TYPE_INCLUDE = {
   },
 } as const
 
+const ACTIVE_ASSIGNMENT_INCLUDE = {
+  where: { isActive: true },
+  orderBy: { startDate: 'desc' as const },
+  take: 1,
+  select: {
+    startDate: true,
+    receiver: { select: { name: true } },
+    deliverer: { select: { name: true } },
+  },
+} as const
+
+const EQUIPMENT_LIST_INCLUDE = {
+  type: { include: EQUIPMENT_TYPE_INCLUDE },
+  model: { select: { brand: true, model: true } },
+  batch: { select: { id: true, batchCode: true } },
+  warehouse: { select: { name: true } },
+  customValues: { select: { fieldName: true, fieldValue: true } },
+  assignments: ACTIVE_ASSIGNMENT_INCLUDE,
+} as const
+
 export interface AssetsQueryParams {
   userId: string
   role: string
@@ -53,6 +73,9 @@ export interface UnifiedAssetItem {
   notes?: string
   batchId?: string | null
   batchCode?: string | null
+  assignedToName?: string
+  assignedAt?: string
+  assignedByName?: string
 }
 
 export interface AssetsQueryResult {
@@ -91,13 +114,7 @@ export async function queryAssets(params: AssetsQueryParams): Promise<AssetsQuer
   if (personalOnly) {
     const items = await prisma.equipment.findMany({
       where: { id: { in: personalEquipmentIds } },
-      include: {
-        type: { include: EQUIPMENT_TYPE_INCLUDE },
-        model: { select: { brand: true, model: true } },
-        batch: { select: { id: true, batchCode: true } },
-        warehouse: { select: { name: true } },
-        customValues: { select: { fieldName: true, fieldValue: true } },
-      },
+      include: EQUIPMENT_LIST_INCLUDE,
       orderBy: { createdAt: 'desc' },
     })
     const mapped = items.map(mapEquipmentItem)
@@ -107,7 +124,8 @@ export async function queryAssets(params: AssetsQueryParams): Promise<AssetsQuer
             i.name.toLowerCase().includes(searchQuery) ||
             (i.code ?? '').toLowerCase().includes(searchQuery) ||
             (i.serialNumber ?? '').toLowerCase().includes(searchQuery) ||
-            (i.batchCode ?? '').toLowerCase().includes(searchQuery)
+            (i.batchCode ?? '').toLowerCase().includes(searchQuery) ||
+            (i.assignedToName ?? '').toLowerCase().includes(searchQuery)
         )
       : mapped
     return paginate(filtered, page, pageSize)
@@ -169,13 +187,7 @@ export async function queryAssets(params: AssetsQueryParams): Promise<AssetsQuer
       ? Promise.resolve([] as any[])
       : prisma.equipment.findMany({
           where: buildEquipmentWhere(),
-          include: {
-            type: { include: EQUIPMENT_TYPE_INCLUDE },
-            model: { select: { brand: true, model: true } },
-            batch: { select: { id: true, batchCode: true } },
-            warehouse: { select: { name: true } },
-            customValues: { select: { fieldName: true, fieldValue: true } },
-          },
+          include: EQUIPMENT_LIST_INCLUDE,
           orderBy: { createdAt: 'desc' },
           take: dbLimit,
         }),
@@ -186,7 +198,16 @@ export async function queryAssets(params: AssetsQueryParams): Promise<AssetsQuer
           where: effectiveFamilyIds
             ? { consumableType: { familyId: { in: effectiveFamilyIds } } }
             : undefined,
-          include: { consumableType: { include: { family: true } } },
+          include: {
+            consumableType: { include: { family: true } },
+            warehouse: { select: { name: true } },
+            assignedEquipment: {
+              select: {
+                code: true,
+                model: { select: { brand: { select: { name: true } }, model: true } },
+              },
+            },
+          },
           orderBy: { createdAt: 'desc' },
           take: dbLimit,
         }),
@@ -197,7 +218,17 @@ export async function queryAssets(params: AssetsQueryParams): Promise<AssetsQuer
           where: effectiveFamilyIds
             ? { licenseType: { familyId: { in: effectiveFamilyIds } } }
             : undefined,
-          include: { licenseType: { include: { family: true } } },
+          include: {
+            licenseType: { include: { family: true } },
+            user: { select: { name: true } },
+            department: { select: { name: true } },
+            equipment: {
+              select: {
+                code: true,
+                model: { select: { brand: { select: { name: true } }, model: true } },
+              },
+            },
+          },
           orderBy: { createdAt: 'desc' },
           take: dbLimit,
         }),
@@ -205,34 +236,48 @@ export async function queryAssets(params: AssetsQueryParams): Promise<AssetsQuer
 
   const mapped: UnifiedAssetItem[] = [
     ...equipmentItems.map(mapEquipmentItem),
-    ...consumableItems.map((item: any) => ({
-      id: item.id,
-      name: item.name,
-      subtype: 'MRO' as const,
-      familyId: item.consumableType?.familyId ?? '',
-      family: {
-        name: item.consumableType?.family?.name ?? '',
-        icon: item.consumableType?.family?.icon ?? null,
-        color: item.consumableType?.family?.color ?? null,
-      },
-      typeName: item.consumableType?.name ?? undefined,
-      status: 'ACTIVE',
-      createdAt: item.createdAt.toISOString(),
-    })),
-    ...licenseItems.map((item: any) => ({
-      id: item.id,
-      name: item.name,
-      subtype: 'LICENSE' as const,
-      familyId: item.licenseType?.familyId ?? '',
-      family: {
-        name: item.licenseType?.family?.name ?? '',
-        icon: item.licenseType?.family?.icon ?? null,
-        color: item.licenseType?.family?.color ?? null,
-      },
-      typeName: item.licenseType?.name ?? undefined,
-      status: 'ACTIVE',
-      createdAt: item.createdAt.toISOString(),
-    })),
+    ...consumableItems.map((item: any) => {
+      const eqLabel = formatLinkedEquipmentName(item.assignedEquipment)
+      return {
+        id: item.id,
+        name: item.name,
+        subtype: 'MRO' as const,
+        familyId: item.consumableType?.familyId ?? '',
+        family: {
+          name: item.consumableType?.family?.name ?? '',
+          icon: item.consumableType?.family?.icon ?? null,
+          color: item.consumableType?.family?.color ?? null,
+        },
+        typeName: item.consumableType?.name ?? undefined,
+        status: item.status ?? 'ACTIVE',
+        createdAt: item.createdAt.toISOString(),
+        warehouseName: item.warehouse?.name ?? undefined,
+        assignedToName: eqLabel ? `Equipo: ${eqLabel}` : undefined,
+      }
+    }),
+    ...licenseItems.map((item: any) => {
+      const assignment = licenseAssignment(item)
+      return {
+        id: item.id,
+        name: item.name,
+        subtype: 'LICENSE' as const,
+        familyId: item.licenseType?.familyId ?? '',
+        family: {
+          name: item.licenseType?.family?.name ?? '',
+          icon: item.licenseType?.family?.icon ?? null,
+          color: item.licenseType?.family?.color ?? null,
+        },
+        typeName: item.licenseType?.name ?? undefined,
+        status: assignment.assignedToName ? 'ASSIGNED' : 'AVAILABLE',
+        createdAt: item.createdAt.toISOString(),
+        purchaseDate: item.purchaseDate ? new Date(item.purchaseDate).toISOString() : undefined,
+        purchasePrice: item.cost ?? undefined,
+        invoiceNumber: item.invoiceNumber ?? undefined,
+        purchaseOrderNumber: item.purchaseOrderNumber ?? undefined,
+        assignedToName: assignment.assignedToName,
+        assignedAt: assignment.assignedAt,
+      }
+    }),
   ]
 
   const filtered = searchQuery
@@ -241,7 +286,8 @@ export async function queryAssets(params: AssetsQueryParams): Promise<AssetsQuer
           i.name.toLowerCase().includes(searchQuery) ||
           (i.code ?? '').toLowerCase().includes(searchQuery) ||
           (i.serialNumber ?? '').toLowerCase().includes(searchQuery) ||
-          (i.batchCode ?? '').toLowerCase().includes(searchQuery)
+          (i.batchCode ?? '').toLowerCase().includes(searchQuery) ||
+          (i.assignedToName ?? '').toLowerCase().includes(searchQuery)
       )
     : mapped
 
@@ -258,6 +304,7 @@ function mapEquipmentItem(item: any): UnifiedAssetItem {
     item.type?.attributes ?? [],
     item.type?.family?.customFields ?? []
   )
+  const current = item.assignments?.[0]
 
   return {
     id: item.id,
@@ -289,7 +336,39 @@ function mapEquipmentItem(item: any): UnifiedAssetItem {
     notes: item.notes ?? undefined,
     batchId: item.batchId ?? item.batch?.id ?? null,
     batchCode: item.batch?.batchCode ?? null,
+    assignedToName: current?.receiver?.name ?? undefined,
+    assignedAt: current?.startDate ? new Date(current.startDate).toISOString() : undefined,
+    assignedByName: current?.deliverer?.name ?? undefined,
   }
+}
+
+function formatLinkedEquipmentName(
+  eq:
+    | {
+        code?: string | null
+        model?: { brand?: { name?: string | null } | null; model?: string | null } | null
+      }
+    | null
+    | undefined
+): string | undefined {
+  if (!eq) return undefined
+  const modelName = `${eq.model?.brand?.name ?? ''} ${eq.model?.model ?? ''}`.trim()
+  if (modelName && eq.code) return `${modelName} (${eq.code})`
+  return modelName || eq.code || undefined
+}
+
+function licenseAssignment(item: any): { assignedToName?: string; assignedAt?: string } {
+  if (item.user?.name) {
+    return { assignedToName: item.user.name }
+  }
+  const eqLabel = formatLinkedEquipmentName(item.equipment)
+  if (eqLabel) {
+    return { assignedToName: `Equipo: ${eqLabel}` }
+  }
+  if (item.department?.name) {
+    return { assignedToName: `Depto: ${item.department.name}` }
+  }
+  return {}
 }
 
 function paginate<T>(items: T[], page: number, pageSize: number) {

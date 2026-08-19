@@ -89,12 +89,7 @@ export function buildRoleNavigation({
   canRequestAssets,
   hasKnowledge,
 }: RoleNavigationInput): DashboardNavItem[] {
-  const navKey =
-    userRole === 'TECHNICIAN' && canManageInventory
-      ? 'TECHNICIAN_MANAGER'
-      : userRole === 'CLIENT' && canManageInventory
-        ? 'CLIENT_MANAGER'
-        : userRole
+  const navKey = userRole === 'TECHNICIAN' && canManageInventory ? 'TECHNICIAN_MANAGER' : userRole
 
   if (userRole === 'ADMIN') {
     const adminNav = navigationByRole['ADMIN'].filter(item => {
@@ -195,7 +190,6 @@ export function buildRoleNavigation({
   const assetRequestParents: Record<string, string> = {
     CLIENT: 'Mis Equipos',
     TECHNICIAN: 'Mis Equipos',
-    CLIENT_MANAGER: 'Inventario',
     TECHNICIAN_MANAGER: 'Inventario',
   }
   const assetParentName = assetRequestParents[navKey]

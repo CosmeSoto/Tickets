@@ -84,11 +84,7 @@ export function DashboardHeader({
       ? canManageInventory
         ? 'Técnico · Gestor'
         : 'Técnico'
-      : userRole === 'CLIENT'
-        ? canManageInventory
-          ? 'Cliente · Gestor'
-          : getRoleLabelFn(userRole, isSuperAdmin)
-        : getRoleLabelFn(userRole, isSuperAdmin)
+      : getRoleLabelFn(userRole, isSuperAdmin)
 
   const handleLogout = async () => {
     await signOut({ redirect: false })
@@ -97,10 +93,7 @@ export function DashboardHeader({
 
   const utilityCluster = (
     <>
-      <motion.div
-        whileHover={reduceMotion ? undefined : { y: -1 }}
-        transition={{ duration: 0.15 }}
-      >
+      <motion.div whileHover={reduceMotion ? undefined : { y: -1 }} transition={{ duration: 0.15 }}>
         <Link
           href='/?preview=true'
           target='_blank'
@@ -202,9 +195,7 @@ export function DashboardHeader({
 
         {/* Fila 2: acciones de página — ancho completo, wrap sin aplastar el título */}
         {headerActions ? (
-          <div className='flex flex-wrap items-center gap-2 min-w-0 w-full'>
-            {headerActions}
-          </div>
+          <div className='flex flex-wrap items-center gap-2 min-w-0 w-full'>{headerActions}</div>
         ) : null}
 
         {headerBreadcrumbs.length > 0 && (

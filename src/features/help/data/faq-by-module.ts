@@ -19,7 +19,7 @@ export interface HelpFaqItem {
   question: string
   answer: string
   /** Roles para los que aplica; si empty = todos */
-  roles?: Array<'ADMIN' | 'TECHNICIAN' | 'CLIENT' | 'CLIENT_MANAGER'>
+  roles?: Array<'ADMIN' | 'TECHNICIAN' | 'CLIENT'>
   keywords?: string[]
 }
 
@@ -196,8 +196,18 @@ export const HELP_FAQS: HelpFaqItem[] = [
     category: 'Inventario',
     question: '¿Para qué sirven los contratos en inventario?',
     answer:
-      'Los contratos documentan alquileres, licencias, mantenimiento o soporte con un proveedor. Puedes vincularlos a equipos o a un mantenimiento externo. El sistema envía alertas de vencimiento según la configuración del contrato.',
-    keywords: ['contrato', 'suscripción', 'vencimiento'],
+      'Los contratos documentan alquileres, licencias, mantenimiento o soporte. Cada línea (equipo) puede tener su propia fecha de renta. En Inventario → Pagos ves las cuotas: cada mes se cobra solo lo que sigue en renta. Tras agregar o devolver un activo, usa «Recalcular pendientes» en el contrato. Las alertas de vencimiento de contrato, de fin de renta de un equipo y de cuotas salen in-app, correo y Telegram (si están activos). Los dumps de inventario ya incluyen contratos, líneas y pagos.',
+    keywords: ['contrato', 'suscripción', 'vencimiento', 'pago', 'renta'],
+  },
+  {
+    id: 'inv-payments',
+    module: 'inventory',
+    category: 'Inventario',
+    question: '¿Dónde se gestionan los pagos de contratos de renta?',
+    answer:
+      'En el menú Inventario → Pagos (justo debajo de Contratos). Ahí registras cuotas vencidas o del mes. El calendario de un contrato sigue en el detalle del contrato (generar / recalcular). El monto no es un único costo del encabezado si las líneas tienen precio: es la suma de equipos vigentes esa fecha.',
+    keywords: ['pagos', 'cuota', 'mensual', 'renta'],
+    roles: ['ADMIN', 'TECHNICIAN'],
   },
   {
     id: 'inv-5',
@@ -207,7 +217,7 @@ export const HELP_FAQS: HelpFaqItem[] = [
     answer:
       'Depende de tus permisos de inventario y familia. Quienes gestionan inventario pueden crear/editar proveedores, actas de entrega/devolución y bajas. Los clientes suelen ver solo lo vinculado a sus activos. Toda acción relevante queda en auditoría.',
     keywords: ['proveedor', 'acta', 'permisos'],
-    roles: ['ADMIN', 'TECHNICIAN', 'CLIENT_MANAGER'],
+    roles: ['ADMIN', 'TECHNICIAN'],
   },
 
   // ── Rondas ──────────────────────────────────────────────────────────────

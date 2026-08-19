@@ -4,9 +4,9 @@ import { authOptions } from '@/lib/auth'
 import { ContractService } from '@/lib/services/contract-service'
 import { canManageInventory, canManageAsset, inventoryForbidden } from '@/lib/inventory-access'
 import { assertContractViewAccess } from '@/lib/contracts/access'
-import { updateContractSchema } from '@/lib/validations/contracts'
+import { updateContractSchema, contractLineSchema } from '@/lib/validations/contracts'
 import { extractBillingPayload } from '@/lib/contracts/billing-payload'
-import { ZodError } from 'zod'
+import { ZodError, z } from 'zod'
 
 // GET /api/inventory/contracts/[id]
 export async function GET(_req: NextRequest, context: { params: Promise<{ id: string }> }) {
@@ -41,11 +41,7 @@ export async function GET(_req: NextRequest, context: { params: Promise<{ id: st
   if (!contract) return NextResponse.json({ error: 'Contrato no encontrado' }, { status: 404 })
 
   const isSuperAdmin = (session.user as any).isSuperAdmin === true
-  if (
-    session.user.role !== 'CLIENT' &&
-    !isSuperAdmin &&
-    contract.familyId
-  ) {
+  if (session.user.role !== 'CLIENT' && !isSuperAdmin && contract.familyId) {
     const allowed = await canManageAsset(
       session.user.id,
       session.user.role,
@@ -118,7 +114,23 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
     await ContractService.update(params.id, updateData, session.user.id)
 
     if (Array.isArray(rawLines)) {
-      await ContractService.upsertLines(params.id, rawLines, session.user.id)
+      const lines = z.array(contractLineSchema).parse(rawLines)
+      await ContractService.upsertLines(
+        params.id,
+        lines.map(l => ({
+          type: l.type,
+          description: l.description,
+          quantity: l.quantity,
+          unitPrice: l.unitPrice ?? undefined,
+          equipmentId: l.equipmentId ?? undefined,
+          licenseId: l.licenseId ?? undefined,
+          notes: l.notes ?? undefined,
+          serviceStartDate: l.serviceStartDate ?? undefined,
+          serviceEndDate: l.serviceEndDate ?? undefined,
+          order: l.order,
+        })),
+        session.user.id
+      )
     }
 
     const updated = await ContractService.getById(params.id)

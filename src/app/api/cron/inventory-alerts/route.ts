@@ -8,6 +8,7 @@ import {
 import { CheckLicenseExpirationJob } from '@/lib/jobs/check-license-expiration.job'
 import { CheckRentalExpirationJob } from '@/lib/jobs/check-rental-expiration.job'
 import { CheckAssignmentExpirationJob } from '@/lib/jobs/check-assignment-expiration.job'
+import { checkPaymentAlerts } from '@/lib/cron/check-payment-alerts'
 import { isInventoryAlertEnabled } from '@/lib/settings/runtime-settings'
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
@@ -34,6 +35,7 @@ export async function GET(request: NextRequest) {
       tasks.push(CheckLicenseExpirationJob.run())
       tasks.push(checkContractAlerts())
       tasks.push(CheckRentalExpirationJob.run())
+      tasks.push(checkPaymentAlerts())
     }
     if (mroEnabled) tasks.push(checkMROExpiryAlerts())
     if (warrantyEnabled) tasks.push(checkWarrantyAlerts())

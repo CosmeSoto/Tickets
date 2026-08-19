@@ -13,7 +13,13 @@ export async function syncContractEquipmentLines(contractId: string): Promise<nu
       monthlyCost: true,
       lines: {
         where: { equipmentId: { not: null } },
-        select: { equipmentId: true, unitPrice: true, totalPrice: true },
+        select: {
+          equipmentId: true,
+          unitPrice: true,
+          totalPrice: true,
+          serviceStartDate: true,
+          serviceEndDate: true,
+        },
       },
     },
   })
@@ -24,6 +30,8 @@ export async function syncContractEquipmentLines(contractId: string): Promise<nu
   for (const line of contract.lines) {
     if (!line.equipmentId) continue
     const monthlyCost = line.unitPrice ?? line.totalPrice ?? contract.monthlyCost ?? undefined
+    const start = line.serviceStartDate ?? contract.startDate
+    const end = line.serviceEndDate ?? contract.endDate
     await prisma.equipment.update({
       where: { id: line.equipmentId },
       data: {
@@ -31,13 +39,13 @@ export async function syncContractEquipmentLines(contractId: string): Promise<nu
           rentalMonthlyCost: monthlyCost,
           contractRenewalCost: monthlyCost,
         }),
-        ...(contract.startDate && {
-          rentalStartDate: contract.startDate,
-          contractStartDate: contract.startDate,
+        ...(start && {
+          rentalStartDate: start,
+          contractStartDate: start,
         }),
-        ...(contract.endDate && {
-          rentalEndDate: contract.endDate,
-          contractEndDate: contract.endDate,
+        ...(end && {
+          rentalEndDate: end,
+          contractEndDate: end,
         }),
         ...(contract.contractNumber && { rentalContractNumber: contract.contractNumber }),
       },

@@ -30,6 +30,7 @@ import {
   KeyRound,
   ScrollText,
   Workflow,
+  Wallet,
 } from 'lucide-react'
 import type { DashboardNavItem } from '@/components/layout/dashboard-nav-types'
 
@@ -58,6 +59,7 @@ export const navigationByRole: Record<string, DashboardNavItem[]> = {
         { name: 'Ventas', href: '/inventory/sales', icon: Database },
         { name: 'Mantenimientos', href: '/inventory/maintenance', icon: Wrench },
         { name: 'Contratos', href: '/inventory/contracts', icon: FileSignature },
+        { name: 'Pagos', href: '/inventory/payments', icon: Wallet },
         { name: 'Actas', href: '/inventory/acts', icon: FileText },
         { name: 'Proveedores', href: '/inventory/suppliers', icon: Building2 },
         { name: 'Reportes', href: '/inventory/reports', icon: BarChart3 },
@@ -190,6 +192,7 @@ export const navigationByRole: Record<string, DashboardNavItem[]> = {
         { name: 'Activos', href: '/inventory', icon: Monitor },
         { name: 'Mantenimientos', href: '/inventory/maintenance', icon: Wrench },
         { name: 'Contratos', href: '/inventory/contracts', icon: FileSignature },
+        { name: 'Pagos', href: '/inventory/payments', icon: Wallet },
         { name: 'Actas', href: '/inventory/acts', icon: FileText },
         { name: 'Reportes', href: '/inventory/reports', icon: BarChart3 },
         { name: 'Configuración', href: '/inventory/settings', icon: Settings },
@@ -262,63 +265,6 @@ export const navigationByRole: Record<string, DashboardNavItem[]> = {
       ],
     },
     // Noticias: solo si canManageNews (ver abajo en filtro). Feed de lectura va en dashboard.
-    {
-      name: 'Noticias',
-      href: '/admin/news',
-      icon: Newspaper,
-    },
-    {
-      name: 'Documentos',
-      href: '/forms',
-      icon: FileText,
-    },
-    {
-      name: 'Credenciales',
-      href: '/credentials',
-      icon: KeyRound,
-    },
-    {
-      name: 'Procesos',
-      href: '/processes',
-      icon: Workflow,
-    },
-    { name: 'Centro de Ayuda', href: '/help/center', icon: HelpCircle },
-  ],
-
-  // Cliente CON gestión de inventario: tickets + inventario operativo de sus familias
-  CLIENT_MANAGER: [
-    { name: 'Dashboard', href: '/client', icon: LayoutDashboard },
-    {
-      name: 'Mis Tickets',
-      href: '/client/tickets',
-      icon: Ticket,
-      children: [
-        { name: 'Ver Tickets', href: '/client/tickets', icon: Ticket },
-        { name: 'Base de Conocimientos', href: '/knowledge', icon: BookOpen },
-      ],
-    },
-    {
-      name: 'Inventario',
-      href: '/inventory',
-      icon: Package,
-      children: [
-        { name: 'Activos', href: '/inventory', icon: Monitor },
-        { name: 'Mantenimientos', href: '/inventory/maintenance', icon: Wrench },
-        { name: 'Contratos', href: '/inventory/contracts', icon: FileSignature },
-        { name: 'Actas', href: '/inventory/acts', icon: FileText },
-        { name: 'Reportes', href: '/inventory/reports', icon: BarChart3 },
-        { name: 'Configuración', href: '/inventory/settings', icon: Settings },
-      ],
-    },
-    {
-      name: 'Mis Rondas',
-      href: '/patrol',
-      icon: Shield,
-      children: [
-        { name: 'Mis Rondas', href: '/patrol', icon: MapPin },
-        { name: 'Mis Incidentes', href: '/patrol/incidents', icon: AlertTriangle },
-      ],
-    },
     {
       name: 'Noticias',
       href: '/admin/news',

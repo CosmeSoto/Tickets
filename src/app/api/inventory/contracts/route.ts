@@ -87,6 +87,8 @@ export async function POST(req: NextRequest) {
         equipmentId: l.equipmentId ?? undefined,
         licenseId: l.licenseId ?? undefined,
         notes: l.notes ?? undefined,
+        serviceStartDate: l.serviceStartDate ?? undefined,
+        serviceEndDate: l.serviceEndDate ?? undefined,
         order: l.order,
       })),
       createdBy: session.user.id,

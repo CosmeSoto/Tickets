@@ -12,10 +12,7 @@ import {
   inventoryAccessToResponse,
 } from '@/lib/inventory/inventory-resource-access'
 import { sanitizeSupplierPayload } from '@/lib/validations/inventory/supplier'
-import {
-  buildSupplierAuditSnapshot,
-  supplierAuditMessage,
-} from '@/lib/inventory/supplier-audit'
+import { buildSupplierAuditSnapshot, supplierAuditMessage } from '@/lib/inventory/supplier-audit'
 import { buildSupplierCommercialSummary } from '@/lib/inventory/supplier-commercial'
 import { notifySupplierLifecycle } from '@/lib/inventory/notifications'
 import { ZodError } from 'zod'
@@ -139,6 +136,15 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
     }
 
     const targetFamilyId = data.familyId !== undefined ? data.familyId : existing.familyId
+    if (!targetFamilyId && !user.isSuperAdmin) {
+      return NextResponse.json(
+        {
+          error: 'Selecciona el área del proveedor. Solo Super Admin puede dejarlo global.',
+          field: 'familyId',
+        },
+        { status: 422 }
+      )
+    }
     if (targetFamilyId) {
       try {
         await assertInventoryManageByFamily(user, targetFamilyId)
@@ -296,10 +302,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   } catch (err) {
     if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
     console.error('[PATCH /api/inventory/suppliers/[id]]', err)
-    return NextResponse.json(
-      { error: 'Error al cambiar el estado del proveedor' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error al cambiar el estado del proveedor' }, { status: 500 })
   }
 }
 

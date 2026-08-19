@@ -481,8 +481,7 @@ export default function AdminUsersPage() {
           filters.role &&
           filters.role !== 'all' &&
           (filters.role as string) !== 'SUPER_ADMIN' &&
-          (filters.role as string) !== 'TECHNICIAN_MANAGER' &&
-          (filters.role as string) !== 'CLIENT_MANAGER'
+          (filters.role as string) !== 'TECHNICIAN_MANAGER'
             ? (filters.role as UserRole)
             : undefined
         }

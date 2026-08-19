@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto'
 import { NotificationService } from './notification-service'
 import { getFamilyScopedAdmins } from '@/lib/notifications/family-recipients'
 import { getSetting } from '@/lib/api-cache'
+import { notifyContractOps } from '@/lib/contracts/notify-contract-ops'
 
 type AlertFlag = 'alert60DaysSent' | 'alert30DaysSent' | 'alert15DaysSent'
 
@@ -119,7 +120,99 @@ export class ContractAlertService {
       },
     })
 
-    return alerts
+    const lineAlerts = await this.checkLineExpirations(now, thresholds)
+
+    return { ...alerts, lineAlerts }
+  }
+
+  /**
+   * Equipos/líneas con fin de renta propio (distinto al encabezado).
+   */
+  private static async checkLineExpirations(
+    now: Date,
+    thresholds: Array<{ days: number; upper: number; flag: AlertFlag }>
+  ) {
+    const maxDays = Math.max(...thresholds.map(t => t.days))
+    const until = new Date(now.getTime() + maxDays * 24 * 60 * 60 * 1000)
+    const lines = await prisma.contract_lines.findMany({
+      where: {
+        serviceEndDate: { gte: now, lte: until },
+        contract: { status: 'ACTIVE' },
+      },
+      select: {
+        id: true,
+        description: true,
+        serviceEndDate: true,
+        equipmentId: true,
+        contract: {
+          select: {
+            id: true,
+            name: true,
+            familyId: true,
+            custodianUserId: true,
+            backupCustodianUserId: true,
+            createdBy: true,
+          },
+        },
+      },
+    })
+
+    let sent = 0
+    const today = new Date(now)
+    today.setHours(0, 0, 0, 0)
+
+    for (const line of lines) {
+      if (!line.serviceEndDate) continue
+      const daysUntil = Math.ceil(
+        (line.serviceEndDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+      )
+      const already = await prisma.audit_logs.findFirst({
+        where: {
+          action: 'NOTIFICATION_SENT',
+          entityType: 'contract_line',
+          entityId: line.id,
+          createdAt: { gte: today },
+          details: { path: ['alertType'], equals: 'LINE_RENTAL_END' },
+        },
+      })
+      if (already) continue
+
+      const hits = thresholds.some(t => daysUntil <= t.days && daysUntil >= t.upper)
+      if (!hits && daysUntil !== 1) continue
+
+      await notifyContractOps({
+        familyId: line.contract.familyId,
+        extraUserIds: [
+          line.contract.custodianUserId,
+          line.contract.backupCustodianUserId,
+          line.contract.createdBy,
+        ],
+        title: `Fin de renta de activo (${daysUntil} día${daysUntil === 1 ? '' : 's'})`,
+        message: `La línea "${line.description}" del contrato "${line.contract.name}" deja de estar en renta el ${line.serviceEndDate.toLocaleDateString('es-MX')}. El próximo mes no debe cobrarse ese activo.`,
+        link: '/inventory/payments',
+        metadata: {
+          kind: 'CONTRACT_LINE_RENTAL_END',
+          contractId: line.contract.id,
+          lineId: line.id,
+          equipmentId: line.equipmentId,
+          daysUntil,
+        },
+      })
+
+      await prisma.audit_logs.create({
+        data: {
+          id: randomUUID(),
+          action: 'NOTIFICATION_SENT',
+          entityType: 'contract_line',
+          entityId: line.id,
+          userId: 'system',
+          details: { alertType: 'LINE_RENTAL_END', daysUntil, contractId: line.contract.id },
+        },
+      })
+      sent++
+    }
+
+    return sent
   }
 
   /**
@@ -127,52 +220,36 @@ export class ContractAlertService {
    */
   private static async sendExpirationAlert(
     contract: any,
-    daysThreshold: number,
+    _daysThreshold: number,
     actualDays: number
   ) {
-    // Obtener administradores de la familia
-    const admins = await getFamilyScopedAdmins(contract.familyId, {
-      id: true,
-      name: true,
-      email: true,
-    })
-
     const message = `
 El contrato "${contract.name}" vence en ${actualDays} día(s).
 
-**Detalles del contrato:**
+Detalles:
 - Proveedor: ${contract.supplier?.name || 'No especificado'}
 - Categoría: ${this.getCategoryLabel(contract.category)}
 - Fecha de vencimiento: ${contract.endDate.toLocaleDateString('es-MX')}
-${contract.model ? `- Modelo: ${contract.model.brand} ${contract.model.model}` : ''}
-${contract.batch ? `- Lote: ${contract.batch.batchCode}` : ''}
-${contract.monthlyCost ? `- Costo mensual: $${contract.monthlyCost.toLocaleString()}` : ''}
-${contract.totalValue ? `- Valor total: $${contract.totalValue.toLocaleString()}` : ''}
+${contract.monthlyCost ? `- Costo de referencia: $${contract.monthlyCost.toLocaleString()}` : ''}
 
-**Contacto del proveedor:**
-- Email: ${contract.supplier?.email || 'No disponible'}
-- Teléfono: ${contract.supplier?.phone || 'No disponible'}
-
-Por favor, revise el contrato y considere su renovación.
+Revise renovación, devolución de equipos o ajuste de líneas aún en renta.
     `.trim()
 
-    // Enviar notificaciones
-    for (const admin of admins) {
-      await NotificationService.createNotification({
-        userId: admin.id,
-        type: 'INVENTORY',
-        title: `Contrato próximo a vencer (${actualDays} días)`,
-        message,
-        metadata: {
-          kind: 'CONTRACT_EXPIRING',
-          contractId: contract.id,
-          contractName: contract.name,
-          daysUntilExpiry: actualDays,
-          supplierId: contract.supplierId,
-          priority: actualDays <= 15 ? 'HIGH' : 'MEDIUM',
-        },
-      })
-    }
+    await notifyContractOps({
+      familyId: contract.familyId,
+      extraUserIds: [contract.custodianUserId, contract.backupCustodianUserId, contract.createdBy],
+      title: `Contrato próximo a vencer (${actualDays} días)`,
+      message,
+      link: '/inventory/contracts',
+      metadata: {
+        kind: 'CONTRACT_EXPIRING',
+        contractId: contract.id,
+        contractName: contract.name,
+        daysUntilExpiry: actualDays,
+        supplierId: contract.supplierId,
+        priority: actualDays <= 15 ? 'HIGH' : 'MEDIUM',
+      },
+    })
   }
 
   /**

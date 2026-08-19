@@ -4,11 +4,14 @@ import { authOptions } from '@/lib/auth'
 import { randomUUID } from 'crypto'
 import prisma from '@/lib/prisma'
 import { canManageInventory, inventoryForbidden } from '@/lib/inventory-access'
-import { sanitizeSupplierPayload } from '@/lib/validations/inventory/supplier'
 import {
-  buildSupplierAuditSnapshot,
-  supplierAuditMessage,
-} from '@/lib/inventory/supplier-audit'
+  assertInventoryManageByFamily,
+  InventoryAccessError,
+  inventoryAccessToResponse,
+  toInventoryAccessUser,
+} from '@/lib/inventory/inventory-resource-access'
+import { sanitizeSupplierPayload } from '@/lib/validations/inventory/supplier'
+import { buildSupplierAuditSnapshot, supplierAuditMessage } from '@/lib/inventory/supplier-audit'
 import { buildSupplierCommercialSummary } from '@/lib/inventory/supplier-commercial'
 import { notifySupplierLifecycle } from '@/lib/inventory/notifications'
 import { ZodError } from 'zod'
@@ -184,6 +187,26 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const data = sanitizeSupplierPayload(body)
 
+    const user = toInventoryAccessUser(session.user)
+    if (!user.isSuperAdmin) {
+      if (!data.familyId) {
+        return NextResponse.json(
+          {
+            error:
+              'Selecciona el área del proveedor (tu familia nativa o una asignada de inventario)',
+            field: 'familyId',
+          },
+          { status: 422 }
+        )
+      }
+      try {
+        await assertInventoryManageByFamily(user, data.familyId)
+      } catch (err) {
+        if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+        throw err
+      }
+    }
+
     if (data.taxId) {
       const existing = await prisma.suppliers.findUnique({ where: { taxId: data.taxId } })
       if (existing) {
@@ -224,7 +247,11 @@ export async function POST(request: NextRequest) {
     if (error instanceof ZodError) {
       const first = error.errors[0]
       return NextResponse.json(
-        { error: first?.message ?? 'Datos inválidos', field: first?.path?.join('.'), details: error.errors },
+        {
+          error: first?.message ?? 'Datos inválidos',
+          field: first?.path?.join('.'),
+          details: error.errors,
+        },
         { status: 422 }
       )
     }

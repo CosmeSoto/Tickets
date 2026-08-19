@@ -2,10 +2,15 @@
  * Destinatarios de notificaciones por familia.
  *
  * Tickets (creación / cierre):
- * - Super admin: sí, si no está involucrado en el ticket.
+ * - Super admin: recibe in-app/Telegram, pero NO email (solo admins del área reciben correos).
  * - Admin: familia nativa (departamento) o área asignada en user_family_access (módulo tickets).
  *
- * Inventario y otros módulos siguen usando getFamilyScopedAdmins (super + nativo).
+ * Inventario / contratos / alertas — EMAIL:
+ * - getAreaEmailRecipients(): solo admins nativos del área + custodios explícitos (sin superadmin).
+ * - getFamilyScopedAdmins(): super admins + admin nativo — para notificaciones in-app/Telegram.
+ *
+ * Regla general: el superadmin recibe in-app y Telegram para todo,
+ * pero los CORREOS van solo a los directamente involucrados y al admin del área.
  */
 
 import prisma from '@/lib/prisma'
@@ -169,4 +174,42 @@ export async function getFamilyScopedAdminsForFamilies(
 
   const nativeAdmins = await Promise.all(validIds.map(id => getNativeFamilyAdmins(id, select)))
   return dedupeById([...superAdmins, ...nativeAdmins.flat()])
+}
+
+/**
+ * Destinatarios de EMAIL para alertas de inventario, contratos y licencias.
+ *
+ * Solo incluye:
+ * - Admins nativos del área (familyId), SIN super admins.
+ * - IDs adicionales explícitos (custodios, creadores, responsables del contrato/equipo).
+ *
+ * El superadmin recibe estas alertas vía in-app y Telegram (gestionado en los servicios
+ * que llaman a getFamilyScopedAdmins para push). El correo sería ruido para él.
+ *
+ * Si no hay familyId y tampoco extraUserIds, retorna lista vacía (sin email a nadie).
+ */
+export async function getAreaEmailRecipients(
+  familyId: string | null | undefined,
+  options?: {
+    select?: RecipientSelect
+    extraUserIds?: Array<string | null | undefined>
+    excludeUserIds?: Array<string | null | undefined>
+  }
+): Promise<NotificationRecipient[]> {
+  const select = options?.select ?? ({ id: true, email: true, name: true } as RecipientSelect)
+
+  const nativeAdmins = familyId ? await getNativeFamilyAdmins(familyId, select) : []
+
+  const extraIds = [
+    ...new Set((options?.extraUserIds ?? []).filter((id): id is string => Boolean(id))),
+  ]
+  const extraUsers =
+    extraIds.length === 0
+      ? []
+      : await prisma.users.findMany({
+          where: { id: { in: extraIds }, isActive: true },
+          select,
+        })
+
+  return excludeRecipients(dedupeById([...nativeAdmins, ...extraUsers]), options?.excludeUserIds)
 }

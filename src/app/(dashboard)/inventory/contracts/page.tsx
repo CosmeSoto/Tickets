@@ -301,7 +301,8 @@ export default function ContractsPage() {
                 alertas.
               </p>
               <p>
-                <strong>Gestor:</strong> Igual que admin en familias asignadas (canManageInventory).
+                <strong>Gestor:</strong> Técnico o admin con «Gestión completa» (nunca un cliente).
+                Opera en su familia nativa y las asignadas de inventario.
               </p>
               <p>
                 <strong>Cliente:</strong> Solo lectura de suscripciones asignadas; firma actas vía
@@ -463,10 +464,7 @@ export default function ContractsPage() {
           <div className='flex flex-col items-center justify-center py-16 text-muted-foreground'>
             <FileSignature className='h-12 w-12 mb-4 opacity-30' />
             <p className='text-sm'>
-              {search ||
-              statusFilter !== 'ALL' ||
-              categoryFilter !== 'ALL' ||
-              supplierFilter
+              {search || statusFilter !== 'ALL' || categoryFilter !== 'ALL' || supplierFilter
                 ? 'No se encontraron contratos con los filtros aplicados'
                 : 'No hay contratos registrados'}
             </p>

@@ -192,16 +192,22 @@ export function ModuleAccessCard({
           {options && (
             <div className='px-3 py-2 space-y-2 border-b border-primary/10'>
               {options.onToggleManager !== undefined && (
-                <div className='flex items-center justify-between'>
-                  <div className='flex items-center gap-1.5'>
-                    <span className='text-xs'>🔧</span>
-                    <p className='text-[11px] font-medium'>Gestión completa</p>
+                <div className='flex items-center justify-between gap-2'>
+                  <div className='min-w-0'>
+                    <div className='flex items-center gap-1.5'>
+                      <span className='text-xs'>🔧</span>
+                      <p className='text-[11px] font-medium'>Gestión completa</p>
+                    </div>
+                    <p className='text-[10px] text-muted-foreground mt-0.5 pl-5'>
+                      Solo técnicos y administradores. El cliente nunca es gestor: ve asignados y
+                      puede solicitar si está habilitado.
+                    </p>
                   </div>
                   <Switch
                     checked={options.canManageInventory ?? false}
                     onCheckedChange={options.onToggleManager}
                     disabled={disabled}
-                    className='scale-90'
+                    className='scale-90 shrink-0'
                   />
                 </div>
               )}

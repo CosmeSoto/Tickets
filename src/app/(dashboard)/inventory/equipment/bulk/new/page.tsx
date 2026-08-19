@@ -18,7 +18,6 @@ export default function NewBulkEquipmentPage() {
   const defaultFamilyId = searchParams.get('familyId') ?? undefined
   const cloneFrom = searchParams.get('cloneFrom') ?? undefined
 
-  const canManageInventory = (session?.user as any)?.canManageInventory === true
   const hasAuthenticated = useRef(false)
 
   useEffect(() => {
@@ -27,14 +26,10 @@ export default function NewBulkEquipmentPage() {
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login')
-    else if (
-      status === 'authenticated' &&
-      session?.user?.role === 'CLIENT' &&
-      !canManageInventory
-    ) {
+    else if (status === 'authenticated' && session?.user?.role === 'CLIENT') {
       router.push('/inventory')
     }
-  }, [status, session, router, canManageInventory])
+  }, [status, session, router])
 
   if (status === 'loading' && !hasAuthenticated.current) {
     return (
@@ -45,7 +40,7 @@ export default function NewBulkEquipmentPage() {
     )
   }
 
-  if (!session?.user || (session.user.role === 'CLIENT' && !canManageInventory)) return null
+  if (!session?.user || session.user.role === 'CLIENT') return null
 
   const subtitle = cloneFrom
     ? 'Recompra basada en un lote existente — revisa y ajusta los datos'

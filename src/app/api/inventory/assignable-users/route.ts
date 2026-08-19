@@ -128,6 +128,32 @@ export async function GET(request: NextRequest) {
       department: u.departments ? { id: u.departments.id, name: u.departments.name } : null,
     }))
 
+    // Quien consulta puede ser custodio / asignatario aunque su depto no coincida con el filtro.
+    if (!result.some(u => u.id === userId)) {
+      const me = await prisma.users.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          avatar: true,
+          isActive: true,
+          departments: { select: { id: true, name: true } },
+        },
+      })
+      if (me?.isActive) {
+        result.unshift({
+          id: me.id,
+          name: me.name,
+          email: me.email,
+          role: me.role,
+          avatar: me.avatar,
+          department: me.departments ? { id: me.departments.id, name: me.departments.name } : null,
+        })
+      }
+    }
+
     return NextResponse.json({ users: result })
   } catch (error) {
     console.error('[assignable-users] Error:', error)

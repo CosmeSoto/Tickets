@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { withCache } from '@/lib/api-cache'
+import { effectiveCanManageInventory } from '@/lib/inventory/manager-eligibility'
 /**
  * GET /api/user/modules
  * Devuelve los módulos activos para el usuario autenticado según sus familias asignadas.
@@ -144,6 +145,12 @@ export async function GET(request: Request) {
       canManageAccess = (currentUser as any).canManageAccess ?? false
     }
   }
+
+  canManageInventory = effectiveCanManageInventory({
+    role,
+    isSuperAdmin,
+    canManageInventory,
+  })
 
   const cacheKey = `user:modules:${userId}`
 

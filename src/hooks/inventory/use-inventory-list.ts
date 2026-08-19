@@ -105,6 +105,13 @@ const ALL_EXPORT_COLUMNS = [
   { key: 'accessories', label: sharedFieldExportMap.accessories, format: (v: any) => v ?? '' },
   { key: 'notes', label: sharedFieldExportMap.notes, format: (v: any) => v ?? '' },
   { key: 'batchCode', label: 'Lote', format: (v: any) => v ?? 'Individual' },
+  { key: 'assignedToName', label: 'Asignado a', format: (v: any) => v ?? '' },
+  {
+    key: 'assignedAt',
+    label: 'Fecha de asignación',
+    format: (v: any) => (v ? new Date(v).toLocaleDateString('es-ES') : ''),
+  },
+  { key: 'assignedByName', label: 'Asignado por', format: (v: any) => v ?? '' },
 ]
 
 interface UseInventoryListProps {

@@ -107,6 +107,14 @@ export class DeliveryActService {
         ? `/api/uploads/equipment/${eq.id}/${firstAttachment.filename}`
         : eq.photoUrl || null
 
+      if (!equipmentImagePath) {
+        console.log(
+          `[DeliveryAct] Equipo ${eq.code} sin imagen — el acta se generará sin foto del activo.`
+        )
+      } else {
+        console.log(`[DeliveryAct] Imagen del activo: ${equipmentImagePath}`)
+      }
+
       // Ordenar customValues según el orden definido en los atributos del tipo
       const typeAttrOrder: Map<string, { label: string; order: number }> = new Map(
         (eq.type?.attributes ?? []).map((a: any) => [

@@ -376,7 +376,11 @@ export function EditUserModal({
   }
 
   const handleRoleDeptChange = (field: 'role' | 'departmentId', value: string) => {
-    setFormData(p => ({ ...p, [field]: value }))
+    setFormData(p => ({
+      ...p,
+      [field]: value,
+      ...(field === 'role' && value === 'CLIENT' ? { canManageInventory: false } : {}),
+    }))
   }
 
   const handleToggle = (
@@ -405,8 +409,8 @@ export function EditUserModal({
       setFormData(p => ({
         ...p,
         inventoryEnabled: value,
-        // TECHNICIAN: al activar inventario, activa gestión completa automáticamente
-        canManageInventory: p.role === 'TECHNICIAN' ? value : p.canManageInventory,
+        canManageInventory:
+          p.role === 'CLIENT' ? false : p.role === 'TECHNICIAN' ? value : p.canManageInventory,
         // ADMIN normal: al activar inventario, activa ambos permisos automáticamente
         ...(p.role === 'ADMIN' ? { canManageInventory: value, canRequestAssets: value } : {}),
       }))

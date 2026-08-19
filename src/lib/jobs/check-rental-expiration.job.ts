@@ -1,7 +1,11 @@
 import { getSystemBranding } from '@/lib/branding'
 import { NotificationService } from '../services/notification-service'
-import { getFamilyScopedAdmins } from '@/lib/notifications/family-recipients'
+import {
+  getFamilyScopedAdmins,
+  getAreaEmailRecipients,
+} from '@/lib/notifications/family-recipients'
 import { queueNotificationEmail } from '@/lib/notifications/queue-notification-email'
+import { queueTelegramNotification } from '@/lib/notifications/queue-notification-telegram'
 import { db as prisma } from '@/lib/server'
 
 /**
@@ -74,20 +78,26 @@ export class CheckRentalExpirationJob {
       const { systemName } = await getSystemBranding()
 
       for (const rental of expiringRentals) {
-        const admins = await getFamilyScopedAdmins(rental.type?.familyId ?? null, {
+        const familyId = rental.type?.familyId ?? null
+
+        // In-app + Telegram: superadmin + admin nativo
+        const pushAdmins = await getFamilyScopedAdmins(familyId, {
           id: true,
           email: true,
           name: true,
         })
 
-        if (admins.length === 0) continue
+        // Email: solo admin nativo del área (sin superadmin)
+        const emailAdmins = await getAreaEmailRecipients(familyId)
+
+        if (pushAdmins.length === 0 && emailAdmins.length === 0) continue
 
         const daysRemaining = daysBeforeExpiration
         const equipmentDescription = `${rental.brand} ${rental.model} (${rental.code})`
         const expirationDate = rental.rentalEndDate!
 
-        // Crear notificaciones in-app para cada admin
-        for (const admin of admins) {
+        // In-app + Telegram para todos (incluye superadmin)
+        for (const admin of pushAdmins) {
           try {
             await NotificationService.push({
               userId: admin.id,
@@ -100,12 +110,28 @@ export class CheckRentalExpirationJob {
               metadata: { link: `/inventory/equipment/${rental.id}` },
             })
 
-            if (!admin.email) {
-              notificationsSent++
-              continue
-            }
+            await queueTelegramNotification({
+              recipientUserId: admin.id,
+              title: daysRemaining === 1 ? 'Renta por vencer (urgente)' : 'Renta próxima a vencer',
+              body: `El equipo ${equipmentDescription} vence en ${daysRemaining} día(s).`,
+              module: 'inventory',
+              event: 'inventoryAlert',
+              link: `/inventory/equipment/${rental.id}`,
+            })
 
-            // Crear email en cola (alerta operativa importante)
+            notificationsSent++
+          } catch (error) {
+            console.error(
+              `[CheckRentalExpirationJob] Error enviando notificación in-app para ${rental.code}:`,
+              error
+            )
+          }
+        }
+
+        // Email solo a admins del área (sin superadmin)
+        for (const admin of emailAdmins) {
+          if (!admin.email) continue
+          try {
             await queueNotificationEmail({
               to: admin.email,
               subject:
@@ -123,11 +149,9 @@ export class CheckRentalExpirationJob {
               event: 'inventoryAlert',
               priority: 'important',
             })
-
-            notificationsSent++
           } catch (error) {
             console.error(
-              `[CheckRentalExpirationJob] Error enviando notificación para ${rental.code}:`,
+              `[CheckRentalExpirationJob] Error enviando email para ${rental.code}:`,
               error
             )
           }

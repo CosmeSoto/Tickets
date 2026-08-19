@@ -69,7 +69,6 @@ export function HelpHub() {
     credentials,
     canRequestAssets,
     canAccessKnowledge,
-    canManageInventory,
     loading: modulesLoading,
   } = useUserModules()
   const [searchQuery, setSearchQuery] = useState('')
@@ -91,7 +90,7 @@ export function HelpHub() {
       .catch(() => {})
   }, [])
 
-  const viewerRole = resolveHelpViewerRole(session?.user?.role, !!canManageInventory)
+  const viewerRole = resolveHelpViewerRole(session?.user?.role)
 
   const flags: HelpModuleFlags = useMemo(
     () => ({
@@ -102,26 +101,12 @@ export function HelpHub() {
       credentials: !!credentials,
       knowledge: !!tickets && !!canAccessKnowledge,
     }),
-    [
-      tickets,
-      inventory,
-      canRequestAssets,
-      patrols,
-      forms,
-      credentials,
-      canAccessKnowledge,
-    ]
+    [tickets, inventory, canRequestAssets, patrols, forms, credentials, canAccessKnowledge]
   )
 
-  const visibleFaqs = useMemo(
-    () => filterHelpFaqs(flags, viewerRole),
-    [flags, viewerRole]
-  )
+  const visibleFaqs = useMemo(() => filterHelpFaqs(flags, viewerRole), [flags, viewerRole])
 
-  const sections = useMemo(
-    () => visibleHelpSections(flags, visibleFaqs),
-    [flags, visibleFaqs]
-  )
+  const sections = useMemo(() => visibleHelpSections(flags, visibleFaqs), [flags, visibleFaqs])
 
   const filteredFaqs = useMemo(() => {
     return visibleFaqs.filter(faq => {
@@ -184,7 +169,9 @@ export function HelpHub() {
           {!modulesLoading && (
             <p className='text-xs text-muted-foreground'>
               Mostramos solo la ayuda de los módulos activos en tu cuenta
-              {session?.user?.role ? ` (${session.user.role === 'TECHNICIAN' ? 'técnico' : session.user.role === 'ADMIN' ? 'administrador' : 'cliente'})` : ''}
+              {session?.user?.role
+                ? ` (${session.user.role === 'TECHNICIAN' ? 'técnico' : session.user.role === 'ADMIN' ? 'administrador' : 'cliente'})`
+                : ''}
               . Si falta un módulo, un administrador puede habilitarlo en tu ficha.
             </p>
           )}
@@ -294,7 +281,9 @@ export function HelpHub() {
             )}
             {config?.supportEmail ? (
               <Button asChild variant='default' className='flex-1'>
-                <a href={`mailto:${config.supportEmail}?subject=${encodeURIComponent('Consulta de soporte')}`}>
+                <a
+                  href={`mailto:${config.supportEmail}?subject=${encodeURIComponent('Consulta de soporte')}`}
+                >
                   <Mail className='h-4 w-4 mr-2' />
                   Contactar soporte
                 </a>
@@ -315,8 +304,8 @@ export function HelpHub() {
             </p>
           )}
           <p className='text-xs text-muted-foreground leading-relaxed'>
-            Al contactar, envía solo la información necesaria para atender tu caso. El tratamiento de
-            datos personales se rige por la{' '}
+            Al contactar, envía solo la información necesaria para atender tu caso. El tratamiento
+            de datos personales se rige por la{' '}
             <Link
               href={config?.privacyUrl || '/help/privacy'}
               className='underline underline-offset-2'

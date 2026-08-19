@@ -5,7 +5,7 @@ import {
   enrichFamiliesWithModules,
 } from './shared'
 
-export async function getClientStats(userId: string, canManageInventory: boolean) {
+export async function getClientStats(userId: string, _canManageInventory?: boolean) {
   const [
     totalTickets,
     openTickets,
@@ -95,33 +95,19 @@ export async function getClientStats(userId: string, canManageInventory: boolean
     supportQuality: avgRating >= 4.5 ? 'excellent' : avgRating >= 4 ? 'good' : 'fair',
   }
 
-  stats.isInventoryManager = canManageInventory
+  stats.isInventoryManager = false
   const { resolveModuleFamilyScopeIds } = await import('@/lib/auth/user-family-access')
   const familySelect = { id: true, name: true, code: true, color: true, icon: true } as const
 
-  if (canManageInventory) {
-    const invScopeIds = await resolveModuleFamilyScopeIds(userId, 'inventory', 'canView')
-    const invFamilies =
-      invScopeIds.length > 0
-        ? await prisma.families.findMany({
-            where: { id: { in: invScopeIds }, isActive: true },
-            select: familySelect,
-          })
-        : []
-    const enriched = await enrichFamiliesWithModules(invFamilies)
-    stats.inventoryFamilies = enriched
-    stats.assignedFamilies = enriched
-  } else {
-    const ticketScopeIds = await resolveModuleFamilyScopeIds(userId, 'tickets')
-    const families =
-      ticketScopeIds.length > 0
-        ? await prisma.families.findMany({
-            where: { id: { in: ticketScopeIds }, isActive: true },
-            select: familySelect,
-          })
-        : []
-    stats.assignedFamilies = await enrichFamiliesWithModules(families)
-  }
+  const ticketScopeIds = await resolveModuleFamilyScopeIds(userId, 'tickets')
+  const families =
+    ticketScopeIds.length > 0
+      ? await prisma.families.findMany({
+          where: { id: { in: ticketScopeIds }, isActive: true },
+          select: familySelect,
+        })
+      : []
+  stats.assignedFamilies = await enrichFamiliesWithModules(families)
 
   return stats
 }

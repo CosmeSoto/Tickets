@@ -645,7 +645,8 @@ export async function proxy(request: NextRequest) {
 
     // Rutas de inventario:
     // - Super Admin: acceso total
-    // - ADMIN/TECH/CLIENT: inventoryEnabled o canManageInventory; CLIENT sin gestión → allowlist
+    // - ADMIN/TECH: inventoryEnabled o canManageInventory
+    // - CLIENT: inventoryEnabled / solicitudes → allowlist (nunca gestor)
     if (
       path.startsWith('/inventory') ||
       path === '/settings/inventory' ||
@@ -666,7 +667,7 @@ export async function proxy(request: NextRequest) {
         return NextResponse.redirect(new URL(dashboardForRole(userRole), request.url))
       }
 
-      if (userRole === 'CLIENT' && !canManage) {
+      if (userRole === 'CLIENT') {
         const clientAllowed = [
           '/inventory',
           '/inventory/equipment',

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { useForm, useFieldArray } from 'react-hook-form'
+import { useSession } from 'next-auth/react'
 import { Plus, Trash2, RefreshCw, FileText, Download, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -32,6 +33,7 @@ import { ContractFormSection } from '@/components/contracts/contract-form-sectio
 import { FormDraftBanner } from '@/components/common/form-draft-banner'
 import { FormDraftKeys, useFormDraft } from '@/hooks/common/use-form-draft'
 import { parseMoneyInput } from '@/lib/utils'
+import { suggestedRecurringFromLines } from '@/lib/contracts/line-billing'
 import {
   CONTRACT_CATEGORY_LABELS,
   CONTRACT_LINE_TYPE_LABELS,
@@ -78,8 +80,12 @@ const EMPTY_LINE = {
   equipmentId: '',
   licenseId: '',
   notes: '',
+  serviceStartDate: '',
+  serviceEndDate: '',
   order: 0,
 }
+
+const CUSTODIAN_NONE = '__none__'
 
 function buildContractDraftSnapshot(v: ContractFormData) {
   return {
@@ -110,6 +116,8 @@ function buildContractDraftSnapshot(v: ContractFormData) {
       quantity: l.quantity,
       unitPrice: l.unitPrice,
       notes: l.notes,
+      serviceStartDate: l.serviceStartDate,
+      serviceEndDate: l.serviceEndDate,
       order: l.order,
     })),
   }
@@ -126,6 +134,7 @@ export function ContractForm({
   draftKey,
 }: Props) {
   const { toast } = useToast()
+  const { data: session } = useSession()
   const [submitting, setSubmitting] = useState(false)
   const isEditing = !!contract
 
@@ -262,21 +271,40 @@ export function ContractForm({
     [serviceTypes]
   )
 
-  const resolveServiceTypeUuid = (code: string) =>
-    serviceTypes.find(t => t.code === code)?.id
+  const resolveServiceTypeUuid = (code: string) => serviceTypes.find(t => t.code === code)?.id
 
-  const custodianOptions = useMemo(
-    () => [
-      { value: '', label: 'Sin custodio' },
-      ...assignableUsers
-        .filter(u => u.role === 'ADMIN' || u.role === 'TECHNICIAN')
-        .map(u => ({
-          value: u.id,
-          label: `${u.name} (${u.email})`,
-        })),
-    ],
-    [assignableUsers]
-  )
+  const custodianOptions = useMemo(() => {
+    const meId = session?.user?.id
+    const eligible = assignableUsers.filter(
+      u => u.role === 'ADMIN' || u.role === 'TECHNICIAN' || u.id === meId
+    )
+    const hasMe = meId ? eligible.some(u => u.id === meId) : true
+    const merged =
+      meId && !hasMe
+        ? [
+            {
+              id: meId,
+              name: session?.user?.name || 'Yo',
+              email: session?.user?.email || '',
+              role: session?.user?.role || 'ADMIN',
+            },
+            ...eligible,
+          ]
+        : eligible
+    return [
+      { value: CUSTODIAN_NONE, label: 'Sin asignar (se usará quien crea el contrato)' },
+      ...merged.map(u => ({
+        value: u.id,
+        label: u.id === meId ? `${u.name} (tú)` : `${u.name} (${u.email})`,
+      })),
+    ]
+  }, [
+    assignableUsers,
+    session?.user?.id,
+    session?.user?.name,
+    session?.user?.email,
+    session?.user?.role,
+  ])
 
   const categoryOptions = useMemo(
     () =>
@@ -347,12 +375,22 @@ export function ContractForm({
           equipmentId: l.equipmentId ?? '',
           licenseId: l.licenseId ?? '',
           notes: l.notes ?? '',
+          serviceStartDate: l.serviceStartDate ? String(l.serviceStartDate).slice(0, 10) : '',
+          serviceEndDate: l.serviceEndDate ? String(l.serviceEndDate).slice(0, 10) : '',
           order: l.order,
         })) ?? [],
     },
   })
 
   const { fields, append, remove } = useFieldArray({ control, name: 'lines' })
+
+  useEffect(() => {
+    if (isEditing) return
+    if (getValues('custodianUserId')) return
+    if (session?.user?.id) {
+      setValue('custodianUserId', session.user.id, { shouldDirty: false })
+    }
+  }, [session?.user?.id, isEditing, getValues, setValue])
 
   useEffect(() => {
     onDirtyChange?.(isDirty)
@@ -368,9 +406,7 @@ export function ContractForm({
       ? FormDraftKeys.contractEdit(contract.id)
       : FormDraftKeys.contractNew())
 
-  const [draftSnapshot, setDraftSnapshot] = useState(() =>
-    buildContractDraftSnapshot(getValues())
-  )
+  const [draftSnapshot, setDraftSnapshot] = useState(() => buildContractDraftSnapshot(getValues()))
 
   useEffect(() => {
     let debounceTimer: ReturnType<typeof setTimeout>
@@ -412,7 +448,19 @@ export function ContractForm({
   const billingCycle = watch('billingCycle')
   const startDateValue = watch('startDate')
   const endDateValue = watch('endDate')
+  const watchedLines = watch('lines')
   const isRecurringBilling = billingCycle !== 'ONE_TIME'
+
+  const linesRecurringSum = useMemo(
+    () =>
+      suggestedRecurringFromLines(
+        (watchedLines ?? []).map(l => ({
+          quantity: parseMoneyInput(l.quantity) ?? 1,
+          unitPrice: parseMoneyInput(l.unitPrice),
+        }))
+      ),
+    [watchedLines]
+  )
 
   const recurringCostLabel =
     billingCycle === 'QUARTERLY'
@@ -469,10 +517,7 @@ export function ContractForm({
     if (!current.termsUrl && supplier.website) {
       setValue('termsUrl', supplier.website)
     }
-    if (
-      supplier.preferredPaymentMethod &&
-      current.paymentMethodType === 'CORPORATE_CARD'
-    ) {
+    if (supplier.preferredPaymentMethod && current.paymentMethodType === 'CORPORATE_CARD') {
       setValue(
         'paymentMethodType',
         supplier.preferredPaymentMethod as ContractFormData['paymentMethodType']
@@ -540,8 +585,14 @@ export function ContractForm({
         serviceSubtype: emptyToUndef(data.serviceSubtype) ?? null,
         paymentMethodType: data.paymentMethodType,
         paymentAccountRef: emptyToUndef(data.paymentAccountRef) ?? null,
-        custodianUserId: emptyToUndef(data.custodianUserId) ?? null,
-        backupCustodianUserId: emptyToUndef(data.backupCustodianUserId) ?? null,
+        custodianUserId:
+          emptyToUndef(data.custodianUserId === CUSTODIAN_NONE ? '' : data.custodianUserId) ??
+          (!isEditing ? session?.user?.id : null) ??
+          null,
+        backupCustodianUserId:
+          emptyToUndef(
+            data.backupCustodianUserId === CUSTODIAN_NONE ? '' : data.backupCustodianUserId
+          ) ?? null,
         billingAccountEmail: emptyToUndef(data.billingAccountEmail),
         billingPortalUrl: emptyToUndef(data.billingPortalUrl),
         vendorAccountId: emptyToUndef(data.vendorAccountId),
@@ -561,6 +612,8 @@ export function ContractForm({
             equipmentId: emptyToUndef(l.equipmentId),
             licenseId: emptyToUndef(l.licenseId),
             notes: emptyToUndef(l.notes),
+            serviceStartDate: emptyToUndef(l.serviceStartDate),
+            serviceEndDate: emptyToUndef(l.serviceEndDate),
             order: i,
           })),
       }
@@ -626,8 +679,9 @@ export function ContractForm({
         }}
       />
       <p className='text-xs text-muted-foreground'>
-        Empieza por <strong>Datos generales</strong>. Abre las demás secciones cuando las
-        necesites.
+        Empieza por <strong>Datos generales</strong>. En <strong>Líneas / activos</strong> define
+        cada equipo y su fecha de renta. En <strong>Pagos</strong> el método y las cuotas.{' '}
+        <strong>Custodios</strong> son responsables comerciales, no el medio de cobro.
       </p>
       <fieldset disabled={readOnly} className={readOnly ? 'space-y-4' : 'contents'}>
         {/* ── 1. Datos generales ──────────────────────────────────────────── */}
@@ -718,8 +772,7 @@ export function ContractForm({
                           : []
                         setServiceTypes(rows)
                         const row =
-                          rows.find(t => t.id === saved.id) ||
-                          rows.find(t => t.name === saved.name)
+                          rows.find(t => t.id === saved.id) || rows.find(t => t.name === saved.name)
                         onSuccess({
                           id: row?.code || saved.id,
                           name: row?.name || saved.name,
@@ -785,7 +838,7 @@ export function ContractForm({
         {/* ── 2. Vigencia y costos ────────────────────────────────────────── */}
         <ContractFormSection
           title='2. Vigencia y costos'
-          description='Fechas, ciclo de facturación y monto según el ciclo (recurrente o pago único).'
+          description='Marco del contrato: fechas globales y ciclo. El costo por periodo se puede calcular desde las líneas (activos) si tienen precio y fechas propias.'
           defaultOpen={false}
         >
           <div className={formGrid}>
@@ -873,8 +926,24 @@ export function ContractForm({
                   placeholder='0.00'
                 />
                 <p className='text-[10px] text-muted-foreground'>
-                  Acepta punto o coma decimal (ej. 24.50 o 24,50).
+                  Acepta punto o coma decimal (ej. 24.50 o 24,50). Referencia del contrato; si las
+                  líneas tienen precio, cada cuota de Pagos usa solo los activos vigentes en esa
+                  fecha.
                 </p>
+                {linesRecurringSum > 0 && (
+                  <Button
+                    type='button'
+                    variant='outline'
+                    size='sm'
+                    className='mt-1 h-7 text-xs'
+                    disabled={readOnly}
+                    onClick={() =>
+                      setValue('monthlyCost', String(linesRecurringSum), { shouldDirty: true })
+                    }
+                  >
+                    Usar suma de líneas ({linesRecurringSum})
+                  </Button>
+                )}
               </div>
             ) : (
               <div className='space-y-1'>
@@ -952,10 +1021,45 @@ export function ContractForm({
           </div>
         </ContractFormSection>
 
-        {/* ── 4. Facturación y responsables ───────────────────────────────── */}
+        {/* ── 4. Responsables ─────────────────────────────────────────────── */}
         <ContractFormSection
-          title='4. Facturación y responsables'
-          description='Custodios, método de pago y trazabilidad de cargos (auditoría).'
+          title='4. Responsables (custodios)'
+          description='Quien cuida la relación comercial con el proveedor. No es el método de cobro: eso va en Pagos. Si no eliges custodio principal, se asigna quien crea el contrato.'
+          badge='Opcional'
+          defaultOpen={false}
+        >
+          <div className={formGrid}>
+            <div className='space-y-1'>
+              <Label>Custodio principal</Label>
+              <Combobox
+                options={custodianOptions}
+                value={watch('custodianUserId') || CUSTODIAN_NONE}
+                onValueChange={v =>
+                  setValue('custodianUserId', v === CUSTODIAN_NONE ? '' : v, { shouldDirty: true })
+                }
+                placeholder='Tú, u otro responsable...'
+              />
+            </div>
+            <div className='space-y-1'>
+              <Label>Custodio de respaldo</Label>
+              <Combobox
+                options={custodianOptions}
+                value={watch('backupCustodianUserId') || CUSTODIAN_NONE}
+                onValueChange={v =>
+                  setValue('backupCustodianUserId', v === CUSTODIAN_NONE ? '' : v, {
+                    shouldDirty: true,
+                  })
+                }
+                placeholder='Respaldo para offboarding...'
+              />
+            </div>
+          </div>
+        </ContractFormSection>
+
+        {/* ── 5. Pagos y facturación ──────────────────────────────────────── */}
+        <ContractFormSection
+          title='5. Pagos y facturación'
+          description='Cómo se paga: método, portal, tarjeta o cheque, y trazabilidad de cargos. Las cuotas se generan según el ciclo y las líneas vigentes en cada periodo.'
           badge='Opcional'
           defaultOpen={false}
         >
@@ -984,6 +1088,7 @@ export function ContractForm({
             {(paymentMethodType === 'PAYPAL' ||
               paymentMethodType === 'CRYPTO' ||
               paymentMethodType === 'BANK_TRANSFER' ||
+              paymentMethodType === 'CHECK' ||
               paymentMethodType === 'OTHER') && (
               <div className='space-y-1 sm:col-span-2 lg:col-span-3'>
                 <Label>
@@ -991,7 +1096,9 @@ export function ContractForm({
                     ? 'Dirección wallet / red'
                     : paymentMethodType === 'PAYPAL'
                       ? 'Email o ID PayPal'
-                      : 'Cuenta / referencia de pago'}
+                      : paymentMethodType === 'CHECK'
+                        ? 'Cheque / banco / referencia'
+                        : 'Cuenta / referencia de pago'}
                 </Label>
                 <Input
                   {...register('paymentAccountRef')}
@@ -1000,30 +1107,14 @@ export function ContractForm({
                       ? '0x… o dirección + red (ETH, BTC…)'
                       : paymentMethodType === 'PAYPAL'
                         ? 'cuenta@empresa.com'
-                        : 'N° cuenta, IBAN o alias'
+                        : paymentMethodType === 'CHECK'
+                          ? 'N° de cheque, banco o cuenta'
+                          : 'N° cuenta, IBAN o alias'
                   }
                 />
               </div>
             )}
 
-            <div className='space-y-1'>
-              <Label>Custodio principal</Label>
-              <Combobox
-                options={custodianOptions}
-                value={watch('custodianUserId')}
-                onValueChange={v => setValue('custodianUserId', v)}
-                placeholder='Responsable del servicio...'
-              />
-            </div>
-            <div className='space-y-1'>
-              <Label>Custodio de respaldo</Label>
-              <Combobox
-                options={custodianOptions}
-                value={watch('backupCustodianUserId')}
-                onValueChange={v => setValue('backupCustodianUserId', v)}
-                placeholder='Respaldo para offboarding...'
-              />
-            </div>
             <div className='space-y-1'>
               <Label>Email cuenta de facturación</Label>
               <Input
@@ -1147,13 +1238,13 @@ export function ContractForm({
           </div>
         </ContractFormSection>
 
-        {/* ── 5. Líneas del contrato ──────────────────────────────────────── */}
+        {/* ── 6. Líneas del contrato ──────────────────────────────────────── */}
         <ContractFormSection
-          title='5. Líneas adicionales'
+          title='6. Líneas / activos'
           description={
             embedMode
-              ? 'El activo que estás creando se vinculará al guardar. Aquí solo agrega otros ítems del mismo contrato.'
-              : 'Ítems del contrato (equipos, software, servicios). No duplica la categoría del contrato.'
+              ? 'El activo que estás creando se vinculará al guardar. Aquí agrega otros ítems y, si aplica, la fecha en que cada uno empieza o termina la renta.'
+              : 'Ítems del contrato (equipos, software, servicios). Cada línea puede tener su propia vigencia de renta; si la dejas vacía, usa las fechas del contrato.'
           }
           defaultOpen={false}
           badge='Opcional'
@@ -1253,7 +1344,7 @@ export function ContractForm({
                     />
                   </div>
                   <div className='space-y-1'>
-                    <Label className='text-xs'>Precio unitario</Label>
+                    <Label className='text-xs'>Precio unitario (por ciclo)</Label>
                     <Input
                       className='h-8 text-sm'
                       type='text'
@@ -1262,6 +1353,36 @@ export function ContractForm({
                       {...register(`lines.${i}.unitPrice`)}
                       placeholder='0.00'
                     />
+                  </div>
+                  <div className='space-y-1'>
+                    <Label className='text-xs'>Inicio de renta (este activo)</Label>
+                    <DateInput
+                      value={watch(`lines.${i}.serviceStartDate`) || ''}
+                      onChange={e =>
+                        setValue(`lines.${i}.serviceStartDate`, e.target.value, {
+                          shouldDirty: true,
+                        })
+                      }
+                      clearable
+                    />
+                    <p className='text-[10px] text-muted-foreground'>
+                      Vacío = usa inicio del contrato.
+                    </p>
+                  </div>
+                  <div className='space-y-1'>
+                    <Label className='text-xs'>Fin de renta (este activo)</Label>
+                    <DateInput
+                      value={watch(`lines.${i}.serviceEndDate`) || ''}
+                      onChange={e =>
+                        setValue(`lines.${i}.serviceEndDate`, e.target.value, {
+                          shouldDirty: true,
+                        })
+                      }
+                      clearable
+                    />
+                    <p className='text-[10px] text-muted-foreground'>
+                      Vacío = usa vencimiento del contrato.
+                    </p>
                   </div>
                   <div className='space-y-1'>
                     <Label className='text-xs'>Notas</Label>
@@ -1296,9 +1417,9 @@ export function ContractForm({
           </div>
         </ContractFormSection>
 
-        {/* ── 6. Documentos ───────────────────────────────────────────────── */}
+        {/* ── 7. Documentos ───────────────────────────────────────────────── */}
         <ContractFormSection
-          title='6. Documentos adjuntos'
+          title='7. Documentos adjuntos'
           description='Contrato físico en PDF u otros documentos relacionados.'
           badge='Opcional'
           defaultOpen={false}
@@ -1402,9 +1523,9 @@ export function ContractForm({
         </>
       )}
 
-      {/* ── 7. Notas ─────────────────────────────────────────────────────── */}
+      {/* ── 8. Notas ─────────────────────────────────────────────────────── */}
       <fieldset disabled={readOnly} className={readOnly ? 'block' : 'contents'}>
-        <ContractFormSection title='7. Notas internas' badge='Opcional' defaultOpen={false}>
+        <ContractFormSection title='8. Notas internas' badge='Opcional' defaultOpen={false}>
           <div className='space-y-1'>
             <Label>Notas</Label>
             <Textarea

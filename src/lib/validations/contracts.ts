@@ -4,10 +4,7 @@ import { z } from 'zod'
 const emptyToNull = (v: unknown) => (v === '' || v === undefined ? null : v)
 
 /** IDs de entidades (cuid o uuid) — proveedores usan cuid. */
-const optionalEntityId = z.preprocess(
-  emptyToNull,
-  z.string().min(1).max(40).nullable().optional()
-)
+const optionalEntityId = z.preprocess(emptyToNull, z.string().min(1).max(40).nullable().optional())
 
 const optionalUuid = z.preprocess(emptyToNull, z.string().uuid().nullable().optional())
 
@@ -76,6 +73,7 @@ export const PAYMENT_METHOD_TYPE_VALUES = [
   'PAYPAL',
   'CRYPTO',
   'BANK_TRANSFER',
+  'CHECK',
   'PROVIDER_INVOICE',
   'OTHER',
 ] as const
@@ -94,10 +92,7 @@ export const SUBSCRIPTION_SERVICE_TYPE_VALUES = [
 ] as const
 
 /** Código del catálogo (enum legacy o personalizado). */
-const serviceSubtypeSchema = z.preprocess(
-  emptyToNull,
-  z.string().max(50).nullable().optional()
-)
+const serviceSubtypeSchema = z.preprocess(emptyToNull, z.string().max(50).nullable().optional())
 
 const billingFieldsSchema = {
   serviceSubtype: serviceSubtypeSchema,
@@ -143,6 +138,8 @@ export const contractLineSchema = z.object({
   equipmentId: optionalUuid,
   licenseId: optionalUuid,
   notes: z.string().max(1000).optional().nullable(),
+  serviceStartDate: z.preprocess(emptyToNull, z.string().nullable().optional()),
+  serviceEndDate: z.preprocess(emptyToNull, z.string().nullable().optional()),
   order: z.number({ coerce: true }).int().min(0).default(0),
 })
 

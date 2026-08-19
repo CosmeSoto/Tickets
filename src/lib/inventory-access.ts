@@ -6,22 +6,27 @@ import {
   getInventoryVisibilityFamilyIds,
   managerCanOperateInventoryFamily,
 } from '@/lib/auth/family-scope'
+import { effectiveCanManageInventory } from '@/lib/inventory/manager-eligibility'
 
 /**
  * Verifica si un usuario tiene permiso GLOBAL de gestión de inventario.
  * - Super Admin: siempre sí
- * - Resto (incluido ADMIN de familia): flag canManageInventory en BD
+ * - Admin / Técnico: flag canManageInventory en BD
+ * - Cliente: nunca (aunque el flag legado esté en true)
  */
 export async function canManageInventory(userId: string, _role: string): Promise<boolean> {
   try {
-    return await withCache(`perm:inv:${userId}`, 300, async () => {
+    return await withCache(`perm:inv:v2:${userId}`, 300, async () => {
       const user = await prisma.users.findUnique({
         where: { id: userId },
-        select: { canManageInventory: true, isActive: true, isSuperAdmin: true },
+        select: { canManageInventory: true, isActive: true, isSuperAdmin: true, role: true },
       })
       if (!user || !user.isActive) return false
-      if (user.isSuperAdmin) return true
-      return user.canManageInventory === true
+      return effectiveCanManageInventory({
+        role: user.role,
+        isSuperAdmin: user.isSuperAdmin,
+        canManageInventory: user.canManageInventory,
+      })
     })
   } catch {
     return false
@@ -41,10 +46,18 @@ export async function canManageAsset(
 
   const user = await prisma.users.findUnique({
     where: { id: userId },
-    select: { canManageInventory: true, isActive: true },
+    select: { canManageInventory: true, isActive: true, role: true, isSuperAdmin: true },
   })
   if (!user?.isActive) return false
-  if (!user.canManageInventory) return false
+  if (
+    !effectiveCanManageInventory({
+      role: user.role,
+      isSuperAdmin: user.isSuperAdmin,
+      canManageInventory: user.canManageInventory,
+    })
+  ) {
+    return false
+  }
 
   if (role === 'ADMIN') {
     return adminCanOperateInventoryFamily(userId, assetFamilyId ?? null, false)

@@ -119,6 +119,7 @@ export async function PUT(
 
     await invalidateCache(`user:modules:${managerId}`)
     await invalidateCache(`perm:inv:${managerId}`)
+    await invalidateCache(`perm:inv:v2:${managerId}`)
 
     NotificationEvents.emit(managerId, { type: 'session_refresh', reason: 'permissions_changed' })
 

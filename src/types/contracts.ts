@@ -56,6 +56,7 @@ export type PaymentMethodType =
   | 'PAYPAL'
   | 'CRYPTO'
   | 'BANK_TRANSFER'
+  | 'CHECK'
   | 'PROVIDER_INVOICE'
   | 'OTHER'
 export type SubscriptionServiceType = string
@@ -65,6 +66,7 @@ export const PAYMENT_METHOD_TYPE_LABELS: Record<PaymentMethodType, string> = {
   PAYPAL: 'PayPal',
   CRYPTO: 'Criptomonedas',
   BANK_TRANSFER: 'Transferencia bancaria',
+  CHECK: 'Cheque',
   PROVIDER_INVOICE: 'Factura del proveedor',
   OTHER: 'Otro método',
 }
@@ -173,6 +175,10 @@ export interface ContractLine {
   equipmentId?: string | null
   licenseId?: string | null
   notes?: string | null
+  /** Inicio de renta de este activo; null hereda la vigencia del contrato. */
+  serviceStartDate?: string | null
+  /** Fin de renta de este activo; null hereda la vigencia del contrato. */
+  serviceEndDate?: string | null
   order: number
   createdAt: string
   updatedAt: string
@@ -303,6 +309,8 @@ export interface ContractLineFormData {
   equipmentId: string
   licenseId: string
   notes: string
+  serviceStartDate: string
+  serviceEndDate: string
   order: number
 }
 

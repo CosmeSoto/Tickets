@@ -10,6 +10,8 @@ type LineDraft = {
   equipmentId: string
   licenseId: string
   notes: string
+  serviceStartDate?: string
+  serviceEndDate?: string
   order: number
 }
 
@@ -64,8 +66,7 @@ export function applyContractFormPrefill(
   // Solo prellenar línea si hay identificación concreta del activo (no texto genérico
   // que repite la categoría: "Licencia de software" / "Equipo en arrendamiento").
   const rawDesc = prefill.suggestedLineDescription?.trim()
-  const isGeneric =
-    !rawDesc || GENERIC_LINE_DESCRIPTIONS.has(rawDesc.toLowerCase())
+  const isGeneric = !rawDesc || GENERIC_LINE_DESCRIPTIONS.has(rawDesc.toLowerCase())
 
   if (rawDesc && !isGeneric && currentLineCount === 0) {
     const unitPrice = isRecurring
@@ -83,6 +84,8 @@ export function applyContractFormPrefill(
       equipmentId: '',
       licenseId: '',
       notes: '',
+      serviceStartDate: prefill.startDate ?? '',
+      serviceEndDate: prefill.endDate ?? '',
       order: 0,
     })
   }

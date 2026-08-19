@@ -10,6 +10,7 @@ import { DEFAULT_SYSTEM_NAME } from '@/lib/branding-constants'
 import { getAppTimezone } from '@/lib/utils/date-utils'
 
 async function fetchImageBuffer(url: string): Promise<Buffer | null> {
+  if (!url) return null
   try {
     if (url.startsWith('/')) {
       // Rutas /api/uploads/... → leer desde filesystem directamente
@@ -17,6 +18,10 @@ async function fetchImageBuffer(url: string): Promise<Buffer | null> {
         const relativePath = url.replace('/api/uploads/', '')
         const localPath = getUploadDir(relativePath)
         if (fs.existsSync(localPath)) return fs.readFileSync(localPath)
+        // Fallback: intentar también con public/uploads (desarrollo local)
+        const fallbackPath = path.join(process.cwd(), 'public', 'uploads', relativePath)
+        if (fs.existsSync(fallbackPath)) return fs.readFileSync(fallbackPath)
+        console.warn(`[PDF] Imagen no encontrada en filesystem: ${localPath}`)
         return null
       }
       // Rutas /uploads/... (legacy)
@@ -28,6 +33,11 @@ async function fetchImageBuffer(url: string): Promise<Buffer | null> {
       const client = url.startsWith('https') ? https : http
       client
         .get(url, res => {
+          if (res.statusCode && res.statusCode >= 400) {
+            console.warn(`[PDF] Error HTTP ${res.statusCode} al obtener imagen: ${url}`)
+            resolve(null)
+            return
+          }
           const chunks: Buffer[] = []
           res.on('data', c => chunks.push(c))
           res.on('end', () => resolve(Buffer.concat(chunks)))
@@ -35,7 +45,8 @@ async function fetchImageBuffer(url: string): Promise<Buffer | null> {
         })
         .on('error', reject)
     })
-  } catch {
+  } catch (err) {
+    console.warn(`[PDF] No se pudo cargar imagen (${url}):`, err)
     return null
   }
 }

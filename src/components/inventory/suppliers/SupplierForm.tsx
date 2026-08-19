@@ -26,7 +26,7 @@ import { useFormSubmit } from '@/hooks/common/use-form-submit'
 import { FormDraftKeys, useFormDraft } from '@/hooks/common/use-form-draft'
 import { inventoryToast } from '@/lib/utils/inventory-toast'
 import { useFetch } from '@/hooks/common/use-fetch'
-import { useFamilyOptions } from '@/hooks/use-family-options'
+import { useSession } from 'next-auth/react'
 import {
   supplierFormSchema,
   SUPPLIER_PAYMENT_TERMS_OPTIONS,
@@ -68,13 +68,30 @@ export function SupplierForm({
   onCancel,
   onDirtyChange,
 }: SupplierFormProps) {
+  const { data: session } = useSession()
+  const isSuperAdmin = (session?.user as { isSuperAdmin?: boolean })?.isSuperAdmin === true
   const isEdit = !!supplier?.id
   const initialTypeId = supplier?.typeId ?? ''
   const initialFamilyId = supplier?.familyId ?? defaultFamilyId ?? ''
   const [typeId, setTypeId] = useState<string>(initialTypeId)
   const [familyId, setFamilyId] = useState<string>(initialFamilyId)
+  const [nativeFamilyId, setNativeFamilyId] = useState<string | null>(null)
 
-  const { families } = useFamilyOptions()
+  const { data: manageFamilies, loading: loadingFamilies } = useFetch<{
+    id: string
+    name: string
+    code?: string
+  }>('/api/inventory/families', {
+    params: { manage: '1' },
+    transform: (raw: {
+      families?: { id: string; name: string; code?: string }[]
+      nativeFamilyId?: string | null
+    }) => {
+      if (raw?.nativeFamilyId) setNativeFamilyId(raw.nativeFamilyId)
+      return raw?.families ?? []
+    },
+    showErrorToast: false,
+  })
 
   const { data: supplierTypes, setData: setSupplierTypes } = useFetch<SupplierType>(
     '/api/inventory/supplier-types',
@@ -190,7 +207,32 @@ export function SupplierForm({
     return () => onDirtyChange?.(false)
   }, [onDirtyChange])
 
+  useEffect(() => {
+    if (isEdit || familyId || isSuperAdmin) return
+    const preferred = defaultFamilyId || nativeFamilyId || manageFamilies[0]?.id || ''
+    if (!preferred) return
+    if (
+      manageFamilies.length > 0 &&
+      !manageFamilies.some(f => f.id === preferred) &&
+      manageFamilies[0]
+    ) {
+      setFamilyId(manageFamilies[0].id)
+      setValue('familyId', manageFamilies[0].id)
+      return
+    }
+    setFamilyId(preferred)
+    setValue('familyId', preferred)
+  }, [isEdit, familyId, isSuperAdmin, defaultFamilyId, nativeFamilyId, manageFamilies, setValue])
+
   const onSubmit = async (data: SupplierFormInput) => {
+    if (!isSuperAdmin && !familyId) {
+      inventoryToast({
+        title: 'Área requerida',
+        description: 'Elige tu familia nativa o una asignada de inventario.',
+        variant: 'destructive',
+      })
+      return
+    }
     await submit({
       ...data,
       typeId: typeId || null,
@@ -254,17 +296,35 @@ export function SupplierForm({
           <div className='space-y-1'>
             <Label>
               Familia / área{' '}
-              <span className='text-xs font-normal text-muted-foreground'>(vacío = global)</span>
+              {!isSuperAdmin ? (
+                <span className='text-destructive'>*</span>
+              ) : (
+                <span className='text-xs font-normal text-muted-foreground'>(vacío = global)</span>
+              )}
             </Label>
             <SearchableSelect
-              options={families}
+              options={manageFamilies}
               value={familyId}
-              onChange={setFamilyId}
-              placeholder='Global (todas las familias)'
+              onChange={id => {
+                setFamilyId(id)
+                setValue('familyId', id || null, { shouldDirty: true })
+              }}
+              placeholder={loadingFamilies ? 'Cargando áreas…' : 'Seleccionar área…'}
+              emptyLabel={isSuperAdmin ? 'Global (todas las familias)' : undefined}
+              allowClear={isSuperAdmin}
+              disabled={loadingFamilies || (!isSuperAdmin && manageFamilies.length === 1)}
             />
             <p className='text-xs text-muted-foreground'>
-              Sin familia: visible para todos. Con familia: prioridad al crear activos de esa área.
+              {isSuperAdmin
+                ? 'Sin familia: visible para todos. Con familia: queda en esa área.'
+                : 'Solo tu familia nativa y las asignadas de inventario. El proveedor no puede quedar global.'}
             </p>
+            {!isSuperAdmin && !loadingFamilies && manageFamilies.length === 0 && (
+              <p className='text-xs text-destructive'>
+                No tienes un área operativa de inventario. Pide que te asignen la familia nativa o
+                un grant de inventario.
+              </p>
+            )}
           </div>
 
           <div className='space-y-1'>

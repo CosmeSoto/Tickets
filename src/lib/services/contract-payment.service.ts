@@ -11,8 +11,8 @@
 import { prisma } from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import { createAuditLog } from '@/lib/audit'
-import { NotificationService } from '@/lib/services/notification-service'
-import { getFamilyScopedAdmins } from '@/lib/notifications/family-recipients'
+import { notifyContractOps } from '@/lib/contracts/notify-contract-ops'
+import { amountDueOnDate, lineIsBillableOn } from '@/lib/contracts/line-billing'
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -51,8 +51,21 @@ export class ContractPaymentService {
     toDate?: Date
     page?: number
     pageSize?: number
+    familyId?: string
+    allowedFamilyIds?: string[]
+    search?: string
   }) {
-    const { contractId, status, fromDate, toDate, page = 1, pageSize = 50 } = params
+    const {
+      contractId,
+      status,
+      fromDate,
+      toDate,
+      page = 1,
+      pageSize = 50,
+      familyId,
+      allowedFamilyIds,
+      search,
+    } = params
 
     const where: any = {}
 
@@ -62,6 +75,22 @@ export class ContractPaymentService {
       where.dueDate = {}
       if (fromDate) where.dueDate.gte = fromDate
       if (toDate) where.dueDate.lte = toDate
+    }
+
+    const contractFilter: Record<string, unknown> = {}
+    if (familyId) contractFilter.familyId = familyId
+    else if (allowedFamilyIds && allowedFamilyIds.length > 0) {
+      contractFilter.familyId = { in: allowedFamilyIds }
+    }
+    if (search?.trim()) {
+      contractFilter.OR = [
+        { name: { contains: search.trim(), mode: 'insensitive' } },
+        { contractNumber: { contains: search.trim(), mode: 'insensitive' } },
+        { supplier: { name: { contains: search.trim(), mode: 'insensitive' } } },
+      ]
+    }
+    if (Object.keys(contractFilter).length > 0) {
+      where.contract = contractFilter
     }
 
     const [payments, total] = await Promise.all([
@@ -74,6 +103,8 @@ export class ContractPaymentService {
               name: true,
               contractNumber: true,
               supplier: { select: { name: true } },
+              family: { select: { id: true, name: true, color: true } },
+              billingCycle: true,
             },
           },
           creator: {
@@ -220,7 +251,9 @@ export class ContractPaymentService {
         ...(data.cardLast4 !== undefined && { cardLast4: data.cardLast4 || null }),
         ...(data.cardBrand !== undefined && { cardBrand: data.cardBrand || null }),
         ...(data.bankEntity !== undefined && { bankEntity: data.bankEntity || null }),
-        ...(data.statementPeriod !== undefined && { statementPeriod: data.statementPeriod || null }),
+        ...(data.statementPeriod !== undefined && {
+          statementPeriod: data.statementPeriod || null,
+        }),
         ...(data.transactionId !== undefined && { transactionId: data.transactionId || null }),
         ...(data.chargeSource !== undefined && { chargeSource: data.chargeSource || null }),
       },
@@ -287,12 +320,12 @@ export class ContractPaymentService {
       'PAYPAL',
       'CRYPTO',
       'BANK_TRANSFER',
+      'CHECK',
       'PROVIDER_INVOICE',
       'OTHER',
     ] as const
     const chargeAsMethod =
-      data.chargeSource &&
-      (paymentMethodTypes as readonly string[]).includes(data.chargeSource)
+      data.chargeSource && (paymentMethodTypes as readonly string[]).includes(data.chargeSource)
         ? data.chargeSource
         : undefined
 
@@ -305,7 +338,9 @@ export class ContractPaymentService {
         ...(data.cardLast4 && { paymentCardLast4: data.cardLast4 }),
         ...(data.cardBrand && { paymentCardBrand: data.cardBrand }),
         ...(data.bankEntity && { paymentCardBank: data.bankEntity }),
-        ...(chargeAsMethod && { paymentMethodType: chargeAsMethod as (typeof paymentMethodTypes)[number] }),
+        ...(chargeAsMethod && {
+          paymentMethodType: chargeAsMethod as (typeof paymentMethodTypes)[number],
+        }),
       },
     })
 
@@ -345,8 +380,19 @@ export class ContractPaymentService {
     amount: number
     currency?: string
     createdBy: string
+    /** Si se indica, el monto de cada cuota depende de la fecha (líneas vigentes). */
+    amountForDueDate?: (dueDate: Date) => number
   }) {
-    const { contractId, startDate, endDate, billingCycle, amount, currency, createdBy } = params
+    const {
+      contractId,
+      startDate,
+      endDate,
+      billingCycle,
+      amount,
+      currency,
+      createdBy,
+      amountForDueDate,
+    } = params
 
     const existingPayments = await prisma.contract_payments.count({
       where: {
@@ -389,17 +435,24 @@ export class ContractPaymentService {
       if (billingCycle === 'ONE_TIME') break
     }
 
-    // Crear pagos en la base de datos
     const createdPayments = []
     for (const dueDate of payments) {
+      const periodAmount = amountForDueDate ? amountForDueDate(dueDate) : amount
+      if (periodAmount <= 0) continue
       const payment = await this.create({
         contractId,
-        amount,
+        amount: periodAmount,
         currency,
         dueDate,
         createdBy,
       })
       createdPayments.push(payment)
+    }
+
+    if (createdPayments.length === 0) {
+      throw new Error(
+        'No hay cuotas con monto positivo. Revisa vigencia de líneas y costos unitarios.'
+      )
     }
 
     await createAuditLog({
@@ -415,6 +468,79 @@ export class ContractPaymentService {
     })
 
     return createdPayments
+  }
+
+  /**
+   * Ajusta cuotas pendientes al monto de equipos/líneas aún en renta en cada fecha.
+   * No toca pagos ya cobrados.
+   */
+  static async recalculatePendingAmounts(contractId: string, updatedBy: string) {
+    const contract = await prisma.contracts.findUnique({
+      where: { id: contractId },
+      select: {
+        id: true,
+        startDate: true,
+        endDate: true,
+        billingCycle: true,
+        monthlyCost: true,
+        totalValue: true,
+        lines: {
+          select: {
+            quantity: true,
+            unitPrice: true,
+            totalPrice: true,
+            serviceStartDate: true,
+            serviceEndDate: true,
+            description: true,
+          },
+        },
+      },
+    })
+    if (!contract) throw new Error('Contrato no encontrado')
+
+    const pending = await prisma.contract_payments.findMany({
+      where: {
+        contractId,
+        paidDate: null,
+        status: { in: ['SCHEDULED', 'DUE', 'OVERDUE'] },
+      },
+    })
+
+    let updated = 0
+    let cancelled = 0
+    for (const payment of pending) {
+      const nextAmount = amountDueOnDate(contract.lines, contract, payment.dueDate)
+      if (nextAmount <= 0) {
+        await prisma.contract_payments.update({
+          where: { id: payment.id },
+          data: {
+            status: 'CANCELLED',
+            notes: [payment.notes, 'Cancelado: no hay activos en renta en esta fecha.']
+              .filter(Boolean)
+              .join(' '),
+          },
+        })
+        cancelled++
+        continue
+      }
+      if (Number(payment.amount) !== nextAmount) {
+        await prisma.contract_payments.update({
+          where: { id: payment.id },
+          data: { amount: nextAmount },
+        })
+        updated++
+      }
+    }
+
+    await createAuditLog({
+      entityType: 'contract',
+      entityId: contractId,
+      action: 'payments_recalculated',
+      userId: updatedBy,
+      changes: { updated, cancelled, pending: pending.length },
+    })
+
+    return { updated, cancelled, pending: pending.length }
   }
 
   // ── Job: alertas de pagos próximos ─────────────────────────────────────────
@@ -443,6 +569,16 @@ export class ContractPaymentService {
             supplier: { select: { name: true } },
             family: { select: { id: true, name: true } },
             creator: { select: { id: true, name: true } },
+            lines: {
+              select: {
+                description: true,
+                quantity: true,
+                unitPrice: true,
+                totalPrice: true,
+                serviceStartDate: true,
+                serviceEndDate: true,
+              },
+            },
           },
         },
       },
@@ -544,36 +680,39 @@ export class ContractPaymentService {
     message += `- Proveedor: ${supplierName}\n`
     message += `- Monto: $${payment.amount.toLocaleString()} ${payment.currency}\n`
     message += `- Fecha de vencimiento: ${payment.dueDate.toLocaleDateString('es-MX')}\n`
-    if (payment.referenceNumber) {
-      message += `- Referencia: ${payment.referenceNumber}\n`
+    const activeLines = (contract.lines ?? []).filter((line: any) =>
+      lineIsBillableOn(line, contract, payment.dueDate)
+    )
+    const lineNames = activeLines
+      .map((l: any) => l.description)
+      .filter(Boolean)
+      .slice(0, 8)
+    if (lineNames.length) {
+      message += `\nActivos en renta en esta cuota:\n`
+      for (const name of lineNames) message += `- ${name}\n`
+      if (activeLines.length > 8) message += `- … y ${activeLines.length - 8} más\n`
+    } else {
+      message += `\nMonto según el contrato (sin líneas con precio en esta fecha).\n`
     }
 
-    // Obtener administradores de la familia del contrato
-    const admins = await getFamilyScopedAdmins(contract.familyId, {
-      id: true,
-      name: true,
-      email: true,
+    await notifyContractOps({
+      familyId: contract.familyId,
+      extraUserIds: [contract.custodianUserId, contract.backupCustodianUserId, contract.createdBy],
+      title,
+      message,
+      link: '/inventory/payments',
+      metadata: {
+        kind: type === 'overdue' ? 'CONTRACT_PAYMENT_OVERDUE' : 'CONTRACT_PAYMENT_DUE',
+        paymentId: payment.id,
+        contractId: contract.id,
+        contractName: contract.name,
+        amount: payment.amount,
+        currency: payment.currency,
+        dueDate: payment.dueDate.toISOString(),
+        daysUntilDue: type === 'overdue' ? -days : days,
+        priority,
+      },
     })
-
-    for (const admin of admins) {
-      await NotificationService.createNotification({
-        userId: admin.id,
-        type: 'INVENTORY',
-        title,
-        message,
-        metadata: {
-          kind: type === 'overdue' ? 'CONTRACT_PAYMENT_OVERDUE' : 'CONTRACT_PAYMENT_DUE',
-          paymentId: payment.id,
-          contractId: contract.id,
-          contractName: contract.name,
-          amount: payment.amount,
-          currency: payment.currency,
-          dueDate: payment.dueDate.toISOString(),
-          daysUntilDue: type === 'overdue' ? -days : days,
-          priority,
-        },
-      })
-    }
   }
 
   // ── Estadísticas de pagos ───────────────────────────────────────────────────

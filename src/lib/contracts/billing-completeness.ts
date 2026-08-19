@@ -7,6 +7,7 @@ export type PaymentMethodType =
   | 'PAYPAL'
   | 'CRYPTO'
   | 'BANK_TRANSFER'
+  | 'CHECK'
   | 'PROVIDER_INVOICE'
   | 'OTHER'
 
@@ -42,17 +43,18 @@ export function getBillingCompletenessIssues(data: BillingCompletenessInput): st
         issues.push('Falta cuenta o banco para transferencia')
       }
       break
+    case 'CHECK':
+      if (!data.paymentAccountRef && !data.paymentCardBank) {
+        issues.push('Falta banco, número de cheque o cuenta de referencia')
+      }
+      break
     case 'PROVIDER_INVOICE':
       if (!data.vendorAccountId && !data.billingAccountEmail) {
         issues.push('Falta ID de cuenta o email en proveedor')
       }
       break
     case 'OTHER':
-      if (
-        !data.billingAccountEmail &&
-        !data.paymentAccountRef &&
-        !data.billingPortalUrl
-      ) {
+      if (!data.billingAccountEmail && !data.paymentAccountRef && !data.billingPortalUrl) {
         issues.push('Faltan datos de contacto o referencia de pago')
       }
       break

@@ -5,11 +5,16 @@ import { getUploadDir } from '@/lib/upload-path'
 import { getAppTimezone } from '@/lib/utils/date-utils'
 
 async function fetchImageBuffer(url: string): Promise<Buffer | null> {
+  if (!url) return null
   try {
     if (url.startsWith('/api/uploads/')) {
       const relativePath = url.replace('/api/uploads/', '')
       const localPath = getUploadDir(relativePath)
       if (fs.existsSync(localPath)) return fs.readFileSync(localPath)
+      // Fallback desarrollo local
+      const fallbackPath = path.join(process.cwd(), 'public', 'uploads', relativePath)
+      if (fs.existsSync(fallbackPath)) return fs.readFileSync(fallbackPath)
+      console.warn(`[PDF-Return] Imagen no encontrada: ${localPath}`)
       return null
     }
     if (url.startsWith('/uploads/')) {
@@ -18,7 +23,8 @@ async function fetchImageBuffer(url: string): Promise<Buffer | null> {
       return null
     }
     return null
-  } catch {
+  } catch (err) {
+    console.warn(`[PDF-Return] No se pudo cargar imagen (${url}):`, err)
     return null
   }
 }

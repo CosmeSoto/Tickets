@@ -3,7 +3,8 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { canManageInventory } from '@/lib/inventory-access'
-import { getAccessibleFamilyIds } from '@/lib/inventory/family-access'
+import { getAccessibleFamilyIds, getInventoryManageFamilyIds } from '@/lib/inventory/family-access'
+import { getNativeFamilyId } from '@/lib/auth/family-scope'
 import { randomUUID } from 'crypto'
 import { withCache, buildCacheKey, invalidateCache } from '@/lib/api-cache'
 
@@ -19,6 +20,7 @@ export async function GET(request: NextRequest) {
     const isSuperAdmin = (user as any).isSuperAdmin === true
     const managesInventory = await canManageInventory(user.id, user.role)
     const isManager = !isAdmin && managesInventory
+    const manageOnly = request.nextUrl.searchParams.get('manage') === '1'
     const includeInactive =
       isAdmin && isSuperAdmin && request.nextUrl.searchParams.get('includeInactive') === 'true'
 
@@ -28,17 +30,16 @@ export async function GET(request: NextRequest) {
       role: user.role,
       isSuperAdmin,
       includeInactive,
+      manage: manageOnly ? '1' : '0',
     })
 
     return NextResponse.json(
       await withCache(cacheKey, 300, async () => {
+        const nativeFamilyId = await getNativeFamilyId(user.id)
         if (isAdmin || isManager) {
-          const accessibleIds = await getAccessibleFamilyIds(
-            user.id,
-            user.role,
-            isSuperAdmin,
-            managesInventory
-          )
+          const accessibleIds = manageOnly
+            ? await getInventoryManageFamilyIds(user.id, user.role, isSuperAdmin, managesInventory)
+            : await getAccessibleFamilyIds(user.id, user.role, isSuperAdmin, managesInventory)
           const families = await prisma.families.findMany({
             where: {
               ...(includeInactive ? {} : { isActive: true }),
@@ -46,14 +47,14 @@ export async function GET(request: NextRequest) {
             },
             orderBy: { order: 'asc' },
           })
-          return { families }
+          return { families, nativeFamilyId }
         }
         const families = await prisma.families.findMany({
           where: { isActive: true },
           orderBy: { order: 'asc' },
           select: { id: true, name: true, code: true, color: true, icon: true, order: true },
         })
-        return { families }
+        return { families, nativeFamilyId }
       })
     )
   } catch {
