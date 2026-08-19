@@ -6,7 +6,7 @@
  */
 
 import { PrismaClient } from '@prisma/client'
-import { upsertCategory } from './category-upsert'
+import { upsertCategory, deactivateCategory } from './category-upsert'
 
 export async function seedCategoriesTechnology(prisma: PrismaClient, deptMap: Map<string, string>) {
   const deptInfraId = deptMap.get('Tecnologías de la Información')
@@ -22,8 +22,9 @@ export async function seedCategoriesTechnology(prisma: PrismaClient, deptMap: Ma
 
   // ==================== INFRAESTRUCTURA ====================
   const fallaErrorInfra = await upsertCategory(prisma, {
-    name: 'Falla o Error',
-    description: 'Incidentes y fallas en infraestructura',
+    name: 'Incidente de infraestructura',
+    formerNames: ['Falla o Error'],
+    description: 'Caídas y fallas de red, energía, impresión y servicios centrales',
     level: 1,
     parentId: null,
     departmentId: deptInfraId,
@@ -31,8 +32,9 @@ export async function seedCategoriesTechnology(prisma: PrismaClient, deptMap: Ma
     color: '#EF4444',
   })
   const solicitudRequerimientoInfra = await upsertCategory(prisma, {
-    name: 'Solicitud o Requerimiento',
-    description: 'Solicitudes y requerimientos de infraestructura',
+    name: 'Solicitud de infraestructura',
+    formerNames: ['Solicitud o Requerimiento'],
+    description: 'Altas de red, energía y servicios de plataforma (no cuentas de usuario)',
     level: 1,
     parentId: null,
     departmentId: deptInfraId,
@@ -59,8 +61,9 @@ export async function seedCategoriesTechnology(prisma: PrismaClient, deptMap: Ma
     color: '#F59E0B',
   })
   const gestionOffice365 = await upsertCategory(prisma, {
-    name: 'Gestión de Usuarios Office 365',
-    description: 'Plataforma Microsoft 365, Teams, licencias, cuentas',
+    name: 'Plataforma Microsoft 365',
+    formerNames: ['Gestión de Usuarios Office 365'],
+    description: 'Caída o degradación de Microsoft 365 / correo como servicio central',
     level: 2,
     parentId: fallaErrorInfra.id,
     departmentId: deptInfraId,
@@ -77,9 +80,21 @@ export async function seedCategoriesTechnology(prisma: PrismaClient, deptMap: Ma
     color: '#EC4899',
   })
 
+  const correoServicio = await upsertCategory(prisma, {
+    name: 'Servicio de correo',
+    description:
+      'Exchange / Microsoft 365 como plataforma (caída del servicio, no del buzón de un usuario)',
+    level: 2,
+    parentId: fallaErrorInfra.id,
+    departmentId: deptInfraId,
+    order: 5,
+    color: '#6366F1',
+  })
+
   const solicitudRequerimientoN2Infra = await upsertCategory(prisma, {
-    name: 'Solicitud o Requerimiento',
-    description: 'Solicitudes generales de infraestructura',
+    name: 'Red, VPN y plataforma',
+    formerNames: ['Solicitud o Requerimiento'],
+    description: 'Solicitudes de red, SSID, VPN de sitio y plataforma (no altas de usuario)',
     level: 2,
     parentId: solicitudRequerimientoInfra.id,
     departmentId: deptInfraId,
@@ -161,12 +176,41 @@ export async function seedCategoriesTechnology(prisma: PrismaClient, deptMap: Ma
     color: '#EF4444',
   })
   await upsertCategory(prisma, {
-    name: 'VPN',
-    description: 'Problemas con VPN, túnel VPN caído',
+    name: 'VPN de sitio / túnel',
+    formerNames: ['VPN'],
+    description: 'Túnel VPN de infraestructura caído o inestable',
     level: 3,
     parentId: networking.id,
     departmentId: deptInfraId,
     order: 8,
+    color: '#EF4444',
+  })
+
+  await upsertCategory(prisma, {
+    name: 'Servicio de correo no disponible',
+    description: 'Nadie puede enviar ni recibir; caída de Exchange / Microsoft 365',
+    level: 3,
+    parentId: correoServicio.id,
+    departmentId: deptInfraId,
+    order: 1,
+    color: '#EF4444',
+  })
+  await upsertCategory(prisma, {
+    name: 'Cola de correo retenida',
+    description: 'Mensajes quedan en cola del servidor o conector SMTP',
+    level: 3,
+    parentId: correoServicio.id,
+    departmentId: deptInfraId,
+    order: 2,
+    color: '#EF4444',
+  })
+  await upsertCategory(prisma, {
+    name: 'Conector SMTP o relé',
+    description: 'Falla del relé, conector o envío desde aplicaciones internas',
+    level: 3,
+    parentId: correoServicio.id,
+    departmentId: deptInfraId,
+    order: 3,
     color: '#EF4444',
   })
 
@@ -181,8 +225,9 @@ export async function seedCategoriesTechnology(prisma: PrismaClient, deptMap: Ma
     color: '#3B82F6',
   })
   await upsertCategory(prisma, {
-    name: 'VPN',
-    description: 'Solicitud de acceso VPN, configuración VPN',
+    name: 'VPN de sitio',
+    formerNames: ['VPN'],
+    description: 'Alta o cambio de túnel VPN de infraestructura',
     level: 3,
     parentId: solicitudRequerimientoN2Infra.id,
     departmentId: deptInfraId,
@@ -199,8 +244,9 @@ export async function seedCategoriesTechnology(prisma: PrismaClient, deptMap: Ma
     color: '#3B82F6',
   })
   await upsertCategory(prisma, {
-    name: 'Reportes',
-    description: 'Solicitud de reportes de infraestructura',
+    name: 'Reportes de red',
+    formerNames: ['Reportes'],
+    description: 'Solicitud de reportes de infraestructura o tráfico',
     level: 3,
     parentId: solicitudRequerimientoN2Infra.id,
     departmentId: deptInfraId,
@@ -208,8 +254,9 @@ export async function seedCategoriesTechnology(prisma: PrismaClient, deptMap: Ma
     color: '#3B82F6',
   })
   await upsertCategory(prisma, {
-    name: 'Creación de Cuenta',
-    description: 'Solicitud de creación de cuenta de usuario',
+    name: 'Asignación de Licencia de plataforma',
+    formerNames: ['Asignación de Licencia'],
+    description: 'Licencia de software o servicio de infraestructura (no buzón de usuario)',
     level: 3,
     parentId: solicitudRequerimientoN2Infra.id,
     departmentId: deptInfraId,
@@ -217,8 +264,9 @@ export async function seedCategoriesTechnology(prisma: PrismaClient, deptMap: Ma
     color: '#3B82F6',
   })
   await upsertCategory(prisma, {
-    name: 'Reseteo Contraseña',
-    description: 'Solicitud de reseteo de contraseña',
+    name: 'Teams (servicio)',
+    formerNames: ['Teams'],
+    description: 'Incidencia o solicitud del servicio Teams a nivel de plataforma',
     level: 3,
     parentId: solicitudRequerimientoN2Infra.id,
     departmentId: deptInfraId,
@@ -275,35 +323,15 @@ export async function seedCategoriesTechnology(prisma: PrismaClient, deptMap: Ma
     color: '#3B82F6',
   })
 
-  // N3 - Office 365 (Falla)
+  // N3 - Office 365 (Falla de plataforma)
   await upsertCategory(prisma, {
     name: 'Plataforma Intermitente',
-    description: 'Office 365 intermitente, inestable',
+    description: 'Office 365 / correo institucional intermitente para toda el área',
     level: 3,
     parentId: gestionOffice365.id,
     departmentId: deptInfraId,
     order: 1,
     color: '#EF4444',
-  })
-
-  // N3 - Solicitud N2 — adicionales faltantes
-  await upsertCategory(prisma, {
-    name: 'Asignación de Licencia',
-    description: 'Solicitud de asignación de licencia de software',
-    level: 3,
-    parentId: solicitudRequerimientoN2Infra.id,
-    departmentId: deptInfraId,
-    order: 7,
-    color: '#3B82F6',
-  })
-  await upsertCategory(prisma, {
-    name: 'Teams',
-    description: 'Solicitud relacionada con Microsoft Teams',
-    level: 3,
-    parentId: solicitudRequerimientoN2Infra.id,
-    departmentId: deptInfraId,
-    order: 8,
-    color: '#3B82F6',
   })
 
   // N3 - Impresión (completo según hoja de cálculo)
@@ -436,8 +464,9 @@ export async function seedCategoriesTechnology(prisma: PrismaClient, deptMap: Ma
 
   // ==================== SOPORTE TÉCNICO ====================
   const fallaErrorSoporte = await upsertCategory(prisma, {
-    name: 'Falla o Error',
-    description: 'Incidentes y fallas en soporte técnico',
+    name: 'Incidente de equipo',
+    formerNames: ['Falla o Error'],
+    description: 'Hardware, sistema o aplicaciones de escritorio que no funcionan',
     level: 1,
     parentId: null,
     departmentId: deptSoporteId,
@@ -445,8 +474,9 @@ export async function seedCategoriesTechnology(prisma: PrismaClient, deptMap: Ma
     color: '#EF4444',
   })
   const solicitudRequerimientoSoporte = await upsertCategory(prisma, {
-    name: 'Solicitud o Requerimiento',
-    description: 'Solicitudes y requerimientos de soporte técnico',
+    name: 'Solicitud de soporte',
+    formerNames: ['Solicitud o Requerimiento'],
+    description: 'Preparación de equipos, adquisiciones y suministros',
     level: 1,
     parentId: null,
     departmentId: deptSoporteId,
@@ -463,9 +493,19 @@ export async function seedCategoriesTechnology(prisma: PrismaClient, deptMap: Ma
     order: 1,
     color: '#10B981',
   })
+  const correoCliente = await upsertCategory(prisma, {
+    name: 'Correo en el equipo',
+    description: 'Outlook u otro cliente de correo en el computador del usuario',
+    level: 2,
+    parentId: fallaErrorSoporte.id,
+    departmentId: deptSoporteId,
+    order: 2,
+    color: '#6366F1',
+  })
   const solicitudRequerimientoN2Soporte = await upsertCategory(prisma, {
-    name: 'Solicitud o Requerimiento',
-    description: 'Solicitudes generales de soporte',
+    name: 'Equipamiento',
+    formerNames: ['Solicitud o Requerimiento'],
+    description: 'Renovación o adquisición de equipos',
     level: 2,
     parentId: solicitudRequerimientoSoporte.id,
     departmentId: deptSoporteId,
@@ -529,6 +569,43 @@ export async function seedCategoriesTechnology(prisma: PrismaClient, deptMap: Ma
   })
 
   await upsertCategory(prisma, {
+    name: 'Outlook no abre o no inicia',
+    description: 'El cliente de correo no arranca o se cierra',
+    level: 3,
+    parentId: correoCliente.id,
+    departmentId: deptSoporteId,
+    order: 1,
+    color: '#EF4444',
+  })
+  await upsertCategory(prisma, {
+    name: 'Outlook no sincroniza',
+    description: 'No baja ni envía correo desde el computador; perfil o caché dañado',
+    level: 3,
+    parentId: correoCliente.id,
+    departmentId: deptSoporteId,
+    order: 2,
+    color: '#EF4444',
+  })
+  await upsertCategory(prisma, {
+    name: 'Perfil de correo dañado',
+    description: 'Hay que recrear el perfil de Outlook o el OST',
+    level: 3,
+    parentId: correoCliente.id,
+    departmentId: deptSoporteId,
+    order: 3,
+    color: '#EF4444',
+  })
+  await upsertCategory(prisma, {
+    name: 'Firma o configuración local de correo',
+    description: 'Firma, cuenta adicional o datos de cuenta en el equipo',
+    level: 3,
+    parentId: correoCliente.id,
+    departmentId: deptSoporteId,
+    order: 4,
+    color: '#EF4444',
+  })
+
+  await upsertCategory(prisma, {
     name: 'Renovación de Equipo',
     description: 'Solicitud de renovación de equipo',
     level: 3,
@@ -557,8 +634,9 @@ export async function seedCategoriesTechnology(prisma: PrismaClient, deptMap: Ma
   })
 
   await upsertCategory(prisma, {
-    name: 'Verificación de Partes',
-    description: 'Verificación de partes y suministros',
+    name: 'Solicitud de partes o consumibles',
+    formerNames: ['Verificación de Partes'],
+    description: 'Toner, papel, cables u otros consumibles de soporte',
     level: 3,
     parentId: suministros.id,
     departmentId: deptSoporteId,
@@ -596,13 +674,14 @@ export async function seedCategoriesTechnology(prisma: PrismaClient, deptMap: Ma
     color: '#EF4444',
   })
   await upsertCategory(prisma, {
-    name: 'Sensibilización y Entrenamiento a Usuarios',
-    description: 'Capacitación en seguridad',
+    name: 'Capacitación en seguridad de la información',
+    formerNames: ['Sensibilización y Entrenamiento a Usuarios'],
+    description: 'Charla o material de concienciación (no es un incidente)',
     level: 3,
-    parentId: incidentes.id,
+    parentId: requerimientosSeguridad.id,
     departmentId: deptSeguridadId,
-    order: 2,
-    color: '#EF4444',
+    order: 6,
+    color: '#3B82F6',
   })
   await upsertCategory(prisma, {
     name: 'Sucesivos Intentos Fallidos de Login',
@@ -623,12 +702,30 @@ export async function seedCategoriesTechnology(prisma: PrismaClient, deptMap: Ma
     color: '#EF4444',
   })
   await upsertCategory(prisma, {
-    name: 'Accesos o Intentos no Autorizados',
-    description: 'Acceso no autorizado a sistemas',
+    name: 'Phishing o correo sospechoso',
+    description: 'Correo de suplantación, enlace o archivo malicioso',
     level: 3,
     parentId: incidentes.id,
     departmentId: deptSeguridadId,
-    order: 5,
+    order: 6,
+    color: '#EF4444',
+  })
+  await upsertCategory(prisma, {
+    name: 'Cuenta de correo comprometida',
+    description: 'Envíos no reconocidos, reenvíos automáticos o acceso indebido al buzón',
+    level: 3,
+    parentId: incidentes.id,
+    departmentId: deptSeguridadId,
+    order: 7,
+    color: '#EF4444',
+  })
+  await upsertCategory(prisma, {
+    name: 'Buzón en cuarentena o bloqueado',
+    description: 'Microsoft / antivirus retuvo correo o bloqueó la cuenta',
+    level: 3,
+    parentId: incidentes.id,
+    departmentId: deptSeguridadId,
+    order: 8,
     color: '#EF4444',
   })
 
@@ -680,8 +777,9 @@ export async function seedCategoriesTechnology(prisma: PrismaClient, deptMap: Ma
 
   // ==================== USUARIOS Y PRIVILEGIOS ====================
   const fallaErrorUsuarios = await upsertCategory(prisma, {
-    name: 'Falla o Error',
-    description: 'Problemas con usuarios y privilegios',
+    name: 'Incidente de acceso o correo',
+    formerNames: ['Falla o Error'],
+    description: 'No puede entrar a M365, VPN o su buzón',
     level: 1,
     parentId: null,
     departmentId: deptUsuariosId,
@@ -689,8 +787,9 @@ export async function seedCategoriesTechnology(prisma: PrismaClient, deptMap: Ma
     color: '#EF4444',
   })
   const solicitudRequerimientoUsuarios = await upsertCategory(prisma, {
-    name: 'Solicitud o Requerimiento',
-    description: 'Solicitudes de usuarios y privilegios',
+    name: 'Solicitud de usuarios y privilegios',
+    formerNames: ['Solicitud o Requerimiento'],
+    description: 'Altas, bajas, grupos, buzones y accesos',
     level: 1,
     parentId: null,
     departmentId: deptUsuariosId,
@@ -707,13 +806,31 @@ export async function seedCategoriesTechnology(prisma: PrismaClient, deptMap: Ma
     order: 1,
     color: '#8B5CF6',
   })
-  const m365Solicitudes = await upsertCategory(prisma, {
-    name: 'Microsoft 365',
-    description: 'Solicitudes relacionadas con M365',
+  const correoIncidentes = await upsertCategory(prisma, {
+    name: 'Correo electrónico',
+    description: 'Problemas del buzón (un usuario o un grupo), no la caída total del servicio',
+    level: 2,
+    parentId: fallaErrorUsuarios.id,
+    departmentId: deptUsuariosId,
+    order: 2,
+    color: '#6366F1',
+  })
+  const correoSolicitudes = await upsertCategory(prisma, {
+    name: 'Correo electrónico',
+    description: 'Altas, bajas, alias, grupos y buzones compartidos',
     level: 2,
     parentId: solicitudRequerimientoUsuarios.id,
     departmentId: deptUsuariosId,
     order: 1,
+    color: '#6366F1',
+  })
+  const m365Solicitudes = await upsertCategory(prisma, {
+    name: 'Microsoft 365',
+    description: 'Altas y bajas de usuario en Microsoft 365',
+    level: 2,
+    parentId: solicitudRequerimientoUsuarios.id,
+    departmentId: deptUsuariosId,
+    order: 2,
     color: '#8B5CF6',
   })
   const vpnUsuarios = await upsertCategory(prisma, {
@@ -722,7 +839,7 @@ export async function seedCategoriesTechnology(prisma: PrismaClient, deptMap: Ma
     level: 2,
     parentId: solicitudRequerimientoUsuarios.id,
     departmentId: deptUsuariosId,
-    order: 2,
+    order: 3,
     color: '#10B981',
   })
 
@@ -737,11 +854,58 @@ export async function seedCategoriesTechnology(prisma: PrismaClient, deptMap: Ma
   })
   await upsertCategory(prisma, {
     name: 'Servicio no Disponible en M365',
-    description: 'Servicio M365 caído, no disponible',
+    description:
+      'Un usuario no entra a M365; si nadie entra, usar Incidente de infraestructura → Servicio de correo',
     level: 3,
     parentId: m365Fallas.id,
     departmentId: deptUsuariosId,
     order: 2,
+    color: '#EF4444',
+  })
+
+  await upsertCategory(prisma, {
+    name: 'No recibe correos',
+    description: 'El buzón no entra correo (un usuario o un grupo)',
+    level: 3,
+    parentId: correoIncidentes.id,
+    departmentId: deptUsuariosId,
+    order: 1,
+    color: '#EF4444',
+  })
+  await upsertCategory(prisma, {
+    name: 'No puede enviar correos',
+    description: 'El envío falla, rebota o queda en bandeja de salida',
+    level: 3,
+    parentId: correoIncidentes.id,
+    departmentId: deptUsuariosId,
+    order: 2,
+    color: '#EF4444',
+  })
+  await upsertCategory(prisma, {
+    name: 'Buzón lleno',
+    description: 'Cuota de buzón agotada',
+    level: 3,
+    parentId: correoIncidentes.id,
+    departmentId: deptUsuariosId,
+    order: 3,
+    color: '#EF4444',
+  })
+  await upsertCategory(prisma, {
+    name: 'Correo en spam o cuarentena',
+    description: 'Mensajes legítimos caen en spam o política de retención',
+    level: 3,
+    parentId: correoIncidentes.id,
+    departmentId: deptUsuariosId,
+    order: 4,
+    color: '#EF4444',
+  })
+  await upsertCategory(prisma, {
+    name: 'Correo rebotado',
+    description: 'NDR / destinatario inexistente o bloqueado',
+    level: 3,
+    parentId: correoIncidentes.id,
+    departmentId: deptUsuariosId,
+    order: 5,
     color: '#EF4444',
   })
 
@@ -770,6 +934,61 @@ export async function seedCategoriesTechnology(prisma: PrismaClient, deptMap: Ma
     parentId: m365Solicitudes.id,
     departmentId: deptUsuariosId,
     order: 3,
+    color: '#3B82F6',
+  })
+
+  await upsertCategory(prisma, {
+    name: 'Crear cuenta de correo',
+    description: 'Alta de buzón o cuenta de correo institucional',
+    level: 3,
+    parentId: correoSolicitudes.id,
+    departmentId: deptUsuariosId,
+    order: 1,
+    color: '#3B82F6',
+  })
+  await upsertCategory(prisma, {
+    name: 'Baja de cuenta de correo',
+    description: 'Desactivar o eliminar buzón',
+    level: 3,
+    parentId: correoSolicitudes.id,
+    departmentId: deptUsuariosId,
+    order: 2,
+    color: '#3B82F6',
+  })
+  await upsertCategory(prisma, {
+    name: 'Alias o redirección de correo',
+    description: 'Alias, reenvío o regla de bandeja',
+    level: 3,
+    parentId: correoSolicitudes.id,
+    departmentId: deptUsuariosId,
+    order: 3,
+    color: '#3B82F6',
+  })
+  await upsertCategory(prisma, {
+    name: 'Lista de distribución o grupo',
+    description: 'Alta, baja o miembros de un grupo de correo',
+    level: 3,
+    parentId: correoSolicitudes.id,
+    departmentId: deptUsuariosId,
+    order: 4,
+    color: '#3B82F6',
+  })
+  await upsertCategory(prisma, {
+    name: 'Buzón compartido',
+    description: 'Permisos sobre buzón de área o gerencia',
+    level: 3,
+    parentId: correoSolicitudes.id,
+    departmentId: deptUsuariosId,
+    order: 5,
+    color: '#3B82F6',
+  })
+  await upsertCategory(prisma, {
+    name: 'Aumento de cuota de buzón',
+    description: 'Ampliar espacio del correo',
+    level: 3,
+    parentId: correoSolicitudes.id,
+    departmentId: deptUsuariosId,
+    order: 6,
     color: '#3B82F6',
   })
 
@@ -803,8 +1022,9 @@ export async function seedCategoriesTechnology(prisma: PrismaClient, deptMap: Ma
 
   // ==================== TELEFONÍA ====================
   const fallaErrorTelefonia = await upsertCategory(prisma, {
-    name: 'Falla o Error',
-    description: 'Problemas con telefonía',
+    name: 'Incidente de telefonía',
+    formerNames: ['Falla o Error'],
+    description: 'Extensiones, llamadas y central telefónica',
     level: 1,
     parentId: null,
     departmentId: deptTelefoniaId,
@@ -812,8 +1032,9 @@ export async function seedCategoriesTechnology(prisma: PrismaClient, deptMap: Ma
     color: '#EF4444',
   })
   const solicitudRequerimientoTelefonia = await upsertCategory(prisma, {
-    name: 'Solicitud o Requerimiento',
-    description: 'Solicitudes de telefonía',
+    name: 'Solicitud de telefonía',
+    formerNames: ['Solicitud o Requerimiento'],
+    description: 'Altas, cambios y desvíos de extensión',
     level: 1,
     parentId: null,
     departmentId: deptTelefoniaId,
@@ -840,8 +1061,9 @@ export async function seedCategoriesTechnology(prisma: PrismaClient, deptMap: Ma
     color: '#EF4444',
   })
   await upsertCategory(prisma, {
-    name: 'No Funciona la Extensión',
-    description: 'Extensión no funciona',
+    name: 'Extensión no funciona',
+    formerNames: ['No Funciona la Extensión'],
+    description: 'La extensión no da tono, no marca o está fuera de servicio',
     level: 2,
     parentId: fallaErrorTelefonia.id,
     departmentId: deptTelefoniaId,
@@ -859,11 +1081,29 @@ export async function seedCategoriesTechnology(prisma: PrismaClient, deptMap: Ma
   })
   await upsertCategory(prisma, {
     name: 'Teléfono sin Red',
-    description: 'Teléfono sin conexión de red',
+    description: 'Teléfono IP sin conexión de red',
     level: 2,
     parentId: fallaErrorTelefonia.id,
     departmentId: deptTelefoniaId,
     order: 5,
+    color: '#EF4444',
+  })
+  await upsertCategory(prisma, {
+    name: 'Central telefónica / PBX',
+    description: 'Falla de la central, no de una extensión aislada',
+    level: 2,
+    parentId: fallaErrorTelefonia.id,
+    departmentId: deptTelefoniaId,
+    order: 6,
+    color: '#EF4444',
+  })
+  await upsertCategory(prisma, {
+    name: 'Buzón de voz o desvío',
+    description: 'Buzón de voz, IVR o desvío de llamadas no funciona',
+    level: 2,
+    parentId: fallaErrorTelefonia.id,
+    departmentId: deptTelefoniaId,
+    order: 7,
     color: '#EF4444',
   })
 
@@ -885,6 +1125,42 @@ export async function seedCategoriesTechnology(prisma: PrismaClient, deptMap: Ma
     order: 2,
     color: '#3B82F6',
   })
+  await upsertCategory(prisma, {
+    name: 'Desvío o buzón de voz',
+    description: 'Configurar desvío, IVR o buzón de voz',
+    level: 2,
+    parentId: solicitudRequerimientoTelefonia.id,
+    departmentId: deptTelefoniaId,
+    order: 3,
+    color: '#3B82F6',
+  })
 
-  console.log('✅ Categorías (5 departamentos con jerarquía N1 → N2 → N3)')
+  await deactivateCategory(prisma, {
+    name: 'Central Telefónica',
+    departmentId: deptInfraId,
+    level: 3,
+    parentId: networking.id,
+  })
+  await deactivateCategory(prisma, {
+    name: 'Creación de Cuenta',
+    departmentId: deptInfraId,
+    level: 3,
+    parentId: solicitudRequerimientoN2Infra.id,
+  })
+  await deactivateCategory(prisma, {
+    name: 'Reseteo Contraseña',
+    departmentId: deptInfraId,
+    level: 3,
+    parentId: solicitudRequerimientoN2Infra.id,
+  })
+  await deactivateCategory(prisma, {
+    name: 'Sensibilización y Entrenamiento a Usuarios',
+    departmentId: deptSeguridadId,
+    level: 3,
+    parentId: incidentes.id,
+  })
+
+  console.log(
+    '✅ Categorías TI (Administración): infraestructura, soporte, seguridad, usuarios/correo y telefonía'
+  )
 }
