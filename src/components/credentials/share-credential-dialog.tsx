@@ -190,9 +190,10 @@ export function ShareCredentialDialog({ entry, onClose }: ShareCredentialDialogP
             Compartir credencial
           </DialogTitle>
           <DialogDescription>
-            Comparte «{entry?.title}» con usuarios de tu nivel o inferior que compartan tu área
-            nativa o alguna familia asignada de Credenciales. Solo podrá revelar/usar (auditado); no
-            recibe la clave por notificación.
+            Comparte «{entry?.title}» con usuarios de tu familia (nativa o asignada de
+            Credenciales), sea de tu nivel, inferior o superior — por ejemplo un cliente puede
+            compartir con un técnico. Solo podrá revelar/usar (auditado); no recibe la clave por
+            notificación.
           </DialogDescription>
         </DialogHeader>
 

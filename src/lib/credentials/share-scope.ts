@@ -1,9 +1,11 @@
 /**
  * Alcance de compartición de credenciales (usuario → usuario).
  *
- * Reglas por rol (Admin / Técnico / Cliente):
- * - Solo usuarios activos de igual o menor rango (nunca SuperAdmin destino salvo emisor SuperAdmin).
- * - Intersección de áreas: familia nativa + familias asignadas al módulo Credenciales.
+ * Visibilidad automática (jerarquía) y compartido son reglas distintas:
+ * - Jerarquía: solo hacia abajo y solo familia nativa (ver access.ts).
+ * - Compartir: cualquier rango (cliente → técnico, técnico → admin, etc.)
+ *   si hay intersección de familia nativa o asignada de Credenciales.
+ * - Nunca hacia SuperAdmin salvo que el emisor sea SuperAdmin.
  * - SuperAdmin: puede compartir con cualquier usuario activo (auditable).
  *
  * El destinatario debe tener credentialsEnabled (o ser SuperAdmin) para usar el módulo;
@@ -48,6 +50,16 @@ function familiesOverlap(a: string[], b: string[]): boolean {
   if (a.length === 0 || b.length === 0) return false
   const set = new Set(a)
   return b.some(id => set.has(id))
+}
+
+/** Destino de share por rango: cualquier rol de familia, nunca SuperAdmin (salvo emisor SuperAdmin). */
+export function isAllowedCredentialShareTarget(
+  actor: { role: string; isSuperAdmin?: boolean },
+  target: { role: string; isSuperAdmin?: boolean }
+): boolean {
+  if (actor.isSuperAdmin === true) return true
+  if (target.isSuperAdmin === true) return false
+  return roleRank(actor.role, false) > 0 && roleRank(target.role, false) > 0
 }
 
 /**
@@ -117,8 +129,6 @@ export async function listCredentialShareCandidates(
   const q = opts?.q?.trim() ?? ''
   const take = opts?.take ?? 50
 
-  const actorRank = roleRank(actor.role, actor.isSuperAdmin === true)
-
   const users = await prisma.users.findMany({
     where: {
       isActive: true,
@@ -154,8 +164,6 @@ export async function listCredentialShareCandidates(
   const out: ShareCandidate[] = []
 
   for (const u of users) {
-    const targetRank = roleRank(u.role, u.isSuperAdmin === true)
-
     if (actor.isSuperAdmin === true) {
       const canReceive = u.credentialsEnabled === true || u.isSuperAdmin === true
       out.push({
@@ -174,8 +182,14 @@ export async function listCredentialShareCandidates(
       continue
     }
 
-    if (u.isSuperAdmin) continue
-    if (targetRank > actorRank) continue
+    if (
+      !isAllowedCredentialShareTarget(actor, {
+        role: u.role,
+        isSuperAdmin: u.isSuperAdmin === true,
+      })
+    ) {
+      continue
+    }
 
     if (!actorFamilyIds || actorFamilyIds.length === 0) continue
 
@@ -226,15 +240,14 @@ export async function assertCanShareCredentialWith(
     return { ok: false, error: 'Usuario destino no encontrado o inactivo' }
   }
 
-  const actorRank = roleRank(actor.role, actor.isSuperAdmin === true)
-  const targetRank = roleRank(targetUser.role, targetUser.isSuperAdmin === true)
-
   if (actor.isSuperAdmin !== true) {
-    if (targetUser.isSuperAdmin) {
+    if (
+      !isAllowedCredentialShareTarget(actor, {
+        role: targetUser.role,
+        isSuperAdmin: targetUser.isSuperAdmin === true,
+      })
+    ) {
       return { ok: false, error: 'No puedes compartir hacia un SuperAdmin desde tu rol' }
-    }
-    if (targetRank > actorRank) {
-      return { ok: false, error: 'Solo puedes compartir con usuarios de tu nivel o inferior' }
     }
 
     const familyMap = await mapCredentialShareFamilyIds([actor.userId, targetUserId])

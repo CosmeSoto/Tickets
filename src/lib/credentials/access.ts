@@ -1,5 +1,6 @@
 import prisma from '@/lib/prisma'
 import type { Prisma } from '@prisma/client'
+import { getNativeFamilyId } from '@/lib/auth/family-scope'
 import { resolveModuleFamilyScopeIds } from '@/lib/auth/user-family-access'
 import { DEFAULT_AREA_VAULT_NAME } from '@/lib/credentials/constants'
 
@@ -70,7 +71,7 @@ export async function canCreateCredentials(
 }
 
 /**
- * Ver credenciales inferiores = ver/editar las de roles inferiores en el área.
+ * Ver credenciales inferiores = ver/editar las de roles inferiores en la familia nativa.
  * SuperAdmin siempre. ADMIN/TECH requieren canManageCredentials.
  */
 export async function canManageCredentialsHierarchy(
@@ -116,53 +117,37 @@ export async function getCredentialsFamilyScopeIds(
   return resolveModuleFamilyScopeIds(userId, 'credentials', 'canView')
 }
 
-/** Inferiores cuya nativa/grants de credentials intersectan el scope del viewer. */
-async function getInferiorCreatorIdsInCredentialsScope(
-  familyIds: string[],
+/**
+ * Inferiores con familia nativa = área nativa del viewer.
+ * Las familias asignadas no dan visibilidad automática: solo shares.
+ */
+async function getInferiorCreatorIdsInNativeFamily(
+  nativeFamilyId: string,
   inferiorRoles: Array<'ADMIN' | 'TECHNICIAN' | 'CLIENT'>
 ): Promise<string[]> {
-  if (familyIds.length === 0 || inferiorRoles.length === 0) return []
-
-  const moduleKey = (await import('@/lib/auth/family-access-modules')).resolveFamilyAccessModuleKey(
-    'credentials'
-  )
+  if (!nativeFamilyId || inferiorRoles.length === 0) return []
 
   const users = await prisma.users.findMany({
     where: {
       isActive: true,
       isSuperAdmin: false,
       role: { in: inferiorRoles },
-      OR: [
-        { departments: { familyId: { in: familyIds } } },
-        {
-          userFamilyAccess: {
-            some: {
-              module: moduleKey,
-              isActive: true,
-              canView: true,
-              familyId: { in: familyIds },
-            },
-          },
-        },
-      ],
+      departments: { familyId: nativeFamilyId },
     },
     select: { id: true },
   })
   return users.map(u => u.id)
 }
 
-async function personalVaultOverlapsCredentialsScope(
+async function creatorSharesNativeFamily(
   viewerUserId: string,
-  creatorUserId: string,
-  isSuperAdmin?: boolean
+  creatorUserId: string
 ): Promise<boolean> {
-  const scope = await getCredentialsFamilyScopeIds(viewerUserId, { isSuperAdmin })
-  if (scope.length === 0) return false
-  const { mapCredentialShareFamilyIds } = await import('@/lib/credentials/share-scope')
-  const creatorFamilies = (await mapCredentialShareFamilyIds([creatorUserId])).get(creatorUserId) ?? []
-  if (creatorFamilies.length === 0) return false
-  const set = new Set(scope)
-  return creatorFamilies.some(id => set.has(id))
+  const [viewerNative, creatorNative] = await Promise.all([
+    getNativeFamilyId(viewerUserId),
+    getNativeFamilyId(creatorUserId),
+  ])
+  return Boolean(viewerNative && creatorNative && viewerNative === creatorNative)
 }
 
 /**
@@ -201,11 +186,11 @@ function isCreatorInferior(
 
 /**
  * Visibilidad de una entrada:
- * 1) Propias (createdBy o bóveda personal)
- * 2) Compartidas conmigo
- * 3) Con gestión completa: creadas por roles inferiores en familias de mi alcance
- * 4) SuperAdmin: todas
- * Nunca pares ni superiores salvo share explícito.
+ * 1) SuperAdmin: todas
+ * 2) Propias (createdBy o bóveda personal)
+ * 3) Compartidas conmigo (cualquier rango, si alguien me las dio)
+ * 4) Con «Ver credenciales inferiores»: solo roles inferiores de mi familia nativa
+ *    (nunca pares/superiores; nunca dump automático en familias asignadas)
  */
 export async function userCanAccessEntry(
   ctx: CredentialsAccessContext,
@@ -242,17 +227,14 @@ export async function userCanAccessEntry(
   if (!isCreatorInferior(ctx, creator)) return false
 
   if (entry.vault.kind === 'PERSONAL') {
-    return personalVaultOverlapsCredentialsScope(ctx.userId, entry.createdById, ctx.isSuperAdmin)
+    return creatorSharesNativeFamily(ctx.userId, entry.createdById)
   }
 
-  if (!entry.vault.familyId) return false
-  const scope = await getCredentialsFamilyScopeIds(ctx.userId, {
-    isSuperAdmin: ctx.isSuperAdmin,
-  })
-  return scope.includes(entry.vault.familyId)
+  const nativeId = await getNativeFamilyId(ctx.userId)
+  return Boolean(nativeId && entry.vault.familyId === nativeId)
 }
 
-/** Editar/borrar/compartir: dueño, o gestor de jerarquía sobre un inferior. */
+/** Editar/borrar/compartir: dueño, o gestor de jerarquía sobre un inferior nativo. */
 export async function userCanMutateEntry(
   ctx: CredentialsAccessContext,
   entry: EntryAccessShape
@@ -279,13 +261,10 @@ export async function userCanMutateEntry(
   if (!isCreatorInferior(ctx, creator)) return false
 
   if (entry.vault.kind === 'PERSONAL') {
-    return personalVaultOverlapsCredentialsScope(ctx.userId, entry.createdById, ctx.isSuperAdmin)
+    return creatorSharesNativeFamily(ctx.userId, entry.createdById)
   }
-  if (!entry.vault.familyId) return false
-  const scope = await getCredentialsFamilyScopeIds(ctx.userId, {
-    isSuperAdmin: ctx.isSuperAdmin,
-  })
-  return scope.includes(entry.vault.familyId)
+  const nativeId = await getNativeFamilyId(ctx.userId)
+  return Boolean(nativeId && entry.vault.familyId === nativeId)
 }
 
 /** Prisma where para listado GET /entries según jerarquía. */
@@ -296,11 +275,9 @@ export async function buildCredentialEntriesVisibilityWhere(
     return { isActive: true, vault: { isActive: true } }
   }
 
-  const familyIds = await getCredentialsFamilyScopeIds(ctx.userId, {
-    isSuperAdmin: false,
-  })
   const canHierarchy = await canManageCredentialsHierarchy(ctx.userId, ctx.role, ctx.isSuperAdmin)
   const inferiorRoles = inferiorCredentialRoles(ctx.role, ctx.isSuperAdmin)
+  const nativeFamilyId = await getNativeFamilyId(ctx.userId)
 
   const or: Prisma.credential_entriesWhereInput[] = [
     { createdById: ctx.userId },
@@ -317,17 +294,14 @@ export async function buildCredentialEntriesVisibilityWhere(
     },
   ]
 
-  if (canHierarchy && inferiorRoles.length > 0) {
-    const inferiorIds = await getInferiorCreatorIdsInCredentialsScope(familyIds, inferiorRoles)
+  if (canHierarchy && inferiorRoles.length > 0 && nativeFamilyId) {
+    const inferiorIds = await getInferiorCreatorIdsInNativeFamily(nativeFamilyId, inferiorRoles)
     if (inferiorIds.length > 0) {
       or.push({
         createdById: { in: inferiorIds },
         vault: {
           isActive: true,
-          OR: [
-            ...(familyIds.length > 0 ? [{ familyId: { in: familyIds } }] : []),
-            { kind: 'PERSONAL' as const },
-          ],
+          OR: [{ familyId: nativeFamilyId }, { kind: 'PERSONAL' as const }],
         },
       })
     }

@@ -289,8 +289,8 @@ export function ModuleAccessCard({
                     </div>
                     <p className='text-[10px] text-muted-foreground mt-0.5 pl-5'>
                       {role === 'ADMIN'
-                        ? 'Permite ver y editar las de técnicos y clientes del área. Sin esto solo ve propias y las que le compartan. Crear propias no requiere este permiso.'
-                        : 'Permite ver y editar las de clientes del área. Sin esto solo ve propias y las que le compartan. Crear propias no requiere este permiso.'}
+                        ? 'Solo en tu familia nativa: ver y editar las de técnicos y clientes. En familias asignadas no se ven solas: alguien debe compartírtelas. Crear propias no requiere este permiso.'
+                        : 'Solo en tu familia nativa: ver y editar las de clientes. En familias asignadas no se ven solas: alguien debe compartírtelas. Crear propias no requiere este permiso.'}
                     </p>
                   </div>
                   <Switch

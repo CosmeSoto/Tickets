@@ -47,7 +47,10 @@ export async function GET(request: Request) {
   }
 
   if (!(await userCanMutateEntry(ctx, entry))) {
-    return NextResponse.json({ error: 'Sin permiso para compartir esta credencial' }, { status: 403 })
+    return NextResponse.json(
+      { error: 'Sin permiso para compartir esta credencial' },
+      { status: 403 }
+    )
   }
 
   const q = searchParams.get('q')?.trim() ?? ''
@@ -58,7 +61,7 @@ export async function GET(request: Request) {
     meta: {
       rule: ctx.isSuperAdmin
         ? 'SuperAdmin: todos los usuarios activos (auditable)'
-        : 'Tu nivel o inferior, en tu área nativa o familias asignadas de Credenciales',
+        : 'Misma familia (nativa o asignada de Credenciales), cualquier rango excepto SuperAdmin',
     },
   })
 }
