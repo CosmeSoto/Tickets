@@ -30,8 +30,8 @@ export function triggerTicketAssignedToClientEmail(ticketId: string) {
 }
 
 /** Digest admin (optional vía prefs ticketUpdated) */
-export function triggerTicketResolvedToAdminEmail(ticketId: string) {
-  sendTicketResolvedToAdminEmail(ticketId).catch(error => {
+export function triggerTicketResolvedToAdminEmail(ticketId: string, actorUserId?: string) {
+  sendTicketResolvedToAdminEmail(ticketId, actorUserId).catch(error => {
     console.error('Failed to send ticket resolved to admin email:', error)
   })
 }

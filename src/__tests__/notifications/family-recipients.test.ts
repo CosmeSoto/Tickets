@@ -3,6 +3,9 @@ import {
   getFamilyScopedAdminsForFamilies,
   getNativeFamilyAdmins,
   getSuperAdmins,
+  getTicketFamilyAdmins,
+  getTicketOversightAdmins,
+  excludeRecipients,
 } from '@/lib/notifications/family-recipients'
 
 jest.mock('@/lib/prisma', () => ({
@@ -65,6 +68,46 @@ describe('family-recipients', () => {
 
     expect(recipients).toEqual([{ id: 'super-1' }, { id: 'admin-a' }, { id: 'admin-b' }])
   })
+
+  it('getTicketFamilyAdmins une nativa y asignada sin super admins', async () => {
+    mockFindMany
+      .mockResolvedValueOnce([{ id: 'native-1' }])
+      .mockResolvedValueOnce([{ id: 'assigned-1' }, { id: 'native-1' }])
+
+    const recipients = await getTicketFamilyAdmins('family-ti')
+
+    expect(recipients).toEqual([{ id: 'native-1' }, { id: 'assigned-1' }])
+    expect(mockFindMany).toHaveBeenNthCalledWith(2, {
+      where: {
+        role: 'ADMIN',
+        isSuperAdmin: false,
+        isActive: true,
+        userFamilyAccess: {
+          some: { familyId: 'family-ti', module: 'tickets', isActive: true },
+        },
+      },
+      select: { id: true },
+    })
+  })
+
+  it('getTicketOversightAdmins incluye super admins y excluye involucrados', async () => {
+    mockFindMany
+      .mockResolvedValueOnce([{ id: 'super-1' }, { id: 'super-actor' }])
+      .mockResolvedValueOnce([{ id: 'native-1' }])
+      .mockResolvedValueOnce([{ id: 'assigned-1' }])
+
+    const recipients = await getTicketOversightAdmins('family-ti', {
+      excludeUserIds: ['super-actor', 'native-1', null],
+    })
+
+    expect(recipients.map(r => r.id)).toEqual(['super-1', 'assigned-1'])
+  })
+
+  it('excludeRecipients omite ids vacíos', () => {
+    expect(excludeRecipients([{ id: 'a' }, { id: 'b' }], ['a', undefined, ''])).toEqual([
+      { id: 'b' },
+    ])
+  })
 })
 
 describe('dedupeById (via exports)', () => {
@@ -74,5 +117,3 @@ describe('dedupeById (via exports)', () => {
     expect(typeof getFamilyScopedAdmins).toBe('function')
   })
 })
-
-// dedupeById is not exported - test via internal behavior in getFamilyScopedAdminsForFamilies above

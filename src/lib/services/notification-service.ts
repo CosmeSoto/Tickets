@@ -4,8 +4,8 @@ import { randomUUID } from 'crypto'
 import { NotificationEvents } from '@/lib/notification-events'
 import { WebPushService } from '@/lib/services/web-push.service'
 import {
-  getFamilyScopedAdmins,
-  getFamilyScopedAdminsForFamilies,
+  getTicketOversightAdmins,
+  getTicketFamilyAdmins,
 } from '@/lib/notifications/family-recipients'
 import { evaluateDelivery, type NotificationSpecificType } from '@/lib/notifications/delivery'
 import { queueTelegramNotification } from '@/lib/notifications/queue-notification-telegram'
@@ -173,9 +173,8 @@ export class NotificationService {
   }
   /**
    * Notificar cuando se crea un ticket
-   * - Super admins
-   * - Admin cuya familia nativa coincide con la del ticket
-   * - El técnico asignado recibe notifyTicketAssigned por separado
+   * - Super admins y admins del área (nativa o asignada)
+   * - No notifica a quien creó, solicitó o ya está asignado al ticket
    */
   static async notifyTicketCreated(ticketId: string) {
     try {
@@ -195,18 +194,10 @@ export class NotificationService {
         throw new Error('Ticket not found')
       }
 
-      const admins = await getFamilyScopedAdmins(ticket.familyId, {
-        id: true,
-        name: true,
-        email: true,
+      const uniqueRecipients = await getTicketOversightAdmins(ticket.familyId, {
+        select: { id: true, name: true, email: true },
+        excludeUserIds: [ticket.clientId, ticket.createdById, ticket.assigneeId],
       })
-
-      const uniqueRecipients = admins.filter(
-        recipient =>
-          recipient.id !== ticket.clientId &&
-          recipient.id !== ticket.createdById &&
-          recipient.id !== ticket.assigneeId
-      )
 
       if (uniqueRecipients.length === 0) return []
 
@@ -300,9 +291,11 @@ export class NotificationService {
         recipientIds.push(ticket.assigneeId)
       }
 
-      const admins = await getFamilyScopedAdminsForFamilies([oldFamilyId, newFamilyId], {
-        id: true,
-      })
+      const [oldFamilyAdmins, newFamilyAdmins] = await Promise.all([
+        getTicketOversightAdmins(oldFamilyId, { select: { id: true } }),
+        getTicketOversightAdmins(newFamilyId, { select: { id: true } }),
+      ])
+      const admins = [...oldFamilyAdmins, ...newFamilyAdmins]
       for (const admin of admins) {
         if (!recipientIds.includes(admin.id)) {
           recipientIds.push(admin.id)
@@ -482,9 +475,9 @@ export class NotificationService {
       if (isInternalComment) {
         const notifications = []
 
-        // Si lo escribe el técnico → super admins + admin nativo de la familia del ticket
+        // Si lo escribe el técnico → admins del área (nativa o asignada), no todos los super admins
         if (author.role === 'TECHNICIAN') {
-          const admins = await getFamilyScopedAdmins(ticket.familyId, { id: true })
+          const admins = await getTicketFamilyAdmins(ticket.familyId, { id: true })
           for (const admin of admins) {
             if (admin.id === author.id) continue
             const n = await this.createNotification({

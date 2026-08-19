@@ -211,9 +211,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           select: { id: true, name: true, email: true, role: true },
         })
         if (rater?.email) {
-          const { queueTicketResolvedRaterEmail } = await import(
-            '@/lib/notifications/ticket-resolved-email'
-          )
+          const { queueTicketResolvedRaterEmail } =
+            await import('@/lib/notifications/ticket-resolved-email')
           await queueTicketResolvedRaterEmail({
             ticketId,
             title: ticket.title,
@@ -232,7 +231,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
       // Digest opcional a admins (alineado con PUT técnico)
       const { triggerTicketResolvedToAdminEmail } = await import('@/lib/email-triggers')
-      void triggerTicketResolvedToAdminEmail(ticketId)
+      void triggerTicketResolvedToAdminEmail(ticketId, session.user.id)
 
       await AuditServiceComplete.log({
         action: AuditActionsComplete.TICKET_RESOLVED,

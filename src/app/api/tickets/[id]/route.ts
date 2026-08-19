@@ -589,7 +589,7 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
 
           // ⭐ NUEVO: Notificar al administrador que el ticket fue resuelto
           const { triggerTicketResolvedToAdminEmail } = await import('@/lib/email-triggers')
-          void triggerTicketResolvedToAdminEmail(finalId)
+          void triggerTicketResolvedToAdminEmail(finalId, session.user.id)
         }
 
         // ⭐ NUEVO: Disparar webhook de ticket reabierto

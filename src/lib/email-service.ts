@@ -4,7 +4,7 @@
  */
 
 import prisma from './prisma'
-import { getFamilyScopedAdmins } from '@/lib/notifications/family-recipients'
+import { getTicketOversightAdmins } from '@/lib/notifications/family-recipients'
 import { buildOperationalEmail } from '@/lib/services/email/operational-email'
 import ticketAssignedTemplate from '@/lib/services/email/templates/ticket-assigned'
 import { getEmailBranding } from '@/lib/services/email/email-branding'
@@ -72,19 +72,17 @@ export async function sendTicketCreatedToAdminEmail(ticketId: string) {
       where: { id: ticketId },
       include: {
         users_tickets_clientIdTousers: { select: { name: true, email: true } },
+        users_tickets_assigneeIdTousers: { select: { name: true } },
         categories: { select: { name: true } },
       },
     })
 
     if (!ticket) return false
 
-    const admins = await getFamilyScopedAdmins(ticket.familyId, {
-      id: true,
-      email: true,
-      name: true,
+    const admins = await getTicketOversightAdmins(ticket.familyId, {
+      select: { id: true, email: true, name: true },
+      excludeUserIds: [ticket.clientId, ticket.createdById, ticket.assigneeId],
     })
-    if (admins.length === 0) return false
-
     const adminRecipients = admins
       .filter(a => a.email)
       .map(a => ({ userId: a.id, email: a.email as string }))
@@ -92,27 +90,37 @@ export async function sendTicketCreatedToAdminEmail(ticketId: string) {
 
     const branding = await getEmailBranding()
     const code = ticketCode(ticket as { id: string; ticketCode?: string | null })
+    const assigned = Boolean(ticket.assigneeId)
     const { html, text } = await buildOperationalEmail({
-      headline: 'Nuevo ticket sin asignar',
-      preheader: `Ticket #${code} requiere asignación.`,
-      introHtml: `<p style="margin:0 0 8px;">Se registró un ticket que requiere asignación de técnico.</p>`,
+      headline: assigned ? 'Nuevo ticket registrado' : 'Nuevo ticket sin asignar',
+      preheader: assigned
+        ? `Ticket #${code} creado en tu área.`
+        : `Ticket #${code} requiere asignación.`,
+      introHtml: assigned
+        ? `<p style="margin:0 0 8px;">Se registró un ticket en un área que cubres.</p>`
+        : `<p style="margin:0 0 8px;">Se registró un ticket que requiere asignación de técnico.</p>`,
       infoRows: [
         { label: 'Ticket', value: `#${code}` },
         { label: 'Título', value: ticket.title },
         { label: 'Cliente', value: ticket.users_tickets_clientIdTousers.name },
         { label: 'Categoría', value: ticket.categories.name },
         { label: 'Prioridad', value: ticket.priority },
+        ...(assigned
+          ? [{ label: 'Técnico', value: ticket.users_tickets_assigneeIdTousers?.name || '—' }]
+          : []),
       ],
       cta: {
         href: `${branding.baseUrl}/admin/tickets/${ticket.id}`,
-        label: 'Asignar técnico',
+        label: assigned ? 'Ver ticket' : 'Asignar técnico',
       },
     })
 
     return await sendEmail({
       to: adminRecipients.map(r => r.email),
       recipients: adminRecipients,
-      subject: `[Admin] Ticket #${code} — asignación pendiente`,
+      subject: assigned
+        ? `[Admin] Ticket #${code} — nuevo`
+        : `[Admin] Ticket #${code} — asignación pendiente`,
       html,
       text,
       module: 'tickets',
@@ -224,7 +232,7 @@ export async function sendTicketAssignedToClientEmail(ticketId: string) {
   }
 }
 
-export async function sendTicketResolvedToAdminEmail(ticketId: string) {
+export async function sendTicketResolvedToAdminEmail(ticketId: string, actorUserId?: string) {
   try {
     const ticket = await prisma.tickets.findUnique({
       where: { id: ticketId },
@@ -237,13 +245,10 @@ export async function sendTicketResolvedToAdminEmail(ticketId: string) {
 
     if (!ticket) return false
 
-    const admins = await getFamilyScopedAdmins(ticket.familyId, {
-      id: true,
-      email: true,
-      name: true,
+    const admins = await getTicketOversightAdmins(ticket.familyId, {
+      select: { id: true, email: true, name: true },
+      excludeUserIds: [ticket.clientId, ticket.assigneeId, ticket.createdById, actorUserId],
     })
-    if (admins.length === 0) return false
-
     const adminRecipients = admins
       .filter(a => a.email)
       .map(a => ({ userId: a.id, email: a.email as string }))
@@ -279,8 +284,8 @@ export async function sendTicketResolvedToAdminEmail(ticketId: string) {
       html,
       text,
       module: 'tickets',
-      event: 'ticketUpdated',
-      priority: 'optional',
+      event: 'statusChanged',
+      priority: 'important',
     })
   } catch (error) {
     console.error('Error sending ticket resolved to admin email:', error)
@@ -294,30 +299,21 @@ export async function sendRatingToAdminEmail(ticketId: string, rating: number) {
       where: { id: ticketId },
       include: {
         users_tickets_clientIdTousers: { select: { name: true, email: true } },
-        users_tickets_assigneeIdTousers: { select: { name: true, email: true } },
+        users_tickets_assigneeIdTousers: { select: { id: true, name: true, email: true } },
         categories: { select: { name: true } },
       },
     })
 
     if (!ticket) return false
 
+    const technician = ticket.users_tickets_assigneeIdTousers
+    if (!technician?.email || !ticket.assigneeId) return false
+
     const ratingData = await prisma.ticket_ratings.findUnique({
       where: { ticketId },
       select: { rating: true, feedback: true },
     })
     if (!ratingData) return false
-
-    const admins = await getFamilyScopedAdmins(ticket.familyId, {
-      id: true,
-      email: true,
-      name: true,
-    })
-    if (admins.length === 0) return false
-
-    const adminRecipients = admins
-      .filter(a => a.email)
-      .map(a => ({ userId: a.id, email: a.email as string }))
-    if (adminRecipients.length === 0) return false
 
     const branding = await getEmailBranding()
     const code = ticketCode(ticket as { id: string; ticketCode?: string | null })
@@ -326,23 +322,23 @@ export async function sendRatingToAdminEmail(ticketId: string, rating: number) {
     const { html, text } = await buildOperationalEmail({
       headline: 'Nueva calificación',
       preheader: `Ticket #${code}: ${rating}/5 estrellas.`,
-      introHtml: `<p style="margin:0 0 8px;">El cliente calificó un ticket resuelto.</p>`,
+      greetingName: technician.name,
+      introHtml: `<p style="margin:0 0 8px;">El cliente calificó el servicio de este ticket.</p>`,
       infoRows: [
         { label: 'Ticket', value: `#${code}` },
         { label: 'Calificación', value: `${rating}/5` },
-        { label: 'Técnico', value: ticket.users_tickets_assigneeIdTousers?.name || '—' },
         { label: 'Comentario', value: feedback.slice(0, 120) },
       ],
       cta: {
-        href: `${branding.baseUrl}/admin/tickets/${ticket.id}`,
+        href: `${branding.baseUrl}/technician/tickets/${ticket.id}`,
         label: 'Ver ticket',
       },
     })
 
     return await sendEmail({
-      to: adminRecipients.map(r => r.email),
-      recipients: adminRecipients,
-      subject: `[Admin] Calificación ${rating}/5 — Ticket #${code}`,
+      to: technician.email,
+      recipientUserId: ticket.assigneeId,
+      subject: `Calificación ${rating}/5 — Ticket #${code}`,
       html,
       text,
       module: 'tickets',
@@ -350,7 +346,7 @@ export async function sendRatingToAdminEmail(ticketId: string, rating: number) {
       priority: 'optional',
     })
   } catch (error) {
-    console.error('Error sending rating to admin email:', error)
+    console.error('Error sending rating to technician email:', error)
     return false
   }
 }
