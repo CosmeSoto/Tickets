@@ -34,6 +34,7 @@ import { FormDraftBanner } from '@/components/common/form-draft-banner'
 import { FormDraftKeys, useFormDraft } from '@/hooks/common/use-form-draft'
 import { parseMoneyInput } from '@/lib/utils'
 import { suggestedRecurringFromLines } from '@/lib/contracts/line-billing'
+import { SupplierSelect } from '@/components/inventory/suppliers/SupplierSelect'
 import {
   CONTRACT_CATEGORY_LABELS,
   CONTRACT_LINE_TYPE_LABELS,
@@ -204,33 +205,8 @@ export function ContractForm({
     [rawFamilies]
   )
 
-  const { data: suppliers } = useFetch<{
-    id: string
-    name: string
-    email?: string | null
-    phone?: string | null
-    contactName?: string | null
-    website?: string | null
-    preferredPaymentMethod?: string | null
-    paymentTermsDays?: number | null
-    bankName?: string | null
-    bankAccountNumber?: string | null
-  }>('/api/inventory/suppliers', {
-    params: { active: 'true', limit: 100 },
-    transform: d => d.suppliers ?? d ?? [],
-    showErrorToast: false,
-  })
-
-  const supplierOptions = useMemo(
-    () => [
-      { value: '', label: 'Sin proveedor' },
-      ...suppliers.map(s => ({
-        value: s.id,
-        label: s.name,
-      })),
-    ],
-    [suppliers]
-  )
+  // SupplierSelect gestiona su propia carga de lista con búsqueda, paginación, crear y editar.
+  // Para auto-rellenar el formulario de contacto hacemos un fetch puntual al seleccionar.
 
   const { data: assignableUsers } = useFetch<{
     id: string
@@ -496,40 +472,49 @@ export function ContractForm({
     ],
     [licenses]
   )
-  // Auto-rellenar contacto y preferencias comerciales desde el proveedor
+  // Auto-rellenar contacto y preferencias comerciales desde el proveedor seleccionado.
+  // Hace un fetch puntual al cambiar la selección — no depende de una lista cargada.
   useEffect(() => {
-    if (!selectedSupplierId || !suppliers.length) return
-
-    const supplier = suppliers.find(s => s.id === selectedSupplierId)
-    if (!supplier) return
-
-    const current = getValues()
-
-    if (!current.contactName && supplier.contactName) {
-      setValue('contactName', supplier.contactName)
-    }
-    if (!current.contactEmail && supplier.email) {
-      setValue('contactEmail', supplier.email)
-    }
-    if (!current.contactPhone && supplier.phone) {
-      setValue('contactPhone', supplier.phone)
-    }
-    if (!current.termsUrl && supplier.website) {
-      setValue('termsUrl', supplier.website)
-    }
-    if (supplier.preferredPaymentMethod && current.paymentMethodType === 'CORPORATE_CARD') {
-      setValue(
-        'paymentMethodType',
-        supplier.preferredPaymentMethod as ContractFormData['paymentMethodType']
+    if (!selectedSupplierId) return
+    let cancelled = false
+    fetch(`/api/inventory/suppliers/${selectedSupplierId}`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(
+        (
+          supplier: {
+            contactName?: string | null
+            email?: string | null
+            phone?: string | null
+            website?: string | null
+            preferredPaymentMethod?: string | null
+            bankName?: string | null
+            bankAccountNumber?: string | null
+          } | null
+        ) => {
+          if (cancelled || !supplier) return
+          const current = getValues()
+          if (!current.contactName && supplier.contactName)
+            setValue('contactName', supplier.contactName)
+          if (!current.contactEmail && supplier.email) setValue('contactEmail', supplier.email)
+          if (!current.contactPhone && supplier.phone) setValue('contactPhone', supplier.phone)
+          if (!current.termsUrl && supplier.website) setValue('termsUrl', supplier.website)
+          if (supplier.preferredPaymentMethod && current.paymentMethodType === 'CORPORATE_CARD')
+            setValue(
+              'paymentMethodType',
+              supplier.preferredPaymentMethod as ContractFormData['paymentMethodType']
+            )
+          if (supplier.bankAccountNumber && !current.paymentAccountRef) {
+            const ref = [supplier.bankName, supplier.bankAccountNumber].filter(Boolean).join(' — ')
+            setValue('paymentAccountRef', ref)
+          }
+        }
       )
-    }
-    // Plazo de pago del proveedor ≠ aviso de cancelación del contrato: no se mapean.
-    if (supplier.bankAccountNumber && !current.paymentAccountRef) {
-      const ref = [supplier.bankName, supplier.bankAccountNumber].filter(Boolean).join(' — ')
-      setValue('paymentAccountRef', ref)
+      .catch(() => {})
+    return () => {
+      cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedSupplierId, suppliers, setValue, getValues])
+  }, [selectedSupplierId])
 
   const emptyToUndef = (v: string | null | undefined) => {
     if (v == null || v === '') return undefined
@@ -814,13 +799,11 @@ export function ContractForm({
 
             <div className='space-y-1'>
               <Label>Proveedor</Label>
-              <Combobox
-                value={watch('supplierId') || ''}
-                onValueChange={v => setValue('supplierId', v || '')}
-                options={supplierOptions}
-                placeholder='Seleccionar proveedor'
-                searchPlaceholder='Buscar proveedor...'
-                emptyText='No se encontraron proveedores'
+              <SupplierSelect
+                value={watch('supplierId') || null}
+                onChange={v => setValue('supplierId', v ?? '', { shouldDirty: true })}
+                familyId={familyId || undefined}
+                disabled={readOnly}
               />
             </div>
 
