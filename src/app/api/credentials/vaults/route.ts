@@ -40,7 +40,11 @@ export async function GET() {
   })
 
   for (const familyId of familyIds) {
-    await ensureDefaultAreaVault(familyId)
+    try {
+      await ensureDefaultAreaVault(familyId)
+    } catch {
+      // familyId huérfano (p. ej. tras restore parcial): ignorar y continuar
+    }
   }
 
   const entryVisibility = await buildCredentialEntriesVisibilityWhere(ctx)

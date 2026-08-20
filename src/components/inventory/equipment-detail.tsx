@@ -25,6 +25,7 @@ import { EquipmentBatchCard } from './equipment/EquipmentBatchCard'
 import { EquipmentAttachments } from './equipment-attachments'
 import { DepreciationCard } from './equipment/DepreciationCard'
 import { FinancialInfoSection } from './shared/FinancialInfoSection'
+import { EquipmentInvoicesCard } from './equipment/EquipmentInvoicesCard'
 
 import { AssignmentDialog } from './equipment/dialogs/assignment-dialog'
 import { ReturnDialog } from './equipment/dialogs/return-dialog'
@@ -269,7 +270,13 @@ export function EquipmentDetail({
             />
           )}
 
-          {/* 6. Depreciación — colapsable */}
+          {/* 6. Facturas / pagos de adquisición */}
+          <EquipmentInvoicesCard
+            equipmentId={equipmentId}
+            canManage={userRole === 'ADMIN' || isSuperAdminSession}
+          />
+
+          {/* 7. Depreciación — colapsable */}
           {(equipment as any).usefulLifeYears && (
             <div className='rounded-md border border-border overflow-hidden'>
               <button

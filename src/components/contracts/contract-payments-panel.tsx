@@ -1,23 +1,33 @@
 'use client'
 
+/**
+ * ContractPaymentsPanel — Vista de calendario de cuotas dentro del contrato.
+ *
+ * PROPÓSITO: Configuración y generación del calendario de pagos.
+ * OPERACIÓN (registrar pagos): exclusivamente en /inventory/payments.
+ *
+ * El panel NO tiene botón "Pagar" — eso evita duplicar la operación financiera
+ * en dos lugares. El enlace "Ir a Pagos" lleva al gestor al punto centralizado.
+ */
+
 import { useCallback, useEffect, useState } from 'react'
-import { CalendarClock, CheckCircle, RefreshCw, Sparkles } from 'lucide-react'
+import {
+  CalendarClock,
+  ExternalLink,
+  RefreshCw,
+  Sparkles,
+  AlertCircle,
+  CheckCircle2,
+  Clock,
+  XCircle,
+} from 'lucide-react'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { DateInput } from '@/components/ui/date-input'
-import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
-import { PAYMENT_METHOD_TYPE_LABELS, type PaymentMethodType } from '@/types/contracts'
+
+// ── Tipos ─────────────────────────────────────────────────────────────────────
 
 interface ContractPayment {
   id: string
@@ -36,20 +46,30 @@ interface PaymentStats {
   paid: number
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  SCHEDULED: 'Programado',
-  DUE: 'Por vencer hoy',
-  OVERDUE: 'Vencido',
-  PAID: 'Pagado',
-  CANCELLED: 'Cancelado',
-}
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-const STATUS_CLS: Record<string, string> = {
-  SCHEDULED: 'bg-slate-100 text-slate-700',
-  DUE: 'bg-amber-100 text-amber-800',
-  OVERDUE: 'bg-red-100 text-red-800',
-  PAID: 'bg-green-100 text-green-800',
-  CANCELLED: 'bg-muted text-muted-foreground',
+const STATUS_CONFIG: Record<string, { label: string; cls: string; icon: React.ElementType }> = {
+  SCHEDULED: {
+    label: 'Programado',
+    cls: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
+    icon: Clock,
+  },
+  DUE: {
+    label: 'Vence hoy',
+    cls: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
+    icon: AlertCircle,
+  },
+  OVERDUE: {
+    label: 'Vencido',
+    cls: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
+    icon: AlertCircle,
+  },
+  PAID: {
+    label: 'Pagado',
+    cls: 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300',
+    icon: CheckCircle2,
+  },
+  CANCELLED: { label: 'Cancelado', cls: 'bg-muted text-muted-foreground', icon: XCircle },
 }
 
 function fmtDate(d: string) {
@@ -68,10 +88,7 @@ function fmtCurrency(n: number, currency = 'USD') {
   }).format(n)
 }
 
-/** Devuelve la fecha de hoy en formato YYYY-MM-DD para el input[type=date] */
-function todayISO() {
-  return new Date().toISOString().split('T')[0]
-}
+// ── Componente ────────────────────────────────────────────────────────────────
 
 interface Props {
   contractId: string
@@ -86,29 +103,15 @@ export function ContractPaymentsPanel({ contractId, hasBillingDates }: Props) {
   const [generating, setGenerating] = useState(false)
   const [recalculating, setRecalculating] = useState(false)
 
-  // Estado del modal "Marcar como pagado"
-  const [markingPayment, setMarkingPayment] = useState<ContractPayment | null>(null)
-  const [paidDate, setPaidDate] = useState(todayISO())
-  const [paymentMethod, setPaymentMethod] = useState('')
-  const [referenceNumber, setReferenceNumber] = useState('')
-  const [transactionId, setTransactionId] = useState('')
-  const [cardLast4, setCardLast4] = useState('')
-  const [cardBrand, setCardBrand] = useState('')
-  const [bankEntity, setBankEntity] = useState('')
-  const [chargeSource, setChargeSource] = useState<PaymentMethodType>('CORPORATE_CARD')
-  const [marking, setMarking] = useState(false)
-
   const load = useCallback(async () => {
     setLoading(true)
     try {
       const [paymentsRes, statsRes] = await Promise.all([
         fetch(`/api/inventory/contracts/${contractId}/payments?pageSize=12`),
-        // Ruta correcta: /api/inventory/contracts/payments/stats?contractId=...
         fetch(`/api/inventory/contracts/payments/stats?contractId=${contractId}`),
       ])
       if (paymentsRes.ok) {
         const data = await paymentsRes.json()
-        // El endpoint devuelve { payments, total, ... }
         setPayments(data.payments ?? [])
       }
       if (statsRes.ok) {
@@ -132,7 +135,6 @@ export function ContractPaymentsPanel({ contractId, hasBillingDates }: Props) {
       })
       return
     }
-
     setGenerating(true)
     try {
       const res = await fetch(`/api/inventory/contracts/${contractId}/payments/generate`, {
@@ -150,12 +152,11 @@ export function ContractPaymentsPanel({ contractId, hasBillingDates }: Props) {
         })
         return
       }
-
       if (!res.ok) throw new Error(json.error ?? 'No se pudieron generar los pagos')
 
       toast({
         title: 'Pagos generados',
-        description: `Se crearon ${json.paymentsGenerated ?? 0} pagos programados.`,
+        description: `Se crearon ${json.paymentsGenerated ?? 0} cuota(s) en el calendario.`,
       })
       await load()
     } catch (err: unknown) {
@@ -179,7 +180,7 @@ export function ContractPaymentsPanel({ contractId, hasBillingDates }: Props) {
       if (!res.ok) throw new Error(json.error ?? 'No se pudo recalcular')
       toast({
         title: 'Cuotas actualizadas',
-        description: `Ajustadas: ${json.updated ?? 0}. Canceladas (sin renta): ${json.cancelled ?? 0}.`,
+        description: `Ajustadas: ${json.updated ?? 0}. Sin renta activa (canceladas): ${json.cancelled ?? 0}.`,
       })
       await load()
     } catch (err: unknown) {
@@ -193,330 +194,185 @@ export function ContractPaymentsPanel({ contractId, hasBillingDates }: Props) {
     }
   }
 
-  const openMarkModal = (p: ContractPayment) => {
-    setMarkingPayment(p)
-    setPaidDate(todayISO())
-    setPaymentMethod('')
-    setReferenceNumber('')
-    setTransactionId('')
-    setCardLast4('')
-    setCardBrand('')
-    setBankEntity('')
-    setChargeSource('CORPORATE_CARD')
-  }
-
-  const handleMarkAsPaid = async () => {
-    if (!markingPayment) return
-    if (!paidDate) {
-      toast({
-        title: 'Fecha requerida',
-        description: 'Ingresa la fecha de pago.',
-        variant: 'destructive',
-      })
-      return
-    }
-
-    setMarking(true)
-    try {
-      const res = await fetch(`/api/inventory/contracts/payments/${markingPayment.id}/mark-paid`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          paidDate,
-          paymentMethod: paymentMethod || undefined,
-          referenceNumber: referenceNumber || undefined,
-          transactionId: transactionId || undefined,
-          cardLast4: cardLast4 || undefined,
-          cardBrand: cardBrand || undefined,
-          bankEntity: bankEntity || undefined,
-          chargeSource,
-        }),
-      })
-      const json = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(json.error ?? 'No se pudo registrar el pago')
-
-      toast({
-        title: 'Pago registrado',
-        description: `El pago de ${fmtCurrency(markingPayment.amount, markingPayment.currency)} fue marcado como pagado.`,
-      })
-      setMarkingPayment(null)
-      await load()
-    } catch (err: unknown) {
-      toast({
-        title: 'Error al registrar pago',
-        description: err instanceof Error ? err.message : 'Error desconocido',
-        variant: 'destructive',
-      })
-    } finally {
-      setMarking(false)
-    }
-  }
-
-  const canMarkAsPaid = (status: string) =>
-    status === 'SCHEDULED' || status === 'DUE' || status === 'OVERDUE'
+  // Cuotas con acción pendiente (para resaltar en la vista)
+  const pendingCount = stats ? stats.overdue + stats.due : 0
 
   return (
-    <>
-      <Card>
-        <CardHeader className='pb-3'>
-          <div className='flex items-start justify-between gap-3'>
-            <div>
-              <CardTitle className='text-base flex items-center gap-2'>
-                <CalendarClock className='h-4 w-4' />
-                Pagos programados
-              </CardTitle>
-              <p className='text-xs text-muted-foreground mt-1'>
-                Cada cuota cobra solo los equipos aún en renta esa fecha.{' '}
-                <Link href='/inventory/payments' className='underline underline-offset-2'>
-                  Ver todos los pagos
-                </Link>
-              </p>
-            </div>
-            <div className='flex gap-2'>
-              <Button type='button' variant='outline' size='sm' onClick={load} disabled={loading}>
-                <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${loading ? 'animate-spin' : ''}`} />
-                Actualizar
-              </Button>
-              <Button
-                type='button'
-                variant='outline'
-                size='sm'
-                onClick={handleRecalculate}
-                disabled={recalculating || loading}
+    <Card>
+      <CardHeader className='pb-3'>
+        <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
+          {/* Título + descripción */}
+          <div className='min-w-0'>
+            <CardTitle className='text-base flex items-center gap-2'>
+              <CalendarClock className='h-4 w-4 shrink-0' />
+              Calendario de pagos
+              {pendingCount > 0 && (
+                <Badge variant='destructive' className='text-xs'>
+                  {pendingCount} pendiente{pendingCount !== 1 ? 's' : ''}
+                </Badge>
+              )}
+            </CardTitle>
+            <p className='text-xs text-muted-foreground mt-1 max-w-lg'>
+              Cada cuota cobra solo los equipos en renta esa fecha. Para{' '}
+              <strong>registrar un pago</strong> ve a{' '}
+              <Link
+                href='/inventory/payments'
+                className='inline-flex items-center gap-0.5 underline underline-offset-2 hover:text-foreground transition-colors'
               >
-                {recalculating ? <RefreshCw className='h-3.5 w-3.5 mr-1.5 animate-spin' /> : null}
-                Recalcular pendientes
-              </Button>
-              <Button
-                type='button'
-                size='sm'
-                onClick={handleGenerate}
-                disabled={generating || !hasBillingDates}
-              >
-                {generating ? (
-                  <RefreshCw className='h-3.5 w-3.5 mr-1.5 animate-spin' />
-                ) : (
-                  <Sparkles className='h-3.5 w-3.5 mr-1.5' />
-                )}
-                Generar pagos
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className='space-y-4'>
-          {stats && (
-            <div className='grid grid-cols-2 sm:grid-cols-5 gap-2 text-center'>
-              {(
-                [
-                  ['Total', stats.total],
-                  ['Programados', stats.scheduled],
-                  ['Hoy', stats.due],
-                  ['Vencidos', stats.overdue],
-                  ['Pagados', stats.paid],
-                ] as [string, number][]
-              ).map(([label, value]) => (
-                <div key={label} className='rounded-md border px-2 py-2'>
-                  <p className='text-lg font-semibold'>{value}</p>
-                  <p className='text-[10px] uppercase tracking-wide text-muted-foreground'>
-                    {label}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {loading ? (
-            <p className='text-sm text-muted-foreground'>Cargando pagos...</p>
-          ) : payments.length === 0 ? (
-            <p className='text-sm text-muted-foreground'>
-              No hay pagos registrados. Usa &quot;Generar pagos&quot; para crear el calendario
-              automático.
+                Pagos
+                <ExternalLink className='h-3 w-3 ml-0.5' />
+              </Link>
+              .
             </p>
-          ) : (
-            <ul className='space-y-2'>
-              {payments.map(p => (
-                <li
-                  key={p.id}
-                  className='flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm'
-                >
-                  <div className='min-w-0'>
-                    <p className='font-medium'>{fmtCurrency(p.amount, p.currency)}</p>
-                    <p className='text-xs text-muted-foreground'>
-                      Vence: {fmtDate(p.dueDate)}
-                      {p.paidDate && (
-                        <span className='ml-2 text-green-600'>· Pagado: {fmtDate(p.paidDate)}</span>
-                      )}
-                    </p>
-                  </div>
-                  <div className='flex items-center gap-2 shrink-0'>
-                    <Badge variant='outline' className={STATUS_CLS[p.status] ?? ''}>
-                      {STATUS_LABELS[p.status] ?? p.status}
-                    </Badge>
-                    {canMarkAsPaid(p.status) && (
-                      <Button
-                        type='button'
-                        size='sm'
-                        variant='outline'
-                        className='h-7 px-2 text-xs text-green-700 border-green-200 hover:bg-green-50'
-                        onClick={() => openMarkModal(p)}
-                      >
-                        <CheckCircle className='h-3.5 w-3.5 mr-1' />
-                        Pagar
-                      </Button>
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+          </div>
 
-      {/* Modal: Marcar como pagado */}
-      <Dialog
-        open={!!markingPayment}
-        onOpenChange={open => {
-          if (!open) setMarkingPayment(null)
-        }}
-      >
-        <DialogContent className='sm:max-w-md'>
-          <DialogHeader>
-            <DialogTitle className='flex items-center gap-2'>
-              <CheckCircle className='h-4 w-4 text-green-600' />
-              Registrar pago
-            </DialogTitle>
-          </DialogHeader>
-
-          {markingPayment && (
-            <div className='space-y-4 py-2'>
-              <div className='rounded-md bg-muted/50 px-3 py-2 text-sm'>
-                <p className='font-medium'>
-                  {fmtCurrency(markingPayment.amount, markingPayment.currency)}
-                </p>
-                <p className='text-xs text-muted-foreground'>
-                  Vencimiento: {fmtDate(markingPayment.dueDate)}
-                </p>
-              </div>
-
-              <div className='space-y-1'>
-                <Label htmlFor='paid-date'>
-                  Fecha de pago <span className='text-destructive'>*</span>
-                </Label>
-                <DateInput
-                  id='paid-date'
-                  value={paidDate}
-                  onChange={e => setPaidDate(e.target.value)}
-                />
-              </div>
-
-              <div className='space-y-1'>
-                <Label htmlFor='payment-method'>
-                  Método de pago <span className='text-xs text-muted-foreground'>(opcional)</span>
-                </Label>
-                <Input
-                  id='payment-method'
-                  value={paymentMethod}
-                  onChange={e => setPaymentMethod(e.target.value)}
-                  placeholder='Ej: Transferencia, Cheque...'
-                />
-              </div>
-
-              <div className='space-y-1'>
-                <Label htmlFor='reference-number'>
-                  N° de referencia <span className='text-xs text-muted-foreground'>(opcional)</span>
-                </Label>
-                <Input
-                  id='reference-number'
-                  value={referenceNumber}
-                  onChange={e => setReferenceNumber(e.target.value)}
-                  placeholder='Ej: TRF-20260622-001'
-                />
-              </div>
-
-              <div className='space-y-1'>
-                <Label htmlFor='transaction-id'>ID transacción bancaria</Label>
-                <Input
-                  id='transaction-id'
-                  value={transactionId}
-                  onChange={e => setTransactionId(e.target.value)}
-                  placeholder='Para kit de cancelación'
-                />
-              </div>
-
-              <div className='space-y-1'>
-                <Label htmlFor='charge-source'>Método de cobro</Label>
-                <select
-                  id='charge-source'
-                  className='flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm'
-                  value={chargeSource}
-                  onChange={e => setChargeSource(e.target.value as PaymentMethodType)}
-                >
-                  {Object.entries(PAYMENT_METHOD_TYPE_LABELS).map(([k, v]) => (
-                    <option key={k} value={k}>
-                      {v}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className='grid grid-cols-3 gap-2'>
-                <div className='space-y-1'>
-                  <Label htmlFor='card-last4'>Tarjeta ·4</Label>
-                  <Input
-                    id='card-last4'
-                    maxLength={4}
-                    value={cardLast4}
-                    onChange={e => setCardLast4(e.target.value)}
-                    placeholder='1234'
-                  />
-                </div>
-                <div className='space-y-1'>
-                  <Label htmlFor='card-brand'>Marca</Label>
-                  <Input
-                    id='card-brand'
-                    value={cardBrand}
-                    onChange={e => setCardBrand(e.target.value)}
-                    placeholder='VISA'
-                  />
-                </div>
-                <div className='space-y-1'>
-                  <Label htmlFor='bank-entity'>Banco</Label>
-                  <Input
-                    id='bank-entity'
-                    value={bankEntity}
-                    onChange={e => setBankEntity(e.target.value)}
-                    placeholder='Entidad'
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          <DialogFooter className='gap-2'>
+          {/* Acciones */}
+          <div className='flex flex-wrap gap-2 shrink-0'>
+            <Button type='button' variant='outline' size='sm' onClick={load} disabled={loading}>
+              <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+              <span className='sr-only sm:not-sr-only sm:ml-1.5'>Actualizar</span>
+            </Button>
             <Button
               type='button'
               variant='outline'
-              onClick={() => setMarkingPayment(null)}
-              disabled={marking}
+              size='sm'
+              onClick={handleRecalculate}
+              disabled={recalculating || loading || payments.length === 0}
+              title='Ajusta los montos de cuotas pendientes según los activos aún en renta'
             >
-              Cancelar
+              {recalculating ? <RefreshCw className='h-3.5 w-3.5 animate-spin mr-1.5' /> : null}
+              Recalcular
             </Button>
             <Button
               type='button'
-              onClick={handleMarkAsPaid}
-              disabled={marking || !paidDate}
-              className='bg-green-600 hover:bg-green-700 text-white'
+              size='sm'
+              onClick={handleGenerate}
+              disabled={generating || !hasBillingDates}
+              title={
+                !hasBillingDates
+                  ? 'El contrato necesita fechas de inicio y fin'
+                  : 'Genera el calendario automático de cuotas'
+              }
             >
-              {marking ? (
+              {generating ? (
                 <RefreshCw className='h-3.5 w-3.5 mr-1.5 animate-spin' />
               ) : (
-                <CheckCircle className='h-3.5 w-3.5 mr-1.5' />
+                <Sparkles className='h-3.5 w-3.5 mr-1.5' />
               )}
-              Confirmar pago
+              Generar pagos
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+          </div>
+        </div>
+      </CardHeader>
+
+      <CardContent className='space-y-4'>
+        {/* Stats de cuotas */}
+        {stats && (
+          <div className='grid grid-cols-2 sm:grid-cols-5 gap-2 text-center'>
+            {(
+              [
+                ['Total', stats.total, ''],
+                ['Programados', stats.scheduled, ''],
+                ['Hoy', stats.due, stats.due > 0 ? 'text-amber-600 dark:text-amber-400' : ''],
+                [
+                  'Vencidos',
+                  stats.overdue,
+                  stats.overdue > 0 ? 'text-red-600 dark:text-red-400' : '',
+                ],
+                ['Pagados', stats.paid, stats.paid > 0 ? 'text-green-600 dark:text-green-400' : ''],
+              ] as [string, number, string][]
+            ).map(([label, value, cls]) => (
+              <div key={label} className='rounded-md border px-2 py-2'>
+                <p className={`text-lg font-semibold tabular-nums ${cls}`}>{value}</p>
+                <p className='text-[10px] uppercase tracking-wide text-muted-foreground'>{label}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Aviso de acción pendiente */}
+        {!loading && pendingCount > 0 && (
+          <div className='flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 dark:border-amber-800/40 dark:bg-amber-900/20 px-3 py-2.5 text-sm'>
+            <AlertCircle className='h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5' />
+            <div className='min-w-0'>
+              <p className='font-medium text-amber-800 dark:text-amber-300'>
+                {pendingCount} cuota{pendingCount !== 1 ? 's' : ''} requieren atención
+              </p>
+              <p className='text-xs text-amber-700 dark:text-amber-400 mt-0.5'>
+                Regístralas desde{' '}
+                <Link
+                  href='/inventory/payments'
+                  className='underline underline-offset-2 hover:text-amber-900 dark:hover:text-amber-200 inline-flex items-center gap-0.5'
+                >
+                  Inventario → Pagos <ExternalLink className='h-3 w-3' />
+                </Link>
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Lista de cuotas (solo calendario, sin acción de pago) */}
+        {loading ? (
+          <div className='flex items-center gap-2 text-sm text-muted-foreground py-4'>
+            <RefreshCw className='h-3.5 w-3.5 animate-spin' />
+            Cargando calendario…
+          </div>
+        ) : payments.length === 0 ? (
+          <div className='rounded-md border border-dashed py-6 text-center'>
+            <CalendarClock className='h-8 w-8 mx-auto mb-2 text-muted-foreground/40' />
+            <p className='text-sm text-muted-foreground'>Sin cuotas generadas.</p>
+            <p className='text-xs text-muted-foreground mt-1'>
+              {hasBillingDates
+                ? 'Usa "Generar pagos" para crear el calendario automático.'
+                : 'Configura las fechas del contrato para poder generar cuotas.'}
+            </p>
+          </div>
+        ) : (
+          <ul className='space-y-1.5'>
+            {payments.map(p => {
+              const cfg = STATUS_CONFIG[p.status] ?? STATUS_CONFIG.SCHEDULED
+              const Icon = cfg.icon
+              return (
+                <li
+                  key={p.id}
+                  className='flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm hover:bg-muted/30 transition-colors'
+                >
+                  <div className='min-w-0 flex-1'>
+                    <span className='font-medium tabular-nums'>
+                      {fmtCurrency(p.amount, p.currency)}
+                    </span>
+                    <span className='text-xs text-muted-foreground ml-2'>
+                      Vence: {fmtDate(p.dueDate)}
+                    </span>
+                    {p.paidDate && (
+                      <span className='text-xs text-green-600 dark:text-green-400 ml-2'>
+                        · Pagado: {fmtDate(p.paidDate)}
+                      </span>
+                    )}
+                  </div>
+                  <Badge variant='outline' className={`shrink-0 gap-1 text-xs ${cfg.cls}`}>
+                    <Icon className='h-3 w-3' />
+                    {cfg.label}
+                  </Badge>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+
+        {/* Pie: enlace a la vista global si hay más cuotas */}
+        {stats && stats.total > payments.length && (
+          <p className='text-xs text-muted-foreground text-right'>
+            Mostrando {payments.length} de {stats.total} cuotas.{' '}
+            <Link
+              href='/inventory/payments'
+              className='underline underline-offset-2 hover:text-foreground inline-flex items-center gap-0.5'
+            >
+              Ver todas <ExternalLink className='h-3 w-3' />
+            </Link>
+          </p>
+        )}
+      </CardContent>
+    </Card>
   )
 }

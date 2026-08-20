@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Lock, Unlock, X } from 'lucide-react'
+import { Eye, EyeOff, Lock, Unlock, X } from 'lucide-react'
 import { usePasswordPolicy } from '@/hooks/use-password-policy'
 import { useToast } from '@/hooks/use-toast'
 
@@ -22,6 +22,7 @@ export function UserSecuritySection({
   const { toast } = useToast()
   const [showResetPassword, setShowResetPassword] = useState(false)
   const [newPassword, setNewPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [resetPasswordLoading, setResetPasswordLoading] = useState(false)
   const [unlockLoading, setUnlockLoading] = useState(false)
 
@@ -88,14 +89,29 @@ export function UserSecuritySection({
           </>
         ) : (
           <div className='flex items-center gap-2 w-full'>
-            <Input
-              type='password'
-              placeholder={`Nueva contraseña (mín. ${minLength} caracteres)`}
-              value={newPassword}
-              onChange={e => setNewPassword(e.target.value)}
-              className='flex-1 h-8 text-sm'
-              autoFocus
-            />
+            <div className='relative flex-1'>
+              <Input
+                type={showPassword ? 'text' : 'password'}
+                placeholder={`Nueva contraseña (mín. ${minLength} caracteres)`}
+                value={newPassword}
+                onChange={e => setNewPassword(e.target.value)}
+                className='h-8 text-sm pr-8'
+                autoFocus
+              />
+              <button
+                type='button'
+                tabIndex={-1}
+                onClick={() => setShowPassword(v => !v)}
+                className='absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors'
+                aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+              >
+                {showPassword ? (
+                  <EyeOff className='h-3.5 w-3.5' />
+                ) : (
+                  <Eye className='h-3.5 w-3.5' />
+                )}
+              </button>
+            </div>
             <Button
               type='button'
               size='sm'
@@ -112,6 +128,7 @@ export function UserSecuritySection({
               onClick={() => {
                 setShowResetPassword(false)
                 setNewPassword('')
+                setShowPassword(false)
               }}
               className='shrink-0'
             >

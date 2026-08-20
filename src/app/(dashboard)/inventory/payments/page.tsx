@@ -1,9 +1,38 @@
 'use client'
 
+/**
+ * /inventory/payments
+ *
+ * Dos pestañas:
+ *  · Contratos — cuotas de arrendamiento/suscripciones (contract_payments)
+ *  · Activos   — facturas de adquisición de equipos (equipment_invoices)
+ *
+ * Features por pestaña:
+ *  ✓ Stats KPIs (total, pendiente, vencido, pagado, monto)
+ *  ✓ Filtros: estado, área/familia, búsqueda, rango de fechas
+ *  ✓ Ordenamiento por columna (useTableSort)
+ *  ✓ Paginación cliente (usePagination)
+ *  ✓ Exportación CSV / Excel / PDF (useExport)
+ *  ✓ Toolbar estándar (ListTableToolbar)
+ *  ✓ Dialog de "registrar pago" con método de pago
+ *  ✓ Scope de familias por rol
+ */
+
 import { useCallback, useState } from 'react'
 import Link from 'next/link'
-import { CheckCircle, RefreshCw, Wallet } from 'lucide-react'
+import {
+  AlertCircle,
+  CheckCircle2,
+  Clock,
+  Package,
+  Receipt,
+  Wallet,
+  XCircle,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
+import { ListTableToolbar } from '@/components/common/list-table-toolbar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -14,41 +43,136 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import { Label } from '@/components/ui/label'
 import { DateInput } from '@/components/ui/date-input'
 import { FamilyCombobox } from '@/components/ui/family-combobox'
+import { SortableTableHead } from '@/components/ui/sortable-table-head'
 import { useFamilyOptions } from '@/hooks/use-family-options'
 import { useFetch } from '@/hooks/common/use-fetch'
+import { useTableSort } from '@/hooks/common/use-table-sort'
+import { usePagination } from '@/hooks/common/use-pagination'
+import { useExport } from '@/hooks/common/use-export'
 import { useInventoryPermissions } from '@/hooks/use-inventory-permissions'
 import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 import { PAYMENT_METHOD_TYPE_LABELS, type PaymentMethodType } from '@/types/contracts'
 
-type PaymentRow = {
+// ── Tipos ─────────────────────────────────────────────────────────────────────
+
+type ContractPayment = {
   id: string
   amount: number
   currency: string
   dueDate: string
-  status: string
   paidDate?: string | null
+  status: string
+  paymentMethod?: string | null
+  referenceNumber?: string | null
+  notes?: string | null
+  createdAt: string
   contract: {
     id: string
     name: string
     contractNumber?: string | null
     billingCycle?: string | null
     supplier?: { name: string } | null
-    family?: { name: string; color?: string | null } | null
+    family?: { id: string; name: string; color?: string | null } | null
   }
+  creator?: { id: string; name: string } | null
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  SCHEDULED: 'Programado',
-  DUE: 'Vence hoy',
-  OVERDUE: 'Vencido',
-  PAID: 'Pagado',
-  CANCELLED: 'Cancelado',
+type AssetInvoice = {
+  id: string
+  invoiceNumber?: string | null
+  purchaseOrderNumber?: string | null
+  amount: number
+  currency: string
+  dueDate?: string | null
+  paidDate?: string | null
+  status: string
+  paymentMethod?: string | null
+  supplierName?: string | null
+  notes?: string | null
+  createdAt: string
+  equipment: {
+    id: string
+    code: string
+    brand: string
+    modelDeprecated: string
+    model?: { model: string } | null
+    type?: {
+      name: string
+      family?: { id: string; name: string; color?: string | null } | null
+    } | null
+  }
+  supplier?: { id: string; name: string } | null
+  creator?: { id: string; name: string } | null
 }
 
-function fmtDate(d: string) {
+// ── Constantes y helpers ──────────────────────────────────────────────────────
+
+const CONTRACT_STATUS_OPTIONS = [
+  { value: 'ALL', label: 'Todos los estados' },
+  { value: 'OVERDUE', label: 'Vencidos' },
+  { value: 'DUE', label: 'Vence hoy' },
+  { value: 'SCHEDULED', label: 'Programados' },
+  { value: 'PAID', label: 'Pagados' },
+  { value: 'CANCELLED', label: 'Cancelados' },
+]
+
+const ASSET_STATUS_OPTIONS = [
+  { value: 'ALL', label: 'Todos los estados' },
+  { value: 'OVERDUE', label: 'Vencidos' },
+  { value: 'PENDING', label: 'Pendientes' },
+  { value: 'PAID', label: 'Pagados' },
+  { value: 'CANCELLED', label: 'Cancelados' },
+]
+
+const CONTRACT_STATUS_CONFIG: Record<
+  string,
+  {
+    label: string
+    variant: 'default' | 'secondary' | 'destructive' | 'outline'
+    icon: React.ElementType
+  }
+> = {
+  SCHEDULED: { label: 'Programado', variant: 'secondary', icon: Clock },
+  DUE: { label: 'Vence hoy', variant: 'default', icon: AlertCircle },
+  OVERDUE: { label: 'Vencido', variant: 'destructive', icon: AlertCircle },
+  PAID: { label: 'Pagado', variant: 'default', icon: CheckCircle2 },
+  CANCELLED: { label: 'Cancelado', variant: 'outline', icon: XCircle },
+}
+
+const ASSET_STATUS_CONFIG: Record<
+  string,
+  {
+    label: string
+    variant: 'default' | 'secondary' | 'destructive' | 'outline'
+    icon: React.ElementType
+  }
+> = {
+  PENDING: { label: 'Pendiente', variant: 'secondary', icon: Clock },
+  OVERDUE: { label: 'Vencido', variant: 'destructive', icon: AlertCircle },
+  PAID: { label: 'Pagado', variant: 'default', icon: CheckCircle2 },
+  CANCELLED: { label: 'Cancelado', variant: 'outline', icon: XCircle },
+}
+
+function fmtDate(d?: string | null) {
+  if (!d) return '—'
   return new Date(d).toLocaleDateString('es-CL', {
     day: '2-digit',
     month: '2-digit',
@@ -68,224 +192,1140 @@ function todayISO() {
   return new Date().toISOString().split('T')[0]
 }
 
-const TABS: { id: string; label: string; status?: string }[] = [
-  { id: 'overdue', label: 'Vencidos', status: 'OVERDUE' },
-  { id: 'due', label: 'Hoy', status: 'DUE' },
-  { id: 'upcoming', label: 'Próximos', status: 'SCHEDULED' },
-  { id: 'paid', label: 'Pagados', status: 'PAID' },
-  { id: 'all', label: 'Todos' },
-]
+function StatusBadge({ status, cfg }: { status: string; cfg: typeof CONTRACT_STATUS_CONFIG }) {
+  const c = cfg[status] ?? { label: status, variant: 'secondary' as const, icon: Clock }
+  const Icon = c.icon
+  return (
+    <Badge variant={c.variant} className='gap-1 text-xs whitespace-nowrap'>
+      <Icon className='h-3 w-3' />
+      {c.label}
+    </Badge>
+  )
+}
+
+// ── Sub-componente: stats KPI ─────────────────────────────────────────────────
+
+function StatsRow({
+  items,
+  isCurrency = false,
+}: {
+  items: { label: string; value: string | number; cls: string }[]
+  isCurrency?: boolean
+}) {
+  return (
+    <div className='grid grid-cols-2 sm:grid-cols-5 gap-2'>
+      {items.map(item => (
+        <div key={item.label} className='rounded-lg border bg-muted/30 px-3 py-2.5 text-center'>
+          <p className={`text-xl font-bold tabular-nums ${item.cls}`}>{item.value}</p>
+          <p className='text-xs text-muted-foreground mt-0.5'>{item.label}</p>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── Sub-componente: controles de paginación ───────────────────────────────────
+
+function PaginationBar({
+  currentPage,
+  totalPages,
+  startIndex,
+  endIndex,
+  totalItems,
+  prevPage,
+  nextPage,
+  hasPrevPage,
+  hasNextPage,
+}: {
+  currentPage: number
+  totalPages: number
+  startIndex: number
+  endIndex: number
+  totalItems: number
+  prevPage: () => void
+  nextPage: () => void
+  hasPrevPage: boolean
+  hasNextPage: boolean
+}) {
+  if (totalPages <= 1) return null
+  return (
+    <div className='flex items-center justify-between pt-2 text-sm text-muted-foreground'>
+      <span>
+        {startIndex}–{endIndex} de {totalItems}
+      </span>
+      <div className='flex items-center gap-1'>
+        <Button
+          type='button'
+          variant='outline'
+          size='sm'
+          onClick={prevPage}
+          disabled={!hasPrevPage}
+        >
+          <ChevronLeft className='h-4 w-4' />
+        </Button>
+        <span className='px-2'>
+          {currentPage} / {totalPages}
+        </span>
+        <Button
+          type='button'
+          variant='outline'
+          size='sm'
+          onClick={nextPage}
+          disabled={!hasNextPage}
+        >
+          <ChevronRight className='h-4 w-4' />
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// ── Página ────────────────────────────────────────────────────────────────────
+
+type Section = 'contracts' | 'assets'
 
 export default function InventoryPaymentsPage() {
   const { canManageContracts } = useInventoryPermissions()
   const { families } = useFamilyOptions()
-  const [tab, setTab] = useState('overdue')
-  const [familyFilter, setFamilyFilter] = useState('all')
-  const [search, setSearch] = useState('')
-  const [marking, setMarking] = useState<PaymentRow | null>(null)
-  const [paidDate, setPaidDate] = useState(todayISO())
-  const [saving, setSaving] = useState(false)
 
-  const activeTab = TABS.find(t => t.id === tab) ?? TABS[0]
+  // ── Sección activa
+  const [section, setSection] = useState<Section>('contracts')
 
-  const buildUrl = useCallback(() => {
-    const p = new URLSearchParams({ pageSize: '100' })
-    if (activeTab.status) p.set('status', activeTab.status)
-    if (familyFilter !== 'all') p.set('familyId', familyFilter)
-    if (search.trim()) p.set('search', search.trim())
+  // ── Filtros contratos
+  const [cStatus, setCStatus] = useState('ALL')
+  const [cFamily, setCFamily] = useState('all')
+  const [cSearch, setCSearch] = useState('')
+  const [cFromDate, setCFromDate] = useState('')
+  const [cToDate, setCToDate] = useState('')
+
+  // ── Filtros activos
+  const [aStatus, setAStatus] = useState('ALL')
+  const [aFamily, setAFamily] = useState('all')
+  const [aSearch, setASearch] = useState('')
+  const [aFromDate, setAFromDate] = useState('')
+  const [aToDate, setAToDate] = useState('')
+
+  // ── Dialogs — pago de contrato
+  const [markingContract, setMarkingContract] = useState<ContractPayment | null>(null)
+  const [cPaidDate, setCPaidDate] = useState(todayISO())
+  const [cPaidMethod, setCPaidMethod] = useState<string>('')
+  const [cPaidRef, setCPaidRef] = useState('')
+  const [savingC, setSavingC] = useState(false)
+
+  // ── Dialogs — pago de activo
+  const [markingAsset, setMarkingAsset] = useState<AssetInvoice | null>(null)
+  const [aPaidDate, setAPaidDate] = useState(todayISO())
+  const [aPaidMethod, setAPaidMethod] = useState<string>('')
+  const [aPaidRef, setAPaidRef] = useState('')
+  const [savingA, setSavingA] = useState(false)
+
+  // ── Fetch contratos
+  const buildContractUrl = useCallback(() => {
+    const p = new URLSearchParams({ pageSize: '500' })
+    if (cStatus !== 'ALL') p.set('status', cStatus)
+    if (cFamily !== 'all') p.set('familyId', cFamily)
+    if (cSearch.trim()) p.set('search', cSearch.trim())
+    if (cFromDate) p.set('fromDate', cFromDate)
+    if (cToDate) p.set('toDate', cToDate)
     return `/api/inventory/payments?${p}`
-  }, [activeTab.status, familyFilter, search])
+  }, [cStatus, cFamily, cSearch, cFromDate, cToDate])
 
   const {
-    data: payments,
-    loading,
-    reload,
-  } = useFetch<PaymentRow>(buildUrl(), {
+    data: contractPayments,
+    loading: loadingC,
+    reload: reloadC,
+  } = useFetch<ContractPayment>(buildContractUrl(), {
     transform: d => d.payments ?? [],
-    enabled: canManageContracts,
+    enabled: canManageContracts && section === 'contracts',
   })
 
-  const markPaid = async () => {
-    if (!marking) return
-    setSaving(true)
+  // ── Fetch activos
+  const buildAssetUrl = useCallback(() => {
+    const p = new URLSearchParams({ pageSize: '500' })
+    if (aStatus !== 'ALL') p.set('status', aStatus)
+    if (aFamily !== 'all') p.set('familyId', aFamily)
+    if (aSearch.trim()) p.set('search', aSearch.trim())
+    if (aFromDate) p.set('fromDate', aFromDate)
+    if (aToDate) p.set('toDate', aToDate)
+    return `/api/inventory/equipment-payments?${p}`
+  }, [aStatus, aFamily, aSearch, aFromDate, aToDate])
+
+  const {
+    data: assetInvoices,
+    loading: loadingA,
+    reload: reloadA,
+  } = useFetch<AssetInvoice>(buildAssetUrl(), {
+    transform: d => d.invoices ?? [],
+    enabled: canManageContracts && section === 'assets',
+  })
+
+  // ── Ordenamiento contratos
+  const {
+    sortedData: sortedContracts,
+    requestSort: reqSortC,
+    getSortIcon: iconC,
+  } = useTableSort<ContractPayment>(contractPayments, { key: 'dueDate', direction: 'asc' })
+
+  // ── Ordenamiento activos
+  const {
+    sortedData: sortedAssets,
+    requestSort: reqSortA,
+    getSortIcon: iconA,
+  } = useTableSort<AssetInvoice>(assetInvoices, { key: 'dueDate', direction: 'asc' })
+
+  // ── Paginación contratos
+  const {
+    paginatedData: pageC,
+    currentPage: pgC,
+    totalPages: tpgC,
+    startIndex: startC,
+    endIndex: endC,
+    totalItems: totalC,
+    nextPage: nextC,
+    prevPage: prevC,
+    hasPrevPage: hasPrevC,
+    hasNextPage: hasNextC,
+  } = usePagination(sortedContracts, { pageSize: 50 })
+
+  // ── Paginación activos
+  const {
+    paginatedData: pageA,
+    currentPage: pgA,
+    totalPages: tpgA,
+    startIndex: startA,
+    endIndex: endA,
+    totalItems: totalA,
+    nextPage: nextA,
+    prevPage: prevA,
+    hasPrevPage: hasPrevA,
+    hasNextPage: hasNextA,
+  } = usePagination(sortedAssets, { pageSize: 50 })
+
+  // ── Exportación contratos
+  const {
+    exportCSV: expCCSV,
+    exportExcel: expCXLSX,
+    exportPDF: expCPDF,
+    exporting: expCLoading,
+  } = useExport({
+    filename: 'pagos-contratos',
+    title: 'Pagos de Contratos',
+    getData: () => sortedContracts,
+    columns: [
+      { key: 'dueDate', label: 'Vencimiento', format: v => fmtDate(v) },
+      { key: 'contract', label: 'Contrato', format: v => v?.name ?? '' },
+      { key: 'contract', label: 'N° Contrato', format: v => v?.contractNumber ?? '' },
+      { key: 'contract', label: 'Proveedor', format: v => v?.supplier?.name ?? '' },
+      { key: 'contract', label: 'Área', format: v => v?.family?.name ?? '' },
+      { key: 'contract', label: 'Ciclo', format: v => v?.billingCycle ?? '' },
+      { key: 'amount', label: 'Monto', format: (v, row) => fmtCurrency(Number(v), row.currency) },
+      { key: 'currency', label: 'Moneda' },
+      { key: 'status', label: 'Estado', format: v => CONTRACT_STATUS_CONFIG[v]?.label ?? v },
+      { key: 'paidDate', label: 'Fecha pago', format: v => fmtDate(v) },
+      {
+        key: 'paymentMethod',
+        label: 'Método pago',
+        format: v => (v ? (PAYMENT_METHOD_TYPE_LABELS[v as PaymentMethodType] ?? v) : ''),
+      },
+      { key: 'referenceNumber', label: 'Referencia', format: v => v ?? '' },
+    ],
+  })
+
+  // ── Exportación activos
+  const {
+    exportCSV: expACSV,
+    exportExcel: expAXLSX,
+    exportPDF: expAPDF,
+    exporting: expALoading,
+  } = useExport({
+    filename: 'facturas-activos',
+    title: 'Facturas de Adquisición de Activos',
+    getData: () => sortedAssets,
+    columns: [
+      { key: 'equipment', label: 'Código', format: v => v?.code ?? '' },
+      {
+        key: 'equipment',
+        label: 'Equipo',
+        format: v => `${v?.brand ?? ''} ${v?.model?.model ?? v?.modelDeprecated ?? ''}`.trim(),
+      },
+      { key: 'equipment', label: 'Tipo', format: v => v?.type?.name ?? '' },
+      { key: 'equipment', label: 'Área', format: v => v?.type?.family?.name ?? '' },
+      { key: 'invoiceNumber', label: 'N° Factura', format: v => v ?? '' },
+      { key: 'purchaseOrderNumber', label: 'N° OC', format: v => v ?? '' },
+      { key: 'amount', label: 'Monto', format: (v, row) => fmtCurrency(Number(v), row.currency) },
+      { key: 'currency', label: 'Moneda' },
+      { key: 'dueDate', label: 'Vencimiento', format: v => fmtDate(v) },
+      { key: 'status', label: 'Estado', format: v => ASSET_STATUS_CONFIG[v]?.label ?? v },
+      { key: 'paidDate', label: 'Fecha pago', format: v => fmtDate(v) },
+      {
+        key: 'paymentMethod',
+        label: 'Método pago',
+        format: v => (v ? (PAYMENT_METHOD_TYPE_LABELS[v as PaymentMethodType] ?? v) : ''),
+      },
+      {
+        key: 'supplier',
+        label: 'Proveedor',
+        format: (v, row) => v?.name ?? row.supplierName ?? '',
+      },
+    ],
+  })
+
+  // ── Stats contratos
+  const cStats = {
+    total: contractPayments.length,
+    overdue: contractPayments.filter(p => p.status === 'OVERDUE').length,
+    due: contractPayments.filter(p => p.status === 'DUE').length,
+    pending: contractPayments.filter(p => p.status === 'SCHEDULED').length,
+    paid: contractPayments.filter(p => p.status === 'PAID').length,
+    totalAmt: contractPayments
+      .filter(p => p.status !== 'CANCELLED')
+      .reduce((s, p) => s + p.amount, 0),
+    pendingAmt: contractPayments
+      .filter(p => ['SCHEDULED', 'DUE', 'OVERDUE'].includes(p.status))
+      .reduce((s, p) => s + p.amount, 0),
+    currency: contractPayments[0]?.currency ?? 'USD',
+  }
+
+  // ── Stats activos
+  const aStats = {
+    total: assetInvoices.length,
+    overdue: assetInvoices.filter(i => i.status === 'OVERDUE').length,
+    pending: assetInvoices.filter(i => i.status === 'PENDING').length,
+    paid: assetInvoices.filter(i => i.status === 'PAID').length,
+    totalAmt: assetInvoices.filter(i => i.status !== 'CANCELLED').reduce((s, i) => s + i.amount, 0),
+    pendingAmt: assetInvoices
+      .filter(i => ['PENDING', 'OVERDUE'].includes(i.status))
+      .reduce((s, i) => s + i.amount, 0),
+    currency: assetInvoices[0]?.currency ?? 'USD',
+  }
+
+  // ── Acción: marcar contrato pagado
+  const markContractPaid = async () => {
+    if (!markingContract) return
+    setSavingC(true)
     try {
-      const res = await fetch(`/api/inventory/contracts/payments/${marking.id}/mark-paid`, {
+      const res = await fetch(`/api/inventory/contracts/payments/${markingContract.id}/mark-paid`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          paidDate,
-          paymentMethod: 'BANK_TRANSFER' as PaymentMethodType,
+          paidDate: cPaidDate,
+          paymentMethod: cPaidMethod || 'BANK_TRANSFER',
+          referenceNumber: cPaidRef || undefined,
         }),
       })
       const json = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(json.error || 'No se pudo registrar')
-      toast({ title: 'Pago registrado' })
-      setMarking(null)
-      await reload()
-    } catch (err: unknown) {
+      toast({ title: 'Pago registrado correctamente' })
+      setMarkingContract(null)
+      reloadC()
+    } catch (err) {
       toast({
         title: 'Error',
-        description: err instanceof Error ? err.message : 'Error desconocido',
+        description: err instanceof Error ? err.message : 'Error',
         variant: 'destructive',
       })
     } finally {
-      setSaving(false)
+      setSavingC(false)
     }
   }
 
+  // ── Acción: marcar activo pagado
+  const markAssetPaid = async () => {
+    if (!markingAsset) return
+    setSavingA(true)
+    try {
+      const res = await fetch(`/api/inventory/equipment/invoices/${markingAsset.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'markAsPaid',
+          paidDate: aPaidDate,
+          paymentMethod: aPaidMethod || undefined,
+          referenceNumber: aPaidRef || undefined,
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || 'No se pudo registrar')
+      toast({ title: 'Pago registrado correctamente' })
+      setMarkingAsset(null)
+      reloadA()
+    } catch (err) {
+      toast({
+        title: 'Error',
+        description: err instanceof Error ? err.message : 'Error',
+        variant: 'destructive',
+      })
+    } finally {
+      setSavingA(false)
+    }
+  }
+
+  // ── Guard de permisos
   if (!canManageContracts) {
     return (
-      <ModuleLayout title='Pagos' subtitle='Solo gestores de inventario pueden operar cuotas.'>
+      <ModuleLayout title='Pagos' subtitle='Acceso restringido.'>
         <p className='text-sm text-muted-foreground'>No tienes permiso para esta sección.</p>
       </ModuleLayout>
     )
   }
 
+  const isContracts = section === 'contracts'
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
   return (
     <ModuleLayout
-      title='Pagos de contratos'
-      subtitle='Cuotas mensuales de equipos que siguen en renta. Cada fecha cobra solo los activos vigentes ese día.'
-      headerActions={
-        <Button
-          type='button'
-          variant='outline'
-          size='sm'
-          onClick={() => reload()}
-          disabled={loading}
-        >
-          <RefreshCw className={`h-4 w-4 mr-1.5 ${loading ? 'animate-spin' : ''}`} />
-          Actualizar
-        </Button>
+      title='Pagos'
+      subtitle='Cuotas de contratos de renta y facturas de adquisición de activos.'
+      loading={
+        (isContracts ? loadingC : loadingA) &&
+        (isContracts ? contractPayments.length === 0 : assetInvoices.length === 0)
       }
     >
-      <div className='space-y-4'>
-        <div className='flex flex-wrap gap-2'>
-          {TABS.map(t => (
-            <Button
-              key={t.id}
-              type='button'
-              size='sm'
-              variant={tab === t.id ? 'default' : 'outline'}
-              onClick={() => setTab(t.id)}
-            >
-              {t.label}
-            </Button>
-          ))}
+      <div className='space-y-5'>
+        {/* ── Selector de sección ─────────────────────────────────────── */}
+        <div className='flex gap-0 border-b'>
+          <button
+            type='button'
+            onClick={() => setSection('contracts')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
+              isContracts
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Wallet className='h-4 w-4' />
+            Contratos
+            {cStats.total > 0 && (
+              <Badge variant='secondary' className='text-xs ml-1'>
+                {cStats.total}
+              </Badge>
+            )}
+            {cStats.overdue > 0 && (
+              <Badge variant='destructive' className='text-xs ml-0.5'>
+                {cStats.overdue}
+              </Badge>
+            )}
+          </button>
+          <button
+            type='button'
+            onClick={() => setSection('assets')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
+              !isContracts
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Package className='h-4 w-4' />
+            Activos
+            {aStats.total > 0 && (
+              <Badge variant='secondary' className='text-xs ml-1'>
+                {aStats.total}
+              </Badge>
+            )}
+            {aStats.overdue > 0 && (
+              <Badge variant='destructive' className='text-xs ml-0.5'>
+                {aStats.overdue}
+              </Badge>
+            )}
+          </button>
         </div>
 
-        <div className='flex flex-col sm:flex-row gap-3'>
-          <Input
-            placeholder='Buscar contrato o proveedor…'
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className='sm:max-w-xs'
-          />
-          <FamilyCombobox
-            families={families}
-            value={familyFilter}
-            onValueChange={v => setFamilyFilter(v || 'all')}
-            allowAll
-            allowClear
-            placeholder='Todas las áreas'
-          />
-        </div>
+        {/* ══════════════════════════════════════════════════════════════
+            SECCIÓN CONTRATOS
+        ══════════════════════════════════════════════════════════════ */}
+        {isContracts && (
+          <div className='space-y-4'>
+            {/* Stats */}
+            <StatsRow
+              items={[
+                { label: 'Total', value: cStats.total, cls: 'text-foreground' },
+                { label: 'Vencidos', value: cStats.overdue, cls: 'text-red-600 dark:text-red-400' },
+                { label: 'Hoy', value: cStats.due, cls: 'text-amber-600 dark:text-amber-400' },
+                {
+                  label: 'Programados',
+                  value: cStats.pending,
+                  cls: 'text-blue-600 dark:text-blue-400',
+                },
+                {
+                  label: 'Pendiente ($)',
+                  value: fmtCurrency(cStats.pendingAmt, cStats.currency),
+                  cls: 'text-orange-600 dark:text-orange-400 text-base',
+                },
+              ]}
+            />
 
-        <p className='text-xs text-muted-foreground flex items-center gap-1.5'>
-          <Wallet className='h-3.5 w-3.5' />
-          {payments.length} cuota(s) en esta vista. Las alertas de vencimiento salen por la app,
-          correo y Telegram (si están activos). Tras agregar o devolver un equipo, abre el contrato
-          y recalcula las cuotas pendientes.
-        </p>
+            {/* Toolbar */}
+            <ListTableToolbar
+              title={
+                <p className='text-sm text-muted-foreground'>
+                  {cStats.total} cuota{cStats.total !== 1 ? 's' : ''}
+                  {cStatus !== 'ALL'
+                    ? ` · ${CONTRACT_STATUS_OPTIONS.find(o => o.value === cStatus)?.label}`
+                    : ''}
+                  {cFamily !== 'all'
+                    ? ` · ${families.find(f => f.id === cFamily)?.name ?? ''}`
+                    : ''}
+                </p>
+              }
+              loading={loadingC}
+              onRefresh={reloadC}
+              showViewToggle={false}
+              export={{
+                onExportCSV: expCCSV,
+                onExportExcel: expCXLSX,
+                onExportPDF: expCPDF,
+                loading: expCLoading,
+                disabled: contractPayments.length === 0,
+              }}
+            />
 
-        <div className='rounded-lg border overflow-x-auto'>
-          <table className='w-full text-sm'>
-            <thead className='bg-muted/50 text-left'>
-              <tr>
-                <th className='px-3 py-2 font-medium'>Vencimiento</th>
-                <th className='px-3 py-2 font-medium'>Contrato</th>
-                <th className='px-3 py-2 font-medium'>Proveedor</th>
-                <th className='px-3 py-2 font-medium'>Monto</th>
-                <th className='px-3 py-2 font-medium'>Estado</th>
-                <th className='px-3 py-2 font-medium' />
-              </tr>
-            </thead>
-            <tbody>
-              {payments.length === 0 && !loading && (
-                <tr>
-                  <td colSpan={6} className='px-3 py-8 text-center text-muted-foreground'>
-                    No hay cuotas en esta vista.
-                  </td>
-                </tr>
+            {/* Filtros */}
+            <div className='flex flex-wrap gap-2'>
+              <Input
+                placeholder='Buscar contrato, N° contrato o proveedor…'
+                value={cSearch}
+                onChange={e => setCSearch(e.target.value)}
+                className='flex-1 min-w-[200px] max-w-xs'
+              />
+              <Select value={cStatus} onValueChange={setCStatus}>
+                <SelectTrigger className='w-44'>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CONTRACT_STATUS_OPTIONS.map(o => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {families.length > 1 && (
+                <FamilyCombobox
+                  families={families}
+                  value={cFamily}
+                  onValueChange={v => setCFamily(v || 'all')}
+                  allowAll
+                  allowClear
+                  placeholder='Todas las áreas'
+                  className='w-52'
+                />
               )}
-              {payments.map(p => (
-                <tr key={p.id} className='border-t'>
-                  <td className='px-3 py-2 whitespace-nowrap'>{fmtDate(p.dueDate)}</td>
-                  <td className='px-3 py-2'>
-                    <Link href='/inventory/contracts' className='font-medium hover:underline'>
-                      {p.contract.name}
-                    </Link>
-                    {p.contract.contractNumber && (
-                      <span className='block text-xs text-muted-foreground'>
-                        {p.contract.contractNumber}
-                      </span>
-                    )}
-                  </td>
-                  <td className='px-3 py-2'>{p.contract.supplier?.name ?? '—'}</td>
-                  <td className='px-3 py-2 whitespace-nowrap'>
-                    {fmtCurrency(Number(p.amount), p.currency)}
-                  </td>
-                  <td className='px-3 py-2'>
-                    <Badge variant='secondary'>{STATUS_LABELS[p.status] ?? p.status}</Badge>
-                  </td>
-                  <td className='px-3 py-2 text-right'>
-                    {(p.status === 'SCHEDULED' || p.status === 'DUE' || p.status === 'OVERDUE') && (
-                      <Button
-                        type='button'
-                        size='sm'
-                        variant='outline'
-                        onClick={() => {
-                          setPaidDate(todayISO())
-                          setMarking(p)
-                        }}
+              <div className='flex items-center gap-1.5'>
+                <DateInput
+                  value={cFromDate}
+                  onChange={e => setCFromDate(e.target.value)}
+                  clearable
+                  placeholder='Desde'
+                  className='w-36'
+                />
+                <span className='text-muted-foreground text-xs'>–</span>
+                <DateInput
+                  value={cToDate}
+                  onChange={e => setCToDate(e.target.value)}
+                  clearable
+                  placeholder='Hasta'
+                  className='w-36'
+                />
+              </div>
+            </div>
+
+            {/* Tabla */}
+            <div className='rounded-md border overflow-hidden'>
+              <div className='overflow-x-auto'>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <SortableTableHead
+                        sortKey='dueDate'
+                        currentSort={iconC('dueDate')}
+                        onSort={reqSortC}
                       >
-                        <CheckCircle className='h-3.5 w-3.5 mr-1' />
-                        Registrar
-                      </Button>
+                        Vencimiento
+                      </SortableTableHead>
+                      <SortableTableHead
+                        sortKey='contract.name'
+                        currentSort={iconC('contract.name')}
+                        onSort={reqSortC}
+                      >
+                        Contrato
+                      </SortableTableHead>
+                      <SortableTableHead
+                        sortKey='contract.supplier'
+                        currentSort={iconC('contract.supplier')}
+                        onSort={reqSortC}
+                        className='hidden md:table-cell'
+                      >
+                        Proveedor
+                      </SortableTableHead>
+                      <SortableTableHead
+                        sortKey='contract.family'
+                        currentSort={iconC('contract.family')}
+                        onSort={reqSortC}
+                        className='hidden lg:table-cell'
+                      >
+                        Área
+                      </SortableTableHead>
+                      <SortableTableHead
+                        sortKey='amount'
+                        currentSort={iconC('amount')}
+                        onSort={reqSortC}
+                        align='right'
+                      >
+                        Monto
+                      </SortableTableHead>
+                      <SortableTableHead
+                        sortKey='status'
+                        currentSort={iconC('status')}
+                        onSort={reqSortC}
+                      >
+                        Estado
+                      </SortableTableHead>
+                      <SortableTableHead
+                        sortKey='paidDate'
+                        currentSort={iconC('paidDate')}
+                        onSort={reqSortC}
+                        className='hidden md:table-cell'
+                      >
+                        Fecha pago
+                      </SortableTableHead>
+                      <TableHead />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {loadingC && contractPayments.length === 0 ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={8}
+                          className='text-center py-10 text-muted-foreground text-sm'
+                        >
+                          Cargando…
+                        </TableCell>
+                      </TableRow>
+                    ) : pageC.length === 0 ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={8}
+                          className='text-center py-10 text-muted-foreground text-sm'
+                        >
+                          <Wallet className='h-8 w-8 mx-auto mb-2 opacity-30' />
+                          No hay cuotas con los filtros seleccionados.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      pageC.map(p => (
+                        <TableRow key={p.id} className='hover:bg-muted/30 transition-colors'>
+                          <TableCell className='whitespace-nowrap font-mono text-xs'>
+                            {fmtDate(p.dueDate)}
+                          </TableCell>
+                          <TableCell>
+                            <Link
+                              href='/inventory/contracts'
+                              className='font-medium text-sm hover:underline'
+                            >
+                              {p.contract.name}
+                            </Link>
+                            {p.contract.contractNumber && (
+                              <span className='block text-xs text-muted-foreground'>
+                                {p.contract.contractNumber}
+                              </span>
+                            )}
+                          </TableCell>
+                          <TableCell className='hidden md:table-cell text-sm'>
+                            {p.contract.supplier?.name ?? '—'}
+                          </TableCell>
+                          <TableCell className='hidden lg:table-cell'>
+                            {p.contract.family && (
+                              <span className='inline-flex items-center gap-1 text-xs'>
+                                {p.contract.family.color && (
+                                  <span
+                                    className='h-2 w-2 rounded-full flex-shrink-0'
+                                    style={{ backgroundColor: p.contract.family.color }}
+                                  />
+                                )}
+                                {p.contract.family.name}
+                              </span>
+                            )}
+                          </TableCell>
+                          <TableCell className='text-right font-medium whitespace-nowrap'>
+                            {fmtCurrency(Number(p.amount), p.currency)}
+                          </TableCell>
+                          <TableCell>
+                            <StatusBadge status={p.status} cfg={CONTRACT_STATUS_CONFIG} />
+                          </TableCell>
+                          <TableCell className='hidden md:table-cell text-xs text-muted-foreground whitespace-nowrap'>
+                            {p.status === 'PAID' ? fmtDate(p.paidDate) : '—'}
+                          </TableCell>
+                          <TableCell className='text-right'>
+                            {(p.status === 'SCHEDULED' ||
+                              p.status === 'DUE' ||
+                              p.status === 'OVERDUE') && (
+                              <Button
+                                type='button'
+                                size='sm'
+                                variant='outline'
+                                className='h-7 text-xs'
+                                onClick={() => {
+                                  setCPaidDate(todayISO())
+                                  setCPaidMethod('')
+                                  setCPaidRef('')
+                                  setMarkingContract(p)
+                                }}
+                              >
+                                <CheckCircle2 className='h-3.5 w-3.5 mr-1' />
+                                Pagar
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))
                     )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+
+            <PaginationBar
+              currentPage={pgC}
+              totalPages={tpgC}
+              startIndex={startC}
+              endIndex={endC}
+              totalItems={totalC}
+              prevPage={prevC}
+              nextPage={nextC}
+              hasPrevPage={hasPrevC}
+              hasNextPage={hasNextC}
+            />
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════════
+            SECCIÓN ACTIVOS
+        ══════════════════════════════════════════════════════════════ */}
+        {!isContracts && (
+          <div className='space-y-4'>
+            {/* Stats */}
+            <StatsRow
+              items={[
+                { label: 'Total', value: aStats.total, cls: 'text-foreground' },
+                { label: 'Vencidas', value: aStats.overdue, cls: 'text-red-600 dark:text-red-400' },
+                {
+                  label: 'Pendientes',
+                  value: aStats.pending,
+                  cls: 'text-amber-600 dark:text-amber-400',
+                },
+                { label: 'Pagadas', value: aStats.paid, cls: 'text-green-600 dark:text-green-400' },
+                {
+                  label: 'Pendiente ($)',
+                  value: fmtCurrency(aStats.pendingAmt, aStats.currency),
+                  cls: 'text-orange-600 dark:text-orange-400 text-base',
+                },
+              ]}
+            />
+
+            {/* Toolbar */}
+            <ListTableToolbar
+              title={
+                <p className='text-sm text-muted-foreground'>
+                  {aStats.total} factura{aStats.total !== 1 ? 's' : ''}
+                  {aStatus !== 'ALL'
+                    ? ` · ${ASSET_STATUS_OPTIONS.find(o => o.value === aStatus)?.label}`
+                    : ''}
+                  {aFamily !== 'all'
+                    ? ` · ${families.find(f => f.id === aFamily)?.name ?? ''}`
+                    : ''}
+                </p>
+              }
+              loading={loadingA}
+              onRefresh={reloadA}
+              showViewToggle={false}
+              export={{
+                onExportCSV: expACSV,
+                onExportExcel: expAXLSX,
+                onExportPDF: expAPDF,
+                loading: expALoading,
+                disabled: assetInvoices.length === 0,
+              }}
+            />
+
+            {/* Filtros */}
+            <div className='flex flex-wrap gap-2'>
+              <Input
+                placeholder='Buscar código de equipo, marca…'
+                value={aSearch}
+                onChange={e => setASearch(e.target.value)}
+                className='flex-1 min-w-[200px] max-w-xs'
+              />
+              <Select value={aStatus} onValueChange={setAStatus}>
+                <SelectTrigger className='w-44'>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ASSET_STATUS_OPTIONS.map(o => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {families.length > 1 && (
+                <FamilyCombobox
+                  families={families}
+                  value={aFamily}
+                  onValueChange={v => setAFamily(v || 'all')}
+                  allowAll
+                  allowClear
+                  placeholder='Todas las áreas'
+                  className='w-52'
+                />
+              )}
+              <div className='flex items-center gap-1.5'>
+                <DateInput
+                  value={aFromDate}
+                  onChange={e => setAFromDate(e.target.value)}
+                  clearable
+                  placeholder='Desde'
+                  className='w-36'
+                />
+                <span className='text-muted-foreground text-xs'>–</span>
+                <DateInput
+                  value={aToDate}
+                  onChange={e => setAToDate(e.target.value)}
+                  clearable
+                  placeholder='Hasta'
+                  className='w-36'
+                />
+              </div>
+            </div>
+
+            {/* Tabla */}
+            <div className='rounded-md border overflow-hidden'>
+              <div className='overflow-x-auto'>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <SortableTableHead
+                        sortKey='equipment.code'
+                        currentSort={iconA('equipment.code')}
+                        onSort={reqSortA}
+                      >
+                        Equipo
+                      </SortableTableHead>
+                      <SortableTableHead
+                        sortKey='equipment.type'
+                        currentSort={iconA('equipment.type')}
+                        onSort={reqSortA}
+                        className='hidden lg:table-cell'
+                      >
+                        Tipo / Área
+                      </SortableTableHead>
+                      <SortableTableHead
+                        sortKey='invoiceNumber'
+                        currentSort={iconA('invoiceNumber')}
+                        onSort={reqSortA}
+                        className='hidden md:table-cell'
+                      >
+                        Factura / OC
+                      </SortableTableHead>
+                      <SortableTableHead
+                        sortKey='supplierName'
+                        currentSort={iconA('supplierName')}
+                        onSort={reqSortA}
+                        className='hidden md:table-cell'
+                      >
+                        Proveedor
+                      </SortableTableHead>
+                      <SortableTableHead
+                        sortKey='amount'
+                        currentSort={iconA('amount')}
+                        onSort={reqSortA}
+                        align='right'
+                      >
+                        Monto
+                      </SortableTableHead>
+                      <SortableTableHead
+                        sortKey='dueDate'
+                        currentSort={iconA('dueDate')}
+                        onSort={reqSortA}
+                      >
+                        Vencimiento
+                      </SortableTableHead>
+                      <SortableTableHead
+                        sortKey='status'
+                        currentSort={iconA('status')}
+                        onSort={reqSortA}
+                      >
+                        Estado
+                      </SortableTableHead>
+                      <SortableTableHead
+                        sortKey='paidDate'
+                        currentSort={iconA('paidDate')}
+                        onSort={reqSortA}
+                        className='hidden md:table-cell'
+                      >
+                        Fecha pago
+                      </SortableTableHead>
+                      <TableHead />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {loadingA && assetInvoices.length === 0 ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={9}
+                          className='text-center py-10 text-muted-foreground text-sm'
+                        >
+                          Cargando…
+                        </TableCell>
+                      </TableRow>
+                    ) : pageA.length === 0 ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={9}
+                          className='text-center py-10 text-muted-foreground text-sm'
+                        >
+                          <Receipt className='h-8 w-8 mx-auto mb-2 opacity-30' />
+                          No hay facturas con los filtros seleccionados.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      pageA.map(inv => {
+                        const supplierLabel = inv.supplier?.name ?? inv.supplierName ?? '—'
+                        return (
+                          <TableRow key={inv.id} className='hover:bg-muted/30 transition-colors'>
+                            <TableCell>
+                              <Link
+                                href={`/inventory/equipment/${inv.equipment.id}`}
+                                className='font-medium text-sm hover:underline font-mono'
+                              >
+                                {inv.equipment.code}
+                              </Link>
+                              <span className='block text-xs text-muted-foreground'>
+                                {inv.equipment.brand}{' '}
+                                {inv.equipment.model?.model ?? inv.equipment.modelDeprecated}
+                              </span>
+                            </TableCell>
+                            <TableCell className='hidden lg:table-cell'>
+                              <span className='text-sm'>{inv.equipment.type?.name ?? '—'}</span>
+                              {inv.equipment.type?.family && (
+                                <span className='flex items-center gap-1 text-xs text-muted-foreground mt-0.5'>
+                                  {inv.equipment.type.family.color && (
+                                    <span
+                                      className='h-2 w-2 rounded-full flex-shrink-0'
+                                      style={{ backgroundColor: inv.equipment.type.family.color }}
+                                    />
+                                  )}
+                                  {inv.equipment.type.family.name}
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell className='hidden md:table-cell'>
+                              {inv.invoiceNumber ? (
+                                <span className='font-mono text-xs font-medium'>
+                                  {inv.invoiceNumber}
+                                </span>
+                              ) : (
+                                <span className='text-muted-foreground text-xs'>—</span>
+                              )}
+                              {inv.purchaseOrderNumber && (
+                                <span className='block text-xs text-muted-foreground'>
+                                  OC: {inv.purchaseOrderNumber}
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell className='hidden md:table-cell text-sm'>
+                              {supplierLabel}
+                            </TableCell>
+                            <TableCell className='text-right font-medium whitespace-nowrap'>
+                              {fmtCurrency(Number(inv.amount), inv.currency)}
+                            </TableCell>
+                            <TableCell className='whitespace-nowrap font-mono text-xs'>
+                              {inv.status === 'PAID' ? (
+                                <span className='text-muted-foreground'>Pagado</span>
+                              ) : (
+                                fmtDate(inv.dueDate)
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <StatusBadge status={inv.status} cfg={ASSET_STATUS_CONFIG} />
+                            </TableCell>
+                            <TableCell className='hidden md:table-cell text-xs text-muted-foreground whitespace-nowrap'>
+                              {inv.status === 'PAID' ? fmtDate(inv.paidDate) : '—'}
+                            </TableCell>
+                            <TableCell className='text-right'>
+                              {(inv.status === 'PENDING' || inv.status === 'OVERDUE') && (
+                                <Button
+                                  type='button'
+                                  size='sm'
+                                  variant='outline'
+                                  className='h-7 text-xs'
+                                  onClick={() => {
+                                    setAPaidDate(todayISO())
+                                    setAPaidMethod(inv.paymentMethod ?? '')
+                                    setAPaidRef('')
+                                    setMarkingAsset(inv)
+                                  }}
+                                >
+                                  <CheckCircle2 className='h-3.5 w-3.5 mr-1' />
+                                  Pagar
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+
+            <PaginationBar
+              currentPage={pgA}
+              totalPages={tpgA}
+              startIndex={startA}
+              endIndex={endA}
+              totalItems={totalA}
+              prevPage={prevA}
+              nextPage={nextA}
+              hasPrevPage={hasPrevA}
+              hasNextPage={hasNextA}
+            />
+          </div>
+        )}
       </div>
 
-      <Dialog open={!!marking} onOpenChange={open => !open && setMarking(null)}>
-        <DialogContent>
+      {/* ── Dialog: marcar pago de contrato ──────────────────────────────────── */}
+      <Dialog open={!!markingContract} onOpenChange={open => !open && setMarkingContract(null)}>
+        <DialogContent className='max-w-sm'>
           <DialogHeader>
-            <DialogTitle>Registrar pago</DialogTitle>
+            <DialogTitle className='flex items-center gap-2'>
+              <Wallet className='h-4 w-4' />
+              Registrar pago de cuota
+            </DialogTitle>
           </DialogHeader>
-          {marking && (
-            <div className='space-y-3'>
-              <p className='text-sm text-muted-foreground'>
-                {marking.contract.name} · {fmtCurrency(Number(marking.amount), marking.currency)}
-              </p>
-              <div className='space-y-1'>
+          {markingContract && (
+            <div className='space-y-4 py-1'>
+              <div className='rounded-md bg-muted/50 px-3 py-2 text-sm space-y-0.5'>
+                <p className='font-medium'>{markingContract.contract.name}</p>
+                <p className='text-muted-foreground text-xs'>
+                  {fmtDate(markingContract.dueDate)} ·{' '}
+                  {fmtCurrency(Number(markingContract.amount), markingContract.currency)}
+                </p>
+              </div>
+              <div className='space-y-1.5'>
                 <Label>Fecha de pago</Label>
-                <DateInput value={paidDate} onChange={e => setPaidDate(e.target.value)} />
+                <DateInput value={cPaidDate} onChange={e => setCPaidDate(e.target.value)} />
+              </div>
+              <div className='space-y-1.5'>
+                <Label>Método de pago</Label>
+                <Select value={cPaidMethod} onValueChange={setCPaidMethod}>
+                  <SelectTrigger>
+                    <SelectValue placeholder='Seleccionar método' />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value=''>Sin especificar</SelectItem>
+                    {(
+                      Object.entries(PAYMENT_METHOD_TYPE_LABELS) as [PaymentMethodType, string][]
+                    ).map(([k, v]) => (
+                      <SelectItem key={k} value={k}>
+                        {v}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className='space-y-1.5'>
+                <Label>
+                  N° Referencia / Transacción{' '}
+                  <span className='text-muted-foreground'>(opcional)</span>
+                </Label>
+                <Input
+                  placeholder='REF-12345'
+                  value={cPaidRef}
+                  onChange={e => setCPaidRef(e.target.value)}
+                  maxLength={200}
+                />
               </div>
               <p className='text-xs text-muted-foreground'>
-                Método por defecto: {PAYMENT_METHOD_TYPE_LABELS.BANK_TRANSFER}. Puedes detallar
-                tarjeta o cheque desde el contrato.
+                Para detalles adicionales (tarjeta, banco) edita la cuota desde el contrato.
               </p>
             </div>
           )}
           <DialogFooter>
-            <Button type='button' variant='outline' onClick={() => setMarking(null)}>
+            <Button type='button' variant='outline' onClick={() => setMarkingContract(null)}>
               Cancelar
             </Button>
-            <Button type='button' onClick={markPaid} disabled={saving}>
-              Confirmar
+            <Button type='button' onClick={markContractPaid} disabled={savingC}>
+              {savingC ? 'Guardando…' : 'Confirmar pago'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Dialog: marcar pago de factura de activo ─────────────────────────── */}
+      <Dialog open={!!markingAsset} onOpenChange={open => !open && setMarkingAsset(null)}>
+        <DialogContent className='max-w-sm'>
+          <DialogHeader>
+            <DialogTitle className='flex items-center gap-2'>
+              <Package className='h-4 w-4' />
+              Registrar pago de factura
+            </DialogTitle>
+          </DialogHeader>
+          {markingAsset && (
+            <div className='space-y-4 py-1'>
+              <div className='rounded-md bg-muted/50 px-3 py-2 text-sm space-y-0.5'>
+                <p className='font-medium font-mono'>{markingAsset.equipment.code}</p>
+                <p className='text-muted-foreground text-xs'>
+                  {markingAsset.equipment.brand}{' '}
+                  {markingAsset.equipment.model?.model ?? markingAsset.equipment.modelDeprecated}
+                  {markingAsset.invoiceNumber ? ` · ${markingAsset.invoiceNumber}` : ''}
+                </p>
+                <p className='font-semibold'>
+                  {fmtCurrency(Number(markingAsset.amount), markingAsset.currency)}
+                </p>
+              </div>
+              <div className='space-y-1.5'>
+                <Label>Fecha de pago</Label>
+                <DateInput value={aPaidDate} onChange={e => setAPaidDate(e.target.value)} />
+              </div>
+              <div className='space-y-1.5'>
+                <Label>Método de pago</Label>
+                <Select value={aPaidMethod} onValueChange={setAPaidMethod}>
+                  <SelectTrigger>
+                    <SelectValue placeholder='Seleccionar método' />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value=''>Sin especificar</SelectItem>
+                    {(
+                      Object.entries(PAYMENT_METHOD_TYPE_LABELS) as [PaymentMethodType, string][]
+                    ).map(([k, v]) => (
+                      <SelectItem key={k} value={k}>
+                        {v}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className='space-y-1.5'>
+                <Label>
+                  N° Referencia <span className='text-muted-foreground'>(opcional)</span>
+                </Label>
+                <Input
+                  placeholder='REF-12345'
+                  value={aPaidRef}
+                  onChange={e => setAPaidRef(e.target.value)}
+                  maxLength={200}
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button type='button' variant='outline' onClick={() => setMarkingAsset(null)}>
+              Cancelar
+            </Button>
+            <Button type='button' onClick={markAssetPaid} disabled={savingA}>
+              {savingA ? 'Guardando…' : 'Confirmar pago'}
             </Button>
           </DialogFooter>
         </DialogContent>

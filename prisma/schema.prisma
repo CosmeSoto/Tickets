@@ -612,6 +612,7 @@ model users {
   credentialEntriesUpdated                        credential_entries[]            @relation("CredentialEntryUpdater")
   credentialShares                                credential_shares[]
   telegramLinkTokens                              telegram_link_tokens[]
+  equipmentInvoicesCreated                        equipment_invoices[]            @relation("EquipmentInvoiceCreator")
   processesOwned                                  processes[]                     @relation("ProcessOwner")
   processesCreated                                processes[]                     @relation("ProcessCreator")
   processVersionsCreated                          process_versions[]             @relation("ProcessVersionCreator")
@@ -1184,6 +1185,7 @@ model equipment {
   sale                  equipment_sales?
   customValues          equipment_custom_values[]
   credentialEntries     credential_entries[]
+  invoices              equipment_invoices[]
 
   @@index([code])
   @@index([serialNumber])
@@ -1609,7 +1611,7 @@ model suppliers {
   country                String?   @db.VarChar(100)
   website                String?
   contactName            String?   @map("contact_name") @db.VarChar(200)
-  /// Plazo de pago habitual (días): 0 = contado, 30 = Net 30, etc.
+  /// Plazo de pago habitual (días): 0 = contado, 30 = 30, etc.
   paymentTermsDays       Int?      @map("payment_terms_days")
   /// Límite de crédito otorgado por el proveedor (referencia AP)
   creditLimit            Decimal?  @map("credit_limit") @db.Decimal(14, 2)
@@ -1632,6 +1634,7 @@ model suppliers {
   contracts              contracts[]
   batches                equipment_batches[]
   maintenances           maintenance_records[]
+  equipmentInvoices      equipment_invoices[] @relation("EquipmentInvoiceSupplier")
 
   @@index([typeId, isActive])
   @@index([familyId, isActive])
@@ -2901,6 +2904,54 @@ model equipment_sales {
   @@index([requestedById])
   @@index([approvedById])
   @@map("equipment_sales")
+}
+
+// ── Facturas / Pagos de adquisición de equipos ────────────────────────────────
+
+/// Estado de una factura de compra de activo
+enum AcquisitionPaymentStatus {
+  PENDING    // Registrada, sin confirmar pago
+  PAID       // Pago confirmado
+  OVERDUE    // Venció sin pagar
+  CANCELLED  // Anulada
+}
+
+/// Registro de factura/pago asociado a la adquisición de un equipo individual.
+/// Complementa los campos financieros planos de `equipment` (purchasePrice, invoiceNumber)
+/// cuando se quiere trazabilidad de múltiples pagos o financiamiento por cuotas.
+model equipment_invoices {
+  id                  String                   @id @default(uuid())
+  equipmentId         String                   @map("equipment_id")
+  invoiceNumber       String?                  @map("invoice_number") @db.VarChar(100)
+  purchaseOrderNumber String?                  @map("purchase_order_number") @db.VarChar(100)
+  amount              Float
+  currency            String                   @default("USD") @db.VarChar(3)
+  dueDate             DateTime?                @map("due_date")
+  paidDate            DateTime?                @map("paid_date")
+  status              AcquisitionPaymentStatus @default(PENDING)
+  paymentMethod       PaymentMethodType?       @map("payment_method")
+  supplierId          String?                  @map("supplier_id")
+  /// Nombre libre cuando no hay proveedor registrado en catálogo
+  supplierName        String?                  @map("supplier_name") @db.VarChar(200)
+  referenceNumber     String?                  @map("reference_number") @db.VarChar(200)
+  bankEntity          String?                  @map("bank_entity") @db.VarChar(100)
+  cardLast4           String?                  @map("card_last4") @db.VarChar(4)
+  cardBrand           String?                  @map("card_brand") @db.VarChar(50)
+  transactionId       String?                  @map("transaction_id") @db.VarChar(200)
+  notes               String?
+  createdBy           String                   @map("created_by")
+  createdAt           DateTime                 @default(now()) @map("created_at")
+  updatedAt           DateTime                 @updatedAt @map("updated_at")
+
+  equipment equipment  @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  supplier  suppliers? @relation("EquipmentInvoiceSupplier", fields: [supplierId], references: [id], onDelete: SetNull)
+  creator   users      @relation("EquipmentInvoiceCreator", fields: [createdBy], references: [id])
+
+  @@index([equipmentId])
+  @@index([supplierId])
+  @@index([status, dueDate])
+  @@index([createdAt(sort: Desc)])
+  @@map("equipment_invoices")
 }
 
 // ── Solicitudes de Activos ────────────────────────────────────────────────────

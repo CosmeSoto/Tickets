@@ -195,18 +195,43 @@ export default function CredentialsPage() {
         return
       }
 
-      if (vaultRes.ok) {
-        const data = await vaultRes.json()
-        setVaults(data.vaults ?? [])
+      // Parsear JSON de forma segura para evitar que un 500 con HTML cause un
+      // throw en .json() y aterrice en el catch genérico con mensaje confuso
+      const safeJson = async (res: Response) => {
+        const text = await res.text()
+        try {
+          return { ok: true, data: JSON.parse(text) }
+        } catch {
+          return { ok: false, data: null, status: res.status, text }
+        }
       }
-      if (entryRes.ok) {
-        const data = await entryRes.json()
-        setEntries(data.entries ?? [])
+
+      const [vaultParsed, entryParsed] = await Promise.all([safeJson(vaultRes), safeJson(entryRes)])
+
+      if (!vaultParsed.ok || !entryParsed.ok) {
+        const failedOn = !vaultParsed.ok ? 'bóvedas' : 'entradas'
+        toastRef.current({
+          title: 'Error del servidor',
+          description: `No se pudieron cargar las credenciales (${failedOn}). Intente recargar la página.`,
+          variant: 'destructive',
+        })
+        return
+      }
+
+      if (vaultRes.ok) setVaults(vaultParsed.data.vaults ?? [])
+      if (entryRes.ok) setEntries(entryParsed.data.entries ?? [])
+
+      if (!vaultRes.ok || !entryRes.ok) {
+        toastRef.current({
+          title: 'Error',
+          description: 'No se pudieron cargar las credenciales. Intente recargar la página.',
+          variant: 'destructive',
+        })
       }
     } catch {
       toastRef.current({
-        title: 'Error',
-        description: 'No se pudieron cargar las credenciales',
+        title: 'Error de conexión',
+        description: 'No se pudo contactar el servidor. Verifique su conexión e intente de nuevo.',
         variant: 'destructive',
       })
     } finally {

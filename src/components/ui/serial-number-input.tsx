@@ -14,84 +14,119 @@ export interface SerialNumberInputProps extends InputProps {
 
 type CameraError = 'permission' | 'not-found' | 'unknown' | null
 
+/** Espera hasta que el elemento video esté en el DOM (máx. 1 s). */
+async function waitForVideoElement(
+  ref: React.RefObject<HTMLVideoElement | null>
+): Promise<HTMLVideoElement | null> {
+  for (let i = 0; i < 20; i++) {
+    if (ref.current) return ref.current
+    await new Promise(r => setTimeout(r, 50))
+  }
+  return null
+}
+
 const SerialNumberInput = React.forwardRef<HTMLInputElement, SerialNumberInputProps>(
   ({ className, value, onChange, onKeyDown, onScanComplete, ...props }, ref) => {
     const inputRef = React.useRef<HTMLInputElement>(null)
     const videoRef = React.useRef<HTMLVideoElement>(null)
+    const readerRef = React.useRef<any>(null)
+
     const [isKeyboardScanning, setIsKeyboardScanning] = React.useState(false)
     const [isCameraScanning, setIsCameraScanning] = React.useState(false)
     const [scanBuffer, setScanBuffer] = React.useState('')
-    const [codeReader, setCodeReader] = React.useState<any>(null)
     const [cameraError, setCameraError] = React.useState<CameraError>(null)
     const [isLoadingCamera, setIsLoadingCamera] = React.useState(false)
 
+    // ── Limpiar al desmontar ────────────────────────────────────────────────
     React.useEffect(() => {
-      if (typeof window !== 'undefined') {
-        import('@zxing/library').then(module => {
-          setCodeReader(new module.BrowserMultiFormatReader())
-        })
+      return () => {
+        readerRef.current?.reset()
+        readerRef.current = null
       }
     }, [])
 
+    // ── Iniciar escáner cuando el Dialog ya está visible ───────────────────
+    // isCameraScanning=true + cameraError=null + !isLoadingCamera → arrancar
     React.useEffect(() => {
-      return () => {
-        if (codeReader) {
-          codeReader.reset()
+      if (!isCameraScanning || cameraError !== null) return
+
+      let cancelled = false
+
+      const init = async () => {
+        // Esperar a que el <video> esté montado en el DOM
+        const video = await waitForVideoElement(videoRef)
+        if (cancelled || !video) {
+          if (!cancelled) setCameraError('unknown')
+          return
         }
-      }
-    }, [codeReader])
 
-    const startCameraScan = async () => {
-      if (!codeReader) return
+        try {
+          const { BrowserMultiFormatReader } = await import('@zxing/library')
 
-      try {
-        setIsLoadingCamera(true)
-        setCameraError(null)
-        setIsCameraScanning(true)
+          // Recrear lector fresco en cada apertura
+          readerRef.current?.reset()
+          readerRef.current = null
+          const reader = new BrowserMultiFormatReader()
+          readerRef.current = reader
 
-        await new Promise(resolve => setTimeout(resolve, 100))
+          if (cancelled) return
 
-        const result = await codeReader.decodeFromVideoDevice(
-          undefined,
-          videoRef.current!,
-          (result: any, err: any) => {
-            if (result) {
-              const scannedValue = result.getText()
-              if (onChange) {
-                const event = {
-                  target: { value: scannedValue },
-                } as React.ChangeEvent<HTMLInputElement>
-                onChange(event)
-              }
-              onScanComplete?.(scannedValue)
-              stopCameraScan()
+          // decodeFromVideoDevice(null, videoElement, callback)
+          // Con deviceId=null zxing pide facingMode:'environment' internamente
+          await reader.decodeFromVideoDevice(null, video, (result: any) => {
+            if (!result || cancelled) return
+            const scannedValue = result.getText()
+            if (onChange) {
+              onChange({
+                target: { value: scannedValue },
+              } as React.ChangeEvent<HTMLInputElement>)
             }
+            onScanComplete?.(scannedValue)
+            stopCameraScan()
+          })
+        } catch (error: any) {
+          if (cancelled) return
+          console.error('[SerialNumberInput] Error cámara:', error)
+          const name = error?.name ?? ''
+          if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+            setCameraError('permission')
+          } else if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+            setCameraError('not-found')
+          } else {
+            setCameraError('unknown')
           }
-        )
-      } catch (error: any) {
-        console.error('Error accessing camera:', error)
-
-        if (error.name === 'NotAllowedError') {
-          setCameraError('permission')
-        } else if (error.name === 'NotFoundError') {
-          setCameraError('not-found')
-        } else {
-          setCameraError('unknown')
+        } finally {
+          if (!cancelled) setIsLoadingCamera(false)
         }
-      } finally {
-        setIsLoadingCamera(false)
       }
+
+      init()
+
+      return () => {
+        cancelled = true
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isCameraScanning])
+
+    // ── Abrir / cerrar ─────────────────────────────────────────────────────
+    const startCameraScan = () => {
+      // Limpiar estado previo antes de abrir
+      readerRef.current?.reset()
+      readerRef.current = null
+      setCameraError(null)
+      setIsLoadingCamera(true)
+      setIsCameraScanning(true)
     }
 
-    const stopCameraScan = () => {
+    const stopCameraScan = React.useCallback(() => {
+      readerRef.current?.reset()
+      readerRef.current = null
       setIsCameraScanning(false)
       setIsLoadingCamera(false)
       setCameraError(null)
-      if (codeReader) {
-        codeReader.reset()
-      }
-    }
+    }, [])
 
+    // ── Lector físico (teclado / pistola) ───────────────────────────────────
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
       if (e.key === 'Enter' || e.key === 'Tab') {
         if (scanBuffer.length > 0) {
@@ -103,26 +138,20 @@ const SerialNumberInput = React.forwardRef<HTMLInputElement, SerialNumberInputPr
       } else if (e.key === 'Backspace') {
         setScanBuffer(prev => prev.slice(0, -1))
       }
-
-      if (onKeyDown) {
-        onKeyDown(e)
-      }
+      onKeyDown?.(e)
     }
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       setScanBuffer(e.target.value)
-      if (onChange) {
-        onChange(e)
-      }
+      onChange?.(e)
     }
 
     const handleKeyboardScanButtonClick = () => {
-      setIsKeyboardScanning(!isKeyboardScanning)
-      if (!isKeyboardScanning) {
-        inputRef.current?.focus()
-      }
+      setIsKeyboardScanning(prev => !prev)
+      if (!isKeyboardScanning) inputRef.current?.focus()
     }
 
+    // ── Mensajes de error ───────────────────────────────────────────────────
     const getErrorMessage = () => {
       switch (cameraError) {
         case 'permission':
@@ -130,14 +159,14 @@ const SerialNumberInput = React.forwardRef<HTMLInputElement, SerialNumberInputPr
             <div className='space-y-2'>
               <p className='font-medium'>Permiso de cámara denegado</p>
               <p className='text-sm text-gray-600'>
-                Por favor, habilita el acceso a la cámara en la configuración de tu navegador y
-                vuelve a intentarlo.
+                Habilita el acceso a la cámara en la configuración del navegador y vuelve a
+                intentarlo.
               </p>
               <ol className='text-sm text-gray-600 list-decimal list-inside space-y-1'>
-                <li>Haz clic en el ícono de candado en la barra de direcciones</li>
-                <li>Busca la opción &quot;Cámara&quot; o &quot;Permisos&quot;</li>
+                <li>Toca el ícono de candado en la barra de direcciones</li>
+                <li>Busca &quot;Cámara&quot; o &quot;Permisos&quot;</li>
                 <li>Cambia el acceso a &quot;Permitir&quot;</li>
-                <li>Actualiza la página y vuelve a intentar</li>
+                <li>Recarga la página y vuelve a intentar</li>
               </ol>
             </div>
           )
@@ -146,8 +175,8 @@ const SerialNumberInput = React.forwardRef<HTMLInputElement, SerialNumberInputPr
             <div className='space-y-2'>
               <p className='font-medium'>No se encontró la cámara</p>
               <p className='text-sm text-gray-600'>
-                Asegúrate de que tu dispositivo tenga una cámara conectada y que no esté siendo
-                utilizada por otra aplicación.
+                Asegúrate de que el dispositivo tenga cámara y que no esté siendo usada por otra
+                aplicación.
               </p>
             </div>
           )
@@ -156,23 +185,20 @@ const SerialNumberInput = React.forwardRef<HTMLInputElement, SerialNumberInputPr
             <div className='space-y-2'>
               <p className='font-medium'>Error al acceder a la cámara</p>
               <p className='text-sm text-gray-600'>
-                Ocurrió un error inesperado al intentar acceder a la cámara. Por favor, vuelve a
-                intentarlo.
+                Verifica los permisos de cámara y vuelve a intentarlo.
               </p>
             </div>
           )
       }
     }
 
+    // ── Render ──────────────────────────────────────────────────────────────
     return (
       <div className='relative'>
         <Input
           ref={node => {
-            if (typeof ref === 'function') {
-              ref(node)
-            } else if (ref) {
-              ref.current = node
-            }
+            if (typeof ref === 'function') ref(node)
+            else if (ref) ref.current = node
             inputRef.current = node
           }}
           className={cn(
@@ -247,16 +273,20 @@ const SerialNumberInput = React.forwardRef<HTMLInputElement, SerialNumberInputPr
             ) : (
               <div className='space-y-4'>
                 <div className='relative aspect-video bg-black rounded-lg overflow-hidden'>
-                  {isLoadingCamera ? (
-                    <div className='absolute inset-0 flex items-center justify-center bg-gray-900 text-white'>
+                  {isLoadingCamera && (
+                    <div className='absolute inset-0 flex items-center justify-center bg-gray-900 text-white z-10'>
                       <div className='text-center space-y-2'>
                         <RefreshCw className='h-8 w-8 mx-auto animate-spin' />
-                        <p>Cargando cámara...</p>
+                        <p className='text-sm'>Iniciando cámara...</p>
                       </div>
                     </div>
-                  ) : (
-                    <video ref={videoRef} className='w-full h-full object-cover' playsInline />
                   )}
+                  {/*
+                   * El <video> siempre está montado (aunque cubierto por el spinner)
+                   * para que videoRef esté disponible cuando zxing lo necesite.
+                   * muted y playsInline son obligatorios en iOS/Android para autoplay.
+                   */}
+                  <video ref={videoRef} className='w-full h-full object-cover' playsInline muted />
                 </div>
                 <div className='flex justify-end'>
                   <Button variant='outline' onClick={stopCameraScan}>

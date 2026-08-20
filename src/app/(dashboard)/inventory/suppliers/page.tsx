@@ -270,7 +270,10 @@ export default function SuppliersPage() {
   )
 
   return (
-    <ModuleLayout title='Proveedores' subtitle='Maestro comercial: identidad, crédito, banco y vínculo con contratos'>
+    <ModuleLayout
+      title='Proveedores'
+      subtitle='Maestro comercial: identidad, crédito, banco y vínculo con contratos'
+    >
       <Tabs defaultValue='suppliers' className='space-y-6'>
         <TabsList>
           <TabsTrigger value='suppliers'>
@@ -474,7 +477,7 @@ export default function SuppliersPage() {
                           ? '—'
                           : s.paymentTermsDays === 0
                             ? 'Contado'
-                            : `Net ${s.paymentTermsDays}`}
+                            : `${s.paymentTermsDays}`}
                       </TableCell>
                       <TableCell className='text-muted-foreground hidden xl:table-cell'>
                         <div className='flex flex-col gap-1 items-start'>
@@ -631,7 +634,10 @@ export default function SuppliersPage() {
 
       {/* Dialog formulario */}
       <Dialog open={formOpen} onOpenChange={handleFormOpenChange}>
-        <DialogContent className='w-[min(98vw,56rem)] max-w-4xl max-h-[92vh] overflow-y-auto' aria-describedby={undefined}>
+        <DialogContent
+          className='w-[min(98vw,56rem)] max-w-4xl max-h-[92vh] overflow-y-auto'
+          aria-describedby={undefined}
+        >
           <DialogHeader>
             <DialogTitle>{editingSupplier ? 'Editar proveedor' : 'Nuevo proveedor'}</DialogTitle>
           </DialogHeader>

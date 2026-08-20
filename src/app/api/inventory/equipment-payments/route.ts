@@ -1,32 +1,31 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import { ContractPaymentService } from '@/lib/services/contract-payment.service'
-import { requireInventoryModuleAccess } from '@/lib/inventory/require-inventory-api'
-
 /**
- * GET /api/inventory/payments
+ * GET /api/inventory/equipment-payments
+ *
+ * Listado global de facturas de adquisición de activos (pestaña "Activos" en /inventory/payments).
  *
  * Scope de familias por rol:
  *   Super Admin → sin restricción (undefined)
  *   Admin no-super → familia nativa + grants del módulo 'inventory'
- *   Gestor (canManageInventory, rol ≠ ADMIN) → solo grants del módulo 'inventory'
- *
- * Query params soportados:
- *   status, familyId, search, page, pageSize, fromDate, toDate
+ *   Gestor → solo grants del módulo 'inventory'
  */
+
+import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { EquipmentInvoiceService } from '@/lib/services/equipment-invoice.service'
+import { requireInventoryModuleAccess } from '@/lib/inventory/require-inventory-api'
+import type { AcquisitionPaymentStatus } from '@/lib/services/equipment-invoice.service'
+
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session?.user) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    }
+    if (!session?.user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
     const denied = await requireInventoryModuleAccess(session.user)
     if (denied) return denied
 
     const { searchParams } = new URL(request.url)
-    const status = searchParams.get('status') || undefined
+    const status = (searchParams.get('status') || undefined) as AcquisitionPaymentStatus | undefined
     const familyId = searchParams.get('familyId') || undefined
     const search = searchParams.get('search') || undefined
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10))
@@ -46,17 +45,16 @@ export async function GET(request: NextRequest) {
       allowedFamilyIds = await getModuleFamilyIds(session.user.id, 'inventory')
 
       if (allowedFamilyIds.length === 0) {
-        return NextResponse.json({ payments: [], total: 0, page, pageSize, totalPages: 0 })
+        return NextResponse.json({ invoices: [], total: 0, page, pageSize, totalPages: 0 })
       }
     }
 
-    // Si el filtro de familia solicitado está fuera del scope, devolver vacío
     if (familyId && allowedFamilyIds && !allowedFamilyIds.includes(familyId)) {
-      return NextResponse.json({ payments: [], total: 0, page, pageSize, totalPages: 0 })
+      return NextResponse.json({ invoices: [], total: 0, page, pageSize, totalPages: 0 })
     }
 
-    const result = await ContractPaymentService.list({
-      status: status as 'SCHEDULED' | 'DUE' | 'OVERDUE' | 'PAID' | 'CANCELLED' | undefined,
+    const result = await EquipmentInvoiceService.listGlobal({
+      status,
       familyId,
       allowedFamilyIds,
       search,
@@ -68,7 +66,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(result)
   } catch (error) {
-    console.error('[GET /api/inventory/payments]', error)
-    return NextResponse.json({ error: 'Error al listar pagos' }, { status: 500 })
+    console.error('[GET /api/inventory/equipment-payments]', error)
+    return NextResponse.json({ error: 'Error al listar facturas de activos' }, { status: 500 })
   }
 }

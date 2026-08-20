@@ -47,7 +47,7 @@ interface SupplierDetail extends Supplier {
 
 function termsLabel(days: number | null | undefined) {
   if (days == null) return null
-  return SUPPLIER_PAYMENT_TERMS_OPTIONS.find(o => o.value === days)?.label ?? `Net ${days}`
+  return SUPPLIER_PAYMENT_TERMS_OPTIONS.find(o => o.value === days)?.label ?? `${days}`
 }
 
 export default function SupplierDetailPage({
@@ -58,8 +58,7 @@ export default function SupplierDetailPage({
   const params = use(paramsPromise)
   const router = useRouter()
   const { data: session } = useSession()
-  const isAdmin =
-    session?.user?.role === 'ADMIN' || (session?.user as any)?.isSuperAdmin === true
+  const isAdmin = session?.user?.role === 'ADMIN' || (session?.user as any)?.isSuperAdmin === true
   const [supplier, setSupplier] = useState<SupplierDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [formOpen, setFormOpen] = useState(false)
@@ -263,7 +262,11 @@ export default function SupplierDetailPage({
               <div className='flex items-center gap-2'>
                 <Globe className='h-3.5 w-3.5 text-muted-foreground' />
                 <a
-                  href={supplier.website.startsWith('http') ? supplier.website : `https://${supplier.website}`}
+                  href={
+                    supplier.website.startsWith('http')
+                      ? supplier.website
+                      : `https://${supplier.website}`
+                  }
                   target='_blank'
                   rel='noreferrer'
                   className='hover:underline truncate'
@@ -356,9 +359,7 @@ export default function SupplierDetailPage({
                   <Landmark className='h-3.5 w-3.5' /> Datos bancarios
                 </p>
                 {supplier.bankName && <p>{supplier.bankName}</p>}
-                {bankTypeLabel && (
-                  <p className='text-xs text-muted-foreground'>{bankTypeLabel}</p>
-                )}
+                {bankTypeLabel && <p className='text-xs text-muted-foreground'>{bankTypeLabel}</p>}
                 {supplier.bankAccountNumber && (
                   <p className='font-mono text-xs'>{supplier.bankAccountNumber}</p>
                 )}
@@ -372,7 +373,9 @@ export default function SupplierDetailPage({
                 <p className='text-xs font-medium flex items-center gap-1.5'>
                   <FileText className='h-3.5 w-3.5' /> Notas
                 </p>
-                <p className='text-xs text-muted-foreground whitespace-pre-wrap'>{supplier.notes}</p>
+                <p className='text-xs text-muted-foreground whitespace-pre-wrap'>
+                  {supplier.notes}
+                </p>
               </div>
             )}
           </CardContent>
