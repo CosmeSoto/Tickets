@@ -1,4 +1,5 @@
 import prisma from '@/lib/prisma'
+import { formatTimeAgo } from '@/lib/utils/date-utils'
 
 const AVG_RESPONSE_SAMPLE_DAYS = 90
 const AVG_RESPONSE_MAX_TICKETS = 500
@@ -113,18 +114,7 @@ export async function calculateAvgResponseTimeForClient(clientId: string): Promi
   }
 }
 
-function formatTimeAgo(date: Date): string {
-  const now = new Date()
-  const diff = now.getTime() - date.getTime()
-  const minutes = Math.floor(diff / (1000 * 60))
-  const hours = Math.floor(minutes / 60)
-  const days = Math.floor(hours / 24)
-
-  if (days > 0) return `hace ${days}d`
-  if (hours > 0) return `hace ${hours}h`
-  if (minutes > 0) return `hace ${minutes}min`
-  return 'ahora'
-}
+// formatTimeAgo importada de @/lib/utils/date-utils — ver definición allí
 
 export async function getRecentActivity(
   role: string,

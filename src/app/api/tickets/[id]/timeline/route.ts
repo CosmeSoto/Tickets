@@ -123,6 +123,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
     const timeline = history.map(entry => {
       const baseEvent = {
         id: entry.id,
+        action: entry.action,
         type: mapActionToType(entry.action),
         title: generateTitle(entry.action, entry.field, entry.newValue, entry.oldValue),
         description: generateDescription(
@@ -365,46 +366,52 @@ function parseMetadata(
     }
   }
 
-  // Para planes de resolución, agregar información completa del plan
+  // Para planes de resolución, usar el snapshot guardado en `comment` como fuente primaria
+  // y complementar con datos actuales del plan solo lo que no esté en el snapshot.
+  // Esto garantiza que cada entrada del historial muestre el estado del plan EN ESE MOMENTO,
+  // no el estado actual (que podría ser "completado" aunque el evento sea "creado").
   if (action.includes('resolution_plan')) {
-    // Fuente 1: datos del plan actual en la BD (estado más reciente)
-    if (resolutionPlan) {
-      metadata.planTitle = resolutionPlan.title
-      metadata.status = resolutionPlan.status
-      metadata.totalTasks = resolutionPlan.totalTasks
-      metadata.completedTasks = resolutionPlan.completedTasks
-      metadata.estimatedHours = resolutionPlan.estimatedHours
-      metadata.actualHours = resolutionPlan.actualHours
-
-      if (resolutionPlan.startDate) {
-        metadata.startDate = resolutionPlan.startDate.toISOString()
-      }
-      if (resolutionPlan.targetDate) {
-        metadata.targetDate = resolutionPlan.targetDate.toISOString()
-      }
-      if (resolutionPlan.completedDate) {
-        metadata.completedDate = resolutionPlan.completedDate.toISOString()
-      }
-    }
-
-    // Fuente 2: metadata guardada en el campo comment del historial (snapshot al momento del evento)
+    // Fuente 1: snapshot guardado en el campo comment al momento del evento (más fiel)
     if (comment) {
       try {
         const savedMeta = JSON.parse(comment)
-        // Usar datos guardados como fallback si el plan no existe o para datos del momento
-        if (!metadata.planTitle && savedMeta.planTitle) metadata.planTitle = savedMeta.planTitle
-        if (!metadata.startDate && savedMeta.startDate) metadata.startDate = savedMeta.startDate
-        if (!metadata.targetDate && savedMeta.targetDate) metadata.targetDate = savedMeta.targetDate
-        if (!metadata.estimatedHours && savedMeta.estimatedHours)
-          metadata.estimatedHours = savedMeta.estimatedHours
-        if (!metadata.status && savedMeta.status) metadata.status = savedMeta.status
+        if (savedMeta.planTitle) metadata.planTitle = savedMeta.planTitle
         if (savedMeta.description) metadata.description = savedMeta.description
+        if (savedMeta.status) metadata.status = savedMeta.status
+        if (savedMeta.startDate) metadata.startDate = savedMeta.startDate
+        if (savedMeta.targetDate) metadata.targetDate = savedMeta.targetDate
+        if (savedMeta.completedDate) metadata.completedDate = savedMeta.completedDate
+        if (savedMeta.estimatedHours != null) metadata.estimatedHours = savedMeta.estimatedHours
+        if (savedMeta.actualHours != null) metadata.actualHours = savedMeta.actualHours
+        if (savedMeta.totalTasks != null) metadata.totalTasks = savedMeta.totalTasks
+        if (savedMeta.completedTasks != null) metadata.completedTasks = savedMeta.completedTasks
       } catch {
         // comment no es JSON, ignorar
       }
     }
 
-    // Fallback final: usar newValue como título
+    // Fuente 2: datos actuales del plan — solo para rellenar lo que el snapshot no tiene
+    // (p. ej. planes creados antes de que se guardara el snapshot completo)
+    if (resolutionPlan) {
+      if (!metadata.planTitle) metadata.planTitle = resolutionPlan.title
+      if (!metadata.status) metadata.status = resolutionPlan.status
+      if (metadata.totalTasks == null) metadata.totalTasks = resolutionPlan.totalTasks
+      if (metadata.completedTasks == null) metadata.completedTasks = resolutionPlan.completedTasks
+      if (metadata.estimatedHours == null) metadata.estimatedHours = resolutionPlan.estimatedHours
+      if (!metadata.startDate && resolutionPlan.startDate)
+        metadata.startDate = resolutionPlan.startDate.toISOString()
+      if (!metadata.targetDate && resolutionPlan.targetDate)
+        metadata.targetDate = resolutionPlan.targetDate.toISOString()
+      // completedDate y actualHours solo para eventos de completado
+      // (no contaminar el evento "creado" con datos que no existían entonces)
+      if (action === 'resolution_plan_completed') {
+        if (!metadata.completedDate && resolutionPlan.completedDate)
+          metadata.completedDate = resolutionPlan.completedDate.toISOString()
+        if (metadata.actualHours == null) metadata.actualHours = resolutionPlan.actualHours
+      }
+    }
+
+    // Fallback final: usar newValue/oldValue como título
     if (!metadata.planTitle) {
       metadata.planTitle = newValue || oldValue
     }

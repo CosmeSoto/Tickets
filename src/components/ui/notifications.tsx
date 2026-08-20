@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
+import { formatTimeAgoCompact } from '@/lib/utils/date-utils'
 import {
   Bell,
   X,
@@ -75,15 +76,7 @@ function getDashboardBorder(type: string) {
   }
 }
 
-function formatTimeAgo(date: string | Date) {
-  const now = new Date()
-  const diff = now.getTime() - new Date(date).getTime()
-  const minutes = Math.floor(diff / (1000 * 60))
-  const hours = Math.floor(diff / (1000 * 60 * 60))
-  if (minutes < 60) return `${minutes}min`
-  if (hours < 24) return `${hours}h`
-  return `${Math.floor(hours / 24)}d`
-}
+// formatTimeAgo reemplazada por formatTimeAgoCompact importada de @/lib/utils/date-utils
 
 export function Notifications({ className, variant = 'bell', maxVisible = 5 }: NotificationsProps) {
   const { data: session } = useSession()
@@ -271,7 +264,7 @@ export function Notifications({ className, variant = 'bell', maxVisible = 5 }: N
                     {cfg.label}
                   </Badge>
                   <span className='text-xs text-muted-foreground'>
-                    {formatTimeAgo(n.createdAt)}
+                    {formatTimeAgoCompact(n.createdAt)}
                   </span>
                   {!n.isRead && (
                     <span className='w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0' />
@@ -383,7 +376,7 @@ function BellNotificationItem({
           </div>
           <div className='flex items-center justify-between'>
             <div className='text-xs text-muted-foreground font-medium'>
-              {formatTimeAgo(n.createdAt)}
+              {formatTimeAgoCompact(n.createdAt)}
             </div>
             <div className='flex items-center space-x-1' onClick={e => e.stopPropagation()}>
               {!n.isRead && (

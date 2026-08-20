@@ -5,7 +5,19 @@ import { useToast } from './use-toast'
 import { useTicketSSE } from './use-ticket-sse'
 export interface TimelineEvent {
   id: string
-  type: 'comment' | 'status_change' | 'assignment' | 'priority_change' | 'resolution' | 'rating' | 'created' | 'resolution_plan' | 'resolution_task' | 'file_uploaded'
+  /** Acción original de BD (e.g. 'resolution_plan_created', 'resolution_plan_completed') */
+  action?: string
+  type:
+    | 'comment'
+    | 'status_change'
+    | 'assignment'
+    | 'priority_change'
+    | 'resolution'
+    | 'rating'
+    | 'created'
+    | 'resolution_plan'
+    | 'resolution_task'
+    | 'file_uploaded'
   title: string
   description?: string
   user: {
@@ -83,12 +95,14 @@ export function useTimeline(ticketId: string) {
   // sin esperar re-render (a diferencia de useState)
   const stoppedRef = useRef(false)
 
-  useEffect(() => { toastRef.current = toast }, [toast])
+  useEffect(() => {
+    toastRef.current = toast
+  }, [toast])
   useEffect(() => {
     ticketIdRef.current = ticketId
-    stoppedRef.current = false  // resetear al navegar a otro ticket
+    stoppedRef.current = false // resetear al navegar a otro ticket
     if (ticketId) loadTimeline()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticketId])
 
   const loadTimeline = useCallback(async (silent = false) => {
@@ -98,9 +112,9 @@ export function useTimeline(ticketId: string) {
     try {
       if (!silent) setLoading(true)
       setError(null)
-      
+
       const response = await fetch(`/api/tickets/${currentTicketId}/timeline`)
-      
+
       if (!response.ok) {
         if (response.status === 404) {
           // Ticket eliminado — detener polling permanentemente e inmediatamente
@@ -112,7 +126,7 @@ export function useTimeline(ticketId: string) {
       }
 
       const data = await response.json()
-      
+
       if (data.success) {
         const incoming: TimelineEvent[] = data.data || []
         setEvents(incoming)
@@ -126,131 +140,151 @@ export function useTimeline(ticketId: string) {
       setError(errorMessage)
       if (!errorMessage.includes('404')) {
         toastRef.current({
-          variant: "destructive",
-          title: "Error",
-          description: "No se pudo cargar el historial del ticket"
+          variant: 'destructive',
+          title: 'Error',
+          description: 'No se pudo cargar el historial del ticket',
         })
       }
       setEvents([])
     } finally {
       if (!silent) setLoading(false)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const addComment = useCallback(async (content: string, isInternal: boolean = false, attachments?: File[]) => {
-    if (!content.trim()) {
-      toastRef.current({
-        variant: "destructive",
-        title: "Contenido requerido",
-        description: "Debes escribir un comentario antes de enviarlo"
-      })
-      return false
-    }
-
-    submittingRef.current = true // bloquear recargas del polling
-
-    try {
-      const formData = new FormData()
-      formData.append('content', content)
-      formData.append('isInternal', isInternal.toString())
-      
-      if (attachments && attachments.length > 0) {
-        attachments.forEach((file, index) => {
-          formData.append(`attachments[${index}]`, file)
-        })
-      }
-
-      const response = await fetch(`/api/tickets/${ticketIdRef.current}/comments`, {
-        method: 'POST',
-        body: formData
-      })
-
-      if (!response.ok) {
-        throw new Error('Error al agregar comentario')
-      }
-
-      const data = await response.json()
-      
-      if (data.success) {
-        const commentType = isInternal ? 'interno' : 'público'
-        const attachmentInfo = attachments && attachments.length > 0 
-          ? ` con ${attachments.length} archivo(s) adjunto(s)` 
-          : ''
+  const addComment = useCallback(
+    async (content: string, isInternal: boolean = false, attachments?: File[]) => {
+      if (!content.trim()) {
         toastRef.current({
-          title: "Comentario agregado",
-          description: `Comentario ${commentType} agregado${attachmentInfo}`,
-          duration: 3000
+          variant: 'destructive',
+          title: 'Contenido requerido',
+          description: 'Debes escribir un comentario antes de enviarlo',
         })
-        // Recargar inmediatamente para el usuario que envió el comentario
-        loadTimeline(true)
-        // Notificar a otros componentes (ej: notificaciones) que hay actividad
-        window.dispatchEvent(new CustomEvent('ticket-updated', { detail: { ticketId: ticketIdRef.current, type: 'comment_added' } }))
-        return data.data
-      } else {
-        throw new Error(data.message || 'Error al agregar comentario')
+        return false
       }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
-      toastRef.current({
-        variant: "destructive",
-        title: "Error al agregar comentario",
-        description: `No se pudo agregar el comentario. ${errorMessage}. Intenta nuevamente.`
-      })
-      return false
-    } finally {
-      submittingRef.current = false // liberar bloqueo siempre
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadTimeline])
 
-  const updateTicketStatus = useCallback(async (newStatus: string, comment?: string) => {
-    try {
-      const response = await fetch(`/api/tickets/${ticketIdRef.current}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus, comment })
-      })
-      if (!response.ok) throw new Error('Error al actualizar estado')
-      const data = await response.json()
-      if (data.success) {
-        toastRef.current({ title: "Estado actualizado", description: "El estado del ticket se ha actualizado" })
-        loadTimeline()
-        return true
-      } else {
-        throw new Error(data.message || 'Error al actualizar estado')
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
-      toastRef.current({ variant: "destructive", title: "Error", description: errorMessage })
-      return false
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadTimeline])
+      submittingRef.current = true // bloquear recargas del polling
 
-  const assignTicket = useCallback(async (assigneeId: string | null, comment?: string) => {
-    try {
-      const response = await fetch(`/api/tickets/${ticketIdRef.current}/assign`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ assigneeId, comment })
-      })
-      if (!response.ok) throw new Error('Error al asignar ticket')
-      const data = await response.json()
-      if (data.success) {
-        toastRef.current({ title: "Ticket asignado", description: "La asignación del ticket se ha actualizado" })
-        loadTimeline()
-        return true
-      } else {
-        throw new Error(data.message || 'Error al asignar ticket')
+      try {
+        const formData = new FormData()
+        formData.append('content', content)
+        formData.append('isInternal', isInternal.toString())
+
+        if (attachments && attachments.length > 0) {
+          attachments.forEach((file, index) => {
+            formData.append(`attachments[${index}]`, file)
+          })
+        }
+
+        const response = await fetch(`/api/tickets/${ticketIdRef.current}/comments`, {
+          method: 'POST',
+          body: formData,
+        })
+
+        if (!response.ok) {
+          throw new Error('Error al agregar comentario')
+        }
+
+        const data = await response.json()
+
+        if (data.success) {
+          const commentType = isInternal ? 'interno' : 'público'
+          const attachmentInfo =
+            attachments && attachments.length > 0
+              ? ` con ${attachments.length} archivo(s) adjunto(s)`
+              : ''
+          toastRef.current({
+            title: 'Comentario agregado',
+            description: `Comentario ${commentType} agregado${attachmentInfo}`,
+            duration: 3000,
+          })
+          // Recargar inmediatamente para el usuario que envió el comentario
+          loadTimeline(true)
+          // Notificar a otros componentes (ej: notificaciones) que hay actividad
+          window.dispatchEvent(
+            new CustomEvent('ticket-updated', {
+              detail: { ticketId: ticketIdRef.current, type: 'comment_added' },
+            })
+          )
+          return data.data
+        } else {
+          throw new Error(data.message || 'Error al agregar comentario')
+        }
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
+        toastRef.current({
+          variant: 'destructive',
+          title: 'Error al agregar comentario',
+          description: `No se pudo agregar el comentario. ${errorMessage}. Intenta nuevamente.`,
+        })
+        return false
+      } finally {
+        submittingRef.current = false // liberar bloqueo siempre
       }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
-      toastRef.current({ variant: "destructive", title: "Error", description: errorMessage })
-      return false
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadTimeline])
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    },
+    [loadTimeline]
+  )
+
+  const updateTicketStatus = useCallback(
+    async (newStatus: string, comment?: string) => {
+      try {
+        const response = await fetch(`/api/tickets/${ticketIdRef.current}/status`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: newStatus, comment }),
+        })
+        if (!response.ok) throw new Error('Error al actualizar estado')
+        const data = await response.json()
+        if (data.success) {
+          toastRef.current({
+            title: 'Estado actualizado',
+            description: 'El estado del ticket se ha actualizado',
+          })
+          loadTimeline()
+          return true
+        } else {
+          throw new Error(data.message || 'Error al actualizar estado')
+        }
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
+        toastRef.current({ variant: 'destructive', title: 'Error', description: errorMessage })
+        return false
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    },
+    [loadTimeline]
+  )
+
+  const assignTicket = useCallback(
+    async (assigneeId: string | null, comment?: string) => {
+      try {
+        const response = await fetch(`/api/tickets/${ticketIdRef.current}/assign`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ assigneeId, comment }),
+        })
+        if (!response.ok) throw new Error('Error al asignar ticket')
+        const data = await response.json()
+        if (data.success) {
+          toastRef.current({
+            title: 'Ticket asignado',
+            description: 'La asignación del ticket se ha actualizado',
+          })
+          loadTimeline()
+          return true
+        } else {
+          throw new Error(data.message || 'Error al asignar ticket')
+        }
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
+        toastRef.current({ variant: 'destructive', title: 'Error', description: errorMessage })
+        return false
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    },
+    [loadTimeline]
+  )
 
   // Polling cada 3s — usa stoppedRef para detención inmediata sin esperar re-render
   useEffect(() => {
@@ -272,12 +306,18 @@ export function useTimeline(ticketId: string) {
     }
 
     const stopPolling = () => {
-      if (interval) { clearInterval(interval); interval = null }
+      if (interval) {
+        clearInterval(interval)
+        interval = null
+      }
     }
 
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
-        if (!stoppedRef.current) { loadTimeline(true); startPolling() }
+        if (!stoppedRef.current) {
+          loadTimeline(true)
+          startPolling()
+        }
       } else {
         stopPolling()
       }
@@ -293,12 +333,17 @@ export function useTimeline(ticketId: string) {
   }, [loadTimeline])
 
   // SSE: recarga inmediata cuando el servidor emite un evento (comment_added, etc.)
-  useTicketSSE(ticketId, useCallback(() => {
-    loadTimeline(true)
-  }, [loadTimeline]))
+  useTicketSSE(
+    ticketId,
+    useCallback(() => {
+      loadTimeline(true)
+    }, [loadTimeline])
+  )
 
   /** Detiene el polling permanentemente (ej: antes de eliminar el ticket) */
-  const stopPolling = () => { stoppedRef.current = true }
+  const stopPolling = () => {
+    stoppedRef.current = true
+  }
 
   return {
     events,
@@ -323,7 +368,7 @@ export function useRating(ticketId: string) {
     try {
       setLoading(true)
       const response = await fetch(`/api/tickets/${ticketId}/rating`)
-      
+
       if (response.ok) {
         const data = await response.json()
         if (data.success && data.data) {
@@ -337,51 +382,54 @@ export function useRating(ticketId: string) {
     }
   }, [ticketId])
 
-  const submitRating = useCallback(async (ratingData: {
-    rating: number
-    feedback?: string
-    categories: {
-      responseTime: number
-      technicalSkill: number
-      communication: number
-      problemResolution: number
-    }
-  }) => {
-    try {
-      const response = await fetch(`/api/tickets/${ticketId}/rating`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(ratingData)
-      })
-
-      if (!response.ok) {
-        throw new Error('Error al enviar calificación')
+  const submitRating = useCallback(
+    async (ratingData: {
+      rating: number
+      feedback?: string
+      categories: {
+        responseTime: number
+        technicalSkill: number
+        communication: number
+        problemResolution: number
       }
-
-      const data = await response.json()
-      
-      if (data.success) {
-        toast({
-          title: "Calificación enviada",
-          description: "Gracias por tu feedback. Nos ayuda a mejorar nuestro servicio."
+    }) => {
+      try {
+        const response = await fetch(`/api/tickets/${ticketId}/rating`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(ratingData),
         })
-        loadRating() // Recargar rating
-        return true
-      } else {
-        throw new Error(data.message || 'Error al enviar calificación')
+
+        if (!response.ok) {
+          throw new Error('Error al enviar calificación')
+        }
+
+        const data = await response.json()
+
+        if (data.success) {
+          toast({
+            title: 'Calificación enviada',
+            description: 'Gracias por tu feedback. Nos ayuda a mejorar nuestro servicio.',
+          })
+          loadRating() // Recargar rating
+          return true
+        } else {
+          throw new Error(data.message || 'Error al enviar calificación')
+        }
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: errorMessage,
+        })
+        return false
       }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: errorMessage
-      })
-      return false
-    }
-  }, [ticketId, toast, loadRating])
+    },
+    [ticketId, toast, loadRating]
+  )
 
   useEffect(() => {
     loadRating()
@@ -391,7 +439,7 @@ export function useRating(ticketId: string) {
     rating,
     loading,
     loadRating,
-    submitRating
+    submitRating,
   }
 }
 
@@ -405,7 +453,7 @@ export function useResolutionPlan(ticketId: string) {
     try {
       setLoading(true)
       const response = await fetch(`/api/tickets/${ticketId}/resolution-plan`)
-      
+
       if (response.ok) {
         const data = await response.json()
         if (data.success && data.data) {
@@ -419,125 +467,131 @@ export function useResolutionPlan(ticketId: string) {
     }
   }, [ticketId])
 
-  const createPlan = useCallback(async (planData: {
-    title: string
-    description?: string
-  }) => {
-    try {
-      const response = await fetch(`/api/tickets/${ticketId}/resolution-plan`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(planData)
-      })
-
-      if (!response.ok) {
-        throw new Error('Error al crear plan de resolución')
-      }
-
-      const data = await response.json()
-      
-      if (data.success) {
-        setPlan(data.data)
-        toast({
-          title: "Plan creado",
-          description: "Se ha creado el plan de resolución exitosamente"
+  const createPlan = useCallback(
+    async (planData: { title: string; description?: string }) => {
+      try {
+        const response = await fetch(`/api/tickets/${ticketId}/resolution-plan`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(planData),
         })
-        return true
-      } else {
-        throw new Error(data.message || 'Error al crear plan')
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: errorMessage
-      })
-      return false
-    }
-  }, [ticketId, toast])
 
-  const addTask = useCallback(async (taskData: {
-    title: string
-    description?: string
-    priority: 'low' | 'medium' | 'high'
-    estimatedHours?: number
-    dueDate?: string
-  }) => {
-    try {
-      const response = await fetch(`/api/tickets/${ticketId}/resolution-plan/tasks`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(taskData)
-      })
+        if (!response.ok) {
+          throw new Error('Error al crear plan de resolución')
+        }
 
-      if (!response.ok) {
-        throw new Error('Error al agregar tarea')
-      }
+        const data = await response.json()
 
-      const data = await response.json()
-      
-      if (data.success) {
-        loadPlan() // Recargar plan
+        if (data.success) {
+          setPlan(data.data)
+          toast({
+            title: 'Plan creado',
+            description: 'Se ha creado el plan de resolución exitosamente',
+          })
+          return true
+        } else {
+          throw new Error(data.message || 'Error al crear plan')
+        }
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
         toast({
-          title: "Tarea agregada",
-          description: "La tarea se ha agregado al plan de resolución"
+          variant: 'destructive',
+          title: 'Error',
+          description: errorMessage,
         })
-        return true
-      } else {
-        throw new Error(data.message || 'Error al agregar tarea')
+        return false
       }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: errorMessage
-      })
-      return false
-    }
-  }, [ticketId, toast, loadPlan])
+    },
+    [ticketId, toast]
+  )
 
-  const updateTaskStatus = useCallback(async (taskId: string, status: string) => {
-    try {
-      const response = await fetch(`/api/tickets/${ticketId}/resolution-plan/tasks/${taskId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ status })
-      })
+  const addTask = useCallback(
+    async (taskData: {
+      title: string
+      description?: string
+      priority: 'low' | 'medium' | 'high'
+      estimatedHours?: number
+      dueDate?: string
+    }) => {
+      try {
+        const response = await fetch(`/api/tickets/${ticketId}/resolution-plan/tasks`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(taskData),
+        })
 
-      if (!response.ok) {
-        throw new Error('Error al actualizar tarea')
-      }
+        if (!response.ok) {
+          throw new Error('Error al agregar tarea')
+        }
 
-      const data = await response.json()
-      
-      if (data.success) {
-        loadPlan() // Recargar plan
+        const data = await response.json()
+
+        if (data.success) {
+          loadPlan() // Recargar plan
+          toast({
+            title: 'Tarea agregada',
+            description: 'La tarea se ha agregado al plan de resolución',
+          })
+          return true
+        } else {
+          throw new Error(data.message || 'Error al agregar tarea')
+        }
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
         toast({
-          title: "Tarea actualizada",
-          description: "El estado de la tarea se ha actualizado"
+          variant: 'destructive',
+          title: 'Error',
+          description: errorMessage,
         })
-        return true
-      } else {
-        throw new Error(data.message || 'Error al actualizar tarea')
+        return false
       }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: errorMessage
-      })
-      return false
-    }
-  }, [ticketId, toast, loadPlan])
+    },
+    [ticketId, toast, loadPlan]
+  )
+
+  const updateTaskStatus = useCallback(
+    async (taskId: string, status: string) => {
+      try {
+        const response = await fetch(`/api/tickets/${ticketId}/resolution-plan/tasks/${taskId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ status }),
+        })
+
+        if (!response.ok) {
+          throw new Error('Error al actualizar tarea')
+        }
+
+        const data = await response.json()
+
+        if (data.success) {
+          loadPlan() // Recargar plan
+          toast({
+            title: 'Tarea actualizada',
+            description: 'El estado de la tarea se ha actualizado',
+          })
+          return true
+        } else {
+          throw new Error(data.message || 'Error al actualizar tarea')
+        }
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: errorMessage,
+        })
+        return false
+      }
+    },
+    [ticketId, toast, loadPlan]
+  )
 
   useEffect(() => {
     loadPlan()
@@ -549,6 +603,6 @@ export function useResolutionPlan(ticketId: string) {
     loadPlan,
     createPlan,
     addTask,
-    updateTaskStatus
+    updateTaskStatus,
   }
 }

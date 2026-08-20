@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast'
 import { useModuleData } from '@/hooks/common/use-module-data'
 import { usePagination } from '@/hooks/common/use-pagination'
 import { type UserRole } from '@/lib/constants/user-constants'
+import { formatLastSeen } from '@/lib/utils/date-utils'
 
 export interface UserData {
   id: string
@@ -438,16 +439,5 @@ export function useUsers(options: UseUsersOptions = {}): UseUsersReturn {
   }
 }
 
-// Función para formatear tiempo relativo
-export function formatTimeAgo(dateString: string): string {
-  const date = new Date(dateString)
-  const now = new Date()
-  const diff = now.getTime() - date.getTime()
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-
-  if (days === 0) return 'Hoy'
-  if (days === 1) return 'Ayer'
-  if (days < 30) return `${days} días`
-  if (days < 365) return `${Math.floor(days / 30)} meses`
-  return `${Math.floor(days / 365)} años`
-}
+// Re-export desde la utilidad canónica — mantiene compatibilidad con importadores existentes
+export { formatLastSeen as formatTimeAgo } from '@/lib/utils/date-utils'

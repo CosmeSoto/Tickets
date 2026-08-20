@@ -29,9 +29,11 @@ import {
   Lock,
   Globe,
   PlayCircle,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react'
 import { useTimeline, type TimelineEvent } from '@/hooks/use-timeline'
-import { formatTimeAgo } from '@/hooks/use-ticket-data'
+import { formatTimeAgo, formatExactDateTime } from '@/hooks/use-ticket-data'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './tooltip'
 import { FilePreviewModal } from '@/components/tickets/file-preview-modal'
 import { formatDuration } from '@/lib/utils/time-utils'
@@ -170,6 +172,7 @@ export function TicketTimeline({
   const [isInternal, setIsInternal] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [attachments, setAttachments] = useState<File[]>([])
+  const [showAll, setShowAll] = useState(false)
   const [previewFile, setPreviewFile] = useState<{
     id: string
     originalName: string
@@ -384,7 +387,127 @@ export function TicketTimeline({
           </div>
         )
 
-      case 'resolution_plan':
+      case 'resolution_plan': {
+        // Determinar qué tipo de evento es para renderizar de forma apropiada
+        const planAction = event.action
+
+        // ── Plan eliminado: solo texto informativo ──────────────────────────
+        if (planAction === 'resolution_plan_deleted') {
+          return metadata.planTitle ? (
+            <div className='mt-2 flex items-center gap-2 text-sm text-muted-foreground'>
+              <FileText className='h-4 w-4 shrink-0' />
+              <span className='italic'>&quot;{metadata.planTitle}&quot;</span>
+            </div>
+          ) : null
+        }
+
+        // ── Plan completado: card compacta con resultado ─────────────────────
+        if (planAction === 'resolution_plan_completed') {
+          return (
+            <div className='mt-3 space-y-3 p-4 bg-green-50 dark:bg-green-950 rounded-lg border border-green-200 dark:border-green-800'>
+              {metadata.planTitle && (
+                <div className='flex items-start space-x-2'>
+                  <CheckCircle className='h-5 w-5 text-green-600 dark:text-green-400 mt-0.5 shrink-0' />
+                  <p className='font-semibold text-green-900 dark:text-green-100'>
+                    {metadata.planTitle}
+                  </p>
+                </div>
+              )}
+              <div className='grid grid-cols-2 gap-3 text-sm'>
+                {metadata.completedDate && (
+                  <div className='flex items-center space-x-2'>
+                    <CheckCircle className='h-4 w-4 text-green-600 dark:text-green-400' />
+                    <div>
+                      <span className='text-muted-foreground block text-xs'>Completado el</span>
+                      <div className='font-medium text-green-700 dark:text-green-300'>
+                        {new Date(metadata.completedDate).toLocaleString('es-ES', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {metadata.totalTasks !== undefined && (
+                  <div className='flex items-center space-x-2'>
+                    <CheckCircle className='h-4 w-4 text-green-600 dark:text-green-400' />
+                    <div>
+                      <span className='text-muted-foreground block text-xs'>Tareas</span>
+                      <div className='font-medium text-green-700 dark:text-green-300'>
+                        {metadata.completedTasks || 0} / {metadata.totalTasks} completadas
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {metadata.actualHours != null && metadata.actualHours > 0 && (
+                  <div className='flex items-center space-x-2'>
+                    <Clock className='h-4 w-4 text-green-600 dark:text-green-400' />
+                    <div>
+                      <span className='text-muted-foreground block text-xs'>Tiempo real</span>
+                      <div className='font-medium text-green-700 dark:text-green-300'>
+                        {formatDuration(metadata.actualHours)}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {metadata.estimatedHours != null && metadata.estimatedHours > 0 && (
+                  <div className='flex items-center space-x-2'>
+                    <Clock className='h-4 w-4 text-muted-foreground' />
+                    <div>
+                      <span className='text-muted-foreground block text-xs'>Tiempo estimado</span>
+                      <div className='font-medium'>{formatDuration(metadata.estimatedHours)}</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className='flex items-center space-x-2 pt-2 border-t border-green-200 dark:border-green-800'>
+                <Badge className='text-xs bg-green-100 text-green-700 border border-green-200 dark:bg-green-500/20 dark:text-green-300 dark:border-green-500/40'>
+                  ✅ Completado
+                </Badge>
+              </div>
+            </div>
+          )
+        }
+
+        // ── Plan actualizado: card compacta con el cambio ────────────────────
+        if (planAction === 'resolution_plan_updated') {
+          return (
+            <div className='mt-3 space-y-2 p-4 bg-indigo-50 dark:bg-indigo-950 rounded-lg border border-indigo-200 dark:border-indigo-800'>
+              {metadata.planTitle && (
+                <div className='flex items-start space-x-2'>
+                  <FileText className='h-4 w-4 text-indigo-600 dark:text-indigo-400 mt-0.5 shrink-0' />
+                  <p className='font-medium text-indigo-900 dark:text-indigo-100 text-sm'>
+                    {metadata.planTitle}
+                  </p>
+                </div>
+              )}
+              {metadata.status && (
+                <div className='flex items-center space-x-2'>
+                  <Badge
+                    variant='outline'
+                    className={`text-xs ${
+                      metadata.status === 'completed'
+                        ? 'bg-green-100 text-green-700 border-green-200 dark:bg-green-500/20 dark:text-green-300 dark:border-green-500/40'
+                        : metadata.status === 'active'
+                          ? 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-500/20 dark:text-blue-300 dark:border-blue-500/40'
+                          : 'bg-muted text-muted-foreground border-border'
+                    }`}
+                  >
+                    {metadata.status === 'draft' && '📝 Borrador'}
+                    {metadata.status === 'active' && '🔄 Activo'}
+                    {metadata.status === 'completed' && '✅ Completado'}
+                    {metadata.status === 'cancelled' && '❌ Cancelado'}
+                  </Badge>
+                </div>
+              )}
+            </div>
+          )
+        }
+
+        // ── Plan creado (default): tarjeta completa con todos los detalles ───
         return (
           <div className='mt-3 space-y-3 p-4 bg-indigo-50 dark:bg-indigo-950 rounded-lg border border-indigo-200 dark:border-indigo-800'>
             {metadata.planTitle && (
@@ -437,40 +560,12 @@ export function TicketTimeline({
                   </div>
                 </div>
               )}
-              {metadata.completedDate && (
-                <div className='flex items-center space-x-2'>
-                  <CheckCircle className='h-4 w-4 text-green-600 dark:text-green-400' />
-                  <div>
-                    <span className='text-muted-foreground block text-xs'>Completado el</span>
-                    <div className='font-medium text-green-700 dark:text-green-300'>
-                      {new Date(metadata.completedDate).toLocaleString('es-ES', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </div>
-                  </div>
-                </div>
-              )}
-              {metadata.estimatedHours && (
+              {metadata.estimatedHours != null && metadata.estimatedHours > 0 && (
                 <div className='flex items-center space-x-2'>
                   <Clock className='h-4 w-4 text-indigo-600 dark:text-indigo-400' />
                   <div>
                     <span className='text-muted-foreground block text-xs'>Tiempo estimado</span>
                     <div className='font-medium'>{formatDuration(metadata.estimatedHours)}</div>
-                  </div>
-                </div>
-              )}
-              {metadata.actualHours !== undefined && metadata.actualHours > 0 && (
-                <div className='flex items-center space-x-2'>
-                  <Clock className='h-4 w-4 text-purple-600 dark:text-purple-400' />
-                  <div>
-                    <span className='text-muted-foreground block text-xs'>Tiempo real</span>
-                    <div className='font-medium text-purple-700 dark:text-purple-300'>
-                      {formatDuration(metadata.actualHours)}
-                    </div>
                   </div>
                 </div>
               )}
@@ -481,13 +576,6 @@ export function TicketTimeline({
                     <span className='text-muted-foreground block text-xs'>Progreso de tareas</span>
                     <div className='font-medium'>
                       {metadata.completedTasks || 0} de {metadata.totalTasks}
-                      {metadata.totalTasks > 0 && (
-                        <span className='text-xs text-muted-foreground ml-1'>
-                          (
-                          {Math.round(((metadata.completedTasks || 0) / metadata.totalTasks) * 100)}
-                          %)
-                        </span>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -496,13 +584,13 @@ export function TicketTimeline({
             {metadata.status && (
               <div className='flex items-center space-x-2 pt-2 border-t border-indigo-200 dark:border-indigo-800'>
                 <Badge
-                  variant={metadata.status === 'completed' ? 'default' : 'outline'}
+                  variant='outline'
                   className={`text-xs ${
                     metadata.status === 'completed'
-                      ? 'bg-green-100 text-green-700 border border-green-200 dark:bg-green-500/20 dark:text-green-300 dark:border-green-500/40'
+                      ? 'bg-green-100 text-green-700 border-green-200 dark:bg-green-500/20 dark:text-green-300 dark:border-green-500/40'
                       : metadata.status === 'active'
-                        ? 'bg-blue-100 text-blue-700 border border-blue-200 dark:bg-blue-500/20 dark:text-blue-300 dark:border-blue-500/40'
-                        : 'bg-muted text-muted-foreground border border-border'
+                        ? 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-500/20 dark:text-blue-300 dark:border-blue-500/40'
+                        : 'bg-muted text-muted-foreground border-border'
                   }`}
                 >
                   {metadata.status === 'draft' && '📝 Borrador'}
@@ -514,6 +602,7 @@ export function TicketTimeline({
             )}
           </div>
         )
+      }
 
       case 'resolution_task':
         return (
@@ -811,155 +900,254 @@ export function TicketTimeline({
                 <p>No hay actividad registrada para este ticket</p>
               </div>
             ) : (
-              events
-                .filter(event => canViewInternal || !event.isInternal)
-                .map(event => {
-                  const isSystemEvent = ![
-                    'comment',
-                    'file_uploaded',
-                    'resolution_plan',
-                    'resolution_task',
-                  ].includes(event.type)
+              (() => {
+                // ── Filtrar según visibilidad ───────────────────────────────
+                const visible = events.filter(event => canViewInternal || !event.isInternal)
 
-                  // ── Eventos de sistema: compactos, sin burbuja ──────────────
-                  if (isSystemEvent) {
-                    return (
-                      <div key={event.id} className='flex items-start gap-2.5 py-1.5 px-1 group'>
-                        {/* Línea vertical + ícono */}
-                        <div className='flex flex-col items-center shrink-0 mt-0.5'>
-                          <div
-                            className={`w-6 h-6 rounded-full flex items-center justify-center ${getEventColor(event.type, event.isInternal)}`}
-                          >
-                            {getEventIcon(event.type)}
-                          </div>
-                        </div>
+                // ── Colapso: mostrar los últimos 6, el resto bajo "Ver más" ─
+                const INITIAL_VISIBLE = 6
+                const hiddenCount =
+                  visible.length > INITIAL_VISIBLE ? visible.length - INITIAL_VISIBLE : 0
+                const displayed =
+                  showAll || hiddenCount === 0 ? visible : visible.slice(0, INITIAL_VISIBLE)
 
-                        {/* Contenido compacto */}
-                        <div className='flex-1 min-w-0 flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5'>
-                          <span className='text-sm font-medium text-foreground'>
-                            {event.user?.name ?? '—'}
-                          </span>
-                          <span className='text-xs text-muted-foreground'>
-                            {event.user?.role === 'TECHNICIAN'
-                              ? '· Técnico'
-                              : event.user?.role === 'ADMIN'
-                                ? '· Admin'
-                                : ''}
-                          </span>
-                          <span className='text-sm text-muted-foreground'>{event.title}</span>
-                          {/* Badges de cambio de estado/prioridad inline */}
-                          {(event.type === 'status_change' || event.type === 'priority_change') &&
-                            event.metadata?.oldValue &&
-                            event.metadata?.newValue && (
-                              <span className='inline-flex items-center gap-1 ml-0.5'>
-                                {event.type === 'status_change' ? (
-                                  <>
-                                    <StatusBadge
-                                      status={event.metadata.oldValue as any}
-                                      size='sm'
-                                    />
-                                    <span className='text-muted-foreground text-xs'>→</span>
-                                    <StatusBadge
-                                      status={event.metadata.newValue as any}
-                                      size='sm'
-                                    />
-                                  </>
-                                ) : (
-                                  <>
-                                    <PriorityBadge
-                                      priority={event.metadata.oldValue as any}
-                                      size='sm'
-                                    />
-                                    <span className='text-muted-foreground text-xs'>→</span>
-                                    <PriorityBadge
-                                      priority={event.metadata.newValue as any}
-                                      size='sm'
-                                    />
-                                  </>
-                                )}
-                              </span>
-                            )}
-                          <span className='text-xs text-muted-foreground ml-auto shrink-0'>
-                            {formatTimeAgo(event.createdAt)}
-                          </span>
-                        </div>
-                      </div>
-                    )
+                // ── Helper: separador de fecha entre eventos de días distintos ─
+                const dayLabel = (dateStr: string) =>
+                  new Date(dateStr).toLocaleDateString('es-ES', {
+                    weekday: 'long',
+                    day: '2-digit',
+                    month: 'long',
+                    year: 'numeric',
+                  })
+
+                // ── Helper: timestamp con tooltip para eventos recientes ─────
+                const TimestampLabel = ({
+                  dateStr,
+                  className,
+                }: {
+                  dateStr: string
+                  className?: string
+                }) => {
+                  const diff = Date.now() - new Date(dateStr).getTime()
+                  const isRelative = diff < 24 * 60 * 60 * 1000 // < 24 h → relativo
+                  const label = formatTimeAgo(dateStr)
+                  const exact = formatExactDateTime(dateStr)
+
+                  if (!isRelative) {
+                    return <span className={className}>{label}</span>
                   }
-
-                  // ── Comentarios y archivos: burbuja completa ────────────────
                   return (
-                    <div key={event.id} className='flex space-x-3 py-2'>
-                      {/* Avatar/ícono */}
-                      <div
-                        className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${getEventColor(event.type, event.isInternal)}`}
-                      >
-                        {event.type === 'comment' && event.isInternal ? (
-                          <Lock className='h-4 w-4' />
-                        ) : (
-                          getEventIcon(event.type)
-                        )}
-                      </div>
-
-                      {/* Contenido */}
-                      <div className='flex-1 min-w-0'>
-                        <div className='flex items-center justify-between flex-wrap gap-1'>
-                          <div className='flex items-center space-x-2 flex-wrap gap-1'>
-                            <span className='font-medium text-foreground'>
-                              {event.user?.name ?? '—'}
-                            </span>
-                            <Badge variant='outline' className='text-xs'>
-                              {event.user?.role === 'TECHNICIAN'
-                                ? 'Técnico'
-                                : event.user?.role === 'ADMIN'
-                                  ? 'Admin'
-                                  : event.user?.role === 'CLIENT'
-                                    ? 'Cliente'
-                                    : (event.user?.role ?? '')}
-                            </Badge>
-                            {event.isInternal && (
-                              <Badge className='text-xs bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/50 dark:text-amber-300 dark:border-amber-700 flex items-center gap-1'>
-                                <Lock className='h-2.5 w-2.5' />
-                                Solo equipo
-                              </Badge>
-                            )}
-                          </div>
-                          <span className='text-sm text-muted-foreground'>
-                            {formatTimeAgo(event.createdAt)}
-                          </span>
-                        </div>
-
-                        <div className='mt-1'>
-                          {/* Contenido del comentario */}
-                          {event.type === 'comment' && event.description && (
-                            <div
-                              className={`mt-1 p-3 rounded-lg text-sm whitespace-pre-wrap ${
-                                event.isInternal
-                                  ? 'bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-100'
-                                  : 'bg-muted text-foreground'
-                              }`}
-                            >
-                              {event.description}
-                            </div>
-                          )}
-
-                          {/* Archivo subido */}
-                          {event.type === 'file_uploaded' && (
-                            <p className='text-sm text-muted-foreground mt-0.5'>{event.title}</p>
-                          )}
-
-                          {/* Plan de resolución / Tarea — mostrar título del evento */}
-                          {(event.type === 'resolution_plan' ||
-                            event.type === 'resolution_task') && (
-                            <p className='text-sm text-muted-foreground mt-0.5'>{event.title}</p>
-                          )}
-
-                          {renderEventMetadata(event)}
-                        </div>
-                      </div>
-                    </div>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span
+                          className={`${className ?? ''} cursor-default underline decoration-dotted decoration-muted-foreground/40 underline-offset-2`}
+                        >
+                          {label}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side='top' className='text-xs'>
+                        {exact}
+                      </TooltipContent>
+                    </Tooltip>
                   )
-                })
+                }
+
+                return (
+                  <>
+                    {/* Botón "Ver más" — arriba, ya que el historial es newest-first */}
+                    {hiddenCount > 0 && !showAll && (
+                      <button
+                        type='button'
+                        onClick={() => setShowAll(true)}
+                        className='w-full flex items-center justify-center gap-1.5 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors group'
+                      >
+                        <ChevronUp className='h-3.5 w-3.5 group-hover:text-primary transition-colors' />
+                        <span>
+                          Ver {hiddenCount} actividad{hiddenCount > 1 ? 'es' : ''} anterior
+                          {hiddenCount > 1 ? 'es' : ''}
+                        </span>
+                        <ChevronUp className='h-3.5 w-3.5 group-hover:text-primary transition-colors' />
+                      </button>
+                    )}
+
+                    <TooltipProvider delayDuration={300}>
+                      {displayed.map((event, idx) => {
+                        // Separador de fecha cuando cambia el día
+                        const prevEvent = displayed[idx - 1]
+                        const showDaySeparator =
+                          idx === displayed.length - 1 || // último visible (más antiguo)
+                          (prevEvent && dayLabel(event.createdAt) !== dayLabel(prevEvent.createdAt))
+
+                        const isSystemEvent = ![
+                          'comment',
+                          'file_uploaded',
+                          'resolution_plan',
+                          'resolution_task',
+                        ].includes(event.type)
+
+                        const eventNode = isSystemEvent ? (
+                          // ── Eventos de sistema: compactos, sin burbuja ──────
+                          <div
+                            key={event.id}
+                            className='flex items-start gap-2.5 py-1.5 px-1 group'
+                          >
+                            <div className='flex flex-col items-center shrink-0 mt-0.5'>
+                              <div
+                                className={`w-6 h-6 rounded-full flex items-center justify-center ${getEventColor(event.type, event.isInternal)}`}
+                              >
+                                {getEventIcon(event.type)}
+                              </div>
+                            </div>
+                            <div className='flex-1 min-w-0 flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5'>
+                              <span className='text-sm font-medium text-foreground'>
+                                {event.user?.name ?? '—'}
+                              </span>
+                              <span className='text-xs text-muted-foreground'>
+                                {event.user?.role === 'TECHNICIAN'
+                                  ? '· Técnico'
+                                  : event.user?.role === 'ADMIN'
+                                    ? '· Admin'
+                                    : ''}
+                              </span>
+                              <span className='text-sm text-muted-foreground'>{event.title}</span>
+                              {(event.type === 'status_change' ||
+                                event.type === 'priority_change') &&
+                                event.metadata?.oldValue &&
+                                event.metadata?.newValue && (
+                                  <span className='inline-flex items-center gap-1 ml-0.5'>
+                                    {event.type === 'status_change' ? (
+                                      <>
+                                        <StatusBadge
+                                          status={event.metadata.oldValue as any}
+                                          size='sm'
+                                        />
+                                        <span className='text-muted-foreground text-xs'>→</span>
+                                        <StatusBadge
+                                          status={event.metadata.newValue as any}
+                                          size='sm'
+                                        />
+                                      </>
+                                    ) : (
+                                      <>
+                                        <PriorityBadge
+                                          priority={event.metadata.oldValue as any}
+                                          size='sm'
+                                        />
+                                        <span className='text-muted-foreground text-xs'>→</span>
+                                        <PriorityBadge
+                                          priority={event.metadata.newValue as any}
+                                          size='sm'
+                                        />
+                                      </>
+                                    )}
+                                  </span>
+                                )}
+                              <TimestampLabel
+                                dateStr={event.createdAt}
+                                className='text-xs text-muted-foreground ml-auto shrink-0'
+                              />
+                            </div>
+                          </div>
+                        ) : (
+                          // ── Comentarios y archivos: burbuja completa ────────
+                          <div key={event.id} className='flex space-x-3 py-2'>
+                            <div
+                              className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${getEventColor(event.type, event.isInternal)}`}
+                            >
+                              {event.type === 'comment' && event.isInternal ? (
+                                <Lock className='h-4 w-4' />
+                              ) : (
+                                getEventIcon(event.type)
+                              )}
+                            </div>
+                            <div className='flex-1 min-w-0'>
+                              <div className='flex items-center justify-between flex-wrap gap-1'>
+                                <div className='flex items-center space-x-2 flex-wrap gap-1'>
+                                  <span className='font-medium text-foreground'>
+                                    {event.user?.name ?? '—'}
+                                  </span>
+                                  <Badge variant='outline' className='text-xs'>
+                                    {event.user?.role === 'TECHNICIAN'
+                                      ? 'Técnico'
+                                      : event.user?.role === 'ADMIN'
+                                        ? 'Admin'
+                                        : event.user?.role === 'CLIENT'
+                                          ? 'Cliente'
+                                          : (event.user?.role ?? '')}
+                                  </Badge>
+                                  {event.isInternal && (
+                                    <Badge className='text-xs bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/50 dark:text-amber-300 dark:border-amber-700 flex items-center gap-1'>
+                                      <Lock className='h-2.5 w-2.5' />
+                                      Solo equipo
+                                    </Badge>
+                                  )}
+                                </div>
+                                <TimestampLabel
+                                  dateStr={event.createdAt}
+                                  className='text-sm text-muted-foreground'
+                                />
+                              </div>
+                              <div className='mt-1'>
+                                {event.type === 'comment' && event.description && (
+                                  <div
+                                    className={`mt-1 p-3 rounded-lg text-sm whitespace-pre-wrap ${
+                                      event.isInternal
+                                        ? 'bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-100'
+                                        : 'bg-muted text-foreground'
+                                    }`}
+                                  >
+                                    {event.description}
+                                  </div>
+                                )}
+                                {event.type === 'file_uploaded' && (
+                                  <p className='text-sm text-muted-foreground mt-0.5'>
+                                    {event.title}
+                                  </p>
+                                )}
+                                {(event.type === 'resolution_plan' ||
+                                  event.type === 'resolution_task') && (
+                                  <p className='text-sm text-muted-foreground mt-0.5'>
+                                    {event.title}
+                                  </p>
+                                )}
+                                {renderEventMetadata(event)}
+                              </div>
+                            </div>
+                          </div>
+                        )
+
+                        return (
+                          <React.Fragment key={event.id}>
+                            {eventNode}
+                            {showDaySeparator && (
+                              <div className='flex items-center gap-3 py-2 px-1'>
+                                <div className='flex-1 h-px bg-border' />
+                                <span className='text-xs text-muted-foreground capitalize shrink-0'>
+                                  {dayLabel(event.createdAt)}
+                                </span>
+                                <div className='flex-1 h-px bg-border' />
+                              </div>
+                            )}
+                          </React.Fragment>
+                        )
+                      })}
+                    </TooltipProvider>
+
+                    {/* Botón "Colapsar" cuando está expandido y hay muchos eventos */}
+                    {showAll && hiddenCount > 0 && (
+                      <button
+                        type='button'
+                        onClick={() => setShowAll(false)}
+                        className='w-full flex items-center justify-center gap-1.5 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors group'
+                      >
+                        <ChevronDown className='h-3.5 w-3.5 group-hover:text-primary transition-colors' />
+                        <span>Colapsar historial</span>
+                        <ChevronDown className='h-3.5 w-3.5 group-hover:text-primary transition-colors' />
+                      </button>
+                    )}
+                  </>
+                )
+              })()
             )}
           </div>
         </CardContent>

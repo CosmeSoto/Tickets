@@ -489,19 +489,8 @@ export const getStatusConfig = (status: TicketStatus['value']) =>
 export const getPriorityConfig = (priority: TicketPriority['value']) =>
   TICKET_PRIORITIES.find(p => p.value === priority)
 
-export const formatTimeAgo = (dateString: string): string => {
-  const date = new Date(dateString)
-  const now = new Date()
-  const diff = now.getTime() - date.getTime()
-  const minutes = Math.floor(diff / (1000 * 60))
-  const hours = Math.floor(minutes / 60)
-  const days = Math.floor(hours / 24)
-
-  if (days > 0) return `hace ${days} día${days > 1 ? 's' : ''}`
-  if (hours > 0) return `hace ${hours} hora${hours > 1 ? 's' : ''}`
-  if (minutes > 0) return `hace ${minutes} minuto${minutes > 1 ? 's' : ''}`
-  return 'Ahora mismo'
-}
+// Re-exports desde la utilidad canónica de fechas — no duplicar lógica aquí
+export { formatTimeAgo, formatExactDateTime } from '@/lib/utils/date-utils'
 
 export const formatDate = (dateString: string): string => {
   return new Date(dateString).toLocaleString('es-ES', {
