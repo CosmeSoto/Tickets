@@ -321,6 +321,9 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
               },
             },
           },
+          orderBy: {
+            createdAt: 'asc',
+          },
         },
         ticket_ratings: {
           select: {
@@ -415,49 +418,68 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       }
     }
 
-    // 3. Plan de Resolución (si existe)
+    // 3. Planes de Resolución (todos los completados + el activo si existe)
     if (ticket.resolution_plans && ticket.resolution_plans.length > 0) {
-      const plan = ticket.resolution_plans[0]
-      suggestedContent += `## 📝 Plan de Resolución\n\n`
-      suggestedContent += `**Título:** ${plan.title}\n\n`
+      // Ordenar: completados primero por fecha de creación, luego draft/active al final
+      const completedPlans = ticket.resolution_plans.filter((p: any) => p.status === 'completed')
+      const otherPlans = ticket.resolution_plans.filter((p: any) => p.status !== 'completed')
+      const orderedPlans = [...completedPlans, ...otherPlans]
 
-      if (plan.description) {
-        suggestedContent += `**Descripción:**\n${plan.description}\n\n`
-      }
+      const multiplePlans = orderedPlans.length > 1
 
-      if (plan.tasks && plan.tasks.length > 0) {
-        suggestedContent += `### Tareas Realizadas\n\n`
-        plan.tasks.forEach((task: any, index: number) => {
-          suggestedContent += `${index + 1}. **${task.title}**\n`
-          if (task.description) {
-            suggestedContent += `   - ${task.description}\n`
-          }
-          suggestedContent += `   - Estado: ${translateTaskStatus(task.status)}\n`
+      suggestedContent += `## 📝 Plan${multiplePlans ? 'es' : ''} de Resolución\n\n`
 
-          // Incluir información de horario si está disponible
-          if (task.startTime && task.endTime && task.estimatedHours) {
-            const hours = Math.floor(task.estimatedHours)
-            const minutes = Math.round((task.estimatedHours - hours) * 60)
-            let duration = ''
-            if (hours === 0) {
-              duration = `${minutes} minutos`
-            } else if (minutes === 0) {
-              duration = `${hours} ${hours === 1 ? 'hora' : 'horas'}`
-            } else {
-              duration = `${hours} ${hours === 1 ? 'hora' : 'horas'} ${minutes} minutos`
+      orderedPlans.forEach((plan: any, planIndex: number) => {
+        if (multiplePlans) {
+          const statusLabel =
+            plan.status === 'completed'
+              ? '✅ Completado'
+              : plan.status === 'active'
+                ? '🔄 Activo'
+                : '📝 Borrador'
+          suggestedContent += `### Plan ${planIndex + 1}: ${plan.title} (${statusLabel})\n\n`
+        } else {
+          suggestedContent += `**Título:** ${plan.title}\n\n`
+        }
+
+        if (plan.description) {
+          suggestedContent += `**Descripción:**\n${plan.description}\n\n`
+        }
+
+        if (plan.tasks && plan.tasks.length > 0) {
+          suggestedContent += `#### Tareas Realizadas\n\n`
+          plan.tasks.forEach((task: any, index: number) => {
+            suggestedContent += `${index + 1}. **${task.title}**\n`
+            if (task.description) {
+              suggestedContent += `   - ${task.description}\n`
             }
-            suggestedContent += `   - Horario: ${task.startTime} a ${task.endTime} (${duration})\n`
-          } else if (task.estimatedHours) {
-            suggestedContent += `   - Tiempo estimado: ${task.estimatedHours} horas\n`
-          }
+            suggestedContent += `   - Estado: ${translateTaskStatus(task.status)}\n`
 
-          if (task.notes) {
-            suggestedContent += `   - Notas: ${task.notes}\n`
-          }
-          suggestedContent += `\n`
-        })
-      }
-      suggestedContent += `\n`
+            if (task.startTime && task.endTime && task.estimatedHours) {
+              const hours = Math.floor(task.estimatedHours)
+              const minutes = Math.round((task.estimatedHours - hours) * 60)
+              let duration = ''
+              if (hours === 0) {
+                duration = `${minutes} minutos`
+              } else if (minutes === 0) {
+                duration = `${hours} ${hours === 1 ? 'hora' : 'horas'}`
+              } else {
+                duration = `${hours} ${hours === 1 ? 'hora' : 'horas'} ${minutes} minutos`
+              }
+              suggestedContent += `   - Horario: ${task.startTime} a ${task.endTime} (${duration})\n`
+            } else if (task.estimatedHours) {
+              suggestedContent += `   - Tiempo estimado: ${task.estimatedHours} horas\n`
+            }
+
+            if (task.notes) {
+              suggestedContent += `   - Notas: ${task.notes}\n`
+            }
+            suggestedContent += `\n`
+          })
+        }
+
+        suggestedContent += `\n`
+      })
     }
 
     // 4. Métricas del Ticket (información real y útil)

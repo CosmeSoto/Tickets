@@ -62,6 +62,15 @@ export interface PlanFormData {
   estimatedHours: string
 }
 
+export interface TaskFormData {
+  title: string
+  description: string
+  priority: 'low' | 'medium' | 'high'
+  dueDate: string
+  startTime: string
+  endTime: string
+}
+
 const EMPTY_PLAN_FORM: PlanFormData = {
   title: '',
   description: '',
@@ -439,16 +448,17 @@ export function useResolutionPlan(ticketId: string, onPlanChange?: () => void) {
     }
 
     try {
-      let dueDate = null
-      let estimatedHours = null
+      let dueDate: string | null = null
+      let estimatedHours: number | null = null
 
       if (newTask.dueDate && newTask.startTime && newTask.endTime) {
+        // Construir ISO de inicio combinando fecha + hora inicio
         const startDateTime = new Date(`${newTask.dueDate}T${newTask.startTime}:00`)
         dueDate = startDateTime.toISOString()
 
         const endDateTime = new Date(`${newTask.dueDate}T${newTask.endTime}:00`)
         const durationMs = endDateTime.getTime() - startDateTime.getTime()
-        estimatedHours = durationMs / (1000 * 60 * 60)
+        estimatedHours = Math.round((durationMs / (1000 * 60 * 60)) * 100) / 100
 
         if (estimatedHours <= 0) {
           toast({
@@ -458,21 +468,30 @@ export function useResolutionPlan(ticketId: string, onPlanChange?: () => void) {
           })
           return
         }
+      } else if (newTask.dueDate && !newTask.startTime && !newTask.endTime) {
+        // Solo fecha sin hora — usar fecha al inicio del día
+        dueDate = new Date(`${newTask.dueDate}T00:00:00`).toISOString()
       }
 
       const response = await fetch(`/api/tickets/${ticketId}/resolution-plan/tasks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: newTask.title,
-          description: newTask.description,
+          title: newTask.title.trim(),
+          description: newTask.description.trim() || undefined,
           priority: newTask.priority,
           estimatedHours,
           dueDate,
+          // Enviar horarios al API para guardarlos en la BD
+          startTime: newTask.startTime || undefined,
+          endTime: newTask.endTime || undefined,
         }),
       })
 
-      if (!response.ok) throw new Error('Error al agregar tarea')
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}))
+        throw new Error((err as any).message || 'Error al agregar tarea')
+      }
 
       const data = await response.json()
       if (data.success) {
@@ -485,11 +504,12 @@ export function useResolutionPlan(ticketId: string, onPlanChange?: () => void) {
           onPlanChangeRef.current?.()
         }
         const taskTitle = newTask.title
-        setNewTask(EMPTY_TASK_FORM)
+        // Cerrar form y limpiar estado
         setShowAddTask(false)
+        setNewTask(EMPTY_TASK_FORM)
         taskDraft.clearDraft()
         toast({
-          title: 'Tarea agregada exitosamente',
+          title: 'Tarea agregada',
           description: `"${taskTitle}" ha sido agregada al plan de resolución`,
           duration: 4000,
         })
@@ -498,7 +518,8 @@ export function useResolutionPlan(ticketId: string, onPlanChange?: () => void) {
       toast({
         variant: 'destructive',
         title: 'Error al agregar tarea',
-        description: 'No se pudo agregar la tarea al plan. Intenta nuevamente.',
+        description:
+          err instanceof Error ? err.message : 'No se pudo agregar la tarea. Intenta nuevamente.',
       })
     }
   }

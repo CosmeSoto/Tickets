@@ -192,6 +192,35 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     notifyTicketChanged(ticketId, 'plan_task_created')
 
+    // Registrar en el historial del ticket
+    try {
+      await prisma.ticket_history.create({
+        data: {
+          id: randomUUID(),
+          ticketId,
+          userId: session.user.id,
+          action: 'resolution_task_created',
+          field: 'resolution_task',
+          oldValue: null,
+          newValue: task.title,
+          comment: JSON.stringify({
+            planTitle: plan.title,
+            taskTitle: task.title,
+            description: task.description || null,
+            priority: task.priority,
+            status: task.status,
+            startTime: task.startTime || null,
+            endTime: task.endTime || null,
+            estimatedHours: task.estimatedHours || null,
+            dueDate: task.dueDate?.toISOString() || null,
+          }),
+          createdAt: new Date(),
+        },
+      })
+    } catch (historyError) {
+      console.error('[API] Error creating task history:', historyError)
+    }
+
     return NextResponse.json({
       success: true,
       data: {

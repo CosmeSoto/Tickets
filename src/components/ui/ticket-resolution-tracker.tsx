@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './car
 import { Button } from './button'
 import { Badge } from './badge'
 import { Alert, AlertDescription } from './alert'
-import { Plus, Target, PlayCircle } from 'lucide-react'
+import { Plus, Target, PlayCircle, Info } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './tooltip'
 import { useResolutionPlan } from '@/hooks/use-resolution-plan'
 import { PlanSummary } from './resolution-plan/plan-summary'
@@ -64,6 +64,26 @@ export function TicketResolutionTracker({
           <PlayCircle className='h-4 w-4' />
           <AlertDescription>
             Pon el ticket <strong>En progreso</strong> para crear o editar un plan de resolución.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Banner informativo cuando hay un plan en curso y no se puede crear otro */}
+      {canEdit && isInProgress && openPlan && (
+        <Alert className='border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800'>
+          <Info className='h-4 w-4 text-amber-600 dark:text-amber-400' />
+          <AlertDescription className='text-amber-800 dark:text-amber-300'>
+            {openPlan.status === 'draft' ? (
+              <>
+                Hay un plan en <strong>borrador</strong>: &quot;{openPlan.title}&quot;. Actívalo y
+                complétalo antes de crear un nuevo plan.
+              </>
+            ) : (
+              <>
+                Hay un plan <strong>activo</strong>: &quot;{openPlan.title}&quot;. Márcalo como
+                completado para poder crear un nuevo plan.
+              </>
+            )}
           </AlertDescription>
         </Alert>
       )}
