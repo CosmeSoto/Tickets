@@ -46,6 +46,117 @@ export class AssignmentService {
       // El solicitante nunca puede ser el resolutor
       const blockedUserId = excludeUserId ?? ticket.clientId
 
+      // ─────────────────────────────────────────────────────────────────────
+      // 🥇 PRIORIDAD 0: técnico configurado en la categoría con autoAssign:true
+      // Si existe al menos uno con capacidad disponible, asignarlo directamente
+      // sin pasar por el scoring general.
+      // ─────────────────────────────────────────────────────────────────────
+      const categoryAssignments = await prisma.technician_assignments.findMany({
+        where: {
+          categoryId: ticket.categoryId,
+          isActive: true,
+          autoAssign: true,
+          users: {
+            isActive: true,
+            role: { in: ['TECHNICIAN', 'ADMIN'] },
+            // Nunca asignar al solicitante del ticket
+            id: { not: blockedUserId },
+          },
+        },
+        include: {
+          users: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              role: true,
+              departmentId: true,
+              _count: {
+                select: {
+                  tickets_tickets_assigneeIdTousers: {
+                    where: { status: { in: ['OPEN', 'IN_PROGRESS'] } },
+                  },
+                },
+              },
+            },
+          },
+        },
+        orderBy: { priority: 'asc' }, // prioridad 1 = más importante
+      })
+
+      // Filtrar solo los que tienen capacidad (tickets activos < maxTickets)
+      const { getMaxTicketsPerUser } = await import('@/lib/settings/runtime-settings')
+      const maxWorkloadTickets = await getMaxTicketsPerUser()
+
+      const categoryTechsWithCapacity = categoryAssignments.filter(a => {
+        const active = a.users._count.tickets_tickets_assigneeIdTousers
+        const cap = a.maxTickets ?? maxWorkloadTickets
+        return active < cap
+      })
+
+      if (categoryTechsWithCapacity.length > 0) {
+        // Usar el de mayor prioridad (menor número) con menor carga como desempate
+        const sorted = categoryTechsWithCapacity.sort((a, b) => {
+          if (a.priority !== b.priority) return a.priority - b.priority
+          const aActive = a.users._count.tickets_tickets_assigneeIdTousers
+          const bActive = b.users._count.tickets_tickets_assigneeIdTousers
+          return aActive - bActive
+        })
+        const winner = sorted[0].users
+
+        const updatedTicket = await prisma.tickets.update({
+          where: { id: ticketId },
+          data: { assigneeId: winner.id, status: 'IN_PROGRESS' },
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            priority: true,
+            users_tickets_assigneeIdTousers: { select: { id: true, name: true, email: true } },
+            users_tickets_clientIdTousers: { select: { id: true, name: true, email: true } },
+            categories: { select: { id: true, name: true, color: true, departmentId: true } },
+          },
+        })
+
+        await prisma.ticket_history.create({
+          data: {
+            id: randomUUID(),
+            action: ticket.assigneeId ? 'reassigned' : 'auto_assigned',
+            comment: `Asignado automáticamente a ${winner.name} (técnico de la categoría, prioridad ${sorted[0].priority})`,
+            ticketId,
+            userId: winner.id,
+            createdAt: new Date(),
+          },
+        })
+
+        if (!options?.skipNotifications) {
+          const { NotificationService } = await import('./notification-service')
+          await NotificationService.notifyTicketAssigned(ticketId, winner.id).catch(err => {
+            console.error('[AUTO-ASSIGN] Error enviando notificaciones:', err)
+          })
+          const { triggerTicketAssignedToTechnicianEmail, triggerTicketAssignedToClientEmail } =
+            await import('@/lib/email-triggers')
+          void Promise.resolve(triggerTicketAssignedToTechnicianEmail(ticketId)).catch(
+            (err: Error) => console.error('[EMAIL] Error email técnico:', err)
+          )
+          void Promise.resolve(triggerTicketAssignedToClientEmail(ticketId)).catch((err: Error) =>
+            console.error('[EMAIL] Error email cliente:', err)
+          )
+        }
+
+        return {
+          ticket: updatedTicket,
+          assignedTechnician: {
+            ...winner,
+            assignmentReason: `Técnico asignado a la categoría (prioridad ${sorted[0].priority})`,
+          },
+          reason: `Técnico asignado a la categoría (prioridad ${sorted[0].priority})`,
+        }
+      }
+      // ─────────────────────────────────────────────────────────────────────
+      // Sin técnicos configurados en la categoría → flujo general de scoring
+      // ─────────────────────────────────────────────────────────────────────
+
       // Obtener candidatos disponibles, excluyendo al solicitante
       let availableTechnicians = await this.getAvailableTechnicians(criteria, blockedUserId)
 
@@ -82,9 +193,7 @@ export class AssignmentService {
         }
       }
 
-      // Calcular el mejor técnico
-      const { getMaxTicketsPerUser } = await import('@/lib/settings/runtime-settings')
-      const maxWorkloadTickets = await getMaxTicketsPerUser()
+      // Calcular el mejor técnico (reutiliza maxWorkloadTickets calculado arriba)
       const bestTechnician = await this.calculateBestTechnician(
         ticket,
         availableTechnicians,

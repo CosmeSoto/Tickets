@@ -78,10 +78,15 @@ export function SidebarDetailsCard({
                     .filter(r => r.id !== ticket.client?.id)
                     .map(r => (
                       <SelectItem key={r.id} value={r.id}>
-                        <div className='flex items-center gap-2'>
-                          <span>{r.name}</span>
-                          {r.role === 'ADMIN' && (
-                            <span className='text-xs text-muted-foreground'>(Admin)</span>
+                        <div className='flex flex-col leading-tight'>
+                          <div className='flex items-center gap-1.5'>
+                            <span>{r.name}</span>
+                            {r.role === 'ADMIN' && (
+                              <span className='text-xs text-muted-foreground'>(Admin)</span>
+                            )}
+                          </div>
+                          {r.email && (
+                            <span className='text-xs text-muted-foreground'>{r.email}</span>
                           )}
                         </div>
                       </SelectItem>

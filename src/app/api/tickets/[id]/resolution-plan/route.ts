@@ -751,6 +751,39 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       updateData.status = body.status
       changes.status = { old: existingPlan.status, new: body.status }
 
+      // Si se activa el plan, registrar en historial
+      if (body.status === 'active' && existingPlan.status !== 'active') {
+        await prisma.ticket_history.create({
+          data: {
+            id: randomUUID(),
+            ticketId,
+            userId: session.user.id,
+            action: 'resolution_plan_updated',
+            field: 'resolution_plan',
+            oldValue: existingPlan.status,
+            newValue: 'active',
+            comment: JSON.stringify({
+              planTitle: existingPlan.title,
+              description: existingPlan.description || null,
+              status: 'active',
+              startDate: existingPlan.startDate?.toISOString() || null,
+              targetDate: existingPlan.targetDate?.toISOString() || null,
+              estimatedHours: existingPlan.estimatedHours || null,
+            }),
+            createdAt: new Date(),
+          },
+        })
+
+        // Notificar al cliente que el plan está en marcha
+        await NotificationService.push({
+          userId: existingPlan.ticket.clientId,
+          type: 'INFO',
+          title: 'Plan de resolución activado',
+          message: `El plan de resolución "${existingPlan.title}" ha sido activado y está en progreso.`,
+          ticketId,
+        }).catch(err => console.error('[API] Error creating notification:', err))
+      }
+
       // Si se marca como completado, registrar en historial y notificar
       if (body.status === 'completed' && existingPlan.status !== 'completed') {
         // Si no se proporciona completedDate, establecerla ahora
