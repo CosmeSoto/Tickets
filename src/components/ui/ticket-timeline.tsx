@@ -954,29 +954,16 @@ export function TicketTimeline({
 
                 return (
                   <>
-                    {/* Botón "Ver más" — arriba, ya que el historial es newest-first */}
-                    {hiddenCount > 0 && !showAll && (
-                      <button
-                        type='button'
-                        onClick={() => setShowAll(true)}
-                        className='w-full flex items-center justify-center gap-1.5 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors group'
-                      >
-                        <ChevronUp className='h-3.5 w-3.5 group-hover:text-primary transition-colors' />
-                        <span>
-                          Ver {hiddenCount} actividad{hiddenCount > 1 ? 'es' : ''} anterior
-                          {hiddenCount > 1 ? 'es' : ''}
-                        </span>
-                        <ChevronUp className='h-3.5 w-3.5 group-hover:text-primary transition-colors' />
-                      </button>
-                    )}
-
                     <TooltipProvider delayDuration={300}>
                       {displayed.map((event, idx) => {
-                        // Separador de fecha cuando cambia el día
-                        const prevEvent = displayed[idx - 1]
-                        const showDaySeparator =
-                          idx === displayed.length - 1 || // último visible (más antiguo)
-                          (prevEvent && dayLabel(event.createdAt) !== dayLabel(prevEvent.createdAt))
+                        // ── Separador de fecha ANTES del evento ─────────────
+                        // El listado es newest-first: el evento [idx] es más reciente
+                        // que [idx+1]. Mostramos el separador ENCIMA del primer evento
+                        // de cada día, comparando con el evento siguiente (más antiguo).
+                        const nextEvent = displayed[idx + 1]
+                        const showDaySeparatorBefore =
+                          idx === 0 || // siempre encabeza el primer grupo
+                          (nextEvent && dayLabel(event.createdAt) !== dayLabel(nextEvent.createdAt))
 
                         const isSystemEvent = ![
                           'comment',
@@ -1118,8 +1105,8 @@ export function TicketTimeline({
 
                         return (
                           <React.Fragment key={event.id}>
-                            {eventNode}
-                            {showDaySeparator && (
+                            {/* Separador de fecha ENCIMA del primer evento del día */}
+                            {showDaySeparatorBefore && (
                               <div className='flex items-center gap-3 py-2 px-1'>
                                 <div className='flex-1 h-px bg-border' />
                                 <span className='text-xs text-muted-foreground capitalize shrink-0'>
@@ -1128,10 +1115,27 @@ export function TicketTimeline({
                                 <div className='flex-1 h-px bg-border' />
                               </div>
                             )}
+                            {eventNode}
                           </React.Fragment>
                         )
                       })}
                     </TooltipProvider>
+
+                    {/* Botón "Ver actividades anteriores" — abajo, donde están los eventos más viejos */}
+                    {hiddenCount > 0 && !showAll && (
+                      <button
+                        type='button'
+                        onClick={() => setShowAll(true)}
+                        className='w-full flex items-center justify-center gap-1.5 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors group'
+                      >
+                        <ChevronDown className='h-3.5 w-3.5 group-hover:text-primary transition-colors' />
+                        <span>
+                          Ver {hiddenCount} actividad{hiddenCount > 1 ? 'es' : ''} anterior
+                          {hiddenCount > 1 ? 'es' : ''}
+                        </span>
+                        <ChevronDown className='h-3.5 w-3.5 group-hover:text-primary transition-colors' />
+                      </button>
+                    )}
 
                     {/* Botón "Colapsar" cuando está expandido y hay muchos eventos */}
                     {showAll && hiddenCount > 0 && (
@@ -1140,9 +1144,9 @@ export function TicketTimeline({
                         onClick={() => setShowAll(false)}
                         className='w-full flex items-center justify-center gap-1.5 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors group'
                       >
-                        <ChevronDown className='h-3.5 w-3.5 group-hover:text-primary transition-colors' />
+                        <ChevronUp className='h-3.5 w-3.5 group-hover:text-primary transition-colors' />
                         <span>Colapsar historial</span>
-                        <ChevronDown className='h-3.5 w-3.5 group-hover:text-primary transition-colors' />
+                        <ChevronUp className='h-3.5 w-3.5 group-hover:text-primary transition-colors' />
                       </button>
                     )}
                   </>
