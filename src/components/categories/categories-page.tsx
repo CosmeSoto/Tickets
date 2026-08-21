@@ -69,6 +69,7 @@ export default function CategoriesPage() {
   const { data: session } = useSession()
   const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
   const [familyFilter, setFamilyFilter] = useState('all')
+  const [technicianFilter, setTechnicianFilter] = useState<string | null>(null)
   const [showImportModal, setShowImportModal] = useState(false)
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false)
   // Familias que el admin tiene asignadas (para validar permisos en UI)
@@ -196,8 +197,15 @@ export default function CategoriesPage() {
       result = result.filter((cat: any) => cat.departmentId === departmentFilter)
     }
 
+    // Filtro por técnico — categorías que tienen asignado a ese técnico
+    if (technicianFilter) {
+      result = result.filter((cat: any) =>
+        cat.technician_assignments?.some((a: any) => a.technicianId === technicianFilter)
+      )
+    }
+
     return result
-  }, [filteredCategories, familyFilter, departmentFilter])
+  }, [filteredCategories, familyFilter, departmentFilter, technicianFilter])
 
   // Opciones del filtro de departamento: unión de API + departamentos reales de las categorías del área.
   // Así aparecen TI/Soporte aunque /api/departments venga incompleto o con familyId desfasado.
@@ -497,7 +505,14 @@ export default function CategoriesPage() {
       <div className='space-y-6'>
         <BackToTickets />
         {/* Panel de estado del sistema */}
-        <CategoryStatsPanel stats={stats} loading={loading} />
+        <CategoryStatsPanel
+          stats={stats}
+          loading={loading}
+          onFilterByTechnician={id => {
+            setTechnicianFilter(id)
+          }}
+          activeTechnicianFilter={technicianFilter}
+        />
 
         {/* Vista de Categorías - Card principal */}
         <Card>
@@ -713,10 +728,27 @@ export default function CategoriesPage() {
                   </SelectContent>
                 </Select>
                 {/* Limpiar filtros */}
+                {/* Filtro activo por técnico — badge visible en la barra */}
+                {technicianFilter &&
+                  (() => {
+                    const tech = stats.byTechnician?.find(t => t.id === technicianFilter)
+                    return tech ? (
+                      <button
+                        type='button'
+                        onClick={() => setTechnicianFilter(null)}
+                        className='inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-indigo-100 text-indigo-700 border border-indigo-200 hover:bg-indigo-200 dark:bg-indigo-950/50 dark:text-indigo-300 dark:border-indigo-800 transition-colors'
+                        title='Quitar filtro por técnico'
+                      >
+                        <span>Técnico: {tech.name}</span>
+                        <span className='text-indigo-400 hover:text-indigo-700'>×</span>
+                      </button>
+                    ) : null
+                  })()}
                 {(searchTerm ||
                   levelFilter !== 'all' ||
                   statusFilter !== 'all' ||
                   departmentFilter !== 'all' ||
+                  technicianFilter ||
                   familyFilter !== 'all') && (
                   <Button
                     variant='outline'
@@ -726,6 +758,7 @@ export default function CategoriesPage() {
                       setLevelFilter('all')
                       setStatusFilter('all')
                       setDepartmentFilter('all')
+                      setTechnicianFilter(null)
                       setFamilyFilter('all')
                     }}
                     className='flex items-center gap-1.5'
@@ -750,6 +783,7 @@ export default function CategoriesPage() {
                       levelFilter !== 'all' ||
                       statusFilter !== 'all' ||
                       departmentFilter !== 'all' ||
+                      technicianFilter ||
                       familyFilter !== 'all'
                         ? 'No se encontraron categorías que coincidan con los filtros'
                         : 'No hay categorías disponibles'}
@@ -758,6 +792,7 @@ export default function CategoriesPage() {
                       levelFilter !== 'all' ||
                       statusFilter !== 'all' ||
                       departmentFilter !== 'all' ||
+                      technicianFilter ||
                       familyFilter !== 'all') && (
                       <Button
                         variant='outline'
@@ -766,6 +801,7 @@ export default function CategoriesPage() {
                           setLevelFilter('all')
                           setStatusFilter('all')
                           setDepartmentFilter('all')
+                          setTechnicianFilter(null)
                           setFamilyFilter('all')
                         }}
                         className='mt-2'

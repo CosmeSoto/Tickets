@@ -108,7 +108,64 @@ export function useCategories(options: UseCategoriesOptions = {}) {
       level4: dataHook.categories.filter(c => c.level === 4).length,
     }
 
-    return { total, active, inactive, filtered, withTechnicians, byLevel }
+    // Agrupación por técnico: cuántas categorías tiene asignadas cada uno
+    // Itera todas las categorías y acumula sus technician_assignments
+    const techMap = new Map<
+      string,
+      {
+        id: string
+        name: string
+        email: string
+        role: string
+        categoryCount: number
+        totalCapacity: number // suma de maxTickets de sus asignaciones
+        categories: Array<{
+          id: string
+          name: string
+          color: string
+          priority: number
+          autoAssign: boolean
+        }>
+      }
+    >()
+
+    for (const cat of dataHook.categories) {
+      if (!cat.technician_assignments) continue
+      for (const assignment of cat.technician_assignments) {
+        const u = assignment.users
+        if (!u?.id) continue
+        const existing = techMap.get(u.id)
+        const catEntry = {
+          id: cat.id,
+          name: cat.name,
+          color: cat.color,
+          priority: assignment.priority,
+          autoAssign: assignment.autoAssign,
+        }
+        if (existing) {
+          existing.categoryCount += 1
+          existing.totalCapacity += assignment.maxTickets ?? 10
+          existing.categories.push(catEntry)
+        } else {
+          techMap.set(u.id, {
+            id: u.id,
+            name: u.name,
+            email: u.email,
+            role: (u as any).role ?? 'TECHNICIAN',
+            categoryCount: 1,
+            totalCapacity: assignment.maxTickets ?? 10,
+            categories: [catEntry],
+          })
+        }
+      }
+    }
+
+    // Convertir a array ordenado por cantidad de categorías desc
+    const byTechnician = Array.from(techMap.values()).sort(
+      (a, b) => b.categoryCount - a.categoryCount
+    )
+
+    return { total, active, inactive, filtered, withTechnicians, byLevel, byTechnician }
   }, [dataHook.categories, filteredCategories])
 
   // Paginación - siempre llamar el hook, pero retornar null si está deshabilitado
