@@ -189,9 +189,9 @@ export function serializeAttachments(attachments: Attachment[]): SerializedEmail
         contentType: att.contentType || 'application/octet-stream',
         cid: typeof att.cid === 'string' ? att.cid : undefined,
         contentDisposition: att.contentDisposition === 'inline' ? 'inline' : 'attachment',
-      } satisfies SerializedEmailAttachment
+      } as SerializedEmailAttachment
     })
-    .filter((a): a is SerializedEmailAttachment => a != null)
+    .filter((a): a is SerializedEmailAttachment => a !== null)
 }
 
 export function deserializeAttachments(
@@ -230,6 +230,7 @@ export function parseQueuedAttachments(templateData: unknown): {
   }
 
   const serialized = parsed.__attachments as SerializedEmailAttachment[] | undefined
-  const { __attachments: _drop, ...rest } = parsed
+  const { __attachments: _attachments, ...rest } = parsed
+  void _attachments
   return { rest, attachments: deserializeAttachments(serialized) }
 }

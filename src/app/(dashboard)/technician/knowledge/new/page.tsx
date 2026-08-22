@@ -280,10 +280,10 @@ function NewArticleContent() {
           </Button>
 
           <Button
-            type='submit'
-            form='knowledge-article-form'
+            type='button'
             disabled={isSaving || loadingSuggestions || !sourceTicketId}
             size='sm'
+            onClick={() => void handleSubmit()}
           >
             {isSaving ? (
               <>

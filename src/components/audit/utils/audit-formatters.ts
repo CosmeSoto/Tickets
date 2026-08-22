@@ -505,20 +505,8 @@ export function formatValue(key: string, value: any): string {
       EXPIRED: 'Vencido',
       OUT_OF_SCOPE: 'Fuera de alcance',
       NOT_FOUND: 'No encontrado',
-      PENDING_PRIVACY: 'Pendiente de privacidad',
     }
     return statuses[value] || value
-  }
-
-  // Formatear recurrencia
-  if (key === 'recurrence' && typeof value === 'string') {
-    const recurrences: Record<string, string> = {
-      NONE: 'Sin recurrencia',
-      DAILY: 'Diaria',
-      WEEKLY: 'Semanal',
-      CUSTOM: 'Personalizada',
-    }
-    return recurrences[value] || value
   }
 
   if (key === 'source' && typeof value === 'string') {

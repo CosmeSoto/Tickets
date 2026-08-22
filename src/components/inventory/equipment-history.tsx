@@ -36,8 +36,8 @@ const EVENT_ICONS: Record<string, any> = {
 const INITIAL_VISIBLE = 6
 
 /** Etiqueta de día para separadores (ej. "martes, 19 de agosto de 2026") */
-function dayLabel(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('es-EC', {
+function dayLabel(date: Date | string): string {
+  return new Date(date).toLocaleDateString('es-EC', {
     weekday: 'long',
     day: '2-digit',
     month: 'long',

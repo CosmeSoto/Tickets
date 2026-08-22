@@ -46,16 +46,17 @@ export async function hardDeleteAccessPasses(ids: string[]): Promise<{
   })
   if (passes.length === 0) return { deleted: [], subjectsRemoved: 0 }
 
-  const passIds = passes.map((pass: { id: string }) => pass.id)
-  const subjectIds = [...new Set(passes.map((pass: { subjectId: string }) => pass.subjectId))]
-  const photosBySubject = new Map(
-    passes.map(
-      (pass: { subject: { id: string; photoPath: string | null } }) =>
-        [pass.subject.id, pass.subject.photoPath] as const
+  const passIds = (passes as Array<{ id: string }>).map(p => p.id)
+  const subjectIds: string[] = [
+    ...new Set((passes as Array<{ subjectId: string }>).map(p => p.subjectId)),
+  ]
+  const photosBySubject = new Map<string, string | null>(
+    (passes as Array<{ subject: { id: string; photoPath: string | null } }>).map(
+      pass => [pass.subject.id, pass.subject.photoPath] as [string, string | null]
     )
   )
 
-  const orphanIds: string[] = await db.$transaction(async (tx: any) => {
+  const orphanIds = (await db.$transaction(async (tx: any) => {
     await tx.access_passes.deleteMany({ where: { id: { in: passIds } } })
     const remaining = await tx.access_passes.findMany({
       where: { subjectId: { in: subjectIds } },
@@ -67,9 +68,9 @@ export async function hardDeleteAccessPasses(ids: string[]): Promise<{
       await tx.access_subjects.deleteMany({ where: { id: { in: orphans } } })
     }
     return orphans
-  })
+  })) as string[]
 
-  await Promise.all(orphanIds.map(id => removeStoredPhoto(photosBySubject.get(id))))
+  await Promise.all(orphanIds.map(id => removeStoredPhoto(photosBySubject.get(id) ?? null)))
 
   return {
     deleted: passes.map((pass: DeletedAccessPassSummary) => ({

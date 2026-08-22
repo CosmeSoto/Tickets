@@ -26,7 +26,6 @@ import { CompactFileManager } from '@/components/tickets/compact-file-manager'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
@@ -304,8 +303,12 @@ export default function TechnicianTicketDetailPage() {
             </Button>
           ) : (
             <Button
-              variant='outline'
               size='sm'
+              className={
+                ticket.status === 'CLOSED'
+                  ? 'bg-green-600 hover:bg-green-700 text-white'
+                  : 'bg-primary hover:bg-primary/90 text-primary-foreground'
+              }
               onClick={() => router.push(`/technician/knowledge/new?fromTicket=${ticket.id}`)}
             >
               <Lightbulb className='h-4 w-4 sm:mr-2' />
@@ -360,19 +363,12 @@ export default function TechnicianTicketDetailPage() {
                 <CheckCircle className='h-5 w-5 text-green-600 shrink-0 mt-0.5' />
                 <div>
                   <p className='font-medium text-green-900 dark:text-green-100'>Ticket cerrado</p>
-                  {isAssignedResolver && !hasArticle && (
-                    <Button
-                      variant='outline'
-                      size='sm'
-                      className='mt-2 border-green-300 text-green-800 hover:bg-green-100'
-                      onClick={() =>
-                        router.push(`/technician/knowledge/new?fromTicket=${ticket.id}`)
-                      }
-                    >
-                      <BookOpen className='h-4 w-4 mr-2' />
-                      Promover a Artículo
-                    </Button>
-                  )}
+                  <p className='text-sm text-green-700 dark:text-green-300 mt-0.5'>
+                    Este ticket ha sido cerrado exitosamente.
+                    {canCreateArticle && !hasArticle && (
+                      <> Puedes crear un artículo de conocimiento con el botón superior.</>
+                    )}
+                  </p>
                 </div>
               </CardContent>
             </Card>

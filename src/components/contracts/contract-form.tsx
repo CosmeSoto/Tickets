@@ -413,7 +413,7 @@ export function ContractForm({
 
   useEffect(() => {
     if (contract || !prefill) return
-    applyContractFormPrefill(prefill, setValue, line => append(line), fields.length)
+    applyContractFormPrefill(prefill, setValue, line => append(line as any), fields.length)
   }, [contract, prefill, setValue, append, fields.length])
 
   const autoRenew = watch('autoRenew')

@@ -76,6 +76,8 @@ export interface CreateTicketFormProps {
   cardTitle?: string
   /** Texto de la descripción de la card */
   cardDescription?: string
+  /** Mostrar tips de ayuda al final del formulario */
+  showTips?: boolean
   /** Valores iniciales (p. ej. query string desde inventario) */
   initialValues?: {
     title?: string
@@ -126,7 +128,6 @@ export function CreateTicketForm({
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitSuccess, setSubmitSuccess] = useState(false)
-  const [createdTicketId, setCreatedTicketId] = useState<string | null>(null)
 
   const { families: availableFamilies, loading: loadingFamilies } = useTicketRequestFamilies()
   const [selectedFamilyId, setSelectedFamilyId] = useState<string | null>(null)
@@ -298,7 +299,6 @@ export function CreateTicketForm({
       if (res.ok) {
         const result = await res.json()
         const ticketId = result.data.id
-        setCreatedTicketId(ticketId)
         await uploadFiles(ticketId)
         clearDraft()
         setSubmitSuccess(true)
