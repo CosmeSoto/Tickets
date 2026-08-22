@@ -10,7 +10,20 @@ import { REPORT_LIMITS, ERROR_MESSAGES, AUDIT_CONFIG } from '@/config/reports.co
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session || session.user.role !== 'ADMIN') {
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: ERROR_MESSAGES.unauthorized }, { status: 401 })
+    }
+
+    const role = session.user.role
+    const isSuperAdmin = (session.user as any).isSuperAdmin === true
+
+    // CLIENT no tiene acceso a reportes
+    if (role === 'CLIENT') {
+      return NextResponse.json({ error: ERROR_MESSAGES.forbidden }, { status: 403 })
+    }
+
+    // Solo ADMIN y TECHNICIAN continúan
+    if (role !== 'ADMIN' && role !== 'TECHNICIAN') {
       return NextResponse.json({ error: ERROR_MESSAGES.unauthorized }, { status: 401 })
     }
 
@@ -68,6 +81,8 @@ export async function GET(request: NextRequest) {
     const assigneeId = searchParams.get('assigneeId')
     const clientId = searchParams.get('clientId')
     const departmentId = searchParams.get('departmentId')
+    const createdById = searchParams.get('createdById')
+    const collaboratorId = searchParams.get('collaboratorId')
 
     if (status && status.trim() !== '' && status !== 'all') filters.status = status.trim()
     if (priority && priority.trim() !== '' && priority !== 'all') filters.priority = priority.trim()
@@ -78,26 +93,60 @@ export async function GET(request: NextRequest) {
     if (clientId && clientId.trim() !== '' && clientId !== 'all') filters.clientId = clientId.trim()
     if (departmentId && departmentId.trim() !== '' && departmentId !== 'all')
       filters.departmentId = departmentId.trim()
+    if (createdById && createdById.trim() !== '' && createdById !== 'all')
+      filters.createdById = createdById.trim()
+    if (collaboratorId && collaboratorId.trim() !== '' && collaboratorId !== 'all')
+      filters.collaboratorId = collaboratorId.trim()
 
     if (process.env.NODE_ENV === 'development') {
       console.log('📊 API Reports - Solicitud procesada:', {
         type: reportType,
         format,
         limit,
+        role,
         maxLimit: REPORT_LIMITS[reportType as keyof typeof REPORT_LIMITS],
         filtrosAplicados: filters,
       })
     }
 
-    // Admin Normal: reportes de tickets solo de familia nativa (cola que soporta)
-    const isSuperAdmin = (session.user as any).isSuperAdmin === true
-    if (!isSuperAdmin) {
-      const { getTicketOperationalFamilyIds } = await import('@/lib/auth/family-scope')
-      const operationalIds = await getTicketOperationalFamilyIds(session.user.id, 'ADMIN', false)
-      if (operationalIds && operationalIds.length > 0) {
-        filters.familyIds = operationalIds
-      } else if (operationalIds) {
-        filters.familyIds = ['__NONE__']
+    // ── Scoping por rol ────────────────────────────────────────────────────
+    //
+    // TECHNICIAN → solo puede ver sus propios datos.
+    //   · assigneeId se fuerza a su propio ID (invalida cualquier otro valor enviado).
+    //   · Solo puede pedir reportes de tipo 'tickets' y 'technicians'.
+    //   · No puede filtrar por createdById ni ver datos de otros técnicos.
+    //
+    // ADMIN normal → reportes de tickets solo de su familia operativa.
+    //   · Puede filtrar por createdById para ver órdenes emitidas por un admin.
+    //
+    // ADMIN super → sin restricciones de familia.
+    // ──────────────────────────────────────────────────────────────────────
+
+    if (role === 'TECHNICIAN') {
+      // Técnicos solo pueden ver sus propios reportes
+      filters.assigneeId = session.user.id
+      // Limpiar filtros que podrían exponer datos de otros usuarios
+      delete filters.createdById
+      delete filters.clientId
+      delete filters.collaboratorId
+
+      // Restringir a tipos de reporte que tienen sentido para un técnico
+      if (reportType !== 'tickets' && reportType !== 'technicians') {
+        return NextResponse.json(
+          { error: 'Los técnicos solo pueden consultar reportes de tickets y de técnicos.' },
+          { status: 403 }
+        )
+      }
+    } else {
+      // ADMIN Normal: reportes de tickets solo de familia operativa
+      if (!isSuperAdmin) {
+        const { getTicketOperationalFamilyIds } = await import('@/lib/auth/family-scope')
+        const operationalIds = await getTicketOperationalFamilyIds(session.user.id, 'ADMIN', false)
+        if (operationalIds && operationalIds.length > 0) {
+          filters.familyIds = operationalIds
+        } else if (operationalIds) {
+          filters.familyIds = ['__NONE__']
+        }
       }
     }
 
@@ -303,14 +352,20 @@ export async function POST(request: NextRequest) {
     if (filters.clientId && filters.clientId !== 'all') reportFilters.clientId = filters.clientId
     if (filters.departmentId && filters.departmentId !== 'all')
       reportFilters.departmentId = filters.departmentId
+    if (filters.createdById && filters.createdById !== 'all')
+      reportFilters.createdById = filters.createdById
+    if (filters.collaboratorId && filters.collaboratorId !== 'all')
+      reportFilters.collaboratorId = filters.collaboratorId
 
-    // Si es técnico, solo puede ver sus propios reportes
+    // Scoping por rol (mismo comportamiento que GET)
     if (session.user.role === 'TECHNICIAN') {
+      // Técnico solo ve sus propios datos; eliminar filtros que exponen datos ajenos
       reportFilters.assigneeId = session.user.id
-    }
-
-    // Admin Normal: reportes de tickets solo de familia nativa
-    if (session.user.role === 'ADMIN' && !(session.user as any).isSuperAdmin) {
+      delete reportFilters.createdById
+      delete reportFilters.clientId
+      delete reportFilters.collaboratorId
+    } else if (session.user.role === 'ADMIN' && !(session.user as any).isSuperAdmin) {
+      // Admin normal: scope de familia operativa
       const { getTicketOperationalFamilyIds } = await import('@/lib/auth/family-scope')
       const operationalIds = await getTicketOperationalFamilyIds(session.user.id, 'ADMIN', false)
       if (operationalIds && operationalIds.length > 0) {

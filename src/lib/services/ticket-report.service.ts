@@ -8,6 +8,16 @@ export interface ReportFilters {
   categoryId?: string
   assigneeId?: string
   clientId?: string
+  /**
+   * Filtra por quien creó el ticket (puede ser un admin creando en nombre de un cliente).
+   * Permite responder: "¿Qué tickets ordenó el Admin X?".
+   */
+  createdById?: string
+  /**
+   * Filtra tickets donde un técnico específico participó como colaborador.
+   * Permite responder: "¿En qué tickets colaboró el Técnico Y?".
+   */
+  collaboratorId?: string
   departmentId?: string
   familyIds?: string[]
 }
@@ -106,6 +116,21 @@ export interface TicketReport {
     } | null
     commentsCount: number
     attachmentsCount: number
+    // Quien creó el ticket (puede ser admin diferente al cliente)
+    createdBy: {
+      id: string
+      name: string
+      email: string
+      role: string
+    } | null
+    // true cuando un admin creó este ticket en nombre de un cliente (orden de trabajo)
+    isAdminDispatched: boolean
+    // Técnicos que participaron como colaboradores
+    collaborators: Array<{
+      id: string
+      name: string
+      email: string
+    }>
   }>
   // Metadatos para control de volumen
   metadata?: {
@@ -155,6 +180,22 @@ export interface TechnicianReport {
     avgSlaResponseTime: string
     criticalSlaBreaches: number
     upcomingSlaDeadlines: number
+  }
+  // Métricas de tareas de planes de resolución asignadas directamente al técnico
+  taskMetrics: {
+    tasksAssigned: number
+    tasksCompleted: number
+    tasksOverdue: number
+    tasksPending: number
+    taskCompletionRate: number
+    avgTaskCompletionHours: number | null
+  }
+  // Métricas de colaboración: tickets donde el técnico participó como acompañante
+  collaborationMetrics: {
+    ticketsAsCollaborator: number
+    resolvedAsCollaborator: number
+    inProgressAsCollaborator: number
+    collaborationResolutionRate: number
   }
 }
 
@@ -283,6 +324,8 @@ export class ReportService {
         ticketsThisMonth,
         averageRating,
         slaMetrics,
+        taskMetrics,
+        collaborationMetrics,
       ] = await Promise.all([
         prisma.tickets.count({ where: baseWhere }),
         prisma.tickets.count({ where: { ...baseWhere, status: 'RESOLVED' } }),
@@ -308,6 +351,8 @@ export class ReportService {
         }),
         this.calculateAverageRating(technician.id),
         this.calculateTechnicianSLAMetrics(technician.id, filters),
+        this.calculateTechnicianTaskMetrics(technician.id, filters),
+        this.calculateCollaborationMetrics(technician.id, filters),
       ])
 
       const resolutionRate = totalAssigned > 0 ? (resolved / totalAssigned) * 100 : 0
@@ -330,6 +375,8 @@ export class ReportService {
         averageRating,
         isActive: technician.isActive,
         slaMetrics,
+        taskMetrics,
+        collaborationMetrics,
       })
     }
 
@@ -553,6 +600,18 @@ export class ReportService {
     }
     if (filters.clientId && filters.clientId.trim() !== '') {
       where.clientId = filters.clientId.trim()
+    }
+
+    // Filtro por quien creó el ticket (admin que emitió la orden)
+    if (filters.createdById && filters.createdById.trim() !== '') {
+      where.createdById = filters.createdById.trim()
+    }
+
+    // Filtro por colaborador (técnico acompañante)
+    if (filters.collaboratorId && filters.collaboratorId.trim() !== '') {
+      where.ticket_collaborators = {
+        some: { collaboratorId: filters.collaboratorId.trim() },
+      }
     }
 
     // Filtro por departamento (a través de categoría)
@@ -1255,6 +1314,15 @@ export class ReportService {
             email: true,
           },
         },
+        // Quien creó el ticket (puede ser admin diferente al cliente)
+        users_tickets_createdByIdTousers: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+          },
+        },
         categories: {
           select: {
             id: true,
@@ -1308,6 +1376,15 @@ export class ReportService {
             comments: true,
             attachments: true,
           },
+        },
+        // Colaboradores del ticket para trazabilidad completa del equipo
+        ticket_collaborators: {
+          include: {
+            collaborator: {
+              select: { id: true, name: true, email: true },
+            },
+          },
+          orderBy: { createdAt: 'asc' },
         },
       },
       orderBy: {
@@ -1377,6 +1454,14 @@ export class ReportService {
         tags: ticket.tags || [],
         client: ticket.users_tickets_clientIdTousers,
         assignee: ticket.users_tickets_assigneeIdTousers,
+        // Quien creó el ticket (audit trail de la orden)
+        createdBy: ticket.users_tickets_createdByIdTousers ?? null,
+        // true cuando un admin creó el ticket en nombre de un cliente (orden de trabajo)
+        isAdminDispatched:
+          ticket.users_tickets_createdByIdTousers !== null &&
+          ticket.users_tickets_createdByIdTousers !== undefined &&
+          ticket.users_tickets_createdByIdTousers.id !== ticket.clientId &&
+          ticket.users_tickets_createdByIdTousers.role === 'ADMIN',
         category: {
           id: ticket.categories.id,
           name: ticket.categories.name,
@@ -1391,6 +1476,8 @@ export class ReportService {
           : null,
         commentsCount: ticket._count.comments,
         attachmentsCount: ticket._count.attachments,
+        // Equipo completo del ticket: colaboradores acompañantes
+        collaborators: ticket.ticket_collaborators.map(tc => tc.collaborator),
       }
     })
 
@@ -1404,6 +1491,138 @@ export class ReportService {
         hasMoreRecords: totalCount > limit,
         filtersApplied: Object.keys(where).length > 0,
       },
+    }
+  }
+
+  /**
+   * Calcula métricas de resolution_tasks asignadas directamente al técnico.
+   *
+   * Proporciona visibilidad real de la carga operativa: un técnico con 2 tickets
+   * puede tener 12 tareas asignadas — el reporte de tickets solo da la mitad del cuadro.
+   */
+  private static async calculateTechnicianTaskMetrics(
+    technicianId: string,
+    filters: ReportFilters
+  ): Promise<TechnicianReport['taskMetrics']> {
+    const now = new Date()
+
+    // Filtro de fechas heredado de los filtros generales del reporte
+    const dateFilter: any = {}
+    if (filters.startDate) dateFilter.gte = new Date(filters.startDate)
+    if (filters.endDate) {
+      const end = new Date(filters.endDate)
+      end.setHours(23, 59, 59, 999)
+      dateFilter.lte = end
+    }
+
+    const taskWhere: any = { assignedTo: technicianId }
+    if (Object.keys(dateFilter).length > 0) {
+      taskWhere.createdAt = dateFilter
+    }
+
+    const [tasksAssigned, tasksCompleted, tasksOverdue, tasksPending, completedWithTime] =
+      await Promise.all([
+        prisma.resolution_tasks.count({ where: taskWhere }),
+        prisma.resolution_tasks.count({ where: { ...taskWhere, status: 'completed' } }),
+        // Vencidas: pendientes o en curso cuya dueDate ya pasó
+        prisma.resolution_tasks.count({
+          where: {
+            ...taskWhere,
+            status: { in: ['pending', 'in_progress'] },
+            dueDate: { lt: now },
+          },
+        }),
+        prisma.resolution_tasks.count({
+          where: { ...taskWhere, status: { in: ['pending', 'in_progress'] } },
+        }),
+        // Para calcular el promedio de horas reales de completación
+        prisma.resolution_tasks.findMany({
+          where: { ...taskWhere, status: 'completed', actualHours: { not: null } },
+          select: { actualHours: true },
+        }),
+      ])
+
+    const taskCompletionRate =
+      tasksAssigned > 0 ? Math.round((tasksCompleted / tasksAssigned) * 100) : 0
+
+    const avgTaskCompletionHours =
+      completedWithTime.length > 0
+        ? Math.round(
+            (completedWithTime.reduce((s, t) => s + (t.actualHours ?? 0), 0) /
+              completedWithTime.length) *
+              10
+          ) / 10
+        : null
+
+    return {
+      tasksAssigned,
+      tasksCompleted,
+      tasksOverdue,
+      tasksPending,
+      taskCompletionRate,
+      avgTaskCompletionHours,
+    }
+  }
+
+  /**
+   * Calcula métricas de los tickets donde el técnico participó como colaborador.
+   *
+   * Complementa totalAssigned (donde es el responsable principal) con la vista
+   * completa de participación real en tickets del área.
+   */
+  private static async calculateCollaborationMetrics(
+    technicianId: string,
+    filters: ReportFilters
+  ): Promise<TechnicianReport['collaborationMetrics']> {
+    // IDs de tickets donde el técnico es colaborador (no asignado)
+    const collabLinks = await prisma.ticket_collaborators.findMany({
+      where: { collaboratorId: technicianId },
+      select: { ticketId: true },
+    })
+
+    if (collabLinks.length === 0) {
+      return {
+        ticketsAsCollaborator: 0,
+        resolvedAsCollaborator: 0,
+        inProgressAsCollaborator: 0,
+        collaborationResolutionRate: 0,
+      }
+    }
+
+    const collabTicketIds = collabLinks.map(c => c.ticketId)
+
+    // Filtro de fechas del reporte (para coherencia con el resto de métricas)
+    const dateFilter: any = {}
+    if (filters.startDate) dateFilter.gte = new Date(filters.startDate)
+    if (filters.endDate) {
+      const end = new Date(filters.endDate)
+      end.setHours(23, 59, 59, 999)
+      dateFilter.lte = end
+    }
+    const baseWhere: any = {
+      id: { in: collabTicketIds },
+      // Excluir los tickets donde también es el assignee (evitar doble conteo)
+      assigneeId: { not: technicianId },
+    }
+    if (Object.keys(dateFilter).length > 0) baseWhere.createdAt = dateFilter
+
+    const [ticketsAsCollaborator, resolvedAsCollaborator, inProgressAsCollaborator] =
+      await Promise.all([
+        prisma.tickets.count({ where: baseWhere }),
+        prisma.tickets.count({ where: { ...baseWhere, status: { in: ['RESOLVED', 'CLOSED'] } } }),
+        prisma.tickets.count({ where: { ...baseWhere, status: 'IN_PROGRESS' } }),
+      ])
+
+    const collaborationResolutionRate =
+      ticketsAsCollaborator > 0
+        ? Math.round((resolvedAsCollaborator / ticketsAsCollaborator) * 100)
+        : 0
+
+    return {
+      ticketsAsCollaborator,
+      resolvedAsCollaborator,
+      inProgressAsCollaborator,
+      collaborationResolutionRate,
     }
   }
 }

@@ -471,6 +471,13 @@ export class NotificationService {
       const author = comment.users
       const isInternalComment = comment.isInternal
 
+      // Colaboradores actuales del ticket (para incluirlos en notificaciones pertinentes)
+      const collaboratorRows = await prisma.ticket_collaborators.findMany({
+        where: { ticketId: ticket.id },
+        select: { collaboratorId: true },
+      })
+      const collaboratorIds = collaboratorRows.map(c => c.collaboratorId)
+
       // Comentario interno: notificar solo al equipo (admin ↔ técnico), nunca al cliente
       if (isInternalComment) {
         const notifications = []
@@ -505,6 +512,23 @@ export class NotificationService {
           if (n) notifications.push(n)
         }
 
+        // Nota interna del admin → notificar también a colaboradores técnicos
+        // (son parte del equipo y deben ver las instrucciones internas)
+        if (author.role === 'ADMIN' && collaboratorIds.length > 0) {
+          for (const collabId of collaboratorIds) {
+            if (collabId === author.id || collabId === ticket.assigneeId) continue
+            const n = await this.createNotification({
+              userId: collabId,
+              type: 'INFO',
+              title: '🔒 Nota interna en tu ticket',
+              message: `${author.name} dejó una nota interna en el ticket "${ticket.title}"`,
+              ticketId: ticket.id,
+              specificType: 'newComments',
+            })
+            if (n) notifications.push(n)
+          }
+        }
+
         return notifications
       }
 
@@ -536,7 +560,6 @@ export class NotificationService {
         if (techNotification) notifications.push(techNotification)
 
         // Telegram al técnico: el cliente esperando respuesta es operativamente importante
-        // Se usa priority 'important' explícita porque 'newComments' es 'optional' en política
         queueTelegramNotification({
           recipientUserId: ticket.assigneeId,
           title: 'El cliente respondió en tu ticket',
@@ -545,6 +568,21 @@ export class NotificationService {
           priority: 'important',
           link: `/technician/tickets/${ticket.id}`,
         }).catch(err => console.error('[TELEGRAM] notifyNewComment técnico:', err))
+
+        // Notificar también a los colaboradores cuando el cliente responde —
+        // son parte del equipo activo en el ticket y deben estar al tanto.
+        for (const collabId of collaboratorIds) {
+          if (collabId === ticket.assigneeId) continue // ya fue notificado arriba
+          const n = await this.createNotification({
+            userId: collabId,
+            type: 'INFO',
+            title: 'El cliente respondió en tu ticket',
+            message: `${author.name} ha comentado en el ticket "${ticket.title}"`,
+            ticketId: ticket.id,
+            specificType: 'newComments',
+          })
+          if (n) notifications.push(n)
+        }
       }
 
       return notifications
@@ -629,6 +667,26 @@ export class NotificationService {
           event: 'statusChanged',
           link: `/technician/tickets/${ticket.id}`,
         }).catch(err => console.error('[TELEGRAM] notifyTicketResolved:', err))
+      }
+
+      // Notificar a los colaboradores que el ticket fue resuelto.
+      // Ellos participaron en el trabajo y deben enterarse del cierre.
+      const collaboratorRows = await prisma.ticket_collaborators.findMany({
+        where: { ticketId: ticket.id },
+        select: { collaboratorId: true },
+      })
+      for (const { collaboratorId } of collaboratorRows) {
+        // No duplicar si el colaborador es también el assignee
+        if (collaboratorId === ticket.assigneeId) continue
+        this.push({
+          userId: collaboratorId,
+          type: 'SUCCESS',
+          title: 'Ticket resuelto',
+          message: `El ticket "${ticket.title}" en el que colaborabas ha sido resuelto.`,
+          ticketId: ticket.id,
+          specificType: 'statusChanged',
+          metadata: { link: `/technician/tickets/${ticket.id}` },
+        }).catch(() => {})
       }
 
       return notification

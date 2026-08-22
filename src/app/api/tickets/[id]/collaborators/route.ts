@@ -225,6 +225,12 @@ export async function DELETE(
     where: { ticketId, collaboratorId },
   })
 
+  // Obtener nombre del ticket y del colaborador para la notificación
+  const [ticketForNotif, removedUser] = await Promise.all([
+    prisma.tickets.findUnique({ where: { id: ticketId }, select: { title: true } }),
+    prisma.users.findUnique({ where: { id: collaboratorId }, select: { name: true } }),
+  ])
+
   await prisma.ticket_history
     .create({
       data: {
@@ -232,11 +238,24 @@ export async function DELETE(
         ticketId,
         userId: session.user.id,
         action: 'collaborator_removed',
-        comment: 'Colaborador eliminado del ticket',
+        comment: removedUser
+          ? `${removedUser.name} eliminado como colaborador`
+          : 'Colaborador eliminado del ticket',
         createdAt: new Date(),
       },
     })
     .catch(() => {})
+
+  // Notificar al colaborador removido para que sepa que ya no tiene acceso
+  if (ticketForNotif) {
+    NotificationService.push({
+      userId: collaboratorId,
+      type: 'INFO',
+      title: 'Removido como colaborador',
+      message: `Has sido removido como colaborador del ticket "${ticketForNotif.title}".`,
+      ticketId,
+    }).catch(() => {})
+  }
 
   AuditServiceComplete.log({
     action: AuditActionsComplete.COLLABORATOR_REMOVED,

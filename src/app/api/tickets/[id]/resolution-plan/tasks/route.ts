@@ -11,6 +11,7 @@ import {
   formatDuration,
 } from '@/lib/time-utils'
 import { NotificationService } from '@/lib/services/notification-service'
+import { ResolutionNotificationService } from '@/lib/services/resolution-notification-service'
 import {
   assertTicketAccess,
   TicketAccessError,
@@ -191,6 +192,21 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     notifyTicketChanged(ticketId, 'plan_task_created')
+
+    // ── Notificar al técnico asignado a la tarea ─────────────────────────
+    // El servicio ResolutionNotificationService.notifyTaskAssigned existe pero
+    // no estaba conectado. Aquí lo activamos para que el técnico reciba la orden.
+    if (task.assignedTo && task.assignedTo !== plan.ticket.clientId) {
+      ResolutionNotificationService.notifyTaskAssigned({
+        taskId: task.id,
+        taskTitle: task.title,
+        dueDate: task.dueDate ?? new Date(),
+        assignedTo: task.assignedTo,
+        planTitle: plan.title,
+        ticketId,
+        ticketTitle: plan.ticket.title,
+      }).catch(err => console.error('[API] Error notifying assigned technician:', err))
+    }
 
     // Registrar en el historial del ticket
     try {

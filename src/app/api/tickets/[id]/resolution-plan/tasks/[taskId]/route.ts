@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma'
 import { auditTaskChange } from '@/lib/audit'
 import { calculateDuration, validateTimeRange, combineDateAndTime } from '@/lib/time-utils'
 import { NotificationService } from '@/lib/services/notification-service'
+import { ResolutionNotificationService } from '@/lib/services/resolution-notification-service'
 import {
   assertTicketAccess,
   TicketAccessError,
@@ -165,7 +166,6 @@ export async function PATCH(
       updateData.assignedTo = body.assignedTo
       changes.assignedTo = { old: task.assignedTo, new: body.assignedTo }
     }
-
     if (body.dueDate !== undefined) {
       updateData.dueDate = body.dueDate ? new Date(body.dueDate) : null
     }
@@ -255,6 +255,21 @@ export async function PATCH(
     }
 
     notifyTicketChanged(ticketId, 'plan_task_updated')
+
+    // ── Notificar al técnico si cambia la asignación ─────────────────────
+    const newAssignedTo = body.assignedTo !== undefined ? body.assignedTo : null
+    const assigneeChanged = body.assignedTo !== undefined && body.assignedTo !== task.assignedTo
+    if (assigneeChanged && newAssignedTo) {
+      ResolutionNotificationService.notifyTaskAssigned({
+        taskId: updatedTask.id,
+        taskTitle: updatedTask.title,
+        dueDate: updatedTask.dueDate ?? new Date(),
+        assignedTo: newAssignedTo,
+        planTitle: task.plan.title,
+        ticketId,
+        ticketTitle: task.plan.ticket.title,
+      }).catch(err => console.error('[API] Error notifying reassigned technician:', err))
+    }
 
     return NextResponse.json({
       success: true,

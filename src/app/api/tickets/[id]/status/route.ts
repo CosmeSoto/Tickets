@@ -307,6 +307,35 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       'dashboard:*',
     ]).catch(() => {})
 
+    // Notificar a colaboradores sobre cambios de estado significativos.
+    // Se excluye IN_PROGRESS (ruido) y RESOLVED (ya lo maneja notifyTicketResolved).
+    // CLOSED y ON_HOLD sí se notifican: el colaborador debe saber que el trabajo cambió.
+    if (['CLOSED', 'ON_HOLD', 'OPEN'].includes(newStatus)) {
+      const collabRows = await prisma.ticket_collaborators.findMany({
+        where: { ticketId },
+        select: { collaboratorId: true },
+      })
+      const statusLabels: Record<string, string> = {
+        CLOSED: 'cerrado',
+        ON_HOLD: 'en espera',
+        OPEN: 'reabierto',
+      }
+      const label = statusLabels[newStatus] ?? newStatus
+      for (const { collaboratorId } of collabRows) {
+        // No notificar al colaborador que realizó el cambio
+        if (collaboratorId === session.user.id) continue
+        NotificationService.push({
+          userId: collaboratorId,
+          type: newStatus === 'CLOSED' ? 'SUCCESS' : 'INFO',
+          title: `Ticket ${label}`,
+          message: `El ticket "${ticket.title}" en el que colaboras ha sido ${label}.`,
+          ticketId,
+          specificType: 'statusChanged',
+          metadata: { link: `/technician/tickets/${ticketId}` },
+        }).catch(() => {})
+      }
+    }
+
     // Avisar a quien tenga el detalle abierto (cliente ve calificación al instante)
     const { TicketEvents } = await import('@/lib/ticket-events')
     TicketEvents.emit(ticketId, {
