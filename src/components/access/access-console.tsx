@@ -6,6 +6,7 @@ import {
   Camera,
   CheckCircle2,
   ClipboardPaste,
+  History,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -119,7 +120,55 @@ function effectivePassLabel(pass: AccessPass): {
   return { label: 'VIGENTE', variant: 'default' }
 }
 
+const SCAN_RESULT_LABELS: Record<
+  string,
+  { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }
+> = {
+  VALID: { label: 'Autorizado', variant: 'default' },
+  EXPIRED: { label: 'Vencido', variant: 'secondary' },
+  REVOKED: { label: 'Revocado', variant: 'destructive' },
+  SUSPENDED: { label: 'Suspendido', variant: 'outline' },
+  PENDING_PRIVACY: { label: 'Pend. privacidad', variant: 'outline' },
+  INACTIVE_SUBJECT: { label: 'Inactivo', variant: 'secondary' },
+  NOT_FOUND: { label: 'No encontrado', variant: 'destructive' },
+  OUT_OF_SCOPE: { label: 'Fuera de alcance', variant: 'secondary' },
+}
+
+function scanResultLabel(result: string): {
+  label: string
+  variant: 'default' | 'secondary' | 'destructive' | 'outline'
+} {
+  return SCAN_RESULT_LABELS[result] ?? { label: result, variant: 'outline' }
+}
+
 type Family = { id: string; name: string; code: string }
+
+/** Registro individual del historial de escaneos */
+type ScanEvent = {
+  id: string
+  result: string
+  scannedAt: string
+  failureCode?: string | null
+  agent: { id: string; name: string }
+  family?: { id: string; name: string; code: string } | null
+  pass?: {
+    id: string
+    credentialCode: string
+    subject: {
+      firstName: string
+      lastName: string
+      accessType: string
+      organization?: string | null
+    }
+  } | null
+}
+
+type ScanEventsPagination = {
+  total: number
+  page: number
+  limit: number
+  totalPages: number
+}
 
 const PRIVACY_NOTICE_VERSION = 'v1'
 
@@ -164,6 +213,21 @@ export function AccessConsole() {
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('cards')
   const [submitting, setSubmitting] = useState(false)
   const [busyPassId, setBusyPassId] = useState<string | null>(null)
+
+  // ── Historial de escaneos ──────────────────────────────────────────────────
+  const [scanEvents, setScanEvents] = useState<ScanEvent[]>([])
+  const [scanEventsPagination, setScanEventsPagination] = useState<ScanEventsPagination>({
+    total: 0,
+    page: 1,
+    limit: 20,
+    totalPages: 1,
+  })
+  const [scanEventsPage, setScanEventsPage] = useState(1)
+  const [scanEventsLimit, setScanEventsLimit] = useState(20)
+  const [scanEventsFilters, setScanEventsFilters] = useState<Record<string, string>>({})
+  const [scanEventsLoading, setScanEventsLoading] = useState(false)
+  // ──────────────────────────────────────────────────────────────────────────
+
   const [columnOrder, setColumnOrder] = useState([
     'subject',
     'family.name',
@@ -249,6 +313,49 @@ export function AccessConsole() {
     void loadOrganizations()
   }, [canManage, loadOrganizations])
 
+  const loadScanEvents = useCallback(
+    async (
+      opts: {
+        page?: number
+        limit?: number
+        filters?: Record<string, string>
+      } = {}
+    ) => {
+      const page = opts.page ?? scanEventsPage
+      const limit = opts.limit ?? scanEventsLimit
+      const filters = opts.filters ?? scanEventsFilters
+      setScanEventsLoading(true)
+      try {
+        const params = new URLSearchParams()
+        params.set('page', String(page))
+        params.set('limit', String(limit))
+        if (filters.familyId) params.set('familyId', filters.familyId)
+        if (filters.result) params.set('result', filters.result)
+        if (filters.dateFrom) params.set('dateFrom', filters.dateFrom)
+        if (filters.dateTo) params.set('dateTo', filters.dateTo)
+        if (filters.search?.trim()) params.set('search', filters.search.trim())
+        const response = await fetch(`/api/access-passes/scan-events?${params.toString()}`)
+        if (!response.ok) return
+        const data = await response.json()
+        setScanEvents(data.events ?? [])
+        setScanEventsPagination(data.pagination)
+      } finally {
+        setScanEventsLoading(false)
+      }
+    },
+    [scanEventsPage, scanEventsLimit, scanEventsFilters]
+  )
+
+  // Cargar historial cuando el usuario tiene acceso de escaneo o gestión
+  useEffect(() => {
+    void loadScanEvents()
+  }, [loadScanEvents])
+
+  const handleScanEventsFiltersChange = useCallback((filters: Record<string, string>) => {
+    setScanEventsFilters(filters)
+    setScanEventsPage(1)
+  }, [])
+
   const verify = useCallback(
     async (value: string) => {
       if (!value.trim() || scanning) return
@@ -261,13 +368,16 @@ export function AccessConsole() {
         })
         const data = await response.json()
         setResult(data)
+        // Actualizar historial con la página 1 para mostrar el escaneo recién hecho
+        void loadScanEvents({ page: 1 })
+        setScanEventsPage(1)
       } finally {
         setScanning(false)
         setCameraOpen(false)
         readerRef.current?.reset()
       }
     },
-    [scanning]
+    [scanning, loadScanEvents]
   )
 
   const startCamera = async () => {
@@ -775,6 +885,105 @@ export function AccessConsole() {
     getData: () => passes,
   })
 
+  // ── Columnas del historial de escaneos ────────────────────────────────────
+  const scanEventColumns = useMemo<Column<ScanEvent>[]>(
+    () => [
+      {
+        key: 'scannedAt',
+        label: 'Fecha / hora',
+        sortable: true,
+        render: event => (
+          <span className='whitespace-nowrap text-sm'>{formatAccessDateTime(event.scannedAt)}</span>
+        ),
+      },
+      {
+        key: 'pass',
+        label: 'Persona',
+        sortable: false,
+        render: event =>
+          event.pass ? (
+            <div>
+              <p className='font-medium text-sm'>
+                {event.pass.subject.firstName} {event.pass.subject.lastName}
+              </p>
+              <p className='text-xs text-muted-foreground'>
+                {accessTypeLabel(event.pass.subject.accessType)}
+                {event.pass.subject.organization ? ` · ${event.pass.subject.organization}` : ''}
+              </p>
+            </div>
+          ) : (
+            <span className='text-muted-foreground text-sm'>—</span>
+          ),
+      },
+      {
+        key: 'family',
+        label: 'Área',
+        sortable: false,
+        render: event =>
+          event.family ? (
+            <span className='text-sm'>{event.family.name}</span>
+          ) : (
+            <span className='text-muted-foreground text-sm'>—</span>
+          ),
+      },
+      {
+        key: 'result',
+        label: 'Resultado',
+        sortable: true,
+        render: event => {
+          const badge = scanResultLabel(event.result)
+          return <Badge variant={badge.variant}>{badge.label}</Badge>
+        },
+      },
+      {
+        key: 'agent',
+        label: 'Verificado por',
+        sortable: false,
+        render: event => <span className='text-sm text-muted-foreground'>{event.agent.name}</span>,
+      },
+      {
+        key: 'credentialCode',
+        label: 'Credencial',
+        sortable: false,
+        render: event =>
+          event.pass ? (
+            <span className='font-mono text-xs'>{event.pass.credentialCode}</span>
+          ) : (
+            <span className='text-muted-foreground text-sm'>—</span>
+          ),
+      },
+    ],
+    []
+  )
+
+  const {
+    exportCSV: exportEventsCsv,
+    exportExcel: exportEventsExcel,
+    exportPDF: exportEventsPdf,
+    exporting: exportingEvents,
+  } = useExport({
+    filename: 'historial-escaneos',
+    title: 'Historial de escaneos',
+    subtitle: 'Registro de verificaciones de acceso',
+    columns: [
+      { label: 'Fecha / hora', accessor: (e: ScanEvent) => formatAccessDateTime(e.scannedAt) },
+      {
+        label: 'Persona',
+        accessor: (e: ScanEvent) =>
+          e.pass ? `${e.pass.subject.firstName} ${e.pass.subject.lastName}` : '—',
+      },
+      { label: 'Área', accessor: (e: ScanEvent) => e.family?.name ?? '—' },
+      {
+        label: 'Resultado',
+        accessor: (e: ScanEvent) => scanResultLabel(e.result).label,
+      },
+      { label: 'Verificado por', accessor: (e: ScanEvent) => e.agent.name },
+      { label: 'Credencial', accessor: (e: ScanEvent) => e.pass?.credentialCode ?? '—' },
+    ],
+    getData: () => scanEvents,
+  })
+  // ──────────────────────────────────────────────────────────────────────────
+
   return (
     <div className='grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_380px]'>
       <section className='min-w-0 space-y-4'>
@@ -969,6 +1178,73 @@ export function AccessConsole() {
             }}
           />
         )}
+
+        {/* ── Historial de escaneos ── */}
+        <DataTable
+          title='Registro de accesos'
+          description='Historial completo de verificaciones ordenado por más reciente.'
+          data={scanEvents}
+          columns={scanEventColumns}
+          loading={scanEventsLoading}
+          filters={[
+            {
+              key: 'result',
+              label: 'Resultado',
+              type: 'select',
+              options: [
+                { value: 'VALID', label: 'Autorizado' },
+                { value: 'EXPIRED', label: 'Vencido' },
+                { value: 'REVOKED', label: 'Revocado' },
+                { value: 'SUSPENDED', label: 'Suspendido' },
+                { value: 'PENDING_PRIVACY', label: 'Pend. privacidad' },
+                { value: 'INACTIVE_SUBJECT', label: 'Inactivo' },
+                { value: 'NOT_FOUND', label: 'No encontrado' },
+                { value: 'OUT_OF_SCOPE', label: 'Fuera de alcance' },
+              ],
+            },
+            ...(families.length > 0
+              ? [
+                  {
+                    key: 'familyId',
+                    label: 'Área',
+                    type: 'select' as const,
+                    options: families.map(f => ({ value: f.id, label: f.name })),
+                  },
+                ]
+              : []),
+            { key: 'dateFrom', label: 'Desde', type: 'input' as const, placeholder: 'YYYY-MM-DD' },
+            { key: 'dateTo', label: 'Hasta', type: 'input' as const, placeholder: 'YYYY-MM-DD' },
+          ]}
+          onFiltersChange={handleScanEventsFiltersChange}
+          onRefresh={() => void loadScanEvents()}
+          pagination={{
+            page: scanEventsPage,
+            limit: scanEventsLimit,
+            total: scanEventsPagination.total,
+            onPageChange: page => {
+              setScanEventsPage(page)
+              void loadScanEvents({ page })
+            },
+            onLimitChange: limit => {
+              setScanEventsLimit(limit)
+              setScanEventsPage(1)
+              void loadScanEvents({ page: 1, limit })
+            },
+          }}
+          onExport={
+            <ExportButton
+              onExportCSV={exportEventsCsv}
+              onExportExcel={exportEventsExcel}
+              onExportPDF={exportEventsPdf}
+              loading={exportingEvents}
+            />
+          }
+          emptyState={{
+            icon: <History className='h-8 w-8 text-muted-foreground/40' />,
+            title: 'Sin registros',
+            description: 'No hay escaneos que coincidan con los filtros seleccionados.',
+          }}
+        />
       </section>
 
       {canManage && (

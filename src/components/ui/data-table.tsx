@@ -359,14 +359,19 @@ export function DataTable<T extends { id: string }>({
                     </label>
                     {filter.type === 'select' && filter.options ? (
                       <Select
-                        value={filterValues[filter.key] || ''}
-                        onValueChange={v => setFilterValues(prev => ({ ...prev, [filter.key]: v }))}
+                        value={filterValues[filter.key] || '__all__'}
+                        onValueChange={v =>
+                          setFilterValues(prev => ({
+                            ...prev,
+                            [filter.key]: v === '__all__' ? '' : v,
+                          }))
+                        }
                       >
                         <SelectTrigger className='h-8 text-sm'>
                           <SelectValue placeholder='Todos' />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value=''>Todos</SelectItem>
+                          <SelectItem value='__all__'>Todos</SelectItem>
                           {filter.options.map(opt => (
                             <SelectItem key={opt.value} value={opt.value}>
                               {opt.label}
