@@ -329,6 +329,32 @@ El worker detiene app/nginx/postgres, restaura y reinicia todo (~5–15 min de d
 
 Para restauración por módulo usa **Export .dump**, no pgBackRest.
 
+### ⚠️ Nota importante: `technician_assignments` en backups por módulo
+
+Las asignaciones de técnicos a categorías (`technician_assignments`) **no se incluían** en los backups del módulo `tickets` ni en versiones antiguas del módulo `families`. Si restauraste un backup parcial y los técnicos de las categorías desaparecieron, tienes dos opciones:
+
+**Opción A — Recuperar desde el .dump existente (si el dump lo tenía):**
+
+```bash
+# En el servidor de producción:
+chmod +x docker/scripts/recover-technician-assignments.sh
+./docker/scripts/recover-technician-assignments.sh
+# O especificando el dump:
+./docker/scripts/recover-technician-assignments.sh backups/backup-YYYY-MM-DD.dump
+```
+
+El script detecta si hay datos en el dump, los extrae e inserta con `ON CONFLICT DO NOTHING`.
+
+**Opción B — Re-asignar manualmente desde la UI:**
+
+```
+Admin → Tickets → Categorías → editar cada categoría → pestaña "Técnicos"
+```
+
+Esta opción siempre funciona independientemente del dump.
+
+> **Fix aplicado:** Desde ahora, el backup del módulo `families` incluye `technician_assignments`. Los backups completos (`.dump` pgdump) siempre los incluyeron.
+
 ### Operación diaria (automático)
 
 El cron del **servidor Debian** llama `POST /api/admin/cron/backup` (protegido con `CRON_SECRET`):

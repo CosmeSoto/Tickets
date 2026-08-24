@@ -344,8 +344,17 @@ export async function exportPatrolsModuleData(): Promise<Record<PatrolsModuleTab
   } as Record<PatrolsModuleTable, unknown[]>
 }
 
-/** Orden de inserción respetando FKs del módulo families. */
-export const FAMILIES_MODULE_RESTORE_ORDER = ['families', 'departments', 'categories'] as const
+/** Orden de inserción respetando FKs del módulo families.
+ *
+ * technician_assignments FK: technicianId → users, categoryId → categories
+ * Por eso va después de categories.
+ */
+export const FAMILIES_MODULE_RESTORE_ORDER = [
+  'families',
+  'departments',
+  'categories',
+  'technician_assignments',
+] as const
 
 export type FamiliesModuleTable = (typeof FAMILIES_MODULE_RESTORE_ORDER)[number]
 
@@ -353,16 +362,32 @@ const EMPTY_FAMILIES_PAYLOAD: Record<FamiliesModuleTable, unknown[]> = {
   families: [],
   departments: [],
   categories: [],
+  technician_assignments: [],
 }
 
 export async function exportFamiliesModuleData(): Promise<Record<FamiliesModuleTable, unknown[]>> {
-  const families = await prisma.families.findMany()
-  const departments = await prisma.departments.findMany()
-  const categories = await prisma.categories.findMany()
+  const [families, departments, categories] = await Promise.all([
+    prisma.families.findMany(),
+    prisma.departments.findMany(),
+    prisma.categories.findMany(),
+  ])
+
+  // Exportar las asignaciones de técnicos a categorías.
+  // Sin esto, al restaurar el módulo families las categorías quedan sin técnicos
+  // y la auto-asignación de tickets no funciona.
+  const categoryIds = categories.map(c => c.id)
+  const technician_assignments =
+    categoryIds.length > 0
+      ? await prisma.technician_assignments.findMany({
+          where: { categoryId: { in: categoryIds } },
+        })
+      : []
+
   return {
     families: families as unknown[],
     departments: departments as unknown[],
     categories: categories as unknown[],
+    technician_assignments: technician_assignments as unknown[],
   }
 }
 
