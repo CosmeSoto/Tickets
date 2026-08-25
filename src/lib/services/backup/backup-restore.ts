@@ -18,6 +18,7 @@ import {
   INVENTORY_MODULE_RESTORE_ORDER,
   PROCESSES_MODULE_RESTORE_ORDER,
   ACCESS_MODULE_RESTORE_ORDER,
+  FORMS_MODULE_RESTORE_ORDER,
 } from '../backup-modules'
 
 const execAsync = promisify(exec)
@@ -800,6 +801,7 @@ function getTablesForModules(modules: string[]): string[] {
     credentials: CREDENTIALS_MODULE_RESTORE_ORDER,
     processes: PROCESSES_MODULE_RESTORE_ORDER,
     access: ACCESS_MODULE_RESTORE_ORDER,
+    forms: FORMS_MODULE_RESTORE_ORDER,
   }
 
   const tables: string[] = []
@@ -1011,6 +1013,9 @@ async function restoreFromJSON(
           break
         case 'access':
           restoreOrder = ACCESS_MODULE_RESTORE_ORDER
+          break
+        case 'forms':
+          restoreOrder = FORMS_MODULE_RESTORE_ORDER
           break
         default:
           throw new Error(`Módulo no soportado para restauración: ${effectiveModule}`)

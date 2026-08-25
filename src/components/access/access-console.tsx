@@ -59,6 +59,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { formatAccessDateTime } from '@/lib/access/access-dates'
 import {
   accessTypeLabel,
+  accessTypeRequiresOrganization,
   formatAccessBelongsTo,
   formatAccessPurpose,
 } from '@/lib/access/access-labels'
@@ -408,6 +409,14 @@ export function AccessConsole() {
 
   const createPass = async (event: FormEvent) => {
     event.preventDefault()
+    if (accessTypeRequiresOrganization(form.accessType) && !form.organizationId) {
+      setResult({
+        result: 'CREATE_ERROR',
+        valid: false,
+        message: `Selecciona el arrendatario/empresa: es obligatorio para "${accessTypeLabel(form.accessType)}".`,
+      })
+      return
+    }
     setSubmitting(true)
     try {
       const response = await fetch('/api/access-passes', {
@@ -1312,7 +1321,26 @@ export function AccessConsole() {
             </p>
 
             <div className='space-y-1.5'>
-              <Label>Arrendatario / empresa</Label>
+              <Label>Tipo de acceso</Label>
+              <select
+                className='h-10 w-full rounded-md border bg-background px-3 text-sm'
+                value={form.accessType}
+                onChange={e => setForm({ ...form, accessType: e.target.value })}
+              >
+                <option value='AUTHORIZED_VISITOR'>Visitante autorizado</option>
+                <option value='TENANT_EMPLOYEE'>Empleado de arrendatario</option>
+                <option value='CONTRACTOR'>Contratista</option>
+              </select>
+              <p className='text-[11px] text-muted-foreground'>Lista fija del sistema.</p>
+            </div>
+
+            <div className='space-y-1.5'>
+              <Label>
+                Arrendatario / empresa
+                {accessTypeRequiresOrganization(form.accessType) && (
+                  <span className='text-destructive'> *</span>
+                )}
+              </Label>
               <InlineCreateSelect
                 options={organizations}
                 value={form.organizationId}
@@ -1350,23 +1378,12 @@ export function AccessConsole() {
                 }}
               />
               <p className='text-xs text-muted-foreground'>
+                {accessTypeRequiresOrganization(form.accessType)
+                  ? `Obligatorio para "${accessTypeLabel(form.accessType)}".`
+                  : 'Opcional para visitante autorizado; útil si visita en representación de una empresa.'}{' '}
                 Catálogo compartido: crea, edita o desactiva arrendatarios sin introducir texto
                 libre.
               </p>
-            </div>
-
-            <div className='space-y-1.5'>
-              <Label>Tipo de acceso</Label>
-              <select
-                className='h-10 w-full rounded-md border bg-background px-3 text-sm'
-                value={form.accessType}
-                onChange={e => setForm({ ...form, accessType: e.target.value })}
-              >
-                <option value='AUTHORIZED_VISITOR'>Visitante autorizado</option>
-                <option value='TENANT_EMPLOYEE'>Empleado de arrendatario</option>
-                <option value='CONTRACTOR'>Contratista</option>
-              </select>
-              <p className='text-[11px] text-muted-foreground'>Lista fija del sistema.</p>
             </div>
 
             <div className='space-y-1.5'>

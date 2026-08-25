@@ -13,6 +13,7 @@ import {
 } from '@/lib/access/access-control'
 import { hardDeleteAccessPasses } from '@/lib/access/delete-access-passes'
 import { formatAccessDateTime } from '@/lib/access/access-dates'
+import { accessTypeRequiresOrganization } from '@/lib/access/access-labels'
 import { AuditActionsComplete, AuditServiceComplete } from '@/lib/services/audit-service-complete'
 import { queueNotificationEmail } from '@/lib/notifications/queue-notification-email'
 import { getEmailBranding } from '@/lib/services/email/email-branding'
@@ -51,6 +52,12 @@ const createSchema = z
   .refine(data => !!data.email, {
     message: 'Se requiere correo para solicitar la aceptación y activar la credencial.',
     path: ['email'],
+  })
+  // Empleado de arrendatario y contratista se definen por su relación con una empresa;
+  // el visitante autorizado puede no pertenecer a ninguna (visita personal, entrega, etc.).
+  .refine(data => !accessTypeRequiresOrganization(data.accessType) || !!data.organizationId, {
+    message: 'Selecciona el arrendatario/empresa para este tipo de acceso.',
+    path: ['organizationId'],
   })
 
 /** Campos para listado de gestores: persona, pertenencia, tipo y motivo del acceso. */

@@ -366,6 +366,9 @@ export class EmailService {
             data: {
               status: exhausted ? 'failed' : 'pending',
               errorMessage: error instanceof Error ? error.message : 'Unknown error',
+              // Backoff antes del próximo reintento (evita martillar un SMTP caído en cada
+              // corrida del cron, igual que processTelegramQueue()).
+              ...(exhausted ? {} : { scheduledAt: new Date(Date.now() + 60_000) }),
             },
           })
           if (exhausted) failed++

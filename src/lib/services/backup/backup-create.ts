@@ -37,6 +37,7 @@ import {
   exportInventoryModuleData,
   exportCredentialsModuleData,
   exportAccessModuleData,
+  exportFormsModuleData,
   BACKUP_MODULE_REGISTRY,
 } from '../backup-modules'
 
@@ -111,6 +112,8 @@ async function exportModulePayload(moduleId: BackupModuleId): Promise<Record<str
       return exportProcessesModuleData()
     case 'access':
       return exportAccessModuleData()
+    case 'forms':
+      return exportFormsModuleData()
     default:
       throw new Error(`Módulo no soportado para exportación: ${moduleId}`)
   }

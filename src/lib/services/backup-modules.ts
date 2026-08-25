@@ -17,6 +17,7 @@ export type BackupModuleId =
   | 'credentials'
   | 'processes'
   | 'access'
+  | 'forms'
 
 export interface BackupModuleDefinition {
   id: BackupModuleId
@@ -53,7 +54,7 @@ export const BACKUP_MODULE_REGISTRY: Record<BackupModuleId, BackupModuleDefiniti
     id: 'users',
     label: 'Usuarios',
     description:
-      'Usuarios del sistema, sus departamentos, configuraciones, preferencias de notificaciones, asignaciones, credenciales OAuth y tokens de sesión.',
+      'Usuarios del sistema, sus departamentos, configuraciones, preferencias de notificaciones, notificaciones en la app (todas, no solo las de tickets), asignaciones, credenciales OAuth y tokens de sesión.',
   },
   audits: {
     id: 'audits',
@@ -63,7 +64,8 @@ export const BACKUP_MODULE_REGISTRY: Record<BackupModuleId, BackupModuleDefiniti
   configurations: {
     id: 'configurations',
     label: 'Configuraciones del Sistema',
-    description: 'Configuraciones generales del sistema (system_settings, site_config, etc.).',
+    description:
+      'Configuraciones generales del sistema (system_settings, site_config, oauth, etc.) y el contenido de la página pública (hero, servicios, banners).',
   },
   inventory: {
     id: 'inventory',
@@ -88,6 +90,12 @@ export const BACKUP_MODULE_REGISTRY: Record<BackupModuleId, BackupModuleDefiniti
     label: 'Accesos',
     description:
       'Personas externas, pases QR y trazabilidad de verificaciones. Los secretos QR se respaldan solo como hashes no reversibles.',
+  },
+  forms: {
+    id: 'forms',
+    label: 'Documentos',
+    description:
+      'Documentos descargables: categorías, formularios, visibilidad (roles/usuarios/departamentos/familias), descargas y adjuntos. Los archivos en disco (forms.fileUrl y form_attachments.path) deben respaldarse aparte.',
   },
 }
 
@@ -421,13 +429,26 @@ export async function exportAuditsModuleData(): Promise<Record<AuditsModuleTable
   return { audit_logs: audit_logs as unknown[] }
 }
 
-/** Orden de inserción respetando FKs del módulo configurations. */
+/**
+ * Orden de inserción respetando FKs del módulo configurations.
+ *
+ * NOTA: `landing_page_content`, `landing_page_services` y `landing_page_banners` (la página
+ * pública: hero, servicios, banners) estuvieron ausentes de esta lista y de
+ * exportConfigurationsModuleData durante un tiempo — un respaldo/restauración parcial de
+ * "Configuraciones del Sistema" (JSON o selectivo desde .dump) perdía en silencio todo el
+ * contenido del landing page público; solo un respaldo completo (dump entero o pgBackRest)
+ * lo capturaba. Ninguna de las tres tiene FKs hacia otras tablas, así que el orden entre
+ * ellas y el resto del módulo es indiferente.
+ */
 export const CONFIGURATIONS_MODULE_RESTORE_ORDER = [
   'system_settings',
   'system_modules',
   'site_config',
   'pages',
   'oauth_configs',
+  'landing_page_content',
+  'landing_page_services',
+  'landing_page_banners',
 ] as const
 
 export type ConfigurationsModuleTable = (typeof CONFIGURATIONS_MODULE_RESTORE_ORDER)[number]
@@ -438,17 +459,32 @@ const EMPTY_CONFIGURATIONS_PAYLOAD: Record<ConfigurationsModuleTable, unknown[]>
   site_config: [],
   pages: [],
   oauth_configs: [],
+  landing_page_content: [],
+  landing_page_services: [],
+  landing_page_banners: [],
 }
 
 export async function exportConfigurationsModuleData(): Promise<
   Record<ConfigurationsModuleTable, unknown[]>
 > {
-  const [system_settings, system_modules, site_config, pages, oauth_configs] = await Promise.all([
+  const [
+    system_settings,
+    system_modules,
+    site_config,
+    pages,
+    oauth_configs,
+    landing_page_content,
+    landing_page_services,
+    landing_page_banners,
+  ] = await Promise.all([
     prisma.system_settings.findMany(),
     prisma.system_modules.findMany(),
     prisma.site_config.findMany(),
     prisma.pages.findMany(),
     prisma.oauth_configs.findMany(),
+    prisma.landing_page_content.findMany(),
+    prisma.landing_page_services.findMany(),
+    prisma.landing_page_banners.findMany(),
   ])
 
   return {
@@ -457,6 +493,9 @@ export async function exportConfigurationsModuleData(): Promise<
     site_config: site_config as unknown[],
     pages: pages as unknown[],
     oauth_configs: oauth_configs as unknown[],
+    landing_page_content: landing_page_content as unknown[],
+    landing_page_services: landing_page_services as unknown[],
+    landing_page_banners: landing_page_banners as unknown[],
   }
 }
 
@@ -467,6 +506,7 @@ export const USERS_MODULE_RESTORE_ORDER = [
   'user_settings',
   'notification_preferences',
   'notification_mutes',
+  'notifications',
   'accounts',
   'sessions',
   'oauth_accounts',
@@ -484,6 +524,7 @@ const EMPTY_USERS_PAYLOAD: Record<UsersModuleTable, unknown[]> = {
   user_settings: [],
   notification_preferences: [],
   notification_mutes: [],
+  notifications: [],
   accounts: [],
   sessions: [],
   oauth_accounts: [],
@@ -512,6 +553,7 @@ export async function exportUsersModuleData(): Promise<Record<UsersModuleTable, 
     user_settings,
     notification_preferences,
     notification_mutes,
+    notifications,
     accounts,
     sessions,
     oauth_accounts,
@@ -526,6 +568,11 @@ export async function exportUsersModuleData(): Promise<Record<UsersModuleTable, 
     prisma.user_settings.findMany({ where: { userId: { in: userIds } } }),
     prisma.notification_preferences.findMany({ where: { userId: { in: userIds } } }),
     prisma.notification_mutes.findMany({ where: { userId: { in: userIds } } }),
+    // Todas las notificaciones del usuario, no solo las ligadas a tickets (el módulo
+    // tickets solo exporta notifications con ticketId — noticias, documentos, rondas,
+    // inventario y asignaciones de familia generan notificaciones con ticketId null que
+    // antes no quedaban en ningún respaldo de módulo).
+    prisma.notifications.findMany({ where: { userId: { in: userIds } } }),
     prisma.accounts.findMany({ where: { userId: { in: userIds } } }),
     prisma.sessions.findMany({ where: { userId: { in: userIds } } }),
     prisma.oauth_accounts.findMany({ where: { userId: { in: userIds } } }),
@@ -543,6 +590,7 @@ export async function exportUsersModuleData(): Promise<Record<UsersModuleTable, 
     user_settings: user_settings as unknown[],
     notification_preferences: notification_preferences as unknown[],
     notification_mutes: notification_mutes as unknown[],
+    notifications: notifications as unknown[],
     accounts: accounts as unknown[],
     sessions: sessions as unknown[],
     oauth_accounts: oauth_accounts as unknown[],
@@ -783,4 +831,77 @@ export async function exportAccessModuleData(): Promise<Record<AccessModuleTable
       (prisma as any).access_scan_events.findMany(),
     ])
   return { access_organizations, access_subjects, access_passes, access_scan_events }
+}
+
+/**
+ * Orden de inserción respetando FKs del módulo forms (Documentos).
+ *
+ * NOTA: este módulo no existía en BackupModuleId ni en BACKUP_MODULE_REGISTRY — no había forma
+ * de respaldarlo/restaurarlo de forma independiente (ni JSON de módulo ni restauración selectiva
+ * desde .dump). Solo un .dump completo o pgBackRest capturaban estas 8 tablas, de forma
+ * implícita. `form_categories` va primero (FK desde `forms`); el resto cuelga de `forms`.
+ */
+export const FORMS_MODULE_RESTORE_ORDER = [
+  'form_categories',
+  'forms',
+  'form_roles',
+  'form_users',
+  'form_departments',
+  'form_families',
+  'form_downloads',
+  'form_attachments',
+] as const
+
+export type FormsModuleTable = (typeof FORMS_MODULE_RESTORE_ORDER)[number]
+
+const EMPTY_FORMS_PAYLOAD: Record<FormsModuleTable, unknown[]> = {
+  form_categories: [],
+  forms: [],
+  form_roles: [],
+  form_users: [],
+  form_departments: [],
+  form_families: [],
+  form_downloads: [],
+  form_attachments: [],
+}
+
+/**
+ * Exporta solo datos del módulo forms/Documentos (JSON).
+ * Los archivos en disco (forms.fileUrl y form_attachments.path) deben respaldarse aparte.
+ */
+export async function exportFormsModuleData(): Promise<Record<FormsModuleTable, unknown[]>> {
+  const form_categories = await prisma.form_categories.findMany()
+  const forms = await prisma.forms.findMany()
+  const formIds = forms.map(f => f.id)
+
+  if (formIds.length === 0) {
+    return { ...EMPTY_FORMS_PAYLOAD, form_categories: form_categories as unknown[] }
+  }
+
+  const [
+    form_roles,
+    form_users,
+    form_departments,
+    form_families,
+    form_downloads,
+    form_attachments,
+  ] = await Promise.all([
+    prisma.form_roles.findMany({ where: { formId: { in: formIds } } }),
+    prisma.form_users.findMany({ where: { formId: { in: formIds } } }),
+    prisma.form_departments.findMany({ where: { formId: { in: formIds } } }),
+    prisma.form_families.findMany({ where: { formId: { in: formIds } } }),
+    prisma.form_downloads.findMany({ where: { formId: { in: formIds } } }),
+    prisma.form_attachments.findMany({ where: { formId: { in: formIds } } }),
+  ])
+
+  return {
+    form_categories: form_categories as unknown[],
+    forms: forms as unknown[],
+    form_roles: form_roles as unknown[],
+    form_users: form_users as unknown[],
+    form_departments: form_departments as unknown[],
+    form_families: form_families as unknown[],
+    form_downloads: form_downloads as unknown[],
+    form_attachments: form_attachments as unknown[],
+  } as Record<FormsModuleTable, unknown[]>
 }

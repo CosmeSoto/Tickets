@@ -46,7 +46,9 @@ export async function GET(request: NextRequest) {
     if (period === 'today') {
       const endOfDay = new Date()
       endOfDay.setHours(23, 59, 59, 999)
-      andConditions.push({ createdAt: { gte: new Date(now.setHours(0, 0, 0, 0)) } })
+      const startOfDay = new Date(now)
+      startOfDay.setHours(0, 0, 0, 0)
+      andConditions.push({ createdAt: { gte: startOfDay } })
     } else if (period === 'week') {
       const weekAgo = new Date()
       weekAgo.setDate(weekAgo.getDate() - 7)
