@@ -3270,6 +3270,13 @@ model patrol_schedules {
   /// true = forzar validación estricta para esta programación
   /// false = deshabilitar validación de horario solo para esta programación
   overrideTimeValidation Boolean?        @map("override_time_validation")
+  /// Repetición intra-turno: cada cuántos minutos se genera una sub-ronda dentro del
+  /// bloque scheduledStart→scheduledEnd. null = sin repetición (una sola ronda por ocurrencia).
+  /// Debe persistirse (y no solo pasarse como parámetro puntual a generatePatrols) porque
+  /// tanto el cron de regeneración (regenerateActiveSchedules) como el PATCH de edición
+  /// regeneran las rondas futuras de este schedule; sin esta columna esa regeneración
+  /// perdía la repetición intra-turno en cada ciclo.
+  repeatIntervalMinutes  Int?             @map("repeat_interval_minutes")
   createdAt             DateTime         @default(now()) @map("created_at")
   updatedAt             DateTime         @updatedAt @map("updated_at")
 

@@ -94,6 +94,7 @@ export async function GET(request: NextRequest) {
           recurrenceDays: true,
           isActive: true,
           overrideTimeValidation: true,
+          repeatIntervalMinutes: true,
           createdAt: true,
           route: { select: { id: true, name: true } },
           agent: { select: { id: true, name: true, email: true } },
@@ -131,7 +132,10 @@ export async function POST(request: NextRequest) {
     if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
     if (session.user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Solo administradores pueden gestionar la configuración de rondas' }, { status: 403 })
+      return NextResponse.json(
+        { error: 'Solo administradores pueden gestionar la configuración de rondas' },
+        { status: 403 }
+      )
     }
 
     const denied = await checkPatrolModuleAccess(session.user.id, session.user.role)
@@ -194,6 +198,9 @@ export async function POST(request: NextRequest) {
         recurrence: data.recurrence,
         recurrenceDays: data.recurrenceDays,
         overrideTimeValidation: data.overrideTimeValidation ?? null,
+        // Persistir la repetición intra-turno: no es solo un parámetro de la generación
+        // inicial, el cron y el PATCH la necesitan para regenerar rondas futuras sin perderla.
+        repeatIntervalMinutes: data.repeatIntervalMinutes ?? null,
       },
     })
 
@@ -214,9 +221,10 @@ export async function POST(request: NextRequest) {
     })
 
     // Telegram: misma alerta al agente por canal operativo
-    const recStr = data.recurrence && data.recurrence !== 'NONE'
-      ? ` (recurrencia: ${data.recurrence.toLowerCase()})`
-      : ''
+    const recStr =
+      data.recurrence && data.recurrence !== 'NONE'
+        ? ` (recurrencia: ${data.recurrence.toLowerCase()})`
+        : ''
     queueTelegramNotification({
       recipientUserId: data.agentId,
       title: 'Nueva ronda asignada',

@@ -39,6 +39,8 @@ const patchScheduleSchema = z.object({
   isActive: z.boolean().optional(),
   // null = heredar del default de la familia; true/false = sobreescribir solo para este schedule
   overrideTimeValidation: z.boolean().nullable().optional(),
+  // null = sin repetición intra-turno; número = minutos entre sub-rondas dentro del bloque
+  repeatIntervalMinutes: z.number().int().min(10).max(1440).nullable().optional(),
 })
 
 // ── GET ───────────────────────────────────────────────────────────────────────
@@ -65,6 +67,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
         recurrenceDays: true,
         isActive: true,
         overrideTimeValidation: true,
+        repeatIntervalMinutes: true,
         createdAt: true,
         updatedAt: true,
         route: { select: { id: true, name: true, estimatedDurationMinutes: true } },
@@ -101,7 +104,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
     if (session.user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Solo administradores pueden gestionar la configuración de rondas' }, { status: 403 })
+      return NextResponse.json(
+        { error: 'Solo administradores pueden gestionar la configuración de rondas' },
+        { status: 403 }
+      )
     }
 
     const denied = await checkPatrolModuleAccess(session.user.id, session.user.role)
@@ -120,6 +126,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         scheduledEnd: true,
         recurrence: true,
         recurrenceDays: true,
+        repeatIntervalMinutes: true,
       },
     })
     if (!existing) return NextResponse.json({ error: 'Schedule no encontrado' }, { status: 404 })
@@ -154,6 +161,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     // overrideTimeValidation admite null (reset al default de la familia)
     if ('overrideTimeValidation' in data)
       updateData.overrideTimeValidation = data.overrideTimeValidation ?? null
+    // repeatIntervalMinutes admite null (quitar la repetición intra-turno)
+    if ('repeatIntervalMinutes' in data)
+      updateData.repeatIntervalMinutes = data.repeatIntervalMinutes ?? null
 
     // Validaciones adicionales
     if (updateData.scheduledStart && updateData.scheduledEnd) {
@@ -224,15 +234,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       data: updateData,
     })
 
-    // Si cambiaron datos que afectan las patrullas futuras (hora, días, agente, ruta),
-    // cancelar las patrullas PENDING futuras y regenerarlas con los nuevos datos
+    // Si cambiaron datos que afectan las patrullas futuras (hora, días, agente, ruta,
+    // repetición intra-turno), cancelar las patrullas PENDING futuras y regenerarlas
+    // con los nuevos datos
     const affectsPatrols =
       updateData.scheduledStart !== undefined ||
       updateData.scheduledEnd !== undefined ||
       updateData.recurrenceDays !== undefined ||
       updateData.recurrence !== undefined ||
       updateData.agentId !== undefined ||
-      updateData.routeId !== undefined
+      updateData.routeId !== undefined ||
+      updateData.repeatIntervalMinutes !== undefined
 
     let regeneratedCount = 0
     if (affectsPatrols && updated.isActive) {
@@ -244,8 +256,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           scheduledStart: { gt: new Date() },
         },
       })
-      // Regenerar con los nuevos datos
-      regeneratedCount = await PatrolSchedulerService.generatePatrols(id, 30)
+      // Regenerar con los nuevos datos — pasar explícitamente repeatIntervalMinutes:
+      // aunque ya quedó persistido en `updated`, generatePatrols no lo lee de BD por sí solo.
+      regeneratedCount = await PatrolSchedulerService.generatePatrols(
+        id,
+        30,
+        updated.repeatIntervalMinutes ?? null
+      )
     }
 
     await AuditServiceComplete.log({

@@ -279,7 +279,16 @@ export async function exportNewsModuleData(): Promise<Record<NewsModuleTable, un
   } as Record<NewsModuleTable, unknown[]>
 }
 
-/** Orden de inserción respetando FKs del módulo patrols. */
+/**
+ * Orden de inserción respetando FKs del módulo patrols.
+ *
+ * NOTA: `patrol_incidents` (novedades reportadas por agentes) estuvo ausente de esta lista
+ * y de exportPatrolsModuleData durante un tiempo — la descripción del módulo en
+ * BACKUP_MODULE_REGISTRY ya prometía "incidentes" pero nunca se exportaban/restauraban,
+ * así que un respaldo+restauración del módulo "Rondas y Patrullajes" perdía en silencio
+ * todas las novedades (descripción, severidad, fotos, vínculo al ticket escalado). Va
+ * después de `patrols` (FK patrolId) y antes de `patrol_photos` (FK incidentId opcional).
+ */
 export const PATROLS_MODULE_RESTORE_ORDER = [
   'patrol_family_config',
   'patrol_checkpoints',
@@ -288,6 +297,7 @@ export const PATROLS_MODULE_RESTORE_ORDER = [
   'patrol_schedules',
   'patrols',
   'patrol_check_ins',
+  'patrol_incidents',
   'patrol_photos',
 ] as const
 
@@ -301,6 +311,7 @@ const EMPTY_PATROLS_PAYLOAD: Record<PatrolsModuleTable, unknown[]> = {
   patrol_schedules: [],
   patrols: [],
   patrol_check_ins: [],
+  patrol_incidents: [],
   patrol_photos: [],
 }
 
@@ -320,17 +331,21 @@ export async function exportPatrolsModuleData(): Promise<Record<PatrolsModuleTab
   const scheduleIds = patrol_schedules.map(s => s.id)
   const patrolIds = patrols.map(p => p.id)
 
-  const [patrol_route_checkpoints, patrol_check_ins, patrol_photos] = await Promise.all([
-    routeIds.length > 0
-      ? prisma.patrol_route_checkpoints.findMany({ where: { routeId: { in: routeIds } } })
-      : [],
-    patrolIds.length > 0
-      ? prisma.patrol_check_ins.findMany({ where: { patrolId: { in: patrolIds } } })
-      : [],
-    patrolIds.length > 0
-      ? prisma.patrol_photos.findMany({ where: { patrolId: { in: patrolIds } } })
-      : [],
-  ])
+  const [patrol_route_checkpoints, patrol_check_ins, patrol_incidents, patrol_photos] =
+    await Promise.all([
+      routeIds.length > 0
+        ? prisma.patrol_route_checkpoints.findMany({ where: { routeId: { in: routeIds } } })
+        : [],
+      patrolIds.length > 0
+        ? prisma.patrol_check_ins.findMany({ where: { patrolId: { in: patrolIds } } })
+        : [],
+      patrolIds.length > 0
+        ? prisma.patrol_incidents.findMany({ where: { patrolId: { in: patrolIds } } })
+        : [],
+      patrolIds.length > 0
+        ? prisma.patrol_photos.findMany({ where: { patrolId: { in: patrolIds } } })
+        : [],
+    ])
 
   return {
     patrol_family_config,
@@ -340,6 +355,7 @@ export async function exportPatrolsModuleData(): Promise<Record<PatrolsModuleTab
     patrol_schedules,
     patrols,
     patrol_check_ins,
+    patrol_incidents,
     patrol_photos,
   } as Record<PatrolsModuleTable, unknown[]>
 }

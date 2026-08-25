@@ -356,13 +356,21 @@ export class PatrolSchedulerService {
         isActive: true,
         recurrence: { not: 'NONE' },
       },
-      select: { id: true },
+      select: { id: true, repeatIntervalMinutes: true },
     })
 
     let totalGenerated = 0
     for (const schedule of activeSchedules) {
       try {
-        const count = await this.generatePatrols(schedule.id, 30)
+        // IMPORTANTE: repeatIntervalMinutes no tiene un default implícito en generatePatrols
+        // (null = sin repetición intra-turno) — hay que leerlo de BD y pasarlo explícitamente
+        // en cada regeneración, o el schedule pierde su repetición cada vez que el cron
+        // extiende el horizonte.
+        const count = await this.generatePatrols(
+          schedule.id,
+          30,
+          schedule.repeatIntervalMinutes ?? null
+        )
         totalGenerated += count
       } catch (err) {
         console.error(`[PatrolSchedulerService] Error regenerando schedule ${schedule.id}:`, err)

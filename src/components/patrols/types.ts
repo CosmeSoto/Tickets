@@ -9,6 +9,7 @@ export interface PatrolSchedule {
   recurrenceDays: number[]
   isActive: boolean
   overrideTimeValidation: boolean | null
+  repeatIntervalMinutes: number | null
   createdAt: string
   route: { id: string; name: string }
   agent: { id: string; name: string; email: string }

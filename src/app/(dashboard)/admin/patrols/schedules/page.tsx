@@ -220,7 +220,7 @@ export default function SchedulesPage() {
       recurrence: schedule.recurrence as any,
       recurrenceDays: schedule.recurrenceDays,
       overrideTimeValidation: schedule.overrideTimeValidation ?? null,
-      repeatIntervalMinutes: (schedule as any).repeatIntervalMinutes ?? null,
+      repeatIntervalMinutes: schedule.repeatIntervalMinutes ?? null,
     })
 
     fetchRoutesForFamily(schedule.familyId)
@@ -271,7 +271,10 @@ export default function SchedulesPage() {
         recurrence: form.recurrence,
         recurrenceDays: form.recurrenceDays,
         overrideTimeValidation: form.overrideTimeValidation,
-        repeatIntervalMinutes: form.repeatIntervalMinutes ?? undefined,
+        // null explícito (no undefined): al editar, el PATCH solo actualiza el campo si la
+        // key está presente en el body — omitirlo dejaría "atascada" una repetición que el
+        // usuario quiso quitar.
+        repeatIntervalMinutes: form.repeatIntervalMinutes ?? null,
       }
 
       const url = currentEditingId
