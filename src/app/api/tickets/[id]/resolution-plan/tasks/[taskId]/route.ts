@@ -146,15 +146,6 @@ export async function PATCH(
         updateData.endTime = body.endTime
         changes.endTime = { old: task.endTime, new: body.endTime }
       }
-
-      // Si hay fecha y hora de inicio, combinarlas en dueDate
-      if (body.dueDate && newStartTime) {
-        updateData.dueDate = combineDateAndTime(body.dueDate, newStartTime)
-      } else if (task.dueDate && newStartTime && body.startTime !== undefined) {
-        // Si solo cambió la hora, actualizar dueDate manteniendo la fecha
-        const currentDate = task.dueDate.toISOString().split('T')[0]
-        updateData.dueDate = combineDateAndTime(currentDate, newStartTime)
-      }
     }
 
     if (body.actualHours !== undefined) {
@@ -166,8 +157,26 @@ export async function PATCH(
       updateData.assignedTo = body.assignedTo
       changes.assignedTo = { old: task.assignedTo, new: body.assignedTo }
     }
+
+    // Fecha límite: SIEMPRE combinar fecha+hora con combineDateAndTime (hora local),
+    // nunca `new Date(dateOnlyString)` a secas — eso se interpreta como medianoche UTC
+    // y en husos horarios negativos la fecha guardada queda un día antes.
+    // Este bloque reemplaza la lógica anterior, que quedaba duplicada y la segunda
+    // pasada pisaba silenciosamente el valor ya calculado arriba.
     if (body.dueDate !== undefined) {
-      updateData.dueDate = body.dueDate ? new Date(body.dueDate) : null
+      if (body.dueDate) {
+        const effectiveStartTime = body.startTime !== undefined ? body.startTime : task.startTime
+        updateData.dueDate = combineDateAndTime(body.dueDate, effectiveStartTime || '00:00')
+      } else {
+        updateData.dueDate = null
+      }
+    } else if (body.startTime !== undefined && task.dueDate) {
+      // No cambió la fecha, solo la hora de inicio: mantener el día (en local, no UTC)
+      // y recombinar con la nueva hora.
+      const d = task.dueDate
+      const pad = (n: number) => String(n).padStart(2, '0')
+      const currentDate = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+      updateData.dueDate = combineDateAndTime(currentDate, body.startTime || '00:00')
     }
 
     if (body.notes !== undefined) {

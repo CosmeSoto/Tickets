@@ -103,25 +103,23 @@ export function PlanFormDialog({
                   </p>
                   <p className='text-xs text-blue-700 dark:text-blue-300'>
                     Calculado automáticamente desde{' '}
-                    {new Date(`${planForm.startDate}T${planForm.startTime}`).toLocaleString(
-                      'es-ES',
-                      {
-                        day: '2-digit',
-                        month: 'short',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      }
-                    )}{' '}
+                    {new Date(
+                      `${planForm.startDate}T${planForm.startTime || '09:00'}`
+                    ).toLocaleString('es-ES', {
+                      day: '2-digit',
+                      month: 'short',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}{' '}
                     hasta{' '}
-                    {new Date(`${planForm.targetDate}T${planForm.targetTime}`).toLocaleString(
-                      'es-ES',
-                      {
-                        day: '2-digit',
-                        month: 'short',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      }
-                    )}
+                    {new Date(
+                      `${planForm.targetDate}T${planForm.targetTime || '09:00'}`
+                    ).toLocaleString('es-ES', {
+                      day: '2-digit',
+                      month: 'short',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
                   </p>
                 </div>
               </div>

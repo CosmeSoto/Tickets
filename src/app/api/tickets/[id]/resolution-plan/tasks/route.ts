@@ -89,16 +89,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     // Calcular duración si hay horarios
     let estimatedHours = body.estimatedHours || null
-    let dueDate = body.dueDate ? new Date(body.dueDate) : null
+    // NOTA: siempre combinar fecha+hora con combineDateAndTime (interpreta la hora en
+    // zona local). Usar `new Date(body.dueDate)` a secas interpreta "YYYY-MM-DD" como
+    // medianoche UTC, lo que en husos horarios negativos muestra el día anterior.
+    const dueDate = body.dueDate
+      ? combineDateAndTime(body.dueDate, body.startTime || '00:00')
+      : null
 
     if (body.startTime && body.endTime) {
       // Calcular duración automáticamente
       estimatedHours = calculateDuration(body.startTime, body.endTime)
-
-      // Combinar fecha y hora de inicio para dueDate
-      if (body.dueDate) {
-        dueDate = combineDateAndTime(body.dueDate, body.startTime)
-      }
     }
 
     // Crear tarea

@@ -739,10 +739,27 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
         message: 'Ticket actualizado exitosamente',
       })
     } else if (session.user.role === 'ADMIN') {
-      // Admin puede actualizar todo (con registro en historial)
+      // Admin puede actualizar los campos del ticket (con registro en historial).
+      // Whitelist explícita: evita mass-assignment de campos no expuestos por el
+      // formulario (p. ej. clientId, createdById, source) que llegaran en el body.
+      // Como efecto colateral, esto también garantiza que el chequeo de "no asignar
+      // al propio solicitante" de más abajo compare siempre contra el clientId real,
+      // porque clientId ya no puede modificarse en la misma petición.
+      const adminAllowed = [
+        'title',
+        'description',
+        'priority',
+        'status',
+        'categoryId',
+        'assigneeId',
+        'familyId',
+      ]
+      const processedUpdates: any = {}
+      adminAllowed.forEach(field => {
+        if (updates[field] !== undefined) processedUpdates[field] = updates[field]
+      })
 
       // Procesar assigneeId: convertir undefined a null para desasignar
-      const processedUpdates = { ...updates }
       if (
         'assigneeId' in processedUpdates &&
         (processedUpdates.assigneeId === undefined || processedUpdates.assigneeId === '')

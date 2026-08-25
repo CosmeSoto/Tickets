@@ -106,9 +106,21 @@ export function TicketRatingSystem({
         setRating(null)
       }
 
-      // NOTA: Las estadísticas del técnico se obtienen desde el reporte de técnicos
-      // No existe endpoint /api/technicians/{id}/stats individual
-      // Si se necesita, usar /api/reports/technicians con filtro por técnico
+      // Estadísticas históricas del técnico (solo si el caller las pide explícitamente,
+      // p. ej. la vista de admin de un ticket resuelto)
+      if (showTechnicianStats && technicianId) {
+        try {
+          const statsResponse = await fetch(`/api/technicians/${technicianId}/stats`, {
+            cache: 'no-store',
+          })
+          if (statsResponse.ok) {
+            const statsData = await statsResponse.json()
+            if (statsData.success) setTechnicianStats(statsData.data)
+          }
+        } catch (statsErr) {
+          console.error('Error loading technician stats:', statsErr)
+        }
+      }
     } catch (err) {
       console.error('Error loading rating data:', err)
     } finally {
