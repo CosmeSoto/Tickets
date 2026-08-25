@@ -257,18 +257,35 @@ async function restoreWithPgRestore(
     )
 
     if (mode === 'replace') {
-      // Modo reemplazo: TRUNCATE + reinsertar datos del backup.
+      // Modo reemplazo: DELETE + reinsertar datos del backup.
       //
-      // PROBLEMA ANTERIOR: el TRUNCATE y el INSERT se ejecutaban en dos invocaciones
+      // PROBLEMA ANTERIOR (v1): el TRUNCATE y el INSERT se ejecutaban en dos invocaciones
       // psql separadas. El TRUNCATE usaba CASCADE (que borraba también audit_logs y otras
       // tablas dependientes), y el INSERT se hacía en una nueva sesión donde
       // session_replication_role ya había vuelto a DEFAULT → las FKs volvían a estar
       // activas → error "Foreign key constraint violated: audit_logs_userId_fkey".
       //
-      // SOLUCIÓN: generar un único archivo SQL que incluya en orden:
+      // PROBLEMA ANTERIOR (v2): se unificó todo en una sola sesión con FKs desactivadas,
+      // pero se mantuvo TRUNCATE ... CASCADE. Postgres exige CASCADE (o error) para
+      // truncar una tabla referenciada por FK desde otra — pero CASCADE vacía también
+      // esas tablas dependientes, sin importar si pertenecen a otro módulo no
+      // seleccionado para esta restauración. Ejemplo real: restaurar solo "tickets"
+      // vaciaba en cascada sla_violations, ticket_sla_metrics, maintenance_records y
+      // patrol_incidents (todas con FK hacia tickets) y esas tablas nunca se
+      // reinsertaban por no pertenecer al módulo — pérdida de datos silenciosa,
+      // contradiciendo el aviso de la UI de que "las demás tablas no se ven afectadas".
+      //
+      // SOLUCIÓN: usar DELETE en vez de TRUNCATE. La restricción de "no se puede truncar,
+      // referenciada por FK" es una verificación propia de TRUNCATE; DELETE no la tiene.
+      // Con session_replication_role = replica ya activo, los triggers de FK (incluida
+      // la verificación de referencias) se saltan durante el DELETE, así que no hace
+      // falta CASCADE y las tablas de otros módulos quedan intactas. Cualquier fila que
+      // quedara con una FK "colgante" hacia un id borrado se auto-repara segundos
+      // después, cuando el propio bloque reinserta esas filas con los mismos IDs del
+      // dump. Un único archivo SQL, en orden:
       //   1. SET session_replication_role = replica  (desactiva FKs para toda la sesión)
       //   2. SET search_path = public
-      //   3. TRUNCATE ... CASCADE  (limpia las tablas del módulo)
+      //   3. DELETE FROM ...  (limpia solo las tablas del módulo seleccionado)
       //   4. SQL de datos del dump (COPY o INSERT)
       //   5. SET session_replication_role = DEFAULT  (reactiva FKs)
       // y ejecutarlo con un solo "psql -f archivo.sql" para que todo ocurra
@@ -299,16 +316,17 @@ async function restoreWithPgRestore(
       }
 
       // Construir el script completo en un único archivo:
-      // header con FK off → TRUNCATE → datos → FK on
-      const truncateSQL = tables.map(t => `TRUNCATE TABLE "${t}" CASCADE;`).join('\n')
+      // header con FK off → DELETE → datos → FK on
+      const deleteSQL = tables.map(t => `DELETE FROM "${t}";`).join('\n')
       const fullScript = [
         '-- Restauración selectiva modo replace',
         '-- FKs desactivadas durante todo el bloque para evitar constraint violations',
         'SET session_replication_role = replica;',
         'SET search_path = public;',
         '',
-        '-- Limpiar tablas del módulo (CASCADE elimina dependencias temporalmente)',
-        truncateSQL,
+        '-- Limpiar solo las tablas del módulo seleccionado (DELETE, no TRUNCATE CASCADE:',
+        '-- no arrastra tablas de otros módulos que referencian estas por FK)',
+        deleteSQL,
         '',
         '-- Datos del backup',
         dumpSqlContent,

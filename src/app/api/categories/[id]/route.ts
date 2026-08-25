@@ -340,15 +340,36 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       },
     })
 
-    // Actualizar asignaciones de técnicos
+    // Actualizar asignaciones de técnicos.
+    // IMPORTANTE: no usar "desactivar todo + createMany(skipDuplicates)". La restricción
+    // única @@unique([technicianId, categoryId]) hace que, para un técnico que ya tenía
+    // una fila (aunque quedara isActive:false tras el updateMany de abajo), createMany
+    // choque con esa fila existente y skipDuplicates la omita en silencio — la asignación
+    // queda atrapada en isActive:false para siempre y el técnico "desaparece" de la
+    // categoría sin ningún error. Por eso se usa upsert por técnico (reactiva si ya
+    // existía, crea si no) y solo se desactivan los técnicos que salieron de la lista.
     if (validatedData.assignedTechnicians !== undefined) {
+      const newTechIds = validatedData.assignedTechnicians.map(tech => tech.id)
+
       await prisma.technician_assignments.updateMany({
-        where: { categoryId: id },
+        where: {
+          categoryId: id,
+          technicianId: newTechIds.length > 0 ? { notIn: newTechIds } : undefined,
+        },
         data: { isActive: false, updatedAt: new Date() },
       })
-      if (validatedData.assignedTechnicians.length > 0) {
-        await prisma.technician_assignments.createMany({
-          data: validatedData.assignedTechnicians.map(tech => ({
+
+      for (const tech of validatedData.assignedTechnicians) {
+        await prisma.technician_assignments.upsert({
+          where: { technicianId_categoryId: { technicianId: tech.id, categoryId: id } },
+          update: {
+            priority: tech.priority,
+            maxTickets: tech.maxTickets,
+            autoAssign: tech.autoAssign,
+            isActive: true,
+            updatedAt: new Date(),
+          },
+          create: {
             id: randomUUID(),
             technicianId: tech.id,
             categoryId: id,
@@ -358,8 +379,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
             isActive: true,
             createdAt: new Date(),
             updatedAt: new Date(),
-          })),
-          skipDuplicates: true,
+          },
         })
       }
     }
