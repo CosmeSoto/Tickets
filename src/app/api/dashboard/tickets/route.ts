@@ -27,14 +27,30 @@ export async function GET(request: NextRequest) {
       const { getAdminTicketFamilyFilter } = await import('@/lib/auth/admin-scope')
       Object.assign(
         where,
-        await getAdminTicketFamilyFilter(userId, (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true)
+        await getAdminTicketFamilyFilter(
+          userId,
+          (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
+        )
       )
     }
 
+    // Excluir tickets cuya categoría ya no existe en la BD (puede ocurrir tras restore parcial).
+    // Usamos categoryId: { in: [...] } con las categorías reales para no alterar
+    // el tipo inferido de Prisma (categories:{ isNot:null } lo cambia a base model).
+    const validCategoryIds = await prisma.categories
+      .findMany({
+        where: { isActive: true },
+        select: { id: true },
+      })
+      .then(cats => cats.map(c => c.id))
+
     const tickets = await prisma.tickets.findMany({
-      where,
+      where: {
+        ...where,
+        ...(validCategoryIds.length > 0 ? { categoryId: { in: validCategoryIds } } : {}),
+      },
       take: limit,
-      orderBy: { updatedAt: 'desc' }, // Cambiado a updatedAt para mostrar actividad reciente
+      orderBy: { updatedAt: 'desc' },
       include: {
         users_tickets_clientIdTousers: {
           select: {

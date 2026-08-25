@@ -475,6 +475,51 @@ async function restoreWithPgRestore(
     } catch (err) {
       console.warn('[RESTORE] No se pudo reparar FKs de familias tras restore:', err)
     }
+
+    // Reparar tickets cuyo categoryId apunta a categorías que ya no existen.
+    // Se reasignan a la primera categoría activa disponible para que el dashboard
+    // y otras queries con include:categories no lancen PrismaClientUnknownRequestError.
+    try {
+      const fallbackCategory = await prisma.categories.findFirst({
+        where: { isActive: true },
+        orderBy: { level: 'asc' },
+        select: { id: true, name: true },
+      })
+
+      if (fallbackCategory) {
+        const fixed = await prisma.$executeRawUnsafe(
+          `
+          UPDATE tickets t
+          SET "category_id" = $1, "updated_at" = NOW()
+          WHERE NOT EXISTS (
+            SELECT 1 FROM categories c WHERE c.id = t."category_id"
+          )
+        `,
+          fallbackCategory.id
+        )
+
+        if (Number(fixed) > 0) {
+          console.log(
+            `[RESTORE] Integridad tickets: ${Number(fixed)} ticket(s) con categoryId huérfano reasignados a "${fallbackCategory.name}"`
+          )
+        }
+      } else {
+        // Sin categoría de respaldo — eliminar tickets huérfanos sería peligroso,
+        // solo logueamos para que el administrador lo resuelva manualmente.
+        const orphanCount = await prisma.$queryRawUnsafe<Array<{ count: string }>>(
+          `SELECT COUNT(*) as count FROM tickets t
+           WHERE NOT EXISTS (SELECT 1 FROM categories c WHERE c.id = t."category_id")`
+        )
+        const n = Number(orphanCount[0]?.count ?? 0)
+        if (n > 0) {
+          console.warn(
+            `[RESTORE] ADVERTENCIA: ${n} ticket(s) con categoryId huérfano. No hay categoría de respaldo disponible.`
+          )
+        }
+      }
+    } catch (err) {
+      console.warn('[RESTORE] No se pudo reparar categoryId huérfano en tickets:', err)
+    }
   } else {
     // Restauración completa — el modo merge no aplica a nivel completo (demasiado riesgo de inconsistencias)
     const command =

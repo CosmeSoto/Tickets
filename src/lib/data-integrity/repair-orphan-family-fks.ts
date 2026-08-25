@@ -44,16 +44,16 @@ export async function repairOrphanFamilyForeignKeys(
 
   const cleared = await client.$executeRawUnsafe(`
     UPDATE departments d
-    SET "familyId" = NULL, "updatedAt" = NOW()
-    WHERE d."familyId" IS NOT NULL
-      AND NOT EXISTS (SELECT 1 FROM families f WHERE f.id = d."familyId")
+    SET "family_id" = NULL, "updated_at" = NOW()
+    WHERE d."family_id" IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM families f WHERE f.id = d."family_id")
   `)
 
   let assignmentsDeleted = 0
   for (const table of ASSIGNMENT_TABLES) {
     const deleted = await client.$executeRawUnsafe(`
       DELETE FROM "${table}" t
-      WHERE NOT EXISTS (SELECT 1 FROM families f WHERE f.id = t."familyId")
+      WHERE NOT EXISTS (SELECT 1 FROM families f WHERE f.id = t."family_id")
     `)
     assignmentsDeleted += Number(deleted)
   }
