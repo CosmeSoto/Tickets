@@ -933,8 +933,22 @@ export class AssetRequestService {
       }
     }
 
-    // 6. Iniciar transacción para actualizar solicitud, crear asignaciones y actualizar equipos
+    // 6. Iniciar transacción para actualizar solicitud, reclamar equipos y crear asignaciones
     const result = await prisma.$transaction(async tx => {
+      // Reclamo atómico: solo reclama equipos que SIGAN AVAILABLE en este momento.
+      // Evita que dos aprobaciones casi simultáneas (doble clic, reintento de red)
+      // dejen el mismo equipo asignado a dos personas — el chequeo de disponibilidad
+      // de más arriba ocurre antes de la transacción y por sí solo no lo evita.
+      const claimed = await tx.equipment.updateMany({
+        where: { id: { in: equipmentIds }, status: 'AVAILABLE' },
+        data: { status: 'ASSIGNED', updatedAt: new Date() },
+      })
+      if (claimed.count !== equipmentIds.length) {
+        throw new Error(
+          'Uno o más equipos ya no está disponible (fue asignado por otra operación). Vuelve a intentar la aprobación.'
+        )
+      }
+
       // Actualizar solicitud a APPROVED
       await tx.asset_requests.update({
         where: { id: requestId },
@@ -971,17 +985,6 @@ export class AssetRequestService {
           })
         )
       )
-
-      // Actualizar estado de equipos a ASSIGNED
-      await tx.equipment.updateMany({
-        where: {
-          id: { in: equipmentIds },
-        },
-        data: {
-          status: 'ASSIGNED',
-          updatedAt: new Date(),
-        },
-      })
 
       return assignments
     })

@@ -47,6 +47,9 @@ interface ModuleAccessCardProps {
     /** Inventario: solicitar activos */
     canRequestAssets?: boolean
     onToggleRequestAssets?: (v: boolean) => void
+    /** Inventario: aprobar bajas definitivas de activos (solo ADMIN, no super admin) */
+    canApproveDecommission?: boolean
+    onToggleApproveDecommission?: (v: boolean) => void
     /** Tickets: Base de conocimientos */
     canAccessKnowledge?: boolean
     onToggleAccessKnowledge?: (v: boolean) => void
@@ -206,6 +209,26 @@ export function ModuleAccessCard({
                   <Switch
                     checked={options.canManageInventory ?? false}
                     onCheckedChange={options.onToggleManager}
+                    disabled={disabled}
+                    className='scale-90 shrink-0'
+                  />
+                </div>
+              )}
+              {options.onToggleApproveDecommission !== undefined && (
+                <div className='flex items-center justify-between gap-2'>
+                  <div className='min-w-0'>
+                    <div className='flex items-center gap-1.5'>
+                      <span className='text-xs'>🗑️</span>
+                      <p className='text-[11px] font-medium'>Aprobar bajas definitivas</p>
+                    </div>
+                    <p className='text-[10px] text-muted-foreground mt-0.5 pl-5'>
+                      Puede aprobar la baja definitiva de activos de su(s) familia(s). El Super
+                      Admin siempre puede, sin necesidad de este permiso.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={options.canApproveDecommission ?? false}
+                    onCheckedChange={options.onToggleApproveDecommission}
                     disabled={disabled}
                     className='scale-90 shrink-0'
                   />

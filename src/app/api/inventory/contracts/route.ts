@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { ContractService } from '@/lib/services/contract-service'
-import { canManageInventory, inventoryForbidden } from '@/lib/inventory-access'
+import { canManageInventory, canManageAsset, inventoryForbidden } from '@/lib/inventory-access'
 import { assertContractViewAccess } from '@/lib/contracts/access'
 import { createContractSchema } from '@/lib/validations/contracts'
 import { extractBillingPayload } from '@/lib/contracts/billing-payload'
@@ -55,6 +55,26 @@ export async function POST(req: NextRequest) {
     if (!raw.category || raw.category === '') raw.category = 'SERVICE'
 
     const p = createContractSchema.parse(raw)
+
+    // Familia destino: un gestor con acceso a una sola familia no debe poder
+    // crear contratos en familias que no gestiona (contratos sin familia son
+    // "globales" y quedan visibles a cualquier gestor, igual que en el resto
+    // del módulo — ver assertContractAccess en inventory-resource-access.ts).
+    if (p.familyId) {
+      const isSuperAdmin = (session.user as any).isSuperAdmin === true
+      const allowed = await canManageAsset(
+        session.user.id,
+        session.user.role,
+        isSuperAdmin,
+        p.familyId
+      )
+      if (!allowed) {
+        return NextResponse.json(
+          { error: 'No tienes permiso para crear contratos en esta familia' },
+          { status: 403 }
+        )
+      }
+    }
 
     const contract = await ContractService.create({
       contractNumber: p.contractNumber ?? undefined,

@@ -504,6 +504,9 @@ model users {
   isActive                                          Boolean                         @default(true)
   isEmailVerified                                   Boolean                         @default(false)
   canManageInventory                                Boolean                         @default(false)
+  /// ADMIN (no super admin) habilitado para aprobar la baja definitiva de activos.
+  /// Solo aplica a role=ADMIN; super admin siempre puede aprobar sin este flag.
+  canApproveDecommission                            Boolean                         @default(false) @map("can_approve_decommission")
   ticketsEnabled                                    Boolean                         @default(true)
   inventoryEnabled                                  Boolean                         @default(false)
   patrolsEnabled                                    Boolean                         @default(false) @map("patrols_enabled")

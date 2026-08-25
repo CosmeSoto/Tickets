@@ -110,6 +110,8 @@ export async function POST(req: NextRequest) {
       code: true,
       status: true,
       sale: true,
+      acquisitionMode: true,
+      ownershipType: true,
       type: { select: { familyId: true } },
     },
   })
@@ -122,6 +124,39 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       { error: 'Ya existe una solicitud de venta para este equipo' },
       { status: 409 }
+    )
+  }
+
+  // No se puede vender un equipo que no es propiedad de la compañía (arriendo
+  // o préstamo de terceros). Primero debe adquirirse — ver
+  // POST /api/inventory/equipment/[id]/convert-to-purchase — y solo entonces,
+  // si no está asignado, puede ponerse a la venta.
+  const ownership = equipment.acquisitionMode ?? equipment.ownershipType
+  if (ownership !== 'FIXED_ASSET') {
+    return NextResponse.json(
+      {
+        error:
+          'Este equipo está en arriendo/préstamo y no es propiedad de la compañía. Primero debe registrarse su compra al arrendador (convertir a activo propio) antes de poder venderse.',
+        code: 'NOT_OWNED_ASSET',
+      },
+      { status: 422 }
+    )
+  }
+
+  // Igual que en decommission-acts: no se puede vender un equipo con
+  // asignación activa — primero debe registrarse su devolución. Sin este
+  // chequeo, aprobar la venta lo marca SOLD mientras equipment_assignments
+  // sigue mostrándolo como asignado a un empleado (estado contradictorio).
+  const activeAssignment = await prisma.equipment_assignments.findFirst({
+    where: { equipmentId, isActive: true },
+  })
+  if (activeAssignment) {
+    return NextResponse.json(
+      {
+        error:
+          'No se puede vender un equipo que está asignado. Primero debe registrar su devolución.',
+      },
+      { status: 422 }
     )
   }
 

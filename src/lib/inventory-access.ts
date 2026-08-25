@@ -34,6 +34,28 @@ export async function canManageInventory(userId: string, _role: string): Promise
 }
 
 /**
+ * Verifica si un ADMIN (no super admin) tiene el permiso delegado para
+ * aprobar bajas definitivas de activos (flag canApproveDecommission en BD).
+ * Super Admin siempre puede aprobar, sin necesidad de este flag.
+ * El scope por familia se valida aparte con isAdminOfFamily.
+ */
+export async function canApproveDecommission(userId: string): Promise<boolean> {
+  try {
+    return await withCache(`perm:decom-approve:v1:${userId}`, 300, async () => {
+      const user = await prisma.users.findUnique({
+        where: { id: userId },
+        select: { canApproveDecommission: true, isActive: true, role: true, isSuperAdmin: true },
+      })
+      if (!user || !user.isActive) return false
+      if (user.isSuperAdmin) return true
+      return user.role === 'ADMIN' && user.canApproveDecommission === true
+    })
+  } catch {
+    return false
+  }
+}
+
+/**
  * CRUD de activos en una familia concreta (scope operational).
  */
 export async function canManageAsset(

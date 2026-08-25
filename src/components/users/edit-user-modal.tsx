@@ -47,6 +47,7 @@ interface EditUserData {
   isActive: boolean
   canManageInventory: boolean
   canRequestAssets: boolean
+  canApproveDecommission: boolean
   canAccessKnowledge: boolean
   ticketsEnabled: boolean
   inventoryEnabled: boolean
@@ -90,6 +91,7 @@ export function EditUserModal({
     isActive: true,
     canManageInventory: false,
     canRequestAssets: false,
+    canApproveDecommission: false,
     canAccessKnowledge: true,
     ticketsEnabled: true,
     inventoryEnabled: false,
@@ -186,6 +188,7 @@ export function EditUserModal({
         isActive: user.isActive,
         canManageInventory: (user as any).canManageInventory ?? false,
         canRequestAssets: (user as any).canRequestAssets ?? false,
+        canApproveDecommission: (user as any).canApproveDecommission ?? false,
         canAccessKnowledge: (user as any).canAccessKnowledge ?? true,
         ticketsEnabled: (user as any).ticketsEnabled ?? true,
         inventoryEnabled: (user as any).inventoryEnabled ?? false,
@@ -293,6 +296,7 @@ export function EditUserModal({
           isActive: formData.isActive,
           canManageInventory: formData.canManageInventory,
           canRequestAssets: formData.canRequestAssets,
+          canApproveDecommission: formData.canApproveDecommission,
           canAccessKnowledge: formData.canAccessKnowledge,
           ticketsEnabled: formData.ticketsEnabled,
           inventoryEnabled: formData.inventoryEnabled,
@@ -402,6 +406,7 @@ export function EditUserModal({
       | 'canManageAccess'
       | 'canManageInventory'
       | 'canRequestAssets'
+      | 'canApproveDecommission'
       | 'canAccessKnowledge',
     value: boolean
   ) => {

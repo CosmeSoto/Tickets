@@ -18,6 +18,7 @@ const updateUserSchema = z.object({
   isActive: z.boolean().optional(),
   canManageInventory: z.boolean().optional(),
   canRequestAssets: z.boolean().optional(),
+  canApproveDecommission: z.boolean().optional(),
   canAccessKnowledge: z.boolean().optional(),
   ticketsEnabled: z.boolean().optional(),
   inventoryEnabled: z.boolean().optional(),
@@ -198,6 +199,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     // Solo un super admin puede cambiar el flag isSuperAdmin de otro usuario
     if (validatedData.isSuperAdmin !== undefined && !(session.user as any).isSuperAdmin) {
       delete validatedData.isSuperAdmin
+    }
+
+    // Solo un super admin puede delegar la aprobación de bajas definitivas a un ADMIN
+    if (validatedData.canApproveDecommission !== undefined && !(session.user as any).isSuperAdmin) {
+      delete validatedData.canApproveDecommission
     }
 
     // Crear/elevar a ADMIN: solo Super Admin
@@ -443,6 +449,28 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         }
         oldValues.canRequestAssets = (currentUser as any).canRequestAssets
         newValues.canRequestAssets = (validatedData as any).canRequestAssets
+        NotificationEvents.emit(targetId, {
+          type: 'session_refresh',
+          reason: 'permissions_changed',
+        })
+      }
+
+      // Si cambia canApproveDecommission, notificar para refrescar sesión
+      if (
+        (validatedData as any).canApproveDecommission !== undefined &&
+        (validatedData as any).canApproveDecommission !==
+          (currentUser as any).canApproveDecommission
+      ) {
+        changes.canApproveDecommission = {
+          old: (currentUser as any).canApproveDecommission
+            ? 'Puede aprobar bajas'
+            : 'No puede aprobar bajas',
+          new: (validatedData as any).canApproveDecommission
+            ? 'Puede aprobar bajas'
+            : 'No puede aprobar bajas',
+        }
+        oldValues.canApproveDecommission = (currentUser as any).canApproveDecommission
+        newValues.canApproveDecommission = (validatedData as any).canApproveDecommission
         NotificationEvents.emit(targetId, {
           type: 'session_refresh',
           reason: 'permissions_changed',

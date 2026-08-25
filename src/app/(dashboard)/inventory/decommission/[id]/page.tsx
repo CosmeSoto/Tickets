@@ -37,12 +37,14 @@ export default function DecommissionDetailPage({ params }: PageProps) {
   const role = session?.user?.role ?? ''
   const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
   const canManageInventory = (session?.user as any)?.canManageInventory === true
+  const canApproveDecommission = (session?.user as any)?.canApproveDecommission === true
 
   const userContext = {
     id: session?.user?.id ?? '',
     role,
     isSuperAdmin,
     canManageInventory,
+    canApproveDecommission,
   }
 
   useEffect(() => {

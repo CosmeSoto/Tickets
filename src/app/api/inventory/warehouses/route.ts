@@ -3,6 +3,12 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { canManageInventory } from '@/lib/inventory-access'
+import {
+  assertInventoryManageByFamily,
+  InventoryAccessError,
+  inventoryAccessToResponse,
+  toInventoryAccessUser,
+} from '@/lib/inventory/inventory-resource-access'
 import { randomUUID } from 'crypto'
 
 /**
@@ -92,6 +98,15 @@ export async function POST(request: NextRequest) {
     // Verificar que la familia existe
     const family = await prisma.families.findUnique({ where: { id: familyId } })
     if (!family) return NextResponse.json({ error: 'Familia no encontrada' }, { status: 404 })
+
+    // Un gestor con acceso a una sola familia no debe poder crear bodegas en
+    // familias que no gestiona (mismo criterio que el resto del módulo).
+    try {
+      await assertInventoryManageByFamily(toInventoryAccessUser(session.user), familyId)
+    } catch (err) {
+      if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+      throw err
+    }
 
     const maxOrder = await prisma.warehouses.aggregate({
       where: { familyId },

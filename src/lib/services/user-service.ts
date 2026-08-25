@@ -79,6 +79,7 @@ export interface UpdateUserData {
   isActive?: boolean
   canManageInventory?: boolean
   canRequestAssets?: boolean
+  canApproveDecommission?: boolean
   canAccessKnowledge?: boolean
   ticketsEnabled?: boolean
   inventoryEnabled?: boolean
@@ -477,6 +478,8 @@ export class UserService {
     if (data.canManageInventory !== undefined)
       updateData.canManageInventory = data.canManageInventory
     if (data.canRequestAssets !== undefined) updateData.canRequestAssets = data.canRequestAssets
+    if (data.canApproveDecommission !== undefined)
+      updateData.canApproveDecommission = data.canApproveDecommission
     if (data.canAccessKnowledge !== undefined)
       updateData.canAccessKnowledge = data.canAccessKnowledge
     if (data.ticketsEnabled !== undefined) updateData.ticketsEnabled = data.ticketsEnabled

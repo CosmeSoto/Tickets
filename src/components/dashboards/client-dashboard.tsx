@@ -55,7 +55,7 @@ export function ClientDashboard({ userId }: { userId: string }) {
       if (equipmentRes.ok) {
         const equipmentData = await equipmentRes.json()
         setStats(prev => ({ ...prev, assignedEquipment: equipmentData.total || 0 }))
-        setRecentEquipment(equipmentData.data || [])
+        setRecentEquipment(equipmentData.equipment || [])
       }
 
       if (requestsRes.ok) {

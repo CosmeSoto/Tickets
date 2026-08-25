@@ -15,6 +15,7 @@ export default function DecommissionPage() {
   const role = session?.user?.role ?? ''
   const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
   const canManageInventory = (session?.user as any)?.canManageInventory === true
+  const canApproveDecommission = (session?.user as any)?.canApproveDecommission === true
   const isAdmin = role === 'ADMIN'
   const isTechnician = role === 'TECHNICIAN'
 
@@ -23,6 +24,7 @@ export default function DecommissionPage() {
     role,
     isSuperAdmin,
     canManageInventory,
+    canApproveDecommission,
   }
 
   const subtitle = isSuperAdmin

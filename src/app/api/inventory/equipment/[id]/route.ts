@@ -16,6 +16,12 @@ import {
 import { getEquipmentDisplayName } from '@/lib/utils/equipment-display'
 import { hasAccessToEquipment } from '@/lib/middleware/family-filter'
 import { randomUUID } from 'crypto'
+import {
+  assertResourceTypeChangeAllowed,
+  InventoryAccessError,
+  inventoryAccessToResponse,
+  toInventoryAccessUser,
+} from '@/lib/inventory/inventory-resource-access'
 
 /**
  * GET /api/inventory/equipment/[id]
@@ -141,6 +147,21 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     // Validar datos base
     const validatedData = updateEquipmentSchema.parse(body)
+
+    // Si se reasigna el tipo (y por tanto la familia), validar permiso en la
+    // familia DESTINO — el chequeo de arriba solo cubrió la familia actual.
+    if (validatedData.typeId) {
+      try {
+        await assertResourceTypeChangeAllowed(
+          toInventoryAccessUser(session.user),
+          'EQUIPMENT',
+          validatedData.typeId
+        )
+      } catch (err) {
+        if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+        throw err
+      }
+    }
 
     // Validación: si se envía departmentId diferente al actual, verificar que no haya asignación activa
     if (validatedData.departmentId !== undefined) {

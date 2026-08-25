@@ -14,6 +14,7 @@ import {
   getInventorySessionContext,
   hasInventoryModuleAccess,
 } from '@/lib/inventory/inventory-session'
+import { releaseEquipmentFromContracts } from '@/lib/inventory/equipment-contract'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -110,6 +111,22 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
 
   if (action === 'approve') {
+    // Revalidar en el momento de aprobar (no solo al crear la solicitud): si
+    // el equipo fue asignado mientras la venta estaba pendiente, no se debe
+    // completar la venta con una asignación activa colgando.
+    const activeAssignment = await prisma.equipment_assignments.findFirst({
+      where: { equipmentId: sale.equipmentId, isActive: true },
+    })
+    if (activeAssignment) {
+      return NextResponse.json(
+        {
+          error:
+            'El equipo tiene una asignación activa (fue asignado después de crearse la solicitud). Registra su devolución antes de aprobar la venta.',
+        },
+        { status: 409 }
+      )
+    }
+
     const [updatedSale] = await prisma.$transaction([
       prisma.equipment_sales.update({
         where: { id },
@@ -135,6 +152,13 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         details: { descripcion: `Venta aprobada para ${sale.equipment.code}`, saleId: id },
         createdAt: new Date(),
       },
+    })
+
+    // Igual que en decommission-acts: liberar vínculos de contrato/renta —
+    // un equipo vendido no debe quedar con número de contrato, fechas o
+    // costo mensual de arrendamiento colgando.
+    await releaseEquipmentFromContracts(sale.equipmentId).catch(err => {
+      console.error('[sales/approve] Error liberando contrato del equipo:', err)
     })
 
     return NextResponse.json(updatedSale)

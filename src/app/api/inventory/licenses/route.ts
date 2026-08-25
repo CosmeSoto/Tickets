@@ -1,22 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { LicenseService } from '@/lib/services/license.service'
-import { linkLicenseToBusinessContract, mapLicenseScope } from '@/lib/inventory/license-contract'
-import { createLicenseSchema, licenseFiltersSchema } from '@/lib/validations/inventory/license'
-import { canManageInventory, inventoryForbidden } from '@/lib/inventory-access'
+import { licenseFiltersSchema } from '@/lib/validations/inventory/license'
 import { ZodError } from 'zod'
-import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 import prisma from '@/lib/prisma'
-import { NotificationService } from '@/lib/services/notification-service'
-import { getFamilyScopedAdmins } from '@/lib/notifications/family-recipients'
 import { getRenewalAlertStatus } from '@/lib/inventory/renewal-alert'
-import { withCache, invalidateCache, buildCacheKey, getSetting } from '@/lib/api-cache'
+import { withCache, buildCacheKey, getSetting } from '@/lib/api-cache'
 import { resolveInventoryListScope } from '@/lib/inventory/inventory-session'
 
 /**
  * GET /api/inventory/licenses
  * Lista licencias con filtros y paginación
+ *
+ * Nota: este archivo solo expone GET — la creación de licencias pasa por
+ * POST /api/inventory/assets con subtype LICENSE (ver assets-create.ts).
  */
 export async function GET(request: NextRequest) {
   try {
@@ -179,103 +176,5 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: message, field, details: error.errors }, { status: 400 })
     }
     return NextResponse.json({ error: 'Error al obtener licencias' }, { status: 500 })
-  }
-}
-
-/**
- * POST /api/inventory/licenses
- * Crea una nueva licencia
- */
-export async function POST(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-    }
-    if (!(await canManageInventory(session.user.id, session.user.role))) {
-      return inventoryForbidden()
-    }
-
-    const body = await request.json()
-    const validatedData = createLicenseSchema.parse(body)
-    const { contractId, scope, licenseTypeId, customValues, ...rest } = validatedData
-
-    const license = await LicenseService.createLicense(
-      {
-        ...rest,
-        supplierId: rest.supplierId ?? undefined,
-        assignedToEquipment: rest.assignedToEquipment ?? undefined,
-        assignedToUser: rest.assignedToUser ?? undefined,
-        assignedToDepartment: rest.assignedToDepartment ?? undefined,
-        typeId: rest.typeId || licenseTypeId!,
-        licenseScope: mapLicenseScope(scope),
-        customValues: customValues && customValues.length > 0 ? customValues : undefined,
-      },
-      session.user.id
-    )
-
-    if (contractId) {
-      await linkLicenseToBusinessContract(license.id, contractId, license.name)
-    }
-
-    await AuditServiceComplete.log({
-      action: AuditActionsComplete.LICENSE_CREATED,
-      entityType: 'inventory',
-      entityId: license.id,
-      userId: session.user.id,
-      details: {
-        name: validatedData.name,
-        typeId: validatedData.typeId,
-        vendor: validatedData.vendor,
-        cost: validatedData.cost,
-      },
-      ipAddress:
-        request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
-      userAgent: request.headers.get('user-agent') || 'unknown',
-    }).catch(err => console.error('[AUDIT] Error registrando creación de licencia:', err))
-
-    await invalidateCache('inventory:licenses:*').catch(() => {})
-
-    // Notificar a admins (asíncrono)
-    notifyAdminsNewLicense(
-      license.name,
-      license.licenseType?.name || 'Sin tipo',
-      license.licenseType?.familyId ?? null,
-      validatedData.cost
-    ).catch(err => console.error('[NOTIFICATION] Error notificando nueva licencia:', err))
-
-    return NextResponse.json(license, { status: 201 })
-  } catch (error) {
-    console.error('Error en POST /api/inventory/licenses:', error)
-    if (error instanceof ZodError) {
-      const first = error.errors[0]
-      const field = first?.path?.join('.') || undefined
-      const message = first?.message
-        ? field
-          ? `${first.message} (${field})`
-          : first.message
-        : 'Datos inválidos'
-      return NextResponse.json({ error: message, field, details: error.errors }, { status: 400 })
-    }
-    return NextResponse.json({ error: 'Error al crear licencia' }, { status: 500 })
-  }
-}
-
-async function notifyAdminsNewLicense(
-  name: string,
-  typeName: string,
-  familyId: string | null,
-  cost?: number
-) {
-  const admins = await getFamilyScopedAdmins(familyId, { id: true })
-
-  for (const admin of admins) {
-    await NotificationService.push({
-      userId: admin.id,
-      type: 'INFO',
-      title: 'Nueva Licencia Registrada',
-      message: `Se registró la licencia "${name}" (${typeName})${cost ? ` - ${cost}` : ''}`,
-      metadata: { link: '/inventory/licenses' },
-    }).catch(() => {})
   }
 }

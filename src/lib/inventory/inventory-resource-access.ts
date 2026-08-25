@@ -240,6 +240,54 @@ export async function assertInventoryResourceManage(
   return familyId
 }
 
+/**
+ * Familia de un tipo de catálogo (equipment_types / consumable_types / license_types).
+ * Usado para validar la familia DESTINO cuando un update reasigna el typeId
+ * de un recurso ya existente (no solo la familia actual del recurso).
+ */
+async function getCatalogTypeFamilyId(
+  kind: 'EQUIPMENT' | 'CONSUMABLE' | 'LICENSE',
+  typeId: string
+): Promise<string | null> {
+  if (kind === 'EQUIPMENT') {
+    const t = await prisma.equipment_types.findUnique({
+      where: { id: typeId },
+      select: { familyId: true },
+    })
+    return t?.familyId ?? null
+  }
+  if (kind === 'CONSUMABLE') {
+    const t = await prisma.consumable_types.findUnique({
+      where: { id: typeId },
+      select: { familyId: true },
+    })
+    return t?.familyId ?? null
+  }
+  const t = await prisma.license_types.findUnique({
+    where: { id: typeId },
+    select: { familyId: true },
+  })
+  return t?.familyId ?? null
+}
+
+/**
+ * Verifica permiso de gestión en la familia del tipo DESTINO al reasignar el
+ * typeId de un equipo/consumible/licencia ya existente. Complementa
+ * assertInventoryResourceManage, que solo valida la familia actual del
+ * recurso antes de aplicar el update — sin esto, un gestor con acceso a una
+ * sola familia podría mover el recurso a otra familia que no gestiona
+ * simplemente cambiando su typeId en el PUT, evitando el flujo dedicado de
+ * transfer-family (que sí valida origen y destino).
+ */
+export async function assertResourceTypeChangeAllowed(
+  user: InventoryAccessUser,
+  kind: 'EQUIPMENT' | 'CONSUMABLE' | 'LICENSE',
+  newTypeId: string
+): Promise<void> {
+  const familyId = await getCatalogTypeFamilyId(kind, newTypeId)
+  await assertInventoryManageByFamily(user, familyId)
+}
+
 /** Contratos bajo /api/inventory/contracts */
 export async function assertContractPaymentAccess(
   user: InventoryAccessUser,
@@ -261,8 +309,7 @@ export async function assertContractAccess(
   contractId: string,
   mode: 'read' | 'write'
 ): Promise<void> {
-  const hasModuleAccess =
-    user.isSuperAdmin || (await canManageInventory(user.id, user.role))
+  const hasModuleAccess = user.isSuperAdmin || (await canManageInventory(user.id, user.role))
   if (!hasModuleAccess) {
     throw new InventoryAccessError('No tienes permisos de gestión de inventario', 403)
   }

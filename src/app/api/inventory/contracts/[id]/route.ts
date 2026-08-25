@@ -86,6 +86,23 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
     const { lines: rawLines, ...rest } = raw
     const p = updateContractSchema.parse(rest)
 
+    // Familia destino: si se reasigna el contrato a otra familia, el gestor
+    // también debe tener permiso de gestión ahí (no solo en la familia actual).
+    if (!isSuperAdmin && p.familyId !== undefined && p.familyId) {
+      const allowedTarget = await canManageAsset(
+        session.user.id,
+        session.user.role,
+        isSuperAdmin,
+        p.familyId
+      )
+      if (!allowedTarget) {
+        return NextResponse.json(
+          { error: 'No tienes permiso para mover el contrato a esa familia' },
+          { status: 403 }
+        )
+      }
+    }
+
     const updateData: Parameters<typeof ContractService.update>[1] = {}
     if (p.contractNumber !== undefined) updateData.contractNumber = p.contractNumber ?? undefined
     if (p.name !== undefined) updateData.name = p.name

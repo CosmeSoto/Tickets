@@ -8,6 +8,7 @@ import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit
 import {
   assertInventoryResourceManage,
   assertInventoryResourceRead,
+  assertResourceTypeChangeAllowed,
   InventoryAccessError,
   toInventoryAccessUser,
   inventoryAccessToResponse,
@@ -172,6 +173,22 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           },
           { status: 422 }
         )
+      }
+    }
+
+    // Si se reasigna el tipo (y por tanto la familia), validar permiso en la
+    // familia DESTINO — assertInventoryResourceManage de arriba solo cubrió
+    // la familia actual de la licencia.
+    if (licenseTypeId) {
+      try {
+        await assertResourceTypeChangeAllowed(
+          toInventoryAccessUser(session.user),
+          'LICENSE',
+          licenseTypeId
+        )
+      } catch (err) {
+        if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+        throw err
       }
     }
 

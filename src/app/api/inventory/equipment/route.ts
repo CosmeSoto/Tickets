@@ -2,131 +2,95 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { z } from 'zod'
 import {
-  assertInventoryManageByFamily,
-  InventoryAccessError,
-  toInventoryAccessUser,
-  inventoryAccessToResponse,
-} from '@/lib/inventory/inventory-resource-access'
-import { canManageInventory, inventoryForbidden } from '@/lib/inventory-access'
+  getInventorySessionContext,
+  hasInventoryModuleAccess,
+} from '@/lib/inventory/inventory-session'
+import { buildEquipmentFamilyWhere } from '@/lib/inventory/scope-filter'
 
-const createEquipmentSchema = z.object({
-  code: z.string().min(1, 'El código es requerido'),
-  serialNumber: z.string().optional(),
-  modelId: z.string().min(1, 'El modelo es requerido'),
-  departmentId: z.string().optional(),
-  warehouseId: z.string().optional(),
-  physicalLocation: z.string().optional(),
-  condition: z.enum(['NEW', 'GOOD', 'FAIR', 'POOR']).optional(),
-  propertyType: z.enum(['FIXED_ASSET', 'RENTAL', 'LOAN']).optional(),
-  purchaseDate: z.string().optional(),
-  purchasePrice: z.number().optional(),
-  customValues: z.record(z.any()).optional(),
-  accessories: z
-    .array(
-      z.object({
-        name: z.string(),
-        quantity: z.number(),
-      })
-    )
-    .optional(),
-  notes: z.string().optional(),
-})
-
-export async function POST(request: NextRequest) {
+/**
+ * GET /api/inventory/equipment
+ * Listado simple de equipos, con scope por familia. Usado por el dashboard de
+ * clientes ("mis equipos asignados") y selectores rápidos (ej. diálogo de
+ * mantenimiento). Para el listado unificado paginado (equipos + MRO +
+ * licencias) usar /api/inventory/assets.
+ *
+ * Nota: este archivo solo expone GET — la creación de equipos pasa por
+ * POST /api/inventory/assets (ver assets-create.ts), no por aquí.
+ */
+export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    const body = await request.json()
-    const validatedData = createEquipmentSchema.parse(body)
+    const { searchParams } = request.nextUrl
+    const status = searchParams.get('status') ?? undefined
+    const familyIdParam = searchParams.get('familyId') ?? undefined
+    const limit = Math.min(Math.max(parseInt(searchParams.get('limit') ?? '20', 10) || 20, 1), 100)
 
-    // Verificar que el código no exista
-    const existingCode = await prisma.equipment.findUnique({
-      where: { code: validatedData.code },
-    })
+    const userId = session.user.id
+    const role = session.user.role
+    const isSuperAdmin = (session.user as any).isSuperAdmin === true
 
-    if (existingCode) {
-      return NextResponse.json({ error: 'El código ya existe' }, { status: 400 })
-    }
+    const andConditions: Record<string, any>[] = []
 
-    // Verificar número de serie si existe
-    if (validatedData.serialNumber) {
-      const existingSerial = await prisma.equipment.findFirst({
-        where: { serialNumber: validatedData.serialNumber },
+    if (role === 'CLIENT') {
+      const assignments = await prisma.equipment_assignments.findMany({
+        where: { receiverId: userId, isActive: true },
+        select: { equipmentId: true },
       })
-
-      if (existingSerial) {
-        return NextResponse.json({ error: 'El número de serie ya existe' }, { status: 400 })
+      const ids = assignments.map(a => a.equipmentId)
+      if (ids.length === 0) {
+        return NextResponse.json({ total: 0, equipment: [] })
       }
+      andConditions.push({ id: { in: ids } })
+    } else {
+      const ctx = await getInventorySessionContext({ id: userId, role, isSuperAdmin })
+      if (!hasInventoryModuleAccess(ctx)) {
+        return NextResponse.json({ total: 0, equipment: [] })
+      }
+      const scopeWhere = buildEquipmentFamilyWhere(ctx.scope.familyIds)
+      if (Object.keys(scopeWhere).length > 0) andConditions.push(scopeWhere)
     }
 
-    // Obtener datos del modelo (incluye marca para los campos deprecated)
-    const model = await prisma.equipment_models.findUnique({
-      where: { id: validatedData.modelId },
-      include: { brand: true, type: true },
-    })
+    if (status) andConditions.push({ status })
+    if (familyIdParam) andConditions.push({ type: { familyId: familyIdParam } })
 
-    if (!model) {
-      return NextResponse.json({ error: 'Modelo no encontrado' }, { status: 404 })
-    }
+    const where = andConditions.length > 0 ? { AND: andConditions } : {}
 
-    if (!(await canManageInventory(session.user.id, session.user.role))) {
-      return inventoryForbidden()
-    }
-
-    try {
-      await assertInventoryManageByFamily(toInventoryAccessUser(session.user), model.type.familyId)
-    } catch (err) {
-      if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
-      throw err
-    }
-
-    // Crear el equipo
-    const qrCode = `EQ-${validatedData.code}-${Date.now()}`
-    const equipment = await prisma.equipment.create({
-      data: {
-        code: validatedData.code,
-        serialNumber: validatedData.serialNumber || '',
-        modelId: validatedData.modelId,
-        brand: model.brand?.name ?? '',
-        modelDeprecated: model.model,
-        typeId: model.typeId,
-        departmentId: validatedData.departmentId,
-        warehouseId: validatedData.warehouseId,
-        location: validatedData.physicalLocation,
-        condition: (validatedData.condition || 'GOOD') as any,
-        ownershipType: (validatedData.propertyType || 'FIXED_ASSET') as any,
-        purchaseDate: validatedData.purchaseDate ? new Date(validatedData.purchaseDate) : null,
-        purchasePrice: validatedData.purchasePrice,
-        accessories: validatedData.accessories?.map(a => a.name) || [],
-        notes: validatedData.notes,
-        status: 'AVAILABLE' as any,
-        batchId: null,
-        qrCode,
-      },
-    })
-
-    return NextResponse.json(
-      {
-        success: true,
-        equipment: {
-          id: equipment.id,
-          code: equipment.code,
+    const [total, items] = await Promise.all([
+      prisma.equipment.count({ where }),
+      prisma.equipment.findMany({
+        where,
+        include: {
+          model: { select: { brand: true, model: true } },
+          type: { select: { family: { select: { name: true } } } },
+          assignments: {
+            where: { isActive: true },
+            orderBy: { startDate: 'desc' },
+            take: 1,
+            select: { startDate: true },
+          },
         },
-      },
-      { status: 201 }
-    )
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+      }),
+    ])
+
+    const equipment = items.map(eq => ({
+      id: eq.id,
+      code: eq.code,
+      brand: eq.model?.brand?.name ?? eq.brand ?? '',
+      model: eq.model?.model ?? eq.modelDeprecated ?? '',
+      familyName: eq.type?.family?.name ?? '',
+      assignedAt: eq.assignments[0]?.startDate?.toISOString() ?? null,
+    }))
+
+    return NextResponse.json({ total, equipment })
   } catch (error) {
-    console.error('Error creating equipment:', error)
-
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Datos inválidos', details: error.errors }, { status: 400 })
-    }
-
-    return NextResponse.json({ error: 'Error al crear equipo' }, { status: 500 })
+    console.error('Error en GET /api/inventory/equipment:', error)
+    return NextResponse.json({ error: 'Error al obtener equipos' }, { status: 500 })
   }
 }

@@ -86,6 +86,8 @@ interface UserContext {
   role: string
   isSuperAdmin: boolean
   canManageInventory: boolean
+  /** ADMIN delegado por el Super Admin para aprobar bajas definitivas */
+  canApproveDecommission?: boolean
 }
 
 interface DecommissionApprovalPanelProps {
@@ -154,13 +156,17 @@ export function DecommissionApprovalPanel({
     (isManager || isAdmin) &&
     ['PENDING', 'TECHNICAL_REVIEW'].includes(request.status)
 
-  // Admin: puede aprobar/rechazar según su nivel
+  // Aprobar: SuperAdmin siempre; ADMIN normal solo si tiene el permiso delegado
+  // canApproveDecommission (otorgado desde Gestión de Usuarios).
   // SuperAdmin: desde cualquier estado activo (no necesita el flujo de elevación)
-  // Admin normal: solo desde MANAGER_REVIEW (o PENDING si no hay gestores)
+  // Admin delegado: solo desde MANAGER_REVIEW (o PENDING si no hay gestores)
+  const canApproveDecommission = isSuperAdmin || userContext.canApproveDecommission === true
   const approvableStatuses = isSuperAdmin
     ? ['PENDING', 'TECHNICAL_REVIEW', 'MANAGER_REVIEW']
     : ['MANAGER_REVIEW', 'PENDING']
-  const canApprove = isAdmin && approvableStatuses.includes(request.status)
+  const canApprove =
+    isAdmin && canApproveDecommission && approvableStatuses.includes(request.status)
+  // Rechazar no requiere el permiso delegado — cualquier admin de la familia puede rechazar.
   const canReject = isAdmin && approvableStatuses.includes(request.status)
 
   // Nombre de la familia del activo (para contexto en los mensajes)

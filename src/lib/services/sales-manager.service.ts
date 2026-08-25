@@ -71,11 +71,13 @@ export class SalesManagerService {
       throw new Error('El precio de venta debe ser mayor a 0')
     }
 
-    // Verificar que los equipos existan y estén disponibles
+    // Verificar que los equipos existan y estén disponibles.
+    // Solo AVAILABLE: un equipo asignado a un empleado no debe poder ponerse
+    // en venta hasta que se registre su devolución.
     const equipment = await prisma.equipment.findMany({
       where: {
         id: { in: equipmentIds },
-        status: { in: ['AVAILABLE', 'ASSIGNED'] }, // Permitir ASSIGNED con advertencia
+        status: 'AVAILABLE',
       },
       include: {
         model: { select: { brand: true, model: true } },
@@ -88,7 +90,20 @@ export class SalesManagerService {
     }
 
     if (equipment.length !== equipmentIds.length) {
-      throw new Error('Algunos equipos no están disponibles o no existen')
+      throw new Error(
+        'Algunos equipos no están disponibles, no existen, o tienen una asignación activa'
+      )
+    }
+
+    // Un equipo en arriendo/préstamo no es propiedad de la compañía — debe
+    // adquirirse primero (convertir a activo propio) antes de poder venderse.
+    const notOwned = equipment.filter(
+      eq => (eq.acquisitionMode ?? eq.ownershipType) !== 'FIXED_ASSET'
+    )
+    if (notOwned.length > 0) {
+      throw new Error(
+        `Los siguientes equipos están en arriendo/préstamo y deben adquirirse (convertir a activo propio) antes de venderse: ${notOwned.map(e => e.code).join(', ')}`
+      )
     }
 
     // Actualizar equipos
@@ -279,17 +294,23 @@ export class SalesManagerService {
   }) {
     const { batchId, salePrice, saleCurrency = 'USD', saleNotes, userId } = params
 
-    // Obtener equipos del lote que estén disponibles
-    const equipment = await prisma.equipment.findMany({
-      where: {
-        batchId,
-        status: { in: ['AVAILABLE', 'ASSIGNED'] },
-      },
-      select: { id: true },
+    // Obtener equipos del lote que estén disponibles y sean propiedad de la
+    // compañía (mismo criterio que activateForSale: solo AVAILABLE +
+    // FIXED_ASSET, para no pasarle IDs que luego rechace y hagan fallar el
+    // lote completo por un conteo que no coincide — las unidades asignadas o
+    // en arriendo del lote simplemente se excluyen de esta activación).
+    const batchEquipment = await prisma.equipment.findMany({
+      where: { batchId, status: 'AVAILABLE' },
+      select: { id: true, acquisitionMode: true, ownershipType: true },
     })
+    const equipment = batchEquipment.filter(
+      eq => (eq.acquisitionMode ?? eq.ownershipType) === 'FIXED_ASSET'
+    )
 
     if (equipment.length === 0) {
-      throw new Error('No hay equipos disponibles en este lote')
+      throw new Error(
+        'No hay equipos disponibles en este lote (o todos están asignados o en arriendo)'
+      )
     }
 
     // Usar el método de activación individual

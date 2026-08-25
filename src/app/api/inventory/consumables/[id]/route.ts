@@ -9,6 +9,7 @@ import prisma from '@/lib/prisma'
 import {
   assertInventoryResourceManage,
   assertInventoryResourceRead,
+  assertResourceTypeChangeAllowed,
   InventoryAccessError,
   toInventoryAccessUser,
   inventoryAccessToResponse,
@@ -110,6 +111,22 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const updatePayload: any = { ...validatedData }
     if (supplierId !== undefined) {
       updatePayload.supplierId = supplierId
+    }
+
+    // Si se reasigna el tipo (y por tanto la familia), validar permiso en la
+    // familia DESTINO — assertInventoryResourceManage de arriba solo cubrió
+    // la familia actual del consumible.
+    if (validatedData.typeId) {
+      try {
+        await assertResourceTypeChangeAllowed(
+          toInventoryAccessUser(session.user),
+          'CONSUMABLE',
+          validatedData.typeId
+        )
+      } catch (err) {
+        if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+        throw err
+      }
     }
 
     const consumable = await ConsumableService.updateConsumable(id, updatePayload, session.user.id)

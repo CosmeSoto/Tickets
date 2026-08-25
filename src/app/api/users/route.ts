@@ -372,6 +372,7 @@ export async function GET(request: NextRequest) {
         isActive: true,
         canManageInventory: true,
         canRequestAssets: true,
+        canApproveDecommission: true,
         canAccessKnowledge: true,
         ticketsEnabled: true,
         inventoryEnabled: true,

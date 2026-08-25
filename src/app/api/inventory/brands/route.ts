@@ -11,14 +11,15 @@ import {
   listBrands,
   type CreateBrandInput,
 } from '@/lib/services/equipment-brands.service'
-import { canManageInventory } from '@/lib/inventory-access'
 import {
+  assertCatalogEntryWrite,
   buildCatalogFamilyWhere,
   requireInventoryCatalogRead,
 } from '@/lib/inventory/inventory-catalog-access'
 import {
   InventoryAccessError,
   inventoryAccessToResponse,
+  toInventoryAccessUser,
 } from '@/lib/inventory/inventory-resource-access'
 import { z } from 'zod'
 
@@ -73,11 +74,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    const hasAccess = await canManageInventory(session.user.id, session.user.role)
-    if (!hasAccess) {
-      return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
-    }
-
     const body = await request.json()
     const validationResult = createBrandSchema.safeParse(body)
     if (!validationResult.success) {
@@ -87,9 +83,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    await assertCatalogEntryWrite(
+      toInventoryAccessUser(session.user),
+      validationResult.data.familyId
+    )
+
     const brand = await createBrand(validationResult.data as CreateBrandInput)
     return NextResponse.json(brand, { status: 201 })
   } catch (error: unknown) {
+    if (error instanceof InventoryAccessError) return inventoryAccessToResponse(error)
     console.error('Error creating brand:', error)
     const message = error instanceof Error ? error.message : 'Error al crear marca'
     const status = message.includes('Ya existe') ? 409 : 500

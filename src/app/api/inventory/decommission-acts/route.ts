@@ -11,6 +11,12 @@ import { FolioService } from '@/lib/services/folio.service'
 import { notifyFamilyScopedAdmins } from '@/lib/api/notify'
 import { getInventorySessionContext } from '@/lib/inventory/inventory-session'
 import { buildLicenseFamilyWhere, buildEquipmentFamilyWhere } from '@/lib/inventory/scope-filter'
+import {
+  assertInventoryReadByFamily,
+  InventoryAccessError,
+  inventoryAccessToResponse,
+  toInventoryAccessUser,
+} from '@/lib/inventory/inventory-resource-access'
 
 const decommissionInclude = {
   requester: { select: { id: true, name: true, email: true } },
@@ -203,6 +209,18 @@ export async function POST(request: NextRequest) {
         select: { licenseType: { select: { familyId: true } } },
       })
       familyId = licenseWithFamily?.licenseType?.familyId ?? null
+    }
+
+    // El solicitante (ADMIN/gestor/técnico) debe tener acceso de lectura a la
+    // familia del activo — sin esto, cualquier técnico o gestor del sistema
+    // podía crear solicitudes de baja para activos de familias que no le
+    // corresponden (la revisión posterior sí estaba bien acotada, pero la
+    // creación no debería generar ruido cruzado entre familias).
+    try {
+      await assertInventoryReadByFamily(toInventoryAccessUser(session.user), familyId)
+    } catch (err) {
+      if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+      throw err
     }
 
     // Crear solicitud

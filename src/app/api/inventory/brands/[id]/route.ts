@@ -14,7 +14,16 @@ import {
   deleteBrand,
   type UpdateBrandInput,
 } from '@/lib/services/equipment-brands.service'
-import { canManageInventory } from '@/lib/inventory-access'
+import {
+  assertCatalogEntryRead,
+  assertCatalogEntryWrite,
+  assertGlobalCatalogDelete,
+} from '@/lib/inventory/inventory-catalog-access'
+import {
+  InventoryAccessError,
+  inventoryAccessToResponse,
+  toInventoryAccessUser,
+} from '@/lib/inventory/inventory-resource-access'
 import { z } from 'zod'
 
 // Validation schema for update
@@ -40,17 +49,14 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    // Check inventory access
-    const hasAccess = await canManageInventory(session.user.id, session.user.role)
-    if (!hasAccess) {
-      return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
-    }
-
     const { id } = await params
     const brand = await getBrandById(id)
 
+    await assertCatalogEntryRead(toInventoryAccessUser(session.user), brand.familyId)
+
     return NextResponse.json(brand)
   } catch (error: any) {
+    if (error instanceof InventoryAccessError) return inventoryAccessToResponse(error)
     console.error('Error getting brand:', error)
 
     if (error.message === 'Marca no encontrada') {
@@ -73,12 +79,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    // Check inventory access
-    const hasAccess = await canManageInventory(session.user.id, session.user.role)
-    if (!hasAccess) {
-      return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
-    }
-
     const { id } = await params
     const body = await request.json()
 
@@ -94,11 +94,21 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       )
     }
 
+    const existingBrand = await getBrandById(id)
+    const user = toInventoryAccessUser(session.user)
+    await assertCatalogEntryWrite(user, existingBrand.familyId)
+
     const data: UpdateBrandInput = validationResult.data
+    // Familia destino: si se reasigna, validar permiso ahí también.
+    if (data.familyId !== undefined && data.familyId !== existingBrand.familyId) {
+      await assertCatalogEntryWrite(user, data.familyId)
+    }
+
     const brand = await updateBrand(id, data)
 
     return NextResponse.json(brand)
   } catch (error: any) {
+    if (error instanceof InventoryAccessError) return inventoryAccessToResponse(error)
     console.error('Error updating brand:', error)
 
     if (
@@ -133,17 +143,14 @@ export async function DELETE(
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    // Check inventory access
-    const hasAccess = await canManageInventory(session.user.id, session.user.role)
-    if (!hasAccess) {
-      return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
-    }
+    await assertGlobalCatalogDelete(toInventoryAccessUser(session.user))
 
     const { id } = await params
     const result = await deleteBrand(id)
 
     return NextResponse.json(result)
   } catch (error: any) {
+    if (error instanceof InventoryAccessError) return inventoryAccessToResponse(error)
     console.error('Error deleting brand:', error)
 
     if (error.message === 'Marca no encontrada') {

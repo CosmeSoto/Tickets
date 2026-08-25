@@ -68,6 +68,25 @@ export class AssignmentService {
 
       // Crear asignación en transacción
       const assignment = await prisma.$transaction(async tx => {
+        // Reclamo atómico: solo reclama el equipo si SIGUE AVAILABLE en este
+        // momento. Evita que dos asignaciones casi simultáneas (doble clic,
+        // reintento de red) dejen el mismo equipo asignado a dos personas —
+        // el chequeo de disponibilidad de más arriba ocurre antes de la
+        // transacción y por sí solo no lo evita.
+        const claimed = await (tx.equipment.updateMany as any)({
+          where: { id: data.equipmentId, status: 'AVAILABLE' },
+          data: {
+            status: 'ASSIGNED',
+            // Desnormalizar el departamento del receptor para filtros rápidos
+            departmentId: (receiver as any).departmentId ?? null,
+          },
+        })
+        if (claimed.count === 0) {
+          throw new Error(
+            'El equipo ya no está disponible para asignación (fue asignado por otra operación)'
+          )
+        }
+
         // Crear asignación
         const newAssignment = await tx.equipment_assignments.create({
           data: {
@@ -85,16 +104,6 @@ export class AssignmentService {
             equipment: true,
             receiver: true,
             deliverer: true,
-          },
-        })
-
-        // Actualizar estado del equipo a ASSIGNED y sincronizar departmentId
-        await (tx.equipment.update as any)({
-          where: { id: data.equipmentId },
-          data: {
-            status: 'ASSIGNED',
-            // Desnormalizar el departamento del receptor para filtros rápidos
-            departmentId: (receiver as any).departmentId ?? null,
           },
         })
 

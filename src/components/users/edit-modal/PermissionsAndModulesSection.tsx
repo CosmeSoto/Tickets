@@ -47,6 +47,7 @@ interface PermissionsAndModulesSectionProps {
     canManageAccess: boolean
     canManageInventory: boolean
     canRequestAssets: boolean
+    canApproveDecommission: boolean
     canAccessKnowledge: boolean
   }
   /** Departamentos del sistema (con familyId/family) para resolver nativa al cambiar depto */
@@ -97,6 +98,7 @@ interface PermissionsAndModulesSectionProps {
       | 'canManageAccess'
       | 'canManageInventory'
       | 'canRequestAssets'
+      | 'canApproveDecommission'
       | 'canAccessKnowledge',
     value: boolean
   ) => void
@@ -326,6 +328,16 @@ export function PermissionsAndModulesSection({
                 onToggleRequestAssets:
                   formData.role === 'CLIENT' || formData.role === 'TECHNICIAN'
                     ? v => onToggle('canRequestAssets', v)
+                    : undefined,
+                // Aprobar bajas definitivas — solo ADMIN no-super (el super admin
+                // siempre puede aprobar, el toggle no aplica en su caso)
+                canApproveDecommission:
+                  formData.role === 'ADMIN' && !formData.isSuperAdmin
+                    ? formData.canApproveDecommission
+                    : undefined,
+                onToggleApproveDecommission:
+                  formData.role === 'ADMIN' && !formData.isSuperAdmin
+                    ? v => onToggle('canApproveDecommission', v)
                     : undefined,
               }}
               loading={loadingFamilies}

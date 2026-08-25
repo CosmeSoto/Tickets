@@ -330,6 +330,7 @@ const sharedAuthOptions: Omit<NextAuthOptions, 'providers'> = {
                 token.canManageProcesses = dbUser.canManageProcesses ?? false
                 token.accessEnabled = (dbUser as any).accessEnabled ?? false
                 token.canManageAccess = (dbUser as any).canManageAccess ?? false
+                token.canApproveDecommission = (dbUser as any).canApproveDecommission ?? false
                 token.isOAuth = true
                 token.needsProfileCompletion = clientNeedsProfileCompletion({
                   role: dbUser.role,
@@ -353,6 +354,7 @@ const sharedAuthOptions: Omit<NextAuthOptions, 'providers'> = {
                 token.canManageProcesses = false
                 token.accessEnabled = false
                 token.canManageAccess = false
+                token.canApproveDecommission = false
               }
             } catch (error) {
               console.error('Error obteniendo usuario OAuth:', error)
@@ -393,6 +395,7 @@ const sharedAuthOptions: Omit<NextAuthOptions, 'providers'> = {
                   canManageProcesses: true,
                   accessEnabled: true,
                   canManageAccess: true,
+                  canApproveDecommission: true,
                   passwordChangedAt: true,
                 },
               })
@@ -417,6 +420,7 @@ const sharedAuthOptions: Omit<NextAuthOptions, 'providers'> = {
               token.canManageProcesses = dbUser?.canManageProcesses ?? false
               token.accessEnabled = (dbUser as any)?.accessEnabled ?? false
               token.canManageAccess = (dbUser as any)?.canManageAccess ?? false
+              token.canApproveDecommission = (dbUser as any)?.canApproveDecommission ?? false
 
               // ── Política de cambio de contraseña ───────────────────────
               try {
@@ -495,6 +499,7 @@ const sharedAuthOptions: Omit<NextAuthOptions, 'providers'> = {
                   canManageProcesses: true,
                   accessEnabled: true,
                   canManageAccess: true,
+                  canApproveDecommission: true,
                   departmentId: true,
                   phone: true,
                   passwordChangedAt: true,
@@ -530,6 +535,7 @@ const sharedAuthOptions: Omit<NextAuthOptions, 'providers'> = {
               token.canManageProcesses = dbUser.canManageProcesses ?? false
               token.accessEnabled = (dbUser as any).accessEnabled ?? false
               token.canManageAccess = (dbUser as any).canManageAccess ?? false
+              token.canApproveDecommission = (dbUser as any).canApproveDecommission ?? false
               token.departmentId = dbUser.departmentId || undefined
               token.department = dbUser.departments?.name || undefined
               token.phone = dbUser.phone || undefined
@@ -678,6 +684,8 @@ const sharedAuthOptions: Omit<NextAuthOptions, 'providers'> = {
           ;(session.user as any).canManageProcesses = (token.canManageProcesses as boolean) ?? false
           ;(session.user as any).accessEnabled = (token.accessEnabled as boolean) ?? false
           ;(session.user as any).canManageAccess = (token.canManageAccess as boolean) ?? false
+          ;(session.user as any).canApproveDecommission =
+            (token.canApproveDecommission as boolean) ?? false
 
           // Política de cambio de contraseña
           ;(session.user as any).mustChangePassword = (token.mustChangePassword as boolean) ?? false
