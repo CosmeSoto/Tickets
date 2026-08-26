@@ -387,6 +387,7 @@ export async function GET(request: NextRequest) {
         lastLogin: true,
         _count: {
           select: {
+            tickets_tickets_clientIdTousers: true,
             tickets_tickets_createdByIdTousers: true,
             tickets_tickets_assigneeIdTousers: true,
             technician_assignments: true,

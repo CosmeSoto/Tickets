@@ -54,8 +54,10 @@ export interface UserData {
   createdAt: string
   canDelete?: boolean
   _count: {
+    tickets_tickets_clientIdTousers?: number
     tickets_tickets_createdByIdTousers: number
     tickets_tickets_assigneeIdTousers: number
+    technician_assignments?: number
   }
 }
 

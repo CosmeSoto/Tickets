@@ -3,7 +3,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { RoleBadge } from '@/components/ui/role-badge'
-import { Camera, X, RotateCcw, Calendar, Activity, Ticket, Lock } from 'lucide-react'
+import { Camera, X, RotateCcw, Calendar, Activity, Ticket, Lock, Tag } from 'lucide-react'
 import type { UserRole } from '@/lib/constants/user-constants'
 
 interface UserHeaderCardProps {
@@ -17,6 +17,7 @@ interface UserHeaderCardProps {
     _count?: {
       tickets_tickets_clientIdTousers?: number
       tickets_tickets_assigneeIdTousers?: number
+      technician_assignments?: number
     }
   }
   avatarPreview: string | null
@@ -149,6 +150,20 @@ export function UserHeaderCard({
           </p>
           <p className='text-xs text-muted-foreground'>Asignados</p>
         </div>
+        {(role === 'TECHNICIAN' || role === 'ADMIN') && (
+          <div
+            className='text-center'
+            title='Categorías donde este usuario está configurado como resolutor (ver también Categorías → Cobertura por Técnico)'
+          >
+            <p className='text-lg font-bold text-amber-600 dark:text-amber-400'>
+              {user._count?.technician_assignments ?? 0}
+            </p>
+            <p className='text-xs text-muted-foreground flex items-center gap-0.5'>
+              <Tag className='h-3 w-3' />
+              Categorías
+            </p>
+          </div>
+        )}
       </div>
     </div>
   )
