@@ -4,16 +4,48 @@ import { User, Calendar, Clock, MessageSquare, Paperclip, Eye } from 'lucide-rea
 import { StatusBadge, PriorityBadge } from '@/components/ui/status-badge'
 import { Button } from '@/components/ui/button'
 import type { Column } from '@/components/ui/data-table'
+import type { TableColumnDef } from '@/components/common/table-columns-menu'
 import type { Ticket as TicketType } from '@/hooks/use-ticket-data'
 import { formatTimeAgo, getTicketDisplayCode } from '@/hooks/use-ticket-data'
 
-interface AdminTicketColumnsProps {
-  onView: (ticket: TicketType) => void
+/**
+ * Definiciones para el selector de columnas (`TableColumnsMenu`) del datatable
+ * de Admin. 'title' es la única obligatoria (identifica la fila). El orden
+ * aquí es el orden por defecto.
+ */
+export const ADMIN_TICKET_COLUMN_DEFS: TableColumnDef[] = [
+  { key: 'title', label: 'Ticket', required: true },
+  { key: 'family', label: 'Área' },
+  { key: 'status', label: 'Estado' },
+  { key: 'priority', label: 'Prioridad' },
+  { key: 'client', label: 'Cliente' },
+  { key: 'assignee', label: 'Asignado' },
+  { key: 'category', label: 'Categoría' },
+  { key: 'createdAt', label: 'Creado' },
+  { key: 'updatedAt', label: 'Actividad' },
+]
+
+/** Botón "ver" — se pasa como `rowActions` de `DataTable`, no como columna. */
+export function renderAdminTicketRowActions(onView: (ticket: TicketType) => void) {
+  function AdminTicketRowActions(ticket: TicketType) {
+    return (
+      <Button
+        variant='ghost'
+        size='sm'
+        onClick={e => {
+          e.stopPropagation()
+          onView(ticket)
+        }}
+      >
+        <Eye className='h-4 w-4' />
+      </Button>
+    )
+  }
+  return AdminTicketRowActions
 }
 
-export function createAdminTicketColumns({
-  onView,
-}: AdminTicketColumnsProps): Column<TicketType>[] {
+/** Todas las columnas de datos disponibles, keyed igual que ADMIN_TICKET_COLUMN_DEFS. */
+export function createAdminTicketColumns(): Column<TicketType>[] {
   return [
     {
       key: 'title',
@@ -138,22 +170,6 @@ export function createAdminTicketColumns({
             <span>{formatTimeAgo(ticket.updatedAt)}</span>
           </div>
         </div>
-      ),
-    },
-    {
-      key: 'actions',
-      label: '',
-      render: (ticket: TicketType) => (
-        <Button
-          variant='ghost'
-          size='sm'
-          onClick={e => {
-            e.stopPropagation()
-            onView(ticket)
-          }}
-        >
-          <Eye className='h-4 w-4' />
-        </Button>
       ),
     },
   ]

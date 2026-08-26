@@ -13,7 +13,12 @@ import { StaggerGrid } from '@/components/shared/stagger-grid'
 import { TicketFilters } from '@/components/tickets/ticket-filters'
 import { Button } from '@/components/ui/button'
 import { ExportButton } from '@/components/common/export-button'
-import { createAdminTicketColumns } from '@/components/tickets/admin/ticket-columns'
+import { TableColumnsMenu } from '@/components/common/table-columns-menu'
+import {
+  createAdminTicketColumns,
+  renderAdminTicketRowActions,
+  ADMIN_TICKET_COLUMN_DEFS,
+} from '@/components/tickets/admin/ticket-columns'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 
@@ -23,14 +28,21 @@ import { usePagination } from '@/hooks/common/use-pagination'
 import { useExport } from '@/hooks/common/use-export'
 import type { Ticket as TicketType } from '@/hooks/use-ticket-data'
 import { filterTicketsAdmin, filterTicketsCreatedBy } from '@/lib/utils/ticket-filters'
-import { ADMIN_TICKET_EXPORT_COLUMNS } from '@/lib/utils/ticket-utils'
+import { ADMIN_TICKET_EXPORT_COLUMN_MAP } from '@/lib/utils/ticket-utils'
 import { useFamilies } from '@/contexts/families-context'
 import { useLiveTicketRefresh } from '@/hooks/use-live-ticket-refresh'
+
+const DEFAULT_COLUMN_ORDER = ADMIN_TICKET_COLUMN_DEFS.map(c => c.key)
 
 export default function AdminTicketsPage() {
   const { data: session } = useSession()
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<'all' | 'created'>('all')
+
+  // Selector de columnas (visibilidad + orden), persistido en localStorage.
+  // Alimenta tanto la tabla como la exportación (lo que ves es lo que exportas).
+  const [columnOrder, setColumnOrder] = useState<string[]>(DEFAULT_COLUMN_ORDER)
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(DEFAULT_COLUMN_ORDER)
 
   const { families: contextFamilies } = useFamilies()
   const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
@@ -151,13 +163,33 @@ export default function AdminTicketsPage() {
   }, [createdTicketsRaw, session?.user?.id])
 
   const handleViewTicket = (ticket: TicketType) => router.push(`/admin/tickets/${ticket.id}`)
+  const rowActions = useMemo(() => renderAdminTicketRowActions(handleViewTicket), []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Columnas visibles/ordenadas según el selector — se usan tanto en la tabla
+  // como en la exportación (lo que ves es lo que exportas).
+  const allColumns = useMemo(() => createAdminTicketColumns(), [])
+  const visibleTableColumns = useMemo(
+    () =>
+      columnOrder
+        .filter(k => visibleColumns.includes(k))
+        .map(k => allColumns.find(c => String(c.key) === k))
+        .filter((c): c is (typeof allColumns)[number] => Boolean(c)),
+    [allColumns, columnOrder, visibleColumns]
+  )
+  const exportColumns = useMemo(
+    () =>
+      columnOrder
+        .filter(k => visibleColumns.includes(k) && ADMIN_TICKET_EXPORT_COLUMN_MAP[k])
+        .map(k => ADMIN_TICKET_EXPORT_COLUMN_MAP[k]),
+    [columnOrder, visibleColumns]
+  )
 
   const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
     filename: activeTab === 'all' ? 'tickets-admin' : 'mis-solicitudes-admin',
     title: activeTab === 'all' ? 'Gestión de Tickets' : 'Mis Solicitudes',
     subtitle: `Exportado el ${new Date().toLocaleDateString('es-ES')} • ${activeTickets.length} tickets`,
     getData: () => activeTickets,
-    columns: ADMIN_TICKET_EXPORT_COLUMNS,
+    columns: exportColumns,
   })
 
   const paginationConfig = {
@@ -282,12 +314,14 @@ export default function AdminTicketsPage() {
             categoryFilter={filters.category}
             assigneeFilter={filters.assignee}
             familyFilter={filters.family}
+            dateFilter={filters.dateRange}
             setSearchTerm={term => setFilter('search', term)}
             onStatusChange={status => setFilter('status', status)}
             onPriorityChange={priority => setFilter('priority', priority)}
             onCategoryChange={category => setFilter('category', category)}
             onAssigneeChange={assignee => setFilter('assignee', assignee)}
             onFamilyChange={family => setFilter('family', family)}
+            onDateChange={date => setFilter('dateRange', date)}
             onRefresh={reloadAll}
             onClearFilters={clearFilters}
             categories={categories}
@@ -295,6 +329,7 @@ export default function AdminTicketsPage() {
             variant='admin'
             loading={loadingAll}
             showAssigneeFilter={true}
+            showDateFilter={true}
             searchPlaceholder='Buscar por título, descripción, cliente o técnico...'
           />
 
@@ -302,7 +337,8 @@ export default function AdminTicketsPage() {
             title='Tickets'
             description={`Gestión de tickets del sistema (${filteredAll.length} tickets)`}
             data={pagination.currentItems}
-            columns={createAdminTicketColumns({ onView: handleViewTicket })}
+            columns={visibleTableColumns}
+            rowActions={rowActions}
             loading={loadingAll}
             pagination={paginationConfig}
             onRefresh={reloadAll}
@@ -310,13 +346,23 @@ export default function AdminTicketsPage() {
             hideInternalFilters={true}
             onRowClick={handleViewTicket}
             actions={
-              <ExportButton
-                onExportCSV={exportCSV}
-                onExportExcel={exportExcel}
-                onExportPDF={exportPDF}
-                loading={exporting}
-                disabled={filteredAll.length === 0}
-              />
+              <>
+                <TableColumnsMenu
+                  columns={ADMIN_TICKET_COLUMN_DEFS}
+                  order={columnOrder}
+                  visible={visibleColumns}
+                  onOrderChange={setColumnOrder}
+                  onVisibleChange={setVisibleColumns}
+                  storageKey='admin-tickets-columns-v1'
+                />
+                <ExportButton
+                  onExportCSV={exportCSV}
+                  onExportExcel={exportExcel}
+                  onExportPDF={exportPDF}
+                  loading={exporting}
+                  disabled={filteredAll.length === 0}
+                />
+              </>
             }
             emptyState={{
               icon: <Ticket className='h-12 w-12 text-muted-foreground mx-auto mb-4' />,
@@ -394,11 +440,13 @@ export default function AdminTicketsPage() {
             priorityFilter={filters.priority}
             categoryFilter={filters.category}
             familyFilter={filters.family}
+            dateFilter={filters.dateRange}
             setSearchTerm={term => setFilter('search', term)}
             onStatusChange={status => setFilter('status', status)}
             onPriorityChange={priority => setFilter('priority', priority)}
             onCategoryChange={category => setFilter('category', category)}
             onFamilyChange={family => setFilter('family', family)}
+            onDateChange={date => setFilter('dateRange', date)}
             onRefresh={reloadCreated}
             onClearFilters={clearFilters}
             categories={categories}
@@ -406,6 +454,7 @@ export default function AdminTicketsPage() {
             variant='admin'
             loading={loadingCreated}
             showAssigneeFilter={false}
+            showDateFilter={true}
             searchPlaceholder='Buscar por título o descripción...'
           />
 
@@ -413,7 +462,8 @@ export default function AdminTicketsPage() {
             title='Mis Solicitudes'
             description={`Tickets que creaste como solicitante (${filteredCreated.length} tickets)`}
             data={pagination.currentItems}
-            columns={createAdminTicketColumns({ onView: handleViewTicket })}
+            columns={visibleTableColumns}
+            rowActions={rowActions}
             loading={loadingCreated}
             pagination={paginationConfig}
             onRefresh={reloadCreated}
@@ -421,13 +471,23 @@ export default function AdminTicketsPage() {
             hideInternalFilters={true}
             onRowClick={handleViewTicket}
             actions={
-              <ExportButton
-                onExportCSV={exportCSV}
-                onExportExcel={exportExcel}
-                onExportPDF={exportPDF}
-                loading={exporting}
-                disabled={filteredCreated.length === 0}
-              />
+              <>
+                <TableColumnsMenu
+                  columns={ADMIN_TICKET_COLUMN_DEFS}
+                  order={columnOrder}
+                  visible={visibleColumns}
+                  onOrderChange={setColumnOrder}
+                  onVisibleChange={setVisibleColumns}
+                  storageKey='admin-tickets-columns-v1'
+                />
+                <ExportButton
+                  onExportCSV={exportCSV}
+                  onExportExcel={exportExcel}
+                  onExportPDF={exportPDF}
+                  loading={exporting}
+                  disabled={filteredCreated.length === 0}
+                />
+              </>
             }
             emptyState={{
               icon: <Send className='h-12 w-12 text-muted-foreground mx-auto mb-4' />,

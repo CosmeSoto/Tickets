@@ -5,7 +5,7 @@
 
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import type {
   Family,
@@ -17,14 +17,16 @@ import type {
   ReportTab,
   Granularity,
 } from '@/components/reports/utils/report-types'
+import { exportToCSV, exportToExcel, exportToPDF } from '@/lib/utils/export'
 import {
-  exportExecutiveCSV,
-  exportTechniciansCSV,
-  exportTrendsCSV,
-  exportSLACSV,
-  exportSatisfactionCSV,
-  exportPDF,
-} from '@/components/reports/utils/report-exporters'
+  EXECUTIVE_EXPORT_COLUMNS,
+  TECHNICIANS_EXPORT_COLUMNS,
+  TRENDS_EXPORT_COLUMNS,
+  SLA_EXPORT_COLUMNS,
+  SATISFACTION_EXPORT_COLUMNS,
+  satisfactionExportRows,
+} from '@/components/reports/utils/report-export-columns'
+import { getTabLabel } from '@/components/reports/utils/report-formatters'
 
 export function useReports() {
   const { data: session } = useSession()
@@ -145,15 +147,23 @@ export function useReports() {
   const selectedFamily = families.find(f => f.id === selectedFamilyId) ?? null
   const familyDisplayName = selectedFamily ? selectedFamily.name : 'Todas las familias'
 
-  // ── CSV export handlers ──
-  const handleExportCSV = useCallback(() => {
-    if (activeTab === 'executive') exportExecutiveCSV(executiveData, familyDisplayName)
-    else if (activeTab === 'technicians') exportTechniciansCSV(techniciansData, familyDisplayName)
-    else if (activeTab === 'trends') exportTrendsCSV(trendsData, familyDisplayName)
-    else if (activeTab === 'sla') exportSLACSV(slaData, familyDisplayName)
-    else if (activeTab === 'satisfaction' && satisfactionData)
-      exportSatisfactionCSV(satisfactionData, familyDisplayName)
-    void logExport('csv')
+  // ── Columnas + filas de la pestaña activa (una sola fuente para los 3 formatos) ──
+  const getActiveTabExport = useCallback((): {
+    columns: import('@/lib/utils/export').ExportColumn[]
+    rows: unknown[]
+  } | null => {
+    if (activeTab === 'executive') return { columns: EXECUTIVE_EXPORT_COLUMNS, rows: executiveData }
+    if (activeTab === 'technicians')
+      return { columns: TECHNICIANS_EXPORT_COLUMNS, rows: techniciansData }
+    if (activeTab === 'trends')
+      return { columns: TRENDS_EXPORT_COLUMNS(familyDisplayName), rows: trendsData }
+    if (activeTab === 'sla') return { columns: SLA_EXPORT_COLUMNS, rows: slaData }
+    if (activeTab === 'satisfaction' && satisfactionData)
+      return {
+        columns: SATISFACTION_EXPORT_COLUMNS,
+        rows: satisfactionExportRows(satisfactionData, familyDisplayName),
+      }
+    return null
   }, [
     activeTab,
     executiveData,
@@ -162,33 +172,38 @@ export function useReports() {
     slaData,
     satisfactionData,
     familyDisplayName,
-    logExport,
   ])
 
-  // ── PDF export handler ──
+  const exportMeta = useMemo(
+    () => ({
+      filename: `${activeTab}-${familyDisplayName}`,
+      title: `${getTabLabel(activeTab, granularity)} — ${familyDisplayName}`,
+      subtitle: `Generado el ${new Date().toLocaleDateString('es-ES')}`,
+    }),
+    [activeTab, familyDisplayName, granularity]
+  )
+
+  // ── Export handlers (CSV / Excel / PDF) — mismo motor genérico que Tickets/Inventario ──
+  const handleExportCSV = useCallback(() => {
+    const data = getActiveTabExport()
+    if (!data || data.rows.length === 0) return
+    exportToCSV({ ...exportMeta, ...data })
+    void logExport('csv')
+  }, [getActiveTabExport, exportMeta, logExport]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleExportExcel = useCallback(async () => {
+    const data = getActiveTabExport()
+    if (!data || data.rows.length === 0) return
+    await exportToExcel({ ...exportMeta, ...data })
+    void logExport('excel')
+  }, [getActiveTabExport, exportMeta, logExport]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleExportPDF = useCallback(() => {
-    exportPDF(
-      selectedFamily,
-      activeTab,
-      executiveData,
-      techniciansData,
-      trendsData,
-      slaData,
-      satisfactionData,
-      granularity
-    )
+    const data = getActiveTabExport()
+    if (!data || data.rows.length === 0) return
+    exportToPDF({ ...exportMeta, ...data })
     void logExport('pdf')
-  }, [
-    selectedFamily,
-    activeTab,
-    executiveData,
-    techniciansData,
-    trendsData,
-    slaData,
-    satisfactionData,
-    granularity,
-    logExport,
-  ])
+  }, [getActiveTabExport, exportMeta, logExport]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Clear date filters ──
   const clearDateFilters = useCallback(() => {
@@ -232,6 +247,7 @@ export function useReports() {
     // Actions
     loadReportData,
     handleExportCSV,
+    handleExportExcel,
     handleExportPDF,
     clearDateFilters,
   }

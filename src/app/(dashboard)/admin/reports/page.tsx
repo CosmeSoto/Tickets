@@ -7,20 +7,21 @@
  * Reducido de 1,614 líneas a ~200 líneas (87.6% de reducción)
  */
 
+import { useState } from 'react'
 import {
   BarChart3,
-  Download,
   RefreshCw,
   Users,
   TrendingUp,
   ShieldCheck,
-  FileDown,
   Star,
   AlertCircle,
+  ListFilter,
 } from 'lucide-react'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { ExportButton } from '@/components/common/export-button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useReports } from '@/hooks/use-reports'
 import { ReportFilters } from '@/components/reports/report-filters'
@@ -30,6 +31,7 @@ import {
   TrendsTab,
   SLATab,
   SatisfactionTab,
+  DetailTab,
 } from '@/components/reports/tabs'
 
 export default function ReportsPage() {
@@ -68,9 +70,20 @@ export default function ReportsPage() {
     // Actions
     loadReportData,
     handleExportCSV,
+    handleExportExcel,
     handleExportPDF,
     clearDateFilters,
   } = useReports()
+
+  const [exportingExcel, setExportingExcel] = useState(false)
+  const onExportExcel = async () => {
+    setExportingExcel(true)
+    try {
+      await handleExportExcel()
+    } finally {
+      setExportingExcel(false)
+    }
+  }
 
   return (
     <ModuleLayout
@@ -117,7 +130,7 @@ export default function ReportsPage() {
           <div className='flex flex-col gap-2'>
             {/* Tabs — scroll horizontal en mobile */}
             <div className='overflow-x-auto -mx-1 px-1'>
-              <TabsList className='inline-flex w-max min-w-full sm:w-full sm:grid sm:grid-cols-5'>
+              <TabsList className='inline-flex w-max min-w-full sm:w-full sm:grid sm:grid-cols-6'>
                 <TabsTrigger
                   value='executive'
                   className='flex items-center gap-1.5 whitespace-nowrap'
@@ -147,24 +160,30 @@ export default function ReportsPage() {
                   <Star className='h-4 w-4 flex-shrink-0' />
                   <span>Calificaciones</span>
                 </TabsTrigger>
+                <TabsTrigger value='detail' className='flex items-center gap-1.5 whitespace-nowrap'>
+                  <ListFilter className='h-4 w-4 flex-shrink-0' />
+                  <span>Detalle</span>
+                </TabsTrigger>
               </TabsList>
             </div>
 
-            {/* Action buttons */}
-            <div className='flex items-center justify-end gap-2'>
-              <Button variant='outline' size='sm' onClick={loadReportData} disabled={loadingData}>
-                <RefreshCw className={`h-4 w-4 mr-1.5 ${loadingData ? 'animate-spin' : ''}`} />
-                <span className='hidden sm:inline'>Actualizar</span>
-              </Button>
-              <Button variant='outline' size='sm' onClick={handleExportCSV} disabled={loadingData}>
-                <Download className='h-4 w-4 mr-1.5' />
-                <span className='hidden sm:inline'>CSV</span>
-              </Button>
-              <Button variant='outline' size='sm' onClick={handleExportPDF} disabled={loadingData}>
-                <FileDown className='h-4 w-4 mr-1.5' />
-                <span className='hidden sm:inline'>PDF</span>
-              </Button>
-            </div>
+            {/* Action buttons — la pestaña "Detalle" tiene su propia barra
+                (filtros de servidor + columnas + exportar), no reutiliza estos */}
+            {activeTab !== 'detail' && (
+              <div className='flex items-center justify-end gap-2'>
+                <Button variant='outline' size='sm' onClick={loadReportData} disabled={loadingData}>
+                  <RefreshCw className={`h-4 w-4 mr-1.5 ${loadingData ? 'animate-spin' : ''}`} />
+                  <span className='hidden sm:inline'>Actualizar</span>
+                </Button>
+                <ExportButton
+                  onExportCSV={handleExportCSV}
+                  onExportExcel={onExportExcel}
+                  onExportPDF={handleExportPDF}
+                  loading={exportingExcel}
+                  disabled={loadingData}
+                />
+              </div>
+            )}
           </div>
 
           {/* Tab Contents */}
@@ -196,6 +215,10 @@ export default function ReportsPage() {
 
           <TabsContent value='satisfaction'>
             <SatisfactionTab data={satisfactionData} loading={loadingData} />
+          </TabsContent>
+
+          <TabsContent value='detail'>
+            <DetailTab />
           </TabsContent>
         </Tabs>
       </div>

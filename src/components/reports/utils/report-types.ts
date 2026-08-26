@@ -72,5 +72,5 @@ export interface SatisfactionReport {
   }[]
 }
 
-export type ReportTab = 'executive' | 'technicians' | 'trends' | 'sla' | 'satisfaction'
+export type ReportTab = 'executive' | 'technicians' | 'trends' | 'sla' | 'satisfaction' | 'detail'
 export type Granularity = 'day' | 'week' | 'month'

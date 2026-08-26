@@ -275,3 +275,42 @@ export const CLIENT_TICKET_EXPORT_COLUMNS: ExportColumn[] = [
   { key: 'assignee', label: 'Técnico', format: (v: any) => v?.name ?? 'Sin asignar' },
   ...BASE_TICKET_EXPORT_COLUMNS.slice(4),
 ]
+
+/**
+ * Mapa de columnas de exportación para el datatable de Admin, keyed igual que
+ * las columnas visibles de la tabla (`ticket-columns.tsx`) — permite exportar
+ * exactamente las columnas visibles/ordenadas que el usuario eligió en el
+ * selector de columnas ("lo que ves es lo que exportas").
+ */
+export const ADMIN_TICKET_EXPORT_COLUMN_MAP: Record<string, ExportColumn> = {
+  title: { key: 'title', label: 'Título' },
+  family: { key: 'family', label: 'Área', format: (v: any) => v?.name ?? '' },
+  status: { key: 'status', label: 'Estado', format: (v: string) => STATUS_LABELS_ES[v] ?? v },
+  priority: {
+    key: 'priority',
+    label: 'Prioridad',
+    format: (v: string) => PRIORITY_LABELS_ES[v] ?? v,
+  },
+  client: { key: 'client', label: 'Cliente', format: (v: any) => v?.name ?? '' },
+  assignee: {
+    key: 'assignee',
+    label: 'Técnico',
+    format: (v: any) => v?.name ?? 'Sin asignar',
+  },
+  category: { key: 'category', label: 'Categoría', format: (v: any) => v?.name ?? '' },
+  createdAt: {
+    key: 'createdAt',
+    label: 'Creado',
+    format: (v: any) => (v ? new Date(v).toLocaleDateString('es-ES') : ''),
+  },
+  updatedAt: {
+    key: 'updatedAt',
+    label: 'Actividad',
+    format: (v: any) => (v ? new Date(v).toLocaleDateString('es-ES') : ''),
+  },
+  ticketCode: {
+    key: 'ticketCode',
+    label: 'Código',
+    format: (v: any, r: any) => v ?? r?.id?.slice(-8)?.toUpperCase() ?? '',
+  },
+}
