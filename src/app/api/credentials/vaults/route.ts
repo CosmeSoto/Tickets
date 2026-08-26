@@ -6,7 +6,7 @@ import prisma from '@/lib/prisma'
 import {
   checkCredentialsModuleAccess,
   canCreateCredentials,
-  ensureDefaultAreaVault,
+  ensureDefaultAreaVaults,
   getCredentialsFamilyScopeIds,
   buildCredentialEntriesVisibilityWhere,
 } from '@/lib/credentials/access'
@@ -39,12 +39,10 @@ export async function GET() {
     isSuperAdmin: ctx.isSuperAdmin,
   })
 
-  for (const familyId of familyIds) {
-    try {
-      await ensureDefaultAreaVault(familyId)
-    } catch {
-      // familyId huérfano (p. ej. tras restore parcial): ignorar y continuar
-    }
+  try {
+    await ensureDefaultAreaVaults(familyIds)
+  } catch {
+    // familyId huérfano (p. ej. tras restore parcial) u otra falla no crítica: ignorar
   }
 
   const entryVisibility = await buildCredentialEntriesVisibilityWhere(ctx)

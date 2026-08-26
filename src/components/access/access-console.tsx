@@ -95,6 +95,7 @@ type AccessPass = {
   subject: {
     firstName: string
     lastName: string
+    email?: string | null
     organization?: string | null
     accessType: string
     purpose?: string | null
@@ -111,7 +112,10 @@ function effectivePassLabel(pass: AccessPass): {
   const now = Date.now()
   const until = new Date(pass.validUntil).getTime()
   const from = new Date(pass.validFrom).getTime()
-  if (from > now || until <= now) return { label: 'EXPIRADO', variant: 'secondary' }
+  // No confundir "todavía no inicia" con "ya terminó": son estados distintos
+  // para quien gestiona el acceso (uno se resuelve esperando, el otro reemitiendo).
+  if (from > now) return { label: 'PROGRAMADO', variant: 'outline' }
+  if (until <= now) return { label: 'EXPIRADO', variant: 'secondary' }
   if (pass.status === 'PENDING_PRIVACY')
     return { label: 'PENDIENTE DE PRIVACIDAD', variant: 'outline' }
   if (pass.status === 'SUSPENDED') return { label: 'SUSPENDIDO', variant: 'outline' }
@@ -127,6 +131,7 @@ const SCAN_RESULT_LABELS: Record<
 > = {
   VALID: { label: 'Autorizado', variant: 'default' },
   EXPIRED: { label: 'Vencido', variant: 'secondary' },
+  NOT_YET_VALID: { label: 'Aún no vigente', variant: 'outline' },
   REVOKED: { label: 'Revocado', variant: 'destructive' },
   SUSPENDED: { label: 'Suspendido', variant: 'outline' },
   PENDING_PRIVACY: { label: 'Pend. privacidad', variant: 'outline' },
@@ -238,6 +243,7 @@ export function AccessConsole() {
     'status',
     'validUntil',
     'credentialCode',
+    'subject.email',
   ])
   const [visibleColumns, setVisibleColumns] = useState([
     'subject',
@@ -802,6 +808,12 @@ export function AccessConsole() {
       },
       { key: 'family.name', label: 'Área', sortable: true, render: pass => pass.family.name },
       {
+        key: 'subject.email',
+        label: 'Correo',
+        sortable: true,
+        render: pass => pass.subject.email?.trim() || '—',
+      },
+      {
         key: 'subject.organization',
         label: 'Arrendatario',
         sortable: true,
@@ -849,6 +861,7 @@ export function AccessConsole() {
         accessor: pass => `${pass.subject.firstName} ${pass.subject.lastName}`,
       },
       'family.name': { label: 'Área', accessor: pass => pass.family.name },
+      'subject.email': { label: 'Correo', accessor: pass => pass.subject.email?.trim() || '—' },
       'subject.accessType': {
         label: 'Tipo de acceso',
         accessor: pass => accessTypeLabel(pass.subject.accessType),
@@ -1203,6 +1216,7 @@ export function AccessConsole() {
               options: [
                 { value: 'VALID', label: 'Autorizado' },
                 { value: 'EXPIRED', label: 'Vencido' },
+                { value: 'NOT_YET_VALID', label: 'Aún no vigente' },
                 { value: 'REVOKED', label: 'Revocado' },
                 { value: 'SUSPENDED', label: 'Suspendido' },
                 { value: 'PENDING_PRIVACY', label: 'Pend. privacidad' },

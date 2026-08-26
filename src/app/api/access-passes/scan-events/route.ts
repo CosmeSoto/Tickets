@@ -7,6 +7,7 @@ import { getAccessModulePermission } from '@/lib/access/access-control'
 const VALID_RESULTS = [
   'VALID',
   'EXPIRED',
+  'NOT_YET_VALID',
   'REVOKED',
   'SUSPENDED',
   'PENDING_PRIVACY',

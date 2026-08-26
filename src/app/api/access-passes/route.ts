@@ -67,6 +67,7 @@ const PASS_LIST_INCLUDE = {
       id: true,
       firstName: true,
       lastName: true,
+      email: true,
       organization: true,
       organizationId: true,
       accessType: true,

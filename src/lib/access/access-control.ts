@@ -108,14 +108,24 @@ export function resolveAccessPassState(pass: {
   validFrom: Date
   validUntil: Date
   subject: { isActive: boolean }
-}): 'VALID' | 'EXPIRED' | 'REVOKED' | 'SUSPENDED' | 'PENDING_PRIVACY' | 'INACTIVE_SUBJECT' {
+}):
+  | 'VALID'
+  | 'EXPIRED'
+  | 'NOT_YET_VALID'
+  | 'REVOKED'
+  | 'SUSPENDED'
+  | 'PENDING_PRIVACY'
+  | 'INACTIVE_SUBJECT' {
   const now = new Date()
   if (!pass.subject.isActive) return 'INACTIVE_SUBJECT'
   if (pass.status === 'REVOKED') return 'REVOKED'
   if (pass.status === 'PENDING_PRIVACY') return 'PENDING_PRIVACY'
   if (pass.status === 'SUSPENDED') return 'SUSPENDED'
+  // "Todavía no inicia" y "ya venció" son estados distintos para quien escanea:
+  // uno se resuelve esperando a la hora de inicio, el otro requiere reemitir el pase.
+  if (pass.validFrom > now) return 'NOT_YET_VALID'
   // Inválido desde el instante de vencimiento (validUntil inclusive como límite).
-  if (pass.validFrom > now || pass.validUntil <= now) return 'EXPIRED'
+  if (pass.validUntil <= now) return 'EXPIRED'
   return 'VALID'
 }
 
@@ -127,7 +137,8 @@ export function isAccessCredentialCode(value: string): boolean {
 
 export const ACCESS_SCAN_MESSAGES: Record<string, string> = {
   VALID: 'Acceso autorizado',
-  EXPIRED: 'Credencial vencida o aún no vigente',
+  EXPIRED: 'Credencial vencida',
+  NOT_YET_VALID: 'Credencial aún no vigente: su periodo de acceso todavía no inicia',
   REVOKED: 'Credencial revocada',
   SUSPENDED: 'Credencial suspendida',
   PENDING_PRIVACY: 'Credencial pendiente: la persona aún no ha aceptado el aviso de privacidad.',

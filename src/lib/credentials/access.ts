@@ -419,6 +419,41 @@ export async function ensureDefaultAreaVault(familyId: string) {
   })
 }
 
+/**
+ * Variante batch de ensureDefaultAreaVault: en vez de 1-2 round-trips *por
+ * familia* en serie (lento y propenso a duplicados bajo concurrencia), hace
+ * como máximo 2 queries fijas para cualquier cantidad de familias.
+ * Pensada para el hot-path de GET /credentials/vaults, que corre en cada
+ * carga/refresh del módulo.
+ */
+export async function ensureDefaultAreaVaults(familyIds: string[]): Promise<void> {
+  const uniqueIds = Array.from(new Set(familyIds))
+  if (uniqueIds.length === 0) return
+
+  const existing = await prisma.credential_vaults.findMany({
+    where: {
+      familyId: { in: uniqueIds },
+      kind: 'AREA',
+      isActive: true,
+      name: DEFAULT_AREA_VAULT_NAME,
+    },
+    select: { familyId: true },
+  })
+  const existingIds = new Set(existing.map(v => v.familyId))
+  const missingIds = uniqueIds.filter(id => !existingIds.has(id))
+  if (missingIds.length === 0) return
+
+  await prisma.credential_vaults.createMany({
+    data: missingIds.map(familyId => ({
+      familyId,
+      name: DEFAULT_AREA_VAULT_NAME,
+      kind: 'AREA' as const,
+      isActive: true,
+    })),
+    skipDuplicates: true,
+  })
+}
+
 /** Metadata fields only — never include secretEncrypted. */
 export const credentialEntryMetadataSelect = {
   id: true,

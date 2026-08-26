@@ -2335,6 +2335,7 @@ enum AccessPassStatus {
 enum AccessScanResult {
   VALID
   EXPIRED
+  NOT_YET_VALID
   REVOKED
   SUSPENDED
   PENDING_PRIVACY
@@ -3816,6 +3817,7 @@ model credential_vaults {
   owner   users?               @relation("CredentialVaultOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
   entries credential_entries[]
 
+  @@unique([familyId, kind, name])
   @@index([familyId, isActive])
   @@index([ownerUserId])
   @@map("credential_vaults")

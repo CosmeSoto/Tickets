@@ -38,6 +38,17 @@ export function RoleDashboardLayout({
   const contentRef = useRef<HTMLDivElement>(null)
   const isFirstNavigation = useRef(true)
 
+  // Última sesión utilizable conocida. NextAuth revalida el JWT muy seguido
+  // (refetchInterval, focus, y los `update()` de SessionTimeoutMonitor cada
+  // ~1-2 min mientras hay actividad); si esa revalidación devuelve `session`
+  // transitoriamente null/undefined (blip de red, hiccup del callback jwt/session,
+  // etc.) NO debe desmontar el dashboard: eso destruiría cualquier formulario en
+  // curso en toda la app. Solo lo tratamos como "sin sesión" antes de tener una
+  // sesión real la primera vez.
+  const lastSessionRef = useRef<typeof session>(null)
+  if (session) lastSessionRef.current = session
+  const effectiveSession = session ?? lastSessionRef.current
+
   // Pulso visual al cambiar ruta SIN remount
   useEffect(() => {
     if (isFirstNavigation.current) {
@@ -110,7 +121,7 @@ export function RoleDashboardLayout({
   // Durante una revalidación de NextAuth puede existir sesión previa aunque `status`
   // pase transitoriamente a loading. No desmontar el dashboard evita perder formularios
   // en curso; solo mostrar el estado de carga cuando todavía no hay sesión utilizable.
-  if (!session) {
+  if (!effectiveSession) {
     return (
       <div className='min-h-screen bg-background'>
         <div className='flex items-center justify-center h-screen'>
@@ -120,14 +131,16 @@ export function RoleDashboardLayout({
     )
   }
 
-  const canManageNews = canManageNewsFromModules || (session.user as any)?.canManageNews === true
-  const canManageForms = canManageFormsFromModules || (session.user as any)?.canManageForms === true
+  const canManageNews =
+    canManageNewsFromModules || (effectiveSession.user as any)?.canManageNews === true
+  const canManageForms =
+    canManageFormsFromModules || (effectiveSession.user as any)?.canManageForms === true
   const canManageProcesses =
-    canManageProcessesFromModules || (session.user as any)?.canManageProcesses === true
-  const userRole = session.user.role as string
+    canManageProcessesFromModules || (effectiveSession.user as any)?.canManageProcesses === true
+  const userRole = effectiveSession.user.role as string
   const canManageInventory =
-    canManageInventoryFromModules || (session.user as any).canManageInventory
-  const isSuperAdmin = (session.user as any).isSuperAdmin === true
+    canManageInventoryFromModules || (effectiveSession.user as any).canManageInventory
+  const isSuperAdmin = (effectiveSession.user as any).isSuperAdmin === true
 
   const navigation = buildRoleNavigation({
     userRole,
@@ -192,9 +205,9 @@ export function RoleDashboardLayout({
           pathname={pathname}
           homeHref={homeHref}
           user={{
-            name: session.user.name,
-            email: session.user.email,
-            avatar: session.user.avatar,
+            name: effectiveSession.user.name,
+            email: effectiveSession.user.email,
+            avatar: effectiveSession.user.avatar,
           }}
           userRole={userRole}
           isSuperAdmin={isSuperAdmin}
