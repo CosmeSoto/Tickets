@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useSession } from 'next-auth/react'
 import {
   AlertTriangle,
   CheckCircle,
@@ -8,6 +9,8 @@ import {
   UserPlus,
   UserMinus,
   ExternalLink,
+  KeyRound,
+  Loader2,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -22,9 +25,25 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog'
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
 import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 import type { Contract } from '@/types/contracts'
+
+interface SystemClientUser {
+  id: string
+  name: string
+  email: string
+  role: string
+}
 
 interface AssignmentRow {
   id: string
@@ -52,6 +71,9 @@ const ACT_STATUS: Record<string, string> = {
 }
 
 export function ContractAssignmentsPanel({ contract, onUpdated, canManage = true }: Props) {
+  const { data: session } = useSession()
+  const isAdmin = session?.user?.role === 'ADMIN'
+
   const [assignments, setAssignments] = useState<AssignmentRow[]>([])
   const [active, setActive] = useState<AssignmentRow | null>(null)
   const [loading, setLoading] = useState(true)
@@ -64,7 +86,84 @@ export function ContractAssignmentsPanel({ contract, onUpdated, canManage = true
   const [notes, setNotes] = useState('')
   const [withdrawalReason, setWithdrawalReason] = useState('')
 
+  // Dar acceso de cliente al área sin salir del panel de asignación —
+  // ver /api/inventory/contracts/clients: solo aparecen usuarios CLIENT con
+  // user_family_access(module='tickets', canConsume=true) en esta familia.
+  const [grantOpen, setGrantOpen] = useState(false)
+  const [systemClients, setSystemClients] = useState<SystemClientUser[] | null>(null)
+  const [loadingSystemClients, setLoadingSystemClients] = useState(false)
+  const [grantingId, setGrantingId] = useState<string | null>(null)
+
   const familyId = contract.familyId
+
+  const loadClients = useCallback(async () => {
+    if (!familyId) {
+      setClients([])
+      return
+    }
+    try {
+      const r = await fetch(`/api/inventory/contracts/clients?familyId=${familyId}`)
+      const d = r.ok ? await r.json() : { clients: [] }
+      setClients(d.clients ?? [])
+    } catch {
+      setClients([])
+    }
+  }, [familyId])
+
+  const clientsWithAccessIds = useMemo(() => new Set(clients.map(c => c.id)), [clients])
+
+  const candidatesWithoutAccess = useMemo(
+    () => (systemClients ?? []).filter(u => !clientsWithAccessIds.has(u.id)),
+    [systemClients, clientsWithAccessIds]
+  )
+
+  const openGrantDialog = async () => {
+    setGrantOpen(true)
+    if (systemClients !== null) return
+    setLoadingSystemClients(true)
+    try {
+      const res = await fetch('/api/admin/users')
+      const data = res.ok ? await res.json() : { users: [] }
+      const onlyClients: SystemClientUser[] = (data.users ?? []).filter(
+        (u: SystemClientUser) => u.role === 'CLIENT'
+      )
+      setSystemClients(onlyClients)
+    } catch {
+      setSystemClients([])
+    } finally {
+      setLoadingSystemClients(false)
+    }
+  }
+
+  const handleGrantAccess = async (user: SystemClientUser) => {
+    if (!familyId) return
+    setGrantingId(user.id)
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}/family-access`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ module: 'tickets', familyId }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error ?? json.message ?? 'No se pudo dar acceso')
+
+      toast({
+        title: 'Acceso otorgado',
+        description: `${user.name} ya puede ser asignado como cliente de este contrato.`,
+      })
+      await loadClients()
+      setClientId(user.id)
+      setGrantOpen(false)
+    } catch (err: unknown) {
+      toast({
+        title: 'Error',
+        description: err instanceof Error ? err.message : 'No se pudo dar acceso',
+        variant: 'destructive',
+      })
+    } finally {
+      setGrantingId(null)
+    }
+  }
 
   const clientOptions = useMemo(
     () =>
@@ -95,15 +194,8 @@ export function ContractAssignmentsPanel({ contract, onUpdated, canManage = true
   }, [load])
 
   useEffect(() => {
-    if (!familyId) {
-      setClients([])
-      return
-    }
-    fetch(`/api/inventory/contracts/clients?familyId=${familyId}`)
-      .then(r => (r.ok ? r.json() : { clients: [] }))
-      .then(d => setClients(d.clients ?? []))
-      .catch(() => setClients([]))
-  }, [familyId])
+    loadClients()
+  }, [loadClients])
 
   const handleAssign = async () => {
     if (!clientId) {
@@ -211,7 +303,12 @@ export function ContractAssignmentsPanel({ contract, onUpdated, canManage = true
             </div>
             <div className='flex gap-2 shrink-0'>
               {canManage && active && (
-                <Button type='button' size='sm' variant='outline' onClick={() => setReturnOpen(true)}>
+                <Button
+                  type='button'
+                  size='sm'
+                  variant='outline'
+                  onClick={() => setReturnOpen(true)}
+                >
                   <UserMinus className='h-3.5 w-3.5 mr-1' />
                   Retiro
                 </Button>
@@ -251,21 +348,25 @@ export function ContractAssignmentsPanel({ contract, onUpdated, canManage = true
                   <Badge variant='secondary'>
                     {ACT_STATUS[active.deliveryAct.status] ?? active.deliveryAct.status}
                   </Badge>
-                  {active.deliveryAct.status === 'PENDING' && active.deliveryAct.acceptanceToken && (
-                    <a
-                      href={`/acts/${active.deliveryAct.id}/accept?token=${active.deliveryAct.acceptanceToken}`}
-                      className='inline-flex items-center gap-1 text-primary hover:underline'
-                    >
-                      Ver acta <ExternalLink className='h-3 w-3' />
-                    </a>
-                  )}
+                  {active.deliveryAct.status === 'PENDING' &&
+                    active.deliveryAct.acceptanceToken && (
+                      <a
+                        href={`/acts/${active.deliveryAct.id}/accept?token=${active.deliveryAct.acceptanceToken}`}
+                        className='inline-flex items-center gap-1 text-primary hover:underline'
+                      >
+                        Ver acta <ExternalLink className='h-3 w-3' />
+                      </a>
+                    )}
                 </div>
               )}
             </div>
           ) : (
             <div className='flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/80 dark:bg-amber-500/10 px-3 py-2 text-sm'>
               <AlertTriangle className='h-4 w-4 text-amber-600 shrink-0 mt-0.5' />
-              <span>Sin cliente asignado. Las suscripciones sin custodio operativo generan riesgo de cobros huérfanos.</span>
+              <span>
+                Sin cliente asignado. Las suscripciones sin custodio operativo generan riesgo de
+                cobros huérfanos.
+              </span>
             </div>
           )}
 
@@ -307,6 +408,16 @@ export function ContractAssignmentsPanel({ contract, onUpdated, canManage = true
                 placeholder='Seleccionar cliente...'
                 searchPlaceholder='Buscar por nombre o email...'
               />
+              {isAdmin && (
+                <button
+                  type='button'
+                  onClick={openGrantDialog}
+                  className='text-xs text-primary hover:underline inline-flex items-center gap-1 mt-1'
+                >
+                  <KeyRound className='h-3 w-3' />
+                  ¿No aparece el cliente? Darle acceso a esta área
+                </button>
+              )}
             </div>
             {active && (
               <div className='space-y-1'>
@@ -360,11 +471,7 @@ export function ContractAssignmentsPanel({ contract, onUpdated, canManage = true
             </div>
             <div className='space-y-1'>
               <Label>Notas de entrega (opcional)</Label>
-              <Textarea
-                value={notes}
-                onChange={e => setNotes(e.target.value)}
-                rows={2}
-              />
+              <Textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} />
             </div>
           </div>
           <DialogFooter>
@@ -376,6 +483,58 @@ export function ContractAssignmentsPanel({ contract, onUpdated, canManage = true
               Generar acta de retiro
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dar acceso de cliente al área — sin salir de Contratos */}
+      <Dialog open={grantOpen} onOpenChange={setGrantOpen}>
+        <DialogContent className='sm:max-w-md'>
+          <DialogHeader>
+            <DialogTitle>Dar acceso de cliente</DialogTitle>
+            <DialogDescription>
+              Solo los usuarios con rol Cliente y acceso habilitado a esta área pueden asignarse a
+              un contrato. Selecciona a quién habilitar.
+            </DialogDescription>
+          </DialogHeader>
+          <Command shouldFilter={true} className='rounded-md border'>
+            <CommandInput placeholder='Buscar por nombre o email...' />
+            <CommandList className='max-h-64 overflow-y-auto'>
+              {loadingSystemClients ? (
+                <div className='flex items-center justify-center py-6 text-sm text-muted-foreground'>
+                  <Loader2 className='h-4 w-4 animate-spin mr-2' />
+                  Cargando usuarios...
+                </div>
+              ) : (
+                <>
+                  <CommandEmpty>
+                    <p className='py-3 text-center text-sm text-muted-foreground'>
+                      {(systemClients ?? []).length === 0
+                        ? 'No hay usuarios con rol Cliente en el sistema. Créalo primero en Admin → Usuarios.'
+                        : 'Sin resultados. Todos los clientes del sistema ya tienen acceso a esta área.'}
+                    </p>
+                  </CommandEmpty>
+                  <CommandGroup>
+                    {candidatesWithoutAccess.map(u => (
+                      <CommandItem
+                        key={u.id}
+                        value={`${u.name} ${u.email}`}
+                        onSelect={() => handleGrantAccess(u)}
+                        disabled={grantingId === u.id}
+                      >
+                        <div className='flex-1 min-w-0'>
+                          <p className='truncate text-sm'>{u.name}</p>
+                          <p className='truncate text-xs text-muted-foreground'>{u.email}</p>
+                        </div>
+                        {grantingId === u.id && (
+                          <Loader2 className='h-3.5 w-3.5 animate-spin ml-2 shrink-0' />
+                        )}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </>
+              )}
+            </CommandList>
+          </Command>
         </DialogContent>
       </Dialog>
     </>

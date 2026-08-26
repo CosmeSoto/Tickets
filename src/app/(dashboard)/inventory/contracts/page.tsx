@@ -535,7 +535,14 @@ export default function ContractsPage() {
                     const sc = STATUS_CONFIG[c.status] ?? STATUS_CONFIG.DRAFT
                     const StatusIcon = sc.icon
                     return (
-                      <tr key={c.id} className='hover:bg-muted/30 transition-colors'>
+                      <tr
+                        key={c.id}
+                        className='cursor-pointer hover:bg-muted/30 transition-colors'
+                        onClick={() => {
+                          setEditingContract(c)
+                          setFormOpen(true)
+                        }}
+                      >
                         <td className='px-4 py-3'>
                           <p className='font-medium leading-none'>{c.name}</p>
                           {c.contractNumber && (
@@ -585,7 +592,7 @@ export default function ContractsPage() {
                           </span>
                         </td>
                         {(canManage || isClientOnly) && (
-                          <td className='px-4 py-3'>
+                          <td className='px-4 py-3' onClick={e => e.stopPropagation()}>
                             <div className='flex items-center gap-1 justify-end'>
                               {isClientOnly ? (
                                 <Button
