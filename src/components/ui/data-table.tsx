@@ -1,10 +1,12 @@
 'use client'
 
 import React, { useState, useEffect, ReactNode, useRef, useMemo } from 'react'
+import { format } from 'date-fns'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './card'
 import { Button } from './button'
 import { Input } from './input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './select'
+import { DatePicker } from './date-picker'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './table'
 import {
   Search,
@@ -37,6 +39,16 @@ interface FilterDef {
   type: 'select' | 'input' | 'date'
   options?: { value: string; label: string }[]
   placeholder?: string
+}
+
+/** Filtros de fecha se guardan como 'yyyy-MM-dd'; parsear en local para no correr un día por UTC. */
+function parseFilterDate(value: string | undefined): Date | undefined {
+  if (!value) return undefined
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  if (!match) return undefined
+  const [, y, m, d] = match
+  const date = new Date(Number(y), Number(m) - 1, Number(d))
+  return Number.isNaN(date.getTime()) ? undefined : date
 }
 
 interface DataTableProps<T> {
@@ -357,7 +369,19 @@ export function DataTable<T extends { id: string }>({
                     <label className='text-xs font-medium text-muted-foreground'>
                       {filter.label}
                     </label>
-                    {filter.type === 'select' && filter.options ? (
+                    {filter.type === 'date' ? (
+                      <DatePicker
+                        date={parseFilterDate(filterValues[filter.key])}
+                        onDateChange={d =>
+                          setFilterValues(prev => ({
+                            ...prev,
+                            [filter.key]: d ? format(d, 'yyyy-MM-dd') : '',
+                          }))
+                        }
+                        placeholder={filter.placeholder || 'Seleccionar fecha'}
+                        className='h-8 text-sm'
+                      />
+                    ) : filter.type === 'select' && filter.options ? (
                       <Select
                         value={filterValues[filter.key] || '__all__'}
                         onValueChange={v =>

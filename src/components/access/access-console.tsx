@@ -338,6 +338,8 @@ export function AccessConsole() {
         params.set('limit', String(limit))
         if (filters.familyId) params.set('familyId', filters.familyId)
         if (filters.result) params.set('result', filters.result)
+        if (filters.accessType) params.set('accessType', filters.accessType)
+        if (filters.organizationId) params.set('organizationId', filters.organizationId)
         if (filters.dateFrom) params.set('dateFrom', filters.dateFrom)
         if (filters.dateTo) params.set('dateTo', filters.dateTo)
         if (filters.search?.trim()) params.set('search', filters.search.trim())
@@ -908,7 +910,27 @@ export function AccessConsole() {
   })
 
   // ── Columnas del historial de escaneos ────────────────────────────────────
-  const scanEventColumns = useMemo<Column<ScanEvent>[]>(
+  const [scanColumnOrder, setScanColumnOrder] = useState([
+    'scannedAt',
+    'pass',
+    'family',
+    'result',
+    'agent',
+    'credentialCode',
+    'pass.subject.accessType',
+    'pass.subject.organization',
+  ])
+  const [scanVisibleColumns, setScanVisibleColumns] = useState([
+    'scannedAt',
+    'pass',
+    'family',
+    'result',
+    'agent',
+    'credentialCode',
+    'pass.subject.accessType',
+    'pass.subject.organization',
+  ])
+  const allScanColumns = useMemo<Column<ScanEvent>[]>(
     () => [
       {
         key: 'scannedAt',
@@ -924,15 +946,9 @@ export function AccessConsole() {
         sortable: false,
         render: event =>
           event.pass ? (
-            <div>
-              <p className='font-medium text-sm'>
-                {event.pass.subject.firstName} {event.pass.subject.lastName}
-              </p>
-              <p className='text-xs text-muted-foreground'>
-                {accessTypeLabel(event.pass.subject.accessType)}
-                {event.pass.subject.organization ? ` · ${event.pass.subject.organization}` : ''}
-              </p>
-            </div>
+            <p className='font-medium text-sm'>
+              {event.pass.subject.firstName} {event.pass.subject.lastName}
+            </p>
           ) : (
             <span className='text-muted-foreground text-sm'>—</span>
           ),
@@ -974,10 +990,77 @@ export function AccessConsole() {
             <span className='text-muted-foreground text-sm'>—</span>
           ),
       },
+      {
+        key: 'pass.subject.accessType',
+        label: 'Tipo de acceso',
+        sortable: true,
+        render: event =>
+          event.pass ? (
+            <span className='text-sm'>{accessTypeLabel(event.pass.subject.accessType)}</span>
+          ) : (
+            <span className='text-muted-foreground text-sm'>—</span>
+          ),
+      },
+      {
+        key: 'pass.subject.organization',
+        label: 'Arrendatario / Empresa',
+        sortable: true,
+        render: event => (
+          <span className='text-sm'>{event.pass?.subject.organization?.trim() || '—'}</span>
+        ),
+      },
     ],
     []
   )
+  const scanEventColumns = useMemo(
+    () =>
+      scanColumnOrder
+        .filter(key => scanVisibleColumns.includes(key))
+        .map(key => allScanColumns.find(column => column.key === key))
+        .filter((column): column is Column<ScanEvent> => Boolean(column)),
+    [allScanColumns, scanColumnOrder, scanVisibleColumns]
+  )
 
+  const scanExportColumnByKey = useMemo<Record<string, ExportColumn>>(
+    () => ({
+      scannedAt: {
+        label: 'Fecha / hora',
+        accessor: (e: ScanEvent) => formatAccessDateTime(e.scannedAt),
+      },
+      pass: {
+        label: 'Persona',
+        accessor: (e: ScanEvent) =>
+          e.pass ? `${e.pass.subject.firstName} ${e.pass.subject.lastName}` : '—',
+      },
+      family: { label: 'Área', accessor: (e: ScanEvent) => e.family?.name ?? '—' },
+      result: {
+        label: 'Resultado',
+        accessor: (e: ScanEvent) => scanResultLabel(e.result).label,
+      },
+      agent: { label: 'Verificado por', accessor: (e: ScanEvent) => e.agent.name },
+      credentialCode: {
+        label: 'Credencial',
+        accessor: (e: ScanEvent) => e.pass?.credentialCode ?? '—',
+      },
+      'pass.subject.accessType': {
+        label: 'Tipo de acceso',
+        accessor: (e: ScanEvent) => (e.pass ? accessTypeLabel(e.pass.subject.accessType) : '—'),
+      },
+      'pass.subject.organization': {
+        label: 'Arrendatario / Empresa',
+        accessor: (e: ScanEvent) => e.pass?.subject.organization?.trim() || '—',
+      },
+    }),
+    []
+  )
+  const scanExportColumns = useMemo(
+    () =>
+      scanColumnOrder
+        .filter(key => scanVisibleColumns.includes(key))
+        .map(key => scanExportColumnByKey[key])
+        .filter((column): column is ExportColumn => Boolean(column)),
+    [scanColumnOrder, scanExportColumnByKey, scanVisibleColumns]
+  )
   const {
     exportCSV: exportEventsCsv,
     exportExcel: exportEventsExcel,
@@ -987,21 +1070,7 @@ export function AccessConsole() {
     filename: 'historial-escaneos',
     title: 'Historial de escaneos',
     subtitle: 'Registro de verificaciones de acceso',
-    columns: [
-      { label: 'Fecha / hora', accessor: (e: ScanEvent) => formatAccessDateTime(e.scannedAt) },
-      {
-        label: 'Persona',
-        accessor: (e: ScanEvent) =>
-          e.pass ? `${e.pass.subject.firstName} ${e.pass.subject.lastName}` : '—',
-      },
-      { label: 'Área', accessor: (e: ScanEvent) => e.family?.name ?? '—' },
-      {
-        label: 'Resultado',
-        accessor: (e: ScanEvent) => scanResultLabel(e.result).label,
-      },
-      { label: 'Verificado por', accessor: (e: ScanEvent) => e.agent.name },
-      { label: 'Credencial', accessor: (e: ScanEvent) => e.pass?.credentialCode ?? '—' },
-    ],
+    columns: scanExportColumns,
     getData: () => scanEvents,
   })
   // ──────────────────────────────────────────────────────────────────────────
@@ -1208,6 +1277,7 @@ export function AccessConsole() {
           data={scanEvents}
           columns={scanEventColumns}
           loading={scanEventsLoading}
+          searchPlaceholder='Buscar por código, nombre, apellido o arrendatario...'
           filters={[
             {
               key: 'result',
@@ -1235,8 +1305,28 @@ export function AccessConsole() {
                   },
                 ]
               : []),
-            { key: 'dateFrom', label: 'Desde', type: 'input' as const, placeholder: 'YYYY-MM-DD' },
-            { key: 'dateTo', label: 'Hasta', type: 'input' as const, placeholder: 'YYYY-MM-DD' },
+            {
+              key: 'accessType',
+              label: 'Tipo de acceso',
+              type: 'select' as const,
+              options: [
+                { value: 'TENANT_EMPLOYEE', label: accessTypeLabel('TENANT_EMPLOYEE') },
+                { value: 'CONTRACTOR', label: accessTypeLabel('CONTRACTOR') },
+                { value: 'AUTHORIZED_VISITOR', label: accessTypeLabel('AUTHORIZED_VISITOR') },
+              ],
+            },
+            ...(organizations.length > 0
+              ? [
+                  {
+                    key: 'organizationId',
+                    label: 'Arrendatario / Empresa',
+                    type: 'select' as const,
+                    options: organizations.map(o => ({ value: o.id, label: o.name })),
+                  },
+                ]
+              : []),
+            { key: 'dateFrom', label: 'Desde', type: 'date' as const },
+            { key: 'dateTo', label: 'Hasta', type: 'date' as const },
           ]}
           onFiltersChange={handleScanEventsFiltersChange}
           onRefresh={() => void loadScanEvents()}
@@ -1260,6 +1350,20 @@ export function AccessConsole() {
               onExportExcel={exportEventsExcel}
               onExportPDF={exportEventsPdf}
               loading={exportingEvents}
+            />
+          }
+          actions={
+            <TableColumnsMenu
+              columns={allScanColumns.map(column => ({
+                key: String(column.key),
+                label: column.label,
+                required: column.key === 'scannedAt',
+              }))}
+              order={scanColumnOrder}
+              visible={scanVisibleColumns}
+              onOrderChange={setScanColumnOrder}
+              onVisibleChange={setScanVisibleColumns}
+              storageKey='table-columns:access-scan-events-v1'
             />
           }
           emptyState={{
