@@ -123,7 +123,7 @@ export function TypeFormDialog({
                     : typeKind === 'license'
                       ? 'licencias'
                       : 'suministros'
-                }`
+                }. Al terminar, podrás definir sus atributos personalizados de inmediato.`
               : 'Modifica la información de este tipo'}
           </DialogDescription>
         </DialogHeader>
@@ -213,7 +213,11 @@ export function TypeFormDialog({
               Cancelar
             </Button>
             <Button type='submit' disabled={saving}>
-              {saving ? 'Guardando...' : mode === 'create' ? 'Crear' : 'Guardar cambios'}
+              {saving
+                ? 'Guardando...'
+                : mode === 'create'
+                  ? 'Crear y continuar'
+                  : 'Guardar cambios'}
             </Button>
           </DialogFooter>
         </form>

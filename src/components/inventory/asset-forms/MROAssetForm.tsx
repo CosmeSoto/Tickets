@@ -15,6 +15,8 @@ import { WarehouseInlineForm } from '@/components/inventory/asset-forms/Warehous
 import { inlineSelectFeedback } from '@/lib/utils/inline-select-feedback'
 import { isDirectFormSubmit } from '@/lib/utils/inline-form-guard'
 import { TypeAttributesInput } from '@/components/inventory/custom-fields/type-attributes-input'
+import { AttributeManagerDialog } from '@/components/settings/inventory/attribute-manager-dialog'
+import type { InlineSelectOption } from '@/components/ui/inline-create-select'
 import type { FamilyConfig } from '@/lib/inventory/family-config-types'
 import { toast } from 'sonner'
 
@@ -52,7 +54,12 @@ interface TypeAttributesSectionProps {
   onChange: (values: Array<{ fieldName: string; fieldValue: string }>) => void
 }
 
-function TypeAttributesSection({ typeId, values, onChange }: TypeAttributesSectionProps) {
+function TypeAttributesSection({
+  typeId,
+  values,
+  onChange,
+  reloadToken,
+}: TypeAttributesSectionProps & { reloadToken?: number }) {
   if (!typeId) return null
   return (
     <div className='space-y-2'>
@@ -62,6 +69,7 @@ function TypeAttributesSection({ typeId, values, onChange }: TypeAttributesSecti
         assetType='consumable'
         values={values}
         onChange={onChange}
+        reloadToken={reloadToken}
       />
     </div>
   )
@@ -79,6 +87,10 @@ export function MROAssetForm({
   const [name, setName] = useState('')
   const [consumableTypeId, setConsumableTypeId] = useState('')
   const [consumableTypes, setConsumableTypes] = useState<SelectOption[]>([])
+  // Gestor de atributos del tipo, encadenado desde el mismo selector (crear/editar categoría)
+  const [manageAttributesFor, setManageAttributesFor] = useState<InlineSelectOption | null>(null)
+  const [manageAttributesAutoCreate, setManageAttributesAutoCreate] = useState(false)
+  const [attributesReloadToken, setAttributesReloadToken] = useState(0)
   const [customFieldValues, setCustomFieldValues] = useState<
     Array<{ fieldName: string; fieldValue: string }>
   >([])
@@ -177,264 +189,299 @@ export function MROAssetForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className='space-y-5'>
-      <div className='rounded-lg border bg-muted/40 px-3 py-2.5 text-xs text-muted-foreground'>
-        Para consumos diarios (ej. botellones de agua), registra el stock aquí y luego, en la ficha,
-        usa <strong className='text-foreground'>Registrar consumo</strong> cada día. El detalle
-        muestra totales del día, semana y mes para decidir compras.
-      </div>
-
-      {/* ── 1. NOMBRE ─────────────────────────────────────────────── */}
-      <div className='space-y-1'>
-        <Label>
-          Nombre del suministro <span className='text-destructive'>*</span>
-        </Label>
-        <Input
-          value={name}
-          onChange={e => setName(e.target.value)}
-          required
-          placeholder='Ej: Botellón de agua 20L, Papel A4, Tóner HP…'
-        />
-      </div>
-
-      {/* ── 2. CATEGORÍA + UNIDAD ─────────────────────────────────── */}
-      <div className='grid grid-cols-2 gap-3'>
-        <div className='space-y-1'>
-          <Label>
-            Categoría <span className='text-destructive'>*</span>
-          </Label>
-          <InlineCreateSelect
-            options={consumableTypes}
-            value={consumableTypeId}
-            onChange={setConsumableTypeId}
-            placeholder='Ej: Bebidas, Oficina…'
-            createLabel='Crear categoría'
-            createTitle='Nueva categoría de suministro'
-            editTitle='Editar categoría'
-            deleteConfirmMessage='¿Eliminar esta categoría? Solo es posible si no tiene suministros asociados.'
-            {...inlineSelectFeedback('Categoría')}
-            createForm={({ item, onSuccess, onCancel }) => (
-              <CatalogTypeInlineForm
-                apiEndpoint='/api/inventory/consumable-types'
-                familyId={familyId}
-                item={item}
-                onSuccess={newItem => {
-                  if (item)
-                    setConsumableTypes(prev => prev.map(t => (t.id === newItem.id ? newItem : t)))
-                  else setConsumableTypes(prev => [...prev, newItem])
-                  onSuccess(newItem)
-                }}
-                onCancel={onCancel}
-              />
-            )}
-            onDelete={async id => {
-              const res = await fetch(`/api/inventory/consumable-types/${id}`, { method: 'DELETE' })
-              if (!res.ok) {
-                const d = await res.json()
-                throw new Error(d.error || 'Error al eliminar')
-              }
-              setConsumableTypes(prev => prev.filter(t => t.id !== id))
-            }}
-          />
+    <>
+      <form onSubmit={handleSubmit} className='space-y-5'>
+        <div className='rounded-lg border bg-muted/40 px-3 py-2.5 text-xs text-muted-foreground'>
+          Para consumos diarios (ej. botellones de agua), registra el stock aquí y luego, en la
+          ficha, usa <strong className='text-foreground'>Registrar consumo</strong> cada día. El
+          detalle muestra totales del día, semana y mes para decidir compras.
         </div>
+
+        {/* ── 1. NOMBRE ─────────────────────────────────────────────── */}
         <div className='space-y-1'>
           <Label>
-            Unidad de medida <span className='text-destructive'>*</span>
-          </Label>
-          <InlineCreateSelect
-            options={unitsOfMeasure}
-            value={unitOfMeasureId}
-            onChange={setUnitOfMeasureId}
-            placeholder='Ej: Botellón, Unidad, Litro…'
-            createLabel='Crear unidad'
-            createTitle='Nueva unidad de medida'
-            editTitle='Editar unidad de medida'
-            deleteConfirmMessage='¿Eliminar esta unidad de medida? Solo es posible si no tiene suministros asociados.'
-            {...inlineSelectFeedback('Unidad de medida')}
-            createForm={({ item, onSuccess, onCancel }) => (
-              <UnitOfMeasureInlineForm
-                item={item}
-                onSuccess={newItem => {
-                  if (item)
-                    setUnitsOfMeasure(prev => prev.map(u => (u.id === newItem.id ? newItem : u)))
-                  else setUnitsOfMeasure(prev => [...prev, newItem])
-                  onSuccess(newItem)
-                }}
-                onCancel={onCancel}
-              />
-            )}
-            onDelete={async id => {
-              const res = await fetch(`/api/inventory/units-of-measure/${id}`, { method: 'DELETE' })
-              if (!res.ok) {
-                const d = await res.json()
-                throw new Error(d.error || 'Error al eliminar')
-              }
-              setUnitsOfMeasure(prev => prev.filter(u => u.id !== id))
-            }}
-          />
-        </div>
-      </div>
-
-      <TypeAttributesSection
-        typeId={consumableTypeId}
-        values={customFieldValues}
-        onChange={setCustomFieldValues}
-      />
-
-      {/* ── 3. ADQUISICIÓN ────────────────────────────────────────── */}
-      <div className='space-y-1'>
-        <Label>¿Cómo se obtiene este suministro?</Label>
-        <SimpleSelect
-          value={acquisitionMode}
-          onChange={e => setAcquisitionMode(e.target.value as typeof acquisitionMode)}
-          options={ACQUISITION_MODES}
-        />
-        <p className='text-xs text-muted-foreground'>
-          {ACQUISITION_MODES.find(m => m.value === acquisitionMode)?.help}
-        </p>
-      </div>
-
-      <div className='space-y-1'>
-        <Label>
-          Proveedor{' '}
-          {acquisitionMode === 'RENTAL' ? (
-            <span className='text-destructive'>*</span>
-          ) : (
-            <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
-          )}
-        </Label>
-        <SupplierSelect
-          value={supplierId || null}
-          onChange={v => setSupplierId(v || '')}
-          familyId={familyId}
-        />
-      </div>
-
-      {/* ── 4. STOCK ──────────────────────────────────────────────── */}
-      {isVisible('STOCK_MRO') && (
-        <fieldset className='rounded-lg border border-border p-4 space-y-3'>
-          <legend className='px-2 text-sm font-semibold text-foreground'>
-            Cantidades en stock
-            {isRequired('STOCK_MRO') && <span className='text-destructive'> *</span>}
-          </legend>
-          <p className='text-xs text-muted-foreground'>
-            El mínimo dispara alerta de reposición. El máximo es la cantidad objetivo a mantener
-            (ej. 10 botellones).
-          </p>
-          <div className='grid grid-cols-3 gap-3'>
-            <div className='space-y-1'>
-              <Label>Cantidad inicial</Label>
-              <Input
-                type='number'
-                min='0'
-                value={initialStock}
-                onChange={e => setInitialStock(e.target.value)}
-                placeholder='0'
-              />
-            </div>
-            <div className='space-y-1'>
-              <Label>Alerta cuando baje de</Label>
-              <Input
-                type='number'
-                min='0'
-                value={minStock}
-                onChange={e => setMinStock(e.target.value)}
-                placeholder='2'
-              />
-            </div>
-            <div className='space-y-1'>
-              <Label>Máximo a mantener</Label>
-              <Input
-                type='number'
-                min='0'
-                value={maxStock}
-                onChange={e => setMaxStock(e.target.value)}
-                placeholder='10'
-              />
-            </div>
-          </div>
-        </fieldset>
-      )}
-
-      {/* ── 5. FINANCIERO ─────────────────────────────────────────── */}
-      {isVisible('FINANCIAL') && (
-        <div className='space-y-1'>
-          <Label>
-            Precio por unidad
-            {isRequired('FINANCIAL') ? (
-              <span className='text-destructive'> *</span>
-            ) : (
-              <span className='text-xs font-normal text-muted-foreground'> (opcional)</span>
-            )}
+            Nombre del suministro <span className='text-destructive'>*</span>
           </Label>
           <Input
-            type='number'
-            min='0'
-            step='0.01'
-            value={costPerUnit}
-            onChange={e => setCostPerUnit(e.target.value)}
-            placeholder='0.00'
+            value={name}
+            onChange={e => setName(e.target.value)}
+            required
+            placeholder='Ej: Botellón de agua 20L, Papel A4, Tóner HP…'
           />
         </div>
-      )}
 
-      {/* ── 6. BODEGA ─────────────────────────────────────────────── */}
-      {isVisible('WAREHOUSE') && (
+        {/* ── 2. CATEGORÍA + UNIDAD ─────────────────────────────────── */}
+        <div className='grid grid-cols-2 gap-3'>
+          <div className='space-y-1'>
+            <Label>
+              Categoría <span className='text-destructive'>*</span>
+            </Label>
+            <InlineCreateSelect
+              options={consumableTypes}
+              value={consumableTypeId}
+              onChange={setConsumableTypeId}
+              placeholder='Ej: Bebidas, Oficina…'
+              createLabel='Crear categoría'
+              createTitle='Nueva categoría de suministro'
+              editTitle='Editar categoría'
+              deleteConfirmMessage='¿Eliminar esta categoría? Solo es posible si no tiene suministros asociados.'
+              {...inlineSelectFeedback('Categoría')}
+              createForm={({ item, onSuccess, onCancel }) => (
+                <CatalogTypeInlineForm
+                  apiEndpoint='/api/inventory/consumable-types'
+                  familyId={familyId}
+                  item={item}
+                  onSuccess={newItem => {
+                    if (item)
+                      setConsumableTypes(prev => prev.map(t => (t.id === newItem.id ? newItem : t)))
+                    else setConsumableTypes(prev => [...prev, newItem])
+                    onSuccess(newItem)
+                  }}
+                  onCancel={onCancel}
+                />
+              )}
+              onCreated={item => {
+                // Al crear una categoría nueva, ir directo a definir sus atributos
+                setManageAttributesFor(item)
+                setManageAttributesAutoCreate(true)
+              }}
+              onManageAttributes={item => {
+                setManageAttributesFor(item)
+                setManageAttributesAutoCreate(false)
+              }}
+              manageAttributesTooltip='Gestionar atributos'
+              onDelete={async id => {
+                const res = await fetch(`/api/inventory/consumable-types/${id}`, {
+                  method: 'DELETE',
+                })
+                if (!res.ok) {
+                  const d = await res.json()
+                  throw new Error(d.error || 'Error al eliminar')
+                }
+                setConsumableTypes(prev => prev.filter(t => t.id !== id))
+              }}
+            />
+          </div>
+          <div className='space-y-1'>
+            <Label>
+              Unidad de medida <span className='text-destructive'>*</span>
+            </Label>
+            <InlineCreateSelect
+              options={unitsOfMeasure}
+              value={unitOfMeasureId}
+              onChange={setUnitOfMeasureId}
+              placeholder='Ej: Botellón, Unidad, Litro…'
+              createLabel='Crear unidad'
+              createTitle='Nueva unidad de medida'
+              editTitle='Editar unidad de medida'
+              deleteConfirmMessage='¿Eliminar esta unidad de medida? Solo es posible si no tiene suministros asociados.'
+              {...inlineSelectFeedback('Unidad de medida')}
+              createForm={({ item, onSuccess, onCancel }) => (
+                <UnitOfMeasureInlineForm
+                  item={item}
+                  onSuccess={newItem => {
+                    if (item)
+                      setUnitsOfMeasure(prev => prev.map(u => (u.id === newItem.id ? newItem : u)))
+                    else setUnitsOfMeasure(prev => [...prev, newItem])
+                    onSuccess(newItem)
+                  }}
+                  onCancel={onCancel}
+                />
+              )}
+              onDelete={async id => {
+                const res = await fetch(`/api/inventory/units-of-measure/${id}`, {
+                  method: 'DELETE',
+                })
+                if (!res.ok) {
+                  const d = await res.json()
+                  throw new Error(d.error || 'Error al eliminar')
+                }
+                setUnitsOfMeasure(prev => prev.filter(u => u.id !== id))
+              }}
+            />
+          </div>
+        </div>
+
+        <TypeAttributesSection
+          typeId={consumableTypeId}
+          values={customFieldValues}
+          onChange={setCustomFieldValues}
+          reloadToken={attributesReloadToken}
+        />
+
+        {/* ── 3. ADQUISICIÓN ────────────────────────────────────────── */}
+        <div className='space-y-1'>
+          <Label>¿Cómo se obtiene este suministro?</Label>
+          <SimpleSelect
+            value={acquisitionMode}
+            onChange={e => setAcquisitionMode(e.target.value as typeof acquisitionMode)}
+            options={ACQUISITION_MODES}
+          />
+          <p className='text-xs text-muted-foreground'>
+            {ACQUISITION_MODES.find(m => m.value === acquisitionMode)?.help}
+          </p>
+        </div>
+
         <div className='space-y-1'>
           <Label>
-            Bodega
-            {isRequired('WAREHOUSE') && <span className='text-destructive'> *</span>}
-          </Label>
-          <InlineCreateSelect
-            options={warehouses}
-            value={warehouseId}
-            onChange={setWarehouseId}
-            placeholder='Buscar bodega...'
-            allowClear
-            createLabel='Crear bodega'
-            createTitle='Nueva bodega'
-            {...inlineSelectFeedback('Bodega')}
-            createForm={({ onSuccess, onCancel }) => (
-              <WarehouseInlineForm
-                defaultFamilyId={familyId}
-                onSuccess={item => {
-                  setWarehouses(prev => [...prev, item])
-                  onSuccess(item)
-                }}
-                onCancel={onCancel}
-              />
+            Proveedor{' '}
+            {acquisitionMode === 'RENTAL' ? (
+              <span className='text-destructive'>*</span>
+            ) : (
+              <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
             )}
+          </Label>
+          <SupplierSelect
+            value={supplierId || null}
+            onChange={v => setSupplierId(v || '')}
+            familyId={familyId}
           />
         </div>
-      )}
 
-      {/* ── 7. NOTAS Y ADJUNTOS ───────────────────────────────────── */}
-      <div className='space-y-1'>
-        <Label>Observaciones</Label>
-        <Textarea
-          value={notes}
-          onChange={e => setNotes(e.target.value)}
-          rows={3}
-          placeholder='Notas adicionales...'
+        {/* ── 4. STOCK ──────────────────────────────────────────────── */}
+        {isVisible('STOCK_MRO') && (
+          <fieldset className='rounded-lg border border-border p-4 space-y-3'>
+            <legend className='px-2 text-sm font-semibold text-foreground'>
+              Cantidades en stock
+              {isRequired('STOCK_MRO') && <span className='text-destructive'> *</span>}
+            </legend>
+            <p className='text-xs text-muted-foreground'>
+              El mínimo dispara alerta de reposición. El máximo es la cantidad objetivo a mantener
+              (ej. 10 botellones).
+            </p>
+            <div className='grid grid-cols-3 gap-3'>
+              <div className='space-y-1'>
+                <Label>Cantidad inicial</Label>
+                <Input
+                  type='number'
+                  min='0'
+                  value={initialStock}
+                  onChange={e => setInitialStock(e.target.value)}
+                  placeholder='0'
+                />
+              </div>
+              <div className='space-y-1'>
+                <Label>Alerta cuando baje de</Label>
+                <Input
+                  type='number'
+                  min='0'
+                  value={minStock}
+                  onChange={e => setMinStock(e.target.value)}
+                  placeholder='2'
+                />
+              </div>
+              <div className='space-y-1'>
+                <Label>Máximo a mantener</Label>
+                <Input
+                  type='number'
+                  min='0'
+                  value={maxStock}
+                  onChange={e => setMaxStock(e.target.value)}
+                  placeholder='10'
+                />
+              </div>
+            </div>
+          </fieldset>
+        )}
+
+        {/* ── 5. FINANCIERO ─────────────────────────────────────────── */}
+        {isVisible('FINANCIAL') && (
+          <div className='space-y-1'>
+            <Label>
+              Precio por unidad
+              {isRequired('FINANCIAL') ? (
+                <span className='text-destructive'> *</span>
+              ) : (
+                <span className='text-xs font-normal text-muted-foreground'> (opcional)</span>
+              )}
+            </Label>
+            <Input
+              type='number'
+              min='0'
+              step='0.01'
+              value={costPerUnit}
+              onChange={e => setCostPerUnit(e.target.value)}
+              placeholder='0.00'
+            />
+          </div>
+        )}
+
+        {/* ── 6. BODEGA ─────────────────────────────────────────────── */}
+        {isVisible('WAREHOUSE') && (
+          <div className='space-y-1'>
+            <Label>
+              Bodega
+              {isRequired('WAREHOUSE') && <span className='text-destructive'> *</span>}
+            </Label>
+            <InlineCreateSelect
+              options={warehouses}
+              value={warehouseId}
+              onChange={setWarehouseId}
+              placeholder='Buscar bodega...'
+              allowClear
+              createLabel='Crear bodega'
+              createTitle='Nueva bodega'
+              {...inlineSelectFeedback('Bodega')}
+              createForm={({ onSuccess, onCancel }) => (
+                <WarehouseInlineForm
+                  defaultFamilyId={familyId}
+                  onSuccess={item => {
+                    setWarehouses(prev => [...prev, item])
+                    onSuccess(item)
+                  }}
+                  onCancel={onCancel}
+                />
+              )}
+            />
+          </div>
+        )}
+
+        {/* ── 7. NOTAS Y ADJUNTOS ───────────────────────────────────── */}
+        <div className='space-y-1'>
+          <Label>Observaciones</Label>
+          <Textarea
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            rows={3}
+            placeholder='Notas adicionales...'
+          />
+        </div>
+        <FileUploadZone
+          files={attachments}
+          onChange={setAttachments}
+          maxFileSizeMB={maxFileSizeMB}
+          label='Adjuntos'
         />
-      </div>
-      <FileUploadZone
-        files={attachments}
-        onChange={setAttachments}
-        maxFileSizeMB={maxFileSizeMB}
-        label='Adjuntos'
-      />
 
-      {submitError && <p className='text-sm text-destructive'>{submitError}</p>}
+        {submitError && <p className='text-sm text-destructive'>{submitError}</p>}
 
-      <div className='flex gap-3 pt-2'>
-        <Button type='button' variant='outline' onClick={onBack} disabled={submitting}>
-          ← Atrás
-        </Button>
-        <Button type='submit' disabled={submitting} className='flex-1'>
-          {submitting ? 'Guardando...' : 'Crear suministro'}
-        </Button>
-      </div>
-    </form>
+        <div className='flex gap-3 pt-2'>
+          <Button type='button' variant='outline' onClick={onBack} disabled={submitting}>
+            ← Atrás
+          </Button>
+          <Button type='submit' disabled={submitting} className='flex-1'>
+            {submitting ? 'Guardando...' : 'Crear suministro'}
+          </Button>
+        </div>
+      </form>
+
+      {/* Gestor de atributos encadenado desde el selector de Categoría */}
+      {manageAttributesFor && (
+        <AttributeManagerDialog
+          open={!!manageAttributesFor}
+          onOpenChange={o => {
+            if (!o) {
+              setManageAttributesFor(null)
+              setManageAttributesAutoCreate(false)
+            }
+          }}
+          typeKind='consumable'
+          typeId={manageAttributesFor.id}
+          typeName={manageAttributesFor.name}
+          autoOpenCreate={manageAttributesAutoCreate}
+          onAttributesChange={() => setAttributesReloadToken(t => t + 1)}
+        />
+      )}
+    </>
   )
 }

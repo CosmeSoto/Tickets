@@ -5,7 +5,7 @@
 
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Plus, Edit, Trash2, MoveUp, MoveDown, Download, Eye, EyeOff } from 'lucide-react'
 import {
   Dialog,
@@ -61,6 +61,12 @@ interface AttributeManagerDialogProps {
   familyColor?: string | null
   /** Callback cuando cambia el número de atributos */
   onAttributesChange?: () => void
+  /**
+   * Si es true y el tipo aún no tiene atributos, abre automáticamente el
+   * formulario de "Nuevo Atributo" al abrir este diálogo. Pensado para
+   * encadenar el flujo justo después de crear un tipo nuevo.
+   */
+  autoOpenCreate?: boolean
 }
 
 const ATTRIBUTE_TYPE_LABELS: Record<string, string> = {
@@ -80,6 +86,7 @@ export function AttributeManagerDialog({
   typeId,
   typeName,
   onAttributesChange,
+  autoOpenCreate = false,
 }: AttributeManagerDialogProps) {
   const {
     attributes,
@@ -146,6 +153,22 @@ export function AttributeManagerDialog({
       loadAttributes()
     }
   }, [open, loadAttributes])
+
+  // Encadenar con la creación del tipo: si viene recién creado y sin atributos,
+  // saltar directo al formulario de "Nuevo Atributo" en vez de dejar al usuario
+  // frente a una tabla vacía. Se dispara una sola vez por apertura del diálogo.
+  const autoOpenFiredRef = useRef(false)
+  useEffect(() => {
+    if (!open) {
+      autoOpenFiredRef.current = false
+      return
+    }
+    if (autoOpenCreate && !loading && attributes.length === 0 && !autoOpenFiredRef.current) {
+      autoOpenFiredRef.current = true
+      setEditingAttribute(null)
+      setFormOpen(true)
+    }
+  }, [open, autoOpenCreate, loading, attributes.length])
 
   // Handlers
   const handleCreate = () => {

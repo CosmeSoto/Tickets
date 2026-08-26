@@ -41,6 +41,10 @@ interface TypeAttributesInputProps {
   values: AttributeValue[]
   onChange: (values: AttributeValue[]) => void
   errors?: Record<string, string>
+  /** Cambiar este valor fuerza recargar los atributos sin necesidad de cambiar
+   * de tipo — útil cuando se editan/agregan atributos del tipo actual desde
+   * el mismo formulario (ver AttributeManagerDialog encadenado). */
+  reloadToken?: number
 }
 
 /**
@@ -53,6 +57,7 @@ export function TypeAttributesInput({
   values,
   onChange,
   errors = {},
+  reloadToken,
 }: TypeAttributesInputProps) {
   const [attributes, setAttributes] = useState<TypeAttribute[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -64,7 +69,7 @@ export function TypeAttributesInput({
       setAttributes([])
       setIsLoading(false)
     }
-  }, [typeId, assetType])
+  }, [typeId, assetType, reloadToken])
 
   const loadAttributes = async () => {
     try {

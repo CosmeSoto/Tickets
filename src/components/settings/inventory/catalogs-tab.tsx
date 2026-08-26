@@ -80,6 +80,9 @@ export function CatalogsTab({ familyId, familyColor }: CatalogsTabProps) {
     kind: TypeKind
     type: AnyType
   } | null>(null)
+  // true solo cuando el gestor de atributos se abre encadenado justo tras
+  // crear un tipo nuevo: hace que salte directo al formulario de "Nuevo Atributo"
+  const [attributeDialogAutoCreate, setAttributeDialogAutoCreate] = useState(false)
 
   // Estado para el diálogo de crear/editar tipo
   const [typeFormDialogOpen, setTypeFormDialogOpen] = useState(false)
@@ -104,6 +107,7 @@ export function CatalogsTab({ familyId, familyColor }: CatalogsTabProps) {
 
   const handleManageEquipmentAttributes = (type: EquipmentType) => {
     setSelectedType({ kind: 'equipment', type })
+    setAttributeDialogAutoCreate(false)
     setAttributeDialogOpen(true)
   }
 
@@ -124,6 +128,7 @@ export function CatalogsTab({ familyId, familyColor }: CatalogsTabProps) {
 
   const handleManageLicenseAttributes = (type: LicenseType) => {
     setSelectedType({ kind: 'license', type })
+    setAttributeDialogAutoCreate(false)
     setAttributeDialogOpen(true)
   }
 
@@ -144,6 +149,7 @@ export function CatalogsTab({ familyId, familyColor }: CatalogsTabProps) {
 
   const handleManageConsumableAttributes = (type: ConsumableType) => {
     setSelectedType({ kind: 'consumable', type })
+    setAttributeDialogAutoCreate(false)
     setAttributeDialogOpen(true)
   }
 
@@ -151,16 +157,25 @@ export function CatalogsTab({ familyId, familyColor }: CatalogsTabProps) {
   const handleTypeFormSubmit = async (data: CreateTypeData): Promise<boolean> => {
     if (typeFormMode === 'create') {
       // Crear nuevo tipo
+      let result: AnyType | null = null
       if (typeFormKind === 'equipment') {
-        const result = await equipmentTypes.createType(data)
-        return result !== null
+        result = await equipmentTypes.createType(data)
       } else if (typeFormKind === 'license') {
-        const result = await licenseTypes.createType(data)
-        return result !== null
+        result = await licenseTypes.createType(data)
       } else {
-        const result = await consumableTypes.createType(data)
-        return result !== null
+        result = await consumableTypes.createType(data)
       }
+
+      if (result) {
+        // Encadenar: al crear el tipo, abrir de inmediato su gestor de
+        // atributos (y de ahí, directo al formulario de "Nuevo Atributo")
+        // para no obligar al usuario a volver a buscar el ícono de engranaje.
+        setSelectedType({ kind: typeFormKind, type: result })
+        setAttributeDialogAutoCreate(true)
+        setAttributeDialogOpen(true)
+      }
+
+      return result !== null
     } else {
       // Editar tipo existente
       if (!typeFormData) return false
@@ -324,6 +339,7 @@ export function CatalogsTab({ familyId, familyColor }: CatalogsTabProps) {
           typeId={selectedType.type.id}
           typeName={selectedType.type.name}
           familyColor={familyColor}
+          autoOpenCreate={attributeDialogAutoCreate}
           onAttributesChange={() => {
             // Recargar los tipos para actualizar el contador de atributos
             if (selectedType.kind === 'equipment') {

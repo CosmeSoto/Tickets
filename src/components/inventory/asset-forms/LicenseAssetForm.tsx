@@ -22,6 +22,8 @@ import { CatalogTypeInlineForm } from '@/components/inventory/asset-forms/Catalo
 import { inlineSelectFeedback } from '@/lib/utils/inline-select-feedback'
 import { isDirectFormSubmit } from '@/lib/utils/inline-form-guard'
 import { TypeAttributesInput } from '@/components/inventory/custom-fields/type-attributes-input'
+import { AttributeManagerDialog } from '@/components/settings/inventory/attribute-manager-dialog'
+import type { InlineSelectOption } from '@/components/ui/inline-create-select'
 import type { FamilyConfig } from '@/lib/inventory/family-config-types'
 import { useFetch } from '@/hooks/common/use-fetch'
 import { useActiveDepartments } from '@/contexts/departments-context'
@@ -100,10 +102,12 @@ function LicenseTypeAttributesSection({
   typeId,
   values,
   onChange,
+  reloadToken,
 }: {
   typeId: string
   values: Array<{ fieldName: string; fieldValue: string }>
   onChange: (values: Array<{ fieldName: string; fieldValue: string }>) => void
+  reloadToken?: number
 }) {
   if (!typeId) return null
   return (
@@ -114,6 +118,7 @@ function LicenseTypeAttributesSection({
         assetType='license'
         values={values}
         onChange={onChange}
+        reloadToken={reloadToken}
       />
     </div>
   )
@@ -143,6 +148,10 @@ export function LicenseAssetForm({
   const [customFieldValues, setCustomFieldValues] = useState<
     Array<{ fieldName: string; fieldValue: string }>
   >([])
+  // Gestor de atributos del tipo, encadenado desde el mismo selector (crear/editar tipo)
+  const [manageAttributesFor, setManageAttributesFor] = useState<InlineSelectOption | null>(null)
+  const [manageAttributesAutoCreate, setManageAttributesAutoCreate] = useState(false)
+  const [attributesReloadToken, setAttributesReloadToken] = useState(0)
   const [licenseKey, setLicenseKey] = useState('')
   const [scope, setScope] = useState<Scope>('Empresa')
   const [userId, setUserId] = useState('')
@@ -493,339 +502,378 @@ export function LicenseAssetForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className='space-y-5'>
-      <FormDraftBanner
-        visible={wasRestored}
-        onDismiss={dismissRestoredBanner}
-        onDiscard={handleDiscardDraft}
-      />
-      {hasCredentials && (
-        <div className='rounded-lg border bg-muted/40 px-3 py-2.5 text-xs text-muted-foreground flex items-start gap-2'>
-          <KeyRound className='h-3.5 w-3.5 shrink-0 mt-0.5' />
-          <span>
-            Contraseñas de acceso (portal del proveedor, admin del SaaS, VPN, etc.) no van en este
-            formulario: tras crear la licencia, úsalas en la tarjeta{' '}
-            <strong className='text-foreground'>Credenciales</strong> del detalle (bóveda con
-            auditoría). La clave de producto / licencia sí se registra abajo en este formulario.
-          </span>
-        </div>
-      )}
-
-      <div className='grid grid-cols-1 md:grid-cols-3 gap-4 [&>*]:min-w-0'>
-        <div className='space-y-1'>
-          <Label>
-            Nombre <span className='text-destructive'>*</span>
-          </Label>
-          <Input
-            value={name}
-            onChange={e => setName(e.target.value)}
-            required
-            placeholder='Ej: Microsoft Office 365'
-          />
-        </div>
-
-        <div className='space-y-1'>
-          <Label>
-            Tipo de Licencia / Contrato <span className='text-destructive'>*</span>
-          </Label>
-          <InlineCreateSelect
-            options={licenseTypes}
-            value={licenseTypeId}
-            onChange={setLicenseTypeId}
-            placeholder='Buscar tipo...'
-            createLabel='Crear tipo de licencia'
-            createTitle='Nuevo tipo de licencia'
-            {...inlineSelectFeedback('Tipo de licencia')}
-            createForm={({ onSuccess, onCancel }) => (
-              <CatalogTypeInlineForm
-                apiEndpoint='/api/inventory/license-types'
-                familyId={familyId}
-                onSuccess={item => {
-                  setLicenseTypes(prev => [...prev, item])
-                  onSuccess(item)
-                }}
-                onCancel={onCancel}
-              />
-            )}
-          />
-        </div>
-
-        <div className='space-y-1'>
-          <Label>
-            Clave de Licencia{' '}
-            <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
-          </Label>
-          <Input
-            value={licenseKey}
-            onChange={e => setLicenseKey(e.target.value)}
-            placeholder='Ej: XXXXX-XXXXX-XXXXX'
-            type='text'
-            autoComplete='off'
-            spellCheck={false}
-            className='font-mono'
-          />
-          <p className='text-xs text-muted-foreground pt-1'>
-            Clave de producto o serial de la licencia. Se guarda cifrada en inventario y se muestra
-            en el detalle a quien gestiona la licencia.
-          </p>
-        </div>
-      </div>
-
-      <LicenseTypeAttributesSection
-        typeId={licenseTypeId}
-        values={customFieldValues}
-        onChange={setCustomFieldValues}
-      />
-
-      <div className='grid grid-cols-1 md:grid-cols-2 gap-3'>
-        <div className='space-y-1'>
-          <Label>Alcance</Label>
-          <SimpleSelect value={scope} onChange={e => setScope(e.target.value as Scope)}>
-            <option value='Individual'>Individual</option>
-            <option value='Departamento'>Departamento</option>
-            <option value='Empresa'>Empresa</option>
-          </SimpleSelect>
-        </div>
-
-        <div className='space-y-1'>
-          <Label>
-            Proveedor / Vendedor{' '}
-            <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
-          </Label>
-          <SupplierSelect
-            value={supplierId || null}
-            onChange={v => setSupplierId(v || '')}
-            familyId={familyId}
-          />
-        </div>
-
-        {scope === 'Individual' && (
-          <div className='space-y-1 md:col-span-2'>
-            <AssignableUserSelect
-              familyId={familyId}
-              value={userId}
-              onChange={setUserId}
-              label={
-                isEditMode
-                  ? 'Usuario asignado (opcional aquí; también desde Asignar)'
-                  : 'Usuario asignado'
-              }
-              required={!isEditMode}
-            />
+    <>
+      <form onSubmit={handleSubmit} className='space-y-5'>
+        <FormDraftBanner
+          visible={wasRestored}
+          onDismiss={dismissRestoredBanner}
+          onDiscard={handleDiscardDraft}
+        />
+        {hasCredentials && (
+          <div className='rounded-lg border bg-muted/40 px-3 py-2.5 text-xs text-muted-foreground flex items-start gap-2'>
+            <KeyRound className='h-3.5 w-3.5 shrink-0 mt-0.5' />
+            <span>
+              Contraseñas de acceso (portal del proveedor, admin del SaaS, VPN, etc.) no van en este
+              formulario: tras crear la licencia, úsalas en la tarjeta{' '}
+              <strong className='text-foreground'>Credenciales</strong> del detalle (bóveda con
+              auditoría). La clave de producto / licencia sí se registra abajo en este formulario.
+            </span>
           </div>
         )}
-        {scope === 'Departamento' && (
+
+        <div className='grid grid-cols-1 md:grid-cols-3 gap-4 [&>*]:min-w-0'>
           <div className='space-y-1'>
             <Label>
-              Departamento Asignado {!isEditMode && <span className='text-destructive'>*</span>}
+              Nombre <span className='text-destructive'>*</span>
             </Label>
-            <SearchableSelect
-              options={departments}
-              value={departmentId}
-              onChange={setDepartmentId}
-              placeholder='Buscar departamento...'
+            <Input
+              value={name}
+              onChange={e => setName(e.target.value)}
+              required
+              placeholder='Ej: Microsoft Office 365'
             />
           </div>
-        )}
-      </div>
 
-      {isVisible('CONTRACT') && (
-        <div className='rounded-lg border border-border p-4 space-y-3'>
-          <p className='text-xs text-muted-foreground'>
-            El contrato es la fuente de verdad para costos y vigencia. Los campos financieros
-            duplicados se ocultan al vincular. Use <strong>Completar</strong> para abrir el
-            formulario completo sin salir.
-          </p>
-          <label className='flex items-center gap-3 cursor-pointer select-none'>
-            <button
-              type='button'
-              role='switch'
-              aria-checked={hasRecurring}
-              onClick={() => setHasRecurring(v => !v)}
-              className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${hasRecurring ? 'bg-primary' : 'bg-muted'}`}
-            >
-              <span
-                className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-lg transition-transform ${hasRecurring ? 'translate-x-4' : 'translate-x-0'}`}
-              />
-            </button>
-            <div>
-              <span className='text-sm font-medium flex items-center gap-1.5'>
-                <RefreshCw className='h-3.5 w-3.5 text-muted-foreground' />
-                Tiene suscripción / pago recurrente
-              </span>
-              <p className='text-xs text-muted-foreground'>
-                Activa si el software se paga mensual o anualmente (SaaS, arrendamiento)
-              </p>
-            </div>
-          </label>
-
-          {hasRecurring ? (
-            <p className='text-xs text-muted-foreground rounded-md bg-muted/40 px-3 py-2'>
-              Esta licencia tiene pago recurrente. Vincula el contrato del módulo de Contratos para
-              mantener trazabilidad financiera y operativa.
-            </p>
-          ) : (
-            <p className='text-xs text-muted-foreground rounded-md bg-muted/40 px-3 py-2'>
-              Aunque no sea recurrente, puedes vincular el contrato de compra o soporte para evitar
-              datos huérfanos y duplicados.
-            </p>
-          )}
-
-          <div className='space-y-2'>
+          <div className='space-y-1'>
             <Label>
-              Contrato vinculado{' '}
+              Tipo de Licencia / Contrato <span className='text-destructive'>*</span>
+            </Label>
+            <InlineCreateSelect
+              options={licenseTypes}
+              value={licenseTypeId}
+              onChange={setLicenseTypeId}
+              placeholder='Buscar tipo...'
+              createLabel='Crear tipo de licencia'
+              createTitle='Nuevo tipo de licencia'
+              {...inlineSelectFeedback('Tipo de licencia')}
+              createForm={({ item, onSuccess, onCancel }) => (
+                <CatalogTypeInlineForm
+                  apiEndpoint='/api/inventory/license-types'
+                  familyId={familyId}
+                  item={item}
+                  onSuccess={newItem => {
+                    if (item) {
+                      setLicenseTypes(prev => prev.map(t => (t.id === newItem.id ? newItem : t)))
+                    } else {
+                      setLicenseTypes(prev => [...prev, newItem])
+                    }
+                    onSuccess(newItem)
+                  }}
+                  onCancel={onCancel}
+                />
+              )}
+              onCreated={item => {
+                // Al crear un tipo de licencia nuevo, ir directo a definir sus atributos
+                setManageAttributesFor(item)
+                setManageAttributesAutoCreate(true)
+              }}
+              onManageAttributes={item => {
+                setManageAttributesFor(item)
+                setManageAttributesAutoCreate(false)
+              }}
+              manageAttributesTooltip='Gestionar atributos'
+            />
+          </div>
+
+          <div className='space-y-1'>
+            <Label>
+              Clave de Licencia{' '}
               <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
             </Label>
-            <ContractPicker
-              value={linkedContractId}
-              onChange={handleContractChange}
-              supplierId={supplierId || null}
+            <Input
+              value={licenseKey}
+              onChange={e => setLicenseKey(e.target.value)}
+              placeholder='Ej: XXXXX-XXXXX-XXXXX'
+              type='text'
+              autoComplete='off'
+              spellCheck={false}
+              className='font-mono'
+            />
+            <p className='text-xs text-muted-foreground pt-1'>
+              Clave de producto o serial de la licencia. Se guarda cifrada en inventario y se
+              muestra en el detalle a quien gestiona la licencia.
+            </p>
+          </div>
+        </div>
+
+        <LicenseTypeAttributesSection
+          typeId={licenseTypeId}
+          values={customFieldValues}
+          onChange={setCustomFieldValues}
+          reloadToken={attributesReloadToken}
+        />
+
+        <div className='grid grid-cols-1 md:grid-cols-2 gap-3'>
+          <div className='space-y-1'>
+            <Label>Alcance</Label>
+            <SimpleSelect value={scope} onChange={e => setScope(e.target.value as Scope)}>
+              <option value='Individual'>Individual</option>
+              <option value='Departamento'>Departamento</option>
+              <option value='Empresa'>Empresa</option>
+            </SimpleSelect>
+          </div>
+
+          <div className='space-y-1'>
+            <Label>
+              Proveedor / Vendedor{' '}
+              <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
+            </Label>
+            <SupplierSelect
+              value={supplierId || null}
+              onChange={v => setSupplierId(v || '')}
               familyId={familyId}
-              context='license'
-              prefill={contractPrefill}
-              draftParentKey={draftKey}
             />
           </div>
 
-          {linkedContract && contractFinancial ? (
-            <div className='rounded-md border bg-muted/30 px-3 py-2.5 space-y-1'>
-              <p className='text-xs text-muted-foreground'>{contractFinancial.amountLabel}</p>
-              <p className='text-sm font-medium font-mono'>
-                {formatContractAmount(contractFinancial.displayAmount, contractFinancial.currency)}
-              </p>
-              <p className='text-[11px] text-muted-foreground'>
-                Tomado automáticamente del contrato vinculado.{' '}
-                {hasRecurring
-                  ? 'Se guardará como costo de renovación.'
-                  : 'Se guardará como costo de la licencia.'}
-              </p>
+          {scope === 'Individual' && (
+            <div className='space-y-1 md:col-span-2'>
+              <AssignableUserSelect
+                familyId={familyId}
+                value={userId}
+                onChange={setUserId}
+                label={
+                  isEditMode
+                    ? 'Usuario asignado (opcional aquí; también desde Asignar)'
+                    : 'Usuario asignado'
+                }
+                required={!isEditMode}
+              />
             </div>
-          ) : (
-            <p className='text-xs text-muted-foreground rounded-md bg-muted/40 px-3 py-2'>
-              Vincula un contrato para cargar el costo automáticamente según el tipo de pago
-              {hasRecurring ? ' recurrente' : ' único'}.
-            </p>
+          )}
+          {scope === 'Departamento' && (
+            <div className='space-y-1'>
+              <Label>
+                Departamento Asignado {!isEditMode && <span className='text-destructive'>*</span>}
+              </Label>
+              <SearchableSelect
+                options={departments}
+                value={departmentId}
+                onChange={setDepartmentId}
+                placeholder='Buscar departamento...'
+              />
+            </div>
           )}
         </div>
-      )}
 
-      {isVisible('FINANCIAL') && (
-        <>
-          {linkedContract && (
-            <div className='rounded-lg border border-blue-200/80 bg-blue-50/50 dark:bg-blue-500/10 px-3 py-2 text-xs text-muted-foreground'>
-              Costo y vigencia provienen del contrato vinculado. Aquí solo registra datos propios de
-              la licencia (factura, orden de compra, fecha de compra).
-            </div>
-          )}
-          <div className='grid grid-cols-1 md:grid-cols-3 gap-3 [&>*]:min-w-0'>
-            <div className='space-y-1'>
+        {isVisible('CONTRACT') && (
+          <div className='rounded-lg border border-border p-4 space-y-3'>
+            <p className='text-xs text-muted-foreground'>
+              El contrato es la fuente de verdad para costos y vigencia. Los campos financieros
+              duplicados se ocultan al vincular. Use <strong>Completar</strong> para abrir el
+              formulario completo sin salir.
+            </p>
+            <label className='flex items-center gap-3 cursor-pointer select-none'>
+              <button
+                type='button'
+                role='switch'
+                aria-checked={hasRecurring}
+                onClick={() => setHasRecurring(v => !v)}
+                className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${hasRecurring ? 'bg-primary' : 'bg-muted'}`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-lg transition-transform ${hasRecurring ? 'translate-x-4' : 'translate-x-0'}`}
+                />
+              </button>
+              <div>
+                <span className='text-sm font-medium flex items-center gap-1.5'>
+                  <RefreshCw className='h-3.5 w-3.5 text-muted-foreground' />
+                  Tiene suscripción / pago recurrente
+                </span>
+                <p className='text-xs text-muted-foreground'>
+                  Activa si el software se paga mensual o anualmente (SaaS, arrendamiento)
+                </p>
+              </div>
+            </label>
+
+            {hasRecurring ? (
+              <p className='text-xs text-muted-foreground rounded-md bg-muted/40 px-3 py-2'>
+                Esta licencia tiene pago recurrente. Vincula el contrato del módulo de Contratos
+                para mantener trazabilidad financiera y operativa.
+              </p>
+            ) : (
+              <p className='text-xs text-muted-foreground rounded-md bg-muted/40 px-3 py-2'>
+                Aunque no sea recurrente, puedes vincular el contrato de compra o soporte para
+                evitar datos huérfanos y duplicados.
+              </p>
+            )}
+
+            <div className='space-y-2'>
               <Label>
-                Fecha de Compra
-                {isRequired('FINANCIAL') && <span className='text-destructive'> *</span>}
+                Contrato vinculado{' '}
+                <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
               </Label>
-              <DateInput
-                value={purchaseDate}
-                onChange={e => setPurchaseDate(e.target.value)}
-                required={isRequired('FINANCIAL')}
-                clearable
+              <ContractPicker
+                value={linkedContractId}
+                onChange={handleContractChange}
+                supplierId={supplierId || null}
+                familyId={familyId}
+                context='license'
+                prefill={contractPrefill}
+                draftParentKey={draftKey}
               />
             </div>
-            {!linkedContract && (
-              <>
-                <div className='space-y-1'>
-                  <Label>Fecha de Vencimiento</Label>
-                  <DateInput
-                    value={expirationDate}
-                    onChange={e => setExpirationDate(e.target.value)}
-                    clearable
-                    min={purchaseDate || undefined}
-                  />
-                </div>
-                <div className='space-y-1'>
-                  <Label>
-                    Costo{' '}
-                    <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
-                  </Label>
-                  <Input
-                    type='text'
-                    inputMode='decimal'
-                    autoComplete='off'
-                    value={cost}
-                    onChange={e => setCost(e.target.value)}
-                    placeholder='0.00'
-                  />
-                </div>
-              </>
+
+            {linkedContract && contractFinancial ? (
+              <div className='rounded-md border bg-muted/30 px-3 py-2.5 space-y-1'>
+                <p className='text-xs text-muted-foreground'>{contractFinancial.amountLabel}</p>
+                <p className='text-sm font-medium font-mono'>
+                  {formatContractAmount(
+                    contractFinancial.displayAmount,
+                    contractFinancial.currency
+                  )}
+                </p>
+                <p className='text-[11px] text-muted-foreground'>
+                  Tomado automáticamente del contrato vinculado.{' '}
+                  {hasRecurring
+                    ? 'Se guardará como costo de renovación.'
+                    : 'Se guardará como costo de la licencia.'}
+                </p>
+              </div>
+            ) : (
+              <p className='text-xs text-muted-foreground rounded-md bg-muted/40 px-3 py-2'>
+                Vincula un contrato para cargar el costo automáticamente según el tipo de pago
+                {hasRecurring ? ' recurrente' : ' único'}.
+              </p>
             )}
           </div>
+        )}
 
-          <div className='grid grid-cols-1 md:grid-cols-3 gap-3 [&>*]:min-w-0'>
-            <div className='space-y-1'>
-              <Label>
-                Número de Factura{' '}
-                <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
-              </Label>
-              <Input
-                value={invoiceNumber}
-                onChange={e => setInvoiceNumber(e.target.value)}
-                placeholder='Ej: FACT-2024-001'
-              />
-            </div>
-            <div className='space-y-1'>
-              <Label>
-                Número de Orden de Compra{' '}
-                <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
-              </Label>
-              <Input
-                value={purchaseOrderNumber}
-                onChange={e => setPurchaseOrderNumber(e.target.value)}
-                placeholder='Ej: OC-2024-001'
-              />
-            </div>
-            {!linkedContract && (
+        {isVisible('FINANCIAL') && (
+          <>
+            {linkedContract && (
+              <div className='rounded-lg border border-blue-200/80 bg-blue-50/50 dark:bg-blue-500/10 px-3 py-2 text-xs text-muted-foreground'>
+                Costo y vigencia provienen del contrato vinculado. Aquí solo registra datos propios
+                de la licencia (factura, orden de compra, fecha de compra).
+              </div>
+            )}
+            <div className='grid grid-cols-1 md:grid-cols-3 gap-3 [&>*]:min-w-0'>
               <div className='space-y-1'>
                 <Label>
-                  Fecha de Renovación{' '}
-                  <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
+                  Fecha de Compra
+                  {isRequired('FINANCIAL') && <span className='text-destructive'> *</span>}
                 </Label>
                 <DateInput
-                  value={renewalDate}
-                  onChange={e => setRenewalDate(e.target.value)}
+                  value={purchaseDate}
+                  onChange={e => setPurchaseDate(e.target.value)}
+                  required={isRequired('FINANCIAL')}
                   clearable
                 />
               </div>
-            )}
-          </div>
-        </>
-      )}
+              {!linkedContract && (
+                <>
+                  <div className='space-y-1'>
+                    <Label>Fecha de Vencimiento</Label>
+                    <DateInput
+                      value={expirationDate}
+                      onChange={e => setExpirationDate(e.target.value)}
+                      clearable
+                      min={purchaseDate || undefined}
+                    />
+                  </div>
+                  <div className='space-y-1'>
+                    <Label>
+                      Costo{' '}
+                      <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
+                    </Label>
+                    <Input
+                      type='text'
+                      inputMode='decimal'
+                      autoComplete='off'
+                      value={cost}
+                      onChange={e => setCost(e.target.value)}
+                      placeholder='0.00'
+                    />
+                  </div>
+                </>
+              )}
+            </div>
 
-      <div className='space-y-1'>
-        <Label>Observaciones</Label>
-        <Textarea
-          value={notes}
-          onChange={e => setNotes(e.target.value)}
-          rows={3}
-          placeholder='Notas adicionales...'
+            <div className='grid grid-cols-1 md:grid-cols-3 gap-3 [&>*]:min-w-0'>
+              <div className='space-y-1'>
+                <Label>
+                  Número de Factura{' '}
+                  <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
+                </Label>
+                <Input
+                  value={invoiceNumber}
+                  onChange={e => setInvoiceNumber(e.target.value)}
+                  placeholder='Ej: FACT-2024-001'
+                />
+              </div>
+              <div className='space-y-1'>
+                <Label>
+                  Número de Orden de Compra{' '}
+                  <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
+                </Label>
+                <Input
+                  value={purchaseOrderNumber}
+                  onChange={e => setPurchaseOrderNumber(e.target.value)}
+                  placeholder='Ej: OC-2024-001'
+                />
+              </div>
+              {!linkedContract && (
+                <div className='space-y-1'>
+                  <Label>
+                    Fecha de Renovación{' '}
+                    <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
+                  </Label>
+                  <DateInput
+                    value={renewalDate}
+                    onChange={e => setRenewalDate(e.target.value)}
+                    clearable
+                  />
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        <div className='space-y-1'>
+          <Label>Observaciones</Label>
+          <Textarea
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            rows={3}
+            placeholder='Notas adicionales...'
+          />
+        </div>
+
+        <FileUploadZone
+          files={attachments}
+          onChange={setAttachments}
+          maxFileSizeMB={maxFileSizeMB}
+          label='Adjuntos'
         />
-      </div>
 
-      <FileUploadZone
-        files={attachments}
-        onChange={setAttachments}
-        maxFileSizeMB={maxFileSizeMB}
-        label='Adjuntos'
-      />
+        {submitError && <p className='text-sm text-destructive'>{submitError}</p>}
 
-      {submitError && <p className='text-sm text-destructive'>{submitError}</p>}
+        <div className='flex gap-3 pt-2'>
+          <Button type='button' variant='outline' onClick={onBack} disabled={submitting}>
+            ← Atrás
+          </Button>
+          <Button type='submit' disabled={submitting} className='flex-1'>
+            {submitting ? 'Guardando...' : isEditMode ? 'Guardar cambios' : 'Crear Licencia'}
+          </Button>
+        </div>
+      </form>
 
-      <div className='flex gap-3 pt-2'>
-        <Button type='button' variant='outline' onClick={onBack} disabled={submitting}>
-          ← Atrás
-        </Button>
-        <Button type='submit' disabled={submitting} className='flex-1'>
-          {submitting ? 'Guardando...' : isEditMode ? 'Guardar cambios' : 'Crear Licencia'}
-        </Button>
-      </div>
-    </form>
+      {/* Gestor de atributos encadenado desde el selector de Tipo de Licencia */}
+      {manageAttributesFor && (
+        <AttributeManagerDialog
+          open={!!manageAttributesFor}
+          onOpenChange={o => {
+            if (!o) {
+              setManageAttributesFor(null)
+              setManageAttributesAutoCreate(false)
+            }
+          }}
+          typeKind='license'
+          typeId={manageAttributesFor.id}
+          typeName={manageAttributesFor.name}
+          autoOpenCreate={manageAttributesAutoCreate}
+          onAttributesChange={() => setAttributesReloadToken(t => t + 1)}
+        />
+      )}
+    </>
   )
 }

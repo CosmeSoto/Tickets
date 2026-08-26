@@ -26,6 +26,8 @@ import { WarehouseInlineForm } from '@/components/inventory/asset-forms/Warehous
 import { AssignableUserSelect } from '@/components/inventory/shared/AssignableUserSelect'
 import { MaintenanceStatusBlock } from '@/components/inventory/shared/MaintenanceStatusBlock'
 import { TypeAttributesInput } from '@/components/inventory/custom-fields/type-attributes-input'
+import { AttributeManagerDialog } from '@/components/settings/inventory/attribute-manager-dialog'
+import type { InlineSelectOption } from '@/components/ui/inline-create-select'
 import { AttachmentsField } from '@/components/inventory/shared/AttachmentsField'
 import { AccessoriesSection } from '@/components/inventory/shared/AccessoriesSection'
 import { toast } from 'sonner'
@@ -193,6 +195,10 @@ export function EquipmentAssetForm({
       trackMaintenance?: boolean
     }>
   >([])
+  // Gestor de atributos del tipo, encadenado desde el mismo selector (crear/editar tipo)
+  const [manageAttributesFor, setManageAttributesFor] = useState<InlineSelectOption | null>(null)
+  const [manageAttributesAutoCreate, setManageAttributesAutoCreate] = useState(false)
+  const [attributesReloadToken, setAttributesReloadToken] = useState(0)
   // Configuración del tipo seleccionado
   const [selectedTypeConfig, setSelectedTypeConfig] = useState<{
     trackMaintenance: boolean
@@ -900,911 +906,950 @@ export function EquipmentAssetForm({
   }, [submitting, submitError, clearDraft])
 
   return (
-    <form onSubmit={handleSubmit} className='space-y-5'>
-      <FormDraftBanner
-        visible={wasRestored}
-        onDismiss={dismissRestoredBanner}
-        onDiscard={() => {
-          clearDraft()
-          dismissRestoredBanner()
-        }}
-      />
-      {hasCredentials && (
-        <div className='rounded-lg border bg-muted/40 px-3 py-2.5 text-xs text-muted-foreground flex items-start gap-2'>
-          <KeyRound className='h-3.5 w-3.5 shrink-0 mt-0.5' />
-          <span>
-            Contraseñas de equipo (BIOS, admin, Wi‑Fi, etc.) no van en este formulario: tras crear
-            el activo, úsalas en la tarjeta{' '}
-            <strong className='text-foreground'>Credenciales</strong> del detalle (bóveda con
-            auditoría).
-          </span>
-        </div>
-      )}
-      {/* ── 1. IDENTIFICACIÓN ─────────────────────────────────────── */}
-      <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
-        {/* Tipo de equipo */}
-        <div className='space-y-1'>
-          <Label>
-            Tipo de Equipo <span className='text-destructive'>*</span>
-          </Label>
-          <InlineCreateSelect
-            options={equipmentTypes}
-            value={equipmentTypeId}
-            onChange={setEquipmentTypeId}
-            placeholder='Buscar tipo de equipo...'
-            createLabel='Crear tipo de equipo'
-            createTitle='Nuevo tipo de equipo'
-            editTitle='Editar tipo de equipo'
-            deleteConfirmMessage='¿Eliminar este tipo de equipo? Solo es posible si no tiene activos asociados.'
-            {...inlineSelectFeedback('Tipo de equipo')}
-            createForm={({ item, onSuccess, onCancel }) => (
-              <EquipmentTypeInlineForm
-                familyId={familyId}
-                item={item}
-                onSuccess={newItem => {
-                  if (item) {
-                    setEquipmentTypes(prev => prev.map(t => (t.id === newItem.id ? newItem : t)))
-                  } else {
-                    setEquipmentTypes(prev => [...prev, newItem])
-                  }
-                  onSuccess(newItem)
-                }}
-                onCancel={onCancel}
-              />
-            )}
-            onDelete={async id => {
-              const res = await fetch(`/api/inventory/equipment-types/${id}`, { method: 'DELETE' })
-              if (!res.ok) {
-                const d = await res.json()
-                throw new Error(d.error || 'Error al eliminar')
-              }
-              setEquipmentTypes(prev => prev.filter(t => t.id !== id))
-              if (equipmentTypeId === id) {
-                setEquipmentTypeId('')
-                setSelectedBrandId('')
-                setSelectedModelId('')
-              }
-            }}
-          />
-        </div>
-
-        {/* Marca */}
-        {equipmentTypeId && (
+    <>
+      <form onSubmit={handleSubmit} className='space-y-5'>
+        <FormDraftBanner
+          visible={wasRestored}
+          onDismiss={dismissRestoredBanner}
+          onDiscard={() => {
+            clearDraft()
+            dismissRestoredBanner()
+          }}
+        />
+        {hasCredentials && (
+          <div className='rounded-lg border bg-muted/40 px-3 py-2.5 text-xs text-muted-foreground flex items-start gap-2'>
+            <KeyRound className='h-3.5 w-3.5 shrink-0 mt-0.5' />
+            <span>
+              Contraseñas de equipo (BIOS, admin, Wi‑Fi, etc.) no van en este formulario: tras crear
+              el activo, úsalas en la tarjeta{' '}
+              <strong className='text-foreground'>Credenciales</strong> del detalle (bóveda con
+              auditoría).
+            </span>
+          </div>
+        )}
+        {/* ── 1. IDENTIFICACIÓN ─────────────────────────────────────── */}
+        <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+          {/* Tipo de equipo */}
           <div className='space-y-1'>
             <Label>
-              Marca <span className='text-destructive'>*</span>
+              Tipo de Equipo <span className='text-destructive'>*</span>
             </Label>
             <InlineCreateSelect
-              options={brands}
-              value={selectedBrandId}
-              onChange={newVal => {
-                setSelectedBrandId(newVal)
-                setSelectedModelId('')
-              }}
-              placeholder='Buscar o crear marca...'
-              createLabel='Crear marca'
-              createTitle='Nueva marca'
-              editTitle='Editar marca'
-              deleteConfirmMessage='¿Eliminar esta marca? Solo es posible si no tiene activos asociados.'
-              {...inlineSelectFeedback('Marca')}
+              options={equipmentTypes}
+              value={equipmentTypeId}
+              onChange={setEquipmentTypeId}
+              placeholder='Buscar tipo de equipo...'
+              createLabel='Crear tipo de equipo'
+              createTitle='Nuevo tipo de equipo'
+              editTitle='Editar tipo de equipo'
+              deleteConfirmMessage='¿Eliminar este tipo de equipo? Solo es posible si no tiene activos asociados.'
+              {...inlineSelectFeedback('Tipo de equipo')}
               createForm={({ item, onSuccess, onCancel }) => (
-                <EquipmentBrandInlineForm
+                <EquipmentTypeInlineForm
                   familyId={familyId}
                   item={item}
                   onSuccess={newItem => {
                     if (item) {
-                      setBrands(prev => prev.map(b => (b.id === newItem.id ? newItem : b)))
+                      setEquipmentTypes(prev => prev.map(t => (t.id === newItem.id ? newItem : t)))
                     } else {
-                      setBrands(prev => [...prev, newItem])
+                      setEquipmentTypes(prev => [...prev, newItem])
                     }
-                    setSelectedBrandId(newItem.id)
                     onSuccess(newItem)
                   }}
                   onCancel={onCancel}
                 />
               )}
+              onCreated={item => {
+                // Al crear un tipo de equipo nuevo, ir directo a definir sus atributos
+                setManageAttributesFor(item)
+                setManageAttributesAutoCreate(true)
+              }}
+              onManageAttributes={item => {
+                setManageAttributesFor(item)
+                setManageAttributesAutoCreate(false)
+              }}
+              manageAttributesTooltip='Gestionar atributos'
               onDelete={async id => {
-                const res = await fetch(`/api/inventory/brands/${id}`, { method: 'DELETE' })
+                const res = await fetch(`/api/inventory/equipment-types/${id}`, {
+                  method: 'DELETE',
+                })
                 if (!res.ok) {
                   const d = await res.json()
                   throw new Error(d.error || 'Error al eliminar')
                 }
-                setBrands(prev => prev.filter(b => b.id !== id))
-                if (selectedBrandId === id) {
+                setEquipmentTypes(prev => prev.filter(t => t.id !== id))
+                if (equipmentTypeId === id) {
+                  setEquipmentTypeId('')
                   setSelectedBrandId('')
                   setSelectedModelId('')
                 }
               }}
             />
           </div>
-        )}
 
-        {/* Modelo de Equipo */}
-        {equipmentTypeId && selectedBrandId && (
-          <div className='space-y-1'>
-            <Label>
-              Modelo <span className='text-destructive'>*</span>
-            </Label>
-            <InlineCreateSelect
-              options={equipmentModels}
-              value={selectedModelId}
-              onChange={setSelectedModelId}
-              placeholder='Buscar o crear modelo...'
-              allowClear
-              createLabel='Crear modelo'
-              createTitle='Nuevo modelo de equipo'
-              editTitle='Editar modelo de equipo'
-              deleteConfirmMessage='¿Eliminar este modelo? Solo es posible si no tiene activos asociados.'
-              {...inlineSelectFeedback('Modelo')}
-              createForm={({ item, onSuccess, onCancel }) => (
-                <EquipmentModelInlineForm
-                  typeId={equipmentTypeId}
-                  familyId={familyId}
-                  item={item}
-                  initialBrandId={selectedBrandId || undefined}
-                  onSuccess={newItem => {
-                    if (item) {
-                      setEquipmentModels(prev => prev.map(t => (t.id === newItem.id ? newItem : t)))
-                    } else {
-                      setEquipmentModels(prev => [...prev, newItem])
-                    }
-                    onSuccess(newItem)
-                  }}
-                  onCancel={onCancel}
-                />
-              )}
-              onDelete={async id => {
-                try {
-                  const res = await fetch(`/api/inventory/models/${id}`, { method: 'DELETE' })
+          {/* Marca */}
+          {equipmentTypeId && (
+            <div className='space-y-1'>
+              <Label>
+                Marca <span className='text-destructive'>*</span>
+              </Label>
+              <InlineCreateSelect
+                options={brands}
+                value={selectedBrandId}
+                onChange={newVal => {
+                  setSelectedBrandId(newVal)
+                  setSelectedModelId('')
+                }}
+                placeholder='Buscar o crear marca...'
+                createLabel='Crear marca'
+                createTitle='Nueva marca'
+                editTitle='Editar marca'
+                deleteConfirmMessage='¿Eliminar esta marca? Solo es posible si no tiene activos asociados.'
+                {...inlineSelectFeedback('Marca')}
+                createForm={({ item, onSuccess, onCancel }) => (
+                  <EquipmentBrandInlineForm
+                    familyId={familyId}
+                    item={item}
+                    onSuccess={newItem => {
+                      if (item) {
+                        setBrands(prev => prev.map(b => (b.id === newItem.id ? newItem : b)))
+                      } else {
+                        setBrands(prev => [...prev, newItem])
+                      }
+                      setSelectedBrandId(newItem.id)
+                      onSuccess(newItem)
+                    }}
+                    onCancel={onCancel}
+                  />
+                )}
+                onDelete={async id => {
+                  const res = await fetch(`/api/inventory/brands/${id}`, { method: 'DELETE' })
                   if (!res.ok) {
                     const d = await res.json()
                     throw new Error(d.error || 'Error al eliminar')
                   }
-                  setEquipmentModels(prev => prev.filter(t => t.id !== id))
-                  if (selectedModelId === id) {
+                  setBrands(prev => prev.filter(b => b.id !== id))
+                  if (selectedBrandId === id) {
+                    setSelectedBrandId('')
                     setSelectedModelId('')
                   }
-                  toast.success('Modelo eliminado exitosamente')
-                } catch (err: unknown) {
-                  const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
-                  toast.error(errorMessage)
-                  throw err
-                }
-              }}
-            />
-          </div>
-        )}
-
-        {/* N° Serie */}
-        <div className='space-y-1'>
-          <Label>
-            N° de Serie del Fabricante <span className='text-destructive'>*</span>
-          </Label>
-          <SerialNumberInput
-            value={serialNumber}
-            onChange={e => setSerialNumber(e.target.value)}
-            placeholder='Ej: SN-ABC-12345'
-          />
-        </div>
-
-        {/* Código */}
-        <div className='space-y-1'>
-          <Label>
-            Código Interno{' '}
-            <span className='text-xs font-normal text-muted-foreground'>
-              (opcional — se genera automáticamente)
-            </span>
-          </Label>
-          <Input
-            value={code}
-            onChange={e => setCode(e.target.value)}
-            placeholder='Dejar vacío para generar automáticamente'
-          />
-        </div>
-      </div>
-
-      {/* ── 2. DETALLES DEL EQUIPO ────────────────────────────────── */}
-      {/* Atributos por Tipo */}
-      <TypeAttributesSection
-        typeId={equipmentTypeId}
-        values={customFieldValues}
-        onChange={setCustomFieldValues}
-      />
-
-      {/* Accesorios */}
-      <AccessoriesSection accessories={accessories} onChange={setAccessories} inline />
-
-      {/* ── 3. ESTADO Y UBICACIÓN ──────────────────────────────────── */}
-      <div className='grid grid-cols-1 md:grid-cols-2 gap-3'>
-        <div className='space-y-1'>
-          <Label>
-            Condición <span className='text-destructive'>*</span>
-          </Label>
-          <SimpleSelect value={condition} onChange={e => setCondition(e.target.value)}>
-            <option value='NEW'>Nuevo</option>
-            <option value='USED'>Usado</option>
-            <option value='DAMAGED'>Dañado</option>
-          </SimpleSelect>
-          {conditionMessage[condition] && (
-            <p
-              className={`text-xs ${condition === 'NEW' ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}`}
-            >
-              {conditionMessage[condition]}
-            </p>
-          )}
-        </div>
-        <div className='space-y-1'>
-          <Label>Estado</Label>
-          <SimpleSelect value={equipmentStatus} onChange={e => setEquipmentStatus(e.target.value)}>
-            {(allowedStatusesByCondition[condition] || []).map(status => (
-              <option key={status} value={status}>
-                {status === 'AVAILABLE'
-                  ? 'Disponible'
-                  : status === 'ASSIGNED'
-                    ? 'Asignado'
-                    : status === 'MAINTENANCE'
-                      ? 'En Mantenimiento'
-                      : status === 'DAMAGED'
-                        ? 'Dañado'
-                        : status === 'RETIRED'
-                          ? 'Retirado'
-                          : status === 'FOR_SALE'
-                            ? 'En venta'
-                            : status}
-              </option>
-            ))}
-          </SimpleSelect>
-        </div>
-
-        {/* Bodega — solo AVAILABLE y DAMAGED */}
-        {showWarehouse && (
-          <div className='space-y-1'>
-            <Label>Bodega</Label>
-            <InlineCreateSelect
-              options={warehouses}
-              value={warehouseId}
-              onChange={setWarehouseId}
-              placeholder='Buscar bodega...'
-              allowClear
-              createLabel='Crear bodega'
-              createTitle='Nueva bodega'
-              editTitle='Editar bodega'
-              deleteConfirmMessage='¿Eliminar esta bodega? Solo es posible si no tiene activos asociados.'
-              {...inlineSelectFeedback('Bodega')}
-              createForm={({ onSuccess, onCancel }) => (
-                <WarehouseInlineForm
-                  defaultFamilyId={familyId}
-                  onSuccess={item => {
-                    setWarehouses(prev => [...prev, item])
-                    onSuccess(item)
-                  }}
-                  onCancel={onCancel}
-                />
-              )}
-              onDelete={async id => {
-                const res = await fetch(`/api/inventory/warehouses/${id}`, { method: 'DELETE' })
-                if (!res.ok) {
-                  const d = await res.json()
-                  throw new Error(d.error || 'Error al eliminar')
-                }
-                setWarehouses(prev => prev.filter(w => w.id !== id))
-                if (warehouseId === id) {
-                  setWarehouseId('')
-                }
-              }}
-            />
-          </div>
-        )}
-      </div>
-
-      {/* Departamento — solo información automática cuando estado = ASSIGNED y hay usuario asignado */}
-      {equipmentStatus === 'ASSIGNED' && assignedUserDept && (
-        <div className='rounded-md border border-primary/30 bg-primary/5 p-3'>
-          <Label className='text-xs text-muted-foreground'>Departamento</Label>
-          <p className='font-medium'>{assignedUserDept.name}</p>
-        </div>
-      )}
-
-      {/* Precio Estimado — solo para Bueno/Malo y FIXED_ASSET */}
-      {showEstimatedPrice && (
-        <div className='space-y-1'>
-          <Label>Precio Estimado (USD) — opcional</Label>
-          <Input
-            type='number'
-            step='0.01'
-            min='0'
-            value={estimatedPrice}
-            onChange={e => setEstimatedPrice(e.target.value)}
-            placeholder='Ej: 500.00 — valor estimado del activo'
-          />
-          {/* <p className='text-xs text-muted-foreground'>
-            Valor estimado del activo en su condición actual.
-          </p> */}
-        </div>
-      )}
-
-      {/* Aviso para activos registrados directamente como RETIRED (históricos) */}
-      {equipmentStatus === 'RETIRED' && (
-        <div className='rounded-md border border-muted-foreground/20 bg-muted/40 px-4 py-3 space-y-1'>
-          <p className='text-sm font-medium text-muted-foreground'>
-            Registro de activo histórico retirado
-          </p>
-          <p className='text-xs text-muted-foreground'>
-            Estás registrando un activo que ya fue dado de baja. Este modo es exclusivo para
-            migración de datos históricos. Para dar de baja un activo activo, usa el botón
-            &ldquo;Solicitar baja&rdquo; desde el detalle del equipo — eso inicia el flujo formal
-            con aprobación, acta y folio.
-          </p>
-        </div>
-      )}
-
-      {/* Precio de venta — solo cuando estado es FOR_SALE */}
-      {showForSalePriceField(equipmentStatus) && (
-        <div className='space-y-2 col-span-2'>
-          <div className='rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 space-y-3'>
-            <p className='text-sm font-medium text-amber-700 dark:text-amber-400 flex items-center gap-2'>
-              <Tag className='h-4 w-4' />
-              Activo marcado para la venta
-            </p>
-            <div className='space-y-1'>
-              <Label>Precio de venta público (USD) — opcional</Label>
-              <Input
-                type='number'
-                step='0.01'
-                min='0'
-                value={saleListingPrice}
-                onChange={e => setSaleListingPrice(e.target.value)}
-                placeholder="Ej: 850.00 — dejar vacío para mostrar 'Consultar precio'"
+                }}
               />
-              <p className='text-xs text-muted-foreground'>
-                Este precio se mostrará en la vitrina pública. Si no lo defines, se mostrará
-                &ldquo;Consultar precio&rdquo;.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Asignar a usuario — usa el componente compartido con departamento auto-rellenado */}
-      {showAssignmentBlock(equipmentStatus) && (
-        <div className='rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3'>
-          <AssignableUserSelect
-            familyId={familyId}
-            value={assignedUserId}
-            onChange={(userId, user) => {
-              setAssignedUserId(userId)
-              setAssignedUserDept(user?.department ?? null)
-            }}
-            required
-          />
-          <div className='space-y-1'>
-            <Label>
-              Fecha de Devolución Estimada{' '}
-              <span className='text-xs text-muted-foreground font-normal'>(opcional)</span>
-            </Label>
-            <DateInput
-              value={assignmentEndDate}
-              onChange={e => setAssignmentEndDate(e.target.value)}
-              min={new Date().toISOString().split('T')[0]}
-              clearable
-            />
-            <p className='text-xs text-muted-foreground'>
-              Si es préstamo o uso temporal, indica la fecha esperada de devolución. El sistema
-              enviará una alerta próxima a esa fecha.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Mantenimiento — usa componente compartido */}
-      {showMaintenanceBlock(equipmentStatus) && (
-        <MaintenanceStatusBlock
-          date={maintenanceDate}
-          onDateChange={setMaintenanceDate}
-          type={maintenanceType}
-          onTypeChange={setMaintenanceType}
-          technicianId={maintenanceTechnicianId}
-          onTechnicianChange={setMaintenanceTechnicianId}
-          supplierId={maintenanceSupplierId}
-          onSupplierChange={setMaintenanceSupplierId}
-          description={maintenanceDescription}
-          onDescriptionChange={setMaintenanceDescription}
-          familyId={familyId}
-        />
-      )}
-
-      {/* ── 4. ADQUISICIÓN ────────────────────────────────────────── */}
-      {/* Ocultar cuando el estado es transitorio (MAINTENANCE/FOR_SALE) — solo datos operativos */}
-      {equipmentStatus !== 'MAINTENANCE' && equipmentStatus !== 'FOR_SALE' && (
-        <>
-          {/* Modalidad */}
-          <div className='space-y-1'>
-            <Label>¿Cómo se adquirió este equipo?</Label>
-            <SimpleSelect
-              value={acquisitionMode}
-              onChange={e => setAcquisitionMode(e.target.value as typeof acquisitionMode)}
-              options={ACQUISITION_MODES}
-            />
-            <p className='text-xs text-muted-foreground'>
-              {ACQUISITION_MODES.find(m => m.value === acquisitionMode)?.help}
-            </p>
-          </div>
-
-          {/* Proveedor */}
-          <div className='space-y-1'>
-            <Label>
-              {supplierLabel} {supplierRequired && <span className='text-destructive'>*</span>}
-            </Label>
-            <SupplierSelect
-              value={supplierId || null}
-              onChange={v => setSupplierId(v || '')}
-              familyId={familyId}
-            />
-          </div>
-
-          {/* Contrato — arrendamiento */}
-          {isVisible('CONTRACT') && acquisitionMode === 'RENTAL' && (
-            <div className='rounded-md border border-border p-4 space-y-3'>
-              <p className='text-sm font-medium'>
-                Contrato de arrendamiento
-                {isRequired('CONTRACT') && <span className='text-destructive'> *</span>}
-              </p>
-              <ContractPicker
-                value={linkedContractId}
-                onChange={handleContractChange}
-                supplierId={supplierId || null}
-                familyId={familyId}
-                context='equipment'
-                prefill={contractPrefill}
-                draftParentKey={draftKey}
-              />
-              {linkedContract && contractFinancial ? (
-                <div className='rounded-md border bg-muted/30 px-3 py-2.5 space-y-1'>
-                  <p className='text-xs text-muted-foreground'>{contractFinancial.amountLabel}</p>
-                  <p className='text-sm font-medium font-mono'>
-                    {formatContractAmount(
-                      contractFinancial.displayAmount,
-                      contractFinancial.currency
-                    )}
-                  </p>
-                  {(contractFinancial.startDate || contractFinancial.endDate) && (
-                    <p className='text-[11px] text-muted-foreground'>
-                      Vigencia: {contractFinancial.startDate ?? '—'} →{' '}
-                      {contractFinancial.endDate ?? '—'}
-                    </p>
-                  )}
-                  <p className='text-[11px] text-muted-foreground'>
-                    Tomado automáticamente del contrato vinculado. El costo y las fechas se
-                    sincronizan al guardar.
-                  </p>
-                </div>
-              ) : (
-                <p className='text-xs text-muted-foreground rounded-md bg-muted/40 px-3 py-2'>
-                  Vincula un contrato de arrendamiento para cargar costo mensual y vigencia
-                  automáticamente.
-                </p>
-              )}
-
-              <div className='grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1'>
-                <div className='space-y-1'>
-                  <Label htmlFor='rentalDeliveryDate'>Fecha de entrega</Label>
-                  <DateInput
-                    id='rentalDeliveryDate'
-                    value={rentalDeliveryDate}
-                    onChange={e => setRentalDeliveryDate(e.target.value)}
-                    clearable
-                  />
-                  <p className='text-[11px] text-muted-foreground'>
-                    Entrega física del equipo (puede diferir del inicio del contrato).
-                  </p>
-                </div>
-                <div className='space-y-1'>
-                  <Label htmlFor='rentalBuyoutValue'>Valor opción de compra</Label>
-                  <Input
-                    id='rentalBuyoutValue'
-                    type='number'
-                    min='0'
-                    step='0.01'
-                    value={rentalBuyoutValue}
-                    onChange={e => setRentalBuyoutValue(e.target.value)}
-                    placeholder='0.00'
-                  />
-                  <p className='text-[11px] text-muted-foreground'>
-                    Valor de compra al finalizar la renta (según contrato).
-                  </p>
-                </div>
-                <div className='space-y-1 sm:col-span-2'>
-                  <Label htmlFor='rentalClientResponse'>Respuesta del cliente</Label>
-                  <SimpleSelect
-                    value={rentalClientResponse}
-                    onChange={e => setRentalClientResponse(e.target.value)}
-                    options={[
-                      { value: 'NOT_NOTIFIED', label: 'No se ha notificado al cliente' },
-                      { value: 'PENDING_DECISION', label: 'Pendiente de decisión' },
-                      { value: 'PURCHASE_CONFIRMED', label: 'Compra del equipo confirmada' },
-                      { value: 'RETURN_REQUESTED', label: 'Devolución solicitada' },
-                      { value: 'RENEWAL_REQUESTED', label: 'Renovación solicitada' },
-                    ]}
-                  />
-                </div>
-              </div>
             </div>
           )}
-        </>
-      )}
 
-      {/* ── 6. FINANCIERO + DEPRECIACIÓN ──────────────────────────── */}
-      {showFinancial && (
-        <fieldset className='rounded-lg border border-border p-4 space-y-3'>
-          <legend className='px-2 text-sm font-semibold text-foreground'>
-            Información Financiera
-            {financialRequired && <span className='text-destructive'> *</span>}
-          </legend>
-          <div className='grid grid-cols-2 gap-3'>
+          {/* Modelo de Equipo */}
+          {equipmentTypeId && selectedBrandId && (
             <div className='space-y-1'>
               <Label>
-                Precio de Compra
-                {financialRequired && <span className='text-destructive'> *</span>}
+                Modelo <span className='text-destructive'>*</span>
               </Label>
-              <Input
-                type='number'
-                min='0'
-                step='0.01'
-                value={purchasePrice}
-                onChange={e => setPurchasePrice(e.target.value)}
-                placeholder='0.00'
-              />
-              {priceError && <p className='text-xs text-destructive'>{priceError}</p>}
-            </div>
-            <div className='space-y-1'>
-              <Label>Fecha de Compra</Label>
-              <DateInput
-                value={purchaseDate}
-                onChange={e => setPurchaseDate(e.target.value)}
-                clearable
-              />
-            </div>
-            <div className='space-y-1 col-span-2 sm:col-span-1'>
-              <Label>N° de Factura</Label>
-              <Input
-                value={invoiceNumber}
-                onChange={e => setInvoiceNumber(e.target.value)}
-                placeholder='Ej: FAC-2024-0123'
-              />
-            </div>
-            <div className='space-y-1 col-span-2 sm:col-span-1'>
-              <Label>
-                N° Orden de Compra{' '}
-                <span className='text-xs text-muted-foreground font-normal'>(opcional)</span>
-              </Label>
-              <Input
-                value={purchaseOrderNumber}
-                onChange={e => setPurchaseOrderNumber(e.target.value)}
-                placeholder='Ej: OC-2024-001'
-              />
-            </div>
-          </div>
-        </fieldset>
-      )}
-
-      {showDepreciation && (
-        <fieldset className='rounded-lg border border-border p-4 space-y-3'>
-          <legend className='px-2 text-sm font-semibold text-foreground'>
-            Depreciación
-            {isRequired('DEPRECIATION') && <span className='text-destructive'> *</span>}
-          </legend>
-          <div className='grid grid-cols-2 gap-3'>
-            {/* Método */}
-            <div className='space-y-1 col-span-2'>
-              <Label>Método de Depreciación</Label>
-              <SimpleSelect
-                value={depreciationMethod}
-                onChange={e => setDepreciationMethod(e.target.value)}
-                options={DEPRECIATION_METHODS}
-              />
-              {/* Descripción corta */}
-              {DEPRECIATION_METHOD_HELP[depreciationMethod] && (
-                <p className='text-xs text-muted-foreground'>
-                  {DEPRECIATION_METHOD_HELP[depreciationMethod]}
-                </p>
-              )}
-              {/* Ejemplo concreto */}
-              {DEPRECIATION_METHOD_EXAMPLE[depreciationMethod] && (
-                <p className='text-xs text-muted-foreground italic'>
-                  {DEPRECIATION_METHOD_EXAMPLE[depreciationMethod]}
-                </p>
-              )}
-            </div>
-
-            {/* Vida útil */}
-            <div className='space-y-1'>
-              <Label>
-                {depreciationMethod === 'UNITS_OF_PRODUCTION'
-                  ? 'Vida útil estimada (años)'
-                  : 'Vida Útil (años)'}
-              </Label>
-              <Input
-                type='number'
-                min='1'
-                value={usefulLifeYears}
-                onChange={e => setUsefulLifeYears(e.target.value)}
-              />
-              <p className='text-xs text-muted-foreground'>
-                Ej: laptops 3-5 años, servidores 5-7 años, mobiliario 10 años.
-              </p>
-            </div>
-
-            {/* Valor residual */}
-            <div className='space-y-1'>
-              <Label>Valor Residual</Label>
-              <Input
-                type='number'
-                min='0'
-                step='0.01'
-                value={residualValue}
-                onChange={e => setResidualValue(e.target.value)}
-                placeholder='0.00'
-              />
-              <p className='text-xs text-muted-foreground'>
-                Valor estimado del activo al final de su vida útil.
-              </p>
-              {suggestedResidualValue != null && !residualValue && (
-                <button
-                  type='button'
-                  className='text-xs text-primary hover:underline'
-                  onClick={() => setResidualValue(String(suggestedResidualValue))}
-                >
-                  Sugerido: ${suggestedResidualValue.toLocaleString('es-CL')} (
-                  {familyDepConfig?.defaultResidualValuePct}% del precio)
-                </button>
-              )}
-            </div>
-
-            {/* ── Campos extra para "Por Uso" ── */}
-            {depreciationMethod === 'UNITS_OF_PRODUCTION' && (
-              <>
-                {/* Unidad de medida */}
-                <div className='space-y-1 col-span-2'>
-                  <Label>¿Qué unidad mide el uso de este equipo?</Label>
-                  <div className='flex gap-2'>
-                    {['horas', 'km', 'ciclos', 'horas de vuelo'].map(u => (
-                      <button
-                        key={u}
-                        type='button'
-                        onClick={() => setUnitLabel(u)}
-                        className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
-                          unitLabel === u
-                            ? 'bg-primary text-primary-foreground border-primary'
-                            : 'bg-muted border-border hover:border-primary/50'
-                        }`}
-                      >
-                        {u}
-                      </button>
-                    ))}
-                    <Input
-                      value={
-                        ['horas', 'km', 'ciclos', 'horas de vuelo'].includes(unitLabel)
-                          ? ''
-                          : unitLabel
+              <InlineCreateSelect
+                options={equipmentModels}
+                value={selectedModelId}
+                onChange={setSelectedModelId}
+                placeholder='Buscar o crear modelo...'
+                allowClear
+                createLabel='Crear modelo'
+                createTitle='Nuevo modelo de equipo'
+                editTitle='Editar modelo de equipo'
+                deleteConfirmMessage='¿Eliminar este modelo? Solo es posible si no tiene activos asociados.'
+                {...inlineSelectFeedback('Modelo')}
+                createForm={({ item, onSuccess, onCancel }) => (
+                  <EquipmentModelInlineForm
+                    typeId={equipmentTypeId}
+                    familyId={familyId}
+                    item={item}
+                    initialBrandId={selectedBrandId || undefined}
+                    onSuccess={newItem => {
+                      if (item) {
+                        setEquipmentModels(prev =>
+                          prev.map(t => (t.id === newItem.id ? newItem : t))
+                        )
+                      } else {
+                        setEquipmentModels(prev => [...prev, newItem])
                       }
-                      onChange={e => setUnitLabel(e.target.value || 'horas')}
-                      placeholder='Otra unidad...'
-                      className='h-7 text-xs flex-1'
-                    />
-                  </div>
-                  <p className='text-xs text-muted-foreground'>
-                    Ej: un generador usa &ldquo;horas&rdquo;, un vehículo usa &ldquo;km&rdquo;, una
-                    prensa usa &ldquo;ciclos&rdquo;.
-                  </p>
-                </div>
-
-                {/* Capacidad total */}
-                <div className='space-y-1'>
-                  <Label>
-                    Capacidad total de vida ({unitLabel})
-                    <span className='text-destructive ml-1'>*</span>
-                  </Label>
-                  <Input
-                    type='number'
-                    min='1'
-                    value={totalUnits}
-                    onChange={e => setTotalUnits(e.target.value)}
-                    placeholder={`Ej: 10000 ${unitLabel}`}
+                      onSuccess(newItem)
+                    }}
+                    onCancel={onCancel}
                   />
-                  <p className='text-xs text-muted-foreground'>
-                    Total de {unitLabel} que el equipo puede operar en toda su vida útil.
-                  </p>
-                </div>
-
-                {/* Unidades ya usadas */}
-                <div className='space-y-1'>
-                  <Label>
-                    {unitLabel.charAt(0).toUpperCase() + unitLabel.slice(1)} ya utilizados
-                  </Label>
-                  <Input
-                    type='number'
-                    min='0'
-                    value={usedUnits}
-                    onChange={e => setUsedUnits(e.target.value)}
-                    placeholder={`Ej: 1500 ${unitLabel}`}
-                  />
-                  <p className='text-xs text-muted-foreground'>
-                    Cuántos {unitLabel} lleva acumulados hasta hoy (0 si es nuevo).
-                  </p>
-                </div>
-
-                {/* Indicador visual de uso */}
-                {totalUnits && usedUnits && parseFloat(totalUnits) > 0 && (
-                  <div className='col-span-2 space-y-1'>
-                    <div className='flex justify-between text-xs text-muted-foreground'>
-                      <span>Uso acumulado</span>
-                      <span>
-                        {Math.min(
-                          100,
-                          Math.round((parseFloat(usedUnits) / parseFloat(totalUnits)) * 100)
-                        )}
-                        % &nbsp;({usedUnits} / {totalUnits} {unitLabel})
-                      </span>
-                    </div>
-                    <div className='h-2 rounded-full bg-muted overflow-hidden'>
-                      <div
-                        className='h-full rounded-full bg-primary transition-all'
-                        style={{
-                          width: `${Math.min(100, (parseFloat(usedUnits) / parseFloat(totalUnits)) * 100)}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
                 )}
-              </>
+                onDelete={async id => {
+                  try {
+                    const res = await fetch(`/api/inventory/models/${id}`, { method: 'DELETE' })
+                    if (!res.ok) {
+                      const d = await res.json()
+                      throw new Error(d.error || 'Error al eliminar')
+                    }
+                    setEquipmentModels(prev => prev.filter(t => t.id !== id))
+                    if (selectedModelId === id) {
+                      setSelectedModelId('')
+                    }
+                    toast.success('Modelo eliminado exitosamente')
+                  } catch (err: unknown) {
+                    const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
+                    toast.error(errorMessage)
+                    throw err
+                  }
+                }}
+              />
+            </div>
+          )}
+
+          {/* N° Serie */}
+          <div className='space-y-1'>
+            <Label>
+              N° de Serie del Fabricante <span className='text-destructive'>*</span>
+            </Label>
+            <SerialNumberInput
+              value={serialNumber}
+              onChange={e => setSerialNumber(e.target.value)}
+              placeholder='Ej: SN-ABC-12345'
+            />
+          </div>
+
+          {/* Código */}
+          <div className='space-y-1'>
+            <Label>
+              Código Interno{' '}
+              <span className='text-xs font-normal text-muted-foreground'>
+                (opcional — se genera automáticamente)
+              </span>
+            </Label>
+            <Input
+              value={code}
+              onChange={e => setCode(e.target.value)}
+              placeholder='Dejar vacío para generar automáticamente'
+            />
+          </div>
+        </div>
+
+        {/* ── 2. DETALLES DEL EQUIPO ────────────────────────────────── */}
+        {/* Atributos por Tipo */}
+        <TypeAttributesSection
+          typeId={equipmentTypeId}
+          values={customFieldValues}
+          onChange={setCustomFieldValues}
+          reloadToken={attributesReloadToken}
+        />
+
+        {/* Accesorios */}
+        <AccessoriesSection accessories={accessories} onChange={setAccessories} inline />
+
+        {/* ── 3. ESTADO Y UBICACIÓN ──────────────────────────────────── */}
+        <div className='grid grid-cols-1 md:grid-cols-2 gap-3'>
+          <div className='space-y-1'>
+            <Label>
+              Condición <span className='text-destructive'>*</span>
+            </Label>
+            <SimpleSelect value={condition} onChange={e => setCondition(e.target.value)}>
+              <option value='NEW'>Nuevo</option>
+              <option value='USED'>Usado</option>
+              <option value='DAMAGED'>Dañado</option>
+            </SimpleSelect>
+            {conditionMessage[condition] && (
+              <p
+                className={`text-xs ${condition === 'NEW' ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}`}
+              >
+                {conditionMessage[condition]}
+              </p>
             )}
           </div>
+          <div className='space-y-1'>
+            <Label>Estado</Label>
+            <SimpleSelect
+              value={equipmentStatus}
+              onChange={e => setEquipmentStatus(e.target.value)}
+            >
+              {(allowedStatusesByCondition[condition] || []).map(status => (
+                <option key={status} value={status}>
+                  {status === 'AVAILABLE'
+                    ? 'Disponible'
+                    : status === 'ASSIGNED'
+                      ? 'Asignado'
+                      : status === 'MAINTENANCE'
+                        ? 'En Mantenimiento'
+                        : status === 'DAMAGED'
+                          ? 'Dañado'
+                          : status === 'RETIRED'
+                            ? 'Retirado'
+                            : status === 'FOR_SALE'
+                              ? 'En venta'
+                              : status}
+                </option>
+              ))}
+            </SimpleSelect>
+          </div>
 
-          {/* ── Vista previa enrollable ── */}
-          {depreciationPreview && depreciationPreview.length > 0 && (
-            <div className='mt-2 rounded-md border border-border bg-muted/30'>
-              <button
-                type='button'
-                className='flex w-full items-center justify-between px-3 py-2 text-sm font-medium'
-                onClick={() => setDepreciationPreviewOpen(p => !p)}
-              >
-                <span>Vista previa de depreciación</span>
-                {depreciationPreviewOpen ? (
-                  <ChevronUp className='h-4 w-4' />
-                ) : (
-                  <ChevronDown className='h-4 w-4' />
+          {/* Bodega — solo AVAILABLE y DAMAGED */}
+          {showWarehouse && (
+            <div className='space-y-1'>
+              <Label>Bodega</Label>
+              <InlineCreateSelect
+                options={warehouses}
+                value={warehouseId}
+                onChange={setWarehouseId}
+                placeholder='Buscar bodega...'
+                allowClear
+                createLabel='Crear bodega'
+                createTitle='Nueva bodega'
+                editTitle='Editar bodega'
+                deleteConfirmMessage='¿Eliminar esta bodega? Solo es posible si no tiene activos asociados.'
+                {...inlineSelectFeedback('Bodega')}
+                createForm={({ onSuccess, onCancel }) => (
+                  <WarehouseInlineForm
+                    defaultFamilyId={familyId}
+                    onSuccess={item => {
+                      setWarehouses(prev => [...prev, item])
+                      onSuccess(item)
+                    }}
+                    onCancel={onCancel}
+                  />
                 )}
-              </button>
-              {depreciationPreviewOpen && (
-                <div className='border-t border-border px-3 py-2 space-y-2'>
-                  {/* Fórmula del método seleccionado */}
-                  <div className='rounded-md bg-muted/60 px-3 py-2 text-xs font-mono text-muted-foreground'>
-                    {depreciationMethod === 'LINEAR' && (
-                      <span>Depreciación anual = (Precio − Valor residual) ÷ Vida útil</span>
-                    )}
-                    {depreciationMethod === 'DECLINING_BALANCE' && (
-                      <span>Depreciación año N = Valor libro × (2 ÷ Vida útil)</span>
-                    )}
-                    {depreciationMethod === 'UNITS_OF_PRODUCTION' && (
-                      <span>
-                        Depreciación = (Precio − Residual) ÷ Total {unitLabel} × {unitLabel} usados
-                      </span>
-                    )}
-                  </div>
-                  <p className='text-xs text-muted-foreground'>
-                    Valor libro estimado (solo informativo
-                    {!purchaseDate && depreciationMethod !== 'UNITS_OF_PRODUCTION'
-                      ? ' — simulado desde hoy'
-                      : ''}
-                    ):
-                  </p>
-                  <div className='grid grid-cols-3 gap-2'>
-                    {depreciationPreview.map(({ year, bookValue }) => (
-                      <div
-                        key={year}
-                        className='rounded-md bg-background border border-border p-2 text-center'
-                      >
-                        <p className='text-xs text-muted-foreground'>Año {year}</p>
-                        <p className='text-sm font-semibold'>
-                          $
-                          {bookValue.toLocaleString('es-CL', {
-                            minimumFractionDigits: 0,
-                            maximumFractionDigits: 0,
-                          })}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                  {depreciationMethod === 'UNITS_OF_PRODUCTION' && (
-                    <p className='text-xs text-muted-foreground italic'>
-                      * Simulado con uso uniforme anual. El valor real depende de los {unitLabel}{' '}
-                      registrados cada año.
-                    </p>
-                  )}
-                </div>
-              )}
+                onDelete={async id => {
+                  const res = await fetch(`/api/inventory/warehouses/${id}`, { method: 'DELETE' })
+                  if (!res.ok) {
+                    const d = await res.json()
+                    throw new Error(d.error || 'Error al eliminar')
+                  }
+                  setWarehouses(prev => prev.filter(w => w.id !== id))
+                  if (warehouseId === id) {
+                    setWarehouseId('')
+                  }
+                }}
+              />
             </div>
           )}
-        </fieldset>
-      )}
+        </div>
 
-      {/* Nota informativa: arrendamiento / activo de tercero no deprecia contablemente */}
-      {isVisible('DEPRECIATION') && acquisitionMode !== 'FIXED_ASSET' && (
-        <div className='rounded-md border border-border bg-muted/40 px-4 py-3 space-y-1'>
-          <p className='text-sm font-medium text-foreground'>Sin depreciación</p>
+        {/* Departamento — solo información automática cuando estado = ASSIGNED y hay usuario asignado */}
+        {equipmentStatus === 'ASSIGNED' && assignedUserDept && (
+          <div className='rounded-md border border-primary/30 bg-primary/5 p-3'>
+            <Label className='text-xs text-muted-foreground'>Departamento</Label>
+            <p className='font-medium'>{assignedUserDept.name}</p>
+          </div>
+        )}
+
+        {/* Precio Estimado — solo para Bueno/Malo y FIXED_ASSET */}
+        {showEstimatedPrice && (
+          <div className='space-y-1'>
+            <Label>Precio Estimado (USD) — opcional</Label>
+            <Input
+              type='number'
+              step='0.01'
+              min='0'
+              value={estimatedPrice}
+              onChange={e => setEstimatedPrice(e.target.value)}
+              placeholder='Ej: 500.00 — valor estimado del activo'
+            />
+            {/* <p className='text-xs text-muted-foreground'>
+            Valor estimado del activo en su condición actual.
+          </p> */}
+          </div>
+        )}
+
+        {/* Aviso para activos registrados directamente como RETIRED (históricos) */}
+        {equipmentStatus === 'RETIRED' && (
+          <div className='rounded-md border border-muted-foreground/20 bg-muted/40 px-4 py-3 space-y-1'>
+            <p className='text-sm font-medium text-muted-foreground'>
+              Registro de activo histórico retirado
+            </p>
+            <p className='text-xs text-muted-foreground'>
+              Estás registrando un activo que ya fue dado de baja. Este modo es exclusivo para
+              migración de datos históricos. Para dar de baja un activo activo, usa el botón
+              &ldquo;Solicitar baja&rdquo; desde el detalle del equipo — eso inicia el flujo formal
+              con aprobación, acta y folio.
+            </p>
+          </div>
+        )}
+
+        {/* Precio de venta — solo cuando estado es FOR_SALE */}
+        {showForSalePriceField(equipmentStatus) && (
+          <div className='space-y-2 col-span-2'>
+            <div className='rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 space-y-3'>
+              <p className='text-sm font-medium text-amber-700 dark:text-amber-400 flex items-center gap-2'>
+                <Tag className='h-4 w-4' />
+                Activo marcado para la venta
+              </p>
+              <div className='space-y-1'>
+                <Label>Precio de venta público (USD) — opcional</Label>
+                <Input
+                  type='number'
+                  step='0.01'
+                  min='0'
+                  value={saleListingPrice}
+                  onChange={e => setSaleListingPrice(e.target.value)}
+                  placeholder="Ej: 850.00 — dejar vacío para mostrar 'Consultar precio'"
+                />
+                <p className='text-xs text-muted-foreground'>
+                  Este precio se mostrará en la vitrina pública. Si no lo defines, se mostrará
+                  &ldquo;Consultar precio&rdquo;.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Asignar a usuario — usa el componente compartido con departamento auto-rellenado */}
+        {showAssignmentBlock(equipmentStatus) && (
+          <div className='rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3'>
+            <AssignableUserSelect
+              familyId={familyId}
+              value={assignedUserId}
+              onChange={(userId, user) => {
+                setAssignedUserId(userId)
+                setAssignedUserDept(user?.department ?? null)
+              }}
+              required
+            />
+            <div className='space-y-1'>
+              <Label>
+                Fecha de Devolución Estimada{' '}
+                <span className='text-xs text-muted-foreground font-normal'>(opcional)</span>
+              </Label>
+              <DateInput
+                value={assignmentEndDate}
+                onChange={e => setAssignmentEndDate(e.target.value)}
+                min={new Date().toISOString().split('T')[0]}
+                clearable
+              />
+              <p className='text-xs text-muted-foreground'>
+                Si es préstamo o uso temporal, indica la fecha esperada de devolución. El sistema
+                enviará una alerta próxima a esa fecha.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Mantenimiento — usa componente compartido */}
+        {showMaintenanceBlock(equipmentStatus) && (
+          <MaintenanceStatusBlock
+            date={maintenanceDate}
+            onDateChange={setMaintenanceDate}
+            type={maintenanceType}
+            onTypeChange={setMaintenanceType}
+            technicianId={maintenanceTechnicianId}
+            onTechnicianChange={setMaintenanceTechnicianId}
+            supplierId={maintenanceSupplierId}
+            onSupplierChange={setMaintenanceSupplierId}
+            description={maintenanceDescription}
+            onDescriptionChange={setMaintenanceDescription}
+            familyId={familyId}
+          />
+        )}
+
+        {/* ── 4. ADQUISICIÓN ────────────────────────────────────────── */}
+        {/* Ocultar cuando el estado es transitorio (MAINTENANCE/FOR_SALE) — solo datos operativos */}
+        {equipmentStatus !== 'MAINTENANCE' && equipmentStatus !== 'FOR_SALE' && (
+          <>
+            {/* Modalidad */}
+            <div className='space-y-1'>
+              <Label>¿Cómo se adquirió este equipo?</Label>
+              <SimpleSelect
+                value={acquisitionMode}
+                onChange={e => setAcquisitionMode(e.target.value as typeof acquisitionMode)}
+                options={ACQUISITION_MODES}
+              />
+              <p className='text-xs text-muted-foreground'>
+                {ACQUISITION_MODES.find(m => m.value === acquisitionMode)?.help}
+              </p>
+            </div>
+
+            {/* Proveedor */}
+            <div className='space-y-1'>
+              <Label>
+                {supplierLabel} {supplierRequired && <span className='text-destructive'>*</span>}
+              </Label>
+              <SupplierSelect
+                value={supplierId || null}
+                onChange={v => setSupplierId(v || '')}
+                familyId={familyId}
+              />
+            </div>
+
+            {/* Contrato — arrendamiento */}
+            {isVisible('CONTRACT') && acquisitionMode === 'RENTAL' && (
+              <div className='rounded-md border border-border p-4 space-y-3'>
+                <p className='text-sm font-medium'>
+                  Contrato de arrendamiento
+                  {isRequired('CONTRACT') && <span className='text-destructive'> *</span>}
+                </p>
+                <ContractPicker
+                  value={linkedContractId}
+                  onChange={handleContractChange}
+                  supplierId={supplierId || null}
+                  familyId={familyId}
+                  context='equipment'
+                  prefill={contractPrefill}
+                  draftParentKey={draftKey}
+                />
+                {linkedContract && contractFinancial ? (
+                  <div className='rounded-md border bg-muted/30 px-3 py-2.5 space-y-1'>
+                    <p className='text-xs text-muted-foreground'>{contractFinancial.amountLabel}</p>
+                    <p className='text-sm font-medium font-mono'>
+                      {formatContractAmount(
+                        contractFinancial.displayAmount,
+                        contractFinancial.currency
+                      )}
+                    </p>
+                    {(contractFinancial.startDate || contractFinancial.endDate) && (
+                      <p className='text-[11px] text-muted-foreground'>
+                        Vigencia: {contractFinancial.startDate ?? '—'} →{' '}
+                        {contractFinancial.endDate ?? '—'}
+                      </p>
+                    )}
+                    <p className='text-[11px] text-muted-foreground'>
+                      Tomado automáticamente del contrato vinculado. El costo y las fechas se
+                      sincronizan al guardar.
+                    </p>
+                  </div>
+                ) : (
+                  <p className='text-xs text-muted-foreground rounded-md bg-muted/40 px-3 py-2'>
+                    Vincula un contrato de arrendamiento para cargar costo mensual y vigencia
+                    automáticamente.
+                  </p>
+                )}
+
+                <div className='grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1'>
+                  <div className='space-y-1'>
+                    <Label htmlFor='rentalDeliveryDate'>Fecha de entrega</Label>
+                    <DateInput
+                      id='rentalDeliveryDate'
+                      value={rentalDeliveryDate}
+                      onChange={e => setRentalDeliveryDate(e.target.value)}
+                      clearable
+                    />
+                    <p className='text-[11px] text-muted-foreground'>
+                      Entrega física del equipo (puede diferir del inicio del contrato).
+                    </p>
+                  </div>
+                  <div className='space-y-1'>
+                    <Label htmlFor='rentalBuyoutValue'>Valor opción de compra</Label>
+                    <Input
+                      id='rentalBuyoutValue'
+                      type='number'
+                      min='0'
+                      step='0.01'
+                      value={rentalBuyoutValue}
+                      onChange={e => setRentalBuyoutValue(e.target.value)}
+                      placeholder='0.00'
+                    />
+                    <p className='text-[11px] text-muted-foreground'>
+                      Valor de compra al finalizar la renta (según contrato).
+                    </p>
+                  </div>
+                  <div className='space-y-1 sm:col-span-2'>
+                    <Label htmlFor='rentalClientResponse'>Respuesta del cliente</Label>
+                    <SimpleSelect
+                      value={rentalClientResponse}
+                      onChange={e => setRentalClientResponse(e.target.value)}
+                      options={[
+                        { value: 'NOT_NOTIFIED', label: 'No se ha notificado al cliente' },
+                        { value: 'PENDING_DECISION', label: 'Pendiente de decisión' },
+                        { value: 'PURCHASE_CONFIRMED', label: 'Compra del equipo confirmada' },
+                        { value: 'RETURN_REQUESTED', label: 'Devolución solicitada' },
+                        { value: 'RENEWAL_REQUESTED', label: 'Renovación solicitada' },
+                      ]}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ── 6. FINANCIERO + DEPRECIACIÓN ──────────────────────────── */}
+        {showFinancial && (
+          <fieldset className='rounded-lg border border-border p-4 space-y-3'>
+            <legend className='px-2 text-sm font-semibold text-foreground'>
+              Información Financiera
+              {financialRequired && <span className='text-destructive'> *</span>}
+            </legend>
+            <div className='grid grid-cols-2 gap-3'>
+              <div className='space-y-1'>
+                <Label>
+                  Precio de Compra
+                  {financialRequired && <span className='text-destructive'> *</span>}
+                </Label>
+                <Input
+                  type='number'
+                  min='0'
+                  step='0.01'
+                  value={purchasePrice}
+                  onChange={e => setPurchasePrice(e.target.value)}
+                  placeholder='0.00'
+                />
+                {priceError && <p className='text-xs text-destructive'>{priceError}</p>}
+              </div>
+              <div className='space-y-1'>
+                <Label>Fecha de Compra</Label>
+                <DateInput
+                  value={purchaseDate}
+                  onChange={e => setPurchaseDate(e.target.value)}
+                  clearable
+                />
+              </div>
+              <div className='space-y-1 col-span-2 sm:col-span-1'>
+                <Label>N° de Factura</Label>
+                <Input
+                  value={invoiceNumber}
+                  onChange={e => setInvoiceNumber(e.target.value)}
+                  placeholder='Ej: FAC-2024-0123'
+                />
+              </div>
+              <div className='space-y-1 col-span-2 sm:col-span-1'>
+                <Label>
+                  N° Orden de Compra{' '}
+                  <span className='text-xs text-muted-foreground font-normal'>(opcional)</span>
+                </Label>
+                <Input
+                  value={purchaseOrderNumber}
+                  onChange={e => setPurchaseOrderNumber(e.target.value)}
+                  placeholder='Ej: OC-2024-001'
+                />
+              </div>
+            </div>
+          </fieldset>
+        )}
+
+        {showDepreciation && (
+          <fieldset className='rounded-lg border border-border p-4 space-y-3'>
+            <legend className='px-2 text-sm font-semibold text-foreground'>
+              Depreciación
+              {isRequired('DEPRECIATION') && <span className='text-destructive'> *</span>}
+            </legend>
+            <div className='grid grid-cols-2 gap-3'>
+              {/* Método */}
+              <div className='space-y-1 col-span-2'>
+                <Label>Método de Depreciación</Label>
+                <SimpleSelect
+                  value={depreciationMethod}
+                  onChange={e => setDepreciationMethod(e.target.value)}
+                  options={DEPRECIATION_METHODS}
+                />
+                {/* Descripción corta */}
+                {DEPRECIATION_METHOD_HELP[depreciationMethod] && (
+                  <p className='text-xs text-muted-foreground'>
+                    {DEPRECIATION_METHOD_HELP[depreciationMethod]}
+                  </p>
+                )}
+                {/* Ejemplo concreto */}
+                {DEPRECIATION_METHOD_EXAMPLE[depreciationMethod] && (
+                  <p className='text-xs text-muted-foreground italic'>
+                    {DEPRECIATION_METHOD_EXAMPLE[depreciationMethod]}
+                  </p>
+                )}
+              </div>
+
+              {/* Vida útil */}
+              <div className='space-y-1'>
+                <Label>
+                  {depreciationMethod === 'UNITS_OF_PRODUCTION'
+                    ? 'Vida útil estimada (años)'
+                    : 'Vida Útil (años)'}
+                </Label>
+                <Input
+                  type='number'
+                  min='1'
+                  value={usefulLifeYears}
+                  onChange={e => setUsefulLifeYears(e.target.value)}
+                />
+                <p className='text-xs text-muted-foreground'>
+                  Ej: laptops 3-5 años, servidores 5-7 años, mobiliario 10 años.
+                </p>
+              </div>
+
+              {/* Valor residual */}
+              <div className='space-y-1'>
+                <Label>Valor Residual</Label>
+                <Input
+                  type='number'
+                  min='0'
+                  step='0.01'
+                  value={residualValue}
+                  onChange={e => setResidualValue(e.target.value)}
+                  placeholder='0.00'
+                />
+                <p className='text-xs text-muted-foreground'>
+                  Valor estimado del activo al final de su vida útil.
+                </p>
+                {suggestedResidualValue != null && !residualValue && (
+                  <button
+                    type='button'
+                    className='text-xs text-primary hover:underline'
+                    onClick={() => setResidualValue(String(suggestedResidualValue))}
+                  >
+                    Sugerido: ${suggestedResidualValue.toLocaleString('es-CL')} (
+                    {familyDepConfig?.defaultResidualValuePct}% del precio)
+                  </button>
+                )}
+              </div>
+
+              {/* ── Campos extra para "Por Uso" ── */}
+              {depreciationMethod === 'UNITS_OF_PRODUCTION' && (
+                <>
+                  {/* Unidad de medida */}
+                  <div className='space-y-1 col-span-2'>
+                    <Label>¿Qué unidad mide el uso de este equipo?</Label>
+                    <div className='flex gap-2'>
+                      {['horas', 'km', 'ciclos', 'horas de vuelo'].map(u => (
+                        <button
+                          key={u}
+                          type='button'
+                          onClick={() => setUnitLabel(u)}
+                          className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                            unitLabel === u
+                              ? 'bg-primary text-primary-foreground border-primary'
+                              : 'bg-muted border-border hover:border-primary/50'
+                          }`}
+                        >
+                          {u}
+                        </button>
+                      ))}
+                      <Input
+                        value={
+                          ['horas', 'km', 'ciclos', 'horas de vuelo'].includes(unitLabel)
+                            ? ''
+                            : unitLabel
+                        }
+                        onChange={e => setUnitLabel(e.target.value || 'horas')}
+                        placeholder='Otra unidad...'
+                        className='h-7 text-xs flex-1'
+                      />
+                    </div>
+                    <p className='text-xs text-muted-foreground'>
+                      Ej: un generador usa &ldquo;horas&rdquo;, un vehículo usa &ldquo;km&rdquo;,
+                      una prensa usa &ldquo;ciclos&rdquo;.
+                    </p>
+                  </div>
+
+                  {/* Capacidad total */}
+                  <div className='space-y-1'>
+                    <Label>
+                      Capacidad total de vida ({unitLabel})
+                      <span className='text-destructive ml-1'>*</span>
+                    </Label>
+                    <Input
+                      type='number'
+                      min='1'
+                      value={totalUnits}
+                      onChange={e => setTotalUnits(e.target.value)}
+                      placeholder={`Ej: 10000 ${unitLabel}`}
+                    />
+                    <p className='text-xs text-muted-foreground'>
+                      Total de {unitLabel} que el equipo puede operar en toda su vida útil.
+                    </p>
+                  </div>
+
+                  {/* Unidades ya usadas */}
+                  <div className='space-y-1'>
+                    <Label>
+                      {unitLabel.charAt(0).toUpperCase() + unitLabel.slice(1)} ya utilizados
+                    </Label>
+                    <Input
+                      type='number'
+                      min='0'
+                      value={usedUnits}
+                      onChange={e => setUsedUnits(e.target.value)}
+                      placeholder={`Ej: 1500 ${unitLabel}`}
+                    />
+                    <p className='text-xs text-muted-foreground'>
+                      Cuántos {unitLabel} lleva acumulados hasta hoy (0 si es nuevo).
+                    </p>
+                  </div>
+
+                  {/* Indicador visual de uso */}
+                  {totalUnits && usedUnits && parseFloat(totalUnits) > 0 && (
+                    <div className='col-span-2 space-y-1'>
+                      <div className='flex justify-between text-xs text-muted-foreground'>
+                        <span>Uso acumulado</span>
+                        <span>
+                          {Math.min(
+                            100,
+                            Math.round((parseFloat(usedUnits) / parseFloat(totalUnits)) * 100)
+                          )}
+                          % &nbsp;({usedUnits} / {totalUnits} {unitLabel})
+                        </span>
+                      </div>
+                      <div className='h-2 rounded-full bg-muted overflow-hidden'>
+                        <div
+                          className='h-full rounded-full bg-primary transition-all'
+                          style={{
+                            width: `${Math.min(100, (parseFloat(usedUnits) / parseFloat(totalUnits)) * 100)}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* ── Vista previa enrollable ── */}
+            {depreciationPreview && depreciationPreview.length > 0 && (
+              <div className='mt-2 rounded-md border border-border bg-muted/30'>
+                <button
+                  type='button'
+                  className='flex w-full items-center justify-between px-3 py-2 text-sm font-medium'
+                  onClick={() => setDepreciationPreviewOpen(p => !p)}
+                >
+                  <span>Vista previa de depreciación</span>
+                  {depreciationPreviewOpen ? (
+                    <ChevronUp className='h-4 w-4' />
+                  ) : (
+                    <ChevronDown className='h-4 w-4' />
+                  )}
+                </button>
+                {depreciationPreviewOpen && (
+                  <div className='border-t border-border px-3 py-2 space-y-2'>
+                    {/* Fórmula del método seleccionado */}
+                    <div className='rounded-md bg-muted/60 px-3 py-2 text-xs font-mono text-muted-foreground'>
+                      {depreciationMethod === 'LINEAR' && (
+                        <span>Depreciación anual = (Precio − Valor residual) ÷ Vida útil</span>
+                      )}
+                      {depreciationMethod === 'DECLINING_BALANCE' && (
+                        <span>Depreciación año N = Valor libro × (2 ÷ Vida útil)</span>
+                      )}
+                      {depreciationMethod === 'UNITS_OF_PRODUCTION' && (
+                        <span>
+                          Depreciación = (Precio − Residual) ÷ Total {unitLabel} × {unitLabel}{' '}
+                          usados
+                        </span>
+                      )}
+                    </div>
+                    <p className='text-xs text-muted-foreground'>
+                      Valor libro estimado (solo informativo
+                      {!purchaseDate && depreciationMethod !== 'UNITS_OF_PRODUCTION'
+                        ? ' — simulado desde hoy'
+                        : ''}
+                      ):
+                    </p>
+                    <div className='grid grid-cols-3 gap-2'>
+                      {depreciationPreview.map(({ year, bookValue }) => (
+                        <div
+                          key={year}
+                          className='rounded-md bg-background border border-border p-2 text-center'
+                        >
+                          <p className='text-xs text-muted-foreground'>Año {year}</p>
+                          <p className='text-sm font-semibold'>
+                            $
+                            {bookValue.toLocaleString('es-CL', {
+                              minimumFractionDigits: 0,
+                              maximumFractionDigits: 0,
+                            })}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                    {depreciationMethod === 'UNITS_OF_PRODUCTION' && (
+                      <p className='text-xs text-muted-foreground italic'>
+                        * Simulado con uso uniforme anual. El valor real depende de los {unitLabel}{' '}
+                        registrados cada año.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </fieldset>
+        )}
+
+        {/* Nota informativa: arrendamiento / activo de tercero no deprecia contablemente */}
+        {isVisible('DEPRECIATION') && acquisitionMode !== 'FIXED_ASSET' && (
+          <div className='rounded-md border border-border bg-muted/40 px-4 py-3 space-y-1'>
+            <p className='text-sm font-medium text-foreground'>Sin depreciación</p>
+            <p className='text-xs text-muted-foreground'>
+              {acquisitionMode === 'RENTAL'
+                ? 'Los equipos arrendados no se deprecian — el proveedor es el propietario y quien registra la depreciación. La empresa registra el costo mensual del arrendamiento como gasto operativo.'
+                : 'Los activos de tercero no se deprecian — el propietario original conserva la titularidad y es quien aplica la depreciación contable.'}
+            </p>
+          </div>
+        )}
+
+        {/* ── 7. NOTAS Y ADJUNTOS ───────────────────────────────────── */}
+        <div className='space-y-1'>
+          <Label>
+            Ubicación física actual{' '}
+            <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
+          </Label>
+          <Input
+            value={physicalLocation}
+            onChange={e => setPhysicalLocation(e.target.value)}
+            placeholder='Ej: Oficina 201, Piso 3, Sala de Servidores...'
+          />
           <p className='text-xs text-muted-foreground'>
-            {acquisitionMode === 'RENTAL'
-              ? 'Los equipos arrendados no se deprecian — el proveedor es el propietario y quien registra la depreciación. La empresa registra el costo mensual del arrendamiento como gasto operativo.'
-              : 'Los activos de tercero no se deprecian — el propietario original conserva la titularidad y es quien aplica la depreciación contable.'}
+            Dónde se encuentra el equipo actualmente (distinto a la bodega de almacenamiento).
           </p>
         </div>
-      )}
 
-      {/* ── 7. NOTAS Y ADJUNTOS ───────────────────────────────────── */}
-      <div className='space-y-1'>
-        <Label>
-          Ubicación física actual{' '}
-          <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
-        </Label>
-        <Input
-          value={physicalLocation}
-          onChange={e => setPhysicalLocation(e.target.value)}
-          placeholder='Ej: Oficina 201, Piso 3, Sala de Servidores...'
-        />
-        <p className='text-xs text-muted-foreground'>
-          Dónde se encuentra el equipo actualmente (distinto a la bodega de almacenamiento).
-        </p>
-      </div>
+        <div className='space-y-1'>
+          <Label>Observaciones</Label>
+          <Textarea
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            rows={3}
+            placeholder='Notas adicionales sobre el activo...'
+          />
+        </div>
 
-      <div className='space-y-1'>
-        <Label>Observaciones</Label>
-        <Textarea
-          value={notes}
-          onChange={e => setNotes(e.target.value)}
-          rows={3}
-          placeholder='Notas adicionales sobre el activo...'
-        />
-      </div>
-
-      <AttachmentsField
-        files={attachments}
-        existingAttachments={existingAttachments}
-        onChange={setAttachments}
-        onDeleteExisting={
-          isEditMode && equipmentId
-            ? async (attachmentId: string) => {
-                try {
-                  const res = await fetch(
-                    `/api/inventory/equipment/${equipmentId}/attachments/${attachmentId}`,
-                    { method: 'DELETE' }
-                  )
-                  if (res.ok) {
-                    setExistingAttachments(prev => prev.filter(a => a.id !== attachmentId))
-                  } else {
-                    const err = await res.json()
-                    toast.error(err.error || 'No se pudo eliminar el adjunto')
+        <AttachmentsField
+          files={attachments}
+          existingAttachments={existingAttachments}
+          onChange={setAttachments}
+          onDeleteExisting={
+            isEditMode && equipmentId
+              ? async (attachmentId: string) => {
+                  try {
+                    const res = await fetch(
+                      `/api/inventory/equipment/${equipmentId}/attachments/${attachmentId}`,
+                      { method: 'DELETE' }
+                    )
+                    if (res.ok) {
+                      setExistingAttachments(prev => prev.filter(a => a.id !== attachmentId))
+                    } else {
+                      const err = await res.json()
+                      toast.error(err.error || 'No se pudo eliminar el adjunto')
+                    }
+                  } catch {
+                    toast.error('Error al eliminar el adjunto')
                   }
-                } catch {
-                  toast.error('Error al eliminar el adjunto')
                 }
-              }
-            : undefined
-        }
-        maxFileSizeMB={maxFileSizeMB}
-        equipmentId={isEditMode ? equipmentId : undefined}
-      />
+              : undefined
+          }
+          maxFileSizeMB={maxFileSizeMB}
+          equipmentId={isEditMode ? equipmentId : undefined}
+        />
 
-      {submitError && <p className='text-sm text-destructive'>{submitError}</p>}
+        {submitError && <p className='text-sm text-destructive'>{submitError}</p>}
 
-      <div className='flex gap-3 pt-2'>
-        <Button type='button' variant='outline' onClick={onBack} disabled={submitting}>
-          ← Atrás
-        </Button>
-        <Button type='submit' disabled={submitting} className='flex-1'>
-          {submitting ? 'Guardando...' : isEditMode ? 'Guardar cambios' : 'Crear Activo'}
-        </Button>
-      </div>
-    </form>
+        <div className='flex gap-3 pt-2'>
+          <Button type='button' variant='outline' onClick={onBack} disabled={submitting}>
+            ← Atrás
+          </Button>
+          <Button type='submit' disabled={submitting} className='flex-1'>
+            {submitting ? 'Guardando...' : isEditMode ? 'Guardar cambios' : 'Crear Activo'}
+          </Button>
+        </div>
+      </form>
+
+      {/* Gestor de atributos encadenado desde el selector de Tipo de Equipo */}
+      {manageAttributesFor && (
+        <AttributeManagerDialog
+          open={!!manageAttributesFor}
+          onOpenChange={o => {
+            if (!o) {
+              setManageAttributesFor(null)
+              setManageAttributesAutoCreate(false)
+            }
+          }}
+          typeKind='equipment'
+          typeId={manageAttributesFor.id}
+          typeName={manageAttributesFor.name}
+          autoOpenCreate={manageAttributesAutoCreate}
+          onAttributesChange={() => setAttributesReloadToken(t => t + 1)}
+        />
+      )}
+    </>
   )
 }
 
@@ -1813,10 +1858,12 @@ function TypeAttributesSection({
   typeId,
   values,
   onChange,
+  reloadToken,
 }: {
   typeId: string
   values: Array<{ fieldName: string; fieldValue: string }>
   onChange: (values: Array<{ fieldName: string; fieldValue: string }>) => void
+  reloadToken?: number
 }) {
   // No renderizar nada si no hay tipo seleccionado
   if (!typeId) {
@@ -1831,6 +1878,7 @@ function TypeAttributesSection({
         assetType='equipment'
         values={values}
         onChange={onChange}
+        reloadToken={reloadToken}
       />
     </div>
   )

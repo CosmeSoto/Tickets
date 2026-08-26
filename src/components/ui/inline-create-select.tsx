@@ -6,7 +6,7 @@
  */
 
 import { useState, ReactNode } from 'react'
-import { Check, ChevronsUpDown, Plus, X, Pencil, Trash2 } from 'lucide-react'
+import { Check, ChevronsUpDown, Plus, X, Pencil, Trash2, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Command,
@@ -60,6 +60,13 @@ interface InlineCreateSelectProps {
   onAfterSave?: (item: InlineSelectOption, isEdit: boolean) => void
   /** Callback al elegir un item existente de la lista (no al crear) */
   onSelected?: (item: InlineSelectOption) => void
+  /** Se dispara solo al CREAR un item nuevo (no al editar). Útil para encadenar
+   * el flujo hacia la gestión de atributos del tipo recién creado. */
+  onCreated?: (item: InlineSelectOption) => void
+  /** Si se provee, muestra un ícono de engranaje (visible al hover) en cada fila
+   * para saltar directo a gestionar los atributos de ese item, sin salir del formulario. */
+  onManageAttributes?: (item: InlineSelectOption, e: React.MouseEvent) => void
+  manageAttributesTooltip?: string
 }
 
 export function InlineCreateSelect({
@@ -77,6 +84,9 @@ export function InlineCreateSelect({
   deleteConfirmMessage = '¿Eliminar este elemento? Esta acción no se puede deshacer.',
   onAfterSave,
   onSelected,
+  onCreated,
+  onManageAttributes,
+  manageAttributesTooltip = 'Atributos',
 }: InlineCreateSelectProps) {
   const [open, setOpen] = useState(false)
   const [formOpen, setFormOpen] = useState(false)
@@ -98,6 +108,12 @@ export function InlineCreateSelect({
     setFormOpen(true)
   }
 
+  const handleManageAttributes = (item: InlineSelectOption, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setOpen(false)
+    onManageAttributes?.(item, e)
+  }
+
   const handleSaved = (item: InlineSelectOption) => {
     const isEdit = !!editingItem
     setFormOpen(false)
@@ -106,6 +122,8 @@ export function InlineCreateSelect({
     if (!isEdit) onChange(item.id)
     // Notificar al padre para que recargue la lista
     onAfterSave?.(item, isEdit)
+    // Encadenar: recién creado, ofrecer definir sus atributos de inmediato
+    if (!isEdit) onCreated?.(item)
   }
 
   const handleDelete = async () => {
@@ -202,8 +220,8 @@ export function InlineCreateSelect({
                           </p>
                         )}
                       </div>
-                      {/* Acciones editar/eliminar — visibles al hover */}
-                      {(canEdit || canDelete) && (
+                      {/* Acciones editar/atributos/eliminar — visibles al hover */}
+                      {(canEdit || onManageAttributes || canDelete) && (
                         <div className='flex items-center gap-0.5 ml-1 opacity-0 group-hover:opacity-100 transition-opacity'>
                           {canEdit && (
                             <button
@@ -213,6 +231,16 @@ export function InlineCreateSelect({
                               title='Editar'
                             >
                               <Pencil className='h-3 w-3' />
+                            </button>
+                          )}
+                          {onManageAttributes && (
+                            <button
+                              type='button'
+                              onClick={e => handleManageAttributes(opt, e)}
+                              className='p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground'
+                              title={manageAttributesTooltip}
+                            >
+                              <Settings className='h-3 w-3' />
                             </button>
                           )}
                           {canDelete && (
