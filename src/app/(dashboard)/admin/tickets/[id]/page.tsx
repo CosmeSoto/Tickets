@@ -50,7 +50,6 @@ export default function AdminTicketDetailPage() {
   const [loadError, setLoadError] = useState<{ status: number; message: string } | null>(null)
   const [showRatingModal, setShowRatingModal] = useState(false)
   const initialRatingPromptDone = useRef(false)
-  const [resolvers, setResolvers] = useState<any[]>([])
   const [filteredResolvers, setFilteredResolvers] = useState<any[]>([])
   const [isEditing, setIsEditing] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -75,45 +74,51 @@ export default function AdminTicketDetailPage() {
   useEffect(() => {
     if (ticketId && ticketId !== 'create') {
       loadTicket()
-      getResolvers().then(setResolvers)
     }
   }, [ticketId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Filtrar resolvers por familia del ticket cuando ambos estén disponibles
+  // Cargar resolutores elegibles (técnicos + admins) una vez se conoce la
+  // familia del ticket. Usa el mismo endpoint/semántica que "Agregar
+  // resolutor" en Categorías y el panel de Colaboradores (familyId +
+  // purpose=categoryResolvers): nativo del área, acceso concedido
+  // (user_family_access) o Super Admin.
+  //
+  // Antes se combinaban dos fuentes: una lista base SIN family-scoping
+  // (getResolvers(), técnicos+admins "a secas") que luego se filtraba por
+  // familia. El problema: para un Admin no-super, esa lista base ya venía
+  // recortada por api/users/route.ts a solo los departamentos que gestiona
+  // directamente (getAdminUnionDepartmentIds) — así que un técnico/admin de
+  // OTRO departamento dentro de la MISMA familia (p. ej. Soporte Técnico
+  // dentro de la familia Administración) nunca llegaba a estar en la lista
+  // base, y el filtro por familia solo puede restar de ahí, nunca agregar.
+  // Por eso solo con sesión Super Admin (que se salta ese recorte) aparecían
+  // todos los candidatos esperados. Al pedir directamente el endpoint con
+  // familyId + purpose=categoryResolvers, se usa la lógica de elegibilidad
+  // por familia (que sí es correcta para Admin no-super) en vez del recorte
+  // por departamento gestionado.
   useEffect(() => {
-    if (!ticket || resolvers.length === 0) {
-      setFilteredResolvers(resolvers)
-      return
-    }
+    if (!ticket) return
     const familyId = (ticket as any).familyId
     if (!familyId) {
-      // Sin familia: mostrar todos
-      setFilteredResolvers(resolvers)
+      // Sin familia: usar la lista general de resolutores (comportamiento previo)
+      getResolvers().then(setFilteredResolvers)
       return
     }
-    // Cargar técnicos válidos para esta familia desde la API (misma semántica
-    // de elegibilidad que "Agregar resolutor" en Categorías: departamento
-    // nativo, o acceso concedido vía user_family_access, módulo 'tickets')
-    fetch(
-      `/api/users?roles=TECHNICIAN&isActive=true&familyId=${familyId}&purpose=categoryResolvers`
-    )
+    fetch(`/api/users?isActive=true&familyId=${familyId}&purpose=categoryResolvers`)
       .then(r => r.json())
       .then(data => {
-        const validTechIds = new Set<string>((data.data ?? []).map((u: any) => u.id))
-        // Admins siempre son elegibles; técnicos solo si tienen asignación activa a la familia
-        const filtered = resolvers.filter(r => r.role === 'ADMIN' || validTechIds.has(r.id))
+        const eligible: any[] = data.data ?? []
         // Defensivo: el técnico/admin ya asignado al ticket nunca debe
         // desaparecer del selector, aunque el fetch de elegibilidad no lo
         // incluya (p. ej. cambió de departamento/grant después de asignarse).
-        const currentAssigneeId = (ticket as any)?.assignee?.id
-        if (currentAssigneeId && !filtered.some(r => r.id === currentAssigneeId)) {
-          const current = resolvers.find(r => r.id === currentAssigneeId)
-          if (current) filtered.push(current)
+        const currentAssignee = (ticket as any)?.assignee
+        if (currentAssignee?.id && !eligible.some(r => r.id === currentAssignee.id)) {
+          eligible.push(currentAssignee)
         }
-        setFilteredResolvers(filtered)
+        setFilteredResolvers(eligible)
       })
-      .catch(() => setFilteredResolvers(resolvers))
-  }, [ticket, resolvers])
+      .catch(() => getResolvers().then(setFilteredResolvers))
+  }, [ticket]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const getRaterId = useCallback((data: Ticket) => {
     return data.source === 'PATROL' && data.createdById ? data.createdById : data.client?.id
