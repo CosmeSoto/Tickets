@@ -223,13 +223,22 @@ export class AssignmentService {
       }
 
       // 🎯 PRIORIDAD 2: técnicos del departamento de la categoría
+      // Requisito duro: si la categoría tiene departamento, SOLO un técnico de ese
+      // departamento puede ganar por este camino (scoring general, categorías sin
+      // technician_assignments configurados todavía). Antes era un filtro "blando"
+      // (solo se aplicaba si había ≥1 candidato) y por eso, sin ningún técnico
+      // configurado aún, terminaba asignando a cualquiera de la familia aunque
+      // fuera de otro departamento (el bug reportado con Tania Guamán). Sin nadie
+      // en el departamento correcto, el ticket debe quedar sin asignar para que el
+      // Admin decida manualmente — igual que en el camino rápido (Prioridad 0).
       if (ticket.categories.departmentId) {
         const techsFromDept = availableTechnicians.filter(
           t => t.departmentId === ticket.categories.departmentId
         )
-        if (techsFromDept.length > 0) {
-          availableTechnicians = techsFromDept
+        if (techsFromDept.length === 0) {
+          throw new Error('No hay técnico disponible en el departamento de la categoría')
         }
+        availableTechnicians = techsFromDept
       }
 
       // Calcular el mejor técnico (reutiliza maxWorkloadTickets calculado arriba)

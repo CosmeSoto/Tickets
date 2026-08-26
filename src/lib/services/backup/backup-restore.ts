@@ -1168,10 +1168,65 @@ async function restoreFromJSON(
           console.log(`${tableName}: ${insertedCount}/${processed.length} registros insertados`)
         }
       }
+      await cleanupOrphanedForeignKeys(
+        tx,
+        restoreOrder.filter(t => mappedData[t]?.length > 0)
+      )
     },
     { timeout: 600000 }
   )
   console.log('Restauración JSON completada exitosamente')
+}
+
+/**
+ * Tras restaurar con `session_replication_role = replica` (FKs desactivadas para toda
+ * la transacción), pueden quedar filas que referencian IDs que ya no existen en la tabla
+ * referenciada — p. ej. `technician_assignments.categoryId` apuntando a una categoría de
+ * un backup viejo que no coincide con las categorías recién sembradas tras un `--clean` +
+ * reseed (los IDs de `categories` no son estables entre reseeds). Postgres no revalida
+ * esas filas al reactivar los triggers, así que quedan huérfanas en silencio y luego
+ * rompen en runtime cualquier consulta de Prisma que incluya la relación no-opcional
+ * ("Inconsistent query result: Field X is required to return data, got null"). Se
+ * eliminan aquí, tabla por tabla (solo las tablas restauradas en esta corrida), y se
+ * reporta cuántas se quitaron para que quede visible en los logs de restauración.
+ */
+async function cleanupOrphanedForeignKeys(tx: any, tableNames: string[]): Promise<void> {
+  for (const tableName of tableNames) {
+    let fks: { column_name: string; foreign_table_name: string; foreign_column_name: string }[] = []
+    try {
+      fks = await tx.$queryRaw(Prisma.sql`
+        SELECT kcu.column_name, ccu.table_name AS foreign_table_name, ccu.column_name AS foreign_column_name
+        FROM information_schema.table_constraints tc
+        JOIN information_schema.key_column_usage kcu
+          ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema
+        JOIN information_schema.constraint_column_usage ccu
+          ON ccu.constraint_name = tc.constraint_name AND ccu.table_schema = tc.table_schema
+        WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_name = ${tableName}
+      `)
+    } catch {
+      continue
+    }
+    for (const fk of fks) {
+      try {
+        const deleted: number = await tx.$executeRaw(Prisma.sql`
+          DELETE FROM ${Prisma.raw(`"${tableName}"`)}
+          WHERE ${Prisma.raw(`"${fk.column_name}"`)} IS NOT NULL
+            AND ${Prisma.raw(`"${fk.column_name}"`)} NOT IN (
+              SELECT ${Prisma.raw(`"${fk.foreign_column_name}"`)} FROM ${Prisma.raw(`"${fk.foreign_table_name}"`)}
+            )
+        `)
+        if (deleted > 0) {
+          console.warn(
+            `[RESTORE] ⚠ ${tableName}.${fk.column_name}: ${deleted} fila(s) huérfana(s) eliminada(s) (referencia inexistente en ${fk.foreign_table_name}.${fk.foreign_column_name})`
+          )
+        }
+      } catch (e) {
+        console.warn(
+          `[RESTORE] No se pudo verificar FK ${tableName}.${fk.column_name}: ${(e as Error).message?.slice(0, 150)}`
+        )
+      }
+    }
+  }
 }
 
 async function restoreModuleFromJSON(
@@ -1267,6 +1322,10 @@ async function restoreModuleFromJSON(
       }
 
       await tx.$executeRaw(Prisma.sql`SET session_replication_role = DEFAULT;`)
+      await cleanupOrphanedForeignKeys(
+        tx,
+        restoreOrder.filter(t => mappedData[t]?.length > 0)
+      )
     },
     { timeout: 600000 }
   )
