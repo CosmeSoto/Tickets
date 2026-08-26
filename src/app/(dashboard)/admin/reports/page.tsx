@@ -218,7 +218,7 @@ export default function ReportsPage() {
           </TabsContent>
 
           <TabsContent value='detail'>
-            <DetailTab />
+            <DetailTab startDate={startDate} endDate={endDate} />
           </TabsContent>
         </Tabs>
       </div>

@@ -14,10 +14,9 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { AlertTriangle, ListFilter, RotateCcw } from 'lucide-react'
+import { AlertTriangle, ListFilter, RotateCcw, Info } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import {
   Select,
   SelectContent,
@@ -35,6 +34,7 @@ import { Badge } from '@/components/ui/badge'
 import { useExport } from '@/hooks/common/use-export'
 import { usePagination } from '@/hooks/common/use-pagination'
 import { STATUS_OPTIONS, PRIORITY_OPTIONS } from '@/lib/constants/filter-options'
+import { formatDateTimeShort } from '@/lib/utils/date-utils'
 import {
   DETAIL_COLUMN_DEFS,
   DETAIL_DEFAULT_VISIBLE,
@@ -43,14 +43,17 @@ import {
   type DetailedTicketRow,
 } from '../utils/detail-columns'
 
+// Referencia estable — evita que UserCombobox refetchee en loop por recibir
+// un array literal nuevo en cada render (ver comentario en user-combobox.tsx).
+const STAFF_ROLES: Array<'TECHNICIAN' | 'ADMIN'> = ['TECHNICIAN', 'ADMIN']
+
 interface DraftFilters {
   status: string
   priority: string
   categoryId: string
   assigneeId: string
   clientId: string
-  startDate: string
-  endDate: string
+  collaboratorId: string
 }
 
 const EMPTY_FILTERS: DraftFilters = {
@@ -59,8 +62,13 @@ const EMPTY_FILTERS: DraftFilters = {
   categoryId: 'all',
   assigneeId: 'all',
   clientId: 'all',
-  startDate: '',
-  endDate: '',
+  collaboratorId: 'all',
+}
+
+interface DetailTabProps {
+  /** Rango de fechas — viene del filtro global de Reportes (header), no se duplica aquí. */
+  startDate: string
+  endDate: string
 }
 
 function slaVariant(status: string): 'default' | 'destructive' | 'secondary' | 'outline' {
@@ -70,7 +78,7 @@ function slaVariant(status: string): 'default' | 'destructive' | 'secondary' | '
   return 'outline'
 }
 
-export function DetailTab() {
+export function DetailTab({ startDate, endDate }: DetailTabProps) {
   const router = useRouter()
 
   const [filters, setFilters] = useState<DraftFilters>(EMPTY_FILTERS)
@@ -95,7 +103,7 @@ export function DetailTab() {
     }
   }, [])
 
-  const fetchRows = useCallback(async (f: DraftFilters) => {
+  const fetchRows = useCallback(async (f: DraftFilters, dateFrom: string, dateTo: string) => {
     setLoading(true)
     setError(null)
     try {
@@ -105,8 +113,9 @@ export function DetailTab() {
       if (f.categoryId !== 'all') params.set('categoryId', f.categoryId)
       if (f.assigneeId !== 'all') params.set('assigneeId', f.assigneeId)
       if (f.clientId !== 'all') params.set('clientId', f.clientId)
-      if (f.startDate) params.set('startDate', f.startDate)
-      if (f.endDate) params.set('endDate', f.endDate)
+      if (f.collaboratorId !== 'all') params.set('collaboratorId', f.collaboratorId)
+      if (dateFrom) params.set('startDate', dateFrom)
+      if (dateTo) params.set('endDate', dateTo)
 
       const res = await fetch(`/api/reports?${params.toString()}`)
       const json = await res.json()
@@ -124,12 +133,18 @@ export function DetailTab() {
     }
   }, [])
 
-  // Primera carga (sin filtros) al entrar a la pestaña
+  // Catálogo de categorías — una sola vez.
   useEffect(() => {
     void loadCategories()
-    void fetchRows(EMPTY_FILTERS)
+  }, [loadCategories])
+
+  // Carga inicial, y cada vez que cambia el rango de fechas del filtro
+  // global (header de Reportes) — el resto de filtros usan el botón
+  // "Aplicar filtros" para no exceder el rate limit del endpoint (10/min).
+  useEffect(() => {
+    void fetchRows(filters, startDate, endDate)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [startDate, endDate])
 
   const pagination = usePagination(rows, { pageSize: 20 })
 
@@ -201,8 +216,8 @@ export function DetailTab() {
       label: 'Creado',
       sortable: true,
       render: r => (
-        <span className='text-sm text-muted-foreground'>
-          {new Date(r.createdAt).toLocaleDateString('es-ES')}
+        <span className='text-sm text-muted-foreground whitespace-nowrap'>
+          {formatDateTimeShort(r.createdAt)}
         </span>
       ),
     },
@@ -211,8 +226,8 @@ export function DetailTab() {
       label: 'Resuelto',
       sortable: true,
       render: r => (
-        <span className='text-sm text-muted-foreground'>
-          {r.resolvedAt ? new Date(r.resolvedAt).toLocaleDateString('es-ES') : '—'}
+        <span className='text-sm text-muted-foreground whitespace-nowrap'>
+          {r.resolvedAt ? formatDateTimeShort(r.resolvedAt) : '—'}
         </span>
       ),
     },
@@ -262,6 +277,22 @@ export function DetailTab() {
         <span className='text-sm text-muted-foreground'>{r.createdBy?.name ?? '—'}</span>
       ),
     },
+    {
+      key: 'collaborators',
+      label: 'Colaboradores',
+      render: r =>
+        r.collaborators && r.collaborators.length > 0 ? (
+          <div className='flex flex-wrap gap-1 max-w-[200px]'>
+            {r.collaborators.map(c => (
+              <Badge key={c.id} variant='outline' className='text-xs font-normal'>
+                {c.name}
+              </Badge>
+            ))}
+          </div>
+        ) : (
+          <span className='text-sm text-muted-foreground'>—</span>
+        ),
+    },
   ]
 
   const visibleTableColumns = columnOrder
@@ -281,10 +312,10 @@ export function DetailTab() {
     columns: exportColumns,
   })
 
-  const applyFilters = () => fetchRows(filters)
+  const applyFilters = () => fetchRows(filters, startDate, endDate)
   const clearFilters = () => {
     setFilters(EMPTY_FILTERS)
-    void fetchRows(EMPTY_FILTERS)
+    void fetchRows(EMPTY_FILTERS, startDate, endDate)
   }
 
   return (
@@ -339,11 +370,13 @@ export function DetailTab() {
               />
             </div>
             <div className='space-y-1'>
-              <label className='text-sm font-medium text-muted-foreground'>Técnico</label>
+              <label className='text-sm font-medium text-muted-foreground'>
+                Técnico / responsable
+              </label>
               <UserCombobox
                 value={filters.assigneeId === 'all' ? '' : filters.assigneeId}
                 onValueChange={v => setFilters(f => ({ ...f, assigneeId: v || 'all' }))}
-                role='TECHNICIAN'
+                role={STAFF_ROLES}
                 placeholder='Todos'
                 allowClear
               />
@@ -353,37 +386,36 @@ export function DetailTab() {
               <UserCombobox
                 value={filters.clientId === 'all' ? '' : filters.clientId}
                 onValueChange={v => setFilters(f => ({ ...f, clientId: v || 'all' }))}
-                role='CLIENT'
                 placeholder='Todos'
                 allowClear
               />
             </div>
             <div className='space-y-1'>
-              <label className='text-sm font-medium text-muted-foreground'>Desde</label>
-              <Input
-                type='date'
-                value={filters.startDate}
-                onChange={e => setFilters(f => ({ ...f, startDate: e.target.value }))}
-              />
-            </div>
-            <div className='space-y-1'>
-              <label className='text-sm font-medium text-muted-foreground'>Hasta</label>
-              <Input
-                type='date'
-                value={filters.endDate}
-                onChange={e => setFilters(f => ({ ...f, endDate: e.target.value }))}
+              <label className='text-sm font-medium text-muted-foreground'>Colaborador</label>
+              <UserCombobox
+                value={filters.collaboratorId === 'all' ? '' : filters.collaboratorId}
+                onValueChange={v => setFilters(f => ({ ...f, collaboratorId: v || 'all' }))}
+                role={STAFF_ROLES}
+                placeholder='Todos'
+                allowClear
               />
             </div>
           </div>
-          <div className='flex items-center justify-end gap-2 pt-1'>
-            <Button variant='outline' size='sm' onClick={clearFilters} disabled={loading}>
-              <RotateCcw className='h-4 w-4 mr-1.5' />
-              Limpiar
-            </Button>
-            <Button size='sm' onClick={applyFilters} disabled={loading}>
-              <ListFilter className='h-4 w-4 mr-1.5' />
-              Aplicar filtros
-            </Button>
+          <div className='flex items-center justify-between gap-2 pt-1 flex-wrap'>
+            <p className='text-xs text-muted-foreground flex items-center gap-1'>
+              <Info className='h-3.5 w-3.5 shrink-0' />
+              El rango de fechas (Desde / Hasta) se controla arriba, en el filtro de Reportes.
+            </p>
+            <div className='flex items-center gap-2'>
+              <Button variant='outline' size='sm' onClick={clearFilters} disabled={loading}>
+                <RotateCcw className='h-4 w-4 mr-1.5' />
+                Limpiar
+              </Button>
+              <Button size='sm' onClick={applyFilters} disabled={loading}>
+                <ListFilter className='h-4 w-4 mr-1.5' />
+                Aplicar filtros
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>

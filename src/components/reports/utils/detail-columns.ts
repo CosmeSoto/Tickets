@@ -8,6 +8,7 @@
 
 import type { TableColumnDef } from '@/components/common/table-columns-menu'
 import type { ExportColumn } from '@/lib/utils/export'
+import { formatDateTimeShort } from '@/lib/utils/date-utils'
 
 export interface DetailedTicketRow {
   id: string
@@ -32,6 +33,8 @@ export interface DetailedTicketRow {
   rating: { score: number; comment: string | null } | null
   commentsCount: number
   attachmentsCount: number
+  /** Equipo completo del ticket — técnicos/admins que acompañan al asignado principal. */
+  collaborators?: Array<{ id: string; name: string; email: string }>
 }
 
 export const STATUS_LABELS: Record<string, string> = {
@@ -72,6 +75,7 @@ export const DETAIL_COLUMN_DEFS: TableColumnDef[] = [
   { key: 'slaViolations', label: 'Violaciones SLA abiertas' },
   { key: 'rating', label: 'Calificación' },
   { key: 'createdBy', label: 'Creado por' },
+  { key: 'collaborators', label: 'Colaboradores' },
 ]
 
 /** Visibles por defecto — el resto queda disponible en el selector pero oculto. */
@@ -82,15 +86,14 @@ export const DETAIL_DEFAULT_VISIBLE = [
   'category',
   'client',
   'assignee',
+  'collaborators',
   'createdAt',
   'resolutionTime',
   'slaStatus',
 ]
 
 function fmtDate(v: string | null): string {
-  return v
-    ? new Date(v).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })
-    : '—'
+  return v ? formatDateTimeShort(v) : '—'
 }
 
 /** Mapa de columnas de exportación, keyed igual que DETAIL_COLUMN_DEFS. */
@@ -125,4 +128,10 @@ export const DETAIL_EXPORT_COLUMN_MAP: Record<string, ExportColumn> = {
     format: (v: any) => (v?.score != null ? `★ ${v.score}` : '—'),
   },
   createdBy: { key: 'createdBy', label: 'Creado por', format: (v: any) => v?.name ?? '—' },
+  collaborators: {
+    key: 'collaborators',
+    label: 'Colaboradores',
+    format: (v: any) =>
+      Array.isArray(v) && v.length > 0 ? v.map((c: any) => c.name).join(', ') : '—',
+  },
 }

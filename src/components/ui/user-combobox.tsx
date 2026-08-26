@@ -28,10 +28,13 @@ export interface UserOption {
   avatar?: string
 }
 
+type UserRoleFilter = 'CLIENT' | 'TECHNICIAN' | 'ADMIN'
+
 interface UserComboboxProps {
   value?: string
   onValueChange: (value: string) => void
-  role?: 'CLIENT' | 'TECHNICIAN' | 'ADMIN'
+  /** Un rol único, o varios (ej. técnico + admin, cuando ambos pueden resolver tickets). */
+  role?: UserRoleFilter | UserRoleFilter[]
   departmentId?: string
   placeholder?: string
   emptyText?: string
@@ -66,6 +69,11 @@ export function UserCombobox({
   // Debounce search
   const debounceTimeout = React.useRef<NodeJS.Timeout | null>(null)
 
+  // Clave primitiva y estable para `role` — si `role` llega como array literal
+  // inline (`role={['TECHNICIAN','ADMIN']}`), su referencia cambia en cada
+  // render del padre; depender de esa referencia dispararía un fetch en loop.
+  const roleKey = Array.isArray(role) ? role.slice().sort().join(',') : (role ?? '')
+
   // Cargar usuarios cuando se abre el combobox o cambia la búsqueda
   React.useEffect(() => {
     if (open || search) {
@@ -85,7 +93,7 @@ export function UserCombobox({
         clearTimeout(debounceTimeout.current)
       }
     }
-  }, [open, search, role, departmentId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, search, roleKey, departmentId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Cargar usuario seleccionado cuando cambia el value
   React.useEffect(() => {
@@ -102,7 +110,11 @@ export function UserCombobox({
     setLoading(true)
     try {
       const params = new URLSearchParams()
-      if (role) params.append('role', role)
+      if (Array.isArray(role)) {
+        if (role.length > 0) params.append('roles', role.join(','))
+      } else if (role) {
+        params.append('role', role)
+      }
       if (departmentId) params.append('departmentId', departmentId)
       params.append('isActive', 'true')
       params.append('limit', '20')
