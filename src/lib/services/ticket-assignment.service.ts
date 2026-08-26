@@ -84,11 +84,40 @@ export class AssignmentService {
         orderBy: { priority: 'asc' }, // prioridad 1 = más importante
       })
 
+      // ¿La categoría tiene técnicos configurados? (se calcula ANTES del filtro
+      // de departamento/familia de abajo, para poder distinguir "sin config"
+      // de "config pero de otro departamento/familia" más adelante).
+      const hadCategoryAssignments = categoryAssignments.length > 0
+
+      // Acotar los candidatos configurados en la categoría a los que además
+      // pertenecen al departamento correcto (o, si la categoría no tiene
+      // departamento, a la familia del ticket —nativa o concedida—). Sin esto,
+      // un técnico configurado en `technician_assignments` para la categoría
+      // pero de otro departamento (o de otra familia) podía ganar por prioridad
+      // sin ninguna validación de encaje real.
+      let departmentScopedAssignments = categoryAssignments
+      if (ticket.categories.departmentId) {
+        departmentScopedAssignments = categoryAssignments.filter(
+          a => a.users.departmentId === ticket.categories.departmentId
+        )
+      } else if (ticket.familyId) {
+        const { getTechnicianIdsNativeToFamily } = await import('@/lib/auth/family-scope')
+        const nativeTechIds = new Set(await getTechnicianIdsNativeToFamily(ticket.familyId))
+        const grantedAccess = await prisma.user_family_access.findMany({
+          where: { familyId: ticket.familyId, module: 'tickets', isActive: true },
+          select: { userId: true },
+        })
+        const grantedTechIds = new Set(grantedAccess.map(g => g.userId))
+        departmentScopedAssignments = categoryAssignments.filter(
+          a => nativeTechIds.has(a.users.id) || grantedTechIds.has(a.users.id)
+        )
+      }
+
       // Filtrar solo los que tienen capacidad (tickets activos < maxTickets)
       const { getMaxTicketsPerUser } = await import('@/lib/settings/runtime-settings')
       const maxWorkloadTickets = await getMaxTicketsPerUser()
 
-      const categoryTechsWithCapacity = categoryAssignments.filter(a => {
+      const categoryTechsWithCapacity = departmentScopedAssignments.filter(a => {
         const active = a.users._count.tickets_tickets_assigneeIdTousers
         const cap = a.maxTickets ?? maxWorkloadTickets
         return active < cap
@@ -153,6 +182,16 @@ export class AssignmentService {
           reason: `Técnico asignado a la categoría (prioridad ${sorted[0].priority})`,
         }
       }
+
+      if (hadCategoryAssignments) {
+        // La categoría SÍ tiene técnicos configurados, pero ninguno pertenece
+        // al departamento (o familia) correcto, o ninguno tiene capacidad. No
+        // se asigna a alguien de otro departamento/familia como comodín: el
+        // ticket queda sin asignar para que un Admin lo asigne manualmente
+        // (pudiendo elegir de otro departamento dentro de su familia).
+        throw new Error('No hay técnico disponible en el departamento de la categoría')
+      }
+
       // ─────────────────────────────────────────────────────────────────────
       // Sin técnicos configurados en la categoría → flujo general de scoring
       // ─────────────────────────────────────────────────────────────────────

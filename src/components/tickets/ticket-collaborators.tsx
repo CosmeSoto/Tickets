@@ -18,7 +18,7 @@ function getInitials(name: string): string {
   return name
     .split(' ')
     .slice(0, 2)
-    .map((n) => n[0])
+    .map(n => n[0])
     .join('')
     .toUpperCase()
 }
@@ -66,25 +66,34 @@ export function TicketCollaborators({ ticketId, familyId, assigneeId, canManage 
         const data = await res.json()
         setCollaborators(data.data ?? [])
       }
-    } catch { /* silencioso */ }
-    finally { setLoading(false) }
+    } catch {
+      /* silencioso */
+    } finally {
+      setLoading(false)
+    }
   }, [ticketId])
 
   const loadAvailableTechs = useCallback(async () => {
     try {
-      // Si hay familia, cargar técnicos de esa familia; si no, todos los técnicos activos
+      // Si hay familia, cargar técnicos elegibles de esa familia (nativos o con
+      // acceso concedido vía user_family_access, módulo 'tickets'); si no,
+      // todos los técnicos activos
       const url = familyId
-        ? `/api/users?role=TECHNICIAN&isActive=true&familyId=${familyId}&limit=500`
+        ? `/api/users?roles=TECHNICIAN&isActive=true&familyId=${familyId}&purpose=categoryResolvers&limit=500`
         : `/api/users?role=TECHNICIAN&isActive=true&limit=500`
       const res = await fetch(url)
       if (res.ok) {
         const data = await res.json()
         setAvailableTechs(data.data ?? [])
       }
-    } catch { /* silencioso */ }
+    } catch {
+      /* silencioso */
+    }
   }, [familyId])
 
-  useEffect(() => { loadCollaborators() }, [loadCollaborators])
+  useEffect(() => {
+    loadCollaborators()
+  }, [loadCollaborators])
 
   useEffect(() => {
     if (showAdd) loadAvailableTechs()
@@ -100,14 +109,20 @@ export function TicketCollaborators({ ticketId, familyId, assigneeId, canManage 
       })
       const data = await res.json()
       if (!res.ok) {
-        toast({ title: 'Error', description: data.message || 'No se pudo agregar', variant: 'destructive' })
+        toast({
+          title: 'Error',
+          description: data.message || 'No se pudo agregar',
+          variant: 'destructive',
+        })
         return
       }
       toast({ title: 'Colaborador agregado' })
       await loadCollaborators()
     } catch {
       toast({ title: 'Error de conexión', variant: 'destructive' })
-    } finally { setAddingId(null) }
+    } finally {
+      setAddingId(null)
+    }
   }
 
   const handleRemove = async (collaboratorId: string) => {
@@ -119,20 +134,26 @@ export function TicketCollaborators({ ticketId, familyId, assigneeId, canManage 
       )
       if (!res.ok) {
         const data = await res.json()
-        toast({ title: 'Error', description: data.message || 'No se pudo quitar', variant: 'destructive' })
+        toast({
+          title: 'Error',
+          description: data.message || 'No se pudo quitar',
+          variant: 'destructive',
+        })
         return
       }
       toast({ title: 'Colaborador eliminado' })
       await loadCollaborators()
     } catch {
       toast({ title: 'Error de conexión', variant: 'destructive' })
-    } finally { setRemovingId(null) }
+    } finally {
+      setRemovingId(null)
+    }
   }
 
-  const collaboratorIds = new Set(collaborators.map((c) => c.collaboratorId))
+  const collaboratorIds = new Set(collaborators.map(c => c.collaboratorId))
 
   const filteredTechs = availableTechs.filter(
-    (t) =>
+    t =>
       t.id !== assigneeId &&
       !collaboratorIds.has(t.id) &&
       (search === '' ||
@@ -142,27 +163,32 @@ export function TicketCollaborators({ ticketId, familyId, assigneeId, canManage 
 
   if (loading) {
     return (
-      <div className="flex-1">
-        <p className="text-sm font-medium">Colaboradores</p>
-        <p className="text-xs text-muted-foreground mt-1">Cargando...</p>
+      <div className='flex-1'>
+        <p className='text-sm font-medium'>Colaboradores</p>
+        <p className='text-xs text-muted-foreground mt-1'>Cargando...</p>
       </div>
     )
   }
 
   return (
-    <div className="flex-1 space-y-2">
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-medium">Colaboradores</p>
+    <div className='flex-1 space-y-2'>
+      <div className='flex items-center justify-between'>
+        <p className='text-sm font-medium'>Colaboradores</p>
         {canManage && (
           <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 px-2 text-xs"
-            onClick={() => { setShowAdd(!showAdd); setSearch('') }}
+            variant='ghost'
+            size='sm'
+            className='h-6 px-2 text-xs'
+            onClick={() => {
+              setShowAdd(!showAdd)
+              setSearch('')
+            }}
           >
-            {showAdd ? 'Cerrar' : (
+            {showAdd ? (
+              'Cerrar'
+            ) : (
               <>
-                <UserPlus className="h-3 w-3 mr-1" />
+                <UserPlus className='h-3 w-3 mr-1' />
                 Agregar
               </>
             )}
@@ -172,32 +198,38 @@ export function TicketCollaborators({ ticketId, familyId, assigneeId, canManage 
 
       {/* Lista de colaboradores actuales */}
       {collaborators.length === 0 ? (
-        <p className="text-xs text-muted-foreground italic">Sin colaboradores</p>
+        <p className='text-xs text-muted-foreground italic'>Sin colaboradores</p>
       ) : (
-        <div className="space-y-1.5">
-          {collaborators.map((c) => (
-            <div key={c.collaboratorId} className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <Avatar className="h-6 w-6 flex-shrink-0">
+        <div className='space-y-1.5'>
+          {collaborators.map(c => (
+            <div key={c.collaboratorId} className='flex items-center justify-between gap-2'>
+              <div className='flex items-center gap-2 min-w-0'>
+                <Avatar className='h-6 w-6 flex-shrink-0'>
                   <AvatarImage src={c.collaborator.avatar ?? undefined} />
-                  <AvatarFallback className="text-[10px]">{getInitials(c.collaborator.name)}</AvatarFallback>
+                  <AvatarFallback className='text-[10px]'>
+                    {getInitials(c.collaborator.name)}
+                  </AvatarFallback>
                 </Avatar>
-                <div className="min-w-0">
-                  <p className="text-xs font-medium truncate">{c.collaborator.name}</p>
-                  <p className="text-[10px] text-muted-foreground truncate">{c.collaborator.email}</p>
+                <div className='min-w-0'>
+                  <p className='text-xs font-medium truncate'>{c.collaborator.name}</p>
+                  <p className='text-[10px] text-muted-foreground truncate'>
+                    {c.collaborator.email}
+                  </p>
                 </div>
               </div>
               {canManage && (
                 <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 w-6 p-0 flex-shrink-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                  variant='ghost'
+                  size='sm'
+                  className='h-6 w-6 p-0 flex-shrink-0 text-destructive hover:text-destructive hover:bg-destructive/10'
                   onClick={() => handleRemove(c.collaboratorId)}
                   disabled={removingId === c.collaboratorId}
                 >
-                  {removingId === c.collaboratorId
-                    ? <RefreshCw className="h-3 w-3 animate-spin" />
-                    : <UserMinus className="h-3 w-3" />}
+                  {removingId === c.collaboratorId ? (
+                    <RefreshCw className='h-3 w-3 animate-spin' />
+                  ) : (
+                    <UserMinus className='h-3 w-3' />
+                  )}
                 </Button>
               )}
             </div>
@@ -207,42 +239,49 @@ export function TicketCollaborators({ ticketId, familyId, assigneeId, canManage 
 
       {/* Panel para agregar colaboradores */}
       {showAdd && canManage && (
-        <div className="border rounded-md p-2 space-y-2 bg-muted/20">
-          <div className="relative">
-            <Search className="absolute left-2 top-2 h-3 w-3 text-muted-foreground" />
+        <div className='border rounded-md p-2 space-y-2 bg-muted/20'>
+          <div className='relative'>
+            <Search className='absolute left-2 top-2 h-3 w-3 text-muted-foreground' />
             <Input
-              placeholder="Buscar técnico..."
+              placeholder='Buscar técnico...'
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-6 h-7 text-xs"
+              onChange={e => setSearch(e.target.value)}
+              className='pl-6 h-7 text-xs'
             />
           </div>
           {filteredTechs.length === 0 ? (
-            <p className="text-xs text-muted-foreground italic py-1 text-center">
+            <p className='text-xs text-muted-foreground italic py-1 text-center'>
               {search ? 'Sin resultados' : 'No hay técnicos disponibles'}
             </p>
           ) : (
-            <div className="space-y-1 max-h-40 overflow-y-auto">
-              {filteredTechs.map((tech) => (
-                <div key={tech.id} className="flex items-center justify-between gap-2 rounded px-1.5 py-1 hover:bg-muted/40">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Avatar className="h-5 w-5 flex-shrink-0">
-                      <AvatarFallback className="text-[9px]">{getInitials(tech.name)}</AvatarFallback>
+            <div className='space-y-1 max-h-40 overflow-y-auto'>
+              {filteredTechs.map(tech => (
+                <div
+                  key={tech.id}
+                  className='flex items-center justify-between gap-2 rounded px-1.5 py-1 hover:bg-muted/40'
+                >
+                  <div className='flex items-center gap-2 min-w-0'>
+                    <Avatar className='h-5 w-5 flex-shrink-0'>
+                      <AvatarFallback className='text-[9px]'>
+                        {getInitials(tech.name)}
+                      </AvatarFallback>
                     </Avatar>
-                    <div className="min-w-0">
-                      <p className="text-xs font-medium truncate">{tech.name}</p>
+                    <div className='min-w-0'>
+                      <p className='text-xs font-medium truncate'>{tech.name}</p>
                     </div>
                   </div>
                   <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-6 px-2 text-xs flex-shrink-0"
+                    variant='outline'
+                    size='sm'
+                    className='h-6 px-2 text-xs flex-shrink-0'
                     onClick={() => handleAdd(tech.id)}
                     disabled={addingId === tech.id}
                   >
-                    {addingId === tech.id
-                      ? <RefreshCw className="h-3 w-3 animate-spin" />
-                      : <UserPlus className="h-3 w-3" />}
+                    {addingId === tech.id ? (
+                      <RefreshCw className='h-3 w-3 animate-spin' />
+                    ) : (
+                      <UserPlus className='h-3 w-3' />
+                    )}
                   </Button>
                 </div>
               ))}

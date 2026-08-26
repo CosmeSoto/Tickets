@@ -130,7 +130,10 @@ export async function GET(request: NextRequest) {
 
     // Filtro por familia del área de la categoría (resolutores)
     if (familyId && isCategoryResolvers) {
-      // Elegibles: nativa del área, Super Admin, o Admin con grant tickets en esa familia.
+      // Elegibles: nativa del área, Super Admin, o cualquier usuario (Admin o
+      // Técnico) con grant de tickets concedido a esa familia. Antes esta
+      // última rama solo aplicaba a Admins, lo que excluía a los Técnicos con
+      // acceso concedido (no nativo) a la familia de la categoría.
       where.AND = [
         ...(where.AND ?? []),
         {
@@ -138,14 +141,9 @@ export async function GET(request: NextRequest) {
             { departments: { familyId } },
             { isSuperAdmin: true },
             {
-              AND: [
-                { role: 'ADMIN' },
-                {
-                  userFamilyAccess: {
-                    some: { familyId, module: 'tickets', isActive: true },
-                  },
-                },
-              ],
+              userFamilyAccess: {
+                some: { familyId, module: 'tickets', isActive: true },
+              },
             },
           ],
         },
@@ -223,19 +221,16 @@ export async function GET(request: NextRequest) {
               OR: [
                 { departments: { familyId: { in: effectiveFamilyIds } } },
                 { isSuperAdmin: true },
+                // Acceso concedido (no nativo) a esa familia para tickets:
+                // aplica a cualquier rol (Admin o Técnico), no solo Admin.
                 {
-                  AND: [
-                    { role: 'ADMIN' },
-                    {
-                      userFamilyAccess: {
-                        some: {
-                          familyId: { in: effectiveFamilyIds },
-                          module: 'tickets',
-                          isActive: true,
-                        },
-                      },
+                  userFamilyAccess: {
+                    some: {
+                      familyId: { in: effectiveFamilyIds },
+                      module: 'tickets',
+                      isActive: true,
                     },
-                  ],
+                  },
                 },
               ],
             },

@@ -75,20 +75,17 @@ type RestoreMode = 'replace' | 'merge'
 
 const RESTORE_MODULES: { id: RestoreModuleId; label: string }[] = [
   { id: 'tickets', label: 'Tickets' },
-  { id: 'news', label: 'Noticias' },
+  { id: 'inventory', label: 'Inventario' },
   { id: 'patrols', label: 'Rondas' },
+  { id: 'access', label: 'Accesos' },
+  { id: 'news', label: 'Noticias' },
+  { id: 'forms', label: 'Documentos' },
+  { id: 'credentials', label: 'Credenciales (secretos cifrados)' },
+  { id: 'processes', label: 'Procesos y Procedimientos' },
   { id: 'families', label: 'Familias' },
   { id: 'users', label: 'Usuarios' },
   { id: 'audits', label: 'Auditorías' },
   { id: 'configurations', label: 'Configuraciones' },
-  { id: 'inventory', label: 'Inventario' },
-  {
-    id: 'credentials',
-    label: 'Credenciales (secretos cifrados)',
-  },
-  { id: 'processes', label: 'Procesos y Procedimientos' },
-  { id: 'access', label: 'Accesos' },
-  { id: 'forms', label: 'Documentos' },
 ]
 
 interface BackupRestoreProps {

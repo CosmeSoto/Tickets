@@ -91,13 +91,25 @@ export default function AdminTicketDetailPage() {
       setFilteredResolvers(resolvers)
       return
     }
-    // Cargar técnicos válidos para esta familia desde la API
-    fetch(`/api/users?role=TECHNICIAN&isActive=true&familyId=${familyId}`)
+    // Cargar técnicos válidos para esta familia desde la API (misma semántica
+    // de elegibilidad que "Agregar resolutor" en Categorías: departamento
+    // nativo, o acceso concedido vía user_family_access, módulo 'tickets')
+    fetch(
+      `/api/users?roles=TECHNICIAN&isActive=true&familyId=${familyId}&purpose=categoryResolvers`
+    )
       .then(r => r.json())
       .then(data => {
         const validTechIds = new Set<string>((data.data ?? []).map((u: any) => u.id))
         // Admins siempre son elegibles; técnicos solo si tienen asignación activa a la familia
         const filtered = resolvers.filter(r => r.role === 'ADMIN' || validTechIds.has(r.id))
+        // Defensivo: el técnico/admin ya asignado al ticket nunca debe
+        // desaparecer del selector, aunque el fetch de elegibilidad no lo
+        // incluya (p. ej. cambió de departamento/grant después de asignarse).
+        const currentAssigneeId = (ticket as any)?.assignee?.id
+        if (currentAssigneeId && !filtered.some(r => r.id === currentAssigneeId)) {
+          const current = resolvers.find(r => r.id === currentAssigneeId)
+          if (current) filtered.push(current)
+        }
         setFilteredResolvers(filtered)
       })
       .catch(() => setFilteredResolvers(resolvers))
