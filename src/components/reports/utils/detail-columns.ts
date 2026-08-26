@@ -1,9 +1,10 @@
 /**
  * Definiciones de columnas para la pestaña "Detalle de Tickets" — filas
  * individuales devueltas por `GET /api/reports?type=tickets` (ver
- * `ReportService.getDetailedTickets` en `ticket-report.service.ts`). No se
- * modifica el backend: las columnas de acá se ajustan exactamente a los
- * campos que ese endpoint ya devuelve.
+ * `ReportService.getDetailedTickets` en `ticket-report.service.ts`). Las
+ * columnas de acá se ajustan a los campos que ese endpoint devuelve
+ * (incluye `ticketCode` y `family`, agregados a `getDetailedTickets` para
+ * esta pestaña).
  */
 
 import type { TableColumnDef } from '@/components/common/table-columns-menu'
@@ -12,6 +13,7 @@ import { formatDateTimeShort } from '@/lib/utils/date-utils'
 
 export interface DetailedTicketRow {
   id: string
+  ticketCode: string | null
   title: string
   status: string
   priority: string
@@ -30,6 +32,7 @@ export interface DetailedTicketRow {
   createdBy: { id: string; name: string; email: string; role: string } | null
   category: { id: string; name: string; color: string }
   department: { id: string; name: string } | null
+  family: { id: string; name: string; code: string; color: string | null } | null
   rating: { score: number; comment: string | null } | null
   commentsCount: number
   attachmentsCount: number
@@ -61,11 +64,13 @@ export const SLA_STATUS_LABELS: Record<string, string> = {
 
 /** Selector de columnas — 'title' es la única obligatoria. Orden por defecto. */
 export const DETAIL_COLUMN_DEFS: TableColumnDef[] = [
+  { key: 'ticketCode', label: 'Código' },
   { key: 'title', label: 'Ticket', required: true },
   { key: 'status', label: 'Estado' },
   { key: 'priority', label: 'Prioridad' },
   { key: 'category', label: 'Categoría' },
   { key: 'department', label: 'Departamento' },
+  { key: 'family', label: 'Familia / Área' },
   { key: 'client', label: 'Cliente' },
   { key: 'assignee', label: 'Técnico' },
   { key: 'createdAt', label: 'Creado' },
@@ -80,10 +85,12 @@ export const DETAIL_COLUMN_DEFS: TableColumnDef[] = [
 
 /** Visibles por defecto — el resto queda disponible en el selector pero oculto. */
 export const DETAIL_DEFAULT_VISIBLE = [
+  'ticketCode',
   'title',
   'status',
   'priority',
   'category',
+  'family',
   'client',
   'assignee',
   'collaborators',
@@ -98,11 +105,13 @@ function fmtDate(v: string | null): string {
 
 /** Mapa de columnas de exportación, keyed igual que DETAIL_COLUMN_DEFS. */
 export const DETAIL_EXPORT_COLUMN_MAP: Record<string, ExportColumn> = {
+  ticketCode: { key: 'ticketCode', label: 'Código', format: (v: string | null) => v ?? '—' },
   title: { key: 'title', label: 'Ticket' },
   status: { key: 'status', label: 'Estado', format: (v: string) => STATUS_LABELS[v] ?? v },
   priority: { key: 'priority', label: 'Prioridad', format: (v: string) => PRIORITY_LABELS[v] ?? v },
   category: { key: 'category', label: 'Categoría', format: (v: any) => v?.name ?? '' },
   department: { key: 'department', label: 'Departamento', format: (v: any) => v?.name ?? '—' },
+  family: { key: 'family', label: 'Familia / Área', format: (v: any) => v?.name ?? '—' },
   client: { key: 'client', label: 'Cliente', format: (v: any) => v?.name ?? '' },
   assignee: { key: 'assignee', label: 'Técnico', format: (v: any) => v?.name ?? 'Sin asignar' },
   createdAt: { key: 'createdAt', label: 'Creado', format: (v: string) => fmtDate(v) },

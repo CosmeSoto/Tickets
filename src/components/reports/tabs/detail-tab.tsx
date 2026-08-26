@@ -150,6 +150,16 @@ export function DetailTab({ startDate, endDate }: DetailTabProps) {
 
   const allColumns: Column<DetailedTicketRow>[] = [
     {
+      key: 'ticketCode',
+      label: 'Código',
+      sortable: true,
+      render: r => (
+        <span className='text-sm font-mono text-muted-foreground whitespace-nowrap'>
+          {r.ticketCode ?? '—'}
+        </span>
+      ),
+    },
+    {
       key: 'title',
       label: 'Ticket',
       sortable: true,
@@ -187,6 +197,22 @@ export function DetailTab({ startDate, endDate }: DetailTabProps) {
       sortable: true,
       render: r => (
         <span className='text-sm text-muted-foreground'>{r.department?.name ?? '—'}</span>
+      ),
+    },
+    {
+      key: 'family',
+      label: 'Familia / Área',
+      sortable: true,
+      render: r => (
+        <div className='flex items-center gap-1.5'>
+          {r.family?.color && (
+            <span
+              className='w-2.5 h-2.5 rounded-full shrink-0'
+              style={{ backgroundColor: r.family.color }}
+            />
+          )}
+          <span className='text-sm truncate max-w-[140px]'>{r.family?.name ?? '—'}</span>
+        </div>
       ),
     },
     {

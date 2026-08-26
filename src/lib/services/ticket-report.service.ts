@@ -62,6 +62,7 @@ export interface TicketReport {
   }
   detailedTickets?: Array<{
     id: string
+    ticketCode: string | null
     title: string
     description: string
     status: string
@@ -109,6 +110,12 @@ export interface TicketReport {
     department: {
       id: string
       name: string
+    } | null
+    family: {
+      id: string
+      name: string
+      code: string
+      color: string | null
     } | null
     rating: {
       score: number
@@ -1334,6 +1341,14 @@ export class ReportService {
                 name: true,
               },
             },
+            family: {
+              select: {
+                id: true,
+                name: true,
+                code: true,
+                color: true,
+              },
+            },
           },
         },
         ticket_ratings: {
@@ -1430,6 +1445,7 @@ export class ReportService {
 
       return {
         id: ticket.id,
+        ticketCode: ticket.ticketCode || null,
         title: ticket.title,
         description: ticket.description || '',
         status: ticket.status as string,
@@ -1468,6 +1484,7 @@ export class ReportService {
           color: ticket.categories.color || '#3B82F6',
         },
         department: ticket.categories.departments || null,
+        family: ticket.categories.family || null,
         rating: rating
           ? {
               score: rating.rating,
