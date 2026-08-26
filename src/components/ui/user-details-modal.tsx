@@ -10,15 +10,7 @@ import { Badge } from './badge'
 import { Button } from './button'
 import { Avatar, AvatarFallback, AvatarImage } from './avatar'
 import { Separator } from './separator'
-import {
-  User,
-  Phone,
-  Building2,
-  Clock,
-  Edit,
-  Trash2,
-  Calendar,
-} from 'lucide-react'
+import { User, Phone, Building2, Clock, Edit, Trash2, Calendar, Ticket, Tag } from 'lucide-react'
 import { RoleBadge } from '@/components/ui/role-badge'
 import type { UserData } from '@/hooks/use-users'
 import { getUserInitials } from '@/components/users/user-utils'
@@ -147,6 +139,37 @@ export function UserDetailsModal({
                   {user.isActive ? '● Activo' : '● Inactivo'}
                 </Badge>
               </div>
+            </div>
+            <div className='flex gap-3 shrink-0'>
+              <div className='text-center'>
+                <p className='text-lg font-bold text-primary'>
+                  {user._count?.tickets_tickets_clientIdTousers ?? 0}
+                </p>
+                <p className='text-[10px] text-muted-foreground flex items-center gap-0.5'>
+                  <Ticket className='h-3 w-3' />
+                  Tickets
+                </p>
+              </div>
+              <div className='text-center'>
+                <p className='text-lg font-bold text-green-600 dark:text-green-400'>
+                  {user._count?.tickets_tickets_assigneeIdTousers ?? 0}
+                </p>
+                <p className='text-[10px] text-muted-foreground'>Asignados</p>
+              </div>
+              {(user.role === 'TECHNICIAN' || user.role === 'ADMIN') && (
+                <div
+                  className='text-center'
+                  title='Categorías donde este usuario está configurado como resolutor'
+                >
+                  <p className='text-lg font-bold text-amber-600 dark:text-amber-400'>
+                    {user._count?.technician_assignments ?? 0}
+                  </p>
+                  <p className='text-[10px] text-muted-foreground flex items-center gap-0.5'>
+                    <Tag className='h-3 w-3' />
+                    Categorías
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
