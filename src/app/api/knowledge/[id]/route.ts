@@ -13,6 +13,38 @@ import {
   rewriteTicketAttachmentLinks,
 } from '@/lib/knowledge/article-access'
 
+// ── Dedup de vistas ───────────────────────────────────────────────────────
+// GET incrementa `views`, pero este endpoint se llama en cada recarga en
+// segundo plano (refetch de sesión de NextAuth, pestañas duplicadas, ida y
+// vuelta con el botón atrás, etc.) — sin esto, cada recarga silenciosa suma
+// una vista aunque el usuario "solo abrió el artículo una vez". Se cuenta
+// como máximo una vista por usuario+artículo cada 30 minutos, sin importar
+// cuántas veces se dispare el GET en ese lapso.
+const VIEW_DEDUP_WINDOW_MS = 30 * 60 * 1000
+const recentArticleViews = new Map<string, number>() // `${userId}:${articleId}` -> timestamp
+
+function shouldCountView(userId: string, articleId: string): boolean {
+  const key = `${userId}:${articleId}`
+  const now = Date.now()
+  const last = recentArticleViews.get(key)
+  if (last && now - last < VIEW_DEDUP_WINDOW_MS) return false
+  recentArticleViews.set(key, now)
+  return true
+}
+
+// Limpieza periódica para no acumular memoria indefinidamente
+if (typeof setInterval !== 'undefined') {
+  setInterval(
+    () => {
+      const now = Date.now()
+      for (const [key, ts] of recentArticleViews.entries()) {
+        if (now - ts > VIEW_DEDUP_WINDOW_MS) recentArticleViews.delete(key)
+      }
+    },
+    10 * 60 * 1000
+  )
+}
+
 // Schema de validación para actualizar artículo
 const updateArticleSchema = z.object({
   title: z.string().min(10).max(200).optional(),
@@ -103,10 +135,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     // Incrementar contador de vistas — excepto cuando el autor ve su propio
-    // artículo (p. ej. mientras lo edita o revisa), para que el contador
-    // refleje interés real de otros usuarios y no las propias visitas.
+    // artículo (p. ej. mientras lo edita o revisa) o cuando este mismo usuario
+    // ya generó una vista de este artículo en los últimos 30 minutos.
     const isOwnArticle = article.authorId === session.user.id
-    if (!isOwnArticle) {
+    const countsAsNewView = !isOwnArticle && shouldCountView(session.user.id, id)
+    if (countsAsNewView) {
       await prisma.knowledge_articles.update({
         where: { id },
         data: {
@@ -145,7 +178,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({
       ...article,
       content,
-      views: isOwnArticle ? article.views : article.views + 1,
+      views: countsAsNewView ? article.views + 1 : article.views,
       helpfulPercentage,
       userVote,
       sourceContext,

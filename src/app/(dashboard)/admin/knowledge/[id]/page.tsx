@@ -103,8 +103,11 @@ export default function AdminKnowledgeDetailPage() {
       if (response.ok) {
         const data = await response.json()
         setArticle(data)
-        // Cargar artículos similares después de cargar el artículo
-        loadSimilarArticles()
+        // Nota: los artículos similares se cargan solo vía el efecto
+        // `[article?.id]` de abajo — llamarlo aquí también leía `article`
+        // desde este mismo closure (aún no actualizado por el setArticle
+        // recién hecho), así que en el primer render era una llamada muerta
+        // y en recargas duplicaba la petición con datos obsoletos.
       } else {
         setError('Artículo no encontrado')
       }

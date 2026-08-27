@@ -76,10 +76,17 @@ export function UsersProvider({ children }: { children: React.ReactNode }) {
 
   const load = useCallback(async () => {
     if (status !== 'authenticated' || !session?.user) return
-    // Clientes no tienen acceso a la lista de usuarios — evitar el 403
-    if (session.user.role === 'CLIENT') {
-      setLoading(false)
-      return
+    // CLIENT/TECHNICIAN solo pueden listar usuarios si tienen canManageNews o
+    // canManageForms (mismo criterio que exige /api/users) — sin este check
+    // cualquier cliente o técnico sin esos permisos disparaba un fetch que el
+    // API siempre rechazaba con 403 (ruido en consola, petición desperdiciada).
+    const role = session.user.role
+    if (role === 'CLIENT' || role === 'TECHNICIAN') {
+      const u = session.user as { canManageNews?: boolean; canManageForms?: boolean }
+      if (!u.canManageNews && !u.canManageForms) {
+        setLoading(false)
+        return
+      }
     }
     setLoading(true)
     try {
