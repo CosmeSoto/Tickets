@@ -24,6 +24,8 @@ interface ExecutiveSummaryTabProps {
   data: FamilyExecutiveSummary[]
   loading: boolean
   isAllFamilies: boolean
+  /** Clic en una fila → salta a "Detalle" filtrado por esa familia. */
+  onFamilyClick?: (familyId: string) => void
 }
 
 function KPICard({
@@ -55,7 +57,12 @@ function KPICard({
   )
 }
 
-export function ExecutiveSummaryTab({ data, loading, isAllFamilies }: ExecutiveSummaryTabProps) {
+export function ExecutiveSummaryTab({
+  data,
+  loading,
+  isAllFamilies,
+  onFamilyClick,
+}: ExecutiveSummaryTabProps) {
   const [columnOrder, setColumnOrder] = useState<string[]>(COLUMN_DEFS.map(c => c.key))
   const [visibleColumns, setVisibleColumns] = useState<string[]>(DEFAULT_VISIBLE)
 
@@ -266,7 +273,11 @@ export function ExecutiveSummaryTab({ data, loading, isAllFamilies }: ExecutiveS
                   return (
                     <tr
                       key={row.familyId}
-                      className='border-b last:border-0 hover:bg-muted/30 transition-colors'
+                      className={`border-b last:border-0 hover:bg-muted/30 transition-colors ${
+                        onFamilyClick ? 'cursor-pointer' : ''
+                      }`}
+                      onClick={() => onFamilyClick?.(row.familyId)}
+                      title={onFamilyClick ? 'Ver tickets de esta familia en Detalle' : undefined}
                     >
                       {columnOrder
                         .filter(k => visibleColumns.includes(k))

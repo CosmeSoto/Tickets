@@ -74,3 +74,16 @@ export interface SatisfactionReport {
 
 export type ReportTab = 'executive' | 'technicians' | 'trends' | 'sla' | 'satisfaction' | 'detail'
 export type Granularity = 'day' | 'week' | 'month'
+
+/**
+ * Drill-down: al hacer clic en una fila de Resumen/Técnicos/SLA, se salta a
+ * la pestaña "Detalle" con estos filtros pre-aplicados. `nonce` cambia en
+ * cada clic (aunque sea el mismo valor) para forzar el refetch.
+ */
+export interface DetailDrillDown {
+  familyId?: string
+  assigneeId?: string
+  priority?: string
+  status?: string
+  nonce: number
+}

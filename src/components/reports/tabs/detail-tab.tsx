@@ -12,7 +12,7 @@
  * espera ese hook.
  */
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { AlertTriangle, ListFilter, RotateCcw, Info } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
@@ -42,6 +42,7 @@ import {
   SLA_STATUS_LABELS,
   type DetailedTicketRow,
 } from '../utils/detail-columns'
+import type { DetailDrillDown } from '../utils/report-types'
 
 // Referencia estable — evita que UserCombobox refetchee en loop por recibir
 // un array literal nuevo en cada render (ver comentario en user-combobox.tsx).
@@ -71,6 +72,8 @@ interface DetailTabProps {
   endDate: string
   /** Familia seleccionada en el filtro global de Reportes ('all' = todas). */
   selectedFamilyId: string
+  /** Filtros pre-cargados por un clic de drill-down desde otra pestaña. */
+  drillDown?: DetailDrillDown | null
 }
 
 function slaVariant(status: string): 'default' | 'destructive' | 'secondary' | 'outline' {
@@ -80,8 +83,12 @@ function slaVariant(status: string): 'default' | 'destructive' | 'secondary' | '
   return 'outline'
 }
 
-export function DetailTab({ startDate, endDate, selectedFamilyId }: DetailTabProps) {
+export function DetailTab({ startDate, endDate, selectedFamilyId, drillDown }: DetailTabProps) {
   const router = useRouter()
+
+  // Último nonce de drill-down ya aplicado — evita reaplicar el mismo clic
+  // dos veces (p. ej. si el componente se re-renderiza por otro motivo).
+  const appliedDrillNonceRef = useRef<number | undefined>(undefined)
 
   const [filters, setFilters] = useState<DraftFilters>(EMPTY_FILTERS)
   const [rows, setRows] = useState<DetailedTicketRow[]>([])
@@ -146,12 +153,28 @@ export function DetailTab({ startDate, endDate, selectedFamilyId }: DetailTabPro
 
   // Carga inicial, y cada vez que cambia el rango de fechas o la familia del
   // filtro global (header de Reportes) — igual que en las otras 5 pestañas.
-  // El resto de filtros usan el botón "Aplicar filtros" para no exceder el
-  // rate limit del endpoint (10/min).
+  // También reacciona a un drill-down (clic en una fila de otra pestaña):
+  // en ese caso reemplaza los filtros por los del drill-down antes de
+  // recargar. Todo queda en un solo efecto para que un drill-down que además
+  // cambia la familia (mismo commit de React) dispare un único fetch, no dos
+  // en carrera. El resto de filtros usan el botón "Aplicar filtros" para no
+  // exceder el rate limit del endpoint (10/min).
   useEffect(() => {
-    void fetchRows(filters, startDate, endDate, selectedFamilyId)
+    if (drillDown && drillDown.nonce !== appliedDrillNonceRef.current) {
+      appliedDrillNonceRef.current = drillDown.nonce
+      const merged: DraftFilters = {
+        ...EMPTY_FILTERS,
+        ...(drillDown.assigneeId ? { assigneeId: drillDown.assigneeId } : {}),
+        ...(drillDown.priority ? { priority: drillDown.priority } : {}),
+        ...(drillDown.status ? { status: drillDown.status } : {}),
+      }
+      setFilters(merged)
+      void fetchRows(merged, startDate, endDate, selectedFamilyId)
+    } else {
+      void fetchRows(filters, startDate, endDate, selectedFamilyId)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [startDate, endDate, selectedFamilyId])
+  }, [startDate, endDate, selectedFamilyId, drillDown?.nonce])
 
   const pagination = usePagination(rows, { pageSize: 20 })
 

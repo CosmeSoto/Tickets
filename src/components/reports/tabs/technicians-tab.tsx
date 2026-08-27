@@ -22,6 +22,8 @@ const DEFAULT_VISIBLE = COLUMN_DEFS.map(c => c.key)
 interface TechniciansTabProps {
   data: TechnicianPerformance[]
   loading: boolean
+  /** Clic en una fila → salta a "Detalle" filtrado por ese técnico. */
+  onTechnicianClick?: (technicianId: string) => void
 }
 
 function EfficiencyBar({ value }: { value: number }) {
@@ -46,7 +48,7 @@ function EfficiencyBar({ value }: { value: number }) {
   )
 }
 
-export function TechniciansTab({ data, loading }: TechniciansTabProps) {
+export function TechniciansTab({ data, loading, onTechnicianClick }: TechniciansTabProps) {
   const [search, setSearch] = useState('')
   const [columnOrder, setColumnOrder] = useState<string[]>(COLUMN_DEFS.map(c => c.key))
   const [visibleColumns, setVisibleColumns] = useState<string[]>(DEFAULT_VISIBLE)
@@ -219,7 +221,13 @@ export function TechniciansTab({ data, loading }: TechniciansTabProps) {
                   return (
                     <tr
                       key={tech.technicianId}
-                      className='border-b last:border-0 hover:bg-muted/30 transition-colors'
+                      className={`border-b last:border-0 hover:bg-muted/30 transition-colors ${
+                        onTechnicianClick ? 'cursor-pointer' : ''
+                      }`}
+                      onClick={() => onTechnicianClick?.(tech.technicianId)}
+                      title={
+                        onTechnicianClick ? 'Ver tickets de este técnico en Detalle' : undefined
+                      }
                     >
                       {columnOrder
                         .filter(k => visibleColumns.includes(k))

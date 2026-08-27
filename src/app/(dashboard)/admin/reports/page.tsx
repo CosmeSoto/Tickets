@@ -7,7 +7,7 @@
  * Reducido de 1,614 líneas a ~200 líneas (87.6% de reducción)
  */
 
-import { useState } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import {
   BarChart3,
   RefreshCw,
@@ -25,6 +25,7 @@ import { ExportButton } from '@/components/common/export-button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useReports } from '@/hooks/use-reports'
 import { ReportFilters } from '@/components/reports/report-filters'
+import type { DetailDrillDown } from '@/components/reports/utils/report-types'
 import {
   ExecutiveSummaryTab,
   TechniciansTab,
@@ -84,6 +85,20 @@ export default function ReportsPage() {
       setExportingExcel(false)
     }
   }
+
+  // Drill-down: clic en una fila de Resumen/Técnicos/SLA salta a "Detalle"
+  // con esos filtros pre-aplicados (y cambia la familia global si aplica).
+  const [detailDrillDown, setDetailDrillDown] = useState<DetailDrillDown | null>(null)
+  const drillNonceRef = useRef(0)
+  const drillDownToDetail = useCallback(
+    (preset: Omit<DetailDrillDown, 'nonce'>) => {
+      if (preset.familyId) setSelectedFamilyId(preset.familyId)
+      drillNonceRef.current += 1
+      setDetailDrillDown({ ...preset, nonce: drillNonceRef.current })
+      setActiveTab('detail')
+    },
+    [setSelectedFamilyId, setActiveTab]
+  )
 
   return (
     <ModuleLayout
@@ -192,11 +207,16 @@ export default function ReportsPage() {
               data={executiveData}
               loading={loadingData}
               isAllFamilies={selectedFamilyId === 'all'}
+              onFamilyClick={familyId => drillDownToDetail({ familyId })}
             />
           </TabsContent>
 
           <TabsContent value='technicians'>
-            <TechniciansTab data={techniciansData} loading={loadingData} />
+            <TechniciansTab
+              data={techniciansData}
+              loading={loadingData}
+              onTechnicianClick={assigneeId => drillDownToDetail({ assigneeId })}
+            />
           </TabsContent>
 
           <TabsContent value='trends'>
@@ -210,7 +230,11 @@ export default function ReportsPage() {
           </TabsContent>
 
           <TabsContent value='sla'>
-            <SLATab data={slaData} loading={loadingData} />
+            <SLATab
+              data={slaData}
+              loading={loadingData}
+              onPriorityClick={(familyId, priority) => drillDownToDetail({ familyId, priority })}
+            />
           </TabsContent>
 
           <TabsContent value='satisfaction'>
@@ -222,6 +246,7 @@ export default function ReportsPage() {
               startDate={startDate}
               endDate={endDate}
               selectedFamilyId={selectedFamilyId}
+              drillDown={detailDrillDown}
             />
           </TabsContent>
         </Tabs>

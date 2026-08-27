@@ -21,6 +21,8 @@ const DEFAULT_VISIBLE = COLUMN_DEFS.map(c => c.key)
 interface SLATabProps {
   data: SLAComplianceRow[]
   loading: boolean
+  /** Clic en una fila de prioridad → salta a "Detalle" filtrado por esa familia + prioridad. */
+  onPriorityClick?: (familyId: string, priority: string) => void
 }
 
 function SLABar({ value }: { value: number }) {
@@ -40,7 +42,7 @@ function SLABar({ value }: { value: number }) {
   )
 }
 
-export function SLATab({ data, loading }: SLATabProps) {
+export function SLATab({ data, loading, onPriorityClick }: SLATabProps) {
   const [columnOrder, setColumnOrder] = useState<string[]>(COLUMN_DEFS.map(c => c.key))
   const [visibleColumns, setVisibleColumns] = useState<string[]>(DEFAULT_VISIBLE)
 
@@ -201,7 +203,15 @@ export function SLATab({ data, loading }: SLATabProps) {
                       return (
                         <tr
                           key={priority}
-                          className='border-b last:border-0 hover:bg-muted/30 transition-colors'
+                          className={`border-b last:border-0 hover:bg-muted/30 transition-colors ${
+                            onPriorityClick ? 'cursor-pointer' : ''
+                          }`}
+                          onClick={() => onPriorityClick?.(familyId, priority)}
+                          title={
+                            onPriorityClick
+                              ? 'Ver tickets de esta familia y prioridad en Detalle'
+                              : undefined
+                          }
                         >
                           {columnOrder
                             .filter(k => visibleColumns.includes(k))
