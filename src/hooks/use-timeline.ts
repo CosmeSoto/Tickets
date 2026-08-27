@@ -33,6 +33,7 @@ export interface TimelineEvent {
     // Para planes de resolución
     planId?: string
     planTitle?: string
+    taskTitle?: string
     status?: string
     totalTasks?: number
     completedTasks?: number

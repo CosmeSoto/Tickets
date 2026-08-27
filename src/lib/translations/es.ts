@@ -5,81 +5,81 @@
 
 // Estados de tickets
 export const TICKET_STATUS_ES: Record<string, string> = {
-  'OPEN': 'ABIERTO',
-  'IN_PROGRESS': 'EN PROGRESO',
-  'PENDING': 'PENDIENTE',
-  'RESOLVED': 'RESUELTO',
-  'CLOSED': 'CERRADO',
-  'CANCELLED': 'CANCELADO',
-  'ON_HOLD': 'EN ESPERA',
+  OPEN: 'ABIERTO',
+  IN_PROGRESS: 'EN PROGRESO',
+  PENDING: 'PENDIENTE',
+  RESOLVED: 'RESUELTO',
+  CLOSED: 'CERRADO',
+  CANCELLED: 'CANCELADO',
+  ON_HOLD: 'EN ESPERA',
 }
 
 // Prioridades
 export const PRIORITY_ES: Record<string, string> = {
-  'LOW': 'BAJA',
-  'MEDIUM': 'MEDIA',
-  'HIGH': 'ALTA',
-  'URGENT': 'URGENTE',
+  LOW: 'BAJA',
+  MEDIUM: 'MEDIA',
+  HIGH: 'ALTA',
+  URGENT: 'URGENTE',
 }
 
 // Estados de tareas
 export const TASK_STATUS_ES: Record<string, string> = {
-  'PENDING': 'PENDIENTE',
-  'IN_PROGRESS': 'EN PROGRESO',
-  'COMPLETED': 'COMPLETADA',
-  'BLOCKED': 'BLOQUEADA',
-  'CANCELLED': 'CANCELADA',
+  PENDING: 'PENDIENTE',
+  IN_PROGRESS: 'EN PROGRESO',
+  COMPLETED: 'COMPLETADA',
+  BLOCKED: 'BLOQUEADA',
+  CANCELLED: 'CANCELADA',
 }
 
 // Roles de usuario
 export const USER_ROLE_ES: Record<string, string> = {
-  'ADMIN': 'ADMINISTRADOR',
-  'TECHNICIAN': 'TÉCNICO',
-  'CLIENT': 'CLIENTE',
-  'MANAGER': 'GERENTE',
+  ADMIN: 'ADMINISTRADOR',
+  TECHNICIAN: 'TÉCNICO',
+  CLIENT: 'CLIENTE',
+  MANAGER: 'GERENTE',
 }
 
 // Estados de artículos de conocimiento
 export const ARTICLE_STATUS_ES: Record<string, string> = {
-  'DRAFT': 'BORRADOR',
-  'PUBLISHED': 'PUBLICADO',
-  'ARCHIVED': 'ARCHIVADO',
+  DRAFT: 'BORRADOR',
+  PUBLISHED: 'PUBLICADO',
+  ARCHIVED: 'ARCHIVADO',
 }
 
 // Tipos de notificación
 export const NOTIFICATION_TYPE_ES: Record<string, string> = {
-  'INFO': 'INFORMACIÓN',
-  'SUCCESS': 'ÉXITO',
-  'WARNING': 'ADVERTENCIA',
-  'CRITICAL': 'CRÍTICO',
-  'ERROR': 'ERROR',
+  INFO: 'INFORMACIÓN',
+  SUCCESS: 'ÉXITO',
+  WARNING: 'ADVERTENCIA',
+  CRITICAL: 'CRÍTICO',
+  ERROR: 'ERROR',
 }
 
 // Días de la semana
 export const DAYS_ES: Record<string, string> = {
-  'Monday': 'Lunes',
-  'Tuesday': 'Martes',
-  'Wednesday': 'Miércoles',
-  'Thursday': 'Jueves',
-  'Friday': 'Viernes',
-  'Saturday': 'Sábado',
-  'Sunday': 'Domingo',
+  Monday: 'Lunes',
+  Tuesday: 'Martes',
+  Wednesday: 'Miércoles',
+  Thursday: 'Jueves',
+  Friday: 'Viernes',
+  Saturday: 'Sábado',
+  Sunday: 'Domingo',
 }
 
 // Meses
 export const MONTHS_ES: Record<string, string> = {
-  'January': 'Enero',
-  'February': 'Febrero',
-  'March': 'Marzo',
-  'April': 'Abril',
-  'May': 'Mayo',
-  'June': 'Junio',
-  'July': 'Julio',
-  'August': 'Agosto',
-  'September': 'Septiembre',
-  'October': 'Octubre',
-  'November': 'Noviembre',
-  'December': 'Diciembre',
+  January: 'Enero',
+  February: 'Febrero',
+  March: 'Marzo',
+  April: 'Abril',
+  May: 'Mayo',
+  June: 'Junio',
+  July: 'Julio',
+  August: 'Agosto',
+  September: 'Septiembre',
+  October: 'Octubre',
+  November: 'Noviembre',
+  December: 'Diciembre',
 }
 
 // Funciones de utilidad para traducción
@@ -92,7 +92,10 @@ export const translatePriority = (priority: string): string => {
 }
 
 export const translateTaskStatus = (status: string): string => {
-  return TASK_STATUS_ES[status] || status
+  // resolution_tasks.status es un string libre en minúsculas ('pending', 'in_progress', ...)
+  // a diferencia de tickets.status/priority que son enums de Prisma ya en mayúsculas.
+  // Normalizamos a mayúsculas para que el lookup funcione con ambos casos.
+  return TASK_STATUS_ES[status?.toUpperCase()] || status
 }
 
 export const translateUserRole = (role: string): string => {
@@ -130,7 +133,7 @@ export const formatRelativeTimeES = (date: Date | string): string => {
   const d = typeof date === 'string' ? new Date(date) : date
   const now = new Date()
   const diff = now.getTime() - d.getTime()
-  
+
   const seconds = Math.floor(diff / 1000)
   const minutes = Math.floor(seconds / 60)
   const hours = Math.floor(minutes / 60)
@@ -138,7 +141,7 @@ export const formatRelativeTimeES = (date: Date | string): string => {
   const weeks = Math.floor(days / 7)
   const months = Math.floor(days / 30)
   const years = Math.floor(days / 365)
-  
+
   if (seconds < 60) return 'hace un momento'
   if (minutes < 60) return `hace ${minutes} minuto${minutes !== 1 ? 's' : ''}`
   if (hours < 24) return `hace ${hours} hora${hours !== 1 ? 's' : ''}`

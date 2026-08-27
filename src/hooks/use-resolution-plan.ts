@@ -16,6 +16,8 @@ export interface ResolutionTask {
   priority: 'low' | 'medium' | 'high'
   estimatedHours?: number
   actualHours?: number
+  startTime?: string
+  endTime?: string
   assignedTo?: {
     id: string
     name: string
@@ -524,6 +526,68 @@ export function useResolutionPlan(ticketId: string, onPlanChange?: () => void) {
     }
   }
 
+  /** Edita título/descripción/prioridad/fecha/horario de una tarea existente
+   *  (p. ej. desde el ítem "Editar" del menú de una tarea — el quick-add solo
+   *  pide título, así que estos detalles se agregan/ajustan después). */
+  const updateTask = async (
+    taskId: string,
+    updates: Partial<{
+      title: string
+      description: string
+      priority: ResolutionTask['priority']
+      dueDate: string
+      startTime: string
+      endTime: string
+    }>
+  ) => {
+    try {
+      const body: Record<string, unknown> = {}
+      if (updates.title !== undefined) body.title = updates.title.trim()
+      if (updates.description !== undefined) body.description = updates.description.trim() || null
+      if (updates.priority !== undefined) body.priority = updates.priority
+      if (updates.dueDate !== undefined) body.dueDate = updates.dueDate || null
+      if (updates.startTime !== undefined) body.startTime = updates.startTime || null
+      if (updates.endTime !== undefined) body.endTime = updates.endTime || null
+
+      const response = await fetch(`/api/tickets/${ticketId}/resolution-plan/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}))
+        throw new Error((err as any).message || 'Error al actualizar tarea')
+      }
+
+      const data = await response.json()
+      if (data.success) {
+        setPlan(prev =>
+          prev
+            ? {
+                ...prev,
+                tasks: prev.tasks.map(t => (t.id === taskId ? { ...t, ...data.data } : t)),
+              }
+            : prev
+        )
+        onPlanChangeRef.current?.()
+        toast({
+          title: 'Tarea actualizada',
+          description: `"${data.data.title}" ha sido actualizada`,
+        })
+        return true
+      }
+      return false
+    } catch (err) {
+      toast({
+        variant: 'destructive',
+        title: 'Error al actualizar tarea',
+        description: err instanceof Error ? err.message : 'No se pudo actualizar la tarea',
+      })
+      return false
+    }
+  }
+
   const updateTaskStatus = async (taskId: string, status: ResolutionTask['status']) => {
     try {
       const task = plan?.tasks.find(t => t.id === taskId)
@@ -698,6 +762,7 @@ export function useResolutionPlan(ticketId: string, onPlanChange?: () => void) {
 
     // Acciones de tareas
     addTask,
+    updateTask,
     updateTaskStatus,
     deleteTask,
 

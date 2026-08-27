@@ -250,7 +250,18 @@ function generateTitle(
     case 'resolution_task_created':
       return 'Nueva tarea agregada'
     case 'resolution_task_updated':
-      return 'Tarea actualizada'
+      switch (newValue) {
+        case 'completed':
+          return 'Tarea completada'
+        case 'in_progress':
+          return 'Tarea en progreso'
+        case 'blocked':
+          return 'Tarea bloqueada'
+        case 'pending':
+          return 'Tarea marcada como pendiente'
+        default:
+          return 'Tarea actualizada'
+      }
     case 'resolution_task_deleted':
       return 'Tarea eliminada'
     case 'rating_submitted':
@@ -414,6 +425,28 @@ function parseMetadata(
     // Fallback final: usar newValue/oldValue como título
     if (!metadata.planTitle) {
       metadata.planTitle = newValue || oldValue
+    }
+  }
+
+  // Para tareas del plan (creación o cambio de estado), el comment guarda un
+  // snapshot JSON con el título/estado/prioridad de la tarea EN ESE MOMENTO.
+  // Sin esto, el evento solo mostraba el título genérico de la acción
+  // ("Nueva tarea agregada" / "Tarea actualizada") sin decir de qué tarea se
+  // trataba ni su prioridad/fecha — la información quedaba invisible en el
+  // historial aunque ya se guardaba en BD.
+  if (action.includes('resolution_task') && comment) {
+    try {
+      const savedMeta = JSON.parse(comment)
+      if (savedMeta.taskTitle) metadata.taskTitle = savedMeta.taskTitle
+      if (savedMeta.planTitle) metadata.planTitle = savedMeta.planTitle
+      if (savedMeta.description) metadata.description = savedMeta.description
+      if (savedMeta.priority) metadata.priority = savedMeta.priority
+      if (savedMeta.status) metadata.status = savedMeta.status
+      if (savedMeta.dueDate) metadata.dueDate = savedMeta.dueDate
+      if (savedMeta.estimatedHours != null) metadata.estimatedHours = savedMeta.estimatedHours
+      if (savedMeta.completedAt) metadata.completedAt = savedMeta.completedAt
+    } catch {
+      // comment no es JSON, ignorar
     }
   }
 

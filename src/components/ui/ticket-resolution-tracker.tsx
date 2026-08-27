@@ -175,6 +175,7 @@ export function TicketResolutionTracker({
             newTask={hook.newTask}
             setNewTask={hook.setNewTask}
             onAddTask={hook.addTask}
+            onUpdateTask={hook.updateTask}
             onUpdateTaskStatus={hook.updateTaskStatus}
             onDeleteTask={hook.setTaskToDelete}
           />

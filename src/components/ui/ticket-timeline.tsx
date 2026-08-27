@@ -1094,7 +1094,9 @@ export function TicketTimeline({
                                 {(event.type === 'resolution_plan' ||
                                   event.type === 'resolution_task') && (
                                   <p className='text-sm text-muted-foreground mt-0.5'>
-                                    {event.title}
+                                    {event.metadata?.taskTitle
+                                      ? `${event.title}: "${event.metadata.taskTitle}"`
+                                      : event.title}
                                   </p>
                                 )}
                                 {renderEventMetadata(event)}

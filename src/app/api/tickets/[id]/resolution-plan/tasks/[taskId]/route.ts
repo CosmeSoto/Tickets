@@ -201,6 +201,36 @@ export async function PATCH(
 
     // Si cambió el estado de completitud, actualizar contador en el plan
     if (body.status !== undefined && body.status !== oldStatus) {
+      // Registrar el cambio de estado de la tarea en el historial del ticket —
+      // antes solo se registraba la creación de la tarea y (si completaba TODO
+      // el plan) el cierre del plan, así que marcar una tarea individual como
+      // completada/en progreso/bloqueada era invisible en "Historial".
+      try {
+        await prisma.ticket_history.create({
+          data: {
+            id: crypto.randomUUID(),
+            ticketId: task.plan.ticketId,
+            userId: session.user.id,
+            action: 'resolution_task_updated',
+            field: 'resolution_task',
+            oldValue: oldStatus,
+            newValue: body.status,
+            comment: JSON.stringify({
+              planTitle: task.plan.title,
+              taskTitle: updatedTask.title,
+              priority: updatedTask.priority,
+              status: updatedTask.status,
+              dueDate: updatedTask.dueDate?.toISOString() || null,
+              estimatedHours: updatedTask.estimatedHours,
+              completedAt: updatedTask.completedAt?.toISOString() || null,
+            }),
+            createdAt: new Date(),
+          },
+        })
+      } catch (historyError) {
+        console.error('[API] Error creating task status history:', historyError)
+      }
+
       const allTasks = await prisma.resolution_tasks.findMany({
         where: { planId: task.planId },
       })
