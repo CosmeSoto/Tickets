@@ -115,6 +115,11 @@ export default function TechnicianTicketDetailPage() {
   const [showRatingModal, setShowRatingModal] = useState(false)
   const prevStatusRef = useRef<string | null>(null)
   const initialRatingPromptDone = useRef(false)
+  // Evita recargar el ticket (y mostrar el skeleton "Cargando...") cada vez que
+  // `session` recibe una referencia nueva por el refetch periódico de NextAuth
+  // (~5 min, foco de ventana, o el sync de actividad de SessionTimeoutMonitor
+  // cada ~60s) — mismo patrón que admin/settings y admin/backups.
+  const ticketLoadedRef = useRef<string | null>(null)
 
   const isAssignedResolver = ticket?.assignee?.id === session?.user?.id
   const isUnassigned = !ticket?.assignee
@@ -144,8 +149,11 @@ export default function TechnicianTicketDetailPage() {
       router.push('/login')
       return
     }
-    if (ticketId) loadTicket()
-  }, [session, authStatus, ticketId]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (ticketId && ticketLoadedRef.current !== ticketId) {
+      ticketLoadedRef.current = ticketId
+      loadTicket()
+    }
+  }, [authStatus, session?.user?.id, session?.user?.role, ticketId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const refreshTicketSilent = useCallback(async () => {
     if (!ticketId) return
