@@ -32,6 +32,7 @@ function AuditPageContent() {
   const {
     session,
     status,
+    isSuperAdmin,
     logs,
     stats,
     families,
@@ -47,9 +48,12 @@ function AuditPageContent() {
     columnOrder,
     visibleColumns,
     includeSensitive,
+    selectedIds,
+    deleting,
     setColumnOrder,
     setVisibleColumns,
     setIncludeSensitive,
+    setSelectedIds,
     updateFilter,
     clearFilters,
     applyPreset,
@@ -62,12 +66,13 @@ function AuditPageContent() {
     handleExportJSON,
     handleExportJSONInternal,
     handleExportPDFFull,
+    deleteSelected,
+    deleteFiltered,
   } = useAudit()
 
   const { toast } = useToast()
 
-  const toastOk = (msg: string) =>
-    toast({ title: 'Exportación completada', description: msg })
+  const toastOk = (msg: string) => toast({ title: 'Exportación completada', description: msg })
   const toastErr = (err: string) =>
     toast({ title: 'Error al exportar', description: err, variant: 'destructive' })
   const toastInternalOk = (msg: string) =>
@@ -76,6 +81,9 @@ function AuditPageContent() {
       description: msg,
       variant: 'destructive',
     })
+  const toastDeleteOk = (msg: string) => toast({ title: 'Registros eliminados', description: msg })
+  const toastDeleteErr = (err: string) =>
+    toast({ title: 'Error al eliminar', description: err, variant: 'destructive' })
 
   if (status === 'loading') {
     return (
@@ -124,6 +132,12 @@ function AuditPageContent() {
           onExportJSON={() => handleExportJSON(toastOk, toastErr)}
           onExportJSONInternal={() => handleExportJSONInternal(toastInternalOk, toastErr)}
           onExportPDF={() => handleExportPDFFull(toastOk, toastErr)}
+          isSuperAdmin={isSuperAdmin}
+          selectedCount={selectedIds.length}
+          filteredTotal={pagination.total}
+          deleting={deleting}
+          onDeleteSelected={() => deleteSelected(toastDeleteOk, toastDeleteErr)}
+          onDeleteFiltered={() => deleteFiltered(toastDeleteOk, toastDeleteErr)}
         />
 
         <AuditTable
@@ -134,6 +148,9 @@ function AuditPageContent() {
           onPageChange={handlePageChange}
           onLimitChange={handleLimitChange}
           onClearFilters={clearFilters}
+          selectable={isSuperAdmin}
+          selectedIds={selectedIds}
+          onSelectedIdsChange={setSelectedIds}
         />
       </div>
 

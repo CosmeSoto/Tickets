@@ -43,6 +43,10 @@ export type BackupOperationEntry = {
   async: boolean
   size: number | null
   backupType: string | null
+  /** IDs reales de audit_logs que representan esta entrada (para poder borrarla). */
+  auditLogIds: string[]
+  /** false para entradas sintéticas sin fila real en audit_logs (legacy / job en curso). */
+  deletable: boolean
 }
 
 /** @deprecated use BackupOperationEntry */
@@ -116,6 +120,8 @@ function parseRestoreHistoryFromAudits(
       async: details.async === true,
       size: null,
       backupType: typeof details.type === 'string' ? details.type : null,
+      auditLogIds: outcome ? [start.id, outcome.id] : [start.id],
+      deletable: true,
     }
   })
 
@@ -158,6 +164,8 @@ function parseRestoreHistoryFromAudits(
         async: d.async === true,
         size: null,
         backupType: typeof d.type === 'string' ? d.type : null,
+        auditLogIds: [o.id],
+        deletable: true,
       }
     })
 
@@ -198,6 +206,8 @@ function mapSimpleAuditToOperation(audit: {
         async: false,
         size,
         backupType,
+        auditLogIds: [audit.id],
+        deletable: true,
       }
     case 'backup_imported':
       return {
@@ -217,6 +227,8 @@ function mapSimpleAuditToOperation(audit: {
         async: false,
         size,
         backupType: 'manual',
+        auditLogIds: [audit.id],
+        deletable: true,
       }
     case 'backup_deleted':
       return {
@@ -236,6 +248,8 @@ function mapSimpleAuditToOperation(audit: {
         async: false,
         size: null,
         backupType: null,
+        auditLogIds: [audit.id],
+        deletable: true,
       }
     case 'backup_uploaded_cloud':
       return {
@@ -255,6 +269,8 @@ function mapSimpleAuditToOperation(audit: {
         async: false,
         size,
         backupType: null,
+        auditLogIds: [audit.id],
+        deletable: true,
       }
     default:
       return null
@@ -361,6 +377,8 @@ export async function getBackupOperationsHistory(options?: {
       async: false,
       size: b.size,
       backupType: b.type,
+      auditLogIds: [],
+      deletable: false,
     }))
 
   const merged = [...restoreEntries, ...otherEntries, ...legacyEntries].sort(
@@ -489,6 +507,8 @@ export function mergeWorkerJobIntoHistory(
         async: true,
         size: null,
         backupType: null,
+        auditLogIds: [],
+        deletable: false,
       },
       ...entries,
     ]

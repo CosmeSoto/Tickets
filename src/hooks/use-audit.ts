@@ -84,6 +84,10 @@ export function useAudit() {
   const [includeSensitive, setIncludeSensitive] = useState(true)
   const [exporting, setExporting] = useState(false)
 
+  /** Selección de filas y borrado — solo Super Admin */
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [deleting, setDeleting] = useState(false)
+
   const tabularExportKeys = useCallback(() => {
     return resolveAuditExportKeys(
       columnOrder.filter(
@@ -219,6 +223,60 @@ export function useAudit() {
       loadAuditData()
     }
   }, [filters, status, session, loadAuditData])
+
+  // Selección de filas depende de la página/filtro actual — se limpia al recargar
+  useEffect(() => {
+    setSelectedIds([])
+  }, [logs])
+
+  /** Elimina los logs seleccionados por checkbox (Super Admin) */
+  const deleteSelected = useCallback(
+    async (onSuccess: (message: string) => void, onError: (error: string) => void) => {
+      if (selectedIds.length === 0) return
+      try {
+        setDeleting(true)
+        const res = await fetch('/api/admin/audit/logs', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids: selectedIds }),
+        })
+        const data = await res.json()
+        if (!res.ok || !data.success) throw new Error(data.error || 'No se pudo eliminar')
+        onSuccess(`${data.deletedCount} registro(s) eliminado(s).`)
+        setSelectedIds([])
+        await loadAuditData(1, pagination.limit)
+      } catch (error) {
+        onError(error instanceof Error ? error.message : 'Error desconocido')
+      } finally {
+        setDeleting(false)
+      }
+    },
+    [selectedIds, loadAuditData, pagination.limit]
+  )
+
+  /** Elimina todos los logs que coinciden con el filtro actual (Super Admin) */
+  const deleteFiltered = useCallback(
+    async (onSuccess: (message: string) => void, onError: (error: string) => void) => {
+      try {
+        setDeleting(true)
+        const res = await fetch('/api/admin/audit/logs', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filters, days: filters.days }),
+        })
+        const data = await res.json()
+        if (!res.ok || !data.success) throw new Error(data.error || 'No se pudo eliminar')
+        onSuccess(`${data.deletedCount} registro(s) eliminado(s).`)
+        setSelectedIds([])
+        await loadAuditData(1, pagination.limit)
+      } catch (error) {
+        onError(error instanceof Error ? error.message : 'Error desconocido')
+      } finally {
+        setDeleting(false)
+      }
+    },
+    [filters, loadAuditData, pagination.limit]
+  )
 
   const runExport = useCallback(
     (
@@ -382,9 +440,12 @@ export function useAudit() {
     columnOrder,
     visibleColumns,
     includeSensitive,
+    selectedIds,
+    deleting,
     setColumnOrder,
     setVisibleColumns,
     setIncludeSensitive,
+    setSelectedIds,
     loadAuditData,
     updateFilter,
     clearFilters,
@@ -398,5 +459,7 @@ export function useAudit() {
     handleExportJSON,
     handleExportJSONInternal,
     handleExportPDFFull,
+    deleteSelected,
+    deleteFiltered,
   }
 }

@@ -3,7 +3,8 @@
  * Handles all filter controls for audit logs
  */
 
-import { Filter, Search, Download } from 'lucide-react'
+import { useState } from 'react'
+import { Filter, Search, Download, Trash2 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -14,6 +15,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { TableColumnsMenu } from '@/components/common/table-columns-menu'
 import type { AuditFilters } from './utils/audit-types'
 import type { Family } from '@/components/reports/utils/report-types'
@@ -50,6 +61,13 @@ interface AuditFiltersProps {
   /** JSON interno sin enmascarar (acceso discreto) */
   onExportJSONInternal?: () => void
   onExportPDF?: () => void
+  /** Eliminación de logs — solo Super Admin */
+  isSuperAdmin?: boolean
+  selectedCount?: number
+  filteredTotal?: number
+  deleting?: boolean
+  onDeleteSelected?: () => void
+  onDeleteFiltered?: () => void
 }
 
 export function AuditFiltersComponent({
@@ -73,8 +91,17 @@ export function AuditFiltersComponent({
   onExportJSON,
   onExportJSONInternal,
   onExportPDF,
+  isSuperAdmin = false,
+  selectedCount = 0,
+  filteredTotal = 0,
+  deleting = false,
+  onDeleteSelected,
+  onDeleteFiltered,
 }: AuditFiltersProps) {
-  const busy = loading || Boolean(exporting)
+  const busy = loading || Boolean(exporting) || deleting
+  const [confirmSelectedOpen, setConfirmSelectedOpen] = useState(false)
+  const [confirmFilteredOpen, setConfirmFilteredOpen] = useState(false)
+  const [confirmText, setConfirmText] = useState('')
   // CSV/Excel/PDF: solo columnas no sensibles (LOPDP)
   const columnDefs = AUDIT_COLUMN_DEFS.filter(
     c => !SENSITIVE_AUDIT_COLUMNS.includes(c.key as never)
@@ -310,6 +337,44 @@ export function AuditFiltersComponent({
           </div>
         </div>
 
+        {isSuperAdmin && (onDeleteSelected || onDeleteFiltered) && (
+          <div className='space-y-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3 sm:p-4'>
+            <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
+              <div className='min-w-0'>
+                <p className='text-sm font-medium'>Eliminar</p>
+                <p className='text-xs text-muted-foreground'>
+                  Solo Super Admin. Acción irreversible — queda registrada en auditoría.
+                </p>
+              </div>
+              <div className='flex flex-wrap gap-2 items-center'>
+                <Button
+                  onClick={() => setConfirmSelectedOpen(true)}
+                  variant='destructive'
+                  size='sm'
+                  disabled={busy || selectedCount === 0}
+                  className='min-h-9'
+                >
+                  <Trash2 className='h-4 w-4 mr-1' />
+                  Eliminar seleccionados ({selectedCount})
+                </Button>
+                <Button
+                  onClick={() => {
+                    setConfirmText('')
+                    setConfirmFilteredOpen(true)
+                  }}
+                  variant='destructive'
+                  size='sm'
+                  disabled={busy || filteredTotal === 0}
+                  className='min-h-9'
+                >
+                  <Trash2 className='h-4 w-4 mr-1' />
+                  Vaciar según filtro ({filteredTotal})
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {hasActiveFilters && (
           <div className='mt-4 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg'>
             <div className='text-sm text-blue-800 dark:text-blue-200 break-words'>
@@ -327,6 +392,66 @@ export function AuditFiltersComponent({
           </div>
         )}
       </CardContent>
+
+      <AlertDialog open={confirmSelectedOpen} onOpenChange={setConfirmSelectedOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar {selectedCount} registro(s) de auditoría?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción es permanente y no se puede deshacer. Quedará registrada en auditoría.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={e => {
+                e.preventDefault()
+                onDeleteSelected?.()
+                setConfirmSelectedOpen(false)
+              }}
+              disabled={deleting}
+              className='bg-destructive text-destructive-foreground hover:bg-destructive/90'
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmFilteredOpen} onOpenChange={setConfirmFilteredOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Vaciar {filteredTotal} registro(s)?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se eliminarán TODOS los logs de auditoría que coinciden con el filtro actualmente
+              aplicado
+              {hasActiveFilters ? '' : ' (no hay filtros activos: se borrará todo el historial)'}.
+              Esta acción es permanente y no se puede deshacer. Escribe <strong>ELIMINAR</strong>{' '}
+              para confirmar.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Input
+            value={confirmText}
+            onChange={e => setConfirmText(e.target.value)}
+            placeholder='ELIMINAR'
+            autoFocus
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={e => {
+                e.preventDefault()
+                onDeleteFiltered?.()
+                setConfirmFilteredOpen(false)
+              }}
+              disabled={deleting || confirmText !== 'ELIMINAR'}
+              className='bg-destructive text-destructive-foreground hover:bg-destructive/90'
+            >
+              Vaciar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   )
 }

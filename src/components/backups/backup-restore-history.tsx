@@ -1,10 +1,22 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useSession } from 'next-auth/react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import {
   CheckCircle,
   Clock,
@@ -20,6 +32,7 @@ import {
 } from 'lucide-react'
 import { BackupSectionToolbar } from '@/components/backups/backup-section-toolbar'
 import { useExport } from '@/hooks/common/use-export'
+import { useToast } from '@/hooks/use-toast'
 import {
   engineLabel,
   formatOperationDuration,
@@ -45,6 +58,8 @@ export type BackupOperationEntry = {
   async: boolean
   size: number | null
   backupType: string | null
+  auditLogIds: string[]
+  deletable: boolean
 }
 
 interface BackupOperationsHistoryProps {
@@ -113,6 +128,11 @@ function statusBadge(entry: BackupOperationEntry) {
 }
 
 export function BackupOperationsHistory({ refreshKey = 0 }: BackupOperationsHistoryProps) {
+  const { data: session } = useSession()
+  const isSuperAdmin =
+    (session?.user as { isSuperAdmin?: boolean } | undefined)?.isSuperAdmin === true
+  const { toast } = useToast()
+
   const [history, setHistory] = useState<BackupOperationEntry[]>([])
   const [activeJob, setActiveJob] = useState<{
     label?: string | null
@@ -124,6 +144,9 @@ export function BackupOperationsHistory({ refreshKey = 0 }: BackupOperationsHist
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(0)
   const [hasMore, setHasMore] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   const loadHistory = useCallback(async (append = false, pageIndex = 0) => {
     try {
@@ -174,6 +197,48 @@ export function BackupOperationsHistory({ refreshKey = 0 }: BackupOperationsHist
     [history, search]
   )
 
+  const toggleSelected = useCallback((id: string, checked: boolean) => {
+    setSelectedIds(prev => (checked ? [...new Set([...prev, id])] : prev.filter(i => i !== id)))
+  }, [])
+
+  const handleDeleteSelected = useCallback(async () => {
+    const auditLogIds = history
+      .filter(entry => selectedIds.includes(entry.id))
+      .flatMap(entry => entry.auditLogIds)
+
+    if (auditLogIds.length === 0) {
+      setConfirmDeleteOpen(false)
+      return
+    }
+
+    try {
+      setDeleting(true)
+      const res = await fetch('/api/admin/audit/logs', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: auditLogIds }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) throw new Error(data.error || 'No se pudo eliminar')
+
+      toast({
+        title: 'Historial actualizado',
+        description: `${selectedIds.length} operación(es) eliminada(s) del historial.`,
+      })
+      setSelectedIds([])
+      setConfirmDeleteOpen(false)
+      void loadHistory(false, 0)
+    } catch (err) {
+      toast({
+        title: 'Error al eliminar',
+        description: err instanceof Error ? err.message : 'Error desconocido',
+        variant: 'destructive',
+      })
+    } finally {
+      setDeleting(false)
+    }
+  }, [history, selectedIds, toast, loadHistory])
+
   const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
     filename: 'operaciones-backup',
     title: 'Historial de operaciones de backup',
@@ -212,16 +277,29 @@ export function BackupOperationsHistory({ refreshKey = 0 }: BackupOperationsHist
               Creaciones, restauraciones e importaciones. Detalle completo en Admin → Auditoría.
             </CardDescription>
           </div>
-          <Button
-            variant='outline'
-            size='sm'
-            onClick={() => void loadHistory(false, 0)}
-            disabled={loading}
-            title='Recargar historial'
-          >
-            <RefreshCw className={`h-4 w-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
-            Recargar
-          </Button>
+          <div className='flex items-center gap-2 flex-shrink-0'>
+            {isSuperAdmin && selectedIds.length > 0 && (
+              <Button
+                variant='destructive'
+                size='sm'
+                onClick={() => setConfirmDeleteOpen(true)}
+                disabled={deleting}
+              >
+                <Trash2 className='h-4 w-4 mr-1' />
+                Eliminar seleccionados ({selectedIds.length})
+              </Button>
+            )}
+            <Button
+              variant='outline'
+              size='sm'
+              onClick={() => void loadHistory(false, 0)}
+              disabled={loading}
+              title='Recargar historial'
+            >
+              <RefreshCw className={`h-4 w-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
+              Recargar
+            </Button>
+          </div>
         </div>
         <BackupSectionToolbar
           search={search}
@@ -279,6 +357,22 @@ export function BackupOperationsHistory({ refreshKey = 0 }: BackupOperationsHist
                   >
                     <div className='flex flex-wrap items-center justify-between gap-2'>
                       <div className='flex items-start gap-2 min-w-0'>
+                        {isSuperAdmin &&
+                          (entry.deletable ? (
+                            <Checkbox
+                              className='mt-1'
+                              checked={selectedIds.includes(entry.id)}
+                              onCheckedChange={checked =>
+                                toggleSelected(entry.id, checked === true)
+                              }
+                              aria-label='Seleccionar operación'
+                            />
+                          ) : (
+                            <div
+                              className='mt-1 h-4 w-4 shrink-0'
+                              title='Vinculado a un backup existente: elimínalo desde la lista de backups'
+                            />
+                          ))}
                         <Icon className='h-4 w-4 text-primary mt-0.5 shrink-0' />
                         <div className='min-w-0'>
                           <p className='font-medium text-sm'>{operationTitle(entry)}</p>
@@ -333,6 +427,33 @@ export function BackupOperationsHistory({ refreshKey = 0 }: BackupOperationsHist
           </>
         )}
       </CardContent>
+
+      <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              ¿Eliminar {selectedIds.length} operación(es) del historial?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Se eliminarán permanentemente los registros de auditoría asociados a las operaciones
+              seleccionadas. Esta acción no se puede deshacer y no afecta a los archivos de backup.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={e => {
+                e.preventDefault()
+                void handleDeleteSelected()
+              }}
+              disabled={deleting}
+              className='bg-destructive text-destructive-foreground hover:bg-destructive/90'
+            >
+              {deleting ? 'Eliminando…' : 'Eliminar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   )
 }

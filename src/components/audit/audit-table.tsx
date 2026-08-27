@@ -18,6 +18,10 @@ interface AuditTableProps {
   onPageChange: (page: number) => void
   onLimitChange: (limit: number) => void
   onClearFilters: () => void
+  /** Selección de filas — solo Super Admin la usa (borrado de logs) */
+  selectable?: boolean
+  selectedIds?: string[]
+  onSelectedIdsChange?: (ids: string[]) => void
 }
 
 export function AuditTable({
@@ -28,6 +32,9 @@ export function AuditTable({
   onPageChange,
   onLimitChange,
   onClearFilters,
+  selectable = false,
+  selectedIds,
+  onSelectedIdsChange,
 }: AuditTableProps) {
   const columns = getAuditColumns(onViewDetails)
 
@@ -68,6 +75,9 @@ export function AuditTable({
             columns={columns}
             loading={loading}
             searchable={false}
+            selectable={selectable}
+            selectedIds={selectedIds}
+            onSelectedIdsChange={onSelectedIdsChange}
             pagination={{
               page: pagination.page,
               limit: pagination.limit,
