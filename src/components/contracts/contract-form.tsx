@@ -218,6 +218,18 @@ export function ContractForm({
     showErrorToast: false,
   })
 
+  // Responsable operativo ya asignado (contract_assignments, panel más abajo) — atajo para
+  // no volver a elegir a la misma persona como custodio de gobernanza.
+  const { data: activeResponsibleData } = useFetch<{
+    id: string
+    client: { id: string; name: string; email: string }
+  }>(contract?.id ? `/api/inventory/contracts/${contract.id}/assignments` : '', {
+    enabled: isEditing && !!contract?.id,
+    transform: d => (d.active ? [d.active] : []),
+    showErrorToast: false,
+  })
+  const activeResponsible = activeResponsibleData[0]?.client ?? null
+
   type ServiceTypeRow = { id: string; code: string; name: string }
   const [serviceTypes, setServiceTypes] = useState<ServiceTypeRow[]>([])
 
@@ -1007,7 +1019,7 @@ export function ContractForm({
         {/* ── 4. Responsables ─────────────────────────────────────────────── */}
         <ContractFormSection
           title='4. Responsables (custodios)'
-          description='Quien cuida la relación comercial con el proveedor. No es el método de cobro: eso va en Pagos. Si no eliges custodio principal, se asigna quien crea el contrato.'
+          description='Quien cuida la relación comercial con el proveedor y recibe los avisos de vencimiento/riesgo. No es el método de cobro (eso va en Pagos) ni la custodia legal con actas (eso va en «Responsable operativo», más abajo). Si no eliges custodio principal, se asigna quien crea el contrato.'
           badge='Opcional'
           defaultOpen={false}
         >
@@ -1022,6 +1034,17 @@ export function ContractForm({
                 }
                 placeholder='Tú, u otro responsable...'
               />
+              {activeResponsible && watch('custodianUserId') !== activeResponsible.id && (
+                <button
+                  type='button'
+                  onClick={() =>
+                    setValue('custodianUserId', activeResponsible.id, { shouldDirty: true })
+                  }
+                  className='text-xs text-primary hover:underline mt-1'
+                >
+                  Usar el mismo responsable operativo: {activeResponsible.name}
+                </button>
+              )}
             </div>
             <div className='space-y-1'>
               <Label>Custodio de respaldo</Label>

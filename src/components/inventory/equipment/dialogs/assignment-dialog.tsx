@@ -1,6 +1,6 @@
 'use client'
 
-import { Loader2 } from 'lucide-react'
+import { Loader2, UserCheck } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/select'
 import { AssignableUserSelect } from '@/components/inventory/shared/AssignableUserSelect'
 import { getEquipmentDisplayName } from '@/lib/utils/equipment-display'
+import { useFetch } from '@/hooks/common/use-fetch'
 import type { AssignmentForm } from '../utils/equipment-types'
 
 interface AssignmentDialogProps {
@@ -33,6 +34,8 @@ interface AssignmentDialogProps {
   equipmentModelName?: string
   /** familyId del equipo — filtra los usuarios asignables */
   familyId?: string
+  /** Contrato vinculado a este equipo, si existe — habilita el atajo de responsable. */
+  contractId?: string | null
   form: AssignmentForm
   onFormChange: (form: AssignmentForm) => void
   onSubmit: () => void
@@ -48,6 +51,7 @@ export function AssignmentDialog({
   equipmentBrandName,
   equipmentModelName,
   familyId,
+  contractId,
   form,
   onFormChange,
   onSubmit,
@@ -59,6 +63,18 @@ export function AssignmentDialog({
     equipmentBrandName,
     equipmentModelName,
   })
+
+  // Responsable ya asignado en el contrato vinculado (contract_assignments) — atajo para
+  // no volver a buscarlo en la lista completa cuando coincide con quien recibirá el equipo.
+  const { data: contractAssignments } = useFetch<{
+    id: string
+    client: { id: string; name: string; email: string }
+  }>(contractId ? `/api/inventory/contracts/${contractId}/assignments` : '', {
+    enabled: open && !!contractId,
+    transform: d => (d.active ? [d.active] : []),
+    showErrorToast: false,
+  })
+  const contractResponsible = contractAssignments[0]?.client ?? null
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -77,6 +93,19 @@ export function AssignmentDialog({
           }}
         >
           <div className='space-y-4 py-2'>
+            {contractResponsible && contractResponsible.id !== form.receiverId && (
+              <button
+                type='button'
+                onClick={() => onFormChange({ ...form, receiverId: contractResponsible.id })}
+                className='flex w-full items-center gap-2 rounded-md border border-dashed px-3 py-2 text-left text-xs hover:bg-muted/50 transition-colors'
+              >
+                <UserCheck className='h-3.5 w-3.5 text-primary shrink-0' />
+                <span>
+                  Usar el mismo responsable del contrato:{' '}
+                  <span className='font-medium text-foreground'>{contractResponsible.name}</span>
+                </span>
+              </button>
+            )}
             {/* Selector de usuario con departamento auto-rellenado */}
             <AssignableUserSelect
               familyId={familyId}

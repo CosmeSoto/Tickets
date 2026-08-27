@@ -2,7 +2,7 @@
 
 import { use } from 'react'
 import { useRouter } from 'next/navigation'
-import { useSession } from 'next-auth/react'
+import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 import { useEffect } from 'react'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { ConsumableDetail } from '@/components/inventory/consumable-detail'
@@ -13,7 +13,7 @@ interface PageProps {
 
 export default function SuministroDetailPage({ params }: PageProps) {
   const { id } = use(params)
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAuthReady()
   const router = useRouter()
 
   useEffect(() => {

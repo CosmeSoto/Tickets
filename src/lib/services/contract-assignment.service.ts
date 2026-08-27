@@ -95,20 +95,23 @@ export class ContractAssignmentService {
       where: { id: data.clientId },
       select: { id: true, name: true, role: true, isActive: true },
     })
-    if (!client || !client.isActive) throw new Error('Cliente no encontrado o inactivo')
-    if (client.role !== 'CLIENT') {
-      throw new Error('Solo se pueden asignar usuarios con rol Cliente')
-    }
+    if (!client || !client.isActive) throw new Error('Usuario no encontrado o inactivo')
 
-    const { userHasFamilyInModule } = await import('@/lib/auth/user-family-access')
-    const hasAccess = await userHasFamilyInModule(
-      data.clientId,
-      'tickets',
-      contract.familyId,
-      'canConsume'
-    )
-    if (!hasAccess) {
-      throw new Error('El cliente no tiene acceso al área de este contrato')
+    // Clientes externos (portal) requieren acceso explícito otorgado al área, igual que
+    // para consumir tickets de esa familia. El personal interno (Admin/Técnico) ya está
+    // habilitado por pertenecer al área — mismo criterio que la asignación de activos
+    // (AssignableUserSelect / /api/inventory/assignable-users), sin gate adicional aquí.
+    if (client.role === 'CLIENT') {
+      const { userHasFamilyInModule } = await import('@/lib/auth/user-family-access')
+      const hasAccess = await userHasFamilyInModule(
+        data.clientId,
+        'tickets',
+        contract.familyId,
+        'canConsume'
+      )
+      if (!hasAccess) {
+        throw new Error('El cliente no tiene acceso al área de este contrato')
+      }
     }
 
     const active = await prisma.contract_assignments.findFirst({
@@ -117,7 +120,7 @@ export class ContractAssignmentService {
     })
 
     if (active?.clientId === data.clientId) {
-      throw new Error('Este cliente ya tiene la asignación activa del contrato')
+      throw new Error('Este usuario ya tiene la asignación activa del contrato')
     }
 
     const startDate = data.startDate ? new Date(data.startDate) : new Date()

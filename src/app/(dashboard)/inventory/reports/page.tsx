@@ -1,16 +1,9 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { useSession } from 'next-auth/react'
+import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 import { useRouter } from 'next/navigation'
-import {
-  BarChart3,
-  Crown,
-  Lock,
-  Sparkles,
-  ArrowRight,
-  LayoutGrid,
-} from 'lucide-react'
+import { BarChart3, Crown, Lock, Sparkles, ArrowRight, LayoutGrid } from 'lucide-react'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -39,12 +32,13 @@ function getSubtitle(role: string, isSuperAdmin: boolean, canManage: boolean): s
 }
 
 export default function InventoryReportsPage() {
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAuthReady()
   const router = useRouter()
 
   const role = session?.user?.role ?? ''
   const isSuperAdmin = (session?.user as { isSuperAdmin?: boolean })?.isSuperAdmin === true
-  const canManageInventory = (session?.user as { canManageInventory?: boolean })?.canManageInventory === true
+  const canManageInventory =
+    (session?.user as { canManageInventory?: boolean })?.canManageInventory === true
 
   const [selectedFamilyId, setSelectedFamilyId] = useState<string | null>(null)
   const [scheduleReportId, setScheduleReportId] = useState<string | null>(null)
@@ -259,8 +253,8 @@ export default function InventoryReportsPage() {
           <div className='space-y-1'>
             <p>
               <strong>Plantillas</strong> = reportes ejecutivos prearmados (KPIs + tabla).
-              <strong className='ml-2'>Explorador</strong> = consultas ad hoc con filtros y
-              columnas configurables.
+              <strong className='ml-2'>Explorador</strong> = consultas ad hoc con filtros y columnas
+              configurables.
             </p>
             {!isSuperAdmin && role !== 'ADMIN' && (
               <p className='flex items-center gap-1'>

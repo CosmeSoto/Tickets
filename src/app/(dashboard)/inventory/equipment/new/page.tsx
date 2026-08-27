@@ -1,7 +1,7 @@
 'use client'
 
-import { Suspense, useEffect, useRef } from 'react'
-import { useSession } from 'next-auth/react'
+import { Suspense, useEffect } from 'react'
+import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { UnifiedAssetForm } from '@/components/inventory/unified-asset-form'
@@ -9,16 +9,10 @@ import { Card, CardContent } from '@/components/ui/card'
 import { ArrowLeft, Loader2 } from 'lucide-react'
 
 function NewEquipmentPageContent() {
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAuthReady()
   const router = useRouter()
   const searchParams = useSearchParams()
   const defaultFamilyId = searchParams.get('familyId') ?? undefined
-
-  const hasAuthenticated = useRef(false)
-
-  useEffect(() => {
-    if (status === 'authenticated') hasAuthenticated.current = true
-  }, [status])
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login')
@@ -27,7 +21,7 @@ function NewEquipmentPageContent() {
     }
   }, [status, session, router])
 
-  if (status === 'loading' && !hasAuthenticated.current) {
+  if (status === 'loading') {
     return (
       <ModuleLayout title='Nuevo Activo Individual' subtitle='Cargando...'>
         <div className='flex items-center justify-center h-64'>

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, use, Suspense, useMemo } from 'react'
-import { useSession } from 'next-auth/react'
+import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
   Download,
@@ -368,7 +368,7 @@ interface ReportData {
 }
 
 function ReportSlugContent({ slug }: { slug: string }) {
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAuthReady()
   const router = useRouter()
   const searchParams = useSearchParams()
 

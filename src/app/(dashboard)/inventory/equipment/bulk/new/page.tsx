@@ -1,8 +1,8 @@
 'use client'
 
-import { useSession } from 'next-auth/react'
+import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
 import { BulkEquipmentForm } from '@/components/inventory/equipment/BulkEquipmentForm'
 import { Card, CardContent } from '@/components/ui/card'
 import { ArrowLeft, Loader2 } from 'lucide-react'
@@ -12,17 +12,11 @@ import { ArrowLeft, Loader2 } from 'lucide-react'
  * de inventario y con la generación de tipos de Next.js.
  */
 export default function NewBulkEquipmentPage() {
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAuthReady()
   const router = useRouter()
   const searchParams = useSearchParams()
   const defaultFamilyId = searchParams.get('familyId') ?? undefined
   const cloneFrom = searchParams.get('cloneFrom') ?? undefined
-
-  const hasAuthenticated = useRef(false)
-
-  useEffect(() => {
-    if (status === 'authenticated') hasAuthenticated.current = true
-  }, [status])
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login')
@@ -31,7 +25,7 @@ export default function NewBulkEquipmentPage() {
     }
   }, [status, session, router])
 
-  if (status === 'loading' && !hasAuthenticated.current) {
+  if (status === 'loading') {
     return (
       <div className='max-w-5xl mx-auto px-4 py-8 flex flex-col items-center justify-center min-h-[40vh] gap-3'>
         <Loader2 className='h-10 w-10 animate-spin text-primary' />

@@ -6,7 +6,13 @@ import { canManageInventory, inventoryForbidden } from '@/lib/inventory-access'
 
 /**
  * GET /api/inventory/contracts/clients?familyId=
- * Clientes activos con acceso al área (user_family_access tickets).
+ *
+ * Candidatos para "Responsable operativo" del contrato (contract_assignments):
+ *   - Clientes externos (portal): requieren acceso explícito al área
+ *     (user_family_access, module='tickets', canConsume=true) — igual que antes.
+ *   - Personal interno (Admin/Técnico) del área: califica automáticamente por
+ *     pertenecer al departamento de la familia, sin permiso adicional — mismo
+ *     criterio que /api/inventory/assignable-users (asignación de activos).
  */
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions)
@@ -20,17 +26,36 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'familyId es requerido' }, { status: 400 })
   }
 
-  const rows = await prisma.user_family_access.findMany({
-    where: { familyId, module: 'tickets', isActive: true, canConsume: true },
-    include: {
-      user: {
-        select: { id: true, name: true, email: true, role: true, isActive: true },
+  const [accessRows, staffUsers] = await Promise.all([
+    prisma.user_family_access.findMany({
+      where: { familyId, module: 'tickets', isActive: true, canConsume: true },
+      include: {
+        user: { select: { id: true, name: true, email: true, role: true, isActive: true } },
       },
-    },
-    orderBy: { user: { name: 'asc' } },
-  })
+      orderBy: { user: { name: 'asc' } },
+    }),
+    prisma.users.findMany({
+      where: {
+        isActive: true,
+        role: { in: ['ADMIN', 'TECHNICIAN'] },
+        departments: { familyId },
+      },
+      select: { id: true, name: true, email: true, role: true },
+      orderBy: { name: 'asc' },
+    }),
+  ])
 
-  const clients = rows.map(a => a.user).filter(c => c.isActive && c.role === 'CLIENT')
+  const clientUsers = accessRows.map(a => a.user).filter(c => c.isActive && c.role === 'CLIENT')
 
-  return NextResponse.json({ clients })
+  const seen = new Set(clientUsers.map(c => c.id))
+  const merged = [
+    ...clientUsers,
+    ...staffUsers.filter(u => {
+      if (seen.has(u.id)) return false
+      seen.add(u.id)
+      return true
+    }),
+  ].sort((a, b) => a.name.localeCompare(b.name))
+
+  return NextResponse.json({ clients: merged })
 }

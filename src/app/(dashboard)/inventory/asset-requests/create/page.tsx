@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useSession } from 'next-auth/react'
+import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 import Link from 'next/link'
 import { AssetRequestCreateForm } from '@/components/inventory/asset-requests/asset-request-create-form'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
@@ -11,7 +11,7 @@ import { useUserModules } from '@/hooks/use-user-modules'
 
 export default function CreateAssetRequestPage() {
   const router = useRouter()
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAuthReady()
   const { canRequestAssets, loading: modulesLoading } = useUserModules()
 
   useEffect(() => {

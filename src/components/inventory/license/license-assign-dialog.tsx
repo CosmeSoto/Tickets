@@ -16,7 +16,7 @@ import { SearchableSelect, type SearchableSelectOption } from '@/components/ui/s
 import { AssignableUserSelect } from '@/components/inventory/shared/AssignableUserSelect'
 import { useActiveDepartments } from '@/contexts/departments-context'
 import { useFetch } from '@/hooks/common/use-fetch'
-import { Loader2 } from 'lucide-react'
+import { Loader2, UserCheck } from 'lucide-react'
 
 type Scope = 'Individual' | 'Departamento' | 'Empresa'
 
@@ -26,6 +26,8 @@ type LicenseAssignDialogProps = {
   licenseId: string
   licenseName: string
   familyId?: string | null
+  /** Contrato vinculado a esta licencia, si existe — habilita el atajo de responsable. */
+  contractId?: string | null
   currentScope?: string | null
   currentUserId?: string | null
   currentDepartmentId?: string | null
@@ -48,6 +50,7 @@ export function LicenseAssignDialog({
   licenseId,
   licenseName,
   familyId,
+  contractId,
   currentScope,
   currentUserId,
   currentDepartmentId,
@@ -92,6 +95,18 @@ export function LicenseAssignDialog({
       })),
     [equipmentRows]
   )
+
+  // Responsable ya asignado en el contrato vinculado (contract_assignments) — atajo para
+  // no volver a buscarlo en la lista completa cuando coincide con quien usará la licencia.
+  const { data: contractAssignments } = useFetch<{
+    id: string
+    client: { id: string; name: string; email: string }
+  }>(contractId ? `/api/inventory/contracts/${contractId}/assignments` : '', {
+    enabled: open && scope === 'Individual' && !!contractId,
+    transform: d => (d.active ? [d.active] : []),
+    showErrorToast: false,
+  })
+  const contractResponsible = contractAssignments[0]?.client ?? null
 
   useEffect(() => {
     if (!open) return
@@ -212,6 +227,22 @@ export function LicenseAssignDialog({
 
           {scope === 'Individual' && (
             <>
+              {contractResponsible && contractResponsible.id !== userId && (
+                <button
+                  type='button'
+                  onClick={() => {
+                    setUserId(contractResponsible.id)
+                    setEquipmentId('')
+                  }}
+                  className='flex w-full items-center gap-2 rounded-md border border-dashed px-3 py-2 text-left text-xs hover:bg-muted/50 transition-colors'
+                >
+                  <UserCheck className='h-3.5 w-3.5 text-primary shrink-0' />
+                  <span>
+                    Usar el mismo responsable del contrato:{' '}
+                    <span className='font-medium text-foreground'>{contractResponsible.name}</span>
+                  </span>
+                </button>
+              )}
               <AssignableUserSelect
                 familyId={familyId ?? undefined}
                 value={userId}

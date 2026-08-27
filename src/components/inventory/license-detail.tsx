@@ -57,6 +57,7 @@ interface LicenseData {
   assignedToUser?: string | null
   assignedToEquipment?: string | null
   assignedToDepartment?: string | null
+  linkedContractId?: string | null
   customValues?: Array<{ fieldName: string; fieldValue: string }> | null
   renewalAlertStatus?: 'ok' | 'warning' | 'critical' | 'expired' | null
   licenseType?: {
@@ -105,6 +106,14 @@ const SCOPE_LABELS: Record<string, string> = {
   INDIVIDUAL: 'Individual',
   DEPARTMENT: 'Departamento',
   COMPANY: 'Empresa',
+}
+
+const CONTRACT_TYPE_LABELS: Record<string, string> = {
+  SOFTWARE: 'Software / SaaS',
+  SERVICE_EXTERNAL: 'Servicio externo',
+  MAINTENANCE: 'Mantenimiento',
+  INSURANCE: 'Seguro',
+  SLA: 'SLA',
 }
 
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -366,7 +375,14 @@ export function LicenseDetail({ licenseId, userRole, isSuperAdmin = false }: Pro
                       : '—'
                   }
                 />
-                <InfoRow label='Tipo contrato' value={license.contractType || '—'} />
+                <InfoRow
+                  label='Tipo contrato'
+                  value={
+                    license.contractType
+                      ? (CONTRACT_TYPE_LABELS[license.contractType] ?? license.contractType)
+                      : '—'
+                  }
+                />
                 <InfoRow label='Proveedor' value={license.supplier?.name || '—'} />
                 <InfoRow label='N° Factura' value={license.invoiceNumber || '—'} />
                 <InfoRow label='N° Orden de compra' value={license.purchaseOrderNumber || '—'} />
@@ -522,6 +538,7 @@ export function LicenseDetail({ licenseId, userRole, isSuperAdmin = false }: Pro
         licenseId={licenseId}
         licenseName={license.name}
         familyId={currentFamilyId}
+        contractId={license.linkedContractId}
         currentScope={license.licenseScope}
         currentUserId={license.assignedToUser ?? license.user?.id ?? null}
         currentDepartmentId={license.assignedToDepartment ?? license.department?.id ?? null}

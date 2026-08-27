@@ -1,6 +1,6 @@
 'use client'
 
-import { useSession } from 'next-auth/react'
+import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 import { useRouter } from 'next/navigation'
 import { useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -12,7 +12,7 @@ import { Plus, Package, User, Layers, Upload } from 'lucide-react'
 import Link from 'next/link'
 
 function InventoryContent() {
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAuthReady()
   const router = useRouter()
   const searchParams = useSearchParams()
   const familyId = searchParams.get('familyId') ?? undefined
@@ -42,8 +42,7 @@ function InventoryContent() {
 
   if (!session?.user) return null
 
-  const canCreate =
-    isSuperAdmin || canManageInventory || role === 'TECHNICIAN'
+  const canCreate = isSuperAdmin || canManageInventory || role === 'TECHNICIAN'
   const title = isClientOnly ? 'Mis Activos' : 'Inventario'
   const subtitle = isClientOnly
     ? 'Activos asignados a tu cuenta'

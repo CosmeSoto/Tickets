@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useSession } from 'next-auth/react'
+import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -75,7 +75,7 @@ const EXPORT_COLUMNS = [
 
 export default function AssetRequestsPage() {
   const router = useRouter()
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAuthReady()
   const { canRequestAssets, loading: modulesLoading } = useUserModules()
   const [requests, setRequests] = useState<AssetRequest[]>([])
   const [total, setTotal] = useState(0)

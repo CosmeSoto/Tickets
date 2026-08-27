@@ -2,7 +2,7 @@
 
 import { use } from 'react'
 import { useRouter } from 'next/navigation'
-import { useSession } from 'next-auth/react'
+import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 import { useEffect } from 'react'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { EquipmentDetail } from '@/components/inventory/equipment-detail'
@@ -13,7 +13,7 @@ interface EquipmentDetailPageProps {
 
 export default function EquipmentDetailPage({ params }: EquipmentDetailPageProps) {
   const { id } = use(params)
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAuthReady()
   const router = useRouter()
 
   useEffect(() => {

@@ -1,7 +1,7 @@
 'use client'
 
 import { use, useState, useEffect } from 'react'
-import { useSession } from 'next-auth/react'
+import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 import { useRouter } from 'next/navigation'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { EquipmentAssetForm } from '@/components/inventory/asset-forms/EquipmentAssetForm'
@@ -18,7 +18,7 @@ interface EditEquipmentPageProps {
 
 export default function EditEquipmentPage({ params }: EditEquipmentPageProps) {
   const { id } = use(params)
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAuthReady()
   const router = useRouter()
   const [equipment, setEquipment] = useState<Equipment | null>(null)
   const [familyConfig, setFamilyConfig] = useState<FamilyConfig | null>(null)

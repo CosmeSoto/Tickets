@@ -355,6 +355,7 @@ export function EquipmentDetail({
         equipmentBrandName={equipment.model?.brand?.name || equipment.brand}
         equipmentModelName={equipment.model?.model || equipment.modelDeprecated}
         familyId={(equipment as any).type?.family?.id}
+        contractId={(equipment as any).businessContractId ?? null}
         form={assignForm}
         onFormChange={setAssignForm}
         onSubmit={submitAssignment}

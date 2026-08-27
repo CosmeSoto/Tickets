@@ -1,7 +1,7 @@
 'use client'
 
 import { use, useState, useEffect } from 'react'
-import { useSession } from 'next-auth/react'
+import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 import { useRouter } from 'next/navigation'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { LicenseAssetForm } from '@/components/inventory/asset-forms/LicenseAssetForm'
@@ -16,7 +16,7 @@ interface EditLicensePageProps {
 
 export default function EditLicensePage({ params }: EditLicensePageProps) {
   const { id } = use(params)
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAuthReady()
   const router = useRouter()
   const [license, setLicense] = useState<Record<string, unknown> | null>(null)
   const [familyConfig, setFamilyConfig] = useState<FamilyConfig | null>(null)

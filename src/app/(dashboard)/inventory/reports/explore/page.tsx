@@ -1,7 +1,7 @@
 'use client'
 
 import { Suspense, useEffect } from 'react'
-import { useSession } from 'next-auth/react'
+import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
@@ -13,13 +13,11 @@ function ExploreContent() {
   const searchParams = useSearchParams()
   const initialDataset = searchParams.get('dataset') ?? undefined
   const initialSaved = searchParams.get('saved') ?? undefined
-  return (
-    <ReportExplorer initialDatasetId={initialDataset} initialSavedId={initialSaved} />
-  )
+  return <ReportExplorer initialDatasetId={initialDataset} initialSavedId={initialSaved} />
 }
 
 export default function InventoryReportsExplorePage() {
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAuthReady()
   const router = useRouter()
   const role = session?.user?.role ?? ''
   const isSuperAdmin = (session?.user as { isSuperAdmin?: boolean })?.isSuperAdmin === true
