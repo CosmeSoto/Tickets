@@ -38,6 +38,14 @@ interface AssignableUserSelectProps {
   disabled?: boolean
   label?: string
   required?: boolean
+  /**
+   * Nombre/email ya conocidos del usuario asignado actualmente (el padre ya los tiene, p. ej.
+   * `license.user` o `currentAssignment.receiver`). Evita depender del listado paginado por
+   * familia — que puede no incluir a alguien de otro departamento/familia — o del fallback a
+   * `/api/users/[id]`, que un TECHNICIAN o un ADMIN fuera de alcance no puede consultar y
+   * antes dejaba el campo en blanco aunque la asignación sí existiera.
+   */
+  initialUser?: { id: string; name: string; email: string } | null
 }
 
 export function AssignableUserSelect({
@@ -47,6 +55,7 @@ export function AssignableUserSelect({
   disabled = false,
   label = 'Asignar a',
   required = false,
+  initialUser = null,
 }: AssignableUserSelectProps) {
   const [users, setUsers] = useState<AssignableUser[]>([])
   const [loading, setLoading] = useState(false)
@@ -94,7 +103,19 @@ export function AssignableUserSelect({
         setSelectedUser(found)
         return
       }
-      // Si no está en la lista, fetch individual
+      // El padre ya conoce el nombre/email de la asignación actual (viene con el
+      // activo/licencia) — úsalo directo en vez de depender de un fetch que puede
+      // fallar por permisos o porque el usuario está fuera del alcance del filtro.
+      if (initialUser && initialUser.id === value) {
+        setSelectedUser({
+          id: initialUser.id,
+          name: initialUser.name,
+          email: initialUser.email,
+          department: null,
+        })
+        return
+      }
+      // Último recurso: fetch individual (puede fallar por permisos — ver arriba)
       fetch(`/api/users/${value}`)
         .then(r => (r.ok ? r.json() : null))
         .then(u => {
@@ -113,7 +134,7 @@ export function AssignableUserSelect({
     if (!value) {
       setSelectedUser(null)
     }
-  }, [value, users]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [value, users, initialUser]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSelect = (user: AssignableUser) => {
     setSelectedUser(user)

@@ -37,6 +37,11 @@ import {
 import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 import type { Contract } from '@/types/contracts'
 
+// Este despliegue no usa clientes externos (portal) por ahora — apagado a pedido.
+// Cambiar a `true` si en el futuro hace falta dar acceso de portal a un cliente externo
+// desde el diálogo de responsable operativo.
+const SHOW_EXTERNAL_CLIENT_ACCESS_LINK = false
+
 interface SystemClientUser {
   id: string
   name: string
@@ -413,7 +418,11 @@ export function ContractAssignmentsPanel({ contract, onUpdated, canManage = true
               <p className='text-xs text-muted-foreground'>
                 Incluye personal interno (Admin/Técnico) del área y clientes externos con acceso.
               </p>
-              {isAdmin && (
+              {/* Deshabilitado a pedido: por ahora no se usan clientes externos en este
+                  despliegue. Cambiar a `isAdmin &&` si en el futuro hace falta dar acceso
+                  de portal a un cliente externo desde aquí (el diálogo "Dar acceso" más
+                  abajo sigue intacto, solo queda inalcanzable mientras el flag esté en false). */}
+              {SHOW_EXTERNAL_CLIENT_ACCESS_LINK && isAdmin && (
                 <button
                   type='button'
                   onClick={openGrantDialog}

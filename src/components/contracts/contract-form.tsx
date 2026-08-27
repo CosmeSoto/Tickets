@@ -33,6 +33,10 @@ import { ContractFormSection } from '@/components/contracts/contract-form-sectio
 import { FormDraftBanner } from '@/components/common/form-draft-banner'
 import { FormDraftKeys, useFormDraft } from '@/hooks/common/use-form-draft'
 import { parseMoneyInput } from '@/lib/utils'
+import {
+  getBillingCompletenessIssues,
+  methodNeedsPortal,
+} from '@/lib/contracts/billing-completeness'
 import { suggestedRecurringFromLines } from '@/lib/contracts/line-billing'
 import { SupplierSelect } from '@/components/inventory/suppliers/SupplierSelect'
 import {
@@ -293,6 +297,28 @@ export function ContractForm({
     session?.user?.email,
     session?.user?.role,
   ])
+
+  // Si el contrato ya editado tiene datos de facturación incompletos, la sección 5 arranca
+  // abierta — de lo contrario el usuario nunca la ve y el aviso "en riesgo" de la lista de
+  // contratos (que depende de estos mismos campos) sigue apareciendo aunque haya llenado
+  // otras partes del formulario (custodio, responsable operativo, último cargo).
+  const billingHasRisk = useMemo(() => {
+    if (!contract) return false
+    const issues = getBillingCompletenessIssues({
+      paymentMethodType: contract.paymentMethodType,
+      paymentCardLast4: contract.paymentCardLast4,
+      paymentCardBank: contract.paymentCardBank,
+      paymentAccountRef: contract.paymentAccountRef,
+      billingAccountEmail: contract.billingAccountEmail,
+      vendorAccountId: contract.vendorAccountId,
+      billingPortalUrl: contract.billingPortalUrl,
+    })
+    const needsPortal =
+      !contract.billingPortalUrl &&
+      !contract.billingAccountEmail &&
+      methodNeedsPortal(contract.paymentMethodType)
+    return issues.length > 0 || needsPortal
+  }, [contract])
 
   const categoryOptions = useMemo(
     () =>
@@ -1065,9 +1091,13 @@ export function ContractForm({
         {/* ── 5. Pagos y facturación ──────────────────────────────────────── */}
         <ContractFormSection
           title='5. Pagos y facturación'
-          description='Cómo se paga: método, portal, tarjeta o cheque, y trazabilidad de cargos. Las cuotas se generan según el ciclo y las líneas vigentes en cada periodo.'
-          badge='Opcional'
-          defaultOpen={false}
+          description={
+            billingHasRisk
+              ? 'Faltan datos de este método de pago — por eso el contrato aparece "en riesgo" en el listado. Complétalos aquí para que desaparezca el aviso.'
+              : 'Cómo se paga: método, portal, tarjeta o cheque, y trazabilidad de cargos. Las cuotas se generan según el ciclo y las líneas vigentes en cada periodo.'
+          }
+          badge={billingHasRisk ? 'Pendiente' : 'Opcional'}
+          defaultOpen={billingHasRisk}
         >
           <div className={formGrid}>
             <div className='space-y-1 sm:col-span-2 lg:col-span-3'>

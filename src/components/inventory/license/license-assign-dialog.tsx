@@ -30,6 +30,8 @@ type LicenseAssignDialogProps = {
   contractId?: string | null
   currentScope?: string | null
   currentUserId?: string | null
+  /** Nombre/email del usuario ya asignado (license.user) — evita que el campo se vea vacío. */
+  currentUser?: { id: string; name: string; email: string } | null
   currentDepartmentId?: string | null
   currentEquipmentId?: string | null
   onAssigned: () => void
@@ -53,6 +55,7 @@ export function LicenseAssignDialog({
   contractId,
   currentScope,
   currentUserId,
+  currentUser,
   currentDepartmentId,
   currentEquipmentId,
   onAssigned,
@@ -208,10 +211,23 @@ export function LicenseAssignDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className='sm:max-w-md'>
         <DialogHeader>
-          <DialogTitle>Asignar licencia</DialogTitle>
+          <DialogTitle>
+            {currentUserId || currentDepartmentId || currentEquipmentId
+              ? 'Cambiar asignación'
+              : 'Asignar licencia'}
+          </DialogTitle>
           <DialogDescription>
-            Asigna <span className='font-medium text-foreground'>{licenseName}</span> según el
-            alcance. El área queda fijada por el tipo de licencia (inventario).
+            {currentUserId || currentDepartmentId || currentEquipmentId ? (
+              <>
+                <span className='font-medium text-foreground'>{licenseName}</span> ya está asignada.
+                Cambia el alcance o el destinatario, o usa «Desasignar» para quitarla.
+              </>
+            ) : (
+              <>
+                Asigna <span className='font-medium text-foreground'>{licenseName}</span> según el
+                alcance. El área queda fijada por el tipo de licencia (inventario).
+              </>
+            )}
           </DialogDescription>
         </DialogHeader>
 
@@ -251,6 +267,7 @@ export function LicenseAssignDialog({
                   if (id) setEquipmentId('')
                 }}
                 label='Usuario'
+                initialUser={currentUser ?? null}
               />
               <div className='space-y-1.5'>
                 <Label>O equipo (alternativa)</Label>

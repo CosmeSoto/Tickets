@@ -4,6 +4,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { ActDetailsDisplay } from '@/components/inventory/act-details-display'
 import { ActAcceptanceForm } from '@/components/inventory/act-acceptance-form'
 import prisma from '@/lib/prisma'
+import { DeliveryActService } from '@/lib/services/delivery-act.service'
 import Image from 'next/image'
 import { DEFAULT_SYSTEM_NAME } from '@/lib/branding-constants'
 
@@ -12,15 +13,21 @@ interface PageProps {
   searchParams: Promise<{ token?: string }>
 }
 
+// Consulta directa (sin fetch a la propia API): un self-fetch por HTTP a NEXTAUTH_URL/
+// localhost:3000 desde este Server Component es frágil en despliegues Docker/on-prem
+// (el contenedor no siempre puede alcanzarse a sí mismo por esa URL) y cualquier falla de
+// red aquí se traducía en un 404 genérico, indistinguible de un token realmente inválido.
 async function getActDetails(id: string, token: string) {
   try {
-    const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
-    const response = await fetch(`${baseUrl}/api/inventory/acts/${id}?token=${token}`, {
-      cache: 'no-store',
-    })
-    if (!response.ok) return null
-    return await response.json()
-  } catch {
+    const act = await DeliveryActService.getActByToken(token)
+    if (!act || act.id !== id) return null
+
+    const isExpired = DeliveryActService.isActExpired(act)
+    const canAccept = act.status === 'PENDING' && !isExpired
+
+    return { act, canAccept, isExpired, accessLevel: 'participant' as const }
+  } catch (error) {
+    console.error('Error obteniendo acta por token:', error)
     return null
   }
 }
@@ -37,16 +44,23 @@ async function getSystemBranding() {
   }
 }
 
-function fmtDateTime(d: string) {
+function fmtDateTime(d: string | Date | null | undefined) {
+  if (!d) return '—'
   return new Date(d).toLocaleDateString('es-ES', {
-    day: 'numeric', month: 'long', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
   })
 }
 
-function fmtDate(d: string) {
+function fmtDate(d: string | Date | null | undefined) {
+  if (!d) return '—'
   return new Date(d).toLocaleDateString('es-ES', {
-    day: 'numeric', month: 'long', year: 'numeric',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
   })
 }
 
@@ -59,14 +73,15 @@ export default async function ActAcceptancePage({ params, searchParams }: PagePr
   // Sin token
   if (!token) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className='min-h-screen bg-background'>
         <PublicHeader branding={branding} />
-        <div className="container max-w-3xl py-10">
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
+        <div className='container max-w-3xl py-10'>
+          <Alert variant='destructive'>
+            <AlertCircle className='h-4 w-4' />
             <AlertTitle>Token requerido</AlertTitle>
             <AlertDescription>
-              Esta página requiere un token de acceso válido. Usa el enlace que recibiste por correo electrónico.
+              Esta página requiere un token de acceso válido. Usa el enlace que recibiste por correo
+              electrónico.
             </AlertDescription>
           </Alert>
         </div>
@@ -82,51 +97,56 @@ export default async function ActAcceptancePage({ params, searchParams }: PagePr
   const { act, canAccept, isExpired } = data
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className='min-h-screen bg-background flex flex-col'>
       <PublicHeader branding={branding} act={act} />
 
-      <main className="flex-1 container max-w-3xl py-8 space-y-6">
-
+      <main className='flex-1 container max-w-3xl py-8 space-y-6'>
         {/* Banner de estado */}
         {act.status === 'ACCEPTED' && (
-          <Alert className="border-green-500 bg-green-50 dark:bg-green-950">
-            <CheckCircle className="h-4 w-4 text-green-600" />
-            <AlertTitle className="text-green-700">Acta aceptada y firmada</AlertTitle>
-            <AlertDescription className="text-green-700">
+          <Alert className='border-green-500 bg-green-50 dark:bg-green-950'>
+            <CheckCircle className='h-4 w-4 text-green-600' />
+            <AlertTitle className='text-green-700'>Acta aceptada y firmada</AlertTitle>
+            <AlertDescription className='text-green-700'>
               Aceptada el {fmtDateTime(act.acceptedAt)}. No se requiere ninguna acción adicional.
             </AlertDescription>
           </Alert>
         )}
 
         {act.status === 'REJECTED' && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
+          <Alert variant='destructive'>
+            <AlertCircle className='h-4 w-4' />
             <AlertTitle>Acta rechazada</AlertTitle>
             <AlertDescription>
               Rechazada el {fmtDateTime(act.rejectedAt)}.
-              {act.rejectionReason && <> Motivo: <strong>{act.rejectionReason}</strong></>}
+              {act.rejectionReason && (
+                <>
+                  {' '}
+                  Motivo: <strong>{act.rejectionReason}</strong>
+                </>
+              )}
             </AlertDescription>
           </Alert>
         )}
 
         {(act.status === 'EXPIRED' || (act.status === 'PENDING' && isExpired)) && (
-          <Alert variant="destructive">
-            <Clock className="h-4 w-4" />
+          <Alert variant='destructive'>
+            <Clock className='h-4 w-4' />
             <AlertTitle>Acta expirada</AlertTitle>
             <AlertDescription>
-              Esta acta expiró el {fmtDate(act.expirationDate)} sin ser firmada.
-              Contacta a <strong>{act.delivererInfo?.name}</strong> ({act.delivererInfo?.email}) para que genere una nueva.
+              Esta acta expiró el {fmtDate(act.expirationDate)} sin ser firmada. Contacta a{' '}
+              <strong>{act.delivererInfo?.name}</strong> ({act.delivererInfo?.email}) para que
+              genere una nueva.
             </AlertDescription>
           </Alert>
         )}
 
         {act.status === 'PENDING' && !isExpired && (
-          <Alert className="border-blue-300 bg-blue-50 dark:bg-blue-950">
-            <Clock className="h-4 w-4 text-blue-600" />
-            <AlertTitle className="text-blue-800">Acción requerida</AlertTitle>
-            <AlertDescription className="text-blue-700">
-              Revisa los detalles del equipo y acepta o rechaza la entrega.
-              Esta acta expira el <strong>{fmtDate(act.expirationDate)}</strong>.
+          <Alert className='border-blue-300 bg-blue-50 dark:bg-blue-950'>
+            <Clock className='h-4 w-4 text-blue-600' />
+            <AlertTitle className='text-blue-800'>Acción requerida</AlertTitle>
+            <AlertDescription className='text-blue-700'>
+              Revisa los detalles del equipo y acepta o rechaza la entrega. Esta acta expira el{' '}
+              <strong>{fmtDate(act.expirationDate)}</strong>.
             </AlertDescription>
           </Alert>
         )}
@@ -135,17 +155,14 @@ export default async function ActAcceptancePage({ params, searchParams }: PagePr
         <ActDetailsDisplay act={act} showStatus={false} />
 
         {/* Formulario de aceptación */}
-        {canAccept && (
-          <ActAcceptanceForm actId={id} token={token} />
-        )}
+        {canAccept && <ActAcceptanceForm actId={id} token={token} />}
 
         {/* Ayuda */}
         <Alert>
-          <Shield className="h-4 w-4" />
+          <Shield className='h-4 w-4' />
           <AlertTitle>¿Necesitas ayuda?</AlertTitle>
           <AlertDescription>
-            Si tienes alguna pregunta, contacta a{' '}
-            <strong>{act.delivererInfo?.name}</strong>
+            Si tienes alguna pregunta, contacta a <strong>{act.delivererInfo?.name}</strong>
             {act.delivererInfo?.email && <> ({act.delivererInfo.email})</>}.
           </AlertDescription>
         </Alert>
@@ -166,27 +183,27 @@ function PublicHeader({
   act?: any
 }) {
   return (
-    <header className="border-b bg-card">
-      <div className="container max-w-3xl py-5 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
+    <header className='border-b bg-card'>
+      <div className='container max-w-3xl py-5 flex items-center justify-between gap-4'>
+        <div className='flex items-center gap-3'>
           {branding.logoUrl ? (
-            <div className="relative h-10 w-32">
+            <div className='relative h-10 w-32'>
               <Image
                 src={branding.logoUrl}
                 alt={branding.companyName}
                 fill
-                className="object-contain object-left"
+                className='object-contain object-left'
                 unoptimized
               />
             </div>
           ) : (
-            <span className="font-bold text-lg">{branding.companyName}</span>
+            <span className='font-bold text-lg'>{branding.companyName}</span>
           )}
         </div>
         {act && (
-          <div className="text-right">
-            <p className="text-xs text-muted-foreground uppercase tracking-wide">Acta de Entrega</p>
-            <p className="font-mono font-semibold text-sm">{act.folio}</p>
+          <div className='text-right'>
+            <p className='text-xs text-muted-foreground uppercase tracking-wide'>Acta de Entrega</p>
+            <p className='font-mono font-semibold text-sm'>{act.folio}</p>
           </div>
         )}
       </div>
@@ -196,11 +213,11 @@ function PublicHeader({
 
 function PublicFooter({ branding }: { branding: { companyName: string } }) {
   return (
-    <footer className="border-t mt-8">
-      <div className="container max-w-3xl py-5 text-center text-xs text-muted-foreground space-y-1">
+    <footer className='border-t mt-8'>
+      <div className='container max-w-3xl py-5 text-center text-xs text-muted-foreground space-y-1'>
         <p>{branding.companyName}</p>
-        <p className="flex items-center justify-center gap-1">
-          <Shield className="h-3 w-3" />
+        <p className='flex items-center justify-center gap-1'>
+          <Shield className='h-3 w-3' />
           Página segura — tu aceptación queda registrada con firma digital (IP, fecha y hora)
         </p>
       </div>

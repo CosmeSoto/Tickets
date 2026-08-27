@@ -541,6 +541,15 @@ export function LicenseDetail({ licenseId, userRole, isSuperAdmin = false }: Pro
         contractId={license.linkedContractId}
         currentScope={license.licenseScope}
         currentUserId={license.assignedToUser ?? license.user?.id ?? null}
+        currentUser={
+          license.user
+            ? {
+                id: license.user.id,
+                name: license.user.name ?? license.user.email,
+                email: license.user.email,
+              }
+            : null
+        }
         currentDepartmentId={license.assignedToDepartment ?? license.department?.id ?? null}
         currentEquipmentId={license.assignedToEquipment ?? license.equipment?.id ?? null}
         onAssigned={() => {

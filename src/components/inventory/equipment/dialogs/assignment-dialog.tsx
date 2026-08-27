@@ -36,6 +36,8 @@ interface AssignmentDialogProps {
   familyId?: string
   /** Contrato vinculado a este equipo, si existe — habilita el atajo de responsable. */
   contractId?: string | null
+  /** Receptor de la asignación activa, si existe — evita que el campo se vea vacío al reabrir. */
+  currentUser?: { id: string; name: string; email: string } | null
   form: AssignmentForm
   onFormChange: (form: AssignmentForm) => void
   onSubmit: () => void
@@ -52,6 +54,7 @@ export function AssignmentDialog({
   equipmentModelName,
   familyId,
   contractId,
+  currentUser,
   form,
   onFormChange,
   onSubmit,
@@ -112,6 +115,7 @@ export function AssignmentDialog({
               value={form.receiverId}
               onChange={userId => onFormChange({ ...form, receiverId: userId })}
               required
+              initialUser={currentUser ?? null}
             />
 
             {/* Tipo de asignación */}

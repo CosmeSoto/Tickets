@@ -356,6 +356,15 @@ export function EquipmentDetail({
         equipmentModelName={equipment.model?.model || equipment.modelDeprecated}
         familyId={(equipment as any).type?.family?.id}
         contractId={(equipment as any).businessContractId ?? null}
+        currentUser={
+          currentAssignment
+            ? {
+                id: currentAssignment.receiverId,
+                name: currentAssignment.receiver?.name ?? '',
+                email: currentAssignment.receiver?.email ?? '',
+              }
+            : null
+        }
         form={assignForm}
         onFormChange={setAssignForm}
         onSubmit={submitAssignment}

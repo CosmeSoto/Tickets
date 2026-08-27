@@ -3,6 +3,7 @@ import { AlertCircle, CheckCircle, Clock } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ContractReturnAcceptanceForm } from '@/components/inventory/contract-return-acceptance-form'
+import { prisma } from '@/lib/prisma'
 import {
   PAYMENT_METHOD_TYPE_LABELS,
   getServiceSubtypeLabel,
@@ -14,14 +15,25 @@ interface PageProps {
   searchParams: Promise<{ token?: string }>
 }
 
+// Consulta directa (sin fetch a la propia API): un self-fetch por HTTP a NEXTAUTH_URL/
+// localhost:3000 desde este Server Component es frágil en despliegues Docker/on-prem
+// (el contenedor no siempre puede alcanzarse a sí mismo por esa URL) y cualquier falla de
+// red aquí se traducía en un 404 genérico, indistinguible de un token realmente inválido.
 async function getAct(id: string, token: string) {
-  const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
-  const res = await fetch(
-    `${baseUrl}/api/inventory/contract-return-acts/${id}?token=${encodeURIComponent(token)}`,
-    { cache: 'no-store' }
-  )
-  if (!res.ok) return null
-  return res.json()
+  try {
+    const act = await prisma.contract_return_acts.findFirst({
+      where: { id, acceptanceToken: token },
+    })
+    if (!act) return null
+
+    const isExpired = act.expirationDate < new Date()
+    const canAccept = act.status === 'PENDING' && !isExpired
+
+    return { act, canAccept, isExpired }
+  } catch (error) {
+    console.error('Error obteniendo acta de retiro por token:', error)
+    return null
+  }
 }
 
 export default async function ContractReturnAcceptPage({ params, searchParams }: PageProps) {
@@ -34,7 +46,9 @@ export default async function ContractReturnAcceptPage({ params, searchParams }:
         <Alert variant='destructive'>
           <AlertCircle className='h-4 w-4' />
           <AlertTitle>Token requerido</AlertTitle>
-          <AlertDescription>Usa el enlace completo que te enviaron para firmar el acta.</AlertDescription>
+          <AlertDescription>
+            Usa el enlace completo que te enviaron para firmar el acta.
+          </AlertDescription>
         </Alert>
       </div>
     )
