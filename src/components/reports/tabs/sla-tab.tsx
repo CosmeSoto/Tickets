@@ -1,11 +1,22 @@
 'use client'
 
+import { useState } from 'react'
 import { ShieldCheck } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { TableColumnsMenu, type TableColumnDef } from '@/components/common/table-columns-menu'
 import type { SLAComplianceRow } from '../utils/report-types'
 import { priorityLabel, priorityColor, slaColor } from '../utils/report-formatters'
 import { TabLoadingState, TabEmptyState } from './shared-tab-states'
+
+const COLUMN_DEFS: TableColumnDef[] = [
+  { key: 'priority', label: 'Prioridad', required: true },
+  { key: 'total', label: 'Total' },
+  { key: 'compliant', label: 'Cumplidos' },
+  { key: 'breached', label: 'Incumplidos' },
+  { key: 'rate', label: 'Tasa', required: true },
+]
+const DEFAULT_VISIBLE = COLUMN_DEFS.map(c => c.key)
 
 interface SLATabProps {
   data: SLAComplianceRow[]
@@ -30,6 +41,9 @@ function SLABar({ value }: { value: number }) {
 }
 
 export function SLATab({ data, loading }: SLATabProps) {
+  const [columnOrder, setColumnOrder] = useState<string[]>(COLUMN_DEFS.map(c => c.key))
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(DEFAULT_VISIBLE)
+
   if (loading) return <TabLoadingState />
   if (data.length === 0)
     return <TabEmptyState message='No hay datos de SLA para los filtros seleccionados.' />
@@ -84,6 +98,19 @@ export function SLATab({ data, loading }: SLATabProps) {
         </Card>
       </div>
 
+      {/* Selector de columnas — aplica a la tabla de todas las familias abajo */}
+      <div className='flex justify-end'>
+        <TableColumnsMenu
+          columns={COLUMN_DEFS}
+          order={columnOrder}
+          visible={visibleColumns}
+          onOrderChange={setColumnOrder}
+          onVisibleChange={setVisibleColumns}
+          storageKey='reports-sla-columns-v1'
+          defaultVisible={DEFAULT_VISIBLE}
+        />
+      </div>
+
       {/* Por familia */}
       {Object.entries(byFamily).map(([familyId, rows]) => {
         const familyName = rows[0]?.familyName ?? familyId
@@ -112,19 +139,59 @@ export function SLATab({ data, loading }: SLATabProps) {
                 <table className='w-full text-sm'>
                   <thead>
                     <tr className='border-b bg-muted/50'>
-                      <th className='text-left px-4 py-2.5 font-medium text-muted-foreground'>
-                        Prioridad
-                      </th>
-                      <th className='text-right px-4 py-2.5 font-medium text-muted-foreground'>
-                        Total
-                      </th>
-                      <th className='text-right px-4 py-2.5 font-medium text-muted-foreground'>
-                        Cumplidos
-                      </th>
-                      <th className='text-right px-4 py-2.5 font-medium text-muted-foreground hidden sm:table-cell'>
-                        Incumplidos
-                      </th>
-                      <th className='px-4 py-2.5 font-medium text-muted-foreground'>Tasa</th>
+                      {columnOrder
+                        .filter(k => visibleColumns.includes(k))
+                        .map(key => {
+                          switch (key) {
+                            case 'priority':
+                              return (
+                                <th
+                                  key={key}
+                                  className='text-left px-4 py-2.5 font-medium text-muted-foreground'
+                                >
+                                  Prioridad
+                                </th>
+                              )
+                            case 'total':
+                              return (
+                                <th
+                                  key={key}
+                                  className='text-right px-4 py-2.5 font-medium text-muted-foreground'
+                                >
+                                  Total
+                                </th>
+                              )
+                            case 'compliant':
+                              return (
+                                <th
+                                  key={key}
+                                  className='text-right px-4 py-2.5 font-medium text-muted-foreground'
+                                >
+                                  Cumplidos
+                                </th>
+                              )
+                            case 'breached':
+                              return (
+                                <th
+                                  key={key}
+                                  className='text-right px-4 py-2.5 font-medium text-muted-foreground'
+                                >
+                                  Incumplidos
+                                </th>
+                              )
+                            case 'rate':
+                              return (
+                                <th
+                                  key={key}
+                                  className='px-4 py-2.5 font-medium text-muted-foreground'
+                                >
+                                  Tasa
+                                </th>
+                              )
+                            default:
+                              return null
+                          }
+                        })}
                     </tr>
                   </thead>
                   <tbody>
@@ -136,29 +203,60 @@ export function SLATab({ data, loading }: SLATabProps) {
                           key={priority}
                           className='border-b last:border-0 hover:bg-muted/30 transition-colors'
                         >
-                          <td className='px-4 py-2.5'>
-                            <Badge className={priorityColor(priority)} variant='outline'>
-                              {priorityLabel(priority)}
-                            </Badge>
-                          </td>
-                          <td className='px-4 py-2.5 text-right text-foreground'>{row.total}</td>
-                          <td className='px-4 py-2.5 text-right font-medium text-emerald-600 dark:text-emerald-400'>
-                            {row.compliant}
-                          </td>
-                          <td className='px-4 py-2.5 text-right hidden sm:table-cell'>
-                            <span
-                              className={
-                                row.breached > 0
-                                  ? 'font-medium text-destructive'
-                                  : 'text-muted-foreground'
+                          {columnOrder
+                            .filter(k => visibleColumns.includes(k))
+                            .map(key => {
+                              switch (key) {
+                                case 'priority':
+                                  return (
+                                    <td key={key} className='px-4 py-2.5'>
+                                      <Badge className={priorityColor(priority)} variant='outline'>
+                                        {priorityLabel(priority)}
+                                      </Badge>
+                                    </td>
+                                  )
+                                case 'total':
+                                  return (
+                                    <td
+                                      key={key}
+                                      className='px-4 py-2.5 text-right text-foreground'
+                                    >
+                                      {row.total}
+                                    </td>
+                                  )
+                                case 'compliant':
+                                  return (
+                                    <td
+                                      key={key}
+                                      className='px-4 py-2.5 text-right font-medium text-emerald-600 dark:text-emerald-400'
+                                    >
+                                      {row.compliant}
+                                    </td>
+                                  )
+                                case 'breached':
+                                  return (
+                                    <td key={key} className='px-4 py-2.5 text-right'>
+                                      <span
+                                        className={
+                                          row.breached > 0
+                                            ? 'font-medium text-destructive'
+                                            : 'text-muted-foreground'
+                                        }
+                                      >
+                                        {row.breached}
+                                      </span>
+                                    </td>
+                                  )
+                                case 'rate':
+                                  return (
+                                    <td key={key} className='px-4 py-2.5'>
+                                      <SLABar value={row.complianceRate} />
+                                    </td>
+                                  )
+                                default:
+                                  return null
                               }
-                            >
-                              {row.breached}
-                            </span>
-                          </td>
-                          <td className='px-4 py-2.5'>
-                            <SLABar value={row.complianceRate} />
-                          </td>
+                            })}
                         </tr>
                       )
                     })}

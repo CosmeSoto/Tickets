@@ -4,9 +4,20 @@ import { useState } from 'react'
 import { Users, Search, Star } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { TableColumnsMenu, type TableColumnDef } from '@/components/common/table-columns-menu'
 import type { TechnicianPerformance } from '../utils/report-types'
 import { formatMinutes } from '../utils/report-formatters'
 import { TabLoadingState, TabEmptyState } from './shared-tab-states'
+
+const COLUMN_DEFS: TableColumnDef[] = [
+  { key: 'technician', label: 'Técnico', required: true },
+  { key: 'assigned', label: 'Asignados' },
+  { key: 'resolved', label: 'Resueltos' },
+  { key: 'efficiency', label: 'Eficiencia' },
+  { key: 'avgTime', label: 'Tiempo promedio' },
+  { key: 'rating', label: 'Calificación' },
+]
+const DEFAULT_VISIBLE = COLUMN_DEFS.map(c => c.key)
 
 interface TechniciansTabProps {
   data: TechnicianPerformance[]
@@ -37,6 +48,8 @@ function EfficiencyBar({ value }: { value: number }) {
 
 export function TechniciansTab({ data, loading }: TechniciansTabProps) {
   const [search, setSearch] = useState('')
+  const [columnOrder, setColumnOrder] = useState<string[]>(COLUMN_DEFS.map(c => c.key))
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(DEFAULT_VISIBLE)
 
   if (loading) return <TabLoadingState />
   if (data.length === 0)
@@ -109,13 +122,24 @@ export function TechniciansTab({ data, loading }: TechniciansTabProps) {
               </CardTitle>
               <CardDescription>Ordenado por tickets resueltos</CardDescription>
             </div>
-            <div className='relative w-full sm:w-64'>
-              <Search className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none' />
-              <Input
-                placeholder='Buscar técnico...'
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                className='pl-9'
+            <div className='flex items-center gap-2'>
+              <div className='relative w-full sm:w-64'>
+                <Search className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none' />
+                <Input
+                  placeholder='Buscar técnico...'
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  className='pl-9'
+                />
+              </div>
+              <TableColumnsMenu
+                columns={COLUMN_DEFS}
+                order={columnOrder}
+                visible={visibleColumns}
+                onOrderChange={setColumnOrder}
+                onVisibleChange={setVisibleColumns}
+                storageKey='reports-technicians-columns-v1'
+                defaultVisible={DEFAULT_VISIBLE}
               />
             </div>
           </div>
@@ -125,24 +149,65 @@ export function TechniciansTab({ data, loading }: TechniciansTabProps) {
             <table className='w-full text-sm'>
               <thead>
                 <tr className='border-b bg-muted/50'>
-                  <th className='text-left px-4 py-2.5 font-medium text-muted-foreground'>
-                    Técnico
-                  </th>
-                  <th className='text-right px-4 py-2.5 font-medium text-muted-foreground'>
-                    Asignados
-                  </th>
-                  <th className='text-right px-4 py-2.5 font-medium text-muted-foreground'>
-                    Resueltos
-                  </th>
-                  <th className='px-4 py-2.5 font-medium text-muted-foreground hidden md:table-cell'>
-                    Eficiencia
-                  </th>
-                  <th className='text-right px-4 py-2.5 font-medium text-muted-foreground hidden lg:table-cell'>
-                    T. promedio
-                  </th>
-                  <th className='text-right px-4 py-2.5 font-medium text-muted-foreground'>
-                    Calificación
-                  </th>
+                  {columnOrder
+                    .filter(k => visibleColumns.includes(k))
+                    .map(key => {
+                      switch (key) {
+                        case 'technician':
+                          return (
+                            <th
+                              key={key}
+                              className='text-left px-4 py-2.5 font-medium text-muted-foreground'
+                            >
+                              Técnico
+                            </th>
+                          )
+                        case 'assigned':
+                          return (
+                            <th
+                              key={key}
+                              className='text-right px-4 py-2.5 font-medium text-muted-foreground'
+                            >
+                              Asignados
+                            </th>
+                          )
+                        case 'resolved':
+                          return (
+                            <th
+                              key={key}
+                              className='text-right px-4 py-2.5 font-medium text-muted-foreground'
+                            >
+                              Resueltos
+                            </th>
+                          )
+                        case 'efficiency':
+                          return (
+                            <th key={key} className='px-4 py-2.5 font-medium text-muted-foreground'>
+                              Eficiencia
+                            </th>
+                          )
+                        case 'avgTime':
+                          return (
+                            <th
+                              key={key}
+                              className='text-right px-4 py-2.5 font-medium text-muted-foreground'
+                            >
+                              T. promedio
+                            </th>
+                          )
+                        case 'rating':
+                          return (
+                            <th
+                              key={key}
+                              className='text-right px-4 py-2.5 font-medium text-muted-foreground'
+                            >
+                              Calificación
+                            </th>
+                          )
+                        default:
+                          return null
+                      }
+                    })}
                 </tr>
               </thead>
               <tbody>
@@ -156,38 +221,77 @@ export function TechniciansTab({ data, loading }: TechniciansTabProps) {
                       key={tech.technicianId}
                       className='border-b last:border-0 hover:bg-muted/30 transition-colors'
                     >
-                      <td className='px-4 py-2.5'>
-                        <p className='font-medium text-foreground'>{tech.technicianName}</p>
-                        <p className='text-xs text-muted-foreground'>{tech.technicianEmail}</p>
-                      </td>
-                      <td className='px-4 py-2.5 text-right text-foreground'>
-                        {tech.assignedTickets}
-                      </td>
-                      <td className='px-4 py-2.5 text-right font-medium text-emerald-600 dark:text-emerald-400'>
-                        {tech.resolvedTickets}
-                      </td>
-                      <td className='px-4 py-2.5 hidden md:table-cell'>
-                        <EfficiencyBar value={efficiency} />
-                      </td>
-                      <td className='px-4 py-2.5 text-right text-muted-foreground hidden lg:table-cell'>
-                        {formatMinutes(tech.avgResolutionTimeMinutes)}
-                      </td>
-                      <td className='px-4 py-2.5 text-right'>
-                        {tech.avgRating !== null ? (
-                          <span className='font-medium text-amber-500 dark:text-amber-400 flex items-center justify-end gap-1'>
-                            <Star className='h-3 w-3 fill-current' />
-                            {tech.avgRating.toFixed(1)}
-                          </span>
-                        ) : (
-                          <span className='text-muted-foreground'>—</span>
-                        )}
-                      </td>
+                      {columnOrder
+                        .filter(k => visibleColumns.includes(k))
+                        .map(key => {
+                          switch (key) {
+                            case 'technician':
+                              return (
+                                <td key={key} className='px-4 py-2.5'>
+                                  <p className='font-medium text-foreground'>
+                                    {tech.technicianName}
+                                  </p>
+                                  <p className='text-xs text-muted-foreground'>
+                                    {tech.technicianEmail}
+                                  </p>
+                                </td>
+                              )
+                            case 'assigned':
+                              return (
+                                <td key={key} className='px-4 py-2.5 text-right text-foreground'>
+                                  {tech.assignedTickets}
+                                </td>
+                              )
+                            case 'resolved':
+                              return (
+                                <td
+                                  key={key}
+                                  className='px-4 py-2.5 text-right font-medium text-emerald-600 dark:text-emerald-400'
+                                >
+                                  {tech.resolvedTickets}
+                                </td>
+                              )
+                            case 'efficiency':
+                              return (
+                                <td key={key} className='px-4 py-2.5'>
+                                  <EfficiencyBar value={efficiency} />
+                                </td>
+                              )
+                            case 'avgTime':
+                              return (
+                                <td
+                                  key={key}
+                                  className='px-4 py-2.5 text-right text-muted-foreground'
+                                >
+                                  {formatMinutes(tech.avgResolutionTimeMinutes)}
+                                </td>
+                              )
+                            case 'rating':
+                              return (
+                                <td key={key} className='px-4 py-2.5 text-right'>
+                                  {tech.avgRating !== null ? (
+                                    <span className='font-medium text-amber-500 dark:text-amber-400 flex items-center justify-end gap-1'>
+                                      <Star className='h-3 w-3 fill-current' />
+                                      {tech.avgRating.toFixed(1)}
+                                    </span>
+                                  ) : (
+                                    <span className='text-muted-foreground'>—</span>
+                                  )}
+                                </td>
+                              )
+                            default:
+                              return null
+                          }
+                        })}
                     </tr>
                   )
                 })}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={6} className='px-4 py-8 text-center text-muted-foreground text-sm'>
+                    <td
+                      colSpan={visibleColumns.length}
+                      className='px-4 py-8 text-center text-muted-foreground text-sm'
+                    >
                       No se encontraron técnicos con ese criterio.
                     </td>
                   </tr>
