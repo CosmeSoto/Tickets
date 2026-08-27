@@ -44,7 +44,7 @@ export async function repairOrphanFamilyForeignKeys(
 
   const cleared = await client.$executeRawUnsafe(`
     UPDATE departments d
-    SET "family_id" = NULL, "updated_at" = NOW()
+    SET "family_id" = NULL, "updatedAt" = NOW()
     WHERE d."family_id" IS NOT NULL
       AND NOT EXISTS (SELECT 1 FROM families f WHERE f.id = d."family_id")
   `)

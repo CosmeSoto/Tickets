@@ -509,9 +509,9 @@ async function restoreWithPgRestore(
         const fixed = await prisma.$executeRawUnsafe(
           `
           UPDATE tickets t
-          SET "category_id" = $1, "updated_at" = NOW()
+          SET "categoryId" = $1, "updatedAt" = NOW()
           WHERE NOT EXISTS (
-            SELECT 1 FROM categories c WHERE c.id = t."category_id"
+            SELECT 1 FROM categories c WHERE c.id = t."categoryId"
           )
         `,
           fallbackCategory.id
@@ -527,7 +527,7 @@ async function restoreWithPgRestore(
         // solo logueamos para que el administrador lo resuelva manualmente.
         const orphanCount = await prisma.$queryRawUnsafe<Array<{ count: string }>>(
           `SELECT COUNT(*) as count FROM tickets t
-           WHERE NOT EXISTS (SELECT 1 FROM categories c WHERE c.id = t."category_id")`
+           WHERE NOT EXISTS (SELECT 1 FROM categories c WHERE c.id = t."categoryId")`
         )
         const n = Number(orphanCount[0]?.count ?? 0)
         if (n > 0) {
@@ -538,6 +538,31 @@ async function restoreWithPgRestore(
       }
     } catch (err) {
       console.warn('[RESTORE] No se pudo reparar categoryId huérfano en tickets:', err)
+    }
+
+    // Reparar technician_assignments cuyo categoryId apunta a una categoría que
+    // ya no existe (categories.id no es determinista entre reseeds — ver
+    // cleanupOrphanedForeignKeys). categoryId es NOT NULL ahí, así que a
+    // diferencia de tickets no hay "categoría de respaldo" razonable: la fila
+    // es la asignación categoría↔técnico, sin sentido sin su categoría. Dejarla
+    // huérfana rompe cualquier include de esa relación (p. ej. GET /api/users
+    // ?purpose=categoryResolvers), lo que termina mostrando "0 técnicos
+    // disponibles" en el selector de resolutores de categorías.
+    try {
+      const deleted = await prisma.$executeRawUnsafe(`
+        DELETE FROM technician_assignments t
+        WHERE NOT EXISTS (SELECT 1 FROM categories c WHERE c.id = t."categoryId")
+      `)
+      if (Number(deleted) > 0) {
+        console.log(
+          `[RESTORE] Integridad technician_assignments: ${Number(deleted)} asignación(es) con categoryId huérfano eliminada(s)`
+        )
+      }
+    } catch (err) {
+      console.warn(
+        '[RESTORE] No se pudo reparar categoryId huérfano en technician_assignments:',
+        err
+      )
     }
   } else {
     // Restauración completa — el modo merge no aplica a nivel completo (demasiado riesgo de inconsistencias)
