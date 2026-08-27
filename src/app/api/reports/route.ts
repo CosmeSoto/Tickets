@@ -98,6 +98,8 @@ export async function GET(request: NextRequest) {
     if (collaboratorId && collaboratorId.trim() !== '' && collaboratorId !== 'all')
       filters.collaboratorId = collaboratorId.trim()
 
+    const familyId = searchParams.get('familyId')
+
     if (process.env.NODE_ENV === 'development') {
       console.log('📊 API Reports - Solicitud procesada:', {
         type: reportType,
@@ -147,6 +149,24 @@ export async function GET(request: NextRequest) {
         } else if (operationalIds) {
           filters.familyIds = ['__NONE__']
         }
+      }
+    }
+
+    // Filtro de familia específica (selector global de Reportes) — antes solo
+    // lo aplicaban las 5 pestañas agregadas (/api/reports/families/[id]); la
+    // pestaña "Detalle de Tickets" (este endpoint) lo ignoraba por completo y
+    // mostraba tickets de todas las familias del usuario sin importar cuál
+    // estuviera seleccionada arriba, inconsistente con el resto de pestañas.
+    if (familyId && familyId.trim() !== '' && familyId !== 'all') {
+      const requestedFamilyId = familyId.trim()
+      if (role === 'ADMIN' && !isSuperAdmin) {
+        if (!filters.familyIds || !filters.familyIds.includes(requestedFamilyId)) {
+          return NextResponse.json({ error: 'No tienes acceso a esta familia' }, { status: 403 })
+        }
+        filters.familyIds = [requestedFamilyId]
+      } else {
+        // Super admin o técnico: no hay familyIds previo que intersectar.
+        filters.familyIds = [requestedFamilyId]
       }
     }
 

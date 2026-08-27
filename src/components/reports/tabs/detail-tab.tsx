@@ -69,6 +69,8 @@ interface DetailTabProps {
   /** Rango de fechas — viene del filtro global de Reportes (header), no se duplica aquí. */
   startDate: string
   endDate: string
+  /** Familia seleccionada en el filtro global de Reportes ('all' = todas). */
+  selectedFamilyId: string
 }
 
 function slaVariant(status: string): 'default' | 'destructive' | 'secondary' | 'outline' {
@@ -78,7 +80,7 @@ function slaVariant(status: string): 'default' | 'destructive' | 'secondary' | '
   return 'outline'
 }
 
-export function DetailTab({ startDate, endDate }: DetailTabProps) {
+export function DetailTab({ startDate, endDate, selectedFamilyId }: DetailTabProps) {
   const router = useRouter()
 
   const [filters, setFilters] = useState<DraftFilters>(EMPTY_FILTERS)
@@ -103,48 +105,53 @@ export function DetailTab({ startDate, endDate }: DetailTabProps) {
     }
   }, [])
 
-  const fetchRows = useCallback(async (f: DraftFilters, dateFrom: string, dateTo: string) => {
-    setLoading(true)
-    setError(null)
-    try {
-      const params = new URLSearchParams({ type: 'tickets', format: 'json', limit: '1000' })
-      if (f.status !== 'all') params.set('status', f.status)
-      if (f.priority !== 'all') params.set('priority', f.priority)
-      if (f.categoryId !== 'all') params.set('categoryId', f.categoryId)
-      if (f.assigneeId !== 'all') params.set('assigneeId', f.assigneeId)
-      if (f.clientId !== 'all') params.set('clientId', f.clientId)
-      if (f.collaboratorId !== 'all') params.set('collaboratorId', f.collaboratorId)
-      if (dateFrom) params.set('startDate', dateFrom)
-      if (dateTo) params.set('endDate', dateTo)
+  const fetchRows = useCallback(
+    async (f: DraftFilters, dateFrom: string, dateTo: string, familyId: string) => {
+      setLoading(true)
+      setError(null)
+      try {
+        const params = new URLSearchParams({ type: 'tickets', format: 'json', limit: '1000' })
+        if (f.status !== 'all') params.set('status', f.status)
+        if (f.priority !== 'all') params.set('priority', f.priority)
+        if (f.categoryId !== 'all') params.set('categoryId', f.categoryId)
+        if (f.assigneeId !== 'all') params.set('assigneeId', f.assigneeId)
+        if (f.clientId !== 'all') params.set('clientId', f.clientId)
+        if (f.collaboratorId !== 'all') params.set('collaboratorId', f.collaboratorId)
+        if (dateFrom) params.set('startDate', dateFrom)
+        if (dateTo) params.set('endDate', dateTo)
+        if (familyId && familyId !== 'all') params.set('familyId', familyId)
 
-      const res = await fetch(`/api/reports?${params.toString()}`)
-      const json = await res.json()
-      if (!res.ok) {
-        setError(json.error || json.message || 'No se pudo cargar el detalle de tickets.')
-        setRows([])
-        return
+        const res = await fetch(`/api/reports?${params.toString()}`)
+        const json = await res.json()
+        if (!res.ok) {
+          setError(json.error || json.message || 'No se pudo cargar el detalle de tickets.')
+          setRows([])
+          return
+        }
+        setRows(Array.isArray(json.data?.detailedTickets) ? json.data.detailedTickets : [])
+        setWarnings(Array.isArray(json.warnings) ? json.warnings : [])
+      } catch {
+        setError('Error de conexión al cargar el detalle de tickets.')
+      } finally {
+        setLoading(false)
       }
-      setRows(Array.isArray(json.data?.detailedTickets) ? json.data.detailedTickets : [])
-      setWarnings(Array.isArray(json.warnings) ? json.warnings : [])
-    } catch {
-      setError('Error de conexión al cargar el detalle de tickets.')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+    },
+    []
+  )
 
   // Catálogo de categorías — una sola vez.
   useEffect(() => {
     void loadCategories()
   }, [loadCategories])
 
-  // Carga inicial, y cada vez que cambia el rango de fechas del filtro
-  // global (header de Reportes) — el resto de filtros usan el botón
-  // "Aplicar filtros" para no exceder el rate limit del endpoint (10/min).
+  // Carga inicial, y cada vez que cambia el rango de fechas o la familia del
+  // filtro global (header de Reportes) — igual que en las otras 5 pestañas.
+  // El resto de filtros usan el botón "Aplicar filtros" para no exceder el
+  // rate limit del endpoint (10/min).
   useEffect(() => {
-    void fetchRows(filters, startDate, endDate)
+    void fetchRows(filters, startDate, endDate, selectedFamilyId)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [startDate, endDate])
+  }, [startDate, endDate, selectedFamilyId])
 
   const pagination = usePagination(rows, { pageSize: 20 })
 
@@ -338,10 +345,10 @@ export function DetailTab({ startDate, endDate }: DetailTabProps) {
     columns: exportColumns,
   })
 
-  const applyFilters = () => fetchRows(filters, startDate, endDate)
+  const applyFilters = () => fetchRows(filters, startDate, endDate, selectedFamilyId)
   const clearFilters = () => {
     setFilters(EMPTY_FILTERS)
-    void fetchRows(EMPTY_FILTERS, startDate, endDate)
+    void fetchRows(EMPTY_FILTERS, startDate, endDate, selectedFamilyId)
   }
 
   return (
@@ -430,7 +437,7 @@ export function DetailTab({ startDate, endDate }: DetailTabProps) {
           <div className='flex items-center justify-between gap-2 pt-1 flex-wrap'>
             <p className='text-xs text-muted-foreground flex items-center gap-1'>
               <Info className='h-3.5 w-3.5 shrink-0' />
-              El rango de fechas (Desde / Hasta) se controla arriba, en el filtro de Reportes.
+              La familia y el rango de fechas se controlan arriba, en el filtro de Reportes.
             </p>
             <div className='flex items-center gap-2'>
               <Button variant='outline' size='sm' onClick={clearFilters} disabled={loading}>

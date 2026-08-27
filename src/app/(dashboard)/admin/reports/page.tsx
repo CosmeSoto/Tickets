@@ -218,7 +218,11 @@ export default function ReportsPage() {
           </TabsContent>
 
           <TabsContent value='detail'>
-            <DetailTab startDate={startDate} endDate={endDate} />
+            <DetailTab
+              startDate={startDate}
+              endDate={endDate}
+              selectedFamilyId={selectedFamilyId}
+            />
           </TabsContent>
         </Tabs>
       </div>
