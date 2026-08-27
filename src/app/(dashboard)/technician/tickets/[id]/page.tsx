@@ -282,7 +282,15 @@ export default function TechnicianTicketDetailPage() {
   const getPriorityConfig = (p: string) =>
     TICKET_PRIORITIES.find(x => x.value === p) ?? TICKET_PRIORITIES[0]
 
-  if (authStatus === 'loading' || loading) {
+  // El skeleton "Cargando..." SOLO debe verse en la carga inicial (aún no hay
+  // `ticket`). Antes se mostraba cada vez que `loading` se ponía en true —
+  // incluyendo recargas en segundo plano con datos ya presentes (p. ej.
+  // handleStatusChange llama loadTicket() de nuevo) — lo que desmontaba TODO
+  // el árbol (Tabs incluido) y lo reconstruía desde cero: eso es lo que se
+  // sentía como "la pantalla se refresca sola". Con `!ticket` de por medio,
+  // una vez cargado el ticket una vez, se queda montado y los datos se
+  // actualizan en el sitio sin destruir nada.
+  if ((authStatus === 'loading' || loading) && !ticket) {
     return (
       <TicketDetailLayout
         title='Cargando...'

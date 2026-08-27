@@ -210,7 +210,11 @@ export default function ClientTicketDetailPage() {
     }
   }
 
-  if (loading || !ticket) {
+  // El skeleton SOLO debe verse en la carga inicial (aún no hay `ticket`) —
+  // no en cada recarga en segundo plano con datos ya presentes, que antes
+  // desmontaba todo el árbol (Tabs incluidos) y se sentía como que "la
+  // pantalla se refresca sola".
+  if (loading && !ticket) {
     return (
       <TicketDetailLayout
         title='Cargando ticket...'
@@ -220,6 +224,23 @@ export default function ClientTicketDetailPage() {
         loading={true}
       >
         <div />
+      </TicketDetailLayout>
+    )
+  }
+
+  if (!ticket) {
+    return (
+      <TicketDetailLayout
+        title='Ticket no encontrado'
+        ticketCode=''
+        status={{ label: '', color: '' }}
+        priority={{ label: '', color: '' }}
+      >
+        <div className='text-center py-12'>
+          <AlertCircle className='h-12 w-12 text-muted-foreground mx-auto mb-4' />
+          <p className='text-muted-foreground mb-4'>No se pudo cargar el ticket</p>
+          <Button onClick={() => router.push('/client/tickets')}>Volver a Mis Tickets</Button>
+        </div>
       </TicketDetailLayout>
     )
   }
