@@ -138,10 +138,9 @@ export default function TechnicianTicketDetailPage() {
   // mensaje de error visible para el técnico.
   const hasKnowledgeAccess =
     (session?.user as any)?.isSuperAdmin || (session?.user as any)?.canAccessKnowledge !== false
-  const canCreateArticle =
-    isAssignedResolver &&
-    (ticket?.status === 'RESOLVED' || ticket?.status === 'CLOSED') &&
-    hasKnowledgeAccess
+  const canCreateArticleBase =
+    isAssignedResolver && (ticket?.status === 'RESOLVED' || ticket?.status === 'CLOSED')
+  const canCreateArticle = canCreateArticleBase && hasKnowledgeAccess
   const hasArticle = !!ticket?.knowledgeArticleId
   const isRequester = ticket?.client?.id === session?.user?.id
   const ratingUserId =
@@ -344,8 +343,24 @@ export default function TechnicianTicketDetailPage() {
       status={statusConfig}
       priority={priorityConfig}
       headerActions={
-        canCreateArticle ? (
-          hasArticle ? (
+        canCreateArticleBase ? (
+          !hasKnowledgeAccess ? (
+            <Button
+              variant='destructive'
+              size='sm'
+              onClick={() =>
+                toast({
+                  variant: 'destructive',
+                  title: 'Sin acceso a Base de Conocimiento',
+                  description:
+                    'Tu cuenta tiene este permiso deshabilitado. Pide a un administrador o super admin que lo habilite para poder crear o ver artículos.',
+                })
+              }
+            >
+              <Lightbulb className='h-4 w-4 sm:mr-2' />
+              <span className='hidden sm:inline'>Sin permiso</span>
+            </Button>
+          ) : hasArticle ? (
             <Button
               variant='outline'
               size='sm'

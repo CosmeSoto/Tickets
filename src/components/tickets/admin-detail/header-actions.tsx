@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { AutoAssignment } from '@/components/tickets/auto-assignment'
 import type { Ticket } from '@/hooks/use-ticket-data'
+import { useToast } from '@/hooks/use-toast'
 
 interface HeaderActionsProps {
   ticket: Ticket
@@ -45,6 +46,7 @@ export function HeaderActions({
   onAssignmentOpenChange,
 }: HeaderActionsProps) {
   const router = useRouter()
+  const { toast } = useToast()
   const isRequester = ticket.client?.id === sessionUser?.id
   const isAssignedResolver = ticket.assignee?.id === sessionUser?.id
   // El middleware bloquea TODO /admin/knowledge/* si el usuario no tiene
@@ -52,13 +54,30 @@ export function HeaderActions({
   // una URL que el proxy redirige silenciosamente al dashboard, sin ningún
   // mensaje de error para el usuario.
   const hasKnowledgeAccess = sessionUser?.isSuperAdmin || sessionUser?.canAccessKnowledge !== false
+  const canShowArticleAction =
+    (ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') &&
+    (isAssignedResolver || (!isRequester && sessionUser?.role === 'ADMIN'))
 
   return (
     <div className='flex flex-wrap items-center gap-2'>
-      {(ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') &&
-        (isAssignedResolver || (!isRequester && sessionUser?.role === 'ADMIN')) &&
-        hasKnowledgeAccess &&
-        (ticket.knowledgeArticleId ? (
+      {canShowArticleAction &&
+        (!hasKnowledgeAccess ? (
+          <Button
+            variant='destructive'
+            size='sm'
+            onClick={() =>
+              toast({
+                variant: 'destructive',
+                title: 'Sin acceso a Base de Conocimiento',
+                description:
+                  'Esta cuenta tiene este permiso deshabilitado. Pide a un super admin que lo habilite para poder crear o ver artículos.',
+              })
+            }
+          >
+            <Lightbulb className='h-4 w-4 sm:mr-2' />
+            <span className='hidden sm:inline'>Sin permiso</span>
+          </Button>
+        ) : ticket.knowledgeArticleId ? (
           <Button
             variant='outline'
             size='sm'
