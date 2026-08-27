@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useParams } from 'next/navigation'
 import {
@@ -56,6 +56,13 @@ export default function KnowledgeDetailPage() {
   const [voting, setVoting] = useState(false)
   const [userVote, setUserVote] = useState<boolean | null>(null)
   const [similarArticles, setSimilarArticles] = useState<Article[]>([])
+  // Evita recargar el artículo (y, con ello, inflar el contador de vistas —
+  // GET /api/knowledge/[id] incrementa `views` en cada llamada) cada vez que
+  // `session` recibe una referencia nueva por el refetch periódico de NextAuth
+  // (~5 min, foco de ventana, o el sync de actividad de SessionTimeoutMonitor
+  // cada ~60s) — mismo patrón ya corregido en settings/backups/tickets.
+  const articleLoadedRef = useRef<string | null>(null)
+  const articleId = params.id as string
 
   useEffect(() => {
     if (status === 'loading') return
@@ -65,8 +72,11 @@ export default function KnowledgeDetailPage() {
       return
     }
 
-    loadArticle()
-  }, [session, status, params.id]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (articleId && articleLoadedRef.current !== articleId) {
+      articleLoadedRef.current = articleId
+      loadArticle()
+    }
+  }, [status, session?.user?.id, articleId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadArticle = async () => {
     try {

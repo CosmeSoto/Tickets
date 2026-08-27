@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useParams } from 'next/navigation'
 import {
@@ -60,6 +60,12 @@ export default function AdminKnowledgeDetailPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [toggling, setToggling] = useState(false)
+  // Evita recargar el artículo (y, con ello, inflar el contador de vistas —
+  // GET /api/knowledge/[id] incrementa `views` en cada llamada) cada vez que
+  // `session` recibe una referencia nueva por el refetch periódico de NextAuth
+  // (~5 min, foco de ventana, o el sync de actividad de SessionTimeoutMonitor
+  // cada ~60s) — mismo patrón ya corregido en settings/backups/tickets.
+  const articleLoadedRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (status === 'loading') return
@@ -70,10 +76,16 @@ export default function AdminKnowledgeDetailPage() {
     }
 
     // Evitar cargar si el ID es "create" o "new"
-    if (articleId && articleId !== 'create' && articleId !== 'new') {
+    if (
+      articleId &&
+      articleId !== 'create' &&
+      articleId !== 'new' &&
+      articleLoadedRef.current !== articleId
+    ) {
+      articleLoadedRef.current = articleId
       loadArticle()
     }
-  }, [session, status, articleId, router]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [status, session?.user?.id, session?.user?.role, articleId, router]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (article) {

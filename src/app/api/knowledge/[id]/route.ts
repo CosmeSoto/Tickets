@@ -102,15 +102,20 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       throw err
     }
 
-    // Incrementar contador de vistas
-    await prisma.knowledge_articles.update({
-      where: { id },
-      data: {
-        views: {
-          increment: 1,
+    // Incrementar contador de vistas — excepto cuando el autor ve su propio
+    // artículo (p. ej. mientras lo edita o revisa), para que el contador
+    // refleje interés real de otros usuarios y no las propias visitas.
+    const isOwnArticle = article.authorId === session.user.id
+    if (!isOwnArticle) {
+      await prisma.knowledge_articles.update({
+        where: { id },
+        data: {
+          views: {
+            increment: 1,
+          },
         },
-      },
-    })
+      })
+    }
 
     // Calcular estadísticas
     const helpfulPercentage =
@@ -140,7 +145,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({
       ...article,
       content,
-      views: article.views + 1,
+      views: isOwnArticle ? article.views : article.views + 1,
       helpfulPercentage,
       userVote,
       sourceContext,
