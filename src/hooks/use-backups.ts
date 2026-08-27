@@ -5,7 +5,7 @@
 
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/hooks/use-toast'
@@ -132,6 +132,14 @@ export function useBackups() {
   const [deleting, setDeleting] = useState(false)
   const [cleaning, setCleaning] = useState(false)
 
+  // Evita recargar backups/stats cada vez que NextAuth revalida el token (cada
+  // 5 min, al volver de otra pestaña, o cada ~60s por la sincronización de
+  // actividad de SessionTimeoutMonitor) — el objeto `session` cambia de
+  // referencia en cada revalidación aunque su contenido sea el mismo, y volver
+  // a cargar la lista de backups en pleno vuelo borraba la selección de
+  // restauración en curso (ver efecto de limpieza en BackupRestore).
+  const backupsLoadedRef = useRef(false)
+
   // ── Auth check ──
   useEffect(() => {
     if (status === 'loading') return
@@ -149,9 +157,17 @@ export function useBackups() {
       router.push('/admin')
       return
     }
+    if (backupsLoadedRef.current) return
+    backupsLoadedRef.current = true
     loadBackups()
     loadStats()
-  }, [session, status, router]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [
+    status,
+    session?.user?.id,
+    session?.user?.role,
+    (session?.user as { isSuperAdmin?: boolean } | undefined)?.isSuperAdmin,
+    router,
+  ]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Load backups ──
   const loadBackups = useCallback(
