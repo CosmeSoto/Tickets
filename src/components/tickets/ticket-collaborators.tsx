@@ -268,6 +268,7 @@ export function TicketCollaborators({ ticketId, familyId, assigneeId, canManage 
                     </Avatar>
                     <div className='min-w-0'>
                       <p className='text-xs font-medium truncate'>{tech.name}</p>
+                      <p className='text-[10px] text-muted-foreground truncate'>{tech.email}</p>
                     </div>
                   </div>
                   <Button

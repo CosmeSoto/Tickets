@@ -290,6 +290,31 @@ export async function getTechnicianIdsNativeToFamily(familyId: string): Promise<
   return technicians.map(t => t.id)
 }
 
+/**
+ * IDs de admins (no super) cuya familia NATIVA coincide — "el admin más
+ * cercano" cuando ningún técnico/admin del departamento exacto está
+ * disponible. No incluye Super Admin (ese ya tiene bypass propio donde se
+ * necesita).
+ */
+export async function getAdminIdsNativeToFamily(familyId: string): Promise<string[]> {
+  const departments = await prisma.departments.findMany({
+    where: { familyId, isActive: true },
+    select: { id: true },
+  })
+  if (departments.length === 0) return []
+
+  const admins = await prisma.users.findMany({
+    where: {
+      role: 'ADMIN',
+      isActive: true,
+      isSuperAdmin: false,
+      departmentId: { in: departments.map(d => d.id) },
+    },
+    select: { id: true },
+  })
+  return admins.map(a => a.id)
+}
+
 /** Técnico tiene familia nativa operativa igual a la del ticket. */
 export async function technicianIsNativeToFamily(
   technicianId: string,

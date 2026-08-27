@@ -47,91 +47,35 @@ export class AssignmentService {
       const blockedUserId = excludeUserId ?? ticket.clientId
 
       // ─────────────────────────────────────────────────────────────────────
-      // 🥇 PRIORIDAD 0: técnico configurado en la categoría con autoAssign:true
-      // Si existe al menos uno con capacidad disponible, asignarlo directamente
-      // sin pasar por el scoring general.
+      // 🥇 PRIORIDAD 0: técnico configurado (`technician_assignments`,
+      // autoAssign:true) en la categoría del ticket, o — si esa categoría
+      // puntual no tiene ninguno configurado — en la primera categoría
+      // ANCESTRO que sí tenga uno (cascada hacia niveles superiores; la UI de
+      // categorías ya anuncia este comportamiento: "Sin técnicos asignados.
+      // Se usará cascada inteligente hacia niveles superiores", pero antes
+      // nada en este servicio lo implementaba de verdad). Ej.: un ticket cae
+      // en "La Impresora no Imprime" (subcategoría sin resolutor propio) pero
+      // su categoría padre "Impresión" sí tiene uno asignado — debe ganar ese
+      // técnico en vez de quedar en manos del scoring general (que podía
+      // terminar en alguien de otro departamento sin ninguna relación).
       // ─────────────────────────────────────────────────────────────────────
-      const categoryAssignments = await prisma.technician_assignments.findMany({
-        where: {
-          categoryId: ticket.categoryId,
-          isActive: true,
-          autoAssign: true,
-          users: {
-            isActive: true,
-            role: { in: ['TECHNICIAN', 'ADMIN'] },
-            // Nunca asignar al solicitante del ticket
-            id: { not: blockedUserId },
-          },
-        },
-        include: {
-          users: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              role: true,
-              departmentId: true,
-              _count: {
-                select: {
-                  tickets_tickets_assigneeIdTousers: {
-                    where: { status: { in: ['OPEN', 'IN_PROGRESS'] } },
-                  },
-                },
-              },
-            },
-          },
-        },
-        orderBy: { priority: 'asc' }, // prioridad 1 = más importante
-      })
+      const categoryChain = await this.buildCategoryAncestorChain(ticket.categoryId)
 
-      // ¿La categoría tiene técnicos configurados? (se calcula ANTES del filtro
-      // de departamento/familia de abajo, para poder distinguir "sin config"
-      // de "config pero de otro departamento/familia" más adelante).
-      const hadCategoryAssignments = categoryAssignments.length > 0
-
-      // Acotar los candidatos configurados en la categoría a los que además
-      // pertenecen al departamento correcto (o, si la categoría no tiene
-      // departamento, a la familia del ticket —nativa o concedida—). Sin esto,
-      // un técnico configurado en `technician_assignments` para la categoría
-      // pero de otro departamento (o de otra familia) podía ganar por prioridad
-      // sin ninguna validación de encaje real.
-      let departmentScopedAssignments = categoryAssignments
-      if (ticket.categories.departmentId) {
-        departmentScopedAssignments = categoryAssignments.filter(
-          a => a.users.departmentId === ticket.categories.departmentId
+      let hadAnyCategoryAssignments = false
+      for (const chainCategoryId of categoryChain) {
+        const resolved = await this.resolveConfiguredTechnicianForCategory(
+          chainCategoryId,
+          ticket,
+          blockedUserId
         )
-      } else if (ticket.familyId) {
-        const { getTechnicianIdsNativeToFamily } = await import('@/lib/auth/family-scope')
-        const nativeTechIds = new Set(await getTechnicianIdsNativeToFamily(ticket.familyId))
-        const grantedAccess = await prisma.user_family_access.findMany({
-          where: { familyId: ticket.familyId, module: 'tickets', isActive: true },
-          select: { userId: true },
-        })
-        const grantedTechIds = new Set(grantedAccess.map(g => g.userId))
-        departmentScopedAssignments = categoryAssignments.filter(
-          a => nativeTechIds.has(a.users.id) || grantedTechIds.has(a.users.id)
-        )
-      }
+        if (resolved.hadAssignments) hadAnyCategoryAssignments = true
+        if (!resolved.winner) continue
 
-      // Filtrar solo los que tienen capacidad (tickets activos < maxTickets)
-      const { getMaxTicketsPerUser } = await import('@/lib/settings/runtime-settings')
-      const maxWorkloadTickets = await getMaxTicketsPerUser()
-
-      const categoryTechsWithCapacity = departmentScopedAssignments.filter(a => {
-        const active = a.users._count.tickets_tickets_assigneeIdTousers
-        const cap = a.maxTickets ?? maxWorkloadTickets
-        return active < cap
-      })
-
-      if (categoryTechsWithCapacity.length > 0) {
-        // Usar el de mayor prioridad (menor número) con menor carga como desempate
-        const sorted = categoryTechsWithCapacity.sort((a, b) => {
-          if (a.priority !== b.priority) return a.priority - b.priority
-          const aActive = a.users._count.tickets_tickets_assigneeIdTousers
-          const bActive = b.users._count.tickets_tickets_assigneeIdTousers
-          return aActive - bActive
-        })
-        const winner = sorted[0].users
+        const { winner, priority } = resolved
+        const reason =
+          chainCategoryId === ticket.categoryId
+            ? `Técnico asignado a la categoría (prioridad ${priority})`
+            : `Técnico heredado de la categoría superior "${resolved.categoryName}" (prioridad ${priority})`
 
         const updatedTicket = await prisma.tickets.update({
           where: { id: ticketId },
@@ -151,7 +95,7 @@ export class AssignmentService {
           data: {
             id: randomUUID(),
             action: ticket.assigneeId ? 'reassigned' : 'auto_assigned',
-            comment: `Asignado automáticamente a ${winner.name} (técnico de la categoría, prioridad ${sorted[0].priority})`,
+            comment: `Asignado automáticamente a ${winner.name} (${reason})`,
             ticketId,
             userId: winner.id,
             createdAt: new Date(),
@@ -175,20 +119,18 @@ export class AssignmentService {
 
         return {
           ticket: updatedTicket,
-          assignedTechnician: {
-            ...winner,
-            assignmentReason: `Técnico asignado a la categoría (prioridad ${sorted[0].priority})`,
-          },
-          reason: `Técnico asignado a la categoría (prioridad ${sorted[0].priority})`,
+          assignedTechnician: { ...winner, assignmentReason: reason },
+          reason,
         }
       }
 
-      if (hadCategoryAssignments) {
-        // La categoría SÍ tiene técnicos configurados, pero ninguno pertenece
-        // al departamento (o familia) correcto, o ninguno tiene capacidad. No
-        // se asigna a alguien de otro departamento/familia como comodín: el
-        // ticket queda sin asignar para que un Admin lo asigne manualmente
-        // (pudiendo elegir de otro departamento dentro de su familia).
+      if (hadAnyCategoryAssignments) {
+        // Alguna categoría de la cadena (la del ticket o alguna ancestro) SÍ
+        // tiene técnicos configurados, pero ninguno pertenece al departamento
+        // (o familia) correcto, o ninguno tiene capacidad. No se asigna a
+        // alguien de otro departamento/familia como comodín: el ticket queda
+        // sin asignar para que un Admin lo asigne manualmente (pudiendo elegir
+        // de otro departamento dentro de su familia).
         throw new Error('No hay técnico disponible en el departamento de la categoría')
       }
 
@@ -228,20 +170,38 @@ export class AssignmentService {
       // technician_assignments configurados todavía). Antes era un filtro "blando"
       // (solo se aplicaba si había ≥1 candidato) y por eso, sin ningún técnico
       // configurado aún, terminaba asignando a cualquiera de la familia aunque
-      // fuera de otro departamento (el bug reportado con Tania Guamán). Sin nadie
-      // en el departamento correcto, el ticket debe quedar sin asignar para que el
-      // Admin decida manualmente — igual que en el camino rápido (Prioridad 0).
+      // fuera de otro departamento (el bug reportado con Tania Guamán).
+      //
+      // 🎯 PRIORIDAD 3 (fallback dentro de este mismo bloque): si nadie del
+      // departamento exacto está disponible, "el admin más cercano" —un admin
+      // nativo de la FAMILIA del ticket (no necesariamente ese departamento
+      // puntual)— es mejor comodín que dejar el ticket sin asignar: sigue
+      // siendo alguien con responsabilidad real sobre esa área, a diferencia
+      // de un técnico de otro departamento sin ninguna relación. Solo si
+      // tampoco hay ningún admin de la familia, el ticket queda sin asignar
+      // para que un Admin lo asigne manualmente.
       if (ticket.categories.departmentId) {
         const techsFromDept = availableTechnicians.filter(
           t => t.departmentId === ticket.categories.departmentId
         )
-        if (techsFromDept.length === 0) {
+        if (techsFromDept.length > 0) {
+          availableTechnicians = techsFromDept
+        } else if (ticket.familyId) {
+          const { getAdminIdsNativeToFamily } = await import('@/lib/auth/family-scope')
+          const nativeAdminIds = new Set(await getAdminIdsNativeToFamily(ticket.familyId))
+          const adminsInFamily = availableTechnicians.filter(t => nativeAdminIds.has(t.id))
+          if (adminsInFamily.length === 0) {
+            throw new Error('No hay técnico disponible en el departamento de la categoría')
+          }
+          availableTechnicians = adminsInFamily
+        } else {
           throw new Error('No hay técnico disponible en el departamento de la categoría')
         }
-        availableTechnicians = techsFromDept
       }
 
-      // Calcular el mejor técnico (reutiliza maxWorkloadTickets calculado arriba)
+      // Calcular el mejor técnico
+      const { getMaxTicketsPerUser } = await import('@/lib/settings/runtime-settings')
+      const maxWorkloadTickets = await getMaxTicketsPerUser()
       const bestTechnician = await this.calculateBestTechnician(
         ticket,
         availableTechnicians,
@@ -342,6 +302,147 @@ export class AssignmentService {
     } catch (error) {
       console.error('[CRITICAL] Error en asignación automática:', error)
       throw error
+    }
+  }
+
+  /**
+   * Cadena de categorías desde `categoryId` (incluido, primero) hacia la
+   * raíz, siguiendo `parentId`. Tope de 5 niveles (el árbol de categorías
+   * tiene 4) por si algún dato quedara corrupto — nunca debería alcanzarse.
+   */
+  private static async buildCategoryAncestorChain(categoryId: string): Promise<string[]> {
+    const chain = [categoryId]
+    let currentId = categoryId
+    for (let i = 0; i < 5; i++) {
+      const current: { parentId: string | null } | null = await prisma.categories.findUnique({
+        where: { id: currentId },
+        select: { parentId: true },
+      })
+      if (!current?.parentId) break
+      chain.push(current.parentId)
+      currentId = current.parentId
+    }
+    return chain
+  }
+
+  /**
+   * Busca el técnico configurado (`technician_assignments`, autoAssign:true)
+   * para UNA categoría puntual de la cadena — acotado siempre al departamento
+   * (o familia) del TICKET real, no del nivel de la cadena que se esté
+   * evaluando, para que cascadear a una categoría padre no "salte" de
+   * departamento — y con capacidad disponible. También informa si la
+   * categoría tenía técnicos configurados (aunque ninguno pasara el filtro),
+   * para que el llamador decida si sigue cascadeando o cae al scoring general.
+   */
+  private static async resolveConfiguredTechnicianForCategory(
+    categoryId: string,
+    ticket: {
+      familyId: string | null
+      categories: { departmentId: string | null }
+    },
+    blockedUserId?: string
+  ): Promise<{
+    hadAssignments: boolean
+    winner: {
+      id: string
+      name: string
+      email: string
+      role: string
+      departmentId: string | null
+    } | null
+    priority: number
+    categoryName: string | null
+  }> {
+    const categoryAssignments = await prisma.technician_assignments.findMany({
+      where: {
+        categoryId,
+        isActive: true,
+        autoAssign: true,
+        users: {
+          isActive: true,
+          role: { in: ['TECHNICIAN', 'ADMIN'] },
+          // Nunca asignar al solicitante del ticket
+          id: { not: blockedUserId },
+        },
+      },
+      include: {
+        users: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+            departmentId: true,
+            _count: {
+              select: {
+                tickets_tickets_assigneeIdTousers: {
+                  where: { status: { in: ['OPEN', 'IN_PROGRESS'] } },
+                },
+              },
+            },
+          },
+        },
+        categories: { select: { name: true } },
+      },
+      orderBy: { priority: 'asc' }, // prioridad 1 = más importante
+    })
+
+    const hadAssignments = categoryAssignments.length > 0
+    if (!hadAssignments) {
+      return { hadAssignments, winner: null, priority: 0, categoryName: null }
+    }
+
+    // Acotar a los que además pertenecen al departamento correcto del TICKET
+    // (o, si su categoría no tiene departamento, a la familia del ticket
+    // —nativa o concedida—). Sin esto, un técnico configurado en
+    // `technician_assignments` para la categoría pero de otro departamento
+    // (o de otra familia) podía ganar por prioridad sin ninguna validación de
+    // encaje real.
+    let scoped = categoryAssignments
+    if (ticket.categories.departmentId) {
+      scoped = categoryAssignments.filter(
+        a => a.users.departmentId === ticket.categories.departmentId
+      )
+    } else if (ticket.familyId) {
+      const { getTechnicianIdsNativeToFamily } = await import('@/lib/auth/family-scope')
+      const nativeTechIds = new Set(await getTechnicianIdsNativeToFamily(ticket.familyId))
+      const grantedAccess = await prisma.user_family_access.findMany({
+        where: { familyId: ticket.familyId, module: 'tickets', isActive: true },
+        select: { userId: true },
+      })
+      const grantedTechIds = new Set(grantedAccess.map(g => g.userId))
+      scoped = categoryAssignments.filter(
+        a => nativeTechIds.has(a.users.id) || grantedTechIds.has(a.users.id)
+      )
+    }
+
+    // Filtrar solo los que tienen capacidad (tickets activos < maxTickets)
+    const { getMaxTicketsPerUser } = await import('@/lib/settings/runtime-settings')
+    const maxWorkloadTickets = await getMaxTicketsPerUser()
+
+    const withCapacity = scoped.filter(a => {
+      const active = a.users._count.tickets_tickets_assigneeIdTousers
+      const cap = a.maxTickets ?? maxWorkloadTickets
+      return active < cap
+    })
+
+    if (withCapacity.length === 0) {
+      return { hadAssignments, winner: null, priority: 0, categoryName: null }
+    }
+
+    // Usar el de mayor prioridad (menor número) con menor carga como desempate
+    const sorted = withCapacity.sort((a, b) => {
+      if (a.priority !== b.priority) return a.priority - b.priority
+      const aActive = a.users._count.tickets_tickets_assigneeIdTousers
+      const bActive = b.users._count.tickets_tickets_assigneeIdTousers
+      return aActive - bActive
+    })
+
+    return {
+      hadAssignments,
+      winner: sorted[0].users,
+      priority: sorted[0].priority,
+      categoryName: sorted[0].categories?.name ?? null,
     }
   }
 
