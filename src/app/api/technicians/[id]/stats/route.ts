@@ -102,15 +102,20 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       (avgResponseTime + avgTechnicalSkill + avgCommunication + avgProblemResolution) / 4
 
     // Formatear calificaciones recientes (últimas 5)
+    // Nota: el modelo ticket_ratings usa `rating` (estrellas 1-5) y `feedback`
+    // (comentario) — antes se mapeaba `comment`, un campo que no existe en el
+    // modelo, así que las últimas 5 calificaciones siempre llegaban con
+    // feedback undefined y sin el puntaje en estrellas al frontend.
     const recentRatings = (ratings as any[]).slice(0, 5).map((rating: any) => ({
       id: rating.id,
       ticketId: rating.ticketId,
       clientId: rating.clientId,
+      rating: rating.rating,
       responseTime: rating.responseTime,
       technicalSkill: rating.technicalSkill,
       communication: rating.communication,
       problemResolution: rating.problemResolution,
-      comment: rating.comment,
+      feedback: rating.feedback,
       createdAt: rating.createdAt,
       client: rating.users_ticket_ratings_clientIdTousers,
       ticket: rating.tickets,

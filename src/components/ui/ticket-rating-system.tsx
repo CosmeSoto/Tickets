@@ -7,6 +7,7 @@ import { Textarea } from './textarea'
 import { Badge } from './badge'
 import { Star, MessageSquare, User, CheckCircle } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './tooltip'
 
 interface Rating {
   id: string
@@ -548,23 +549,39 @@ export function TicketRatingSystem({
                 <h4 className='font-medium text-foreground mb-2 text-sm'>
                   Calificaciones Recientes
                 </h4>
-                <div className='space-y-2 max-h-40 overflow-y-auto'>
-                  {technicianStats.recentRatings.slice(0, 5).map(recentRating => (
-                    <div
-                      key={recentRating.id}
-                      className='flex items-center justify-between p-2 bg-muted rounded'
-                    >
-                      <div className='flex items-center space-x-2'>
-                        <StarRating value={recentRating.rating} readonly size='sm' />
-                        <span className='text-xs text-muted-foreground'>
-                          {new Date(recentRating.createdAt).toLocaleDateString()}
-                        </span>
+                <div className='space-y-2 max-h-52 overflow-y-auto'>
+                  <TooltipProvider>
+                    {technicianStats.recentRatings.slice(0, 5).map(recentRating => (
+                      <div key={recentRating.id} className='p-2 bg-muted rounded space-y-1'>
+                        <div className='flex items-center justify-between gap-2'>
+                          <span className='text-xs font-medium text-foreground truncate'>
+                            {recentRating.client?.name ?? 'Cliente'}
+                          </span>
+                          <div className='flex items-center gap-2 shrink-0'>
+                            <StarRating value={recentRating.rating} readonly size='sm' />
+                            <span className='text-xs text-muted-foreground'>
+                              {new Date(recentRating.createdAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+                        {recentRating.feedback && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <p className='flex items-center gap-1 text-xs text-muted-foreground italic truncate cursor-default'>
+                                <MessageSquare className='h-3 w-3 shrink-0' />
+                                <span className='truncate'>
+                                  &quot;{recentRating.feedback}&quot;
+                                </span>
+                              </p>
+                            </TooltipTrigger>
+                            <TooltipContent side='top' className='max-w-xs'>
+                              <p className='text-xs'>{recentRating.feedback}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
                       </div>
-                      {recentRating.feedback && (
-                        <MessageSquare className='h-3.5 w-3.5 text-muted-foreground' />
-                      )}
-                    </div>
-                  ))}
+                    ))}
+                  </TooltipProvider>
                 </div>
               </div>
             )}
