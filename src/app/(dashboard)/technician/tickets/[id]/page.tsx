@@ -132,8 +132,16 @@ export default function TechnicianTicketDetailPage() {
   const isAssignedResolver = ticket?.assignee?.id === session?.user?.id
   const isUnassigned = !ticket?.assignee
   const canAct = isAssignedResolver || isUnassigned // puede actuar si es el asignado o si no hay asignado
+  // El middleware bloquea TODO /technician/knowledge/* si el usuario no tiene
+  // canAccessKnowledge (Super Admin exento) — sin esto el botón navegaba a
+  // una URL que el proxy redirige silenciosamente al dashboard, sin ningún
+  // mensaje de error visible para el técnico.
+  const hasKnowledgeAccess =
+    (session?.user as any)?.isSuperAdmin || (session?.user as any)?.canAccessKnowledge !== false
   const canCreateArticle =
-    isAssignedResolver && (ticket?.status === 'RESOLVED' || ticket?.status === 'CLOSED')
+    isAssignedResolver &&
+    (ticket?.status === 'RESOLVED' || ticket?.status === 'CLOSED') &&
+    hasKnowledgeAccess
   const hasArticle = !!ticket?.knowledgeArticleId
   const isRequester = ticket?.client?.id === session?.user?.id
   const ratingUserId =

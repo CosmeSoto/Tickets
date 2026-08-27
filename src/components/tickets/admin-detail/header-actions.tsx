@@ -22,7 +22,7 @@ interface HeaderActionsProps {
   isEditing: boolean
   unassigning: boolean
   assignmentDialogOpen: boolean
-  sessionUser?: { id: string; role?: string; isSuperAdmin?: boolean }
+  sessionUser?: { id: string; role?: string; isSuperAdmin?: boolean; canAccessKnowledge?: boolean }
   onEdit: () => void
   onCancelEdit: () => void
   onSave: () => void
@@ -47,11 +47,17 @@ export function HeaderActions({
   const router = useRouter()
   const isRequester = ticket.client?.id === sessionUser?.id
   const isAssignedResolver = ticket.assignee?.id === sessionUser?.id
+  // El middleware bloquea TODO /admin/knowledge/* si el usuario no tiene
+  // canAccessKnowledge (Super Admin exento) — sin esto el botón navegaba a
+  // una URL que el proxy redirige silenciosamente al dashboard, sin ningún
+  // mensaje de error para el usuario.
+  const hasKnowledgeAccess = sessionUser?.isSuperAdmin || sessionUser?.canAccessKnowledge !== false
 
   return (
     <div className='flex flex-wrap items-center gap-2'>
       {(ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') &&
         (isAssignedResolver || (!isRequester && sessionUser?.role === 'ADMIN')) &&
+        hasKnowledgeAccess &&
         (ticket.knowledgeArticleId ? (
           <Button
             variant='outline'
