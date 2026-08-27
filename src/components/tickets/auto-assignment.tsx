@@ -25,6 +25,7 @@ import {
   AlertCircle,
   Loader2,
   Users,
+  UserCheck,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
@@ -35,8 +36,19 @@ interface AutoAssignmentProps {
     name: string
     email: string
   }
+  /** Familia del ticket — para ofrecer candidatos manuales (rol + familia nativa/asignada) si la auto-asignación falla. */
+  familyId?: string | null
   onAssignmentComplete?: (assignedTechnician?: { id: string; name: string; email: string }) => void
   onOpenChange?: (open: boolean) => void
+}
+
+interface ManualCandidate {
+  id: string
+  name: string
+  email: string
+  role: string
+  isSuperAdmin?: boolean
+  department?: { id: string; name: string; color?: string | null } | null
 }
 
 interface AssignmentResult {
@@ -53,6 +65,7 @@ interface AssignmentResult {
 export function AutoAssignment({
   ticketId,
   currentAssignee,
+  familyId,
   onAssignmentComplete,
   onOpenChange,
 }: AutoAssignmentProps) {
@@ -62,6 +75,9 @@ export function AutoAssignment({
   const [autoAssignmentEnabled, setAutoAssignmentEnabled] = useState(true)
   const [result, setResult] = useState<AssignmentResult | null>(null)
   const [error, setError] = useState('')
+  const [candidates, setCandidates] = useState<ManualCandidate[] | null>(null)
+  const [candidatesLoading, setCandidatesLoading] = useState(false)
+  const [manualAssigningId, setManualAssigningId] = useState<string | null>(null)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -121,9 +137,65 @@ export function AutoAssignment({
     }
   }
 
+  // Cuando la asignación automática falla (típicamente "no hay técnico en el
+  // departamento de la categoría"), ofrecer de una vez el picker manual en
+  // vez de dejar al admin con un callejón sin salida — mismos candidatos
+  // (rol + familia nativa/asignada) que ya usa el resto de la app para
+  // resolutores de categoría.
+  useEffect(() => {
+    if (!error || !familyId) {
+      setCandidates(null)
+      return
+    }
+    setCandidatesLoading(true)
+    fetch(
+      `/api/users?purpose=categoryResolvers&roles=TECHNICIAN,ADMIN&isActive=true&familyId=${familyId}&limit=100`
+    )
+      .then(r => (r.ok ? r.json() : null))
+      .then(data => {
+        setCandidates(data?.success && Array.isArray(data.data) ? data.data : [])
+      })
+      .catch(() => setCandidates([]))
+      .finally(() => setCandidatesLoading(false))
+  }, [error, familyId])
+
+  const handleManualAssign = async (candidate: ManualCandidate) => {
+    setManualAssigningId(candidate.id)
+    try {
+      const response = await fetch(`/api/tickets/${ticketId}/assign`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assigneeId: candidate.id }),
+      })
+      const data = await response.json().catch(() => null)
+      if (response.ok && data?.success) {
+        setError('')
+        setCandidates(null)
+        setResult({
+          ticket: data.data?.ticket,
+          assignedTechnician: {
+            id: candidate.id,
+            name: candidate.name,
+            email: candidate.email,
+            assignmentReason: 'Asignado manualmente desde el listado de disponibles',
+          },
+          reason: 'Asignado manualmente',
+        })
+      } else {
+        const errorMessage = data?.message || 'No se pudo asignar el ticket'
+        toast({ title: 'Error', description: errorMessage, variant: 'destructive' })
+      }
+    } catch {
+      toast({ title: 'Error de conexión', variant: 'destructive' })
+    } finally {
+      setManualAssigningId(null)
+    }
+  }
+
   const resetDialog = () => {
     setResult(null)
     setError('')
+    setCandidates(null)
     setLoading(false)
   }
 
@@ -275,6 +347,77 @@ export function AutoAssignment({
                   <AlertCircle className='h-4 w-4' />
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
+              )}
+
+              {/* La auto-asignación no encontró a nadie — ofrecer el picker manual
+                  ahí mismo, con los mismos candidatos (rol + familia nativa/asignada)
+                  que el resto de la app usa para resolutores de categoría. */}
+              {error && (
+                <Card>
+                  <CardHeader className='pb-3'>
+                    <CardTitle className='text-sm flex items-center gap-2'>
+                      <UserCheck className='h-4 w-4' />
+                      Asignar manualmente
+                    </CardTitle>
+                    <CardDescription className='text-xs'>
+                      Técnicos y admins de la familia de este ticket
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {!familyId ? (
+                      <p className='text-xs text-muted-foreground italic'>
+                        Este ticket no tiene familia asignada — no se pueden sugerir candidatos.
+                      </p>
+                    ) : candidatesLoading ? (
+                      <div className='flex items-center justify-center py-3'>
+                        <Loader2 className='h-4 w-4 animate-spin text-muted-foreground' />
+                      </div>
+                    ) : !candidates || candidates.length === 0 ? (
+                      <p className='text-xs text-muted-foreground italic'>
+                        Nadie disponible en esta familia por ahora.
+                      </p>
+                    ) : (
+                      <div className='space-y-1.5 max-h-56 overflow-y-auto'>
+                        {candidates.map(candidate => (
+                          <div
+                            key={candidate.id}
+                            className='flex items-center justify-between gap-2 rounded-md border px-2 py-1.5'
+                          >
+                            <div className='min-w-0'>
+                              <div className='flex items-center gap-1.5'>
+                                <p className='text-xs font-medium truncate'>{candidate.name}</p>
+                                <Badge variant='outline' className='text-[10px] px-1 py-0'>
+                                  {candidate.isSuperAdmin
+                                    ? 'Super Admin'
+                                    : candidate.role === 'ADMIN'
+                                      ? 'Admin'
+                                      : 'Técnico'}
+                                </Badge>
+                              </div>
+                              <p className='text-[11px] text-muted-foreground truncate'>
+                                {candidate.email}
+                                {candidate.department ? ` · ${candidate.department.name}` : ''}
+                              </p>
+                            </div>
+                            <Button
+                              size='sm'
+                              variant='outline'
+                              className='h-7 px-2 text-xs flex-shrink-0'
+                              disabled={manualAssigningId === candidate.id}
+                              onClick={() => handleManualAssign(candidate)}
+                            >
+                              {manualAssigningId === candidate.id ? (
+                                <Loader2 className='h-3 w-3 animate-spin' />
+                              ) : (
+                                'Asignar'
+                              )}
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
               )}
 
               {/* Acciones */}

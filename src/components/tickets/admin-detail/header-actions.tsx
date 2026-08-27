@@ -103,6 +103,7 @@ export function HeaderActions({
           <AutoAssignment
             ticketId={ticket.id}
             currentAssignee={ticket.assignee}
+            familyId={ticket.family?.id}
             onAssignmentComplete={onAssignmentComplete}
             onOpenChange={onAssignmentOpenChange}
           />

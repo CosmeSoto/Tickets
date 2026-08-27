@@ -373,6 +373,7 @@ export class AssignmentService {
             email: true,
             role: true,
             departmentId: true,
+            isSuperAdmin: true,
             _count: {
               select: {
                 tickets_tickets_assigneeIdTousers: {
@@ -392,27 +393,44 @@ export class AssignmentService {
       return { hadAssignments, winner: null, priority: 0, categoryName: null }
     }
 
-    // Acotar a los que además pertenecen al departamento correcto del TICKET
-    // (o, si su categoría no tiene departamento, a la familia del ticket
-    // —nativa o concedida—). Sin esto, un técnico configurado en
-    // `technician_assignments` para la categoría pero de otro departamento
-    // (o de otra familia) podía ganar por prioridad sin ninguna validación de
-    // encaje real.
+    // Acotar a los que pertenecen a la misma FAMILIA del ticket (nativa o
+    // concedida) — no al departamento EXACTO de la categoría. Estos técnicos
+    // ya fueron configurados a mano por un Admin en `technician_assignments`
+    // para esta categoría (o una ancestro); ese es el fit real y confiable.
+    // Exigir además que su propio `departmentId` coincida literal con el de
+    // la categoría es demasiado estricto cuando el organigrama separa el
+    // "departamento de dotación" del técnico (p. ej. Soporte Técnico) del
+    // "departamento de categorización" de los tickets (p. ej. Tecnologías de
+    // la Información) — ambos bajo la misma familia, pero con IDs distintos.
+    // El filtro por departamento EXACTO sigue vivo, y a propósito, en el
+    // camino de scoring GENERAL (Prioridad 2 más abajo) — ahí sí hace falta
+    // porque no hay ninguna configuración explícita que respalde el encaje
+    // (ahí vivía el bug original de Tania Guamán).
     let scoped = categoryAssignments
-    if (ticket.categories.departmentId) {
+    if (ticket.familyId) {
+      const { getTechnicianIdsNativeToFamily, getAdminIdsNativeToFamily } =
+        await import('@/lib/auth/family-scope')
+      const [nativeTechIds, nativeAdminIds, grantedAccess] = await Promise.all([
+        getTechnicianIdsNativeToFamily(ticket.familyId),
+        getAdminIdsNativeToFamily(ticket.familyId),
+        prisma.user_family_access.findMany({
+          where: { familyId: ticket.familyId, module: 'tickets', isActive: true },
+          select: { userId: true },
+        }),
+      ])
+      const eligibleIds = new Set([
+        ...nativeTechIds,
+        ...nativeAdminIds,
+        ...grantedAccess.map(g => g.userId),
+      ])
+      scoped = categoryAssignments.filter(
+        a => eligibleIds.has(a.users.id) || a.users.isSuperAdmin === true
+      )
+    } else if (ticket.categories.departmentId) {
+      // Ticket sin familia (no debería pasar en la práctica) — cae al
+      // departamento exacto como único criterio disponible.
       scoped = categoryAssignments.filter(
         a => a.users.departmentId === ticket.categories.departmentId
-      )
-    } else if (ticket.familyId) {
-      const { getTechnicianIdsNativeToFamily } = await import('@/lib/auth/family-scope')
-      const nativeTechIds = new Set(await getTechnicianIdsNativeToFamily(ticket.familyId))
-      const grantedAccess = await prisma.user_family_access.findMany({
-        where: { familyId: ticket.familyId, module: 'tickets', isActive: true },
-        select: { userId: true },
-      })
-      const grantedTechIds = new Set(grantedAccess.map(g => g.userId))
-      scoped = categoryAssignments.filter(
-        a => nativeTechIds.has(a.users.id) || grantedTechIds.has(a.users.id)
       )
     }
 
