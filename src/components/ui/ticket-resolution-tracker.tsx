@@ -2,7 +2,6 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './card'
 import { Button } from './button'
-import { Badge } from './badge'
 import { Alert, AlertDescription } from './alert'
 import { Plus, Target, PlayCircle, Info } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './tooltip'
@@ -11,8 +10,8 @@ import { PlanSummary } from './resolution-plan/plan-summary'
 import { TaskList } from './resolution-plan/task-list'
 import { PlanFormDialog } from './resolution-plan/plan-form-dialog'
 import { PlanDialogs } from './resolution-plan/plan-dialogs'
+import { PastPlanCard } from './resolution-plan/past-plan-card'
 import { FormDraftBanner } from '@/components/common/form-draft-banner'
-import { getStatusLabel, getStatusColor } from './resolution-plan/plan-helpers'
 
 interface TicketResolutionTrackerProps {
   ticketId: string
@@ -201,22 +200,13 @@ export function TicketResolutionTracker({
         <Card>
           <CardHeader className='pb-2'>
             <CardTitle className='text-sm'>Planes anteriores</CardTitle>
-            <CardDescription>Historial de planes completados o cerrados</CardDescription>
+            <CardDescription>
+              Reseña de planes completados o cerrados — toca uno para ver las tareas realizadas
+            </CardDescription>
           </CardHeader>
           <CardContent className='space-y-2'>
             {pastPlans.map(p => (
-              <div
-                key={p.id}
-                className='flex items-center justify-between rounded-lg border px-3 py-2 text-sm'
-              >
-                <div className='min-w-0'>
-                  <p className='font-medium truncate'>{p.title}</p>
-                  <p className='text-xs text-muted-foreground'>
-                    {p.completedTasks}/{p.totalTasks} tareas
-                  </p>
-                </div>
-                <Badge className={getStatusColor(p.status)}>{getStatusLabel(p.status)}</Badge>
-              </div>
+              <PastPlanCard key={p.id} plan={p} />
             ))}
           </CardContent>
         </Card>

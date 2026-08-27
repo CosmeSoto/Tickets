@@ -120,6 +120,14 @@ export default function TechnicianTicketDetailPage() {
   // (~5 min, foco de ventana, o el sync de actividad de SessionTimeoutMonitor
   // cada ~60s) — mismo patrón que admin/settings y admin/backups.
   const ticketLoadedRef = useRef<string | null>(null)
+  // Pestaña activa (Historial/Plan/Archivos), persistida por ticket. Los Tabs de
+  // Radix son "no controlados" con defaultValue='timeline': si por cualquier
+  // motivo el árbol bajo <TicketDetailLayout> llega a remontarse (p. ej. una
+  // recarga silenciosa que deje `loading` en true un instante), pierden su
+  // estado interno y vuelven siempre a "Historial" — sacando al técnico de la
+  // pestaña "Plan" en medio de la edición. Controlar el valor y guardarlo en
+  // sessionStorage hace que la posición sobreviva a cualquier remount.
+  const [activeTab, setActiveTab] = useState('timeline')
 
   const isAssignedResolver = ticket?.assignee?.id === session?.user?.id
   const isUnassigned = !ticket?.assignee
@@ -154,6 +162,27 @@ export default function TechnicianTicketDetailPage() {
       loadTicket()
     }
   }, [authStatus, session?.user?.id, session?.user?.role, ticketId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Restaurar la pestaña activa guardada para este ticket (ver comentario junto
+  // a activeTab más arriba).
+  useEffect(() => {
+    if (!ticketId) return
+    try {
+      const saved = sessionStorage.getItem(`ticket-tab:${ticketId}`)
+      if (saved) setActiveTab(saved)
+    } catch {
+      /* sessionStorage no disponible */
+    }
+  }, [ticketId])
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value)
+    try {
+      sessionStorage.setItem(`ticket-tab:${ticketId}`, value)
+    } catch {
+      /* ignore */
+    }
+  }
 
   const refreshTicketSilent = useCallback(async () => {
     if (!ticketId) return
@@ -385,7 +414,7 @@ export default function TechnicianTicketDetailPage() {
           {/* Calificación cuando el técnico es el solicitante/}
 
           {/* Tabs — sin el tab de Estado */}
-          <Tabs defaultValue='timeline'>
+          <Tabs value={activeTab} onValueChange={handleTabChange}>
             <TabsList className='grid w-full grid-cols-3'>
               <TabsTrigger value='timeline'>Historial</TabsTrigger>
               <TabsTrigger value='resolution'>Plan</TabsTrigger>

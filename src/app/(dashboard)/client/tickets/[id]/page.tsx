@@ -73,6 +73,27 @@ export default function ClientTicketDetailPage() {
 
   const ticketId = params.id as string
 
+  // Persistir la pestaña activa por ticket — mismo motivo que en las vistas
+  // de técnico/admin: si el árbol llega a remontarse, no debe perderse la
+  // posición donde estaba el cliente.
+  useEffect(() => {
+    if (!ticketId) return
+    try {
+      const saved = sessionStorage.getItem(`ticket-tab:${ticketId}`)
+      if (saved) setActiveTab(saved)
+    } catch {
+      /* sessionStorage no disponible */
+    }
+  }, [ticketId])
+  const handleTabChange = (value: string) => {
+    setActiveTab(value)
+    try {
+      sessionStorage.setItem(`ticket-tab:${ticketId}`, value)
+    } catch {
+      /* ignore */
+    }
+  }
+
   const applyTicketUpdate = useCallback(
     (data: Ticket, opts?: { openRatingIfResolved?: boolean }) => {
       const prevStatus = prevStatusRef.current
@@ -349,7 +370,7 @@ export default function ClientTicketDetailPage() {
           )}
 
           {/* Tabs */}
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <Tabs value={activeTab} onValueChange={handleTabChange}>
             <TabsList className='grid w-full grid-cols-2'>
               <TabsTrigger value='timeline'>Historial</TabsTrigger>
               <TabsTrigger value='files'>Archivos</TabsTrigger>

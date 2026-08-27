@@ -1,5 +1,6 @@
 export * from './plan-summary'
 export * from './task-list'
+export * from './past-plan-card'
 export * from './plan-form-dialog'
 export * from './plan-dialogs'
 export * from './plan-helpers'

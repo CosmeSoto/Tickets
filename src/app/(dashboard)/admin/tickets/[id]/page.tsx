@@ -77,6 +77,30 @@ export default function AdminTicketDetailPage() {
     }
   }, [ticketId]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Pestaña activa (Historial/Plan/Archivos), persistida por ticket — mismo
+  // motivo que en la vista de técnico: si el árbol llega a remontarse (p. ej.
+  // loadTicket() vuelve a poner loading=true un instante), un <Tabs> no
+  // controlado siempre vuelve a su defaultValue ("Historial"), sacando al
+  // admin de la pestaña donde estaba trabajando.
+  const [activeTab, setActiveTab] = useState('timeline')
+  useEffect(() => {
+    if (!ticketId) return
+    try {
+      const saved = sessionStorage.getItem(`ticket-tab:${ticketId}`)
+      if (saved) setActiveTab(saved)
+    } catch {
+      /* sessionStorage no disponible */
+    }
+  }, [ticketId])
+  const handleTabChange = (value: string) => {
+    setActiveTab(value)
+    try {
+      sessionStorage.setItem(`ticket-tab:${ticketId}`, value)
+    } catch {
+      /* ignore */
+    }
+  }
+
   // Cargar resolutores elegibles (técnicos + admins) una vez se conoce la
   // familia del ticket. Usa el mismo endpoint/semántica que "Agregar
   // resolutor" en Categorías y el panel de Colaboradores (familyId +
@@ -449,7 +473,7 @@ export default function AdminTicketDetailPage() {
             </Card>
           )}
 
-          <Tabs defaultValue='timeline'>
+          <Tabs value={activeTab} onValueChange={handleTabChange}>
             <TabsList className='grid w-full grid-cols-3'>
               <TabsTrigger value='timeline'>Historial</TabsTrigger>
               <TabsTrigger value='resolution'>Plan</TabsTrigger>
