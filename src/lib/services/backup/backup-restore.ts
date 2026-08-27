@@ -1183,24 +1183,42 @@ async function restoreFromJSON(
  * la transacción), pueden quedar filas que referencian IDs que ya no existen en la tabla
  * referenciada — p. ej. `technician_assignments.categoryId` apuntando a una categoría de
  * un backup viejo que no coincide con las categorías recién sembradas tras un `--clean` +
- * reseed (los IDs de `categories` no son estables entre reseeds). Postgres no revalida
- * esas filas al reactivar los triggers, así que quedan huérfanas en silencio y luego
- * rompen en runtime cualquier consulta de Prisma que incluya la relación no-opcional
- * ("Inconsistent query result: Field X is required to return data, got null"). Se
- * eliminan aquí, tabla por tabla (solo las tablas restauradas en esta corrida), y se
- * reporta cuántas se quitaron para que quede visible en los logs de restauración.
+ * reseed (los IDs de `categories` no son estables entre reseeds), o `users.departmentId`
+ * apuntando a un departamento renombrado entre el momento del backup y el reseed actual
+ * (los IDs de `departments`/`families` SÍ son deterministas por nombre/código, pero un
+ * rename real sí cambia el hash). Postgres no revalida esas filas al reactivar los
+ * triggers, así que quedan huérfanas en silencio y luego rompen en runtime cualquier
+ * consulta de Prisma que incluya la relación no-opcional ("Inconsistent query result:
+ * Field X is required to return data, got null").
+ *
+ * Si la columna es NULLABLE (p. ej. `users.departmentId`), se pone en NULL en vez de
+ * borrar la fila — el registro (la cuenta del técnico, el ticket, etc.) es el dato
+ * valioso, no el vínculo roto; perderlo por completo silenciosamente (como ocurría
+ * antes) dejaba, por ejemplo, técnicos restaurados sin aparecer nunca más como
+ * resolutores disponibles en ninguna categoría. Solo se borra la fila cuando la columna
+ * es NOT NULL — ahí sí es una fila de vínculo (p. ej. una asignación) sin sentido sin
+ * su referencia. Se reporta cuántas filas se tocaron para que quede visible en los logs.
  */
 async function cleanupOrphanedForeignKeys(tx: any, tableNames: string[]): Promise<void> {
   for (const tableName of tableNames) {
-    let fks: { column_name: string; foreign_table_name: string; foreign_column_name: string }[] = []
+    let fks: {
+      column_name: string
+      foreign_table_name: string
+      foreign_column_name: string
+      is_nullable: string
+    }[] = []
     try {
       fks = await tx.$queryRaw(Prisma.sql`
-        SELECT kcu.column_name, ccu.table_name AS foreign_table_name, ccu.column_name AS foreign_column_name
+        SELECT kcu.column_name, ccu.table_name AS foreign_table_name, ccu.column_name AS foreign_column_name,
+               c.is_nullable
         FROM information_schema.table_constraints tc
         JOIN information_schema.key_column_usage kcu
           ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema
         JOIN information_schema.constraint_column_usage ccu
           ON ccu.constraint_name = tc.constraint_name AND ccu.table_schema = tc.table_schema
+        JOIN information_schema.columns c
+          ON c.table_schema = tc.table_schema AND c.table_name = tc.table_name
+             AND c.column_name = kcu.column_name
         WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_name = ${tableName}
       `)
     } catch {
@@ -1208,6 +1226,23 @@ async function cleanupOrphanedForeignKeys(tx: any, tableNames: string[]): Promis
     }
     for (const fk of fks) {
       try {
+        if (fk.is_nullable === 'YES') {
+          const cleared: number = await tx.$executeRaw(Prisma.sql`
+            UPDATE ${Prisma.raw(`"${tableName}"`)}
+            SET ${Prisma.raw(`"${fk.column_name}"`)} = NULL
+            WHERE ${Prisma.raw(`"${fk.column_name}"`)} IS NOT NULL
+              AND ${Prisma.raw(`"${fk.column_name}"`)} NOT IN (
+                SELECT ${Prisma.raw(`"${fk.foreign_column_name}"`)} FROM ${Prisma.raw(`"${fk.foreign_table_name}"`)}
+              )
+          `)
+          if (cleared > 0) {
+            console.warn(
+              `[RESTORE] ⚠ ${tableName}.${fk.column_name}: ${cleared} fila(s) con referencia huérfana a ${fk.foreign_table_name}.${fk.foreign_column_name} — columna puesta en NULL (fila conservada)`
+            )
+          }
+          continue
+        }
+
         const deleted: number = await tx.$executeRaw(Prisma.sql`
           DELETE FROM ${Prisma.raw(`"${tableName}"`)}
           WHERE ${Prisma.raw(`"${fk.column_name}"`)} IS NOT NULL
@@ -1217,7 +1252,7 @@ async function cleanupOrphanedForeignKeys(tx: any, tableNames: string[]): Promis
         `)
         if (deleted > 0) {
           console.warn(
-            `[RESTORE] ⚠ ${tableName}.${fk.column_name}: ${deleted} fila(s) huérfana(s) eliminada(s) (referencia inexistente en ${fk.foreign_table_name}.${fk.foreign_column_name})`
+            `[RESTORE] ⚠ ${tableName}.${fk.column_name}: ${deleted} fila(s) huérfana(s) eliminada(s) (referencia inexistente en ${fk.foreign_table_name}.${fk.foreign_column_name}, columna NOT NULL)`
           )
         }
       } catch (e) {
