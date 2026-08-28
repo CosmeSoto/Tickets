@@ -279,15 +279,16 @@ export function BackupOperationsHistory({ refreshKey = 0 }: BackupOperationsHist
           </div>
           <div className='flex items-center gap-2 flex-shrink-0'>
             {isSuperAdmin && selectedIds.length > 0 && (
-              <Button
-                variant='destructive'
-                size='sm'
+              <button
+                type='button'
                 onClick={() => setConfirmDeleteOpen(true)}
                 disabled={deleting}
+                className='h-8 w-8 flex items-center justify-center rounded text-muted-foreground/25 hover:text-destructive disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-muted-foreground/25'
+                title={`Eliminar seleccionados (${selectedIds.length})`}
+                aria-label='Eliminar operaciones seleccionadas del historial'
               >
-                <Trash2 className='h-4 w-4 mr-1' />
-                Eliminar seleccionados ({selectedIds.length})
-              </Button>
+                <Trash2 className='h-4 w-4' />
+              </button>
             )}
             <Button
               variant='outline'

@@ -333,47 +333,40 @@ export function AuditFiltersComponent({
               <Button onClick={onClearFilters} variant='outline' size='sm' className='min-h-9'>
                 Limpiar
               </Button>
+              {isSuperAdmin && (onDeleteSelected || onDeleteFiltered) && (
+                <div className='flex items-center gap-1 border-l pl-2 ml-1'>
+                  {onDeleteSelected && (
+                    <button
+                      type='button'
+                      onClick={() => setConfirmSelectedOpen(true)}
+                      disabled={busy || selectedCount === 0}
+                      className='h-6 w-6 flex items-center justify-center rounded text-muted-foreground/25 hover:text-destructive disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-muted-foreground/25'
+                      title={`Eliminar seleccionados (${selectedCount})`}
+                      aria-label='Eliminar registros de auditoría seleccionados'
+                    >
+                      <Trash2 className='h-3 w-3' />
+                    </button>
+                  )}
+                  {onDeleteFiltered && (
+                    <button
+                      type='button'
+                      onClick={() => {
+                        setConfirmText('')
+                        setConfirmFilteredOpen(true)
+                      }}
+                      disabled={busy || filteredTotal === 0}
+                      className='h-6 w-3 text-[10px] leading-none text-muted-foreground/25 hover:text-destructive disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-muted-foreground/25'
+                      title={`Vaciar según filtro (${filteredTotal}) — solo Super Admin`}
+                      aria-label='Eliminar todos los registros que coinciden con el filtro actual'
+                    >
+                      ·
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
-
-        {isSuperAdmin && (onDeleteSelected || onDeleteFiltered) && (
-          <div className='space-y-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3 sm:p-4'>
-            <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
-              <div className='min-w-0'>
-                <p className='text-sm font-medium'>Eliminar</p>
-                <p className='text-xs text-muted-foreground'>
-                  Solo Super Admin. Acción irreversible — queda registrada en auditoría.
-                </p>
-              </div>
-              <div className='flex flex-wrap gap-2 items-center'>
-                <Button
-                  onClick={() => setConfirmSelectedOpen(true)}
-                  variant='destructive'
-                  size='sm'
-                  disabled={busy || selectedCount === 0}
-                  className='min-h-9'
-                >
-                  <Trash2 className='h-4 w-4 mr-1' />
-                  Eliminar seleccionados ({selectedCount})
-                </Button>
-                <Button
-                  onClick={() => {
-                    setConfirmText('')
-                    setConfirmFilteredOpen(true)
-                  }}
-                  variant='destructive'
-                  size='sm'
-                  disabled={busy || filteredTotal === 0}
-                  className='min-h-9'
-                >
-                  <Trash2 className='h-4 w-4 mr-1' />
-                  Vaciar según filtro ({filteredTotal})
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {hasActiveFilters && (
           <div className='mt-4 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg'>
