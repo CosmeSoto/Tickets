@@ -95,6 +95,8 @@ interface NewsItem {
   isFeatured: boolean
   allowComments: boolean
   allowReactions: boolean
+  notifyEmail: boolean
+  notifyTelegram: boolean
   views: number
   createdById: string
   updatedById: string | null
@@ -192,6 +194,8 @@ export default function AdminNewsPage() {
     isFeatured: false,
     allowComments: false,
     allowReactions: true,
+    notifyEmail: true,
+    notifyTelegram: false,
     roles: [] as string[],
     userIds: [] as string[],
     departmentIds: [] as string[],
@@ -278,9 +282,7 @@ export default function AdminNewsPage() {
         if (res.ok) {
           const data = await res.json()
           const canManage =
-            session.user.role === 'ADMIN'
-              ? data.news === true
-              : data.canManageNews && data.news
+            session.user.role === 'ADMIN' ? data.news === true : data.canManageNews && data.news
           if (canManage) {
             setHasAccess(true)
             loadNews()
@@ -465,6 +467,8 @@ export default function AdminNewsPage() {
       isFeatured: item.isFeatured,
       allowComments: item.allowComments,
       allowReactions: item.allowReactions,
+      notifyEmail: item.notifyEmail,
+      notifyTelegram: item.notifyTelegram,
       roles: item.news_roles.map(r => r.role),
       userIds: item.news_users.map(u => u.userId),
       departmentIds: item.news_departments.map(d => d.departmentId),
@@ -527,6 +531,8 @@ export default function AdminNewsPage() {
       isFeatured: false,
       allowComments: false,
       allowReactions: true,
+      notifyEmail: true,
+      notifyTelegram: false,
       roles: [],
       userIds: [],
       departmentIds: [],
@@ -952,6 +958,28 @@ export default function AdminNewsPage() {
                     onCheckedChange={v => setFormData({ ...formData, allowReactions: v })}
                   />
                   <Label className='text-sm'>Permitir reacciones</Label>
+                </div>
+              </div>
+
+              <div className='space-y-1.5'>
+                <p className='text-xs font-medium text-muted-foreground'>
+                  Al publicar, además de la notificación en la app, avisar también por:
+                </p>
+                <div className='flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:gap-4 sm:items-center'>
+                  <div className='flex items-center gap-2'>
+                    <Switch
+                      checked={formData.notifyEmail}
+                      onCheckedChange={v => setFormData({ ...formData, notifyEmail: v })}
+                    />
+                    <Label className='text-sm'>Email</Label>
+                  </div>
+                  <div className='flex items-center gap-2'>
+                    <Switch
+                      checked={formData.notifyTelegram}
+                      onCheckedChange={v => setFormData({ ...formData, notifyTelegram: v })}
+                    />
+                    <Label className='text-sm'>Telegram</Label>
+                  </div>
                 </div>
               </div>
 

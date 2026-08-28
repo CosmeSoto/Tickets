@@ -235,6 +235,8 @@ export async function POST(request: NextRequest) {
         isFeatured: data.isFeatured || false,
         allowComments: data.allowComments || false,
         allowReactions: data.allowReactions !== false,
+        notifyEmail: data.notifyEmail !== false,
+        notifyTelegram: data.notifyTelegram === true,
         createdById: session.user.id,
         news_roles: {
           create: sanitized.roles.map(role => ({ role })),
@@ -290,9 +292,12 @@ export async function POST(request: NextRequest) {
         title: data.title,
         summary: data.summary,
         content: data.content,
+        imageUrl: news.imageUrl,
         type,
         priority,
         actorUserId: session.user.id,
+        notifyEmail: news.notifyEmail,
+        notifyTelegram: news.notifyTelegram,
       })
     }
 

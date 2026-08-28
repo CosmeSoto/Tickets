@@ -204,6 +204,8 @@ export async function PUT(request: NextRequest, { params }: Params) {
         isFeatured: data.isFeatured,
         allowComments: data.allowComments,
         allowReactions: data.allowReactions,
+        notifyEmail: data.notifyEmail,
+        notifyTelegram: data.notifyTelegram,
         updatedById: session.user.id,
       },
       include: {
@@ -299,9 +301,12 @@ export async function PUT(request: NextRequest, { params }: Params) {
         title: news.title,
         summary: news.summary,
         content: news.content,
+        imageUrl: news.imageUrl,
         type: news.type,
         priority: news.priority ?? 'MEDIUM',
         actorUserId: session.user.id,
+        notifyEmail: news.notifyEmail,
+        notifyTelegram: news.notifyTelegram,
       })
     }
 

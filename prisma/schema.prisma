@@ -3463,6 +3463,8 @@ model news {
   isFeatured     Boolean      @default(false) @map("is_featured")
   allowComments  Boolean      @default(false) @map("allow_comments")
   allowReactions Boolean      @default(true) @map("allow_reactions")
+  notifyEmail    Boolean      @default(true) @map("notify_email")
+  notifyTelegram Boolean      @default(false) @map("notify_telegram")
   views          Int          @default(0)
   createdById    String       @map("created_by_id")
   updatedById    String?      @map("updated_by_id")
