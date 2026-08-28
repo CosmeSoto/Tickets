@@ -176,10 +176,33 @@ export default function CredentialsPage() {
     loadInFlightRef.current = true
     setLoading(true)
     try {
-      const [vaultRes, entryRes] = await Promise.all([
+      const [vaultResult, entryResult] = await Promise.allSettled([
         dedupedFetch('/api/credentials/vaults'),
         dedupedFetch('/api/credentials/entries'),
       ])
+
+      // Diagnóstico: antes esto era un Promise.all que, si CUALQUIERA de los
+      // dos fetch fallaba, tragaba el motivo real en un catch genérico —
+      // imposible saber si era vaults o entries, ni por qué. Con
+      // allSettled + log identificamos exactamente cuál y con qué error.
+      if (vaultResult.status === 'rejected' || entryResult.status === 'rejected') {
+        if (vaultResult.status === 'rejected') {
+          console.error('[Credentials] GET /api/credentials/vaults falló:', vaultResult.reason)
+        }
+        if (entryResult.status === 'rejected') {
+          console.error('[Credentials] GET /api/credentials/entries falló:', entryResult.reason)
+        }
+        toastRef.current({
+          title: 'Error de conexión',
+          description:
+            'No se pudo contactar el servidor. Verifique su conexión e intente de nuevo.',
+          variant: 'destructive',
+        })
+        return
+      }
+
+      const vaultRes = vaultResult.value
+      const entryRes = entryResult.value
 
       if (vaultRes.status === 403 || entryRes.status === 403) {
         routerRef.current.push('/')
@@ -228,7 +251,8 @@ export default function CredentialsPage() {
           variant: 'destructive',
         })
       }
-    } catch {
+    } catch (err) {
+      console.error('[Credentials] loadData falló de forma inesperada:', err)
       toastRef.current({
         title: 'Error de conexión',
         description: 'No se pudo contactar el servidor. Verifique su conexión e intente de nuevo.',

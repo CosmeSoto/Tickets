@@ -54,6 +54,11 @@ async function fetchWithRetry(input: RequestInfo | URL, init?: RequestInit): Pro
       return await fetch(input, init)
     } catch (err) {
       lastError = err
+      // eslint-disable-next-line no-console -- diagnóstico temporal de fallos de red intermitentes
+      console.warn(
+        `[fetchWithRetry] intento ${attempt + 1}/${RETRYABLE_MAX_ATTEMPTS} falló para ${typeof input === 'string' ? input : input.toString()}:`,
+        err
+      )
       if (attempt < RETRYABLE_MAX_ATTEMPTS - 1) {
         await wait(RETRYABLE_BASE_DELAY_MS * (attempt + 1))
       }
