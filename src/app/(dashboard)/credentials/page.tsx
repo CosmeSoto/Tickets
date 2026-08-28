@@ -1,9 +1,21 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { KeyRound, Plus, Eye, Loader2, ExternalLink, Trash2, Copy, Share2 } from 'lucide-react'
+import {
+  KeyRound,
+  Plus,
+  Eye,
+  Loader2,
+  ExternalLink,
+  Trash2,
+  Copy,
+  Share2,
+  Cpu,
+  FileKey,
+} from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { FilterBar } from '@/components/common/filters'
 import { ListTableToolbar } from '@/components/common/list-table-toolbar'
@@ -65,6 +77,16 @@ type CredentialEntry = {
   notes?: string | null
   entryType: string
   equipmentId?: string | null
+  licenseId?: string | null
+  /** Presente solo si equipmentId apunta a un equipo real (join en credentialEntryMetadataSelect). */
+  equipment?: {
+    id: string
+    code: string
+    brand?: string | null
+    model?: { model: string } | null
+  } | null
+  /** Presente solo si licenseId apunta a una licencia real. */
+  license?: { id: string; name: string } | null
   lastRevealedAt?: string | null
   sharedWithMe?: boolean
   /** own | shared | hierarchy */
@@ -94,6 +116,10 @@ type CredentialRow = CredentialEntry & {
   isSharedLabel: string
   sharedWithLabel: string
   sharedByLabel: string
+  /** 'equipment' | 'license' | 'none' — para el filtro y el export. */
+  linkedKind: 'equipment' | 'license' | 'none'
+  linkedLabel: string
+  linkedHref: string | null
 }
 
 type ViewMode = 'table' | 'cards'
@@ -102,6 +128,7 @@ const COLUMN_DEFS: TableColumnDef[] = [
   { key: 'title', label: 'Título', required: true },
   { key: 'areaLabel', label: 'Área' },
   { key: 'typeLabel', label: 'Tipo' },
+  { key: 'linkedLabel', label: 'Vinculada a' },
   { key: 'username', label: 'Usuario' },
   { key: 'passwordMasked', label: 'Contraseña (••••)' },
   { key: 'url', label: 'URL' },
@@ -117,6 +144,7 @@ const EXPORT_COLUMN_MAP: Record<string, ExportColumn> = {
   title: { key: 'title', label: 'Título' },
   areaLabel: { key: 'areaLabel', label: 'Área' },
   typeLabel: { key: 'typeLabel', label: 'Tipo' },
+  linkedLabel: { key: 'linkedLabel', label: 'Vinculada a' },
   username: { key: 'username', label: 'Usuario' },
   passwordMasked: { key: 'passwordMasked', label: 'Contraseña' },
   url: { key: 'url', label: 'URL' },
@@ -125,11 +153,39 @@ const EXPORT_COLUMN_MAP: Record<string, ExportColumn> = {
   sharedByLabel: { key: 'sharedByLabel', label: 'Compartida por' },
 }
 
+/** Etiqueta legible de un equipo: "código · marca modelo" con lo que haya disponible. */
+function equipmentLabel(eq: NonNullable<CredentialEntry['equipment']>): string {
+  const modelName = eq.model?.model
+  const parts = [eq.brand, modelName].filter(Boolean)
+  return parts.length > 0 ? `${eq.code} · ${parts.join(' ')}` : eq.code
+}
+
+/**
+ * Vínculo inverso credencial → activo/licencia. El dato (equipmentId/licenseId)
+ * existe en la BD desde antes y ya se usa para el sentido activo→credencial
+ * (ver LinkedCredentialsCard), pero nunca se mostraba aquí — no había forma de
+ * saber, parado en el módulo real, a qué equipo o licencia pertenece una
+ * entrada ni de saltar a su detalle.
+ */
 function toRow(entry: CredentialEntry): CredentialRow {
   const vault = entry.vault
     ? { name: entry.vault.name, kind: entry.vault.kind, family: entry.vault.family }
     : { name: '—', kind: null, family: null }
   const sharedOut = (entry.shareCount ?? 0) > 0 || (entry.sharedWith?.length ?? 0) > 0
+
+  let linkedKind: CredentialRow['linkedKind'] = 'none'
+  let linkedLabel = '—'
+  let linkedHref: string | null = null
+  if (entry.equipment) {
+    linkedKind = 'equipment'
+    linkedLabel = equipmentLabel(entry.equipment)
+    linkedHref = `/inventory/equipment/${entry.equipment.id}`
+  } else if (entry.license) {
+    linkedKind = 'license'
+    linkedLabel = entry.license.name
+    linkedHref = `/inventory/license/${entry.license.id}`
+  }
+
   return {
     ...entry,
     areaLabel: formatCredentialVaultLabel(vault),
@@ -139,6 +195,9 @@ function toRow(entry: CredentialEntry): CredentialRow {
     isSharedLabel: sharedOut || entry.sharedWithMe || entry.isShared ? 'Sí' : 'No',
     sharedWithLabel: entry.sharedWithLabel?.trim() || '—',
     sharedByLabel: entry.sharedByLabel?.trim() || '—',
+    linkedKind,
+    linkedLabel,
+    linkedHref,
   }
 }
 
@@ -321,6 +380,19 @@ export default function CredentialsPage() {
         defaultValue: 'all',
         options: CREDENTIAL_ENTRY_TYPE_OPTIONS,
       },
+      {
+        id: 'linkedKind',
+        type: 'select',
+        label: 'Vinculada a',
+        field: 'linkedKind',
+        defaultValue: 'all',
+        options: [
+          { value: 'all', label: 'Todas' },
+          { value: 'equipment', label: 'Equipos' },
+          { value: 'license', label: 'Licencias' },
+          { value: 'none', label: 'Sin vincular' },
+        ],
+      },
     ],
     [vaults]
   )
@@ -463,6 +535,28 @@ export default function CredentialsPage() {
     void loadData()
   }
 
+  const renderLinkedBadge = (entry: CredentialRow) => {
+    if (entry.linkedKind === 'none' || !entry.linkedHref) {
+      return <span className='text-muted-foreground text-sm'>—</span>
+    }
+    const Icon = entry.linkedKind === 'equipment' ? Cpu : FileKey
+    return (
+      <Link
+        href={entry.linkedHref}
+        className='inline-flex items-center gap-1 max-w-[200px]'
+        title={entry.linkedLabel}
+      >
+        <Badge
+          variant='outline'
+          className='gap-1 hover:border-primary hover:text-primary transition-colors truncate'
+        >
+          <Icon className='h-3 w-3 shrink-0' />
+          <span className='truncate'>{entry.linkedLabel}</span>
+        </Badge>
+      </Link>
+    )
+  }
+
   const renderActions = (entry: CredentialRow, compact = false) => (
     <div className={cn('flex items-center gap-1.5 flex-wrap', compact ? 'justify-end' : '')}>
       <Button
@@ -543,6 +637,8 @@ export default function CredentialsPage() {
             <Badge variant='outline'>{entry.typeLabel}</Badge>
           </TableCell>
         )
+      case 'linkedLabel':
+        return <TableCell key={key}>{renderLinkedBadge(entry)}</TableCell>
       case 'username':
         return (
           <TableCell key={key}>
@@ -762,6 +858,9 @@ export default function CredentialsPage() {
                         </div>
                       </div>
                       <p className='text-xs text-muted-foreground'>{entry.areaLabel}</p>
+                      {entry.linkedKind !== 'none' && (
+                        <div className='pt-0.5'>{renderLinkedBadge(entry)}</div>
+                      )}
                       {entry.sharedWithLabel && entry.sharedWithLabel !== '—' ? (
                         <p className='text-xs text-muted-foreground line-clamp-2'>
                           Con: {entry.sharedWithLabel}

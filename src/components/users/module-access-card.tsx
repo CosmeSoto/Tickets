@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { ChevronDown, Search, RefreshCw, Lock, Info } from 'lucide-react'
+import { ChevronDown, Search, RefreshCw, Lock, Info, ArrowRightLeft } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import {
   getModuleEmoji,
@@ -71,6 +72,19 @@ interface ModuleAccessCardProps {
   }
   /** Familias de solo lectura (fuera del scope del admin) */
   readOnlyFamilyIds?: string[]
+  /**
+   * Referencia para alinear áreas con otro módulo (ej. Credenciales vs.
+   * Inventario): si el usuario tiene familias adicionales asignadas allá que
+   * no tiene aquí, se muestra un aviso con botón para igualarlas en un clic —
+   * sin esto es fácil asignar inventario a un área y olvidar credenciales (o
+   * viceversa), y el desajuste solo se nota al usar el módulo real.
+   */
+  familyAlignment?: {
+    /** Nombre del módulo de referencia, ej. 'Inventario' */
+    label: string
+    /** IDs de familias adicionales (no nativa) asignadas en el módulo de referencia */
+    referenceFamilyIds: string[]
+  }
   /** Oculta el selector de familias de esta tarjeta (y su badge de conteo)
    *  cuando se muestra en otro lugar — ej. Noticias/Documentos, que comparten
    *  un único selector "Áreas de contenido" (ver ContentFamiliesCard) para no
@@ -95,12 +109,14 @@ export function ModuleAccessCard({
   options,
   readOnlyFamilyIds = [],
   hideFamilies = false,
+  familyAlignment,
   loading,
   disabled,
 }: ModuleAccessCardProps) {
   const [expanded, setExpanded] = useState(false)
   const [search, setSearch] = useState('')
   const [savingId, setSavingId] = useState<string | null>(null)
+  const [syncingAlignment, setSyncingAlignment] = useState(false)
   const { toast } = useToast()
 
   // Auto-expandir cuando el módulo se activa, para que la familia nativa
@@ -119,6 +135,35 @@ export function ModuleAccessCard({
 
   const assignedSet = new Set(assignedFamilyIds)
   const readOnlySet = new Set(readOnlyFamilyIds)
+
+  const missingFromReference = familyAlignment
+    ? familyAlignment.referenceFamilyIds.filter(id => !assignedSet.has(id) && !readOnlySet.has(id))
+    : []
+
+  const handleSyncAlignment = async () => {
+    if (syncingAlignment || missingFromReference.length === 0) return
+    setSyncingAlignment(true)
+    try {
+      for (const familyId of missingFromReference) {
+        // Secuencial (no Promise.all): mismo patrón que el toggle individual,
+        // evita ráfagas de escrituras concurrentes al mismo user_family_access.
+        // eslint-disable-next-line no-await-in-loop
+        await onAssignFamily(familyId)
+      }
+      toast({
+        title: 'Áreas igualadas',
+        description: `${missingFromReference.length} área${missingFromReference.length !== 1 ? 's' : ''} de ${familyAlignment!.label} agregada${missingFromReference.length !== 1 ? 's' : ''} aquí.`,
+      })
+    } catch (err: any) {
+      toast({
+        title: 'Error',
+        description: err.message || 'No se pudieron igualar todas las áreas',
+        variant: 'destructive',
+      })
+    } finally {
+      setSyncingAlignment(false)
+    }
+  }
 
   const resolvedNativeFamily: ModuleFamily | null =
     nativeFamily ?? (nativeFamilyId ? (families.find(f => f.id === nativeFamilyId) ?? null) : null)
@@ -390,6 +435,36 @@ export function ModuleAccessCard({
                 </p>
               </div>
             )}
+
+          {/* ── Aviso de desajuste con el módulo de referencia (ej. Inventario) ── */}
+          {familyAlignment && !hideFamilies && missingFromReference.length > 0 && (
+            <div className='flex items-center justify-between gap-2 px-3 py-2 bg-amber-50 dark:bg-amber-950/30 border-b border-primary/10'>
+              <div className='flex items-start gap-1.5 min-w-0'>
+                <ArrowRightLeft className='h-3.5 w-3.5 text-amber-600 dark:text-amber-500 shrink-0 mt-0.5' />
+                <p className='text-[11px] text-muted-foreground leading-tight'>
+                  <span className='font-medium text-foreground'>
+                    {missingFromReference.length} área
+                    {missingFromReference.length !== 1 ? 's' : ''}
+                  </span>{' '}
+                  de {familyAlignment.label} sin acceso aquí todavía.
+                </p>
+              </div>
+              <Button
+                type='button'
+                size='sm'
+                variant='outline'
+                className='h-6 text-[10px] px-2 shrink-0'
+                disabled={disabled || syncingAlignment}
+                onClick={handleSyncAlignment}
+              >
+                {syncingAlignment ? (
+                  <RefreshCw className='h-3 w-3 animate-spin' />
+                ) : (
+                  `Igualar con ${familyAlignment.label}`
+                )}
+              </Button>
+            </div>
+          )}
 
           {/* ── Sección de familias — solo si hay familias relevantes y no se
               muestra ya en otro lugar (ver hideFamilies) ── */}

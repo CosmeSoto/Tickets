@@ -49,6 +49,8 @@ export function LinkedCredentialsCard({
   const [createOpen, setCreateOpen] = useState(false)
   const [vaults, setVaults] = useState<Vault[]>([])
   const [copyingId, setCopyingId] = useState<string | null>(null)
+  /** null = aún no se sabe (durante la carga); evita parpadeo del botón "Agregar". */
+  const [canCreateHere, setCanCreateHere] = useState<boolean | null>(null)
 
   const apiPath =
     entity === 'equipment'
@@ -71,6 +73,7 @@ export function LinkedCredentialsCard({
       if (res.ok) {
         const data = await res.json()
         setEntries(data.entries ?? [])
+        setCanCreateHere(data.canCreate !== false)
       }
     } finally {
       setLoading(false)
@@ -161,7 +164,7 @@ export function LinkedCredentialsCard({
             <Button variant='ghost' size='sm' asChild>
               <Link href='/credentials'>Ver módulo</Link>
             </Button>
-            {canManage && (
+            {canManage && canCreateHere !== false && (
               <Button variant='outline' size='sm' onClick={() => setCreateOpen(true)}>
                 <Plus className='h-3.5 w-3.5 mr-1' />
                 Agregar
@@ -170,6 +173,12 @@ export function LinkedCredentialsCard({
           </div>
         </CardHeader>
         <CardContent className='space-y-2'>
+          {canManage && canCreateHere === false && (
+            <p className='text-xs text-amber-600 dark:text-amber-500 rounded-md bg-amber-50 dark:bg-amber-950/30 px-2.5 py-1.5'>
+              Tu acceso a Credenciales no incluye el área de este activo. Pide a un administrador
+              que la agregue en Usuarios → Credenciales.
+            </p>
+          )}
           {entries.length === 0 ? (
             <p className='text-sm text-muted-foreground'>{emptyLabel}</p>
           ) : (
@@ -237,7 +246,7 @@ export function LinkedCredentialsCard({
         </CardContent>
       </Card>
 
-      {canManage && (
+      {canManage && canCreateHere !== false && (
         <CreateCredentialDialog
           open={createOpen}
           onOpenChange={setCreateOpen}

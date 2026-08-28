@@ -385,6 +385,16 @@ export function PermissionsAndModulesSection({
                     }
                   : undefined
               }
+              // Las credenciales de un equipo/licencia viven en el área de ese
+              // activo (ver assertEquipmentLinkAllowed/assertLicenseLinkAllowed en
+              // src/lib/credentials/access.ts): si el usuario tiene un área de
+              // Inventario sin su contraparte aquí, el detalle del activo le
+              // muestra la tarjeta de Credenciales pero no puede usarla ahí.
+              familyAlignment={
+                formData.inventoryEnabled || formData.canManageInventory
+                  ? { label: 'Inventario', referenceFamilyIds: inventoryFamilyIds }
+                  : undefined
+              }
               loading={loadingFamilies}
               disabled={loading}
             />

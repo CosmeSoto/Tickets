@@ -6,6 +6,7 @@ import {
   checkCredentialsModuleAccess,
   buildCredentialEntriesVisibilityWhere,
   credentialEntryMetadataSelect,
+  assertLicenseLinkAllowed,
 } from '@/lib/credentials/access'
 
 type RouteParams = { params: Promise<{ licenseId: string }> }
@@ -37,5 +38,12 @@ export async function GET(_request: Request, { params }: RouteParams) {
     orderBy: { title: 'asc' },
   })
 
-  return NextResponse.json({ entries })
+  // Si el área de esta licencia no está en el alcance de Credenciales del
+  // usuario (aunque sí lo esté en Inventario), evitamos que la tarjeta del
+  // detalle ofrezca "Agregar" para terminar en un 403 al guardar — ver
+  // ModuleAccessCard.familyAlignment en Usuarios, que ahora avisa de este
+  // desajuste antes de que ocurra.
+  const linkCheck = await assertLicenseLinkAllowed(ctx, licenseId, null)
+
+  return NextResponse.json({ entries, canCreate: linkCheck.ok })
 }

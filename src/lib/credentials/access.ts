@@ -471,6 +471,21 @@ export const credentialEntryMetadataSelect = {
   isActive: true,
   createdAt: true,
   updatedAt: true,
+  // Join liviano solo para mostrar "vinculada a X" con enlace de vuelta al
+  // activo/licencia en el módulo real (antes solo se guardaba el id, nunca
+  // se mostraba en /credentials — ver LinkedCredentialsCard para el sentido
+  // inverso, que ya existía).
+  equipment: {
+    select: {
+      id: true,
+      code: true,
+      brand: true,
+      model: { select: { model: true } },
+    },
+  },
+  license: {
+    select: { id: true, name: true },
+  },
   vault: {
     select: {
       id: true,
