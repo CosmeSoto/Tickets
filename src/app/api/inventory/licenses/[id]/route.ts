@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { LicenseService } from '@/lib/services/license.service'
-import { updateLicenseSchema, assignLicenseSchema } from '@/lib/validations/inventory/license'
+import { updateLicenseSchema } from '@/lib/validations/inventory/license'
 import { ZodError } from 'zod'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 import {
@@ -301,7 +301,9 @@ export async function DELETE(
 
 /**
  * PATCH /api/inventory/licenses/[id]
- * Asignar/desasignar licencia o cerrar contrato
+ * Cerrar contrato (isActive: false). Asignar/desasignar responsable vive en
+ * /api/inventory/licenses/[id]/assign — deja historial (license_assignments) y
+ * genera acta de entrega cuando corresponde, algo que este endpoint no hacía.
  */
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -345,51 +347,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       return NextResponse.json(closed)
     }
 
-    if (body.action === 'unassign') {
-      const license = await LicenseService.unassignLicense(id, session.user.id)
-
-      await AuditServiceComplete.log({
-        action: AuditActionsComplete.LICENSE_UNASSIGNED,
-        entityType: 'inventory',
-        entityId: id,
-        userId: session.user.id,
-        details: { name: license.name },
-        ipAddress:
-          request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
-        userAgent: request.headers.get('user-agent') || 'unknown',
-      }).catch(err => console.error('[AUDIT] Error registrando desasignación:', err))
-
-      return NextResponse.json(license)
-    }
-
-    const validatedData = assignLicenseSchema.parse(body)
-    const license = await LicenseService.assignLicense(
-      id,
-      {
-        assignedToEquipment: validatedData.assignedToEquipment || undefined,
-        assignedToUser: validatedData.assignedToUser || undefined,
-        assignedToDepartment: validatedData.assignedToDepartment || undefined,
-      },
-      session.user.id
+    return NextResponse.json(
+      { error: 'Usa POST /api/inventory/licenses/[id]/assign para asignar o desasignar' },
+      { status: 400 }
     )
-
-    await AuditServiceComplete.log({
-      action: AuditActionsComplete.LICENSE_ASSIGNED,
-      entityType: 'inventory',
-      entityId: id,
-      userId: session.user.id,
-      details: {
-        name: license.name,
-        assignedToEquipment: validatedData.assignedToEquipment,
-        assignedToUser: validatedData.assignedToUser,
-        assignedToDepartment: validatedData.assignedToDepartment,
-      },
-      ipAddress:
-        request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
-      userAgent: request.headers.get('user-agent') || 'unknown',
-    }).catch(err => console.error('[AUDIT] Error registrando asignación:', err))
-
-    return NextResponse.json(license)
   } catch (error) {
     console.error('Error en PATCH /api/inventory/licenses/[id]:', error)
     if (error instanceof ZodError) {

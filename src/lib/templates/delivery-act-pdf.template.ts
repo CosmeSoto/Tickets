@@ -9,6 +9,7 @@ import { getUploadDir } from '@/lib/upload-path'
 import { DEFAULT_SYSTEM_NAME } from '@/lib/branding-constants'
 import { getAppTimezone } from '@/lib/utils/date-utils'
 import { PAYMENT_METHOD_TYPE_LABELS, type PaymentMethodType } from '@/types/contracts'
+import { CONTRACT_TYPE_LABELS } from '@/lib/inventory/license-labels'
 
 async function fetchImageBuffer(url: string): Promise<Buffer | null> {
   if (!url) return null
@@ -125,6 +126,7 @@ export async function generateDeliveryActPDF(
     MRO_DELIVERY: 'ACTA DE ENTREGA — MATERIALES',
     SERVICE_COMPLETION: 'ACTA DE SERVICIO',
     ASSET_TRANSFER: 'ACTA DE TRANSFERENCIA',
+    LICENSE_ASSIGNMENT: 'ACTA DE ENTREGA — LICENCIA',
   }
   const actTypeLabel =
     actTypeLabels[(act as any).actType ?? 'EQUIPMENT_ASSIGNMENT'] ?? 'ACTA DE ENTREGA'
@@ -243,6 +245,51 @@ export async function generateDeliveryActPDF(
 
     y = fieldRow('CUSTODIO', snap.custodian?.name || '—', y)
     y = fieldRow('EMAIL DE FACTURACIÓN', snap.billingAccountEmail || '—', y)
+
+    y = separator(y)
+  } else if (actType === 'LICENSE_ASSIGNMENT') {
+    // ── Licencia de software ───────────────────────────────────────────────
+    y = sectionTitle('Licencia Entregada', y)
+
+    y = fieldRow('LICENCIA', snap.name || '—', y)
+    y = fieldRow('PROVEEDOR', snap.supplier?.name || snap.vendor || '—', y)
+
+    doc
+      .fontSize(7.5)
+      .font('Helvetica-Bold')
+      .fillColor(C.muted)
+      .text('TIPO DE CONTRATO', ML, y, { width: halfW })
+    doc
+      .fontSize(7.5)
+      .font('Helvetica-Bold')
+      .fillColor(C.muted)
+      .text('COSTO', ML + CW / 2, y, { width: halfW })
+    y += 9
+    doc
+      .fontSize(9)
+      .font('Helvetica')
+      .fillColor(C.text)
+      .text((snap.contractType && CONTRACT_TYPE_LABELS[snap.contractType]) || '—', ML, y, {
+        width: halfW,
+      })
+    doc
+      .fontSize(9)
+      .font('Helvetica')
+      .fillColor(C.text)
+      .text(snap.cost != null ? String(snap.cost) : '—', ML + CW / 2, y, { width: halfW })
+    y += 20
+
+    if (Array.isArray(snap.customValues) && snap.customValues.length > 0) {
+      y = separator(y)
+      y = sectionTitle('Atributos de la Licencia', y)
+      for (const cv of snap.customValues as Array<{
+        fieldName: string
+        fieldValue: string
+        fieldLabel?: string
+      }>) {
+        y = fieldRow((cv.fieldLabel ?? cv.fieldName).toUpperCase(), cv.fieldValue || '—', y)
+      }
+    }
 
     y = separator(y)
   } else if (actType === 'MRO_DELIVERY') {

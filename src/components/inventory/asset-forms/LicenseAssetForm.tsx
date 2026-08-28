@@ -462,19 +462,24 @@ export function LicenseAssetForm({
       // Los adjuntos se suben por endpoint aparte; no van en el PUT de licencia
     }
 
-    // Solo enviar asignación si hay valor (evita borrar asignatario al editar otros campos)
-    if (scope === 'Individual' && userId) {
-      payload.assignedToUser = userId
-      payload.assignedToDepartment = null
-      payload.assignedToEquipment = null
-    } else if (scope === 'Departamento' && departmentId) {
-      payload.assignedToDepartment = departmentId
-      payload.assignedToUser = null
-      payload.assignedToEquipment = null
-    } else if (scope === 'Empresa' && !isEditMode) {
-      payload.assignedToUser = null
-      payload.assignedToDepartment = null
-      payload.assignedToEquipment = null
+    // El responsable solo se fija aquí al CREAR. Cambiarlo después de creada la licencia
+    // pasa exclusivamente por el diálogo "Asignar" (deja historial + acta de entrega) —
+    // este formulario de edición ya no reescribe el asignatario para no tener dos caminos
+    // silenciosos hacia el mismo dato (ver LicenseAssignDialog / license-assignment.service).
+    if (!isEditMode) {
+      if (scope === 'Individual' && userId) {
+        payload.assignedToUser = userId
+        payload.assignedToDepartment = null
+        payload.assignedToEquipment = null
+      } else if (scope === 'Departamento' && departmentId) {
+        payload.assignedToDepartment = departmentId
+        payload.assignedToUser = null
+        payload.assignedToEquipment = null
+      } else if (scope === 'Empresa') {
+        payload.assignedToUser = null
+        payload.assignedToDepartment = null
+        payload.assignedToEquipment = null
+      }
     }
 
     onSubmit(payload)
@@ -614,11 +619,20 @@ export function LicenseAssetForm({
         <div className='grid grid-cols-1 md:grid-cols-2 gap-3'>
           <div className='space-y-1'>
             <Label>Alcance</Label>
-            <SimpleSelect value={scope} onChange={e => setScope(e.target.value as Scope)}>
+            <SimpleSelect
+              value={scope}
+              onChange={e => setScope(e.target.value as Scope)}
+              disabled={isEditMode}
+            >
               <option value='Individual'>Individual</option>
               <option value='Departamento'>Departamento</option>
               <option value='Empresa'>Empresa</option>
             </SimpleSelect>
+            {isEditMode && (
+              <p className='text-xs text-muted-foreground'>
+                Para cambiar el responsable usa el botón «Asignar» en el detalle de la licencia.
+              </p>
+            )}
           </div>
 
           <div className='space-y-1'>
@@ -648,25 +662,21 @@ export function LicenseAssetForm({
             </SimpleSelect>
           </div>
 
-          {scope === 'Individual' && (
+          {scope === 'Individual' && !isEditMode && (
             <div className='space-y-1 md:col-span-2'>
               <AssignableUserSelect
                 familyId={familyId}
                 value={userId}
                 onChange={setUserId}
-                label={
-                  isEditMode
-                    ? 'Usuario asignado (opcional aquí; también desde Asignar)'
-                    : 'Usuario asignado'
-                }
-                required={!isEditMode}
+                label='Usuario asignado'
+                required
               />
             </div>
           )}
-          {scope === 'Departamento' && (
+          {scope === 'Departamento' && !isEditMode && (
             <div className='space-y-1'>
               <Label>
-                Departamento Asignado {!isEditMode && <span className='text-destructive'>*</span>}
+                Departamento Asignado <span className='text-destructive'>*</span>
               </Label>
               <SearchableSelect
                 options={departments}

@@ -5,7 +5,6 @@ import type {
   SoftwareLicense,
   CreateLicenseData,
   UpdateLicenseData,
-  AssignLicenseData,
   LicenseSummary,
   LicenseListResponse,
 } from '@/types/inventory/license'
@@ -96,43 +95,9 @@ export class LicenseService {
     await prisma.software_licenses.delete({ where: { id } })
   }
 
-  /**
-   * Asigna una licencia a equipo, usuario y/o departamento
-   */
-  static async assignLicense(
-    id: string,
-    data: AssignLicenseData,
-    _userId: string
-  ): Promise<SoftwareLicense> {
-    const license = await prisma.software_licenses.update({
-      where: { id },
-      data: {
-        assignedToEquipment: data.assignedToEquipment || null,
-        assignedToUser: data.assignedToUser || null,
-        assignedToDepartment: data.assignedToDepartment || null,
-      },
-      include: licenseInclude,
-    })
-
-    return this.decryptLicenseKey(license) as SoftwareLicense
-  }
-
-  /**
-   * Desasigna una licencia de todo
-   */
-  static async unassignLicense(id: string, _userId: string): Promise<SoftwareLicense> {
-    const license = await prisma.software_licenses.update({
-      where: { id },
-      data: {
-        assignedToEquipment: null,
-        assignedToUser: null,
-        assignedToDepartment: null,
-      },
-      include: licenseInclude,
-    })
-
-    return this.decryptLicenseKey(license) as SoftwareLicense
-  }
+  // Asignar/desasignar responsable vive en LicenseAssignmentService (license-assignment.service.ts)
+  // — deja historial (license_assignments) y genera acta de entrega, algo que un simple
+  // update de estas tres columnas no podía ofrecer.
 
   /**
    * Obtiene una licencia por ID

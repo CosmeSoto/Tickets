@@ -143,33 +143,17 @@ export function LicenseAssignDialog({
         Empresa: 'COMPANY',
       } as const
 
-      // Actualizar alcance si cambió
-      const putRes = await fetch(`/api/inventory/licenses/${licenseId}`, {
-        method: 'PUT',
+      // Asigna en un solo paso: guarda el alcance, crea el registro de historial y —si el
+      // receptor es un usuario concreto— genera el acta de entrega para firma de recibido.
+      const res = await fetch(`/api/inventory/licenses/${licenseId}/assign`, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          scope,
-          licenseScope: scopeMap[scope],
+          scope: scopeMap[scope],
+          userId: scope === 'Individual' ? userId || null : null,
+          equipmentId: scope === 'Individual' ? equipmentId || null : null,
+          departmentId: scope === 'Departamento' ? departmentId || null : null,
         }),
-      })
-      if (!putRes.ok) {
-        const j = await putRes.json().catch(() => ({}))
-        throw new Error(j.error || 'No se pudo actualizar el alcance')
-      }
-
-      const assignBody =
-        scope === 'Empresa'
-          ? { action: 'unassign' as const }
-          : {
-              assignedToUser: scope === 'Individual' ? userId || null : null,
-              assignedToEquipment: scope === 'Individual' ? equipmentId || null : null,
-              assignedToDepartment: scope === 'Departamento' ? departmentId || null : null,
-            }
-
-      const res = await fetch(`/api/inventory/licenses/${licenseId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(assignBody),
       })
       if (!res.ok) {
         const j = await res.json().catch(() => ({}))
@@ -189,8 +173,8 @@ export function LicenseAssignDialog({
     setSubmitting(true)
     setError(null)
     try {
-      const res = await fetch(`/api/inventory/licenses/${licenseId}`, {
-        method: 'PATCH',
+      const res = await fetch(`/api/inventory/licenses/${licenseId}/assign`, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'unassign' }),
       })

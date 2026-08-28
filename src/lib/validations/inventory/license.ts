@@ -50,12 +50,6 @@ export const createLicenseSchema = z.object({
 
 export const updateLicenseSchema = createLicenseSchema.partial()
 
-export const assignLicenseSchema = z.object({
-  assignedToEquipment: optionalNullableId,
-  assignedToUser: optionalNullableId,
-  assignedToDepartment: optionalNullableId,
-})
-
 export const licenseFiltersSchema = z.object({
   search: z.string().optional(),
   typeId: z.array(z.string()).optional(),
@@ -67,5 +61,4 @@ export const licenseFiltersSchema = z.object({
 
 export type CreateLicenseInput = z.infer<typeof createLicenseSchema>
 export type UpdateLicenseInput = z.infer<typeof updateLicenseSchema>
-export type AssignLicenseInput = z.infer<typeof assignLicenseSchema>
 export type LicenseFiltersInput = z.infer<typeof licenseFiltersSchema>

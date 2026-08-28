@@ -8,6 +8,7 @@ import {
   getServiceSubtypeLabel,
   type PaymentMethodType,
 } from '@/types/contracts'
+import { CONTRACT_TYPE_LABELS } from '@/lib/inventory/license-labels'
 
 /**
  * Tarjeta del "activo" de un acta de entrega — única fuente de verdad para diferenciar
@@ -96,6 +97,67 @@ export function ActItemCard({ actType, snapshot: snap, accessories }: ActItemCar
           <div className='sm:col-span-2'>
             <Field label='Email de facturación' value={snap.billingAccountEmail} />
           </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  // ── Licencia de software ────────────────────────────────────────────────────
+  if (type === 'LICENSE_ASSIGNMENT') {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className='flex items-center gap-2 text-base'>
+            <Package className='h-5 w-5' />
+            Licencia entregada
+          </CardTitle>
+        </CardHeader>
+        <CardContent className='space-y-4'>
+          <div className='grid gap-4 sm:grid-cols-2 md:grid-cols-3'>
+            <Field label='Licencia' value={snap.name} />
+            <Field label='Tipo' value={snap.typeName} />
+            <Field
+              label='Proveedor'
+              value={(snap.supplier as { name?: string })?.name ?? snap.vendor}
+            />
+            <Field
+              label='Tipo de contrato'
+              value={
+                snap.contractType
+                  ? (CONTRACT_TYPE_LABELS[snap.contractType as string] ?? snap.contractType)
+                  : undefined
+              }
+            />
+            <Field label='Costo' value={snap.cost} />
+            <Field label='Vencimiento' value={formatSnapshotDate(snap.expirationDate)} />
+          </div>
+
+          {Array.isArray(snap.customValues) && snap.customValues.length > 0 && (
+            <>
+              <Separator />
+              <div>
+                <p className='text-xs text-muted-foreground uppercase tracking-wide mb-3'>
+                  Atributos de la licencia
+                </p>
+                <div className='grid gap-3 sm:grid-cols-2 md:grid-cols-3'>
+                  {(
+                    snap.customValues as Array<{
+                      fieldName: string
+                      fieldValue: string
+                      fieldLabel?: string
+                    }>
+                  ).map(cv => (
+                    <div key={cv.fieldName}>
+                      <p className='text-xs text-muted-foreground uppercase tracking-wide mb-1'>
+                        {cv.fieldLabel ?? cv.fieldName}
+                      </p>
+                      <p className='font-medium text-sm'>{cv.fieldValue || '—'}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
     )
@@ -260,6 +322,12 @@ export function ActItemCard({ actType, snapshot: snap, accessories }: ActItemCar
       )}
     </Card>
   )
+}
+
+function formatSnapshotDate(value: unknown): string | undefined {
+  if (!value) return undefined
+  const date = new Date(value as string)
+  return Number.isNaN(date.getTime()) ? undefined : date.toLocaleDateString('es-ES')
 }
 
 function Field({ label, value }: { label: string; value: unknown }) {

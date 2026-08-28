@@ -54,12 +54,6 @@ export interface UpdateLicenseData {
   customValues?: Array<{ fieldName: string; fieldValue: string }>
 }
 
-export interface AssignLicenseData {
-  assignedToEquipment?: string
-  assignedToUser?: string
-  assignedToDepartment?: string
-}
-
 export interface LicenseSummary {
   total: number
   active: number

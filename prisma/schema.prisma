@@ -150,6 +150,7 @@ model departments {
   equipmentBatches equipment_batches[] // Nueva relación con lotes
   family           families?           @relation(fields: [familyId], references: [id])
   licenses         software_licenses[]
+  licenseAssignments license_assignments[]
   users            users[]
   news_departments news_departments[]
   form_departments form_departments[]
@@ -550,6 +551,8 @@ model users {
   decommissionManagerReviews                        decommission_requests[]         @relation("DecommissionManager")
   assignmentsDelivered                              equipment_assignments[]         @relation("AssignmentDeliverer")
   assignmentsReceived                               equipment_assignments[]         @relation("AssignmentReceiver")
+  licenseAssignmentsDelivered                       license_assignments[]           @relation("LicenseAssignmentDeliverer")
+  licenseAssignmentsReceived                        license_assignments[]           @relation("LicenseAssignmentReceiver")
   equipmentAttachments                              equipment_attachments[]
   knowledge_articles                                knowledge_articles[]            @relation("knowledge_articles_author")
   licenseAttachments                                license_attachments[]
@@ -1187,6 +1190,7 @@ model equipment {
   attachments           equipment_attachments[]
   maintenanceRecords    maintenance_records[]
   licenses              software_licenses[]
+  licenseAssignments    license_assignments[]
   stockMovements        stock_movements[]         @relation("StockMovementEquipment")
   contractLines         contract_lines[]          @relation("ContractLineEquipment")
   sale                  equipment_sales?
@@ -1296,8 +1300,10 @@ model delivery_acts {
   createdAt          DateTime               @default(now()) @map("created_at")
   updatedAt          DateTime               @updatedAt @map("updated_at")
   contractAssignmentId String?               @unique @map("contract_assignment_id")
+  licenseAssignmentId  String?               @unique @map("license_assignment_id")
   assignment           equipment_assignments? @relation(fields: [assignmentId], references: [id])
   contractAssignment   contract_assignments?  @relation(fields: [contractAssignmentId], references: [id])
+  licenseAssignment    license_assignments?   @relation(fields: [licenseAssignmentId], references: [id])
   returnActs           return_acts[]
 
   @@index([folio])
@@ -1440,12 +1446,45 @@ model software_licenses {
   licenseType           license_types           @relation(fields: [typeId], references: [id])
   contractLines         contract_lines[]        @relation("ContractLineLicense")
   credentialEntries     credential_entries[]
+  assignments           license_assignments[]
 
   @@index([typeId, expirationDate])
   @@index([assignedToEquipment])
   @@index([assignedToUser])
   @@index([assignedToDepartment])
   @@map("software_licenses")
+}
+
+// Historial de asignaciones de una licencia — mismo patrón que equipment_assignments /
+// contract_assignments (deliverer, fechas, acta de entrega), adaptado a que una licencia
+// puede quedar en manos de un usuario, un departamento completo, un equipo o la empresa
+// entera (ver LicenseScope), por eso el receptor es opcional y de 3 tipos distintos.
+model license_assignments {
+  id             String       @id @default(uuid())
+  licenseId      String       @map("license_id")
+  delivererId    String       @map("deliverer_id")
+  scope          LicenseScope
+  receiverUserId String?      @map("receiver_user_id")
+  departmentId   String?      @map("department_id")
+  equipmentId    String?      @map("equipment_id")
+  startDate      DateTime     @default(now()) @map("start_date")
+  actualEndDate  DateTime?    @map("actual_end_date")
+  isActive       Boolean      @default(true) @map("is_active")
+  changeReason   String?      @map("change_reason")
+  observations   String?
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  license     software_licenses @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+  deliverer   users             @relation("LicenseAssignmentDeliverer", fields: [delivererId], references: [id])
+  receiver    users?            @relation("LicenseAssignmentReceiver", fields: [receiverUserId], references: [id])
+  department  departments?      @relation(fields: [departmentId], references: [id])
+  equipment   equipment?        @relation(fields: [equipmentId], references: [id])
+  deliveryAct delivery_acts?
+
+  @@index([licenseId, isActive])
+  @@index([receiverUserId, isActive])
+  @@map("license_assignments")
 }
 
 model consumable_types {
@@ -2453,6 +2492,7 @@ enum DeliveryActType {
   ASSET_TRANSFER
   CONTRACT_RENEWAL
   SUBSCRIPTION_ASSIGNMENT
+  LICENSE_ASSIGNMENT
 }
 
 enum SubscriptionUsageStatus {

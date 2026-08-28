@@ -769,6 +769,19 @@ function ActCardItemLine({ act }: { act: any }) {
     )
   }
 
+  if (actType === 'LICENSE_ASSIGNMENT') {
+    return (
+      <>
+        <span className='font-medium'>{snap.name ?? 'Licencia'}</span>
+        {(snap.supplier?.name || snap.vendor) && (
+          <span className='text-muted-foreground truncate'>
+            — {snap.supplier?.name ?? snap.vendor}
+          </span>
+        )}
+      </>
+    )
+  }
+
   if (actType === 'MRO_DELIVERY') {
     const qty = snap.quantity != null ? `${snap.quantity} ${snap.unit ?? ''}`.trim() : null
     return (
