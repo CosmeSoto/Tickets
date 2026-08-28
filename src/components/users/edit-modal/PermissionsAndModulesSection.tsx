@@ -4,6 +4,7 @@ import { useMemo } from 'react'
 import { Activity } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { ModuleAccessCard } from '@/components/users/module-access-card'
+import { ContentFamiliesCard } from '@/components/users/content-families-card'
 import { UserModulesPanel } from '@/components/users/user-modules-panel'
 import { useSystemModules } from '@/hooks/use-system-modules'
 import { type UserRole } from '@/lib/constants/user-constants'
@@ -389,7 +390,8 @@ export function PermissionsAndModulesSection({
             />
 
             {/* ── Noticias ── */}
-            {/* Áreas: módulo unificado `content` (compartido con Documentos). */}
+            {/* Áreas: módulo unificado `content` (compartido con Documentos) —
+                se muestran una sola vez, en ContentFamiliesCard más abajo. */}
             <ModuleAccessCard
               moduleKey='news'
               moduleName='Noticias'
@@ -403,6 +405,7 @@ export function PermissionsAndModulesSection({
               readOnlyFamilyIds={adminScopeReadOnlyIds}
               onAssignFamily={handlers.handleAssignContentFamily}
               onUnassignFamily={handlers.handleUnassignContentFamily}
+              hideFamilies
               options={
                 formData.role === 'TECHNICIAN' || formData.role === 'CLIENT'
                   ? {
@@ -416,7 +419,8 @@ export function PermissionsAndModulesSection({
             />
 
             {/* ── Documentos ── */}
-            {/* Mismas áreas que Noticias (user_family_access.module = content). */}
+            {/* Mismas áreas que Noticias (user_family_access.module = content) —
+                idem, se muestran una sola vez en ContentFamiliesCard. */}
             <ModuleAccessCard
               moduleKey='forms'
               moduleName='Documentos'
@@ -430,6 +434,7 @@ export function PermissionsAndModulesSection({
               readOnlyFamilyIds={adminScopeReadOnlyIds}
               onAssignFamily={handlers.handleAssignContentFamily}
               onUnassignFamily={handlers.handleUnassignContentFamily}
+              hideFamilies
               options={
                 formData.role === 'TECHNICIAN' || formData.role === 'CLIENT'
                   ? {
@@ -438,6 +443,21 @@ export function PermissionsAndModulesSection({
                     }
                   : undefined
               }
+              loading={loadingFamilies}
+              disabled={loading}
+            />
+
+            {/* ── Áreas de contenido (Noticias + Documentos, una sola vez) ── */}
+            <ContentFamiliesCard
+              active={formData.newsEnabled || formData.formsEnabled}
+              role={formData.role}
+              families={allFamilies}
+              assignedFamilyIds={contentFamilyIds}
+              nativeFamilyId={nativeFamilyId}
+              nativeFamily={nativeFamilyForCards}
+              readOnlyFamilyIds={adminScopeReadOnlyIds}
+              onAssignFamily={handlers.handleAssignContentFamily}
+              onUnassignFamily={handlers.handleUnassignContentFamily}
               loading={loadingFamilies}
               disabled={loading}
             />

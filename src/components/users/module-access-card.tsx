@@ -71,6 +71,11 @@ interface ModuleAccessCardProps {
   }
   /** Familias de solo lectura (fuera del scope del admin) */
   readOnlyFamilyIds?: string[]
+  /** Oculta el selector de familias de esta tarjeta (y su badge de conteo)
+   *  cuando se muestra en otro lugar — ej. Noticias/Documentos, que comparten
+   *  un único selector "Áreas de contenido" (ver ContentFamiliesCard) para no
+   *  duplicar la misma lista dos veces en el modal. */
+  hideFamilies?: boolean
   loading?: boolean
   disabled?: boolean
 }
@@ -89,6 +94,7 @@ export function ModuleAccessCard({
   onUnassignFamily,
   options,
   readOnlyFamilyIds = [],
+  hideFamilies = false,
   loading,
   disabled,
 }: ModuleAccessCardProps) {
@@ -179,7 +185,7 @@ export function ModuleAccessCard({
           </div>
         </div>
         <div className='flex items-center gap-2'>
-          {enabled && totalAssigned > 0 && (
+          {enabled && !hideFamilies && totalAssigned > 0 && (
             <Badge variant='secondary' className='text-[10px] px-1.5 py-0'>
               {totalAssigned} familia{totalAssigned !== 1 ? 's' : ''}
             </Badge>
@@ -385,8 +391,9 @@ export function ModuleAccessCard({
               </div>
             )}
 
-          {/* ── Sección de familias — solo si hay familias relevantes ── */}
-          {showFamiliesSection && (
+          {/* ── Sección de familias — solo si hay familias relevantes y no se
+              muestra ya en otro lugar (ver hideFamilies) ── */}
+          {showFamiliesSection && !hideFamilies && (
             <div className='px-3 py-2'>
               {showAdditionalFamilySelector && (
                 <>

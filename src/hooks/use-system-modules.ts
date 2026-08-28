@@ -215,15 +215,12 @@ export function getAdditionalFamilyHint(moduleKey: string, role: string): string
       TECHNICIAN: 'Áreas donde puede solicitar o gestionar activos.',
       CLIENT: 'Áreas donde puede solicitar equipos o mantenimientos.',
     },
-    news: {
-      ADMIN: 'Áreas de contenido (mismas que Documentos).',
-      TECHNICIAN: 'Áreas de contenido donde puede publicar (mismas que Documentos).',
-      CLIENT: 'Áreas de contenido donde puede publicar (mismas que Documentos).',
-    },
-    forms: {
-      ADMIN: 'Áreas de contenido (mismas que Noticias).',
-      TECHNICIAN: 'Áreas de contenido donde puede publicar (mismas que Noticias).',
-      CLIENT: 'Áreas de contenido donde puede publicar (mismas que Noticias).',
+    /** Noticias y Documentos comparten un único selector "Áreas de contenido"
+     *  (ver ContentFamiliesCard) — sus tarjetas individuales no muestran hint. */
+    content: {
+      ADMIN: 'Visibilidad en Noticias y Documentos.',
+      TECHNICIAN: 'Áreas donde puede publicar en Noticias y Documentos.',
+      CLIENT: 'Áreas donde puede publicar en Noticias y Documentos.',
     },
     credentials: {
       ADMIN:
