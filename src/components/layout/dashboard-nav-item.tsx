@@ -42,6 +42,17 @@ function SidebarActiveIndicator({
   )
 }
 
+/**
+ * prefetch={false} + router.prefetch() en onMouseEnter en cada <Link> de
+ * este archivo: por defecto Next.js precarga (RSC fetch) todo <Link> que
+ * entra en el viewport. Como el sidebar completo es visible de entrada,
+ * eso disparaba ~20-30 requests de prefetch en paralelo en cada carga de
+ * página — de sobra para agotar el límite de conexiones del navegador y
+ * retrasar varios segundos las llamadas de datos reales de la página
+ * activa (visto en Credenciales: /api/credentials/vaults tardaba +25s en
+ * siquiera salir). Con hover, solo se precarga lo que el usuario realmente
+ * va a visitar, y sigue siendo casi instantáneo al hacer click.
+ */
 export function DashboardNavItemComponent({
   item,
   pathname,
@@ -91,13 +102,6 @@ export function DashboardNavItemComponent({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- solo reaccionar a isActive
   }, [isActive])
 
-  useEffect(() => {
-    if (!isOpen || !children?.length) return
-    for (const child of children) {
-      router.prefetch(child.href)
-    }
-  }, [isOpen, children, router])
-
   const Icon = item.icon
   const indent = depth * 12
   const spring = reduceMotion
@@ -138,9 +142,10 @@ export function DashboardNavItemComponent({
             <Link
               href={item.href}
               onClick={onNavigate}
+              onMouseEnter={() => router.prefetch(item.href)}
               aria-label={item.name}
               className={itemClass(isActive)}
-              prefetch
+              prefetch={false}
             >
               {isActive && <SidebarActiveIndicator spring={spring} rail />}
               <Icon
@@ -193,7 +198,8 @@ export function DashboardNavItemComponent({
         <PopoverContent side='right' align='start' sideOffset={8} className='w-56 p-1'>
           <Link
             href={item.href}
-            prefetch
+            prefetch={false}
+            onMouseEnter={() => router.prefetch(item.href)}
             onClick={() => {
               setFlyoutOpen(false)
               onNavigate?.()
@@ -210,7 +216,8 @@ export function DashboardNavItemComponent({
               <Link
                 key={child.href + child.name}
                 href={child.href}
-                prefetch
+                prefetch={false}
+                onMouseEnter={() => router.prefetch(child.href)}
                 onClick={() => {
                   setFlyoutOpen(false)
                   onNavigate?.()
@@ -237,9 +244,10 @@ export function DashboardNavItemComponent({
       <Link
         href={item.href}
         onClick={onNavigate}
+        onMouseEnter={() => router.prefetch(item.href)}
         style={{ paddingLeft: `${16 + indent}px` }}
         className={itemClass(isActive)}
-        prefetch
+        prefetch={false}
       >
         {isActive && <SidebarActiveIndicator spring={spring} />}
         <Icon
@@ -265,7 +273,8 @@ export function DashboardNavItemComponent({
       >
         <Link
           href={item.href}
-          prefetch
+          prefetch={false}
+          onMouseEnter={() => router.prefetch(item.href)}
           onClick={() => {
             setOpenPersistent(true)
             onNavigate?.()
