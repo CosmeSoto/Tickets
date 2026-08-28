@@ -123,7 +123,14 @@ export function CategoryFormDialog({
 
   const derivedFamily = families.find(f => f.id === derivedFamilyId) ?? null
 
-  // Recargar resolutores al abrir / cambiar familia de la categoría
+  // Recargar resolutores al abrir / cambiar familia de la categoría.
+  // A propósito se pide por FAMILIA, no por departamento nativo: así, un
+  // técnico de otro departamento de esta misma familia también aparece como
+  // candidato y puede asignarse aquí a categorías fuera de su departamento
+  // nativo (p. ej. para que dé soporte a otra área dentro de su familia).
+  // Ver detalle completo del diseño (y la alternativa "departamento
+  // adicional" si esto se vuelve tedioso categoría por categoría) en
+  // ticket-assignment.service.ts, resolveConfiguredTechnicianForCategory().
   useEffect(() => {
     if (!isOpen) return
     const assignedIds = (formData.technician_assignments ?? []).map(

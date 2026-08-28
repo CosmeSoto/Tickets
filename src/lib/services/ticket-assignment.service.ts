@@ -406,6 +406,21 @@ export class AssignmentService {
     // camino de scoring GENERAL (Prioridad 2 más abajo) — ahí sí hace falta
     // porque no hay ninguna configuración explícita que respalde el encaje
     // (ahí vivía el bug original de Tania Guamán).
+    //
+    // Nota de diseño (2026-08-28): esto es también el mecanismo hoy vigente
+    // para que un técnico dé soporte a categorías de OTRO departamento de su
+    // misma familia — no hace falta "asignarle un departamento", basta con
+    // agregarlo como resolutor de esas categorías puntuales desde el diálogo
+    // de categoría (category-form-dialog.tsx ya pide candidatos por familia,
+    // no por departamento nativo). Si en el futuro eso resulta tedioso
+    // categoría por categoría, la alternativa evaluada es una tabla nueva
+    // tipo `technician_department_access` (mismo patrón que
+    // `user_family_access` pero a nivel de departamento) que amplíe al
+    // técnico como candidato en TODAS las categorías de ese departamento
+    // adicional. Tocaría 3 puntos: el filtro `categoryResolvers` en
+    // src/app/api/users/route.ts, el `scoped` de aquí arriba, y el filtro
+    // duro por `departmentId` de Prioridad 2 (getAvailableTechnicians /
+    // más abajo en este archivo).
     let scoped = categoryAssignments
     if (ticket.familyId) {
       const { getTechnicianIdsNativeToFamily, getAdminIdsNativeToFamily } =
