@@ -8,6 +8,7 @@ import type { DeliveryAct } from '@/types/inventory/delivery-act'
 import { getUploadDir } from '@/lib/upload-path'
 import { DEFAULT_SYSTEM_NAME } from '@/lib/branding-constants'
 import { getAppTimezone } from '@/lib/utils/date-utils'
+import { PAYMENT_METHOD_TYPE_LABELS, type PaymentMethodType } from '@/types/contracts'
 
 async function fetchImageBuffer(url: string): Promise<Buffer | null> {
   if (!url) return null
@@ -194,10 +195,57 @@ export async function generateDeliveryActPDF(
 
   // ── SECCIÓN DE ACTIVO — layout condicional por tipo de acta ────────────
   const snap = act.equipmentSnapshot as any
-  const actType: string = snap.actType ?? 'EQUIPMENT_ASSIGNMENT'
+  // La columna `act.actType` (no `snap.actType`) es la fuente de verdad: el snapshot de
+  // suscripción (buildContractSnapshot) nunca escribe `actType` dentro del JSON, así que
+  // leerlo del snapshot hacía que toda acta de suscripción cayera en el layout de "Datos
+  // del Equipo" con Código/N° Serie/Marca/Modelo vacíos.
+  const actType: string = (act as { actType?: string }).actType ?? 'EQUIPMENT_ASSIGNMENT'
   const halfW = CW / 2 - 8
 
-  if (actType === 'MRO_DELIVERY') {
+  if (actType === 'SUBSCRIPTION_ASSIGNMENT' || actType === 'CONTRACT_RENEWAL') {
+    // ── Suscripción / contrato ────────────────────────────────────────────
+    y = sectionTitle('Servicio / Suscripción', y)
+
+    y = fieldRow('CONTRATO', snap.name || '—', y)
+    y = fieldRow('PROVEEDOR', snap.supplier?.name || '—', y)
+
+    doc
+      .fontSize(7.5)
+      .font('Helvetica-Bold')
+      .fillColor(C.muted)
+      .text('MÉTODO DE PAGO', ML, y, { width: halfW })
+    doc
+      .fontSize(7.5)
+      .font('Helvetica-Bold')
+      .fillColor(C.muted)
+      .text('COSTO MENSUAL', ML + CW / 2, y, { width: halfW })
+    y += 9
+    doc
+      .fontSize(9)
+      .font('Helvetica')
+      .fillColor(C.text)
+      .text(
+        (snap.paymentMethodType &&
+          PAYMENT_METHOD_TYPE_LABELS[snap.paymentMethodType as PaymentMethodType]) ||
+          '—',
+        ML,
+        y,
+        { width: halfW }
+      )
+    const monthlyCost =
+      snap.monthlyCost != null ? `${snap.monthlyCost} ${snap.currency ?? ''}`.trim() : '—'
+    doc
+      .fontSize(9)
+      .font('Helvetica')
+      .fillColor(C.text)
+      .text(monthlyCost, ML + CW / 2, y, { width: halfW })
+    y += 18
+
+    y = fieldRow('CUSTODIO', snap.custodian?.name || '—', y)
+    y = fieldRow('EMAIL DE FACTURACIÓN', snap.billingAccountEmail || '—', y)
+
+    y = separator(y)
+  } else if (actType === 'MRO_DELIVERY') {
     // ── Suministros ─────────────────────────────────────────────────────
     y = sectionTitle('Suministro Entregado', y)
 

@@ -66,7 +66,7 @@ interface ConsumableData {
   notes?: string | null
   status: string
   expirationDate?: string | null
-  customValues?: Array<{ fieldName: string; fieldValue: string }> | null
+  customValues?: Array<{ fieldName: string; fieldValue: string; fieldLabel?: string }> | null
   consumableType?: {
     id: string
     name: string
@@ -492,7 +492,11 @@ export function ConsumableDetail({ consumableId, userRole, isSuperAdmin = false 
                     </p>
                     <div className='grid grid-cols-2 gap-x-6 gap-y-3'>
                       {consumable.customValues.map(v => (
-                        <InfoRow key={v.fieldName} label={v.fieldName} value={v.fieldValue} />
+                        <InfoRow
+                          key={v.fieldName}
+                          label={v.fieldLabel ?? v.fieldName}
+                          value={v.fieldValue}
+                        />
                       ))}
                     </div>
                   </div>

@@ -37,6 +37,7 @@ import { TransferFamilyDialog } from './transfer-family-dialog'
 import { LinkedCredentialsCard } from '@/components/credentials/linked-credentials-card'
 import { LicenseAssignDialog } from '@/components/inventory/license/license-assign-dialog'
 import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
+import { CONTRACT_TYPE_LABELS } from '@/lib/inventory/license-labels'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -58,7 +59,7 @@ interface LicenseData {
   assignedToEquipment?: string | null
   assignedToDepartment?: string | null
   linkedContractId?: string | null
-  customValues?: Array<{ fieldName: string; fieldValue: string }> | null
+  customValues?: Array<{ fieldName: string; fieldValue: string; fieldLabel?: string }> | null
   renewalAlertStatus?: 'ok' | 'warning' | 'critical' | 'expired' | null
   licenseType?: {
     id: string
@@ -106,14 +107,6 @@ const SCOPE_LABELS: Record<string, string> = {
   INDIVIDUAL: 'Individual',
   DEPARTMENT: 'Departamento',
   COMPANY: 'Empresa',
-}
-
-const CONTRACT_TYPE_LABELS: Record<string, string> = {
-  SOFTWARE: 'Software / SaaS',
-  SERVICE_EXTERNAL: 'Servicio externo',
-  MAINTENANCE: 'Mantenimiento',
-  INSURANCE: 'Seguro',
-  SLA: 'SLA',
 }
 
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -442,7 +435,11 @@ export function LicenseDetail({ licenseId, userRole, isSuperAdmin = false }: Pro
                     </p>
                     <div className='grid grid-cols-2 gap-x-6 gap-y-3'>
                       {license.customValues.map(v => (
-                        <InfoRow key={v.fieldName} label={v.fieldName} value={v.fieldValue} />
+                        <InfoRow
+                          key={v.fieldName}
+                          label={v.fieldLabel ?? v.fieldName}
+                          value={v.fieldValue}
+                        />
                       ))}
                     </div>
                   </div>

@@ -3,10 +3,10 @@
  * Extraído de /api/inventory/assets/route.ts para mantener ese archivo manejable.
  */
 import { prisma } from '@/lib/prisma'
-import { formatEquipmentAttributesString } from '@/lib/inventory/format-equipment-attributes'
+import { formatAttributesString } from '@/lib/inventory/attribute-labels'
 
 const EQUIPMENT_TYPE_INCLUDE = {
-  family: { include: { customFields: { orderBy: { order: 'asc' as const } } } },
+  family: { select: { id: true, name: true, icon: true, color: true } },
   attributes: {
     orderBy: { order: 'asc' as const },
     select: { attributeName: true, attributeLabel: true, order: true },
@@ -299,11 +299,7 @@ export async function queryAssets(params: AssetsQueryParams): Promise<AssetsQuer
 }
 
 function mapEquipmentItem(item: any): UnifiedAssetItem {
-  const attributesStr = formatEquipmentAttributesString(
-    item.customValues,
-    item.type?.attributes ?? [],
-    item.type?.family?.customFields ?? []
-  )
+  const attributesStr = formatAttributesString(item.customValues, item.type?.attributes ?? [])
   const current = item.assignments?.[0]
 
   return {

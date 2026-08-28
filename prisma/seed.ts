@@ -1,7 +1,6 @@
 import { PrismaClient, UserRole } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { randomUUID, createHash } from 'crypto'
-import { seedCustomFields } from './seeds/custom-fields.seed'
 import { seedInventoryTypes } from './seeds/inventory-types.seed'
 import { seedEquipmentBrands, syncBrandFamilies } from './seeds/equipment-brands.seed'
 import { seedCategoriesTechnology } from './seeds/categories-technology.seed'
@@ -111,9 +110,6 @@ async function main() {
 
   // 13b2. TIPOS DE SERVICIO (contratos)
   await seedContractServiceTypes(prisma)
-
-  // 13c. CAMPOS PERSONALIZADOS (custom fields por familia)
-  await seedCustomFields(prisma, familyMap)
 
   // 13e. ATRIBUTOS DE TIPOS (equipment, license, consumable)
   await seedAttributes(prisma, familyMap)

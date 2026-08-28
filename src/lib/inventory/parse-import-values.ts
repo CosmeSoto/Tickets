@@ -1,14 +1,8 @@
-import type {
-  AttributeCatalogEntry,
-  EquipmentCustomValue,
-  LegacyFamilyFieldEntry,
-} from '@/lib/inventory/format-equipment-attributes'
-import {
-  buildAttributeFieldMeta,
-  humanizeAttributeFieldName,
-} from '@/lib/inventory/format-equipment-attributes'
+import type { AttributeCatalogEntry, CustomFieldValue } from '@/lib/inventory/attribute-labels'
+import { humanizeAttributeFieldName } from '@/lib/inventory/attribute-labels'
 
 type AttributeLabelRef = Pick<AttributeCatalogEntry, 'attributeName' | 'attributeLabel'>
+type EquipmentCustomValue = CustomFieldValue
 
 /** Acepta valores de plantilla o de exportación (con $, espacios, comas decimales o de miles) */
 export function parsePurchasePrice(raw?: string): number | undefined {
@@ -52,19 +46,13 @@ export function parsePurchaseDate(raw?: string): Date | undefined {
  */
 export function parseEquipmentAttributesFromExportString(
   raw: string | undefined,
-  typeAttributes: AttributeLabelRef[] = [],
-  familyFields: LegacyFamilyFieldEntry[] = []
+  typeAttributes: AttributeLabelRef[] = []
 ): EquipmentCustomValue[] {
   if (!raw?.trim()) return []
 
   const labelToFieldName = new Map<string, string>()
   for (const attr of typeAttributes) {
     labelToFieldName.set(attr.attributeLabel.toLowerCase(), attr.attributeName)
-  }
-
-  const fieldMeta = buildAttributeFieldMeta([], familyFields)
-  for (const [fieldName, meta] of fieldMeta) {
-    labelToFieldName.set(meta.label.toLowerCase(), fieldName)
   }
 
   const result: EquipmentCustomValue[] = []

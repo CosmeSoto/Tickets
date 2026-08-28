@@ -5,6 +5,7 @@ import { PDFGeneratorService } from './pdf-generator.service'
 import { InventoryNotificationService } from './inventory-notification.service'
 import type { DeliveryAct, UserInfo } from '@/types/inventory/delivery-act'
 import { buildActReceiverInfo, buildGeneralActSnapshot } from '@/lib/inventory/general-delivery-act'
+import { withAttributeLabels } from '@/lib/inventory/attribute-labels'
 import { db as prisma } from '@/lib/server'
 import {
   addActExpirationDays,
@@ -115,24 +116,14 @@ export class DeliveryActService {
         console.log(`[DeliveryAct] Imagen del activo: ${equipmentImagePath}`)
       }
 
-      // Ordenar customValues según el orden definido en los atributos del tipo
-      const typeAttrOrder: Map<string, { label: string; order: number }> = new Map(
-        (eq.type?.attributes ?? []).map((a: any) => [
-          a.attributeName,
-          { label: a.attributeLabel ?? a.attributeName, order: a.order ?? 999 },
-        ])
-      )
+      // Etiqueta y orden de los atributos personalizados, resueltos contra el catálogo
+      // del tipo de equipo (ver attribute-labels.ts — misma fuente que el resto del módulo).
       const rawCustomValues: Array<{ fieldName: string; fieldValue: string }> =
         eq.customValues ?? []
-      const sortedCustomValues = rawCustomValues
-        .filter(v => v.fieldValue !== '' && v.fieldValue != null)
-        .map(v => ({
-          fieldName: v.fieldName,
-          fieldValue: v.fieldValue,
-          label: typeAttrOrder.get(v.fieldName)?.label ?? v.fieldName,
-          order: typeAttrOrder.get(v.fieldName)?.order ?? 999,
-        }))
-        .sort((a, b) => a.order - b.order)
+      const sortedCustomValues = withAttributeLabels(
+        rawCustomValues.filter(v => v.fieldValue !== '' && v.fieldValue != null),
+        eq.type?.attributes
+      )
 
       const equipmentSnapshot = {
         id: eq.id,

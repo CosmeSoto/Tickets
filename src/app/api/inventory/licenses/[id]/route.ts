@@ -21,6 +21,7 @@ import {
   syncLicenseContractLink,
   mapLicenseScope,
 } from '@/lib/inventory/license-contract'
+import { withAttributeLabels } from '@/lib/inventory/attribute-labels'
 
 /**
  * GET /api/inventory/licenses/[id]
@@ -53,9 +54,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         supplier: { select: { id: true, name: true, taxId: true } },
         licenseScope: true,
         contractType: true,
-        licenseType: { include: { family: true } },
+        licenseType: { include: { family: true, attributes: true } },
       },
     })
+
+    // Etiqueta legible de cada atributo personalizado, resuelta contra el catálogo del
+    // tipo de licencia (misma fuente que equipo/suministro — ver attribute-labels.ts).
+    const customValuesWithLabels = withAttributeLabels(
+      (license as any).customValues,
+      licenseWithExtra?.licenseType?.attributes
+    )
 
     const warningDaysRaw = await getSetting('inventory.license_alert_days_first', 600, '30')
     const warningDays = Math.max(1, parseInt(warningDaysRaw ?? '30', 10) || 30)
@@ -68,6 +76,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     return NextResponse.json({
       ...license,
+      customValues: customValuesWithLabels,
       supplier: licenseWithExtra?.supplier ?? null,
       licenseScope: licenseWithExtra?.licenseScope ?? null,
       contractType: licenseWithExtra?.contractType ?? null,

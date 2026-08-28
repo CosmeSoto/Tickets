@@ -20,6 +20,7 @@ import {
   OWNERSHIP_LABELS,
 } from './utils/equipment-constants'
 import type { Equipment } from './utils/equipment-types'
+import { withAttributeLabels, type AttributeCatalogEntry } from '@/lib/inventory/attribute-labels'
 
 interface EquipmentInfoCardProps {
   equipment: Equipment
@@ -40,31 +41,12 @@ export function EquipmentInfoCard({ equipment }: EquipmentInfoCardProps) {
   const customValues = (equipment as any).customValues as
     | Array<{ fieldName: string; fieldValue: string }>
     | undefined
-  const familyCustomFields = (equipment as any).type?.family?.customFields as
-    | Array<{ fieldName: string; fieldLabel: string; order: number }>
-    | undefined
+  const typeAttributes = (equipment as any).type?.attributes as AttributeCatalogEntry[] | undefined
 
-  // Sort customValues according to familyCustomFields order and add fieldLabel
-  const sortedCustomValues = (() => {
-    if (!customValues || !familyCustomFields) return customValues
-
-    const sortedFamilyFields = [...familyCustomFields].sort(
-      (a, b) => (a.order ?? 0) - (b.order ?? 0)
-    )
-    const orderMap = new Map(sortedFamilyFields.map((field, index) => [field.fieldName, index]))
-    const labelMap = new Map(sortedFamilyFields.map(field => [field.fieldName, field.fieldLabel]))
-
-    return [...customValues]
-      .map(item => ({
-        ...item,
-        fieldLabel: labelMap.get(item.fieldName) || item.fieldName,
-      }))
-      .sort((a, b) => {
-        const orderA = orderMap.get(a.fieldName) ?? Infinity
-        const orderB = orderMap.get(b.fieldName) ?? Infinity
-        return orderA - orderB
-      })
-  })()
+  // Etiqueta y orden vienen del catálogo de atributos del tipo de equipo (ver
+  // AttributeManagerDialog / TypeAttributesInput) — misma fuente que usan
+  // licencias y suministros.
+  const sortedCustomValues = withAttributeLabels(customValues, typeAttributes)
 
   const hasLocation =
     physicalLocation ||

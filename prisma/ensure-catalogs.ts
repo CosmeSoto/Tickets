@@ -11,7 +11,6 @@ import { ORGANIGRAM_FAMILIES } from './seeds/family-map'
 import { seedInventoryTypes } from './seeds/inventory-types.seed'
 import { seedEquipmentBrands, syncBrandFamilies } from './seeds/equipment-brands.seed'
 import { seedWarehouses } from './seeds/warehouses.seed'
-import { seedCustomFields } from './seeds/custom-fields.seed'
 import { seedAttributes } from './seeds/attributes.seed'
 import { seedSupplierTypes } from './seeds/supplier-types.seed'
 import { seedContractServiceTypes } from './seeds/contract-service-types.seed'
@@ -41,7 +40,6 @@ export async function ensureInventoryCatalogs(prisma: PrismaClient) {
   await seedEquipmentBrands(prisma, familyMap)
   await syncBrandFamilies(prisma, familyMap)
   await seedWarehouses(prisma, familyMap)
-  await seedCustomFields(prisma, familyMap)
   await seedAttributes(prisma, familyMap)
   await seedSupplierTypes(prisma, familyMap)
   await seedContractServiceTypes(prisma)

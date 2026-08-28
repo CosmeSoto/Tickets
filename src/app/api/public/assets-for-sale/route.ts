@@ -91,26 +91,6 @@ export async function GET(request?: NextRequest) {
       settingsContactPhone: settingsPhone,
     })
 
-    const familyIds = [
-      ...new Set(equipment.map(eq => eq.type?.familyId).filter(Boolean)),
-    ] as string[]
-    const legacyCustomFields =
-      familyIds.length > 0
-        ? await prisma.family_custom_fields.findMany({
-            where: {
-              familyId: { in: familyIds },
-            },
-          })
-        : []
-
-    const legacyFieldsByFamily = new Map<string, Map<string, (typeof legacyCustomFields)[0]>>()
-    legacyCustomFields.forEach(field => {
-      if (!legacyFieldsByFamily.has(field.familyId)) {
-        legacyFieldsByFamily.set(field.familyId, new Map())
-      }
-      legacyFieldsByFamily.get(field.familyId)!.set(field.fieldName, field)
-    })
-
     const publicItems: PublicEquipmentItem[] = equipment
       .map(eq => {
         try {
@@ -121,41 +101,21 @@ export async function GET(request?: NextRequest) {
           const customAttributes: Record<string, { value: string; label: string; type: string }> =
             {}
 
-          if (eq.customValues && eq.customValues.length > 0) {
-            if (eq.type.attributes && eq.type.attributes.length > 0) {
-              const sortedVisibleAttributes = [...eq.type.attributes]
-                .filter((attr: any) => attr?.isVisible)
-                .sort((a: any, b: any) => (a?.order ?? 0) - (b?.order ?? 0))
+          if (eq.customValues && eq.customValues.length > 0 && eq.type.attributes) {
+            const sortedVisibleAttributes = [...eq.type.attributes]
+              .filter((attr: any) => attr?.isVisible)
+              .sort((a: any, b: any) => (a?.order ?? 0) - (b?.order ?? 0))
 
-              sortedVisibleAttributes.forEach((attr: any) => {
-                const cv = eq.customValues.find(cv => cv.fieldName === attr.attributeName)
-                if (cv) {
-                  customAttributes[attr.attributeName] = {
-                    value: cv.fieldValue != null ? String(cv.fieldValue) : '',
-                    label: attr.attributeLabel,
-                    type: attr.attributeType,
-                  }
+            sortedVisibleAttributes.forEach((attr: any) => {
+              const cv = eq.customValues.find(cv => cv.fieldName === attr.attributeName)
+              if (cv) {
+                customAttributes[attr.attributeName] = {
+                  value: cv.fieldValue != null ? String(cv.fieldValue) : '',
+                  label: attr.attributeLabel,
+                  type: attr.attributeType,
                 }
-              })
-            } else if (eq.type.familyId) {
-              const familyFields = legacyFieldsByFamily.get(eq.type.familyId)
-              if (familyFields) {
-                const sortedFields = [...familyFields.entries()].sort(
-                  ([, a], [, b]) => a.order - b.order
-                )
-
-                sortedFields.forEach(([fieldName, fieldInfo]) => {
-                  const cv = eq.customValues.find(cv => cv.fieldName === fieldName)
-                  if (cv) {
-                    customAttributes[fieldName] = {
-                      value: cv.fieldValue != null ? String(cv.fieldValue) : '',
-                      label: fieldInfo.fieldLabel,
-                      type: fieldInfo.fieldType,
-                    }
-                  }
-                })
               }
-            }
+            })
           }
 
           const resolvedBrand = eq.model?.brand?.name || eq.brand || ''

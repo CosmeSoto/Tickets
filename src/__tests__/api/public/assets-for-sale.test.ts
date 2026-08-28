@@ -9,7 +9,6 @@ import prisma from '@/lib/prisma'
 jest.mock('@/lib/prisma', () => {
   const p = {
     equipment: { findMany: jest.fn() },
-    family_custom_fields: { findMany: jest.fn().mockResolvedValue([]) },
     system_settings: { findMany: jest.fn().mockResolvedValue([]) },
     landing_page_content: {
       findFirst: jest.fn().mockResolvedValue({ socialWhatsapp: null, contactPhone: null }),
@@ -54,7 +53,6 @@ function baseEquipmentRow(overrides: Record<string, unknown> = {}) {
 describe('GET /api/public/assets-for-sale', () => {
   beforeEach(() => {
     jest.clearAllMocks()
-    ;(prisma.family_custom_fields.findMany as jest.Mock).mockResolvedValue([])
   })
 
   it('returns 200 and omits sensitive fields from grouped units', async () => {

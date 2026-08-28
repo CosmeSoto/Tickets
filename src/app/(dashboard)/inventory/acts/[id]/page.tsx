@@ -2,13 +2,12 @@
 
 import { useEffect, useState, useCallback, use } from 'react'
 import { useRouter } from 'next/navigation'
-import { useSession } from 'next-auth/react'
+import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import {
   Download,
   FileText,
   Shield,
-  Package,
   User,
   Calendar,
   CheckCircle,
@@ -26,7 +25,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Separator } from '@/components/ui/separator'
+import { ActItemCard } from '@/components/inventory/act-item-card'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -76,32 +75,6 @@ const STATUS_CONFIG = {
   },
 }
 
-const EQUIPMENT_TYPE_LABELS: Record<string, string> = {
-  LAPTOP: 'Laptop',
-  DESKTOP: 'Desktop',
-  MONITOR: 'Monitor',
-  PRINTER: 'Impresora',
-  PHONE: 'Teléfono',
-  TABLET: 'Tablet',
-  KEYBOARD: 'Teclado',
-  MOUSE: 'Mouse',
-  HEADSET: 'Audífonos',
-  WEBCAM: 'Webcam',
-  DOCKING_STATION: 'Docking Station',
-  UPS: 'UPS',
-  ROUTER: 'Router',
-  SWITCH: 'Switch',
-  OTHER: 'Otro',
-}
-
-const CONDITION_LABELS: Record<string, string> = {
-  NEW: 'Nuevo',
-  LIKE_NEW: 'Como Nuevo',
-  GOOD: 'Bueno',
-  FAIR: 'Regular',
-  POOR: 'Malo',
-}
-
 function fmtDate(d: string | Date) {
   return format(new Date(d), "d 'de' MMMM 'de' yyyy", { locale: es })
 }
@@ -111,7 +84,7 @@ function fmtDateTime(d: string | Date) {
 
 export default function ActDetailPage({ params: paramsPromise }: PageProps) {
   const params = use(paramsPromise)
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAuthReady()
   const router = useRouter()
 
   const [act, setAct] = useState<any>(null)
@@ -285,6 +258,18 @@ export default function ActDetailPage({ params: paramsPromise }: PageProps) {
   const isAdminOrManager = isAdmin || isManager // puede ver todo
   const canDownload = act.status === 'ACCEPTED' && (isDeliverer || isReceiver || isAdminOrManager)
 
+  // Nombre y sustantivo del activo, según el tipo de acta — evita que los banners de
+  // "equipo" aparezcan sobre una suscripción o un suministro.
+  const isSubscriptionAct =
+    act.actType === 'SUBSCRIPTION_ASSIGNMENT' || act.actType === 'CONTRACT_RENEWAL'
+  const isSupplyAct = act.actType === 'MRO_DELIVERY'
+  const itemNoun = isSubscriptionAct ? 'servicio' : isSupplyAct ? 'suministro' : 'equipo'
+  const itemLabel = isSubscriptionAct
+    ? (act.equipmentSnapshot?.name ?? '—')
+    : isSupplyAct
+      ? (act.equipmentSnapshot?.name ?? act.equipmentSnapshot?.code ?? '—')
+      : (act.equipmentSnapshot?.code ?? '—')
+
   if (!isDeliverer && !isReceiver && !isAdminOrManager) {
     return (
       <ModuleLayout title='Acceso Denegado' subtitle=''>
@@ -335,8 +320,8 @@ export default function ActDetailPage({ params: paramsPromise }: PageProps) {
               Acción requerida — Debes firmar esta acta
             </AlertTitle>
             <AlertDescription className='text-yellow-700 dark:text-yellow-400'>
-              Tienes pendiente aceptar o rechazar la entrega del equipo{' '}
-              <strong>{act.equipmentSnapshot?.code}</strong>. Tienes hasta el{' '}
+              Tienes pendiente aceptar o rechazar la entrega del {itemNoun}{' '}
+              <strong>{itemLabel}</strong>. Tienes hasta el{' '}
               <strong>{fmtDate(act.expirationDate)}</strong> para firmar.
             </AlertDescription>
           </Alert>
@@ -452,105 +437,14 @@ export default function ActDetailPage({ params: paramsPromise }: PageProps) {
           </CardContent>
         </Card>
 
-        {/* Equipo */}
-        <Card>
-          <CardHeader>
-            <CardTitle className='flex items-center gap-2 text-base'>
-              <Package className='h-5 w-5' />
-              Equipo entregado
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className='grid gap-4 sm:grid-cols-2 md:grid-cols-3'>
-              {[
-                ['Código', act.equipmentSnapshot?.code],
-                ['Número de Serie', act.equipmentSnapshot?.serialNumber || '—'],
-                [
-                  'Tipo',
-                  act.equipmentSnapshot?.typeName ||
-                    EQUIPMENT_TYPE_LABELS[act.equipmentSnapshot?.type] ||
-                    act.equipmentSnapshot?.type ||
-                    '—',
-                ],
-                ['Marca', act.equipmentSnapshot?.brand],
-                ['Modelo', act.equipmentSnapshot?.model],
-                [
-                  'Condición',
-                  CONDITION_LABELS[act.equipmentSnapshot?.condition] ||
-                    act.equipmentSnapshot?.condition,
-                ],
-              ].map(([label, value]) => (
-                <div key={label}>
-                  <p className='text-xs text-muted-foreground uppercase tracking-wide mb-1'>
-                    {label}
-                  </p>
-                  <p className='font-medium'>{value}</p>
-                </div>
-              ))}
-            </div>
-            {act.accessories && act.accessories.length > 0 && (
-              <>
-                <Separator className='my-4' />
-                <p className='text-xs text-muted-foreground uppercase tracking-wide mb-2'>
-                  Accesorios incluidos
-                </p>
-                <ul className='space-y-1'>
-                  {act.accessories.map((acc: string, i: number) => (
-                    <li key={i} className='flex items-center gap-2 text-sm'>
-                      <div className='h-1.5 w-1.5 rounded-full bg-primary' />
-                      {acc}
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-
-            {/* Imagen del equipo */}
-            {act.equipmentSnapshot?.equipmentImagePath && (
-              <>
-                <Separator className='my-4' />
-                <p className='text-xs text-muted-foreground uppercase tracking-wide mb-2'>
-                  Imagen del equipo
-                </p>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={act.equipmentSnapshot.equipmentImagePath}
-                  alt={`${act.equipmentSnapshot.brand} ${act.equipmentSnapshot.model}`}
-                  className='rounded-md border border-border object-contain max-h-48 max-w-xs'
-                />
-              </>
-            )}
-
-            {/* Atributos personalizados */}
-            {act.equipmentSnapshot?.customValues &&
-              Array.isArray(act.equipmentSnapshot.customValues) &&
-              act.equipmentSnapshot.customValues.length > 0 && (
-                <>
-                  <Separator className='my-4' />
-                  <p className='text-xs text-muted-foreground uppercase tracking-wide mb-3'>
-                    Atributos del equipo
-                  </p>
-                  <div className='grid gap-3 sm:grid-cols-2 md:grid-cols-3'>
-                    {(
-                      act.equipmentSnapshot.customValues as Array<{
-                        fieldName: string
-                        fieldValue: string
-                        label?: string
-                        order?: number
-                      }>
-                    ).map(cv => (
-                      <div key={cv.fieldName}>
-                        <p className='text-xs text-muted-foreground uppercase tracking-wide mb-1'>
-                          {cv.label ?? cv.fieldName}
-                        </p>
-                        <p className='font-medium text-sm'>{cv.fieldValue || '—'}</p>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-          </CardContent>
-        </Card>
+        {/* Activo entregado — la tarjeta cambia según el tipo de acta (equipo, suministro o
+            suscripción) para que nunca se muestren campos de equipo vacíos en un acta que
+            en realidad es de una licencia/servicio. Ver ActItemCard. */}
+        <ActItemCard
+          actType={act.actType}
+          snapshot={act.equipmentSnapshot ?? {}}
+          accessories={act.accessories}
+        />
 
         {/* Entregador y Receptor */}
         <div className='grid gap-4 md:grid-cols-2'>
@@ -787,10 +681,15 @@ export default function ActDetailPage({ params: paramsPromise }: PageProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Aceptar y firmar acta de entrega</AlertDialogTitle>
             <AlertDialogDescription>
-              Al aceptar, confirmas que recibiste el equipo{' '}
-              <strong>{act.equipmentSnapshot?.code}</strong> ({act.equipmentSnapshot?.brand}{' '}
-              {act.equipmentSnapshot?.model}) en las condiciones descritas. Esta acción genera una
-              firma digital y no puede deshacerse.
+              Al aceptar, confirmas que recibiste el {itemNoun} <strong>{itemLabel}</strong>
+              {!isSubscriptionAct && !isSupplyAct && act.equipmentSnapshot?.brand && (
+                <>
+                  {' '}
+                  ({act.equipmentSnapshot.brand} {act.equipmentSnapshot.model})
+                </>
+              )}{' '}
+              en las condiciones descritas. Esta acción genera una firma digital y no puede
+              deshacerse.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className='flex items-start gap-3 px-1 py-2'>

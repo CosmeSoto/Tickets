@@ -8,7 +8,6 @@ import prisma from '@/lib/prisma'
 jest.mock('@/lib/prisma', () => {
   const p = {
     equipment: { findMany: jest.fn().mockResolvedValue([]) },
-    family_custom_fields: { findMany: jest.fn().mockResolvedValue([]) },
   }
   return { __esModule: true, default: p, prisma: p }
 })
@@ -16,7 +15,6 @@ jest.mock('@/lib/prisma', () => {
 describe('Public API Security - Field Selection', () => {
   beforeEach(() => {
     jest.clearAllMocks()
-    ;(prisma.family_custom_fields.findMany as jest.Mock).mockResolvedValue([])
     ;(prisma.equipment.findMany as jest.Mock).mockResolvedValue([])
   })
 

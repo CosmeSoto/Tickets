@@ -15,6 +15,7 @@ import {
   inventoryAccessToResponse,
 } from '@/lib/inventory/inventory-resource-access'
 import { getConsumableConsumptionSummary } from '@/lib/inventory/consumable-consumption'
+import { withAttributeLabels } from '@/lib/inventory/attribute-labels'
 
 /**
  * GET /api/inventory/consumables/[id]
@@ -30,7 +31,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const consumable = await prisma.consumables.findUnique({
       where: { id },
       include: {
-        consumableType: { include: { family: { select: { id: true, name: true } } } },
+        consumableType: {
+          include: { family: { select: { id: true, name: true } }, attributes: true },
+        },
         unitOfMeasure: true,
         warehouse: { select: { id: true, name: true } },
         assignedEquipment: {
@@ -69,7 +72,19 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       consumable.currentStock ?? 0
     )
 
-    return NextResponse.json({ ...consumable, totalStockValue, consumptionSummary })
+    // Etiqueta legible de cada atributo personalizado, resuelta contra el catálogo del
+    // tipo de suministro (misma fuente que equipo/licencia — ver attribute-labels.ts).
+    const customValuesWithLabels = withAttributeLabels(
+      consumable.customValues as any,
+      consumable.consumableType?.attributes
+    )
+
+    return NextResponse.json({
+      ...consumable,
+      customValues: customValuesWithLabels,
+      totalStockValue,
+      consumptionSummary,
+    })
   } catch (error) {
     console.error('Error en GET /api/inventory/consumables/[id]:', error)
     return NextResponse.json({ error: 'Error al obtener suministro' }, { status: 500 })

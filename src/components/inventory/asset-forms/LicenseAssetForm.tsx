@@ -38,6 +38,7 @@ import { toLocalDateInputValue } from '@/lib/forms/form-date'
 import { parseMoneyInput } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { AssignableUserSelect } from '@/components/inventory/shared/AssignableUserSelect'
+import { CONTRACT_TYPE_OPTIONS } from '@/lib/inventory/license-labels'
 import { KeyRound, RefreshCw } from 'lucide-react'
 
 interface LicenseAssetFormProps {
@@ -74,6 +75,7 @@ type LicenseDraft = {
   linkedContractId: string | null
   notes: string
   customFieldValues: Array<{ fieldName: string; fieldValue: string }>
+  contractType: string
 }
 
 /** Borrador útil (evita que un draft solo con scope=Empresa vacíe el editar). */
@@ -172,6 +174,7 @@ export function LicenseAssetForm({
   const [purchaseOrderNumber, setPurchaseOrderNumber] = useState('')
   const [renewalCost, setRenewalCost] = useState('')
   const [renewalDate, setRenewalDate] = useState('')
+  const [contractType, setContractType] = useState('')
   const [hasRecurring, setHasRecurring] = useState(false)
   const [linkedContractId, setLinkedContractId] = useState<string | null>(null)
   const [notes, setNotes] = useState('')
@@ -204,6 +207,7 @@ export function LicenseAssetForm({
       linkedContractId,
       notes,
       customFieldValues,
+      contractType,
     }),
     [
       name,
@@ -223,6 +227,7 @@ export function LicenseAssetForm({
       linkedContractId,
       notes,
       customFieldValues,
+      contractType,
     ]
   )
 
@@ -243,6 +248,7 @@ export function LicenseAssetForm({
     if (typeof d.hasRecurring === 'boolean') setHasRecurring(d.hasRecurring)
     if (d.linkedContractId !== undefined) setLinkedContractId(d.linkedContractId)
     if (d.notes != null) setNotes(String(d.notes))
+    if (d.contractType != null) setContractType(String(d.contractType))
     if (Array.isArray(d.customFieldValues)) setCustomFieldValues(d.customFieldValues)
   }
 
@@ -323,6 +329,7 @@ export function LicenseAssetForm({
         initialLicense.contractType === 'SOFTWARE'
     )
     setLinkedContractId((initialLicense.linkedContractId as string | null) ?? null)
+    setContractType(String(initialLicense.contractType ?? ''))
     setNotes(String(initialLicense.notes ?? ''))
     setCustomFieldValues(
       (initialLicense.customValues as Array<{ fieldName: string; fieldValue: string }>) ?? []
@@ -448,6 +455,7 @@ export function LicenseAssetForm({
       purchaseOrderNumber: purchaseOrderNumber || undefined,
       renewalCost: parsedRenewal,
       renewalDate: renewalDate || undefined,
+      contractType: contractType || null,
       contractId: linkedContractId || undefined,
       notes: notes || undefined,
       customValues: customFieldValues.length ? customFieldValues : undefined,
@@ -623,6 +631,21 @@ export function LicenseAssetForm({
               onChange={v => setSupplierId(v || '')}
               familyId={familyId}
             />
+          </div>
+
+          <div className='space-y-1'>
+            <Label>
+              Tipo de contrato{' '}
+              <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
+            </Label>
+            <SimpleSelect value={contractType} onChange={e => setContractType(e.target.value)}>
+              <option value=''>Sin especificar</option>
+              {CONTRACT_TYPE_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </SimpleSelect>
           </div>
 
           {scope === 'Individual' && (

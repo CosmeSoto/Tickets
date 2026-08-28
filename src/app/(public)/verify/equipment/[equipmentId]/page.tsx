@@ -3,6 +3,7 @@ import { headers } from 'next/headers'
 import { prisma } from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import { DEFAULT_SYSTEM_NAME } from '@/lib/branding-constants'
+import { withAttributeLabels } from '@/lib/inventory/attribute-labels'
 import {
   Building2,
   Package,
@@ -81,6 +82,7 @@ export default async function EquipmentPublicPage({ params }: PageProps) {
       type: {
         include: {
           family: true,
+          attributes: true,
         },
       },
       assignments: {
@@ -122,39 +124,9 @@ export default async function EquipmentPublicPage({ params }: PageProps) {
   const displayModel = equipment.model?.model ?? equipment.modelDeprecated
   const catalogLabel = `${displayBrand} ${displayModel}`.trim()
 
-  // Obtén campos personalizados para la familia.
-  let familyCustomFields = null
-  if (equipment.type?.family?.id) {
-    familyCustomFields = await prisma.family_custom_fields.findMany({
-      where: { familyId: equipment.type.family.id },
-      orderBy: { order: 'asc' },
-    })
-  }
-
-  // Agregar fieldLabel a los valores personalizados
-  const customValuesWithLabels = (equipment.customValues || []).map(cv => {
-    const field = familyCustomFields?.find(f => f.fieldName === (cv as any).fieldName)
-    return {
-      ...cv,
-      fieldLabel: field?.fieldLabel || (cv as any).fieldName,
-    }
-  })
-
-  // Ordenar valores personalizados por orden de familia
-  const sortedCustomValues = (() => {
-    if (!customValuesWithLabels || !familyCustomFields) return customValuesWithLabels
-
-    const sortedFamilyFields = [...familyCustomFields].sort(
-      (a, b) => (a.order ?? 0) - (b.order ?? 0)
-    )
-    const orderMap = new Map(sortedFamilyFields.map((field, index) => [field.fieldName, index]))
-
-    return [...customValuesWithLabels].sort((a, b) => {
-      const orderA = orderMap.get((a as any).fieldName) ?? Infinity
-      const orderB = orderMap.get((b as any).fieldName) ?? Infinity
-      return orderA - orderB
-    })
-  })()
+  // Etiqueta y orden de los atributos personalizados, resueltos contra el catálogo del
+  // tipo de equipo (ver attribute-labels.ts — misma fuente que el detalle interno).
+  const sortedCustomValues = withAttributeLabels(equipment.customValues, equipment.type?.attributes)
 
   // Registrar escaneo en audit_logs (fire-and-forget, no bloquea el render)
   prisma.audit_logs

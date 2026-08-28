@@ -749,6 +749,47 @@ function ActsList({
   return <div className='space-y-3'>{acts.map(renderCard)}</div>
 }
 
+/**
+ * Línea de resumen del activo dentro de la tarjeta del listado. El snapshot de una
+ * suscripción/contrato no tiene code/brand/model (esos campos son de equipo), así que
+ * antes de este fix cualquier acta de suscripción mostraba esta línea en blanco.
+ */
+function ActCardItemLine({ act }: { act: any }) {
+  const snap = act.equipmentSnapshot ?? {}
+  const actType: string = act.actType ?? 'EQUIPMENT_ASSIGNMENT'
+
+  if (actType === 'SUBSCRIPTION_ASSIGNMENT' || actType === 'CONTRACT_RENEWAL') {
+    return (
+      <>
+        <span className='font-medium'>{snap.name ?? 'Suscripción'}</span>
+        {snap.supplier?.name && (
+          <span className='text-muted-foreground truncate'>— {snap.supplier.name}</span>
+        )}
+      </>
+    )
+  }
+
+  if (actType === 'MRO_DELIVERY') {
+    const qty = snap.quantity != null ? `${snap.quantity} ${snap.unit ?? ''}`.trim() : null
+    return (
+      <>
+        <span className='font-medium'>{snap.name ?? snap.code ?? act.equipment?.code}</span>
+        {qty && <span className='text-muted-foreground truncate'>— {qty}</span>}
+      </>
+    )
+  }
+
+  return (
+    <>
+      <span className='font-medium'>{snap.code ?? act.equipment?.code}</span>
+      <span className='text-muted-foreground'>—</span>
+      <span className='text-muted-foreground truncate'>
+        {snap.brand ?? act.equipment?.brand} {snap.model ?? act.equipment?.model}
+      </span>
+    </>
+  )
+}
+
 function ActCard({
   act,
   highlight,
@@ -801,14 +842,7 @@ function ActCard({
             </div>
             <div className='flex items-center gap-1.5 text-sm mb-1'>
               <Package className='h-3.5 w-3.5 text-muted-foreground shrink-0' />
-              <span className='font-medium'>
-                {act.equipmentSnapshot?.code ?? act.equipment?.code}
-              </span>
-              <span className='text-muted-foreground'>—</span>
-              <span className='text-muted-foreground truncate'>
-                {act.equipmentSnapshot?.brand ?? act.equipment?.brand}{' '}
-                {act.equipmentSnapshot?.model ?? act.equipment?.model}
-              </span>
+              <ActCardItemLine act={act} />
             </div>
             {subtitle}
           </div>

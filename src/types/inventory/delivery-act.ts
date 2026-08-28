@@ -22,6 +22,8 @@ export interface DeliveryAct {
   id: string
   folio: string
   assignmentId: string
+  contractAssignmentId?: string | null
+  actType?: string
   equipmentSnapshot: Record<string, any>
   delivererInfo: UserInfo
   receiverInfo: UserInfo

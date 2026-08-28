@@ -16,6 +16,7 @@ import { linkLicenseToBusinessContract, mapLicenseScope } from '@/lib/inventory/
 import { DeliveryActService } from '@/lib/services/delivery-act.service'
 import { ConsumableService } from '@/lib/services/consumable.service'
 import { LicenseService } from '@/lib/services/license.service'
+import type { CreateLicenseData } from '@/types/inventory/license'
 import { InventoryDepartmentService } from '@/lib/services/inventory-department.service'
 import { AssignmentService } from '@/lib/services/assignment.service'
 
@@ -435,7 +436,11 @@ export async function createAsset(
         renewalCost: body.renewalCost ?? undefined,
         renewalDate: body.renewalDate ? new Date(body.renewalDate) : undefined,
         licenseScope: mapLicenseScope(body.scope),
-        contractType: body.hasRecurring ? 'SOFTWARE' : undefined,
+        // Prioriza el tipo de contrato elegido explícitamente en el formulario; si no se
+        // especificó, se infiere de "pago recurrente" como respaldo (comportamiento previo).
+        contractType:
+          (body.contractType as CreateLicenseData['contractType']) ||
+          (body.hasRecurring ? 'SOFTWARE' : undefined),
         notes: licenseNotes || undefined,
         assignedToUser: body.assignedToUser ? String(body.assignedToUser) : undefined,
         assignedToDepartment: body.assignedToDepartment
