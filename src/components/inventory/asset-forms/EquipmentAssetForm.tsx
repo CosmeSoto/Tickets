@@ -435,40 +435,41 @@ export function EquipmentAssetForm({
       .catch(() => setEquipmentModels([]))
   }, [equipmentTypeId, equipmentTypes, selectedBrandId, isEditMode, initialEquipment?.modelId])
 
-  // Task 19.1: fetch family-config depreciation defaults when familyId changes
+  // Task 19.1: defaults de depreciación de la familia — vienen en el prop `familyConfig`
+  // (ya lo trae UnifiedAssetForm al hacer GET /api/inventory/family-config/:id antes de
+  // montar este formulario). Antes se volvía a pedir el mismo endpoint por separado, una
+  // llamada de red redundante en cada carga de "Nuevo Activo").
   useEffect(() => {
-    fetch(`/api/inventory/family-config/${familyId}`)
-      .then(r => (r.ok ? r.json() : null))
-      .then(json => {
-        if (!json) return
-        const raw = (json.data ?? json) as FamilyDepreciationConfig & Record<string, unknown>
-        const cfg: FamilyDepreciationConfig = {
-          defaultDepreciationMethod: normalizeDepreciationMethod(
-            raw.defaultDepreciationMethod as string | null | undefined
-          ),
-          defaultUsefulLifeYears: raw.defaultUsefulLifeYears ?? null,
-          defaultResidualValuePct: raw.defaultResidualValuePct ?? null,
-        }
-        setFamilyDepConfig(cfg)
+    const cfg: FamilyDepreciationConfig = {
+      defaultDepreciationMethod: normalizeDepreciationMethod(
+        familyConfig.defaultDepreciationMethod
+      ),
+      defaultUsefulLifeYears: familyConfig.defaultUsefulLifeYears ?? null,
+      defaultResidualValuePct: familyConfig.defaultResidualValuePct ?? null,
+    }
+    setFamilyDepConfig(cfg)
 
-        // Pre-fill depreciation fields
-        if (cfg.defaultDepreciationMethod) {
-          setDepreciationMethod(cfg.defaultDepreciationMethod)
-        } else if (familyCode) {
-          setDepreciationMethod(getRecommendedDepreciationMethod(familyCode))
-        }
+    // Pre-fill depreciation fields
+    if (cfg.defaultDepreciationMethod) {
+      setDepreciationMethod(cfg.defaultDepreciationMethod)
+    } else if (familyCode) {
+      setDepreciationMethod(getRecommendedDepreciationMethod(familyCode))
+    }
 
-        if (cfg.defaultUsefulLifeYears != null) {
-          setUsefulLifeYears(String(cfg.defaultUsefulLifeYears))
-        } else if (familyCode && DEFAULT_USEFUL_LIFE_YEARS[familyCode] != null) {
-          const defaultYears = DEFAULT_USEFUL_LIFE_YEARS[familyCode]
-          if (defaultYears > 0) setUsefulLifeYears(String(defaultYears))
-        }
+    if (cfg.defaultUsefulLifeYears != null) {
+      setUsefulLifeYears(String(cfg.defaultUsefulLifeYears))
+    } else if (familyCode && DEFAULT_USEFUL_LIFE_YEARS[familyCode] != null) {
+      const defaultYears = DEFAULT_USEFUL_LIFE_YEARS[familyCode]
+      if (defaultYears > 0) setUsefulLifeYears(String(defaultYears))
+    }
 
-        // residualValue will be auto-calculated when purchasePrice is entered (task 19.2)
-      })
-      .catch(() => {})
-  }, [familyId, familyCode])
+    // residualValue will be auto-calculated when purchasePrice is entered (task 19.2)
+  }, [
+    familyConfig.defaultDepreciationMethod,
+    familyConfig.defaultUsefulLifeYears,
+    familyConfig.defaultResidualValuePct,
+    familyCode,
+  ])
 
   // Usuarios asignables: cargados desde el endpoint de inventario con lógica de rol/familia
   const [assignableUsersList, setAssignableUsersList] = useState<
