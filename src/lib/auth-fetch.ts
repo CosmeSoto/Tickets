@@ -76,14 +76,28 @@ export async function dedupedFetch(
   const method = init?.method ?? 'GET'
   const key = `${method}:${url}`
 
+  // BUG real encontrado en producción (confirmado con el error exacto en
+  // consola: "Failed to execute 'text' on 'Response': body stream already
+  // read"): el body de un Response solo se puede leer UNA vez. Si dos
+  // callers piden la misma URL casi al mismo tiempo (p. ej. dos efectos
+  // montando a la vez), antes ambos recibían el MISMO objeto Response desde
+  // este caché — el primero en llamar a .text()/.json() se lo quedaba, el
+  // segundo reventaba con ese TypeError, que loadData() de Credenciales
+  // traducía en el falso "Error de conexión". clone() da a cada caller su
+  // propia copia independiente del body, sin repetir la petición de red.
   const existing = inFlightGets.get(key)
-  if (existing) return existing
+  if (existing) {
+    const res = await existing
+    return res.clone()
+  }
 
   // Reintento solo para GET/HEAD: son idempotentes, seguros de repetir.
   const isIdempotent = method === 'GET' || method === 'HEAD'
-  const promise = (isIdempotent ? fetchWithRetry(input, init) : fetch(input, init)).finally(() => {
+  const promise = isIdempotent ? fetchWithRetry(input, init) : fetch(input, init)
+  inFlightGets.set(key, promise)
+  promise.finally(() => {
     setTimeout(() => inFlightGets.delete(key), 100)
   })
-  inFlightGets.set(key, promise)
-  return promise
+  const res = await promise
+  return res.clone()
 }
