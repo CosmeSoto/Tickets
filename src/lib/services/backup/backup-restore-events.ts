@@ -8,7 +8,9 @@ const RESTORE_ACTIONS = [
   'backup_restore_failed',
 ] as const
 
-const BACKUP_OPERATION_ACTIONS = [
+/** Exportado: lo usa la API de auditoría para saber qué logs eliminados
+ *  requieren marcar `historyClearedAt` en su backup asociado (ver abajo). */
+export const BACKUP_OPERATION_ACTIONS = [
   ...RESTORE_ACTIONS,
   'backup_created',
   'backup_deleted',
@@ -344,6 +346,9 @@ export async function getBackupOperationsHistory(options?: {
     where: {
       status: 'completed',
       engine: { in: ['export', 'import', 'pgbackrest'] },
+      // Un admin borró la entrada de historial de este backup a propósito —
+      // no reconstruirla como registro "legacy" (ver historyClearedAt arriba).
+      historyClearedAt: null,
     },
     orderBy: { createdAt: 'desc' },
     take: needCount,
@@ -392,6 +397,25 @@ export async function getBackupOperationsHistory(options?: {
     entries: await enrichOperationEntries(slice),
     hasMore,
   }
+}
+
+/**
+ * Marca uno o más backups como "historial ocultado": tras borrar sus entradas
+ * de audit_logs desde el Historial de operaciones o desde Auditoría, evita
+ * que `getBackupOperationsHistory` los reconstruya como registro legacy no
+ * eliminable. No afecta al backup en sí (archivo, metadata, etc.).
+ */
+export async function clearBackupOperationHistory(backupIds: string[]): Promise<void> {
+  const ids = [
+    ...new Set(
+      backupIds.filter(id => id && id !== 'backup' && id !== 'pgbackrest' && id !== 'unknown')
+    ),
+  ]
+  if (ids.length === 0) return
+  await prisma.backups.updateMany({
+    where: { id: { in: ids } },
+    data: { historyClearedAt: new Date() },
+  })
 }
 
 export async function getRestoreHistory(limit = 20): Promise<RestoreHistoryEntry[]> {

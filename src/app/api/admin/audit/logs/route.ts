@@ -7,6 +7,10 @@ import { requireSuperAdmin } from '@/lib/auth/require-super-admin'
 import { AuditServiceComplete, type AuditLogFilter } from '@/lib/services/audit-service-complete'
 import { buildAuditLogWhere } from '@/lib/services/audit-query-builder'
 import { withCache, buildCacheKey, invalidateCache } from '@/lib/api-cache'
+import {
+  BACKUP_OPERATION_ACTIONS,
+  clearBackupOperationHistory,
+} from '@/lib/services/backup/backup-restore-events'
 
 export async function GET(request: NextRequest) {
   try {
@@ -136,7 +140,20 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
+    // Antes de borrar: si alguno de los logs a eliminar es de un backup
+    // (creación/importación/restauración/subida), su backup asociado sigue
+    // existiendo en `backups` — sin esto, la siguiente carga del Historial de
+    // operaciones lo reconstruiría como registro "legacy" no eliminable.
+    const backupLogs = await prisma.audit_logs.findMany({
+      where: { AND: [where, { action: { in: [...BACKUP_OPERATION_ACTIONS] } }] },
+      select: { entityId: true },
+    })
+
     const result = await prisma.audit_logs.deleteMany({ where })
+
+    if (backupLogs.length > 0) {
+      await clearBackupOperationHistory(backupLogs.map(l => l.entityId))
+    }
 
     await prisma.audit_logs.create({
       data: {

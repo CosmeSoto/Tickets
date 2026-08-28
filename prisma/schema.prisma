@@ -81,6 +81,10 @@ model backups {
   /// JSON con metadata del backup (conteo de tablas, pgBackRest info, etc.)
   metadata   String?
   createdAt  DateTime @default(now())
+  /// Cuando un admin borra la entrada del Historial de operaciones (audit_logs)
+  /// de este backup, se marca aquí para que no "resucite" como registro legacy
+  /// sin auditoría — el backup en sí sigue existiendo, solo se oculta del historial.
+  historyClearedAt DateTime?
 
   @@index([status, createdAt(sort: Desc)])
   @@index([type, status])
