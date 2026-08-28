@@ -40,6 +40,7 @@ export type NotificationEmailEvent =
   | 'processReviewDue'
   | 'accessPassIssued'
   | 'accessPassExpiring'
+  | 'newsPublished'
 
 export const EMAIL_EVENT_PRIORITY: Record<NotificationEmailEvent, EmailPriority> = {
   security: 'critical',
@@ -60,6 +61,7 @@ export const EMAIL_EVENT_PRIORITY: Record<NotificationEmailEvent, EmailPriority>
   processReviewDue: 'important',
   accessPassIssued: 'important',
   accessPassExpiring: 'important',
+  newsPublished: 'optional',
 }
 
 export function resolveEmailPriority(

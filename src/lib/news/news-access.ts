@@ -181,7 +181,7 @@ export function getNewsNotificationLink(viewer: { role: string; canManageNews?: 
 export async function getNewsNotificationRecipientIds(
   newsId: string,
   excludeUserId?: string
-): Promise<Array<{ id: string; role: string; canManageNews: boolean }>> {
+): Promise<Array<{ id: string; role: string; canManageNews: boolean; email: string | null }>> {
   const news = await prisma.news.findUnique({
     where: { id: newsId },
     include: NEWS_VISIBILITY_INCLUDE,
@@ -191,11 +191,7 @@ export async function getNewsNotificationRecipientIds(
 
   const moduleAccess = {
     isActive: true,
-    OR: [
-      { isSuperAdmin: true },
-      { newsEnabled: true },
-      { canManageNews: true },
-    ],
+    OR: [{ isSuperAdmin: true }, { newsEnabled: true }, { canManageNews: true }],
   }
 
   const noRestrictions =
@@ -228,7 +224,7 @@ export async function getNewsNotificationRecipientIds(
       ...(excludeUserId ? { id: { not: excludeUserId } } : {}),
       ...(noRestrictions ? {} : { OR: visibilityOr }),
     },
-    select: { id: true, role: true, canManageNews: true },
+    select: { id: true, role: true, canManageNews: true, email: true },
   })
 
   return users

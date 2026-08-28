@@ -282,48 +282,18 @@ export async function POST(request: NextRequest) {
       request,
     })
 
-    // Notificar solo a destinatarios de la visibilidad (no a todos los SSE conectados)
+    // Notificar solo a destinatarios de la visibilidad (in-app + email)
     if (newsStatus === 'PUBLISHED') {
-      try {
-        const { NotificationService } = await import('@/lib/services/notification-service')
-        const { NotificationType } = await import('@prisma/client')
-        const { NotificationEvents } = await import('@/lib/notification-events')
-        const { getNewsNotificationLink, getNewsNotificationRecipientIds } =
-          await import('@/lib/news/news-access')
-
-        const targetUsers = await getNewsNotificationRecipientIds(news.id, session.user.id)
-        const targetIds = targetUsers.map(u => u.id)
-
-        if (targetIds.length > 0) {
-          NotificationEvents.emitToMany?.(targetIds, {
-            type: 'news_published',
-            newsId: news.id,
-            newsType: type,
-          })
-        }
-
-        const priorityLabel = priority === 'URGENT' ? '🚨 ' : priority === 'HIGH' ? '⚠️ ' : ''
-
-        await Promise.allSettled(
-          targetUsers.map(u =>
-            NotificationService.push({
-              userId: u.id,
-              type:
-                priority === 'URGENT' || priority === 'HIGH'
-                  ? NotificationType.WARNING
-                  : NotificationType.INFO,
-              title: `${priorityLabel}Nueva noticia publicada`,
-              message: `${data.title}`,
-              metadata: {
-                link: getNewsNotificationLink(u),
-                newsId: news.id,
-              },
-            })
-          )
-        )
-      } catch {
-        // no-op: notificación opcional
-      }
+      const { notifyNewsPublished } = await import('@/lib/news/notify-news-published')
+      await notifyNewsPublished({
+        newsId: news.id,
+        title: data.title,
+        summary: data.summary,
+        content: data.content,
+        type,
+        priority,
+        actorUserId: session.user.id,
+      })
     }
 
     return NextResponse.json({ news })

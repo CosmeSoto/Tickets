@@ -291,50 +291,18 @@ export async function PUT(request: NextRequest, { params }: Params) {
       request,
     })
 
-    // Notificar solo a destinatarios de la visibilidad al publicar
+    // Notificar solo a destinatarios de la visibilidad al publicar (in-app + email)
     if (data.status === 'PUBLISHED' && existingNews.status !== 'PUBLISHED') {
-      try {
-        const { NotificationService } = await import('@/lib/services/notification-service')
-        const { NotificationType } = await import('@prisma/client')
-        const { NotificationEvents } = await import('@/lib/notification-events')
-        const { getNewsNotificationLink, getNewsNotificationRecipientIds } =
-          await import('@/lib/news/news-access')
-
-        const targetUsers = await getNewsNotificationRecipientIds(news.id, session.user.id)
-        const targetIds = targetUsers.map(u => u.id)
-
-        if (targetIds.length > 0) {
-          NotificationEvents.emitToMany?.(targetIds, {
-            type: 'news_published',
-            newsId: news.id,
-            newsType: news.type,
-          })
-        }
-
-        const newsPriority = news.priority ?? 'MEDIUM'
-        const priorityLabel =
-          newsPriority === 'URGENT' ? '🚨 ' : newsPriority === 'HIGH' ? '⚠️ ' : ''
-
-        await Promise.allSettled(
-          targetUsers.map(u =>
-            NotificationService.push({
-              userId: u.id,
-              type:
-                newsPriority === 'URGENT' || newsPriority === 'HIGH'
-                  ? NotificationType.WARNING
-                  : NotificationType.INFO,
-              title: `${priorityLabel}Nueva noticia publicada`,
-              message: `${news.title}`,
-              metadata: {
-                link: getNewsNotificationLink(u),
-                newsId: news.id,
-              },
-            })
-          )
-        )
-      } catch {
-        // no-op: notificación opcional
-      }
+      const { notifyNewsPublished } = await import('@/lib/news/notify-news-published')
+      await notifyNewsPublished({
+        newsId: news.id,
+        title: news.title,
+        summary: news.summary,
+        content: news.content,
+        type: news.type,
+        priority: news.priority ?? 'MEDIUM',
+        actorUserId: session.user.id,
+      })
     }
 
     return NextResponse.json({ news })

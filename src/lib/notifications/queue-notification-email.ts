@@ -17,12 +17,13 @@ import {
 import type { Attachment } from 'nodemailer/lib/mailer'
 
 export type QueueNotificationEmailInput = {
-  to: string | string[]
+  /** Requerido salvo que se use `recipients` (destinatarios usuario→email). */
+  to?: string | string[]
   subject: string
   html: string
   text?: string
   recipientUserId?: string | null
-  /** Varios destinatarios usuario→email (filtra prefs uno a uno) */
+  /** Varios destinatarios usuario→email (filtra prefs uno a uno). Alternativa a `to`. */
   recipients?: Array<{ userId: string; email: string }>
   module: EmailModule
   event?: NotificationEmailEvent
