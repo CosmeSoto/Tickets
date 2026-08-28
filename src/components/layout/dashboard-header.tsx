@@ -98,6 +98,10 @@ export function DashboardHeader({
           href='/?preview=true'
           target='_blank'
           rel='noopener noreferrer'
+          // Abre en pestaña nueva — nunca usa el prefetch/Router Cache de esta pestaña,
+          // así que precargarlo es puro desperdicio. Este header vive en todas las
+          // páginas del dashboard, así que sin esto se repetía en cada carga.
+          prefetch={false}
           title='Ver Página Pública'
           className='flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors border border-border rounded-md px-2 py-1.5 hover:bg-accent flex-shrink-0'
         >

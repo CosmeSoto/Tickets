@@ -311,6 +311,7 @@ export function HelpHub() {
               className='underline underline-offset-2'
               target='_blank'
               rel='noopener noreferrer'
+              prefetch={false}
             >
               Política de Privacidad
             </Link>

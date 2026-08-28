@@ -125,6 +125,7 @@ export function PrivacyAcceptance({ passId, token }: { passId: string; token: st
                   <Link
                     href='/help/privacy'
                     target='_blank'
+                    prefetch={false}
                     className='text-primary underline underline-offset-4'
                   >
                     aviso de privacidad (versión {pass.subject.privacyNoticeVersion || 'vigente'})
