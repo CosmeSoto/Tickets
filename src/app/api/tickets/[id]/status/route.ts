@@ -143,6 +143,28 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       }
     }
 
+    // No permitir resolver mientras haya un plan de resolución en curso (borrador o
+    // activo) — el técnico decide cuándo un plan está terminado (ver
+    // ticket-resolution-tracker.tsx: ya no se autocompleta solo), así que resolver el
+    // ticket sin haber cerrado el plan lo dejaría a medio camino, sin forma de retomarlo
+    // desde el ticket ya resuelto salvo reabriéndolo. SUPER ADMIN queda exento, igual que
+    // el resto de restricciones de este endpoint.
+    if (newStatus === 'RESOLVED' && !isSuperAdmin) {
+      const openPlan = await prisma.resolution_plans.findFirst({
+        where: { ticketId, status: { in: ['draft', 'active'] } },
+        select: { title: true, status: true },
+      })
+      if (openPlan) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: `Hay un plan de resolución ${openPlan.status === 'draft' ? 'en borrador' : 'activo'} ("${openPlan.title}"). Complétalo o elimínalo antes de resolver el ticket.`,
+          },
+          { status: 400 }
+        )
+      }
+    }
+
     // Construir datos de actualización
     const updateData: any = {
       status: newStatus,
