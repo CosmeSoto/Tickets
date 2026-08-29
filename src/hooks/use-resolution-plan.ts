@@ -180,9 +180,12 @@ export function useResolutionPlan(ticketId: string, onPlanChange?: () => void) {
   // ── Cargar plan ──────────────────────────────────────────────────────────
 
   const loadResolutionPlan = useCallback(
-    async (notifyChange = false) => {
+    // silent=true evita el spinner de pantalla completa — se usa para resincronizar en
+    // segundo plano tras acciones que ya tienen su propia actualización optimista/toast
+    // (p. ej. completar una tarea), donde un flash de "cargando" sería un paso atrás.
+    async (notifyChange = false, silent = false) => {
       try {
-        setLoading(true)
+        if (!silent) setLoading(true)
         const response = await fetch(`/api/tickets/${ticketId}/resolution-plan`)
 
         if (response.ok) {
@@ -202,7 +205,7 @@ export function useResolutionPlan(ticketId: string, onPlanChange?: () => void) {
       } catch (err) {
         console.error('Error loading resolution plan:', err)
       } finally {
-        setLoading(false)
+        if (!silent) setLoading(false)
       }
     },
     // Solo depender de ticketId — onPlanChange se usa via ref para evitar loops
@@ -385,7 +388,10 @@ export function useResolutionPlan(ticketId: string, onPlanChange?: () => void) {
         body: JSON.stringify({ status: 'active', planId: plan?.id }),
       })
 
-      if (!response.ok) throw new Error('Error al activar plan')
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}))
+        throw new Error(error.message || 'Error al activar plan')
+      }
 
       const data = await response.json()
       if (data.success) {
@@ -400,7 +406,7 @@ export function useResolutionPlan(ticketId: string, onPlanChange?: () => void) {
       toast({
         variant: 'destructive',
         title: 'Error al activar plan',
-        description: 'No se pudo activar el plan',
+        description: err instanceof Error ? err.message : 'No se pudo activar el plan',
       })
     }
   }
@@ -417,7 +423,10 @@ export function useResolutionPlan(ticketId: string, onPlanChange?: () => void) {
         }),
       })
 
-      if (!response.ok) throw new Error('Error al completar plan')
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}))
+        throw new Error(error.message || 'Error al completar plan')
+      }
 
       const data = await response.json()
       if (data.success) {
@@ -432,7 +441,7 @@ export function useResolutionPlan(ticketId: string, onPlanChange?: () => void) {
       toast({
         variant: 'destructive',
         title: 'Error al completar plan',
-        description: 'No se pudo completar el plan',
+        description: err instanceof Error ? err.message : 'No se pudo completar el plan',
       })
     }
   }
@@ -603,6 +612,7 @@ export function useResolutionPlan(ticketId: string, onPlanChange?: () => void) {
 
       const data = await response.json()
       if (data.success) {
+        // Actualización optimista inmediata (checkbox/tachado sin esperar red)...
         if (plan) {
           const updatedTasks = plan.tasks.map(t =>
             t.id === taskId
@@ -615,8 +625,14 @@ export function useResolutionPlan(ticketId: string, onPlanChange?: () => void) {
           )
           const completedTasks = updatedTasks.filter(t => t.status === 'completed').length
           setPlan({ ...plan, tasks: updatedTasks, completedTasks })
-          onPlanChangeRef.current?.()
         }
+        // ...pero se resincroniza en silencio con el servidor: si esta era la última
+        // tarea pendiente, el backend auto-completa el plan entero (status → 'completed',
+        // completedDate/actualHours) y el parche optimista de arriba no lo sabe. Antes
+        // eso dejaba la tarjeta mostrando "Activo" y el botón "Marcar como Completado"
+        // visible, y al usarlo el servidor lo rechazaba (400, "ya fue completado") porque
+        // en realidad ya estaba completado.
+        void loadResolutionPlan(true, true)
 
         const messages = {
           pending: {

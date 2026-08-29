@@ -484,50 +484,58 @@ export function TaskList({
                             Cambiar Estado
                           </DropdownMenuSubTrigger>
                           <DropdownMenuSubContent>
-                            <DropdownMenuItem
-                              onClick={() => onUpdateTaskStatus(task.id, 'pending')}
-                            >
-                              <Clock className='h-4 w-4 mr-2' />
-                              <div className='flex flex-col'>
-                                <span>Pendiente</span>
-                                <span className='text-xs text-muted-foreground'>
-                                  Tarea no iniciada
-                                </span>
-                              </div>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => onUpdateTaskStatus(task.id, 'in_progress')}
-                            >
-                              <PlayCircle className='h-4 w-4 mr-2' />
-                              <div className='flex flex-col'>
-                                <span>En Progreso</span>
-                                <span className='text-xs text-muted-foreground'>
-                                  Trabajando activamente
-                                </span>
-                              </div>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => onUpdateTaskStatus(task.id, 'completed')}
-                            >
-                              <CheckCircle className='h-4 w-4 mr-2' />
-                              <div className='flex flex-col'>
-                                <span>Completada</span>
-                                <span className='text-xs text-muted-foreground'>
-                                  Terminada exitosamente
-                                </span>
-                              </div>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => onUpdateTaskStatus(task.id, 'blocked')}
-                            >
-                              <XCircle className='h-4 w-4 mr-2' />
-                              <div className='flex flex-col'>
-                                <span>Bloqueada</span>
-                                <span className='text-xs text-muted-foreground'>
-                                  No se puede continuar
-                                </span>
-                              </div>
-                            </DropdownMenuItem>
+                            {task.status !== 'pending' && (
+                              <DropdownMenuItem
+                                onClick={() => onUpdateTaskStatus(task.id, 'pending')}
+                              >
+                                <Clock className='h-4 w-4 mr-2' />
+                                <div className='flex flex-col'>
+                                  <span>Pendiente</span>
+                                  <span className='text-xs text-muted-foreground'>
+                                    Tarea no iniciada
+                                  </span>
+                                </div>
+                              </DropdownMenuItem>
+                            )}
+                            {task.status !== 'in_progress' && (
+                              <DropdownMenuItem
+                                onClick={() => onUpdateTaskStatus(task.id, 'in_progress')}
+                              >
+                                <PlayCircle className='h-4 w-4 mr-2' />
+                                <div className='flex flex-col'>
+                                  <span>En Progreso</span>
+                                  <span className='text-xs text-muted-foreground'>
+                                    Trabajando activamente
+                                  </span>
+                                </div>
+                              </DropdownMenuItem>
+                            )}
+                            {task.status !== 'completed' && (
+                              <DropdownMenuItem
+                                onClick={() => onUpdateTaskStatus(task.id, 'completed')}
+                              >
+                                <CheckCircle className='h-4 w-4 mr-2' />
+                                <div className='flex flex-col'>
+                                  <span>Completada</span>
+                                  <span className='text-xs text-muted-foreground'>
+                                    Terminada exitosamente
+                                  </span>
+                                </div>
+                              </DropdownMenuItem>
+                            )}
+                            {task.status !== 'blocked' && (
+                              <DropdownMenuItem
+                                onClick={() => onUpdateTaskStatus(task.id, 'blocked')}
+                              >
+                                <XCircle className='h-4 w-4 mr-2' />
+                                <div className='flex flex-col'>
+                                  <span>Bloqueada</span>
+                                  <span className='text-xs text-muted-foreground'>
+                                    No se puede continuar
+                                  </span>
+                                </div>
+                              </DropdownMenuItem>
+                            )}
                           </DropdownMenuSubContent>
                         </DropdownMenuSub>
 
