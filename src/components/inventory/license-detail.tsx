@@ -224,7 +224,12 @@ export function LicenseDetail({ licenseId, userRole, isSuperAdmin = false }: Pro
 
   const currentFamilyId = license.licenseType?.familyId ?? null
   const currentFamilyName = license.licenseType?.family?.name ?? null
-  const isAssigned = Boolean(license.user || license.equipment || license.department)
+  // Alcance Empresa deja user/equipment/department en null a propósito (nadie en
+  // particular) — sin este OR la licencia se veía "Sin asignar" aunque sí se hubiera
+  // guardado el alcance, y el usuario no tenía forma de saber que su guardado funcionó.
+  const isAssigned = Boolean(
+    license.user || license.equipment || license.department || license.licenseScope === 'COMPANY'
+  )
   const renewal = license.renewalAlertStatus ? renewalBadge(license.renewalAlertStatus) : null
   const hasSecondaryActions = canEdit || canTransfer || canDelete
 
@@ -502,10 +507,15 @@ export function LicenseDetail({ licenseId, userRole, isSuperAdmin = false }: Pro
                 }
               />
               <InfoRow label='Departamento' value={license.department?.name || '—'} />
-              {!isAssigned && (
+              {!isAssigned ? (
                 <p className='text-xs text-muted-foreground pt-1'>
-                  Sin asignar. Usa «Asignar» para vincular usuario, equipo o departamento según el
-                  alcance.
+                  <span className='font-medium text-foreground'>Disponible para asignar.</span> Usa
+                  «Asignar» para vincular usuario, equipo o departamento según el alcance.
+                </p>
+              ) : (
+                <p className='text-xs text-muted-foreground pt-1'>
+                  Desasignar no afecta el pago ni la vigencia de la licencia — sigue siendo válida
+                  según su fecha de vencimiento y queda disponible para asignarla a alguien más.
                 </p>
               )}
             </CardContent>

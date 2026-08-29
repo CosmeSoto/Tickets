@@ -9,6 +9,8 @@ interface DeliveryActRejectedEmailData {
   equipmentDescription: string
   rejectionReason: string
   rejectedAt: Date
+  /** Rótulo del ítem — "Equipo" o "Licencia" según el tipo de acta. */
+  itemLabel?: string
 }
 
 export function generateDeliveryActRejectedEmail(data: DeliveryActRejectedEmailData): {
@@ -16,7 +18,16 @@ export function generateDeliveryActRejectedEmail(data: DeliveryActRejectedEmailD
   html: string
   text: string
 } {
-  const { act, recipientName, equipmentCode, equipmentDescription, rejectionReason, rejectedAt , systemName = DEFAULT_SYSTEM_NAME } = data
+  const {
+    act,
+    recipientName,
+    equipmentCode,
+    equipmentDescription,
+    rejectionReason,
+    rejectedAt,
+    systemName = DEFAULT_SYSTEM_NAME,
+    itemLabel = 'Equipo',
+  } = data
 
   const rejectedAtStr = new Date(rejectedAt).toLocaleString('es-ES', {
     day: 'numeric',
@@ -48,7 +59,7 @@ export function generateDeliveryActRejectedEmail(data: DeliveryActRejectedEmailD
     
     <div style="background-color: #fee2e2; border-left: 4px solid #dc2626; padding: 15px; margin: 20px 0;">
       <p style="margin: 0 0 8px 0;"><strong>Acta:</strong> ${act.folio}</p>
-      <p style="margin: 0 0 8px 0;"><strong>Equipo:</strong> ${equipmentCode}</p>
+      <p style="margin: 0 0 8px 0;"><strong>${itemLabel}:</strong> ${equipmentCode}</p>
       <p style="margin: 0 0 8px 0;"><strong>Descripción:</strong> ${equipmentDescription}</p>
       <p style="margin: 0;"><strong>Rechazada el:</strong> ${rejectedAtStr}</p>
     </div>
@@ -58,7 +69,7 @@ export function generateDeliveryActRejectedEmail(data: DeliveryActRejectedEmailD
       <p style="margin: 0;">${rejectionReason}</p>
     </div>
 
-    <p>La asignación ha sido cancelada y el equipo está nuevamente disponible. Por favor, contacta al departamento de TI para coordinar una nueva entrega si es necesario.</p>
+    <p>La asignación ha sido cancelada y vuelve a estar disponible para asignar. Por favor, contacta al departamento de TI para coordinar una nueva entrega si es necesario.</p>
   </div>
 
   <div style="border-top: 1px solid #e5e7eb; padding-top: 20px; margin-top: 20px; color: #6b7280; font-size: 12px;">
@@ -77,14 +88,14 @@ Hola ${recipientName},
 El acta de entrega ha sido RECHAZADA.
 
 Acta: ${act.folio}
-Equipo: ${equipmentCode}
+${itemLabel}: ${equipmentCode}
 Descripción: ${equipmentDescription}
 Rechazada el: ${rejectedAtStr}
 
 MOTIVO DEL RECHAZO:
 ${rejectionReason}
 
-La asignación ha sido cancelada y el equipo está nuevamente disponible. Por favor, contacta al departamento de TI para coordinar una nueva entrega si es necesario.
+La asignación ha sido cancelada y vuelve a estar disponible para asignar. Por favor, contacta al departamento de TI para coordinar una nueva entrega si es necesario.
 
 ---
 ${systemName}

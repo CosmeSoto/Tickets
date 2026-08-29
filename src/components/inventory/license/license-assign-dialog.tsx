@@ -14,7 +14,6 @@ import { Label } from '@/components/ui/label'
 import { SimpleSelect } from '@/components/ui/simple-select'
 import { SearchableSelect, type SearchableSelectOption } from '@/components/ui/searchable-select'
 import { AssignableUserSelect } from '@/components/inventory/shared/AssignableUserSelect'
-import { useActiveDepartments } from '@/contexts/departments-context'
 import { useFetch } from '@/hooks/common/use-fetch'
 import { Loader2, UserCheck } from 'lucide-react'
 
@@ -67,7 +66,17 @@ export function LicenseAssignDialog({
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const { departments: rawDepartments } = useActiveDepartments()
+  // Departamentos de la familia de la licencia — antes usaba el contexto global
+  // (todos los departamentos del sistema, sin filtrar), igual que el selector de
+  // equipo debajo debe estar acotado al área de la licencia.
+  const { data: rawDepartments } = useFetch<{
+    id: string
+    name: string
+  }>(familyId ? `/api/departments?familyId=${familyId}&isActive=true` : '', {
+    enabled: open && scope === 'Departamento' && !!familyId,
+    transform: d => d.departments ?? d.data ?? [],
+    showErrorToast: false,
+  })
   const departments: SearchableSelectOption[] = useMemo(
     () => rawDepartments.map(d => ({ id: d.id, name: d.name })),
     [rawDepartments]

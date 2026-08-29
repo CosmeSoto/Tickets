@@ -10,6 +10,8 @@ interface DeliveryActAcceptedEmailData {
   equipmentDescription: string
   acceptedAt: Date
   pdfUrl?: string
+  /** Rótulo del ítem — "Equipo" o "Licencia" según el tipo de acta. */
+  itemLabel?: string
 }
 
 export function generateDeliveryActAcceptedEmail(data: DeliveryActAcceptedEmailData): {
@@ -17,7 +19,17 @@ export function generateDeliveryActAcceptedEmail(data: DeliveryActAcceptedEmailD
   html: string
   text: string
 } {
-  const { act, recipientName, recipientRole, equipmentCode, equipmentDescription, acceptedAt, pdfUrl , systemName = DEFAULT_SYSTEM_NAME } = data
+  const {
+    act,
+    recipientName,
+    recipientRole,
+    equipmentCode,
+    equipmentDescription,
+    acceptedAt,
+    pdfUrl,
+    systemName = DEFAULT_SYSTEM_NAME,
+    itemLabel = 'Equipo',
+  } = data
 
   const acceptedAtStr = new Date(acceptedAt).toLocaleString('es-ES', {
     day: 'numeric',
@@ -53,12 +65,14 @@ export function generateDeliveryActAcceptedEmail(data: DeliveryActAcceptedEmailD
     
     <div style="background-color: #f3f4f6; border-left: 4px solid #10b981; padding: 15px; margin: 20px 0;">
       <p style="margin: 0 0 8px 0;"><strong>Acta:</strong> ${act.folio}</p>
-      <p style="margin: 0 0 8px 0;"><strong>Equipo:</strong> ${equipmentCode}</p>
+      <p style="margin: 0 0 8px 0;"><strong>${itemLabel}:</strong> ${equipmentCode}</p>
       <p style="margin: 0 0 8px 0;"><strong>Descripción:</strong> ${equipmentDescription}</p>
       <p style="margin: 0;"><strong>Aceptada el:</strong> ${acceptedAtStr}</p>
     </div>
 
-    ${pdfUrl ? `
+    ${
+      pdfUrl
+        ? `
     <div style="background-color: #dbeafe; border: 1px solid #3b82f6; border-radius: 8px; padding: 15px; margin: 20px 0;">
       <p style="margin: 0 0 10px 0;"><strong>📄 Documento Disponible</strong></p>
       <p style="margin: 0 0 15px 0; font-size: 14px;">El acta firmada digitalmente está disponible para descarga:</p>
@@ -69,12 +83,16 @@ export function generateDeliveryActAcceptedEmail(data: DeliveryActAcceptedEmailD
         </a>
       </div>
     </div>
-    ` : ''}
+    `
+        : ''
+    }
 
     <p style="color: #6b7280; font-size: 14px; margin-top: 20px;">
-      ${recipientRole === 'receiver' 
-        ? 'Recuerda cuidar el equipo y reportar cualquier problema inmediatamente.' 
-        : 'La entrega ha sido completada exitosamente.'}
+      ${
+        recipientRole === 'receiver'
+          ? 'Recuerda cuidarlo/usarlo según corresponda y reportar cualquier problema inmediatamente.'
+          : 'La entrega ha sido completada exitosamente.'
+      }
     </p>
   </div>
 
@@ -104,19 +122,25 @@ Hola ${recipientName},
 El acta de entrega ha sido ACEPTADA EXITOSAMENTE por ${otherParty}.
 
 Acta: ${act.folio}
-Equipo: ${equipmentCode}
+${itemLabel}: ${equipmentCode}
 Descripción: ${equipmentDescription}
 Aceptada el: ${acceptedAtStr}
 
-${pdfUrl ? `
+${
+  pdfUrl
+    ? `
 📄 DOCUMENTO DISPONIBLE
 El acta firmada digitalmente está disponible para descarga en:
 ${pdfUrl}
-` : ''}
+`
+    : ''
+}
 
-${recipientRole === 'receiver' 
-  ? 'Recuerda cuidar el equipo y reportar cualquier problema inmediatamente.' 
-  : 'La entrega ha sido completada exitosamente.'}
+${
+  recipientRole === 'receiver'
+    ? 'Recuerda cuidarlo/usarlo según corresponda y reportar cualquier problema inmediatamente.'
+    : 'La entrega ha sido completada exitosamente.'
+}
 
 ✓ FIRMA DIGITAL REGISTRADA
 Este acta ha sido firmada digitalmente y puede ser verificada en cualquier momento.

@@ -8,6 +8,8 @@ interface DeliveryActExpiredEmailData {
   equipmentCode: string
   equipmentDescription: string
   expirationDate: Date
+  /** Rótulo del ítem — "Equipo" o "Licencia" según el tipo de acta. */
+  itemLabel?: string
 }
 
 export function generateDeliveryActExpiredEmail(data: DeliveryActExpiredEmailData): {
@@ -15,7 +17,15 @@ export function generateDeliveryActExpiredEmail(data: DeliveryActExpiredEmailDat
   html: string
   text: string
 } {
-  const { act, recipientName, equipmentCode, equipmentDescription, expirationDate , systemName = DEFAULT_SYSTEM_NAME } = data
+  const {
+    act,
+    recipientName,
+    equipmentCode,
+    equipmentDescription,
+    expirationDate,
+    systemName = DEFAULT_SYSTEM_NAME,
+    itemLabel = 'Equipo',
+  } = data
 
   const expirationDateStr = new Date(expirationDate).toLocaleDateString('es-ES', {
     day: 'numeric',
@@ -45,7 +55,7 @@ export function generateDeliveryActExpiredEmail(data: DeliveryActExpiredEmailDat
     
     <div style="background-color: #f3f4f6; border-left: 4px solid #6b7280; padding: 15px; margin: 20px 0;">
       <p style="margin: 0 0 8px 0;"><strong>Acta:</strong> ${act.folio}</p>
-      <p style="margin: 0 0 8px 0;"><strong>Equipo:</strong> ${equipmentCode}</p>
+      <p style="margin: 0 0 8px 0;"><strong>${itemLabel}:</strong> ${equipmentCode}</p>
       <p style="margin: 0 0 8px 0;"><strong>Descripción:</strong> ${equipmentDescription}</p>
       <p style="margin: 0;"><strong>Expiró el:</strong> ${expirationDateStr}</p>
     </div>
@@ -69,7 +79,7 @@ Hola ${recipientName},
 El acta de entrega ha EXPIRADO sin ser aceptada.
 
 Acta: ${act.folio}
-Equipo: ${equipmentCode}
+${itemLabel}: ${equipmentCode}
 Descripción: ${equipmentDescription}
 Expiró el: ${expirationDateStr}
 

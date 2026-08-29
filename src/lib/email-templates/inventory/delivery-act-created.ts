@@ -10,6 +10,8 @@ interface DeliveryActCreatedEmailData {
   equipmentCode: string
   equipmentDescription: string
   expirationDate: Date
+  /** Rótulo del ítem — "Equipo" o "Licencia" según el tipo de acta. */
+  itemLabel?: string
 }
 
 export function generateDeliveryActCreatedEmail(data: DeliveryActCreatedEmailData): {
@@ -17,7 +19,17 @@ export function generateDeliveryActCreatedEmail(data: DeliveryActCreatedEmailDat
   html: string
   text: string
 } {
-  const { act, acceptanceUrl, receiverName, delivererName, equipmentCode, equipmentDescription, expirationDate , systemName = DEFAULT_SYSTEM_NAME } = data
+  const {
+    act,
+    acceptanceUrl,
+    receiverName,
+    delivererName,
+    equipmentCode,
+    equipmentDescription,
+    expirationDate,
+    systemName = DEFAULT_SYSTEM_NAME,
+    itemLabel = 'Equipo',
+  } = data
 
   const expirationDateStr = new Date(expirationDate).toLocaleDateString('es-ES', {
     day: 'numeric',
@@ -44,10 +56,10 @@ export function generateDeliveryActCreatedEmail(data: DeliveryActCreatedEmailDat
   <div style="background-color: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
     <h2 style="color: #1f2937; font-size: 18px; margin-top: 0;">Hola ${receiverName},</h2>
     
-    <p>Se ha generado un acta de entrega para el siguiente equipo:</p>
+    <p>Se ha generado un acta de entrega para lo siguiente:</p>
     
     <div style="background-color: #f3f4f6; border-left: 4px solid #2563eb; padding: 15px; margin: 20px 0;">
-      <p style="margin: 0 0 8px 0;"><strong>Equipo:</strong> ${equipmentCode}</p>
+      <p style="margin: 0 0 8px 0;"><strong>${itemLabel}:</strong> ${equipmentCode}</p>
       <p style="margin: 0 0 8px 0;"><strong>Descripción:</strong> ${equipmentDescription}</p>
       <p style="margin: 0;"><strong>Entregado por:</strong> ${delivererName}</p>
     </div>
@@ -69,7 +81,7 @@ export function generateDeliveryActCreatedEmail(data: DeliveryActCreatedEmailDat
 
   <div style="background-color: #fef3c7; border: 1px solid #fbbf24; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
     <p style="margin: 0; font-size: 14px;">
-      <strong>📋 Importante:</strong> Al aceptar el acta, confirmas que has recibido el equipo en las condiciones descritas y te comprometes a cuidarlo según las políticas de la empresa.
+      <strong>📋 Importante:</strong> Al aceptar el acta, confirmas que has recibido lo descrito y te comprometes a cuidarlo/usarlo según las políticas de la empresa.
     </p>
   </div>
 
@@ -90,9 +102,9 @@ ${act.folio}
 
 Hola ${receiverName},
 
-Se ha generado un acta de entrega para el siguiente equipo:
+Se ha generado un acta de entrega para lo siguiente:
 
-Equipo: ${equipmentCode}
+${itemLabel}: ${equipmentCode}
 Descripción: ${equipmentDescription}
 Entregado por: ${delivererName}
 
@@ -104,7 +116,7 @@ ${acceptanceUrl}
 
 Si no aceptas el acta antes de la fecha de expiración, la asignación será cancelada automáticamente.
 
-📋 IMPORTANTE: Al aceptar el acta, confirmas que has recibido el equipo en las condiciones descritas y te comprometes a cuidarlo según las políticas de la empresa.
+📋 IMPORTANTE: Al aceptar el acta, confirmas que has recibido lo descrito y te comprometes a cuidarlo/usarlo según las políticas de la empresa.
 
 Si tienes alguna pregunta, contacta a ${delivererName} o al departamento de TI.
 

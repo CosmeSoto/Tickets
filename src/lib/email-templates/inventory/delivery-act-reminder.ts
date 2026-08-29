@@ -10,6 +10,8 @@ interface DeliveryActReminderEmailData {
   equipmentDescription: string
   expirationDate: Date
   daysRemaining: number
+  /** Rótulo del ítem — "Equipo" o "Licencia" según el tipo de acta. */
+  itemLabel?: string
 }
 
 export function generateDeliveryActReminderEmail(data: DeliveryActReminderEmailData): {
@@ -17,7 +19,17 @@ export function generateDeliveryActReminderEmail(data: DeliveryActReminderEmailD
   html: string
   text: string
 } {
-  const { act, acceptanceUrl, receiverName, equipmentCode, equipmentDescription, expirationDate, daysRemaining , systemName = DEFAULT_SYSTEM_NAME } = data
+  const {
+    act,
+    acceptanceUrl,
+    receiverName,
+    equipmentCode,
+    equipmentDescription,
+    expirationDate,
+    daysRemaining,
+    systemName = DEFAULT_SYSTEM_NAME,
+    itemLabel = 'Equipo',
+  } = data
 
   const expirationDateStr = new Date(expirationDate).toLocaleDateString('es-ES', {
     day: 'numeric',
@@ -53,7 +65,7 @@ export function generateDeliveryActReminderEmail(data: DeliveryActReminderEmailD
     
     <div style="background-color: #f3f4f6; border-left: 4px solid ${urgencyColor}; padding: 15px; margin: 20px 0;">
       <p style="margin: 0 0 8px 0;"><strong>Acta:</strong> ${act.folio}</p>
-      <p style="margin: 0 0 8px 0;"><strong>Equipo:</strong> ${equipmentCode}</p>
+      <p style="margin: 0 0 8px 0;"><strong>${itemLabel}:</strong> ${equipmentCode}</p>
       <p style="margin: 0;"><strong>Descripción:</strong> ${equipmentDescription}</p>
     </div>
 
@@ -67,7 +79,7 @@ export function generateDeliveryActReminderEmail(data: DeliveryActReminderEmailD
     </div>
 
     <p style="color: #dc2626; font-weight: bold;">
-      Si no aceptas el acta antes de la fecha de expiración, la asignación será cancelada automáticamente y deberás devolver el equipo.
+      Si no aceptas el acta antes de la fecha de expiración, la asignación será cancelada automáticamente.
     </p>
   </div>
 
@@ -90,7 +102,7 @@ Hola ${receiverName},
 Tienes un acta de entrega pendiente que EXPIRA EL ${expirationDateStr}.
 
 Acta: ${act.folio}
-Equipo: ${equipmentCode}
+${itemLabel}: ${equipmentCode}
 Descripción: ${equipmentDescription}
 
 ⏰ TIEMPO RESTANTE: ${daysRemaining === 1 ? '1 DÍA' : `${daysRemaining} DÍAS`}
@@ -98,7 +110,7 @@ Descripción: ${equipmentDescription}
 Para aceptar el acta, visita:
 ${acceptanceUrl}
 
-⚠️ IMPORTANTE: Si no aceptas el acta antes de la fecha de expiración, la asignación será cancelada automáticamente y deberás devolver el equipo.
+⚠️ IMPORTANTE: Si no aceptas el acta antes de la fecha de expiración, la asignación será cancelada automáticamente.
 
 ---
 ${systemName}

@@ -93,8 +93,39 @@ async function notifyDeliveryActFamilyAdmins(
 
 async function getActFamilyId(act: {
   assignment?: { equipment?: { type?: { familyId?: string | null } | null } | null } | null
+  licenseAssignment?: {
+    license?: { licenseType?: { familyId?: string | null } | null } | null
+  } | null
 }): Promise<string | null> {
-  return act.assignment?.equipment?.type?.familyId ?? null
+  return (
+    act.assignment?.equipment?.type?.familyId ??
+    act.licenseAssignment?.license?.licenseType?.familyId ??
+    null
+  )
+}
+
+/**
+ * Código/descripción/rótulo legibles del ítem del acta — el snapshot en `equipmentSnapshot`
+ * es polimórfico: para equipos viene de buildEquipmentSnapshot ({code, brand, model, ...}),
+ * para licencias de buildLicenseSnapshot ({name, typeName, vendor, ...}, sin code/brand/model).
+ * Antes esto siempre asumía la forma de equipo y salía "undefined" en las actas de licencia.
+ */
+function getActItemDisplay(
+  act: { licenseAssignment?: unknown },
+  equipmentSnapshot: any
+): { itemCode: string; itemDescription: string; itemLabel: string } {
+  if (act.licenseAssignment) {
+    return {
+      itemCode: equipmentSnapshot?.name ?? 'Licencia',
+      itemDescription: equipmentSnapshot?.typeName ?? equipmentSnapshot?.vendor ?? '',
+      itemLabel: 'Licencia',
+    }
+  }
+  return {
+    itemCode: equipmentSnapshot?.code ?? '',
+    itemDescription: `${equipmentSnapshot?.brand ?? ''} ${equipmentSnapshot?.model ?? ''}`.trim(),
+    itemLabel: 'Equipo',
+  }
 }
 
 // Helper para parsear JSON de forma segura
@@ -125,6 +156,9 @@ export class InventoryNotificationService {
               deliverer: true,
             },
           },
+          licenseAssignment: {
+            include: { license: { include: { licenseType: true } } },
+          },
         },
       })
 
@@ -140,8 +174,11 @@ export class InventoryNotificationService {
       const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
       const acceptanceUrl = `${baseUrl}/acts/${act.id}/accept?token=${act.acceptanceToken}`
 
-      const equipmentCode = equipmentSnapshot.code
-      const equipmentDescription = `${equipmentSnapshot.brand} ${equipmentSnapshot.model}`
+      const {
+        itemCode: equipmentCode,
+        itemDescription: equipmentDescription,
+        itemLabel,
+      } = getActItemDisplay(act, equipmentSnapshot)
 
       // Generar email
       const { systemName } = await getSystemBranding()
@@ -155,6 +192,7 @@ export class InventoryNotificationService {
         equipmentCode,
         equipmentDescription,
         expirationDate: act.expirationDate,
+        itemLabel,
       })
 
       // Agregar a cola de emails
@@ -225,6 +263,9 @@ export class InventoryNotificationService {
               receiver: true,
             },
           },
+          licenseAssignment: {
+            include: { license: { include: { licenseType: true } } },
+          },
         },
       })
 
@@ -239,8 +280,11 @@ export class InventoryNotificationService {
       const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
       const acceptanceUrl = `${baseUrl}/acts/${act.id}/accept?token=${act.acceptanceToken}`
 
-      const equipmentCode = equipmentSnapshot.code
-      const equipmentDescription = `${equipmentSnapshot.brand} ${equipmentSnapshot.model}`
+      const {
+        itemCode: equipmentCode,
+        itemDescription: equipmentDescription,
+        itemLabel,
+      } = getActItemDisplay(act, equipmentSnapshot)
 
       // Generar email
       const { systemName } = await getSystemBranding()
@@ -259,6 +303,7 @@ export class InventoryNotificationService {
         equipmentDescription,
         expirationDate: act.expirationDate,
         daysRemaining,
+        itemLabel,
       })
 
       // Agregar a cola de emails
@@ -317,6 +362,9 @@ export class InventoryNotificationService {
               deliverer: true,
             },
           },
+          licenseAssignment: {
+            include: { license: { include: { licenseType: true } } },
+          },
         },
       })
 
@@ -327,8 +375,11 @@ export class InventoryNotificationService {
       const delivererInfo = parseJsonField<any>(act.delivererInfo)
 
       const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
-      const equipmentCode = equipmentSnapshot.code
-      const equipmentDescription = `${equipmentSnapshot.brand} ${equipmentSnapshot.model}`
+      const {
+        itemCode: equipmentCode,
+        itemDescription: equipmentDescription,
+        itemLabel,
+      } = getActItemDisplay(act, equipmentSnapshot)
       const actLink = `/inventory/acts/${act.id}`
       const acceptedAtStr = act.acceptedAt
         ? new Date(act.acceptedAt).toLocaleString('es-ES')
@@ -339,7 +390,6 @@ export class InventoryNotificationService {
 
       const { systemName } = await getSystemBranding()
 
-
       const receiverEmailData = generateDeliveryActAcceptedEmail({
         systemName,
         act: { ...act, equipmentSnapshot, receiverInfo, delivererInfo } as DeliveryAct,
@@ -349,6 +399,7 @@ export class InventoryNotificationService {
         equipmentDescription,
         acceptedAt: act.acceptedAt!,
         pdfUrl,
+        itemLabel,
       })
 
       const delivererEmailData = generateDeliveryActAcceptedEmail({
@@ -360,6 +411,7 @@ export class InventoryNotificationService {
         equipmentDescription,
         acceptedAt: act.acceptedAt!,
         pdfUrl,
+        itemLabel,
       })
 
       await Promise.all([
@@ -469,6 +521,9 @@ export class InventoryNotificationService {
               deliverer: true,
             },
           },
+          licenseAssignment: {
+            include: { license: { include: { licenseType: true } } },
+          },
         },
       })
 
@@ -479,8 +534,11 @@ export class InventoryNotificationService {
       const delivererInfo = parseJsonField<any>(act.delivererInfo)
 
       const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
-      const equipmentCode = equipmentSnapshot.code
-      const equipmentDescription = `${equipmentSnapshot.brand} ${equipmentSnapshot.model}`
+      const {
+        itemCode: equipmentCode,
+        itemDescription: equipmentDescription,
+        itemLabel,
+      } = getActItemDisplay(act, equipmentSnapshot)
       const actLink = `/inventory/acts/${act.id}`
       const rejectedAtStr = act.rejectedAt
         ? new Date(act.rejectedAt).toLocaleString('es-ES')
@@ -498,6 +556,7 @@ export class InventoryNotificationService {
         equipmentDescription,
         rejectionReason: motivo,
         rejectedAt: act.rejectedAt!,
+        itemLabel,
       })
 
       await legacyQueueCreate({
@@ -522,7 +581,7 @@ export class InventoryNotificationService {
           userId: delivererInfo.id,
           type: 'WARNING',
           title: `⚠️ Acta rechazada — ${equipmentCode}`,
-          message: `${receiverInfo.name} rechazó el acta ${act.folio} para el equipo ${equipmentCode} (${equipmentDescription}). Motivo: "${motivo}". El equipo volvió a estar disponible. Fecha: ${rejectedAtStr}.`,
+          message: `${receiverInfo.name} rechazó el acta ${act.folio} para ${equipmentCode} (${equipmentDescription}). Motivo: "${motivo}". Vuelve a estar disponible. Fecha: ${rejectedAtStr}.`,
           metadata: {
             type: 'delivery_act_rejected',
             actId: act.id,
@@ -535,7 +594,7 @@ export class InventoryNotificationService {
           userId: receiverInfo.id,
           type: 'INFO',
           title: `Rechazo registrado — ${equipmentCode}`,
-          message: `Rechazaste el acta ${act.folio} para el equipo ${equipmentCode}. El entregador ha sido notificado. El equipo volvió a bodega.`,
+          message: `Rechazaste el acta ${act.folio} para ${equipmentCode}. El entregador ha sido notificado. Vuelve a estar disponible.`,
           metadata: {
             type: 'delivery_act_rejected',
             actId: act.id,
@@ -582,6 +641,9 @@ export class InventoryNotificationService {
               deliverer: true,
             },
           },
+          licenseAssignment: {
+            include: { license: { include: { licenseType: true } } },
+          },
         },
       })
 
@@ -594,8 +656,11 @@ export class InventoryNotificationService {
       const receiverInfo = parseJsonField<any>(act.receiverInfo)
       const delivererInfo = parseJsonField<any>(act.delivererInfo)
 
-      const equipmentCode = equipmentSnapshot.code
-      const equipmentDescription = `${equipmentSnapshot.brand} ${equipmentSnapshot.model}`
+      const {
+        itemCode: equipmentCode,
+        itemDescription: equipmentDescription,
+        itemLabel,
+      } = getActItemDisplay(act, equipmentSnapshot)
 
       // Email para ambas partes
       const { systemName } = await getSystemBranding()
@@ -607,6 +672,7 @@ export class InventoryNotificationService {
         equipmentCode,
         equipmentDescription,
         expirationDate: act.expirationDate,
+        itemLabel,
       })
 
       // Email al receptor
@@ -717,7 +783,6 @@ export class InventoryNotificationService {
 
       const { systemName } = await getSystemBranding()
 
-
       const emailData = generateDeliveryActCreatedEmail({
         systemName,
         act: {
@@ -739,9 +804,7 @@ export class InventoryNotificationService {
         data: {
           toEmail: receiverInfo.email,
           subject: emailData.subject.replace('Entrega', 'Asignación de suscripción'),
-          body: emailData.html
-            .replace(/equipo/gi, 'suscripción')
-            .replace(/Equipo/g, 'Suscripción'),
+          body: emailData.html.replace(/equipo/gi, 'suscripción').replace(/Equipo/g, 'Suscripción'),
           status: 'pending',
           templateName: 'subscription_delivery_act_created',
           templateData: JSON.stringify({

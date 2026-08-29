@@ -28,6 +28,19 @@ export interface AssignableUser {
   department: { id: string; name: string } | null
 }
 
+/**
+ * Caché en memoria por familyId+query (TTL corto) — este selector se monta en varios
+ * diálogos (asignar equipo, asignar licencia, formularios de alta) y antes repetía el
+ * fetch cada vez que se abría uno, incluso reabriendo el mismo diálogo en la misma
+ * sesión. Mismo patrón que `modulesMemoryCache` en `use-user-modules.ts`.
+ */
+const ASSIGNABLE_USERS_TTL_MS = 30_000
+const assignableUsersCache = new Map<string, { data: AssignableUser[]; at: number }>()
+
+function cacheKey(familyId: string | undefined, query: string): string {
+  return `${familyId ?? ''}::${query.trim().toLowerCase()}`
+}
+
 interface AssignableUserSelectProps {
   /** familyId del equipo — filtra los usuarios por familia */
   familyId?: string
@@ -63,9 +76,15 @@ export function AssignableUserSelect({
   const [showDropdown, setShowDropdown] = useState(false)
   const [selectedUser, setSelectedUser] = useState<AssignableUser | null>(null)
 
-  // Cargar usuarios desde la API
+  // Cargar usuarios desde la API (con caché corta por familyId+query)
   const loadUsers = useCallback(
     async (query: string) => {
+      const key = cacheKey(familyId, query)
+      const cached = assignableUsersCache.get(key)
+      if (cached && Date.now() - cached.at < ASSIGNABLE_USERS_TTL_MS) {
+        setUsers(cached.data)
+        return
+      }
       setLoading(true)
       try {
         const params = new URLSearchParams()
@@ -74,7 +93,9 @@ export function AssignableUserSelect({
         const res = await fetch(`/api/inventory/assignable-users?${params}`)
         if (res.ok) {
           const data = await res.json()
-          setUsers(data.users ?? [])
+          const list: AssignableUser[] = data.users ?? []
+          setUsers(list)
+          assignableUsersCache.set(key, { data: list, at: Date.now() })
         }
       } finally {
         setLoading(false)
@@ -83,13 +104,14 @@ export function AssignableUserSelect({
     [familyId]
   )
 
-  // Carga inicial
+  // Carga al montar / cambiar de familia (inmediata); búsqueda con debounce. Antes eran
+  // dos efectos separados que disparaban el mismo fetch vacío al montar (uno inmediato,
+  // otro 300ms después) — ahora es uno solo.
   useEffect(() => {
-    loadUsers('')
-  }, [loadUsers])
-
-  // Debounce búsqueda
-  useEffect(() => {
+    if (search.trim() === '') {
+      loadUsers('')
+      return
+    }
     const t = setTimeout(() => loadUsers(search), 300)
     return () => clearTimeout(t)
   }, [search, loadUsers])
