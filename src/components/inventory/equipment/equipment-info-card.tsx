@@ -67,7 +67,7 @@ export function EquipmentInfoCard({ equipment }: EquipmentInfoCardProps) {
       </CardHeader>
       <CardContent className='space-y-5'>
         {/* ── 1. Identificación ── */}
-        <div className='grid grid-cols-2 gap-x-6 gap-y-3'>
+        <div className='grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2'>
           <div>
             <p className='text-xs text-muted-foreground'>Estado</p>
             <div className='mt-0.5'>
@@ -101,7 +101,7 @@ export function EquipmentInfoCard({ equipment }: EquipmentInfoCardProps) {
         {equipment.ownershipType === 'RENTAL' && (
           <>
             <Separator />
-            <div className='grid grid-cols-2 gap-x-6 gap-y-3'>
+            <div className='grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2'>
               {equipment.rentalContractNumber && (
                 <InfoRow label='N° contrato' value={equipment.rentalContractNumber} />
               )}

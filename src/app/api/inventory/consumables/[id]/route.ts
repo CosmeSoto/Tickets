@@ -37,7 +37,21 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         unitOfMeasure: true,
         warehouse: { select: { id: true, name: true } },
         assignedEquipment: {
-          select: { id: true, code: true, brand: true, model: true, serialNumber: true },
+          select: {
+            id: true,
+            code: true,
+            brand: true,
+            model: true,
+            serialNumber: true,
+            // Usuario que hoy tiene ese equipo — el suministro no se asigna a una
+            // persona directamente, pero si el equipo al que está ligado sí tiene
+            // dueño, es información derivada útil ("en uso por" en el detalle).
+            assignments: {
+              where: { isActive: true },
+              take: 1,
+              select: { receiver: { select: { id: true, name: true, email: true } } },
+            },
+          },
         },
         supplier: { select: { id: true, name: true, taxId: true } },
         movements: {

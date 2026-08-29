@@ -23,6 +23,7 @@ import {
   ArrowDownUp,
   FileText,
   CalendarDays,
+  User,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -81,6 +82,8 @@ interface ConsumableData {
     code: string
     brand: string
     model?: string | null
+    /** Usuario que hoy tiene ese equipo asignado, si aplica — dato derivado de solo lectura. */
+    assignments?: Array<{ receiver: { id: string; name?: string | null; email: string } }>
   } | null
   movements?: StockMovement[]
   consumptionSummary?: {
@@ -449,7 +452,7 @@ export function ConsumableDetail({ consumableId, userRole, isSuperAdmin = false 
               </CardTitle>
             </CardHeader>
             <CardContent className='space-y-5'>
-              <div className='grid grid-cols-2 gap-x-6 gap-y-3'>
+              <div className='grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2'>
                 <InfoRow label='Tipo' value={consumable.consumableType?.name || '—'} />
                 <InfoRow label='Área / Familia' value={currentFamilyName || '—'} />
                 <InfoRow label='Unidad de medida' value={consumable.unitOfMeasure?.name || '—'} />
@@ -480,6 +483,21 @@ export function ConsumableDetail({ consumableId, userRole, isSuperAdmin = false 
                     value={`${consumable.assignedEquipment.brand || 'Equipo'} (${consumable.assignedEquipment.code})`}
                   />
                 )}
+                {consumable.assignedEquipment?.assignments?.[0]?.receiver && (
+                  <InfoRow
+                    label='En uso por'
+                    value={
+                      <span className='inline-flex items-center gap-1'>
+                        <User className='h-3.5 w-3.5 text-muted-foreground' />
+                        {consumable.assignedEquipment.assignments[0].receiver.name ??
+                          consumable.assignedEquipment.assignments[0].receiver.email}
+                        <span className='text-xs text-muted-foreground font-normal'>
+                          (vía {consumable.assignedEquipment.code})
+                        </span>
+                      </span>
+                    }
+                  />
+                )}
               </div>
 
               {consumable.customValues && consumable.customValues.length > 0 && (
@@ -490,7 +508,7 @@ export function ConsumableDetail({ consumableId, userRole, isSuperAdmin = false 
                       <Tag className='h-3.5 w-3.5' />
                       Atributos del tipo
                     </p>
-                    <div className='grid grid-cols-2 gap-x-6 gap-y-3'>
+                    <div className='grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2'>
                       {consumable.customValues.map(v => (
                         <InfoRow
                           key={v.fieldName}

@@ -379,7 +379,7 @@ export function LicenseDetail({ licenseId, userRole, isSuperAdmin = false }: Pro
               </CardTitle>
             </CardHeader>
             <CardContent className='space-y-5'>
-              <div className='grid grid-cols-2 gap-x-6 gap-y-3'>
+              <div className='grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2'>
                 <InfoRow label='Tipo de licencia' value={license.licenseType?.name} />
                 <InfoRow label='Área / Familia' value={currentFamilyName} />
                 <InfoRow
@@ -422,7 +422,7 @@ export function LicenseDetail({ licenseId, userRole, isSuperAdmin = false }: Pro
                   <Calendar className='h-3.5 w-3.5' />
                   Fechas y costos
                 </p>
-                <div className='grid grid-cols-2 gap-x-6 gap-y-3'>
+                <div className='grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2'>
                   <InfoRow label='Fecha de compra' value={fmtDate(license.purchaseDate)} />
                   <InfoRow label='Vencimiento' value={fmtDate(license.expirationDate)} />
                   <InfoRow label='Renovación' value={fmtDate(license.renewalDate)} />
@@ -455,7 +455,7 @@ export function LicenseDetail({ licenseId, userRole, isSuperAdmin = false }: Pro
                       <Tag className='h-3.5 w-3.5' />
                       Atributos del tipo
                     </p>
-                    <div className='grid grid-cols-2 gap-x-6 gap-y-3'>
+                    <div className='grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2'>
                       {license.customValues.map(v => (
                         <InfoRow
                           key={v.fieldName}
