@@ -3,7 +3,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './card'
 import { Button } from './button'
 import { Alert, AlertDescription } from './alert'
-import { Plus, Target, PlayCircle, Info } from 'lucide-react'
+import { Plus, Target, PlayCircle, Info, CheckCircle2 } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './tooltip'
 import { useResolutionPlan } from '@/hooks/use-resolution-plan'
 import { PlanSummary } from './resolution-plan/plan-summary'
@@ -151,6 +151,20 @@ export function TicketResolutionTracker({
         </Card>
       ) : (
         <>
+          {/* El plan ya no se autocompleta solo al terminar la última tarea (a propósito
+              — se puede seguir agregando tareas sobre la marcha); esto solo avisa que
+              está listo para cerrarse cuando el técnico lo considere. */}
+          {effectiveCanEdit && openPlan.status === 'active' && hook.calculateProgress() === 100 && (
+            <Alert className='border-emerald-200 bg-emerald-50 dark:bg-emerald-950/20 dark:border-emerald-800'>
+              <CheckCircle2 className='h-4 w-4 text-emerald-600 dark:text-emerald-400' />
+              <AlertDescription className='text-emerald-800 dark:text-emerald-300'>
+                Todas las tareas están completadas. Cierra el plan con{' '}
+                <strong>Marcar como Completado</strong> cuando estés listo, o sigue agregando tareas
+                si aún falta algo.
+              </AlertDescription>
+            </Alert>
+          )}
+
           <PlanSummary
             plan={openPlan}
             canEdit={effectiveCanEdit}

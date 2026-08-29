@@ -4,7 +4,6 @@ import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { auditTaskChange } from '@/lib/audit'
 import { calculateDuration, validateTimeRange, combineDateAndTime } from '@/lib/time-utils'
-import { NotificationService } from '@/lib/services/notification-service'
 import { ResolutionNotificationService } from '@/lib/services/resolution-notification-service'
 import {
   assertTicketAccess,
@@ -239,49 +238,19 @@ export async function PATCH(
         t.id === taskId ? body.status === 'completed' : t.status === 'completed'
       ).length
 
-      const totalTasks = allTasks.length
       const planUpdateData: any = {
         completedTasks: completedCount,
         updatedAt: new Date(),
       }
 
-      // Si todas las tareas están completadas y el plan está activo, marcarlo como completado
-      if (completedCount === totalTasks && totalTasks > 0 && task.plan.status === 'active') {
-        planUpdateData.status = 'completed'
-        planUpdateData.completedDate = new Date()
-
-        // Registrar en el historial del ticket
-        await prisma.ticket_history.create({
-          data: {
-            id: crypto.randomUUID(),
-            ticketId: task.plan.ticketId,
-            userId: session.user.id,
-            action: 'resolution_plan_completed',
-            field: 'resolution_plan',
-            oldValue: 'active',
-            newValue: 'completed',
-            comment: `Plan de resolución completado: "${task.plan.title}". Todas las tareas (${totalTasks}) han sido finalizadas exitosamente.`,
-            createdAt: new Date(),
-          },
-        })
-
-        // Crear notificación para el cliente
-        await NotificationService.push({
-          userId: task.plan.ticket.clientId,
-          type: 'SUCCESS',
-          title: 'Plan de resolución completado',
-          message: `El plan de resolución "${task.plan.title}" ha sido completado exitosamente. Todas las tareas programadas han sido finalizadas.`,
-          ticketId: task.plan.ticketId,
-          metadata: {
-            planId: task.plan.id,
-            planTitle: task.plan.title,
-            totalTasks,
-            completedTasks: completedCount,
-            link: `/client/tickets/${task.plan.ticketId}`,
-          },
-        }).catch(() => {})
-      }
-
+      // A propósito NO se autocompleta el plan aquí aunque completedCount === totalTasks:
+      // el técnico puede seguir agregando tareas sobre la marcha (no siempre se conocen
+      // todas de antelación) y cerrar el plan solo cuando lo considere terminado, con
+      // "Marcar como Completado" (resolution-plan/route.ts, PATCH status:'completed').
+      // Antes esto sí autocompletaba el plan, lo que lo cerraba de golpe apenas se
+      // terminaba la última tarea del momento — sin dar chance a agregar más — y además
+      // dejaba al cliente (esta ruta solo actualiza la tarea) desincronizado del estado
+      // real del plan hasta el siguiente refetch.
       await prisma.resolution_plans.update({
         where: { id: task.planId },
         data: planUpdateData,
