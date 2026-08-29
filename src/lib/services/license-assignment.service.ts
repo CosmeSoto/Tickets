@@ -68,8 +68,17 @@ export class LicenseAssignmentService {
     if (data.scope === 'INDIVIDUAL' && !userId && !equipmentId) {
       throw new Error('Asigna un usuario o un equipo')
     }
+    // Usuario + equipo a la vez está permitido solo si el equipo es el que ese mismo
+    // usuario ya tiene asignado (licencia nominal instalada en su equipo). Si el equipo
+    // es de otra persona, no tiene sentido — se rechaza.
     if (data.scope === 'INDIVIDUAL' && userId && equipmentId) {
-      throw new Error('Una licencia individual no puede ir a usuario y equipo a la vez')
+      const equipmentOwnedByUser = await prisma.equipment_assignments.findFirst({
+        where: { equipmentId, receiverId: userId, isActive: true },
+        select: { id: true },
+      })
+      if (!equipmentOwnedByUser) {
+        throw new Error('Ese equipo no está asignado al usuario elegido')
+      }
     }
     if (data.scope === 'DEPARTMENT' && !departmentId) {
       throw new Error('Selecciona un departamento')

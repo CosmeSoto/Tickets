@@ -132,13 +132,11 @@ export function LicenseAssignDialog({
   const handleSubmit = async () => {
     setError(null)
     if (scope === 'Individual' && !userId && !equipmentId) {
-      setError('Asigna un usuario o un equipo (no ambos).')
+      setError('Asigna un usuario o un equipo.')
       return
     }
-    if (scope === 'Individual' && userId && equipmentId) {
-      setError('Una licencia individual no puede ir a usuario y equipo a la vez.')
-      return
-    }
+    // Si se eligen ambos, el servicio valida que el equipo sea del usuario elegido
+    // y devuelve un error claro si no lo es — no se duplica esa validación aquí.
     if (scope === 'Departamento' && !departmentId) {
       setError('Selecciona un departamento.')
       return
@@ -255,15 +253,12 @@ export function LicenseAssignDialog({
               <AssignableUserSelect
                 familyId={familyId ?? undefined}
                 value={userId}
-                onChange={id => {
-                  setUserId(id)
-                  if (id) setEquipmentId('')
-                }}
+                onChange={id => setUserId(id)}
                 label='Usuario'
                 initialUser={currentUser ?? null}
               />
               <div className='space-y-1.5'>
-                <Label>O equipo (alternativa)</Label>
+                <Label>Equipo (opcional)</Label>
                 {loadingEquipment ? (
                   <div className='flex items-center gap-2 text-sm text-muted-foreground py-2'>
                     <Loader2 className='h-4 w-4 animate-spin' />
@@ -273,16 +268,14 @@ export function LicenseAssignDialog({
                   <SearchableSelect
                     options={equipmentOptions}
                     value={equipmentId}
-                    onChange={v => {
-                      setEquipmentId(v)
-                      if (v) setUserId('')
-                    }}
+                    onChange={setEquipmentId}
                     placeholder='Buscar equipo del área…'
                     emptyLabel='Sin equipo'
                   />
                 )}
                 <p className='text-xs text-muted-foreground'>
-                  Elige usuario o equipo, no ambos. Solo equipos del área de la licencia.
+                  Puedes asignar solo a un usuario, solo a un equipo, o a un usuario y el equipo que
+                  ese usuario ya tiene (p. ej. licencia nominal instalada en su equipo).
                 </p>
               </div>
             </>

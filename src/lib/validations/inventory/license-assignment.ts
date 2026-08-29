@@ -13,10 +13,9 @@ export const assignLicenseScopeSchema = z
     message: 'Asigna un usuario o un equipo',
     path: ['userId'],
   })
-  .refine(d => !(d.scope === 'INDIVIDUAL' && d.userId && d.equipmentId), {
-    message: 'Una licencia individual no puede ir a usuario y equipo a la vez',
-    path: ['userId'],
-  })
+  // Usuario + equipo juntos están permitidos (p. ej. licencia nominal instalada en el
+  // equipo que ese usuario ya tiene) — la pertenencia real se valida en el servicio,
+  // que sí conoce la asignación activa del equipo (equipment_assignments).
   .refine(d => d.scope !== 'DEPARTMENT' || !!d.departmentId, {
     message: 'Selecciona un departamento',
     path: ['departmentId'],
