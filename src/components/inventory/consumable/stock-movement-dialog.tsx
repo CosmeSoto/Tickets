@@ -15,6 +15,9 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { DateInput } from '@/components/ui/date-input'
 import { SimpleSelect } from '@/components/ui/simple-select'
+import { SearchableSelect, type SearchableSelectOption } from '@/components/ui/searchable-select'
+import { AssignableUserSelect } from '@/components/inventory/shared/AssignableUserSelect'
+import { useFetch } from '@/hooks/common/use-fetch'
 import { Loader2 } from 'lucide-react'
 
 type MovementKind = 'ENTRY' | 'EXIT' | 'ADJUSTMENT'
@@ -27,6 +30,11 @@ type Props = {
   currentStock: number
   unit: string
   defaultType?: MovementKind
+  /** familyId del suministro — filtra usuarios/equipos del destinatario. */
+  familyId?: string | null
+  /** Equipo ya vinculado al suministro (assignedEquipmentId), si existe — se preselecciona
+   * como destinatario por ser el caso más común (p. ej. tóner ya ligado a una impresora). */
+  defaultEquipment?: { id: string; code: string; brand?: string | null } | null
   onSaved: () => void
 }
 
@@ -68,6 +76,8 @@ export function StockMovementDialog({
   currentStock,
   unit,
   defaultType = 'EXIT',
+  familyId,
+  defaultEquipment,
   onSaved,
 }: Props) {
   const [type, setType] = useState<MovementKind>(defaultType)
@@ -76,6 +86,9 @@ export function StockMovementDialog({
   const [occurredAt, setOccurredAt] = useState(todayYmd())
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showRecipient, setShowRecipient] = useState(false)
+  const [recipientUserId, setRecipientUserId] = useState('')
+  const [recipientEquipmentId, setRecipientEquipmentId] = useState('')
 
   useEffect(() => {
     if (!open) return
@@ -84,7 +97,41 @@ export function StockMovementDialog({
     setReason(defaultType === 'EXIT' ? 'Consumo diario personal' : '')
     setOccurredAt(todayYmd())
     setError(null)
-  }, [open, defaultType])
+    setShowRecipient(false)
+    setRecipientUserId('')
+    // Preseleccionar el equipo ya vinculado al suministro — caso más común.
+    setRecipientEquipmentId(defaultEquipment?.id ?? '')
+  }, [open, defaultType, defaultEquipment])
+
+  const { data: equipmentRows, loading: loadingEquipment } = useFetch<{
+    id: string
+    code?: string
+    brand?: string
+  }>(
+    familyId
+      ? `/api/inventory/assets?familyId=${familyId}&subtype=EQUIPMENT&pageSize=100`
+      : '/api/inventory/assets?subtype=EQUIPMENT&pageSize=100',
+    {
+      enabled: open && showRecipient && !!familyId,
+      transform: d => d.items ?? d.assets ?? [],
+      showErrorToast: false,
+    }
+  )
+  const equipmentOptions: SearchableSelectOption[] = (() => {
+    const rows = equipmentRows.map(e => ({
+      id: e.id,
+      name: [e.code, e.brand].filter(Boolean).join(' · ') || e.id,
+    }))
+    // El equipo por defecto puede no venir en la primera página del listado — se agrega
+    // aparte para que siempre aparezca seleccionable aunque no calce en pageSize=100.
+    if (defaultEquipment && !rows.some(r => r.id === defaultEquipment.id)) {
+      rows.unshift({
+        id: defaultEquipment.id,
+        name: [defaultEquipment.code, defaultEquipment.brand].filter(Boolean).join(' · '),
+      })
+    }
+    return rows
+  })()
 
   const qty = Number(quantity)
   const previewStock =
@@ -121,6 +168,8 @@ export function StockMovementDialog({
           quantity: qty,
           reason: reason.trim() || undefined,
           occurredAt,
+          assignedToUserId: showRecipient ? recipientUserId || undefined : undefined,
+          assignedToEquipmentId: showRecipient ? recipientEquipmentId || undefined : undefined,
         }),
       })
       const data = await res.json().catch(() => ({}))
@@ -223,6 +272,64 @@ export function StockMovementDialog({
               maxLength={500}
             />
           </div>
+
+          {type === 'EXIT' && (
+            <div className='space-y-2'>
+              {!showRecipient ? (
+                <button
+                  type='button'
+                  onClick={() => setShowRecipient(true)}
+                  className='text-xs text-primary hover:underline'
+                >
+                  + Registrar para quién fue (opcional)
+                </button>
+              ) : (
+                <div className='space-y-3 rounded-md border border-dashed p-3'>
+                  <div className='flex items-center justify-between'>
+                    <Label className='text-xs text-muted-foreground'>Destinatario (opcional)</Label>
+                    <button
+                      type='button'
+                      onClick={() => {
+                        setShowRecipient(false)
+                        setRecipientUserId('')
+                        setRecipientEquipmentId('')
+                      }}
+                      className='text-xs text-muted-foreground hover:text-foreground'
+                    >
+                      Quitar
+                    </button>
+                  </div>
+                  <AssignableUserSelect
+                    familyId={familyId ?? undefined}
+                    value={recipientUserId}
+                    onChange={setRecipientUserId}
+                    label='Usuario'
+                  />
+                  <div className='space-y-1.5'>
+                    <Label>Equipo</Label>
+                    {loadingEquipment ? (
+                      <div className='flex items-center gap-2 text-sm text-muted-foreground py-2'>
+                        <Loader2 className='h-4 w-4 animate-spin' />
+                        Cargando equipos del área…
+                      </div>
+                    ) : (
+                      <SearchableSelect
+                        options={equipmentOptions}
+                        value={recipientEquipmentId}
+                        onChange={setRecipientEquipmentId}
+                        placeholder='Buscar equipo del área…'
+                        emptyLabel='Sin equipo'
+                      />
+                    )}
+                  </div>
+                  <p className='text-xs text-muted-foreground'>
+                    Puedes indicar usuario, equipo, o ambos — es solo para el historial, no cambia a
+                    quién está vinculado el suministro.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
           {error && <p className='text-sm text-destructive'>{error}</p>}
         </div>

@@ -583,6 +583,19 @@ export function ConsumableDetail({ consumableId, userRole, isSuperAdmin = false 
                           {m.reason && (
                             <p className='text-xs text-muted-foreground truncate'>{m.reason}</p>
                           )}
+                          {(m.assignedToUser || m.assignedToEquipment) && (
+                            <p className='text-xs text-muted-foreground truncate'>
+                              Para:{' '}
+                              {[
+                                m.assignedToUser?.name ?? m.assignedToUser?.email,
+                                m.assignedToEquipment
+                                  ? `${m.assignedToEquipment.brand || 'Equipo'} (${m.assignedToEquipment.code})`
+                                  : null,
+                              ]
+                                .filter(Boolean)
+                                .join(' · ')}
+                            </p>
+                          )}
                         </div>
                       </div>
                       <div className='text-right text-xs text-muted-foreground shrink-0 ml-3'>
@@ -737,6 +750,8 @@ export function ConsumableDetail({ consumableId, userRole, isSuperAdmin = false 
         currentStock={consumable.currentStock}
         unit={unit}
         defaultType={movementDefault}
+        familyId={currentFamilyId}
+        defaultEquipment={consumable.assignedEquipment}
         onSaved={() => {
           toast({ title: 'Movimiento registrado' })
           void loadConsumable()
