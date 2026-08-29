@@ -21,6 +21,7 @@ import {
   UserPlus,
   MoreHorizontal,
   StickyNote,
+  RotateCcw,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -36,6 +37,7 @@ import {
 import { TransferFamilyDialog } from './transfer-family-dialog'
 import { LinkedCredentialsCard } from '@/components/credentials/linked-credentials-card'
 import { LicenseAssignDialog } from '@/components/inventory/license/license-assign-dialog'
+import { LicenseReturnDialog } from '@/components/inventory/license/license-return-dialog'
 import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 import { CONTRACT_TYPE_LABELS } from '@/lib/inventory/license-labels'
 
@@ -151,6 +153,7 @@ export function LicenseDetail({ licenseId, userRole, isSuperAdmin = false }: Pro
   const [error, setError] = useState<string | null>(null)
   const [showTransferDialog, setShowTransferDialog] = useState(false)
   const [showAssignDialog, setShowAssignDialog] = useState(false)
+  const [showReturnDialog, setShowReturnDialog] = useState(false)
 
   const canManageInventory =
     (session?.user as { canManageInventory?: boolean })?.canManageInventory === true
@@ -230,6 +233,14 @@ export function LicenseDetail({ licenseId, userRole, isSuperAdmin = false }: Pro
   const isAssigned = Boolean(
     license.user || license.equipment || license.department || license.licenseScope === 'COMPANY'
   )
+  const currentAssigneeLabel =
+    license.user?.name ??
+    license.user?.email ??
+    license.department?.name ??
+    (license.equipment
+      ? `${license.equipment.brand || 'Equipo'} (${license.equipment.code})`
+      : null) ??
+    (license.licenseScope === 'COMPANY' ? 'Empresa' : null)
   const renewal = license.renewalAlertStatus ? renewalBadge(license.renewalAlertStatus) : null
   const hasSecondaryActions = canEdit || canTransfer || canDelete
 
@@ -288,7 +299,7 @@ export function LicenseDetail({ licenseId, userRole, isSuperAdmin = false }: Pro
           {canEdit && (
             <Button size='sm' onClick={() => setShowAssignDialog(true)}>
               <UserPlus className='h-4 w-4 mr-1.5' />
-              Asignar
+              {isAssigned ? 'Cambiar' : 'Asignar'}
             </Button>
           )}
           {hasSecondaryActions && (
@@ -300,6 +311,12 @@ export function LicenseDetail({ licenseId, userRole, isSuperAdmin = false }: Pro
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align='end' className='w-52'>
+                {canEdit && isAssigned && (
+                  <DropdownMenuItem onClick={() => setShowReturnDialog(true)}>
+                    <RotateCcw className='h-4 w-4 mr-2' />
+                    Devolver
+                  </DropdownMenuItem>
+                )}
                 {canEdit && (
                   <DropdownMenuItem
                     onClick={() => router.push(`/inventory/license/${licenseId}/edit`)}
@@ -561,6 +578,18 @@ export function LicenseDetail({ licenseId, userRole, isSuperAdmin = false }: Pro
         currentEquipmentId={license.assignedToEquipment ?? license.equipment?.id ?? null}
         onAssigned={() => {
           toast({ title: 'Asignación actualizada' })
+          void loadLicense()
+        }}
+      />
+
+      <LicenseReturnDialog
+        open={showReturnDialog}
+        onOpenChange={setShowReturnDialog}
+        licenseId={licenseId}
+        licenseName={license.name}
+        currentAssignee={currentAssigneeLabel}
+        onReturned={() => {
+          toast({ title: 'Licencia devuelta — disponible para asignar' })
           void loadLicense()
         }}
       />

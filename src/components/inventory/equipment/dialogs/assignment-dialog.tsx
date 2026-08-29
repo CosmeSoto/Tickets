@@ -1,6 +1,6 @@
 'use client'
 
-import { Loader2, UserCheck } from 'lucide-react'
+import { Loader2, UserCheck, AlertTriangle } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -96,7 +96,7 @@ export function AssignmentDialog({
           }}
         >
           <div className='space-y-4 py-2'>
-            {contractResponsible && contractResponsible.id !== form.receiverId && (
+            {contractResponsible && !form.receiverId && (
               <button
                 type='button'
                 onClick={() => onFormChange({ ...form, receiverId: contractResponsible.id })}
@@ -109,6 +109,18 @@ export function AssignmentDialog({
                 </span>
               </button>
             )}
+            {contractResponsible &&
+              form.receiverId &&
+              contractResponsible.id !== form.receiverId && (
+                <div className='flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400'>
+                  <AlertTriangle className='h-3.5 w-3.5 shrink-0 mt-0.5' />
+                  <span>
+                    El responsable del contrato vinculado es{' '}
+                    <span className='font-medium'>{contractResponsible.name}</span>, distinto a
+                    quien estás asignando aquí. No es un error — solo revisa que sea intencional.
+                  </span>
+                </div>
+              )}
             {/* Selector de usuario con departamento auto-rellenado */}
             <AssignableUserSelect
               familyId={familyId}

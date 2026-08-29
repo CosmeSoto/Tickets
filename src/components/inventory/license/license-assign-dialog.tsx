@@ -15,7 +15,7 @@ import { SimpleSelect } from '@/components/ui/simple-select'
 import { SearchableSelect, type SearchableSelectOption } from '@/components/ui/searchable-select'
 import { AssignableUserSelect } from '@/components/inventory/shared/AssignableUserSelect'
 import { useFetch } from '@/hooks/common/use-fetch'
-import { Loader2, UserCheck } from 'lucide-react'
+import { Loader2, UserCheck, AlertTriangle } from 'lucide-react'
 
 type Scope = 'Individual' | 'Departamento' | 'Empresa'
 
@@ -176,28 +176,6 @@ export function LicenseAssignDialog({
     }
   }
 
-  const handleUnassign = async () => {
-    setSubmitting(true)
-    setError(null)
-    try {
-      const res = await fetch(`/api/inventory/licenses/${licenseId}/assign`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'unassign' }),
-      })
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}))
-        throw new Error(j.error || 'No se pudo desasignar')
-      }
-      onAssigned()
-      onOpenChange(false)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error inesperado')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className='sm:max-w-md'>
@@ -211,7 +189,8 @@ export function LicenseAssignDialog({
             {currentUserId || currentDepartmentId || currentEquipmentId ? (
               <>
                 <span className='font-medium text-foreground'>{licenseName}</span> ya está asignada.
-                Cambia el alcance o el destinatario, o usa «Desasignar» para quitarla.
+                Cambia el alcance o el destinatario, o usa «Devolver» desde el menú de acciones para
+                quitarla.
               </>
             ) : (
               <>
@@ -234,7 +213,7 @@ export function LicenseAssignDialog({
 
           {scope === 'Individual' && (
             <>
-              {contractResponsible && contractResponsible.id !== userId && (
+              {contractResponsible && !userId && (
                 <button
                   type='button'
                   onClick={() => {
@@ -249,6 +228,16 @@ export function LicenseAssignDialog({
                     <span className='font-medium text-foreground'>{contractResponsible.name}</span>
                   </span>
                 </button>
+              )}
+              {contractResponsible && userId && contractResponsible.id !== userId && (
+                <div className='flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400'>
+                  <AlertTriangle className='h-3.5 w-3.5 shrink-0 mt-0.5' />
+                  <span>
+                    El responsable del contrato vinculado es{' '}
+                    <span className='font-medium'>{contractResponsible.name}</span>, distinto a
+                    quien estás asignando aquí. No es un error — solo revisa que sea intencional.
+                  </span>
+                </div>
               )}
               <AssignableUserSelect
                 familyId={familyId ?? undefined}
@@ -303,17 +292,6 @@ export function LicenseAssignDialog({
         </div>
 
         <DialogFooter className='gap-2 sm:gap-2 flex-wrap'>
-          {(currentUserId || currentDepartmentId || currentEquipmentId) && (
-            <Button
-              type='button'
-              variant='ghost'
-              disabled={submitting}
-              onClick={() => void handleUnassign()}
-              className='mr-auto'
-            >
-              Desasignar
-            </Button>
-          )}
           <Button type='button' variant='outline' onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
