@@ -287,7 +287,14 @@ export function useTimeline(ticketId: string) {
     [loadTimeline]
   )
 
-  // Polling cada 3s — usa stoppedRef para detención inmediata sin esperar re-render
+  // Polling cada 30s — es solo un respaldo por si el SSE se pierde un evento; la
+  // entrega en tiempo real la hace useTicketSSE de abajo. Estuvo en 3s (ver historial:
+  // "reduce polling de 5s a 3s como fallback más agresivo") porque en ese momento el SSE
+  // no compartía suscriptores entre rutas bajo Turbopack en dev y parecía "no funcionar" —
+  // eso ya se corrigió (ticket-events.ts usa globalThis), así que ya no hace falta un
+  // fallback tan agresivo. A 3s, una sola pestaña de ticket abierta generaba ~20
+  // requests/minuto solo de este polling — el grueso del volumen de requests reportado
+  // en una sesión larga. Usa stoppedRef para detención inmediata sin esperar re-render.
   useEffect(() => {
     if (stoppedRef.current) return
     loadTimeline()
@@ -303,7 +310,7 @@ export function useTimeline(ticketId: string) {
           return
         }
         loadTimeline(true)
-      }, 3 * 1000)
+      }, 30 * 1000)
     }
 
     const stopPolling = () => {
