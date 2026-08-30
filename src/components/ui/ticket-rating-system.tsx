@@ -484,33 +484,39 @@ export function TicketRatingSystem({
           </CardHeader>
           <CardContent className='space-y-4 pt-0'>
             {/* Resumen general */}
-            <div className='grid grid-cols-1 md:grid-cols-3 gap-3'>
-              <div className='text-center p-3 bg-blue-50 rounded-lg'>
-                <div className='flex items-center justify-center space-x-1 mb-2'>
+            <div className='grid grid-cols-3 gap-2'>
+              <div className='text-center p-2 bg-blue-50 dark:bg-blue-950/50 rounded-lg'>
+                <div className='flex items-center justify-center mb-1'>
                   <StarRating
                     value={Math.round(technicianStats.averageRating)}
                     readonly
                     size='sm'
                   />
                 </div>
-                <div className='text-lg font-bold text-blue-900'>
+                <div className='text-base font-bold text-blue-900 dark:text-blue-300 leading-tight'>
                   {technicianStats.averageRating.toFixed(1)}
                 </div>
-                <div className='text-xs text-blue-700'>Promedio General</div>
+                <div className='text-[10px] text-blue-700 dark:text-blue-400 leading-tight mt-0.5'>
+                  Promedio General
+                </div>
               </div>
 
-              <div className='text-center p-3 bg-green-50 rounded-lg'>
-                <div className='text-lg font-bold text-green-900'>
+              <div className='text-center p-2 bg-green-50 dark:bg-green-950/50 rounded-lg'>
+                <div className='text-base font-bold text-green-900 dark:text-green-300 leading-tight'>
                   {technicianStats.totalRatings}
                 </div>
-                <div className='text-xs text-green-700'>Total Calificaciones</div>
+                <div className='text-[10px] text-green-700 dark:text-green-400 leading-tight mt-0.5'>
+                  Total Calific.
+                </div>
               </div>
 
-              <div className='text-center p-3 bg-purple-50 rounded-lg'>
-                <div className='text-lg font-bold text-purple-900'>
+              <div className='text-center p-2 bg-purple-50 dark:bg-purple-950/50 rounded-lg'>
+                <div className='text-base font-bold text-purple-900 dark:text-purple-300 leading-tight'>
                   {technicianStats.recentRatings.filter(r => r.rating >= 4).length}
                 </div>
-                <div className='text-xs text-purple-700'>Calificaciones 4+</div>
+                <div className='text-[10px] text-purple-700 dark:text-purple-400 leading-tight mt-0.5'>
+                  Calific. 4+
+                </div>
               </div>
             </div>
 
