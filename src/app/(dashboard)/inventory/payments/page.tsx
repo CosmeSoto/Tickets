@@ -1219,12 +1219,15 @@ export default function InventoryPaymentsPage() {
               </div>
               <div className='space-y-1.5'>
                 <Label>Método de pago</Label>
-                <Select value={cPaidMethod} onValueChange={setCPaidMethod}>
+                <Select
+                  value={cPaidMethod || '__none__'}
+                  onValueChange={v => setCPaidMethod(v === '__none__' ? '' : v)}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder='Seleccionar método' />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value=''>Sin especificar</SelectItem>
+                    <SelectItem value='__none__'>Sin especificar</SelectItem>
                     {(
                       Object.entries(PAYMENT_METHOD_TYPE_LABELS) as [PaymentMethodType, string][]
                     ).map(([k, v]) => (
@@ -1291,12 +1294,15 @@ export default function InventoryPaymentsPage() {
               </div>
               <div className='space-y-1.5'>
                 <Label>Método de pago</Label>
-                <Select value={aPaidMethod} onValueChange={setAPaidMethod}>
+                <Select
+                  value={aPaidMethod || '__none__'}
+                  onValueChange={v => setAPaidMethod(v === '__none__' ? '' : v)}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder='Seleccionar método' />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value=''>Sin especificar</SelectItem>
+                    <SelectItem value='__none__'>Sin especificar</SelectItem>
                     {(
                       Object.entries(PAYMENT_METHOD_TYPE_LABELS) as [PaymentMethodType, string][]
                     ).map(([k, v]) => (

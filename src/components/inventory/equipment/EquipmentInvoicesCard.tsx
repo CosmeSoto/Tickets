@@ -627,12 +627,15 @@ export function EquipmentInvoicesCard({
             {/* Método de pago */}
             <div className='space-y-1'>
               <Label htmlFor='inv-method'>Método de pago</Label>
-              <Select value={form.paymentMethod} onValueChange={v => setField('paymentMethod', v)}>
+              <Select
+                value={form.paymentMethod || '__none__'}
+                onValueChange={v => setField('paymentMethod', v === '__none__' ? '' : v)}
+              >
                 <SelectTrigger id='inv-method'>
                   <SelectValue placeholder='Seleccionar método' />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value=''>Sin especificar</SelectItem>
+                  <SelectItem value='__none__'>Sin especificar</SelectItem>
                   {(
                     Object.entries(PAYMENT_METHOD_TYPE_LABELS) as [PaymentMethodType, string][]
                   ).map(([key, label]) => (
@@ -738,12 +741,15 @@ export function EquipmentInvoicesCard({
               </div>
               <div className='space-y-1'>
                 <Label>Método de pago</Label>
-                <Select value={paidMethod} onValueChange={v => setPaidMethod(v)}>
+                <Select
+                  value={paidMethod || '__none__'}
+                  onValueChange={v => setPaidMethod(v === '__none__' ? '' : v)}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder='Seleccionar método' />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value=''>Sin especificar</SelectItem>
+                    <SelectItem value='__none__'>Sin especificar</SelectItem>
                     {(
                       Object.entries(PAYMENT_METHOD_TYPE_LABELS) as [PaymentMethodType, string][]
                     ).map(([key, label]) => (

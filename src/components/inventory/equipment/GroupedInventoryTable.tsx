@@ -258,22 +258,28 @@ export function GroupedInventoryTable({ onCreateBulk }: GroupedInventoryTablePro
             {/* Filtros */}
             <div className='flex gap-2 items-center'>
               <Filter className='h-4 w-4 text-muted-foreground' />
-              <Select value={selectedFamilyId} onValueChange={setSelectedFamilyId}>
+              <Select
+                value={selectedFamilyId || '__all__'}
+                onValueChange={v => setSelectedFamilyId(v === '__all__' ? '' : v)}
+              >
                 <SelectTrigger className='w-[200px]'>
                   <SelectValue placeholder='Todas las familias' />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value=''>Todas las familias</SelectItem>
+                  <SelectItem value='__all__'>Todas las familias</SelectItem>
                   {/* Aquí irían las familias dinámicas */}
                 </SelectContent>
               </Select>
 
-              <Select value={selectedTypeId} onValueChange={setSelectedTypeId}>
+              <Select
+                value={selectedTypeId || '__all__'}
+                onValueChange={v => setSelectedTypeId(v === '__all__' ? '' : v)}
+              >
                 <SelectTrigger className='w-[200px]'>
                   <SelectValue placeholder='Todos los tipos' />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value=''>Todos los tipos</SelectItem>
+                  <SelectItem value='__all__'>Todos los tipos</SelectItem>
                   {/* Aquí irían los tipos dinámicos */}
                 </SelectContent>
               </Select>
