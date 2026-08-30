@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { FamilyCombobox } from '@/components/ui/family-combobox'
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
 import { FamilyBadge } from '@/components/inventory/family-badge'
 import { SubtypeBadge } from '@/components/inventory/subtype-badge'
 import { ExportButton } from '@/components/common/export-button'
@@ -245,67 +246,68 @@ export function UnifiedInventoryList({
         </div>
 
         {/* Selector de columnas */}
-        <div className='relative'>
-          <button
-            type='button'
-            onClick={() => setShowColumnPicker(p => !p)}
-            className='flex h-9 items-center gap-1.5 rounded-md border border-border bg-card px-3 py-2 text-sm hover:bg-accent transition-colors'
+        <Popover open={showColumnPicker} onOpenChange={setShowColumnPicker}>
+          <PopoverTrigger asChild>
+            <button
+              type='button'
+              className='flex h-9 items-center gap-1.5 rounded-md border border-border bg-card px-3 py-2 text-sm hover:bg-accent transition-colors'
+            >
+              <SlidersHorizontal className='h-4 w-4' />
+              <span className='hidden sm:inline'>Columnas</span>
+            </button>
+          </PopoverTrigger>
+          {/* Portal + colisión con el viewport de Radix: nunca queda tapado por el sidebar
+              ni se sale de pantalla, sin importar dónde caiga el botón al hacer wrap. */}
+          <PopoverContent
+            align='end'
+            sideOffset={4}
+            className='w-60 max-w-[calc(100vw-1rem)] p-0 overflow-hidden'
           >
-            <SlidersHorizontal className='h-4 w-4' />
-            <span className='hidden sm:inline'>Columnas</span>
-          </button>
-          {showColumnPicker && (
-            <>
-              <div className='fixed inset-0 z-10' onClick={() => setShowColumnPicker(false)} />
-              {/* max-w evita que se salga del viewport en móvil */}
-              <div className='absolute right-0 z-20 mt-1 w-60 max-w-[calc(100vw-1rem)] rounded-md border border-border bg-popover shadow-lg overflow-hidden'>
-                <p className='px-3 py-2 text-xs font-semibold text-muted-foreground border-b border-border'>
-                  Columnas visibles
-                </p>
-                <div className='max-h-80 overflow-y-auto py-1'>
-                  {OPTIONAL_COLUMNS.map(c => (
-                    <button
-                      key={c.key}
-                      type='button'
-                      onClick={() => toggleColumn(c.key)}
-                      className='flex w-full items-center gap-2.5 px-3 py-1.5 text-sm hover:bg-accent transition-colors'
-                    >
-                      <span
-                        className={`h-4 w-4 shrink-0 rounded border flex items-center justify-center ${
-                          visibleColumns.has(c.key)
-                            ? 'bg-primary border-primary'
-                            : 'border-border bg-background'
-                        }`}
-                      >
-                        {visibleColumns.has(c.key) && (
-                          <Check className='h-2.5 w-2.5 text-primary-foreground' />
-                        )}
-                      </span>
-                      <span className='text-left'>{c.label}</span>
-                    </button>
-                  ))}
-                </div>
-                <div className='border-t border-border px-3 py-2 flex gap-2'>
-                  <button
-                    type='button'
-                    onClick={resetColumns}
-                    className='text-xs text-muted-foreground hover:text-foreground transition-colors'
+            <p className='px-3 py-2 text-xs font-semibold text-muted-foreground border-b border-border'>
+              Columnas visibles
+            </p>
+            <div className='max-h-80 overflow-y-auto py-1'>
+              {OPTIONAL_COLUMNS.map(c => (
+                <button
+                  key={c.key}
+                  type='button'
+                  onClick={() => toggleColumn(c.key)}
+                  className='flex w-full items-center gap-2.5 px-3 py-1.5 text-sm hover:bg-accent transition-colors'
+                >
+                  <span
+                    className={`h-4 w-4 shrink-0 rounded border flex items-center justify-center ${
+                      visibleColumns.has(c.key)
+                        ? 'bg-primary border-primary'
+                        : 'border-border bg-background'
+                    }`}
                   >
-                    Predeterminado
-                  </button>
-                  <span className='text-muted-foreground'>·</span>
-                  <button
-                    type='button'
-                    onClick={showAllColumns}
-                    className='text-xs text-muted-foreground hover:text-foreground transition-colors'
-                  >
-                    Todas
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
+                    {visibleColumns.has(c.key) && (
+                      <Check className='h-2.5 w-2.5 text-primary-foreground' />
+                    )}
+                  </span>
+                  <span className='text-left'>{c.label}</span>
+                </button>
+              ))}
+            </div>
+            <div className='border-t border-border px-3 py-2 flex gap-2'>
+              <button
+                type='button'
+                onClick={resetColumns}
+                className='text-xs text-muted-foreground hover:text-foreground transition-colors'
+              >
+                Predeterminado
+              </button>
+              <span className='text-muted-foreground'>·</span>
+              <button
+                type='button'
+                onClick={showAllColumns}
+                className='text-xs text-muted-foreground hover:text-foreground transition-colors'
+              >
+                Todas
+              </button>
+            </div>
+          </PopoverContent>
+        </Popover>
 
         <ExportButton
           onExportCSV={exportCSV}
