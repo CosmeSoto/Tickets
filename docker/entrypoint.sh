@@ -141,19 +141,21 @@ const { PrismaClient } = require('@prisma/client');
 const p = new PrismaClient();
 (async () => {
   try {
-    const [types, brands, warehouses, supplierTypes, contractServiceTypes] = await Promise.all([
+    const [types, brands, warehouses, supplierTypes, contractServiceTypes, bankEntities] = await Promise.all([
       p.equipment_types.count(),
       p.equipment_brands.count(),
       p.warehouses.count(),
       p.supplier_types.count(),
       p.contract_service_types.count(),
+      p.bank_entities.count(),
     ]);
     if (
       types === 0 ||
       brands === 0 ||
       warehouses === 0 ||
       supplierTypes === 0 ||
-      contractServiceTypes === 0
+      contractServiceTypes === 0 ||
+      bankEntities === 0
     ) {
       console.log(
         '  → Catálogos incompletos (tipos=' +
@@ -166,6 +168,8 @@ const p = new PrismaClient();
           supplierTypes +
           ', tipos servicio contrato=' +
           contractServiceTypes +
+          ', bancos=' +
+          bankEntities +
           ')'
       );
       process.exit(2);
@@ -181,6 +185,8 @@ const p = new PrismaClient();
         supplierTypes +
         ', tipos servicio contrato=' +
         contractServiceTypes +
+        ', bancos=' +
+        bankEntities +
         ')'
     );
     process.exit(0);
