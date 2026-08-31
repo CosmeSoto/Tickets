@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { CurrencySelect } from '@/components/ui/currency-select'
 import { InlineCreateSelect } from '@/components/ui/inline-create-select'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { CatalogTypeInlineForm } from '@/components/inventory/asset-forms/CatalogTypeInlineForm'
@@ -504,21 +505,11 @@ export function SupplierForm({
 
           <div className='space-y-1'>
             <Label>Moneda del crédito</Label>
-            <Select
+            <CurrencySelect
               value={creditCurrency || 'USD'}
-              onValueChange={v => setValue('creditCurrency', v, { shouldDirty: true })}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value='USD'>USD</SelectItem>
-                <SelectItem value='EUR'>EUR</SelectItem>
-                <SelectItem value='CLP'>CLP</SelectItem>
-                <SelectItem value='MXN'>MXN</SelectItem>
-                <SelectItem value='COP'>COP</SelectItem>
-              </SelectContent>
-            </Select>
+              onChange={v => setValue('creditCurrency', v, { shouldDirty: true })}
+              labelStyle='code'
+            />
           </div>
         </div>
       </ContractFormSection>

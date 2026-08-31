@@ -43,6 +43,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { CurrencySelect } from '@/components/ui/currency-select'
 import { DateInput } from '@/components/ui/date-input'
 import { SupplierSelect } from '@/components/inventory/suppliers/SupplierSelect'
 import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
@@ -541,20 +542,12 @@ export function EquipmentInvoicesCard({
               </div>
               <div className='space-y-1'>
                 <Label htmlFor='inv-currency'>Moneda</Label>
-                <Select value={form.currency} onValueChange={v => setField('currency', v)}>
-                  <SelectTrigger id='inv-currency'>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value='USD'>USD</SelectItem>
-                    <SelectItem value='CLP'>CLP</SelectItem>
-                    <SelectItem value='EUR'>EUR</SelectItem>
-                    <SelectItem value='MXN'>MXN</SelectItem>
-                    <SelectItem value='COP'>COP</SelectItem>
-                    <SelectItem value='PEN'>PEN</SelectItem>
-                    <SelectItem value='ARS'>ARS</SelectItem>
-                  </SelectContent>
-                </Select>
+                <CurrencySelect
+                  id='inv-currency'
+                  value={form.currency}
+                  onChange={v => setField('currency', v)}
+                  labelStyle='code'
+                />
               </div>
             </div>
 

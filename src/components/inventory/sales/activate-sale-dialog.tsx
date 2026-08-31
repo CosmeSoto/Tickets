@@ -23,13 +23,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { CurrencySelect } from '@/components/ui/currency-select'
 import { toast } from 'sonner'
 
 const formSchema = z.object({
@@ -126,19 +120,7 @@ export function ActivateSaleDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Moneda</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder='Seleccionar moneda' />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value='USD'>USD - Dólar</SelectItem>
-                      <SelectItem value='EUR'>EUR - Euro</SelectItem>
-                      <SelectItem value='COP'>COP - Peso Colombiano</SelectItem>
-                      <SelectItem value='MXN'>MXN - Peso Mexicano</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <CurrencySelect value={field.value} onChange={field.onChange} />
                   <FormMessage />
                 </FormItem>
               )}

@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { CurrencySelect } from '@/components/ui/currency-select'
 import { Combobox } from '@/components/ui/combobox'
 import { Separator } from '@/components/ui/separator'
 import { InlineCreateSelect, type InlineSelectOption } from '@/components/ui/inline-create-select'
@@ -922,18 +923,7 @@ export function ContractForm({
 
             <div className='space-y-1'>
               <Label>Moneda</Label>
-              <Select value={watch('currency')} onValueChange={v => setValue('currency', v)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value='USD'>USD — Dólar</SelectItem>
-                  <SelectItem value='EUR'>EUR — Euro</SelectItem>
-                  <SelectItem value='CLP'>CLP — Peso chileno</SelectItem>
-                  <SelectItem value='MXN'>MXN — Peso mexicano</SelectItem>
-                  <SelectItem value='COP'>COP — Peso colombiano</SelectItem>
-                </SelectContent>
-              </Select>
+              <CurrencySelect value={watch('currency')} onChange={v => setValue('currency', v)} />
             </div>
 
             {isRecurringBilling ? (
