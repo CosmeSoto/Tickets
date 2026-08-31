@@ -606,16 +606,6 @@ export function EquipmentInvoicesCard({
                 value={form.supplierId || null}
                 onChange={v => setField('supplierId', v ?? '')}
               />
-              <p className='text-xs text-muted-foreground'>
-                O escribe el nombre si no está en el catálogo:
-              </p>
-              <Input
-                placeholder='Nombre libre del proveedor'
-                value={form.supplierName}
-                onChange={e => setField('supplierName', e.target.value)}
-                maxLength={200}
-                disabled={!!form.supplierId}
-              />
             </div>
 
             {/* Método de pago */}

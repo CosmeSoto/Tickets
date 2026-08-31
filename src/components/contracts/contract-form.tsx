@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { CurrencySelect } from '@/components/ui/currency-select'
+import { BankEntitySelect } from '@/components/inventory/shared/BankEntitySelect'
 import { Combobox } from '@/components/ui/combobox'
 import { Separator } from '@/components/ui/separator'
 import { InlineCreateSelect, type InlineSelectOption } from '@/components/ui/inline-create-select'
@@ -1194,7 +1195,10 @@ export function ContractForm({
                 </div>
                 <div className='space-y-1'>
                   <Label>Banco / entidad</Label>
-                  <Input {...register('paymentCardBank')} placeholder='Ej: Banco Estado' />
+                  <BankEntitySelect
+                    value={watch('paymentCardBank') ?? ''}
+                    onChange={v => setValue('paymentCardBank', v)}
+                  />
                 </div>
                 <div className='space-y-1'>
                   <Label>Vencimiento tarjeta (MM/YYYY)</Label>
