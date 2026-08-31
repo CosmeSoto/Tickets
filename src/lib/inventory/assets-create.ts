@@ -14,6 +14,7 @@ import { calculateConsumableStatus } from '@/lib/inventory/consumable-status'
 import { linkEquipmentToContract } from '@/lib/inventory/equipment-contract'
 import { linkLicenseToBusinessContract, mapLicenseScope } from '@/lib/inventory/license-contract'
 import { DeliveryActService } from '@/lib/services/delivery-act.service'
+import { EquipmentInvoiceService } from '@/lib/services/equipment-invoice.service'
 import { ConsumableService } from '@/lib/services/consumable.service'
 import { LicenseService } from '@/lib/services/license.service'
 import type { CreateLicenseData } from '@/types/inventory/license'
@@ -187,6 +188,17 @@ export async function createAsset(
     })
     if (!equipmentModel) return { error: 'El modelo de equipo no existe', status: 404 }
 
+    // Requerir info financiera en activos nuevos — hasta ahora esta regla solo
+    // se validaba en el cliente (EquipmentAssetForm/BulkEquipmentForm), así
+    // que un caller de la API podía saltársela por completo.
+    const financialRequired =
+      (acquisitionMode ?? 'FIXED_ASSET') === 'FIXED_ASSET' &&
+      (condition ?? 'NEW') === 'NEW' &&
+      config.requireFinancialForNew !== false
+    if (financialRequired && (purchasePrice == null || purchasePrice === '')) {
+      return { error: 'El precio de compra es obligatorio para activos nuevos', status: 422 }
+    }
+
     const equipmentId = randomUUID()
     let createdAssignmentId: string | undefined
 
@@ -295,6 +307,30 @@ export async function createAsset(
 
     if (bodyContractId && acquisitionMode === 'RENTAL') {
       await linkEquipmentToContract(asset.id, bodyContractId, equipmentLabel || resolvedCode)
+    }
+
+    // Espejo automático en el libro de facturas (equipment_invoices) — si al
+    // crear el equipo ya se informó el precio de compra, se registra también
+    // como la primera factura/pago de adquisición, para que el usuario no
+    // tenga que volver a escribir el mismo monto en "Registrar factura"
+    // después. syncEquipmentPurchaseFields (disparado dentro de .create)
+    // termina escribiendo de vuelta los mismos valores que ya se guardaron
+    // arriba — es un no-op sobre los campos planos, solo crea la fila del
+    // libro.
+    if (
+      (acquisitionMode ?? 'FIXED_ASSET') === 'FIXED_ASSET' &&
+      purchasePrice != null &&
+      purchasePrice > 0
+    ) {
+      await EquipmentInvoiceService.create({
+        equipmentId: asset.id,
+        invoiceNumber: invoiceNumber || null,
+        purchaseOrderNumber: purchaseOrderNumber || null,
+        amount: Number(purchasePrice),
+        paidDate: purchaseDate ? new Date(purchaseDate) : null,
+        supplierId: supplierId || null,
+        createdBy: userId,
+      })
     }
 
     if (createdAssignmentId) {

@@ -78,6 +78,63 @@ export function computeAcquisitionStatus(
   return 'PENDING'
 }
 
+// ── Sincronizar campos planos del equipo desde el libro de facturas ───────────
+//
+// `equipment.purchasePrice/purchaseDate/invoiceNumber/purchaseOrderNumber/
+// supplierId` se leen directamente (depreciación, reportes, dashboard, ventas)
+// en muchos lugares que no pueden pasar a consultar `equipment_invoices` en
+// vivo sin un cambio mucho más grande. En vez de eso, esos campos planos pasan
+// a ser un espejo automático del libro de facturas: se recalculan cada vez que
+// una factura se crea/edita/paga/cancela/elimina, para que el usuario solo
+// tenga que escribir el precio/fecha/N° de factura UNA vez (ya sea al crear el
+// equipo o después vía "Registrar factura"), nunca por separado en los dos
+// lugares.
+//
+// purchasePrice = suma de montos de facturas no canceladas.
+// purchaseDate  = la fecha más antigua entre esas facturas (paidDate si ya se
+//                 pagó, si no dueDate, si no la fecha de creación del registro).
+// invoiceNumber/purchaseOrderNumber/supplierId = los de la factura más antigua
+//                 (con una sola factura activa coincide 1:1 con hoy).
+//
+// Si no queda ninguna factura activa (se cancelaron/borraron todas), NO se
+// tocan los campos planos — se conserva el último valor conocido en vez de
+// forzarlo a $0, que rompería la depreciación ya calculada.
+export async function syncEquipmentPurchaseFields(equipmentId: string): Promise<void> {
+  const invoices = await prisma.equipment_invoices.findMany({
+    where: { equipmentId, status: { not: 'CANCELLED' } },
+    select: {
+      amount: true,
+      invoiceNumber: true,
+      purchaseOrderNumber: true,
+      supplierId: true,
+      paidDate: true,
+      dueDate: true,
+      createdAt: true,
+    },
+    orderBy: { createdAt: 'asc' },
+  })
+
+  if (invoices.length === 0) return
+
+  const totalAmount = invoices.reduce((sum, i) => sum + i.amount, 0)
+  const earliestDate = invoices.reduce<Date | null>((min, i) => {
+    const d = i.paidDate ?? i.dueDate ?? i.createdAt
+    return !min || d < min ? d : min
+  }, null)
+  const primary = invoices[0]
+
+  await prisma.equipment.update({
+    where: { id: equipmentId },
+    data: {
+      purchasePrice: totalAmount,
+      purchaseDate: earliestDate,
+      invoiceNumber: primary.invoiceNumber,
+      purchaseOrderNumber: primary.purchaseOrderNumber,
+      ...(primary.supplierId ? { supplierId: primary.supplierId } : {}),
+    },
+  })
+}
+
 // ── Servicio ──────────────────────────────────────────────────────────────────
 
 export class EquipmentInvoiceService {
@@ -243,6 +300,8 @@ export class EquipmentInvoiceService {
       },
     })
 
+    await syncEquipmentPurchaseFields(input.equipmentId)
+
     return invoice
   }
 
@@ -301,6 +360,8 @@ export class EquipmentInvoiceService {
         after: { amount: invoice.amount, status: invoice.status },
       },
     })
+
+    await syncEquipmentPurchaseFields(before.equipmentId)
 
     return invoice
   }
@@ -362,6 +423,8 @@ export class EquipmentInvoiceService {
       userId: deletedBy,
       changes: { amount: invoice.amount, status: invoice.status },
     })
+
+    await syncEquipmentPurchaseFields(invoice.equipmentId)
   }
 
   // ── Estadísticas por equipo ───────────────────────────────────────────────

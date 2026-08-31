@@ -24,6 +24,7 @@ import { EquipmentModelInlineForm } from '@/components/inventory/asset-forms/Equ
 import { EquipmentBrandInlineForm } from '@/components/inventory/asset-forms/EquipmentBrandInlineForm'
 import { WarehouseInlineForm } from '@/components/inventory/asset-forms/WarehouseInlineForm'
 import { AssignableUserSelect } from '@/components/inventory/shared/AssignableUserSelect'
+import { FinancialInfoSection } from '@/components/inventory/shared/FinancialInfoSection'
 import { MaintenanceStatusBlock } from '@/components/inventory/shared/MaintenanceStatusBlock'
 import { TypeAttributesInput } from '@/components/inventory/custom-fields/type-attributes-input'
 import { AttributeManagerDialog } from '@/components/settings/inventory/attribute-manager-dialog'
@@ -1460,58 +1461,47 @@ export function EquipmentAssetForm({
         )}
 
         {/* ── 6. FINANCIERO + DEPRECIACIÓN ──────────────────────────── */}
-        {showFinancial && (
-          <fieldset className='rounded-lg border border-border p-4 space-y-3'>
-            <legend className='px-2 text-sm font-semibold text-foreground'>
-              Información Financiera
-              {financialRequired && <span className='text-destructive'> *</span>}
-            </legend>
-            <div className='grid grid-cols-2 gap-3'>
-              <div className='space-y-1'>
-                <Label>
-                  Precio de Compra
-                  {financialRequired && <span className='text-destructive'> *</span>}
-                </Label>
-                <Input
-                  type='number'
-                  min='0'
-                  step='0.01'
-                  value={purchasePrice}
-                  onChange={e => setPurchasePrice(e.target.value)}
-                  placeholder='0.00'
-                />
-                {priceError && <p className='text-xs text-destructive'>{priceError}</p>}
-              </div>
-              <div className='space-y-1'>
-                <Label>Fecha de Compra</Label>
-                <DateInput
-                  value={purchaseDate}
-                  onChange={e => setPurchaseDate(e.target.value)}
-                  clearable
-                />
-              </div>
-              <div className='space-y-1 col-span-2 sm:col-span-1'>
-                <Label>N° de Factura</Label>
-                <Input
-                  value={invoiceNumber}
-                  onChange={e => setInvoiceNumber(e.target.value)}
-                  placeholder='Ej: FAC-2024-0123'
-                />
-              </div>
-              <div className='space-y-1 col-span-2 sm:col-span-1'>
-                <Label>
-                  N° Orden de Compra{' '}
-                  <span className='text-xs text-muted-foreground font-normal'>(opcional)</span>
-                </Label>
-                <Input
-                  value={purchaseOrderNumber}
-                  onChange={e => setPurchaseOrderNumber(e.target.value)}
-                  placeholder='Ej: OC-2024-001'
-                />
-              </div>
+        {showFinancial &&
+          (isEditMode ? (
+            // En edición: solo lectura — el precio/fecha/factura ahora se
+            // administran desde "Facturas / Pagos de adquisición" en la ficha
+            // del equipo (se sincronizan solos hacia estos mismos campos), no
+            // aquí, para no tener dos formularios pidiendo lo mismo.
+            <div className='space-y-1'>
+              <FinancialInfoSection
+                title='Información Financiera'
+                hiddenFields={['supplier']}
+                purchasePrice={purchasePrice ? parseFloat(purchasePrice) : null}
+                purchaseDate={purchaseDate || null}
+                invoiceNumber={invoiceNumber}
+                purchaseOrderNumber={purchaseOrderNumber}
+                collapsible={false}
+                readOnly
+              />
+              <p className='text-xs text-muted-foreground'>
+                Para modificar precio, fecha o N° de factura, edítalo en &quot;Facturas / Pagos de
+                adquisición&quot;, en la ficha del equipo.
+              </p>
             </div>
-          </fieldset>
-        )}
+          ) : (
+            <FinancialInfoSection
+              title='Información Financiera'
+              hiddenFields={['supplier']}
+              required={financialRequired}
+              priceError={priceError}
+              purchasePrice={purchasePrice ? parseFloat(purchasePrice) : null}
+              purchaseDate={purchaseDate || null}
+              invoiceNumber={invoiceNumber}
+              purchaseOrderNumber={purchaseOrderNumber}
+              collapsible={false}
+              onChange={(field, value) => {
+                if (field === 'purchasePrice') setPurchasePrice(value != null ? String(value) : '')
+                else if (field === 'purchaseDate') setPurchaseDate(value ?? '')
+                else if (field === 'invoiceNumber') setInvoiceNumber(value ?? '')
+                else if (field === 'purchaseOrderNumber') setPurchaseOrderNumber(value ?? '')
+              }}
+            />
+          ))}
 
         {showDepreciation && (
           <fieldset className='rounded-lg border border-border p-4 space-y-3'>

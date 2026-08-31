@@ -12,7 +12,6 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { DateInput } from '@/components/ui/date-input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
@@ -37,6 +36,7 @@ import { FamilySelector } from '@/components/inventory/family-selector'
 import { SubtypeSelector } from '@/components/inventory/subtype-selector'
 import { useInventoryFamilies } from '@/contexts/families-context'
 import { StepHeader } from '@/components/inventory/shared/StepHeader'
+import { FinancialInfoSection } from '@/components/inventory/shared/FinancialInfoSection'
 import { SupplierSelect } from '@/components/inventory/suppliers/SupplierSelect'
 import { BulkMROForm } from '@/components/inventory/equipment/BulkMROForm'
 import { AccessoriesSection } from '@/components/inventory/shared/AccessoriesSection'
@@ -1054,59 +1054,31 @@ export function BulkEquipmentForm({
 
         {/* Financiero */}
         {showFinancial && (
-          <fieldset className='rounded-lg border border-border p-4 space-y-3'>
-            <legend className='px-2 text-sm font-semibold'>
-              Información Financiera
-              {financialRequired && <span className='text-destructive'> *</span>}
-            </legend>
-            <div className='grid grid-cols-2 gap-3'>
-              <div className='space-y-1'>
-                <Label>
-                  Precio Unitario
-                  {financialRequired && <span className='text-destructive'> *</span>}
-                </Label>
-                <Input
-                  type='number'
-                  min='0'
-                  step='0.01'
-                  value={purchasePrice}
-                  onChange={e => setPurchasePrice(e.target.value)}
-                  placeholder='Precio sin impuestos'
-                />
-              </div>
-              <div className='space-y-1'>
-                <Label>Fecha de Compra</Label>
-                <DateInput
-                  value={purchaseDate}
-                  onChange={e => setPurchaseDate(e.target.value)}
-                  clearable
-                />
-              </div>
-              <div className='space-y-1'>
-                <Label>N° de Factura</Label>
-                <Input
-                  value={invoiceNumber}
-                  onChange={e => setInvoiceNumber(e.target.value)}
-                  placeholder='FAC-2024-0123'
-                />
-              </div>
-              <div className='space-y-1'>
-                <Label>Orden de Compra</Label>
-                <Input
-                  value={purchaseOrderNumber}
-                  onChange={e => setPurchaseOrderNumber(e.target.value)}
-                  placeholder='OC-2024-0456'
-                />
-              </div>
-            </div>
+          <div className='space-y-2'>
+            <FinancialInfoSection
+              title='Información Financiera'
+              hiddenFields={['supplier']}
+              required={financialRequired}
+              purchasePrice={purchasePrice ? parseFloat(purchasePrice) : null}
+              purchaseDate={purchaseDate || null}
+              invoiceNumber={invoiceNumber}
+              purchaseOrderNumber={purchaseOrderNumber}
+              collapsible={false}
+              onChange={(field, value) => {
+                if (field === 'purchasePrice') setPurchasePrice(value != null ? String(value) : '')
+                else if (field === 'purchaseDate') setPurchaseDate(value ?? '')
+                else if (field === 'invoiceNumber') setInvoiceNumber(value ?? '')
+                else if (field === 'purchaseOrderNumber') setPurchaseOrderNumber(value ?? '')
+              }}
+            />
             {purchasePrice && quantity > 1 && (
               <p className='text-xs text-muted-foreground'>
-                Total del lote:{' '}
+                &quot;Costo de adquisición&quot; es por unidad. Total del lote:{' '}
                 <strong>${(parseFloat(purchasePrice) * quantity).toFixed(2)}</strong> ({quantity} ×
                 ${parseFloat(purchasePrice).toFixed(2)})
               </p>
             )}
-          </fieldset>
+          </div>
         )}
       </div>
 
