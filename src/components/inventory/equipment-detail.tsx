@@ -262,6 +262,7 @@ export function EquipmentDetail({
             (equipment as any).supplierId) && (
             <FinancialInfoSection
               supplierId={(equipment as any).supplierId}
+              supplierName={(equipment as any).supplier?.name}
               invoiceNumber={(equipment as any).invoiceNumber}
               purchaseOrderNumber={(equipment as any).purchaseOrderNumber}
               purchasePrice={(equipment as any).purchasePrice}

@@ -59,7 +59,16 @@ const DEFAULT: UserModules = {
 }
 
 /** Caché en memoria: evita repetir GET /api/user/modules en cada remontaje. */
-const MODULES_MEMORY_TTL_MS = 30_000 // 30 segundos (reducido de 120s para detectar cambios más rápido)
+const MODULES_MEMORY_TTL_MS = 30_000
+/**
+ * Polling de respaldo — el canal principal es el evento SSE 'modules-updated'
+ * (push instantáneo desde el servidor cuando cambian permisos/módulos). Este
+ * poll solo cubre el caso de que se pierda ese evento (SSE caído, reconexión,
+ * etc.), así que no necesita ser tan seguido como el TTL de caché de arriba;
+ * antes usaba el mismo valor que el TTL (30s), lo que generaba un
+ * GET /api/user/modules cada 30s por cada pestaña abierta indefinidamente.
+ */
+const MODULES_POLL_INTERVAL_MS = 3 * 60_000 // 3 minutos
 
 type ModulesMemoryEntry = { userId: string; data: UserModules; at: number }
 let modulesMemoryCache: ModulesMemoryEntry | null = null
@@ -129,7 +138,8 @@ export function useUserModules() {
     load()
   }, [load])
 
-  // Polling cada 30s como fallback si el SSE no entrega el evento
+  // Polling como fallback si el SSE no entrega el evento (ver comentario en
+  // MODULES_POLL_INTERVAL_MS — deliberadamente más espaciado que el TTL de caché).
   useEffect(() => {
     if (status !== 'authenticated' || !userId) return
 
@@ -144,7 +154,7 @@ export function useUserModules() {
       if (expired) {
         load(false)
       }
-    }, MODULES_MEMORY_TTL_MS)
+    }, MODULES_POLL_INTERVAL_MS)
 
     return () => {
       if (pollRef.current) clearInterval(pollRef.current)

@@ -20,6 +20,9 @@ type FinancialField =
 interface FinancialInfoSectionProps {
   // Valores actuales
   supplierId?: string | null
+  /** Nombre del proveedor, solo para el modo readOnly (evita otro round-trip
+   * al catálogo — el nombre ya viene incluido en el detalle del activo). */
+  supplierName?: string | null
   invoiceNumber?: string | null
   purchaseOrderNumber?: string | null
   purchasePrice?: number | null
@@ -53,6 +56,7 @@ interface FinancialInfoSectionProps {
 
 export function FinancialInfoSection({
   supplierId,
+  supplierName,
   invoiceNumber,
   purchaseOrderNumber,
   purchasePrice,
@@ -91,7 +95,9 @@ export function FinancialInfoSection({
         <div className='sm:col-span-2'>
           <Label>Proveedor</Label>
           {readOnly ? (
-            <p className='mt-1 text-sm'>{supplierId ? '(proveedor asociado)' : '—'}</p>
+            <p className='mt-1 text-sm'>
+              {supplierName || (supplierId ? '(proveedor asociado)' : '—')}
+            </p>
           ) : (
             <SupplierSelect
               value={supplierId}
