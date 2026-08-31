@@ -1,5 +1,14 @@
 'use client'
 
+/**
+ * AcquisitionInvoicesCard — libro de facturas/pagos de adquisición.
+ *
+ * Generaliza lo que antes era EquipmentInvoicesCard (equipo-only) para que
+ * Equipos y Licencias compartan el mismo componente en vez de reimplementar
+ * el mismo formulario dos veces — el único punto de variación real entre
+ * ambos es qué endpoint de API golpear, dado por `assetType`.
+ */
+
 import { useState, useEffect, useCallback } from 'react'
 import {
   Receipt,
@@ -53,8 +62,9 @@ import { PAYMENT_METHOD_TYPE_LABELS, type PaymentMethodType } from '@/types/cont
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
 type InvoiceStatus = 'PENDING' | 'PAID' | 'OVERDUE' | 'CANCELLED'
+export type AcquisitionAssetType = 'equipment' | 'license'
 
-interface EquipmentInvoice {
+interface AcquisitionInvoice {
   id: string
   invoiceNumber?: string | null
   purchaseOrderNumber?: string | null
@@ -109,6 +119,22 @@ const EMPTY_FORM: FormState = {
   notes: '',
 }
 
+// ── Endpoints por tipo de activo ────────────────────────────────────────────
+
+const API_BASE: Record<
+  AcquisitionAssetType,
+  { list: (id: string) => string; item: (id: string) => string }
+> = {
+  equipment: {
+    list: id => `/api/inventory/equipment/${id}/invoices`,
+    item: id => `/api/inventory/equipment/invoices/${id}`,
+  },
+  license: {
+    list: id => `/api/inventory/licenses/${id}/invoices`,
+    item: id => `/api/inventory/licenses/invoices/${id}`,
+  },
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const STATUS_CONFIG: Record<
@@ -149,25 +175,29 @@ function todayISO() {
 
 // ── Componente principal ──────────────────────────────────────────────────────
 
-interface EquipmentInvoicesCardProps {
-  equipmentId: string
+interface AcquisitionInvoicesCardProps {
+  assetType: AcquisitionAssetType
+  assetId: string
   canManage?: boolean
 }
 
-export function EquipmentInvoicesCard({
-  equipmentId,
+export function AcquisitionInvoicesCard({
+  assetType,
+  assetId,
   canManage = false,
-}: EquipmentInvoicesCardProps) {
+}: AcquisitionInvoicesCardProps) {
+  const endpoints = API_BASE[assetType]
+
   const [expanded, setExpanded] = useState(false)
-  const [invoices, setInvoices] = useState<EquipmentInvoice[]>([])
+  const [invoices, setInvoices] = useState<AcquisitionInvoice[]>([])
   const [loading, setLoading] = useState(false)
   const [loaded, setLoaded] = useState(false)
 
   // Dialogs
   const [showForm, setShowForm] = useState(false)
-  const [editing, setEditing] = useState<EquipmentInvoice | null>(null)
-  const [markingPaid, setMarkingPaid] = useState<EquipmentInvoice | null>(null)
-  const [deleting, setDeleting] = useState<EquipmentInvoice | null>(null)
+  const [editing, setEditing] = useState<AcquisitionInvoice | null>(null)
+  const [markingPaid, setMarkingPaid] = useState<AcquisitionInvoice | null>(null)
+  const [deleting, setDeleting] = useState<AcquisitionInvoice | null>(null)
   const [saving, setSaving] = useState(false)
 
   // Formulario
@@ -178,7 +208,7 @@ export function EquipmentInvoicesCard({
   const loadInvoices = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/inventory/equipment/${equipmentId}/invoices`)
+      const res = await fetch(endpoints.list(assetId))
       const data = await res.json()
       setInvoices(data.invoices ?? [])
     } catch {
@@ -187,7 +217,7 @@ export function EquipmentInvoicesCard({
       setLoading(false)
       setLoaded(true)
     }
-  }, [equipmentId])
+  }, [assetId, endpoints])
 
   useEffect(() => {
     if (expanded && !loaded) loadInvoices()
@@ -201,7 +231,7 @@ export function EquipmentInvoicesCard({
     setShowForm(true)
   }
 
-  function openEdit(inv: EquipmentInvoice) {
+  function openEdit(inv: AcquisitionInvoice) {
     setEditing(inv)
     setForm({
       invoiceNumber: inv.invoiceNumber ?? '',
@@ -250,13 +280,13 @@ export function EquipmentInvoicesCard({
 
       let res: Response
       if (editing) {
-        res = await fetch(`/api/inventory/equipment/invoices/${editing.id}`, {
+        res = await fetch(endpoints.item(editing.id), {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         })
       } else {
-        res = await fetch(`/api/inventory/equipment/${equipmentId}/invoices`, {
+        res = await fetch(endpoints.list(assetId), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -281,7 +311,7 @@ export function EquipmentInvoicesCard({
   const [paidDate, setPaidDate] = useState(todayISO())
   const [paidMethod, setPaidMethod] = useState<string>('')
 
-  function openMarkPaid(inv: EquipmentInvoice) {
+  function openMarkPaid(inv: AcquisitionInvoice) {
     setPaidDate(todayISO())
     setPaidMethod(inv.paymentMethod ?? '')
     setMarkingPaid(inv)
@@ -291,7 +321,7 @@ export function EquipmentInvoicesCard({
     if (!markingPaid) return
     setSaving(true)
     try {
-      const res = await fetch(`/api/inventory/equipment/invoices/${markingPaid.id}`, {
+      const res = await fetch(endpoints.item(markingPaid.id), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -318,9 +348,7 @@ export function EquipmentInvoicesCard({
     if (!deleting) return
     setSaving(true)
     try {
-      const res = await fetch(`/api/inventory/equipment/invoices/${deleting.id}`, {
-        method: 'DELETE',
-      })
+      const res = await fetch(endpoints.item(deleting.id), { method: 'DELETE' })
       const json = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(json.error || 'No se pudo eliminar')
       toast.success('Factura eliminada')

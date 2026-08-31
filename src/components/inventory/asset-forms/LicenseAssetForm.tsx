@@ -3,7 +3,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { Input } from '@/components/ui/input'
-import { DateInput } from '@/components/ui/date-input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -38,6 +37,7 @@ import { toLocalDateInputValue } from '@/lib/forms/form-date'
 import { parseMoneyInput } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { AssignableUserSelect } from '@/components/inventory/shared/AssignableUserSelect'
+import { FinancialInfoSection } from '@/components/inventory/shared/FinancialInfoSection'
 import { CONTRACT_TYPE_OPTIONS } from '@/lib/inventory/license-labels'
 import { KeyRound, RefreshCw } from 'lucide-react'
 
@@ -771,95 +771,84 @@ export function LicenseAssetForm({
           </div>
         )}
 
-        {isVisible('FINANCIAL') && (
-          <>
-            {linkedContract && (
-              <div className='rounded-lg border border-blue-200/80 bg-blue-50/50 dark:bg-blue-500/10 px-3 py-2 text-xs text-muted-foreground'>
-                Costo y vigencia provienen del contrato vinculado. Aquí solo registra datos propios
-                de la licencia (factura, orden de compra, fecha de compra).
-              </div>
-            )}
-            <div className='grid grid-cols-1 md:grid-cols-3 gap-3 [&>*]:min-w-0'>
-              <div className='space-y-1'>
-                <Label>
-                  Fecha de Compra
-                  {isRequired('FINANCIAL') && <span className='text-destructive'> *</span>}
-                </Label>
-                <DateInput
-                  value={purchaseDate}
-                  onChange={e => setPurchaseDate(e.target.value)}
-                  required={isRequired('FINANCIAL')}
-                  clearable
-                />
-              </div>
-              {!linkedContract && (
-                <>
-                  <div className='space-y-1'>
-                    <Label>Fecha de Vencimiento</Label>
-                    <DateInput
-                      value={expirationDate}
-                      onChange={e => setExpirationDate(e.target.value)}
-                      clearable
-                      min={purchaseDate || undefined}
-                    />
-                  </div>
-                  <div className='space-y-1'>
-                    <Label>
-                      Costo{' '}
-                      <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
-                    </Label>
-                    <Input
-                      type='text'
-                      inputMode='decimal'
-                      autoComplete='off'
-                      value={cost}
-                      onChange={e => setCost(e.target.value)}
-                      placeholder='0.00'
-                    />
-                  </div>
-                </>
-              )}
-            </div>
+        {isVisible('FINANCIAL') &&
+          (() => {
+            // Costo/vigencia/renovación vienen del contrato vinculado cuando
+            // aplica — mismo criterio que ya existía, solo que ahora pasa por
+            // el componente compartido en vez de JSX suelto. Fecha de compra,
+            // N° de factura y N° de OC son datos propios de la licencia y
+            // siguen editables aunque haya contrato vinculado.
+            const hiddenFields = [
+              'supplier' as const,
+              ...(linkedContract
+                ? (['expirationDate', 'purchasePrice', 'renewalCost', 'renewalDate'] as const)
+                : []),
+            ]
 
-            <div className='grid grid-cols-1 md:grid-cols-3 gap-3 [&>*]:min-w-0'>
-              <div className='space-y-1'>
-                <Label>
-                  Número de Factura{' '}
-                  <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
-                </Label>
-                <Input
-                  value={invoiceNumber}
-                  onChange={e => setInvoiceNumber(e.target.value)}
-                  placeholder='Ej: FACT-2024-001'
-                />
-              </div>
-              <div className='space-y-1'>
-                <Label>
-                  Número de Orden de Compra{' '}
-                  <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
-                </Label>
-                <Input
-                  value={purchaseOrderNumber}
-                  onChange={e => setPurchaseOrderNumber(e.target.value)}
-                  placeholder='Ej: OC-2024-001'
-                />
-              </div>
-              {!linkedContract && (
+            if (isEditMode) {
+              // En edición: solo lectura — precio/fecha/factura ahora se
+              // administran desde "Facturas / Pagos de adquisición" en la
+              // ficha de la licencia (se sincronizan solos hacia estos mismos
+              // campos), no aquí.
+              return (
                 <div className='space-y-1'>
-                  <Label>
-                    Fecha de Renovación{' '}
-                    <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
-                  </Label>
-                  <DateInput
-                    value={renewalDate}
-                    onChange={e => setRenewalDate(e.target.value)}
-                    clearable
+                  <FinancialInfoSection
+                    hiddenFields={hiddenFields}
+                    purchasePrice={cost ? parseFloat(cost) : null}
+                    purchaseDate={purchaseDate || null}
+                    expirationDate={expirationDate || null}
+                    invoiceNumber={invoiceNumber}
+                    purchaseOrderNumber={purchaseOrderNumber}
+                    renewalCost={renewalCost ? parseFloat(renewalCost) : null}
+                    renewalDate={renewalDate || null}
+                    showExpiration
+                    showRenewal
+                    collapsible={false}
+                    readOnly
                   />
+                  <p className='text-xs text-muted-foreground'>
+                    Para modificar el costo, la fecha o el N° de factura, edítalo en &quot;Facturas
+                    / Pagos de adquisición&quot;, en la ficha de la licencia.
+                  </p>
                 </div>
-              )}
-            </div>
-          </>
-        )}
+              )
+            }
+
+            return (
+              <>
+                {linkedContract && (
+                  <div className='rounded-lg border border-blue-200/80 bg-blue-50/50 dark:bg-blue-500/10 px-3 py-2 text-xs text-muted-foreground'>
+                    Costo y vigencia provienen del contrato vinculado. Aquí solo registra datos
+                    propios de la licencia (factura, orden de compra, fecha de compra).
+                  </div>
+                )}
+                <FinancialInfoSection
+                  hiddenFields={hiddenFields}
+                  required={isRequired('FINANCIAL')}
+                  purchasePrice={cost ? parseFloat(cost) : null}
+                  purchaseDate={purchaseDate || null}
+                  expirationDate={expirationDate || null}
+                  invoiceNumber={invoiceNumber}
+                  purchaseOrderNumber={purchaseOrderNumber}
+                  renewalCost={renewalCost ? parseFloat(renewalCost) : null}
+                  renewalDate={renewalDate || null}
+                  showExpiration
+                  showRenewal
+                  collapsible={false}
+                  onChange={(field, value) => {
+                    if (field === 'purchasePrice') setCost(value != null ? String(value) : '')
+                    else if (field === 'purchaseDate') setPurchaseDate(value ?? '')
+                    else if (field === 'expirationDate') setExpirationDate(value ?? '')
+                    else if (field === 'invoiceNumber') setInvoiceNumber(value ?? '')
+                    else if (field === 'purchaseOrderNumber') setPurchaseOrderNumber(value ?? '')
+                    else if (field === 'renewalCost')
+                      setRenewalCost(value != null ? String(value) : '')
+                    else if (field === 'renewalDate') setRenewalDate(value ?? '')
+                  }}
+                />
+              </>
+            )
+          })()}
 
         <div className='space-y-1'>
           <Label>Observaciones</Label>

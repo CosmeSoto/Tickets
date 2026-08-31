@@ -623,6 +623,7 @@ model users {
   credentialShares                                credential_shares[]
   telegramLinkTokens                              telegram_link_tokens[]
   equipmentInvoicesCreated                        equipment_invoices[]            @relation("EquipmentInvoiceCreator")
+  licenseInvoicesCreated                          license_invoices[]              @relation("LicenseInvoiceCreator")
   processesOwned                                  processes[]                     @relation("ProcessOwner")
   processesCreated                                processes[]                     @relation("ProcessCreator")
   processVersionsCreated                          process_versions[]             @relation("ProcessVersionCreator")
@@ -1447,6 +1448,7 @@ model software_licenses {
   contractLines         contract_lines[]        @relation("ContractLineLicense")
   credentialEntries     credential_entries[]
   assignments           license_assignments[]
+  invoices              license_invoices[]
 
   @@index([typeId, expirationDate])
   @@index([assignedToEquipment])
@@ -1681,6 +1683,7 @@ model suppliers {
   batches                equipment_batches[]
   maintenances           maintenance_records[]
   equipmentInvoices      equipment_invoices[] @relation("EquipmentInvoiceSupplier")
+  licenseInvoices        license_invoices[]   @relation("LicenseInvoiceSupplier")
 
   @@index([typeId, isActive])
   @@index([familyId, isActive])
@@ -3015,6 +3018,45 @@ model equipment_invoices {
   @@index([status, dueDate])
   @@index([createdAt(sort: Desc)])
   @@map("equipment_invoices")
+}
+
+// Libro de facturas/pagos de adquisición de licencias — mismo propósito y
+// forma que equipment_invoices, para licencias. Complementa los campos
+// planos de software_licenses (cost/purchaseDate/invoiceNumber/
+// purchaseOrderNumber), que se sincronizan automáticamente desde aquí.
+model license_invoices {
+  id                  String                   @id @default(uuid())
+  licenseId           String                   @map("license_id")
+  invoiceNumber       String?                  @map("invoice_number") @db.VarChar(100)
+  purchaseOrderNumber String?                  @map("purchase_order_number") @db.VarChar(100)
+  amount              Float
+  currency            String                   @default("USD") @db.VarChar(3)
+  dueDate             DateTime?                @map("due_date")
+  paidDate            DateTime?                @map("paid_date")
+  status              AcquisitionPaymentStatus @default(PENDING)
+  paymentMethod       PaymentMethodType?       @map("payment_method")
+  supplierId          String?                  @map("supplier_id")
+  /// Nombre libre cuando no hay proveedor registrado en catálogo
+  supplierName        String?                  @map("supplier_name") @db.VarChar(200)
+  referenceNumber     String?                  @map("reference_number") @db.VarChar(200)
+  bankEntity          String?                  @map("bank_entity") @db.VarChar(100)
+  cardLast4           String?                  @map("card_last4") @db.VarChar(4)
+  cardBrand           String?                  @map("card_brand") @db.VarChar(50)
+  transactionId       String?                  @map("transaction_id") @db.VarChar(200)
+  notes               String?
+  createdBy           String                   @map("created_by")
+  createdAt           DateTime                 @default(now()) @map("created_at")
+  updatedAt           DateTime                 @updatedAt @map("updated_at")
+
+  license  software_licenses @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+  supplier suppliers?        @relation("LicenseInvoiceSupplier", fields: [supplierId], references: [id], onDelete: SetNull)
+  creator  users             @relation("LicenseInvoiceCreator", fields: [createdBy], references: [id])
+
+  @@index([licenseId])
+  @@index([supplierId])
+  @@index([status, dueDate])
+  @@index([createdAt(sort: Desc)])
+  @@map("license_invoices")
 }
 
 // ── Solicitudes de Activos ────────────────────────────────────────────────────

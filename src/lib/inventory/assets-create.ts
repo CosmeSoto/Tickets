@@ -15,6 +15,7 @@ import { linkEquipmentToContract } from '@/lib/inventory/equipment-contract'
 import { linkLicenseToBusinessContract, mapLicenseScope } from '@/lib/inventory/license-contract'
 import { DeliveryActService } from '@/lib/services/delivery-act.service'
 import { EquipmentInvoiceService } from '@/lib/services/equipment-invoice.service'
+import { LicenseInvoiceService } from '@/lib/services/license-invoice.service'
 import { ConsumableService } from '@/lib/services/consumable.service'
 import { LicenseService } from '@/lib/services/license.service'
 import type { CreateLicenseData } from '@/types/inventory/license'
@@ -489,6 +490,21 @@ export async function createAsset(
 
     if (bodyContractId) {
       await linkLicenseToBusinessContract(license.id, bodyContractId, license.name)
+    } else if (cost != null && Number(cost) > 0) {
+      // Espejo automático en el libro de facturas (license_invoices) — solo
+      // cuando NO hay contrato vinculado (ahí el costo viene del contrato,
+      // que tiene su propio seguimiento de pagos, no es una compra puntual).
+      // Igual que en equipos: evita que el usuario tenga que volver a
+      // escribir el mismo monto en "Registrar factura" después.
+      await LicenseInvoiceService.create({
+        licenseId: license.id,
+        invoiceNumber: body.invoiceNumber ? String(body.invoiceNumber) : null,
+        purchaseOrderNumber: body.purchaseOrderNumber ? String(body.purchaseOrderNumber) : null,
+        amount: Number(cost),
+        paidDate: purchaseDate ? new Date(purchaseDate) : null,
+        supplierId: supplierId || null,
+        createdBy: userId,
+      })
     }
 
     asset = license

@@ -25,7 +25,7 @@ import { EquipmentBatchCard } from './equipment/EquipmentBatchCard'
 import { EquipmentAttachments } from './equipment-attachments'
 import { DepreciationCard } from './equipment/DepreciationCard'
 import { FinancialInfoSection } from './shared/FinancialInfoSection'
-import { EquipmentInvoicesCard } from './equipment/EquipmentInvoicesCard'
+import { AcquisitionInvoicesCard } from './shared/AcquisitionInvoicesCard'
 
 import { AssignmentDialog } from './equipment/dialogs/assignment-dialog'
 import { ReturnDialog } from './equipment/dialogs/return-dialog'
@@ -271,8 +271,9 @@ export function EquipmentDetail({
           )}
 
           {/* 6. Facturas / pagos de adquisición */}
-          <EquipmentInvoicesCard
-            equipmentId={equipmentId}
+          <AcquisitionInvoicesCard
+            assetType='equipment'
+            assetId={equipmentId}
             canManage={userRole === 'ADMIN' || isSuperAdminSession}
           />
 

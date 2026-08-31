@@ -11,6 +11,7 @@ type FinancialField =
   | 'supplier'
   | 'purchasePrice'
   | 'purchaseDate'
+  | 'expirationDate'
   | 'invoiceNumber'
   | 'purchaseOrderNumber'
   | 'renewalCost'
@@ -23,11 +24,14 @@ interface FinancialInfoSectionProps {
   purchaseOrderNumber?: string | null
   purchasePrice?: number | null
   purchaseDate?: string | null
+  expirationDate?: string | null
   renewalCost?: number | null
   renewalDate?: string | null
   // Modo
   readOnly?: boolean
   showRenewal?: boolean
+  /** Muestra "Fecha de Vencimiento" (licencias con expiración propia). */
+  showExpiration?: boolean
   familyId?: string
   // Callbacks
   onChange?: (field: string, value: any) => void
@@ -53,10 +57,12 @@ export function FinancialInfoSection({
   purchaseOrderNumber,
   purchasePrice,
   purchaseDate,
+  expirationDate,
   renewalCost,
   renewalDate,
   readOnly = false,
   showRenewal = false,
+  showExpiration = false,
   familyId,
   onChange,
   hiddenFields = [],
@@ -74,6 +80,7 @@ export function FinancialInfoSection({
     purchaseOrderNumber ||
     purchasePrice ||
     purchaseDate ||
+    expirationDate ||
     renewalCost ||
     renewalDate
   )
@@ -134,6 +141,25 @@ export function FinancialInfoSection({
               id='purchaseDate'
               value={purchaseDate ? purchaseDate.substring(0, 10) : ''}
               onChange={e => onChange?.('purchaseDate', e.target.value || null)}
+              clearable
+            />
+          )}
+        </div>
+      )}
+
+      {showExpiration && !hidden('expirationDate') && (
+        <div>
+          <Label htmlFor='expirationDate'>Fecha de Vencimiento</Label>
+          {readOnly ? (
+            <p className='mt-1 text-sm'>
+              {expirationDate ? new Date(expirationDate).toLocaleDateString('es-EC') : '—'}
+            </p>
+          ) : (
+            <DateInput
+              id='expirationDate'
+              value={expirationDate ? expirationDate.substring(0, 10) : ''}
+              onChange={e => onChange?.('expirationDate', e.target.value || null)}
+              min={purchaseDate || undefined}
               clearable
             />
           )}

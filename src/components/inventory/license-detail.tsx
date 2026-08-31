@@ -36,6 +36,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { TransferFamilyDialog } from './transfer-family-dialog'
 import { LinkedCredentialsCard } from '@/components/credentials/linked-credentials-card'
+import { AcquisitionInvoicesCard } from '@/components/inventory/shared/AcquisitionInvoicesCard'
 import { LicenseAssignDialog } from '@/components/inventory/license/license-assign-dialog'
 import { LicenseReturnDialog } from '@/components/inventory/license/license-return-dialog'
 import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
@@ -482,6 +483,9 @@ export function LicenseDetail({ licenseId, userRole, isSuperAdmin = false }: Pro
               )}
             </CardContent>
           </Card>
+
+          {/* Facturas / pagos de adquisición */}
+          <AcquisitionInvoicesCard assetType='license' assetId={licenseId} canManage={isAdmin} />
         </div>
 
         {/* Lateral: credenciales + asignación (como QR/asignación en equipo) */}
