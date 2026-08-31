@@ -7,6 +7,22 @@ import type {
 } from '@/types/inventory/maintenance'
 
 /**
+ * Se lanza al intentar completar un mantenimiento con tareas del checklist
+ * sin marcar — el llamador (API) la distingue por `code` para ofrecer
+ * "completar de todas formas" en vez de un error genérico.
+ */
+export class IncompleteTasksError extends Error {
+  code = 'INCOMPLETE_TASKS' as const
+  incompleteCount: number
+  constructor(incompleteCount: number) {
+    super(
+      `Aún ${incompleteCount === 1 ? 'queda' : 'quedan'} ${incompleteCount} tarea${incompleteCount === 1 ? '' : 's'} sin completar en el checklist.`
+    )
+    this.incompleteCount = incompleteCount
+  }
+}
+
+/**
  * Servicio para gestión de registros de mantenimiento
  * Flujo de estados:
  *   REQUESTED (cliente solicita) → SCHEDULED (admin/técnico programa, equipo → MAINTENANCE)
@@ -425,7 +441,7 @@ export class MaintenanceService {
    */
   static async completeMaintenance(
     id: string,
-    data: UpdateMaintenanceData & { returnTo?: 'available' | 'previous_user' },
+    data: UpdateMaintenanceData & { returnTo?: 'available' | 'previous_user'; force?: boolean },
     userId: string
   ): Promise<MaintenanceRecord & { reAssigned?: boolean }> {
     const result = await prisma.$transaction(async tx => {
@@ -449,6 +465,19 @@ export class MaintenanceService {
       const allowedStatuses = ['SCHEDULED', 'ACCEPTED']
       if (!allowedStatuses.includes(existing.status)) {
         throw new Error('El mantenimiento ya fue completado o cancelado')
+      }
+
+      // El checklist es organizativo, no obligatorio por diseño — pero si
+      // quedan tareas sin marcar, se avisa antes de cerrar en vez de dejar
+      // que pase desapercibido. `force` permite completar igual (el técnico
+      // decide, no queda bloqueado si algún paso no aplicaba).
+      if (!data.force) {
+        const incompleteCount = await tx.maintenance_tasks.count({
+          where: { maintenanceRecordId: id, isCompleted: false },
+        })
+        if (incompleteCount > 0) {
+          throw new IncompleteTasksError(incompleteCount)
+        }
       }
 
       const maintenance = await tx.maintenance_records.update({

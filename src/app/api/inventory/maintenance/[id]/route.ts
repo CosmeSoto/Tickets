@@ -69,6 +69,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       notes,
       supplierInvoice,
       warrantyExpiresAt,
+      force,
     } = body
 
     const isClient = session.user.role === 'CLIENT'
@@ -246,6 +247,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           notes,
           supplierInvoice: supplierInvoice || undefined,
           warrantyExpiresAt: warrantyExpiresAt ? new Date(warrantyExpiresAt) : undefined,
+          force: force === true,
         },
         session.user.id
       )
@@ -276,7 +278,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     )
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Error al actualizar mantenimiento'
-    return NextResponse.json({ error: message }, { status: 400 })
+    // IncompleteTasksError (checklist con tareas sin marcar) viaja con `code`
+    // para que el front ofrezca "completar de todas formas" en vez de un
+    // error genérico — ver MaintenanceTasksCard / handleComplete.
+    const code = (error as { code?: string })?.code
+    return NextResponse.json({ error: message, ...(code ? { code } : {}) }, { status: 400 })
   }
 }
 

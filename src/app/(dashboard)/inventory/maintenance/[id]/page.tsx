@@ -18,6 +18,7 @@ import {
   ThumbsUp,
   User,
   Ticket,
+  AlertTriangle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -146,6 +147,9 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
     emptyAssignee()
   )
   const [showComplete, setShowComplete] = useState(false)
+  // Si el checklist tiene tareas sin marcar, el servidor rechaza "Completar" una
+  // primera vez con este aviso — al confirmar de nuevo se reintenta con force.
+  const [incompleteTasksWarning, setIncompleteTasksWarning] = useState<string | null>(null)
   const [showCancel, setShowCancel] = useState(false)
 
   const [newAt, setNewAt] = useState('')
@@ -195,7 +199,9 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
       })
       if (!res.ok) {
         const e = await res.json()
-        throw new Error(e.error)
+        const err = new Error(e.error) as Error & { code?: string }
+        if (e.code) err.code = e.code
+        throw err
       }
       return await res.json()
     } finally {
@@ -292,7 +298,7 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
     }
   }
 
-  const handleComplete = async () => {
+  const handleComplete = async (force = false) => {
     try {
       const result = await doAction('complete', {
         cost: completeCost ? parseFloat(completeCost) : undefined,
@@ -306,14 +312,20 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
         notes: completeNotes || undefined,
         supplierInvoice: completeSupplierInvoice || undefined,
         warrantyExpiresAt: completeWarrantyDate || undefined,
+        force,
       })
       const destMsg = result.reAssigned
         ? 'El equipo fue reasignado al usuario anterior.'
         : 'El equipo está disponible en bodega.'
       toast({ title: 'Mantenimiento completado', description: destMsg })
       setShowComplete(false)
+      setIncompleteTasksWarning(null)
       router.push(`/inventory/equipment/${maintenance!.equipment.id}`)
     } catch (e) {
+      if ((e as { code?: string })?.code === 'INCOMPLETE_TASKS') {
+        setIncompleteTasksWarning(e instanceof Error ? e.message : 'Quedan tareas sin completar.')
+        return
+      }
       toast({
         title: 'Error',
         description: e instanceof Error ? e.message : 'Error',
@@ -821,7 +833,13 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
       </Dialog>
 
       {/* Dialog: Completar */}
-      <Dialog open={showComplete} onOpenChange={setShowComplete}>
+      <Dialog
+        open={showComplete}
+        onOpenChange={open => {
+          setShowComplete(open)
+          if (!open) setIncompleteTasksWarning(null)
+        }}
+      >
         <DialogContent className='max-w-md' aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>Completar Mantenimiento</DialogTitle>
@@ -923,14 +941,26 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
                 </div>
               </div>
             )}
+            {incompleteTasksWarning && (
+              <Alert className='border-amber-400 bg-amber-50 dark:border-amber-800/40 dark:bg-amber-900/20'>
+                <AlertTriangle className='h-4 w-4 text-amber-600 dark:text-amber-400' />
+                <AlertDescription className='text-amber-800 dark:text-amber-300'>
+                  {incompleteTasksWarning} ¿Completar de todas formas?
+                </AlertDescription>
+              </Alert>
+            )}
           </div>
           <DialogFooter>
             <Button variant='outline' onClick={() => setShowComplete(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleComplete} disabled={actionLoading}>
-              {actionLoading && <Loader2 className='mr-2 h-4 w-4 animate-spin' />} Confirmar y
-              Completar
+            <Button
+              onClick={() => handleComplete(!!incompleteTasksWarning)}
+              disabled={actionLoading}
+              variant={incompleteTasksWarning ? 'destructive' : 'default'}
+            >
+              {actionLoading && <Loader2 className='mr-2 h-4 w-4 animate-spin' />}
+              {incompleteTasksWarning ? 'Completar de todas formas' : 'Confirmar y Completar'}
             </Button>
           </DialogFooter>
         </DialogContent>
