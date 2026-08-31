@@ -1705,6 +1705,22 @@ model supplier_types {
   @@map("supplier_types")
 }
 
+// Catálogo simple de bancos/entidades financieras — sugerencias reutilizables
+// para el campo "Banco / Entidad" (facturas de equipo, datos bancarios de
+// proveedores, etc). Esos campos siguen siendo texto libre; esta tabla solo
+// alimenta el selector con crear/editar/eliminar, sin relación FK.
+model bank_entities {
+  id        String   @id @default(uuid())
+  name      String   @unique @db.VarChar(100)
+  isActive  Boolean  @default(true) @map("is_active")
+  order     Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([isActive, order])
+  @@map("bank_entities")
+}
+
 model decommission_requests {
   id              String                @id @default(cuid())
   assetType       DecommissionAssetType @map("asset_type")

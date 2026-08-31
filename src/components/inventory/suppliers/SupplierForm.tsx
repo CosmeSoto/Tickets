@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/select'
 import { CurrencySelect } from '@/components/ui/currency-select'
 import { InlineCreateSelect } from '@/components/ui/inline-create-select'
+import { BankEntitySelect } from '@/components/inventory/shared/BankEntitySelect'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { CatalogTypeInlineForm } from '@/components/inventory/asset-forms/CatalogTypeInlineForm'
 import { ContractFormSection } from '@/components/contracts/contract-form-section'
@@ -523,7 +524,10 @@ export function SupplierForm({
         <div className={grid}>
           <div className='space-y-1'>
             <Label htmlFor='bankName'>Banco</Label>
-            <Input id='bankName' {...register('bankName')} placeholder='Nombre del banco' />
+            <BankEntitySelect
+              value={watched.bankName || ''}
+              onChange={v => setValue('bankName', v, { shouldDirty: true })}
+            />
           </div>
           <div className='space-y-1'>
             <Label>Tipo de cuenta</Label>

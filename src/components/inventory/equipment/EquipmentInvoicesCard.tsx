@@ -46,6 +46,7 @@ import {
 import { CurrencySelect } from '@/components/ui/currency-select'
 import { DateInput } from '@/components/ui/date-input'
 import { SupplierSelect } from '@/components/inventory/suppliers/SupplierSelect'
+import { BankEntitySelect } from '@/components/inventory/shared/BankEntitySelect'
 import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 import { PAYMENT_METHOD_TYPE_LABELS, type PaymentMethodType } from '@/types/contracts'
 
@@ -516,7 +517,7 @@ export function EquipmentInvoicesCard({
 
       {/* ── Dialog: crear / editar factura ───────────────────────────────── */}
       <Dialog open={showForm} onOpenChange={open => !open && setShowForm(false)}>
-        <DialogContent className='max-w-lg max-h-[92vh] overflow-y-auto'>
+        <DialogContent className='w-[min(95vw,42rem)] max-w-2xl max-h-[92vh] overflow-y-auto'>
           <DialogHeader>
             <DialogTitle>
               {editing ? 'Editar factura' : 'Registrar factura / pago de adquisición'}
@@ -654,12 +655,9 @@ export function EquipmentInvoicesCard({
               </div>
               <div className='space-y-1'>
                 <Label htmlFor='inv-bank'>Banco / Entidad</Label>
-                <Input
-                  id='inv-bank'
-                  placeholder='Banco XYZ'
+                <BankEntitySelect
                   value={form.bankEntity}
-                  onChange={e => setField('bankEntity', e.target.value)}
-                  maxLength={100}
+                  onChange={v => setField('bankEntity', v)}
                 />
               </div>
             </div>
