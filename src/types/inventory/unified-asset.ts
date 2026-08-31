@@ -116,7 +116,7 @@ export const DEFAULT_VISIBLE_COLUMNS: ColumnKey[] = [
   'codigo',
   'estado',
   'condicion',
-  'lote',
+  // 'lote',
   'asignado',
   'propiedad',
   'creado',
