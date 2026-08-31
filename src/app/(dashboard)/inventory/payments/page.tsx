@@ -336,7 +336,10 @@ export default function InventoryPaymentsPage() {
     reload: reloadC,
   } = useFetch<ContractPayment>(buildContractUrl(), {
     transform: d => d.payments ?? [],
-    enabled: canManageContracts && section === 'contracts',
+    // Ambas pestañas se cargan siempre (no solo la activa) — si no, el
+    // contador de la pestaña inactiva se queda en 0 hasta hacer clic en
+    // ella, dando la falsa impresión de que no hay nada ahí.
+    enabled: canManageContracts,
   })
 
   // ── Fetch activos
@@ -356,7 +359,7 @@ export default function InventoryPaymentsPage() {
     reload: reloadA,
   } = useFetch<AssetInvoice>(buildAssetUrl(), {
     transform: d => d.invoices ?? [],
-    enabled: canManageContracts && section === 'assets',
+    enabled: canManageContracts,
   })
 
   // ── Ordenamiento contratos
