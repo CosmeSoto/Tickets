@@ -648,6 +648,50 @@ export class MaintenanceService {
   }
 
   /**
+   * Reasigna el técnico interno de un mantenimiento — limpia `supplierId`
+   * porque el técnico interno y el proveedor externo son mutuamente
+   * excluyentes (ver resolveMaintenanceParties). No toca la fecha
+   * programada; antes esto se hacía (mal) reutilizando reschedule().
+   */
+  static async reassignTechnician(
+    id: string,
+    technicianId: string,
+    userId: string
+  ): Promise<MaintenanceRecord> {
+    const result = await prisma.$transaction(async tx => {
+      const existing = await tx.maintenance_records.findUnique({
+        where: { id },
+        include: { technician: true },
+      })
+      if (!existing) throw new Error('Registro de mantenimiento no encontrado')
+
+      const maintenance = await tx.maintenance_records.update({
+        where: { id },
+        data: { technicianId, supplierId: null },
+        include: { equipment: true, technician: true, ticket: true },
+      })
+
+      await tx.audit_logs.create({
+        data: {
+          id: randomUUID(),
+          action: 'MAINTENANCE_TECHNICIAN_REASSIGNED',
+          entityType: 'maintenance_record',
+          entityId: id,
+          userId,
+          details: {
+            descripcion: `Se reasignó el técnico del mantenimiento. Anterior: ${existing.technician?.name ?? 'sin asignar'}. Nuevo: ${maintenance.technician?.name ?? technicianId}.`,
+            previousTechnicianId: existing.technicianId,
+            newTechnicianId: technicianId,
+          },
+        },
+      })
+
+      return maintenance
+    })
+    return result as MaintenanceRecord
+  }
+
+  /**
    * Crea mantenimiento para todos los equipos de un modelo
    */
   static async createMaintenanceByModel(

@@ -222,7 +222,7 @@ export function BulkMaintenanceModal({
             )}
 
             {/* Resumen */}
-            <div className='bg-gray-50 p-4 rounded-md'>
+            <div className='bg-gray-50 dark:bg-gray-800/50 p-4 rounded-md'>
               <h4 className='font-semibold mb-2'>Resumen</h4>
               <ul className='text-sm space-y-1'>
                 <li>Equipos seleccionados: {equipment.length}</li>

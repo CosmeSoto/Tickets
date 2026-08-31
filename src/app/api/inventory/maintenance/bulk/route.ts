@@ -186,13 +186,7 @@ export async function POST(req: NextRequest) {
         // Actualizar técnico en múltiples mantenimientos
         const assignResults = await Promise.allSettled(
           ids.map((id: string) =>
-            MaintenanceService.reschedule(
-              id,
-              {
-                scheduledDate: new Date(), // Mantener fecha actual
-              },
-              session.user.id
-            )
+            MaintenanceService.reassignTechnician(id, data.technicianId, session.user.id)
           )
         )
 
