@@ -558,6 +558,8 @@ model users {
   licenseAttachments                                license_attachments[]
   maintenanceRequests                               maintenance_records[]           @relation("MaintenanceRequester")
   maintenanceRecords                                maintenance_records[]           @relation("MaintenanceTechnician")
+  maintenanceTasksCreated                           maintenance_tasks[]             @relation("MaintenanceTaskCreator")
+  maintenanceTasksCompleted                         maintenance_tasks[]             @relation("MaintenanceTaskCompletedBy")
   notification_preferences                          notification_preferences?
   notification_mutes                                notification_mutes[]
   notifications                                     notifications[]
@@ -1383,6 +1385,7 @@ model maintenance_records {
   technician           users?            @relation("MaintenanceTechnician", fields: [technicianId], references: [id])
   ticket               tickets?          @relation(fields: [ticketId], references: [id])
   contract             contracts?        @relation(fields: [contractId], references: [id], onDelete: SetNull)
+  tasks                maintenance_tasks[]
 
   @@index([equipmentId, date])
   @@index([technicianId])
@@ -1392,6 +1395,30 @@ model maintenance_records {
   @@index([status])
   @@index([equipmentId, status])
   @@map("maintenance_records")
+}
+
+/// Checklist de pasos marcables dentro de un mantenimiento (ej. "Limpieza",
+/// "Cambio de pasta térmica", "Prueba final") — puramente organizativo, no
+/// condiciona el flujo de estados del mantenimiento en sí.
+model maintenance_tasks {
+  id                   String    @id @default(uuid())
+  maintenanceRecordId  String    @map("maintenance_record_id")
+  description          String    @db.VarChar(300)
+  order                Int
+  isCompleted          Boolean   @default(false) @map("is_completed")
+  completedAt          DateTime? @map("completed_at")
+  completedById        String?   @map("completed_by_id")
+  createdBy            String    @map("created_by")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  maintenanceRecord maintenance_records @relation(fields: [maintenanceRecordId], references: [id], onDelete: Cascade)
+  completedBy       users?              @relation("MaintenanceTaskCompletedBy", fields: [completedById], references: [id])
+  creator           users               @relation("MaintenanceTaskCreator", fields: [createdBy], references: [id])
+
+  @@unique([maintenanceRecordId, order])
+  @@index([maintenanceRecordId, order])
+  @@map("maintenance_tasks")
 }
 
 model license_types {

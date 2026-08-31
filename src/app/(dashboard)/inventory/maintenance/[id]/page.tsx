@@ -59,6 +59,7 @@ import {
   emptyAssignee,
   type MaintenanceAssigneeValue,
 } from '@/components/inventory/maintenance/maintenance-assignee-fields'
+import { MaintenanceTasksCard } from '@/components/inventory/maintenance/maintenance-tasks-card'
 import {
   MAINTENANCE_STATUS_LABELS,
   MAINTENANCE_STATUS_COLORS,
@@ -737,6 +738,9 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
           </CardContent>
         </Card>
       </div>
+
+      {/* Checklist de tareas — organizativo, no condiciona el flujo de estados */}
+      <MaintenanceTasksCard maintenanceId={maintenance.id} canManage={isAdminOrTech} />
 
       {/* Dialog: Aprobar solicitud */}
       <Dialog
