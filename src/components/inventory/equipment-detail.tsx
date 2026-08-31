@@ -201,7 +201,7 @@ export function EquipmentDetail({
             !isAssigned &&
             !(equipment as any).sale
           }
-          canTransferFamily={userRole === 'ADMIN' || isSuperAdmin}
+          canTransferFamily={(userRole === 'ADMIN' || isSuperAdmin) && !isAssigned}
           isSuperAdmin={isSuperAdmin}
           isInMaintenance={isInMaintenance}
           onReportProblem={handleReportProblem}
