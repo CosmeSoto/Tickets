@@ -509,7 +509,6 @@ export function SupplierForm({
             <CurrencySelect
               value={creditCurrency || 'USD'}
               onChange={v => setValue('creditCurrency', v, { shouldDirty: true })}
-              labelStyle='code'
             />
           </div>
         </div>

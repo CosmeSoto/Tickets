@@ -575,7 +575,6 @@ export function AcquisitionInvoicesCard({
                   id='inv-currency'
                   value={form.currency}
                   onChange={v => setField('currency', v)}
-                  labelStyle='code'
                 />
               </div>
             </div>
