@@ -620,6 +620,13 @@ export function EquipmentAssetForm({
   const showEstimatedPrice =
     (condition === 'USED' || condition === 'DAMAGED') && acquisitionMode === 'FIXED_ASSET'
 
+  // El equipo ya tiene una asignación activa (se está editando, no dando de alta).
+  // Reasignar o devolver a bodega tiene su propio flujo con acta y notificaciones
+  // (botones "Asignar" / "Devolver a bodega" en la ficha) — este formulario no debe
+  // ofrecer una segunda vía silenciosa para lo mismo, y menos una que ni siquiera
+  // guarda nada (el backend de edición ignora assignedUserId).
+  const hasActiveAssignment = isEditMode && !!initialEquipment?.currentAssignment
+
   // Estado actualizado solo si es permitido por la condición
   useEffect(() => {
     const allowed = allowedStatusesByCondition[condition] || []
@@ -669,7 +676,7 @@ export function EquipmentAssetForm({
       toast.error('Selecciona la bodega de almacenamiento')
       return
     }
-    if (equipmentStatus === 'ASSIGNED' && !assignedUserId) {
+    if (equipmentStatus === 'ASSIGNED' && !hasActiveAssignment && !assignedUserId) {
       toast.error('Selecciona el usuario al que se asignará el equipo')
       return
     }
@@ -1162,6 +1169,7 @@ export function EquipmentAssetForm({
             <SimpleSelect
               value={equipmentStatus}
               onChange={e => setEquipmentStatus(e.target.value)}
+              disabled={hasActiveAssignment}
             >
               {(allowedStatusesByCondition[condition] || []).map(status => (
                 <option key={status} value={status}>
@@ -1181,6 +1189,11 @@ export function EquipmentAssetForm({
                 </option>
               ))}
             </SimpleSelect>
+            {hasActiveAssignment && (
+              <p className='text-xs text-muted-foreground'>
+                Para cambiar el estado, primero devuelve el equipo a bodega desde la ficha.
+              </p>
+            )}
           </div>
 
           {/* Bodega — solo AVAILABLE y DAMAGED */}
@@ -1292,8 +1305,37 @@ export function EquipmentAssetForm({
           </div>
         )}
 
-        {/* Asignar a usuario — usa el componente compartido con departamento auto-rellenado */}
-        {showAssignmentBlock(equipmentStatus) && (
+        {/* Ya asignado — solo lectura. Reasignar/devolver tiene su propio flujo con acta
+            (botones "Asignar" / "Devolver a bodega" en la ficha), este formulario no lo hace. */}
+        {hasActiveAssignment && (
+          <div className='rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-1'>
+            <Label className='text-xs text-muted-foreground'>Asignado a</Label>
+            <p className='font-medium'>
+              {initialEquipment.currentAssignment.receiver?.name}
+              {initialEquipment.currentAssignment.receiver?.email && (
+                <span className='font-normal text-muted-foreground'>
+                  {' '}
+                  ({initialEquipment.currentAssignment.receiver.email})
+                </span>
+              )}
+            </p>
+            {initialEquipment.currentAssignment.startDate && (
+              <p className='text-xs text-muted-foreground'>
+                Desde el{' '}
+                {new Date(initialEquipment.currentAssignment.startDate).toLocaleDateString('es-EC')}
+              </p>
+            )}
+            <p className='text-xs text-muted-foreground pt-1'>
+              Para reasignarlo o devolverlo a bodega, usa &ldquo;Asignar&rdquo; / &ldquo;Devolver a
+              bodega&rdquo; desde la ficha del equipo — así queda registrado con acta y
+              notificaciones.
+            </p>
+          </div>
+        )}
+
+        {/* Asignar a usuario — usa el componente compartido con departamento auto-rellenado.
+            Solo cuando se está asignando por primera vez desde aquí (no hay asignación activa). */}
+        {!hasActiveAssignment && showAssignmentBlock(equipmentStatus) && (
           <div className='rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3'>
             <AssignableUserSelect
               familyId={familyId}
