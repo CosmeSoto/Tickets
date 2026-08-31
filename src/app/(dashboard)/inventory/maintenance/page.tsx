@@ -41,6 +41,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { formatLocalDateTime } from '@/lib/forms/form-date'
+import {
+  MAINTENANCE_STATUS_LABELS,
+  MAINTENANCE_STATUS_COLORS,
+  MAINTENANCE_TYPE_LABELS,
+} from '@/lib/constants/maintenance-labels'
 
 interface MaintenanceItem {
   id: string
@@ -61,35 +66,27 @@ interface MaintenanceItem {
   requestedBy: { id: string; name: string } | null
 }
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; icon: ReactNode }> = {
-  REQUESTED: {
-    label: 'Solicitado',
-    color: 'bg-blue-100 text-blue-800',
-    icon: <Clock className='h-3 w-3' />,
-  },
-  SCHEDULED: {
-    label: 'Programado',
-    color: 'bg-yellow-100 text-yellow-800',
-    icon: <Calendar className='h-3 w-3' />,
-  },
-  ACCEPTED: {
-    label: 'Aceptado',
-    color: 'bg-purple-100 text-purple-800',
-    icon: <ThumbsUp className='h-3 w-3' />,
-  },
-  COMPLETED: {
-    label: 'Completado',
-    color: 'bg-green-100 text-green-800',
-    icon: <CheckCircle className='h-3 w-3' />,
-  },
-  CANCELLED: {
-    label: 'Cancelado',
-    color: 'bg-muted text-muted-foreground',
-    icon: <XCircle className='h-3 w-3' />,
-  },
+const STATUS_ICONS: Record<string, ReactNode> = {
+  REQUESTED: <Clock className='h-3 w-3' />,
+  SCHEDULED: <Calendar className='h-3 w-3' />,
+  ACCEPTED: <ThumbsUp className='h-3 w-3' />,
+  COMPLETED: <CheckCircle className='h-3 w-3' />,
+  CANCELLED: <XCircle className='h-3 w-3' />,
 }
 
-const TYPE_LABELS: Record<string, string> = { PREVENTIVE: 'Preventivo', CORRECTIVE: 'Correctivo' }
+const STATUS_CONFIG: Record<string, { label: string; color: string; icon: ReactNode }> =
+  Object.fromEntries(
+    Object.keys(MAINTENANCE_STATUS_LABELS).map(key => [
+      key,
+      {
+        label: MAINTENANCE_STATUS_LABELS[key],
+        color: MAINTENANCE_STATUS_COLORS[key],
+        icon: STATUS_ICONS[key],
+      },
+    ])
+  )
+
+const TYPE_LABELS = MAINTENANCE_TYPE_LABELS
 
 export function MaintenanceListPageContent() {
   const { data: session } = useSession()
@@ -205,7 +202,11 @@ export function MaintenanceListPageContent() {
     columns: [
       { key: 'type', label: 'Tipo', format: v => TYPE_LABELS[v] ?? v },
       { key: 'status', label: 'Estado', format: v => STATUS_CONFIG[v]?.label ?? v },
-      { key: 'equipment', label: 'Equipo', format: v => (v ? `${v.brand} ${v.model} (${v.code})` : '') },
+      {
+        key: 'equipment',
+        label: 'Equipo',
+        format: v => (v ? `${v.brand} ${v.model} (${v.code})` : ''),
+      },
       { key: 'description', label: 'Descripción' },
       {
         key: 'date',
@@ -290,8 +291,8 @@ export function MaintenanceListPageContent() {
           <div
             className={`rounded-lg px-4 py-3 flex items-center gap-3 text-sm ${
               isClient
-                ? 'bg-yellow-50 border border-yellow-200 text-yellow-800'
-                : 'bg-blue-50 border border-blue-200 text-blue-800'
+                ? 'bg-yellow-50 border border-yellow-200 text-yellow-800 dark:bg-yellow-900/20 dark:border-yellow-800/40 dark:text-yellow-300'
+                : 'bg-blue-50 border border-blue-200 text-blue-800 dark:bg-blue-900/20 dark:border-blue-800/40 dark:text-blue-300'
             }`}
           >
             <Clock className='h-4 w-4 shrink-0' />
@@ -420,10 +421,10 @@ export function MaintenanceListPageContent() {
                     <div className='flex items-start justify-between gap-3 flex-wrap'>
                       <div className='flex items-start gap-3 min-w-0'>
                         <div
-                          className={`p-2 rounded-lg shrink-0 ${record.type === 'CORRECTIVE' ? 'bg-red-50' : 'bg-blue-50'}`}
+                          className={`p-2 rounded-lg shrink-0 ${record.type === 'CORRECTIVE' ? 'bg-red-50 dark:bg-red-900/20' : 'bg-blue-50 dark:bg-blue-900/20'}`}
                         >
                           <Wrench
-                            className={`h-4 w-4 ${record.type === 'CORRECTIVE' ? 'text-red-600' : 'text-blue-600'}`}
+                            className={`h-4 w-4 ${record.type === 'CORRECTIVE' ? 'text-red-600 dark:text-red-400' : 'text-blue-600 dark:text-blue-400'}`}
                           />
                         </div>
                         <div className='min-w-0'>

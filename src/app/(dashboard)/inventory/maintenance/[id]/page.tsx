@@ -59,6 +59,12 @@ import {
   emptyAssignee,
   type MaintenanceAssigneeValue,
 } from '@/components/inventory/maintenance/maintenance-assignee-fields'
+import {
+  MAINTENANCE_STATUS_LABELS,
+  MAINTENANCE_STATUS_COLORS,
+  MAINTENANCE_TYPE_LABELS,
+  MAINTENANCE_FLOW_STEPS,
+} from '@/lib/constants/maintenance-labels'
 
 interface MaintenanceDetail {
   id: string
@@ -97,38 +103,30 @@ interface MaintenanceDetail {
   ticket: { id: string; title: string; status: string } | null
 }
 
-const TYPE_LABELS: Record<string, string> = { PREVENTIVE: 'Preventivo', CORRECTIVE: 'Correctivo' }
+const TYPE_LABELS = MAINTENANCE_TYPE_LABELS
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; icon: ReactNode }> = {
-  REQUESTED: {
-    label: 'Solicitado',
-    color: 'bg-blue-100 text-blue-800',
-    icon: <Clock className='h-4 w-4' />,
-  },
-  SCHEDULED: {
-    label: 'Programado',
-    color: 'bg-yellow-100 text-yellow-800',
-    icon: <Calendar className='h-4 w-4' />,
-  },
-  ACCEPTED: {
-    label: 'Aceptado',
-    color: 'bg-purple-100 text-purple-800',
-    icon: <ThumbsUp className='h-4 w-4' />,
-  },
-  COMPLETED: {
-    label: 'Completado',
-    color: 'bg-green-100 text-green-800',
-    icon: <CheckCircle className='h-4 w-4' />,
-  },
-  CANCELLED: {
-    label: 'Cancelado',
-    color: 'bg-muted text-muted-foreground',
-    icon: <XCircle className='h-4 w-4' />,
-  },
+const STATUS_ICONS: Record<string, ReactNode> = {
+  REQUESTED: <Clock className='h-4 w-4' />,
+  SCHEDULED: <Calendar className='h-4 w-4' />,
+  ACCEPTED: <ThumbsUp className='h-4 w-4' />,
+  COMPLETED: <CheckCircle className='h-4 w-4' />,
+  CANCELLED: <XCircle className='h-4 w-4' />,
 }
 
+const STATUS_CONFIG: Record<string, { label: string; color: string; icon: ReactNode }> =
+  Object.fromEntries(
+    Object.keys(MAINTENANCE_STATUS_LABELS).map(key => [
+      key,
+      {
+        label: MAINTENANCE_STATUS_LABELS[key],
+        color: MAINTENANCE_STATUS_COLORS[key],
+        icon: STATUS_ICONS[key],
+      },
+    ])
+  )
+
 // Pasos del flujo para mostrar progreso visual
-const FLOW_STEPS = ['REQUESTED', 'SCHEDULED', 'ACCEPTED', 'COMPLETED']
+const FLOW_STEPS = MAINTENANCE_FLOW_STEPS
 
 export default function MaintenanceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -500,9 +498,9 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
 
       {/* Banner de estado contextual */}
       {status === 'REQUESTED' && (
-        <Alert className='border-blue-300 bg-blue-50'>
-          <Clock className='h-4 w-4 text-blue-600' />
-          <AlertDescription className='text-blue-800'>
+        <Alert className='border-blue-300 bg-blue-50 dark:border-blue-800/40 dark:bg-blue-900/20'>
+          <Clock className='h-4 w-4 text-blue-600 dark:text-blue-400' />
+          <AlertDescription className='text-blue-800 dark:text-blue-300'>
             {isClient
               ? 'Tu solicitud de mantenimiento está pendiente de aprobación por el equipo técnico.'
               : 'Hay una solicitud de mantenimiento pendiente de aprobación. Revisa los detalles y aprueba para programar el mantenimiento.'}
@@ -510,9 +508,9 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
         </Alert>
       )}
       {status === 'SCHEDULED' && (
-        <Alert className='border-yellow-400 bg-yellow-50'>
-          <Wrench className='h-4 w-4 text-yellow-600' />
-          <AlertDescription className='text-yellow-800'>
+        <Alert className='border-yellow-400 bg-yellow-50 dark:border-yellow-800/40 dark:bg-yellow-900/20'>
+          <Wrench className='h-4 w-4 text-yellow-600 dark:text-yellow-400' />
+          <AlertDescription className='text-yellow-800 dark:text-yellow-300'>
             {isClient
               ? `Mantenimiento programado para el ${scheduledDate.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}. Puedes aceptarlo para confirmar tu disponibilidad.`
               : `Mantenimiento programado. ${isPast ? 'La fecha ya pasó — marca como completado cuando esté listo.' : `Fecha: ${scheduledDate.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}.`}`}
@@ -520,9 +518,9 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
         </Alert>
       )}
       {status === 'ACCEPTED' && (
-        <Alert className='border-purple-300 bg-purple-50'>
-          <ThumbsUp className='h-4 w-4 text-purple-600' />
-          <AlertDescription className='text-purple-800'>
+        <Alert className='border-purple-300 bg-purple-50 dark:border-purple-800/40 dark:bg-purple-900/20'>
+          <ThumbsUp className='h-4 w-4 text-purple-600 dark:text-purple-400' />
+          <AlertDescription className='text-purple-800 dark:text-purple-300'>
             {isClient
               ? 'Has confirmado el mantenimiento. El técnico lo completará y recibirás una notificación cuando esté listo.'
               : 'El cliente aceptó el mantenimiento. Puedes marcarlo como completado cuando finalice.'}
@@ -530,9 +528,9 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
         </Alert>
       )}
       {status === 'COMPLETED' && (
-        <Alert className='border-green-400 bg-green-50'>
-          <CheckCircle className='h-4 w-4 text-green-600' />
-          <AlertDescription className='text-green-800'>
+        <Alert className='border-green-400 bg-green-50 dark:border-green-800/40 dark:bg-green-900/20'>
+          <CheckCircle className='h-4 w-4 text-green-600 dark:text-green-400' />
+          <AlertDescription className='text-green-800 dark:text-green-300'>
             Mantenimiento completado el{' '}
             {maintenance.completedAt
               ? new Date(maintenance.completedAt).toLocaleDateString('es-ES')
