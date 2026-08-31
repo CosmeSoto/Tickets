@@ -179,7 +179,7 @@ export function useNotificationSSE({
   onNotification,
   sound = true,
 }: UseNotificationSSEOptions = {}) {
-  const { data: session, status, update: updateSession } = useSession()
+  const { data: session, update: updateSession } = useSession()
   const onNotificationRef = useRef(onNotification)
   useEffect(() => {
     onNotificationRef.current = onNotification
@@ -191,7 +191,12 @@ export function useNotificationSSE({
   }, [sound])
 
   const connect = useCallback(() => {
-    if (status !== 'authenticated' || !session?.user?.id) return
+    // Ojo: solo `session?.user?.id` en la guarda y en las deps de abajo —
+    // NO `status`. session.update() (SessionTimeoutMonitor, cada 2 min) hace
+    // parpadear `status` a 'loading' y de vuelta a 'authenticated' sin que el
+    // usuario cambie; si `status` estuviera en las deps, ese parpadeo cerraba
+    // y volvía a abrir el EventSource cada 2 minutos sin necesidad.
+    if (!session?.user?.id) return
 
     let es: EventSource | null = null
     let retryTimeout: ReturnType<typeof setTimeout> | null = null
@@ -262,7 +267,7 @@ export function useNotificationSSE({
       if (retryTimeout) clearTimeout(retryTimeout)
       es?.close()
     }
-  }, [status, session?.user?.id, updateSession])
+  }, [session?.user?.id, updateSession])
 
   useEffect(() => {
     const cleanup = connect()

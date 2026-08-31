@@ -66,6 +66,11 @@ export function UsersProvider({ children }: { children: React.ReactNode }) {
   const [users, setUsers] = useState<UserItem[]>([])
   const [loading, setLoading] = useState(true)
   const mountedRef = useRef(true)
+  // Usuario para el que ya se cargó — session.update() (SessionTimeoutMonitor,
+  // cada 2 min) hace parpadear `status` a 'loading' y de vuelta a 'authenticated'
+  // sin que el usuario cambie; sin este guard ese parpadeo recreaba `load` y el
+  // efecto de abajo repetía la petición de 1000 usuarios cada vez.
+  const loadedForUserIdRef = useRef<string | null>(null)
 
   useEffect(() => {
     mountedRef.current = true
@@ -74,34 +79,41 @@ export function UsersProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  const load = useCallback(async () => {
-    if (status !== 'authenticated' || !session?.user) return
-    // CLIENT/TECHNICIAN solo pueden listar usuarios si tienen canManageNews o
-    // canManageForms (mismo criterio que exige /api/users) — sin este check
-    // cualquier cliente o técnico sin esos permisos disparaba un fetch que el
-    // API siempre rechazaba con 403 (ruido en consola, petición desperdiciada).
-    const role = session.user.role
-    if (role === 'CLIENT' || role === 'TECHNICIAN') {
-      const u = session.user as { canManageNews?: boolean; canManageForms?: boolean }
-      if (!u.canManageNews && !u.canManageForms) {
-        setLoading(false)
-        return
+  const load = useCallback(
+    async (force = false) => {
+      if (status !== 'authenticated' || !session?.user) return
+      const uid = session.user.id
+      if (!force && loadedForUserIdRef.current === uid) return
+      // CLIENT/TECHNICIAN solo pueden listar usuarios si tienen canManageNews o
+      // canManageForms (mismo criterio que exige /api/users) — sin este check
+      // cualquier cliente o técnico sin esos permisos disparaba un fetch que el
+      // API siempre rechazaba con 403 (ruido en consola, petición desperdiciada).
+      const role = session.user.role
+      if (role === 'CLIENT' || role === 'TECHNICIAN') {
+        const u = session.user as { canManageNews?: boolean; canManageForms?: boolean }
+        if (!u.canManageNews && !u.canManageForms) {
+          loadedForUserIdRef.current = uid
+          setLoading(false)
+          return
+        }
       }
-    }
-    setLoading(true)
-    try {
-      // Cargar todos los usuarios activos de una vez
-      const res = await fetch('/api/users?isActive=true&limit=1000', { cache: 'no-store' })
-      if (res.ok && mountedRef.current) {
-        const data = await res.json()
-        setUsers(data.data ?? [])
+      loadedForUserIdRef.current = uid
+      setLoading(true)
+      try {
+        // Cargar todos los usuarios activos de una vez
+        const res = await fetch('/api/users?isActive=true&limit=1000', { cache: 'no-store' })
+        if (res.ok && mountedRef.current) {
+          const data = await res.json()
+          setUsers(data.data ?? [])
+        }
+      } catch {
+        // Silencioso — los componentes muestran estado vacío
+      } finally {
+        if (mountedRef.current) setLoading(false)
       }
-    } catch {
-      // Silencioso — los componentes muestran estado vacío
-    } finally {
-      if (mountedRef.current) setLoading(false)
-    }
-  }, [status, session?.user?.id, session?.user?.role]) // eslint-disable-line react-hooks/exhaustive-deps
+    },
+    [status, session?.user?.id, session?.user?.role] // eslint-disable-line react-hooks/exhaustive-deps
+  )
 
   useEffect(() => {
     load()
@@ -122,7 +134,7 @@ export function UsersProvider({ children }: { children: React.ReactNode }) {
         managers,
         clients,
         loading,
-        reload: load,
+        reload: () => load(true),
       }}
     >
       {children}

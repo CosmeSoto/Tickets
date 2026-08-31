@@ -223,11 +223,15 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     }
   }, [status, session?.user?.id, hasMore, loadingMore, loading, buildQuery, applyLocalOverrides])
 
-  // Recargar al autenticar o al cambiar filtros/búsqueda
+  // Recargar al autenticar o al cambiar filtros/búsqueda.
+  // Ojo: sin `status` en las deps a propósito — session.update() (cada 2 min)
+  // hace parpadear `status` a 'loading' y de vuelta a 'authenticated' sin que
+  // el usuario cambie; con `status` en las deps eso forzaba (force=true) un
+  // refetch completo de notificaciones cada 2 minutos.
   useEffect(() => {
-    if (status !== 'authenticated' || !session?.user?.id) return
+    if (!session?.user?.id) return
     void loadNotificationsRef.current(true)
-  }, [status, session?.user?.id, filterRead, filterType, debouncedSearch])
+  }, [session?.user?.id, filterRead, filterType, debouncedSearch])
 
   const markAsRead = useCallback(async (id: string) => {
     let shouldUpdate = false

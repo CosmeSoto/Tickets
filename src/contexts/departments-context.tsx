@@ -62,6 +62,11 @@ export function DepartmentsProvider({ children }: { children: React.ReactNode })
   const [departments, setDepartments] = useState<DepartmentItem[]>([])
   const [loading, setLoading] = useState(true)
   const mountedRef = useRef(true)
+  // Usuario para el que ya se cargó — session.update() (SessionTimeoutMonitor,
+  // cada 2 min) hace parpadear `status` a 'loading' y de vuelta a 'authenticated'
+  // sin que el usuario cambie; sin este guard ese parpadeo recreaba `load` y el
+  // efecto de abajo volvía a pedir /api/departments cada vez.
+  const loadedForUserIdRef = useRef<string | null>(null)
 
   useEffect(() => {
     mountedRef.current = true
@@ -70,21 +75,27 @@ export function DepartmentsProvider({ children }: { children: React.ReactNode })
     }
   }, [])
 
-  const load = useCallback(async () => {
-    if (status !== 'authenticated' || !session?.user) return
-    setLoading(true)
-    try {
-      const res = await fetch('/api/departments', { cache: 'no-store' })
-      if (res.ok && mountedRef.current) {
-        const data = await res.json()
-        setDepartments(data.departments ?? data.data ?? [])
+  const load = useCallback(
+    async (force = false) => {
+      if (status !== 'authenticated' || !session?.user) return
+      const uid = session.user.id
+      if (!force && loadedForUserIdRef.current === uid) return
+      loadedForUserIdRef.current = uid
+      setLoading(true)
+      try {
+        const res = await fetch('/api/departments', { cache: 'no-store' })
+        if (res.ok && mountedRef.current) {
+          const data = await res.json()
+          setDepartments(data.departments ?? data.data ?? [])
+        }
+      } catch {
+        // Silencioso — los componentes muestran estado vacío
+      } finally {
+        if (mountedRef.current) setLoading(false)
       }
-    } catch {
-      // Silencioso — los componentes muestran estado vacío
-    } finally {
-      if (mountedRef.current) setLoading(false)
-    }
-  }, [status, session?.user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+    },
+    [status, session?.user?.id] // eslint-disable-line react-hooks/exhaustive-deps
+  )
 
   useEffect(() => {
     load()
@@ -99,7 +110,7 @@ export function DepartmentsProvider({ children }: { children: React.ReactNode })
         departments,
         activeDepartments,
         loading,
-        reload: load,
+        reload: () => load(true),
       }}
     >
       {children}
