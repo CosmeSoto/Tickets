@@ -22,6 +22,7 @@ const consumableInclude = {
       user: { select: { id: true, name: true, email: true } },
       assignedToUser: { select: { id: true, name: true, email: true } },
       assignedToEquipment: { select: { id: true, code: true, brand: true, model: true } },
+      supplier: { select: { id: true, name: true } },
     },
     orderBy: { createdAt: 'desc' as const },
     take: 5,
@@ -120,6 +121,10 @@ export class ConsumableService {
 
       const occurredAt = data.occurredAt ? new Date(`${data.occurredAt}T12:00:00`) : undefined
 
+      // Datos de compra — solo tienen efecto en ENTRY. Evita que una Salida o
+      // Ajuste arrastre por error datos de una compra anterior.
+      const hasPurchaseData = data.type === 'ENTRY' && data.amount != null && data.amount > 0
+
       const movement = await tx.stock_movements.create({
         data: {
           consumableId: data.consumableId,
@@ -130,12 +135,28 @@ export class ConsumableService {
           assignedToUserId: data.assignedToUserId || null,
           assignedToEquipmentId: data.assignedToEquipmentId || null,
           ...(occurredAt && !Number.isNaN(occurredAt.getTime()) ? { createdAt: occurredAt } : {}),
+          ...(hasPurchaseData
+            ? {
+                amount: data.amount,
+                currency: data.currency || 'USD',
+                invoiceNumber: data.invoiceNumber || null,
+                purchaseOrderNumber: data.purchaseOrderNumber || null,
+                supplierId: data.supplierId || null,
+                paymentMethod: (data.paymentMethod as any) || null,
+                bankEntity: data.bankEntity || null,
+                referenceNumber: data.referenceNumber || null,
+                cardLast4: data.cardLast4 || null,
+                cardBrand: data.cardBrand || null,
+                transactionId: data.transactionId || null,
+              }
+            : {}),
         },
         include: {
           consumable: true,
           user: true,
           assignedToUser: true,
           assignedToEquipment: true,
+          supplier: true,
         },
       })
 
@@ -147,7 +168,19 @@ export class ConsumableService {
       )
       await tx.consumables.update({
         where: { id: data.consumableId },
-        data: { currentStock: newStock, status: newStatus },
+        data: {
+          currentStock: newStock,
+          status: newStatus,
+          // Espejo automático — costPerUnit/proveedor pasan a reflejar la
+          // compra más reciente con datos de factura, para no tener que
+          // editarlos por separado en la ficha del suministro.
+          ...(hasPurchaseData
+            ? {
+                costPerUnit: data.amount! / data.quantity,
+                ...(data.supplierId ? { supplierId: data.supplierId } : {}),
+              }
+            : {}),
+        },
       })
 
       await tx.audit_logs.create({
@@ -324,6 +357,7 @@ export class ConsumableService {
         user: true,
         assignedToUser: true,
         assignedToEquipment: true,
+        supplier: true,
       },
       orderBy: { createdAt: 'desc' },
       take: limit,

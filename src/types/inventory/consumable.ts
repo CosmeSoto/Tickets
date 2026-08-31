@@ -21,6 +21,7 @@ export type StockMovement = Prisma.stock_movementsGetPayload<{
     user: true
     assignedToUser: true
     assignedToEquipment: true
+    supplier: true
   }
 }>
 
@@ -62,6 +63,20 @@ export interface CreateStockMovementData {
   assignedToEquipmentId?: string
   /** ISO date YYYY-MM-DD — se guarda como createdAt del movimiento */
   occurredAt?: string
+  // Datos de compra — opcionales, solo se persisten cuando type=ENTRY.
+  // Alimentan también costPerUnit/supplierId del suministro (ver
+  // ConsumableService.createStockMovement).
+  amount?: number
+  currency?: string
+  invoiceNumber?: string
+  purchaseOrderNumber?: string
+  supplierId?: string
+  paymentMethod?: string
+  bankEntity?: string
+  referenceNumber?: string
+  cardLast4?: string
+  cardBrand?: string
+  transactionId?: string
 }
 
 export interface ConsumableSummary {

@@ -1633,15 +1633,34 @@ model stock_movements {
   assignedToUserId      String?      @map("assigned_to_user_id")
   assignedToEquipmentId String?      @map("assigned_to_equipment_id")
   createdAt             DateTime     @default(now()) @map("created_at")
-  assignedToEquipment   equipment?   @relation("StockMovementEquipment", fields: [assignedToEquipmentId], references: [id])
-  assignedToUser        users?       @relation("StockMovementAssignedTo", fields: [assignedToUserId], references: [id])
-  consumable            consumables  @relation(fields: [consumableId], references: [id])
-  user                  users        @relation("StockMovementUser", fields: [userId], references: [id])
+
+  // Datos de compra — opcionales, solo tienen sentido en type=ENTRY. Evitan
+  // tener que registrar la compra por separado del ingreso de stock; el
+  // costPerUnit/supplierId del suministro se recalculan solos desde el
+  // ENTRY con datos de compra más reciente (ver syncConsumableCostFromEntry).
+  amount              Float?
+  currency            String?            @db.VarChar(3)
+  invoiceNumber       String?            @map("invoice_number") @db.VarChar(100)
+  purchaseOrderNumber String?            @map("purchase_order_number") @db.VarChar(100)
+  supplierId          String?            @map("supplier_id")
+  paymentMethod       PaymentMethodType? @map("payment_method")
+  bankEntity          String?            @map("bank_entity") @db.VarChar(100)
+  referenceNumber     String?            @map("reference_number") @db.VarChar(200)
+  cardLast4           String?            @map("card_last4") @db.VarChar(4)
+  cardBrand           String?            @map("card_brand") @db.VarChar(50)
+  transactionId       String?            @map("transaction_id") @db.VarChar(200)
+
+  assignedToEquipment equipment?  @relation("StockMovementEquipment", fields: [assignedToEquipmentId], references: [id])
+  assignedToUser      users?      @relation("StockMovementAssignedTo", fields: [assignedToUserId], references: [id])
+  consumable          consumables @relation(fields: [consumableId], references: [id])
+  user                users       @relation("StockMovementUser", fields: [userId], references: [id])
+  supplier            suppliers?  @relation("StockMovementSupplier", fields: [supplierId], references: [id], onDelete: SetNull)
 
   @@index([consumableId, createdAt])
   @@index([userId])
   @@index([assignedToUserId])
   @@index([assignedToEquipmentId])
+  @@index([supplierId])
   @@map("stock_movements")
 }
 
@@ -1684,6 +1703,7 @@ model suppliers {
   maintenances           maintenance_records[]
   equipmentInvoices      equipment_invoices[] @relation("EquipmentInvoiceSupplier")
   licenseInvoices        license_invoices[]   @relation("LicenseInvoiceSupplier")
+  stockMovements         stock_movements[]    @relation("StockMovementSupplier")
 
   @@index([typeId, isActive])
   @@index([familyId, isActive])

@@ -16,9 +16,20 @@ import { Textarea } from '@/components/ui/textarea'
 import { DateInput } from '@/components/ui/date-input'
 import { SimpleSelect } from '@/components/ui/simple-select'
 import { SearchableSelect, type SearchableSelectOption } from '@/components/ui/searchable-select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { CurrencySelect } from '@/components/ui/currency-select'
 import { AssignableUserSelect } from '@/components/inventory/shared/AssignableUserSelect'
+import { SupplierSelect } from '@/components/inventory/suppliers/SupplierSelect'
+import { BankEntitySelect } from '@/components/inventory/shared/BankEntitySelect'
 import { useFetch } from '@/hooks/common/use-fetch'
 import { Loader2 } from 'lucide-react'
+import { PAYMENT_METHOD_TYPE_LABELS, type PaymentMethodType } from '@/types/contracts'
 
 type MovementKind = 'ENTRY' | 'EXIT' | 'ADJUSTMENT'
 
@@ -90,6 +101,21 @@ export function StockMovementDialog({
   const [recipientUserId, setRecipientUserId] = useState('')
   const [recipientEquipmentId, setRecipientEquipmentId] = useState('')
 
+  // Datos de compra (opcional) — solo aplica a Entrada. Evita tener que
+  // registrar la factura por separado: cantidad + costo + factura quedan en
+  // una sola acción, y costPerUnit/proveedor del suministro se recalculan
+  // solos desde acá.
+  const [showPurchase, setShowPurchase] = useState(false)
+  const [amount, setAmount] = useState('')
+  const [currency, setCurrency] = useState('USD')
+  const [invoiceNumber, setInvoiceNumber] = useState('')
+  const [purchaseOrderNumber, setPurchaseOrderNumber] = useState('')
+  const [purchaseSupplierId, setPurchaseSupplierId] = useState('')
+  const [paymentMethod, setPaymentMethod] = useState('')
+  const [bankEntity, setBankEntity] = useState('')
+  const [referenceNumber, setReferenceNumber] = useState('')
+  const [cardLast4, setCardLast4] = useState('')
+
   useEffect(() => {
     if (!open) return
     setType(defaultType)
@@ -101,6 +127,16 @@ export function StockMovementDialog({
     setRecipientUserId('')
     // Preseleccionar el equipo ya vinculado al suministro — caso más común.
     setRecipientEquipmentId(defaultEquipment?.id ?? '')
+    setShowPurchase(false)
+    setAmount('')
+    setCurrency('USD')
+    setInvoiceNumber('')
+    setPurchaseOrderNumber('')
+    setPurchaseSupplierId('')
+    setPaymentMethod('')
+    setBankEntity('')
+    setReferenceNumber('')
+    setCardLast4('')
   }, [open, defaultType, defaultEquipment])
 
   const { data: equipmentRows, loading: loadingEquipment } = useFetch<{
@@ -170,6 +206,19 @@ export function StockMovementDialog({
           occurredAt,
           assignedToUserId: showRecipient ? recipientUserId || undefined : undefined,
           assignedToEquipmentId: showRecipient ? recipientEquipmentId || undefined : undefined,
+          ...(type === 'ENTRY' && showPurchase && amount
+            ? {
+                amount: Number(amount),
+                currency: currency || 'USD',
+                invoiceNumber: invoiceNumber || undefined,
+                purchaseOrderNumber: purchaseOrderNumber || undefined,
+                supplierId: purchaseSupplierId || undefined,
+                paymentMethod: paymentMethod || undefined,
+                bankEntity: bankEntity || undefined,
+                referenceNumber: referenceNumber || undefined,
+                cardLast4: cardLast4 || undefined,
+              }
+            : {}),
         }),
       })
       const data = await res.json().catch(() => ({}))
@@ -185,7 +234,7 @@ export function StockMovementDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className='sm:max-w-md'>
+      <DialogContent className='sm:max-w-md max-h-[92vh] overflow-y-auto'>
         <DialogHeader>
           <DialogTitle>{type === 'EXIT' ? 'Registrar consumo' : 'Movimiento de stock'}</DialogTitle>
           <DialogDescription>
@@ -272,6 +321,148 @@ export function StockMovementDialog({
               maxLength={500}
             />
           </div>
+
+          {type === 'ENTRY' && (
+            <div className='space-y-2'>
+              {!showPurchase ? (
+                <button
+                  type='button'
+                  onClick={() => setShowPurchase(true)}
+                  className='text-xs text-primary hover:underline'
+                >
+                  + Agregar datos de compra (factura, proveedor…) (opcional)
+                </button>
+              ) : (
+                <div className='space-y-3 rounded-md border border-dashed p-3'>
+                  <div className='flex items-center justify-between'>
+                    <Label className='text-xs text-muted-foreground'>
+                      Datos de compra (opcional)
+                    </Label>
+                    <button
+                      type='button'
+                      onClick={() => {
+                        setShowPurchase(false)
+                        setAmount('')
+                        setCurrency('USD')
+                        setInvoiceNumber('')
+                        setPurchaseOrderNumber('')
+                        setPurchaseSupplierId('')
+                        setPaymentMethod('')
+                        setBankEntity('')
+                        setReferenceNumber('')
+                        setCardLast4('')
+                      }}
+                      className='text-xs text-muted-foreground hover:text-foreground'
+                    >
+                      Quitar
+                    </button>
+                  </div>
+
+                  <div className='grid grid-cols-3 gap-2'>
+                    <div className='col-span-2 space-y-1'>
+                      <Label htmlFor='mov-amount'>Monto</Label>
+                      <Input
+                        id='mov-amount'
+                        type='number'
+                        min='0'
+                        step='0.01'
+                        value={amount}
+                        onChange={e => setAmount(e.target.value)}
+                        placeholder='0.00'
+                      />
+                    </div>
+                    <div className='space-y-1'>
+                      <Label htmlFor='mov-currency'>Moneda</Label>
+                      <CurrencySelect id='mov-currency' value={currency} onChange={setCurrency} />
+                    </div>
+                  </div>
+
+                  <p className='text-xs text-muted-foreground'>
+                    Con esto se actualiza también el costo por unidad del suministro.
+                  </p>
+
+                  <div className='space-y-1'>
+                    <Label htmlFor='mov-invoice'>N° Factura</Label>
+                    <Input
+                      id='mov-invoice'
+                      value={invoiceNumber}
+                      onChange={e => setInvoiceNumber(e.target.value)}
+                      placeholder='FAC-001'
+                      maxLength={100}
+                    />
+                  </div>
+                  <div className='space-y-1'>
+                    <Label htmlFor='mov-po'>N° Orden de Compra</Label>
+                    <Input
+                      id='mov-po'
+                      value={purchaseOrderNumber}
+                      onChange={e => setPurchaseOrderNumber(e.target.value)}
+                      placeholder='OC-001'
+                      maxLength={100}
+                    />
+                  </div>
+                  <div className='space-y-1'>
+                    <Label>Proveedor</Label>
+                    <SupplierSelect
+                      value={purchaseSupplierId || null}
+                      onChange={v => setPurchaseSupplierId(v ?? '')}
+                    />
+                  </div>
+                  <div className='space-y-1'>
+                    <Label htmlFor='mov-method'>Método de pago</Label>
+                    <Select
+                      value={paymentMethod || '__none__'}
+                      onValueChange={v => setPaymentMethod(v === '__none__' ? '' : v)}
+                    >
+                      <SelectTrigger id='mov-method'>
+                        <SelectValue placeholder='Seleccionar método' />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value='__none__'>Sin especificar</SelectItem>
+                        {(
+                          Object.entries(PAYMENT_METHOD_TYPE_LABELS) as [
+                            PaymentMethodType,
+                            string,
+                          ][]
+                        ).map(([key, label]) => (
+                          <SelectItem key={key} value={key}>
+                            {label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className='space-y-1'>
+                    <Label htmlFor='mov-ref'>N° Referencia / Transacción</Label>
+                    <Input
+                      id='mov-ref'
+                      value={referenceNumber}
+                      onChange={e => setReferenceNumber(e.target.value)}
+                      placeholder='REF-12345'
+                      maxLength={200}
+                    />
+                  </div>
+                  <div className='space-y-1'>
+                    <Label htmlFor='mov-bank'>Banco / Entidad</Label>
+                    <BankEntitySelect value={bankEntity} onChange={setBankEntity} />
+                  </div>
+                  {paymentMethod === 'CORPORATE_CARD' && (
+                    <div className='space-y-1'>
+                      <Label htmlFor='mov-card4'>Últimos 4 dígitos tarjeta</Label>
+                      <Input
+                        id='mov-card4'
+                        value={cardLast4}
+                        onChange={e => setCardLast4(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                        placeholder='1234'
+                        maxLength={4}
+                        className='w-24'
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {type === 'EXIT' && (
             <div className='space-y-2'>

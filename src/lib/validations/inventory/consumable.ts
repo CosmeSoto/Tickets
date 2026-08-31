@@ -55,6 +55,18 @@ export const createStockMovementSchema = z
       .string()
       .regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha inválida')
       .optional(),
+    // Datos de compra — opcionales, solo tienen efecto en type=ENTRY.
+    amount: z.number().min(0, 'El monto debe ser mayor o igual a 0').optional(),
+    currency: z.string().max(3).optional(),
+    invoiceNumber: z.string().max(100).optional(),
+    purchaseOrderNumber: z.string().max(100).optional(),
+    supplierId: z.string().optional(),
+    paymentMethod: z.string().optional(),
+    bankEntity: z.string().max(100).optional(),
+    referenceNumber: z.string().max(200).optional(),
+    cardLast4: z.string().max(4).optional(),
+    cardBrand: z.string().max(50).optional(),
+    transactionId: z.string().max(200).optional(),
   })
   .superRefine((data, ctx) => {
     if (!data.occurredAt) return

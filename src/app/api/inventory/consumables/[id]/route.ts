@@ -59,6 +59,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             user: { select: { id: true, name: true, email: true } },
             assignedToUser: { select: { id: true, name: true, email: true } },
             assignedToEquipment: { select: { id: true, code: true, brand: true, model: true } },
+            supplier: { select: { id: true, name: true } },
           },
           orderBy: { createdAt: 'desc' },
           take: 20,

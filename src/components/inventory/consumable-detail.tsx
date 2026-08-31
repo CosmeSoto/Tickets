@@ -53,6 +53,11 @@ interface StockMovement {
   user?: { name?: string | null; email: string } | null
   assignedToUser?: { name?: string | null; email: string } | null
   assignedToEquipment?: { code: string; brand: string } | null
+  // Datos de compra — solo presentes en type=ENTRY con factura registrada.
+  amount?: number | null
+  currency?: string | null
+  invoiceNumber?: string | null
+  supplier?: { id: string; name: string } | null
 }
 
 interface ConsumableData {
@@ -114,11 +119,11 @@ function fmtDate(d: string | null | undefined) {
   })
 }
 
-function fmtCurrency(n: number | null | undefined) {
+function fmtCurrency(n: number | null | undefined, currency = 'USD') {
   if (n == null) return '—'
   return new Intl.NumberFormat('es-EC', {
     style: 'currency',
-    currency: 'USD',
+    currency,
     minimumFractionDigits: 2,
   }).format(n)
 }
@@ -582,6 +587,13 @@ export function ConsumableDetail({ consumableId, userRole, isSuperAdmin = false 
                           </p>
                           {m.reason && (
                             <p className='text-xs text-muted-foreground truncate'>{m.reason}</p>
+                          )}
+                          {m.amount != null && (
+                            <p className='text-xs text-muted-foreground truncate'>
+                              {fmtCurrency(m.amount, m.currency || 'USD')}
+                              {m.invoiceNumber && ` · Fact. ${m.invoiceNumber}`}
+                              {m.supplier?.name && ` · ${m.supplier.name}`}
+                            </p>
                           )}
                           {(m.assignedToUser || m.assignedToEquipment) && (
                             <p className='text-xs text-muted-foreground truncate'>
