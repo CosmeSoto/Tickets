@@ -6,6 +6,7 @@ import { InventoryNotificationService } from './inventory-notification.service'
 import type { DeliveryAct, UserInfo } from '@/types/inventory/delivery-act'
 import { buildActReceiverInfo, buildGeneralActSnapshot } from '@/lib/inventory/general-delivery-act'
 import { withAttributeLabels } from '@/lib/inventory/attribute-labels'
+import { resolveEquipmentImagePath } from '@/lib/inventory/equipment-image'
 import { db as prisma } from '@/lib/server'
 import {
   addActExpirationDays,
@@ -103,10 +104,7 @@ export class DeliveryActService {
 
       // Crear snapshot del equipo (incluye campos financieros si existen)
       const eq = assignment.equipment as any
-      const firstAttachment = eq.attachments?.[0]
-      const equipmentImagePath = firstAttachment
-        ? `/api/uploads/equipment/${eq.id}/${firstAttachment.filename}`
-        : eq.photoUrl || null
+      const equipmentImagePath = resolveEquipmentImagePath(eq)
 
       if (!equipmentImagePath) {
         console.log(

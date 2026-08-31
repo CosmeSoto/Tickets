@@ -8,6 +8,7 @@ import { generateReturnActPDF } from '../templates/return-act-pdf.template'
 import type { DeliveryAct } from '@/types/inventory/delivery-act'
 import { getUploadDir } from '@/lib/upload-path'
 import { DEFAULT_SYSTEM_NAME } from '@/lib/branding-constants'
+import { resolveEquipmentImagePath } from '@/lib/inventory/equipment-image'
 const mkdir = promisify(fs.mkdir)
 const writeFile = promisify(fs.writeFile)
 
@@ -17,7 +18,7 @@ const writeFile = promisify(fs.writeFile)
  */
 function normalizeLogoUrl(url: string | null): string | null {
   if (!url) return null
-  if (url.startsWith('/api/uploads/')) return url  // ya correcto
+  if (url.startsWith('/api/uploads/')) return url // ya correcto
   if (url.startsWith('/uploads/')) return url.replace('/uploads/', '/api/uploads/')
   return url
 }
@@ -25,7 +26,11 @@ function normalizeLogoUrl(url: string | null): string | null {
 /**
  * Obtiene el logo y nombre de la empresa desde la configuración del sistema
  */
-async function getSystemBranding(): Promise<{ logoUrl: string | null; logoDarkUrl: string | null; companyName: string }> {
+async function getSystemBranding(): Promise<{
+  logoUrl: string | null
+  logoDarkUrl: string | null
+  companyName: string
+}> {
   try {
     const content = await prisma.landing_page_content.findFirst({ where: { id: 'default' } })
     return {
@@ -72,16 +77,45 @@ export class PDFGeneratorService {
         include: {
           assignment: {
             include: {
-              equipment: true,
+              equipment: {
+                include: {
+                  attachments: {
+                    where: { mimeType: { startsWith: 'image/' } },
+                    orderBy: { createdAt: 'asc' },
+                    take: 1,
+                  },
+                },
+              },
               receiver: true,
               deliverer: true,
-            }
-          }
-        }
+            },
+          },
+        },
       })
 
       if (!act) {
         throw new Error('Acta no encontrada')
+      }
+
+      // El acta se crea (y su snapshot se congela) al asignar el equipo — a
+      // menudo justo al darlo de alta, antes de que dé tiempo a subirle una
+      // foto. El PDF en cambio no se genera hasta que se acepta/firma
+      // (minutos u horas después), así que acá volvemos a mirar los
+      // adjuntos actuales del equipo por si ya hay una foto que el snapshot
+      // original no alcanzó a capturar — sin tocar el resto de los datos
+      // congelados (precio, factura, etc., que sí deben quedar como estaban).
+      const eqWithAttachments = (act as any).assignment?.equipment
+      if (eqWithAttachments) {
+        const freshImagePath = resolveEquipmentImagePath(eqWithAttachments)
+        if (
+          freshImagePath &&
+          freshImagePath !== (act as any).equipmentSnapshot?.equipmentImagePath
+        ) {
+          ;(act as any).equipmentSnapshot = {
+            ...(act as any).equipmentSnapshot,
+            equipmentImagePath: freshImagePath,
+          }
+        }
       }
 
       // Generar QR code para verificación
@@ -116,7 +150,7 @@ export class PDFGeneratorService {
       // Actualizar acta con la ruta del PDF
       await prisma.delivery_acts.update({
         where: { id: actId },
-        data: { pdfPath: relativePath }
+        data: { pdfPath: relativePath },
       })
 
       return relativePath
@@ -143,9 +177,9 @@ export class PDFGeneratorService {
               equipment: true,
               receiver: true,
               deliverer: true,
-            }
-          }
-        }
+            },
+          },
+        },
       })
 
       if (!act) {
@@ -183,7 +217,7 @@ export class PDFGeneratorService {
       // Actualizar acta con la ruta del PDF
       await prisma.return_acts.update({
         where: { id: actId },
-        data: { pdfPath: relativePath }
+        data: { pdfPath: relativePath },
       })
 
       return relativePath
@@ -202,7 +236,7 @@ export class PDFGeneratorService {
       // Eliminar PDF anterior si existe
       const act = await prisma.delivery_acts.findUnique({
         where: { id: actId },
-        select: { pdfPath: true }
+        select: { pdfPath: true },
       })
 
       if (act?.pdfPath) {
@@ -231,7 +265,7 @@ export class PDFGeneratorService {
     try {
       const act = await prisma.delivery_acts.findUnique({
         where: { id: actId },
-        select: { pdfPath: true }
+        select: { pdfPath: true },
       })
 
       return act?.pdfPath || null
@@ -248,7 +282,7 @@ export class PDFGeneratorService {
     try {
       const act = await prisma.return_acts.findUnique({
         where: { id: actId },
-        select: { pdfPath: true }
+        select: { pdfPath: true },
       })
 
       return act?.pdfPath || null
