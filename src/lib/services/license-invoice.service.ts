@@ -314,6 +314,71 @@ export class LicenseInvoiceService {
     await syncLicensePurchaseFields(invoice.licenseId)
   }
 
+  // ── Listar global (para /inventory/payments pestaña Activos) ──────────────
+  // Mismo criterio que EquipmentInvoiceService.listGlobal — el llamador
+  // (equipment-payments/route.ts) hace la mezcla con las facturas de equipo.
+
+  static async listGlobal(params: {
+    status?: AcquisitionPaymentStatus
+    familyId?: string
+    allowedFamilyIds?: string[]
+    search?: string
+    fromDate?: Date
+    toDate?: Date
+    take?: number
+  }) {
+    const { status, familyId, allowedFamilyIds, search, fromDate, toDate, take = 500 } = params
+
+    const where: any = {}
+    if (status) where.status = status
+    if (fromDate || toDate) {
+      where.dueDate = {}
+      if (fromDate) where.dueDate.gte = fromDate
+      if (toDate) where.dueDate.lte = toDate
+    }
+
+    // Filtro por familia a través de la licencia → tipo → familia
+    const licenseFilter: any = {}
+    if (familyId) {
+      licenseFilter.licenseType = { familyId }
+    } else if (allowedFamilyIds && allowedFamilyIds.length > 0) {
+      licenseFilter.licenseType = { familyId: { in: allowedFamilyIds } }
+    }
+    if (search?.trim()) {
+      licenseFilter.name = { contains: search.trim(), mode: 'insensitive' as const }
+    }
+    if (Object.keys(licenseFilter).length > 0) {
+      where.license = licenseFilter
+    }
+
+    const [invoices, total] = await Promise.all([
+      prisma.license_invoices.findMany({
+        where,
+        include: {
+          license: {
+            select: {
+              id: true,
+              name: true,
+              licenseType: {
+                select: {
+                  name: true,
+                  family: { select: { id: true, name: true, color: true } },
+                },
+              },
+            },
+          },
+          supplier: { select: { id: true, name: true } },
+          creator: { select: { id: true, name: true } },
+        },
+        orderBy: [{ status: 'asc' }, { dueDate: 'asc' }, { createdAt: 'desc' }],
+        take,
+      }),
+      prisma.license_invoices.count({ where }),
+    ])
+
+    return { invoices, total }
+  }
+
   // ── Estadísticas por licencia ─────────────────────────────────────────────
 
   static async getStatsByLicense(licenseId: string) {

@@ -97,6 +97,7 @@ type ContractPayment = {
 
 type AssetInvoice = {
   id: string
+  assetKind: 'EQUIPMENT' | 'LICENSE'
   invoiceNumber?: string | null
   purchaseOrderNumber?: string | null
   amount: number
@@ -108,7 +109,7 @@ type AssetInvoice = {
   supplierName?: string | null
   notes?: string | null
   createdAt: string
-  equipment: {
+  equipment?: {
     id: string
     code: string
     brand: string
@@ -119,8 +120,37 @@ type AssetInvoice = {
       family?: { id: string; name: string; color?: string | null } | null
     } | null
   }
+  license?: {
+    id: string
+    name: string
+    licenseType?: {
+      name: string
+      family?: { id: string; name: string; color?: string | null } | null
+    } | null
+  }
   supplier?: { id: string; name: string } | null
   creator?: { id: string; name: string } | null
+}
+
+/** Info de despliegue del activo (equipo o licencia) unificada para la tabla/export/dialog. */
+function assetDisplay(inv: AssetInvoice) {
+  if (inv.assetKind === 'LICENSE' && inv.license) {
+    return {
+      code: inv.license.name,
+      subtitle: '',
+      typeName: inv.license.licenseType?.name ?? null,
+      family: inv.license.licenseType?.family ?? null,
+      href: `/inventory/licenses/${inv.license.id}`,
+    }
+  }
+  const eq = inv.equipment
+  return {
+    code: eq?.code ?? '—',
+    subtitle: `${eq?.brand ?? ''} ${eq?.model?.model ?? eq?.modelDeprecated ?? ''}`.trim(),
+    typeName: eq?.type?.name ?? null,
+    family: eq?.type?.family ?? null,
+    href: eq ? `/inventory/equipment/${eq.id}` : '#',
+  }
 }
 
 // ── Constantes y helpers ──────────────────────────────────────────────────────
@@ -445,14 +475,19 @@ export default function InventoryPaymentsPage() {
     title: 'Facturas de Adquisición de Activos',
     getData: () => sortedAssets,
     columns: [
-      { key: 'equipment', label: 'Código', format: v => v?.code ?? '' },
+      {
+        key: 'assetKind',
+        label: 'Tipo de activo',
+        format: v => (v === 'LICENSE' ? 'Licencia' : 'Equipo'),
+      },
+      { key: 'equipment', label: 'Código / Nombre', format: (_v, row) => assetDisplay(row).code },
+      { key: 'equipment', label: 'Detalle', format: (_v, row) => assetDisplay(row).subtitle },
+      { key: 'equipment', label: 'Tipo', format: (_v, row) => assetDisplay(row).typeName ?? '' },
       {
         key: 'equipment',
-        label: 'Equipo',
-        format: v => `${v?.brand ?? ''} ${v?.model?.model ?? v?.modelDeprecated ?? ''}`.trim(),
+        label: 'Área',
+        format: (_v, row) => assetDisplay(row).family?.name ?? '',
       },
-      { key: 'equipment', label: 'Tipo', format: v => v?.type?.name ?? '' },
-      { key: 'equipment', label: 'Área', format: v => v?.type?.family?.name ?? '' },
       { key: 'invoiceNumber', label: 'N° Factura', format: v => v ?? '' },
       { key: 'purchaseOrderNumber', label: 'N° OC', format: v => v ?? '' },
       { key: 'amount', label: 'Monto', format: (v, row) => fmtCurrency(Number(v), row.currency) },
@@ -537,7 +572,11 @@ export default function InventoryPaymentsPage() {
     if (!markingAsset) return
     setSavingA(true)
     try {
-      const res = await fetch(`/api/inventory/equipment/invoices/${markingAsset.id}`, {
+      const base =
+        markingAsset.assetKind === 'LICENSE'
+          ? '/api/inventory/licenses/invoices'
+          : '/api/inventory/equipment/invoices'
+      const res = await fetch(`${base}/${markingAsset.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -954,7 +993,7 @@ export default function InventoryPaymentsPage() {
             {/* Filtros */}
             <div className='flex flex-wrap gap-2'>
               <Input
-                placeholder='Buscar código de equipo, marca…'
+                placeholder='Buscar código de equipo, marca o nombre de licencia…'
                 value={aSearch}
                 onChange={e => setASearch(e.target.value)}
                 className='flex-1 min-w-[200px] max-w-xs'
@@ -1012,7 +1051,7 @@ export default function InventoryPaymentsPage() {
                         currentSort={iconA('equipment.code')}
                         onSort={reqSortA}
                       >
-                        Equipo
+                        Activo
                       </SortableTableHead>
                       <SortableTableHead
                         sortKey='equipment.type'
@@ -1094,31 +1133,40 @@ export default function InventoryPaymentsPage() {
                     ) : (
                       pageA.map(inv => {
                         const supplierLabel = inv.supplier?.name ?? inv.supplierName ?? '—'
+                        const asset = assetDisplay(inv)
                         return (
                           <TableRow key={inv.id} className='hover:bg-muted/30 transition-colors'>
                             <TableCell>
-                              <Link
-                                href={`/inventory/equipment/${inv.equipment.id}`}
-                                className='font-medium text-sm hover:underline font-mono'
-                              >
-                                {inv.equipment.code}
-                              </Link>
-                              <span className='block text-xs text-muted-foreground'>
-                                {inv.equipment.brand}{' '}
-                                {inv.equipment.model?.model ?? inv.equipment.modelDeprecated}
-                              </span>
+                              <div className='flex items-center gap-1.5'>
+                                <Link
+                                  href={asset.href}
+                                  className='font-medium text-sm hover:underline font-mono'
+                                >
+                                  {asset.code}
+                                </Link>
+                                {inv.assetKind === 'LICENSE' && (
+                                  <Badge variant='outline' className='text-[10px] px-1 py-0'>
+                                    Licencia
+                                  </Badge>
+                                )}
+                              </div>
+                              {asset.subtitle && (
+                                <span className='block text-xs text-muted-foreground'>
+                                  {asset.subtitle}
+                                </span>
+                              )}
                             </TableCell>
                             <TableCell className='hidden lg:table-cell'>
-                              <span className='text-sm'>{inv.equipment.type?.name ?? '—'}</span>
-                              {inv.equipment.type?.family && (
+                              <span className='text-sm'>{asset.typeName ?? '—'}</span>
+                              {asset.family && (
                                 <span className='flex items-center gap-1 text-xs text-muted-foreground mt-0.5'>
-                                  {inv.equipment.type.family.color && (
+                                  {asset.family.color && (
                                     <span
                                       className='h-2 w-2 rounded-full flex-shrink-0'
-                                      style={{ backgroundColor: inv.equipment.type.family.color }}
+                                      style={{ backgroundColor: asset.family.color }}
                                     />
                                   )}
-                                  {inv.equipment.type.family.name}
+                                  {asset.family.name}
                                 </span>
                               )}
                             </TableCell>
@@ -1281,10 +1329,9 @@ export default function InventoryPaymentsPage() {
           {markingAsset && (
             <div className='space-y-4 py-1'>
               <div className='rounded-md bg-muted/50 px-3 py-2 text-sm space-y-0.5'>
-                <p className='font-medium font-mono'>{markingAsset.equipment.code}</p>
+                <p className='font-medium font-mono'>{assetDisplay(markingAsset).code}</p>
                 <p className='text-muted-foreground text-xs'>
-                  {markingAsset.equipment.brand}{' '}
-                  {markingAsset.equipment.model?.model ?? markingAsset.equipment.modelDeprecated}
+                  {assetDisplay(markingAsset).subtitle}
                   {markingAsset.invoiceNumber ? ` · ${markingAsset.invoiceNumber}` : ''}
                 </p>
                 <p className='font-semibold'>

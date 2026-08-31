@@ -1,7 +1,11 @@
 /**
  * GET /api/inventory/equipment-payments
  *
- * Listado global de facturas de adquisición de activos (pestaña "Activos" en /inventory/payments).
+ * Listado global de facturas de adquisición de activos (pestaña "Activos" en
+ * /inventory/payments) — mezcla facturas de Equipos (equipment_invoices) y de
+ * Licencias (license_invoices), cada una etiquetada con `assetKind`. El
+ * nombre de la ruta quedó de cuando solo cubría equipos; se conserva para no
+ * romper el único consumidor (la propia página de Pagos).
  *
  * Scope de familias por rol:
  *   Super Admin → sin restricción (undefined)
@@ -13,8 +17,22 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { EquipmentInvoiceService } from '@/lib/services/equipment-invoice.service'
+import { LicenseInvoiceService } from '@/lib/services/license-invoice.service'
 import { requireInventoryModuleAccess } from '@/lib/inventory/require-inventory-api'
 import type { AcquisitionPaymentStatus } from '@/lib/services/equipment-invoice.service'
+
+const STATUS_SORT: Record<string, number> = { OVERDUE: 0, PENDING: 1, PAID: 2, CANCELLED: 3 }
+
+function sortInvoices(
+  a: { status: string; dueDate: Date | null },
+  b: { status: string; dueDate: Date | null }
+) {
+  const s = (STATUS_SORT[a.status] ?? 9) - (STATUS_SORT[b.status] ?? 9)
+  if (s !== 0) return s
+  const da = a.dueDate ? a.dueDate.getTime() : Infinity
+  const db = b.dueDate ? b.dueDate.getTime() : Infinity
+  return da - db
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -53,18 +71,48 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ invoices: [], total: 0, page, pageSize, totalPages: 0 })
     }
 
-    const result = await EquipmentInvoiceService.listGlobal({
-      status,
-      familyId,
-      allowedFamilyIds,
-      search,
+    // El front pide siempre pageSize=500 y pagina del lado del cliente (igual
+    // que la pestaña Contratos) — se trae hasta pageSize de cada tabla y se
+    // mezcla, en vez de paginar cada modelo por separado (Prisma no puede
+    // hacer un UNION entre equipment_invoices y license_invoices).
+    const [equipmentResult, licenseResult] = await Promise.all([
+      EquipmentInvoiceService.listGlobal({
+        status,
+        familyId,
+        allowedFamilyIds,
+        search,
+        page: 1,
+        pageSize,
+        fromDate,
+        toDate,
+      }),
+      LicenseInvoiceService.listGlobal({
+        status,
+        familyId,
+        allowedFamilyIds,
+        search,
+        fromDate,
+        toDate,
+        take: pageSize,
+      }),
+    ])
+
+    const merged = [
+      ...equipmentResult.invoices.map(inv => ({ ...inv, assetKind: 'EQUIPMENT' as const })),
+      ...licenseResult.invoices.map(inv => ({ ...inv, assetKind: 'LICENSE' as const })),
+    ]
+      .sort(sortInvoices)
+      .slice(0, pageSize)
+
+    const total = equipmentResult.total + licenseResult.total
+
+    return NextResponse.json({
+      invoices: merged,
+      total,
       page,
       pageSize,
-      fromDate,
-      toDate,
+      totalPages: Math.ceil(total / pageSize),
     })
-
-    return NextResponse.json(result)
   } catch (error) {
     console.error('[GET /api/inventory/equipment-payments]', error)
     return NextResponse.json({ error: 'Error al listar facturas de activos' }, { status: 500 })
