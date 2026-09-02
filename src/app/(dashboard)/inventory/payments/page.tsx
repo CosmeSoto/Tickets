@@ -18,7 +18,7 @@
  *  ✓ Scope de familias por rol
  */
 
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import {
   AlertCircle,
@@ -32,6 +32,7 @@ import {
   ChevronRight,
   Trash2,
   Undo2,
+  Plus,
 } from 'lucide-react'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { ListTableToolbar } from '@/components/common/list-table-toolbar'
@@ -71,6 +72,8 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { CurrencySelect } from '@/components/ui/currency-select'
 import { DateInput } from '@/components/ui/date-input'
 import { FamilyCombobox } from '@/components/ui/family-combobox'
 import { SortableTableHead } from '@/components/ui/sortable-table-head'
@@ -426,6 +429,262 @@ export default function InventoryPaymentsPage() {
   const [undoingAssetInstallment, setUndoingAssetInstallment] = useState<PaymentInstallment | null>(
     null
   )
+
+  // ── Dialog — nueva factura de activo (crear sin salir de Pagos) ───────────
+  // Pago único solamente — el plan de cuotas irregulares sigue viviendo en la
+  // ficha del propio equipo/licencia (AcquisitionInvoicesCard), que ya lo
+  // soporta con el mismo backend; acá se cubre el caso más común: registrar
+  // una factura nueva sin tener que navegar hasta el activo primero.
+  const [showNewInvoice, setShowNewInvoice] = useState(false)
+  const [niQuery, setNiQuery] = useState('')
+  const [niResults, setNiResults] = useState<
+    { id: string; kind: 'equipment' | 'license'; label: string }[]
+  >([])
+  const [niSearching, setNiSearching] = useState(false)
+  const [niAsset, setNiAsset] = useState<{
+    id: string
+    kind: 'equipment' | 'license'
+    label: string
+  } | null>(null)
+  const [niForm, setNiForm] = useState({
+    invoiceNumber: '',
+    purchaseOrderNumber: '',
+    amount: '',
+    currency: 'USD',
+    dueDate: '',
+    supplierId: '',
+    supplierName: '',
+    notes: '',
+  })
+  const [niSaving, setNiSaving] = useState(false)
+
+  useEffect(() => {
+    if (!showNewInvoice || niAsset) return
+    const q = niQuery.trim()
+    if (q.length < 2) {
+      setNiResults([])
+      return
+    }
+    const t = setTimeout(async () => {
+      setNiSearching(true)
+      try {
+        const res = await fetch(`/api/inventory/assets?search=${encodeURIComponent(q)}&pageSize=15`)
+        const json = await res.json()
+        const items = (json.items ?? []).filter(
+          (i: { subtype: string }) => i.subtype === 'EQUIPMENT' || i.subtype === 'LICENSE'
+        )
+        setNiResults(
+          items.map((i: { id: string; subtype: string; code?: string; name: string }) => ({
+            id: i.id,
+            kind: i.subtype === 'LICENSE' ? ('license' as const) : ('equipment' as const),
+            label: i.code ? `${i.code} — ${i.name}` : i.name,
+          }))
+        )
+      } catch {
+        setNiResults([])
+      } finally {
+        setNiSearching(false)
+      }
+    }, 300)
+    return () => clearTimeout(t)
+  }, [niQuery, showNewInvoice, niAsset])
+
+  async function selectNewInvoiceAsset(item: {
+    id: string
+    kind: 'equipment' | 'license'
+    label: string
+  }) {
+    setNiAsset(item)
+    setNiQuery(item.label)
+    setNiResults([])
+    // Proveedor pre-llenado desde el activo — mismo criterio que
+    // AcquisitionInvoicesCard (Parte 3a); si falla, el campo queda vacío y
+    // no bloquea el flujo.
+    try {
+      if (item.kind === 'equipment') {
+        const res = await fetch(`/api/inventory/equipment/${item.id}`)
+        const json = await res.json()
+        setNiForm(f => ({
+          ...f,
+          supplierId: json.equipment?.supplierId ?? '',
+          supplierName: json.equipment?.supplier?.name ?? '',
+        }))
+      } else {
+        const res = await fetch(`/api/inventory/licenses/${item.id}`)
+        const json = await res.json()
+        setNiForm(f => ({
+          ...f,
+          supplierId: json.supplier?.id ?? '',
+          supplierName: json.supplier?.name ?? '',
+        }))
+      }
+    } catch {
+      // proveedor queda vacío — no bloquea el registro de la factura
+    }
+  }
+
+  function closeNewInvoiceDialog() {
+    setShowNewInvoice(false)
+    setNiAsset(null)
+    setNiQuery('')
+    setNiResults([])
+    setNiForm({
+      invoiceNumber: '',
+      purchaseOrderNumber: '',
+      amount: '',
+      currency: 'USD',
+      dueDate: '',
+      supplierId: '',
+      supplierName: '',
+      notes: '',
+    })
+  }
+
+  async function handleCreateNewInvoice() {
+    if (!niAsset) {
+      toast({ title: 'Elige un equipo o licencia', variant: 'destructive' })
+      return
+    }
+    if (!niForm.amount || Number(niForm.amount) <= 0) {
+      toast({ title: 'El monto debe ser mayor a 0', variant: 'destructive' })
+      return
+    }
+    setNiSaving(true)
+    try {
+      const base =
+        niAsset.kind === 'license' ? '/api/inventory/licenses' : '/api/inventory/equipment'
+      const res = await fetch(`${base}/${niAsset.id}/invoices`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          invoiceNumber: niForm.invoiceNumber || null,
+          purchaseOrderNumber: niForm.purchaseOrderNumber || null,
+          amount: Number(niForm.amount),
+          currency: niForm.currency || 'USD',
+          dueDate: niForm.dueDate || null,
+          supplierId: niForm.supplierId || null,
+          supplierName: niForm.supplierName || null,
+          notes: niForm.notes || null,
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || 'No se pudo registrar')
+      toast({ title: 'Factura registrada' })
+      closeNewInvoiceDialog()
+      reloadA()
+    } catch (err) {
+      toast({
+        title: 'Error',
+        description: err instanceof Error ? err.message : 'Error',
+        variant: 'destructive',
+      })
+    } finally {
+      setNiSaving(false)
+    }
+  }
+
+  // ── Dialog — nuevo pago de contrato (crear sin salir de Pagos) ────────────
+  // Cuota ad hoc — complementa "Generar pagos" (ciclo completo, en la ficha
+  // del contrato) para el caso de una cuota suelta (cargo extra, corrección).
+  const [showNewPayment, setShowNewPayment] = useState(false)
+  const [npQuery, setNpQuery] = useState('')
+  const [npResults, setNpResults] = useState<{ id: string; label: string }[]>([])
+  const [npContract, setNpContract] = useState<{ id: string; label: string } | null>(null)
+  const [npForm, setNpForm] = useState({
+    amount: '',
+    currency: 'USD',
+    dueDate: '',
+    paymentMethod: '',
+    referenceNumber: '',
+    notes: '',
+  })
+  const [npSaving, setNpSaving] = useState(false)
+
+  useEffect(() => {
+    if (!showNewPayment || npContract) return
+    const q = npQuery.trim()
+    if (q.length < 2) {
+      setNpResults([])
+      return
+    }
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `/api/inventory/contracts?search=${encodeURIComponent(q)}&pageSize=15`
+        )
+        const json = await res.json()
+        setNpResults(
+          (json.contracts ?? []).map(
+            (c: { id: string; name: string; contractNumber?: string }) => ({
+              id: c.id,
+              label: c.contractNumber ? `${c.contractNumber} — ${c.name}` : c.name,
+            })
+          )
+        )
+      } catch {
+        setNpResults([])
+      }
+    }, 300)
+    return () => clearTimeout(t)
+  }, [npQuery, showNewPayment, npContract])
+
+  function closeNewPaymentDialog() {
+    setShowNewPayment(false)
+    setNpContract(null)
+    setNpQuery('')
+    setNpResults([])
+    setNpForm({
+      amount: '',
+      currency: 'USD',
+      dueDate: '',
+      paymentMethod: '',
+      referenceNumber: '',
+      notes: '',
+    })
+  }
+
+  async function handleCreateNewPayment() {
+    if (!npContract) {
+      toast({ title: 'Elige un contrato', variant: 'destructive' })
+      return
+    }
+    if (!npForm.amount || Number(npForm.amount) <= 0) {
+      toast({ title: 'El monto debe ser mayor a 0', variant: 'destructive' })
+      return
+    }
+    if (!npForm.dueDate) {
+      toast({ title: 'La fecha de vencimiento es obligatoria', variant: 'destructive' })
+      return
+    }
+    setNpSaving(true)
+    try {
+      const res = await fetch(`/api/inventory/contracts/${npContract.id}/payments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: Number(npForm.amount),
+          currency: npForm.currency || 'USD',
+          dueDate: npForm.dueDate,
+          paymentMethod: npForm.paymentMethod || undefined,
+          referenceNumber: npForm.referenceNumber || undefined,
+          notes: npForm.notes || undefined,
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || 'No se pudo registrar')
+      toast({ title: 'Cuota registrada' })
+      closeNewPaymentDialog()
+      reloadC()
+    } catch (err) {
+      toast({
+        title: 'Error',
+        description: err instanceof Error ? err.message : 'Error',
+        variant: 'destructive',
+      })
+    } finally {
+      setNpSaving(false)
+    }
+  }
 
   // ── Fetch contratos
   const buildContractUrl = useCallback(() => {
@@ -957,6 +1216,12 @@ export default function InventoryPaymentsPage() {
                 loading: expALoading,
                 disabled: filteredAssetInvoices.length === 0,
               }}
+              endActions={
+                <Button type='button' size='sm' onClick={() => setShowNewInvoice(true)}>
+                  <Plus className='h-3.5 w-3.5 mr-1.5' />
+                  Nueva factura
+                </Button>
+              }
             />
 
             {/* Filtros */}
@@ -1306,6 +1571,12 @@ export default function InventoryPaymentsPage() {
                 loading: expCLoading,
                 disabled: contractPayments.length === 0,
               }}
+              endActions={
+                <Button type='button' size='sm' onClick={() => setShowNewPayment(true)}>
+                  <Plus className='h-3.5 w-3.5 mr-1.5' />
+                  Nuevo pago
+                </Button>
+              }
             />
 
             {/* Filtros */}
@@ -1806,6 +2077,264 @@ export default function InventoryPaymentsPage() {
                     Number(aPayAmount) >= markingAsset.amount - markingAsset.paidAmount - 0.01
                   ? 'Confirmar pago'
                   : 'Registrar abono'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Dialog: nueva factura de activo (sin salir de Pagos) ──────────── */}
+      <Dialog open={showNewInvoice} onOpenChange={open => !open && closeNewInvoiceDialog()}>
+        <DialogContent className='w-[min(95vw,32rem)] max-w-lg max-h-[92vh] overflow-y-auto'>
+          <DialogHeader>
+            <DialogTitle>Nueva factura de activo</DialogTitle>
+          </DialogHeader>
+          <div className='space-y-3 py-1'>
+            <div className='space-y-1'>
+              <Label>
+                Equipo o licencia <span className='text-destructive'>*</span>
+              </Label>
+              <Input
+                placeholder='Buscar por código, marca o nombre…'
+                value={niQuery}
+                onChange={e => {
+                  setNiQuery(e.target.value)
+                  setNiAsset(null)
+                }}
+              />
+              {niSearching && <p className='text-xs text-muted-foreground'>Buscando…</p>}
+              {!niAsset && niResults.length > 0 && (
+                <ul className='rounded-md border divide-y max-h-40 overflow-y-auto text-sm'>
+                  {niResults.map(item => (
+                    <li key={`${item.kind}-${item.id}`}>
+                      <button
+                        type='button'
+                        onClick={() => selectNewInvoiceAsset(item)}
+                        className='w-full text-left px-3 py-1.5 hover:bg-muted transition-colors flex items-center justify-between gap-2'
+                      >
+                        <span>{item.label}</span>
+                        <Badge variant='secondary' className='text-xs shrink-0'>
+                          {item.kind === 'license' ? 'Licencia' : 'Equipo'}
+                        </Badge>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {niAsset && (
+                <p className='text-xs text-muted-foreground'>
+                  Activo seleccionado — {niAsset.kind === 'license' ? 'Licencia' : 'Equipo'}
+                  {niForm.supplierName && ` · Proveedor: ${niForm.supplierName}`}
+                </p>
+              )}
+            </div>
+
+            <div className='grid grid-cols-3 gap-3'>
+              <div className='col-span-2 space-y-1'>
+                <Label>
+                  Monto <span className='text-destructive'>*</span>
+                </Label>
+                <Input
+                  type='number'
+                  min='0.01'
+                  step='0.01'
+                  placeholder='0.00'
+                  value={niForm.amount}
+                  onChange={e => setNiForm(f => ({ ...f, amount: e.target.value }))}
+                />
+              </div>
+              <div className='space-y-1'>
+                <Label>Moneda</Label>
+                <CurrencySelect
+                  value={niForm.currency}
+                  onChange={v => setNiForm(f => ({ ...f, currency: v }))}
+                />
+              </div>
+            </div>
+
+            <div className='grid grid-cols-2 gap-3'>
+              <div className='space-y-1'>
+                <Label>N° Factura</Label>
+                <Input
+                  placeholder='FAC-001'
+                  value={niForm.invoiceNumber}
+                  onChange={e => setNiForm(f => ({ ...f, invoiceNumber: e.target.value }))}
+                  maxLength={100}
+                />
+              </div>
+              <div className='space-y-1'>
+                <Label>N° Orden de Compra</Label>
+                <Input
+                  placeholder='OC-001'
+                  value={niForm.purchaseOrderNumber}
+                  onChange={e => setNiForm(f => ({ ...f, purchaseOrderNumber: e.target.value }))}
+                  maxLength={100}
+                />
+              </div>
+            </div>
+
+            <div className='space-y-1'>
+              <Label>Fecha de vencimiento</Label>
+              <DateInput
+                value={niForm.dueDate}
+                onChange={e => setNiForm(f => ({ ...f, dueDate: e.target.value }))}
+                clearable
+              />
+            </div>
+
+            <div className='space-y-1'>
+              <Label>Notas</Label>
+              <Textarea
+                rows={2}
+                placeholder='Observaciones opcionales…'
+                value={niForm.notes}
+                onChange={e => setNiForm(f => ({ ...f, notes: e.target.value }))}
+              />
+            </div>
+
+            <p className='text-xs text-muted-foreground'>
+              Pago único. Para un plan de cuotas irregulares, registrá la factura desde la ficha del
+              equipo o la licencia.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button type='button' variant='outline' onClick={closeNewInvoiceDialog}>
+              Cancelar
+            </Button>
+            <Button type='button' onClick={handleCreateNewInvoice} disabled={niSaving}>
+              {niSaving ? 'Guardando…' : 'Registrar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Dialog: nuevo pago de contrato (sin salir de Pagos) ───────────── */}
+      <Dialog open={showNewPayment} onOpenChange={open => !open && closeNewPaymentDialog()}>
+        <DialogContent className='w-[min(95vw,32rem)] max-w-lg max-h-[92vh] overflow-y-auto'>
+          <DialogHeader>
+            <DialogTitle>Nuevo pago de contrato</DialogTitle>
+          </DialogHeader>
+          <div className='space-y-3 py-1'>
+            <div className='space-y-1'>
+              <Label>
+                Contrato <span className='text-destructive'>*</span>
+              </Label>
+              <Input
+                placeholder='Buscar por nombre o N° de contrato…'
+                value={npQuery}
+                onChange={e => {
+                  setNpQuery(e.target.value)
+                  setNpContract(null)
+                }}
+              />
+              {!npContract && npResults.length > 0 && (
+                <ul className='rounded-md border divide-y max-h-40 overflow-y-auto text-sm'>
+                  {npResults.map(item => (
+                    <li key={item.id}>
+                      <button
+                        type='button'
+                        onClick={() => {
+                          setNpContract(item)
+                          setNpQuery(item.label)
+                          setNpResults([])
+                        }}
+                        className='w-full text-left px-3 py-1.5 hover:bg-muted transition-colors'
+                      >
+                        {item.label}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div className='grid grid-cols-3 gap-3'>
+              <div className='col-span-2 space-y-1'>
+                <Label>
+                  Monto <span className='text-destructive'>*</span>
+                </Label>
+                <Input
+                  type='number'
+                  min='0.01'
+                  step='0.01'
+                  placeholder='0.00'
+                  value={npForm.amount}
+                  onChange={e => setNpForm(f => ({ ...f, amount: e.target.value }))}
+                />
+              </div>
+              <div className='space-y-1'>
+                <Label>Moneda</Label>
+                <CurrencySelect
+                  value={npForm.currency}
+                  onChange={v => setNpForm(f => ({ ...f, currency: v }))}
+                />
+              </div>
+            </div>
+
+            <div className='space-y-1'>
+              <Label>
+                Fecha de vencimiento <span className='text-destructive'>*</span>
+              </Label>
+              <DateInput
+                value={npForm.dueDate}
+                onChange={e => setNpForm(f => ({ ...f, dueDate: e.target.value }))}
+              />
+            </div>
+
+            <div className='space-y-1'>
+              <Label>Método de pago</Label>
+              <Select
+                value={npForm.paymentMethod || '__none__'}
+                onValueChange={v =>
+                  setNpForm(f => ({ ...f, paymentMethod: v === '__none__' ? '' : v }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder='Seleccionar método' />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='__none__'>Sin especificar</SelectItem>
+                  {(
+                    Object.entries(PAYMENT_METHOD_TYPE_LABELS) as [PaymentMethodType, string][]
+                  ).map(([key, label]) => (
+                    <SelectItem key={key} value={key}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className='space-y-1'>
+              <Label>N° Referencia</Label>
+              <Input
+                placeholder='REF-12345'
+                value={npForm.referenceNumber}
+                onChange={e => setNpForm(f => ({ ...f, referenceNumber: e.target.value }))}
+                maxLength={200}
+              />
+            </div>
+
+            <div className='space-y-1'>
+              <Label>Notas</Label>
+              <Textarea
+                rows={2}
+                placeholder='Observaciones opcionales…'
+                value={npForm.notes}
+                onChange={e => setNpForm(f => ({ ...f, notes: e.target.value }))}
+              />
+            </div>
+
+            <p className='text-xs text-muted-foreground'>
+              Cuota suelta (cargo extra, corrección). Para generar el ciclo completo de cuotas de un
+              contrato, usa &ldquo;Generar pagos&rdquo; en la ficha del contrato.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button type='button' variant='outline' onClick={closeNewPaymentDialog}>
+              Cancelar
+            </Button>
+            <Button type='button' onClick={handleCreateNewPayment} disabled={npSaving}>
+              {npSaving ? 'Guardando…' : 'Registrar'}
             </Button>
           </DialogFooter>
         </DialogContent>
