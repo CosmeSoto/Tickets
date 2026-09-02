@@ -61,8 +61,19 @@ import { PAYMENT_METHOD_TYPE_LABELS, type PaymentMethodType } from '@/types/cont
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
-type InvoiceStatus = 'PENDING' | 'PAID' | 'OVERDUE' | 'CANCELLED'
+type InvoiceStatus = 'PENDING' | 'PAID' | 'OVERDUE' | 'CANCELLED' | 'PARTIALLY_PAID'
 export type AcquisitionAssetType = 'equipment' | 'license'
+
+interface InvoiceInstallment {
+  id: string
+  amount: number
+  paidDate: string
+  paymentMethod?: string | null
+  referenceNumber?: string | null
+  notes?: string | null
+  createdAt: string
+  creator?: { id: string; name: string } | null
+}
 
 interface AcquisitionInvoice {
   id: string
@@ -85,6 +96,9 @@ interface AcquisitionInvoice {
   createdAt: string
   supplier?: { id: string; name: string } | null
   creator?: { id: string; name: string } | null
+  /** Suma de abonos registrados — ver installments. Calculado en el servidor. */
+  paidAmount: number
+  installments: InvoiceInstallment[]
 }
 
 interface FormState {
@@ -143,12 +157,20 @@ const STATUS_CONFIG: Record<
     label: string
     variant: 'default' | 'secondary' | 'destructive' | 'outline'
     icon: React.ElementType
+    className?: string
   }
 > = {
   PENDING: { label: 'Pendiente', variant: 'secondary', icon: Clock },
   PAID: { label: 'Pagado', variant: 'default', icon: CheckCircle2 },
   OVERDUE: { label: 'Vencido', variant: 'destructive', icon: AlertCircle },
   CANCELLED: { label: 'Cancelado', variant: 'outline', icon: XCircle },
+  PARTIALLY_PAID: {
+    label: 'Parcial',
+    variant: 'outline',
+    icon: Clock,
+    className:
+      'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-900/40',
+  },
 }
 
 function fmtCurrency(amount: number, currency = 'USD') {
@@ -310,22 +332,24 @@ export function AcquisitionInvoicesCard({
 
   const [paidDate, setPaidDate] = useState(todayISO())
   const [paidMethod, setPaidMethod] = useState<string>('')
+  const [payAmount, setPayAmount] = useState<string>('')
 
   function openMarkPaid(inv: AcquisitionInvoice) {
     setPaidDate(todayISO())
     setPaidMethod(inv.paymentMethod ?? '')
+    setPayAmount((inv.amount - inv.paidAmount).toFixed(2))
     setMarkingPaid(inv)
   }
 
-  async function handleMarkPaid() {
+  async function handleRegisterPayment() {
     if (!markingPaid) return
     setSaving(true)
     try {
-      const res = await fetch(endpoints.item(markingPaid.id), {
-        method: 'PATCH',
+      const res = await fetch(`${endpoints.item(markingPaid.id)}/installments`, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'markAsPaid',
+          amount: payAmount ? Number(payAmount) : undefined,
           paidDate,
           paymentMethod: paidMethod || null,
         }),
@@ -367,8 +391,8 @@ export function AcquisitionInvoicesCard({
     (acc, inv) => {
       if (inv.status !== 'CANCELLED') {
         acc.total += inv.amount
-        if (inv.status === 'PAID') acc.paid += inv.amount
-        if (inv.status === 'PENDING' || inv.status === 'OVERDUE') acc.pending += inv.amount
+        acc.paid += inv.paidAmount
+        acc.pending += inv.amount - inv.paidAmount
       }
       return acc
     },
@@ -471,6 +495,11 @@ export function AcquisitionInvoicesCard({
                           </td>
                           <td className='px-3 py-2 whitespace-nowrap font-medium'>
                             {fmtCurrency(inv.amount, inv.currency)}
+                            {inv.paidAmount > 0 && inv.status !== 'PAID' && (
+                              <span className='block text-xs font-normal text-muted-foreground'>
+                                Abonado: {fmtCurrency(inv.paidAmount, inv.currency)}
+                              </span>
+                            )}
                           </td>
                           <td className='px-3 py-2 whitespace-nowrap text-xs'>
                             {inv.status === 'PAID' ? (
@@ -482,7 +511,10 @@ export function AcquisitionInvoicesCard({
                             )}
                           </td>
                           <td className='px-3 py-2'>
-                            <Badge variant={cfg.variant} className='gap-1 text-xs'>
+                            <Badge
+                              variant={cfg.variant}
+                              className={`gap-1 text-xs ${cfg.className ?? ''}`}
+                            >
                               <Icon className='h-3 w-3' />
                               {cfg.label}
                             </Badge>
@@ -490,7 +522,9 @@ export function AcquisitionInvoicesCard({
                           {canManage && (
                             <td className='px-3 py-2'>
                               <div className='flex items-center gap-1 justify-end'>
-                                {(inv.status === 'PENDING' || inv.status === 'OVERDUE') && (
+                                {(inv.status === 'PENDING' ||
+                                  inv.status === 'OVERDUE' ||
+                                  inv.status === 'PARTIALLY_PAID') && (
                                   <Button
                                     type='button'
                                     size='sm'
@@ -499,7 +533,7 @@ export function AcquisitionInvoicesCard({
                                     onClick={() => openMarkPaid(inv)}
                                   >
                                     <CheckCircle2 className='h-3 w-3 mr-1' />
-                                    Pagar
+                                    {inv.paidAmount > 0 ? 'Abonar' : 'Pagar'}
                                   </Button>
                                 )}
                                 <button
@@ -729,7 +763,7 @@ export function AcquisitionInvoicesCard({
         </DialogContent>
       </Dialog>
 
-      {/* ── Dialog: marcar como pagado ────────────────────────────────────── */}
+      {/* ── Dialog: registrar pago / abono ───────────────────────────────── */}
       <Dialog open={!!markingPaid} onOpenChange={open => !open && setMarkingPaid(null)}>
         <DialogContent className='max-w-sm'>
           <DialogHeader>
@@ -737,12 +771,54 @@ export function AcquisitionInvoicesCard({
           </DialogHeader>
           {markingPaid && (
             <div className='space-y-3'>
-              <p className='text-sm text-muted-foreground'>
-                {markingPaid.invoiceNumber ?? 'Factura'} ·{' '}
-                <span className='font-medium'>
-                  {fmtCurrency(markingPaid.amount, markingPaid.currency)}
-                </span>
-              </p>
+              <div className='rounded-md bg-muted/50 px-3 py-2 text-sm space-y-0.5'>
+                <p className='font-medium'>{markingPaid.invoiceNumber ?? 'Factura'}</p>
+                <p className='text-muted-foreground text-xs'>
+                  Monto total: {fmtCurrency(markingPaid.amount, markingPaid.currency)}
+                </p>
+                {markingPaid.paidAmount > 0 && (
+                  <p className='text-muted-foreground text-xs'>
+                    Abonado: {fmtCurrency(markingPaid.paidAmount, markingPaid.currency)}
+                  </p>
+                )}
+                <p className='font-semibold'>
+                  Saldo pendiente:{' '}
+                  {fmtCurrency(markingPaid.amount - markingPaid.paidAmount, markingPaid.currency)}
+                </p>
+              </div>
+
+              {markingPaid.installments.length > 0 && (
+                <div className='space-y-1'>
+                  <Label className='text-xs text-muted-foreground'>
+                    Abonos anteriores ({markingPaid.installments.length})
+                  </Label>
+                  <ul className='rounded-md border divide-y text-xs max-h-24 overflow-y-auto'>
+                    {markingPaid.installments.map(ins => (
+                      <li key={ins.id} className='flex justify-between px-2 py-1'>
+                        <span className='text-muted-foreground'>{fmtDate(ins.paidDate)}</span>
+                        <span className='font-medium'>
+                          {fmtCurrency(ins.amount, markingPaid.currency)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <div className='space-y-1'>
+                <Label>Monto a abonar</Label>
+                <Input
+                  type='number'
+                  min='0.01'
+                  step='0.01'
+                  max={markingPaid.amount - markingPaid.paidAmount}
+                  value={payAmount}
+                  onChange={e => setPayAmount(e.target.value)}
+                />
+                <p className='text-xs text-muted-foreground'>
+                  Deja el monto completo para saldar, o redúcelo para abonar parcialmente.
+                </p>
+              </div>
               <div className='space-y-1'>
                 <Label>Fecha de pago</Label>
                 <DateInput value={paidDate} onChange={e => setPaidDate(e.target.value)} />
@@ -774,8 +850,15 @@ export function AcquisitionInvoicesCard({
             <Button type='button' variant='outline' onClick={() => setMarkingPaid(null)}>
               Cancelar
             </Button>
-            <Button type='button' onClick={handleMarkPaid} disabled={saving}>
-              {saving ? <Loader2 className='h-4 w-4 animate-spin' /> : 'Confirmar pago'}
+            <Button type='button' onClick={handleRegisterPayment} disabled={saving}>
+              {saving ? (
+                <Loader2 className='h-4 w-4 animate-spin' />
+              ) : markingPaid &&
+                Number(payAmount) >= markingPaid.amount - markingPaid.paidAmount - 0.01 ? (
+                'Confirmar pago'
+              ) : (
+                'Registrar abono'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

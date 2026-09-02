@@ -73,6 +73,16 @@ import { PAYMENT_METHOD_TYPE_LABELS, type PaymentMethodType } from '@/types/cont
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
+type PaymentInstallment = {
+  id: string
+  amount: number
+  paidDate: string
+  paymentMethod?: string | null
+  referenceNumber?: string | null
+  notes?: string | null
+  createdAt: string
+}
+
 type ContractPayment = {
   id: string
   amount: number
@@ -84,6 +94,9 @@ type ContractPayment = {
   referenceNumber?: string | null
   notes?: string | null
   createdAt: string
+  /** Suma de abonos registrados — calculado en el servidor. */
+  paidAmount: number
+  installments: PaymentInstallment[]
   contract: {
     id: string
     name: string
@@ -109,6 +122,9 @@ type AssetInvoice = {
   supplierName?: string | null
   notes?: string | null
   createdAt: string
+  /** Suma de abonos registrados — calculado en el servidor. */
+  paidAmount: number
+  installments: PaymentInstallment[]
   equipment?: {
     id: string
     code: string
@@ -159,6 +175,7 @@ const CONTRACT_STATUS_OPTIONS = [
   { value: 'ALL', label: 'Todos los estados' },
   { value: 'OVERDUE', label: 'Vencidos' },
   { value: 'DUE', label: 'Vence hoy' },
+  { value: 'PARTIALLY_PAID', label: 'Parcial' },
   { value: 'SCHEDULED', label: 'Programados' },
   { value: 'PAID', label: 'Pagados' },
   { value: 'CANCELLED', label: 'Cancelados' },
@@ -168,9 +185,13 @@ const ASSET_STATUS_OPTIONS = [
   { value: 'ALL', label: 'Todos los estados' },
   { value: 'OVERDUE', label: 'Vencidos' },
   { value: 'PENDING', label: 'Pendientes' },
+  { value: 'PARTIALLY_PAID', label: 'Parcial' },
   { value: 'PAID', label: 'Pagados' },
   { value: 'CANCELLED', label: 'Cancelados' },
 ]
+
+const PARTIALLY_PAID_BADGE_CLS =
+  'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-900/40'
 
 const CONTRACT_STATUS_CONFIG: Record<
   string,
@@ -178,6 +199,7 @@ const CONTRACT_STATUS_CONFIG: Record<
     label: string
     variant: 'default' | 'secondary' | 'destructive' | 'outline'
     icon: React.ElementType
+    className?: string
   }
 > = {
   SCHEDULED: { label: 'Programado', variant: 'secondary', icon: Clock },
@@ -185,6 +207,12 @@ const CONTRACT_STATUS_CONFIG: Record<
   OVERDUE: { label: 'Vencido', variant: 'destructive', icon: AlertCircle },
   PAID: { label: 'Pagado', variant: 'default', icon: CheckCircle2 },
   CANCELLED: { label: 'Cancelado', variant: 'outline', icon: XCircle },
+  PARTIALLY_PAID: {
+    label: 'Parcial',
+    variant: 'outline',
+    icon: Clock,
+    className: PARTIALLY_PAID_BADGE_CLS,
+  },
 }
 
 const ASSET_STATUS_CONFIG: Record<
@@ -193,12 +221,19 @@ const ASSET_STATUS_CONFIG: Record<
     label: string
     variant: 'default' | 'secondary' | 'destructive' | 'outline'
     icon: React.ElementType
+    className?: string
   }
 > = {
   PENDING: { label: 'Pendiente', variant: 'secondary', icon: Clock },
   OVERDUE: { label: 'Vencido', variant: 'destructive', icon: AlertCircle },
   PAID: { label: 'Pagado', variant: 'default', icon: CheckCircle2 },
   CANCELLED: { label: 'Cancelado', variant: 'outline', icon: XCircle },
+  PARTIALLY_PAID: {
+    label: 'Parcial',
+    variant: 'outline',
+    icon: Clock,
+    className: PARTIALLY_PAID_BADGE_CLS,
+  },
 }
 
 function fmtDate(d?: string | null) {
@@ -242,7 +277,7 @@ function StatusBadge({ status, cfg }: { status: string; cfg: typeof CONTRACT_STA
   const c = cfg[status] ?? { label: status, variant: 'secondary' as const, icon: Clock }
   const Icon = c.icon
   return (
-    <Badge variant={c.variant} className='gap-1 text-xs whitespace-nowrap'>
+    <Badge variant={c.variant} className={`gap-1 text-xs whitespace-nowrap ${c.className ?? ''}`}>
       <Icon className='h-3 w-3' />
       {c.label}
     </Badge>
@@ -356,6 +391,7 @@ export default function InventoryPaymentsPage() {
   const [cPaidDate, setCPaidDate] = useState(todayISO())
   const [cPaidMethod, setCPaidMethod] = useState<string>('')
   const [cPaidRef, setCPaidRef] = useState('')
+  const [cPayAmount, setCPayAmount] = useState('')
   const [savingC, setSavingC] = useState(false)
 
   // ── Dialogs — pago de activo
@@ -363,6 +399,7 @@ export default function InventoryPaymentsPage() {
   const [aPaidDate, setAPaidDate] = useState(todayISO())
   const [aPaidMethod, setAPaidMethod] = useState<string>('')
   const [aPaidRef, setAPaidRef] = useState('')
+  const [aPayAmount, setAPayAmount] = useState('')
   const [savingA, setSavingA] = useState(false)
 
   // ── Fetch contratos
@@ -476,6 +513,16 @@ export default function InventoryPaymentsPage() {
       { key: 'contract', label: 'Área', format: v => v?.family?.name ?? '' },
       { key: 'contract', label: 'Ciclo', format: v => v?.billingCycle ?? '' },
       { key: 'amount', label: 'Monto', format: (v, row) => fmtCurrency(Number(v), row.currency) },
+      {
+        key: 'paidAmount',
+        label: 'Abonado',
+        format: (v, row) => fmtCurrency(Number(v ?? 0), row.currency),
+      },
+      {
+        key: 'amount',
+        label: 'Saldo',
+        format: (v, row) => fmtCurrency(Number(v) - (row.paidAmount ?? 0), row.currency),
+      },
       { key: 'currency', label: 'Moneda' },
       { key: 'status', label: 'Estado', format: v => CONTRACT_STATUS_CONFIG[v]?.label ?? v },
       { key: 'paidDate', label: 'Fecha pago', format: v => fmtDate(v) },
@@ -515,6 +562,16 @@ export default function InventoryPaymentsPage() {
       { key: 'invoiceNumber', label: 'N° Factura', format: v => v ?? '' },
       { key: 'purchaseOrderNumber', label: 'N° OC', format: v => v ?? '' },
       { key: 'amount', label: 'Monto', format: (v, row) => fmtCurrency(Number(v), row.currency) },
+      {
+        key: 'paidAmount',
+        label: 'Abonado',
+        format: (v, row) => fmtCurrency(Number(v ?? 0), row.currency),
+      },
+      {
+        key: 'amount',
+        label: 'Saldo',
+        format: (v, row) => fmtCurrency(Number(v) - (row.paidAmount ?? 0), row.currency),
+      },
       { key: 'currency', label: 'Moneda' },
       { key: 'dueDate', label: 'Vencimiento', format: v => fmtDate(v) },
       { key: 'status', label: 'Estado', format: v => ASSET_STATUS_CONFIG[v]?.label ?? v },
@@ -541,10 +598,15 @@ export default function InventoryPaymentsPage() {
     paid: contractPayments.filter(p => p.status === 'PAID').length,
     // Un total por moneda — sumar montos de monedas distintas en un solo
     // número no tiene sentido y antes mostraba el resultado con la etiqueta
-    // de la primera moneda cargada, que podía ser cualquiera.
+    // de la primera moneda cargada, que podía ser cualquiera. Se suma el
+    // SALDO (amount - paidAmount), no el monto completo — si no, una cuota
+    // PARTIALLY_PAID se contaría dos veces (una acá con su monto completo,
+    // otra en lo ya abonado).
     pendingLabel: fmtMultiCurrency(
       sumByCurrency(
-        contractPayments.filter(p => ['SCHEDULED', 'DUE', 'OVERDUE'].includes(p.status))
+        contractPayments
+          .filter(p => ['SCHEDULED', 'DUE', 'OVERDUE', 'PARTIALLY_PAID'].includes(p.status))
+          .map(p => ({ currency: p.currency, amount: p.amount - p.paidAmount }))
       )
     ),
   }
@@ -556,24 +618,32 @@ export default function InventoryPaymentsPage() {
     pending: filteredAssetInvoices.filter(i => i.status === 'PENDING').length,
     paid: filteredAssetInvoices.filter(i => i.status === 'PAID').length,
     pendingLabel: fmtMultiCurrency(
-      sumByCurrency(filteredAssetInvoices.filter(i => ['PENDING', 'OVERDUE'].includes(i.status)))
+      sumByCurrency(
+        filteredAssetInvoices
+          .filter(i => ['PENDING', 'OVERDUE', 'PARTIALLY_PAID'].includes(i.status))
+          .map(i => ({ currency: i.currency, amount: i.amount - i.paidAmount }))
+      )
     ),
   }
 
-  // ── Acción: marcar contrato pagado
+  // ── Acción: registrar pago (completo o parcial) de contrato
   const markContractPaid = async () => {
     if (!markingContract) return
     setSavingC(true)
     try {
-      const res = await fetch(`/api/inventory/contracts/payments/${markingContract.id}/mark-paid`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          paidDate: cPaidDate,
-          paymentMethod: cPaidMethod || 'BANK_TRANSFER',
-          referenceNumber: cPaidRef || undefined,
-        }),
-      })
+      const res = await fetch(
+        `/api/inventory/contracts/payments/${markingContract.id}/installments`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amount: cPayAmount ? Number(cPayAmount) : undefined,
+            paidDate: cPaidDate,
+            paymentMethod: cPaidMethod || 'BANK_TRANSFER',
+            referenceNumber: cPaidRef || undefined,
+          }),
+        }
+      )
       const json = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(json.error || 'No se pudo registrar')
       toast({ title: 'Pago registrado correctamente' })
@@ -590,7 +660,7 @@ export default function InventoryPaymentsPage() {
     }
   }
 
-  // ── Acción: marcar activo pagado
+  // ── Acción: registrar pago (completo o parcial) de factura de activo
   const markAssetPaid = async () => {
     if (!markingAsset) return
     setSavingA(true)
@@ -599,11 +669,11 @@ export default function InventoryPaymentsPage() {
         markingAsset.assetKind === 'LICENSE'
           ? '/api/inventory/licenses/invoices'
           : '/api/inventory/equipment/invoices'
-      const res = await fetch(`${base}/${markingAsset.id}`, {
-        method: 'PATCH',
+      const res = await fetch(`${base}/${markingAsset.id}/installments`, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'markAsPaid',
+          amount: aPayAmount ? Number(aPayAmount) : undefined,
           paidDate: aPaidDate,
           paymentMethod: aPaidMethod || undefined,
           referenceNumber: aPaidRef || undefined,
@@ -914,6 +984,11 @@ export default function InventoryPaymentsPage() {
                           </TableCell>
                           <TableCell className='text-right font-medium whitespace-nowrap'>
                             {fmtCurrency(Number(p.amount), p.currency)}
+                            {p.paidAmount > 0 && p.status !== 'PAID' && (
+                              <span className='block text-xs font-normal text-muted-foreground'>
+                                Abonado: {fmtCurrency(p.paidAmount, p.currency)}
+                              </span>
+                            )}
                           </TableCell>
                           <TableCell>
                             <StatusBadge status={p.status} cfg={CONTRACT_STATUS_CONFIG} />
@@ -924,7 +999,8 @@ export default function InventoryPaymentsPage() {
                           <TableCell className='text-right'>
                             {(p.status === 'SCHEDULED' ||
                               p.status === 'DUE' ||
-                              p.status === 'OVERDUE') && (
+                              p.status === 'OVERDUE' ||
+                              p.status === 'PARTIALLY_PAID') && (
                               <Button
                                 type='button'
                                 size='sm'
@@ -934,11 +1010,12 @@ export default function InventoryPaymentsPage() {
                                   setCPaidDate(todayISO())
                                   setCPaidMethod('')
                                   setCPaidRef('')
+                                  setCPayAmount((p.amount - p.paidAmount).toFixed(2))
                                   setMarkingContract(p)
                                 }}
                               >
                                 <CheckCircle2 className='h-3.5 w-3.5 mr-1' />
-                                Pagar
+                                {p.paidAmount > 0 ? 'Abonar' : 'Pagar'}
                               </Button>
                             )}
                           </TableCell>
@@ -1228,6 +1305,11 @@ export default function InventoryPaymentsPage() {
                             </TableCell>
                             <TableCell className='text-right font-medium whitespace-nowrap'>
                               {fmtCurrency(Number(inv.amount), inv.currency)}
+                              {inv.paidAmount > 0 && inv.status !== 'PAID' && (
+                                <span className='block text-xs font-normal text-muted-foreground'>
+                                  Abonado: {fmtCurrency(inv.paidAmount, inv.currency)}
+                                </span>
+                              )}
                             </TableCell>
                             <TableCell className='whitespace-nowrap font-mono text-xs'>
                               {inv.status === 'PAID' ? (
@@ -1243,7 +1325,9 @@ export default function InventoryPaymentsPage() {
                               {inv.status === 'PAID' ? fmtDate(inv.paidDate) : '—'}
                             </TableCell>
                             <TableCell className='text-right'>
-                              {(inv.status === 'PENDING' || inv.status === 'OVERDUE') && (
+                              {(inv.status === 'PENDING' ||
+                                inv.status === 'OVERDUE' ||
+                                inv.status === 'PARTIALLY_PAID') && (
                                 <Button
                                   type='button'
                                   size='sm'
@@ -1253,11 +1337,12 @@ export default function InventoryPaymentsPage() {
                                     setAPaidDate(todayISO())
                                     setAPaidMethod(inv.paymentMethod ?? '')
                                     setAPaidRef('')
+                                    setAPayAmount((inv.amount - inv.paidAmount).toFixed(2))
                                     setMarkingAsset(inv)
                                   }}
                                 >
                                   <CheckCircle2 className='h-3.5 w-3.5 mr-1' />
-                                  Pagar
+                                  {inv.paidAmount > 0 ? 'Abonar' : 'Pagar'}
                                 </Button>
                               )}
                             </TableCell>
@@ -1299,8 +1384,53 @@ export default function InventoryPaymentsPage() {
               <div className='rounded-md bg-muted/50 px-3 py-2 text-sm space-y-0.5'>
                 <p className='font-medium'>{markingContract.contract.name}</p>
                 <p className='text-muted-foreground text-xs'>
-                  {fmtDate(markingContract.dueDate)} ·{' '}
+                  {fmtDate(markingContract.dueDate)} · Monto total:{' '}
                   {fmtCurrency(Number(markingContract.amount), markingContract.currency)}
+                </p>
+                {markingContract.paidAmount > 0 && (
+                  <p className='text-muted-foreground text-xs'>
+                    Abonado: {fmtCurrency(markingContract.paidAmount, markingContract.currency)}
+                  </p>
+                )}
+                <p className='font-semibold'>
+                  Saldo pendiente:{' '}
+                  {fmtCurrency(
+                    markingContract.amount - markingContract.paidAmount,
+                    markingContract.currency
+                  )}
+                </p>
+              </div>
+
+              {markingContract.installments.length > 0 && (
+                <div className='space-y-1'>
+                  <Label className='text-xs text-muted-foreground'>
+                    Abonos anteriores ({markingContract.installments.length})
+                  </Label>
+                  <ul className='rounded-md border divide-y text-xs max-h-24 overflow-y-auto'>
+                    {markingContract.installments.map(ins => (
+                      <li key={ins.id} className='flex justify-between px-2 py-1'>
+                        <span className='text-muted-foreground'>{fmtDate(ins.paidDate)}</span>
+                        <span className='font-medium'>
+                          {fmtCurrency(ins.amount, markingContract.currency)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <div className='space-y-1.5'>
+                <Label>Monto a abonar</Label>
+                <Input
+                  type='number'
+                  min='0.01'
+                  step='0.01'
+                  max={markingContract.amount - markingContract.paidAmount}
+                  value={cPayAmount}
+                  onChange={e => setCPayAmount(e.target.value)}
+                />
+                <p className='text-xs text-muted-foreground'>
+                  Deja el monto completo para saldar, o redúcelo para abonar parcialmente.
                 </p>
               </div>
               <div className='space-y-1.5'>
@@ -1350,7 +1480,12 @@ export default function InventoryPaymentsPage() {
               Cancelar
             </Button>
             <Button type='button' onClick={markContractPaid} disabled={savingC}>
-              {savingC ? 'Guardando…' : 'Confirmar pago'}
+              {savingC
+                ? 'Guardando…'
+                : markingContract &&
+                    Number(cPayAmount) >= markingContract.amount - markingContract.paidAmount - 0.01
+                  ? 'Confirmar pago'
+                  : 'Registrar abono'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1373,8 +1508,53 @@ export default function InventoryPaymentsPage() {
                   {assetDisplay(markingAsset).subtitle}
                   {markingAsset.invoiceNumber ? ` · ${markingAsset.invoiceNumber}` : ''}
                 </p>
+                <p className='text-muted-foreground text-xs'>
+                  Monto total: {fmtCurrency(Number(markingAsset.amount), markingAsset.currency)}
+                </p>
+                {markingAsset.paidAmount > 0 && (
+                  <p className='text-muted-foreground text-xs'>
+                    Abonado: {fmtCurrency(markingAsset.paidAmount, markingAsset.currency)}
+                  </p>
+                )}
                 <p className='font-semibold'>
-                  {fmtCurrency(Number(markingAsset.amount), markingAsset.currency)}
+                  Saldo pendiente:{' '}
+                  {fmtCurrency(
+                    markingAsset.amount - markingAsset.paidAmount,
+                    markingAsset.currency
+                  )}
+                </p>
+              </div>
+
+              {markingAsset.installments.length > 0 && (
+                <div className='space-y-1'>
+                  <Label className='text-xs text-muted-foreground'>
+                    Abonos anteriores ({markingAsset.installments.length})
+                  </Label>
+                  <ul className='rounded-md border divide-y text-xs max-h-24 overflow-y-auto'>
+                    {markingAsset.installments.map(ins => (
+                      <li key={ins.id} className='flex justify-between px-2 py-1'>
+                        <span className='text-muted-foreground'>{fmtDate(ins.paidDate)}</span>
+                        <span className='font-medium'>
+                          {fmtCurrency(ins.amount, markingAsset.currency)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <div className='space-y-1.5'>
+                <Label>Monto a abonar</Label>
+                <Input
+                  type='number'
+                  min='0.01'
+                  step='0.01'
+                  max={markingAsset.amount - markingAsset.paidAmount}
+                  value={aPayAmount}
+                  onChange={e => setAPayAmount(e.target.value)}
+                />
+                <p className='text-xs text-muted-foreground'>
+                  Deja el monto completo para saldar, o redúcelo para abonar parcialmente.
                 </p>
               </div>
               <div className='space-y-1.5'>
@@ -1420,7 +1600,12 @@ export default function InventoryPaymentsPage() {
               Cancelar
             </Button>
             <Button type='button' onClick={markAssetPaid} disabled={savingA}>
-              {savingA ? 'Guardando…' : 'Confirmar pago'}
+              {savingA
+                ? 'Guardando…'
+                : markingAsset &&
+                    Number(aPayAmount) >= markingAsset.amount - markingAsset.paidAmount - 0.01
+                  ? 'Confirmar pago'
+                  : 'Registrar abono'}
             </Button>
           </DialogFooter>
         </DialogContent>

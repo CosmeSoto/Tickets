@@ -5,6 +5,12 @@
  * de un activo individual. Complementa los campos planos `purchasePrice`
  * e `invoiceNumber` del modelo `equipment` cuando se necesita trazabilidad
  * completa (financiamiento por cuotas, múltiples facturas, etc.).
+ *
+ * Pago por abonos: el status de una factura SIEMPRE se deriva de
+ * sum(installments.amount) vs amount vs dueDate (ver computeAcquisitionStatus)
+ * — nunca es un hecho independiente. `markAsPaid` es un envoltorio de
+ * `registerPayment` sin monto (paga el saldo restante completo, igual que
+ * siempre); `registerPayment` con un monto menor registra un abono parcial.
  */
 
 import prisma from '@/lib/prisma'
@@ -13,7 +19,12 @@ import { createAuditLog } from '@/lib/audit'
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
-export type AcquisitionPaymentStatus = 'PENDING' | 'PAID' | 'OVERDUE' | 'CANCELLED'
+export type AcquisitionPaymentStatus =
+  | 'PENDING'
+  | 'PAID'
+  | 'OVERDUE'
+  | 'CANCELLED'
+  | 'PARTIALLY_PAID'
 export type PaymentMethodType =
   | 'CORPORATE_CARD'
   | 'PAYPAL'
@@ -62,19 +73,37 @@ export interface UpdateEquipmentInvoiceInput {
   notes?: string | null
 }
 
+export interface RegisterPaymentInput {
+  /** Omitido = paga el saldo restante completo (comportamiento de "Pagar" de siempre). */
+  amount?: number
+  paidDate: Date
+  paymentMethod?: PaymentMethodType | null
+  referenceNumber?: string | null
+  bankEntity?: string | null
+  cardLast4?: string | null
+  cardBrand?: string | null
+  transactionId?: string | null
+  notes?: string | null
+}
+
 // ── Helper: estado automático ─────────────────────────────────────────────────
+
+const EPS = 0.01
 
 export function computeAcquisitionStatus(
   dueDate: Date | null | undefined,
-  paidDate: Date | null | undefined
+  amount: number,
+  paidAmount: number
 ): AcquisitionPaymentStatus {
-  if (paidDate) return 'PAID'
-  if (!dueDate) return 'PENDING'
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const due = new Date(dueDate)
-  due.setHours(0, 0, 0, 0)
-  if (due < today) return 'OVERDUE'
+  if (amount - paidAmount <= EPS) return 'PAID'
+  if (dueDate) {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const due = new Date(dueDate)
+    due.setHours(0, 0, 0, 0)
+    if (due < today) return 'OVERDUE'
+  }
+  if (paidAmount > EPS) return 'PARTIALLY_PAID'
   return 'PENDING'
 }
 
@@ -90,7 +119,8 @@ export function computeAcquisitionStatus(
 // equipo o después vía "Registrar factura"), nunca por separado en los dos
 // lugares.
 //
-// purchasePrice = suma de montos de facturas no canceladas.
+// purchasePrice = suma de montos de facturas no canceladas (el monto total
+//                 adeudado, no lo ya pagado — eso no cambia con los abonos).
 // purchaseDate  = la fecha más antigua entre esas facturas (paidDate si ya se
 //                 pagó, si no dueDate, si no la fecha de creación del registro).
 // invoiceNumber/purchaseOrderNumber/supplierId = los de la factura más antigua
@@ -141,28 +171,37 @@ export class EquipmentInvoiceService {
   // ── Listar facturas de un equipo ──────────────────────────────────────────
 
   static async listByEquipment(equipmentId: string) {
-    return prisma.equipment_invoices.findMany({
+    const invoices = await prisma.equipment_invoices.findMany({
       where: { equipmentId },
       include: {
         supplier: { select: { id: true, name: true } },
         creator: { select: { id: true, name: true } },
+        installments: {
+          orderBy: { createdAt: 'asc' },
+          include: { creator: { select: { id: true, name: true } } },
+        },
       },
       orderBy: { createdAt: 'desc' },
     })
+    return invoices.map(inv => ({
+      ...inv,
+      paidAmount: inv.installments.reduce((s, i) => s + i.amount, 0),
+    }))
   }
 
   // ── Recalcular vencidas ────────────────────────────────────────────────────
   // No hay ningún job/cron que revise el paso del tiempo para esta tabla (a
   // diferencia de contract_payments, que tiene checkPaymentAlerts): status es
-  // una columna que solo se recalcula al crear/editar una factura. Para que
-  // "Vencido" sea confiable sin depender de que corra un cron, se recalcula
-  // aquí mismo, en cada listado — barato (un updateMany condicional) y
-  // garantiza que la pestaña Activos siempre refleje la fecha real.
+  // una columna que solo se recalcula al crear/editar/abonar una factura. Para
+  // que "Vencido" sea confiable sin depender de que corra un cron, se
+  // recalcula aquí mismo, en cada listado — barato (un updateMany condicional)
+  // y garantiza que la pestaña Activos siempre refleje la fecha real. Incluye
+  // PARTIALLY_PAID: un abono parcial no rescata la urgencia de estar vencido.
   static async recomputeOverdue(): Promise<void> {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     await prisma.equipment_invoices.updateMany({
-      where: { status: 'PENDING', dueDate: { lt: today } },
+      where: { status: { in: ['PENDING', 'PARTIALLY_PAID'] }, dueDate: { lt: today } },
       data: { status: 'OVERDUE' },
     })
   }
@@ -217,7 +256,7 @@ export class EquipmentInvoiceService {
       where.equipment = equipmentFilter
     }
 
-    const [invoices, total] = await Promise.all([
+    const [invoicesRaw, total] = await Promise.all([
       prisma.equipment_invoices.findMany({
         where,
         include: {
@@ -238,6 +277,7 @@ export class EquipmentInvoiceService {
           },
           supplier: { select: { id: true, name: true } },
           creator: { select: { id: true, name: true } },
+          installments: { orderBy: { createdAt: 'asc' } },
         },
         orderBy: [{ status: 'asc' }, { dueDate: 'asc' }, { createdAt: 'desc' }],
         skip: (page - 1) * pageSize,
@@ -246,13 +286,18 @@ export class EquipmentInvoiceService {
       prisma.equipment_invoices.count({ where }),
     ])
 
+    const invoices = invoicesRaw.map(inv => ({
+      ...inv,
+      paidAmount: inv.installments.reduce((s, i) => s + i.amount, 0),
+    }))
+
     return { invoices, total, page, pageSize, totalPages: Math.ceil(total / pageSize) }
   }
 
   // ── Obtener una factura ───────────────────────────────────────────────────
 
   static async getById(id: string) {
-    return prisma.equipment_invoices.findUnique({
+    const invoice = await prisma.equipment_invoices.findUnique({
       where: { id },
       include: {
         equipment: {
@@ -267,41 +312,76 @@ export class EquipmentInvoiceService {
         },
         supplier: { select: { id: true, name: true } },
         creator: { select: { id: true, name: true } },
+        installments: {
+          orderBy: { createdAt: 'asc' },
+          include: { creator: { select: { id: true, name: true } } },
+        },
       },
     })
+    if (!invoice) return null
+    return { ...invoice, paidAmount: invoice.installments.reduce((s, i) => s + i.amount, 0) }
   }
 
   // ── Crear factura ─────────────────────────────────────────────────────────
 
   static async create(input: CreateEquipmentInvoiceInput) {
-    const status = computeAcquisitionStatus(input.dueDate, input.paidDate)
+    // Atajo existente: si se crea la factura con paidDate, se registra de
+    // inmediato como pagada por completo — igual que siempre, pero ahora esto
+    // se traduce en un abono por el monto total, para que sum(installments)
+    // siga siendo la única fuente de verdad de cuánto se ha pagado.
+    const hasInitialPayment = !!input.paidDate
+    const status: AcquisitionPaymentStatus = hasInitialPayment
+      ? 'PAID'
+      : computeAcquisitionStatus(input.dueDate, input.amount, 0)
 
-    const invoice = await prisma.equipment_invoices.create({
-      data: {
-        id: randomUUID(),
-        equipmentId: input.equipmentId,
-        invoiceNumber: input.invoiceNumber ?? null,
-        purchaseOrderNumber: input.purchaseOrderNumber ?? null,
-        amount: input.amount,
-        currency: input.currency ?? 'USD',
-        dueDate: input.dueDate ?? null,
-        paidDate: input.paidDate ?? null,
-        status,
-        paymentMethod: (input.paymentMethod as any) ?? null,
-        supplierId: input.supplierId ?? null,
-        supplierName: input.supplierName ?? null,
-        referenceNumber: input.referenceNumber ?? null,
-        bankEntity: input.bankEntity ?? null,
-        cardLast4: input.cardLast4 ?? null,
-        cardBrand: input.cardBrand ?? null,
-        transactionId: input.transactionId ?? null,
-        notes: input.notes ?? null,
-        createdBy: input.createdBy,
-      },
-      include: {
-        supplier: { select: { id: true, name: true } },
-        creator: { select: { id: true, name: true } },
-      },
+    const invoice = await prisma.$transaction(async tx => {
+      const created = await tx.equipment_invoices.create({
+        data: {
+          id: randomUUID(),
+          equipmentId: input.equipmentId,
+          invoiceNumber: input.invoiceNumber ?? null,
+          purchaseOrderNumber: input.purchaseOrderNumber ?? null,
+          amount: input.amount,
+          currency: input.currency ?? 'USD',
+          dueDate: input.dueDate ?? null,
+          paidDate: hasInitialPayment ? input.paidDate : null,
+          status,
+          paymentMethod: (input.paymentMethod as any) ?? null,
+          supplierId: input.supplierId ?? null,
+          supplierName: input.supplierName ?? null,
+          referenceNumber: input.referenceNumber ?? null,
+          bankEntity: input.bankEntity ?? null,
+          cardLast4: input.cardLast4 ?? null,
+          cardBrand: input.cardBrand ?? null,
+          transactionId: input.transactionId ?? null,
+          notes: input.notes ?? null,
+          createdBy: input.createdBy,
+        },
+      })
+
+      if (hasInitialPayment) {
+        await tx.equipment_invoice_installments.create({
+          data: {
+            id: randomUUID(),
+            invoiceId: created.id,
+            amount: input.amount,
+            paidDate: input.paidDate as Date,
+            paymentMethod: (input.paymentMethod as any) ?? null,
+            referenceNumber: input.referenceNumber ?? null,
+            notes: 'Pago registrado al crear la factura',
+            createdBy: input.createdBy,
+          },
+        })
+      }
+
+      return tx.equipment_invoices.findUniqueOrThrow({
+        where: { id: created.id },
+        include: {
+          supplier: { select: { id: true, name: true } },
+          creator: { select: { id: true, name: true } },
+          installments: true,
+        },
+      })
     })
 
     await createAuditLog({
@@ -320,7 +400,7 @@ export class EquipmentInvoiceService {
 
     await syncEquipmentPurchaseFields(input.equipmentId)
 
-    return invoice
+    return { ...invoice, paidAmount: invoice.installments.reduce((s, i) => s + i.amount, 0) }
   }
 
   // ── Actualizar factura ────────────────────────────────────────────────────
@@ -332,59 +412,259 @@ export class EquipmentInvoiceService {
     })
     if (!before) throw new Error('Factura no encontrada')
 
-    // Recalcular status si cambian fechas
-    let newStatus = input.status
-    if (input.dueDate !== undefined || input.paidDate !== undefined) {
-      const due = input.dueDate !== undefined ? input.dueDate : before.dueDate
-      const paid = input.paidDate !== undefined ? input.paidDate : before.paidDate
-      newStatus = computeAcquisitionStatus(due, paid)
+    const paidAmount = await this.sumInstallments(id)
+    const targetAmount = input.amount !== undefined ? input.amount : before.amount
+
+    // Guard: no se puede bajar el monto por debajo de lo ya abonado.
+    if (input.amount !== undefined && input.amount < paidAmount - EPS) {
+      throw new Error(
+        `El monto no puede ser menor a lo ya abonado ($${paidAmount.toLocaleString()}).`
+      )
+    }
+    // Guard: no se puede limpiar la fecha de pago si ya hay abonos registrados.
+    if (input.paidDate === null && paidAmount > EPS) {
+      throw new Error(
+        'Esta factura tiene abonos registrados; edita o elimina los abonos en vez de la fecha de pago.'
+      )
+    }
+    // Guard: no se puede marcar "Pagado" a mano si los abonos no cubren el monto.
+    if (input.status === 'PAID' && paidAmount < targetAmount - EPS) {
+      throw new Error(
+        "No se puede marcar como pagado manualmente: usa 'Registrar pago' o completa el abono."
+      )
     }
 
-    const invoice = await prisma.equipment_invoices.update({
-      where: { id },
-      data: {
-        ...(input.invoiceNumber !== undefined && { invoiceNumber: input.invoiceNumber }),
-        ...(input.purchaseOrderNumber !== undefined && {
-          purchaseOrderNumber: input.purchaseOrderNumber,
-        }),
-        ...(input.amount !== undefined && { amount: input.amount }),
-        ...(input.currency !== undefined && { currency: input.currency }),
-        ...(input.dueDate !== undefined && { dueDate: input.dueDate }),
-        ...(input.paidDate !== undefined && { paidDate: input.paidDate }),
-        ...(newStatus !== undefined && { status: newStatus as any }),
-        ...(input.paymentMethod !== undefined && { paymentMethod: input.paymentMethod as any }),
-        ...(input.supplierId !== undefined && { supplierId: input.supplierId }),
-        ...(input.supplierName !== undefined && { supplierName: input.supplierName }),
-        ...(input.referenceNumber !== undefined && { referenceNumber: input.referenceNumber }),
-        ...(input.bankEntity !== undefined && { bankEntity: input.bankEntity }),
-        ...(input.cardLast4 !== undefined && { cardLast4: input.cardLast4 }),
-        ...(input.cardBrand !== undefined && { cardBrand: input.cardBrand }),
-        ...(input.transactionId !== undefined && { transactionId: input.transactionId }),
-        ...(input.notes !== undefined && { notes: input.notes }),
-      },
-      include: {
-        supplier: { select: { id: true, name: true } },
-        creator: { select: { id: true, name: true } },
-      },
+    return prisma.$transaction(async tx => {
+      // Sugar: setear paidDate directo con cero abonos existentes → crea un
+      // abono por el monto completo, igual que el atajo de create().
+      let effectivePaidAmount = paidAmount
+      if (input.paidDate !== undefined && input.paidDate !== null && paidAmount <= EPS) {
+        await tx.equipment_invoice_installments.create({
+          data: {
+            id: randomUUID(),
+            invoiceId: id,
+            amount: targetAmount,
+            paidDate: input.paidDate,
+            paymentMethod: (input.paymentMethod as any) ?? null,
+            referenceNumber: input.referenceNumber ?? null,
+            notes: 'Pago registrado al editar la factura',
+            createdBy: updatedBy,
+          },
+        })
+        effectivePaidAmount = targetAmount
+      }
+
+      let newStatus = input.status
+      if (
+        input.dueDate !== undefined ||
+        input.paidDate !== undefined ||
+        input.amount !== undefined
+      ) {
+        const due = input.dueDate !== undefined ? input.dueDate : before.dueDate
+        newStatus = computeAcquisitionStatus(due, targetAmount, effectivePaidAmount)
+      }
+
+      const invoice = await tx.equipment_invoices.update({
+        where: { id },
+        data: {
+          ...(input.invoiceNumber !== undefined && { invoiceNumber: input.invoiceNumber }),
+          ...(input.purchaseOrderNumber !== undefined && {
+            purchaseOrderNumber: input.purchaseOrderNumber,
+          }),
+          ...(input.amount !== undefined && { amount: input.amount }),
+          ...(input.currency !== undefined && { currency: input.currency }),
+          ...(input.dueDate !== undefined && { dueDate: input.dueDate }),
+          ...(input.paidDate !== undefined && { paidDate: input.paidDate }),
+          ...(newStatus !== undefined && { status: newStatus as any }),
+          ...(input.paymentMethod !== undefined && { paymentMethod: input.paymentMethod as any }),
+          ...(input.supplierId !== undefined && { supplierId: input.supplierId }),
+          ...(input.supplierName !== undefined && { supplierName: input.supplierName }),
+          ...(input.referenceNumber !== undefined && { referenceNumber: input.referenceNumber }),
+          ...(input.bankEntity !== undefined && { bankEntity: input.bankEntity }),
+          ...(input.cardLast4 !== undefined && { cardLast4: input.cardLast4 }),
+          ...(input.cardBrand !== undefined && { cardBrand: input.cardBrand }),
+          ...(input.transactionId !== undefined && { transactionId: input.transactionId }),
+          ...(input.notes !== undefined && { notes: input.notes }),
+        },
+        include: {
+          supplier: { select: { id: true, name: true } },
+          creator: { select: { id: true, name: true } },
+          installments: { orderBy: { createdAt: 'asc' } },
+        },
+      })
+
+      await createAuditLog({
+        entityType: 'equipment_invoice',
+        entityId: id,
+        action: 'EQUIPMENT_INVOICE_UPDATED',
+        userId: updatedBy,
+        changes: {
+          before: { amount: before.amount, status: before.status },
+          after: { amount: invoice.amount, status: invoice.status },
+        },
+      })
+
+      await syncEquipmentPurchaseFields(before.equipmentId)
+
+      return { ...invoice, paidAmount: invoice.installments.reduce((s, i) => s + i.amount, 0) }
     })
+  }
 
-    await createAuditLog({
-      entityType: 'equipment_invoice',
-      entityId: id,
-      action: 'EQUIPMENT_INVOICE_UPDATED',
-      userId: updatedBy,
-      changes: {
-        before: { amount: before.amount, status: before.status },
-        after: { amount: invoice.amount, status: invoice.status },
-      },
+  // ── Abonos (pagos parciales) ──────────────────────────────────────────────
+
+  /** Suma de abonos registrados contra una factura. */
+  static async sumInstallments(invoiceId: string): Promise<number> {
+    const result = await prisma.equipment_invoice_installments.aggregate({
+      where: { invoiceId },
+      _sum: { amount: true },
     })
+    return result._sum.amount ?? 0
+  }
 
-    await syncEquipmentPurchaseFields(before.equipmentId)
+  static async listInstallments(invoiceId: string) {
+    return prisma.equipment_invoice_installments.findMany({
+      where: { invoiceId },
+      include: { creator: { select: { id: true, name: true } } },
+      orderBy: { createdAt: 'asc' },
+    })
+  }
 
-    return invoice
+  static async getInstallmentById(installmentId: string) {
+    return prisma.equipment_invoice_installments.findUnique({ where: { id: installmentId } })
+  }
+
+  /**
+   * Registra un pago — completo o parcial — contra una factura. `amount`
+   * omitido paga el saldo restante completo (comportamiento de "Pagar" de
+   * siempre — ver markAsPaid). El status se deriva siempre de la suma de
+   * abonos, nunca se marca "pagada" de forma directa.
+   */
+  static async registerPayment(id: string, data: RegisterPaymentInput, createdBy: string) {
+    return prisma.$transaction(async tx => {
+      const parent = await tx.equipment_invoices.findUnique({
+        where: { id },
+        include: { installments: { select: { amount: true } } },
+      })
+      if (!parent) throw new Error('Factura no encontrada')
+      if (parent.status === 'PAID' || parent.status === 'CANCELLED') {
+        throw new Error(
+          parent.status === 'PAID'
+            ? 'Esta factura ya está marcada como pagada.'
+            : 'Esta factura está cancelada, no se puede marcar como pagada.'
+        )
+      }
+
+      const alreadyPaid = parent.installments.reduce((s, i) => s + i.amount, 0)
+      const remaining = parent.amount - alreadyPaid
+      const amount = data.amount ?? remaining
+      if (amount <= 0) throw new Error('El monto del abono debe ser mayor a 0.')
+      if (amount > remaining + EPS) {
+        throw new Error(
+          `El abono ($${amount.toLocaleString()}) excede el saldo pendiente ($${remaining.toLocaleString()}).`
+        )
+      }
+
+      await tx.equipment_invoice_installments.create({
+        data: {
+          id: randomUUID(),
+          invoiceId: id,
+          amount,
+          paidDate: data.paidDate,
+          paymentMethod: (data.paymentMethod as any) ?? null,
+          referenceNumber: data.referenceNumber ?? null,
+          notes: data.notes ?? null,
+          createdBy,
+        },
+      })
+
+      const newPaidAmount = alreadyPaid + amount
+      const newStatus = computeAcquisitionStatus(parent.dueDate, parent.amount, newPaidAmount)
+
+      const invoice = await tx.equipment_invoices.update({
+        where: { id },
+        data: {
+          status: newStatus,
+          ...(newStatus === 'PAID' && { paidDate: data.paidDate }),
+          ...(data.paymentMethod !== undefined && { paymentMethod: data.paymentMethod as any }),
+          ...(data.referenceNumber !== undefined && { referenceNumber: data.referenceNumber }),
+          ...(data.bankEntity !== undefined && { bankEntity: data.bankEntity }),
+          ...(data.cardLast4 !== undefined && { cardLast4: data.cardLast4 }),
+          ...(data.cardBrand !== undefined && { cardBrand: data.cardBrand }),
+          ...(data.transactionId !== undefined && { transactionId: data.transactionId }),
+        },
+        include: {
+          supplier: { select: { id: true, name: true } },
+          creator: { select: { id: true, name: true } },
+          installments: { orderBy: { createdAt: 'asc' } },
+        },
+      })
+
+      await createAuditLog({
+        entityType: 'equipment_invoice',
+        entityId: id,
+        action: 'EQUIPMENT_INVOICE_PAYMENT_REGISTERED',
+        userId: createdBy,
+        changes: {
+          amount,
+          paidDate: data.paidDate.toISOString(),
+          newStatus,
+          remaining: remaining - amount,
+        },
+      })
+
+      await syncEquipmentPurchaseFields(parent.equipmentId)
+
+      return { ...invoice, paidAmount: invoice.installments.reduce((s, i) => s + i.amount, 0) }
+    })
+  }
+
+  /** Deshacer un abono: lo elimina y re-deriva el status de la factura. */
+  static async deleteInstallment(installmentId: string, deletedBy: string) {
+    return prisma.$transaction(async tx => {
+      const installment = await tx.equipment_invoice_installments.findUnique({
+        where: { id: installmentId },
+      })
+      if (!installment) throw new Error('Abono no encontrado')
+
+      await tx.equipment_invoice_installments.delete({ where: { id: installmentId } })
+
+      const remainingAgg = await tx.equipment_invoice_installments.aggregate({
+        where: { invoiceId: installment.invoiceId },
+        _sum: { amount: true },
+      })
+      const paidAmount = remainingAgg._sum.amount ?? 0
+
+      const parent = await tx.equipment_invoices.findUniqueOrThrow({
+        where: { id: installment.invoiceId },
+      })
+      const newStatus = computeAcquisitionStatus(parent.dueDate, parent.amount, paidAmount)
+
+      await tx.equipment_invoices.update({
+        where: { id: installment.invoiceId },
+        data: {
+          status: newStatus,
+          ...(newStatus !== 'PAID' && { paidDate: null }),
+        },
+      })
+
+      await createAuditLog({
+        entityType: 'equipment_invoice',
+        entityId: installment.invoiceId,
+        action: 'EQUIPMENT_INVOICE_PAYMENT_DELETED',
+        userId: deletedBy,
+        changes: { amount: installment.amount, newStatus },
+      })
+
+      await syncEquipmentPurchaseFields(parent.equipmentId)
+
+      return { invoiceId: installment.invoiceId }
+    })
   }
 
   // ── Marcar como pagado ────────────────────────────────────────────────────
+  // Envoltorio de registerPayment sin monto — paga el saldo restante
+  // completo, exactamente el comportamiento de siempre para todo llamador
+  // existente (AcquisitionInvoicesCard, la ruta PATCH action:'markAsPaid').
 
   static async markAsPaid(
     id: string,
@@ -400,39 +680,16 @@ export class EquipmentInvoiceService {
     },
     updatedBy: string
   ) {
-    const before = await prisma.equipment_invoices.findUnique({
-      where: { id },
-      select: { status: true },
-    })
-    if (!before) throw new Error('Factura no encontrada')
-    if (before.status === 'PAID' || before.status === 'CANCELLED') {
-      throw new Error(
-        before.status === 'PAID'
-          ? 'Esta factura ya está marcada como pagada.'
-          : 'Esta factura está cancelada, no se puede marcar como pagada.'
-      )
-    }
-
-    return this.update(
-      id,
-      {
-        paidDate: data.paidDate,
-        status: 'PAID',
-        paymentMethod: data.paymentMethod,
-        referenceNumber: data.referenceNumber,
-        bankEntity: data.bankEntity,
-        cardLast4: data.cardLast4,
-        cardBrand: data.cardBrand,
-        transactionId: data.transactionId,
-        notes: data.notes,
-      },
-      updatedBy
-    )
+    return this.registerPayment(id, { ...data, amount: undefined }, updatedBy)
   }
 
   // ── Cancelar ──────────────────────────────────────────────────────────────
 
   static async cancel(id: string, cancelledBy: string) {
+    const paidAmount = await this.sumInstallments(id)
+    if (paidAmount > EPS) {
+      throw new Error('No se puede cancelar: esta factura ya tiene abonos registrados.')
+    }
     return this.update(id, { status: 'CANCELLED' }, cancelledBy)
   }
 
@@ -444,6 +701,13 @@ export class EquipmentInvoiceService {
       select: { amount: true, status: true, equipmentId: true },
     })
     if (!invoice) throw new Error('Factura no encontrada')
+
+    const paidAmount = await this.sumInstallments(id)
+    if (paidAmount > EPS) {
+      throw new Error(
+        'No se puede eliminar: esta factura ya tiene abonos registrados. Elimina los abonos primero si necesitas corregirla.'
+      )
+    }
 
     await prisma.equipment_invoices.delete({ where: { id } })
 
@@ -463,14 +727,26 @@ export class EquipmentInvoiceService {
   static async getStatsByEquipment(equipmentId: string) {
     const invoices = await prisma.equipment_invoices.findMany({
       where: { equipmentId },
-      select: { amount: true, currency: true, status: true },
+      select: {
+        amount: true,
+        currency: true,
+        status: true,
+        installments: { select: { amount: true } },
+      },
     })
 
     const total = invoices.reduce((s, i) => s + i.amount, 0)
-    const paid = invoices.filter(i => i.status === 'PAID').reduce((s, i) => s + i.amount, 0)
+    const paid = invoices
+      .filter(i => i.status !== 'CANCELLED')
+      .reduce((s, i) => s + i.installments.reduce((si, x) => si + x.amount, 0), 0)
     const pending = invoices
-      .filter(i => i.status === 'PENDING' || i.status === 'OVERDUE')
-      .reduce((s, i) => s + i.amount, 0)
+      .filter(
+        i => i.status === 'PENDING' || i.status === 'OVERDUE' || i.status === 'PARTIALLY_PAID'
+      )
+      .reduce((s, i) => {
+        const invoicePaid = i.installments.reduce((si, x) => si + x.amount, 0)
+        return s + (i.amount - invoicePaid)
+      }, 0)
 
     return {
       count: invoices.length,

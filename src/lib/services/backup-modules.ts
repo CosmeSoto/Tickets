@@ -626,21 +626,26 @@ export const INVENTORY_MODULE_RESTORE_ORDER = [
   'equipment_sales',
   'equipment_batches',
   'equipment_invoices',
+  'equipment_invoice_installments',
   'contract_service_types',
   'contracts',
   'contract_lines',
   'contract_attachments',
   'contract_payments',
+  'contract_payment_installments',
   'contract_assignments',
   'contract_return_acts',
   'contract_amendments',
   'maintenance_records',
+  'maintenance_tasks',
   'delivery_acts',
   'return_acts',
   'decommission_requests',
   'decommission_acts',
   'decommission_attachments',
   'software_licenses',
+  'license_invoices',
+  'license_invoice_installments',
   'license_attachments',
   'consumables',
   'stock_movements',
@@ -704,23 +709,34 @@ export async function exportInventoryModuleData(): Promise<Record<string, unknow
   await fetchTable('equipment_sales', () => prisma.equipment_sales.findMany())
   await fetchTable('equipment_batches', () => prisma.equipment_batches.findMany())
   await fetchTable('equipment_invoices', () => prisma.equipment_invoices.findMany())
+  await fetchTable('equipment_invoice_installments', () =>
+    prisma.equipment_invoice_installments.findMany()
+  )
 
   // Contratos (antes de maintenance_records por FK contract_id)
   await fetchTable('contracts', () => prisma.contracts.findMany())
   await fetchTable('contract_lines', () => prisma.contract_lines.findMany())
   await fetchTable('contract_attachments', () => prisma.contract_attachments.findMany())
   await fetchTable('contract_payments', () => prisma.contract_payments.findMany())
+  await fetchTable('contract_payment_installments', () =>
+    prisma.contract_payment_installments.findMany()
+  )
   await fetchTable('contract_assignments', () => (prisma as any).contract_assignments.findMany())
   await fetchTable('contract_return_acts', () => prisma.contract_return_acts.findMany())
   await fetchTable('contract_amendments', () => (prisma as any).contract_amendments.findMany())
 
   await fetchTable('maintenance_records', () => prisma.maintenance_records.findMany())
+  await fetchTable('maintenance_tasks', () => prisma.maintenance_tasks.findMany())
   await fetchTable('delivery_acts', () => prisma.delivery_acts.findMany())
   await fetchTable('return_acts', () => prisma.return_acts.findMany())
   await fetchTable('decommission_requests', () => prisma.decommission_requests.findMany())
   await fetchTable('decommission_acts', () => prisma.decommission_acts.findMany())
   await fetchTable('decommission_attachments', () => prisma.decommission_attachments.findMany())
   await fetchTable('software_licenses', () => prisma.software_licenses.findMany())
+  await fetchTable('license_invoices', () => prisma.license_invoices.findMany())
+  await fetchTable('license_invoice_installments', () =>
+    prisma.license_invoice_installments.findMany()
+  )
   await fetchTable('license_attachments', () => prisma.license_attachments.findMany())
   await fetchTable('consumables', () => prisma.consumables.findMany())
   await fetchTable('stock_movements', () => prisma.stock_movements.findMany())

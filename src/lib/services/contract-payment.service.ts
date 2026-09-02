@@ -6,6 +6,13 @@
  *  - Cálculo automático de próximos pagos
  *  - Alertas de pagos próximos y vencidos
  *  - Registro de auditoría en cada operación
+ *
+ * Pago por abonos: el status de una cuota SIEMPRE se deriva de
+ * sum(installments.amount) vs amount vs dueDate (ver computePaymentStatus)
+ * — nunca es un hecho independiente. `markAsPaid` es un envoltorio de
+ * `registerPayment` sin monto (paga el saldo restante completo, igual que
+ * siempre); `registerPayment` con un monto menor registra un abono parcial.
+ * Mismo criterio exacto que EquipmentInvoiceService/LicenseInvoiceService.
  */
 
 import { prisma } from '@/lib/prisma'
@@ -16,18 +23,25 @@ import { amountDueOnDate, lineIsBillableOn } from '@/lib/contracts/line-billing'
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
-type PaymentStatus = 'SCHEDULED' | 'DUE' | 'OVERDUE' | 'PAID' | 'CANCELLED'
+type PaymentStatus = 'SCHEDULED' | 'DUE' | 'OVERDUE' | 'PAID' | 'CANCELLED' | 'PARTIALLY_PAID'
+
+const EPS = 0.01
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-export function computePaymentStatus(dueDate: Date, paidDate: Date | null): PaymentStatus {
-  if (paidDate) return 'PAID'
+export function computePaymentStatus(
+  dueDate: Date,
+  amount: number,
+  paidAmount: number
+): PaymentStatus {
+  if (amount - paidAmount <= EPS) return 'PAID'
 
   const now = new Date()
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const due = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate())
 
   if (due < today) return 'OVERDUE'
+  if (paidAmount > EPS) return 'PARTIALLY_PAID'
   if (due.getTime() === today.getTime()) return 'DUE'
   return 'SCHEDULED'
 }
@@ -48,7 +62,9 @@ export class ContractPaymentService {
   // habilitada (ver /api/cron/inventory-alerts) — un admin que apaga esa
   // alerta, sin saberlo, congela también el status de las cuotas. Se
   // recalcula además aquí, en cada listado, para que SCHEDULED/DUE/OVERDUE
-  // sean siempre correctos sin depender de esa configuración.
+  // sean siempre correctos sin depender de esa configuración. Incluye
+  // PARTIALLY_PAID en la transición a OVERDUE: un abono parcial no rescata
+  // la urgencia de estar vencido.
   static async recomputeStatuses(): Promise<void> {
     const now = new Date()
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
@@ -60,7 +76,7 @@ export class ContractPaymentService {
       data: { status: 'DUE' },
     })
     await prisma.contract_payments.updateMany({
-      where: { status: { in: ['SCHEDULED', 'DUE'] }, dueDate: { lt: today } },
+      where: { status: { in: ['SCHEDULED', 'DUE', 'PARTIALLY_PAID'] }, dueDate: { lt: today } },
       data: { status: 'OVERDUE' },
     })
   }
@@ -118,7 +134,7 @@ export class ContractPaymentService {
       where.contract = contractFilter
     }
 
-    const [payments, total] = await Promise.all([
+    const [paymentsRaw, total] = await Promise.all([
       prisma.contract_payments.findMany({
         where,
         include: {
@@ -135,6 +151,7 @@ export class ContractPaymentService {
           creator: {
             select: { id: true, name: true, email: true },
           },
+          installments: { orderBy: { createdAt: 'asc' } },
         },
         orderBy: { dueDate: 'asc' },
         skip: (page - 1) * pageSize,
@@ -142,6 +159,11 @@ export class ContractPaymentService {
       }),
       prisma.contract_payments.count({ where }),
     ])
+
+    const payments = paymentsRaw.map(p => ({
+      ...p,
+      paidAmount: p.installments.reduce((s, i) => s + i.amount, 0),
+    }))
 
     return {
       payments,
@@ -155,7 +177,7 @@ export class ContractPaymentService {
   // ── Obtener un pago ─────────────────────────────────────────────────────────
 
   static async getById(id: string) {
-    return await prisma.contract_payments.findUnique({
+    const payment = await prisma.contract_payments.findUnique({
       where: { id },
       include: {
         contract: {
@@ -170,8 +192,14 @@ export class ContractPaymentService {
         creator: {
           select: { id: true, name: true, email: true },
         },
+        installments: {
+          orderBy: { createdAt: 'asc' },
+          include: { creator: { select: { id: true, name: true } } },
+        },
       },
     })
+    if (!payment) return null
+    return { ...payment, paidAmount: payment.installments.reduce((s, i) => s + i.amount, 0) }
   }
 
   // ── Crear pago ──────────────────────────────────────────────────────────────
@@ -186,7 +214,7 @@ export class ContractPaymentService {
     notes?: string
     createdBy: string
   }) {
-    const status = computePaymentStatus(data.dueDate, null)
+    const status = computePaymentStatus(data.dueDate, data.amount, 0)
 
     const payment = await prisma.contract_payments.create({
       data: {
@@ -252,62 +280,136 @@ export class ContractPaymentService {
     })
     if (!before) throw new Error('Pago no encontrado')
 
-    // Recalcular status si cambia la fecha de vencimiento o pago
-    let newStatus = data.status
-    if (data.dueDate !== undefined || data.paidDate !== undefined) {
-      const dueDate = data.dueDate || before.dueDate
-      const paidDate = data.paidDate !== undefined ? data.paidDate : before.paidDate
-      newStatus = computePaymentStatus(dueDate, paidDate)
+    const paidAmount = await this.sumInstallments(id)
+    const targetAmount = data.amount !== undefined ? data.amount : before.amount
+
+    // Guard: no se puede bajar el monto por debajo de lo ya abonado.
+    if (data.amount !== undefined && data.amount < paidAmount - EPS) {
+      throw new Error(
+        `El monto no puede ser menor a lo ya abonado ($${paidAmount.toLocaleString()}).`
+      )
+    }
+    // Guard: no se puede limpiar la fecha de pago si ya hay abonos registrados.
+    if (data.paidDate === null && paidAmount > EPS) {
+      throw new Error(
+        'Esta cuota tiene abonos registrados; edita o elimina los abonos en vez de la fecha de pago.'
+      )
+    }
+    // Guard: no se puede marcar "Pagado" a mano si los abonos no cubren el monto.
+    if (data.status === 'PAID' && paidAmount < targetAmount - EPS) {
+      throw new Error(
+        "No se puede marcar como pagado manualmente: usa 'Registrar pago' o completa el abono."
+      )
+    }
+    // Guard: no se puede cancelar una cuota que ya tiene abonos registrados.
+    if (data.status === 'CANCELLED' && paidAmount > EPS) {
+      throw new Error('No se puede cancelar: esta cuota ya tiene abonos registrados.')
     }
 
-    const payment = await prisma.contract_payments.update({
-      where: { id },
-      data: {
-        ...(data.amount !== undefined && { amount: data.amount }),
-        ...(data.currency !== undefined && { currency: data.currency }),
-        ...(data.dueDate !== undefined && { dueDate: data.dueDate }),
-        ...(data.paidDate !== undefined && { paidDate: data.paidDate }),
-        ...(newStatus !== undefined && { status: newStatus }),
-        ...(data.paymentMethod !== undefined && { paymentMethod: data.paymentMethod || null }),
-        ...(data.referenceNumber !== undefined && {
-          referenceNumber: data.referenceNumber || null,
-        }),
-        ...(data.notes !== undefined && { notes: data.notes || null }),
-        ...(data.cardLast4 !== undefined && { cardLast4: data.cardLast4 || null }),
-        ...(data.cardBrand !== undefined && { cardBrand: data.cardBrand || null }),
-        ...(data.bankEntity !== undefined && { bankEntity: data.bankEntity || null }),
-        ...(data.statementPeriod !== undefined && {
-          statementPeriod: data.statementPeriod || null,
-        }),
-        ...(data.transactionId !== undefined && { transactionId: data.transactionId || null }),
-        ...(data.chargeSource !== undefined && { chargeSource: data.chargeSource || null }),
-      },
-      include: {
-        contract: {
-          select: { name: true },
+    return prisma.$transaction(async tx => {
+      // Sugar: setear paidDate directo con cero abonos existentes → crea un
+      // abono por el monto completo, igual que la ruta normal de pago.
+      let effectivePaidAmount = paidAmount
+      if (data.paidDate !== undefined && data.paidDate !== null && paidAmount <= EPS) {
+        await tx.contract_payment_installments.create({
+          data: {
+            id: randomUUID(),
+            paymentId: id,
+            amount: targetAmount,
+            paidDate: data.paidDate,
+            paymentMethod: data.paymentMethod || null,
+            referenceNumber: data.referenceNumber || null,
+            notes: 'Pago registrado al editar la cuota',
+            createdBy: updatedBy,
+          },
+        })
+        effectivePaidAmount = targetAmount
+      }
+
+      // Recalcular status si cambia la fecha de vencimiento, pago o monto
+      let newStatus = data.status
+      if (data.dueDate !== undefined || data.paidDate !== undefined || data.amount !== undefined) {
+        const dueDate = data.dueDate || before.dueDate
+        newStatus = computePaymentStatus(dueDate, targetAmount, effectivePaidAmount)
+      }
+
+      const payment = await tx.contract_payments.update({
+        where: { id },
+        data: {
+          ...(data.amount !== undefined && { amount: data.amount }),
+          ...(data.currency !== undefined && { currency: data.currency }),
+          ...(data.dueDate !== undefined && { dueDate: data.dueDate }),
+          ...(data.paidDate !== undefined && { paidDate: data.paidDate }),
+          ...(newStatus !== undefined && { status: newStatus }),
+          ...(data.paymentMethod !== undefined && { paymentMethod: data.paymentMethod || null }),
+          ...(data.referenceNumber !== undefined && {
+            referenceNumber: data.referenceNumber || null,
+          }),
+          ...(data.notes !== undefined && { notes: data.notes || null }),
+          ...(data.cardLast4 !== undefined && { cardLast4: data.cardLast4 || null }),
+          ...(data.cardBrand !== undefined && { cardBrand: data.cardBrand || null }),
+          ...(data.bankEntity !== undefined && { bankEntity: data.bankEntity || null }),
+          ...(data.statementPeriod !== undefined && {
+            statementPeriod: data.statementPeriod || null,
+          }),
+          ...(data.transactionId !== undefined && { transactionId: data.transactionId || null }),
+          ...(data.chargeSource !== undefined && { chargeSource: data.chargeSource || null }),
         },
-      },
-    })
+        include: {
+          contract: {
+            select: { name: true },
+          },
+          installments: { orderBy: { createdAt: 'asc' } },
+        },
+      })
 
-    await createAuditLog({
-      entityType: 'contract_payment',
-      entityId: id,
-      action: 'payment_updated',
-      userId: updatedBy,
-      changes: {
-        before: { amount: before.amount, status: before.status },
-        after: { amount: payment.amount, status: payment.status },
-      },
-    })
+      await createAuditLog({
+        entityType: 'contract_payment',
+        entityId: id,
+        action: 'payment_updated',
+        userId: updatedBy,
+        changes: {
+          before: { amount: before.amount, status: before.status },
+          after: { amount: payment.amount, status: payment.status },
+        },
+      })
 
-    return payment
+      return { ...payment, paidAmount: payment.installments.reduce((s, i) => s + i.amount, 0) }
+    })
   }
 
-  // ── Marcar como pagado ──────────────────────────────────────────────────────
+  // ── Abonos (pagos parciales) ──────────────────────────────────────────────
 
-  static async markAsPaid(
+  static async sumInstallments(paymentId: string): Promise<number> {
+    const result = await prisma.contract_payment_installments.aggregate({
+      where: { paymentId },
+      _sum: { amount: true },
+    })
+    return result._sum.amount ?? 0
+  }
+
+  static async listInstallments(paymentId: string) {
+    return prisma.contract_payment_installments.findMany({
+      where: { paymentId },
+      include: { creator: { select: { id: true, name: true } } },
+      orderBy: { createdAt: 'asc' },
+    })
+  }
+
+  static async getInstallmentById(installmentId: string) {
+    return prisma.contract_payment_installments.findUnique({ where: { id: installmentId } })
+  }
+
+  /**
+   * Registra un pago — completo o parcial — contra una cuota. `amount`
+   * omitido paga el saldo restante completo (comportamiento de "Pagar" de
+   * siempre — ver markAsPaid). Sincroniza el "último cargo" del contrato
+   * (kit de cancelación) con cada abono, no solo cuando queda saldada.
+   */
+  static async registerPayment(
     id: string,
     data: {
+      amount?: number
       paidDate: Date
       paymentMethod?: string
       referenceNumber?: string
@@ -319,40 +421,86 @@ export class ContractPaymentService {
       transactionId?: string
       chargeSource?: string
     },
-    updatedBy: string
+    createdBy: string
   ) {
-    const before = await prisma.contract_payments.findUnique({
-      where: { id },
-      select: { status: true },
+    const { payment, amountPaid } = await prisma.$transaction(async tx => {
+      const parent = await tx.contract_payments.findUnique({
+        where: { id },
+        include: { installments: { select: { amount: true } } },
+      })
+      if (!parent) throw new Error('Pago no encontrado')
+      if (parent.status === 'PAID' || parent.status === 'CANCELLED') {
+        throw new Error(
+          parent.status === 'PAID'
+            ? 'Esta cuota ya está marcada como pagada.'
+            : 'Esta cuota está cancelada, no se puede marcar como pagada.'
+        )
+      }
+
+      const alreadyPaid = parent.installments.reduce((s, i) => s + i.amount, 0)
+      const remaining = parent.amount - alreadyPaid
+      const amount = data.amount ?? remaining
+      if (amount <= 0) throw new Error('El monto del abono debe ser mayor a 0.')
+      if (amount > remaining + EPS) {
+        throw new Error(
+          `El abono ($${amount.toLocaleString()}) excede el saldo pendiente ($${remaining.toLocaleString()}).`
+        )
+      }
+
+      await tx.contract_payment_installments.create({
+        data: {
+          id: randomUUID(),
+          paymentId: id,
+          amount,
+          paidDate: data.paidDate,
+          paymentMethod: data.paymentMethod || null,
+          referenceNumber: data.referenceNumber || null,
+          notes: data.notes || null,
+          createdBy,
+        },
+      })
+
+      const newPaidAmount = alreadyPaid + amount
+      const newStatus = computePaymentStatus(parent.dueDate, parent.amount, newPaidAmount)
+
+      const updated = await tx.contract_payments.update({
+        where: { id },
+        data: {
+          status: newStatus,
+          ...(newStatus === 'PAID' && { paidDate: data.paidDate }),
+          ...(data.paymentMethod !== undefined && { paymentMethod: data.paymentMethod || null }),
+          ...(data.referenceNumber !== undefined && {
+            referenceNumber: data.referenceNumber || null,
+          }),
+          ...(data.notes !== undefined && { notes: data.notes || null }),
+          ...(data.cardLast4 !== undefined && { cardLast4: data.cardLast4 || null }),
+          ...(data.cardBrand !== undefined && { cardBrand: data.cardBrand || null }),
+          ...(data.bankEntity !== undefined && { bankEntity: data.bankEntity || null }),
+          ...(data.statementPeriod !== undefined && {
+            statementPeriod: data.statementPeriod || null,
+          }),
+          ...(data.transactionId !== undefined && { transactionId: data.transactionId || null }),
+          ...(data.chargeSource !== undefined && { chargeSource: data.chargeSource || null }),
+        },
+        include: {
+          contract: { select: { name: true } },
+          installments: { orderBy: { createdAt: 'asc' } },
+        },
+      })
+
+      await createAuditLog({
+        entityType: 'contract_payment',
+        entityId: id,
+        action: 'payment_registered',
+        userId: createdBy,
+        changes: { amount, newStatus, remaining: remaining - amount },
+      })
+
+      return { payment: updated, amountPaid: amount }
     })
-    if (!before) throw new Error('Pago no encontrado')
-    if (before.status === 'PAID' || before.status === 'CANCELLED') {
-      throw new Error(
-        before.status === 'PAID'
-          ? 'Esta cuota ya está marcada como pagada.'
-          : 'Esta cuota está cancelada, no se puede marcar como pagada.'
-      )
-    }
 
-    const payment = await this.update(
-      id,
-      {
-        paidDate: data.paidDate,
-        status: 'PAID',
-        paymentMethod: data.paymentMethod,
-        referenceNumber: data.referenceNumber,
-        notes: data.notes,
-        cardLast4: data.cardLast4,
-        cardBrand: data.cardBrand,
-        bankEntity: data.bankEntity,
-        statementPeriod: data.statementPeriod,
-        transactionId: data.transactionId,
-        chargeSource: data.chargeSource,
-      },
-      updatedBy
-    )
-
-    // Sincronizar último cargo en el contrato para kit de cancelación
+    // Sincronizar último cargo en el contrato para kit de cancelación — cada
+    // abono (parcial o completo) es, por definición, el cargo más reciente.
     const paymentMethodTypes = [
       'CORPORATE_CARD',
       'PAYPAL',
@@ -371,7 +519,7 @@ export class ContractPaymentService {
       where: { id: payment.contractId },
       data: {
         lastChargeDate: data.paidDate,
-        lastChargeAmount: payment.amount,
+        lastChargeAmount: amountPaid,
         lastTransactionRef: data.transactionId || data.referenceNumber || null,
         ...(data.cardLast4 && { paymentCardLast4: data.cardLast4 }),
         ...(data.cardBrand && { paymentCardBrand: data.cardBrand }),
@@ -382,7 +530,72 @@ export class ContractPaymentService {
       },
     })
 
-    return payment
+    return { ...payment, paidAmount: payment.installments.reduce((s, i) => s + i.amount, 0) }
+  }
+
+  /** Deshacer un abono: lo elimina y re-deriva el status de la cuota. */
+  static async deleteInstallment(installmentId: string, deletedBy: string) {
+    return prisma.$transaction(async tx => {
+      const installment = await tx.contract_payment_installments.findUnique({
+        where: { id: installmentId },
+      })
+      if (!installment) throw new Error('Abono no encontrado')
+
+      await tx.contract_payment_installments.delete({ where: { id: installmentId } })
+
+      const remainingAgg = await tx.contract_payment_installments.aggregate({
+        where: { paymentId: installment.paymentId },
+        _sum: { amount: true },
+      })
+      const paidAmount = remainingAgg._sum.amount ?? 0
+
+      const parent = await tx.contract_payments.findUniqueOrThrow({
+        where: { id: installment.paymentId },
+      })
+      const newStatus = computePaymentStatus(parent.dueDate, parent.amount, paidAmount)
+
+      await tx.contract_payments.update({
+        where: { id: installment.paymentId },
+        data: {
+          status: newStatus,
+          ...(newStatus !== 'PAID' && { paidDate: null }),
+        },
+      })
+
+      await createAuditLog({
+        entityType: 'contract_payment',
+        entityId: installment.paymentId,
+        action: 'payment_installment_deleted',
+        userId: deletedBy,
+        changes: { amount: installment.amount, newStatus },
+      })
+
+      return { paymentId: installment.paymentId }
+    })
+  }
+
+  // ── Marcar como pagado ──────────────────────────────────────────────────────
+  // Envoltorio de registerPayment sin monto — paga el saldo restante
+  // completo, exactamente el comportamiento de siempre para todo llamador
+  // existente (la ruta POST .../mark-paid).
+
+  static async markAsPaid(
+    id: string,
+    data: {
+      paidDate: Date
+      paymentMethod?: string
+      referenceNumber?: string
+      notes?: string
+      cardLast4?: string
+      cardBrand?: string
+      bankEntity?: string
+      statementPeriod?: Date
+      transactionId?: string
+      chargeSource?: string
+    },
+    updatedBy: string
+  ) {
+    return this.registerPayment(id, { ...data, amount: undefined }, updatedBy)
   }
 
   // ── Eliminar pago ───────────────────────────────────────────────────────────
@@ -393,6 +606,13 @@ export class ContractPaymentService {
       select: { amount: true, dueDate: true, status: true },
     })
     if (!payment) throw new Error('Pago no encontrado')
+
+    const paidAmount = await this.sumInstallments(id)
+    if (paidAmount > EPS) {
+      throw new Error(
+        'No se puede eliminar: esta cuota ya tiene abonos registrados. Elimina los abonos primero si necesitas corregirla.'
+      )
+    }
 
     await prisma.contract_payments.delete({ where: { id } })
 
@@ -510,7 +730,8 @@ export class ContractPaymentService {
 
   /**
    * Ajusta cuotas pendientes al monto de equipos/líneas aún en renta en cada fecha.
-   * No toca pagos ya cobrados.
+   * No toca pagos ya cobrados NI cuotas que ya tienen abonos registrados —
+   * ese saldo ya comprometido no se debe pisar.
    */
   static async recalculatePendingAmounts(contractId: string, updatedBy: string) {
     const contract = await prisma.contracts.findUnique({
@@ -540,13 +761,19 @@ export class ContractPaymentService {
       where: {
         contractId,
         paidDate: null,
-        status: { in: ['SCHEDULED', 'DUE', 'OVERDUE'] },
+        status: { in: ['SCHEDULED', 'DUE', 'OVERDUE', 'PARTIALLY_PAID'] },
       },
     })
 
     let updated = 0
     let cancelled = 0
+    let skipped = 0
     for (const payment of pending) {
+      const paidAmount = await this.sumInstallments(payment.id)
+      if (paidAmount > EPS) {
+        skipped++
+        continue
+      }
       const nextAmount = amountDueOnDate(contract.lines, contract, payment.dueDate)
       if (nextAmount <= 0) {
         await prisma.contract_payments.update({
@@ -575,10 +802,10 @@ export class ContractPaymentService {
       entityId: contractId,
       action: 'payments_recalculated',
       userId: updatedBy,
-      changes: { updated, cancelled, pending: pending.length },
+      changes: { updated, cancelled, skipped, pending: pending.length },
     })
 
-    return { updated, cancelled, pending: pending.length }
+    return { updated, cancelled, skipped, pending: pending.length }
   }
 
   // ── Job: alertas de pagos próximos ─────────────────────────────────────────
@@ -588,7 +815,6 @@ export class ContractPaymentService {
    */
   static async checkPaymentAlerts() {
     const now = new Date()
-    const in7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
     const alerts = {
       sent7Days: 0,
       sentDue: 0,
@@ -599,9 +825,10 @@ export class ContractPaymentService {
     // Obtener pagos pendientes
     const payments = await prisma.contract_payments.findMany({
       where: {
-        status: { in: ['SCHEDULED', 'DUE', 'OVERDUE'] },
+        status: { in: ['SCHEDULED', 'DUE', 'OVERDUE', 'PARTIALLY_PAID'] },
       },
       include: {
+        installments: { select: { amount: true } },
         contract: {
           include: {
             supplier: { select: { name: true } },
@@ -630,7 +857,8 @@ export class ContractPaymentService {
       )
 
       // Actualizar status
-      const newStatus = computePaymentStatus(payment.dueDate, payment.paidDate)
+      const paidAmount = payment.installments.reduce((s, i) => s + i.amount, 0)
+      const newStatus = computePaymentStatus(payment.dueDate, payment.amount, paidAmount)
       if (newStatus !== payment.status) {
         await prisma.contract_payments.update({
           where: { id: payment.id },
@@ -759,21 +987,25 @@ export class ContractPaymentService {
     const where: any = {}
     if (contractId) where.contractId = contractId
 
-    const [total, scheduled, due, overdue, paid, totalAmount, paidAmount] = await Promise.all([
+    const [total, scheduled, due, overdue, paid, partiallyPaid, allPayments] = await Promise.all([
       prisma.contract_payments.count({ where }),
       prisma.contract_payments.count({ where: { ...where, status: 'SCHEDULED' } }),
       prisma.contract_payments.count({ where: { ...where, status: 'DUE' } }),
       prisma.contract_payments.count({ where: { ...where, status: 'OVERDUE' } }),
       prisma.contract_payments.count({ where: { ...where, status: 'PAID' } }),
-      prisma.contract_payments.aggregate({
+      prisma.contract_payments.count({ where: { ...where, status: 'PARTIALLY_PAID' } }),
+      prisma.contract_payments.findMany({
         where,
-        _sum: { amount: true },
-      }),
-      prisma.contract_payments.aggregate({
-        where: { ...where, status: 'PAID' },
-        _sum: { amount: true },
+        select: { amount: true, status: true, installments: { select: { amount: true } } },
       }),
     ])
+
+    const totalAmount = allPayments.reduce((s, p) => s + p.amount, 0)
+    // paidAmount real = suma de abonos (no solo de cuotas 100% PAID — una
+    // PARTIALLY_PAID ya tiene plata pagada real que antes no se contaba acá).
+    const paidAmount = allPayments
+      .filter(p => p.status !== 'CANCELLED')
+      .reduce((s, p) => s + p.installments.reduce((si, i) => si + i.amount, 0), 0)
 
     return {
       total,
@@ -781,10 +1013,11 @@ export class ContractPaymentService {
       due,
       overdue,
       paid,
-      cancelled: total - scheduled - due - overdue - paid,
-      totalAmount: totalAmount._sum.amount || 0,
-      paidAmount: paidAmount._sum.amount || 0,
-      pendingAmount: (totalAmount._sum.amount || 0) - (paidAmount._sum.amount || 0),
+      partiallyPaid,
+      cancelled: total - scheduled - due - overdue - paid - partiallyPaid,
+      totalAmount,
+      paidAmount,
+      pendingAmount: totalAmount - paidAmount,
     }
   }
 

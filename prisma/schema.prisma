@@ -60,27 +60,27 @@ model audit_logs {
 }
 
 model backups {
-  id         String   @id
-  filename   String
-  filepath   String
-  size       Int
-  type       String
-  status     String
-  error      String?
-  checksum   String?
-  compressed Boolean  @default(false)
-  encrypted  Boolean  @default(false)
+  id               String    @id
+  filename         String
+  filepath         String
+  size             Int
+  type             String
+  status           String
+  error            String?
+  checksum         String?
+  compressed       Boolean   @default(false)
+  encrypted        Boolean   @default(false)
   /// Motor: pgbackrest | export | import
-  engine     String   @default("pgbackrest")
+  engine           String    @default("pgbackrest")
   /// Tipo: full | diff | incr | export
-  backupKind String   @default("full")
+  backupKind       String    @default("full")
   /// Etiqueta pgBackRest (ej. 20260708-120000F)
-  label      String?
+  label            String?
   /// @deprecated — solo respaldos legacy; usar export + restore selectivo
-  module     String?
+  module           String?
   /// JSON con metadata del backup (conteo de tablas, pgBackRest info, etc.)
-  metadata   String?
-  createdAt  DateTime @default(now())
+  metadata         String?
+  createdAt        DateTime  @default(now())
   /// Cuando un admin borra la entrada del Historial de operaciones (audit_logs)
   /// de este backup, se marca aquí para que no "resucite" como registro legacy
   /// sin auditoría — el backup en sí sigue existiendo, solo se oculta del historial.
@@ -136,25 +136,25 @@ model comments {
 }
 
 model departments {
-  id               String              @id
-  name             String              @unique
-  description      String?
-  color            String?             @default("#3B82F6")
-  isActive         Boolean             @default(true)
-  order            Int                 @default(0)
-  familyId         String?             @map("family_id")
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime
-  categories       categories[]
-  equipment        equipment[]
-  equipmentBatches equipment_batches[] // Nueva relación con lotes
-  family           families?           @relation(fields: [familyId], references: [id])
-  licenses         software_licenses[]
+  id                 String                @id
+  name               String                @unique
+  description        String?
+  color              String?               @default("#3B82F6")
+  isActive           Boolean               @default(true)
+  order              Int                   @default(0)
+  familyId           String?               @map("family_id")
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime
+  categories         categories[]
+  equipment          equipment[]
+  equipmentBatches   equipment_batches[] // Nueva relación con lotes
+  family             families?             @relation(fields: [familyId], references: [id])
+  licenses           software_licenses[]
   licenseAssignments license_assignments[]
-  users            users[]
-  news_departments news_departments[]
-  form_departments form_departments[]
-  processes        processes[]
+  users              users[]
+  news_departments   news_departments[]
+  form_departments   form_departments[]
+  processes          processes[]
 
   @@index([isActive, order])
   @@index([familyId])
@@ -397,40 +397,40 @@ model tickets {
 }
 
 model user_settings {
-  id                   String   @id
-  userId               String   @unique
-  emailNotifications   Boolean  @default(true)
-  pushNotifications    Boolean  @default(true)
-  ticketUpdates        Boolean  @default(true)
-  systemAlerts         Boolean  @default(true)
-  weeklyReport         Boolean  @default(false)
-  soundEnabled         Boolean  @default(true)
-  ticketCreated        Boolean  @default(true)
-  ticketAssigned       Boolean  @default(true)
-  statusChanged        Boolean  @default(true)
-  newComments          Boolean  @default(true)
-  ticketUpdated        Boolean  @default(true)
+  id                    String    @id
+  userId                String    @unique
+  emailNotifications    Boolean   @default(true)
+  pushNotifications     Boolean   @default(true)
+  ticketUpdates         Boolean   @default(true)
+  systemAlerts          Boolean   @default(true)
+  weeklyReport          Boolean   @default(false)
+  soundEnabled          Boolean   @default(true)
+  ticketCreated         Boolean   @default(true)
+  ticketAssigned        Boolean   @default(true)
+  statusChanged         Boolean   @default(true)
+  newComments           Boolean   @default(true)
+  ticketUpdated         Boolean   @default(true)
   /// Master switch: notificaciones del módulo Tickets
-  notifyTickets        Boolean  @default(true)
+  notifyTickets         Boolean   @default(true)
   /// Master switch: notificaciones del módulo Inventario
-  notifyInventory      Boolean  @default(true)
+  notifyInventory       Boolean   @default(true)
   /// Master switch: notificaciones del módulo Rondas
-  notifyPatrols        Boolean  @default(true)
+  notifyPatrols         Boolean   @default(true)
   /// Master switch: alertas por Telegram (requiere telegramChatId en users)
-  telegramNotifications Boolean @default(true) @map("telegram_notifications")
+  telegramNotifications Boolean   @default(true) @map("telegram_notifications")
   /// Último digest semanal enviado (idempotencia del cron)
-  lastWeeklyDigestAt   DateTime?
-  quietHoursEnabled    Boolean  @default(false)
-  quietHoursStart      String   @default("22:00")
-  quietHoursEnd        String   @default("08:00")
-  autoAssignEnabled    Boolean  @default(true)
-  maxConcurrentTickets Int      @default(10)
-  theme                String   @default("light")
-  language             String   @default("es")
-  timezone             String   @default("America/Guayaquil")
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime
-  users                users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastWeeklyDigestAt    DateTime?
+  quietHoursEnabled     Boolean   @default(false)
+  quietHoursStart       String    @default("22:00")
+  quietHoursEnd         String    @default("08:00")
+  autoAssignEnabled     Boolean   @default(true)
+  maxConcurrentTickets  Int       @default(10)
+  theme                 String    @default("light")
+  language              String    @default("es")
+  timezone              String    @default("America/Guayaquil")
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime
+  users                 users     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
@@ -498,145 +498,148 @@ model system_modules {
 }
 
 model users {
-  id                                                String                          @id
-  email                                             String                          @unique
+  id                                                String                           @id
+  email                                             String                           @unique
   name                                              String
   passwordHash                                      String?
-  role                                              UserRole                        @default(CLIENT)
+  role                                              UserRole                         @default(CLIENT)
   departmentId                                      String?
   phone                                             String?
   avatar                                            String?
-  isActive                                          Boolean                         @default(true)
-  isEmailVerified                                   Boolean                         @default(false)
-  canManageInventory                                Boolean                         @default(false)
+  isActive                                          Boolean                          @default(true)
+  isEmailVerified                                   Boolean                          @default(false)
+  canManageInventory                                Boolean                          @default(false)
   /// ADMIN (no super admin) habilitado para aprobar la baja definitiva de activos.
   /// Solo aplica a role=ADMIN; super admin siempre puede aprobar sin este flag.
-  canApproveDecommission                            Boolean                         @default(false) @map("can_approve_decommission")
-  ticketsEnabled                                    Boolean                         @default(true)
-  inventoryEnabled                                  Boolean                         @default(false)
-  patrolsEnabled                                    Boolean                         @default(false) @map("patrols_enabled")
-  newsEnabled                                       Boolean                         @default(false) @map("news_enabled")
-  canManageNews                                     Boolean                         @default(false) @map("can_manage_news")
-  formsEnabled                                      Boolean                         @default(false) @map("forms_enabled")
-  canManageForms                                    Boolean                         @default(false) @map("can_manage_forms")
-  credentialsEnabled                                Boolean                         @default(false) @map("credentials_enabled")
-  canManageCredentials                              Boolean                         @default(false) @map("can_manage_credentials")
-  processesEnabled                                  Boolean                         @default(false) @map("processes_enabled")
-  canManageProcesses                                Boolean                         @default(false) @map("can_manage_processes")
-  accessEnabled                                     Boolean                         @default(false) @map("access_enabled")
-  canManageAccess                                   Boolean                         @default(false) @map("can_manage_access")
+  canApproveDecommission                            Boolean                          @default(false) @map("can_approve_decommission")
+  ticketsEnabled                                    Boolean                          @default(true)
+  inventoryEnabled                                  Boolean                          @default(false)
+  patrolsEnabled                                    Boolean                          @default(false) @map("patrols_enabled")
+  newsEnabled                                       Boolean                          @default(false) @map("news_enabled")
+  canManageNews                                     Boolean                          @default(false) @map("can_manage_news")
+  formsEnabled                                      Boolean                          @default(false) @map("forms_enabled")
+  canManageForms                                    Boolean                          @default(false) @map("can_manage_forms")
+  credentialsEnabled                                Boolean                          @default(false) @map("credentials_enabled")
+  canManageCredentials                              Boolean                          @default(false) @map("can_manage_credentials")
+  processesEnabled                                  Boolean                          @default(false) @map("processes_enabled")
+  canManageProcesses                                Boolean                          @default(false) @map("can_manage_processes")
+  accessEnabled                                     Boolean                          @default(false) @map("access_enabled")
+  canManageAccess                                   Boolean                          @default(false) @map("can_manage_access")
   lastLogin                                         DateTime?
-  passwordChangedAt                                 DateTime?                       @map("password_changed_at")
+  passwordChangedAt                                 DateTime?                        @map("password_changed_at")
   oauthProvider                                     String?
   oauthId                                           String?
-  createdAt                                         DateTime                        @default(now())
+  createdAt                                         DateTime                         @default(now())
   updatedAt                                         DateTime
-  isSuperAdmin                                      Boolean                         @default(false) @map("is_super_admin")
-  canRequestAssets                                  Boolean                         @default(false) @map("can_request_assets")
+  isSuperAdmin                                      Boolean                          @default(false) @map("is_super_admin")
+  canRequestAssets                                  Boolean                          @default(false) @map("can_request_assets")
   /// Acceso a Base de conocimientos (hijo del módulo Tickets). Default true = comportamiento histórico.
-  canAccessKnowledge                                Boolean                         @default(true) @map("can_access_knowledge")
+  canAccessKnowledge                                Boolean                          @default(true) @map("can_access_knowledge")
   /// ID de chat de Telegram vinculado (opcional). Necesario para recibir alertas del bot.
-  telegramChatId                                    String?                         @unique @map("telegram_chat_id")
+  telegramChatId                                    String?                          @unique @map("telegram_chat_id")
   accounts                                          accounts[]
   userFamilyAccess                                  user_family_access[]
   article_votes                                     article_votes[]
   attachments                                       attachments[]
   audit_logs                                        audit_logs[]
   comments                                          comments[]
-  decommissionApprovals                             decommission_acts[]             @relation("DecommissionApprover")
+  decommissionApprovals                             decommission_acts[]              @relation("DecommissionApprover")
   decommissionAttachments                           decommission_attachments[]
-  decommissionRequests                              decommission_requests[]         @relation("DecommissionRequester")
-  decommissionReviews                               decommission_requests[]         @relation("DecommissionReviewer")
-  decommissionTechnicianReviews                     decommission_requests[]         @relation("DecommissionTechnician")
-  decommissionManagerReviews                        decommission_requests[]         @relation("DecommissionManager")
-  assignmentsDelivered                              equipment_assignments[]         @relation("AssignmentDeliverer")
-  assignmentsReceived                               equipment_assignments[]         @relation("AssignmentReceiver")
-  licenseAssignmentsDelivered                       license_assignments[]           @relation("LicenseAssignmentDeliverer")
-  licenseAssignmentsReceived                        license_assignments[]           @relation("LicenseAssignmentReceiver")
+  decommissionRequests                              decommission_requests[]          @relation("DecommissionRequester")
+  decommissionReviews                               decommission_requests[]          @relation("DecommissionReviewer")
+  decommissionTechnicianReviews                     decommission_requests[]          @relation("DecommissionTechnician")
+  decommissionManagerReviews                        decommission_requests[]          @relation("DecommissionManager")
+  assignmentsDelivered                              equipment_assignments[]          @relation("AssignmentDeliverer")
+  assignmentsReceived                               equipment_assignments[]          @relation("AssignmentReceiver")
+  licenseAssignmentsDelivered                       license_assignments[]            @relation("LicenseAssignmentDeliverer")
+  licenseAssignmentsReceived                        license_assignments[]            @relation("LicenseAssignmentReceiver")
   equipmentAttachments                              equipment_attachments[]
-  knowledge_articles                                knowledge_articles[]            @relation("knowledge_articles_author")
+  knowledge_articles                                knowledge_articles[]             @relation("knowledge_articles_author")
   licenseAttachments                                license_attachments[]
-  maintenanceRequests                               maintenance_records[]           @relation("MaintenanceRequester")
-  maintenanceRecords                                maintenance_records[]           @relation("MaintenanceTechnician")
-  maintenanceTasksCreated                           maintenance_tasks[]             @relation("MaintenanceTaskCreator")
-  maintenanceTasksCompleted                         maintenance_tasks[]             @relation("MaintenanceTaskCompletedBy")
+  maintenanceRequests                               maintenance_records[]            @relation("MaintenanceRequester")
+  maintenanceRecords                                maintenance_records[]            @relation("MaintenanceTechnician")
+  maintenanceTasksCreated                           maintenance_tasks[]              @relation("MaintenanceTaskCreator")
+  maintenanceTasksCompleted                         maintenance_tasks[]              @relation("MaintenanceTaskCompletedBy")
   notification_preferences                          notification_preferences?
   notification_mutes                                notification_mutes[]
   notifications                                     notifications[]
   oauth_accounts                                    oauth_accounts[]
   password_reset_tokens                             password_reset_tokens[]
-  resolution_plans_created                          resolution_plans[]              @relation("ResolutionPlanCreator")
-  tasks_assigned                                    resolution_tasks[]              @relation("TaskAssignee")
+  resolution_plans_created                          resolution_plans[]               @relation("ResolutionPlanCreator")
+  tasks_assigned                                    resolution_tasks[]               @relation("TaskAssignee")
   sessions                                          sessions[]
-  licensesAssigned                                  software_licenses[]             @relation("LicenseUser")
-  stockMovementsAssigned                            stock_movements[]               @relation("StockMovementAssignedTo")
-  stockMovements                                    stock_movements[]               @relation("StockMovementUser")
+  licensesAssigned                                  software_licenses[]              @relation("LicenseUser")
+  stockMovementsAssigned                            stock_movements[]                @relation("StockMovementAssignedTo")
+  stockMovements                                    stock_movements[]                @relation("StockMovementUser")
   technician_assignments                            technician_assignments[]
-  ticketCollaborationsAdded                         ticket_collaborators[]          @relation("CollaboratorAddedBy")
-  ticketCollaborations                              ticket_collaborators[]          @relation("TicketCollaborator")
+  ticketCollaborationsAdded                         ticket_collaborators[]           @relation("CollaboratorAddedBy")
+  ticketCollaborations                              ticket_collaborators[]           @relation("TicketCollaborator")
   ticket_history                                    ticket_history[]
-  articles_created                                  ticket_knowledge_articles[]     @relation("ArticleCreator")
-  ticket_ratings_ticket_ratings_clientIdTousers     ticket_ratings[]                @relation("ticket_ratings_clientIdTousers")
-  ticket_ratings_ticket_ratings_technicianIdTousers ticket_ratings[]                @relation("ticket_ratings_technicianIdTousers")
-  tickets_tickets_assigneeIdTousers                 tickets[]                       @relation("tickets_assigneeIdTousers")
-  tickets_tickets_clientIdTousers                   tickets[]                       @relation("tickets_clientIdTousers")
-  tickets_tickets_createdByIdTousers                tickets[]                       @relation("tickets_createdByIdTousers")
+  articles_created                                  ticket_knowledge_articles[]      @relation("ArticleCreator")
+  ticket_ratings_ticket_ratings_clientIdTousers     ticket_ratings[]                 @relation("ticket_ratings_clientIdTousers")
+  ticket_ratings_ticket_ratings_technicianIdTousers ticket_ratings[]                 @relation("ticket_ratings_technicianIdTousers")
+  tickets_tickets_assigneeIdTousers                 tickets[]                        @relation("tickets_assigneeIdTousers")
+  tickets_tickets_clientIdTousers                   tickets[]                        @relation("tickets_clientIdTousers")
+  tickets_tickets_createdByIdTousers                tickets[]                        @relation("tickets_createdByIdTousers")
   user_settings                                     user_settings?
-  departments                                       departments?                    @relation(fields: [departmentId], references: [id])
-  managedWarehouses                                 warehouses[]                    @relation("WarehouseManager")
-  webhooks_created                                  webhooks[]                      @relation("WebhookCreator")
-  contractsCreated                                  contracts[]                     @relation("ContractCreator")
-  contractAmendmentsCreated                         contract_amendments[]         @relation("ContractAmendmentCreator")
-  contractAttachmentsUploaded                       contract_attachments[]          @relation("ContractAttachmentUploader")
-  contractPaymentsCreated                           contract_payments[]             @relation("PaymentCreator")
-  saleRequests                                      equipment_sales[]               @relation("SaleRequester")
-  saleApprovals                                     equipment_sales[]               @relation("SaleApprover")
-  assetRequestsCreated                              asset_requests[]                @relation("AssetRequestRequester")
-  assetRequestsReviewed                             asset_requests[]                @relation("AssetRequestReviewer")
-  assetRequestsFulfilled                            asset_requests[]                @relation("AssetRequestFulfiller")
-  batchesReceived                                   equipment_batches[]             @relation("BatchReceiver")
-  patrolsAsAgent                                    patrols[]                       @relation("PatrolAgentExecution")
-  patrolSchedulesAsAgent                            patrol_schedules[]              @relation("PatrolAgent")
-  patrolCheckIns                                    patrol_check_ins[]              @relation("PatrolCheckInAgent")
-  news_created                                      news[]                          @relation("NewsCreator")
-  news_updated                                      news[]                          @relation("NewsUpdater")
+  departments                                       departments?                     @relation(fields: [departmentId], references: [id])
+  managedWarehouses                                 warehouses[]                     @relation("WarehouseManager")
+  webhooks_created                                  webhooks[]                       @relation("WebhookCreator")
+  contractsCreated                                  contracts[]                      @relation("ContractCreator")
+  contractAmendmentsCreated                         contract_amendments[]            @relation("ContractAmendmentCreator")
+  contractAttachmentsUploaded                       contract_attachments[]           @relation("ContractAttachmentUploader")
+  contractPaymentsCreated                           contract_payments[]              @relation("PaymentCreator")
+  contractPaymentInstallmentsCreated                contract_payment_installments[]  @relation("ContractPaymentInstallmentCreator")
+  saleRequests                                      equipment_sales[]                @relation("SaleRequester")
+  saleApprovals                                     equipment_sales[]                @relation("SaleApprover")
+  assetRequestsCreated                              asset_requests[]                 @relation("AssetRequestRequester")
+  assetRequestsReviewed                             asset_requests[]                 @relation("AssetRequestReviewer")
+  assetRequestsFulfilled                            asset_requests[]                 @relation("AssetRequestFulfiller")
+  batchesReceived                                   equipment_batches[]              @relation("BatchReceiver")
+  patrolsAsAgent                                    patrols[]                        @relation("PatrolAgentExecution")
+  patrolSchedulesAsAgent                            patrol_schedules[]               @relation("PatrolAgent")
+  patrolCheckIns                                    patrol_check_ins[]               @relation("PatrolCheckInAgent")
+  news_created                                      news[]                           @relation("NewsCreator")
+  news_updated                                      news[]                           @relation("NewsUpdater")
   news_users                                        news_users[]
   news_views                                        news_views[]
   news_reactions                                    news_reactions[]
   news_comments                                     news_comments[]
-  news_attachments_uploaded                         news_attachments[]              @relation("NewsAttachmentUploader")
-  forms_created                                     forms[]                         @relation("FormCreator")
-  forms_updated                                     forms[]                         @relation("FormUpdater")
+  news_attachments_uploaded                         news_attachments[]               @relation("NewsAttachmentUploader")
+  forms_created                                     forms[]                          @relation("FormCreator")
+  forms_updated                                     forms[]                          @relation("FormUpdater")
   form_users                                        form_users[]
   form_downloads                                    form_downloads[]
-  form_attachments_uploaded                         form_attachments[]              @relation("FormAttachmentUploader")
-  incidentsAsAgent                                  patrol_incidents[]              @relation("IncidentAgent")
-  incidentsAsResolver                               patrol_incidents[]              @relation("IncidentResolver")
+  form_attachments_uploaded                         form_attachments[]               @relation("FormAttachmentUploader")
+  incidentsAsAgent                                  patrol_incidents[]               @relation("IncidentAgent")
+  incidentsAsResolver                               patrol_incidents[]               @relation("IncidentResolver")
   pushSubscriptions                                 push_subscriptions[]
-  contractsAsCustodian                            contracts[]                     @relation("ContractCustodian")
-  contractsAsBackupCustodian                        contracts[]                     @relation("ContractBackupCustodian")
-  contractAssignmentsAsClient                       contract_assignments[]          @relation("ContractAssignmentClient")
-  contractAssignmentsDelivered                      contract_assignments[]          @relation("ContractAssignmentDeliverer")
-  inventorySavedReports                             inventory_saved_reports[]       @relation("InventorySavedReportOwner")
-  inventoryScheduledReports                       inventory_scheduled_reports[]   @relation("InventoryScheduledReportOwner")
-  credentialVaultsOwned                           credential_vaults[]             @relation("CredentialVaultOwner")
-  credentialEntriesCreated                        credential_entries[]            @relation("CredentialEntryCreator")
-  credentialEntriesUpdated                        credential_entries[]            @relation("CredentialEntryUpdater")
-  credentialShares                                credential_shares[]
-  telegramLinkTokens                              telegram_link_tokens[]
-  equipmentInvoicesCreated                        equipment_invoices[]            @relation("EquipmentInvoiceCreator")
-  licenseInvoicesCreated                          license_invoices[]              @relation("LicenseInvoiceCreator")
-  processesOwned                                  processes[]                     @relation("ProcessOwner")
-  processesCreated                                processes[]                     @relation("ProcessCreator")
-  processVersionsCreated                          process_versions[]             @relation("ProcessVersionCreator")
-  processAttachmentsUploaded                      process_attachments[]          @relation("ProcessAttachmentUploader")
-  processApprovalEvents                           process_approval_events[]      @relation("ProcessApprovalActor")
-  processExternalReviewsRecorded                  process_external_reviews[]     @relation("ProcessExternalReviewRecorder")
-  accessPassesCreated                             access_passes[]                @relation("AccessPassCreator")
-  accessPassesUpdated                             access_passes[]                @relation("AccessPassUpdater")
-  accessPassesRevoked                             access_passes[]                @relation("AccessPassRevoker")
-  accessScanEvents                                access_scan_events[]           @relation("AccessScanAgent")
-  accessPrivacyAcceptances                        access_subjects[]              @relation("AccessPrivacyAccepter")
+  contractsAsCustodian                              contracts[]                      @relation("ContractCustodian")
+  contractsAsBackupCustodian                        contracts[]                      @relation("ContractBackupCustodian")
+  contractAssignmentsAsClient                       contract_assignments[]           @relation("ContractAssignmentClient")
+  contractAssignmentsDelivered                      contract_assignments[]           @relation("ContractAssignmentDeliverer")
+  inventorySavedReports                             inventory_saved_reports[]        @relation("InventorySavedReportOwner")
+  inventoryScheduledReports                         inventory_scheduled_reports[]    @relation("InventoryScheduledReportOwner")
+  credentialVaultsOwned                             credential_vaults[]              @relation("CredentialVaultOwner")
+  credentialEntriesCreated                          credential_entries[]             @relation("CredentialEntryCreator")
+  credentialEntriesUpdated                          credential_entries[]             @relation("CredentialEntryUpdater")
+  credentialShares                                  credential_shares[]
+  telegramLinkTokens                                telegram_link_tokens[]
+  equipmentInvoicesCreated                          equipment_invoices[]             @relation("EquipmentInvoiceCreator")
+  licenseInvoicesCreated                            license_invoices[]               @relation("LicenseInvoiceCreator")
+  equipmentInvoiceInstallmentsCreated               equipment_invoice_installments[] @relation("EquipmentInvoiceInstallmentCreator")
+  licenseInvoiceInstallmentsCreated                 license_invoice_installments[]   @relation("LicenseInvoiceInstallmentCreator")
+  processesOwned                                    processes[]                      @relation("ProcessOwner")
+  processesCreated                                  processes[]                      @relation("ProcessCreator")
+  processVersionsCreated                            process_versions[]               @relation("ProcessVersionCreator")
+  processAttachmentsUploaded                        process_attachments[]            @relation("ProcessAttachmentUploader")
+  processApprovalEvents                             process_approval_events[]        @relation("ProcessApprovalActor")
+  processExternalReviewsRecorded                    process_external_reviews[]       @relation("ProcessExternalReviewRecorder")
+  accessPassesCreated                               access_passes[]                  @relation("AccessPassCreator")
+  accessPassesUpdated                               access_passes[]                  @relation("AccessPassUpdater")
+  accessPassesRevoked                               access_passes[]                  @relation("AccessPassRevoker")
+  accessScanEvents                                  access_scan_events[]             @relation("AccessScanAgent")
+  accessPrivacyAcceptances                          access_subjects[]                @relation("AccessPrivacyAccepter")
 
   @@index([departmentId])
   @@index([name, email])
@@ -1277,33 +1280,33 @@ model equipment_code_counters {
 }
 
 model delivery_acts {
-  id                 String                 @id @default(uuid())
-  folio              String                 @unique
-  assignmentId       String?                @unique @map("assignment_id")
-  equipmentSnapshot  Json                   @map("equipment_snapshot")
-  delivererInfo      Json                   @map("deliverer_info")
-  receiverInfo       Json                   @map("receiver_info")
-  accessories        String[]
-  observations       String?
-  termsVersion       String                 @default("1.0") @map("terms_version")
-  status             ActStatus              @default(PENDING)
-  acceptanceToken    String                 @unique @map("acceptance_token")
-  expirationDate     DateTime               @map("expiration_date")
-  acceptedAt         DateTime?              @map("accepted_at")
-  rejectedAt         DateTime?              @map("rejected_at")
-  rejectionReason    String?                @map("rejection_reason")
-  signatureTimestamp DateTime?              @map("signature_timestamp")
-  signatureIp        String?                @map("signature_ip")
-  signatureUserAgent String?                @map("signature_user_agent")
-  verificationHash   String?                @map("verification_hash")
-  pdfPath            String?                @map("pdf_path")
-  actType            DeliveryActType        @default(EQUIPMENT_ASSIGNMENT) @map("act_type")
-  referenceId        String?                @map("reference_id")
-  referenceType      String?                @map("reference_type")
-  createdAt          DateTime               @default(now()) @map("created_at")
-  updatedAt          DateTime               @updatedAt @map("updated_at")
-  contractAssignmentId String?               @unique @map("contract_assignment_id")
-  licenseAssignmentId  String?               @unique @map("license_assignment_id")
+  id                   String                 @id @default(uuid())
+  folio                String                 @unique
+  assignmentId         String?                @unique @map("assignment_id")
+  equipmentSnapshot    Json                   @map("equipment_snapshot")
+  delivererInfo        Json                   @map("deliverer_info")
+  receiverInfo         Json                   @map("receiver_info")
+  accessories          String[]
+  observations         String?
+  termsVersion         String                 @default("1.0") @map("terms_version")
+  status               ActStatus              @default(PENDING)
+  acceptanceToken      String                 @unique @map("acceptance_token")
+  expirationDate       DateTime               @map("expiration_date")
+  acceptedAt           DateTime?              @map("accepted_at")
+  rejectedAt           DateTime?              @map("rejected_at")
+  rejectionReason      String?                @map("rejection_reason")
+  signatureTimestamp   DateTime?              @map("signature_timestamp")
+  signatureIp          String?                @map("signature_ip")
+  signatureUserAgent   String?                @map("signature_user_agent")
+  verificationHash     String?                @map("verification_hash")
+  pdfPath              String?                @map("pdf_path")
+  actType              DeliveryActType        @default(EQUIPMENT_ASSIGNMENT) @map("act_type")
+  referenceId          String?                @map("reference_id")
+  referenceType        String?                @map("reference_type")
+  createdAt            DateTime               @default(now()) @map("created_at")
+  updatedAt            DateTime               @updatedAt @map("updated_at")
+  contractAssignmentId String?                @unique @map("contract_assignment_id")
+  licenseAssignmentId  String?                @unique @map("license_assignment_id")
   assignment           equipment_assignments? @relation(fields: [assignmentId], references: [id])
   contractAssignment   contract_assignments?  @relation(fields: [contractAssignmentId], references: [id])
   licenseAssignment    license_assignments?   @relation(fields: [licenseAssignmentId], references: [id])
@@ -1354,37 +1357,37 @@ model return_acts {
 }
 
 model maintenance_records {
-  id                   String            @id @default(uuid())
-  equipmentId          String            @map("equipment_id")
+  id                   String              @id @default(uuid())
+  equipmentId          String              @map("equipment_id")
   type                 MaintenanceType
-  status               MaintenanceStatus @default(SCHEDULED)
+  status               MaintenanceStatus   @default(SCHEDULED)
   date                 DateTime
   description          String
-  technicianId         String?           @map("technician_id")
-  supplierId           String?           @map("supplier_id")
-  requestedById        String?           @map("requested_by_id")
-  acceptedAt           DateTime?         @map("accepted_at")
-  completedAt          DateTime?         @map("completed_at")
+  technicianId         String?             @map("technician_id")
+  supplierId           String?             @map("supplier_id")
+  requestedById        String?             @map("requested_by_id")
+  acceptedAt           DateTime?           @map("accepted_at")
+  completedAt          DateTime?           @map("completed_at")
   cost                 Float?
-  partsReplaced        String[]          @map("parts_replaced")
-  ticketId             String?           @map("ticket_id")
+  partsReplaced        String[]            @map("parts_replaced")
+  ticketId             String?             @map("ticket_id")
   notes                String?
-  previousStatus       EquipmentStatus?  @map("previous_status")
-  previousDepartmentId String?           @map("previous_department_id")
+  previousStatus       EquipmentStatus?    @map("previous_status")
+  previousDepartmentId String?             @map("previous_department_id")
   /// Factura del proveedor externo (cuando lo realiza un tercero)
-  supplierInvoice      String?           @map("supplier_invoice") @db.VarChar(100)
+  supplierInvoice      String?             @map("supplier_invoice") @db.VarChar(100)
   /// Fecha de vencimiento de garantía del proveedor
-  warrantyExpiresAt    DateTime?         @map("warranty_expires_at")
+  warrantyExpiresAt    DateTime?           @map("warranty_expires_at")
   /// Contrato de mantenimiento/soporte asociado (opcional)
-  contractId           String?           @map("contract_id")
-  createdAt            DateTime          @default(now()) @map("created_at")
-  updatedAt            DateTime          @updatedAt @map("updated_at")
-  equipment            equipment         @relation(fields: [equipmentId], references: [id])
-  requestedBy          users?            @relation("MaintenanceRequester", fields: [requestedById], references: [id])
-  supplier             suppliers?        @relation(fields: [supplierId], references: [id])
-  technician           users?            @relation("MaintenanceTechnician", fields: [technicianId], references: [id])
-  ticket               tickets?          @relation(fields: [ticketId], references: [id])
-  contract             contracts?        @relation(fields: [contractId], references: [id], onDelete: SetNull)
+  contractId           String?             @map("contract_id")
+  createdAt            DateTime            @default(now()) @map("created_at")
+  updatedAt            DateTime            @updatedAt @map("updated_at")
+  equipment            equipment           @relation(fields: [equipmentId], references: [id])
+  requestedBy          users?              @relation("MaintenanceRequester", fields: [requestedById], references: [id])
+  supplier             suppliers?          @relation(fields: [supplierId], references: [id])
+  technician           users?              @relation("MaintenanceTechnician", fields: [technicianId], references: [id])
+  ticket               tickets?            @relation(fields: [ticketId], references: [id])
+  contract             contracts?          @relation(fields: [contractId], references: [id], onDelete: SetNull)
   tasks                maintenance_tasks[]
 
   @@index([equipmentId, date])
@@ -1401,16 +1404,16 @@ model maintenance_records {
 /// "Cambio de pasta térmica", "Prueba final") — puramente organizativo, no
 /// condiciona el flujo de estados del mantenimiento en sí.
 model maintenance_tasks {
-  id                   String    @id @default(uuid())
-  maintenanceRecordId  String    @map("maintenance_record_id")
-  description          String    @db.VarChar(300)
-  order                Int
-  isCompleted          Boolean   @default(false) @map("is_completed")
-  completedAt          DateTime? @map("completed_at")
-  completedById        String?   @map("completed_by_id")
-  createdBy            String    @map("created_by")
-  createdAt            DateTime  @default(now()) @map("created_at")
-  updatedAt            DateTime  @updatedAt @map("updated_at")
+  id                  String    @id @default(uuid())
+  maintenanceRecordId String    @map("maintenance_record_id")
+  description         String    @db.VarChar(300)
+  order               Int
+  isCompleted         Boolean   @default(false) @map("is_completed")
+  completedAt         DateTime? @map("completed_at")
+  completedById       String?   @map("completed_by_id")
+  createdBy           String    @map("created_by")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
 
   maintenanceRecord maintenance_records @relation(fields: [maintenanceRecordId], references: [id], onDelete: Cascade)
   completedBy       users?              @relation("MaintenanceTaskCompletedBy", fields: [completedById], references: [id])
@@ -1692,45 +1695,45 @@ model stock_movements {
 }
 
 model suppliers {
-  id                     String    @id @default(cuid())
-  name                   String    @db.VarChar(200)
-  legalName              String?   @map("legal_name") @db.VarChar(200)
-  typeId                 String?   @map("type_id")
-  familyId               String?   @map("family_id")
-  taxId                  String?   @unique @map("tax_id") @db.VarChar(20)
-  email                  String?   @db.VarChar(200)
-  phone                  String?   @db.VarChar(50)
+  id                     String                @id @default(cuid())
+  name                   String                @db.VarChar(200)
+  legalName              String?               @map("legal_name") @db.VarChar(200)
+  typeId                 String?               @map("type_id")
+  familyId               String?               @map("family_id")
+  taxId                  String?               @unique @map("tax_id") @db.VarChar(20)
+  email                  String?               @db.VarChar(200)
+  phone                  String?               @db.VarChar(50)
   address                String?
-  city                   String?   @db.VarChar(100)
-  country                String?   @db.VarChar(100)
+  city                   String?               @db.VarChar(100)
+  country                String?               @db.VarChar(100)
   website                String?
-  contactName            String?   @map("contact_name") @db.VarChar(200)
+  contactName            String?               @map("contact_name") @db.VarChar(200)
   /// Plazo de pago habitual (días): 0 = contado, 30 = 30, etc.
-  paymentTermsDays       Int?      @map("payment_terms_days")
+  paymentTermsDays       Int?                  @map("payment_terms_days")
   /// Límite de crédito otorgado por el proveedor (referencia AP)
-  creditLimit            Decimal?  @map("credit_limit") @db.Decimal(14, 2)
-  creditCurrency         String?   @default("USD") @map("credit_currency") @db.VarChar(3)
+  creditLimit            Decimal?              @map("credit_limit") @db.Decimal(14, 2)
+  creditCurrency         String?               @default("USD") @map("credit_currency") @db.VarChar(3)
   /// Alineado a PaymentMethodType de contratos (BANK_TRANSFER, CHECK, PROVIDER_INVOICE, …)
-  preferredPaymentMethod String?   @map("preferred_payment_method") @db.VarChar(30)
-  bankName               String?   @map("bank_name") @db.VarChar(100)
-  bankAccountNumber      String?   @map("bank_account_number") @db.VarChar(80)
-  bankAccountType        String?   @map("bank_account_type") @db.VarChar(30)
-  bankSwift              String?   @map("bank_swift") @db.VarChar(30)
+  preferredPaymentMethod String?               @map("preferred_payment_method") @db.VarChar(30)
+  bankName               String?               @map("bank_name") @db.VarChar(100)
+  bankAccountNumber      String?               @map("bank_account_number") @db.VarChar(80)
+  bankAccountType        String?               @map("bank_account_type") @db.VarChar(30)
+  bankSwift              String?               @map("bank_swift") @db.VarChar(30)
   notes                  String?
-  isActive               Boolean   @default(true) @map("is_active")
-  createdAt              DateTime  @default(now()) @map("created_at")
-  updatedAt              DateTime  @updatedAt @map("updated_at")
-  family                 families? @relation(fields: [familyId], references: [id])
-  supplierType           supplier_types? @relation(fields: [typeId], references: [id])
+  isActive               Boolean               @default(true) @map("is_active")
+  createdAt              DateTime              @default(now()) @map("created_at")
+  updatedAt              DateTime              @updatedAt @map("updated_at")
+  family                 families?             @relation(fields: [familyId], references: [id])
+  supplierType           supplier_types?       @relation(fields: [typeId], references: [id])
   consumables            consumables[]
   equipment              equipment[]
   software_licenses      software_licenses[]
   contracts              contracts[]
   batches                equipment_batches[]
   maintenances           maintenance_records[]
-  equipmentInvoices      equipment_invoices[] @relation("EquipmentInvoiceSupplier")
-  licenseInvoices        license_invoices[]   @relation("LicenseInvoiceSupplier")
-  stockMovements         stock_movements[]    @relation("StockMovementSupplier")
+  equipmentInvoices      equipment_invoices[]  @relation("EquipmentInvoiceSupplier")
+  licenseInvoices        license_invoices[]    @relation("LicenseInvoiceSupplier")
+  stockMovements         stock_movements[]     @relation("StockMovementSupplier")
 
   @@index([typeId, isActive])
   @@index([familyId, isActive])
@@ -1857,52 +1860,52 @@ model folio_counters {
 }
 
 model families {
-  id                          String                          @id @default(uuid())
-  code                        String                          @unique @db.VarChar(50)
-  name                        String                          @db.VarChar(100)
-  description                 String?
-  icon                        String?                         @db.VarChar(50)
-  color                       String?                         @default("#6B7280") @db.VarChar(20)
-  isActive                    Boolean                         @default(true) @map("is_active")
-  order                       Int                             @default(0)
-  contactWhatsapp             String?                         @map("contact_whatsapp") @db.VarChar(30)
-  createdAt                   DateTime                        @default(now()) @map("created_at")
-  updatedAt                   DateTime                        @updatedAt @map("updated_at")
-  categories                  categories[]
-  userFamilyAccess            user_family_access[]
-  consumableTypes             consumable_types[]
-  departments                 departments[]
-  equipmentTypes              equipment_types[]
-  equipmentBrands             equipment_brands[]
-  formConfig                  inventory_family_config?
-  knowledge_articles          knowledge_articles[]
-  licenseTypes                license_types[]
-  sla_policies                sla_policies[]
-  supplierTypes               supplier_types[]
-  suppliers                   suppliers[]
-  warehouses                  warehouses[]
-  ticketCodeCounters          ticket_code_counters[]
-  ticketFamilyConfig          ticket_family_config?
-  tickets                     tickets[]
-  contracts                   contracts[]
-  contractAssignments         contract_assignments[]
-  assetRequests               asset_requests[]
-  patrolFamilyConfig          patrol_family_config?
-  patrolCheckpoints           patrol_checkpoints[]
-  patrolRoutes                patrol_routes[]
-  patrolSchedules             patrol_schedules[]
-  patrols                     patrols[]
-  news_families               news_families[]
-  form_categories             form_categories[]
-  forms                       forms[]
-  form_families               form_families[]
-  inventorySavedReports       inventory_saved_reports[]
-  credentialVaults            credential_vaults[]
-  credentialShares            credential_shares[]
-  processes                   processes[]
-  accessSubjects              access_subjects[]
-  accessPasses                access_passes[]
-  accessScanEvents            access_scan_events[]
+  id                    String                    @id @default(uuid())
+  code                  String                    @unique @db.VarChar(50)
+  name                  String                    @db.VarChar(100)
+  description           String?
+  icon                  String?                   @db.VarChar(50)
+  color                 String?                   @default("#6B7280") @db.VarChar(20)
+  isActive              Boolean                   @default(true) @map("is_active")
+  order                 Int                       @default(0)
+  contactWhatsapp       String?                   @map("contact_whatsapp") @db.VarChar(30)
+  createdAt             DateTime                  @default(now()) @map("created_at")
+  updatedAt             DateTime                  @updatedAt @map("updated_at")
+  categories            categories[]
+  userFamilyAccess      user_family_access[]
+  consumableTypes       consumable_types[]
+  departments           departments[]
+  equipmentTypes        equipment_types[]
+  equipmentBrands       equipment_brands[]
+  formConfig            inventory_family_config?
+  knowledge_articles    knowledge_articles[]
+  licenseTypes          license_types[]
+  sla_policies          sla_policies[]
+  supplierTypes         supplier_types[]
+  suppliers             suppliers[]
+  warehouses            warehouses[]
+  ticketCodeCounters    ticket_code_counters[]
+  ticketFamilyConfig    ticket_family_config?
+  tickets               tickets[]
+  contracts             contracts[]
+  contractAssignments   contract_assignments[]
+  assetRequests         asset_requests[]
+  patrolFamilyConfig    patrol_family_config?
+  patrolCheckpoints     patrol_checkpoints[]
+  patrolRoutes          patrol_routes[]
+  patrolSchedules       patrol_schedules[]
+  patrols               patrols[]
+  news_families         news_families[]
+  form_categories       form_categories[]
+  forms                 forms[]
+  form_families         form_families[]
+  inventorySavedReports inventory_saved_reports[]
+  credentialVaults      credential_vaults[]
+  credentialShares      credential_shares[]
+  processes             processes[]
+  accessSubjects        access_subjects[]
+  accessPasses          access_passes[]
+  accessScanEvents      access_scan_events[]
 
   @@index([isActive, order])
   @@map("families")
@@ -1949,27 +1952,27 @@ model license_attachments {
 }
 
 model inventory_family_config {
-  id                        String              @id @default(uuid())
-  familyId                  String              @unique @map("family_id")
-  inventoryEnabled          Boolean             @default(true) @map("inventory_enabled")
-  allowedSubtypes           AssetSubtype[]      @map("allowed_subtypes")
-  visibleSections           FormSection[]       @map("visible_sections")
-  requiredSections          FormSection[]       @map("required_sections")
-  requireFinancialForNew    Boolean             @default(true) @map("require_financial_for_new")
-  sectionsByMode            Json?               @map("sections_by_mode")
-  defaultDepreciationMethod DepreciationMethod? @map("default_depreciation_method")
-  defaultUsefulLifeYears    Float?              @map("default_useful_life_years")
-  defaultResidualValuePct   Float?              @map("default_residual_value_pct")
-  codePrefix                String?             @map("code_prefix") @db.VarChar(10)
-  autoApproveDecommission   Boolean             @default(false) @map("auto_approve_decommission")
-  requireDeliveryAct        Boolean             @default(true) @map("require_delivery_act")
-  batchUtilizationAlertEnabled   Boolean?       @map("batch_utilization_alert_enabled")
-  batchUtilizationEmailCritical  Boolean?       @map("batch_utilization_email_critical")
-  batchUtilizationEmailWarning   Boolean?       @map("batch_utilization_email_warning")
-  batchLowStockThresholdPct      Float?         @map("batch_low_stock_threshold_pct")
-  createdAt                 DateTime            @default(now()) @map("created_at")
-  updatedAt                 DateTime            @updatedAt @map("updated_at")
-  family                    families            @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  id                            String              @id @default(uuid())
+  familyId                      String              @unique @map("family_id")
+  inventoryEnabled              Boolean             @default(true) @map("inventory_enabled")
+  allowedSubtypes               AssetSubtype[]      @map("allowed_subtypes")
+  visibleSections               FormSection[]       @map("visible_sections")
+  requiredSections              FormSection[]       @map("required_sections")
+  requireFinancialForNew        Boolean             @default(true) @map("require_financial_for_new")
+  sectionsByMode                Json?               @map("sections_by_mode")
+  defaultDepreciationMethod     DepreciationMethod? @map("default_depreciation_method")
+  defaultUsefulLifeYears        Float?              @map("default_useful_life_years")
+  defaultResidualValuePct       Float?              @map("default_residual_value_pct")
+  codePrefix                    String?             @map("code_prefix") @db.VarChar(10)
+  autoApproveDecommission       Boolean             @default(false) @map("auto_approve_decommission")
+  requireDeliveryAct            Boolean             @default(true) @map("require_delivery_act")
+  batchUtilizationAlertEnabled  Boolean?            @map("batch_utilization_alert_enabled")
+  batchUtilizationEmailCritical Boolean?            @map("batch_utilization_email_critical")
+  batchUtilizationEmailWarning  Boolean?            @map("batch_utilization_email_warning")
+  batchLowStockThresholdPct     Float?              @map("batch_low_stock_threshold_pct")
+  createdAt                     DateTime            @default(now()) @map("created_at")
+  updatedAt                     DateTime            @updatedAt @map("updated_at")
+  family                        families            @relation(fields: [familyId], references: [id], onDelete: Cascade)
 
   @@index([familyId])
   @@map("inventory_family_config")
@@ -1981,22 +1984,22 @@ enum SavedReportKind {
 }
 
 model inventory_saved_reports {
-  id              String          @id @default(uuid())
-  userId          String          @map("user_id")
-  name            String          @db.VarChar(200)
-  kind            SavedReportKind @default(DATASET)
-  targetId        String          @map("target_id") @db.VarChar(100)
-  familyId        String?         @map("family_id")
-  filterValues    Json            @default("{}") @map("filter_values")
-  visibleColumns  Json            @default("[]") @map("visible_columns")
-  pinned          Boolean         @default(false)
-  pinnedOrder     Int?            @map("pinned_order")
-  pinnedSpan      Int             @default(1) @map("pinned_span")
-  createdAt       DateTime        @default(now()) @map("created_at")
-  updatedAt       DateTime        @updatedAt @map("updated_at")
+  id             String          @id @default(uuid())
+  userId         String          @map("user_id")
+  name           String          @db.VarChar(200)
+  kind           SavedReportKind @default(DATASET)
+  targetId       String          @map("target_id") @db.VarChar(100)
+  familyId       String?         @map("family_id")
+  filterValues   Json            @default("{}") @map("filter_values")
+  visibleColumns Json            @default("[]") @map("visible_columns")
+  pinned         Boolean         @default(false)
+  pinnedOrder    Int?            @map("pinned_order")
+  pinnedSpan     Int             @default(1) @map("pinned_span")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
 
-  owner  users     @relation("InventorySavedReportOwner", fields: [userId], references: [id], onDelete: Cascade)
-  family families? @relation(fields: [familyId], references: [id], onDelete: SetNull)
+  owner     users                         @relation("InventorySavedReportOwner", fields: [userId], references: [id], onDelete: Cascade)
+  family    families?                     @relation(fields: [familyId], references: [id], onDelete: SetNull)
   schedules inventory_scheduled_reports[]
 
   @@index([userId, updatedAt(sort: Desc)])
@@ -2034,8 +2037,8 @@ model inventory_scheduled_reports {
   createdAt     DateTime                @default(now()) @map("created_at")
   updatedAt     DateTime                @updatedAt @map("updated_at")
 
-  owner       users                     @relation("InventoryScheduledReportOwner", fields: [userId], references: [id], onDelete: Cascade)
-  savedReport inventory_saved_reports   @relation(fields: [savedReportId], references: [id], onDelete: Cascade)
+  owner       users                   @relation("InventoryScheduledReportOwner", fields: [userId], references: [id], onDelete: Cascade)
+  savedReport inventory_saved_reports @relation(fields: [savedReportId], references: [id], onDelete: Cascade)
 
   @@index([enabled, nextRunAt])
   @@index([userId, createdAt(sort: Desc)])
@@ -2121,35 +2124,35 @@ model ticket_code_counters {
 /// Catálogo raíz de procesos y procedimientos internos.
 /// La asignación organizacional usa FKs, sin depender de códigos sembrados.
 model processes {
-  id                  String                    @id @default(uuid())
-  code                String                    @unique @db.VarChar(80)
-  title               String                    @db.VarChar(250)
-  objective           String?
-  scope               String?
+  id                   String                    @id @default(uuid())
+  code                 String                    @unique @db.VarChar(80)
+  title                String                    @db.VarChar(250)
+  objective            String?
+  scope                String?
   /// Jerarquía del mapa interno: 0 = macroproceso, 1+ = proceso/subproceso.
-  level               Int                       @default(1) @map("process_level")
-  parentProcessId     String?                   @map("parent_process_id")
-  familyId            String                    @map("family_id")
-  departmentId        String?                   @map("department_id")
-  ownerId             String                    @map("owner_id")
-  createdById         String                    @map("created_by_id")
-  status              ProcessStatus             @default(DRAFT)
-  criticality         ProcessCriticality        @default(MEDIUM)
-  reviewEveryMonths   Int                       @default(12) @map("review_every_months")
-  nextReviewAt        DateTime?                 @map("next_review_at")
-  lastReviewReminderAt DateTime?                @map("last_review_reminder_at")
-  publishedAt         DateTime?                 @map("published_at")
-  createdAt           DateTime                  @default(now()) @map("created_at")
-  updatedAt           DateTime                  @updatedAt @map("updated_at")
-  family              families                  @relation(fields: [familyId], references: [id])
-  department          departments?              @relation(fields: [departmentId], references: [id])
-  owner               users                     @relation("ProcessOwner", fields: [ownerId], references: [id])
-  createdBy           users                     @relation("ProcessCreator", fields: [createdById], references: [id])
-  parentProcess       processes?                @relation("ProcessHierarchy", fields: [parentProcessId], references: [id], onDelete: SetNull)
-  childProcesses      processes[]               @relation("ProcessHierarchy")
-  versions            process_versions[]
-  attachments         process_attachments[]
-  approvalEvents      process_approval_events[]
+  level                Int                       @default(1) @map("process_level")
+  parentProcessId      String?                   @map("parent_process_id")
+  familyId             String                    @map("family_id")
+  departmentId         String?                   @map("department_id")
+  ownerId              String                    @map("owner_id")
+  createdById          String                    @map("created_by_id")
+  status               ProcessStatus             @default(DRAFT)
+  criticality          ProcessCriticality        @default(MEDIUM)
+  reviewEveryMonths    Int                       @default(12) @map("review_every_months")
+  nextReviewAt         DateTime?                 @map("next_review_at")
+  lastReviewReminderAt DateTime?                 @map("last_review_reminder_at")
+  publishedAt          DateTime?                 @map("published_at")
+  createdAt            DateTime                  @default(now()) @map("created_at")
+  updatedAt            DateTime                  @updatedAt @map("updated_at")
+  family               families                  @relation(fields: [familyId], references: [id])
+  department           departments?              @relation(fields: [departmentId], references: [id])
+  owner                users                     @relation("ProcessOwner", fields: [ownerId], references: [id])
+  createdBy            users                     @relation("ProcessCreator", fields: [createdById], references: [id])
+  parentProcess        processes?                @relation("ProcessHierarchy", fields: [parentProcessId], references: [id], onDelete: SetNull)
+  childProcesses       processes[]               @relation("ProcessHierarchy")
+  versions             process_versions[]
+  attachments          process_attachments[]
+  approvalEvents       process_approval_events[]
 
   @@index([familyId, status])
   @@index([departmentId, status])
@@ -2161,16 +2164,16 @@ model processes {
 
 /// Snapshot inmutable del procedimiento. Cada versión puede contener varios diagramas.
 model process_versions {
-  id             String                      @id @default(uuid())
-  processId      String                      @map("process_id")
-  versionNumber  Int                         @map("version_number")
-  content        Json?
-  changeSummary  String?                     @map("change_summary")
-  createdById    String                      @map("created_by_id")
-  createdAt      DateTime                    @default(now()) @map("created_at")
-  process        processes                   @relation(fields: [processId], references: [id], onDelete: Cascade)
-  createdBy      users                       @relation("ProcessVersionCreator", fields: [createdById], references: [id])
-  diagrams       process_diagrams[]
+  id              String                     @id @default(uuid())
+  processId       String                     @map("process_id")
+  versionNumber   Int                        @map("version_number")
+  content         Json?
+  changeSummary   String?                    @map("change_summary")
+  createdById     String                     @map("created_by_id")
+  createdAt       DateTime                   @default(now()) @map("created_at")
+  process         processes                  @relation(fields: [processId], references: [id], onDelete: Cascade)
+  createdBy       users                      @relation("ProcessVersionCreator", fields: [createdById], references: [id])
+  diagrams        process_diagrams[]
   externalReviews process_external_reviews[]
 
   @@unique([processId, versionNumber])
@@ -2215,15 +2218,15 @@ model process_attachments {
 
 /// Trazabilidad de las transiciones internas de aprobación/publicación.
 model process_approval_events {
-  id        String              @id @default(uuid())
-  processId String              @map("process_id")
-  fromStatus ProcessStatus?     @map("from_status")
-  toStatus  ProcessStatus       @map("to_status")
-  notes     String?
-  actorId   String              @map("actor_id")
-  createdAt DateTime            @default(now()) @map("created_at")
-  process   processes           @relation(fields: [processId], references: [id], onDelete: Cascade)
-  actor     users               @relation("ProcessApprovalActor", fields: [actorId], references: [id])
+  id         String         @id @default(uuid())
+  processId  String         @map("process_id")
+  fromStatus ProcessStatus? @map("from_status")
+  toStatus   ProcessStatus  @map("to_status")
+  notes      String?
+  actorId    String         @map("actor_id")
+  createdAt  DateTime       @default(now()) @map("created_at")
+  process    processes      @relation(fields: [processId], references: [id], onDelete: Cascade)
+  actor      users          @relation("ProcessApprovalActor", fields: [actorId], references: [id])
 
   @@index([processId, createdAt])
   @@map("process_approval_events")
@@ -2231,20 +2234,20 @@ model process_approval_events {
 
 /// Evidencia de revisión por el DPD externo; no sustituye Privacy Driver.
 model process_external_reviews {
-  id               String           @id @default(uuid())
-  versionId        String           @map("version_id")
-  provider         String           @default("Privacy Driver") @db.VarChar(150)
-  externalReference String?         @map("external_reference") @db.VarChar(150)
-  status           ExternalReviewStatus @default(PENDING)
-  sentAt           DateTime?        @map("sent_at")
-  reviewedAt       DateTime?        @map("reviewed_at")
-  notes            String?
-  evidencePath     String?          @map("evidence_path")
-  recordedById     String           @map("recorded_by_id")
-  createdAt        DateTime         @default(now()) @map("created_at")
-  updatedAt        DateTime         @updatedAt @map("updated_at")
-  version          process_versions @relation(fields: [versionId], references: [id], onDelete: Cascade)
-  recordedBy       users            @relation("ProcessExternalReviewRecorder", fields: [recordedById], references: [id])
+  id                String               @id @default(uuid())
+  versionId         String               @map("version_id")
+  provider          String               @default("Privacy Driver") @db.VarChar(150)
+  externalReference String?              @map("external_reference") @db.VarChar(150)
+  status            ExternalReviewStatus @default(PENDING)
+  sentAt            DateTime?            @map("sent_at")
+  reviewedAt        DateTime?            @map("reviewed_at")
+  notes             String?
+  evidencePath      String?              @map("evidence_path")
+  recordedById      String               @map("recorded_by_id")
+  createdAt         DateTime             @default(now()) @map("created_at")
+  updatedAt         DateTime             @updatedAt @map("updated_at")
+  version           process_versions     @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  recordedBy        users                @relation("ProcessExternalReviewRecorder", fields: [recordedById], references: [id])
 
   @@index([versionId, status])
   @@map("process_external_reviews")
@@ -2269,30 +2272,30 @@ model access_organizations {
 
 /// Persona externa autorizable; no representa una cuenta ni puede iniciar sesión.
 model access_subjects {
-  id                   String             @id @default(uuid())
-  familyId             String             @map("family_id")
-  firstName            String             @map("first_name") @db.VarChar(120)
-  lastName             String             @map("last_name") @db.VarChar(120)
-  email                String?            @db.VarChar(320)
-  phone                String?            @db.VarChar(40)
-  photoPath            String?            @map("photo_path") @db.VarChar(500)
-  organizationId       String?            @map("organization_id")
-  organization         String?            @db.VarChar(200)
-  accessType           AccessSubjectType  @default(AUTHORIZED_VISITOR) @map("access_type")
-  purpose              String?            @db.VarChar(1000)
-  documentLast4        String?            @map("document_last4") @db.VarChar(4)
-  privacyAcceptedAt    DateTime?          @map("privacy_accepted_at")
-  privacyNoticeVersion String?            @map("privacy_notice_version") @db.VarChar(50)
+  id                   String            @id @default(uuid())
+  familyId             String            @map("family_id")
+  firstName            String            @map("first_name") @db.VarChar(120)
+  lastName             String            @map("last_name") @db.VarChar(120)
+  email                String?           @db.VarChar(320)
+  phone                String?           @db.VarChar(40)
+  photoPath            String?           @map("photo_path") @db.VarChar(500)
+  organizationId       String?           @map("organization_id")
+  organization         String?           @db.VarChar(200)
+  accessType           AccessSubjectType @default(AUTHORIZED_VISITOR) @map("access_type")
+  purpose              String?           @db.VarChar(1000)
+  documentLast4        String?           @map("document_last4") @db.VarChar(4)
+  privacyAcceptedAt    DateTime?         @map("privacy_accepted_at")
+  privacyNoticeVersion String?           @map("privacy_notice_version") @db.VarChar(50)
   /// Quién registró la aceptación (gestor) — la persona no firma aún en el correo.
-  privacyAcceptedById  String?            @map("privacy_accepted_by_id")
-  isActive             Boolean            @default(true) @map("is_active")
-  createdAt            DateTime           @default(now()) @map("created_at")
-  updatedAt            DateTime           @updatedAt @map("updated_at")
+  privacyAcceptedById  String?           @map("privacy_accepted_by_id")
+  isActive             Boolean           @default(true) @map("is_active")
+  createdAt            DateTime          @default(now()) @map("created_at")
+  updatedAt            DateTime          @updatedAt @map("updated_at")
 
-  family             families              @relation(fields: [familyId], references: [id], onDelete: Restrict)
-  organizationRef    access_organizations? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
-  privacyAcceptedBy  users?                @relation("AccessPrivacyAccepter", fields: [privacyAcceptedById], references: [id], onDelete: SetNull)
-  passes             access_passes[]
+  family            families              @relation(fields: [familyId], references: [id], onDelete: Restrict)
+  organizationRef   access_organizations? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  privacyAcceptedBy users?                @relation("AccessPrivacyAccepter", fields: [privacyAcceptedById], references: [id], onDelete: SetNull)
+  passes            access_passes[]
 
   @@index([familyId, isActive])
   @@index([familyId, lastName, firstName])
@@ -2303,37 +2306,37 @@ model access_subjects {
 
 /// Credencial digital: solo se persiste el hash del secreto QR.
 model access_passes {
-  id             String           @id @default(uuid())
-  subjectId      String           @map("subject_id")
-  familyId       String           @map("family_id")
-  credentialCode String           @unique @map("credential_code") @db.VarChar(40)
-  tokenHash      String           @unique @map("token_hash") @db.VarChar(128)
-  status         AccessPassStatus @default(ACTIVE)
+  id                         String           @id @default(uuid())
+  subjectId                  String           @map("subject_id")
+  familyId                   String           @map("family_id")
+  credentialCode             String           @unique @map("credential_code") @db.VarChar(40)
+  tokenHash                  String           @unique @map("token_hash") @db.VarChar(128)
+  status                     AccessPassStatus @default(ACTIVE)
   /// Hash SHA-256 del token de aceptación pública. El valor original nunca se persiste.
-  privacyAcceptanceTokenHash String?   @unique @map("privacy_acceptance_token_hash") @db.VarChar(128)
-  privacyAcceptanceExpiresAt DateTime? @map("privacy_acceptance_expires_at")
-  privacyAcceptedAt          DateTime? @map("privacy_accepted_at")
-  privacyAcceptedIp          String?   @map("privacy_accepted_ip") @db.VarChar(64)
-  privacyAcceptedUserAgent   String?   @map("privacy_accepted_user_agent") @db.VarChar(1000)
-  privacyAcceptanceHash      String?   @map("privacy_acceptance_hash") @db.VarChar(128)
-  validFrom      DateTime         @map("valid_from")
-  validUntil     DateTime         @map("valid_until")
-  issuedAt       DateTime         @default(now()) @map("issued_at")
-  emailedAt      DateTime?        @map("emailed_at")
-  lastScannedAt  DateTime?        @map("last_scanned_at")
-  revokedAt      DateTime?        @map("revoked_at")
-  revokedReason  String?          @map("revoked_reason") @db.VarChar(1000)
-  createdById    String           @map("created_by_id")
-  updatedById    String?          @map("updated_by_id")
-  revokedById    String?          @map("revoked_by_id")
-  createdAt      DateTime         @default(now()) @map("created_at")
-  updatedAt      DateTime         @updatedAt @map("updated_at")
+  privacyAcceptanceTokenHash String?          @unique @map("privacy_acceptance_token_hash") @db.VarChar(128)
+  privacyAcceptanceExpiresAt DateTime?        @map("privacy_acceptance_expires_at")
+  privacyAcceptedAt          DateTime?        @map("privacy_accepted_at")
+  privacyAcceptedIp          String?          @map("privacy_accepted_ip") @db.VarChar(64)
+  privacyAcceptedUserAgent   String?          @map("privacy_accepted_user_agent") @db.VarChar(1000)
+  privacyAcceptanceHash      String?          @map("privacy_acceptance_hash") @db.VarChar(128)
+  validFrom                  DateTime         @map("valid_from")
+  validUntil                 DateTime         @map("valid_until")
+  issuedAt                   DateTime         @default(now()) @map("issued_at")
+  emailedAt                  DateTime?        @map("emailed_at")
+  lastScannedAt              DateTime?        @map("last_scanned_at")
+  revokedAt                  DateTime?        @map("revoked_at")
+  revokedReason              String?          @map("revoked_reason") @db.VarChar(1000)
+  createdById                String           @map("created_by_id")
+  updatedById                String?          @map("updated_by_id")
+  revokedById                String?          @map("revoked_by_id")
+  createdAt                  DateTime         @default(now()) @map("created_at")
+  updatedAt                  DateTime         @updatedAt @map("updated_at")
 
-  subject    access_subjects     @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  family     families            @relation(fields: [familyId], references: [id], onDelete: Restrict)
-  createdBy  users               @relation("AccessPassCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  updatedBy  users?              @relation("AccessPassUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
-  revokedBy  users?              @relation("AccessPassRevoker", fields: [revokedById], references: [id], onDelete: SetNull)
+  subject    access_subjects      @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  family     families             @relation(fields: [familyId], references: [id], onDelete: Restrict)
+  createdBy  users                @relation("AccessPassCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy  users?               @relation("AccessPassUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+  revokedBy  users?               @relation("AccessPassRevoker", fields: [revokedById], references: [id], onDelete: SetNull)
   scanEvents access_scan_events[]
 
   @@index([familyId, status, validUntil])
@@ -2726,45 +2729,45 @@ model contracts {
   renewalCount  Int     @default(0) @map("renewal_count")
 
   // Gobernanza de suscripciones / facturación recurrente
-  custodianUserId         String?                  @map("custodian_user_id")
-  backupCustodianUserId   String?                  @map("backup_custodian_user_id")
-  billingAccountEmail     String?                  @map("billing_account_email") @db.VarChar(200)
-  billingPortalUrl        String?                  @map("billing_portal_url") @db.VarChar(500)
-  vendorAccountId         String?                  @map("vendor_account_id") @db.VarChar(200)
-  paymentMethodType       PaymentMethodType        @default(CORPORATE_CARD) @map("payment_method_type")
-  paymentAccountRef       String?                  @map("payment_account_ref") @db.VarChar(300)
-  paymentCardBrand        String?                  @map("payment_card_brand") @db.VarChar(50)
-  paymentCardLast4        String?                  @map("payment_card_last4") @db.VarChar(4)
-  paymentCardBank         String?                  @map("payment_card_bank") @db.VarChar(100)
-  paymentCardExpiry       String?                  @map("payment_card_expiry") @db.VarChar(7)
-  corporateCardLabel      String?                  @map("corporate_card_label") @db.VarChar(100)
-  lastChargeDate          DateTime?                @map("last_charge_date")
-  lastChargeAmount        Float?                   @map("last_charge_amount")
-  lastTransactionRef      String?                  @map("last_transaction_ref") @db.VarChar(200)
-  subscriptionUsageStatus SubscriptionUsageStatus  @default(ACTIVE) @map("subscription_usage_status")
-  cancellationNoticeDays  Int?                     @map("cancellation_notice_days")
+  custodianUserId         String?                 @map("custodian_user_id")
+  backupCustodianUserId   String?                 @map("backup_custodian_user_id")
+  billingAccountEmail     String?                 @map("billing_account_email") @db.VarChar(200)
+  billingPortalUrl        String?                 @map("billing_portal_url") @db.VarChar(500)
+  vendorAccountId         String?                 @map("vendor_account_id") @db.VarChar(200)
+  paymentMethodType       PaymentMethodType       @default(CORPORATE_CARD) @map("payment_method_type")
+  paymentAccountRef       String?                 @map("payment_account_ref") @db.VarChar(300)
+  paymentCardBrand        String?                 @map("payment_card_brand") @db.VarChar(50)
+  paymentCardLast4        String?                 @map("payment_card_last4") @db.VarChar(4)
+  paymentCardBank         String?                 @map("payment_card_bank") @db.VarChar(100)
+  paymentCardExpiry       String?                 @map("payment_card_expiry") @db.VarChar(7)
+  corporateCardLabel      String?                 @map("corporate_card_label") @db.VarChar(100)
+  lastChargeDate          DateTime?               @map("last_charge_date")
+  lastChargeAmount        Float?                  @map("last_charge_amount")
+  lastTransactionRef      String?                 @map("last_transaction_ref") @db.VarChar(200)
+  subscriptionUsageStatus SubscriptionUsageStatus @default(ACTIVE) @map("subscription_usage_status")
+  cancellationNoticeDays  Int?                    @map("cancellation_notice_days")
 
   createdBy String   @map("created_by")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  creator            users                  @relation("ContractCreator", fields: [createdBy], references: [id])
-  custodian          users?                 @relation("ContractCustodian", fields: [custodianUserId], references: [id], onDelete: SetNull)
-  backupCustodian    users?                 @relation("ContractBackupCustodian", fields: [backupCustodianUserId], references: [id], onDelete: SetNull)
-  supplier           suppliers?             @relation(fields: [supplierId], references: [id])
-  family             families?              @relation(fields: [familyId], references: [id])
-  model        equipment_models?      @relation("ContractModel", fields: [modelId], references: [id], onDelete: SetNull)
-  batch        equipment_batches?     @relation("ContractBatch", fields: [batchId], references: [id], onDelete: SetNull)
-  renewedFrom  contracts?             @relation("ContractRenewalFrom", fields: [renewedFromId], references: [id], onDelete: SetNull)
-  renewedTo    contracts?             @relation("ContractRenewalTo", fields: [renewedToId], references: [id], onDelete: SetNull)
-  renewalsFrom contracts[]            @relation("ContractRenewalFrom")
-  renewalsTo   contracts[]            @relation("ContractRenewalTo")
-  lines        contract_lines[]
-  attachments  contract_attachments[]
-  payments     contract_payments[]    @relation("ContractPayments")
-  assignments  contract_assignments[]
-  amendments   contract_amendments[]
-  maintenances maintenance_records[]
+  creator         users                  @relation("ContractCreator", fields: [createdBy], references: [id])
+  custodian       users?                 @relation("ContractCustodian", fields: [custodianUserId], references: [id], onDelete: SetNull)
+  backupCustodian users?                 @relation("ContractBackupCustodian", fields: [backupCustodianUserId], references: [id], onDelete: SetNull)
+  supplier        suppliers?             @relation(fields: [supplierId], references: [id])
+  family          families?              @relation(fields: [familyId], references: [id])
+  model           equipment_models?      @relation("ContractModel", fields: [modelId], references: [id], onDelete: SetNull)
+  batch           equipment_batches?     @relation("ContractBatch", fields: [batchId], references: [id], onDelete: SetNull)
+  renewedFrom     contracts?             @relation("ContractRenewalFrom", fields: [renewedFromId], references: [id], onDelete: SetNull)
+  renewedTo       contracts?             @relation("ContractRenewalTo", fields: [renewedToId], references: [id], onDelete: SetNull)
+  renewalsFrom    contracts[]            @relation("ContractRenewalFrom")
+  renewalsTo      contracts[]            @relation("ContractRenewalTo")
+  lines           contract_lines[]
+  attachments     contract_attachments[]
+  payments        contract_payments[]    @relation("ContractPayments")
+  assignments     contract_assignments[]
+  amendments      contract_amendments[]
+  maintenances    maintenance_records[]
 
   @@index([status, endDate])
   @@index([supplierId])
@@ -2783,23 +2786,23 @@ model contracts {
 }
 
 model contract_lines {
-  id          String           @id @default(uuid())
-  contractId  String           @map("contract_id")
-  type        ContractLineType @default(SERVICE)
-  description String           @db.VarChar(500)
-  quantity    Float            @default(1)
-  unitPrice   Float?           @map("unit_price")
-  totalPrice  Float?           @map("total_price")
-  equipmentId String?          @map("equipment_id")
-  licenseId   String?          @map("license_id")
-  notes       String?
+  id               String           @id @default(uuid())
+  contractId       String           @map("contract_id")
+  type             ContractLineType @default(SERVICE)
+  description      String           @db.VarChar(500)
+  quantity         Float            @default(1)
+  unitPrice        Float?           @map("unit_price")
+  totalPrice       Float?           @map("total_price")
+  equipmentId      String?          @map("equipment_id")
+  licenseId        String?          @map("license_id")
+  notes            String?
   /// Inicio de renta/servicio de este ítem. Null = vigencia del contrato.
-  serviceStartDate DateTime? @map("service_start_date")
+  serviceStartDate DateTime?        @map("service_start_date")
   /// Fin de renta/servicio de este ítem. Null = vigencia del contrato.
-  serviceEndDate   DateTime? @map("service_end_date")
-  order       Int              @default(0)
-  createdAt   DateTime         @default(now()) @map("created_at")
-  updatedAt   DateTime         @updatedAt @map("updated_at")
+  serviceEndDate   DateTime?        @map("service_end_date")
+  order            Int              @default(0)
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
 
   contract  contracts          @relation(fields: [contractId], references: [id], onDelete: Cascade)
   equipment equipment?         @relation("ContractLineEquipment", fields: [equipmentId], references: [id], onDelete: SetNull)
@@ -2869,6 +2872,7 @@ enum PaymentStatus {
   OVERDUE // Pago vencido (pasó la fecha)
   PAID // Pago realizado
   CANCELLED // Pago cancelado
+  PARTIALLY_PAID // Tiene abonos registrados, pero no cubren el monto completo
 }
 
 model contract_payments {
@@ -2899,8 +2903,9 @@ model contract_payments {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  contract contracts @relation("ContractPayments", fields: [contractId], references: [id], onDelete: Cascade)
-  creator  users     @relation("PaymentCreator", fields: [createdBy], references: [id])
+  contract     contracts                       @relation("ContractPayments", fields: [contractId], references: [id], onDelete: Cascade)
+  creator      users                           @relation("PaymentCreator", fields: [createdBy], references: [id])
+  installments contract_payment_installments[]
 
   @@index([contractId, dueDate])
   @@index([status, dueDate])
@@ -2909,25 +2914,49 @@ model contract_payments {
   @@map("contract_payments")
 }
 
-model contract_assignments {
-  id            String    @id @default(uuid())
-  contractId    String    @map("contract_id")
-  clientId      String    @map("client_id")
-  delivererId   String    @map("deliverer_id")
-  familyId      String    @map("family_id")
-  startDate     DateTime  @map("start_date")
-  plannedEndDate DateTime? @map("planned_end_date")
-  actualEndDate DateTime? @map("actual_end_date")
-  isActive      Boolean   @default(true) @map("is_active")
-  changeReason  String?   @map("change_reason")
-  notes         String?
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+/// Un abono (pago parcial) contra una cuota de contrato. El saldo pendiente
+/// de la cuota es siempre `amount - sum(installments.amount)` — el status de
+/// la cuota se deriva de esa suma, nunca se marca "pagado" de forma directa
+/// (ver computePaymentStatus en contract-payment.service.ts). Inmutables:
+/// corregir un abono es eliminarlo y volver a registrarlo, no editarlo.
+model contract_payment_installments {
+  id              String   @id @default(uuid())
+  paymentId       String   @map("payment_id")
+  amount          Float
+  paidDate        DateTime @map("paid_date")
+  paymentMethod   String?  @map("payment_method") @db.VarChar(100)
+  referenceNumber String?  @map("reference_number") @db.VarChar(200)
+  notes           String?
+  createdBy       String   @map("created_by")
+  createdAt       DateTime @default(now()) @map("created_at")
 
-  contract    contracts            @relation(fields: [contractId], references: [id], onDelete: Cascade)
-  client      users                @relation("ContractAssignmentClient", fields: [clientId], references: [id])
-  deliverer   users                @relation("ContractAssignmentDeliverer", fields: [delivererId], references: [id])
-  family      families             @relation(fields: [familyId], references: [id])
+  payment contract_payments @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  creator users             @relation("ContractPaymentInstallmentCreator", fields: [createdBy], references: [id])
+
+  @@index([paymentId])
+  @@index([createdAt(sort: Desc)])
+  @@map("contract_payment_installments")
+}
+
+model contract_assignments {
+  id             String    @id @default(uuid())
+  contractId     String    @map("contract_id")
+  clientId       String    @map("client_id")
+  delivererId    String    @map("deliverer_id")
+  familyId       String    @map("family_id")
+  startDate      DateTime  @map("start_date")
+  plannedEndDate DateTime? @map("planned_end_date")
+  actualEndDate  DateTime? @map("actual_end_date")
+  isActive       Boolean   @default(true) @map("is_active")
+  changeReason   String?   @map("change_reason")
+  notes          String?
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  contract    contracts             @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  client      users                 @relation("ContractAssignmentClient", fields: [clientId], references: [id])
+  deliverer   users                 @relation("ContractAssignmentDeliverer", fields: [delivererId], references: [id])
+  family      families              @relation(fields: [familyId], references: [id])
   deliveryAct delivery_acts?
   returnAct   contract_return_acts?
 
@@ -2938,29 +2967,29 @@ model contract_assignments {
 }
 
 model contract_return_acts {
-  id                   String             @id @default(uuid())
-  folio                String             @unique
-  contractAssignmentId String             @unique @map("contract_assignment_id")
-  deliveryActId        String             @map("delivery_act_id")
-  contractSnapshot     Json               @map("contract_snapshot")
-  withdrawalReason     String?            @map("withdrawal_reason")
-  handoverNotes        String?            @map("handover_notes")
-  returnDate           DateTime           @map("return_date")
-  receiverInfo         Json               @map("receiver_info")
-  delivererInfo        Json               @map("deliverer_info")
-  status               ActStatus          @default(PENDING)
-  acceptanceToken      String             @unique @map("acceptance_token")
-  expirationDate       DateTime           @map("expiration_date")
-  acceptedAt           DateTime?          @map("accepted_at")
-  rejectedAt           DateTime?          @map("rejected_at")
-  rejectionReason      String?            @map("rejection_reason")
-  signatureTimestamp   DateTime?          @map("signature_timestamp")
-  signatureIp          String?            @map("signature_ip")
-  signatureUserAgent   String?            @map("signature_user_agent")
-  verificationHash     String?            @map("verification_hash")
-  pdfPath              String?            @map("pdf_path")
-  createdAt            DateTime           @default(now()) @map("created_at")
-  updatedAt            DateTime           @updatedAt @map("updated_at")
+  id                   String    @id @default(uuid())
+  folio                String    @unique
+  contractAssignmentId String    @unique @map("contract_assignment_id")
+  deliveryActId        String    @map("delivery_act_id")
+  contractSnapshot     Json      @map("contract_snapshot")
+  withdrawalReason     String?   @map("withdrawal_reason")
+  handoverNotes        String?   @map("handover_notes")
+  returnDate           DateTime  @map("return_date")
+  receiverInfo         Json      @map("receiver_info")
+  delivererInfo        Json      @map("deliverer_info")
+  status               ActStatus @default(PENDING)
+  acceptanceToken      String    @unique @map("acceptance_token")
+  expirationDate       DateTime  @map("expiration_date")
+  acceptedAt           DateTime? @map("accepted_at")
+  rejectedAt           DateTime? @map("rejected_at")
+  rejectionReason      String?   @map("rejection_reason")
+  signatureTimestamp   DateTime? @map("signature_timestamp")
+  signatureIp          String?   @map("signature_ip")
+  signatureUserAgent   String?   @map("signature_user_agent")
+  verificationHash     String?   @map("verification_hash")
+  pdfPath              String?   @map("pdf_path")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
 
   contractAssignment contract_assignments @relation(fields: [contractAssignmentId], references: [id])
 
@@ -3023,10 +3052,11 @@ model equipment_sales {
 
 /// Estado de una factura de compra de activo
 enum AcquisitionPaymentStatus {
-  PENDING    // Registrada, sin confirmar pago
-  PAID       // Pago confirmado
-  OVERDUE    // Venció sin pagar
-  CANCELLED  // Anulada
+  PENDING // Registrada, sin confirmar pago
+  PAID // Pago confirmado
+  OVERDUE // Venció sin pagar
+  CANCELLED // Anulada
+  PARTIALLY_PAID // Tiene abonos registrados, pero no cubren el monto completo
 }
 
 /// Registro de factura/pago asociado a la adquisición de un equipo individual.
@@ -3056,15 +3086,38 @@ model equipment_invoices {
   createdAt           DateTime                 @default(now()) @map("created_at")
   updatedAt           DateTime                 @updatedAt @map("updated_at")
 
-  equipment equipment  @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
-  supplier  suppliers? @relation("EquipmentInvoiceSupplier", fields: [supplierId], references: [id], onDelete: SetNull)
-  creator   users      @relation("EquipmentInvoiceCreator", fields: [createdBy], references: [id])
+  equipment    equipment                        @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  supplier     suppliers?                       @relation("EquipmentInvoiceSupplier", fields: [supplierId], references: [id], onDelete: SetNull)
+  creator      users                            @relation("EquipmentInvoiceCreator", fields: [createdBy], references: [id])
+  installments equipment_invoice_installments[]
 
   @@index([equipmentId])
   @@index([supplierId])
   @@index([status, dueDate])
   @@index([createdAt(sort: Desc)])
   @@map("equipment_invoices")
+}
+
+/// Un abono (pago parcial) contra una factura de compra de equipo. Ver
+/// contract_payment_installments para el criterio completo (saldo, status
+/// derivado, inmutabilidad).
+model equipment_invoice_installments {
+  id              String             @id @default(uuid())
+  invoiceId       String             @map("invoice_id")
+  amount          Float
+  paidDate        DateTime           @map("paid_date")
+  paymentMethod   PaymentMethodType? @map("payment_method")
+  referenceNumber String?            @map("reference_number") @db.VarChar(200)
+  notes           String?
+  createdBy       String             @map("created_by")
+  createdAt       DateTime           @default(now()) @map("created_at")
+
+  invoice equipment_invoices @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  creator users              @relation("EquipmentInvoiceInstallmentCreator", fields: [createdBy], references: [id])
+
+  @@index([invoiceId])
+  @@index([createdAt(sort: Desc)])
+  @@map("equipment_invoice_installments")
 }
 
 // Libro de facturas/pagos de adquisición de licencias — mismo propósito y
@@ -3095,15 +3148,38 @@ model license_invoices {
   createdAt           DateTime                 @default(now()) @map("created_at")
   updatedAt           DateTime                 @updatedAt @map("updated_at")
 
-  license  software_licenses @relation(fields: [licenseId], references: [id], onDelete: Cascade)
-  supplier suppliers?        @relation("LicenseInvoiceSupplier", fields: [supplierId], references: [id], onDelete: SetNull)
-  creator  users             @relation("LicenseInvoiceCreator", fields: [createdBy], references: [id])
+  license      software_licenses              @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+  supplier     suppliers?                     @relation("LicenseInvoiceSupplier", fields: [supplierId], references: [id], onDelete: SetNull)
+  creator      users                          @relation("LicenseInvoiceCreator", fields: [createdBy], references: [id])
+  installments license_invoice_installments[]
 
   @@index([licenseId])
   @@index([supplierId])
   @@index([status, dueDate])
   @@index([createdAt(sort: Desc)])
   @@map("license_invoices")
+}
+
+/// Un abono (pago parcial) contra una factura de compra de licencia. Ver
+/// contract_payment_installments para el criterio completo (saldo, status
+/// derivado, inmutabilidad).
+model license_invoice_installments {
+  id              String             @id @default(uuid())
+  invoiceId       String             @map("invoice_id")
+  amount          Float
+  paidDate        DateTime           @map("paid_date")
+  paymentMethod   PaymentMethodType? @map("payment_method")
+  referenceNumber String?            @map("reference_number") @db.VarChar(200)
+  notes           String?
+  createdBy       String             @map("created_by")
+  createdAt       DateTime           @default(now()) @map("created_at")
+
+  invoice license_invoices @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  creator users            @relation("LicenseInvoiceInstallmentCreator", fields: [createdBy], references: [id])
+
+  @@index([invoiceId])
+  @@index([createdAt(sort: Desc)])
+  @@map("license_invoice_installments")
 }
 
 // ── Solicitudes de Activos ────────────────────────────────────────────────────
@@ -3388,19 +3464,19 @@ model patrol_route_checkpoints {
 }
 
 model patrol_schedules {
-  id                    String           @id @default(uuid())
-  familyId              String           @map("family_id")
-  routeId               String           @map("route_id")
-  agentId               String           @map("agent_id")
-  scheduledStart        DateTime         @map("scheduled_start")
-  scheduledEnd          DateTime         @map("scheduled_end")
-  recurrence            PatrolRecurrence @default(NONE)
-  recurrenceDays        Int[]            @default([]) @map("recurrence_days")
-  isActive              Boolean          @default(true) @map("is_active")
+  id                     String           @id @default(uuid())
+  familyId               String           @map("family_id")
+  routeId                String           @map("route_id")
+  agentId                String           @map("agent_id")
+  scheduledStart         DateTime         @map("scheduled_start")
+  scheduledEnd           DateTime         @map("scheduled_end")
+  recurrence             PatrolRecurrence @default(NONE)
+  recurrenceDays         Int[]            @default([]) @map("recurrence_days")
+  isActive               Boolean          @default(true) @map("is_active")
   /// null = usar el default de patrol_family_config.strictTimeValidation
   /// true = forzar validación estricta para esta programación
   /// false = deshabilitar validación de horario solo para esta programación
-  overrideTimeValidation Boolean?        @map("override_time_validation")
+  overrideTimeValidation Boolean?         @map("override_time_validation")
   /// Repetición intra-turno: cada cuántos minutos se genera una sub-ronda dentro del
   /// bloque scheduledStart→scheduledEnd. null = sin repetición (una sola ronda por ocurrencia).
   /// Debe persistirse (y no solo pasarse como parámetro puntual a generatePatrols) porque
@@ -3408,8 +3484,8 @@ model patrol_schedules {
   /// regeneran las rondas futuras de este schedule; sin esta columna esa regeneración
   /// perdía la repetición intra-turno en cada ciclo.
   repeatIntervalMinutes  Int?             @map("repeat_interval_minutes")
-  createdAt             DateTime         @default(now()) @map("created_at")
-  updatedAt             DateTime         @updatedAt @map("updated_at")
+  createdAt              DateTime         @default(now()) @map("created_at")
+  updatedAt              DateTime         @updatedAt @map("updated_at")
 
   family  families      @relation(fields: [familyId], references: [id])
   route   patrol_routes @relation(fields: [routeId], references: [id])
@@ -3500,10 +3576,10 @@ model patrol_photos {
   deletedAt  DateTime? @map("deleted_at")
   createdAt  DateTime  @default(now()) @map("created_at")
 
-  checkIn     patrol_check_ins?  @relation(fields: [checkInId], references: [id])
-  incident    patrol_incidents?  @relation(fields: [incidentId], references: [id], onDelete: SetNull)
-  patrolStart patrols[]          @relation("PatrolStartPhoto")
-  patrolEnd   patrols[]          @relation("PatrolEndPhoto")
+  checkIn     patrol_check_ins? @relation(fields: [checkInId], references: [id])
+  incident    patrol_incidents? @relation(fields: [incidentId], references: [id], onDelete: SetNull)
+  patrolStart patrols[]         @relation("PatrolStartPhoto")
+  patrolEnd   patrols[]         @relation("PatrolEndPhoto")
 
   @@index([checkInId])
   @@index([patrolId])
@@ -3514,19 +3590,19 @@ model patrol_photos {
 }
 
 model patrol_incidents {
-  id            String           @id @default(uuid())
-  patrolId      String           @map("patrol_id")
-  checkpointId  String           @map("checkpoint_id")
-  agentId       String           @map("agent_id")
-  description   String
-  severity      IncidentSeverity
-  status        IncidentStatus   @default(OPEN)
-  photoIds      String[]         @default([]) @map("photo_ids")
-  ticketId      String?          @map("ticket_id")
-  resolvedAt    DateTime?        @map("resolved_at")
-  resolvedById  String?          @map("resolved_by_id")
-  createdAt     DateTime         @default(now()) @map("created_at")
-  updatedAt     DateTime         @updatedAt @map("updated_at")
+  id           String           @id @default(uuid())
+  patrolId     String           @map("patrol_id")
+  checkpointId String           @map("checkpoint_id")
+  agentId      String           @map("agent_id")
+  description  String
+  severity     IncidentSeverity
+  status       IncidentStatus   @default(OPEN)
+  photoIds     String[]         @default([]) @map("photo_ids")
+  ticketId     String?          @map("ticket_id")
+  resolvedAt   DateTime?        @map("resolved_at")
+  resolvedById String?          @map("resolved_by_id")
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
 
   patrol     patrols            @relation(fields: [patrolId], references: [id], onDelete: Cascade)
   checkpoint patrol_checkpoints @relation(fields: [checkpointId], references: [id])
@@ -3903,8 +3979,8 @@ model push_subscriptions {
   id        String   @id @default(uuid())
   userId    String   @map("user_id")
   endpoint  String   @unique // URL única del push service (FCM, Mozilla, Apple)
-  p256dh    String   // Clave pública del cliente para cifrado
-  auth      String   // Token de autenticación del cliente
+  p256dh    String // Clave pública del cliente para cifrado
+  auth      String // Token de autenticación del cliente
   userAgent String?  @map("user_agent") @db.VarChar(500) // Identificar el dispositivo
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -3970,11 +4046,11 @@ model credential_entries {
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
-  vault     credential_vaults  @relation(fields: [vaultId], references: [id], onDelete: Cascade)
-  equipment equipment?         @relation(fields: [equipmentId], references: [id], onDelete: SetNull)
-  license   software_licenses? @relation(fields: [licenseId], references: [id], onDelete: SetNull)
-  createdBy users              @relation("CredentialEntryCreator", fields: [createdById], references: [id])
-  updatedBy users?             @relation("CredentialEntryUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+  vault     credential_vaults   @relation(fields: [vaultId], references: [id], onDelete: Cascade)
+  equipment equipment?          @relation(fields: [equipmentId], references: [id], onDelete: SetNull)
+  license   software_licenses?  @relation(fields: [licenseId], references: [id], onDelete: SetNull)
+  createdBy users               @relation("CredentialEntryCreator", fields: [createdById], references: [id])
+  updatedBy users?              @relation("CredentialEntryUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
   shares    credential_shares[]
 
   @@index([vaultId, isActive])

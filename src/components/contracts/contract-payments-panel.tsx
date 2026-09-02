@@ -70,6 +70,11 @@ const STATUS_CONFIG: Record<string, { label: string; cls: string; icon: React.El
     icon: CheckCircle2,
   },
   CANCELLED: { label: 'Cancelado', cls: 'bg-muted text-muted-foreground', icon: XCircle },
+  PARTIALLY_PAID: {
+    label: 'Parcial',
+    cls: 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300',
+    icon: Clock,
+  },
 }
 
 function fmtDate(d: string) {
