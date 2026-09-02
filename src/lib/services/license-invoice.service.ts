@@ -50,6 +50,20 @@ export interface CreateLicenseInvoiceInput {
   createdBy: string
 }
 
+/** Ver el comentario gemelo en equipment-invoice.service.ts — mismo criterio
+ * de plan de cuotas por filas "hermanas" (scheduleGroupId). */
+export interface CreateLicenseInvoiceScheduleInput {
+  licenseId: string
+  invoiceNumber?: string | null
+  purchaseOrderNumber?: string | null
+  currency?: string
+  supplierId?: string | null
+  supplierName?: string | null
+  notes?: string | null
+  installments: { amount: number; dueDate: Date }[]
+  createdBy: string
+}
+
 export interface UpdateLicenseInvoiceInput {
   invoiceNumber?: string | null
   purchaseOrderNumber?: string | null
@@ -249,6 +263,84 @@ export class LicenseInvoiceService {
     await syncLicensePurchaseFields(input.licenseId)
 
     return { ...invoice, paidAmount: invoice.installments.reduce((s, i) => s + i.amount, 0) }
+  }
+
+  // ── Crear plan de cuotas ──────────────────────────────────────────────────
+  // Ver el comentario gemelo en EquipmentInvoiceService.createSchedule.
+
+  static async createSchedule(input: CreateLicenseInvoiceScheduleInput) {
+    if (!input.installments || input.installments.length < 2) {
+      throw new Error(
+        'Un plan de cuotas necesita al menos 2 cuotas — con una sola, usa el pago único.'
+      )
+    }
+    for (const cuota of input.installments) {
+      if (!cuota.amount || cuota.amount <= 0) {
+        throw new Error('Cada cuota debe tener un monto mayor a 0.')
+      }
+      if (!cuota.dueDate) {
+        throw new Error('Cada cuota debe tener una fecha de vencimiento.')
+      }
+    }
+
+    const scheduleGroupId = randomUUID()
+    const count = input.installments.length
+
+    await prisma.$transaction(async tx => {
+      for (let i = 0; i < count; i++) {
+        const cuota = input.installments[i]
+        const status = computeAcquisitionStatus(cuota.dueDate, cuota.amount, 0)
+        const row = await tx.license_invoices.create({
+          data: {
+            id: randomUUID(),
+            licenseId: input.licenseId,
+            invoiceNumber: input.invoiceNumber ?? null,
+            purchaseOrderNumber: input.purchaseOrderNumber ?? null,
+            amount: cuota.amount,
+            currency: input.currency ?? 'USD',
+            dueDate: cuota.dueDate,
+            status,
+            supplierId: input.supplierId ?? null,
+            supplierName: input.supplierName ?? null,
+            notes: input.notes ?? null,
+            scheduleGroupId,
+            installmentNumber: i + 1,
+            installmentCount: count,
+            createdBy: input.createdBy,
+          },
+        })
+
+        await createAuditLog({
+          entityType: 'license_invoice',
+          entityId: row.id,
+          action: 'LICENSE_INVOICE_CREATED',
+          userId: input.createdBy,
+          changes: {
+            licenseId: input.licenseId,
+            amount: cuota.amount,
+            currency: row.currency,
+            invoiceNumber: input.invoiceNumber,
+            status,
+            scheduleGroupId,
+            installmentNumber: i + 1,
+            installmentCount: count,
+          },
+        })
+      }
+    })
+
+    await syncLicensePurchaseFields(input.licenseId)
+
+    const invoices = await prisma.license_invoices.findMany({
+      where: { scheduleGroupId },
+      include: {
+        supplier: { select: { id: true, name: true } },
+        creator: { select: { id: true, name: true } },
+        installments: true,
+      },
+      orderBy: { installmentNumber: 'asc' },
+    })
+    return invoices.map(inv => ({ ...inv, paidAmount: 0 }))
   }
 
   // ── Actualizar factura ────────────────────────────────────────────────────

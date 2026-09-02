@@ -30,6 +30,8 @@ import {
   XCircle,
   ChevronLeft,
   ChevronRight,
+  Trash2,
+  Undo2,
 } from 'lucide-react'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { ListTableToolbar } from '@/components/common/list-table-toolbar'
@@ -43,6 +45,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import {
   Select,
   SelectContent,
@@ -125,6 +137,10 @@ type AssetInvoice = {
   /** Suma de abonos registrados — calculado en el servidor. */
   paidAmount: number
   installments: PaymentInstallment[]
+  /** Plan de cuotas: presente cuando esta factura es una cuota "hermana" de
+   * otras (ver scheduleGroupId en el servicio) — ausente en pago único. */
+  installmentNumber?: number | null
+  installmentCount?: number | null
   equipment?: {
     id: string
     code: string
@@ -402,6 +418,15 @@ export default function InventoryPaymentsPage() {
   const [aPayAmount, setAPayAmount] = useState('')
   const [savingA, setSavingA] = useState(false)
 
+  // ── Dialogs — eliminar / deshacer abono
+  const [deletingContract, setDeletingContract] = useState<ContractPayment | null>(null)
+  const [deletingAsset, setDeletingAsset] = useState<AssetInvoice | null>(null)
+  const [undoingContractInstallment, setUndoingContractInstallment] =
+    useState<PaymentInstallment | null>(null)
+  const [undoingAssetInstallment, setUndoingAssetInstallment] = useState<PaymentInstallment | null>(
+    null
+  )
+
   // ── Fetch contratos
   const buildContractUrl = useCallback(() => {
     const p = new URLSearchParams({ pageSize: '500' })
@@ -561,6 +586,11 @@ export default function InventoryPaymentsPage() {
       },
       { key: 'invoiceNumber', label: 'N° Factura', format: v => v ?? '' },
       { key: 'purchaseOrderNumber', label: 'N° OC', format: v => v ?? '' },
+      {
+        key: 'installmentCount',
+        label: 'Cuota',
+        format: (v, row) => (v ? `${row.installmentNumber}/${v}` : ''),
+      },
       { key: 'amount', label: 'Monto', format: (v, row) => fmtCurrency(Number(v), row.currency) },
       {
         key: 'paidAmount',
@@ -683,6 +713,117 @@ export default function InventoryPaymentsPage() {
       if (!res.ok) throw new Error(json.error || 'No se pudo registrar')
       toast({ title: 'Pago registrado correctamente' })
       setMarkingAsset(null)
+      reloadA()
+    } catch (err) {
+      toast({
+        title: 'Error',
+        description: err instanceof Error ? err.message : 'Error',
+        variant: 'destructive',
+      })
+    } finally {
+      setSavingA(false)
+    }
+  }
+
+  // ── Acción: deshacer un abono (contrato o activo) ─────────────────────────
+  // Los abonos son inmutables: corregir = deshacer + volver a registrar. Se
+  // cierra el diálogo de "Registrar pago" al deshacer, igual que al pagar —
+  // el usuario lo vuelve a abrir con el saldo ya recalculado.
+
+  const handleUndoContractInstallment = async () => {
+    if (!undoingContractInstallment) return
+    setSavingC(true)
+    try {
+      const res = await fetch(
+        `/api/inventory/contracts/payments/installments/${undoingContractInstallment.id}`,
+        { method: 'DELETE' }
+      )
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || 'No se pudo deshacer el abono')
+      toast({ title: 'Abono deshecho' })
+      setUndoingContractInstallment(null)
+      setMarkingContract(null)
+      reloadC()
+    } catch (err) {
+      toast({
+        title: 'Error',
+        description: err instanceof Error ? err.message : 'Error',
+        variant: 'destructive',
+      })
+    } finally {
+      setSavingC(false)
+    }
+  }
+
+  const handleUndoAssetInstallment = async () => {
+    if (!undoingAssetInstallment || !markingAsset) return
+    setSavingA(true)
+    try {
+      const base =
+        markingAsset.assetKind === 'LICENSE'
+          ? '/api/inventory/licenses/invoices'
+          : '/api/inventory/equipment/invoices'
+      const res = await fetch(`${base}/installments/${undoingAssetInstallment.id}`, {
+        method: 'DELETE',
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || 'No se pudo deshacer el abono')
+      toast({ title: 'Abono deshecho' })
+      setUndoingAssetInstallment(null)
+      setMarkingAsset(null)
+      reloadA()
+    } catch (err) {
+      toast({
+        title: 'Error',
+        description: err instanceof Error ? err.message : 'Error',
+        variant: 'destructive',
+      })
+    } finally {
+      setSavingA(false)
+    }
+  }
+
+  // ── Acción: eliminar cuota de contrato / factura de activo ────────────────
+  // El backend ya rechaza si tiene abonos — el botón se deshabilita antes de
+  // intentarlo (ver guard en la fila de la tabla) para no depender de un
+  // error tras confirmar.
+
+  const deleteContractPayment = async () => {
+    if (!deletingContract) return
+    setSavingC(true)
+    try {
+      const res = await fetch(`/api/inventory/contracts/payments/${deletingContract.id}`, {
+        method: 'DELETE',
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || 'No se pudo eliminar')
+      toast({ title: 'Cuota eliminada' })
+      setDeletingContract(null)
+      reloadC()
+    } catch (err) {
+      toast({
+        title: 'Error',
+        description: err instanceof Error ? err.message : 'Error',
+        variant: 'destructive',
+      })
+    } finally {
+      setSavingC(false)
+    }
+  }
+
+  const deleteAssetInvoice = async () => {
+    if (!deletingAsset) return
+    setSavingA(true)
+    try {
+      const base =
+        deletingAsset.assetKind === 'LICENSE'
+          ? '/api/inventory/licenses/invoices'
+          : '/api/inventory/equipment/invoices'
+      const res = await fetch(`${base}/${deletingAsset.id}`, { method: 'DELETE' })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || 'No se pudo eliminar')
+      toast({ title: 'Factura eliminada' })
+      setDeletingAsset(null)
       reloadA()
     } catch (err) {
       toast({
@@ -1019,6 +1160,11 @@ export default function InventoryPaymentsPage() {
                               ) : (
                                 <span className='text-muted-foreground text-xs'>—</span>
                               )}
+                              {!!inv.installmentCount && (
+                                <span className='block text-xs text-muted-foreground'>
+                                  Cuota {inv.installmentNumber}/{inv.installmentCount}
+                                </span>
+                              )}
                               {inv.purchaseOrderNumber && (
                                 <span className='block text-xs text-muted-foreground'>
                                   OC: {inv.purchaseOrderNumber}
@@ -1050,26 +1196,45 @@ export default function InventoryPaymentsPage() {
                               {inv.status === 'PAID' ? fmtDate(inv.paidDate) : '—'}
                             </TableCell>
                             <TableCell className='text-right'>
-                              {(inv.status === 'PENDING' ||
-                                inv.status === 'OVERDUE' ||
-                                inv.status === 'PARTIALLY_PAID') && (
-                                <Button
+                              <div className='flex items-center justify-end gap-1'>
+                                {(inv.status === 'PENDING' ||
+                                  inv.status === 'OVERDUE' ||
+                                  inv.status === 'PARTIALLY_PAID') && (
+                                  <Button
+                                    type='button'
+                                    size='sm'
+                                    variant='outline'
+                                    className='h-7 text-xs'
+                                    onClick={() => {
+                                      setAPaidDate(todayISO())
+                                      setAPaidMethod(inv.paymentMethod ?? '')
+                                      setAPaidRef('')
+                                      setAPayAmount((inv.amount - inv.paidAmount).toFixed(2))
+                                      setMarkingAsset(inv)
+                                    }}
+                                  >
+                                    <CheckCircle2 className='h-3.5 w-3.5 mr-1' />
+                                    {inv.paidAmount > 0 ? 'Abonar' : 'Pagar'}
+                                  </Button>
+                                )}
+                                <button
                                   type='button'
-                                  size='sm'
-                                  variant='outline'
-                                  className='h-7 text-xs'
-                                  onClick={() => {
-                                    setAPaidDate(todayISO())
-                                    setAPaidMethod(inv.paymentMethod ?? '')
-                                    setAPaidRef('')
-                                    setAPayAmount((inv.amount - inv.paidAmount).toFixed(2))
-                                    setMarkingAsset(inv)
-                                  }}
+                                  onClick={() => inv.paidAmount <= 0.01 && setDeletingAsset(inv)}
+                                  disabled={inv.paidAmount > 0.01}
+                                  className={`p-1 rounded transition-colors ${
+                                    inv.paidAmount > 0.01
+                                      ? 'text-muted-foreground/40 cursor-not-allowed'
+                                      : 'hover:bg-destructive/10 text-muted-foreground hover:text-destructive'
+                                  }`}
+                                  title={
+                                    inv.paidAmount > 0.01
+                                      ? 'Tiene abonos registrados — deshazlos primero para poder eliminarla'
+                                      : 'Eliminar'
+                                  }
                                 >
-                                  <CheckCircle2 className='h-3.5 w-3.5 mr-1' />
-                                  {inv.paidAmount > 0 ? 'Abonar' : 'Pagar'}
-                                </Button>
-                              )}
+                                  <Trash2 className='h-3.5 w-3.5' />
+                                </button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         )
@@ -1325,27 +1490,46 @@ export default function InventoryPaymentsPage() {
                             {p.status === 'PAID' ? fmtDate(p.paidDate) : '—'}
                           </TableCell>
                           <TableCell className='text-right'>
-                            {(p.status === 'SCHEDULED' ||
-                              p.status === 'DUE' ||
-                              p.status === 'OVERDUE' ||
-                              p.status === 'PARTIALLY_PAID') && (
-                              <Button
+                            <div className='flex items-center justify-end gap-1'>
+                              {(p.status === 'SCHEDULED' ||
+                                p.status === 'DUE' ||
+                                p.status === 'OVERDUE' ||
+                                p.status === 'PARTIALLY_PAID') && (
+                                <Button
+                                  type='button'
+                                  size='sm'
+                                  variant='outline'
+                                  className='h-7 text-xs'
+                                  onClick={() => {
+                                    setCPaidDate(todayISO())
+                                    setCPaidMethod('')
+                                    setCPaidRef('')
+                                    setCPayAmount((p.amount - p.paidAmount).toFixed(2))
+                                    setMarkingContract(p)
+                                  }}
+                                >
+                                  <CheckCircle2 className='h-3.5 w-3.5 mr-1' />
+                                  {p.paidAmount > 0 ? 'Abonar' : 'Pagar'}
+                                </Button>
+                              )}
+                              <button
                                 type='button'
-                                size='sm'
-                                variant='outline'
-                                className='h-7 text-xs'
-                                onClick={() => {
-                                  setCPaidDate(todayISO())
-                                  setCPaidMethod('')
-                                  setCPaidRef('')
-                                  setCPayAmount((p.amount - p.paidAmount).toFixed(2))
-                                  setMarkingContract(p)
-                                }}
+                                onClick={() => p.paidAmount <= 0.01 && setDeletingContract(p)}
+                                disabled={p.paidAmount > 0.01}
+                                className={`p-1 rounded transition-colors ${
+                                  p.paidAmount > 0.01
+                                    ? 'text-muted-foreground/40 cursor-not-allowed'
+                                    : 'hover:bg-destructive/10 text-muted-foreground hover:text-destructive'
+                                }`}
+                                title={
+                                  p.paidAmount > 0.01
+                                    ? 'Tiene abonos registrados — deshazlos primero para poder eliminarla'
+                                    : 'Eliminar'
+                                }
                               >
-                                <CheckCircle2 className='h-3.5 w-3.5 mr-1' />
-                                {p.paidAmount > 0 ? 'Abonar' : 'Pagar'}
-                              </Button>
-                            )}
+                                <Trash2 className='h-3.5 w-3.5' />
+                              </button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))
@@ -1408,11 +1592,19 @@ export default function InventoryPaymentsPage() {
                   </Label>
                   <ul className='rounded-md border divide-y text-xs max-h-24 overflow-y-auto'>
                     {markingContract.installments.map(ins => (
-                      <li key={ins.id} className='flex justify-between px-2 py-1'>
+                      <li key={ins.id} className='flex items-center justify-between px-2 py-1'>
                         <span className='text-muted-foreground'>{fmtDate(ins.paidDate)}</span>
                         <span className='font-medium'>
                           {fmtCurrency(ins.amount, markingContract.currency)}
                         </span>
+                        <button
+                          type='button'
+                          onClick={() => setUndoingContractInstallment(ins)}
+                          className='p-0.5 rounded text-muted-foreground hover:text-destructive transition-colors'
+                          title='Deshacer este abono'
+                        >
+                          <Undo2 className='h-3 w-3' />
+                        </button>
                       </li>
                     ))}
                   </ul>
@@ -1532,11 +1724,19 @@ export default function InventoryPaymentsPage() {
                   </Label>
                   <ul className='rounded-md border divide-y text-xs max-h-24 overflow-y-auto'>
                     {markingAsset.installments.map(ins => (
-                      <li key={ins.id} className='flex justify-between px-2 py-1'>
+                      <li key={ins.id} className='flex items-center justify-between px-2 py-1'>
                         <span className='text-muted-foreground'>{fmtDate(ins.paidDate)}</span>
                         <span className='font-medium'>
                           {fmtCurrency(ins.amount, markingAsset.currency)}
                         </span>
+                        <button
+                          type='button'
+                          onClick={() => setUndoingAssetInstallment(ins)}
+                          className='p-0.5 rounded text-muted-foreground hover:text-destructive transition-colors'
+                          title='Deshacer este abono'
+                        >
+                          <Undo2 className='h-3 w-3' />
+                        </button>
                       </li>
                     ))}
                   </ul>
@@ -1610,6 +1810,110 @@ export default function InventoryPaymentsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ── AlertDialog: confirmar deshacer abono de contrato ────────────── */}
+      <AlertDialog
+        open={!!undoingContractInstallment}
+        onOpenChange={open => !open && setUndoingContractInstallment(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Deshacer este abono?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {undoingContractInstallment &&
+                `Se eliminará el abono de ${fmtCurrency(undoingContractInstallment.amount, markingContract?.currency)} del ${fmtDate(undoingContractInstallment.paidDate)}. El saldo y el estado de la cuota se recalculan al instante.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={savingC}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleUndoContractInstallment}
+              disabled={savingC}
+              className='bg-destructive text-destructive-foreground hover:bg-destructive/90'
+            >
+              {savingC ? 'Deshaciendo…' : 'Deshacer abono'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ── AlertDialog: confirmar deshacer abono de activo ──────────────── */}
+      <AlertDialog
+        open={!!undoingAssetInstallment}
+        onOpenChange={open => !open && setUndoingAssetInstallment(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Deshacer este abono?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {undoingAssetInstallment &&
+                `Se eliminará el abono de ${fmtCurrency(undoingAssetInstallment.amount, markingAsset?.currency)} del ${fmtDate(undoingAssetInstallment.paidDate)}. El saldo y el estado de la factura se recalculan al instante.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={savingA}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleUndoAssetInstallment}
+              disabled={savingA}
+              className='bg-destructive text-destructive-foreground hover:bg-destructive/90'
+            >
+              {savingA ? 'Deshaciendo…' : 'Deshacer abono'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ── AlertDialog: confirmar eliminar cuota de contrato ────────────── */}
+      <AlertDialog
+        open={!!deletingContract}
+        onOpenChange={open => !open && setDeletingContract(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar esta cuota?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deletingContract &&
+                `Se eliminará la cuota de ${deletingContract.contract.name} por ${fmtCurrency(deletingContract.amount, deletingContract.currency)}. Esta acción no se puede deshacer.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={savingC}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={deleteContractPayment}
+              disabled={savingC}
+              className='bg-destructive text-destructive-foreground hover:bg-destructive/90'
+            >
+              {savingC ? 'Eliminando…' : 'Eliminar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ── AlertDialog: confirmar eliminar factura de activo ────────────── */}
+      <AlertDialog open={!!deletingAsset} onOpenChange={open => !open && setDeletingAsset(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar esta factura?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deletingAsset &&
+                (deletingAsset.invoiceNumber
+                  ? `Se eliminará la factura ${deletingAsset.invoiceNumber} por ${fmtCurrency(deletingAsset.amount, deletingAsset.currency)}.`
+                  : `Se eliminará el registro de ${fmtCurrency(deletingAsset.amount, deletingAsset.currency)}.`)}{' '}
+              Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={savingA}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={deleteAssetInvoice}
+              disabled={savingA}
+              className='bg-destructive text-destructive-foreground hover:bg-destructive/90'
+            >
+              {savingA ? 'Eliminando…' : 'Eliminar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </ModuleLayout>
   )
 }

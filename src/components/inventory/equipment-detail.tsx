@@ -276,6 +276,8 @@ export function EquipmentDetail({
             assetType='equipment'
             assetId={equipmentId}
             canManage={userRole === 'ADMIN' || isSuperAdminSession}
+            defaultSupplierId={(equipment as any).supplierId ?? null}
+            defaultSupplierName={(equipment as any).supplier?.name ?? null}
           />
 
           {/* 7. Depreciación — colapsable */}

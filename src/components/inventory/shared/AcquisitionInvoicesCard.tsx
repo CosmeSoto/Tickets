@@ -22,6 +22,7 @@ import {
   Pencil,
   Trash2,
   Loader2,
+  Undo2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -99,6 +100,15 @@ interface AcquisitionInvoice {
   /** Suma de abonos registrados — ver installments. Calculado en el servidor. */
   paidAmount: number
   installments: InvoiceInstallment[]
+  /** Plan de cuotas: presente cuando esta factura es una cuota "hermana" de
+   * otras (ver scheduleGroupId en el servicio) — ausente en pago único. */
+  installmentNumber?: number | null
+  installmentCount?: number | null
+}
+
+interface CuotaRow {
+  amount: string
+  dueDate: string
 }
 
 interface FormState {
@@ -137,15 +147,21 @@ const EMPTY_FORM: FormState = {
 
 const API_BASE: Record<
   AcquisitionAssetType,
-  { list: (id: string) => string; item: (id: string) => string }
+  {
+    list: (id: string) => string
+    item: (id: string) => string
+    installmentItem: (installmentId: string) => string
+  }
 > = {
   equipment: {
     list: id => `/api/inventory/equipment/${id}/invoices`,
     item: id => `/api/inventory/equipment/invoices/${id}`,
+    installmentItem: id => `/api/inventory/equipment/invoices/installments/${id}`,
   },
   license: {
     list: id => `/api/inventory/licenses/${id}/invoices`,
     item: id => `/api/inventory/licenses/invoices/${id}`,
+    installmentItem: id => `/api/inventory/licenses/invoices/installments/${id}`,
   },
 }
 
@@ -201,12 +217,19 @@ interface AcquisitionInvoicesCardProps {
   assetType: AcquisitionAssetType
   assetId: string
   canManage?: boolean
+  /** Proveedor ya cargado en el activo — se usa para pre-llenar "Registrar
+   * factura" en vez de pedirlo de cero cada vez (el campo sigue editable,
+   * por si una factura puntual es de otro proveedor). */
+  defaultSupplierId?: string | null
+  defaultSupplierName?: string | null
 }
 
 export function AcquisitionInvoicesCard({
   assetType,
   assetId,
   canManage = false,
+  defaultSupplierId = null,
+  defaultSupplierName = null,
 }: AcquisitionInvoicesCardProps) {
   const endpoints = API_BASE[assetType]
 
@@ -220,21 +243,35 @@ export function AcquisitionInvoicesCard({
   const [editing, setEditing] = useState<AcquisitionInvoice | null>(null)
   const [markingPaid, setMarkingPaid] = useState<AcquisitionInvoice | null>(null)
   const [deleting, setDeleting] = useState<AcquisitionInvoice | null>(null)
+  const [undoing, setUndoing] = useState<InvoiceInstallment | null>(null)
   const [saving, setSaving] = useState(false)
 
   // Formulario
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
 
+  // Plan de cuotas (solo al crear — ver createMode)
+  const [createMode, setCreateMode] = useState<'single' | 'schedule'>('single')
+  const [cuotas, setCuotas] = useState<CuotaRow[]>([
+    { amount: '', dueDate: '' },
+    { amount: '', dueDate: '' },
+  ])
+  const [scheduleTotal, setScheduleTotal] = useState('')
+  const [scheduleCount, setScheduleCount] = useState('')
+  const [scheduleFirst, setScheduleFirst] = useState('')
+
   // ── Carga de datos ──────────────────────────────────────────────────────────
 
-  const loadInvoices = useCallback(async () => {
+  const loadInvoices = useCallback(async (): Promise<AcquisitionInvoice[]> => {
     setLoading(true)
     try {
       const res = await fetch(endpoints.list(assetId))
       const data = await res.json()
-      setInvoices(data.invoices ?? [])
+      const list: AcquisitionInvoice[] = data.invoices ?? []
+      setInvoices(list)
+      return list
     } catch {
       toast.error('Error al cargar facturas')
+      return []
     } finally {
       setLoading(false)
       setLoaded(true)
@@ -249,12 +286,25 @@ export function AcquisitionInvoicesCard({
 
   function openCreate() {
     setEditing(null)
-    setForm(EMPTY_FORM)
+    setForm({
+      ...EMPTY_FORM,
+      supplierId: defaultSupplierId ?? '',
+      supplierName: defaultSupplierName ?? '',
+    })
+    setCreateMode('single')
+    setCuotas([
+      { amount: '', dueDate: '' },
+      { amount: '', dueDate: '' },
+    ])
+    setScheduleTotal('')
+    setScheduleCount('')
+    setScheduleFirst('')
     setShowForm(true)
   }
 
   function openEdit(inv: AcquisitionInvoice) {
     setEditing(inv)
+    setCreateMode('single')
     setForm({
       invoiceNumber: inv.invoiceNumber ?? '',
       purchaseOrderNumber: inv.purchaseOrderNumber ?? '',
@@ -277,7 +327,100 @@ export function AcquisitionInvoicesCard({
     setForm(prev => ({ ...prev, [k]: v }))
   }
 
+  // ── Plan de cuotas: helpers de la lista de filas ──────────────────────────
+
+  function setCuotaField(idx: number, key: keyof CuotaRow, value: string) {
+    setCuotas(prev => prev.map((c, i) => (i === idx ? { ...c, [key]: value } : c)))
+  }
+
+  function addCuotaRow() {
+    setCuotas(prev => [...prev, { amount: '', dueDate: '' }])
+  }
+
+  function removeCuotaRow(idx: number) {
+    setCuotas(prev => (prev.length <= 2 ? prev : prev.filter((_, i) => i !== idx)))
+  }
+
+  /** Relleno rápido: no persiste como campo — solo pre-llena las filas de
+   * cuotas de abajo, que siguen siendo editables a mano después. */
+  function distributeSchedule() {
+    const total = Number(scheduleTotal)
+    if (!total || total <= 0) {
+      toast.error('Ingresa un total mayor a 0 para distribuir')
+      return
+    }
+    const n = Math.max(2, Math.round(Number(scheduleCount)) || cuotas.length)
+    const first = scheduleFirst ? Number(scheduleFirst) : total / n
+    const restCount = n - 1
+    const restEach = restCount > 0 ? Math.round(((total - first) / restCount) * 100) / 100 : 0
+
+    const rows: CuotaRow[] = []
+    for (let i = 0; i < n; i++) {
+      const due = new Date()
+      due.setDate(1)
+      due.setMonth(due.getMonth() + i + 1)
+      let amount: number
+      if (i === 0) amount = Math.round(first * 100) / 100
+      else if (i === n - 1) {
+        // La última cuota absorbe el redondeo de centavos de las anteriores.
+        const sumSoFar = Math.round(first * 100) / 100 + restEach * (n - 2)
+        amount = Math.round((total - sumSoFar) * 100) / 100
+      } else {
+        amount = restEach
+      }
+      rows.push({ amount: amount.toFixed(2), dueDate: due.toISOString().slice(0, 10) })
+    }
+    setCuotas(rows)
+  }
+
+  const scheduleSum = cuotas.reduce((s, c) => s + (Number(c.amount) || 0), 0)
+
   async function handleSave() {
+    // ── Plan de cuotas ────────────────────────────────────────────────────
+    if (createMode === 'schedule' && !editing) {
+      if (cuotas.length < 2) {
+        toast.error('Un plan de cuotas necesita al menos 2 cuotas')
+        return
+      }
+      for (const c of cuotas) {
+        if (!c.amount || Number(c.amount) <= 0) {
+          toast.error('Cada cuota debe tener un monto mayor a 0')
+          return
+        }
+        if (!c.dueDate) {
+          toast.error('Cada cuota debe tener una fecha de vencimiento')
+          return
+        }
+      }
+      setSaving(true)
+      try {
+        const res = await fetch(endpoints.list(assetId), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            invoiceNumber: form.invoiceNumber || null,
+            purchaseOrderNumber: form.purchaseOrderNumber || null,
+            currency: form.currency || 'USD',
+            supplierId: form.supplierId || null,
+            supplierName: form.supplierName || null,
+            notes: form.notes || null,
+            installments: cuotas.map(c => ({ amount: Number(c.amount), dueDate: c.dueDate })),
+          }),
+        })
+        const json = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(json.error || 'Error al guardar')
+        toast.success(`Plan de ${cuotas.length} cuotas registrado`)
+        setShowForm(false)
+        await loadInvoices()
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Error al guardar')
+      } finally {
+        setSaving(false)
+      }
+      return
+    }
+
+    // ── Pago único (comportamiento de siempre) ───────────────────────────
     if (!form.amount || Number(form.amount) <= 0) {
       toast.error('El monto debe ser mayor a 0')
       return
@@ -361,6 +504,36 @@ export function AcquisitionInvoicesCard({
       await loadInvoices()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error al registrar pago')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // ── Deshacer un abono ────────────────────────────────────────────────────────
+  // Los abonos son inmutables (corregir = deshacer + volver a registrar). Al
+  // deshacer, se recarga la lista y — si el diálogo de "Registrar pago" sigue
+  // abierto para esta misma factura — se actualiza en vivo con el saldo
+  // recalculado, sin cerrar el diálogo.
+
+  async function handleUndoInstallment() {
+    if (!undoing) return
+    setSaving(true)
+    try {
+      const res = await fetch(endpoints.installmentItem(undoing.id), { method: 'DELETE' })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || 'No se pudo deshacer el abono')
+      toast.success('Abono deshecho')
+      setUndoing(null)
+      const list = await loadInvoices()
+      if (markingPaid) {
+        const updated = list.find(i => i.id === markingPaid.id)
+        if (updated) {
+          setMarkingPaid(updated)
+          setPayAmount((updated.amount - updated.paidAmount).toFixed(2))
+        }
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al deshacer abono')
     } finally {
       setSaving(false)
     }
@@ -484,6 +657,11 @@ export function AcquisitionInvoicesCard({
                             <p className='font-mono text-xs font-medium'>
                               {inv.invoiceNumber ?? '—'}
                             </p>
+                            {!!inv.installmentCount && (
+                              <p className='text-xs text-muted-foreground'>
+                                Cuota {inv.installmentNumber}/{inv.installmentCount}
+                              </p>
+                            )}
                             {inv.purchaseOrderNumber && (
                               <p className='text-xs text-muted-foreground'>
                                 OC: {inv.purchaseOrderNumber}
@@ -546,9 +724,18 @@ export function AcquisitionInvoicesCard({
                                 </button>
                                 <button
                                   type='button'
-                                  onClick={() => setDeleting(inv)}
-                                  className='p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors'
-                                  title='Eliminar'
+                                  onClick={() => inv.paidAmount <= 0.01 && setDeleting(inv)}
+                                  disabled={inv.paidAmount > 0.01}
+                                  className={`p-1 rounded transition-colors ${
+                                    inv.paidAmount > 0.01
+                                      ? 'text-muted-foreground/40 cursor-not-allowed'
+                                      : 'hover:bg-destructive/10 text-muted-foreground hover:text-destructive'
+                                  }`}
+                                  title={
+                                    inv.paidAmount > 0.01
+                                      ? 'Tiene abonos registrados — deshazlos primero (en "Abonar") para poder eliminarla'
+                                      : 'Eliminar'
+                                  }
                                 >
                                   <Trash2 className='h-3.5 w-3.5' />
                                 </button>
@@ -587,31 +774,69 @@ export function AcquisitionInvoicesCard({
           </DialogHeader>
 
           <div className='space-y-4 py-1'>
-            {/* Fila 1: Monto + Moneda */}
-            <div className='grid grid-cols-3 gap-3'>
-              <div className='col-span-2 space-y-1'>
-                <Label htmlFor='inv-amount'>
-                  Monto <span className='text-destructive'>*</span>
-                </Label>
-                <Input
-                  id='inv-amount'
-                  type='number'
-                  min='0.01'
-                  step='0.01'
-                  placeholder='0.00'
-                  value={form.amount}
-                  onChange={e => setField('amount', e.target.value)}
-                />
+            {!editing && (
+              <div className='flex rounded-md border p-1 gap-1'>
+                <button
+                  type='button'
+                  onClick={() => setCreateMode('single')}
+                  className={`flex-1 rounded px-3 py-1.5 text-sm font-medium transition-colors ${
+                    createMode === 'single'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:bg-muted'
+                  }`}
+                >
+                  Pago único
+                </button>
+                <button
+                  type='button'
+                  onClick={() => setCreateMode('schedule')}
+                  className={`flex-1 rounded px-3 py-1.5 text-sm font-medium transition-colors ${
+                    createMode === 'schedule'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:bg-muted'
+                  }`}
+                >
+                  Plan de cuotas
+                </button>
               </div>
-              <div className='space-y-1'>
-                <Label htmlFor='inv-currency'>Moneda</Label>
+            )}
+
+            {editing || createMode === 'single' ? (
+              /* Fila 1: Monto + Moneda */
+              <div className='grid grid-cols-3 gap-3'>
+                <div className='col-span-2 space-y-1'>
+                  <Label htmlFor='inv-amount'>
+                    Monto <span className='text-destructive'>*</span>
+                  </Label>
+                  <Input
+                    id='inv-amount'
+                    type='number'
+                    min='0.01'
+                    step='0.01'
+                    placeholder='0.00'
+                    value={form.amount}
+                    onChange={e => setField('amount', e.target.value)}
+                  />
+                </div>
+                <div className='space-y-1'>
+                  <Label htmlFor='inv-currency'>Moneda</Label>
+                  <CurrencySelect
+                    id='inv-currency'
+                    value={form.currency}
+                    onChange={v => setField('currency', v)}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className='space-y-1 max-w-[10rem]'>
+                <Label htmlFor='inv-currency-schedule'>Moneda</Label>
                 <CurrencySelect
-                  id='inv-currency'
+                  id='inv-currency-schedule'
                   value={form.currency}
                   onChange={v => setField('currency', v)}
                 />
               </div>
-            </div>
+            )}
 
             {/* Fila 2: N° Factura + N° OC */}
             <div className='grid grid-cols-2 gap-3'>
@@ -637,28 +862,32 @@ export function AcquisitionInvoicesCard({
               </div>
             </div>
 
-            {/* Fila 3: Fecha vencimiento + Fecha pago */}
-            <div className='grid grid-cols-2 gap-3'>
-              <div className='space-y-1'>
-                <Label htmlFor='inv-due'>Fecha de vencimiento</Label>
-                <DateInput
-                  id='inv-due'
-                  value={form.dueDate}
-                  onChange={e => setField('dueDate', e.target.value)}
-                  clearable
-                />
-              </div>
-              <div className='space-y-1'>
-                <Label htmlFor='inv-paid'>Fecha de pago</Label>
-                <DateInput
-                  id='inv-paid'
-                  value={form.paidDate}
-                  onChange={e => setField('paidDate', e.target.value)}
-                  clearable
-                />
-                <p className='text-xs text-muted-foreground'>Dejar vacío si aún no se paga.</p>
-              </div>
-            </div>
+            {(editing || createMode === 'single') && (
+              <>
+                {/* Fila 3: Fecha vencimiento + Fecha pago */}
+                <div className='grid grid-cols-2 gap-3'>
+                  <div className='space-y-1'>
+                    <Label htmlFor='inv-due'>Fecha de vencimiento</Label>
+                    <DateInput
+                      id='inv-due'
+                      value={form.dueDate}
+                      onChange={e => setField('dueDate', e.target.value)}
+                      clearable
+                    />
+                  </div>
+                  <div className='space-y-1'>
+                    <Label htmlFor='inv-paid'>Fecha de pago</Label>
+                    <DateInput
+                      id='inv-paid'
+                      value={form.paidDate}
+                      onChange={e => setField('paidDate', e.target.value)}
+                      clearable
+                    />
+                    <p className='text-xs text-muted-foreground'>Dejar vacío si aún no se paga.</p>
+                  </div>
+                </div>
+              </>
+            )}
 
             {/* Proveedor */}
             <div className='space-y-1'>
@@ -669,64 +898,155 @@ export function AcquisitionInvoicesCard({
               />
             </div>
 
-            {/* Método de pago */}
-            <div className='space-y-1'>
-              <Label htmlFor='inv-method'>Método de pago</Label>
-              <Select
-                value={form.paymentMethod || '__none__'}
-                onValueChange={v => setField('paymentMethod', v === '__none__' ? '' : v)}
-              >
-                <SelectTrigger id='inv-method'>
-                  <SelectValue placeholder='Seleccionar método' />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value='__none__'>Sin especificar</SelectItem>
-                  {(
-                    Object.entries(PAYMENT_METHOD_TYPE_LABELS) as [PaymentMethodType, string][]
-                  ).map(([key, label]) => (
-                    <SelectItem key={key} value={key}>
-                      {label}
-                    </SelectItem>
+            {editing || createMode === 'single' ? (
+              <>
+                {/* Método de pago */}
+                <div className='space-y-1'>
+                  <Label htmlFor='inv-method'>Método de pago</Label>
+                  <Select
+                    value={form.paymentMethod || '__none__'}
+                    onValueChange={v => setField('paymentMethod', v === '__none__' ? '' : v)}
+                  >
+                    <SelectTrigger id='inv-method'>
+                      <SelectValue placeholder='Seleccionar método' />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value='__none__'>Sin especificar</SelectItem>
+                      {(
+                        Object.entries(PAYMENT_METHOD_TYPE_LABELS) as [PaymentMethodType, string][]
+                      ).map(([key, label]) => (
+                        <SelectItem key={key} value={key}>
+                          {label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Referencia + Banco (condicional) */}
+                <div className='grid grid-cols-2 gap-3'>
+                  <div className='space-y-1'>
+                    <Label htmlFor='inv-ref'>N° Referencia / Transacción</Label>
+                    <Input
+                      id='inv-ref'
+                      placeholder='REF-12345'
+                      value={form.referenceNumber}
+                      onChange={e => setField('referenceNumber', e.target.value)}
+                      maxLength={200}
+                    />
+                  </div>
+                  <div className='space-y-1'>
+                    <Label htmlFor='inv-bank'>Banco / Entidad</Label>
+                    <BankEntitySelect
+                      value={form.bankEntity}
+                      onChange={v => setField('bankEntity', v)}
+                    />
+                  </div>
+                </div>
+
+                {/* Card last4 (si método es tarjeta) */}
+                {form.paymentMethod === 'CORPORATE_CARD' && (
+                  <div className='space-y-1'>
+                    <Label htmlFor='inv-card4'>Últimos 4 dígitos tarjeta</Label>
+                    <Input
+                      id='inv-card4'
+                      placeholder='1234'
+                      value={form.cardLast4}
+                      onChange={e =>
+                        setField('cardLast4', e.target.value.replace(/\D/g, '').slice(0, 4))
+                      }
+                      maxLength={4}
+                      className='w-24'
+                    />
+                  </div>
+                )}
+              </>
+            ) : (
+              /* Plan de cuotas: cada cuota empieza sin pagar — el método de
+               * pago se registra después, al abonar cada una. */
+              <div className='space-y-3 rounded-md border p-3'>
+                <p className='text-sm font-medium'>Cuotas</p>
+
+                <div className='grid grid-cols-3 gap-2'>
+                  <div className='space-y-1'>
+                    <Label className='text-xs'>Total</Label>
+                    <Input
+                      type='number'
+                      min='0.01'
+                      step='0.01'
+                      placeholder='0.00'
+                      value={scheduleTotal}
+                      onChange={e => setScheduleTotal(e.target.value)}
+                    />
+                  </div>
+                  <div className='space-y-1'>
+                    <Label className='text-xs'>N° de cuotas</Label>
+                    <Input
+                      type='number'
+                      min='2'
+                      step='1'
+                      placeholder={String(cuotas.length)}
+                      value={scheduleCount}
+                      onChange={e => setScheduleCount(e.target.value)}
+                    />
+                  </div>
+                  <div className='space-y-1'>
+                    <Label className='text-xs'>Primera cuota (opcional)</Label>
+                    <Input
+                      type='number'
+                      min='0.01'
+                      step='0.01'
+                      placeholder='Igual al resto'
+                      value={scheduleFirst}
+                      onChange={e => setScheduleFirst(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <Button type='button' size='sm' variant='outline' onClick={distributeSchedule}>
+                  Distribuir
+                </Button>
+                <p className='text-xs text-muted-foreground'>
+                  Pre-llena las filas de abajo — siguen siendo editables a mano.
+                </p>
+
+                <div className='space-y-2'>
+                  {cuotas.map((c, idx) => (
+                    <div key={idx} className='flex items-center gap-2'>
+                      <span className='text-xs text-muted-foreground w-14 shrink-0'>
+                        Cuota {idx + 1}
+                      </span>
+                      <Input
+                        type='number'
+                        min='0.01'
+                        step='0.01'
+                        placeholder='Monto'
+                        value={c.amount}
+                        onChange={e => setCuotaField(idx, 'amount', e.target.value)}
+                      />
+                      <DateInput
+                        value={c.dueDate}
+                        onChange={e => setCuotaField(idx, 'dueDate', e.target.value)}
+                      />
+                      <button
+                        type='button'
+                        onClick={() => removeCuotaRow(idx)}
+                        disabled={cuotas.length <= 2}
+                        className='p-1 rounded text-muted-foreground hover:text-destructive disabled:opacity-30 disabled:cursor-not-allowed transition-colors'
+                        title='Quitar cuota'
+                      >
+                        <Trash2 className='h-3.5 w-3.5' />
+                      </button>
+                    </div>
                   ))}
-                </SelectContent>
-              </Select>
-            </div>
+                </div>
+                <Button type='button' size='sm' variant='ghost' onClick={addCuotaRow}>
+                  <Plus className='h-3.5 w-3.5 mr-1' />
+                  Agregar cuota
+                </Button>
 
-            {/* Referencia + Banco (condicional) */}
-            <div className='grid grid-cols-2 gap-3'>
-              <div className='space-y-1'>
-                <Label htmlFor='inv-ref'>N° Referencia / Transacción</Label>
-                <Input
-                  id='inv-ref'
-                  placeholder='REF-12345'
-                  value={form.referenceNumber}
-                  onChange={e => setField('referenceNumber', e.target.value)}
-                  maxLength={200}
-                />
-              </div>
-              <div className='space-y-1'>
-                <Label htmlFor='inv-bank'>Banco / Entidad</Label>
-                <BankEntitySelect
-                  value={form.bankEntity}
-                  onChange={v => setField('bankEntity', v)}
-                />
-              </div>
-            </div>
-
-            {/* Card last4 (si método es tarjeta) */}
-            {form.paymentMethod === 'CORPORATE_CARD' && (
-              <div className='space-y-1'>
-                <Label htmlFor='inv-card4'>Últimos 4 dígitos tarjeta</Label>
-                <Input
-                  id='inv-card4'
-                  placeholder='1234'
-                  value={form.cardLast4}
-                  onChange={e =>
-                    setField('cardLast4', e.target.value.replace(/\D/g, '').slice(0, 4))
-                  }
-                  maxLength={4}
-                  className='w-24'
-                />
+                <p className='text-sm font-medium text-right'>
+                  Total del plan: {fmtCurrency(scheduleSum, form.currency)} ({cuotas.length} cuotas)
+                </p>
               </div>
             )}
 
@@ -755,6 +1075,8 @@ export function AcquisitionInvoicesCard({
                 </>
               ) : editing ? (
                 'Actualizar'
+              ) : createMode === 'schedule' ? (
+                'Registrar plan'
               ) : (
                 'Registrar'
               )}
@@ -794,11 +1116,19 @@ export function AcquisitionInvoicesCard({
                   </Label>
                   <ul className='rounded-md border divide-y text-xs max-h-24 overflow-y-auto'>
                     {markingPaid.installments.map(ins => (
-                      <li key={ins.id} className='flex justify-between px-2 py-1'>
+                      <li key={ins.id} className='flex items-center justify-between px-2 py-1'>
                         <span className='text-muted-foreground'>{fmtDate(ins.paidDate)}</span>
                         <span className='font-medium'>
                           {fmtCurrency(ins.amount, markingPaid.currency)}
                         </span>
+                        <button
+                          type='button'
+                          onClick={() => setUndoing(ins)}
+                          className='p-0.5 rounded text-muted-foreground hover:text-destructive transition-colors'
+                          title='Deshacer este abono'
+                        >
+                          <Undo2 className='h-3 w-3' />
+                        </button>
                       </li>
                     ))}
                   </ul>
@@ -863,6 +1193,29 @@ export function AcquisitionInvoicesCard({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ── AlertDialog: confirmar deshacer abono ────────────────────────── */}
+      <AlertDialog open={!!undoing} onOpenChange={open => !open && setUndoing(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Deshacer este abono?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {undoing &&
+                `Se eliminará el abono de ${fmtCurrency(undoing.amount, markingPaid?.currency)} del ${fmtDate(undoing.paidDate)}. El saldo y el estado de la factura se recalculan al instante.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={saving}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleUndoInstallment}
+              disabled={saving}
+              className='bg-destructive text-destructive-foreground hover:bg-destructive/90'
+            >
+              {saving ? 'Deshaciendo…' : 'Deshacer abono'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* ── AlertDialog: confirmar eliminar ──────────────────────────────── */}
       <AlertDialog open={!!deleting} onOpenChange={open => !open && setDeleting(null)}>

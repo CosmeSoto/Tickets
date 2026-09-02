@@ -485,7 +485,13 @@ export function LicenseDetail({ licenseId, userRole, isSuperAdmin = false }: Pro
           </Card>
 
           {/* Facturas / pagos de adquisición */}
-          <AcquisitionInvoicesCard assetType='license' assetId={licenseId} canManage={isAdmin} />
+          <AcquisitionInvoicesCard
+            assetType='license'
+            assetId={licenseId}
+            canManage={isAdmin}
+            defaultSupplierId={license.supplier?.id ?? null}
+            defaultSupplierName={license.supplier?.name ?? null}
+          />
         </div>
 
         {/* Lateral: credenciales + asignación (como QR/asignación en equipo) */}

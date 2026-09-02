@@ -54,6 +54,25 @@ export interface CreateEquipmentInvoiceInput {
   createdBy: string
 }
 
+/**
+ * Plan de cuotas: cada cuota se crea como una fila normal de
+ * equipment_invoices, "hermana" de las demás vía scheduleGroupId — no una
+ * jerarquía nueva. Cada cuota tiene su propia fecha de vencimiento y, a
+ * partir de ahí, se edita/abona/elimina exactamente igual que cualquier
+ * factura de pago único (ver create/registerPayment/delete).
+ */
+export interface CreateEquipmentInvoiceScheduleInput {
+  equipmentId: string
+  invoiceNumber?: string | null
+  purchaseOrderNumber?: string | null
+  currency?: string
+  supplierId?: string | null
+  supplierName?: string | null
+  notes?: string | null
+  installments: { amount: number; dueDate: Date }[]
+  createdBy: string
+}
+
 export interface UpdateEquipmentInvoiceInput {
   invoiceNumber?: string | null
   purchaseOrderNumber?: string | null
@@ -401,6 +420,88 @@ export class EquipmentInvoiceService {
     await syncEquipmentPurchaseFields(input.equipmentId)
 
     return { ...invoice, paidAmount: invoice.installments.reduce((s, i) => s + i.amount, 0) }
+  }
+
+  // ── Crear plan de cuotas ──────────────────────────────────────────────────
+  // N facturas "hermanas" (mismo proveedor/N° factura/N° OC/moneda/notas,
+  // monto y vencimiento propios por cuota), agrupadas por scheduleGroupId.
+  // Cubre el caso "primera cuota distinta + resto igual" sin tocar nada del
+  // modelo de abonos ya construido — cada cuota se abona/edita/elimina
+  // exactamente igual que una factura de pago único.
+
+  static async createSchedule(input: CreateEquipmentInvoiceScheduleInput) {
+    if (!input.installments || input.installments.length < 2) {
+      throw new Error(
+        'Un plan de cuotas necesita al menos 2 cuotas — con una sola, usa el pago único.'
+      )
+    }
+    for (const cuota of input.installments) {
+      if (!cuota.amount || cuota.amount <= 0) {
+        throw new Error('Cada cuota debe tener un monto mayor a 0.')
+      }
+      if (!cuota.dueDate) {
+        throw new Error('Cada cuota debe tener una fecha de vencimiento.')
+      }
+    }
+
+    const scheduleGroupId = randomUUID()
+    const count = input.installments.length
+
+    await prisma.$transaction(async tx => {
+      for (let i = 0; i < count; i++) {
+        const cuota = input.installments[i]
+        const status = computeAcquisitionStatus(cuota.dueDate, cuota.amount, 0)
+        const row = await tx.equipment_invoices.create({
+          data: {
+            id: randomUUID(),
+            equipmentId: input.equipmentId,
+            invoiceNumber: input.invoiceNumber ?? null,
+            purchaseOrderNumber: input.purchaseOrderNumber ?? null,
+            amount: cuota.amount,
+            currency: input.currency ?? 'USD',
+            dueDate: cuota.dueDate,
+            status,
+            supplierId: input.supplierId ?? null,
+            supplierName: input.supplierName ?? null,
+            notes: input.notes ?? null,
+            scheduleGroupId,
+            installmentNumber: i + 1,
+            installmentCount: count,
+            createdBy: input.createdBy,
+          },
+        })
+
+        await createAuditLog({
+          entityType: 'equipment_invoice',
+          entityId: row.id,
+          action: 'EQUIPMENT_INVOICE_CREATED',
+          userId: input.createdBy,
+          changes: {
+            equipmentId: input.equipmentId,
+            amount: cuota.amount,
+            currency: row.currency,
+            invoiceNumber: input.invoiceNumber,
+            status,
+            scheduleGroupId,
+            installmentNumber: i + 1,
+            installmentCount: count,
+          },
+        })
+      }
+    })
+
+    await syncEquipmentPurchaseFields(input.equipmentId)
+
+    const invoices = await prisma.equipment_invoices.findMany({
+      where: { scheduleGroupId },
+      include: {
+        supplier: { select: { id: true, name: true } },
+        creator: { select: { id: true, name: true } },
+        installments: true,
+      },
+      orderBy: { installmentNumber: 'asc' },
+    })
+    return invoices.map(inv => ({ ...inv, paidAmount: 0 }))
   }
 
   // ── Actualizar factura ────────────────────────────────────────────────────

@@ -66,7 +66,38 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       cardBrand,
       transactionId,
       notes,
+      installments,
     } = body
+
+    // Plan de cuotas: si el body trae `installments` (≥ 2 filas), se crean N
+    // facturas "hermanas" en vez de una sola — ver createSchedule.
+    if (Array.isArray(installments) && installments.length >= 2) {
+      for (const cuota of installments) {
+        if (!cuota?.amount || Number(cuota.amount) <= 0 || !cuota?.dueDate) {
+          return NextResponse.json(
+            { error: 'Cada cuota necesita un monto mayor a 0 y una fecha de vencimiento' },
+            { status: 400 }
+          )
+        }
+      }
+
+      const invoices = await EquipmentInvoiceService.createSchedule({
+        equipmentId: id,
+        invoiceNumber: invoiceNumber || null,
+        purchaseOrderNumber: purchaseOrderNumber || null,
+        currency: currency || 'USD',
+        supplierId: supplierId || null,
+        supplierName: supplierName || null,
+        notes: notes || null,
+        installments: installments.map((cuota: { amount: number; dueDate: string }) => ({
+          amount: Number(cuota.amount),
+          dueDate: new Date(cuota.dueDate),
+        })),
+        createdBy: session.user.id,
+      })
+
+      return NextResponse.json({ invoices }, { status: 201 })
+    }
 
     if (!amount || Number(amount) <= 0) {
       return NextResponse.json({ error: 'El monto debe ser mayor a 0' }, { status: 400 })
