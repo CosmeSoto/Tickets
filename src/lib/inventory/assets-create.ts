@@ -323,12 +323,17 @@ export async function createAsset(
       purchasePrice != null &&
       purchasePrice > 0
     ) {
+      // OJO: no pasar `purchaseDate` como `paidDate` acá — "fecha de compra"
+      // es cuándo se adquirió el equipo, no cuándo se pagó la factura (son
+      // cosas distintas: se puede comprar a crédito/con factura pendiente).
+      // La factura se crea sin fecha de pago → PENDING, tal como cualquier
+      // factura registrada manualmente. El pago se registra aparte con
+      // "Pagar", igual que para cualquier otra factura.
       await EquipmentInvoiceService.create({
         equipmentId: asset.id,
         invoiceNumber: invoiceNumber || null,
         purchaseOrderNumber: purchaseOrderNumber || null,
         amount: Number(purchasePrice),
-        paidDate: purchaseDate ? new Date(purchaseDate) : null,
         supplierId: supplierId || null,
         createdBy: userId,
       })
@@ -496,12 +501,14 @@ export async function createAsset(
       // que tiene su propio seguimiento de pagos, no es una compra puntual).
       // Igual que en equipos: evita que el usuario tenga que volver a
       // escribir el mismo monto en "Registrar factura" después.
+      // Ver el comentario gemelo en la rama de equipment más arriba: "fecha
+      // de compra" no es "fecha de pago" — la factura se crea PENDING y se
+      // paga aparte con "Pagar".
       await LicenseInvoiceService.create({
         licenseId: license.id,
         invoiceNumber: body.invoiceNumber ? String(body.invoiceNumber) : null,
         purchaseOrderNumber: body.purchaseOrderNumber ? String(body.purchaseOrderNumber) : null,
         amount: Number(cost),
-        paidDate: purchaseDate ? new Date(purchaseDate) : null,
         supplierId: supplierId || null,
         createdBy: userId,
       })

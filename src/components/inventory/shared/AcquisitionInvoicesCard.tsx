@@ -711,7 +711,20 @@ export function AcquisitionInvoicesCard({
                                     onClick={() => openMarkPaid(inv)}
                                   >
                                     <CheckCircle2 className='h-3 w-3 mr-1' />
-                                    {inv.paidAmount > 0 ? 'Abonar' : 'Pagar'}
+                                    Pagar
+                                  </Button>
+                                )}
+                                {inv.paidAmount > 0 && (
+                                  <Button
+                                    type='button'
+                                    size='sm'
+                                    variant='outline'
+                                    className='h-7 text-xs'
+                                    onClick={() => openMarkPaid(inv)}
+                                    title='Ver abonos registrados y agregar o deshacer uno'
+                                  >
+                                    <Receipt className='h-3 w-3 mr-1' />
+                                    Abonos
                                   </Button>
                                 )}
                                 <button
@@ -733,7 +746,7 @@ export function AcquisitionInvoicesCard({
                                   }`}
                                   title={
                                     inv.paidAmount > 0.01
-                                      ? 'Tiene abonos registrados — deshazlos primero (en "Abonar") para poder eliminarla'
+                                      ? 'Tiene abonos registrados — deshazlos primero (en "Abonos") para poder eliminarla'
                                       : 'Eliminar'
                                   }
                                 >
@@ -862,32 +875,46 @@ export function AcquisitionInvoicesCard({
               </div>
             </div>
 
-            {(editing || createMode === 'single') && (
-              <>
-                {/* Fila 3: Fecha vencimiento + Fecha pago */}
-                <div className='grid grid-cols-2 gap-3'>
-                  <div className='space-y-1'>
-                    <Label htmlFor='inv-due'>Fecha de vencimiento</Label>
-                    <DateInput
-                      id='inv-due'
-                      value={form.dueDate}
-                      onChange={e => setField('dueDate', e.target.value)}
-                      clearable
-                    />
-                  </div>
-                  <div className='space-y-1'>
-                    <Label htmlFor='inv-paid'>Fecha de pago</Label>
-                    <DateInput
-                      id='inv-paid'
-                      value={form.paidDate}
-                      onChange={e => setField('paidDate', e.target.value)}
-                      clearable
-                    />
-                    <p className='text-xs text-muted-foreground'>Dejar vacío si aún no se paga.</p>
-                  </div>
+            {editing ? (
+              /* Fila 3: Fecha vencimiento + Fecha pago — la fecha de pago solo
+               * se edita acá para corregir un dato ya cargado; para pagar una
+               * factura nueva se usa el botón "Pagar" (crea un abono, no
+               * pisa este campo directo). */
+              <div className='grid grid-cols-2 gap-3'>
+                <div className='space-y-1'>
+                  <Label htmlFor='inv-due'>Fecha de vencimiento</Label>
+                  <DateInput
+                    id='inv-due'
+                    value={form.dueDate}
+                    onChange={e => setField('dueDate', e.target.value)}
+                    clearable
+                  />
                 </div>
-              </>
-            )}
+                <div className='space-y-1'>
+                  <Label htmlFor='inv-paid'>Fecha de pago</Label>
+                  <DateInput
+                    id='inv-paid'
+                    value={form.paidDate}
+                    onChange={e => setField('paidDate', e.target.value)}
+                    clearable
+                  />
+                  <p className='text-xs text-muted-foreground'>Dejar vacío si aún no se paga.</p>
+                </div>
+              </div>
+            ) : createMode === 'single' ? (
+              /* Al crear, sin fecha de pago: toda factura nueva empieza
+               * PENDIENTE — pagarla es una acción aparte ("Pagar"), nunca un
+               * campo que se pueda dejar cargado sin querer. */
+              <div className='space-y-1 max-w-[13rem]'>
+                <Label htmlFor='inv-due'>Fecha de vencimiento</Label>
+                <DateInput
+                  id='inv-due'
+                  value={form.dueDate}
+                  onChange={e => setField('dueDate', e.target.value)}
+                  clearable
+                />
+              </div>
+            ) : null}
 
             {/* Proveedor */}
             <div className='space-y-1'>
@@ -898,7 +925,7 @@ export function AcquisitionInvoicesCard({
               />
             </div>
 
-            {editing || createMode === 'single' ? (
+            {editing ? (
               <>
                 {/* Método de pago */}
                 <div className='space-y-1'>
@@ -961,7 +988,7 @@ export function AcquisitionInvoicesCard({
                   </div>
                 )}
               </>
-            ) : (
+            ) : createMode === 'schedule' ? (
               /* Plan de cuotas: cada cuota empieza sin pagar — el método de
                * pago se registra después, al abonar cada una. */
               <div className='space-y-3 rounded-md border p-3'>
@@ -1048,7 +1075,7 @@ export function AcquisitionInvoicesCard({
                   Total del plan: {fmtCurrency(scheduleSum, form.currency)} ({cuotas.length} cuotas)
                 </p>
               </div>
-            )}
+            ) : null}
 
             {/* Notas */}
             <div className='space-y-1'>
@@ -1089,7 +1116,9 @@ export function AcquisitionInvoicesCard({
       <Dialog open={!!markingPaid} onOpenChange={open => !open && setMarkingPaid(null)}>
         <DialogContent className='max-w-sm'>
           <DialogHeader>
-            <DialogTitle>Registrar pago</DialogTitle>
+            <DialogTitle>
+              {markingPaid?.status === 'PAID' ? 'Abonos registrados' : 'Registrar pago'}
+            </DialogTitle>
           </DialogHeader>
           {markingPaid && (
             <div className='space-y-3'>
@@ -1135,61 +1164,76 @@ export function AcquisitionInvoicesCard({
                 </div>
               )}
 
-              <div className='space-y-1'>
-                <Label>Monto a abonar</Label>
-                <Input
-                  type='number'
-                  min='0.01'
-                  step='0.01'
-                  max={markingPaid.amount - markingPaid.paidAmount}
-                  value={payAmount}
-                  onChange={e => setPayAmount(e.target.value)}
-                />
-                <p className='text-xs text-muted-foreground'>
-                  Deja el monto completo para saldar, o redúcelo para abonar parcialmente.
-                </p>
-              </div>
-              <div className='space-y-1'>
-                <Label>Fecha de pago</Label>
-                <DateInput value={paidDate} onChange={e => setPaidDate(e.target.value)} />
-              </div>
-              <div className='space-y-1'>
-                <Label>Método de pago</Label>
-                <Select
-                  value={paidMethod || '__none__'}
-                  onValueChange={v => setPaidMethod(v === '__none__' ? '' : v)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder='Seleccionar método' />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value='__none__'>Sin especificar</SelectItem>
-                    {(
-                      Object.entries(PAYMENT_METHOD_TYPE_LABELS) as [PaymentMethodType, string][]
-                    ).map(([key, label]) => (
-                      <SelectItem key={key} value={key}>
-                        {label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {markingPaid.status !== 'PAID' && (
+                <>
+                  <div className='space-y-1'>
+                    <Label>Monto a abonar</Label>
+                    <Input
+                      type='number'
+                      min='0.01'
+                      step='0.01'
+                      max={markingPaid.amount - markingPaid.paidAmount}
+                      value={payAmount}
+                      onChange={e => setPayAmount(e.target.value)}
+                    />
+                    <p className='text-xs text-muted-foreground'>
+                      Deja el monto completo para saldar, o redúcelo para abonar parcialmente.
+                    </p>
+                  </div>
+                  <div className='space-y-1'>
+                    <Label>Fecha de pago</Label>
+                    <DateInput value={paidDate} onChange={e => setPaidDate(e.target.value)} />
+                  </div>
+                  <div className='space-y-1'>
+                    <Label>Método de pago</Label>
+                    <Select
+                      value={paidMethod || '__none__'}
+                      onValueChange={v => setPaidMethod(v === '__none__' ? '' : v)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder='Seleccionar método' />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value='__none__'>Sin especificar</SelectItem>
+                        {(
+                          Object.entries(PAYMENT_METHOD_TYPE_LABELS) as [
+                            PaymentMethodType,
+                            string,
+                          ][]
+                        ).map(([key, label]) => (
+                          <SelectItem key={key} value={key}>
+                            {label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </>
+              )}
             </div>
           )}
           <DialogFooter>
-            <Button type='button' variant='outline' onClick={() => setMarkingPaid(null)}>
-              Cancelar
-            </Button>
-            <Button type='button' onClick={handleRegisterPayment} disabled={saving}>
-              {saving ? (
-                <Loader2 className='h-4 w-4 animate-spin' />
-              ) : markingPaid &&
-                Number(payAmount) >= markingPaid.amount - markingPaid.paidAmount - 0.01 ? (
-                'Confirmar pago'
-              ) : (
-                'Registrar abono'
-              )}
-            </Button>
+            {markingPaid?.status === 'PAID' ? (
+              <Button type='button' variant='outline' onClick={() => setMarkingPaid(null)}>
+                Cerrar
+              </Button>
+            ) : (
+              <>
+                <Button type='button' variant='outline' onClick={() => setMarkingPaid(null)}>
+                  Cancelar
+                </Button>
+                <Button type='button' onClick={handleRegisterPayment} disabled={saving}>
+                  {saving ? (
+                    <Loader2 className='h-4 w-4 animate-spin' />
+                  ) : markingPaid &&
+                    Number(payAmount) >= markingPaid.amount - markingPaid.paidAmount - 0.01 ? (
+                    'Confirmar pago'
+                  ) : (
+                    'Registrar abono'
+                  )}
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

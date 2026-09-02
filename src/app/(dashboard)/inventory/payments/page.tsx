@@ -1479,7 +1479,26 @@ export default function InventoryPaymentsPage() {
                                     }}
                                   >
                                     <CheckCircle2 className='h-3.5 w-3.5 mr-1' />
-                                    {inv.paidAmount > 0 ? 'Abonar' : 'Pagar'}
+                                    Pagar
+                                  </Button>
+                                )}
+                                {inv.paidAmount > 0 && (
+                                  <Button
+                                    type='button'
+                                    size='sm'
+                                    variant='outline'
+                                    className='h-7 text-xs'
+                                    title='Ver abonos registrados y agregar o deshacer uno'
+                                    onClick={() => {
+                                      setAPaidDate(todayISO())
+                                      setAPaidMethod(inv.paymentMethod ?? '')
+                                      setAPaidRef('')
+                                      setAPayAmount((inv.amount - inv.paidAmount).toFixed(2))
+                                      setMarkingAsset(inv)
+                                    }}
+                                  >
+                                    <Receipt className='h-3.5 w-3.5 mr-1' />
+                                    Abonos
                                   </Button>
                                 )}
                                 <button
@@ -1780,7 +1799,26 @@ export default function InventoryPaymentsPage() {
                                   }}
                                 >
                                   <CheckCircle2 className='h-3.5 w-3.5 mr-1' />
-                                  {p.paidAmount > 0 ? 'Abonar' : 'Pagar'}
+                                  Pagar
+                                </Button>
+                              )}
+                              {p.paidAmount > 0 && (
+                                <Button
+                                  type='button'
+                                  size='sm'
+                                  variant='outline'
+                                  className='h-7 text-xs'
+                                  title='Ver abonos registrados y agregar o deshacer uno'
+                                  onClick={() => {
+                                    setCPaidDate(todayISO())
+                                    setCPaidMethod('')
+                                    setCPaidRef('')
+                                    setCPayAmount((p.amount - p.paidAmount).toFixed(2))
+                                    setMarkingContract(p)
+                                  }}
+                                >
+                                  <Receipt className='h-3.5 w-3.5 mr-1' />
+                                  Abonos
                                 </Button>
                               )}
                               <button
@@ -1831,7 +1869,9 @@ export default function InventoryPaymentsPage() {
           <DialogHeader>
             <DialogTitle className='flex items-center gap-2'>
               <Wallet className='h-4 w-4' />
-              Registrar pago de cuota
+              {markingContract?.status === 'PAID'
+                ? 'Abonos registrados'
+                : 'Registrar pago de cuota'}
             </DialogTitle>
           </DialogHeader>
           {markingContract && (
@@ -1882,74 +1922,90 @@ export default function InventoryPaymentsPage() {
                 </div>
               )}
 
-              <div className='space-y-1.5'>
-                <Label>Monto a abonar</Label>
-                <Input
-                  type='number'
-                  min='0.01'
-                  step='0.01'
-                  max={markingContract.amount - markingContract.paidAmount}
-                  value={cPayAmount}
-                  onChange={e => setCPayAmount(e.target.value)}
-                />
-                <p className='text-xs text-muted-foreground'>
-                  Deja el monto completo para saldar, o redúcelo para abonar parcialmente.
-                </p>
-              </div>
-              <div className='space-y-1.5'>
-                <Label>Fecha de pago</Label>
-                <DateInput value={cPaidDate} onChange={e => setCPaidDate(e.target.value)} />
-              </div>
-              <div className='space-y-1.5'>
-                <Label>Método de pago</Label>
-                <Select
-                  value={cPaidMethod || '__none__'}
-                  onValueChange={v => setCPaidMethod(v === '__none__' ? '' : v)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder='Seleccionar método' />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value='__none__'>Sin especificar</SelectItem>
-                    {(
-                      Object.entries(PAYMENT_METHOD_TYPE_LABELS) as [PaymentMethodType, string][]
-                    ).map(([k, v]) => (
-                      <SelectItem key={k} value={k}>
-                        {v}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className='space-y-1.5'>
-                <Label>
-                  N° Referencia / Transacción{' '}
-                  <span className='text-muted-foreground'>(opcional)</span>
-                </Label>
-                <Input
-                  placeholder='REF-12345'
-                  value={cPaidRef}
-                  onChange={e => setCPaidRef(e.target.value)}
-                  maxLength={200}
-                />
-              </div>
-              <p className='text-xs text-muted-foreground'>
-                Para detalles adicionales (tarjeta, banco) edita la cuota desde el contrato.
-              </p>
+              {markingContract.status !== 'PAID' && (
+                <>
+                  <div className='space-y-1.5'>
+                    <Label>Monto a abonar</Label>
+                    <Input
+                      type='number'
+                      min='0.01'
+                      step='0.01'
+                      max={markingContract.amount - markingContract.paidAmount}
+                      value={cPayAmount}
+                      onChange={e => setCPayAmount(e.target.value)}
+                    />
+                    <p className='text-xs text-muted-foreground'>
+                      Deja el monto completo para saldar, o redúcelo para abonar parcialmente.
+                    </p>
+                  </div>
+                  <div className='space-y-1.5'>
+                    <Label>Fecha de pago</Label>
+                    <DateInput value={cPaidDate} onChange={e => setCPaidDate(e.target.value)} />
+                  </div>
+                  <div className='space-y-1.5'>
+                    <Label>Método de pago</Label>
+                    <Select
+                      value={cPaidMethod || '__none__'}
+                      onValueChange={v => setCPaidMethod(v === '__none__' ? '' : v)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder='Seleccionar método' />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value='__none__'>Sin especificar</SelectItem>
+                        {(
+                          Object.entries(PAYMENT_METHOD_TYPE_LABELS) as [
+                            PaymentMethodType,
+                            string,
+                          ][]
+                        ).map(([k, v]) => (
+                          <SelectItem key={k} value={k}>
+                            {v}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className='space-y-1.5'>
+                    <Label>
+                      N° Referencia / Transacción{' '}
+                      <span className='text-muted-foreground'>(opcional)</span>
+                    </Label>
+                    <Input
+                      placeholder='REF-12345'
+                      value={cPaidRef}
+                      onChange={e => setCPaidRef(e.target.value)}
+                      maxLength={200}
+                    />
+                  </div>
+                  <p className='text-xs text-muted-foreground'>
+                    Para detalles adicionales (tarjeta, banco) edita la cuota desde el contrato.
+                  </p>
+                </>
+              )}
             </div>
           )}
           <DialogFooter>
-            <Button type='button' variant='outline' onClick={() => setMarkingContract(null)}>
-              Cancelar
-            </Button>
-            <Button type='button' onClick={markContractPaid} disabled={savingC}>
-              {savingC
-                ? 'Guardando…'
-                : markingContract &&
-                    Number(cPayAmount) >= markingContract.amount - markingContract.paidAmount - 0.01
-                  ? 'Confirmar pago'
-                  : 'Registrar abono'}
-            </Button>
+            {markingContract?.status === 'PAID' ? (
+              <Button type='button' variant='outline' onClick={() => setMarkingContract(null)}>
+                Cerrar
+              </Button>
+            ) : (
+              <>
+                <Button type='button' variant='outline' onClick={() => setMarkingContract(null)}>
+                  Cancelar
+                </Button>
+                <Button type='button' onClick={markContractPaid} disabled={savingC}>
+                  {savingC
+                    ? 'Guardando…'
+                    : markingContract &&
+                        Number(cPayAmount) >=
+                          markingContract.amount - markingContract.paidAmount - 0.01
+                      ? 'Confirmar pago'
+                      : 'Registrar abono'}
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1960,7 +2016,7 @@ export default function InventoryPaymentsPage() {
           <DialogHeader>
             <DialogTitle className='flex items-center gap-2'>
               <Package className='h-4 w-4' />
-              Registrar pago de factura
+              {markingAsset?.status === 'PAID' ? 'Abonos registrados' : 'Registrar pago de factura'}
             </DialogTitle>
           </DialogHeader>
           {markingAsset && (
@@ -2014,70 +2070,85 @@ export default function InventoryPaymentsPage() {
                 </div>
               )}
 
-              <div className='space-y-1.5'>
-                <Label>Monto a abonar</Label>
-                <Input
-                  type='number'
-                  min='0.01'
-                  step='0.01'
-                  max={markingAsset.amount - markingAsset.paidAmount}
-                  value={aPayAmount}
-                  onChange={e => setAPayAmount(e.target.value)}
-                />
-                <p className='text-xs text-muted-foreground'>
-                  Deja el monto completo para saldar, o redúcelo para abonar parcialmente.
-                </p>
-              </div>
-              <div className='space-y-1.5'>
-                <Label>Fecha de pago</Label>
-                <DateInput value={aPaidDate} onChange={e => setAPaidDate(e.target.value)} />
-              </div>
-              <div className='space-y-1.5'>
-                <Label>Método de pago</Label>
-                <Select
-                  value={aPaidMethod || '__none__'}
-                  onValueChange={v => setAPaidMethod(v === '__none__' ? '' : v)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder='Seleccionar método' />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value='__none__'>Sin especificar</SelectItem>
-                    {(
-                      Object.entries(PAYMENT_METHOD_TYPE_LABELS) as [PaymentMethodType, string][]
-                    ).map(([k, v]) => (
-                      <SelectItem key={k} value={k}>
-                        {v}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className='space-y-1.5'>
-                <Label>
-                  N° Referencia <span className='text-muted-foreground'>(opcional)</span>
-                </Label>
-                <Input
-                  placeholder='REF-12345'
-                  value={aPaidRef}
-                  onChange={e => setAPaidRef(e.target.value)}
-                  maxLength={200}
-                />
-              </div>
+              {markingAsset.status !== 'PAID' && (
+                <>
+                  <div className='space-y-1.5'>
+                    <Label>Monto a abonar</Label>
+                    <Input
+                      type='number'
+                      min='0.01'
+                      step='0.01'
+                      max={markingAsset.amount - markingAsset.paidAmount}
+                      value={aPayAmount}
+                      onChange={e => setAPayAmount(e.target.value)}
+                    />
+                    <p className='text-xs text-muted-foreground'>
+                      Deja el monto completo para saldar, o redúcelo para abonar parcialmente.
+                    </p>
+                  </div>
+                  <div className='space-y-1.5'>
+                    <Label>Fecha de pago</Label>
+                    <DateInput value={aPaidDate} onChange={e => setAPaidDate(e.target.value)} />
+                  </div>
+                  <div className='space-y-1.5'>
+                    <Label>Método de pago</Label>
+                    <Select
+                      value={aPaidMethod || '__none__'}
+                      onValueChange={v => setAPaidMethod(v === '__none__' ? '' : v)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder='Seleccionar método' />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value='__none__'>Sin especificar</SelectItem>
+                        {(
+                          Object.entries(PAYMENT_METHOD_TYPE_LABELS) as [
+                            PaymentMethodType,
+                            string,
+                          ][]
+                        ).map(([k, v]) => (
+                          <SelectItem key={k} value={k}>
+                            {v}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className='space-y-1.5'>
+                    <Label>
+                      N° Referencia <span className='text-muted-foreground'>(opcional)</span>
+                    </Label>
+                    <Input
+                      placeholder='REF-12345'
+                      value={aPaidRef}
+                      onChange={e => setAPaidRef(e.target.value)}
+                      maxLength={200}
+                    />
+                  </div>
+                </>
+              )}
             </div>
           )}
           <DialogFooter>
-            <Button type='button' variant='outline' onClick={() => setMarkingAsset(null)}>
-              Cancelar
-            </Button>
-            <Button type='button' onClick={markAssetPaid} disabled={savingA}>
-              {savingA
-                ? 'Guardando…'
-                : markingAsset &&
-                    Number(aPayAmount) >= markingAsset.amount - markingAsset.paidAmount - 0.01
-                  ? 'Confirmar pago'
-                  : 'Registrar abono'}
-            </Button>
+            {markingAsset?.status === 'PAID' ? (
+              <Button type='button' variant='outline' onClick={() => setMarkingAsset(null)}>
+                Cerrar
+              </Button>
+            ) : (
+              <>
+                <Button type='button' variant='outline' onClick={() => setMarkingAsset(null)}>
+                  Cancelar
+                </Button>
+                <Button type='button' onClick={markAssetPaid} disabled={savingA}>
+                  {savingA
+                    ? 'Guardando…'
+                    : markingAsset &&
+                        Number(aPayAmount) >= markingAsset.amount - markingAsset.paidAmount - 0.01
+                      ? 'Confirmar pago'
+                      : 'Registrar abono'}
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
