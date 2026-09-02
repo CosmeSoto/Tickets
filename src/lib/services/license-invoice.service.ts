@@ -269,6 +269,19 @@ export class LicenseInvoiceService {
     },
     updatedBy: string
   ) {
+    const before = await prisma.license_invoices.findUnique({
+      where: { id },
+      select: { status: true },
+    })
+    if (!before) throw new Error('Factura no encontrada')
+    if (before.status === 'PAID' || before.status === 'CANCELLED') {
+      throw new Error(
+        before.status === 'PAID'
+          ? 'Esta factura ya está marcada como pagada.'
+          : 'Esta factura está cancelada, no se puede marcar como pagada.'
+      )
+    }
+
     return this.update(
       id,
       {
@@ -314,6 +327,18 @@ export class LicenseInvoiceService {
     await syncLicensePurchaseFields(invoice.licenseId)
   }
 
+  // ── Recalcular vencidas ────────────────────────────────────────────────────
+  // Mismo criterio que EquipmentInvoiceService.recomputeOverdue — ver ahí el
+  // porqué (no hay cron que revise esta tabla, se recalcula en cada listado).
+  static async recomputeOverdue(): Promise<void> {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    await prisma.license_invoices.updateMany({
+      where: { status: 'PENDING', dueDate: { lt: today } },
+      data: { status: 'OVERDUE' },
+    })
+  }
+
   // ── Listar global (para /inventory/payments pestaña Activos) ──────────────
   // Mismo criterio que EquipmentInvoiceService.listGlobal — el llamador
   // (equipment-payments/route.ts) hace la mezcla con las facturas de equipo.
@@ -327,6 +352,8 @@ export class LicenseInvoiceService {
     toDate?: Date
     take?: number
   }) {
+    await this.recomputeOverdue()
+
     const { status, familyId, allowedFamilyIds, search, fromDate, toDate, take = 500 } = params
 
     const where: any = {}

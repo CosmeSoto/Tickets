@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     const familyId = searchParams.get('familyId') || undefined
     const search = searchParams.get('search') || undefined
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10))
-    const pageSize = Math.min(200, Math.max(1, parseInt(searchParams.get('pageSize') || '50', 10)))
+    const pageSize = Math.min(500, Math.max(1, parseInt(searchParams.get('pageSize') || '50', 10)))
     const fromDateStr = searchParams.get('fromDate') || undefined
     const toDateStr = searchParams.get('toDate') || undefined
     const fromDate = fromDateStr ? new Date(fromDateStr) : undefined

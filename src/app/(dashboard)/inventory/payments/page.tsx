@@ -218,6 +218,22 @@ function fmtCurrency(n: number, currency = 'USD') {
   }).format(n)
 }
 
+/** Suma `amount` agrupado por `currency` — evita mezclar montos de distinta moneda en un solo total. */
+function sumByCurrency<T extends { amount: number; currency: string }>(
+  items: T[]
+): Record<string, number> {
+  const out: Record<string, number> = {}
+  for (const it of items) out[it.currency] = (out[it.currency] ?? 0) + it.amount
+  return out
+}
+
+/** Un total por cada moneda presente, ej. "US$800 + $50.000 CLP" — nunca un solo número mezclado. */
+function fmtMultiCurrency(sums: Record<string, number>): string {
+  const entries = Object.entries(sums).filter(([, v]) => v !== 0)
+  if (entries.length === 0) return fmtCurrency(0)
+  return entries.map(([cur, amt]) => fmtCurrency(amt, cur)).join(' + ')
+}
+
 function todayISO() {
   return new Date().toISOString().split('T')[0]
 }
@@ -392,6 +408,14 @@ export default function InventoryPaymentsPage() {
     enabled: canManageContracts,
   })
 
+  // ── Filtro cliente: tipo de activo (Activos) ───────────────────────────────
+  // Client-side sobre lo ya cargado (igual que las 500 filas se paginan del
+  // lado del cliente) — evita otro roundtrip solo para separar Equipos de
+  // Licencias, que la pestaña ya trae mezcladas.
+  const [aAssetKind, setAAssetKind] = useState<'ALL' | 'EQUIPMENT' | 'LICENSE'>('ALL')
+  const filteredAssetInvoices =
+    aAssetKind === 'ALL' ? assetInvoices : assetInvoices.filter(i => i.assetKind === aAssetKind)
+
   // ── Ordenamiento contratos
   const {
     sortedData: sortedContracts,
@@ -404,7 +428,7 @@ export default function InventoryPaymentsPage() {
     sortedData: sortedAssets,
     requestSort: reqSortA,
     getSortIcon: iconA,
-  } = useTableSort<AssetInvoice>(assetInvoices, { key: 'dueDate', direction: 'asc' })
+  } = useTableSort<AssetInvoice>(filteredAssetInvoices, { key: 'dueDate', direction: 'asc' })
 
   // ── Paginación contratos
   const {
@@ -515,26 +539,25 @@ export default function InventoryPaymentsPage() {
     due: contractPayments.filter(p => p.status === 'DUE').length,
     pending: contractPayments.filter(p => p.status === 'SCHEDULED').length,
     paid: contractPayments.filter(p => p.status === 'PAID').length,
-    totalAmt: contractPayments
-      .filter(p => p.status !== 'CANCELLED')
-      .reduce((s, p) => s + p.amount, 0),
-    pendingAmt: contractPayments
-      .filter(p => ['SCHEDULED', 'DUE', 'OVERDUE'].includes(p.status))
-      .reduce((s, p) => s + p.amount, 0),
-    currency: contractPayments[0]?.currency ?? 'USD',
+    // Un total por moneda — sumar montos de monedas distintas en un solo
+    // número no tiene sentido y antes mostraba el resultado con la etiqueta
+    // de la primera moneda cargada, que podía ser cualquiera.
+    pendingLabel: fmtMultiCurrency(
+      sumByCurrency(
+        contractPayments.filter(p => ['SCHEDULED', 'DUE', 'OVERDUE'].includes(p.status))
+      )
+    ),
   }
 
   // ── Stats activos
   const aStats = {
-    total: assetInvoices.length,
-    overdue: assetInvoices.filter(i => i.status === 'OVERDUE').length,
-    pending: assetInvoices.filter(i => i.status === 'PENDING').length,
-    paid: assetInvoices.filter(i => i.status === 'PAID').length,
-    totalAmt: assetInvoices.filter(i => i.status !== 'CANCELLED').reduce((s, i) => s + i.amount, 0),
-    pendingAmt: assetInvoices
-      .filter(i => ['PENDING', 'OVERDUE'].includes(i.status))
-      .reduce((s, i) => s + i.amount, 0),
-    currency: assetInvoices[0]?.currency ?? 'USD',
+    total: filteredAssetInvoices.length,
+    overdue: filteredAssetInvoices.filter(i => i.status === 'OVERDUE').length,
+    pending: filteredAssetInvoices.filter(i => i.status === 'PENDING').length,
+    paid: filteredAssetInvoices.filter(i => i.status === 'PAID').length,
+    pendingLabel: fmtMultiCurrency(
+      sumByCurrency(filteredAssetInvoices.filter(i => ['PENDING', 'OVERDUE'].includes(i.status)))
+    ),
   }
 
   // ── Acción: marcar contrato pagado
@@ -691,7 +714,7 @@ export default function InventoryPaymentsPage() {
                 },
                 {
                   label: 'Pendiente ($)',
-                  value: fmtCurrency(cStats.pendingAmt, cStats.currency),
+                  value: cStats.pendingLabel,
                   cls: 'text-orange-600 dark:text-orange-400 text-base',
                 },
               ]}
@@ -959,7 +982,7 @@ export default function InventoryPaymentsPage() {
                 { label: 'Pagadas', value: aStats.paid, cls: 'text-green-600 dark:text-green-400' },
                 {
                   label: 'Pendiente ($)',
-                  value: fmtCurrency(aStats.pendingAmt, aStats.currency),
+                  value: aStats.pendingLabel,
                   cls: 'text-orange-600 dark:text-orange-400 text-base',
                 },
               ]}
@@ -970,6 +993,9 @@ export default function InventoryPaymentsPage() {
               title={
                 <p className='text-sm text-muted-foreground'>
                   {aStats.total} factura{aStats.total !== 1 ? 's' : ''}
+                  {aAssetKind !== 'ALL'
+                    ? ` · ${aAssetKind === 'EQUIPMENT' ? 'Equipos' : 'Licencias'}`
+                    : ''}
                   {aStatus !== 'ALL'
                     ? ` · ${ASSET_STATUS_OPTIONS.find(o => o.value === aStatus)?.label}`
                     : ''}
@@ -986,7 +1012,7 @@ export default function InventoryPaymentsPage() {
                 onExportExcel: expAXLSX,
                 onExportPDF: expAPDF,
                 loading: expALoading,
-                disabled: assetInvoices.length === 0,
+                disabled: filteredAssetInvoices.length === 0,
               }}
             />
 
@@ -1008,6 +1034,19 @@ export default function InventoryPaymentsPage() {
                       {o.label}
                     </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+              <Select
+                value={aAssetKind}
+                onValueChange={v => setAAssetKind(v as 'ALL' | 'EQUIPMENT' | 'LICENSE')}
+              >
+                <SelectTrigger className='w-40'>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='ALL'>Equipos y Licencias</SelectItem>
+                  <SelectItem value='EQUIPMENT'>Solo Equipos</SelectItem>
+                  <SelectItem value='LICENSE'>Solo Licencias</SelectItem>
                 </SelectContent>
               </Select>
               {families.length > 1 && (

@@ -42,6 +42,29 @@ export class PaymentsAlreadyExistError extends Error {
 // ── Servicio ──────────────────────────────────────────────────────────────────
 
 export class ContractPaymentService {
+  // ── Recalcular estados vencidos ────────────────────────────────────────────
+  // checkPaymentAlerts() (job) también recalcula status, pero solo corre si
+  // el cron está configurado y la alerta de licencias/contratos está
+  // habilitada (ver /api/cron/inventory-alerts) — un admin que apaga esa
+  // alerta, sin saberlo, congela también el status de las cuotas. Se
+  // recalcula además aquí, en cada listado, para que SCHEDULED/DUE/OVERDUE
+  // sean siempre correctos sin depender de esa configuración.
+  static async recomputeStatuses(): Promise<void> {
+    const now = new Date()
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const tomorrow = new Date(today)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+
+    await prisma.contract_payments.updateMany({
+      where: { status: 'SCHEDULED', dueDate: { gte: today, lt: tomorrow } },
+      data: { status: 'DUE' },
+    })
+    await prisma.contract_payments.updateMany({
+      where: { status: { in: ['SCHEDULED', 'DUE'] }, dueDate: { lt: today } },
+      data: { status: 'OVERDUE' },
+    })
+  }
+
   // ── Listar pagos ────────────────────────────────────────────────────────────
 
   static async list(params: {
@@ -55,6 +78,8 @@ export class ContractPaymentService {
     allowedFamilyIds?: string[]
     search?: string
   }) {
+    await this.recomputeStatuses()
+
     const {
       contractId,
       status,
@@ -296,6 +321,19 @@ export class ContractPaymentService {
     },
     updatedBy: string
   ) {
+    const before = await prisma.contract_payments.findUnique({
+      where: { id },
+      select: { status: true },
+    })
+    if (!before) throw new Error('Pago no encontrado')
+    if (before.status === 'PAID' || before.status === 'CANCELLED') {
+      throw new Error(
+        before.status === 'PAID'
+          ? 'Esta cuota ya está marcada como pagada.'
+          : 'Esta cuota está cancelada, no se puede marcar como pagada.'
+      )
+    }
+
     const payment = await this.update(
       id,
       {

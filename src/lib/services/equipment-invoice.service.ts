@@ -151,6 +151,22 @@ export class EquipmentInvoiceService {
     })
   }
 
+  // ── Recalcular vencidas ────────────────────────────────────────────────────
+  // No hay ningún job/cron que revise el paso del tiempo para esta tabla (a
+  // diferencia de contract_payments, que tiene checkPaymentAlerts): status es
+  // una columna que solo se recalcula al crear/editar una factura. Para que
+  // "Vencido" sea confiable sin depender de que corra un cron, se recalcula
+  // aquí mismo, en cada listado — barato (un updateMany condicional) y
+  // garantiza que la pestaña Activos siempre refleje la fecha real.
+  static async recomputeOverdue(): Promise<void> {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    await prisma.equipment_invoices.updateMany({
+      where: { status: 'PENDING', dueDate: { lt: today } },
+      data: { status: 'OVERDUE' },
+    })
+  }
+
   // ── Listar global (para /inventory/payments pestaña Activos) ──────────────
 
   static async listGlobal(params: {
@@ -163,6 +179,8 @@ export class EquipmentInvoiceService {
     fromDate?: Date
     toDate?: Date
   }) {
+    await this.recomputeOverdue()
+
     const {
       status,
       familyId,
@@ -382,6 +400,19 @@ export class EquipmentInvoiceService {
     },
     updatedBy: string
   ) {
+    const before = await prisma.equipment_invoices.findUnique({
+      where: { id },
+      select: { status: true },
+    })
+    if (!before) throw new Error('Factura no encontrada')
+    if (before.status === 'PAID' || before.status === 'CANCELLED') {
+      throw new Error(
+        before.status === 'PAID'
+          ? 'Esta factura ya está marcada como pagada.'
+          : 'Esta factura está cancelada, no se puede marcar como pagada.'
+      )
+    }
+
     return this.update(
       id,
       {
