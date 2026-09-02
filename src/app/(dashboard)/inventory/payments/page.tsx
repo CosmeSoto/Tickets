@@ -175,7 +175,7 @@ function assetDisplay(inv: AssetInvoice) {
       subtitle: '',
       typeName: inv.license.licenseType?.name ?? null,
       family: inv.license.licenseType?.family ?? null,
-      href: `/inventory/licenses/${inv.license.id}`,
+      href: `/inventory/license/${inv.license.id}`,
     }
   }
   const eq = inv.equipment

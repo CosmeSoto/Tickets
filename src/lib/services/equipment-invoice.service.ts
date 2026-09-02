@@ -196,7 +196,7 @@ export class EquipmentInvoiceService {
         supplier: { select: { id: true, name: true } },
         creator: { select: { id: true, name: true } },
         installments: {
-          orderBy: { createdAt: 'asc' },
+          orderBy: { createdAt: 'desc' },
           include: { creator: { select: { id: true, name: true } } },
         },
       },
@@ -296,7 +296,7 @@ export class EquipmentInvoiceService {
           },
           supplier: { select: { id: true, name: true } },
           creator: { select: { id: true, name: true } },
-          installments: { orderBy: { createdAt: 'asc' } },
+          installments: { orderBy: { createdAt: 'desc' } },
         },
         orderBy: [{ status: 'asc' }, { dueDate: 'asc' }, { createdAt: 'desc' }],
         skip: (page - 1) * pageSize,
@@ -332,7 +332,7 @@ export class EquipmentInvoiceService {
         supplier: { select: { id: true, name: true } },
         creator: { select: { id: true, name: true } },
         installments: {
-          orderBy: { createdAt: 'asc' },
+          orderBy: { createdAt: 'desc' },
           include: { creator: { select: { id: true, name: true } } },
         },
       },
@@ -590,7 +590,7 @@ export class EquipmentInvoiceService {
         include: {
           supplier: { select: { id: true, name: true } },
           creator: { select: { id: true, name: true } },
-          installments: { orderBy: { createdAt: 'asc' } },
+          installments: { orderBy: { createdAt: 'desc' } },
         },
       })
 
@@ -626,7 +626,7 @@ export class EquipmentInvoiceService {
     return prisma.equipment_invoice_installments.findMany({
       where: { invoiceId },
       include: { creator: { select: { id: true, name: true } } },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { createdAt: 'desc' },
     })
   }
 
@@ -696,7 +696,7 @@ export class EquipmentInvoiceService {
         include: {
           supplier: { select: { id: true, name: true } },
           creator: { select: { id: true, name: true } },
-          installments: { orderBy: { createdAt: 'asc' } },
+          installments: { orderBy: { createdAt: 'desc' } },
         },
       })
 

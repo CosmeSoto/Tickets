@@ -111,7 +111,7 @@ export async function notifyOrphanContract(
     })
     contractName = contract?.name ?? contractId
     familyId = contract?.licenseType?.familyId ?? null
-    link = '/inventory/licenses'
+    link = `/inventory/license/${contractId}`
   }
 
   await notifyFamilyAdmins(familyId, {

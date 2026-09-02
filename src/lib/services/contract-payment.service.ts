@@ -151,7 +151,7 @@ export class ContractPaymentService {
           creator: {
             select: { id: true, name: true, email: true },
           },
-          installments: { orderBy: { createdAt: 'asc' } },
+          installments: { orderBy: { createdAt: 'desc' } },
         },
         orderBy: { dueDate: 'asc' },
         skip: (page - 1) * pageSize,
@@ -193,7 +193,7 @@ export class ContractPaymentService {
           select: { id: true, name: true, email: true },
         },
         installments: {
-          orderBy: { createdAt: 'asc' },
+          orderBy: { createdAt: 'desc' },
           include: { creator: { select: { id: true, name: true } } },
         },
       },
@@ -359,7 +359,7 @@ export class ContractPaymentService {
           contract: {
             select: { name: true },
           },
-          installments: { orderBy: { createdAt: 'asc' } },
+          installments: { orderBy: { createdAt: 'desc' } },
         },
       })
 
@@ -392,7 +392,7 @@ export class ContractPaymentService {
     return prisma.contract_payment_installments.findMany({
       where: { paymentId },
       include: { creator: { select: { id: true, name: true } } },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { createdAt: 'desc' },
     })
   }
 
@@ -484,7 +484,7 @@ export class ContractPaymentService {
         },
         include: {
           contract: { select: { name: true } },
-          installments: { orderBy: { createdAt: 'asc' } },
+          installments: { orderBy: { createdAt: 'desc' } },
         },
       })
 

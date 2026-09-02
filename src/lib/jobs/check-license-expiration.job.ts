@@ -74,7 +74,7 @@ export class CheckLicenseExpirationJob {
                   ? '¡URGENTE! Licencia por Expirar'
                   : 'Licencia Próxima a Expirar',
               message: `La licencia "${license.name}" (${typeName}) expira en ${daysRemaining} ${daysRemaining === 1 ? 'día' : 'días'}. ${assignedTo}`,
-              metadata: { link: `/inventory/licenses` },
+              metadata: { link: `/inventory/license/${license.id}` },
             })
             notificationsSent++
           } catch (error) {
@@ -187,7 +187,7 @@ export class CheckLicenseExpirationJob {
       </ul>
 
       <p style="text-align: center;">
-        <a href="${process.env.NEXTAUTH_URL}/inventory/licenses/${license.id}" class="button">
+        <a href="${process.env.NEXTAUTH_URL}/inventory/license/${license.id}" class="button">
           Ver Detalles de la Licencia
         </a>
       </p>
