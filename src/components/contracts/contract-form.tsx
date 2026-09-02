@@ -1238,93 +1238,75 @@ export function ContractForm({
                 placeholder='30'
               />
             </div>
-            <div className='space-y-1'>
-              <Label>Último cargo (fecha)</Label>
-              <DateInput
-                value={watch('lastChargeDate')}
-                onChange={e =>
-                  setValue('lastChargeDate', e.target.value, {
-                    shouldValidate: true,
-                    shouldDirty: true,
-                  })
-                }
-                clearable
-              />
-            </div>
-            <div className='space-y-1'>
-              <Label>Último cargo (monto)</Label>
-              <Input
-                type='text'
-                inputMode='decimal'
-                autoComplete='off'
-                {...register('lastChargeAmount')}
-                placeholder='0.00'
-              />
-            </div>
-            <div className='sm:col-span-2 lg:col-span-3 space-y-1'>
-              <Label>Referencia última transacción</Label>
-              <Input {...register('lastTransactionRef')} placeholder='ID transacción bancaria' />
-            </div>
           </div>
         </ContractFormSection>
 
         {/* ── Estado del último cargo (solo lectura / corrección manual) ────
-            Se muestra solo en edición y cuando hay datos. Se actualiza
-            automáticamente al confirmar un pago desde /inventory/payments.
+            Solo en edición — nunca al crear (un contrato nuevo no puede
+            tener todavía un "último cargo": eso lo genera un pago real).
+            Se actualiza automáticamente al confirmar un pago desde
+            /inventory/payments; estos campos son solo para corregirlo a
+            mano si hace falta (ej. al migrar un contrato ya existente).
         ──────────────────────────────────────────────────────────────────── */}
-        {isEditing &&
-          (watch('lastChargeDate') || watch('lastChargeAmount') || watch('lastTransactionRef')) && (
-            <div className='rounded-md border border-dashed bg-muted/30 px-4 py-3 space-y-3'>
-              <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1'>
-                <p className='text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1.5'>
-                  <span className='inline-block h-1.5 w-1.5 rounded-full bg-green-500 shrink-0' />
-                  Último cargo registrado
-                </p>
-                <p className='text-[11px] text-muted-foreground leading-snug'>
-                  Se actualiza automáticamente al confirmar un pago en{' '}
-                  <a
-                    href='/inventory/payments'
-                    className='underline underline-offset-2 hover:text-foreground'
-                  >
-                    Inventario → Pagos
-                  </a>
-                  . Edita estos campos solo para correcciones manuales.
-                </p>
+        {isEditing && (
+          <div className='rounded-md border border-dashed bg-muted/30 px-4 py-3 space-y-3'>
+            <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1'>
+              <p className='text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1.5'>
+                <span
+                  className={`inline-block h-1.5 w-1.5 rounded-full shrink-0 ${
+                    watch('lastChargeDate') ||
+                    watch('lastChargeAmount') ||
+                    watch('lastTransactionRef')
+                      ? 'bg-green-500'
+                      : 'bg-muted-foreground/40'
+                  }`}
+                />
+                {watch('lastChargeDate') || watch('lastChargeAmount') || watch('lastTransactionRef')
+                  ? 'Último cargo registrado'
+                  : 'Sin cargos registrados todavía'}
+              </p>
+              <p className='text-[11px] text-muted-foreground leading-snug'>
+                Se actualiza automáticamente al confirmar un pago en{' '}
+                <a
+                  href='/inventory/payments'
+                  className='underline underline-offset-2 hover:text-foreground'
+                >
+                  Inventario → Pagos
+                </a>
+                . Edita estos campos solo para correcciones manuales.
+              </p>
+            </div>
+            <div className={formGrid}>
+              <div className='space-y-1'>
+                <Label className='text-xs'>Fecha del último cargo</Label>
+                <DateInput
+                  value={watch('lastChargeDate')}
+                  onChange={e =>
+                    setValue('lastChargeDate', e.target.value, {
+                      shouldValidate: true,
+                      shouldDirty: true,
+                    })
+                  }
+                  clearable
+                />
               </div>
-              <div className={formGrid}>
-                <div className='space-y-1'>
-                  <Label className='text-xs'>Fecha del último cargo</Label>
-                  <DateInput
-                    value={watch('lastChargeDate')}
-                    onChange={e =>
-                      setValue('lastChargeDate', e.target.value, {
-                        shouldValidate: true,
-                        shouldDirty: true,
-                      })
-                    }
-                    clearable
-                  />
-                </div>
-                <div className='space-y-1'>
-                  <Label className='text-xs'>Monto del último cargo</Label>
-                  <Input
-                    type='text'
-                    inputMode='decimal'
-                    autoComplete='off'
-                    {...register('lastChargeAmount')}
-                    placeholder='0.00'
-                  />
-                </div>
-                <div className='space-y-1'>
-                  <Label className='text-xs'>Referencia / ID de transacción</Label>
-                  <Input
-                    {...register('lastTransactionRef')}
-                    placeholder='ID transacción bancaria'
-                  />
-                </div>
+              <div className='space-y-1'>
+                <Label className='text-xs'>Monto del último cargo</Label>
+                <Input
+                  type='text'
+                  inputMode='decimal'
+                  autoComplete='off'
+                  {...register('lastChargeAmount')}
+                  placeholder='0.00'
+                />
+              </div>
+              <div className='space-y-1'>
+                <Label className='text-xs'>Referencia / ID de transacción</Label>
+                <Input {...register('lastTransactionRef')} placeholder='ID transacción bancaria' />
               </div>
             </div>
-          )}
+          </div>
+        )}
 
         {/* ── 6. Líneas del contrato ──────────────────────────────────────── */}
         <ContractFormSection
