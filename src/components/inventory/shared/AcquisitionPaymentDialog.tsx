@@ -48,6 +48,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { DateInput } from '@/components/ui/date-input'
+import { BankEntitySelect } from '@/components/inventory/shared/BankEntitySelect'
 import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 import { PAYMENT_METHOD_TYPE_LABELS, type PaymentMethodType } from '@/types/contracts'
 import {
@@ -84,6 +85,8 @@ export function AcquisitionPaymentDialog({
   const [paidDate, setPaidDate] = useState(todayISO())
   const [paidMethod, setPaidMethod] = useState('')
   const [referenceNumber, setReferenceNumber] = useState('')
+  const [bankEntity, setBankEntity] = useState('')
+  const [cardLast4, setCardLast4] = useState('')
   const [payAmount, setPayAmount] = useState('')
   const [undoing, setUndoing] = useState<InvoiceInstallment | null>(null)
 
@@ -97,6 +100,8 @@ export function AcquisitionPaymentDialog({
     setPaidDate(todayISO())
     setPaidMethod(invoice.paymentMethod ?? '')
     setReferenceNumber('')
+    setBankEntity('')
+    setCardLast4('')
     setPayAmount((invoice.amount - invoice.paidAmount).toFixed(2))
   }, [invoice?.id])
 
@@ -116,6 +121,8 @@ export function AcquisitionPaymentDialog({
           paidDate,
           paymentMethod: paidMethod || null,
           referenceNumber: referenceNumber.trim(),
+          bankEntity: bankEntity || null,
+          cardLast4: cardLast4 || null,
         }),
       })
       const json = await res.json().catch(() => ({}))
@@ -252,17 +259,36 @@ export function AcquisitionPaymentDialog({
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className='space-y-1'>
-                    <Label>
-                      N° Referencia <span className='text-destructive'>*</span>
-                    </Label>
-                    <Input
-                      placeholder='REF-12345'
-                      value={referenceNumber}
-                      onChange={e => setReferenceNumber(e.target.value)}
-                      maxLength={200}
-                    />
+                  <div className='grid grid-cols-2 gap-3'>
+                    <div className='space-y-1'>
+                      <Label>
+                        N° Referencia <span className='text-destructive'>*</span>
+                      </Label>
+                      <Input
+                        placeholder='REF-12345'
+                        value={referenceNumber}
+                        onChange={e => setReferenceNumber(e.target.value)}
+                        maxLength={200}
+                      />
+                    </div>
+                    <div className='space-y-1'>
+                      <Label>Banco / Entidad</Label>
+                      <BankEntitySelect value={bankEntity} onChange={setBankEntity} />
+                    </div>
                   </div>
+
+                  {paidMethod === 'CORPORATE_CARD' && (
+                    <div className='space-y-1'>
+                      <Label>Últimos 4 dígitos tarjeta</Label>
+                      <Input
+                        placeholder='1234'
+                        value={cardLast4}
+                        onChange={e => setCardLast4(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                        maxLength={4}
+                        className='w-24'
+                      />
+                    </div>
+                  )}
                 </>
               )}
             </div>

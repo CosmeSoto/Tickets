@@ -80,6 +80,10 @@ export async function POST(
         paidDate: new Date(body.paidDate),
         paymentMethod: body.paymentMethod || null,
         referenceNumber: body.referenceNumber || null,
+        bankEntity: body.bankEntity || null,
+        cardLast4: body.cardLast4 || null,
+        cardBrand: body.cardBrand || null,
+        transactionId: body.transactionId || null,
         notes: body.notes || null,
       },
       session.user.id

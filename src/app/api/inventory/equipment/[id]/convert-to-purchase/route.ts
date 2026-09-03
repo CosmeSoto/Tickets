@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import { canManageInventory, canManageAsset } from '@/lib/inventory-access'
+import { isValidInvoiceNumber, INVOICE_NUMBER_ERROR } from '@/lib/inventory/invoice-number'
 
 /**
  * POST /api/inventory/equipment/[id]/convert-to-purchase
@@ -98,6 +99,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       residualValue?: number
       depreciationMethod?: string
       notes?: string
+    }
+
+    if (!isValidInvoiceNumber(invoiceNumber)) {
+      return NextResponse.json({ error: INVOICE_NUMBER_ERROR }, { status: 400 })
     }
 
     // Precio de compra es obligatorio para la conversión

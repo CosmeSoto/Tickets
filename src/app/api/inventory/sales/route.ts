@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
+import { isValidInvoiceNumber, INVOICE_NUMBER_ERROR } from '@/lib/inventory/invoice-number'
 import {
   getInventorySessionContext,
   hasInventoryModuleAccess,
@@ -101,6 +102,10 @@ export async function POST(req: NextRequest) {
 
   if (!equipmentId || !buyerName || !salePrice || !saleDate) {
     return NextResponse.json({ error: 'Faltan campos obligatorios' }, { status: 400 })
+  }
+
+  if (!isValidInvoiceNumber(invoiceNumber)) {
+    return NextResponse.json({ error: INVOICE_NUMBER_ERROR }, { status: 400 })
   }
 
   const equipment = await prisma.equipment.findUnique({

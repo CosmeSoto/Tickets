@@ -43,6 +43,7 @@ import { DateInput } from '@/components/ui/date-input'
 import { SupplierSelect } from '@/components/inventory/suppliers/SupplierSelect'
 import { BankEntitySelect } from '@/components/inventory/shared/BankEntitySelect'
 import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
+import { sanitizeInvoiceNumberInput } from '@/lib/inventory/invoice-number'
 import { PAYMENT_METHOD_TYPE_LABELS, type PaymentMethodType } from '@/types/contracts'
 import {
   ACQUISITION_INVOICE_API,
@@ -565,9 +566,11 @@ export function AcquisitionInvoiceFormDialog({
                     <Label htmlFor='inv-number'>N° Factura</Label>
                     <Input
                       id='inv-number'
-                      placeholder='FAC-001'
+                      placeholder='001-001-000000123'
                       value={form.invoiceNumber}
-                      onChange={e => setField('invoiceNumber', e.target.value)}
+                      onChange={e =>
+                        setField('invoiceNumber', sanitizeInvoiceNumberInput(e.target.value))
+                      }
                       maxLength={100}
                     />
                   </div>
@@ -575,9 +578,11 @@ export function AcquisitionInvoiceFormDialog({
                     <Label htmlFor='inv-po'>N° Orden de Compra</Label>
                     <Input
                       id='inv-po'
-                      placeholder='OC-001'
+                      placeholder='001-001-000000123'
                       value={form.purchaseOrderNumber}
-                      onChange={e => setField('purchaseOrderNumber', e.target.value)}
+                      onChange={e =>
+                        setField('purchaseOrderNumber', sanitizeInvoiceNumberInput(e.target.value))
+                      }
                       maxLength={100}
                     />
                   </div>

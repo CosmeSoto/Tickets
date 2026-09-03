@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { MovementType } from '@prisma/client'
+import { INVOICE_NUMBER_PATTERN, INVOICE_NUMBER_ERROR } from '@/lib/inventory/invoice-number'
 
 export const movementTypeSchema = z.nativeEnum(MovementType, {
   errorMap: () => ({ message: 'Tipo de movimiento inválido' }),
@@ -58,8 +59,16 @@ export const createStockMovementSchema = z
     // Datos de compra — opcionales, solo tienen efecto en type=ENTRY.
     amount: z.number().min(0, 'El monto debe ser mayor o igual a 0').optional(),
     currency: z.string().max(3).optional(),
-    invoiceNumber: z.string().max(100).optional(),
-    purchaseOrderNumber: z.string().max(100).optional(),
+    invoiceNumber: z
+      .string()
+      .max(100)
+      .regex(INVOICE_NUMBER_PATTERN, INVOICE_NUMBER_ERROR)
+      .optional(),
+    purchaseOrderNumber: z
+      .string()
+      .max(100)
+      .regex(INVOICE_NUMBER_PATTERN, INVOICE_NUMBER_ERROR)
+      .optional(),
     supplierId: z.string().optional(),
     paymentMethod: z.string().optional(),
     bankEntity: z.string().max(100).optional(),

@@ -21,6 +21,7 @@ import { LicenseService } from '@/lib/services/license.service'
 import type { CreateLicenseData } from '@/types/inventory/license'
 import { InventoryDepartmentService } from '@/lib/services/inventory-department.service'
 import { AssignmentService } from '@/lib/services/assignment.service'
+import { isValidInvoiceNumber, INVOICE_NUMBER_ERROR } from '@/lib/inventory/invoice-number'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type CreateAssetBody = Record<string, any>
@@ -72,6 +73,9 @@ export async function createAsset(
 
   if (!familyId) return { error: 'Falta el área (familyId) del activo', status: 400 }
   if (!subtype) return { error: 'Falta el tipo de activo (subtype)', status: 400 }
+  if (!isValidInvoiceNumber(invoiceNumber) || !isValidInvoiceNumber(purchaseOrderNumber)) {
+    return { error: INVOICE_NUMBER_ERROR, status: 400 }
+  }
 
   const config = await getFamilyConfig(familyId)
   const subtypeValidation = validateSubtypeForFamily(subtype, config)

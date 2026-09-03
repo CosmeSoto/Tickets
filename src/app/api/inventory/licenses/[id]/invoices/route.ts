@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { LicenseInvoiceService } from '@/lib/services/license-invoice.service'
+import { isValidInvoiceNumber, INVOICE_NUMBER_ERROR } from '@/lib/inventory/invoice-number'
 import {
   assertInventoryResourceRead,
   assertInventoryResourceManage,
@@ -68,6 +69,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       notes,
       installments,
     } = body
+
+    if (!isValidInvoiceNumber(invoiceNumber) || !isValidInvoiceNumber(purchaseOrderNumber)) {
+      return NextResponse.json({ error: INVOICE_NUMBER_ERROR }, { status: 400 })
+    }
 
     // Plan de cuotas: si el body trae `installments` (≥ 2 filas), se crean N
     // facturas "hermanas" en vez de una sola — ver createSchedule.

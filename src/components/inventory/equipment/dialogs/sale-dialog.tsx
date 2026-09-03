@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/dialog'
 import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 import { getEquipmentDisplayName } from '@/lib/utils/equipment-display'
+import { sanitizeInvoiceNumberInput } from '@/lib/inventory/invoice-number'
 
 interface SaleDialogProps {
   open: boolean
@@ -237,8 +238,8 @@ export function SaleDialog({
                 <Label>N° de Factura</Label>
                 <Input
                   value={invoiceNumber}
-                  onChange={e => setInvoiceNumber(e.target.value)}
-                  placeholder='FAC-2026-001'
+                  onChange={e => setInvoiceNumber(sanitizeInvoiceNumberInput(e.target.value))}
+                  placeholder='001-001-000000123'
                 />
               </div>
               <div className='space-y-1'>

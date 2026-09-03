@@ -22,6 +22,7 @@ import {
   mapLicenseScope,
 } from '@/lib/inventory/license-contract'
 import { withAttributeLabels } from '@/lib/inventory/attribute-labels'
+import { isValidInvoiceNumber, INVOICE_NUMBER_ERROR } from '@/lib/inventory/invoice-number'
 
 /**
  * GET /api/inventory/licenses/[id]
@@ -123,6 +124,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       customValues,
       ...rest
     } = body
+
+    // invoiceNumber/purchaseOrderNumber quedan fuera de `rest` (van directo al
+    // updatePayload más abajo), así que updateLicenseSchema.parse nunca los ve.
+    if (!isValidInvoiceNumber(invoiceNumber) || !isValidInvoiceNumber(purchaseOrderNumber)) {
+      return NextResponse.json({ error: INVOICE_NUMBER_ERROR }, { status: 400 })
+    }
 
     // Validar renewalCost
     if (renewalCost !== undefined && renewalCost !== null && renewalCost < 0) {

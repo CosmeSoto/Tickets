@@ -19,6 +19,7 @@ import { invalidateCache } from '@/lib/api-cache'
 import { createAuditLog } from '@/lib/audit'
 import { z } from 'zod'
 import { EquipmentCondition } from '@prisma/client'
+import { INVOICE_NUMBER_PATTERN, INVOICE_NUMBER_ERROR } from '@/lib/inventory/invoice-number'
 
 const equipmentConditionSchema = z.nativeEnum(EquipmentCondition)
 
@@ -61,8 +62,16 @@ const createBatchSchema = z
         return isNaN(d.getTime()) ? undefined : d
       }),
     purchasePrice: z.number().positive().optional().or(z.literal(0)),
-    invoiceNumber: z.string().max(100).optional(),
-    purchaseOrderNumber: z.string().max(100).optional(),
+    invoiceNumber: z
+      .string()
+      .max(100)
+      .regex(INVOICE_NUMBER_PATTERN, INVOICE_NUMBER_ERROR)
+      .optional(),
+    purchaseOrderNumber: z
+      .string()
+      .max(100)
+      .regex(INVOICE_NUMBER_PATTERN, INVOICE_NUMBER_ERROR)
+      .optional(),
     contractId: z.string().uuid().optional().or(z.literal('')),
 
     // Depreciación (solo FIXED_ASSET)

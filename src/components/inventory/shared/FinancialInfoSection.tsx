@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { SupplierSelect } from '@/components/inventory/suppliers/SupplierSelect'
 import { DateInput } from '@/components/ui/date-input'
+import { sanitizeInvoiceNumberInput } from '@/lib/inventory/invoice-number'
 
 type FinancialField =
   | 'supplier'
@@ -181,8 +182,10 @@ export function FinancialInfoSection({
             <Input
               id='invoiceNumber'
               value={invoiceNumber ?? ''}
-              onChange={e => onChange?.('invoiceNumber', e.target.value || null)}
-              placeholder='FAC-001'
+              onChange={e =>
+                onChange?.('invoiceNumber', sanitizeInvoiceNumberInput(e.target.value) || null)
+              }
+              placeholder='001-001-000000123'
               maxLength={100}
             />
           )}
@@ -201,8 +204,13 @@ export function FinancialInfoSection({
             <Input
               id='purchaseOrderNumber'
               value={purchaseOrderNumber ?? ''}
-              onChange={e => onChange?.('purchaseOrderNumber', e.target.value || null)}
-              placeholder='OC-001'
+              onChange={e =>
+                onChange?.(
+                  'purchaseOrderNumber',
+                  sanitizeInvoiceNumberInput(e.target.value) || null
+                )
+              }
+              placeholder='001-001-000000123'
               maxLength={100}
             />
           )}

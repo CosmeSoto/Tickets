@@ -14,6 +14,7 @@ import {
   getLinkedBusinessContractId,
 } from '@/lib/inventory/equipment-contract'
 import { getEquipmentDisplayName } from '@/lib/utils/equipment-display'
+import { isValidInvoiceNumber, INVOICE_NUMBER_ERROR } from '@/lib/inventory/invoice-number'
 import { hasAccessToEquipment } from '@/lib/middleware/family-filter'
 import { randomUUID } from 'crypto'
 import {
@@ -230,6 +231,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       rentalDeliveryDate?: string | null
       rentalBuyoutValue?: number | null
       rentalClientResponse?: string | null
+    }
+
+    // Validación: N° Factura / N° Orden de Compra solo dígitos y guion
+    if (!isValidInvoiceNumber(invoiceNumber) || !isValidInvoiceNumber(purchaseOrderNumber)) {
+      return NextResponse.json({ error: INVOICE_NUMBER_ERROR }, { status: 400 })
     }
 
     // Validación: usefulLifeYears > 0

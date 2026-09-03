@@ -30,6 +30,7 @@ import { BankEntitySelect } from '@/components/inventory/shared/BankEntitySelect
 import { useFetch } from '@/hooks/common/use-fetch'
 import { Loader2 } from 'lucide-react'
 import { PAYMENT_METHOD_TYPE_LABELS, type PaymentMethodType } from '@/types/contracts'
+import { sanitizeInvoiceNumberInput } from '@/lib/inventory/invoice-number'
 
 type MovementKind = 'ENTRY' | 'EXIT' | 'ADJUSTMENT'
 
@@ -386,8 +387,8 @@ export function StockMovementDialog({
                     <Input
                       id='mov-invoice'
                       value={invoiceNumber}
-                      onChange={e => setInvoiceNumber(e.target.value)}
-                      placeholder='FAC-001'
+                      onChange={e => setInvoiceNumber(sanitizeInvoiceNumberInput(e.target.value))}
+                      placeholder='001-001-000000123'
                       maxLength={100}
                     />
                   </div>
@@ -396,8 +397,10 @@ export function StockMovementDialog({
                     <Input
                       id='mov-po'
                       value={purchaseOrderNumber}
-                      onChange={e => setPurchaseOrderNumber(e.target.value)}
-                      placeholder='OC-001'
+                      onChange={e =>
+                        setPurchaseOrderNumber(sanitizeInvoiceNumberInput(e.target.value))
+                      }
+                      placeholder='001-001-000000123'
                       maxLength={100}
                     />
                   </div>

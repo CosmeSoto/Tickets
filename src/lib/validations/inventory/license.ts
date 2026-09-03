@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { INVOICE_NUMBER_PATTERN, INVOICE_NUMBER_ERROR } from '@/lib/inventory/invoice-number'
 
 /** '' → undefined (campos texto/fecha/dinero opcionales) */
 const emptyToUndef = (v: unknown) => (v === '' || v === null ? undefined : v)
@@ -28,8 +29,14 @@ export const createLicenseSchema = z.object({
   cost: optionalMoney,
   vendor: optionalString,
   supplierId: optionalNullableId,
-  invoiceNumber: z.preprocess(emptyToUndef, z.string().max(100).optional()),
-  purchaseOrderNumber: z.preprocess(emptyToUndef, z.string().max(100).optional()),
+  invoiceNumber: z.preprocess(
+    emptyToUndef,
+    z.string().max(100).regex(INVOICE_NUMBER_PATTERN, INVOICE_NUMBER_ERROR).optional()
+  ),
+  purchaseOrderNumber: z.preprocess(
+    emptyToUndef,
+    z.string().max(100).regex(INVOICE_NUMBER_PATTERN, INVOICE_NUMBER_ERROR).optional()
+  ),
   renewalCost: optionalMoney,
   renewalDate: optionalDate,
   contractId: optionalNullableId,

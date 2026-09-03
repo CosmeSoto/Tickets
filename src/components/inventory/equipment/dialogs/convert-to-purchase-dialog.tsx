@@ -26,6 +26,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 import { getEquipmentDisplayName } from '@/lib/utils/equipment-display'
+import { sanitizeInvoiceNumberInput } from '@/lib/inventory/invoice-number'
 
 const DEPRECIATION_OPTIONS = [
   { value: 'LINEAR', label: 'Línea Recta — mismo monto cada año' },
@@ -222,8 +223,8 @@ export function ConvertToPurchaseDialog({
             <Input
               id='invoiceNumber'
               value={invoiceNumber}
-              onChange={e => setInvoiceNumber(e.target.value)}
-              placeholder='Ej: FAC-2026-0123'
+              onChange={e => setInvoiceNumber(sanitizeInvoiceNumberInput(e.target.value))}
+              placeholder='Ej: 001-001-000000123'
             />
           </div>
 

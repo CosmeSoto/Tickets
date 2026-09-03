@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { EquipmentInvoiceService } from '@/lib/services/equipment-invoice.service'
+import { isValidInvoiceNumber, INVOICE_NUMBER_ERROR } from '@/lib/inventory/invoice-number'
 import {
   assertInventoryResourceRead,
   assertInventoryResourceManage,
@@ -120,6 +121,10 @@ export async function PATCH(
       transactionId,
       notes,
     } = body
+
+    if (!isValidInvoiceNumber(invoiceNumber) || !isValidInvoiceNumber(purchaseOrderNumber)) {
+      return NextResponse.json({ error: INVOICE_NUMBER_ERROR }, { status: 400 })
+    }
 
     const invoice = await EquipmentInvoiceService.update(
       invoiceId,
