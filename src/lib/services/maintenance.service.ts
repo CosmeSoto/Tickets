@@ -1052,12 +1052,13 @@ export class MaintenanceService {
    * Obtiene un registro de mantenimiento por ID
    */
   static async getById(id: string) {
-    return prisma.maintenance_records.findUnique({
+    const record = await prisma.maintenance_records.findUnique({
       where: { id },
       include: {
         equipment: {
           include: {
             type: true,
+            model: { select: { brand: true, model: true } },
             assignments: {
               where: { isActive: true },
               include: { receiver: { select: { id: true, name: true, email: true } } },
@@ -1081,5 +1082,20 @@ export class MaintenanceService {
         ticket: { select: { id: true, title: true, status: true } },
       },
     })
+
+    if (!record?.equipment) return record
+
+    // `equipment.model` es la relación equipment_models (objeto
+    // {brand, model}), no un string — todo lo que consume este registro
+    // (detalle del mantenimiento, textos de notificación) siempre esperó
+    // un string ahí. Se aplana acá, mismo criterio que /api/inventory/equipment.
+    return {
+      ...record,
+      equipment: {
+        ...record.equipment,
+        brand: record.equipment.model?.brand?.name ?? record.equipment.brand ?? '',
+        model: record.equipment.model?.model ?? record.equipment.modelDeprecated ?? '',
+      },
+    }
   }
 }

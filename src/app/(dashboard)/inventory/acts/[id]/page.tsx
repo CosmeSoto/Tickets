@@ -20,6 +20,7 @@ import {
   Eye,
   ChevronLeft,
   Trash2,
+  History,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -91,6 +92,9 @@ export default function ActDetailPage({ params: paramsPromise }: PageProps) {
   const [canAccept, setCanAccept] = useState(false)
   const [isExpired, setIsExpired] = useState(false)
   const [accessLevel, setAccessLevel] = useState<string>('participant')
+  const [postActAccessoryChanges, setPostActAccessoryChanges] = useState<
+    Array<{ at: string; byName: string | null; before: string[]; after: string[] }>
+  >([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [showPdfPreview, setShowPdfPreview] = useState(false)
@@ -115,6 +119,7 @@ export default function ActDetailPage({ params: paramsPromise }: PageProps) {
       setCanAccept(data.canAccept)
       setIsExpired(data.isExpired)
       setAccessLevel(data.accessLevel ?? 'participant')
+      setPostActAccessoryChanges(data.postActAccessoryChanges ?? [])
     } catch {
       /* silencioso */
     } finally {
@@ -445,6 +450,43 @@ export default function ActDetailPage({ params: paramsPromise }: PageProps) {
           snapshot={act.equipmentSnapshot ?? {}}
           accessories={act.accessories}
         />
+
+        {/* Cambios de accesorios DESPUÉS de esta acta — el acta queda congelada
+            al crearse (es un comprobante de entrega, no debe mutar), así que si
+            después se le agrega o quita un accesorio al equipo eso no se ve
+            reflejado arriba. Esto lo hace visible sin tocar el acta original. */}
+        {postActAccessoryChanges.length > 0 && (
+          <Card className='border-amber-200 dark:border-amber-500/40'>
+            <CardHeader className='pb-3'>
+              <CardTitle className='flex items-center gap-2 text-base'>
+                <History className='h-4 w-4 text-amber-600 dark:text-amber-400' />
+                Accesorios del equipo cambiados después de esta acta
+              </CardTitle>
+              <CardDescription>
+                No forman parte de lo que este documento certifica que se entregó — el equipo cambió
+                después de firmarse.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className='space-y-3'>
+              {postActAccessoryChanges.map((c, idx) => (
+                <div key={idx} className='text-sm border-t first:border-t-0 pt-3 first:pt-0'>
+                  <p className='text-xs text-muted-foreground'>
+                    {fmtDateTime(c.at)}
+                    {c.byName && <> · {c.byName}</>}
+                  </p>
+                  <p className='mt-0.5'>
+                    <span className='text-muted-foreground'>Antes: </span>
+                    {c.before?.length ? c.before.join(', ') : 'Ninguno'}
+                  </p>
+                  <p>
+                    <span className='text-muted-foreground'>Después: </span>
+                    {c.after?.length ? c.after.join(', ') : 'Ninguno'}
+                  </p>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Entregador y Receptor */}
         <div className='grid gap-4 md:grid-cols-2'>

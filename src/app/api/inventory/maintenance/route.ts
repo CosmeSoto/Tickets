@@ -122,8 +122,25 @@ export async function GET(request: NextRequest) {
       prisma.maintenance_records.count({ where }),
     ])
 
+    // `equipment.model` viene de la relación equipment_models (select
+    // {brand, model}), no de un string — el frontend siempre esperó un
+    // string ahí (comportamiento previo a esa migración) y lo renderiza tal
+    // cual, así que un objeto ahí tira "Objects are not valid as a React
+    // child" y se cae toda la página. Se aplana acá, mismo criterio que usa
+    // /api/inventory/equipment.
+    const mapped = records.map(r => ({
+      ...r,
+      equipment: r.equipment
+        ? {
+            ...r.equipment,
+            brand: r.equipment.model?.brand?.name ?? r.equipment.brand ?? '',
+            model: r.equipment.model?.model ?? r.equipment.modelDeprecated ?? '',
+          }
+        : null,
+    }))
+
     return NextResponse.json({
-      records,
+      records: mapped,
       pagination: {
         page,
         limit,
@@ -279,13 +296,12 @@ export async function POST(request: NextRequest) {
         const formattedDate = formatLocalDateTime(when)
         const equipmentLabel = `${equipment.code} (${equipmentDisplayLabel(equipment)})`
         const supplierName = (maintenance as { supplier?: { name?: string } | null }).supplier?.name
-        const contract = (maintenance as { contract?: { name?: string; contractNumber?: string | null } | null })
-          .contract
+        const contract = (
+          maintenance as { contract?: { name?: string; contractNumber?: string | null } | null }
+        ).contract
         const performerLine = supplierName
           ? `Lo realizará el proveedor <strong>${supplierName}</strong>${
-              contract
-                ? ` (contrato ${contract.contractNumber || contract.name})`
-                : ''
+              contract ? ` (contrato ${contract.contractNumber || contract.name})` : ''
             }.`
           : 'Lo realizará el equipo técnico interno.'
 
@@ -294,9 +310,7 @@ export async function POST(request: NextRequest) {
           'INFO',
           `Mantenimiento programado — ${equipment.code}`,
           `El equipo ${equipmentLabel} entrará en mantenimiento ${maintenanceTypeLabel} el ${formattedDate}. ${
-            supplierName
-              ? `Proveedor: ${supplierName}. `
-              : ''
+            supplierName ? `Proveedor: ${supplierName}. ` : ''
           }Motivo: ${description}`,
           {
             metadata: {
@@ -329,9 +343,7 @@ export async function POST(request: NextRequest) {
                     <tr>
                       <td style="padding: 8px 12px; font-weight: bold; border: 1px solid #e5e7eb;">Responsable</td>
                       <td style="padding: 8px 12px; border: 1px solid #e5e7eb;">${
-                        supplierName
-                          ? `Proveedor: ${supplierName}`
-                          : 'Técnico interno'
+                        supplierName ? `Proveedor: ${supplierName}` : 'Técnico interno'
                       }</td>
                     </tr>
                     <tr style="background: #f9fafb;">

@@ -11,42 +11,65 @@ import { getAppTimezone } from '@/lib/utils/date-utils'
 import { PAYMENT_METHOD_TYPE_LABELS, type PaymentMethodType } from '@/types/contracts'
 import { CONTRACT_TYPE_LABELS } from '@/lib/inventory/license-labels'
 
+async function readRawImageBuffer(url: string): Promise<Buffer | null> {
+  if (url.startsWith('/')) {
+    // Rutas /api/uploads/... → leer desde filesystem directamente
+    if (url.startsWith('/api/uploads/')) {
+      const relativePath = url.replace('/api/uploads/', '')
+      const localPath = getUploadDir(relativePath)
+      if (fs.existsSync(localPath)) return fs.readFileSync(localPath)
+      // Fallback: intentar también con public/uploads (desarrollo local)
+      const fallbackPath = path.join(process.cwd(), 'public', 'uploads', relativePath)
+      if (fs.existsSync(fallbackPath)) return fs.readFileSync(fallbackPath)
+      console.warn(`[PDF] Imagen no encontrada en filesystem: ${localPath}`)
+      return null
+    }
+    // Rutas /uploads/... (legacy)
+    const localPath = path.join(process.cwd(), 'public', url)
+    if (fs.existsSync(localPath)) return fs.readFileSync(localPath)
+    return null
+  }
+  return await new Promise((resolve, reject) => {
+    const client = url.startsWith('https') ? https : http
+    client
+      .get(url, res => {
+        if (res.statusCode && res.statusCode >= 400) {
+          console.warn(`[PDF] Error HTTP ${res.statusCode} al obtener imagen: ${url}`)
+          resolve(null)
+          return
+        }
+        const chunks: Buffer[] = []
+        res.on('data', c => chunks.push(c))
+        res.on('end', () => resolve(Buffer.concat(chunks)))
+        res.on('error', reject)
+      })
+      .on('error', reject)
+  })
+}
+
+/**
+ * Lee la imagen del equipo y la normaliza para PDFKit, que solo sabe leer
+ * PNG y JPEG baseline — no WebP, no JPEG progresivo, no GIF. El archivo en
+ * disco puede ser cualquiera de esos (el adjunto se guarda con la extensión
+ * y el mimeType que reportó el navegador, que no siempre coincide con el
+ * contenido real: un adjunto ".jpg" puede ser WebP por dentro). Sin esto,
+ * `doc.image()` tira una excepción que el llamador atrapa en silencio y el
+ * acta queda sin foto, sin ningún aviso de por qué.
+ */
 async function fetchImageBuffer(url: string): Promise<Buffer | null> {
   if (!url) return null
   try {
-    if (url.startsWith('/')) {
-      // Rutas /api/uploads/... → leer desde filesystem directamente
-      if (url.startsWith('/api/uploads/')) {
-        const relativePath = url.replace('/api/uploads/', '')
-        const localPath = getUploadDir(relativePath)
-        if (fs.existsSync(localPath)) return fs.readFileSync(localPath)
-        // Fallback: intentar también con public/uploads (desarrollo local)
-        const fallbackPath = path.join(process.cwd(), 'public', 'uploads', relativePath)
-        if (fs.existsSync(fallbackPath)) return fs.readFileSync(fallbackPath)
-        console.warn(`[PDF] Imagen no encontrada en filesystem: ${localPath}`)
-        return null
-      }
-      // Rutas /uploads/... (legacy)
-      const localPath = path.join(process.cwd(), 'public', url)
-      if (fs.existsSync(localPath)) return fs.readFileSync(localPath)
+    const raw = await readRawImageBuffer(url)
+    if (!raw) return null
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
+      const sharp = require('sharp') as typeof import('sharp')
+      // .rotate() sin argumentos re-orienta según el EXIF de la foto original.
+      return await sharp(raw).rotate().jpeg({ quality: 85 }).toBuffer()
+    } catch (err) {
+      console.warn(`[PDF] No se pudo normalizar la imagen (${url}):`, err)
       return null
     }
-    return await new Promise((resolve, reject) => {
-      const client = url.startsWith('https') ? https : http
-      client
-        .get(url, res => {
-          if (res.statusCode && res.statusCode >= 400) {
-            console.warn(`[PDF] Error HTTP ${res.statusCode} al obtener imagen: ${url}`)
-            resolve(null)
-            return
-          }
-          const chunks: Buffer[] = []
-          res.on('data', c => chunks.push(c))
-          res.on('end', () => resolve(Buffer.concat(chunks)))
-          res.on('error', reject)
-        })
-        .on('error', reject)
-    })
   } catch (err) {
     console.warn(`[PDF] No se pudo cargar imagen (${url}):`, err)
     return null
@@ -682,47 +705,12 @@ export async function generateDeliveryActPDF(
   y += 6
   y = separator(y)
 
-  // ── INFORMACIÓN FINANCIERA (condicional) ─────────────────────────────────
-  const hasFinancial = !!(
-    snap.supplierName ||
-    snap.purchasePrice ||
-    snap.purchaseDate ||
-    snap.invoiceNumber ||
-    snap.purchaseOrderNumber
-  )
-
-  if (hasFinancial) {
-    y = sectionTitle('Información Financiera', y)
-    if (snap.supplierName) {
-      y = fieldRow(
-        'Proveedor',
-        snap.supplierName + (snap.supplierTaxId ? ` (${snap.supplierTaxId})` : ''),
-        y
-      )
-    }
-    if (snap.purchasePrice != null) {
-      y = fieldRow(
-        'Costo de Adquisición',
-        `$${Number(snap.purchasePrice).toLocaleString('es-EC', { minimumFractionDigits: 2 })}`,
-        y
-      )
-    }
-    if (snap.purchaseDate) {
-      y = fieldRow(
-        'Fecha de Compra',
-        new Date(snap.purchaseDate).toLocaleDateString('es-EC', {
-          day: '2-digit',
-          month: 'long',
-          year: 'numeric',
-          timeZone: getAppTimezone(),
-        }),
-        y
-      )
-    }
-    if (snap.invoiceNumber) y = fieldRow('N° Factura', snap.invoiceNumber, y)
-    if (snap.purchaseOrderNumber) y = fieldRow('N° Orden de Compra', snap.purchaseOrderNumber, y)
-    y = separator(y)
-  }
+  // Sin sección "Información Financiera": el acta es un comprobante de
+  // entrega (qué equipo, en qué estado, quién lo entregó/recibió), no un
+  // documento de compra — proveedor/costo/factura/OC son datos internos de
+  // procuración que ya viven en Facturas/Pagos del activo, con su propio
+  // control de acceso. Mostrárselos a quien solo está recibiendo un equipo
+  // no aporta nada y expone información comercial que no le corresponde ver.
 
   // ── OBSERVACIONES ───────────────────────────────────────────────────────
   if (act.observations) {

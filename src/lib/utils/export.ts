@@ -36,6 +36,16 @@ export interface ExportOptions<T = any> {
   title?: string
   /** Subtítulo / descripción para el PDF (opcional) */
   subtitle?: string
+  /**
+   * Fila de totales opcional, calculada a partir de las filas ya filtradas
+   * (las mismas que se exportan). Un valor por columna, en el mismo orden
+   * que `columns` — `undefined`/`null` deja esa celda vacía. Se identifica
+   * por posición y no por `key` porque dos columnas pueden compartir la
+   * misma clave con distinto `format` (ej. "Monto" y "Saldo" ambas leen
+   * `amount`), así que una clave no alcanza para saber a cuál corresponde
+   * cada total.
+   */
+  totals?: (rows: T[]) => Array<string | number | null | undefined>
 }
 
 // ─── Helpers internos ─────────────────────────────────────────────────────────
@@ -92,15 +102,21 @@ function escapeCSV(value: string): string {
  * Incluye BOM UTF-8 para compatibilidad con Excel en Windows.
  */
 export function exportToCSV<T>(options: ExportOptions<T>): void {
-  const { filename, columns, rows } = options
+  const { filename, columns, rows, totals } = options
 
   const header = columns.map(c => escapeCSV(getColumnLabel(c))).join(',')
   const body = rows
     .map(row => columns.map(col => escapeCSV(getCellText(row, col))).join(','))
     .join('\n')
+  const totalsLine = totals
+    ? '\n' +
+      totals(rows)
+        .map(v => escapeCSV(v == null ? '' : String(v)))
+        .join(',')
+    : ''
 
   const bom = '\uFEFF'
-  const content = bom + header + '\n' + body
+  const content = bom + header + '\n' + body + totalsLine
 
   const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' })
   triggerDownload(blob, `${sanitizeFilename(filename)}.csv`)
@@ -112,10 +128,18 @@ export function exportToCSV<T>(options: ExportOptions<T>): void {
  * Exporta datos a Excel (.xlsx) usando la librería `xlsx` ya instalada.
  * Incluye encabezados en negrita y anchos de columna automáticos.
  */
-function buildExcelSheet(XLSX: typeof import('xlsx'), columns: ExportColumn[], rows: unknown[]) {
+function buildExcelSheet(
+  XLSX: typeof import('xlsx'),
+  columns: ExportColumn[],
+  rows: unknown[],
+  totalsRow?: Array<string | number | null | undefined>
+) {
   const headerRow = columns.map(c => getColumnLabel(c))
   const dataRows = rows.map(row => columns.map(col => getCellText(row, col)))
-  const wsData = [headerRow, ...dataRows]
+  const totalsAsStrings = totalsRow?.map(v => (v == null ? '' : String(v)))
+  const wsData = totalsAsStrings
+    ? [headerRow, ...dataRows, totalsAsStrings]
+    : [headerRow, ...dataRows]
   const ws = XLSX.utils.aoa_to_sheet(wsData)
 
   ws['!cols'] = columns.map((col, i) => {
@@ -125,19 +149,25 @@ function buildExcelSheet(XLSX: typeof import('xlsx'), columns: ExportColumn[], r
 
   const range = XLSX.utils.decode_range(ws['!ref'] ?? 'A1')
   for (let c = range.s.c; c <= range.e.c; c++) {
-    const cellAddr = XLSX.utils.encode_cell({ r: 0, c })
-    if (ws[cellAddr]) {
-      ws[cellAddr].s = { font: { bold: true } }
+    const headerAddr = XLSX.utils.encode_cell({ r: 0, c })
+    if (ws[headerAddr]) {
+      ws[headerAddr].s = { font: { bold: true } }
+    }
+    if (totalsAsStrings) {
+      const totalsAddr = XLSX.utils.encode_cell({ r: wsData.length - 1, c })
+      if (ws[totalsAddr]) {
+        ws[totalsAddr].s = { font: { bold: true }, border: { top: { style: 'thin' } } }
+      }
     }
   }
   return ws
 }
 
 export async function exportToExcel<T>(options: ExportOptions<T>): Promise<void> {
-  const { filename, columns, rows, title } = options
+  const { filename, columns, rows, title, totals } = options
   const XLSX = await import('xlsx')
   const wb = XLSX.utils.book_new()
-  const ws = buildExcelSheet(XLSX, columns, rows)
+  const ws = buildExcelSheet(XLSX, columns, rows, totals?.(rows))
   XLSX.utils.book_append_sheet(wb, ws, title?.slice(0, 31) ?? 'Datos')
   XLSX.writeFile(wb, `${sanitizeFilename(filename)}.xlsx`)
 }
@@ -166,7 +196,7 @@ export async function exportToExcelMulti(options: {
  * No requiere librerías externas. Produce PDFs limpios y profesionales.
  */
 export function exportToPDF<T>(options: ExportOptions<T>): void {
-  const { filename, columns, rows, title, subtitle } = options
+  const { filename, columns, rows, title, subtitle, totals } = options
 
   const date = new Date().toLocaleDateString('es-ES', {
     year: 'numeric',
@@ -180,6 +210,11 @@ export function exportToPDF<T>(options: ExportOptions<T>): void {
         `<tr>${columns.map(col => `<td>${escapeHTML(getCellText(row, col))}</td>`).join('')}</tr>`
     )
     .join('')
+
+  const totalsValues = totals?.(rows)
+  const totalsRow = totalsValues
+    ? `<tr class="totals">${totalsValues.map(v => `<td>${escapeHTML(v == null ? '' : String(v))}</td>`).join('')}</tr>`
+    : ''
 
   const html = `<!DOCTYPE html>
 <html lang="es">
@@ -199,6 +234,7 @@ export function exportToPDF<T>(options: ExportOptions<T>): void {
     td { padding: 6px 10px; border-bottom: 1px solid #f3f4f6; vertical-align: top; }
     tr:nth-child(even) td { background: #f9fafb; }
     tr:last-child td { border-bottom: none; }
+    tr.totals td { background: #f3f4f6 !important; font-weight: 700; border-top: 2px solid #9ca3af; border-bottom: none; }
     .footer { margin-top: 20px; font-size: 10px; color: #9ca3af; text-align: center; border-top: 1px solid #e5e7eb; padding-top: 10px; }
     @media print {
       body { padding: 0; }
@@ -219,7 +255,7 @@ export function exportToPDF<T>(options: ExportOptions<T>): void {
     <thead>
       <tr>${columns.map(c => `<th>${escapeHTML(getColumnLabel(c))}</th>`).join('')}</tr>
     </thead>
-    <tbody>${tableRows}</tbody>
+    <tbody>${tableRows}${totalsRow}</tbody>
   </table>
   <div class="footer">${escapeHTML(getCachedBranding().systemName)} — ${escapeHTML(title ?? filename)} — ${date}</div>
   <script>window.onload = function() { window.print(); window.onafterprint = function() { window.close(); }; }</script>

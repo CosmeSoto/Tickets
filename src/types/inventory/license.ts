@@ -16,6 +16,11 @@ export type SoftwareLicense = Prisma.software_licensesGetPayload<{
 export type LicenseType = Prisma.license_typesGetPayload<Record<string, never>>
 
 export interface CreateLicenseData {
+  /** Código de inventario — mismo esquema que equipos (ver
+   * asset-code-generator.ts). Se resuelve antes de llegar acá, no se genera
+   * dentro del servicio, para que la lógica de generación quede en un solo
+   * lugar compartido con equipos/MRO. */
+  code: string
   name: string
   typeId: string
   key?: string

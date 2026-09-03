@@ -33,6 +33,7 @@ import {
   Trash2,
   Undo2,
   Plus,
+  Layers,
 } from 'lucide-react'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { ListTableToolbar } from '@/components/common/list-table-toolbar'
@@ -85,6 +86,9 @@ import { useExport } from '@/hooks/common/use-export'
 import { useInventoryPermissions } from '@/hooks/use-inventory-permissions'
 import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 import { PAYMENT_METHOD_TYPE_LABELS, type PaymentMethodType } from '@/types/contracts'
+import { AcquisitionInvoiceFormDialog } from '@/components/inventory/shared/AcquisitionInvoiceFormDialog'
+import { AcquisitionPaymentDialog } from '@/components/inventory/shared/AcquisitionPaymentDialog'
+import type { InvoiceStatus } from '@/components/inventory/shared/acquisition-invoices'
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -132,7 +136,7 @@ type AssetInvoice = {
   currency: string
   dueDate?: string | null
   paidDate?: string | null
-  status: string
+  status: InvoiceStatus
   paymentMethod?: string | null
   supplierName?: string | null
   notes?: string | null
@@ -157,6 +161,7 @@ type AssetInvoice = {
   }
   license?: {
     id: string
+    code?: string | null
     name: string
     licenseType?: {
       name: string
@@ -171,8 +176,13 @@ type AssetInvoice = {
 function assetDisplay(inv: AssetInvoice) {
   if (inv.assetKind === 'LICENSE' && inv.license) {
     return {
-      code: inv.license.name,
-      subtitle: '',
+      // Antes de tener código propio (ver migración add_license_code), acá
+      // se mostraba el nombre de la licencia donde va el código — obligaba
+      // a un badge aparte para no confundirla con un equipo. Con código
+      // real (formato "-LIC-", igual que "-EQ-" en equipos) ya se
+      // distingue solo, como pasa con equipos.
+      code: inv.license.code ?? inv.license.name,
+      subtitle: inv.license.code ? inv.license.name : '',
       typeName: inv.license.licenseType?.name ?? null,
       family: inv.license.licenseType?.family ?? null,
       href: `/inventory/license/${inv.license.id}`,
@@ -288,6 +298,47 @@ function fmtMultiCurrency(sums: Record<string, number>): string {
   return entries.map(([cur, amt]) => fmtCurrency(amt, cur)).join(' + ')
 }
 
+type MoneyRow = { amount: number; paidAmount?: number | null; currency: string }
+
+/**
+ * Fila de totales para las exportaciones de Pagos (Monto / Abonado / Saldo,
+ * uno por moneda presente) — se busca por `label` y no por posición fija
+ * porque contratos y activos no comparten exactamente las mismas columnas.
+ */
+function buildMoneyTotalsRow(
+  columns: readonly { label: string }[],
+  rows: MoneyRow[]
+): Array<string | number | null | undefined> {
+  const idx = (label: string) => columns.findIndex(c => c.label === label)
+  const out = new Array(columns.length).fill(null) as Array<string | number | null | undefined>
+
+  const labelIdx =
+    idx('N° Factura') >= 0 ? idx('N° Factura') : idx('Contrato') >= 0 ? idx('Contrato') : 0
+  out[labelIdx] = 'TOTAL'
+
+  const montoIdx = idx('Monto')
+  if (montoIdx >= 0) {
+    out[montoIdx] = fmtMultiCurrency(
+      sumByCurrency(rows.map(r => ({ currency: r.currency, amount: r.amount })))
+    )
+  }
+  const abonadoIdx = idx('Abonado')
+  if (abonadoIdx >= 0) {
+    out[abonadoIdx] = fmtMultiCurrency(
+      sumByCurrency(rows.map(r => ({ currency: r.currency, amount: r.paidAmount ?? 0 })))
+    )
+  }
+  const saldoIdx = idx('Saldo')
+  if (saldoIdx >= 0) {
+    out[saldoIdx] = fmtMultiCurrency(
+      sumByCurrency(
+        rows.map(r => ({ currency: r.currency, amount: r.amount - (r.paidAmount ?? 0) }))
+      )
+    )
+  }
+  return out
+}
+
 function todayISO() {
   return new Date().toISOString().split('T')[0]
 }
@@ -313,7 +364,7 @@ function StatsRow({
   isCurrency?: boolean
 }) {
   return (
-    <div className='grid grid-cols-2 sm:grid-cols-5 gap-2'>
+    <div className='grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2'>
       {items.map(item => (
         <div key={item.label} className='rounded-lg border bg-muted/30 px-3 py-2.5 text-center'>
           <p className={`text-xl font-bold tabular-nums ${item.cls}`}>{item.value}</p>
@@ -413,175 +464,24 @@ export default function InventoryPaymentsPage() {
   const [cPayAmount, setCPayAmount] = useState('')
   const [savingC, setSavingC] = useState(false)
 
-  // ── Dialogs — pago de activo
-  const [markingAsset, setMarkingAsset] = useState<AssetInvoice | null>(null)
-  const [aPaidDate, setAPaidDate] = useState(todayISO())
-  const [aPaidMethod, setAPaidMethod] = useState<string>('')
-  const [aPaidRef, setAPaidRef] = useState('')
-  const [aPayAmount, setAPayAmount] = useState('')
-  const [savingA, setSavingA] = useState(false)
+  // ── Dialogs — pago de activo, y nueva factura de activo ───────────────────
+  // Ambos modales son los mismos AcquisitionPaymentDialog /
+  // AcquisitionInvoiceFormDialog que usa la ficha del equipo/licencia — antes
+  // esta página reimplementaba su propia versión de cada uno, y con el
+  // tiempo dejaron de verse y comportarse igual. Acá el de "nueva factura"
+  // se abre sin activo fijo, así que primero pide elegir el equipo o
+  // licencia y a partir de ahí es exactamente el mismo formulario (incluido
+  // Plan de cuotas, que antes solo existía entrando por la ficha del activo).
+  const [payingAsset, setPayingAsset] = useState<AssetInvoice | null>(null)
+  const [showNewInvoice, setShowNewInvoice] = useState(false)
+  const [convertingAsset, setConvertingAsset] = useState<AssetInvoice | null>(null)
 
-  // ── Dialogs — eliminar / deshacer abono
+  // ── Dialogs — eliminar
   const [deletingContract, setDeletingContract] = useState<ContractPayment | null>(null)
   const [deletingAsset, setDeletingAsset] = useState<AssetInvoice | null>(null)
   const [undoingContractInstallment, setUndoingContractInstallment] =
     useState<PaymentInstallment | null>(null)
-  const [undoingAssetInstallment, setUndoingAssetInstallment] = useState<PaymentInstallment | null>(
-    null
-  )
-
-  // ── Dialog — nueva factura de activo (crear sin salir de Pagos) ───────────
-  // Pago único solamente — el plan de cuotas irregulares sigue viviendo en la
-  // ficha del propio equipo/licencia (AcquisitionInvoicesCard), que ya lo
-  // soporta con el mismo backend; acá se cubre el caso más común: registrar
-  // una factura nueva sin tener que navegar hasta el activo primero.
-  const [showNewInvoice, setShowNewInvoice] = useState(false)
-  const [niQuery, setNiQuery] = useState('')
-  const [niResults, setNiResults] = useState<
-    { id: string; kind: 'equipment' | 'license'; label: string }[]
-  >([])
-  const [niSearching, setNiSearching] = useState(false)
-  const [niAsset, setNiAsset] = useState<{
-    id: string
-    kind: 'equipment' | 'license'
-    label: string
-  } | null>(null)
-  const [niForm, setNiForm] = useState({
-    invoiceNumber: '',
-    purchaseOrderNumber: '',
-    amount: '',
-    currency: 'USD',
-    dueDate: '',
-    supplierId: '',
-    supplierName: '',
-    notes: '',
-  })
-  const [niSaving, setNiSaving] = useState(false)
-
-  useEffect(() => {
-    if (!showNewInvoice || niAsset) return
-    const q = niQuery.trim()
-    if (q.length < 2) {
-      setNiResults([])
-      return
-    }
-    const t = setTimeout(async () => {
-      setNiSearching(true)
-      try {
-        const res = await fetch(`/api/inventory/assets?search=${encodeURIComponent(q)}&pageSize=15`)
-        const json = await res.json()
-        const items = (json.items ?? []).filter(
-          (i: { subtype: string }) => i.subtype === 'EQUIPMENT' || i.subtype === 'LICENSE'
-        )
-        setNiResults(
-          items.map((i: { id: string; subtype: string; code?: string; name: string }) => ({
-            id: i.id,
-            kind: i.subtype === 'LICENSE' ? ('license' as const) : ('equipment' as const),
-            label: i.code ? `${i.code} — ${i.name}` : i.name,
-          }))
-        )
-      } catch {
-        setNiResults([])
-      } finally {
-        setNiSearching(false)
-      }
-    }, 300)
-    return () => clearTimeout(t)
-  }, [niQuery, showNewInvoice, niAsset])
-
-  async function selectNewInvoiceAsset(item: {
-    id: string
-    kind: 'equipment' | 'license'
-    label: string
-  }) {
-    setNiAsset(item)
-    setNiQuery(item.label)
-    setNiResults([])
-    // Proveedor pre-llenado desde el activo — mismo criterio que
-    // AcquisitionInvoicesCard (Parte 3a); si falla, el campo queda vacío y
-    // no bloquea el flujo.
-    try {
-      if (item.kind === 'equipment') {
-        const res = await fetch(`/api/inventory/equipment/${item.id}`)
-        const json = await res.json()
-        setNiForm(f => ({
-          ...f,
-          supplierId: json.equipment?.supplierId ?? '',
-          supplierName: json.equipment?.supplier?.name ?? '',
-        }))
-      } else {
-        const res = await fetch(`/api/inventory/licenses/${item.id}`)
-        const json = await res.json()
-        setNiForm(f => ({
-          ...f,
-          supplierId: json.supplier?.id ?? '',
-          supplierName: json.supplier?.name ?? '',
-        }))
-      }
-    } catch {
-      // proveedor queda vacío — no bloquea el registro de la factura
-    }
-  }
-
-  function closeNewInvoiceDialog() {
-    setShowNewInvoice(false)
-    setNiAsset(null)
-    setNiQuery('')
-    setNiResults([])
-    setNiForm({
-      invoiceNumber: '',
-      purchaseOrderNumber: '',
-      amount: '',
-      currency: 'USD',
-      dueDate: '',
-      supplierId: '',
-      supplierName: '',
-      notes: '',
-    })
-  }
-
-  async function handleCreateNewInvoice() {
-    if (!niAsset) {
-      toast({ title: 'Elige un equipo o licencia', variant: 'destructive' })
-      return
-    }
-    if (!niForm.amount || Number(niForm.amount) <= 0) {
-      toast({ title: 'El monto debe ser mayor a 0', variant: 'destructive' })
-      return
-    }
-    setNiSaving(true)
-    try {
-      const base =
-        niAsset.kind === 'license' ? '/api/inventory/licenses' : '/api/inventory/equipment'
-      const res = await fetch(`${base}/${niAsset.id}/invoices`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          invoiceNumber: niForm.invoiceNumber || null,
-          purchaseOrderNumber: niForm.purchaseOrderNumber || null,
-          amount: Number(niForm.amount),
-          currency: niForm.currency || 'USD',
-          dueDate: niForm.dueDate || null,
-          supplierId: niForm.supplierId || null,
-          supplierName: niForm.supplierName || null,
-          notes: niForm.notes || null,
-        }),
-      })
-      const json = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(json.error || 'No se pudo registrar')
-      toast({ title: 'Factura registrada' })
-      closeNewInvoiceDialog()
-      reloadA()
-    } catch (err) {
-      toast({
-        title: 'Error',
-        description: err instanceof Error ? err.message : 'Error',
-        variant: 'destructive',
-      })
-    } finally {
-      setNiSaving(false)
-    }
-  }
+  const [savingA, setSavingA] = useState(false)
 
   // ── Dialog — nuevo pago de contrato (crear sin salir de Pagos) ────────────
   // Cuota ad hoc — complementa "Generar pagos" (ciclo completo, en la ficha
@@ -729,6 +629,13 @@ export default function InventoryPaymentsPage() {
     enabled: canManageContracts,
   })
 
+  // Si el modal de pago/abono sigue abierto cuando `reloadA()` trae datos
+  // nuevos (tras registrar un pago o deshacer un abono), lo sincroniza con
+  // el saldo recalculado en vez de dejarlo con el valor viejo.
+  useEffect(() => {
+    setPayingAsset(prev => (prev ? (assetInvoices.find(i => i.id === prev.id) ?? null) : prev))
+  }, [assetInvoices])
+
   // ── Filtro cliente: tipo de activo (Activos) ───────────────────────────────
   // Client-side sobre lo ya cargado (igual que las 500 filas se paginan del
   // lado del cliente) — evita otro roundtrip solo para separar Equipos de
@@ -780,6 +687,39 @@ export default function InventoryPaymentsPage() {
   } = usePagination(sortedAssets, { pageSize: 50 })
 
   // ── Exportación contratos
+  const cColumns = [
+    { key: 'dueDate', label: 'Vencimiento', format: v => fmtDate(v) },
+    { key: 'contract', label: 'Contrato', format: v => v?.name ?? '' },
+    { key: 'contract', label: 'N° Contrato', format: v => v?.contractNumber ?? '' },
+    { key: 'contract', label: 'Proveedor', format: v => v?.supplier?.name ?? '' },
+    { key: 'contract', label: 'Área', format: v => v?.family?.name ?? '' },
+    { key: 'contract', label: 'Ciclo', format: v => v?.billingCycle ?? '' },
+    { key: 'amount', label: 'Monto', format: (v, row) => fmtCurrency(Number(v), row.currency) },
+    {
+      key: 'paidAmount',
+      label: 'Abonado',
+      format: (v, row) => fmtCurrency(Number(v ?? 0), row.currency),
+    },
+    {
+      key: 'amount',
+      label: 'Saldo',
+      format: (v, row) => fmtCurrency(Number(v) - (row.paidAmount ?? 0), row.currency),
+    },
+    { key: 'currency', label: 'Moneda' },
+    { key: 'status', label: 'Estado', format: v => CONTRACT_STATUS_CONFIG[v]?.label ?? v },
+    { key: 'paidDate', label: 'Fecha pago', format: v => fmtDate(v) },
+    {
+      key: 'paymentMethod',
+      label: 'Método pago',
+      format: v => (v ? (PAYMENT_METHOD_TYPE_LABELS[v as PaymentMethodType] ?? v) : ''),
+    },
+    { key: 'referenceNumber', label: 'Referencia', format: v => v ?? '' },
+  ] as const satisfies readonly {
+    key: string
+    label: string
+    format?: (v: any, row: any) => string
+  }[]
+
   const {
     exportCSV: expCCSV,
     exportExcel: expCXLSX,
@@ -789,37 +729,63 @@ export default function InventoryPaymentsPage() {
     filename: 'pagos-contratos',
     title: 'Pagos de Contratos',
     getData: () => sortedContracts,
-    columns: [
-      { key: 'dueDate', label: 'Vencimiento', format: v => fmtDate(v) },
-      { key: 'contract', label: 'Contrato', format: v => v?.name ?? '' },
-      { key: 'contract', label: 'N° Contrato', format: v => v?.contractNumber ?? '' },
-      { key: 'contract', label: 'Proveedor', format: v => v?.supplier?.name ?? '' },
-      { key: 'contract', label: 'Área', format: v => v?.family?.name ?? '' },
-      { key: 'contract', label: 'Ciclo', format: v => v?.billingCycle ?? '' },
-      { key: 'amount', label: 'Monto', format: (v, row) => fmtCurrency(Number(v), row.currency) },
-      {
-        key: 'paidAmount',
-        label: 'Abonado',
-        format: (v, row) => fmtCurrency(Number(v ?? 0), row.currency),
-      },
-      {
-        key: 'amount',
-        label: 'Saldo',
-        format: (v, row) => fmtCurrency(Number(v) - (row.paidAmount ?? 0), row.currency),
-      },
-      { key: 'currency', label: 'Moneda' },
-      { key: 'status', label: 'Estado', format: v => CONTRACT_STATUS_CONFIG[v]?.label ?? v },
-      { key: 'paidDate', label: 'Fecha pago', format: v => fmtDate(v) },
-      {
-        key: 'paymentMethod',
-        label: 'Método pago',
-        format: v => (v ? (PAYMENT_METHOD_TYPE_LABELS[v as PaymentMethodType] ?? v) : ''),
-      },
-      { key: 'referenceNumber', label: 'Referencia', format: v => v ?? '' },
-    ],
+    columns: cColumns as any,
+    totals: rows => buildMoneyTotalsRow(cColumns, rows as unknown as MoneyRow[]),
   })
 
   // ── Exportación activos
+  const aColumns = [
+    {
+      key: 'assetKind',
+      label: 'Tipo de activo',
+      format: v => (v === 'LICENSE' ? 'Licencia' : 'Equipo'),
+    },
+    { key: 'equipment', label: 'Código / Nombre', format: (_v, row) => assetDisplay(row).code },
+    { key: 'equipment', label: 'Detalle', format: (_v, row) => assetDisplay(row).subtitle },
+    { key: 'equipment', label: 'Tipo', format: (_v, row) => assetDisplay(row).typeName ?? '' },
+    {
+      key: 'equipment',
+      label: 'Área',
+      format: (_v, row) => assetDisplay(row).family?.name ?? '',
+    },
+    { key: 'invoiceNumber', label: 'N° Factura', format: v => v ?? '' },
+    { key: 'purchaseOrderNumber', label: 'N° OC', format: v => v ?? '' },
+    {
+      key: 'installmentCount',
+      label: 'Cuota',
+      format: (v, row) => (v ? `${row.installmentNumber}/${v}` : ''),
+    },
+    { key: 'amount', label: 'Monto', format: (v, row) => fmtCurrency(Number(v), row.currency) },
+    {
+      key: 'paidAmount',
+      label: 'Abonado',
+      format: (v, row) => fmtCurrency(Number(v ?? 0), row.currency),
+    },
+    {
+      key: 'amount',
+      label: 'Saldo',
+      format: (v, row) => fmtCurrency(Number(v) - (row.paidAmount ?? 0), row.currency),
+    },
+    { key: 'currency', label: 'Moneda' },
+    { key: 'dueDate', label: 'Vencimiento', format: v => fmtDate(v) },
+    { key: 'status', label: 'Estado', format: v => ASSET_STATUS_CONFIG[v]?.label ?? v },
+    { key: 'paidDate', label: 'Fecha pago', format: v => fmtDate(v) },
+    {
+      key: 'paymentMethod',
+      label: 'Método pago',
+      format: v => (v ? (PAYMENT_METHOD_TYPE_LABELS[v as PaymentMethodType] ?? v) : ''),
+    },
+    {
+      key: 'supplier',
+      label: 'Proveedor',
+      format: (v, row) => v?.name ?? row.supplierName ?? '',
+    },
+  ] as const satisfies readonly {
+    key: string
+    label: string
+    format?: (v: any, row: any) => string
+  }[]
+
   const {
     exportCSV: expACSV,
     exportExcel: expAXLSX,
@@ -829,53 +795,8 @@ export default function InventoryPaymentsPage() {
     filename: 'facturas-activos',
     title: 'Facturas de Adquisición de Activos',
     getData: () => sortedAssets,
-    columns: [
-      {
-        key: 'assetKind',
-        label: 'Tipo de activo',
-        format: v => (v === 'LICENSE' ? 'Licencia' : 'Equipo'),
-      },
-      { key: 'equipment', label: 'Código / Nombre', format: (_v, row) => assetDisplay(row).code },
-      { key: 'equipment', label: 'Detalle', format: (_v, row) => assetDisplay(row).subtitle },
-      { key: 'equipment', label: 'Tipo', format: (_v, row) => assetDisplay(row).typeName ?? '' },
-      {
-        key: 'equipment',
-        label: 'Área',
-        format: (_v, row) => assetDisplay(row).family?.name ?? '',
-      },
-      { key: 'invoiceNumber', label: 'N° Factura', format: v => v ?? '' },
-      { key: 'purchaseOrderNumber', label: 'N° OC', format: v => v ?? '' },
-      {
-        key: 'installmentCount',
-        label: 'Cuota',
-        format: (v, row) => (v ? `${row.installmentNumber}/${v}` : ''),
-      },
-      { key: 'amount', label: 'Monto', format: (v, row) => fmtCurrency(Number(v), row.currency) },
-      {
-        key: 'paidAmount',
-        label: 'Abonado',
-        format: (v, row) => fmtCurrency(Number(v ?? 0), row.currency),
-      },
-      {
-        key: 'amount',
-        label: 'Saldo',
-        format: (v, row) => fmtCurrency(Number(v) - (row.paidAmount ?? 0), row.currency),
-      },
-      { key: 'currency', label: 'Moneda' },
-      { key: 'dueDate', label: 'Vencimiento', format: v => fmtDate(v) },
-      { key: 'status', label: 'Estado', format: v => ASSET_STATUS_CONFIG[v]?.label ?? v },
-      { key: 'paidDate', label: 'Fecha pago', format: v => fmtDate(v) },
-      {
-        key: 'paymentMethod',
-        label: 'Método pago',
-        format: v => (v ? (PAYMENT_METHOD_TYPE_LABELS[v as PaymentMethodType] ?? v) : ''),
-      },
-      {
-        key: 'supplier',
-        label: 'Proveedor',
-        format: (v, row) => v?.name ?? row.supplierName ?? '',
-      },
-    ],
+    columns: aColumns as any,
+    totals: rows => buildMoneyTotalsRow(aColumns, rows as unknown as MoneyRow[]),
   })
 
   // ── Stats contratos
@@ -898,6 +819,16 @@ export default function InventoryPaymentsPage() {
           .map(p => ({ currency: p.currency, amount: p.amount - p.paidAmount }))
       )
     ),
+    // Lo ya abonado — sea la cuota pagada completa o solo un abono parcial.
+    // Sin esto, la barra de métricas solo contaba lo que falta y no daba una
+    // idea del total realmente desembolsado.
+    paidLabel: fmtMultiCurrency(
+      sumByCurrency(
+        contractPayments
+          .filter(p => p.paidAmount > 0)
+          .map(p => ({ currency: p.currency, amount: p.paidAmount }))
+      )
+    ),
   }
 
   // ── Stats activos
@@ -913,11 +844,22 @@ export default function InventoryPaymentsPage() {
           .map(i => ({ currency: i.currency, amount: i.amount - i.paidAmount }))
       )
     ),
+    paidLabel: fmtMultiCurrency(
+      sumByCurrency(
+        filteredAssetInvoices
+          .filter(i => i.paidAmount > 0)
+          .map(i => ({ currency: i.currency, amount: i.paidAmount }))
+      )
+    ),
   }
 
   // ── Acción: registrar pago (completo o parcial) de contrato
   const markContractPaid = async () => {
     if (!markingContract) return
+    if (!cPaidRef.trim()) {
+      toast({ title: 'El N° de referencia es obligatorio', variant: 'destructive' })
+      return
+    }
     setSavingC(true)
     try {
       const res = await fetch(
@@ -929,7 +871,7 @@ export default function InventoryPaymentsPage() {
             amount: cPayAmount ? Number(cPayAmount) : undefined,
             paidDate: cPaidDate,
             paymentMethod: cPaidMethod || 'BANK_TRANSFER',
-            referenceNumber: cPaidRef || undefined,
+            referenceNumber: cPaidRef.trim(),
           }),
         }
       )
@@ -949,42 +891,9 @@ export default function InventoryPaymentsPage() {
     }
   }
 
-  // ── Acción: registrar pago (completo o parcial) de factura de activo
-  const markAssetPaid = async () => {
-    if (!markingAsset) return
-    setSavingA(true)
-    try {
-      const base =
-        markingAsset.assetKind === 'LICENSE'
-          ? '/api/inventory/licenses/invoices'
-          : '/api/inventory/equipment/invoices'
-      const res = await fetch(`${base}/${markingAsset.id}/installments`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount: aPayAmount ? Number(aPayAmount) : undefined,
-          paidDate: aPaidDate,
-          paymentMethod: aPaidMethod || undefined,
-          referenceNumber: aPaidRef || undefined,
-        }),
-      })
-      const json = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(json.error || 'No se pudo registrar')
-      toast({ title: 'Pago registrado correctamente' })
-      setMarkingAsset(null)
-      reloadA()
-    } catch (err) {
-      toast({
-        title: 'Error',
-        description: err instanceof Error ? err.message : 'Error',
-        variant: 'destructive',
-      })
-    } finally {
-      setSavingA(false)
-    }
-  }
-
-  // ── Acción: deshacer un abono (contrato o activo) ─────────────────────────
+  // ── Acción: deshacer un abono de contrato ──────────────────────────────────
+  // (El de activo vive dentro de AcquisitionPaymentDialog — mismo modal que
+  // usa la ficha del equipo/licencia.)
   // Los abonos son inmutables: corregir = deshacer + volver a registrar. Se
   // cierra el diálogo de "Registrar pago" al deshacer, igual que al pagar —
   // el usuario lo vuelve a abrir con el saldo ya recalculado.
@@ -1011,34 +920,6 @@ export default function InventoryPaymentsPage() {
       })
     } finally {
       setSavingC(false)
-    }
-  }
-
-  const handleUndoAssetInstallment = async () => {
-    if (!undoingAssetInstallment || !markingAsset) return
-    setSavingA(true)
-    try {
-      const base =
-        markingAsset.assetKind === 'LICENSE'
-          ? '/api/inventory/licenses/invoices'
-          : '/api/inventory/equipment/invoices'
-      const res = await fetch(`${base}/installments/${undoingAssetInstallment.id}`, {
-        method: 'DELETE',
-      })
-      const json = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(json.error || 'No se pudo deshacer el abono')
-      toast({ title: 'Abono deshecho' })
-      setUndoingAssetInstallment(null)
-      setMarkingAsset(null)
-      reloadA()
-    } catch (err) {
-      toast({
-        title: 'Error',
-        description: err instanceof Error ? err.message : 'Error',
-        variant: 'destructive',
-      })
-    } finally {
-      setSavingA(false)
     }
   }
 
@@ -1182,6 +1063,11 @@ export default function InventoryPaymentsPage() {
                   cls: 'text-amber-600 dark:text-amber-400',
                 },
                 { label: 'Pagadas', value: aStats.paid, cls: 'text-green-600 dark:text-green-400' },
+                {
+                  label: 'Pagado ($)',
+                  value: aStats.paidLabel,
+                  cls: 'text-green-600 dark:text-green-400 text-base',
+                },
                 {
                   label: 'Pendiente ($)',
                   value: aStats.pendingLabel,
@@ -1384,19 +1270,14 @@ export default function InventoryPaymentsPage() {
                         return (
                           <TableRow key={inv.id} className='hover:bg-muted/30 transition-colors'>
                             <TableCell>
-                              <div className='flex items-center gap-1.5'>
-                                <Link
-                                  href={asset.href}
-                                  className='font-medium text-sm hover:underline font-mono'
-                                >
-                                  {asset.code}
-                                </Link>
-                                {inv.assetKind === 'LICENSE' && (
-                                  <Badge variant='outline' className='text-[10px] px-1 py-0'>
-                                    Licencia
-                                  </Badge>
-                                )}
-                              </div>
+                              {/* Sin badge "Licencia"/"Equipo" — el código ya lo dice
+                                  (segmento "-LIC-" o "-EQ-"), igual para ambos. */}
+                              <Link
+                                href={asset.href}
+                                className='font-medium text-sm hover:underline font-mono'
+                              >
+                                {asset.code}
+                              </Link>
                               {asset.subtitle && (
                                 <span className='block text-xs text-muted-foreground'>
                                   {asset.subtitle}
@@ -1462,44 +1343,50 @@ export default function InventoryPaymentsPage() {
                             </TableCell>
                             <TableCell className='text-right'>
                               <div className='flex items-center justify-end gap-1'>
-                                {(inv.status === 'PENDING' ||
-                                  inv.status === 'OVERDUE' ||
-                                  inv.status === 'PARTIALLY_PAID') && (
-                                  <Button
+                                {(() => {
+                                  // Un solo botón por fila para pagar/ver
+                                  // abonos — antes "Pagar" y "Abonos"
+                                  // convivían y abrían el mismo diálogo.
+                                  const canPay =
+                                    inv.status === 'PENDING' ||
+                                    inv.status === 'OVERDUE' ||
+                                    inv.status === 'PARTIALLY_PAID'
+                                  if (!canPay && inv.paidAmount <= 0) return null
+                                  return (
+                                    <Button
+                                      type='button'
+                                      size='sm'
+                                      variant='outline'
+                                      className='h-7 text-xs'
+                                      title={
+                                        canPay
+                                          ? 'Registrar un pago o abono'
+                                          : 'Ver abonos registrados'
+                                      }
+                                      onClick={() => setPayingAsset(inv)}
+                                    >
+                                      {canPay ? (
+                                        <CheckCircle2 className='h-3.5 w-3.5 mr-1' />
+                                      ) : (
+                                        <Receipt className='h-3.5 w-3.5 mr-1' />
+                                      )}
+                                      {canPay
+                                        ? inv.paidAmount > 0
+                                          ? 'Abonar'
+                                          : 'Pagar'
+                                        : 'Abonos'}
+                                    </Button>
+                                  )
+                                })()}
+                                {inv.paidAmount <= 0.01 && !inv.installmentCount && (
+                                  <button
                                     type='button'
-                                    size='sm'
-                                    variant='outline'
-                                    className='h-7 text-xs'
-                                    onClick={() => {
-                                      setAPaidDate(todayISO())
-                                      setAPaidMethod(inv.paymentMethod ?? '')
-                                      setAPaidRef('')
-                                      setAPayAmount((inv.amount - inv.paidAmount).toFixed(2))
-                                      setMarkingAsset(inv)
-                                    }}
+                                    onClick={() => setConvertingAsset(inv)}
+                                    className='p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors'
+                                    title='Convertir a plan de cuotas'
                                   >
-                                    <CheckCircle2 className='h-3.5 w-3.5 mr-1' />
-                                    Pagar
-                                  </Button>
-                                )}
-                                {inv.paidAmount > 0 && (
-                                  <Button
-                                    type='button'
-                                    size='sm'
-                                    variant='outline'
-                                    className='h-7 text-xs'
-                                    title='Ver abonos registrados y agregar o deshacer uno'
-                                    onClick={() => {
-                                      setAPaidDate(todayISO())
-                                      setAPaidMethod(inv.paymentMethod ?? '')
-                                      setAPaidRef('')
-                                      setAPayAmount((inv.amount - inv.paidAmount).toFixed(2))
-                                      setMarkingAsset(inv)
-                                    }}
-                                  >
-                                    <Receipt className='h-3.5 w-3.5 mr-1' />
-                                    Abonos
-                                  </Button>
+                                    <Layers className='h-3.5 w-3.5' />
+                                  </button>
                                 )}
                                 <button
                                   type='button'
@@ -1558,6 +1445,11 @@ export default function InventoryPaymentsPage() {
                   label: 'Programados',
                   value: cStats.pending,
                   cls: 'text-blue-600 dark:text-blue-400',
+                },
+                {
+                  label: 'Pagado ($)',
+                  value: cStats.paidLabel,
+                  cls: 'text-green-600 dark:text-green-400 text-base',
                 },
                 {
                   label: 'Pendiente ($)',
@@ -1781,46 +1673,44 @@ export default function InventoryPaymentsPage() {
                           </TableCell>
                           <TableCell className='text-right'>
                             <div className='flex items-center justify-end gap-1'>
-                              {(p.status === 'SCHEDULED' ||
-                                p.status === 'DUE' ||
-                                p.status === 'OVERDUE' ||
-                                p.status === 'PARTIALLY_PAID') && (
-                                <Button
-                                  type='button'
-                                  size='sm'
-                                  variant='outline'
-                                  className='h-7 text-xs'
-                                  onClick={() => {
-                                    setCPaidDate(todayISO())
-                                    setCPaidMethod('')
-                                    setCPaidRef('')
-                                    setCPayAmount((p.amount - p.paidAmount).toFixed(2))
-                                    setMarkingContract(p)
-                                  }}
-                                >
-                                  <CheckCircle2 className='h-3.5 w-3.5 mr-1' />
-                                  Pagar
-                                </Button>
-                              )}
-                              {p.paidAmount > 0 && (
-                                <Button
-                                  type='button'
-                                  size='sm'
-                                  variant='outline'
-                                  className='h-7 text-xs'
-                                  title='Ver abonos registrados y agregar o deshacer uno'
-                                  onClick={() => {
-                                    setCPaidDate(todayISO())
-                                    setCPaidMethod('')
-                                    setCPaidRef('')
-                                    setCPayAmount((p.amount - p.paidAmount).toFixed(2))
-                                    setMarkingContract(p)
-                                  }}
-                                >
-                                  <Receipt className='h-3.5 w-3.5 mr-1' />
-                                  Abonos
-                                </Button>
-                              )}
+                              {(() => {
+                                // Un solo botón por fila para pagar/ver
+                                // abonos — antes "Pagar" y "Abonos" convivían
+                                // y abrían el mismo diálogo.
+                                const canPay =
+                                  p.status === 'SCHEDULED' ||
+                                  p.status === 'DUE' ||
+                                  p.status === 'OVERDUE' ||
+                                  p.status === 'PARTIALLY_PAID'
+                                if (!canPay && p.paidAmount <= 0) return null
+                                return (
+                                  <Button
+                                    type='button'
+                                    size='sm'
+                                    variant='outline'
+                                    className='h-7 text-xs'
+                                    title={
+                                      canPay
+                                        ? 'Registrar un pago o abono'
+                                        : 'Ver abonos registrados'
+                                    }
+                                    onClick={() => {
+                                      setCPaidDate(todayISO())
+                                      setCPaidMethod('')
+                                      setCPaidRef('')
+                                      setCPayAmount((p.amount - p.paidAmount).toFixed(2))
+                                      setMarkingContract(p)
+                                    }}
+                                  >
+                                    {canPay ? (
+                                      <CheckCircle2 className='h-3.5 w-3.5 mr-1' />
+                                    ) : (
+                                      <Receipt className='h-3.5 w-3.5 mr-1' />
+                                    )}
+                                    {canPay ? (p.paidAmount > 0 ? 'Abonar' : 'Pagar') : 'Abonos'}
+                                  </Button>
+                                )
+                              })()}
                               <button
                                 type='button'
                                 onClick={() => p.paidAmount <= 0.01 && setDeletingContract(p)}
@@ -1968,8 +1858,7 @@ export default function InventoryPaymentsPage() {
                   </div>
                   <div className='space-y-1.5'>
                     <Label>
-                      N° Referencia / Transacción{' '}
-                      <span className='text-muted-foreground'>(opcional)</span>
+                      N° Referencia / Transacción <span className='text-destructive'>*</span>
                     </Label>
                     <Input
                       placeholder='REF-12345'
@@ -1995,7 +1884,11 @@ export default function InventoryPaymentsPage() {
                 <Button type='button' variant='outline' onClick={() => setMarkingContract(null)}>
                   Cancelar
                 </Button>
-                <Button type='button' onClick={markContractPaid} disabled={savingC}>
+                <Button
+                  type='button'
+                  onClick={markContractPaid}
+                  disabled={savingC || !cPaidRef.trim()}
+                >
                   {savingC
                     ? 'Guardando…'
                     : markingContract &&
@@ -2010,273 +1903,37 @@ export default function InventoryPaymentsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Dialog: marcar pago de factura de activo ─────────────────────────── */}
-      <Dialog open={!!markingAsset} onOpenChange={open => !open && setMarkingAsset(null)}>
-        <DialogContent className='max-w-sm'>
-          <DialogHeader>
-            <DialogTitle className='flex items-center gap-2'>
-              <Package className='h-4 w-4' />
-              {markingAsset?.status === 'PAID' ? 'Abonos registrados' : 'Registrar pago de factura'}
-            </DialogTitle>
-          </DialogHeader>
-          {markingAsset && (
-            <div className='space-y-4 py-1'>
-              <div className='rounded-md bg-muted/50 px-3 py-2 text-sm space-y-0.5'>
-                <p className='font-medium font-mono'>{assetDisplay(markingAsset).code}</p>
-                <p className='text-muted-foreground text-xs'>
-                  {assetDisplay(markingAsset).subtitle}
-                  {markingAsset.invoiceNumber ? ` · ${markingAsset.invoiceNumber}` : ''}
-                </p>
-                <p className='text-muted-foreground text-xs'>
-                  Monto total: {fmtCurrency(Number(markingAsset.amount), markingAsset.currency)}
-                </p>
-                {markingAsset.paidAmount > 0 && (
-                  <p className='text-muted-foreground text-xs'>
-                    Abonado: {fmtCurrency(markingAsset.paidAmount, markingAsset.currency)}
-                  </p>
-                )}
-                <p className='font-semibold'>
-                  Saldo pendiente:{' '}
-                  {fmtCurrency(
-                    markingAsset.amount - markingAsset.paidAmount,
-                    markingAsset.currency
-                  )}
-                </p>
-              </div>
+      {/* ── El único modal de pagar/abonar factura de activo — mismo que la
+           ficha del equipo/licencia (AcquisitionPaymentDialog) ────────────── */}
+      <AcquisitionPaymentDialog
+        assetType={payingAsset?.assetKind === 'LICENSE' ? 'license' : 'equipment'}
+        invoice={payingAsset}
+        onOpenChange={open => !open && setPayingAsset(null)}
+        onChanged={reloadA}
+      />
 
-              {markingAsset.installments.length > 0 && (
-                <div className='space-y-1'>
-                  <Label className='text-xs text-muted-foreground'>
-                    Abonos anteriores ({markingAsset.installments.length})
-                  </Label>
-                  <ul className='rounded-md border divide-y text-xs max-h-24 overflow-y-auto'>
-                    {markingAsset.installments.map(ins => (
-                      <li key={ins.id} className='flex items-center justify-between px-2 py-1'>
-                        <span className='text-muted-foreground'>{fmtDate(ins.paidDate)}</span>
-                        <span className='font-medium'>
-                          {fmtCurrency(ins.amount, markingAsset.currency)}
-                        </span>
-                        <button
-                          type='button'
-                          onClick={() => setUndoingAssetInstallment(ins)}
-                          className='p-0.5 rounded text-muted-foreground hover:text-destructive transition-colors'
-                          title='Deshacer este abono'
-                        >
-                          <Undo2 className='h-3 w-3' />
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+      {/* ── El único modal de registrar factura — mismo que la ficha del
+           equipo/licencia (AcquisitionInvoiceFormDialog); sin activo fijo,
+           así que primero pide elegir equipo o licencia ───────────────────── */}
+      <AcquisitionInvoiceFormDialog
+        open={showNewInvoice}
+        onOpenChange={setShowNewInvoice}
+        onSaved={reloadA}
+      />
 
-              {markingAsset.status !== 'PAID' && (
-                <>
-                  <div className='space-y-1.5'>
-                    <Label>Monto a abonar</Label>
-                    <Input
-                      type='number'
-                      min='0.01'
-                      step='0.01'
-                      max={markingAsset.amount - markingAsset.paidAmount}
-                      value={aPayAmount}
-                      onChange={e => setAPayAmount(e.target.value)}
-                    />
-                    <p className='text-xs text-muted-foreground'>
-                      Deja el monto completo para saldar, o redúcelo para abonar parcialmente.
-                    </p>
-                  </div>
-                  <div className='space-y-1.5'>
-                    <Label>Fecha de pago</Label>
-                    <DateInput value={aPaidDate} onChange={e => setAPaidDate(e.target.value)} />
-                  </div>
-                  <div className='space-y-1.5'>
-                    <Label>Método de pago</Label>
-                    <Select
-                      value={aPaidMethod || '__none__'}
-                      onValueChange={v => setAPaidMethod(v === '__none__' ? '' : v)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder='Seleccionar método' />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value='__none__'>Sin especificar</SelectItem>
-                        {(
-                          Object.entries(PAYMENT_METHOD_TYPE_LABELS) as [
-                            PaymentMethodType,
-                            string,
-                          ][]
-                        ).map(([k, v]) => (
-                          <SelectItem key={k} value={k}>
-                            {v}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className='space-y-1.5'>
-                    <Label>
-                      N° Referencia <span className='text-muted-foreground'>(opcional)</span>
-                    </Label>
-                    <Input
-                      placeholder='REF-12345'
-                      value={aPaidRef}
-                      onChange={e => setAPaidRef(e.target.value)}
-                      maxLength={200}
-                    />
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-          <DialogFooter>
-            {markingAsset?.status === 'PAID' ? (
-              <Button type='button' variant='outline' onClick={() => setMarkingAsset(null)}>
-                Cerrar
-              </Button>
-            ) : (
-              <>
-                <Button type='button' variant='outline' onClick={() => setMarkingAsset(null)}>
-                  Cancelar
-                </Button>
-                <Button type='button' onClick={markAssetPaid} disabled={savingA}>
-                  {savingA
-                    ? 'Guardando…'
-                    : markingAsset &&
-                        Number(aPayAmount) >= markingAsset.amount - markingAsset.paidAmount - 0.01
-                      ? 'Confirmar pago'
-                      : 'Registrar abono'}
-                </Button>
-              </>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── Dialog: nueva factura de activo (sin salir de Pagos) ──────────── */}
-      <Dialog open={showNewInvoice} onOpenChange={open => !open && closeNewInvoiceDialog()}>
-        <DialogContent className='w-[min(95vw,32rem)] max-w-lg max-h-[92vh] overflow-y-auto'>
-          <DialogHeader>
-            <DialogTitle>Nueva factura de activo</DialogTitle>
-          </DialogHeader>
-          <div className='space-y-3 py-1'>
-            <div className='space-y-1'>
-              <Label>
-                Equipo o licencia <span className='text-destructive'>*</span>
-              </Label>
-              <Input
-                placeholder='Buscar por código, marca o nombre…'
-                value={niQuery}
-                onChange={e => {
-                  setNiQuery(e.target.value)
-                  setNiAsset(null)
-                }}
-              />
-              {niSearching && <p className='text-xs text-muted-foreground'>Buscando…</p>}
-              {!niAsset && niResults.length > 0 && (
-                <ul className='rounded-md border divide-y max-h-40 overflow-y-auto text-sm'>
-                  {niResults.map(item => (
-                    <li key={`${item.kind}-${item.id}`}>
-                      <button
-                        type='button'
-                        onClick={() => selectNewInvoiceAsset(item)}
-                        className='w-full text-left px-3 py-1.5 hover:bg-muted transition-colors flex items-center justify-between gap-2'
-                      >
-                        <span>{item.label}</span>
-                        <Badge variant='secondary' className='text-xs shrink-0'>
-                          {item.kind === 'license' ? 'Licencia' : 'Equipo'}
-                        </Badge>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {niAsset && (
-                <p className='text-xs text-muted-foreground'>
-                  Activo seleccionado — {niAsset.kind === 'license' ? 'Licencia' : 'Equipo'}
-                  {niForm.supplierName && ` · Proveedor: ${niForm.supplierName}`}
-                </p>
-              )}
-            </div>
-
-            <div className='grid grid-cols-3 gap-3'>
-              <div className='col-span-2 space-y-1'>
-                <Label>
-                  Monto <span className='text-destructive'>*</span>
-                </Label>
-                <Input
-                  type='number'
-                  min='0.01'
-                  step='0.01'
-                  placeholder='0.00'
-                  value={niForm.amount}
-                  onChange={e => setNiForm(f => ({ ...f, amount: e.target.value }))}
-                />
-              </div>
-              <div className='space-y-1'>
-                <Label>Moneda</Label>
-                <CurrencySelect
-                  value={niForm.currency}
-                  onChange={v => setNiForm(f => ({ ...f, currency: v }))}
-                />
-              </div>
-            </div>
-
-            <div className='grid grid-cols-2 gap-3'>
-              <div className='space-y-1'>
-                <Label>N° Factura</Label>
-                <Input
-                  placeholder='FAC-001'
-                  value={niForm.invoiceNumber}
-                  onChange={e => setNiForm(f => ({ ...f, invoiceNumber: e.target.value }))}
-                  maxLength={100}
-                />
-              </div>
-              <div className='space-y-1'>
-                <Label>N° Orden de Compra</Label>
-                <Input
-                  placeholder='OC-001'
-                  value={niForm.purchaseOrderNumber}
-                  onChange={e => setNiForm(f => ({ ...f, purchaseOrderNumber: e.target.value }))}
-                  maxLength={100}
-                />
-              </div>
-            </div>
-
-            <div className='space-y-1'>
-              <Label>Fecha de vencimiento</Label>
-              <DateInput
-                value={niForm.dueDate}
-                onChange={e => setNiForm(f => ({ ...f, dueDate: e.target.value }))}
-                clearable
-              />
-            </div>
-
-            <div className='space-y-1'>
-              <Label>Notas</Label>
-              <Textarea
-                rows={2}
-                placeholder='Observaciones opcionales…'
-                value={niForm.notes}
-                onChange={e => setNiForm(f => ({ ...f, notes: e.target.value }))}
-              />
-            </div>
-
-            <p className='text-xs text-muted-foreground'>
-              Pago único. Para un plan de cuotas irregulares, registrá la factura desde la ficha del
-              equipo o la licencia.
-            </p>
-          </div>
-          <DialogFooter>
-            <Button type='button' variant='outline' onClick={closeNewInvoiceDialog}>
-              Cancelar
-            </Button>
-            <Button type='button' onClick={handleCreateNewInvoice} disabled={niSaving}>
-              {niSaving ? 'Guardando…' : 'Registrar'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* ── El mismo modal, en modo "convertir a plan de cuotas" ──────────── */}
+      <AcquisitionInvoiceFormDialog
+        open={!!convertingAsset}
+        onOpenChange={open => !open && setConvertingAsset(null)}
+        onSaved={reloadA}
+        assetType={convertingAsset?.assetKind === 'LICENSE' ? 'license' : 'equipment'}
+        assetId={
+          (convertingAsset?.assetKind === 'LICENSE'
+            ? convertingAsset?.license?.id
+            : convertingAsset?.equipment?.id) ?? ''
+        }
+        convertingInvoice={convertingAsset}
+      />
 
       {/* ── Dialog: nuevo pago de contrato (sin salir de Pagos) ───────────── */}
       <Dialog open={showNewPayment} onOpenChange={open => !open && closeNewPaymentDialog()}>
@@ -2437,31 +2094,7 @@ export default function InventoryPaymentsPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* ── AlertDialog: confirmar deshacer abono de activo ──────────────── */}
-      <AlertDialog
-        open={!!undoingAssetInstallment}
-        onOpenChange={open => !open && setUndoingAssetInstallment(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Deshacer este abono?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {undoingAssetInstallment &&
-                `Se eliminará el abono de ${fmtCurrency(undoingAssetInstallment.amount, markingAsset?.currency)} del ${fmtDate(undoingAssetInstallment.paidDate)}. El saldo y el estado de la factura se recalculan al instante.`}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={savingA}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleUndoAssetInstallment}
-              disabled={savingA}
-              className='bg-destructive text-destructive-foreground hover:bg-destructive/90'
-            >
-              {savingA ? 'Deshaciendo…' : 'Deshacer abono'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* (El deshacer abono de activo vive dentro de AcquisitionPaymentDialog.) */}
 
       {/* ── AlertDialog: confirmar eliminar cuota de contrato ────────────── */}
       <AlertDialog

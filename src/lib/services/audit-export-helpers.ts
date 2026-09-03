@@ -398,6 +398,14 @@ export function translateEntityType(entityType: string): string {
     access_scan: 'Escaneo de acceso',
     access_subject: 'Persona de acceso',
     process: 'Proceso',
+    equipment: 'Equipo',
+    equipment_invoice: 'Factura de equipo',
+    license: 'Licencia',
+    software_license: 'Licencia',
+    license_invoice: 'Factura de licencia',
+    supplier: 'Proveedor',
+    contract: 'Contrato',
+    contract_payment: 'Cuota de contrato',
   }
   return entityMap[entityType.toLowerCase()] || entityType
 }

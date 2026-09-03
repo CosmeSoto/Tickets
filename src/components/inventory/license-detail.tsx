@@ -46,6 +46,7 @@ import { CONTRACT_TYPE_LABELS } from '@/lib/inventory/license-labels'
 
 interface LicenseData {
   id: string
+  code: string
   name: string
   key?: string | null
   cost?: number | null
@@ -262,6 +263,7 @@ export function LicenseDetail({ licenseId, userRole, isSuperAdmin = false }: Pro
           <Key className='h-6 w-6 shrink-0 text-muted-foreground' />
           <div className='min-w-0'>
             <h1 className='text-lg font-bold truncate'>{license.name}</h1>
+            <p className='text-xs text-muted-foreground font-mono truncate'>{license.code}</p>
             <p className='text-xs text-muted-foreground truncate'>
               {[license.licenseType?.name, currentFamilyName].filter(Boolean).join(' · ') ||
                 'Licencia / contrato'}

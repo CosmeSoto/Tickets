@@ -31,6 +31,49 @@ export function getAffectedObjectLabel(row: AuditAffectedSource): string {
   if (d.categoryName) return `Categoría: ${d.categoryName}`
   if (d.departmentName) return `Departamento: ${d.departmentName}`
   if (d.familyName) return `Área: ${d.familyName}`
+  if (entityType === 'equipment_invoice' || entityType === 'license_invoice') {
+    // El id del activo (equipo/licencia) viaja dentro de `changes`, no como
+    // entityId — ese es el de la propia factura. `d.assetName` ya viene
+    // resuelto (código de equipo o nombre de licencia) desde enrichLogsBatch.
+    const c = d.changes && typeof d.changes === 'object' ? d.changes : {}
+    const amountValue = c.amount ?? c.after?.amount ?? c.before?.amount
+    const currency = typeof c.currency === 'string' ? c.currency : 'USD'
+    const parts: string[] = [c.invoiceNumber ? `Factura ${c.invoiceNumber}` : 'Factura']
+    if (typeof amountValue === 'number') {
+      parts.push(
+        new Intl.NumberFormat('es-CL', {
+          style: 'currency',
+          currency,
+          minimumFractionDigits: 0,
+        }).format(amountValue)
+      )
+    }
+    if (d.assetName) {
+      parts.push(
+        entityType === 'equipment_invoice' ? `Equipo ${d.assetName}` : `Licencia ${d.assetName}`
+      )
+    }
+    return parts.join(' · ')
+  }
+  if (entityType === 'contract_payment') {
+    // El id del contrato viaja dentro de `changes` — `d.assetName` ya viene
+    // resuelto (N° de contrato — nombre) desde enrichLogsBatch.
+    const c = d.changes && typeof d.changes === 'object' ? d.changes : {}
+    const amountValue = c.amount ?? c.after?.amount ?? c.before?.amount
+    const currency = typeof c.currency === 'string' ? c.currency : 'USD'
+    const parts: string[] = ['Cuota de contrato']
+    if (typeof amountValue === 'number') {
+      parts.push(
+        new Intl.NumberFormat('es-CL', {
+          style: 'currency',
+          currency,
+          minimumFractionDigits: 0,
+        }).format(amountValue)
+      )
+    }
+    if (d.assetName) parts.push(String(d.assetName))
+    return parts.join(' · ')
+  }
   if (d.equipmentName || d.assetName) return `Activo: ${d.equipmentName || d.assetName}`
   if (d.credentialName) return `Credencial: ${d.credentialName}`
   if (d.credentialCode) return `Pase de acceso ${d.credentialCode}`
@@ -87,6 +130,13 @@ export function getAffectedObjectFieldLabel(entityType?: string | null): string 
       return 'Pase de acceso'
     case 'system':
       return 'Qué se registró'
+    case 'equipment_invoice':
+    case 'license_invoice':
+      return 'Factura'
+    case 'contract':
+      return 'Contrato'
+    case 'contract_payment':
+      return 'Cuota'
     default:
       return 'Objeto afectado'
   }

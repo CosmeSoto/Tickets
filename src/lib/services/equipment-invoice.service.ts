@@ -92,6 +92,16 @@ export interface UpdateEquipmentInvoiceInput {
   notes?: string | null
 }
 
+/**
+ * Convertir una factura de pago único (sin abonos) en un plan de cuotas —
+ * reemplaza la factura original por N cuotas "hermanas" que heredan su
+ * proveedor/moneda/N° de factura/OC/notas, en vez de dejar ambas y duplicar
+ * el total adeudado del activo (ver `convertToSchedule`).
+ */
+export interface ConvertEquipmentInvoiceToScheduleInput {
+  installments: { amount: number; dueDate: Date }[]
+}
+
 export interface RegisterPaymentInput {
   /** Omitido = paga el saldo restante completo (comportamiento de "Pagar" de siempre). */
   amount?: number
@@ -504,6 +514,121 @@ export class EquipmentInvoiceService {
     return invoices.map(inv => ({ ...inv, paidAmount: 0 }))
   }
 
+  // ── Convertir pago único → plan de cuotas ─────────────────────────────────
+  // Reemplaza (no duplica) la factura: mismo guard que delete() — sin abonos
+  // registrados — más heredar proveedor/moneda/N° factura/OC/notas del
+  // original, así el usuario no tiene que retipearlos.
+
+  static async convertToSchedule(
+    id: string,
+    input: ConvertEquipmentInvoiceToScheduleInput,
+    convertedBy: string
+  ) {
+    const invoice = await prisma.equipment_invoices.findUnique({ where: { id } })
+    if (!invoice) throw new Error('Factura no encontrada')
+    if (invoice.scheduleGroupId) {
+      throw new Error('Esta factura ya es parte de un plan de cuotas.')
+    }
+
+    const paidAmount = await this.sumInstallments(id)
+    if (paidAmount > EPS) {
+      throw new Error(
+        'No se puede convertir: esta factura ya tiene abonos registrados. Deshazlos primero si necesitas pasarla a cuotas.'
+      )
+    }
+
+    if (!input.installments || input.installments.length < 2) {
+      throw new Error(
+        'Un plan de cuotas necesita al menos 2 cuotas — con una sola, usa el pago único.'
+      )
+    }
+    for (const cuota of input.installments) {
+      if (!cuota.amount || cuota.amount <= 0) {
+        throw new Error('Cada cuota debe tener un monto mayor a 0.')
+      }
+      if (!cuota.dueDate) {
+        throw new Error('Cada cuota debe tener una fecha de vencimiento.')
+      }
+    }
+
+    const scheduleGroupId = randomUUID()
+    const count = input.installments.length
+
+    await prisma.$transaction(async tx => {
+      await tx.equipment_invoices.delete({ where: { id } })
+
+      for (let i = 0; i < count; i++) {
+        const cuota = input.installments[i]
+        const status = computeAcquisitionStatus(cuota.dueDate, cuota.amount, 0)
+        const row = await tx.equipment_invoices.create({
+          data: {
+            id: randomUUID(),
+            equipmentId: invoice.equipmentId,
+            invoiceNumber: invoice.invoiceNumber,
+            purchaseOrderNumber: invoice.purchaseOrderNumber,
+            amount: cuota.amount,
+            currency: invoice.currency,
+            dueDate: cuota.dueDate,
+            status,
+            supplierId: invoice.supplierId,
+            supplierName: invoice.supplierName,
+            notes: invoice.notes,
+            scheduleGroupId,
+            installmentNumber: i + 1,
+            installmentCount: count,
+            createdBy: convertedBy,
+          },
+        })
+
+        await createAuditLog({
+          entityType: 'equipment_invoice',
+          entityId: row.id,
+          action: 'EQUIPMENT_INVOICE_CREATED',
+          userId: convertedBy,
+          changes: {
+            equipmentId: invoice.equipmentId,
+            amount: cuota.amount,
+            currency: row.currency,
+            invoiceNumber: invoice.invoiceNumber,
+            status,
+            scheduleGroupId,
+            installmentNumber: i + 1,
+            installmentCount: count,
+            convertedFromInvoiceId: id,
+          },
+        })
+      }
+    })
+
+    await createAuditLog({
+      entityType: 'equipment_invoice',
+      entityId: id,
+      action: 'EQUIPMENT_INVOICE_DELETED',
+      userId: convertedBy,
+      changes: {
+        equipmentId: invoice.equipmentId,
+        invoiceNumber: invoice.invoiceNumber,
+        amount: invoice.amount,
+        currency: invoice.currency,
+        status: invoice.status,
+        convertedToScheduleGroupId: scheduleGroupId,
+      },
+    })
+
+    await syncEquipmentPurchaseFields(invoice.equipmentId)
+
+    const invoices = await prisma.equipment_invoices.findMany({
+      where: { scheduleGroupId },
+      include: {
+        supplier: { select: { id: true, name: true } },
+        creator: { select: { id: true, name: true } },
+        installments: true,
+      },
+      orderBy: { installmentNumber: 'asc' },
+    })
+    return invoices.map(inv => ({ ...inv, paidAmount: 0 }))
+  }
+
   // ── Actualizar factura ────────────────────────────────────────────────────
 
   static async update(id: string, input: UpdateEquipmentInvoiceInput, updatedBy: string) {
@@ -600,6 +725,9 @@ export class EquipmentInvoiceService {
         action: 'EQUIPMENT_INVOICE_UPDATED',
         userId: updatedBy,
         changes: {
+          equipmentId: before.equipmentId,
+          invoiceNumber: invoice.invoiceNumber,
+          currency: invoice.currency,
           before: { amount: before.amount, status: before.status },
           after: { amount: invoice.amount, status: invoice.status },
         },
@@ -706,6 +834,9 @@ export class EquipmentInvoiceService {
         action: 'EQUIPMENT_INVOICE_PAYMENT_REGISTERED',
         userId: createdBy,
         changes: {
+          equipmentId: parent.equipmentId,
+          invoiceNumber: parent.invoiceNumber,
+          currency: parent.currency,
           amount,
           paidDate: data.paidDate.toISOString(),
           newStatus,
@@ -753,7 +884,13 @@ export class EquipmentInvoiceService {
         entityId: installment.invoiceId,
         action: 'EQUIPMENT_INVOICE_PAYMENT_DELETED',
         userId: deletedBy,
-        changes: { amount: installment.amount, newStatus },
+        changes: {
+          equipmentId: parent.equipmentId,
+          invoiceNumber: parent.invoiceNumber,
+          currency: parent.currency,
+          amount: installment.amount,
+          newStatus,
+        },
       })
 
       await syncEquipmentPurchaseFields(parent.equipmentId)
@@ -799,7 +936,13 @@ export class EquipmentInvoiceService {
   static async delete(id: string, deletedBy: string) {
     const invoice = await prisma.equipment_invoices.findUnique({
       where: { id },
-      select: { amount: true, status: true, equipmentId: true },
+      select: {
+        amount: true,
+        currency: true,
+        status: true,
+        equipmentId: true,
+        invoiceNumber: true,
+      },
     })
     if (!invoice) throw new Error('Factura no encontrada')
 
@@ -817,7 +960,13 @@ export class EquipmentInvoiceService {
       entityId: id,
       action: 'EQUIPMENT_INVOICE_DELETED',
       userId: deletedBy,
-      changes: { amount: invoice.amount, status: invoice.status },
+      changes: {
+        equipmentId: invoice.equipmentId,
+        invoiceNumber: invoice.invoiceNumber,
+        currency: invoice.currency,
+        amount: invoice.amount,
+        status: invoice.status,
+      },
     })
 
     await syncEquipmentPurchaseFields(invoice.equipmentId)

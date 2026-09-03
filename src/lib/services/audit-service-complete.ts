@@ -8,6 +8,11 @@ import { randomUUID } from 'crypto'
 import { AuditContextEnricher } from './audit-context-enricher'
 import { NextRequest } from 'next/server'
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+function isUuidLike(value: unknown): boolean {
+  return typeof value === 'string' && UUID_RE.test(value.trim())
+}
+
 export interface AuditLogData {
   action: string
   entityType:
@@ -239,6 +244,15 @@ export class AuditServiceComplete {
     const ticketIds = new Set<string>()
     const categoryIds = new Set<string>()
     const departmentIds = new Set<string>()
+    // Facturas de adquisición (equipos/licencias): el id del activo viaja
+    // dentro de `details.changes`, no como entityId (ese es el de la
+    // factura) — ver equipment-invoice.service.ts / license-invoice.service.ts.
+    const invoiceEquipmentIds = new Set<string>()
+    const invoiceLicenseIds = new Set<string>()
+    // Cuotas de contrato: mismo criterio — el id del contrato viaja dentro
+    // de `details.changes` (ver contract-payment.service.ts). Para
+    // entityType 'contract' directo, el id ya es el propio entityId.
+    const contractIds = new Set<string>()
 
     for (const log of logs) {
       if (log.entityId) {
@@ -247,6 +261,7 @@ export class AuditServiceComplete {
         else if (t === 'ticket') ticketIds.add(log.entityId)
         else if (t === 'category') categoryIds.add(log.entityId)
         else if (t === 'department') departmentIds.add(log.entityId)
+        else if (t === 'contract' && isUuidLike(log.entityId)) contractIds.add(log.entityId)
       }
       const d = log.details || {}
       if (d.userId) userIds.add(d.userId)
@@ -254,40 +269,70 @@ export class AuditServiceComplete {
       if (d.categoryId) categoryIds.add(d.categoryId)
       if (d.departmentId) departmentIds.add(d.departmentId)
       if (d.ticketId) ticketIds.add(d.ticketId)
+
+      const t = log.entityType?.toLowerCase()
+      const c = d.changes && typeof d.changes === 'object' ? d.changes : {}
+      if (t === 'equipment_invoice' && c.equipmentId) invoiceEquipmentIds.add(c.equipmentId)
+      if (t === 'license_invoice' && c.licenseId) invoiceLicenseIds.add(c.licenseId)
+      if (t === 'contract_payment' && c.contractId) contractIds.add(c.contractId)
     }
 
     // Resolver todos en paralelo con queries batch
-    const [users, tickets, categories, departments] = await Promise.all([
-      userIds.size > 0
-        ? prisma.users.findMany({
-            where: { id: { in: [...userIds] } },
-            select: { id: true, name: true, email: true },
-          })
-        : [],
-      ticketIds.size > 0
-        ? prisma.tickets.findMany({
-            where: { id: { in: [...ticketIds] } },
-            select: { id: true, title: true },
-          })
-        : [],
-      categoryIds.size > 0
-        ? prisma.categories.findMany({
-            where: { id: { in: [...categoryIds] } },
-            select: { id: true, name: true },
-          })
-        : [],
-      departmentIds.size > 0
-        ? prisma.departments.findMany({
-            where: { id: { in: [...departmentIds] } },
-            select: { id: true, name: true },
-          })
-        : [],
-    ])
+    const [users, tickets, categories, departments, invoiceEquipments, invoiceLicenses, contracts] =
+      await Promise.all([
+        userIds.size > 0
+          ? prisma.users.findMany({
+              where: { id: { in: [...userIds] } },
+              select: { id: true, name: true, email: true },
+            })
+          : [],
+        ticketIds.size > 0
+          ? prisma.tickets.findMany({
+              where: { id: { in: [...ticketIds] } },
+              select: { id: true, title: true },
+            })
+          : [],
+        categoryIds.size > 0
+          ? prisma.categories.findMany({
+              where: { id: { in: [...categoryIds] } },
+              select: { id: true, name: true },
+            })
+          : [],
+        departmentIds.size > 0
+          ? prisma.departments.findMany({
+              where: { id: { in: [...departmentIds] } },
+              select: { id: true, name: true },
+            })
+          : [],
+        invoiceEquipmentIds.size > 0
+          ? prisma.equipment.findMany({
+              where: { id: { in: [...invoiceEquipmentIds] } },
+              select: { id: true, code: true },
+            })
+          : [],
+        invoiceLicenseIds.size > 0
+          ? prisma.software_licenses.findMany({
+              where: { id: { in: [...invoiceLicenseIds] } },
+              select: { id: true, name: true },
+            })
+          : [],
+        contractIds.size > 0
+          ? prisma.contracts.findMany({
+              where: { id: { in: [...contractIds] } },
+              select: { id: true, name: true, contractNumber: true },
+            })
+          : [],
+      ])
 
     const userMap = new Map(users.map(u => [u.id, `${u.name} (${u.email})`]))
     const ticketMap = new Map(tickets.map(t => [t.id, t.title]))
     const categoryMap = new Map(categories.map(c => [c.id, c.name]))
     const departmentMap = new Map(departments.map(d => [d.id, d.name]))
+    const invoiceEquipmentMap = new Map(invoiceEquipments.map(e => [e.id, e.code]))
+    const invoiceLicenseMap = new Map(invoiceLicenses.map(l => [l.id, l.name]))
+    const contractMap = new Map(
+      contracts.map(c => [c.id, c.contractNumber ? `${c.contractNumber} — ${c.name}` : c.name])
+    )
 
     return logs.map(log => {
       const details = log.details || {}
@@ -302,6 +347,8 @@ export class AuditServiceComplete {
           enriched.entityName = categoryMap.get(log.entityId) ?? log.entityId
         else if (t === 'department')
           enriched.entityName = departmentMap.get(log.entityId) ?? log.entityId
+        else if (t === 'contract')
+          enriched.entityName = contractMap.get(log.entityId) ?? log.entityId
       }
 
       // Resolver IDs en details
@@ -314,6 +361,18 @@ export class AuditServiceComplete {
         enriched.departmentName = departmentMap.get(details.departmentId) ?? details.departmentId
       if (details.ticketId)
         enriched.ticketTitle = ticketMap.get(details.ticketId) ?? details.ticketId
+
+      // Resolver activo de facturas de adquisición (equipo/licencia) y de
+      // cuotas de contrato
+      const t = log.entityType?.toLowerCase()
+      const c = details.changes && typeof details.changes === 'object' ? details.changes : {}
+      if (t === 'equipment_invoice' && c.equipmentId) {
+        enriched.assetName = invoiceEquipmentMap.get(c.equipmentId) ?? null
+      } else if (t === 'license_invoice' && c.licenseId) {
+        enriched.assetName = invoiceLicenseMap.get(c.licenseId) ?? null
+      } else if (t === 'contract_payment' && c.contractId) {
+        enriched.assetName = contractMap.get(c.contractId) ?? null
+      }
 
       return { ...log, details: enriched }
     })

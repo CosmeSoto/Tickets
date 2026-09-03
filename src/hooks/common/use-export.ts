@@ -34,6 +34,9 @@ export interface UseExportOptions<T = any> {
   columns: ExportColumn[]
   /** Función que devuelve los datos actuales (ya filtrados) */
   getData: () => T[]
+  /** Fila de totales opcional — un valor por columna, en el mismo orden que
+   * `columns` (ver ExportOptions.totals en lib/utils/export). */
+  totals?: (rows: T[]) => Array<string | number | null | undefined>
 }
 
 export interface UseExportReturn {
@@ -44,7 +47,7 @@ export interface UseExportReturn {
 }
 
 export function useExport<T = any>(options: UseExportOptions<T>): UseExportReturn {
-  const { filename, title, subtitle, columns, getData } = options
+  const { filename, title, subtitle, columns, getData, totals } = options
   const { toast } = useToast()
   const [exporting, setExporting] = useState(false)
 
@@ -57,45 +60,76 @@ export function useExport<T = any>(options: UseExportOptions<T>): UseExportRetur
     try {
       const rows = getData()
       if (rows.length === 0) {
-        toast({ title: 'Sin datos', description: 'No hay datos para exportar con los filtros actuales', variant: 'destructive' })
+        toast({
+          title: 'Sin datos',
+          description: 'No hay datos para exportar con los filtros actuales',
+          variant: 'destructive',
+        })
         return
       }
-      exportToCSV({ filename: getFilenameWithDate(), columns, rows, title, subtitle })
+      exportToCSV({ filename: getFilenameWithDate(), columns, rows, title, subtitle, totals })
       toast({ title: 'CSV exportado', description: `${rows.length} registros exportados` })
     } catch (err) {
-      toast({ title: 'Error al exportar', description: 'No se pudo generar el CSV', variant: 'destructive' })
+      toast({
+        title: 'Error al exportar',
+        description: 'No se pudo generar el CSV',
+        variant: 'destructive',
+      })
     }
-  }, [getData, columns, title, subtitle, getFilenameWithDate, toast])
+  }, [getData, columns, title, subtitle, totals, getFilenameWithDate, toast])
 
   const exportExcel = useCallback(async () => {
     setExporting(true)
     try {
       const rows = getData()
       if (rows.length === 0) {
-        toast({ title: 'Sin datos', description: 'No hay datos para exportar con los filtros actuales', variant: 'destructive' })
+        toast({
+          title: 'Sin datos',
+          description: 'No hay datos para exportar con los filtros actuales',
+          variant: 'destructive',
+        })
         return
       }
-      await exportToExcel({ filename: getFilenameWithDate(), columns, rows, title, subtitle })
+      await exportToExcel({
+        filename: getFilenameWithDate(),
+        columns,
+        rows,
+        title,
+        subtitle,
+        totals,
+      })
       toast({ title: 'Excel exportado', description: `${rows.length} registros exportados` })
     } catch (err) {
-      toast({ title: 'Error al exportar', description: 'No se pudo generar el Excel', variant: 'destructive' })
+      toast({
+        title: 'Error al exportar',
+        description: 'No se pudo generar el Excel',
+        variant: 'destructive',
+      })
     } finally {
       setExporting(false)
     }
-  }, [getData, columns, title, subtitle, getFilenameWithDate, toast])
+  }, [getData, columns, title, subtitle, totals, getFilenameWithDate, toast])
 
   const exportPDF = useCallback(() => {
     try {
       const rows = getData()
       if (rows.length === 0) {
-        toast({ title: 'Sin datos', description: 'No hay datos para exportar con los filtros actuales', variant: 'destructive' })
+        toast({
+          title: 'Sin datos',
+          description: 'No hay datos para exportar con los filtros actuales',
+          variant: 'destructive',
+        })
         return
       }
-      exportToPDF({ filename: getFilenameWithDate(), columns, rows, title, subtitle })
+      exportToPDF({ filename: getFilenameWithDate(), columns, rows, title, subtitle, totals })
     } catch (err) {
-      toast({ title: 'Error al exportar', description: 'No se pudo generar el PDF', variant: 'destructive' })
+      toast({
+        title: 'Error al exportar',
+        description: 'No se pudo generar el PDF',
+        variant: 'destructive',
+      })
     }
-  }, [getData, columns, title, subtitle, getFilenameWithDate, toast])
+  }, [getData, columns, title, subtitle, totals, getFilenameWithDate, toast])
 
   return { exportCSV, exportExcel, exportPDF, exporting }
 }

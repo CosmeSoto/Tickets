@@ -28,6 +28,7 @@ export class LicenseService {
 
     const license = await prisma.software_licenses.create({
       data: {
+        code: data.code,
         name: data.name,
         typeId: data.typeId,
         key: encryptedKey,

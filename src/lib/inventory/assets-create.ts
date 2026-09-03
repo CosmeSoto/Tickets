@@ -464,6 +464,7 @@ export async function createAsset(
 
     const license = await LicenseService.createLicense(
       {
+        code: resolvedCode,
         name: name.trim(),
         typeId: resolvedLicenseTypeId,
         key: key ? String(key) : undefined,

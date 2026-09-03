@@ -1,13 +1,20 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { KeyRound, Eye, Loader2, Plus, Copy, User } from 'lucide-react'
+import { KeyRound, Eye, Loader2, Plus, Copy, User, Search } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import { RevealCredentialDialog } from '@/components/credentials/reveal-credential-dialog'
 import { CreateCredentialDialog } from '@/components/credentials/create-credential-dialog'
 import { useToast } from '@/hooks/use-toast'
+
+/** A partir de esta cantidad de credenciales, la lista se acota con scroll
+ * interno y aparece un buscador — si no, una tarjeta con 15-20 credenciales
+ * empuja el resto de la barra lateral (Asignación, Área…) fuera de vista. */
+const MANY_ENTRIES_THRESHOLD = 6
 
 type CredentialEntry = {
   id: string
@@ -51,6 +58,7 @@ export function LinkedCredentialsCard({
   const [copyingId, setCopyingId] = useState<string | null>(null)
   /** null = aún no se sabe (durante la carga); evita parpadeo del botón "Agregar". */
   const [canCreateHere, setCanCreateHere] = useState<boolean | null>(null)
+  const [filter, setFilter] = useState('')
 
   const apiPath =
     entity === 'equipment'
@@ -82,8 +90,17 @@ export function LinkedCredentialsCard({
 
   useEffect(() => {
     void loadEntries()
+    setFilter('')
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reload when entity target changes
   }, [entity, entityId])
+
+  const filteredEntries = useMemo(() => {
+    const q = filter.trim().toLowerCase()
+    if (!q) return entries
+    return entries.filter(
+      e => e.title.toLowerCase().includes(q) || (e.username ?? '').toLowerCase().includes(q)
+    )
+  }, [entries, filter])
 
   useEffect(() => {
     if (!canManage || !createOpen) return
@@ -159,6 +176,11 @@ export function LinkedCredentialsCard({
           <CardTitle className='text-base flex items-center gap-2'>
             <KeyRound className='h-4 w-4' />
             Credenciales
+            {entries.length > 0 && (
+              <Badge variant='secondary' className='text-xs'>
+                {entries.length}
+              </Badge>
+            )}
           </CardTitle>
           <div className='flex gap-2'>
             <Button variant='ghost' size='sm' asChild>
@@ -182,60 +204,87 @@ export function LinkedCredentialsCard({
           {entries.length === 0 ? (
             <p className='text-sm text-muted-foreground'>{emptyLabel}</p>
           ) : (
-            entries.map(entry => (
-              <div
-                key={entry.id}
-                className='flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm'
-              >
-                <div className='min-w-0 flex-1'>
-                  <p className='font-medium truncate'>{entry.title}</p>
-                  {entry.username ? (
-                    <p className='text-xs text-muted-foreground truncate'>{entry.username}</p>
-                  ) : (
-                    <p className='text-xs text-muted-foreground'>Sin usuario</p>
-                  )}
+            <>
+              {entries.length > MANY_ENTRIES_THRESHOLD && (
+                <div className='relative'>
+                  <Search className='absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground' />
+                  <Input
+                    value={filter}
+                    onChange={e => setFilter(e.target.value)}
+                    placeholder='Buscar por nombre o usuario…'
+                    className='h-8 pl-8 text-sm'
+                  />
                 </div>
-                <div className='flex items-center gap-0.5 shrink-0'>
-                  {entry.username ? (
-                    <Button
-                      type='button'
-                      variant='ghost'
-                      size='icon'
-                      className='h-8 w-8'
-                      title='Copiar usuario'
-                      onClick={() => void copyUsername(entry.username!)}
+              )}
+              {filteredEntries.length === 0 ? (
+                <p className='text-sm text-muted-foreground py-2'>
+                  Sin resultados para «{filter}».
+                </p>
+              ) : (
+                <div
+                  className={
+                    entries.length > MANY_ENTRIES_THRESHOLD
+                      ? 'space-y-2 max-h-72 overflow-y-auto pr-1'
+                      : 'space-y-2'
+                  }
+                >
+                  {filteredEntries.map(entry => (
+                    <div
+                      key={entry.id}
+                      className='flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm'
                     >
-                      <User className='h-3.5 w-3.5' />
-                    </Button>
-                  ) : null}
-                  <Button
-                    type='button'
-                    variant='ghost'
-                    size='icon'
-                    className='h-8 w-8'
-                    title='Copiar contraseña (auditado)'
-                    disabled={copyingId === entry.id}
-                    onClick={() => void copyPassword(entry)}
-                  >
-                    {copyingId === entry.id ? (
-                      <Loader2 className='h-3.5 w-3.5 animate-spin' />
-                    ) : (
-                      <Copy className='h-3.5 w-3.5' />
-                    )}
-                  </Button>
-                  <Button
-                    type='button'
-                    variant='ghost'
-                    size='icon'
-                    className='h-8 w-8'
-                    title='Revelar en pantalla'
-                    onClick={() => setRevealEntry(entry)}
-                  >
-                    <Eye className='h-3.5 w-3.5' />
-                  </Button>
+                      <div className='min-w-0 flex-1'>
+                        <p className='font-medium truncate'>{entry.title}</p>
+                        {entry.username ? (
+                          <p className='text-xs text-muted-foreground truncate'>{entry.username}</p>
+                        ) : (
+                          <p className='text-xs text-muted-foreground'>Sin usuario</p>
+                        )}
+                      </div>
+                      <div className='flex items-center gap-0.5 shrink-0'>
+                        {entry.username ? (
+                          <Button
+                            type='button'
+                            variant='ghost'
+                            size='icon'
+                            className='h-8 w-8'
+                            title='Copiar usuario'
+                            onClick={() => void copyUsername(entry.username!)}
+                          >
+                            <User className='h-3.5 w-3.5' />
+                          </Button>
+                        ) : null}
+                        <Button
+                          type='button'
+                          variant='ghost'
+                          size='icon'
+                          className='h-8 w-8'
+                          title='Copiar contraseña (auditado)'
+                          disabled={copyingId === entry.id}
+                          onClick={() => void copyPassword(entry)}
+                        >
+                          {copyingId === entry.id ? (
+                            <Loader2 className='h-3.5 w-3.5 animate-spin' />
+                          ) : (
+                            <Copy className='h-3.5 w-3.5' />
+                          )}
+                        </Button>
+                        <Button
+                          type='button'
+                          variant='ghost'
+                          size='icon'
+                          className='h-8 w-8'
+                          title='Revelar en pantalla'
+                          onClick={() => setRevealEntry(entry)}
+                        >
+                          <Eye className='h-3.5 w-3.5' />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              </div>
-            ))
+              )}
+            </>
           )}
           {entries.length > 0 ? (
             <p className='text-[11px] text-muted-foreground pt-1'>

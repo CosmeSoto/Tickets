@@ -244,6 +244,7 @@ export class ContractPaymentService {
       changes: {
         contractId: data.contractId,
         amount: data.amount,
+        currency: payment.currency,
         dueDate: data.dueDate.toISOString(),
         status,
       },
@@ -276,7 +277,14 @@ export class ContractPaymentService {
   ) {
     const before = await prisma.contract_payments.findUnique({
       where: { id },
-      select: { amount: true, dueDate: true, status: true, paidDate: true },
+      select: {
+        amount: true,
+        currency: true,
+        dueDate: true,
+        status: true,
+        paidDate: true,
+        contractId: true,
+      },
     })
     if (!before) throw new Error('Pago no encontrado')
 
@@ -369,6 +377,8 @@ export class ContractPaymentService {
         action: 'payment_updated',
         userId: updatedBy,
         changes: {
+          contractId: before.contractId,
+          currency: payment.currency,
           before: { amount: before.amount, status: before.status },
           after: { amount: payment.amount, status: payment.status },
         },
@@ -493,7 +503,13 @@ export class ContractPaymentService {
         entityId: id,
         action: 'payment_registered',
         userId: createdBy,
-        changes: { amount, newStatus, remaining: remaining - amount },
+        changes: {
+          contractId: parent.contractId,
+          currency: parent.currency,
+          amount,
+          newStatus,
+          remaining: remaining - amount,
+        },
       })
 
       return { payment: updated, amountPaid: amount }
@@ -567,7 +583,12 @@ export class ContractPaymentService {
         entityId: installment.paymentId,
         action: 'payment_installment_deleted',
         userId: deletedBy,
-        changes: { amount: installment.amount, newStatus },
+        changes: {
+          contractId: parent.contractId,
+          currency: parent.currency,
+          amount: installment.amount,
+          newStatus,
+        },
       })
 
       return { paymentId: installment.paymentId }
@@ -603,7 +624,7 @@ export class ContractPaymentService {
   static async delete(id: string, deletedBy: string) {
     const payment = await prisma.contract_payments.findUnique({
       where: { id },
-      select: { amount: true, dueDate: true, status: true },
+      select: { amount: true, currency: true, dueDate: true, status: true, contractId: true },
     })
     if (!payment) throw new Error('Pago no encontrado')
 
@@ -621,7 +642,12 @@ export class ContractPaymentService {
       entityId: id,
       action: 'payment_deleted',
       userId: deletedBy,
-      changes: { amount: payment.amount, status: payment.status },
+      changes: {
+        contractId: payment.contractId,
+        currency: payment.currency,
+        amount: payment.amount,
+        status: payment.status,
+      },
     })
   }
 

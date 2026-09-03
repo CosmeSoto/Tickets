@@ -1446,6 +1446,7 @@ model license_types {
 
 model software_licenses {
   id                    String                  @id @default(uuid())
+  code                  String                  @unique
   name                  String
   typeId                String                  @map("type_id")
   key                   String?

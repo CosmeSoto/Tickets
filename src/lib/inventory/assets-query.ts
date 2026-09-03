@@ -261,6 +261,7 @@ export async function queryAssets(params: AssetsQueryParams): Promise<AssetsQuer
         id: item.id,
         name: item.name,
         subtype: 'LICENSE' as const,
+        code: item.code ?? undefined,
         familyId: item.licenseType?.familyId ?? '',
         family: {
           name: item.licenseType?.family?.name ?? '',

@@ -9,7 +9,11 @@ import { randomUUID } from 'crypto'
 import { getUploadDir } from '@/lib/upload-path'
 
 const ALLOWED_TYPES = [
-  'image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif',
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/webp',
+  'image/gif',
   'application/pdf',
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -22,10 +26,7 @@ const ALLOWED_TYPES = [
  * GET /api/inventory/equipment/[id]/attachments
  * Lista adjuntos de un equipo
  */
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
@@ -44,15 +45,15 @@ export async function GET(
  * POST /api/inventory/equipment/[id]/attachments
  * Sube un adjunto a un equipo
  */
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
-  if (!await canManageInventory(session.user.id, session.user.role)) {
-    return NextResponse.json({ error: 'No tienes permiso para gestionar el inventario' }, { status: 403 })
+  if (!(await canManageInventory(session.user.id, session.user.role))) {
+    return NextResponse.json(
+      { error: 'No tienes permiso para gestionar el inventario' },
+      { status: 403 }
+    )
   }
 
   const { id: equipmentId } = await params
@@ -77,11 +78,46 @@ export async function POST(
   const uploadDir = getUploadDir('equipment', equipmentId)
   if (!existsSync(uploadDir)) await mkdir(uploadDir, { recursive: true })
 
-  const ext = file.name.split('.').pop()?.toLowerCase() || 'bin'
+  const buffer = Buffer.from(await file.arrayBuffer())
+
+  let ext = file.name.split('.').pop()?.toLowerCase() || 'bin'
+  let mimeType = file.type
+  if (file.type.startsWith('image/')) {
+    // El navegador no siempre reporta el formato real: un archivo ".jpg"
+    // puede ser WebP por dentro (pasa con capturas/recortes de algunos
+    // navegadores). Guardarlo con la extensión declarada en vez de la real
+    // deja el archivo ilegible para todo lo que sí valida el contenido —
+    // ej. el acta de entrega en PDF, que solo sabe leer PNG/JPEG y
+    // terminaba omitiendo la foto sin ningún aviso. Se detecta el formato
+    // real del contenido y se usa ese, no el que dijo el cliente.
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
+      const sharp = require('sharp') as typeof import('sharp')
+      const meta = await sharp(buffer).metadata()
+      const extByFormat: Record<string, string> = {
+        jpeg: 'jpg',
+        png: 'png',
+        webp: 'webp',
+        gif: 'gif',
+      }
+      const mimeByFormat: Record<string, string> = {
+        jpeg: 'image/jpeg',
+        png: 'image/png',
+        webp: 'image/webp',
+        gif: 'image/gif',
+      }
+      if (meta.format && extByFormat[meta.format]) {
+        ext = extByFormat[meta.format]
+        mimeType = mimeByFormat[meta.format]
+      }
+    } catch {
+      // No se pudo decodificar pese al Content-Type declarado — se guarda
+      // igual con lo que reportó el cliente, no bloquea la subida.
+    }
+  }
+
   const filename = `${randomUUID()}.${ext}`
   const filepath = getUploadDir('equipment', equipmentId, filename)
-
-  const buffer = Buffer.from(await file.arrayBuffer())
   await writeFile(filepath, buffer)
 
   const attachment = await prisma.equipment_attachments.create({
@@ -90,7 +126,7 @@ export async function POST(
       equipmentId,
       filename,
       originalName: file.name,
-      mimeType: file.type,
+      mimeType,
       size: file.size,
       path: filepath,
       uploadedBy: session.user.id,

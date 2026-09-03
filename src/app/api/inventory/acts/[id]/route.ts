@@ -2,17 +2,55 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { DeliveryActService } from '@/lib/services/delivery-act.service'
+import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
+
+/**
+ * Cambios de accesorios del equipo registrados DESPUÉS de que se generó
+ * esta acta — el acta es un snapshot congelado al crearla (por diseño: es
+ * un comprobante de entrega, no debe mutar), así que si después se le
+ * agrega o quita un accesorio al equipo eso no queda reflejado ahí. Sin
+ * este listado no había ninguna forma de notarlo desde el acta misma.
+ */
+async function getPostActAccessoryChanges(act: {
+  actType?: string | null
+  createdAt: Date
+  assignment?: { equipment?: { id: string } | null } | null
+}) {
+  const equipmentId = act.assignment?.equipment?.id
+  if (!equipmentId || (act.actType && act.actType !== 'EQUIPMENT_ASSIGNMENT')) return []
+
+  const logs = await prisma.audit_logs.findMany({
+    where: {
+      entityType: 'equipment',
+      entityId: equipmentId,
+      action: 'UPDATE',
+      createdAt: { gt: act.createdAt },
+    },
+    include: { users: { select: { name: true } } },
+    orderBy: { createdAt: 'asc' },
+  })
+
+  return logs
+    .map(log => {
+      const change = (log.details as any)?.changes?.Accesorios
+      if (!change) return null
+      return {
+        at: log.createdAt,
+        byName: log.users?.name ?? null,
+        before: change.antes,
+        after: change.después,
+      }
+    })
+    .filter((c): c is NonNullable<typeof c> => c !== null)
+}
 
 /**
  * GET /api/inventory/acts/[id]
  * Obtiene detalles de un acta de entrega
  * Requiere autenticación O token válido
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const searchParams = request.nextUrl.searchParams
@@ -34,22 +72,16 @@ export async function GET(
     if (token) {
       // Acceso por token
       act = await DeliveryActService.getActByToken(token)
-      
+
       if (!act || act.id !== id) {
-        return NextResponse.json(
-          { error: 'Acta no encontrada o token inválido' },
-          { status: 404 }
-        )
+        return NextResponse.json({ error: 'Acta no encontrada o token inválido' }, { status: 404 })
       }
     } else {
       // Acceso autenticado
       act = await DeliveryActService.getActById(id)
-      
+
       if (!act) {
-        return NextResponse.json(
-          { error: 'Acta no encontrada' },
-          { status: 404 }
-        )
+        return NextResponse.json({ error: 'Acta no encontrada' }, { status: 404 })
       }
     }
 
@@ -68,9 +100,9 @@ export async function GET(
       )
 
       const isDeliverer = (act as any).delivererInfo?.id === userId
-      const isReceiver  = (act as any).receiverInfo?.id  === userId
-      const isAdmin     = userRole === 'ADMIN'
-      const isManager   = canManage
+      const isReceiver = (act as any).receiverInfo?.id === userId
+      const isAdmin = userRole === 'ADMIN'
+      const isManager = canManage
 
       if (!isDeliverer && !isReceiver && !isAdmin && !isManager) {
         return NextResponse.json(
@@ -79,37 +111,40 @@ export async function GET(
         )
       }
 
-      const accessLevel = isSuperAdmin ? 'superadmin' : isAdmin ? 'admin' : isManager ? 'manager' : 'participant'
+      const accessLevel = isSuperAdmin
+        ? 'superadmin'
+        : isAdmin
+          ? 'admin'
+          : isManager
+            ? 'manager'
+            : 'participant'
       const isExpired = DeliveryActService.isActExpired(act)
       const canAccept = act.status === 'PENDING' && !isExpired
+      const postActAccessoryChanges = await getPostActAccessoryChanges(act as any)
 
-      return NextResponse.json({ act, canAccept, isExpired, accessLevel })
+      return NextResponse.json({ act, canAccept, isExpired, accessLevel, postActAccessoryChanges })
     }
 
     // Acceso por token — sin verificación de permisos adicional
     const isExpired = DeliveryActService.isActExpired(act)
     const canAccept = act.status === 'PENDING' && !isExpired
+    const postActAccessoryChanges = await getPostActAccessoryChanges(act as any)
 
     return NextResponse.json({
       act,
       canAccept,
       isExpired,
       accessLevel: 'participant',
+      postActAccessoryChanges,
     })
   } catch (error) {
     console.error('Error en GET /api/inventory/acts/[id]:', error)
-    
+
     if (error instanceof Error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
-    return NextResponse.json(
-      { error: 'Error al obtener acta' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error al obtener acta' }, { status: 500 })
   }
 }
 
