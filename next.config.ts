@@ -4,9 +4,16 @@ const nextConfig: NextConfig = {
   // Excluir paquetes server-only del bundling del client
   serverExternalPackages: ['pdfkit', 'fontkit', 'ioredis'],
 
-  // Performance optimizations (optimizeCss solo en producción — rompe Turbopack/PostCSS en dev Docker)
+  // Performance optimizations
+  //
+  // optimizeCss (critters) queda DESACTIVADO: recorre las 139 páginas del build
+  // extrayendo CSS crítico por página, y ese trabajo de I/O intensivo se vuelve
+  // brutalmente lento dentro del filesystem virtualizado de Docker Desktop en
+  // macOS (VirtioFS/overlay de la VM Linux) — un `npm run build` que en Linux
+  // nativo tarda unos minutos se estiraba a 40+ min o parecía colgado en Mac.
+  // El beneficio (CSS crítico inline) es marginal para un dashboard autenticado
+  // como este; no aplica a una landing pública donde sí importaría el first paint.
   experimental: {
-    ...(process.env.NODE_ENV === 'production' ? { optimizeCss: true } : {}),
     optimizePackageImports: ['lucide-react', '@radix-ui/react-icons', 'recharts', 'date-fns'],
   },
 

@@ -335,7 +335,9 @@ export class InventoryNotificationService {
           actId: act.id,
           folio: act.folio,
           daysRemaining,
-          link: acceptanceUrl,
+          // Interno (con sidebar) — el receptor ya está logueado para recibir esta
+          // notificación in-app; el link con token (acceptanceUrl) es solo para el email.
+          link: `/inventory/acts/${act.id}`,
         },
       })
 
@@ -816,7 +818,14 @@ export class InventoryNotificationService {
         },
       })
 
-      const actLink = `/acts/${act.id}/accept?token=${act.acceptanceToken}`
+      // La notificación in-app es solo para usuarios ya logueados en el sistema
+      // (NotificationService.push exige un userId válido) — a diferencia del
+      // email, no tiene sentido sacarlos con el link público con token; eso
+      // rompe el sidebar/header y los deja "fuera del sistema" (ver equipos,
+      // que sí usan /inventory/acts/${id} para ambas partes). El link con
+      // token queda reservado para el correo (acceptanceUrl arriba), que sí
+      // puede abrirse sin sesión.
+      const actLink = `/inventory/acts/${act.id}`
 
       await Promise.all([
         NotificationService.push({
@@ -899,6 +908,10 @@ export class InventoryNotificationService {
 
       const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
       const acceptanceUrl = `${baseUrl}/acts/contract-return/${act.id}/accept?token=${act.acceptanceToken}`
+      // Link interno (con sidebar/header) para las notificaciones in-app — ambas partes ya
+      // están logueadas para recibirlas. El link con token (acceptanceUrl) es solo para el
+      // correo, que debe poder abrirse sin sesión.
+      const actLink = `/inventory/acts/return/${act.id}`
       const expirationStr = new Date(act.expirationDate).toLocaleDateString('es-ES')
 
       await legacyQueueCreate({
@@ -928,7 +941,7 @@ export class InventoryNotificationService {
             actId: act.id,
             folio: act.folio,
             contractId: act.contractAssignment?.contract.id,
-            link: acceptanceUrl,
+            link: actLink,
           },
         }),
         NotificationService.push({
@@ -941,7 +954,7 @@ export class InventoryNotificationService {
             actId: act.id,
             folio: act.folio,
             contractId: act.contractAssignment?.contract.id,
-            link: `/acts/contract-return/${act.id}/accept`,
+            link: actLink,
           },
         }),
       ])
