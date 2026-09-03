@@ -51,14 +51,29 @@ echo ""
 
 # ── 1. Detectar IP actual ──────────────────────────────────────────────────────
 get_local_ip() {
-  if command -v route &>/dev/null && command -v ifconfig &>/dev/null; then
+  # macOS: route + ifconfig
+  if [ "$(uname)" = "Darwin" ]; then
     local iface
     iface=$(route -n get default 2>/dev/null | awk '/interface:/{print $2}')
     if [ -n "$iface" ]; then
-      ifconfig "$iface" | awk '/inet /{print $2}' | head -1
+      local ip
+      ip=$(ifconfig "$iface" 2>/dev/null | awk '/inet /{print $2}' | head -1)
+      if [ -n "$ip" ]; then
+        echo "$ip"
+        return
+      fi
+    fi
+  fi
+  # Linux: ip route
+  if command -v ip &>/dev/null; then
+    local ip
+    ip=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{print $7}' | head -1)
+    if [ -n "$ip" ]; then
+      echo "$ip"
       return
     fi
   fi
+  # Fallback genérico: hostname -I
   hostname -I 2>/dev/null | awk '{print $1}' || echo ""
 }
 
@@ -85,6 +100,10 @@ echo "✅ /etc/hosts → $CURRENT_IP $DOMAIN"
 if command -v dscacheutil &>/dev/null; then
   dscacheutil -flushcache
   killall -HUP mDNSResponder 2>/dev/null || true
+elif command -v resolvectl &>/dev/null; then
+  resolvectl flush-caches 2>/dev/null || true
+elif command -v systemd-resolve &>/dev/null; then
+  systemd-resolve --flush-caches 2>/dev/null || true
 fi
 
 # ── 3. Actualizar NEXTAUTH_URL en .env.production ─────────────────────────────
@@ -93,41 +112,99 @@ ensure_backup_env() {
     return
   fi
   local changed=false
-  if ! grep -q "^BACKUP_WORKER_SECRET=" "$ENV_FILE"; then
+
+  local current_secret
+  current_secret=$(grep "^BACKUP_WORKER_SECRET=" "$ENV_FILE" 2>/dev/null | cut -d= -f2- || true)
+  if [ -z "$current_secret" ]; then
     local secret
     secret=$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | xxd -p -c 64)
-    echo "BACKUP_WORKER_SECRET=$secret" >> "$ENV_FILE"
+    if grep -q "^BACKUP_WORKER_SECRET=" "$ENV_FILE"; then
+      sed -i.tmp "s|^BACKUP_WORKER_SECRET=.*|BACKUP_WORKER_SECRET=$secret|" "$ENV_FILE" && rm -f "${ENV_FILE}.tmp"
+    else
+      echo "BACKUP_WORKER_SECRET=$secret" >> "$ENV_FILE"
+    fi
     echo "✅ BACKUP_WORKER_SECRET generado en .env.production"
     changed=true
   fi
-  if ! grep -q "^BACKUP_WORKER_URL=" "$ENV_FILE"; then
-    echo "BACKUP_WORKER_URL=http://backup-worker:8080" >> "$ENV_FILE"
+
+  local current_worker_url
+  current_worker_url=$(grep "^BACKUP_WORKER_URL=" "$ENV_FILE" 2>/dev/null | cut -d= -f2- || true)
+  if [ -z "$current_worker_url" ]; then
+    if grep -q "^BACKUP_WORKER_URL=" "$ENV_FILE"; then
+      sed -i.tmp "s|^BACKUP_WORKER_URL=.*|BACKUP_WORKER_URL=http://backup-worker:8080|" "$ENV_FILE" && rm -f "${ENV_FILE}.tmp"
+    else
+      echo "BACKUP_WORKER_URL=http://backup-worker:8080" >> "$ENV_FILE"
+    fi
     changed=true
   fi
-  if ! grep -q "^PGBACKREST_STANZA=" "$ENV_FILE"; then
-    echo "PGBACKREST_STANZA=main" >> "$ENV_FILE"
+
+  local current_stanza
+  current_stanza=$(grep "^PGBACKREST_STANZA=" "$ENV_FILE" 2>/dev/null | cut -d= -f2- || true)
+  if [ -z "$current_stanza" ]; then
+    if grep -q "^PGBACKREST_STANZA=" "$ENV_FILE"; then
+      sed -i.tmp "s|^PGBACKREST_STANZA=.*|PGBACKREST_STANZA=main|" "$ENV_FILE" && rm -f "${ENV_FILE}.tmp"
+    else
+      echo "PGBACKREST_STANZA=main" >> "$ENV_FILE"
+    fi
     changed=true
   fi
-  if ! grep -q "^BACKUP_ALLOW_RESTORE=" "$ENV_FILE"; then
-    echo "BACKUP_ALLOW_RESTORE=false" >> "$ENV_FILE"
+
+  local current_allow_restore
+  current_allow_restore=$(grep "^BACKUP_ALLOW_RESTORE=" "$ENV_FILE" 2>/dev/null | cut -d= -f2- || true)
+  if [ -z "$current_allow_restore" ]; then
+    if grep -q "^BACKUP_ALLOW_RESTORE=" "$ENV_FILE"; then
+      sed -i.tmp "s|^BACKUP_ALLOW_RESTORE=.*|BACKUP_ALLOW_RESTORE=false|" "$ENV_FILE" && rm -f "${ENV_FILE}.tmp"
+    else
+      echo "BACKUP_ALLOW_RESTORE=false" >> "$ENV_FILE"
+    fi
     changed=true
   fi
-  if ! grep -q "^CRON_SECRET=" "$ENV_FILE"; then
+
+  local current_cron_secret
+  current_cron_secret=$(grep "^CRON_SECRET=" "$ENV_FILE" 2>/dev/null | cut -d= -f2- || true)
+  if [ -z "$current_cron_secret" ]; then
     local cron_secret
     cron_secret=$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | xxd -p -c 64)
-    echo "CRON_SECRET=$cron_secret" >> "$ENV_FILE"
+    if grep -q "^CRON_SECRET=" "$ENV_FILE"; then
+      sed -i.tmp "s|^CRON_SECRET=.*|CRON_SECRET=$cron_secret|" "$ENV_FILE" && rm -f "${ENV_FILE}.tmp"
+    else
+      echo "CRON_SECRET=$cron_secret" >> "$ENV_FILE"
+    fi
     echo "✅ CRON_SECRET generado — instala cron: ./docker/scripts/setup-backup-cron.sh"
     changed=true
   fi
-  if ! grep -q "^DOCKER_GID=" "$ENV_FILE"; then
-    local docker_gid
-    docker_gid=$(getent group docker 2>/dev/null | cut -d: -f3 || echo "999")
-    echo "DOCKER_GID=$docker_gid" >> "$ENV_FILE"
-    echo "✅ DOCKER_GID=$docker_gid (restauración pgBackRest desde UI)"
+
+  local target_docker_gid="999"
+  if [ "$(uname)" = "Darwin" ]; then
+    target_docker_gid="1"
+  elif command -v getent &>/dev/null; then
+    local detected_gid
+    detected_gid=$(getent group docker 2>/dev/null | cut -d: -f3 || true)
+    if [ -n "$detected_gid" ] && [[ "$detected_gid" =~ ^[0-9]+$ ]]; then
+      target_docker_gid="$detected_gid"
+    fi
+  elif [ -e "/var/run/docker.sock" ]; then
+    local detected_gid
+    detected_gid=$(stat -c "%g" /var/run/docker.sock 2>/dev/null || true)
+    if [ -n "$detected_gid" ] && [[ "$detected_gid" =~ ^[0-9]+$ ]]; then
+      target_docker_gid="$detected_gid"
+    fi
+  fi
+
+  local current_docker_gid
+  current_docker_gid=$(grep "^DOCKER_GID=" "$ENV_FILE" 2>/dev/null | cut -d= -f2- || true)
+  if [ "$current_docker_gid" != "$target_docker_gid" ]; then
+    if grep -q "^DOCKER_GID=" "$ENV_FILE"; then
+      sed -i.tmp "s|^DOCKER_GID=.*|DOCKER_GID=$target_docker_gid|" "$ENV_FILE" && rm -f "${ENV_FILE}.tmp"
+    else
+      echo "DOCKER_GID=$target_docker_gid" >> "$ENV_FILE"
+    fi
+    echo "✅ DOCKER_GID=$target_docker_gid (restauración pgBackRest desde UI)"
     changed=true
   fi
+
   if [ "$changed" = true ]; then
-    echo "✅ Variables pgBackRest añadidas a .env.production"
+    echo "✅ Variables pgBackRest verificadas en .env.production"
   fi
 }
 
@@ -199,32 +276,40 @@ fi
 # ── 5. Levantar servicios ─────────────────────────────────────────────────────
 echo ""
 
-# ── 4b. Verificar DNS de Docker ───────────────────────────────────────────────
-DOCKER_DAEMON_JSON="/etc/docker/daemon.json"
-NEEDS_DOCKER_RESTART=false
+# ── 4b. Verificar DNS de Docker (solo en Linux) ──────────────────────────────
+if [ "$(uname)" = "Linux" ]; then
+  DOCKER_DAEMON_JSON="/etc/docker/daemon.json"
+  NEEDS_DOCKER_RESTART=false
 
-if [ ! -f "$DOCKER_DAEMON_JSON" ]; then
-  echo "⚙️  Configurando DNS de Docker (primera vez)..."
-  cat > "$DOCKER_DAEMON_JSON" <<'EOF'
+  mkdir -p /etc/docker
+
+  if [ ! -f "$DOCKER_DAEMON_JSON" ]; then
+    echo "⚙️  Configurando DNS de Docker (primera vez)..."
+    cat > "$DOCKER_DAEMON_JSON" <<'EOF'
 {
   "dns": ["8.8.8.8", "8.8.4.4", "1.1.1.1"]
 }
 EOF
-  NEEDS_DOCKER_RESTART=true
-  echo "✅ DNS de Docker configurado (8.8.8.8, 8.8.4.4, 1.1.1.1)"
-elif ! grep -q '"dns"' "$DOCKER_DAEMON_JSON"; then
-  echo "⚙️  Agregando DNS a configuración existente de Docker..."
-  # Insertar dns antes del último }
-  sed -i.tmp 's/}$/,\n  "dns": ["8.8.8.8", "8.8.4.4", "1.1.1.1"]\n}/' "$DOCKER_DAEMON_JSON" && rm -f "${DOCKER_DAEMON_JSON}.tmp"
-  NEEDS_DOCKER_RESTART=true
-  echo "✅ DNS de Docker actualizado"
-fi
+    NEEDS_DOCKER_RESTART=true
+    echo "✅ DNS de Docker configurado (8.8.8.8, 8.8.4.4, 1.1.1.1)"
+  elif ! grep -q '"dns"' "$DOCKER_DAEMON_JSON"; then
+    echo "⚙️  Agregando DNS a configuración existente de Docker..."
+    # Insertar dns antes del último }
+    sed -i.tmp 's/}$/,\n  "dns": ["8.8.8.8", "8.8.4.4", "1.1.1.1"]\n}/' "$DOCKER_DAEMON_JSON" && rm -f "${DOCKER_DAEMON_JSON}.tmp"
+    NEEDS_DOCKER_RESTART=true
+    echo "✅ DNS de Docker actualizado"
+  fi
 
-if [ "$NEEDS_DOCKER_RESTART" = true ]; then
-  echo "🔄 Reiniciando Docker daemon para aplicar DNS..."
-  systemctl restart docker
-  sleep 3
-  echo "✅ Docker daemon reiniciado"
+  if [ "$NEEDS_DOCKER_RESTART" = true ]; then
+    echo "🔄 Reiniciando Docker daemon para aplicar DNS..."
+    if command -v systemctl &>/dev/null; then
+      systemctl restart docker
+    elif command -v service &>/dev/null; then
+      service docker restart
+    fi
+    sleep 3
+    echo "✅ Docker daemon reiniciado"
+  fi
 fi
 
 echo "🐳 Levantando servicios con Docker Compose..."
