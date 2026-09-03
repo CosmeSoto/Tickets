@@ -128,7 +128,6 @@ type BillingGovernanceInput = {
   lastChargeAmount?: number | null
   lastTransactionRef?: string | null
   subscriptionUsageStatus?: string
-  cancellationNoticeDays?: number | null
 }
 
 function mapBillingFields(data: BillingGovernanceInput) {
@@ -163,9 +162,6 @@ function mapBillingFields(data: BillingGovernanceInput) {
   }
   if (data.subscriptionUsageStatus !== undefined) {
     mapped.subscriptionUsageStatus = data.subscriptionUsageStatus
-  }
-  if (data.cancellationNoticeDays !== undefined) {
-    mapped.cancellationNoticeDays = data.cancellationNoticeDays ?? null
   }
   return mapped
 }

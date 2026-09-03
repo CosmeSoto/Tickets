@@ -115,10 +115,6 @@ const billingFieldsSchema = {
   ),
   lastTransactionRef: z.preprocess(emptyToNull, z.string().max(200).nullable().optional()),
   subscriptionUsageStatus: z.enum(SUBSCRIPTION_USAGE_STATUS_VALUES).default('ACTIVE'),
-  cancellationNoticeDays: z.preprocess(
-    v => (v === '' || v === undefined ? null : v),
-    z.number({ coerce: true }).int().min(0).max(365).nullable().optional()
-  ),
 }
 
 export const CONTRACT_LINE_TYPE_VALUES = [

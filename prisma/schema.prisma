@@ -2746,7 +2746,6 @@ model contracts {
   lastChargeAmount        Float?                  @map("last_charge_amount")
   lastTransactionRef      String?                 @map("last_transaction_ref") @db.VarChar(200)
   subscriptionUsageStatus SubscriptionUsageStatus @default(ACTIVE) @map("subscription_usage_status")
-  cancellationNoticeDays  Int?                    @map("cancellation_notice_days")
 
   createdBy String   @map("created_by")
   createdAt DateTime @default(now()) @map("created_at")

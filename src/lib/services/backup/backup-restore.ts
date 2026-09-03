@@ -672,6 +672,18 @@ const MERGE_UPDATE_TABLES = new Set([
   '"system_modules"',
   'site_config',
   '"site_config"',
+  // Página pública (landing): creada por el seed con ID fijo 'default'
+  // (landing_page_content) y IDs fijos 'service-1'... (landing_page_services).
+  // Sin esto, favicon/logos/nombre de empresa/SEO configurados por el admin
+  // se pierden en cada restauración en modo fusión: la fila ya existe (la
+  // creó el seed al levantar el sistema) y DO NOTHING conserva ese contenido
+  // de fábrica en vez del respaldo real.
+  'landing_page_content',
+  '"landing_page_content"',
+  'landing_page_services',
+  '"landing_page_services"',
+  'landing_page_banners',
+  '"landing_page_banners"',
   // Asignaciones de familias por usuario (unificado)
   'user_family_access',
   '"user_family_access"',
@@ -1325,15 +1337,54 @@ async function restoreModuleFromJSON(
         }
         // En modo 'merge' no borramos — hacemos upsert directamente
 
+        // Tablas de configuración con fila(s) de ID fijo creadas por el seed
+        // (site_config, landing_page_content, etc.): en modo fusión el backup
+        // SIEMPRE debe ganar sobre lo que ya exista, igual que en el camino de
+        // restauración desde .dump (ver MERGE_UPDATE_TABLES). createMany con
+        // skipDuplicates no sirve aquí: si la fila ya existe (la creó el seed
+        // al levantar el sistema) createMany la salta SIN lanzar error, así
+        // que nunca se llega al fallback de upsert de abajo — la restauración
+        // "funciona" pero deja el contenido de fábrica en vez del respaldo.
+        const forceOverwriteOnMerge = mode === 'merge' && MERGE_UPDATE_TABLES.has(tableName)
+
+        if (forceOverwriteOnMerge) {
+          let updatedCount = 0
+          for (let i = 0; i < processed.length; i++) {
+            try {
+              await tx.$executeRaw(Prisma.sql`SAVEPOINT restore_record;`)
+              if (processed[i].id) {
+                await (tx as any)[tableName].upsert({
+                  where: { id: processed[i].id },
+                  update: processed[i],
+                  create: processed[i],
+                })
+              } else {
+                await (tx as any)[tableName].create({ data: processed[i] })
+              }
+              await tx.$executeRaw(Prisma.sql`RELEASE SAVEPOINT restore_record;`)
+              updatedCount++
+            } catch (recordErr) {
+              await tx.$executeRaw(Prisma.sql`ROLLBACK TO SAVEPOINT restore_record;`)
+              if (i < 3) {
+                console.warn(
+                  `[módulo ${moduleId}] ⚠ ${tableName}[${i}] error: ${(recordErr as Error).message?.slice(0, 150)}`
+                )
+              }
+            }
+          }
+          console.log(
+            `[módulo ${moduleId}] ${tableName}: ${updatedCount}/${processed.length} registros restaurados (fusión con sobrescritura)`
+          )
+          continue
+        }
+
         // Intentar createMany primero (más eficiente)
         try {
           await tx.$executeRaw(Prisma.sql`SAVEPOINT restore_table;`)
-          if (mode === 'merge') {
-            // skipDuplicates ignora conflictos → solo inserta los que no existen
-            await (tx as any)[tableName].createMany({ data: processed, skipDuplicates: true })
-          } else {
-            await (tx as any)[tableName].createMany({ data: processed, skipDuplicates: true })
-          }
+          // skipDuplicates ignora conflictos → solo inserta los que no existen todavía
+          // (correcto para datos reales como tickets/noticias/equipos: en fusión se
+          // agregan registros nuevos sin tocar los existentes).
+          await (tx as any)[tableName].createMany({ data: processed, skipDuplicates: true })
           await tx.$executeRaw(Prisma.sql`RELEASE SAVEPOINT restore_table;`)
         } catch (bulkErr) {
           await tx.$executeRaw(Prisma.sql`ROLLBACK TO SAVEPOINT restore_table;`)

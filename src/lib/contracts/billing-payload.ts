@@ -1,8 +1,6 @@
 import type { CreateContractInput, UpdateContractInput } from '@/lib/validations/contracts'
 
-export function extractBillingPayload(
-  p: Partial<CreateContractInput | UpdateContractInput>
-) {
+export function extractBillingPayload(p: Partial<CreateContractInput | UpdateContractInput>) {
   return {
     custodianUserId: p.custodianUserId ?? undefined,
     backupCustodianUserId: p.backupCustodianUserId ?? undefined,
@@ -21,6 +19,5 @@ export function extractBillingPayload(
     lastChargeAmount: p.lastChargeAmount ?? undefined,
     lastTransactionRef: p.lastTransactionRef ?? undefined,
     subscriptionUsageStatus: p.subscriptionUsageStatus ?? undefined,
-    cancellationNoticeDays: p.cancellationNoticeDays ?? undefined,
   }
 }

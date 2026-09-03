@@ -60,7 +60,6 @@ export async function buildContractSnapshot(
     lastChargeAmount: contract.lastChargeAmount,
     lastTransactionRef: contract.lastTransactionRef,
     subscriptionUsageStatus: contract.subscriptionUsageStatus,
-    cancellationNoticeDays: contract.cancellationNoticeDays,
     lines: contract.lines.map(l => ({
       type: l.type,
       description: l.description,

@@ -98,9 +98,12 @@ function fmtCurrency(n: number, currency = 'USD') {
 interface Props {
   contractId: string
   hasBillingDates: boolean
+  /** Cuál fecha falta exactamente — evita el genérico "configura las fechas" cuando
+   * en realidad ya se cargó una de las dos. */
+  missingDatesHint?: string
 }
 
-export function ContractPaymentsPanel({ contractId, hasBillingDates }: Props) {
+export function ContractPaymentsPanel({ contractId, hasBillingDates, missingDatesHint }: Props) {
   const { toast } = useToast()
   const [payments, setPayments] = useState<ContractPayment[]>([])
   const [stats, setStats] = useState<PaymentStats | null>(null)
@@ -135,7 +138,8 @@ export function ContractPaymentsPanel({ contractId, hasBillingDates }: Props) {
     if (!hasBillingDates) {
       toast({
         title: 'Fechas incompletas',
-        description: 'El contrato debe tener fecha de inicio y fin para generar pagos.',
+        description:
+          missingDatesHint ?? 'El contrato debe tener fecha de inicio y fin para generar pagos.',
         variant: 'destructive',
       })
       return
@@ -255,7 +259,7 @@ export function ContractPaymentsPanel({ contractId, hasBillingDates }: Props) {
               disabled={generating || !hasBillingDates}
               title={
                 !hasBillingDates
-                  ? 'El contrato necesita fechas de inicio y fin'
+                  ? (missingDatesHint ?? 'El contrato necesita fechas de inicio y fin')
                   : 'Genera el calendario automático de cuotas'
               }
             >
@@ -329,7 +333,8 @@ export function ContractPaymentsPanel({ contractId, hasBillingDates }: Props) {
             <p className='text-xs text-muted-foreground mt-1'>
               {hasBillingDates
                 ? 'Usa "Generar pagos" para crear el calendario automático.'
-                : 'Configura las fechas del contrato para poder generar cuotas.'}
+                : (missingDatesHint ?? 'Configura las fechas del contrato') +
+                  ' para poder generar cuotas.'}
             </p>
           </div>
         ) : (

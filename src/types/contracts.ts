@@ -240,7 +240,6 @@ export interface Contract {
   lastChargeAmount?: number | null
   lastTransactionRef?: string | null
   subscriptionUsageStatus?: SubscriptionUsageStatus
-  cancellationNoticeDays?: number | null
   createdBy: string
   createdAt: string
   updatedAt: string
@@ -297,7 +296,6 @@ export interface ContractFormData {
   lastChargeAmount: string
   lastTransactionRef: string
   subscriptionUsageStatus: SubscriptionUsageStatus
-  cancellationNoticeDays: string
 }
 
 export interface ContractLineFormData {

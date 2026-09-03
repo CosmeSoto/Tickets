@@ -379,8 +379,6 @@ export function ContractForm({
       lastChargeAmount: contract?.lastChargeAmount != null ? String(contract.lastChargeAmount) : '',
       lastTransactionRef: contract?.lastTransactionRef ?? '',
       subscriptionUsageStatus: contract?.subscriptionUsageStatus ?? 'ACTIVE',
-      cancellationNoticeDays:
-        contract?.cancellationNoticeDays != null ? String(contract.cancellationNoticeDays) : '',
       lines:
         contract?.lines?.map(l => ({
           id: l.id,
@@ -514,8 +512,20 @@ export function ContractForm({
   )
   // Auto-rellenar contacto y preferencias comerciales desde el proveedor seleccionado.
   // Hace un fetch puntual al cambiar la selección — no depende de una lista cargada.
+  // También guarda los datos bancarios en `supplierBankInfo` para el botón "Usar datos
+  // bancarios del proveedor" — cubre el caso de completar/editar un contrato ya guardado
+  // cuyo proveedor recibió sus datos bancarios *después* de vincularlo (el relleno
+  // automático de abajo solo ocurre si el campo aún está vacío).
+  const [supplierBankInfo, setSupplierBankInfo] = useState<{
+    bankName?: string | null
+    bankAccountNumber?: string | null
+  } | null>(null)
+
   useEffect(() => {
-    if (!selectedSupplierId) return
+    if (!selectedSupplierId) {
+      setSupplierBankInfo(null)
+      return
+    }
     let cancelled = false
     fetch(`/api/inventory/suppliers/${selectedSupplierId}`)
       .then(r => (r.ok ? r.json() : null))
@@ -532,6 +542,10 @@ export function ContractForm({
           } | null
         ) => {
           if (cancelled || !supplier) return
+          setSupplierBankInfo({
+            bankName: supplier.bankName,
+            bankAccountNumber: supplier.bankAccountNumber,
+          })
           const current = getValues()
           if (!current.contactName && supplier.contactName)
             setValue('contactName', supplier.contactName)
@@ -555,6 +569,10 @@ export function ContractForm({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSupplierId])
+
+  const supplierBankRef = supplierBankInfo?.bankAccountNumber
+    ? [supplierBankInfo.bankName, supplierBankInfo.bankAccountNumber].filter(Boolean).join(' — ')
+    : null
 
   const emptyToUndef = (v: string | null | undefined) => {
     if (v == null || v === '') return undefined
@@ -604,9 +622,6 @@ export function ContractForm({
         lastChargeDate: emptyToUndef(data.lastChargeDate),
         lastChargeAmount: parseMoneyInput(data.lastChargeAmount),
         lastTransactionRef: emptyToUndef(data.lastTransactionRef),
-        cancellationNoticeDays: data.cancellationNoticeDays
-          ? Number(data.cancellationNoticeDays)
-          : undefined,
         serviceSubtype: emptyToUndef(data.serviceSubtype) ?? null,
         paymentMethodType: data.paymentMethodType,
         paymentAccountRef: emptyToUndef(data.paymentAccountRef) ?? null,
@@ -1139,6 +1154,17 @@ export function ContractForm({
                           : 'N° cuenta, IBAN o alias'
                   }
                 />
+                {supplierBankRef && watch('paymentAccountRef') !== supplierBankRef && (
+                  <button
+                    type='button'
+                    onClick={() =>
+                      setValue('paymentAccountRef', supplierBankRef, { shouldDirty: true })
+                    }
+                    className='text-xs text-primary hover:underline mt-1'
+                  >
+                    Usar datos bancarios del proveedor: {supplierBankRef}
+                  </button>
+                )}
               </div>
             )}
 
@@ -1228,15 +1254,6 @@ export function ContractForm({
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-            <div className='space-y-1'>
-              <Label>Días aviso de cancelación</Label>
-              <Input
-                type='number'
-                min='0'
-                {...register('cancellationNoticeDays')}
-                placeholder='30'
-              />
             </div>
           </div>
         </ContractFormSection>
@@ -1588,6 +1605,15 @@ export function ContractForm({
             <ContractPaymentsPanel
               contractId={contract.id}
               hasBillingDates={!!(contract.startDate && contract.endDate)}
+              missingDatesHint={
+                !contract.startDate && !contract.endDate
+                  ? 'Falta la fecha de inicio y la de vencimiento'
+                  : !contract.startDate
+                    ? 'Falta la fecha de inicio'
+                    : !contract.endDate
+                      ? 'Falta la fecha de vencimiento'
+                      : undefined
+              }
             />
           )}
         </>
