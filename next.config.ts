@@ -15,6 +15,18 @@ const nextConfig: NextConfig = {
   // como este; no aplica a una landing pública donde sí importaría el first paint.
   experimental: {
     optimizePackageImports: ['lucide-react', '@radix-ui/react-icons', 'recharts', 'date-fns'],
+
+    // Por defecto Next.js lanza `os.cpus().length - 1` workers para "Collecting
+    // page data" / "Generating static pages" (ver getNumberOfWorkers en
+    // next/dist/build/index.js). Dentro de la VM de Docker Desktop en macOS eso
+    // significó 7 workers en paralelo, cada uno un proceso Node cargando la app
+    // completa — con la VM en unos pocos GB de RAM (la Mac de build solo tiene
+    // 8 GB totales) el build terminaba con SIGKILL/"cannot allocate memory" a
+    // mitad de build. En Linux (más RAM, sin VM anidada) 7 workers no es problema,
+    // así que esto no se veía ahí. Fijamos un techo bajo de workers: build algo
+    // más lento, pero no revienta por memoria en hosts chicos. Si el build vuelve
+    // a correr en una máquina con harta RAM, se puede subir o quitar este límite.
+    cpus: 2,
   },
 
   // Image optimization
