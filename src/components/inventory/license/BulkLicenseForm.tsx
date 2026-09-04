@@ -20,6 +20,7 @@ import { DateInput } from '@/components/ui/date-input'
 import { SimpleSelect } from '@/components/ui/simple-select'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { SupplierSelect } from '@/components/inventory/suppliers/SupplierSelect'
+import { ContractPicker } from '@/components/contracts/contract-picker'
 import { sanitizeInvoiceNumberInput } from '@/lib/inventory/invoice-number'
 import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 
@@ -75,6 +76,10 @@ export function BulkLicenseForm({ familyId, onSuccess, onCancel }: BulkLicenseFo
   const [purchaseDate, setPurchaseDate] = useState('')
   const [defaultCost, setDefaultCost] = useState('')
   const [addCount, setAddCount] = useState('10')
+  // Contrato al que se vinculan TODAS las licencias del lote (ej. la orden de
+  // compra recurrente) — opcional. Si se elige, el costo de cada fila se suma
+  // al total recurrente del contrato en vez de generar 60 facturas sueltas.
+  const [contractId, setContractId] = useState<string | null>(null)
 
   const [rows, setRows] = useState<Row[]>([])
   const [submitting, setSubmitting] = useState(false)
@@ -158,6 +163,7 @@ export function BulkLicenseForm({ familyId, onSuccess, onCancel }: BulkLicenseFo
           invoiceNumber: invoiceNumber || undefined,
           purchaseOrderNumber: purchaseOrderNumber || undefined,
           purchaseDate: purchaseDate || undefined,
+          contractId: contractId || undefined,
           rows: rows.map(r => ({
             licenseTypeId: r.licenseTypeId,
             name: r.name.trim(),
@@ -168,9 +174,43 @@ export function BulkLicenseForm({ familyId, onSuccess, onCancel }: BulkLicenseFo
         }),
       })
       const json = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(json.error ?? 'No se pudieron crear las licencias')
+      // 422 con `failed` es un resultado válido y parcial (ver bulk-license.service.ts) —
+      // no un error de request. Solo un !res.ok SIN esa forma es un error real (auth, 500, etc).
+      const isPartialResult = Array.isArray(json.failed) || Array.isArray(json.warnings)
+      if (!res.ok && !isPartialResult) {
+        throw new Error(json.error ?? 'No se pudieron crear las licencias')
+      }
 
-      toast.success(`Se crearon ${json.count ?? rows.length} licencia(s)`)
+      const failedRows: { index: number; name: string; error: string }[] = json.failed ?? []
+      const warningRows: { index: number; name: string; error: string }[] = json.warnings ?? []
+      const createdCount: number = json.count ?? 0
+
+      if (warningRows.length > 0) {
+        toast.error(
+          `${warningRows.length} licencia(s) se crearon pero su vínculo a contrato/factura falló — revísalas manualmente desde su ficha.`
+        )
+      }
+
+      if (failedRows.length > 0) {
+        // Deja en el formulario SOLO las filas que fallaron, con sus datos ya
+        // cargados — reenviar ahora no duplica las que sí se crearon (esas ya
+        // no están en la lista).
+        setRows(prev => failedRows.map(f => prev[f.index]).filter((r): r is Row => !!r))
+        const detail = failedRows.map(f => `${f.name}: ${f.error}`).join(' · ')
+        setError(
+          createdCount > 0
+            ? `Se crearon ${createdCount} licencia(s). ${failedRows.length} fila(s) no se pudieron crear — corrígelas y reenvía: ${detail}`
+            : `No se pudo crear ninguna licencia. ${detail}`
+        )
+        toast.error(
+          createdCount > 0
+            ? `${failedRows.length} fila(s) fallaron — corrígelas y volvé a enviar (las ya creadas no se van a duplicar).`
+            : 'No se pudo crear ninguna licencia. Revisa el detalle debajo del formulario.'
+        )
+        return
+      }
+
+      toast.success(`Se crearon ${createdCount} licencia(s)`)
       if (onSuccess) onSuccess(json)
       else router.push('/inventory')
     } catch (err) {
@@ -255,6 +295,36 @@ export function BulkLicenseForm({ familyId, onSuccess, onCancel }: BulkLicenseFo
             </p>
           </div>
         </div>
+      </div>
+
+      {/* Vínculo a contrato (agrupa el pago del lote bajo un solo total recurrente) */}
+      <div className='rounded-lg border p-4 space-y-2'>
+        <p className='text-sm font-medium'>Vincular a un contrato (opcional)</p>
+        <p className='text-xs text-muted-foreground'>
+          Si esta orden de compra es recurrente (ej. una suscripción anual), vincula el lote a un
+          contrato: el costo de cada licencia se suma al total recurrente del contrato y Pagos
+          muestra un solo calendario de cuotas en vez de {rows.length || 'N'} facturas sueltas.
+        </p>
+        <ContractPicker
+          value={contractId}
+          onChange={setContractId}
+          supplierId={supplierId}
+          familyId={familyId}
+          context='license'
+          skipLinkCost
+          prefill={{
+            name: purchaseOrderNumber ? `OC ${purchaseOrderNumber}` : undefined,
+            supplierId,
+            familyId,
+            hasRecurring: true,
+          }}
+        />
+        {contractId && (
+          <p className='text-xs text-muted-foreground'>
+            Cada licencia se creará vinculada a este contrato — no se generarán facturas
+            individuales por licencia.
+          </p>
+        )}
       </div>
 
       {/* Agregar filas */}

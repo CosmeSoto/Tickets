@@ -38,7 +38,10 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await createBulkLicenses(parsed.data, session.user.id)
-    return NextResponse.json(result, { status: 201 })
+    // Si ninguna fila se pudo crear, el lote falló de verdad — no es un 201
+    // aunque técnicamente la request se procesó sin excepciones.
+    const status = result.created.length === 0 && result.failed.length > 0 ? 422 : 201
+    return NextResponse.json(result, { status })
   } catch (error: any) {
     console.error('Error en alta masiva de licencias:', error)
     return NextResponse.json(

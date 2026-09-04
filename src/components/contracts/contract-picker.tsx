@@ -53,6 +53,13 @@ interface Props {
    * contrato nuevo junto con el activo (ese contrato ya define su costo total).
    */
   onLinkCost?: (cost: number | null) => void
+  /**
+   * Omite el paso de "costo de renta" al vincular un contrato existente — el vínculo
+   * se confirma apenas se elige el contrato. Para flujos donde el costo se maneja
+   * aparte (p. ej. alta masiva: cada fila ya tiene su propio costo, no tiene sentido
+   * pedir "el" costo del lote entero acá).
+   */
+  skipLinkCost?: boolean
 }
 
 type PickerTab = 'link' | 'create' | 'edit'
@@ -67,6 +74,7 @@ export function ContractPicker({
   prefill = null,
   draftParentKey,
   onLinkCost,
+  skipLinkCost,
 }: Props) {
   const [open, setOpen] = useState(false)
   const [tab, setTab] = useState<PickerTab>('link')
@@ -162,6 +170,10 @@ export function ContractPicker({
   const selectContractToLink = (contractId: string) => {
     const contract = contracts.find(c => c.id === contractId)
     if (!contract) return
+    if (skipLinkCost) {
+      handleLink(contract.id)
+      return
+    }
     setPendingLinkContract(contract)
     setPendingLinkCost('')
   }

@@ -9,6 +9,7 @@
  * cada una asignada a una persona distinta.
  */
 import { z } from 'zod'
+import { INVOICE_NUMBER_PATTERN, INVOICE_NUMBER_ERROR } from '@/lib/inventory/invoice-number'
 
 export const bulkLicenseRowSchema = z.object({
   licenseTypeId: z.string().uuid('Tipo de licencia inválido'),
@@ -21,8 +22,28 @@ export const bulkLicenseRowSchema = z.object({
 export const bulkLicenseInputSchema = z.object({
   familyId: z.string().uuid('Familia inválida'),
   supplierId: z.string().uuid().optional().or(z.literal('')),
-  invoiceNumber: z.string().max(100).optional().or(z.literal('')),
-  purchaseOrderNumber: z.string().max(100).optional().or(z.literal('')),
+  // Mismo formato que el resto del módulo de inventario (solo dígitos y guion) —
+  // ver invoice-number.ts. El input ya sanitiza en tiempo real en el cliente;
+  // esto es la validación de defensa en profundidad del lado del servidor.
+  invoiceNumber: z
+    .string()
+    .max(100)
+    .regex(INVOICE_NUMBER_PATTERN, INVOICE_NUMBER_ERROR)
+    .optional()
+    .or(z.literal('')),
+  purchaseOrderNumber: z
+    .string()
+    .max(100)
+    .regex(INVOICE_NUMBER_PATTERN, INVOICE_NUMBER_ERROR)
+    .optional()
+    .or(z.literal('')),
+  /**
+   * Contrato (tabla `contracts`) al que se vinculan TODAS las licencias del lote —
+   * ej. una orden de compra recurrente. Si viene, el costo de cada fila se suma al
+   * total recurrente del contrato en vez de generar una factura PENDIENTE por
+   * licencia (ver bulk-license.service.ts).
+   */
+  contractId: z.string().uuid().optional().or(z.literal('')),
   purchaseDate: z
     .string()
     .optional()
