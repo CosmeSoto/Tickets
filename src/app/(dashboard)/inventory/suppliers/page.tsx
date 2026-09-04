@@ -40,6 +40,7 @@ import { SortableTableHead } from '@/components/ui/sortable-table-head'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { SupplierForm } from '@/components/inventory/suppliers/SupplierForm'
 import { SupplierTypesSection } from '@/components/settings/inventory/supplier-types-section'
+import { SupplierEvaluationsTab } from '@/components/inventory/suppliers/SupplierEvaluationsTab'
 import { ListTableToolbar } from '@/components/common/list-table-toolbar'
 import { useExport } from '@/hooks/common/use-export'
 import { PAYMENT_METHOD_TYPE_LABELS } from '@/types/contracts'
@@ -283,6 +284,7 @@ export default function SuppliersPage() {
             </Badge>
           </TabsTrigger>
           <TabsTrigger value='types'>Tipos de Proveedor</TabsTrigger>
+          <TabsTrigger value='evaluations'>Calificación</TabsTrigger>
         </TabsList>
 
         <TabsContent value='suppliers' className='space-y-6'>
@@ -629,6 +631,10 @@ export default function SuppliersPage() {
 
         <TabsContent value='types'>
           <SupplierTypesSection families={families} />
+        </TabsContent>
+
+        <TabsContent value='evaluations'>
+          <SupplierEvaluationsTab />
         </TabsContent>
       </Tabs>
 

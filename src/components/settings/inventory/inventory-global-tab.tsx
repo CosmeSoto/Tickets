@@ -2,7 +2,7 @@
  * Inventory Global Rules Tab Component
  */
 
-import { Save, Info, Bell, FileText } from 'lucide-react'
+import { Save, Info, Bell, FileText, Star } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -365,6 +365,61 @@ export function InventoryGlobalTab({
               </p>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Calificación de proveedores */}
+      <Card>
+        <CardHeader>
+          <CardTitle className='text-base flex items-center gap-2'>
+            <Star className='h-4 w-4' />
+            Calificación de proveedores
+          </CardTitle>
+          <CardDescription>
+            Puntaje total (sobre 30, suma de los 6 criterios) a partir del cual una evaluación queda
+            como Clasificación A o B. Por debajo del mínimo de B, queda en Clasificación C.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className='space-y-3'>
+          <div className='flex items-center gap-4'>
+            <Input
+              type='number'
+              min='0'
+              max='30'
+              value={globalRules.supplierQualificationMinA}
+              onChange={e =>
+                onSetGlobal('supplierQualificationMinA', parseInt(e.target.value) || 25)
+              }
+              className='w-24 font-mono'
+              disabled={readOnly}
+            />
+            <p className='text-sm'>
+              puntos mínimos para{' '}
+              <span className='font-medium text-emerald-600'>Clasificación A</span>
+            </p>
+          </div>
+          <div className='flex items-center gap-4'>
+            <Input
+              type='number'
+              min='0'
+              max='30'
+              value={globalRules.supplierQualificationMinB}
+              onChange={e =>
+                onSetGlobal('supplierQualificationMinB', parseInt(e.target.value) || 19)
+              }
+              className='w-24 font-mono'
+              disabled={readOnly}
+            />
+            <p className='text-sm'>
+              puntos mínimos para{' '}
+              <span className='font-medium text-amber-600'>Clasificación B</span>
+            </p>
+          </div>
+          {globalRules.supplierQualificationMinB >= globalRules.supplierQualificationMinA && (
+            <p className='text-xs text-destructive'>
+              El mínimo de Clasificación B debe ser menor que el de Clasificación A.
+            </p>
+          )}
         </CardContent>
       </Card>
 

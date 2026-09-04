@@ -100,6 +100,8 @@ export const INVENTORY_GLOBAL_SETTINGS_LABELS: Record<string, string> = {
   batch_utilization_email_critical: 'Email crítico lotes',
   batch_utilization_email_warning: 'Email advertencia lotes',
   batch_low_stock_threshold_pct: 'Umbral stock bajo lotes (%)',
+  supplier_qualification_min_a: 'Calificación proveedores — mínimo Clasificación A',
+  supplier_qualification_min_b: 'Calificación proveedores — mínimo Clasificación B',
 }
 
 export const ASSET_REQUEST_CONFIG_LABELS: Record<string, string> = {

@@ -26,6 +26,7 @@ import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { SupplierForm } from '@/components/inventory/suppliers/SupplierForm'
 import { SupplierAuditCard } from '@/components/inventory/suppliers/SupplierAuditCard'
+import { SupplierEvaluationsCard } from '@/components/inventory/suppliers/SupplierEvaluationsCard'
 import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 import { useSession } from 'next-auth/react'
 import { PAYMENT_METHOD_TYPE_LABELS } from '@/types/contracts'
@@ -432,6 +433,10 @@ export default function SupplierDetailPage({
             )}
           </CardContent>
         </Card>
+      </div>
+
+      <div className='mt-4'>
+        <SupplierEvaluationsCard supplierId={supplier.id} canManage={isAdmin} />
       </div>
 
       <div className='mt-4'>

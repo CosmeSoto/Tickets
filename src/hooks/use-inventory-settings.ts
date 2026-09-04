@@ -92,6 +92,8 @@ export interface GlobalRules {
   batchUtilizationEmailCritical: boolean
   batchUtilizationEmailWarning: boolean
   batchLowStockThresholdPct: number
+  supplierQualificationMinA: number
+  supplierQualificationMinB: number
 }
 
 const DEFAULT_GLOBAL_RULES: GlobalRules = {
@@ -111,6 +113,8 @@ const DEFAULT_GLOBAL_RULES: GlobalRules = {
   batchUtilizationEmailCritical: true,
   batchUtilizationEmailWarning: false,
   batchLowStockThresholdPct: 15,
+  supplierQualificationMinA: 25,
+  supplierQualificationMinB: 19,
 }
 
 /** Normaliza alias legacy del método de depreciación al enum de Prisma. */
@@ -164,6 +168,12 @@ function apiSettingsToGlobalRules(settings: Record<string, unknown>): GlobalRule
     batchLowStockThresholdPct:
       Number(settings.batch_low_stock_threshold_pct) ||
       DEFAULT_GLOBAL_RULES.batchLowStockThresholdPct,
+    supplierQualificationMinA:
+      Number(settings.supplier_qualification_min_a) ||
+      DEFAULT_GLOBAL_RULES.supplierQualificationMinA,
+    supplierQualificationMinB:
+      Number(settings.supplier_qualification_min_b) ||
+      DEFAULT_GLOBAL_RULES.supplierQualificationMinB,
   }
 }
 
@@ -185,6 +195,8 @@ function globalRulesToApiPayload(rules: GlobalRules): Record<string, number | bo
     batch_utilization_email_critical: rules.batchUtilizationEmailCritical,
     batch_utilization_email_warning: rules.batchUtilizationEmailWarning,
     batch_low_stock_threshold_pct: rules.batchLowStockThresholdPct,
+    supplier_qualification_min_a: rules.supplierQualificationMinA,
+    supplier_qualification_min_b: rules.supplierQualificationMinB,
   }
 }
 
@@ -617,10 +629,9 @@ export function useInventorySettings() {
       setSelectedFamilyId(familyId)
       // Mantener la ruta actual (/inventory/settings o /admin/settings/inventory)
       // para no expulsar gestores del gate /admin/*
-      const base =
-        pathname?.startsWith('/admin/settings/inventory')
-          ? '/admin/settings/inventory'
-          : '/inventory/settings'
+      const base = pathname?.startsWith('/admin/settings/inventory')
+        ? '/admin/settings/inventory'
+        : '/inventory/settings'
       router.replace(`${base}?familyId=${familyId}`, { scroll: false })
     },
     [router, pathname]

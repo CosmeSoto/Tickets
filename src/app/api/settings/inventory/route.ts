@@ -5,29 +5,46 @@ import prisma from '@/lib/prisma'
 import { z } from 'zod'
 import { requireSuperAdmin } from '@/lib/auth/require-super-admin'
 import { invalidateBatchAlertSettingsCache } from '@/lib/inventory/batch-alert-settings'
+import { invalidateSupplierQualificationThresholdsCache } from '@/lib/inventory/supplier-qualification'
 import { logConfigAudit } from '@/lib/services/config-audit'
 import { invalidateSettings } from '@/lib/api-cache'
 
-const inventorySettingsSchema = z.object({
-  // Sin default []: si el cliente no envía manager_ids, no se pisan en BD
-  manager_ids: z.array(z.string()).optional(),
-  act_expiration_days: z.number().min(1).max(30),
-  low_stock_alert_enabled: z.boolean(),
-  license_alert_enabled: z.boolean(),
-  license_alert_days_first: z.number().min(1).max(90),
-  license_alert_days_second: z.number().min(1).max(90),
-  mro_expiry_alert_days: z.number().min(1).max(365).optional(),
-  mro_expiry_alert_days_urgent: z.number().min(1).max(365).optional(),
-  warranty_alert_days: z.number().min(1).max(365).optional(),
-  contract_alert_days: z.number().min(1).max(365).optional(),
-  maintenance_alert_days: z.number().min(1).max(365).optional(),
-  mro_expiry_alert_enabled: z.boolean().optional(),
-  warranty_alert_enabled: z.boolean().optional(),
-  batch_utilization_alert_enabled: z.boolean().optional(),
-  batch_utilization_email_critical: z.boolean().optional(),
-  batch_utilization_email_warning: z.boolean().optional(),
-  batch_low_stock_threshold_pct: z.number().min(5).max(50).optional(),
-})
+const inventorySettingsSchema = z
+  .object({
+    // Sin default []: si el cliente no envía manager_ids, no se pisan en BD
+    manager_ids: z.array(z.string()).optional(),
+    act_expiration_days: z.number().min(1).max(30),
+    low_stock_alert_enabled: z.boolean(),
+    license_alert_enabled: z.boolean(),
+    license_alert_days_first: z.number().min(1).max(90),
+    license_alert_days_second: z.number().min(1).max(90),
+    mro_expiry_alert_days: z.number().min(1).max(365).optional(),
+    mro_expiry_alert_days_urgent: z.number().min(1).max(365).optional(),
+    warranty_alert_days: z.number().min(1).max(365).optional(),
+    contract_alert_days: z.number().min(1).max(365).optional(),
+    maintenance_alert_days: z.number().min(1).max(365).optional(),
+    mro_expiry_alert_enabled: z.boolean().optional(),
+    warranty_alert_enabled: z.boolean().optional(),
+    batch_utilization_alert_enabled: z.boolean().optional(),
+    batch_utilization_email_critical: z.boolean().optional(),
+    batch_utilization_email_warning: z.boolean().optional(),
+    batch_low_stock_threshold_pct: z.number().min(5).max(50).optional(),
+    supplier_qualification_min_a: z.number().int().min(0).max(30).optional(),
+    supplier_qualification_min_b: z.number().int().min(0).max(30).optional(),
+  })
+  .superRefine((val, ctx) => {
+    if (
+      val.supplier_qualification_min_a !== undefined &&
+      val.supplier_qualification_min_b !== undefined &&
+      val.supplier_qualification_min_b >= val.supplier_qualification_min_a
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'El mínimo de Clasificación B debe ser menor que el de Clasificación A',
+        path: ['supplier_qualification_min_b'],
+      })
+    }
+  })
 
 const DEFAULT_SETTINGS: Record<string, string> = {
   manager_ids: '[]',
@@ -47,6 +64,8 @@ const DEFAULT_SETTINGS: Record<string, string> = {
   batch_utilization_email_critical: 'true',
   batch_utilization_email_warning: 'false',
   batch_low_stock_threshold_pct: '15',
+  supplier_qualification_min_a: '25',
+  supplier_qualification_min_b: '19',
 }
 
 const JSON_FIELDS = ['manager_ids']
@@ -69,6 +88,8 @@ const NUMBER_FIELDS = [
   'contract_alert_days',
   'maintenance_alert_days',
   'batch_low_stock_threshold_pct',
+  'supplier_qualification_min_a',
+  'supplier_qualification_min_b',
 ]
 
 async function loadInventorySettings(): Promise<Record<string, unknown>> {
@@ -156,6 +177,7 @@ export async function PUT(request: NextRequest) {
     }
 
     invalidateBatchAlertSettingsCache()
+    invalidateSupplierQualificationThresholdsCache()
     if (updatedKeys.length > 0) {
       await invalidateSettings(updatedKeys)
     }
@@ -199,6 +221,10 @@ function getSettingDescription(key: string): string {
     batch_utilization_email_critical: 'Envía email en alertas críticas de lotes',
     batch_utilization_email_warning: 'Envía email en alertas de advertencia de lotes',
     batch_low_stock_threshold_pct: 'Porcentaje mínimo de stock disponible antes de alertar',
+    supplier_qualification_min_a:
+      'Puntaje total mínimo (sobre 30) para Clasificación A en calificación de proveedores',
+    supplier_qualification_min_b:
+      'Puntaje total mínimo (sobre 30) para Clasificación B en calificación de proveedores',
   }
   return descriptions[key] || ''
 }
