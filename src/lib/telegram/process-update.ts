@@ -841,7 +841,10 @@ async function handleMisContratos(chatId: string) {
   })
 
   if (!contracts.length) {
-    await sendTelegramMessage(chatId, `ℹ️ No tienes contratos activos asignados como custodio\\.`)
+    await sendTelegramMessage(
+      chatId,
+      `ℹ️ No tienes contratos activos asignados como custodio comercial\\.`
+    )
     return
   }
 
@@ -915,7 +918,7 @@ async function handleAyuda(chatId: string) {
   if (isAdmin || isTech) inventarioCmds += `*/bajas* — Solicitudes de baja en revisión\n`
 
   // ── Sección contratos ────────────────────────────────────────────────────────
-  const contratosCmds = `\n\n📑 *Contratos:*\n*/mis\\_contratos* — Tus contratos activos como custodio\n`
+  const contratosCmds = `\n\n📑 *Contratos:*\n*/mis\\_contratos* — Tus contratos activos como custodio comercial\n`
 
   // ── Sección rondas ───────────────────────────────────────────────────────────
   let rondasCmds = ''
