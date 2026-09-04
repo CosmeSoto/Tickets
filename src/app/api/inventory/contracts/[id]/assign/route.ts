@@ -16,10 +16,7 @@ import { ZodError } from 'zod'
  * Asigna el contrato/suscripción a un cliente y genera acta de entrega.
  * Si había otro cliente, cierra la asignación anterior y genera acta de retiro.
  */
-export async function POST(
-  request: NextRequest,
-  context: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
@@ -77,14 +74,17 @@ export async function POST(
       )
     }
 
-    const { assignment, previousAssignmentId } = assignmentResult
+    const { assignment, previousAssignmentId, actsRequired } = assignmentResult
     let returnAct = null
     let deliveryAct = null
     let acceptanceUrl: string | null = null
     let returnAcceptanceUrl: string | null = null
 
     try {
-      if (previousAssignmentId) {
+      // Si el área no exige acta, createAssignment ya dejó la asignación anterior
+      // cerrada (isActive:false) dentro de su propia transacción — generar aquí un
+      // acta de retiro exigiría luego una firma que esta área decidió no requerir.
+      if (previousAssignmentId && actsRequired) {
         returnAct = await ContractReturnActService.generateReturnAct(previousAssignmentId, {
           withdrawalReason: body.changeReason || 'Cambio de cliente',
           handoverNotes: body.notes || undefined,
@@ -93,14 +93,7 @@ export async function POST(
         returnAcceptanceUrl = `${baseUrl}/acts/contract-return/${returnAct.id}/accept?token=${returnAct.acceptanceToken}`
       }
 
-      const familyConfig = contract.familyId
-        ? await prisma.inventory_family_config.findUnique({
-            where: { familyId: contract.familyId },
-            select: { requireDeliveryAct: true },
-          })
-        : null
-
-      if (familyConfig?.requireDeliveryAct !== false) {
+      if (actsRequired) {
         deliveryAct = await ContractDeliveryActService.generateDeliveryAct(assignment.id)
         const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
         acceptanceUrl = `${baseUrl}/acts/${deliveryAct.id}/accept?token=${deliveryAct.acceptanceToken}`

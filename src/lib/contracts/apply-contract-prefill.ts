@@ -2,27 +2,6 @@ import type { UseFormSetValue } from 'react-hook-form'
 import type { ContractFormData, ContractLineType } from '@/types/contracts'
 import type { ContractPickerPrefill } from '@/lib/contracts/contract-picker-prefill'
 
-type LineDraft = {
-  type: ContractLineType
-  description: string
-  quantity: string
-  unitPrice: string
-  equipmentId: string
-  licenseId: string
-  notes: string
-  serviceStartDate?: string
-  serviceEndDate?: string
-  order: number
-}
-
-/** Descripciones genéricas que duplican la categoría — no crear línea automática. */
-const GENERIC_LINE_DESCRIPTIONS = new Set([
-  'licencia de software',
-  'equipo en arrendamiento',
-  'software',
-  'equipo',
-])
-
 export function lineTypeForCategory(
   category?: ContractFormData['category'] | string | null
 ): ContractLineType {
@@ -35,9 +14,7 @@ export function lineTypeForCategory(
 /** Aplica prefill al formulario completo de contrato (creación embebida). */
 export function applyContractFormPrefill(
   prefill: ContractPickerPrefill,
-  setValue: UseFormSetValue<ContractFormData>,
-  appendLine: (line: LineDraft) => void,
-  currentLineCount: number
+  setValue: UseFormSetValue<ContractFormData>
 ): void {
   if (prefill.name) setValue('name', prefill.name)
   if (prefill.category) {
@@ -63,30 +40,12 @@ export function applyContractFormPrefill(
   }
   if (prefill.description) setValue('description', prefill.description)
 
-  // Solo prellenar línea si hay identificación concreta del activo (no texto genérico
-  // que repite la categoría: "Licencia de software" / "Equipo en arrendamiento").
-  const rawDesc = prefill.suggestedLineDescription?.trim()
-  const isGeneric = !rawDesc || GENERIC_LINE_DESCRIPTIONS.has(rawDesc.toLowerCase())
-
-  if (rawDesc && !isGeneric && currentLineCount === 0) {
-    const unitPrice = isRecurring
-      ? prefill.monthlyCost != null
-        ? String(prefill.monthlyCost)
-        : ''
-      : prefill.totalValue != null
-        ? String(prefill.totalValue)
-        : ''
-    appendLine({
-      type: prefill.suggestedLineType ?? lineTypeForCategory(prefill.category),
-      description: rawDesc,
-      quantity: '1',
-      unitPrice,
-      equipmentId: '',
-      licenseId: '',
-      notes: '',
-      serviceStartDate: prefill.startDate ?? '',
-      serviceEndDate: prefill.endDate ?? '',
-      order: 0,
-    })
-  }
+  // Deliberadamente NO se agrega una línea para el activo que se está creando.
+  // Ese activo todavía no existe (no tiene id) al momento de este prefill, así
+  // que cualquier línea creada acá quedaría con equipmentId/licenseId vacíos.
+  // Cuando el activo se guarda, linkEquipmentToContract()/linkLicenseToBusinessContract()
+  // crea automáticamente la línea real, ya vinculada a su id — esta de acá nunca
+  // se reemplaza ni se limpia, así que quedaba como un renglón fantasma duplicado
+  // en el contrato (línea sin activo + línea real, mismo ítem). "Agregar ítem"
+  // sigue disponible para cargos u otros activos que el usuario quiera anotar a mano.
 }

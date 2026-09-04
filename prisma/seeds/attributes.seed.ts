@@ -26,9 +26,6 @@ export async function seedAttributes(prisma: PrismaClient, familyMap: Map<string
   const laptopType = await prisma.equipment_types.findFirst({
     where: { name: 'Laptop', familyId: adminFamilyId },
   })
-  const printerType = await prisma.equipment_types.findFirst({
-    where: { name: 'Impresora', familyId: adminFamilyId },
-  })
 
   // Atributos para Computadora de Escritorio
   if (computerType) {
@@ -214,72 +211,6 @@ export async function seedAttributes(prisma: PrismaClient, familyMap: Map<string
       })
     }
     console.log(`  ✅ ${laptopAttrs.length} atributos para Laptop`)
-  }
-
-  // Atributos para Impresora
-  if (printerType) {
-    const printerAttrs = [
-      {
-        attributeName: 'tipo_impresora',
-        attributeLabel: 'Tipo de Impresora',
-        attributeType: 'select',
-        isRequired: true,
-        isVisible: true,
-        order: 4,
-        options: ['Láser', 'Inyección de Tinta', 'Multifuncional', 'Térmica'],
-      },
-      {
-        attributeName: 'color',
-        attributeLabel: 'Color',
-        attributeType: 'select',
-        isRequired: true,
-        isVisible: true,
-        order: 5,
-        options: ['Monocromática', 'Color'],
-      },
-      {
-        attributeName: 'conectividad',
-        attributeLabel: 'Conectividad',
-        attributeType: 'select',
-        isRequired: true,
-        isVisible: true,
-        order: 6,
-        options: ['USB', 'Red (Ethernet)', 'WiFi', 'USB + Red', 'USB + WiFi'],
-      },
-    ]
-
-    for (const attr of printerAttrs) {
-      await prisma.equipment_type_attributes.upsert({
-        where: {
-          equipmentTypeId_attributeName: {
-            equipmentTypeId: printerType.id,
-            attributeName: attr.attributeName,
-          },
-        },
-        update: {
-          attributeLabel: attr.attributeLabel,
-          attributeType: attr.attributeType,
-          isRequired: attr.isRequired,
-          isVisible: attr.isVisible,
-          order: attr.order,
-          helpText: (attr as any).helpText ?? null,
-          options: attr.options ? { options: attr.options } : undefined,
-        },
-        create: {
-          id: randomUUID(),
-          equipmentTypeId: printerType.id,
-          attributeName: attr.attributeName,
-          attributeLabel: attr.attributeLabel,
-          attributeType: attr.attributeType,
-          isRequired: attr.isRequired,
-          isVisible: attr.isVisible,
-          order: attr.order,
-          helpText: (attr as any).helpText ?? null,
-          options: attr.options ? { options: attr.options } : undefined,
-        },
-      })
-    }
-    console.log(`  ✅ ${printerAttrs.length} atributos para Impresora`)
   }
 
   // ============================================
@@ -1327,13 +1258,13 @@ export async function seedAttributes(prisma: PrismaClient, familyMap: Map<string
     helpText?: string
   }> = [
     {
-      attributeName: 'tipo_impresion',
-      attributeLabel: 'Tipo de Impresión',
+      attributeName: 'tipo_impresora',
+      attributeLabel: 'Tipo de Impresora',
       attributeType: 'select',
       isRequired: true,
       isVisible: true,
       order: 4,
-      options: ['Láser', 'Inyección', 'Matricial', 'Térmica'],
+      options: ['Láser', 'Inyección de Tinta', 'Multifuncional', 'Matricial', 'Térmica'],
     },
     {
       attributeName: 'color',
@@ -1342,7 +1273,7 @@ export async function seedAttributes(prisma: PrismaClient, familyMap: Map<string
       isRequired: true,
       isVisible: true,
       order: 5,
-      options: ['Color', 'Monocromática'],
+      options: ['Monocromática', 'Color'],
     },
     {
       attributeName: 'conectividad',
@@ -1591,7 +1522,7 @@ export async function seedAttributes(prisma: PrismaClient, familyMap: Map<string
 
   if (commonAttrCount > 0) {
     console.log(
-      `  ✅ ${commonAttrCount} atributos comunes para tipos Laptop/Desktop/Monitor en otras familias`
+      `  ✅ ${commonAttrCount} atributos comunes para tipos Laptop/Desktop/Monitor/Impresora/Teléfono en todas las familias`
     )
   }
 

@@ -201,6 +201,19 @@ export async function hasAccessToEquipment(
   return checkFamilyAccess(userId, familyId, userRole, isSuperAdmin, canManageInventory)
 }
 
+/**
+ * Verifica si un CLIENT tiene acceso a una licencia específica por tenerla
+ * asignada — mismo criterio que hasAccessToEquipment para CLIENT (la
+ * asignación personal, no la familia, es lo que da acceso de lectura).
+ */
+export async function hasAccessToLicense(userId: string, licenseId: string): Promise<boolean> {
+  const license = await prisma.software_licenses.findUnique({
+    where: { id: licenseId },
+    select: { assignedToUser: true },
+  })
+  return !!license && license.assignedToUser === userId
+}
+
 // ── Funciones Auxiliares ──────────────────────────────────────────────────────
 
 /**

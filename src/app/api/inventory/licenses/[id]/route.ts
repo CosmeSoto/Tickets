@@ -119,6 +119,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       licenseScope,
       contractType,
       contractId,
+      contractLineCost,
       scope,
       licenseTypeId,
       customValues,
@@ -233,7 +234,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const license = await LicenseService.updateLicense(id, updatePayload, session.user.id)
 
     if (contractId !== undefined) {
-      await syncLicenseContractLink(id, contractId || null, license.name)
+      await syncLicenseContractLink(
+        id,
+        contractId || null,
+        license.name,
+        contractLineCost != null ? Number(contractLineCost) : undefined
+      )
     }
 
     await AuditServiceComplete.log({

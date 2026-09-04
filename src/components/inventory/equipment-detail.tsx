@@ -26,6 +26,7 @@ import { EquipmentAttachments } from './equipment-attachments'
 import { DepreciationCard } from './equipment/DepreciationCard'
 import { FinancialInfoSection } from './shared/FinancialInfoSection'
 import { AcquisitionInvoicesCard } from './shared/AcquisitionInvoicesCard'
+import { RentalContractCard } from './shared/RentalContractCard'
 
 import { AssignmentDialog } from './equipment/dialogs/assignment-dialog'
 import { ReturnDialog } from './equipment/dialogs/return-dialog'
@@ -149,6 +150,11 @@ export function EquipmentDetail({
     return <div className='text-center py-12 text-muted-foreground'>Equipo no encontrado</div>
   }
 
+  // RENTAL/LOAN: el equipo todavía no es propio, no tiene compra que facturar — su costo
+  // vive en el contrato vinculado (mismo criterio que habilita "Convertir a compra").
+  const isRentedOrLoaned =
+    equipment.ownershipType === 'RENTAL' || equipment.ownershipType === 'LOAN'
+
   return (
     <div className='space-y-6'>
       {/* Botón regresar */}
@@ -256,29 +262,51 @@ export function EquipmentDetail({
           {/* 4. Historial de eventos */}
           <EquipmentHistoryCard history={history as any} />
 
-          {/* 5. Información financiera — colapsable */}
-          {((equipment as any).purchasePrice ||
-            (equipment as any).invoiceNumber ||
-            (equipment as any).supplierId) && (
-            <FinancialInfoSection
-              supplierId={(equipment as any).supplierId}
-              supplierName={(equipment as any).supplier?.name}
-              invoiceNumber={(equipment as any).invoiceNumber}
-              purchaseOrderNumber={(equipment as any).purchaseOrderNumber}
-              purchasePrice={(equipment as any).purchasePrice}
-              purchaseDate={(equipment as any).purchaseDate}
-              readOnly
-            />
-          )}
+          {/* 5/6. Financiero: un equipo en RENTAL/LOAN todavía no tiene compra propia —
+              su costo y pagos viven en el contrato, no en facturas de adquisición. Mostrar
+              esas dos tarjetas vacías ahí (e invitar a "Registrar factura") es lo que
+              generaba la duda: parecía un dato faltante cuando en realidad vive en el
+              contrato vinculado, que se muestra en su lugar. */}
+          {isRentedOrLoaned ? (
+            (equipment as any).businessContractId ? (
+              <RentalContractCard
+                contractId={(equipment as any).businessContractId}
+                assetLabel='equipo'
+              />
+            ) : (
+              <p className='text-xs text-muted-foreground rounded-md border border-dashed px-3 py-2'>
+                Equipo en {equipment.ownershipType === 'RENTAL' ? 'arrendamiento' : 'préstamo'} sin
+                contrato vinculado — no tiene compra ni contrato asociado con costo o pagos que
+                mostrar.
+              </p>
+            )
+          ) : (
+            <>
+              {/* 5. Información financiera — colapsable */}
+              {((equipment as any).purchasePrice ||
+                (equipment as any).invoiceNumber ||
+                (equipment as any).supplierId) && (
+                <FinancialInfoSection
+                  supplierId={(equipment as any).supplierId}
+                  supplierName={(equipment as any).supplier?.name}
+                  invoiceNumber={(equipment as any).invoiceNumber}
+                  purchaseOrderNumber={(equipment as any).purchaseOrderNumber}
+                  purchasePrice={(equipment as any).purchasePrice}
+                  purchaseDate={(equipment as any).purchaseDate}
+                  readOnly
+                />
+              )}
 
-          {/* 6. Facturas / pagos de adquisición */}
-          <AcquisitionInvoicesCard
-            assetType='equipment'
-            assetId={equipmentId}
-            canManage={userRole === 'ADMIN' || isSuperAdminSession}
-            defaultSupplierId={(equipment as any).supplierId ?? null}
-            defaultSupplierName={(equipment as any).supplier?.name ?? null}
-          />
+              {/* 6. Facturas / pagos de adquisición */}
+              <AcquisitionInvoicesCard
+                assetType='equipment'
+                assetId={equipmentId}
+                canManage={userRole === 'ADMIN' || isSuperAdminSession}
+                defaultSupplierId={(equipment as any).supplierId ?? null}
+                defaultSupplierName={(equipment as any).supplier?.name ?? null}
+              />
+            </>
+          )}
 
           {/* 7. Depreciación — colapsable */}
           {(equipment as any).usefulLifeYears && (

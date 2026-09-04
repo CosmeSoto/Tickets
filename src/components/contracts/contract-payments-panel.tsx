@@ -8,6 +8,11 @@
  *
  * El panel NO tiene botón "Pagar" — eso evita duplicar la operación financiera
  * en dos lugares. El enlace "Ir a Pagos" lleva al gestor al punto centralizado.
+ *
+ * La lista de cuotas es deliberadamente corta (PREVIEW_SIZE): esto es una
+ * verificación rápida de "¿generó bien?", no una segunda tabla operativa —
+ * esa ya existe completa en Pagos → Contratos. Mostrar acá las mismas
+ * decenas de filas duplicaba esa tabla dentro del modal del contrato.
  */
 
 import { useCallback, useEffect, useState } from 'react'
@@ -85,6 +90,9 @@ function fmtDate(d: string) {
   })
 }
 
+/** Cuántas cuotas mostrar en la vista previa — el resto vive en Pagos → Contratos. */
+const PREVIEW_SIZE = 3
+
 function fmtCurrency(n: number, currency = 'USD') {
   return new Intl.NumberFormat('es-CL', {
     style: 'currency',
@@ -115,7 +123,7 @@ export function ContractPaymentsPanel({ contractId, hasBillingDates, missingDate
     setLoading(true)
     try {
       const [paymentsRes, statsRes] = await Promise.all([
-        fetch(`/api/inventory/contracts/${contractId}/payments?pageSize=12`),
+        fetch(`/api/inventory/contracts/${contractId}/payments?pageSize=${PREVIEW_SIZE}`),
         fetch(`/api/inventory/contracts/payments/stats?contractId=${contractId}`),
       ])
       if (paymentsRes.ok) {
@@ -338,36 +346,39 @@ export function ContractPaymentsPanel({ contractId, hasBillingDates, missingDate
             </p>
           </div>
         ) : (
-          <ul className='space-y-1.5'>
-            {payments.map(p => {
-              const cfg = STATUS_CONFIG[p.status] ?? STATUS_CONFIG.SCHEDULED
-              const Icon = cfg.icon
-              return (
-                <li
-                  key={p.id}
-                  className='flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm hover:bg-muted/30 transition-colors'
-                >
-                  <div className='min-w-0 flex-1'>
-                    <span className='font-medium tabular-nums'>
-                      {fmtCurrency(p.amount, p.currency)}
-                    </span>
-                    <span className='text-xs text-muted-foreground ml-2'>
-                      Vence: {fmtDate(p.dueDate)}
-                    </span>
-                    {p.paidDate && (
-                      <span className='text-xs text-green-600 dark:text-green-400 ml-2'>
-                        · Pagado: {fmtDate(p.paidDate)}
+          <div className='space-y-1.5'>
+            <p className='text-xs font-medium text-muted-foreground'>Próximas cuotas</p>
+            <ul className='space-y-1.5'>
+              {payments.map(p => {
+                const cfg = STATUS_CONFIG[p.status] ?? STATUS_CONFIG.SCHEDULED
+                const Icon = cfg.icon
+                return (
+                  <li
+                    key={p.id}
+                    className='flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm hover:bg-muted/30 transition-colors'
+                  >
+                    <div className='min-w-0 flex-1'>
+                      <span className='font-medium tabular-nums'>
+                        {fmtCurrency(p.amount, p.currency)}
                       </span>
-                    )}
-                  </div>
-                  <Badge variant='outline' className={`shrink-0 gap-1 text-xs ${cfg.cls}`}>
-                    <Icon className='h-3 w-3' />
-                    {cfg.label}
-                  </Badge>
-                </li>
-              )
-            })}
-          </ul>
+                      <span className='text-xs text-muted-foreground ml-2'>
+                        Vence: {fmtDate(p.dueDate)}
+                      </span>
+                      {p.paidDate && (
+                        <span className='text-xs text-green-600 dark:text-green-400 ml-2'>
+                          · Pagado: {fmtDate(p.paidDate)}
+                        </span>
+                      )}
+                    </div>
+                    <Badge variant='outline' className={`shrink-0 gap-1 text-xs ${cfg.cls}`}>
+                      <Icon className='h-3 w-3' />
+                      {cfg.label}
+                    </Badge>
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
         )}
 
         {/* Pie: enlace a la vista global si hay más cuotas */}

@@ -121,6 +121,7 @@ const STATUS_CONFIG: Record<ContractStatus, { label: string; icon: any; cls: str
 export default function ContractsPage() {
   const searchParams = useSearchParams()
   const supplierIdFromUrl = searchParams.get('supplierId')
+  const contractIdFromUrl = searchParams.get('contractId')
   const { canManageContracts, canViewOwnContracts, isClient, isSuperAdmin } =
     useInventoryPermissions()
   const isClientOnly = isClient && !canManageContracts
@@ -142,6 +143,27 @@ export default function ContractsPage() {
   useEffect(() => {
     setSupplierFilter(supplierIdFromUrl)
   }, [supplierIdFromUrl])
+
+  // Deep link "?contractId=..." — usado desde el detalle de un equipo/licencia arrendado
+  // ("Ver contrato") para abrir directamente su edición, sin depender de que el contrato
+  // esté en la página actual del listado.
+  const { data: linkedContractFromUrl } = useFetch<Contract>(
+    contractIdFromUrl
+      ? `/api/inventory/contracts/${contractIdFromUrl}`
+      : '/api/inventory/contracts',
+    {
+      enabled: !!contractIdFromUrl,
+      transform: d => (d.id ? [d] : []),
+      showErrorToast: false,
+    }
+  )
+  useEffect(() => {
+    if (linkedContractFromUrl[0]) {
+      setEditingContract(linkedContractFromUrl[0])
+      setFormOpen(true)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linkedContractFromUrl[0]?.id])
 
   // Carga de contratos con useFetch
   const buildUrl = useCallback(() => {

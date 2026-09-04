@@ -16,19 +16,44 @@ export async function getLinkedBusinessContractIdForLicense(
   return line?.contractId ?? null
 }
 
-/** Vincula una licencia a un contrato de negocio (tabla contracts). */
+/**
+ * Vincula una licencia a un contrato de negocio (tabla contracts).
+ *
+ * `additionalCost` — ver el comentario gemelo en linkEquipmentToContract(): solo se
+ * suma cuando es un vínculo nuevo a este contrato (no un resave), y solo tiene sentido
+ * al vincular a un contrato YA EXISTENTE, no uno creado junto con esta licencia.
+ */
 export async function linkLicenseToBusinessContract(
   licenseId: string,
   contractId: string,
-  licenseLabel: string
+  licenseLabel: string,
+  additionalCost?: number | null
 ): Promise<{ contractId: string }> {
-  const businessContract = await prisma.contracts.findUnique({
+  let businessContract = await prisma.contracts.findUnique({
     where: { id: contractId },
-    select: { id: true, status: true },
+    select: { id: true, status: true, monthlyCost: true, totalValue: true, billingCycle: true },
   })
 
   if (!businessContract) {
     throw new Error('El contrato seleccionado no existe')
+  }
+
+  const alreadyLinkedHere = additionalCost
+    ? await prisma.contract_lines.findFirst({
+        where: { licenseId, contractId: businessContract.id },
+        select: { id: true },
+      })
+    : null
+
+  if (additionalCost && !alreadyLinkedHere) {
+    businessContract = await prisma.contracts.update({
+      where: { id: businessContract.id },
+      data:
+        businessContract.billingCycle === 'ONE_TIME'
+          ? { totalValue: (businessContract.totalValue ?? 0) + additionalCost }
+          : { monthlyCost: (businessContract.monthlyCost ?? 0) + additionalCost },
+      select: { id: true, status: true, monthlyCost: true, totalValue: true, billingCycle: true },
+    })
   }
 
   await prisma.contract_lines.deleteMany({ where: { licenseId } })
@@ -62,14 +87,15 @@ export async function linkLicenseToBusinessContract(
 export async function syncLicenseContractLink(
   licenseId: string,
   contractId: string | null | undefined,
-  licenseLabel: string
+  licenseLabel: string,
+  additionalCost?: number | null
 ): Promise<void> {
   if (!contractId) {
     await prisma.contract_lines.deleteMany({ where: { licenseId } })
     return
   }
 
-  await linkLicenseToBusinessContract(licenseId, contractId, licenseLabel)
+  await linkLicenseToBusinessContract(licenseId, contractId, licenseLabel, additionalCost)
 }
 
 /** Mapea el alcance del formulario al enum Prisma. */

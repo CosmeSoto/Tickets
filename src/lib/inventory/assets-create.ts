@@ -48,6 +48,7 @@ export async function createAsset(
     acquisitionMode,
     supplierId,
     contractId: bodyContractId,
+    contractLineCost: bodyContractLineCost,
     code,
     serialNumber,
     brandId,
@@ -311,7 +312,12 @@ export async function createAsset(
       `${equipmentModel.brand?.name ?? ''} ${equipmentModel.model ?? ''}`.trim()
 
     if (bodyContractId && acquisitionMode === 'RENTAL') {
-      await linkEquipmentToContract(asset.id, bodyContractId, equipmentLabel || resolvedCode)
+      await linkEquipmentToContract(
+        asset.id,
+        bodyContractId,
+        equipmentLabel || resolvedCode,
+        bodyContractLineCost != null ? Number(bodyContractLineCost) : undefined
+      )
     }
 
     // Espejo automático en el libro de facturas (equipment_invoices) — si al
@@ -499,7 +505,12 @@ export async function createAsset(
     )
 
     if (bodyContractId) {
-      await linkLicenseToBusinessContract(license.id, bodyContractId, license.name)
+      await linkLicenseToBusinessContract(
+        license.id,
+        bodyContractId,
+        license.name,
+        bodyContractLineCost != null ? Number(bodyContractLineCost) : undefined
+      )
     } else if (cost != null && Number(cost) > 0) {
       // Espejo automático en el libro de facturas (license_invoices) — solo
       // cuando NO hay contrato vinculado (ahí el costo viene del contrato,

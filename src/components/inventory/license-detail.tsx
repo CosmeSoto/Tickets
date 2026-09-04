@@ -37,6 +37,7 @@ import {
 import { TransferFamilyDialog } from './transfer-family-dialog'
 import { LinkedCredentialsCard } from '@/components/credentials/linked-credentials-card'
 import { AcquisitionInvoicesCard } from '@/components/inventory/shared/AcquisitionInvoicesCard'
+import { RentalContractCard } from '@/components/inventory/shared/RentalContractCard'
 import { LicenseAssignDialog } from '@/components/inventory/license/license-assign-dialog'
 import { LicenseReturnDialog } from '@/components/inventory/license/license-return-dialog'
 import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
@@ -486,14 +487,21 @@ export function LicenseDetail({ licenseId, userRole, isSuperAdmin = false }: Pro
             </CardContent>
           </Card>
 
-          {/* Facturas / pagos de adquisición */}
-          <AcquisitionInvoicesCard
-            assetType='license'
-            assetId={licenseId}
-            canManage={isAdmin}
-            defaultSupplierId={license.supplier?.id ?? null}
-            defaultSupplierName={license.supplier?.name ?? null}
-          />
+          {/* Una licencia vinculada a un contrato de negocio se paga vía cuotas del
+              contrato, no con una factura de compra propia — mostrar "Facturas / pagos
+              de adquisición" ahí invita a registrar un pago fantasma que nunca aparecería
+              reflejado ni en el contrato ni en Pagos → Contratos. */}
+          {license.linkedContractId ? (
+            <RentalContractCard contractId={license.linkedContractId} assetLabel='licencia' />
+          ) : (
+            <AcquisitionInvoicesCard
+              assetType='license'
+              assetId={licenseId}
+              canManage={isAdmin}
+              defaultSupplierId={license.supplier?.id ?? null}
+              defaultSupplierName={license.supplier?.name ?? null}
+            />
+          )}
         </div>
 
         {/* Lateral: credenciales + asignación (como QR/asignación en equipo) */}

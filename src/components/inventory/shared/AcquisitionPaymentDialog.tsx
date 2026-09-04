@@ -62,6 +62,39 @@ import {
   type InvoiceInstallment,
 } from './acquisition-invoices'
 
+// Label/placeholder de "N° Referencia" según el método elegido — cada medio
+// de pago deja un rastro distinto (cheque, transferencia, PayPal, cripto...)
+// y pedir siempre "REF-12345" no orienta a qué anotar ahí. Mismo criterio
+// que ya usa el formulario de contrato para paymentAccountRef.
+const REFERENCE_FIELD_BY_METHOD: Partial<
+  Record<PaymentMethodType, { label: string; placeholder: string }>
+> = {
+  CHECK: { label: 'N° de cheque', placeholder: 'Nº 000123' },
+  BANK_TRANSFER: { label: 'N° de operación / transferencia', placeholder: 'OP-12345' },
+  PAYPAL: { label: 'Email o ID de transacción PayPal', placeholder: 'cuenta@empresa.com' },
+  CRYPTO: { label: 'Hash de transacción / wallet', placeholder: '0x… o hash de tx' },
+  CORPORATE_CARD: { label: 'N° de autorización / comprobante', placeholder: 'AUTH-12345' },
+}
+const DEFAULT_REFERENCE_FIELD = { label: 'N° Referencia', placeholder: 'REF-12345' }
+// Banco/Entidad no aplica a medios sin cuenta bancaria de por medio.
+const METHODS_WITHOUT_BANK: PaymentMethodType[] = ['PAYPAL', 'CRYPTO']
+
+/** Resume método + referencia + tarjeta/banco de un abono, para el tooltip
+ * de "Abonos anteriores" — la lista es compacta y no tiene espacio para
+ * mostrar todo el detalle en línea. */
+function installmentDetail(ins: InvoiceInstallment): string {
+  const parts: string[] = []
+  if (ins.paymentMethod) {
+    parts.push(
+      PAYMENT_METHOD_TYPE_LABELS[ins.paymentMethod as PaymentMethodType] ?? ins.paymentMethod
+    )
+  }
+  if (ins.referenceNumber) parts.push(`Ref: ${ins.referenceNumber}`)
+  if (ins.cardLast4) parts.push(`Tarjeta •••• ${ins.cardLast4}`)
+  if (ins.bankEntity) parts.push(`Banco: ${ins.bankEntity}`)
+  return parts.join(' · ') || 'Sin detalle adicional'
+}
+
 interface AcquisitionPaymentDialogProps {
   assetType: AcquisitionAssetType
   /** Factura a pagar/abonar — null cierra el modal. */
@@ -155,6 +188,9 @@ export function AcquisitionPaymentDialog({
   }
 
   const assetLabel = invoice ? acquisitionAssetLabel(invoice) : null
+  const referenceField =
+    REFERENCE_FIELD_BY_METHOD[paidMethod as PaymentMethodType] ?? DEFAULT_REFERENCE_FIELD
+  const showBankField = !METHODS_WITHOUT_BANK.includes(paidMethod as PaymentMethodType)
 
   return (
     <>
@@ -194,7 +230,11 @@ export function AcquisitionPaymentDialog({
                   </Label>
                   <ul className='rounded-md border divide-y text-xs max-h-24 overflow-y-auto'>
                     {invoice.installments.map(ins => (
-                      <li key={ins.id} className='flex items-center justify-between px-2 py-1'>
+                      <li
+                        key={ins.id}
+                        className='flex items-center justify-between px-2 py-1'
+                        title={installmentDetail(ins)}
+                      >
                         <span className='text-muted-foreground'>
                           {fmtAcquisitionDate(ins.paidDate)}
                         </span>
@@ -239,7 +279,18 @@ export function AcquisitionPaymentDialog({
                     <Label>Método de pago</Label>
                     <Select
                       value={paidMethod || '__none__'}
-                      onValueChange={v => setPaidMethod(v === '__none__' ? '' : v)}
+                      onValueChange={v => {
+                        const next = v === '__none__' ? '' : v
+                        setPaidMethod(next)
+                        // Limpia campos que dejan de aplicar al cambiar de método,
+                        // para no enviar de arrastre un valor que ya no corresponde.
+                        if (METHODS_WITHOUT_BANK.includes(next as PaymentMethodType)) {
+                          setBankEntity('')
+                        }
+                        if (next !== 'CORPORATE_CARD') {
+                          setCardLast4('')
+                        }
+                      }}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder='Seleccionar método' />
@@ -262,19 +313,21 @@ export function AcquisitionPaymentDialog({
                   <div className='grid grid-cols-2 gap-3'>
                     <div className='space-y-1'>
                       <Label>
-                        N° Referencia <span className='text-destructive'>*</span>
+                        {referenceField.label} <span className='text-destructive'>*</span>
                       </Label>
                       <Input
-                        placeholder='REF-12345'
+                        placeholder={referenceField.placeholder}
                         value={referenceNumber}
                         onChange={e => setReferenceNumber(e.target.value)}
                         maxLength={200}
                       />
                     </div>
-                    <div className='space-y-1'>
-                      <Label>Banco / Entidad</Label>
-                      <BankEntitySelect value={bankEntity} onChange={setBankEntity} />
-                    </div>
+                    {showBankField && (
+                      <div className='space-y-1'>
+                        <Label>Banco / Entidad</Label>
+                        <BankEntitySelect value={bankEntity} onChange={setBankEntity} />
+                      </div>
+                    )}
                   </div>
 
                   {paidMethod === 'CORPORATE_CARD' && (

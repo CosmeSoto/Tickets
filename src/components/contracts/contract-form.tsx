@@ -3,7 +3,8 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { useSession } from 'next-auth/react'
-import { Plus, Trash2, RefreshCw, FileText, Download, X } from 'lucide-react'
+import { Plus, Trash2, RefreshCw, FileText, Download, Eye, X } from 'lucide-react'
+import { FilePreviewModal, type PreviewFile } from '@/components/ui/file-preview-modal'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DateInput } from '@/components/ui/date-input'
@@ -151,6 +152,7 @@ export function ContractForm({
     (contract as any)?.attachments ?? []
   )
   const [deletingAttachmentId, setDeletingAttachmentId] = useState<string | null>(null)
+  const [previewAttachment, setPreviewAttachment] = useState<PreviewFile | null>(null)
   const [maxFileSize, setMaxFileSize] = useState(10)
 
   useEffect(() => {
@@ -451,8 +453,8 @@ export function ContractForm({
 
   useEffect(() => {
     if (contract || !prefill) return
-    applyContractFormPrefill(prefill, setValue, line => append(line as any), fields.length)
-  }, [contract, prefill, setValue, append, fields.length])
+    applyContractFormPrefill(prefill, setValue)
+  }, [contract, prefill, setValue])
 
   const autoRenew = watch('autoRenew')
   const selectedCategory = watch('category')
@@ -1330,7 +1332,7 @@ export function ContractForm({
           title='6. Líneas / activos'
           description={
             embedMode
-              ? 'El activo que estás creando se vinculará al guardar. Aquí agrega otros ítems y, si aplica, la fecha en que cada uno empieza o termina la renta.'
+              ? 'El activo que estás creando se vinculará al guardar, con su propia línea. Usa "Agregar ítem" solo para cargos u otros conceptos del contrato que no sean un activo del inventario.'
               : 'Ítems del contrato (equipos, software, servicios). Cada línea puede tener su propia vigencia de renta; si la dejas vacía, usa las fechas del contrato.'
           }
           defaultOpen={false}
@@ -1339,9 +1341,12 @@ export function ContractForm({
           <div className='space-y-3'>
             {embedMode && (
               <p className='text-xs rounded-md border border-dashed px-3 py-2 text-muted-foreground'>
-                La categoría en Datos generales ya define el tipo de contrato. No hace falta repetir
-                «Software» / «Licencia de software» aquí: al guardar el activo se crea el vínculo
-                automáticamente.
+                El activo que estás creando ya queda como una línea propia al guardar — no hace
+                falta repetirlo aquí. Si necesitas registrar <strong>otro</strong> equipo o licencia
+                bajo este mismo contrato (con su propio número de serie u otros datos), créalo como
+                un activo nuevo y vincúlalo a este contrato desde su propia creación; «Agregar ítem»
+                no da de alta un activo en el inventario, solo anota un renglón de cargo o concepto
+                del contrato (ej. instalación, servicio, cuota adicional).
               </p>
             )}
             <div className='flex justify-end'>
@@ -1349,20 +1354,22 @@ export function ContractForm({
                 type='button'
                 variant='outline'
                 size='sm'
-                onClick={() =>
+                onClick={() => {
+                  // Un ítem agregado a mano nunca queda vinculado a un activo real (ver filtro
+                  // del selector de Tipo más abajo), así que no arranca en "Equipo" ni copia el
+                  // nombre del activo/contrato — eso sugeriría que es "otra unidad" cuando en
+                  // realidad es solo un renglón de cargo/concepto suelto.
+                  const defaultType = lineTypeForCategory(selectedCategory)
                   append({
                     ...EMPTY_LINE,
-                    type: lineTypeForCategory(selectedCategory),
-                    description: watch('name')?.trim()
-                      ? `${watch('name').trim()} (ítem adicional)`
-                      : '',
+                    type: defaultType === 'EQUIPMENT' ? 'SERVICE' : defaultType,
                     unitPrice:
                       billingCycle !== 'ONE_TIME'
                         ? watch('monthlyCost') || ''
                         : watch('totalValue') || '',
                     order: fields.length,
                   })
-                }
+                }}
                 disabled={readOnly}
               >
                 <Plus className='h-4 w-4 mr-1' /> Agregar ítem
@@ -1401,11 +1408,20 @@ export function ContractForm({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {Object.entries(CONTRACT_LINE_TYPE_LABELS).map(([k, v]) => (
-                          <SelectItem key={k} value={k}>
-                            {v}
-                          </SelectItem>
-                        ))}
+                        {Object.entries(CONTRACT_LINE_TYPE_LABELS)
+                          // "Equipo" no se ofrece para líneas agregadas a mano: no hay forma de
+                          // vincularlas a un activo real desde este formulario (a diferencia de
+                          // "Software", que sí tiene un selector de licencia). Esas líneas solo
+                          // las crea el sistema, ya vinculadas, al guardar el equipo — se sigue
+                          // mostrando acá únicamente si esta línea ya es una de esas.
+                          .filter(
+                            ([k]) => k !== 'EQUIPMENT' || watch(`lines.${i}.type`) === 'EQUIPMENT'
+                          )
+                          .map(([k, v]) => (
+                            <SelectItem key={k} value={k}>
+                              {v}
+                            </SelectItem>
+                          ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -1529,6 +1545,22 @@ export function ContractForm({
                       <span className='shrink-0 text-xs text-muted-foreground'>
                         {formatSize(att.size)}
                       </span>
+                      <button
+                        type='button'
+                        onClick={() =>
+                          setPreviewAttachment({
+                            id: att.id,
+                            originalName: att.originalName,
+                            mimeType: att.mimeType,
+                            size: att.size,
+                            url: att.path,
+                          })
+                        }
+                        className='shrink-0 rounded p-0.5 hover:bg-muted'
+                        title='Vista previa'
+                      >
+                        <Eye className='h-3.5 w-3.5 text-muted-foreground' />
+                      </button>
                       <a
                         href={att.path}
                         target='_blank'
@@ -1577,6 +1609,12 @@ export function ContractForm({
           </div>
         </ContractFormSection>
       </fieldset>
+
+      <FilePreviewModal
+        isOpen={!!previewAttachment}
+        onClose={() => setPreviewAttachment(null)}
+        file={previewAttachment}
+      />
 
       {!isEditing && embedMode && (
         <p className='text-xs text-muted-foreground rounded-md border border-dashed px-3 py-2'>

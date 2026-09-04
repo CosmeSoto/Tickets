@@ -33,6 +33,18 @@ const EQUIPMENT_LIST_INCLUDE = {
   assignments: ACTIVE_ASSIGNMENT_INCLUDE,
 } as const
 
+const LICENSE_LIST_INCLUDE = {
+  licenseType: { include: { family: true } },
+  user: { select: { name: true } },
+  department: { select: { name: true } },
+  equipment: {
+    select: {
+      code: true,
+      model: { select: { brand: { select: { name: true } }, model: true } },
+    },
+  },
+} as const
+
 export interface AssetsQueryParams {
   userId: string
   role: string
@@ -110,14 +122,24 @@ export async function queryAssets(params: AssetsQueryParams): Promise<AssetsQuer
   })
   const personalEquipmentIds = personalAssignments.map(a => a.equipmentId)
 
-  // personalOnly: solo equipos del usuario
+  // personalOnly: equipos Y licencias asignados personalmente al usuario — antes
+  // solo traía equipos, dejando las licencias asignadas directamente a una
+  // persona (software_licenses.assignedToUser, fuera del flujo de contratos)
+  // sin ningún lugar donde esa persona pudiera verlas.
   if (personalOnly) {
-    const items = await prisma.equipment.findMany({
-      where: { id: { in: personalEquipmentIds } },
-      include: EQUIPMENT_LIST_INCLUDE,
-      orderBy: { createdAt: 'desc' },
-    })
-    const mapped = items.map(mapEquipmentItem)
+    const [equipmentItems, licenseItems] = await Promise.all([
+      prisma.equipment.findMany({
+        where: { id: { in: personalEquipmentIds } },
+        include: EQUIPMENT_LIST_INCLUDE,
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.software_licenses.findMany({
+        where: { assignedToUser: userId },
+        include: LICENSE_LIST_INCLUDE,
+        orderBy: { createdAt: 'desc' },
+      }),
+    ])
+    const mapped = [...equipmentItems.map(mapEquipmentItem), ...licenseItems.map(mapLicenseItem)]
     const filtered = searchQuery
       ? mapped.filter(
           i =>
@@ -128,7 +150,10 @@ export async function queryAssets(params: AssetsQueryParams): Promise<AssetsQuer
             (i.assignedToName ?? '').toLowerCase().includes(searchQuery)
         )
       : mapped
-    return paginate(filtered, page, pageSize)
+    const sorted = filtered.sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    )
+    return paginate(sorted, page, pageSize)
   }
 
   // Familias accesibles
@@ -182,6 +207,13 @@ export async function queryAssets(params: AssetsQueryParams): Promise<AssetsQuer
 
   const dbLimit = page * pageSize + pageSize
 
+  // El lote (batch) es un concepto exclusivo de equipos — ni consumibles ni
+  // licencias tienen esa noción en el esquema. Si el filtro de lote está
+  // activo (con lote, sin lote, o un lote puntual), esos dos subtipos no
+  // pueden cumplirlo ni incumplirlo: se excluyen del resultado en vez de
+  // colarse sin filtrar.
+  const hasBatchFilter = !!batchFilter && batchFilter !== 'all'
+
   const [equipmentItems, consumableItems, licenseItems] = await Promise.all([
     subtypeParam && subtypeParam !== 'EQUIPMENT'
       ? Promise.resolve([] as any[])
@@ -192,7 +224,7 @@ export async function queryAssets(params: AssetsQueryParams): Promise<AssetsQuer
           take: dbLimit,
         }),
 
-    restrictToAssignedOnly || (subtypeParam && subtypeParam !== 'MRO')
+    restrictToAssignedOnly || hasBatchFilter || (subtypeParam && subtypeParam !== 'MRO')
       ? Promise.resolve([] as any[])
       : prisma.consumables.findMany({
           where: effectiveFamilyIds
@@ -212,7 +244,7 @@ export async function queryAssets(params: AssetsQueryParams): Promise<AssetsQuer
           take: dbLimit,
         }),
 
-    restrictToAssignedOnly || (subtypeParam && subtypeParam !== 'LICENSE')
+    restrictToAssignedOnly || hasBatchFilter || (subtypeParam && subtypeParam !== 'LICENSE')
       ? Promise.resolve([] as any[])
       : prisma.software_licenses.findMany({
           where: effectiveFamilyIds
@@ -255,30 +287,7 @@ export async function queryAssets(params: AssetsQueryParams): Promise<AssetsQuer
         assignedToName: eqLabel ? `Equipo: ${eqLabel}` : undefined,
       }
     }),
-    ...licenseItems.map((item: any) => {
-      const assignment = licenseAssignment(item)
-      return {
-        id: item.id,
-        name: item.name,
-        subtype: 'LICENSE' as const,
-        code: item.code ?? undefined,
-        familyId: item.licenseType?.familyId ?? '',
-        family: {
-          name: item.licenseType?.family?.name ?? '',
-          icon: item.licenseType?.family?.icon ?? null,
-          color: item.licenseType?.family?.color ?? null,
-        },
-        typeName: item.licenseType?.name ?? undefined,
-        status: assignment.assignedToName ? 'ASSIGNED' : 'AVAILABLE',
-        createdAt: item.createdAt.toISOString(),
-        purchaseDate: item.purchaseDate ? new Date(item.purchaseDate).toISOString() : undefined,
-        purchasePrice: item.cost ?? undefined,
-        invoiceNumber: item.invoiceNumber ?? undefined,
-        purchaseOrderNumber: item.purchaseOrderNumber ?? undefined,
-        assignedToName: assignment.assignedToName,
-        assignedAt: assignment.assignedAt,
-      }
-    }),
+    ...licenseItems.map(mapLicenseItem),
   ]
 
   const filtered = searchQuery
@@ -336,6 +345,31 @@ function mapEquipmentItem(item: any): UnifiedAssetItem {
     assignedToName: current?.receiver?.name ?? undefined,
     assignedAt: current?.startDate ? new Date(current.startDate).toISOString() : undefined,
     assignedByName: current?.deliverer?.name ?? undefined,
+  }
+}
+
+function mapLicenseItem(item: any): UnifiedAssetItem {
+  const assignment = licenseAssignment(item)
+  return {
+    id: item.id,
+    name: item.name,
+    subtype: 'LICENSE',
+    code: item.code ?? undefined,
+    familyId: item.licenseType?.familyId ?? '',
+    family: {
+      name: item.licenseType?.family?.name ?? '',
+      icon: item.licenseType?.family?.icon ?? null,
+      color: item.licenseType?.family?.color ?? null,
+    },
+    typeName: item.licenseType?.name ?? undefined,
+    status: assignment.assignedToName ? 'ASSIGNED' : 'AVAILABLE',
+    createdAt: item.createdAt.toISOString(),
+    purchaseDate: item.purchaseDate ? new Date(item.purchaseDate).toISOString() : undefined,
+    purchasePrice: item.cost ?? undefined,
+    invoiceNumber: item.invoiceNumber ?? undefined,
+    purchaseOrderNumber: item.purchaseOrderNumber ?? undefined,
+    assignedToName: assignment.assignedToName,
+    assignedAt: assignment.assignedAt,
   }
 }
 

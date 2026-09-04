@@ -9,9 +9,11 @@
  */
 
 import { useCallback, useMemo, useState } from 'react'
-import { FileSignature, Plus, X, ExternalLink, Pencil } from 'lucide-react'
+import { FileSignature, Plus, X, ExternalLink, Pencil, ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Dialog,
   DialogContent,
@@ -44,6 +46,13 @@ interface Props {
   prefill?: ContractPickerPrefill | null
   /** Clave del borrador del formulario padre (licencia/equipo) para anidar el del contrato */
   draftParentKey?: string
+  /**
+   * Costo de renta de este activo al vincularlo a un contrato YA EXISTENTE (pestaña
+   * "Vincular existente"). Se suma al costo del contrato al guardar — sin esto, el activo
+   * quedaba vinculado sin afectar en nada el monto que se factura. No aplica al crear un
+   * contrato nuevo junto con el activo (ese contrato ya define su costo total).
+   */
+  onLinkCost?: (cost: number | null) => void
 }
 
 type PickerTab = 'link' | 'create' | 'edit'
@@ -57,10 +66,14 @@ export function ContractPicker({
   context = 'license',
   prefill = null,
   draftParentKey,
+  onLinkCost,
 }: Props) {
   const [open, setOpen] = useState(false)
   const [tab, setTab] = useState<PickerTab>('link')
   const [formDirty, setFormDirty] = useState(false)
+  /** Contrato elegido en "Vincular existente", en espera de confirmar su costo. */
+  const [pendingLinkContract, setPendingLinkContract] = useState<Contract | null>(null)
+  const [pendingLinkCost, setPendingLinkCost] = useState('')
 
   const contractDraftKey = useMemo(() => {
     if (tab === 'edit' && value) return FormDraftKeys.contractEdit(value)
@@ -134,6 +147,8 @@ export function ContractPicker({
   const openPicker = (initialTab: PickerTab = 'link') => {
     setFormDirty(false)
     setTab(initialTab)
+    setPendingLinkContract(null)
+    setPendingLinkCost('')
     setOpen(true)
   }
 
@@ -143,7 +158,35 @@ export function ContractPicker({
     setOpen(false)
   }
 
+  /** Paso 1: elegir contrato existente — pasa al paso 2 (confirmar costo) antes de vincular. */
+  const selectContractToLink = (contractId: string) => {
+    const contract = contracts.find(c => c.id === contractId)
+    if (!contract) return
+    setPendingLinkContract(contract)
+    setPendingLinkCost('')
+  }
+
+  /** Paso 2: confirma el vínculo con el costo (opcional) que se suma al contrato. */
+  const confirmPendingLink = () => {
+    if (!pendingLinkContract) return
+    const trimmed = pendingLinkCost.trim()
+    const parsed = trimmed ? parseFloat(trimmed) : null
+    onLinkCost?.(parsed != null && Number.isFinite(parsed) ? parsed : null)
+    handleLink(pendingLinkContract.id)
+    setPendingLinkContract(null)
+    setPendingLinkCost('')
+  }
+
+  const cancelPendingLink = () => {
+    setPendingLinkContract(null)
+    setPendingLinkCost('')
+  }
+
   const handleCreated = (contract: Contract) => {
+    // Contrato NUEVO creado junto con este activo: su costo total ya lo define el propio
+    // contrato, no hay nada que sumar — limpia cualquier costo que hubiera quedado
+    // pendiente de un intento anterior de vincular a otro contrato existente.
+    onLinkCost?.(null)
     onChange(contract.id)
     reload()
     reloadSelected()
@@ -152,6 +195,7 @@ export function ContractPicker({
   }
 
   const handleUpdated = (contract: Contract) => {
+    onLinkCost?.(null)
     onChange(contract.id)
     reload()
     reloadSelected()
@@ -159,7 +203,10 @@ export function ContractPicker({
     setOpen(false)
   }
 
-  const handleClear = () => onChange(null)
+  const handleClear = () => {
+    onLinkCost?.(null)
+    onChange(null)
+  }
 
   const switchTab = (next: PickerTab) => {
     if (isFormTab && formDirty && next !== tab) {
@@ -283,7 +330,57 @@ export function ContractPicker({
                 </TabsList>
 
                 <TabsContent value='link' className='space-y-4 pt-4'>
-                  {contracts.length === 0 ? (
+                  {pendingLinkContract ? (
+                    <div className='space-y-4'>
+                      <Button
+                        type='button'
+                        variant='ghost'
+                        size='sm'
+                        className='h-7 px-2 text-xs -ml-2'
+                        onClick={cancelPendingLink}
+                      >
+                        <ArrowLeft className='h-3.5 w-3.5 mr-1' /> Elegir otro contrato
+                      </Button>
+
+                      <div className='rounded-lg border bg-muted/30 px-3 py-2.5'>
+                        <p className='text-sm font-medium'>{pendingLinkContract.name}</p>
+                        {pendingLinkContract.contractNumber && (
+                          <p className='text-xs text-muted-foreground font-mono mt-0.5'>
+                            {pendingLinkContract.contractNumber}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className='space-y-1'>
+                        <Label htmlFor='link-cost' className='text-xs'>
+                          Costo de renta de esta {contextLabel} (opcional)
+                        </Label>
+                        <Input
+                          id='link-cost'
+                          type='number'
+                          min='0'
+                          step='0.01'
+                          inputMode='decimal'
+                          placeholder='0.00'
+                          value={pendingLinkCost}
+                          onChange={e => setPendingLinkCost(e.target.value)}
+                        />
+                        <p className='text-xs text-muted-foreground'>
+                          Se suma al costo del contrato para que quede reflejado en sus próximas
+                          cuotas. Déjalo vacío si ya está incluido en el costo actual del contrato.
+                        </p>
+                      </div>
+
+                      <div className='flex justify-end gap-2'>
+                        <Button type='button' variant='outline' onClick={cancelPendingLink}>
+                          Cancelar
+                        </Button>
+                        <Button type='button' onClick={confirmPendingLink}>
+                          Vincular contrato
+                        </Button>
+                      </div>
+                    </div>
+                  ) : contracts.length === 0 ? (
                     <div className='text-center py-10 text-muted-foreground'>
                       <FileSignature className='h-10 w-10 mx-auto mb-3 opacity-30' />
                       <p className='text-sm'>No hay contratos activos disponibles.</p>
@@ -321,7 +418,7 @@ export function ContractPicker({
                           label: c.contractNumber ? `${c.contractNumber} — ${c.name}` : c.name,
                         }))}
                         value={value ?? ''}
-                        onChange={handleLink}
+                        onChange={selectContractToLink}
                         placeholder='Buscar contrato...'
                         emptyLabel='Sin contratos disponibles'
                       />
@@ -330,7 +427,7 @@ export function ContractPicker({
                           <button
                             key={c.id}
                             type='button'
-                            onClick={() => handleLink(c.id)}
+                            onClick={() => selectContractToLink(c.id)}
                             className={`w-full text-left rounded-lg border px-3 py-2.5 hover:bg-muted/50 transition-colors ${
                               value === c.id ? 'border-primary bg-primary/5' : ''
                             }`}

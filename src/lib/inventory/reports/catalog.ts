@@ -409,7 +409,7 @@ export const REPORT_DATASETS: ReportDatasetDef[] = [
       { key: 'categoria', label: 'Categoría', defaultVisible: true },
       { key: 'estado', label: 'Estado', defaultVisible: true },
       { key: 'proveedor', label: 'Proveedor', defaultVisible: true },
-      { key: 'custodio', label: 'Custodio', defaultVisible: true },
+      { key: 'custodio', label: 'Custodio comercial', defaultVisible: true },
       { key: 'inicio', label: 'Inicio', defaultVisible: true },
       { key: 'fin', label: 'Fin', defaultVisible: true },
       { key: 'costoMensual', label: 'Costo/mes', defaultVisible: true },

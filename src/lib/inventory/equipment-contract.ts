@@ -19,13 +19,23 @@ export async function getLinkedBusinessContractId(equipmentId: string): Promise<
 
 /**
  * Vincula un equipo a un contrato de negocio (tabla contracts) o legado (software_licenses).
+ *
+ * `additionalCost` — solo cuando se vincula a un contrato YA EXISTENTE (no uno creado
+ * junto con este equipo): el costo de renta de ESTE equipo, que se suma al monthlyCost/
+ * totalValue del contrato para que quede reflejado en las cuotas futuras. Sin esto, el
+ * equipo quedaba vinculado "de adorno" — visible en el contrato, pero sin afectar en
+ * nada lo que Generar pagos factura (el cálculo usa el costo del encabezado del
+ * contrato, no líneas individuales, salvo que se les ponga precio propio — que acá
+ * deliberadamente no se hace, para no dejar algunas líneas con precio y otras sin él,
+ * lo que dejaría de sumar las que no lo tienen).
  */
 export async function linkEquipmentToContract(
   equipmentId: string,
   contractId: string,
-  equipmentLabel: string
+  equipmentLabel: string,
+  additionalCost?: number | null
 ): Promise<{ contractId: string; source: 'business' | 'legacy' }> {
-  const businessContract = await prisma.contracts.findUnique({
+  let businessContract = await prisma.contracts.findUnique({
     where: { id: contractId },
     select: {
       id: true,
@@ -33,11 +43,45 @@ export async function linkEquipmentToContract(
       startDate: true,
       endDate: true,
       monthlyCost: true,
+      totalValue: true,
+      billingCycle: true,
       status: true,
     },
   })
 
   if (businessContract) {
+    // Solo suma el costo si este es un vínculo NUEVO a este contrato — si el equipo ya
+    // tenía una línea acá (p. ej. se está regrabando el mismo formulario sin cambiar el
+    // contrato), es un resave, no una nueva incorporación: sumarlo de nuevo duplicaría
+    // el costo cada vez que se guarda el equipo. Esto hace la operación idempotente sin
+    // depender de que el frontend solo mande additionalCost una vez.
+    const alreadyLinkedHere = additionalCost
+      ? await prisma.contract_lines.findFirst({
+          where: { equipmentId, contractId: businessContract.id },
+          select: { id: true },
+        })
+      : null
+
+    if (additionalCost && !alreadyLinkedHere) {
+      businessContract = await prisma.contracts.update({
+        where: { id: businessContract.id },
+        data:
+          businessContract.billingCycle === 'ONE_TIME'
+            ? { totalValue: (businessContract.totalValue ?? 0) + additionalCost }
+            : { monthlyCost: (businessContract.monthlyCost ?? 0) + additionalCost },
+        select: {
+          id: true,
+          contractNumber: true,
+          startDate: true,
+          endDate: true,
+          monthlyCost: true,
+          totalValue: true,
+          billingCycle: true,
+          status: true,
+        },
+      })
+    }
+
     await prisma.contract_lines.deleteMany({ where: { equipmentId } })
 
     const lineCount = await prisma.contract_lines.count({
@@ -100,7 +144,8 @@ export async function linkEquipmentToContract(
 export async function syncEquipmentContractLink(
   equipmentId: string,
   contractId: string | null | undefined,
-  equipmentLabel: string
+  equipmentLabel: string,
+  additionalCost?: number | null
 ): Promise<void> {
   if (!contractId) {
     await prisma.contract_lines.deleteMany({ where: { equipmentId } })
@@ -120,7 +165,7 @@ export async function syncEquipmentContractLink(
     return
   }
 
-  await linkEquipmentToContract(equipmentId, contractId, equipmentLabel)
+  await linkEquipmentToContract(equipmentId, contractId, equipmentLabel, additionalCost)
 }
 
 export interface DecommissionContractImpact {

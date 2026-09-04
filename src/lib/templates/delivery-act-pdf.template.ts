@@ -266,7 +266,7 @@ export async function generateDeliveryActPDF(
       .text(monthlyCost, ML + CW / 2, y, { width: halfW })
     y += 18
 
-    y = fieldRow('CUSTODIO', snap.custodian?.name || '—', y)
+    y = fieldRow('CUSTODIO COMERCIAL', snap.custodian?.name || '—', y)
     y = fieldRow('EMAIL DE FACTURACIÓN', snap.billingAccountEmail || '—', y)
 
     y = separator(y)

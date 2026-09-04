@@ -3117,6 +3117,10 @@ model equipment_invoice_installments {
   paidDate        DateTime           @map("paid_date")
   paymentMethod   PaymentMethodType? @map("payment_method")
   referenceNumber String?            @map("reference_number") @db.VarChar(200)
+  bankEntity      String?            @map("bank_entity") @db.VarChar(100)
+  cardLast4       String?            @map("card_last4") @db.VarChar(4)
+  cardBrand       String?            @map("card_brand") @db.VarChar(50)
+  transactionId   String?            @map("transaction_id") @db.VarChar(200)
   notes           String?
   createdBy       String             @map("created_by")
   createdAt       DateTime           @default(now()) @map("created_at")
@@ -3185,6 +3189,10 @@ model license_invoice_installments {
   paidDate        DateTime           @map("paid_date")
   paymentMethod   PaymentMethodType? @map("payment_method")
   referenceNumber String?            @map("reference_number") @db.VarChar(200)
+  bankEntity      String?            @map("bank_entity") @db.VarChar(100)
+  cardLast4       String?            @map("card_last4") @db.VarChar(4)
+  cardBrand       String?            @map("card_brand") @db.VarChar(50)
+  transactionId   String?            @map("transaction_id") @db.VarChar(200)
   notes           String?
   createdBy       String             @map("created_by")
   createdAt       DateTime           @default(now()) @map("created_at")

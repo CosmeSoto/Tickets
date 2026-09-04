@@ -6,6 +6,7 @@ import { canManageAsset, inventoryForbidden } from '@/lib/inventory-access'
 import { assertContractWriteAccess } from '@/lib/contracts/access'
 import { InventoryNotificationService } from '@/lib/services/inventory-notification.service'
 import { ContractReturnActService } from '@/lib/services/contract-return-act.service'
+import { ContractAssignmentService } from '@/lib/services/contract-assignment.service'
 import { returnContractAssignmentSchema } from '@/lib/validations/contract-assignment'
 import { ZodError } from 'zod'
 
@@ -13,10 +14,7 @@ import { ZodError } from 'zod'
  * POST /api/inventory/contract-assignments/[id]/return
  * Genera acta de retiro al devolver la suscripción/contrato del cliente.
  */
-export async function POST(
-  request: NextRequest,
-  context: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
@@ -59,6 +57,25 @@ export async function POST(
     }
 
     const body = returnContractAssignmentSchema.parse(await request.json())
+
+    // Si el área no exige acta de entrega, tampoco tiene sentido exigir una firma
+    // de retiro — la asignación nunca llegó a tener un acta que aceptar (ver
+    // ContractAssignmentService.createAssignment). Cerrar directo, sin acta.
+    const familyConfig = assignment.contract.familyId
+      ? await prisma.inventory_family_config.findUnique({
+          where: { familyId: assignment.contract.familyId },
+          select: { requireDeliveryAct: true },
+        })
+      : null
+
+    if (familyConfig?.requireDeliveryAct === false) {
+      const closed = await ContractAssignmentService.closeAssignment(
+        assignmentId,
+        body.returnDate ? new Date(body.returnDate) : undefined
+      )
+      return NextResponse.json({ assignment: closed, returnAct: null, acceptanceUrl: null })
+    }
+
     const returnAct = await ContractReturnActService.generateReturnAct(assignmentId, body)
 
     const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'

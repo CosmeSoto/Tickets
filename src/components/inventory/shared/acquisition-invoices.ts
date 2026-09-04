@@ -23,6 +23,10 @@ export interface InvoiceInstallment {
   paidDate: string
   paymentMethod?: string | null
   referenceNumber?: string | null
+  bankEntity?: string | null
+  cardLast4?: string | null
+  cardBrand?: string | null
+  transactionId?: string | null
   notes?: string | null
   createdAt: string
   creator?: { id: string; name: string } | null

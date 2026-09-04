@@ -177,6 +177,9 @@ export function LicenseAssetForm({
   const [contractType, setContractType] = useState('')
   const [hasRecurring, setHasRecurring] = useState(false)
   const [linkedContractId, setLinkedContractId] = useState<string | null>(null)
+  /** Costo de renta capturado al vincular a un contrato YA EXISTENTE — ver el equivalente
+   * en EquipmentAssetForm. */
+  const [linkCost, setLinkCost] = useState<number | null>(null)
   const [notes, setNotes] = useState('')
   const [attachments, setAttachments] = useState<File[]>([])
 
@@ -457,6 +460,7 @@ export function LicenseAssetForm({
       renewalDate: renewalDate || undefined,
       contractType: contractType || null,
       contractId: linkedContractId || undefined,
+      contractLineCost: linkCost ?? undefined,
       notes: notes || undefined,
       customValues: customFieldValues.length ? customFieldValues : undefined,
       // Los adjuntos se suben por endpoint aparte; no van en el PUT de licencia
@@ -603,8 +607,7 @@ export function LicenseAssetForm({
               className='font-mono'
             />
             <p className='text-xs text-muted-foreground pt-1'>
-              Clave de producto o serial de la licencia. Se guarda cifrada en inventario y se
-              muestra en el detalle a quien gestiona la licencia.
+              Clave de producto o serial de la licencia.
             </p>
           </div>
         </div>
@@ -738,6 +741,7 @@ export function LicenseAssetForm({
               <ContractPicker
                 value={linkedContractId}
                 onChange={handleContractChange}
+                onLinkCost={setLinkCost}
                 supplierId={supplierId || null}
                 familyId={familyId}
                 context='license'

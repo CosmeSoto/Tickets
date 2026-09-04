@@ -7,7 +7,7 @@ import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { canManageInventory, canManageAsset, isTechnicianOfFamily } from '@/lib/inventory-access'
 import { checkFamilyAccess } from '@/lib/inventory/family-access'
-import { hasAccessToEquipment } from '@/lib/middleware/family-filter'
+import { hasAccessToEquipment, hasAccessToLicense } from '@/lib/middleware/family-filter'
 import { UserRole } from '@prisma/client'
 
 export type InventoryResourceKind =
@@ -224,6 +224,15 @@ export async function assertInventoryResourceRead(
       resourceId
     )
     if (!ok) throw new InventoryAccessError('No tienes acceso a este equipo', 403)
+    return familyId
+  }
+  // CLIENT con una licencia asignada a su cuenta (software_licenses.assignedToUser):
+  // igual que con equipos, la asignación personal da acceso de lectura aunque el
+  // cliente no tenga acceso general al área — sin esto, "Mis Activos" podía listar
+  // la licencia pero el detalle devolvía 403.
+  if (kind === 'LICENSE' && user.role === 'CLIENT') {
+    const ok = await hasAccessToLicense(user.id, resourceId)
+    if (!ok) throw new InventoryAccessError('No tienes acceso a esta licencia', 403)
     return familyId
   }
   await assertInventoryReadByFamily(user, familyId)

@@ -10,6 +10,7 @@ import {
   ExternalLink,
   KeyRound,
   Loader2,
+  Undo2,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -26,6 +27,16 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import {
   Command,
   CommandEmpty,
@@ -77,6 +88,8 @@ const ACT_STATUS: Record<string, string> = {
 export function ContractAssignmentsPanel({ contract, onUpdated, canManage = true }: Props) {
   const { data: session } = useSession()
   const isAdmin = session?.user?.role === 'ADMIN'
+  const isSuperAdmin =
+    (session?.user as { isSuperAdmin?: boolean } | undefined)?.isSuperAdmin === true
 
   const [assignments, setAssignments] = useState<AssignmentRow[]>([])
   const [active, setActive] = useState<AssignmentRow | null>(null)
@@ -84,6 +97,7 @@ export function ContractAssignmentsPanel({ contract, onUpdated, canManage = true
   const [clients, setClients] = useState<Array<{ id: string; name: string; email: string }>>([])
   const [assignOpen, setAssignOpen] = useState(false)
   const [returnOpen, setReturnOpen] = useState(false)
+  const [undoOpen, setUndoOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [clientId, setClientId] = useState('')
   const [changeReason, setChangeReason] = useState('')
@@ -259,10 +273,18 @@ export function ContractAssignmentsPanel({ contract, onUpdated, canManage = true
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? 'Error al retirar')
 
-      toast({
-        title: 'Acta de retiro generada',
-        description: 'El responsable debe aceptar el acta de retiro de la suscripción.',
-      })
+      toast(
+        json.returnAct
+          ? {
+              title: 'Acta de retiro generada',
+              description: 'El responsable debe aceptar el acta de retiro de la suscripción.',
+            }
+          : {
+              title: 'Responsable retirado',
+              description:
+                'Esta área no exige acta de entrega/retiro — la asignación se cerró directamente.',
+            }
+      )
       setReturnOpen(false)
       setWithdrawalReason('')
       setNotes('')
@@ -272,6 +294,36 @@ export function ContractAssignmentsPanel({ contract, onUpdated, canManage = true
       toast({
         title: 'Error',
         description: err instanceof Error ? err.message : 'No se pudo retirar',
+        variant: 'destructive',
+      })
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleUndo = async () => {
+    if (!active) return
+    setSubmitting(true)
+    try {
+      const res = await fetch(`/api/inventory/contract-assignments/${active.id}/undo`, {
+        method: 'POST',
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Error al deshacer')
+
+      toast({
+        title: 'Asignación deshecha',
+        description: json.restoredPreviousAssignmentId
+          ? 'Se eliminó la asignación y su acta pendiente; se restauró al responsable anterior.'
+          : 'Se eliminó la asignación y su acta pendiente. El contrato quedó sin responsable.',
+      })
+      setUndoOpen(false)
+      await load()
+      onUpdated?.()
+    } catch (err: unknown) {
+      toast({
+        title: 'Error',
+        description: err instanceof Error ? err.message : 'No se pudo deshacer',
         variant: 'destructive',
       })
     } finally {
@@ -303,12 +355,26 @@ export function ContractAssignmentsPanel({ contract, onUpdated, canManage = true
             <div>
               <CardTitle className='text-base'>Responsable operativo</CardTitle>
               <p className='text-xs text-muted-foreground mt-1'>
-                Custodia operativa del servicio (cliente externo o personal interno). Cambio de
-                responsable genera acta de retiro y nueva entrega con snapshot financiero y
-                contractual.
+                Quien da seguimiento día a día a esta suscripción — no es el custodio comercial de
+                la sección 4 (relación con el proveedor), es a quien se le entrega y quien firma por
+                el servicio. Cambiarlo cierra al responsable actual y, si el área lo exige, genera
+                actas de retiro y de nueva entrega con el detalle financiero y contractual vigente.
               </p>
             </div>
             <div className='flex gap-2 shrink-0'>
+              {canManage && isSuperAdmin && active?.deliveryAct?.status === 'PENDING' && (
+                <Button
+                  type='button'
+                  size='sm'
+                  variant='outline'
+                  className='border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400'
+                  onClick={() => setUndoOpen(true)}
+                  title='El responsable aún no firmó el acta de entrega — se puede deshacer sin generar acta de retiro'
+                >
+                  <Undo2 className='h-3.5 w-3.5 mr-1' />
+                  Deshacer asignación
+                </Button>
+              )}
               {canManage && active && (
                 <Button
                   type='button'
@@ -371,8 +437,8 @@ export function ContractAssignmentsPanel({ contract, onUpdated, canManage = true
             <div className='flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/80 dark:bg-amber-500/10 px-3 py-2 text-sm'>
               <AlertTriangle className='h-4 w-4 text-amber-600 shrink-0 mt-0.5' />
               <span>
-                Sin responsable asignado. Las suscripciones sin custodio operativo generan riesgo de
-                cobros huérfanos.
+                Sin responsable operativo asignado. Las suscripciones sin responsable operativo
+                generan riesgo de cobros huérfanos.
               </span>
             </div>
           )}
@@ -472,8 +538,9 @@ export function ContractAssignmentsPanel({ contract, onUpdated, canManage = true
           </DialogHeader>
           <div className='space-y-3 py-2'>
             <p className='text-sm text-muted-foreground'>
-              Se generará un acta de retiro con los datos financieros y contractuales vigentes para{' '}
-              <strong>{active?.client.name}</strong>.
+              Se retira a <strong>{active?.client.name}</strong> como responsable operativo. Si el
+              área exige acta, se generará una de retiro con los datos financieros y contractuales
+              vigentes para que la firme; si no, la asignación se cierra directo.
             </p>
             <div className='space-y-1'>
               <Label>Motivo del retiro</Label>
@@ -499,6 +566,33 @@ export function ContractAssignmentsPanel({ contract, onUpdated, canManage = true
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Deshacer asignación — solo mientras el acta de entrega esté PENDING */}
+      <AlertDialog open={undoOpen} onOpenChange={setUndoOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Deshacer esta asignación?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se eliminará la asignación de <strong>{active?.client.name}</strong> y su acta de
+              entrega {active?.deliveryAct?.folio} (aún sin firmar) — no queda ningún registro de
+              que existió.{' '}
+              {assignments.some(a => !a.isActive) &&
+                'Si esta asignación reemplazó a un responsable anterior, se lo restaura como activo. '}
+              Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={submitting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleUndo}
+              disabled={submitting}
+              className='bg-destructive text-destructive-foreground hover:bg-destructive/90'
+            >
+              {submitting ? 'Deshaciendo…' : 'Deshacer asignación'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Dar acceso de cliente al área — sin salir de Contratos */}
       <Dialog open={grantOpen} onOpenChange={setGrantOpen}>

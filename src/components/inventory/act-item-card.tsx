@@ -93,7 +93,7 @@ export function ActItemCard({ actType, snapshot: snap, accessories }: ActItemCar
                 : undefined
             }
           />
-          <Field label='Custodio' value={(snap.custodian as { name?: string })?.name} />
+          <Field label='Custodio comercial' value={(snap.custodian as { name?: string })?.name} />
           <div className='sm:col-span-2'>
             <Field label='Email de facturación' value={snap.billingAccountEmail} />
           </div>

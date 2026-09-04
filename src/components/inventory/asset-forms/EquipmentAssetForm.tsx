@@ -217,6 +217,9 @@ export function EquipmentAssetForm({
   const [linkedContractId, setLinkedContractId] = useState<string | null>(
     initialEquipment?.businessContractId || initialEquipment?.contractId || null
   )
+  /** Costo de renta capturado al vincular a un contrato YA EXISTENTE — se limpia tras
+   * enviarlo una vez, para no volver a sumarlo en un guardado posterior del mismo form. */
+  const [linkCost, setLinkCost] = useState<number | null>(null)
   const [rentalDeliveryDate, setRentalDeliveryDate] = useState(
     initialEquipment?.rentalDeliveryDate
       ? new Date(initialEquipment.rentalDeliveryDate).toISOString().split('T')[0]
@@ -708,6 +711,7 @@ export function EquipmentAssetForm({
           : undefined,
       supplierId: supplierId || undefined,
       contractId: linkedContractId || undefined,
+      contractLineCost: linkCost ?? undefined,
       ...(acquisitionMode === 'RENTAL' && {
         rentalDeliveryDate: rentalDeliveryDate || undefined,
         rentalBuyoutValue: rentalBuyoutValue ? parseFloat(rentalBuyoutValue) : undefined,
@@ -1421,6 +1425,7 @@ export function EquipmentAssetForm({
                 <ContractPicker
                   value={linkedContractId}
                   onChange={handleContractChange}
+                  onLinkCost={setLinkCost}
                   supplierId={supplierId || null}
                   familyId={familyId}
                   context='equipment'

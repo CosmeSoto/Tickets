@@ -378,6 +378,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
       const contractIdFromBody =
         'contractId' in body ? ((body.contractId as string | null | undefined) ?? null) : undefined
+      const contractLineCostFromBody =
+        body.contractLineCost != null ? Number(body.contractLineCost) : undefined
 
       if (effectiveAcquisitionMode === 'RENTAL') {
         const linkedContractId =
@@ -407,7 +409,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
               })
             : id
 
-          await syncEquipmentContractLink(id, contractIdFromBody, equipmentLabel)
+          await syncEquipmentContractLink(
+            id,
+            contractIdFromBody,
+            equipmentLabel,
+            contractLineCostFromBody
+          )
         }
       } else if (contractIdFromBody !== undefined) {
         await syncEquipmentContractLink(id, contractIdFromBody, id)

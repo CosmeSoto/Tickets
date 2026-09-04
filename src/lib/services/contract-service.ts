@@ -1037,11 +1037,25 @@ export class ContractService {
       take: 200,
     })
 
+    // Áreas con "Requerir acta de entrega" desactivado nunca van a tener un acta
+    // ACCEPTED — sin esto, esas suscripciones aparecerían "en riesgo" para siempre
+    // por un acta que a propósito no se les pide.
+    const familyIds = [
+      ...new Set(contracts.map(c => c.familyId).filter((id): id is string => !!id)),
+    ]
+    const familyConfigs = familyIds.length
+      ? await prisma.inventory_family_config.findMany({
+          where: { familyId: { in: familyIds } },
+          select: { familyId: true, requireDeliveryAct: true },
+        })
+      : []
+    const requiresActByFamily = new Map(familyConfigs.map(f => [f.familyId, f.requireDeliveryAct]))
+
     return contracts
       .map(c => {
         const risks: string[] = []
         if (!c.custodianUserId || !c.custodian?.isActive) {
-          risks.push('Sin custodio activo')
+          risks.push('Sin custodio comercial activo')
         }
         const billingIssues = getBillingCompletenessIssues({
           paymentMethodType: c.paymentMethodType,
@@ -1063,8 +1077,11 @@ export class ContractService {
           risks.push('Sin acceso al portal de facturación')
         }
         if (!c.assignments.length) {
-          risks.push('Sin cliente asignado')
-        } else if (c.assignments[0].deliveryAct?.status !== 'ACCEPTED') {
+          risks.push('Sin responsable operativo asignado')
+        } else if (
+          requiresActByFamily.get(c.familyId ?? '') !== false &&
+          c.assignments[0].deliveryAct?.status !== 'ACCEPTED'
+        ) {
           risks.push('Acta de entrega pendiente')
         }
         if (c.subscriptionUsageStatus === 'PENDING_CANCEL' && !c.lastTransactionRef) {
