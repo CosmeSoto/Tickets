@@ -2,7 +2,16 @@
 
 import { useMemo, useRef, useState } from 'react'
 import { useSession } from 'next-auth/react'
-import { Upload, Loader2, CheckCircle2, XCircle, MinusCircle, AlertTriangle } from 'lucide-react'
+import {
+  Upload,
+  Download,
+  FileText,
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  MinusCircle,
+  AlertTriangle,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
@@ -178,6 +187,25 @@ export function SupplierImportDialog({ onDone, onCancel }: SupplierImportDialogP
 
   return (
     <div className='space-y-4'>
+      <div className='flex items-center justify-between p-3 bg-muted/50 rounded-lg border'>
+        <div className='flex items-center gap-2'>
+          <FileText className='h-4 w-4 text-muted-foreground' />
+          <div>
+            <p className='text-sm font-medium'>Plantilla Excel</p>
+            <p className='text-xs text-muted-foreground'>Descarga el formato con ejemplos</p>
+          </div>
+        </div>
+        <Button
+          type='button'
+          variant='outline'
+          size='sm'
+          onClick={() => window.open('/api/inventory/suppliers/import/template', '_blank')}
+        >
+          <Download className='h-3.5 w-3.5 mr-1.5' />
+          Descargar plantilla
+        </Button>
+      </div>
+
       <div className='rounded-md border border-dashed p-4 text-center space-y-2'>
         <input
           ref={fileInputRef}
@@ -200,7 +228,10 @@ export function SupplierImportDialog({ onDone, onCancel }: SupplierImportDialogP
           {fileName || 'Seleccionar archivo (.xlsx o .csv)'}
         </Button>
         <p className='text-xs text-muted-foreground'>
-          Columna obligatoria: Nombre. Opcionales: RUC/NIT, Email, Teléfono, Contacto, Área.
+          Columna obligatoria: Nombre. El resto son opcionales: RUC/NIT, Email, Teléfono, Contacto,
+          Área, Razón social, Tipo de proveedor, Sitio web, Dirección, Ciudad, País, Plazo de pago,
+          Límite de crédito, Moneda, Método de pago, Banco, Cuenta bancaria, Tipo de cuenta,
+          SWIFT/BIC y Notas — descarga la plantilla para ver el formato exacto de cada una.
         </p>
       </div>
 
@@ -284,6 +315,11 @@ export function SupplierImportDialog({ onDone, onCancel }: SupplierImportDialogP
               </TableBody>
             </Table>
           </div>
+          <p className='text-xs text-muted-foreground'>
+            La vista previa solo muestra las columnas principales; el resto de campos del archivo
+            (razón social, dirección, condiciones de pago, datos bancarios, etc.) también se
+            importan aunque no se listen acá.
+          </p>
         </>
       )}
 

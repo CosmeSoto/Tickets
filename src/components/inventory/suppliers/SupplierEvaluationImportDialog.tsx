@@ -2,7 +2,15 @@
 
 import { useMemo, useRef, useState } from 'react'
 import { useSession } from 'next-auth/react'
-import { Upload, Loader2, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react'
+import {
+  Upload,
+  Download,
+  FileText,
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
@@ -168,6 +176,27 @@ export function SupplierEvaluationImportDialog({
 
   return (
     <div className='space-y-4'>
+      <div className='flex items-center justify-between p-3 bg-muted/50 rounded-lg border'>
+        <div className='flex items-center gap-2'>
+          <FileText className='h-4 w-4 text-muted-foreground' />
+          <div>
+            <p className='text-sm font-medium'>Plantilla Excel</p>
+            <p className='text-xs text-muted-foreground'>Descarga el formato con ejemplos</p>
+          </div>
+        </div>
+        <Button
+          type='button'
+          variant='outline'
+          size='sm'
+          onClick={() =>
+            window.open('/api/inventory/suppliers/evaluations/import/template', '_blank')
+          }
+        >
+          <Download className='h-3.5 w-3.5 mr-1.5' />
+          Descargar plantilla
+        </Button>
+      </div>
+
       <div className='rounded-md border border-dashed p-4 text-center space-y-2'>
         <input
           ref={fileInputRef}

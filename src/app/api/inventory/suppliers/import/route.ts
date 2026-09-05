@@ -1,10 +1,12 @@
 /**
  * POST /api/inventory/suppliers/import
  *
- * Importación masiva de proveedores desde un Excel/CSV con columnas básicas
- * (Nombre, RUC/NIT, Email, Teléfono, Contacto, Área — ver
- * src/lib/inventory/supplier-import.ts para el parseo de encabezados, que
- * corre en el cliente antes de llegar acá).
+ * Importación masiva de proveedores desde un Excel/CSV. Solo Nombre es
+ * obligatorio; el resto son los mismos campos opcionales del alta manual
+ * (RUC/NIT, contacto, dirección, condiciones comerciales y datos bancarios —
+ * ver src/lib/inventory/supplier-import.ts para el parseo de encabezados,
+ * que corre en el cliente antes de llegar acá). Área y Tipo de proveedor se
+ * resuelven acá contra los catálogos existentes.
  *
  * Body: { rows: ParsedImportRow[], defaultFamilyId?: string }
  *   - defaultFamilyId se usa solo para filas cuya columna Área venga vacía
@@ -30,10 +32,45 @@ import {
   InventoryAccessError,
   toInventoryAccessUser,
 } from '@/lib/inventory/inventory-resource-access'
-import { sanitizeSupplierPayload } from '@/lib/validations/inventory/supplier'
+import {
+  sanitizeSupplierPayload,
+  SUPPLIER_BANK_ACCOUNT_TYPES,
+  SUPPLIER_BANK_ACCOUNT_TYPE_LABELS,
+  SUPPLIER_PAYMENT_TERMS_OPTIONS,
+} from '@/lib/validations/inventory/supplier'
+import { PAYMENT_METHOD_TYPE_VALUES } from '@/lib/validations/contracts'
+import { PAYMENT_METHOD_TYPE_LABELS } from '@/types/contracts'
 import { supplierAuditMessage } from '@/lib/inventory/supplier-audit'
 import { validateImportRow, type ParsedImportRow } from '@/lib/inventory/supplier-import'
 import { ZodError } from 'zod'
+
+/** Resuelve un código de enum a partir del propio código o de su etiqueta en español (case-insensitive). */
+function resolveEnumByCodeOrLabel(
+  raw: string,
+  values: readonly string[],
+  labels: Record<string, string>
+): { value: string | null; error?: string } {
+  if (!raw) return { value: null }
+  const upper = raw.trim().toUpperCase().replace(/\s+/g, '_')
+  if (values.includes(upper)) return { value: upper }
+  const byLabel = Object.entries(labels).find(
+    ([, label]) => label.trim().toLowerCase() === raw.trim().toLowerCase()
+  )
+  if (byLabel) return { value: byLabel[0] }
+  return { value: null, error: raw }
+}
+
+/** Acepta un número de días o una de las etiquetas predefinidas (p.ej. "30 días", "Contado / inmediato"). */
+function resolvePaymentTermsDays(raw: string): { value: string | null; error?: string } {
+  if (!raw) return { value: null }
+  const trimmed = raw.trim()
+  if (/^-?\d+$/.test(trimmed)) return { value: trimmed }
+  const byLabel = SUPPLIER_PAYMENT_TERMS_OPTIONS.find(
+    o => o.label.toLowerCase() === trimmed.toLowerCase()
+  )
+  if (byLabel) return { value: String(byLabel.value) }
+  return { value: null, error: trimmed }
+}
 
 interface RowResult {
   rowNumber: number
@@ -89,6 +126,37 @@ export async function POST(request: NextRequest) {
     for (const f of families) {
       familyByKey.set(f.name.trim().toLowerCase(), f)
       familyByKey.set(f.code.trim().toLowerCase(), f)
+    }
+
+    // Tipos de proveedor: code es único y manda; el nombre puede repetirse
+    // entre áreas distintas, así que se busca primero acotado al área de la
+    // fila y, si no hay, entre los tipos globales (sin área).
+    const supplierTypes = await prisma.supplier_types.findMany({
+      select: { id: true, code: true, name: true, familyId: true },
+    })
+    const typeByCode = new Map<string, { id: string }>()
+    const typeByFamilyAndName = new Map<string, { id: string }>()
+    const typeByGlobalName = new Map<string, { id: string }>()
+    for (const t of supplierTypes) {
+      typeByCode.set(t.code.trim().toLowerCase(), t)
+      const nameKey = t.name.trim().toLowerCase()
+      if (t.familyId) {
+        typeByFamilyAndName.set(`${t.familyId}|${nameKey}`, t)
+      } else {
+        typeByGlobalName.set(nameKey, t)
+      }
+    }
+    function resolveTypeId(
+      raw: string,
+      familyId: string | null
+    ): { id: string | null; error?: string } {
+      if (!raw) return { id: null }
+      const key = raw.trim().toLowerCase()
+      let t = typeByCode.get(key)
+      if (!t && familyId) t = typeByFamilyAndName.get(`${familyId}|${key}`)
+      if (!t) t = typeByGlobalName.get(key)
+      if (!t) return { id: null, error: raw }
+      return { id: t.id }
     }
 
     // Cache de permisos por familia ya resuelta en este lote (evita repetir el
@@ -195,15 +263,101 @@ export async function POST(request: NextRequest) {
           continue
         }
 
+        // Catálogos y enums opcionales: se resuelven acá porque solo hacen
+        // falta para la fila que sí se va a crear (los duplicados ya se
+        // filtraron arriba).
+        let typeId: string | null = null
+        if (row.typeName) {
+          const resolved = resolveTypeId(row.typeName, familyId)
+          if (resolved.error) {
+            results.push({
+              rowNumber: row.rowNumber,
+              status: 'error',
+              name: row.name,
+              error: `Tipo de proveedor no encontrado: "${resolved.error}"`,
+            })
+            continue
+          }
+          typeId = resolved.id
+        }
+
+        let preferredPaymentMethod: string | null = null
+        if (row.preferredPaymentMethod) {
+          const resolved = resolveEnumByCodeOrLabel(
+            row.preferredPaymentMethod,
+            PAYMENT_METHOD_TYPE_VALUES,
+            PAYMENT_METHOD_TYPE_LABELS
+          )
+          if (resolved.error) {
+            results.push({
+              rowNumber: row.rowNumber,
+              status: 'error',
+              name: row.name,
+              error: `Método de pago no reconocido: "${resolved.error}"`,
+            })
+            continue
+          }
+          preferredPaymentMethod = resolved.value
+        }
+
+        let bankAccountType: string | null = null
+        if (row.bankAccountType) {
+          const resolved = resolveEnumByCodeOrLabel(
+            row.bankAccountType,
+            SUPPLIER_BANK_ACCOUNT_TYPES,
+            SUPPLIER_BANK_ACCOUNT_TYPE_LABELS
+          )
+          if (resolved.error) {
+            results.push({
+              rowNumber: row.rowNumber,
+              status: 'error',
+              name: row.name,
+              error: `Tipo de cuenta bancaria no reconocido: "${resolved.error}"`,
+            })
+            continue
+          }
+          bankAccountType = resolved.value
+        }
+
+        let paymentTermsDays: string | null = null
+        if (row.paymentTermsDays) {
+          const resolved = resolvePaymentTermsDays(row.paymentTermsDays)
+          if (resolved.error) {
+            results.push({
+              rowNumber: row.rowNumber,
+              status: 'error',
+              name: row.name,
+              error: `Plazo de pago no reconocido: "${resolved.error}" (usa un número de días o una opción como "30 días")`,
+            })
+            continue
+          }
+          paymentTermsDays = resolved.value
+        }
+
         let data: ReturnType<typeof sanitizeSupplierPayload>
         try {
           data = sanitizeSupplierPayload({
             name: row.name,
+            legalName: row.legalName || undefined,
+            typeId: typeId || undefined,
             taxId: row.taxId || undefined,
             email: row.email || undefined,
             phone: row.phone || undefined,
             contactName: row.contactName || undefined,
             familyId: familyId || undefined,
+            website: row.website || undefined,
+            address: row.address || undefined,
+            city: row.city || undefined,
+            country: row.country || undefined,
+            paymentTermsDays: paymentTermsDays || undefined,
+            creditLimit: row.creditLimit || undefined,
+            creditCurrency: row.creditCurrency || undefined,
+            preferredPaymentMethod: preferredPaymentMethod || undefined,
+            bankName: row.bankName || undefined,
+            bankAccountNumber: row.bankAccountNumber || undefined,
+            bankAccountType: bankAccountType || undefined,
+            bankSwift: row.bankSwift || undefined,
+            notes: row.notes || undefined,
           })
         } catch (err) {
           const message =
