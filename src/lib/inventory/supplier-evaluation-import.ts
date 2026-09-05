@@ -4,6 +4,8 @@
  * criterios 0-5). Cliente y servidor comparten este mapeo de encabezados.
  */
 
+import { SUPPLIER_TAX_ID_MAX_LENGTH } from '@/lib/validations/inventory/supplier'
+
 function normalizeHeader(h: string): string {
   return h
     .normalize('NFD')
@@ -17,6 +19,7 @@ function normalizeHeader(h: string): string {
 const HEADER_ALIASES: Record<string, string[]> = {
   year: ['ano', 'año', 'year'],
   supplierName: ['proveedor', 'supplier', 'proveedores'],
+  taxId: ['ruc', 'nit', 'ruc/nit', 'ruc / nit', 'tax id', 'taxid'],
   email: ['mail', 'email', 'correo'],
   contact: ['contacto', 'contact'],
   detail: ['detalle', 'detail', 'servicio'],
@@ -56,6 +59,8 @@ export interface ParsedImportRow {
   rowNumber: number // 1-based, incluye encabezado (para mostrar al usuario el número de fila real del Excel)
   year: number | null
   supplierName: string
+  /** RUC/NIT opcional — si viene, tiene prioridad sobre el nombre para ubicar/crear el proveedor. */
+  taxId: string
   email: string
   contact: string
   detail: string
@@ -88,6 +93,7 @@ export function parseImportRows(
     rowNumber: i + 2,
     year: toIntOrNull(get(row, 'year')),
     supplierName: get(row, 'supplierName'),
+    taxId: get(row, 'taxId'),
     email: get(row, 'email'),
     contact: get(row, 'contact'),
     detail: get(row, 'detail'),
@@ -119,5 +125,10 @@ export function validateImportRow(row: ParsedImportRow): string | null {
   ]
   if (scores.some(s => s == null)) return 'Faltan puntajes de algún criterio'
   if (scores.some(s => s! < 0 || s! > 5)) return 'Los puntajes deben estar entre 0 y 5'
+  // Texto libre (no solo dígitos): admite RUC de Ecuador y también NIT, VAT,
+  // EIN u otros identificadores tributarios extranjeros con letras/guiones.
+  if (row.taxId.length > SUPPLIER_TAX_ID_MAX_LENGTH) {
+    return `RUC/NIT no puede superar los ${SUPPLIER_TAX_ID_MAX_LENGTH} caracteres`
+  }
   return null
 }

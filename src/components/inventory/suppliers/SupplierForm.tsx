@@ -34,6 +34,7 @@ import {
   SUPPLIER_PAYMENT_TERMS_OPTIONS,
   SUPPLIER_BANK_ACCOUNT_TYPE_LABELS,
   SUPPLIER_BANK_ACCOUNT_TYPES,
+  SUPPLIER_TAX_ID_MAX_LENGTH,
   type SupplierFormInput,
 } from '@/lib/validations/inventory/supplier'
 import { PAYMENT_METHOD_TYPE_LABELS } from '@/types/contracts'
@@ -373,7 +374,7 @@ export function SupplierForm({
               id='taxId'
               {...register('taxId')}
               placeholder='Ej: 1234567890001'
-              maxLength={20}
+              maxLength={SUPPLIER_TAX_ID_MAX_LENGTH}
             />
           </div>
         </div>

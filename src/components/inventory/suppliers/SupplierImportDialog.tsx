@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from 'react'
 import { useSession } from 'next-auth/react'
-import { Upload, Loader2, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react'
+import { Upload, Loader2, CheckCircle2, XCircle, MinusCircle, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
@@ -24,25 +24,22 @@ import {
   validateImportRow,
   REQUIRED_IMPORT_FIELDS,
   type ParsedImportRow,
-} from '@/lib/inventory/supplier-evaluation-import'
+} from '@/lib/inventory/supplier-import'
 
 interface RowResult {
   rowNumber: number
-  status: 'created' | 'error'
-  supplierName: string
-  supplierCreated?: boolean
+  status: 'created' | 'skipped' | 'error'
+  name: string
+  supplierId?: string
   error?: string
 }
 
-interface SupplierEvaluationImportDialogProps {
+interface SupplierImportDialogProps {
   onDone: () => void
   onCancel: () => void
 }
 
-export function SupplierEvaluationImportDialog({
-  onDone,
-  onCancel,
-}: SupplierEvaluationImportDialogProps) {
+export function SupplierImportDialog({ onDone, onCancel }: SupplierImportDialogProps) {
   const { data: session } = useSession()
   const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
   const { families } = useFamilyOptions()
@@ -94,7 +91,7 @@ export function SupplierEvaluationImportDialog({
     setImporting(true)
     try {
       const validRows = rows.filter((_, i) => !rowErrors[i])
-      const res = await fetch('/api/inventory/suppliers/evaluations/import', {
+      const res = await fetch('/api/inventory/suppliers/import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rows: validRows, defaultFamilyId: defaultFamilyId || undefined }),
@@ -107,7 +104,7 @@ export function SupplierEvaluationImportDialog({
       setResults(data.results)
       toast({
         title: 'Importación completada',
-        description: `${data.summary.created} de ${data.summary.total} filas importadas (${data.summary.suppliersCreated} proveedores nuevos)`,
+        description: `${data.summary.created} de ${data.summary.total} proveedores creados (${data.summary.skipped} ya existían, ${data.summary.failed} con error)`,
       })
     } catch {
       toast({ title: 'Error', description: 'Error de conexión', variant: 'destructive' })
@@ -118,13 +115,19 @@ export function SupplierEvaluationImportDialog({
 
   if (results) {
     const created = results.filter(r => r.status === 'created').length
+    const skipped = results.filter(r => r.status === 'skipped').length
     const failed = results.filter(r => r.status === 'error').length
     return (
       <div className='space-y-4'>
-        <div className='flex gap-3'>
+        <div className='flex flex-wrap gap-3'>
           <Badge className='bg-emerald-100 text-emerald-800 border-emerald-300'>
-            {created} importadas
+            {created} creados
           </Badge>
+          {skipped > 0 && (
+            <Badge className='bg-amber-100 text-amber-800 border-amber-300'>
+              {skipped} ya existían
+            </Badge>
+          )}
           {failed > 0 && <Badge variant='destructive'>{failed} con error</Badge>}
         </div>
         <div className='max-h-[50vh] overflow-y-auto rounded-md border'>
@@ -140,14 +143,21 @@ export function SupplierEvaluationImportDialog({
               {results.map(r => (
                 <TableRow key={r.rowNumber}>
                   <TableCell className='font-mono text-xs'>{r.rowNumber}</TableCell>
-                  <TableCell className='text-sm'>{r.supplierName}</TableCell>
+                  <TableCell className='text-sm'>{r.name}</TableCell>
                   <TableCell className='text-sm'>
-                    {r.status === 'created' ? (
+                    {r.status === 'created' && (
                       <span className='flex items-center gap-1.5 text-emerald-700'>
                         <CheckCircle2 className='h-3.5 w-3.5' />
-                        Registrada{r.supplierCreated ? ' (proveedor nuevo)' : ''}
+                        Creado
                       </span>
-                    ) : (
+                    )}
+                    {r.status === 'skipped' && (
+                      <span className='flex items-center gap-1.5 text-amber-700'>
+                        <MinusCircle className='h-3.5 w-3.5' />
+                        {r.error}
+                      </span>
+                    )}
+                    {r.status === 'error' && (
                       <span className='flex items-center gap-1.5 text-destructive'>
                         <XCircle className='h-3.5 w-3.5' />
                         {r.error}
@@ -190,27 +200,21 @@ export function SupplierEvaluationImportDialog({
           {fileName || 'Seleccionar archivo (.xlsx o .csv)'}
         </Button>
         <p className='text-xs text-muted-foreground'>
-          Columnas esperadas: Año, Proveedor, Mail, Contacto, Detalle, Calidad, Tiempo de crédito,
-          Tiempo de entrega, Precio, Referencias, Equipo (0-5). RUC/NIT es opcional pero
-          recomendado: si viene, se usa para ubicar el proveedor (más confiable que el nombre, que
-          puede repetirse entre razones sociales distintas).
+          Columna obligatoria: Nombre. Opcionales: RUC/NIT, Email, Teléfono, Contacto, Área.
         </p>
       </div>
 
       {missingFields.length > 0 && (
         <div className='flex items-start gap-2 rounded-md border border-destructive/50 bg-destructive/5 p-3 text-sm text-destructive'>
           <AlertTriangle className='h-4 w-4 mt-0.5 flex-shrink-0' />
-          <span>
-            No se encontraron las columnas: {missingFields.join(', ')}. Revisa los encabezados del
-            archivo.
-          </span>
+          <span>No se encontró la columna Nombre. Revisa los encabezados del archivo.</span>
         </div>
       )}
 
       {rows.length > 0 && (
         <>
           <div className='space-y-1'>
-            <Label>Área por defecto para proveedores nuevos</Label>
+            <Label>Área por defecto</Label>
             <FamilyCombobox
               families={families}
               value={defaultFamilyId}
@@ -220,14 +224,13 @@ export function SupplierEvaluationImportDialog({
               popoverWidth='320px'
             />
             <p className='text-xs text-muted-foreground'>
-              Se aplica solo a proveedores que no existan aún en el sistema (se buscan primero por
-              RUC/NIT si la columna viene en el archivo, y por nombre exacto si no). Los ya
-              existentes conservan su área actual.
+              Se usa solo para filas cuya columna Área venga vacía o no coincida con ninguna
+              existente.
               {!defaultFamilyId && !isSuperAdmin && (
                 <>
                   {' '}
-                  Si no eliges un área, las filas con proveedores nuevos fallarán (se indicará el
-                  motivo); las de proveedores ya existentes se importan igual.
+                  Sin área por defecto, esas filas fallarán (se indicará el motivo); las que traigan
+                  un área válida en su propia columna se importan igual.
                 </>
               )}
             </p>
@@ -244,10 +247,11 @@ export function SupplierEvaluationImportDialog({
               <TableHeader>
                 <TableRow>
                   <TableHead className='w-16'>Fila</TableHead>
-                  <TableHead>Año</TableHead>
-                  <TableHead>Proveedor</TableHead>
+                  <TableHead>Nombre</TableHead>
                   <TableHead>RUC/NIT</TableHead>
-                  <TableHead>Detalle</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Contacto</TableHead>
+                  <TableHead>Área</TableHead>
                   <TableHead>Estado</TableHead>
                 </TableRow>
               </TableHeader>
@@ -255,13 +259,18 @@ export function SupplierEvaluationImportDialog({
                 {rows.map((r, i) => (
                   <TableRow key={r.rowNumber}>
                     <TableCell className='font-mono text-xs'>{r.rowNumber}</TableCell>
-                    <TableCell>{r.year ?? '—'}</TableCell>
-                    <TableCell className='text-sm'>{r.supplierName || '—'}</TableCell>
+                    <TableCell className='text-sm'>{r.name || '—'}</TableCell>
                     <TableCell className='text-sm text-muted-foreground'>
                       {r.taxId || '—'}
                     </TableCell>
                     <TableCell className='text-sm text-muted-foreground'>
-                      {r.detail || '—'}
+                      {r.email || '—'}
+                    </TableCell>
+                    <TableCell className='text-sm text-muted-foreground'>
+                      {r.contactName || '—'}
+                    </TableCell>
+                    <TableCell className='text-sm text-muted-foreground'>
+                      {r.familyName || '—'}
                     </TableCell>
                     <TableCell className='text-sm'>
                       {rowErrors[i] ? (

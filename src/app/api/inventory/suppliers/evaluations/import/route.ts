@@ -32,6 +32,8 @@ import {
   classifyTotal,
   getSupplierQualificationThresholds,
 } from '@/lib/inventory/supplier-qualification'
+import { sanitizeSupplierPayload } from '@/lib/validations/inventory/supplier'
+import { ZodError } from 'zod'
 
 interface RowResult {
   rowNumber: number
@@ -79,16 +81,11 @@ export async function POST(request: NextRequest) {
         }
         throw err
       }
-    } else if (!isSuperAdmin) {
-      return NextResponse.json(
-        {
-          error:
-            'Selecciona un área por defecto para los proveedores nuevos que se creen durante la importación (o Super Admin para dejarla global).',
-          field: 'defaultFamilyId',
-        },
-        { status: 422 }
-      )
     }
+    // Sin área elegida y sin ser Super Admin: no abortamos el lote completo — solo
+    // fallarán, fila por fila, las que de verdad necesiten crear un proveedor nuevo
+    // (ver más abajo). Las filas de proveedores ya existentes se importan igual.
+    const requiresFamilyForNewSuppliers = !defaultFamilyId && !isSuperAdmin
 
     const thresholds = await getSupplierQualificationThresholds()
     const results: RowResult[] = []
@@ -106,20 +103,54 @@ export async function POST(request: NextRequest) {
       }
 
       try {
-        let supplier = await prisma.suppliers.findFirst({
-          where: { name: { equals: row.supplierName, mode: 'insensitive' } },
-        })
+        // El RUC/NIT manda por ser único e inequívoco; el nombre es solo un
+        // respaldo (dos proveedores distintos pueden compartir razón social o
+        // nombre comercial similar) — se usa cuando no hay RUC en la fila, o
+        // cuando el RUC de la fila no coincide con ningún proveedor existente.
+        let supplier = row.taxId
+          ? await prisma.suppliers.findUnique({ where: { taxId: row.taxId } })
+          : null
+        if (!supplier) {
+          supplier = await prisma.suppliers.findFirst({
+            where: { name: { equals: row.supplierName, mode: 'insensitive' } },
+          })
+        }
 
         let supplierCreated = false
         if (!supplier) {
-          supplier = await prisma.suppliers.create({
-            data: {
+          if (requiresFamilyForNewSuppliers) {
+            results.push({
+              rowNumber: row.rowNumber,
+              status: 'error',
+              supplierName: row.supplierName,
+              error:
+                'Proveedor nuevo: selecciona un área por defecto para poder crearlo (o pide a un Super Admin que la importe).',
+            })
+            continue
+          }
+          let newSupplierData: ReturnType<typeof sanitizeSupplierPayload>
+          try {
+            newSupplierData = sanitizeSupplierPayload({
               name: row.supplierName,
-              email: row.email || null,
-              contactName: row.contact || null,
-              familyId: defaultFamilyId,
-            },
-          })
+              taxId: row.taxId || undefined,
+              email: row.email || undefined,
+              contactName: row.contact || undefined,
+              familyId: defaultFamilyId || undefined,
+            })
+          } catch (err) {
+            const message =
+              err instanceof ZodError
+                ? (err.errors[0]?.message ?? 'Datos inválidos')
+                : 'Datos inválidos'
+            results.push({
+              rowNumber: row.rowNumber,
+              status: 'error',
+              supplierName: row.supplierName,
+              error: `Proveedor nuevo: ${message}`,
+            })
+            continue
+          }
+          supplier = await prisma.suppliers.create({ data: newSupplierData })
           supplierCreated = true
 
           await prisma.audit_logs.create({

@@ -26,12 +26,26 @@ const emptyToNull = (v: unknown) => (v === '' || v === undefined ? null : v)
 const optionalString = (max: number) =>
   z.preprocess(emptyToNull, z.string().max(max).nullable().optional())
 
+export const SUPPLIER_TAX_ID_MAX_LENGTH = 20
+
 export const supplierFormSchema = z.object({
   name: z.string().min(1, 'El nombre del proveedor es obligatorio').max(200),
   legalName: optionalString(200),
   typeId: optionalString(50),
   familyId: optionalString(50),
-  taxId: optionalString(20),
+  // Texto libre (no solo dígitos): admite RUC de Ecuador y también NIT, VAT,
+  // EIN u otros identificadores tributarios extranjeros con letras/guiones.
+  taxId: z.preprocess(
+    emptyToNull,
+    z
+      .string()
+      .max(
+        SUPPLIER_TAX_ID_MAX_LENGTH,
+        `RUC/NIT no puede superar los ${SUPPLIER_TAX_ID_MAX_LENGTH} caracteres`
+      )
+      .nullable()
+      .optional()
+  ),
   email: z.preprocess(
     emptyToNull,
     z.string().email('Email inválido').max(200).nullable().optional()

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Pencil, PowerOff, Power, RefreshCw, Trash2 } from 'lucide-react'
+import { Plus, Pencil, PowerOff, Power, RefreshCw, Trash2, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -41,6 +41,7 @@ import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { SupplierForm } from '@/components/inventory/suppliers/SupplierForm'
 import { SupplierTypesSection } from '@/components/settings/inventory/supplier-types-section'
 import { SupplierEvaluationsTab } from '@/components/inventory/suppliers/SupplierEvaluationsTab'
+import { SupplierImportDialog } from '@/components/inventory/suppliers/SupplierImportDialog'
 import { ListTableToolbar } from '@/components/common/list-table-toolbar'
 import { useExport } from '@/hooks/common/use-export'
 import { PAYMENT_METHOD_TYPE_LABELS } from '@/types/contracts'
@@ -70,6 +71,7 @@ export default function SuppliersPage() {
   const [deletingSupplier, setDeletingSupplier] = useState<any>(null)
   const [deleting, setDeleting] = useState(false)
   const [creditFilter, setCreditFilter] = useState<'all' | 'high' | 'ok'>('all')
+  const [importOpen, setImportOpen] = useState(false)
 
   // Familias de inventario desde el contexto global (cache Redis, sin peticion extra) - memoizadas
   const { families } = useFamilyOptions()
@@ -314,16 +316,22 @@ export default function SuppliersPage() {
               disabled: suppliers.length === 0,
             }}
             endActions={
-              <Button
-                onClick={() => {
-                  setEditingSupplier(null)
-                  setFormDirty(false)
-                  setFormOpen(true)
-                }}
-              >
-                <Plus className='h-4 w-4 sm:mr-2' />
-                <span className='hidden sm:inline'>Nuevo proveedor</span>
-              </Button>
+              <div className='flex gap-2'>
+                <Button variant='outline' onClick={() => setImportOpen(true)}>
+                  <Upload className='h-4 w-4 sm:mr-2' />
+                  <span className='hidden sm:inline'>Importar proveedores</span>
+                </Button>
+                <Button
+                  onClick={() => {
+                    setEditingSupplier(null)
+                    setFormDirty(false)
+                    setFormOpen(true)
+                  }}
+                >
+                  <Plus className='h-4 w-4 sm:mr-2' />
+                  <span className='hidden sm:inline'>Nuevo proveedor</span>
+                </Button>
+              </div>
             }
           />
           <div className='flex flex-wrap gap-3'>
@@ -657,6 +665,21 @@ export default function SuppliersPage() {
               fetchSuppliers()
             }}
             onCancel={closeSupplierForm}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={importOpen} onOpenChange={setImportOpen}>
+        <DialogContent className='w-[min(98vw,52rem)] max-w-3xl max-h-[92vh] overflow-y-auto'>
+          <DialogHeader>
+            <DialogTitle>Importar proveedores desde Excel</DialogTitle>
+          </DialogHeader>
+          <SupplierImportDialog
+            onCancel={() => setImportOpen(false)}
+            onDone={() => {
+              setImportOpen(false)
+              fetchSuppliers()
+            }}
           />
         </DialogContent>
       </Dialog>

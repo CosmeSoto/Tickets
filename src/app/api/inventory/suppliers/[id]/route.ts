@@ -309,7 +309,8 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
 /**
  * DELETE /api/inventory/suppliers/[id]
  * Eliminar proveedor permanentemente.
- * Solo ADMIN/SuperAdmin. Solo si no tiene activos asociados.
+ * Solo SuperAdmin (los ADMIN normales solo pueden activar/desactivar, ver PATCH).
+ * Solo si no tiene activos asociados.
  */
 export async function DELETE(request: NextRequest, { params }: RouteContext) {
   try {
@@ -319,12 +320,11 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    // Solo ADMIN puede eliminar permanentemente — gestores solo pueden crear/editar
-    const role = session.user.role
+    // Solo Super Admin puede eliminar permanentemente — ADMIN normal solo activa/desactiva
     const isSuperAdmin = (session.user as any).isSuperAdmin === true
-    if (role !== 'ADMIN' && !isSuperAdmin) {
+    if (!isSuperAdmin) {
       return NextResponse.json(
-        { error: 'Solo el administrador puede eliminar proveedores' },
+        { error: 'Solo el Super Admin puede eliminar proveedores permanentemente' },
         { status: 403 }
       )
     }

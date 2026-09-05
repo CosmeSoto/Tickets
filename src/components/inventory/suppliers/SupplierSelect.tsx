@@ -53,13 +53,15 @@ export function SupplierSelect({
 }: SupplierSelectProps) {
   const { data: session } = useSession()
 
-  // Permisos: crear/editar → canManageInventory; desactivar/eliminar → solo ADMIN
+  // Permisos: crear/editar → canManageInventory; desactivar → ADMIN o SuperAdmin;
+  // eliminar permanentemente → solo SuperAdmin (igual que en el listado de Proveedores)
   const userRole = session?.user?.role
   const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
   const canEdit =
     allowCreate &&
     (userRole === 'ADMIN' || isSuperAdmin || (session?.user as any)?.canManageInventory === true)
-  const canDeactivateOrDelete = userRole === 'ADMIN' || isSuperAdmin
+  const canDeactivate = userRole === 'ADMIN' || isSuperAdmin
+  const canDelete = isSuperAdmin
   const [open, setOpen] = useState(false)
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [loading, setLoading] = useState(false)
@@ -329,7 +331,7 @@ export function SupplierSelect({
                         </span>
                       )}
                       {/* Acciones según rol */}
-                      {(canEdit || canDeactivateOrDelete) && (
+                      {(canEdit || canDeactivate || canDelete) && (
                         <div
                           className='flex items-center gap-0.5 ml-2'
                           onClick={e => e.stopPropagation()}
@@ -344,7 +346,7 @@ export function SupplierSelect({
                               <Pencil className='h-3.5 w-3.5' />
                             </button>
                           )}
-                          {canDeactivateOrDelete && (
+                          {canDeactivate && (
                             <button
                               type='button'
                               onClick={() => {
@@ -357,7 +359,7 @@ export function SupplierSelect({
                               <PowerOff className='h-3.5 w-3.5' />
                             </button>
                           )}
-                          {canDeactivateOrDelete && (
+                          {canDelete && (
                             <button
                               type='button'
                               onClick={() => {
@@ -365,7 +367,7 @@ export function SupplierSelect({
                                 setConfirm({ type: 'delete', supplier: s })
                               }}
                               className='p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive'
-                              title='Eliminar proveedor'
+                              title='Eliminar proveedor (Solo Super Admin)'
                             >
                               <Trash2 className='h-3.5 w-3.5' />
                             </button>
