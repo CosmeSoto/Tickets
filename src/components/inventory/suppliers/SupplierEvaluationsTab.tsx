@@ -93,9 +93,14 @@ export function SupplierEvaluationsTab() {
     filename: 'calificacion-proveedores',
     title: 'Calificación de proveedores',
     getData: () => evaluations,
+    // El label de "RUC/NIT" debe coincidir con el alias que reconoce la
+    // importación (src/lib/inventory/supplier-evaluation-import.ts) — es la
+    // clave que usa el import para ubicar/crear el proveedor, así que si no
+    // se exporta, un archivo reimportado vuelve a depender solo del nombre.
     columns: [
       { key: 'year', label: 'Año' },
       { key: 'supplier', label: 'Proveedor', format: v => v?.name ?? '' },
+      { key: 'supplier', label: 'RUC/NIT', format: v => v?.taxId ?? '' },
       { key: 'supplier', label: 'Mail', format: v => v?.email ?? '' },
       { key: 'supplier', label: 'Contacto', format: v => v?.contactName ?? v?.phone ?? '' },
       { key: 'detail', label: 'Detalle', format: v => v ?? '' },

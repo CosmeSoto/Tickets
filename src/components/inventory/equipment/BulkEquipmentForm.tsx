@@ -39,6 +39,7 @@ import { StepHeader } from '@/components/inventory/shared/StepHeader'
 import { FinancialInfoSection } from '@/components/inventory/shared/FinancialInfoSection'
 import { SupplierSelect } from '@/components/inventory/suppliers/SupplierSelect'
 import { BulkMROForm } from '@/components/inventory/equipment/BulkMROForm'
+import { BulkLicenseForm } from '@/components/inventory/license/BulkLicenseForm'
 import { AccessoriesSection } from '@/components/inventory/shared/AccessoriesSection'
 import { TypeAttributesInput } from '@/components/inventory/custom-fields/type-attributes-input'
 import { WarehouseInlineForm } from '@/components/inventory/asset-forms/WarehouseInlineForm'
@@ -300,9 +301,13 @@ export function BulkEquipmentForm({
         else if (fam?.code && DEFAULT_USEFUL_LIFE_YEARS[fam.code] > 0)
           setUsefulLifeYears(String(DEFAULT_USEFUL_LIFE_YEARS[fam.code]))
         const subtypes = config.allowedSubtypes ?? []
-        // En lotes, las licencias no aplican (son individuales por naturaleza)
-        const batchSubtypes = subtypes.filter(s => s !== 'LICENSE')
-        setStep(batchSubtypes.length <= 1 ? 3 : 2)
+        if (subtypes.length <= 1) {
+          // Familia de un solo subtipo: nos saltamos el paso de selección.
+          if (subtypes[0]) setSelectedSubtype(subtypes[0])
+          setStep(3)
+        } else {
+          setStep(2)
+        }
       }
     } finally {
       setLoadingConfig(false)
@@ -674,14 +679,14 @@ export function BulkEquipmentForm({
         <StepHeader
           mode='bulk'
           step={2}
-          description='Indica si el lote es de equipos físicos o suministros.'
+          description='Indica si el lote es de equipos físicos, licencias o suministros.'
           familyName={selectedFamily?.name}
           familyColor={selectedFamily?.color}
           backLabel='Cambiar familia'
           onBack={handleBack}
         />
         <SubtypeSelector
-          allowedSubtypes={familyConfig.allowedSubtypes.filter(s => s !== 'LICENSE')}
+          allowedSubtypes={familyConfig.allowedSubtypes}
           onSelect={handleSubtypeSelect}
         />
       </div>
@@ -701,6 +706,33 @@ export function BulkEquipmentForm({
         onCancel={onCancel}
         onSuccess={onSuccess}
       />
+    )
+  }
+
+  // Para LICENSE: alta masiva de licencias (unidades que varían entre sí)
+  if (step === 3 && selectedSubtype === 'LICENSE' && familyConfig) {
+    return (
+      <div className='space-y-6'>
+        <StepHeader
+          mode='bulk'
+          step={3}
+          description='Cada licencia puede tener su propio plan y colaborador asignado.'
+          familyName={selectedFamily?.name}
+          familyColor={selectedFamily?.color}
+          subtypeName={selectedSubtype}
+          backLabel='Cambiar tipo'
+          onBack={handleBack}
+        />
+        <BulkLicenseForm
+          familyId={selectedFamilyId!}
+          // A diferencia del lote de equipos, las licencias no crean un
+          // equipment_batches — el onSuccess del padre redirige (con delay) a
+          // la pestaña "Lotes" (?tab=batches), que no las mostraría. Por eso
+          // NO se reenvía el onSuccess del padre acá; se navega directo.
+          onSuccess={() => router.push('/inventory')}
+          onCancel={handleBack}
+        />
+      </div>
     )
   }
 

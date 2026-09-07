@@ -60,7 +60,14 @@ export async function GET(request: NextRequest) {
         where,
         include: {
           supplier: {
-            select: { id: true, name: true, email: true, contactName: true, phone: true },
+            select: {
+              id: true,
+              name: true,
+              taxId: true,
+              email: true,
+              contactName: true,
+              phone: true,
+            },
           },
           evaluatedBy: { select: { id: true, name: true } },
         },

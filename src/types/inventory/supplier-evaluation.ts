@@ -21,7 +21,14 @@ export interface SupplierEvaluation {
   evaluatedById?: string | null
   createdAt: string
   updatedAt: string
-  supplier?: { id: string; name: string; email?: string | null; contactName?: string | null }
+  supplier?: {
+    id: string
+    name: string
+    taxId?: string | null
+    email?: string | null
+    contactName?: string | null
+    phone?: string | null
+  }
   evaluatedBy?: { id: string; name: string } | null
 }
 

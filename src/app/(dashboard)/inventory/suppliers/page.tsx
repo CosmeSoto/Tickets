@@ -45,6 +45,7 @@ import { SupplierImportDialog } from '@/components/inventory/suppliers/SupplierI
 import { ListTableToolbar } from '@/components/common/list-table-toolbar'
 import { useExport } from '@/hooks/common/use-export'
 import { PAYMENT_METHOD_TYPE_LABELS } from '@/types/contracts'
+import { SUPPLIER_BANK_ACCOUNT_TYPE_LABELS } from '@/lib/validations/inventory/supplier'
 import { FamilyCombobox } from '@/components/ui/family-combobox'
 import { useFamilyOptions } from '@/hooks/use-family-options'
 
@@ -118,37 +119,58 @@ export default function SuppliersPage() {
     filename: 'proveedores',
     title: 'Proveedores',
     getData: () => suppliers,
+    // IMPORTANTE: estos labels deben coincidir con los alias de encabezado que
+    // reconoce la importación (src/lib/inventory/supplier-import.ts) para que
+    // un archivo exportado se pueda reimportar sin perder columnas — ver
+    // ese archivo antes de renombrar cualquier label de acá.
     columns: [
       { key: 'name', label: 'Nombre' },
-      { key: 'legalName', label: 'Razón social', format: v => v ?? '' },
+      { key: 'legalName', label: 'Razón social legal', format: v => v ?? '' },
       { key: 'supplierType', label: 'Tipo', format: v => v?.name ?? '' },
       { key: 'family', label: 'Área', format: v => v?.name ?? '' },
       { key: 'taxId', label: 'RUC / NIT', format: v => v ?? '' },
       { key: 'email', label: 'Email', format: v => v ?? '' },
       { key: 'phone', label: 'Teléfono', format: v => v ?? '' },
       { key: 'contactName', label: 'Contacto', format: v => v ?? '' },
+      { key: 'website', label: 'Sitio web', format: v => v ?? '' },
+      { key: 'address', label: 'Dirección', format: v => v ?? '' },
+      { key: 'city', label: 'Ciudad', format: v => v ?? '' },
+      { key: 'country', label: 'País', format: v => v ?? '' },
       {
         key: 'paymentTermsDays',
-        label: 'Plazo pago (días)',
+        label: 'Plazo de pago (días)',
         format: v => (v == null ? '' : String(v)),
       },
       {
+        // Valor numérico puro (sin moneda ni separadores de miles) para que
+        // se pueda reimportar tal cual; la moneda va en su propia columna.
         key: 'creditLimit',
-        label: 'Límite crédito',
-        format: (v, row) =>
-          v == null ? '' : `${Number(v).toLocaleString()} ${row?.creditCurrency || 'USD'}`,
+        label: 'Límite de crédito',
+        format: v => (v == null ? '' : String(Number(v))),
       },
+      { key: 'creditCurrency', label: 'Moneda', format: v => v ?? '' },
       {
         key: 'preferredPaymentMethod',
-        label: 'Método pago preferido',
+        label: 'Método de pago',
         format: v =>
           v
             ? PAYMENT_METHOD_TYPE_LABELS[v as keyof typeof PAYMENT_METHOD_TYPE_LABELS] || String(v)
             : '',
       },
       { key: 'bankName', label: 'Banco', format: v => v ?? '' },
-      { key: 'city', label: 'Ciudad', format: v => v ?? '' },
-      { key: 'country', label: 'País', format: v => v ?? '' },
+      { key: 'bankAccountNumber', label: 'Cuenta bancaria', format: v => v ?? '' },
+      {
+        key: 'bankAccountType',
+        label: 'Tipo de cuenta',
+        format: v =>
+          v
+            ? SUPPLIER_BANK_ACCOUNT_TYPE_LABELS[
+                v as keyof typeof SUPPLIER_BANK_ACCOUNT_TYPE_LABELS
+              ] || String(v)
+            : '',
+      },
+      { key: 'bankSwift', label: 'SWIFT/BIC', format: v => v ?? '' },
+      { key: 'notes', label: 'Notas', format: v => v ?? '' },
       { key: 'isActive', label: 'Estado', format: v => (v ? 'Activo' : 'Inactivo') },
     ],
   })
