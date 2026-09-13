@@ -12,17 +12,12 @@ import {
   generateAccessQrSecret,
 } from '@/lib/access/access-control'
 import { hardDeleteAccessPasses } from '@/lib/access/delete-access-passes'
-import { formatAccessDateTime } from '@/lib/access/access-dates'
 import { accessTypeRequiresOrganization } from '@/lib/access/access-labels'
-import { AuditActionsComplete, AuditServiceComplete } from '@/lib/services/audit-service-complete'
-import { queueNotificationEmail } from '@/lib/notifications/queue-notification-email'
-import { getEmailBranding } from '@/lib/services/email/email-branding'
 import {
-  accessPassEmailSubject,
-  accessPrivacyInvitationAltText,
-  accessTypeLabel,
-  buildAccessPrivacyInvitationEmail,
-} from '@/lib/services/email/templates/access-pass-issued'
+  ACCESS_PRIVACY_ACCEPTANCE_TTL_MS,
+  sendAccessPrivacyInvitation,
+} from '@/lib/access/access-invitation'
+import { AuditActionsComplete, AuditServiceComplete } from '@/lib/services/audit-service-complete'
 
 const createSchema = z
   .object({
@@ -186,7 +181,7 @@ export async function POST(request: NextRequest) {
 
   const { tokenHash } = generateAccessQrSecret()
   const acceptanceToken = generateAccessQrSecret()
-  const acceptanceExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+  const acceptanceExpiresAt = new Date(Date.now() + ACCESS_PRIVACY_ACCEPTANCE_TTL_MS)
   const pass = await prisma.$transaction(async (tx: any) => {
     const subject = await tx.access_subjects.create({
       data: {
@@ -221,31 +216,17 @@ export async function POST(request: NextRequest) {
   })
 
   if (data.email) {
-    const branding = await getEmailBranding()
-    const acceptanceUrl = `${branding.baseUrl}/access/passes/${pass.id}/accept?token=${encodeURIComponent(acceptanceToken.token)}`
-    const { html } = await buildAccessPrivacyInvitationEmail({
+    await sendAccessPrivacyInvitation({
+      to: data.email,
       recipientName: `${data.firstName} ${data.lastName}`,
       familyName: family.name,
-      validFromLabel: formatAccessDateTime(data.validFrom),
-      validUntilLabel: formatAccessDateTime(data.validUntil),
-      organizationName,
-      accessTypeLabel: accessTypeLabel(data.accessType),
-      privacyUrl: branding.privacyUrl,
       credentialCode: pass.credentialCode,
-      acceptanceUrl,
-    })
-    await queueNotificationEmail({
-      to: data.email,
-      module: 'access',
-      event: 'accessPassIssued',
-      priority: 'important',
-      subject: `Acción requerida · ${accessPassEmailSubject(family.name)}`,
-      html,
-      text: accessPrivacyInvitationAltText({
-        recipientName: `${data.firstName} ${data.lastName}`,
-        familyName: family.name,
-        acceptanceUrl,
-      }),
+      validFrom: data.validFrom,
+      validUntil: data.validUntil,
+      organizationName,
+      accessType: data.accessType,
+      passId: pass.id,
+      token: acceptanceToken.token,
     })
     await prisma.access_passes.update({
       where: { id: pass.id },

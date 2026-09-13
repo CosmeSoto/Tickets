@@ -46,7 +46,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!isAccessFamilyAllowed(permission, pass.familyId)) {
     return NextResponse.json({ error: 'No tienes acceso a este pase.' }, { status: 403 })
   }
-  if (pass.status !== 'ACTIVE' || !pass.subject.email) {
+  // Segundo cerrojo (además de assertAccessStatusTransition en el PATCH de
+  // gestión): nunca se envía un QR real sin consentimiento registrado.
+  if (pass.status !== 'ACTIVE' || !pass.subject.email || !pass.privacyAcceptedAt) {
     return NextResponse.json(
       { error: 'Solo se puede reenviar una credencial activa con correo registrado.' },
       { status: 409 }
@@ -54,6 +56,23 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 
   const secret = generateAccessQrSecret()
+  // Claim atómico antes de construir el correo: si el pase se revocó/suspendió
+  // mientras se preparaba el envío (doble click, otro gestor revocando a la
+  // vez), esto aborta sin invalidar el QR anterior ni mandar nada por correo.
+  const claimed = await prisma.access_passes.updateMany({
+    where: { id, status: 'ACTIVE', privacyAcceptedAt: { not: null } },
+    data: { tokenHash: secret.tokenHash, emailedAt: new Date(), updatedById: session.user.id },
+  })
+  if (claimed.count !== 1) {
+    return NextResponse.json(
+      {
+        error:
+          'El pase dejó de estar activo mientras se preparaba el envío. Actualiza e inténtalo de nuevo.',
+      },
+      { status: 409 }
+    )
+  }
+
   const qrCode = await QRCode.toDataURL(`ACCESS:${secret.token}`, {
     errorCorrectionLevel: 'M',
     margin: 1,
@@ -70,10 +89,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     accessTypeLabel: accessTypeLabel(pass.subject.accessType),
     qrDataUrl: qrCode,
     privacyUrl: branding.privacyUrl,
-  })
-  await prisma.access_passes.update({
-    where: { id },
-    data: { tokenHash: secret.tokenHash, emailedAt: new Date(), updatedById: session.user.id },
   })
   try {
     await queueNotificationEmail({

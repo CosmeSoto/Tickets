@@ -8,14 +8,10 @@ import {
   getAccessModulePermission,
   isAccessFamilyAllowed,
 } from '@/lib/access/access-control'
-import { getEmailBranding } from '@/lib/services/email/email-branding'
-import { queueNotificationEmail } from '@/lib/notifications/queue-notification-email'
 import {
-  accessPrivacyInvitationAltText,
-  accessTypeLabel,
-  buildAccessPrivacyInvitationEmail,
-} from '@/lib/services/email/templates/access-pass-issued'
-import { formatAccessDateTime } from '@/lib/access/access-dates'
+  ACCESS_PRIVACY_ACCEPTANCE_TTL_MS,
+  sendAccessPrivacyInvitation,
+} from '@/lib/access/access-invitation'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions)
@@ -58,41 +54,38 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 
   const secret = generateAccessQrSecret()
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-  await prisma.access_passes.update({
-    where: { id },
+  const expiresAt = new Date(Date.now() + ACCESS_PRIVACY_ACCEPTANCE_TTL_MS)
+  // Claim atómico: si el pase dejó de estar PENDING_PRIVACY entre la lectura
+  // y este punto (p. ej. la persona ya aceptó, o un admin lo revocó), abortar
+  // sin rotar el token — evita dejar un token de aceptación huérfano o
+  // invalidar una aceptación en curso.
+  const claimed = await prisma.access_passes.updateMany({
+    where: { id, status: 'PENDING_PRIVACY' },
     data: {
       privacyAcceptanceTokenHash: secret.tokenHash,
       privacyAcceptanceExpiresAt: expiresAt,
       updatedById: session.user.id,
     },
   })
-  const branding = await getEmailBranding()
-  const acceptanceUrl = `${branding.baseUrl}/access/passes/${id}/accept?token=${encodeURIComponent(secret.token)}`
-  const recipientName = `${pass.subject.firstName} ${pass.subject.lastName}`
-  const { html } = await buildAccessPrivacyInvitationEmail({
-    recipientName,
+  if (claimed.count !== 1) {
+    return NextResponse.json(
+      { error: 'El pase dejó de estar pendiente de aceptación mientras se preparaba el envío.' },
+      { status: 409 }
+    )
+  }
+
+  await sendAccessPrivacyInvitation({
+    to: pass.subject.email,
+    recipientName: `${pass.subject.firstName} ${pass.subject.lastName}`,
     familyName: pass.family.name,
     credentialCode: pass.credentialCode,
-    validFromLabel: formatAccessDateTime(pass.validFrom),
-    validUntilLabel: formatAccessDateTime(pass.validUntil),
+    validFrom: pass.validFrom,
+    validUntil: pass.validUntil,
     organizationName: pass.subject.organization,
-    accessTypeLabel: accessTypeLabel(pass.subject.accessType),
-    privacyUrl: branding.privacyUrl,
-    acceptanceUrl,
-  })
-  await queueNotificationEmail({
-    to: pass.subject.email,
-    module: 'access',
-    event: 'accessPassIssued',
-    priority: 'important',
-    subject: 'Recordatorio: confirma tu aviso de privacidad',
-    html,
-    text: accessPrivacyInvitationAltText({
-      recipientName,
-      familyName: pass.family.name,
-      acceptanceUrl,
-    }),
+    accessType: pass.subject.accessType,
+    passId: id,
+    token: secret.token,
+    subjectOverride: 'Recordatorio: confirma tu aviso de privacidad',
   })
   return NextResponse.json({
     message: 'Invitación reenviada; el enlace anterior dejó de ser válido.',
