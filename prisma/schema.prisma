@@ -2506,6 +2506,7 @@ enum TicketStatus {
   IN_PROGRESS
   RESOLVED
   CLOSED
+  ON_HOLD
 }
 
 enum UserRole {
