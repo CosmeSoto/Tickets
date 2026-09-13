@@ -8,16 +8,16 @@ import { cn } from '@/lib/utils'
 import { Button } from './button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './card'
 import { Alert, AlertDescription } from './alert'
-import { 
-  AlertTriangle, 
-  RefreshCw, 
-  Home, 
-  ArrowLeft, 
-  Wifi, 
+import {
+  AlertTriangle,
+  RefreshCw,
+  Home,
+  ArrowLeft,
+  Wifi,
   Server,
   FileX,
   Shield,
-  Clock
+  Clock,
 } from 'lucide-react'
 
 // Base Error Props
@@ -48,8 +48,8 @@ export const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
   onGoHome,
   onGoBack,
 }) => {
-  const defaultIcon = <AlertTriangle className="h-12 w-12 text-red-500" />
-  
+  const defaultIcon = <AlertTriangle className='h-12 w-12 text-red-500' />
+
   const variantStyles = {
     default: 'border-border',
     destructive: 'border-red-200 bg-red-50',
@@ -58,32 +58,30 @@ export const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
 
   return (
     <Card className={cn(variantStyles[variant], className)}>
-      <CardContent className="flex flex-col items-center text-center p-8">
-        <div className="mb-4">
-          {icon || defaultIcon}
-        </div>
-        
-        <CardTitle className="mb-2 text-xl">{title}</CardTitle>
-        <CardDescription className="mb-6 max-w-md">{message}</CardDescription>
-        
+      <CardContent className='flex flex-col items-center text-center p-8'>
+        <div className='mb-4'>{icon || defaultIcon}</div>
+
+        <CardTitle className='mb-2 text-xl'>{title}</CardTitle>
+        <CardDescription className='mb-6 max-w-md'>{message}</CardDescription>
+
         {(actions || onRetry || onGoHome || onGoBack) && (
-          <div className="flex flex-wrap gap-3 justify-center">
+          <div className='flex flex-wrap gap-3 justify-center'>
             {actions}
             {onRetry && (
-              <Button onClick={onRetry} variant="default">
-                <RefreshCw className="h-4 w-4 mr-2" />
+              <Button onClick={onRetry} variant='default'>
+                <RefreshCw className='h-4 w-4 mr-2' />
                 Reintentar
               </Button>
             )}
             {onGoBack && (
-              <Button onClick={onGoBack} variant="outline">
-                <ArrowLeft className="h-4 w-4 mr-2" />
+              <Button onClick={onGoBack} variant='outline'>
+                <ArrowLeft className='h-4 w-4 mr-2' />
                 Volver
               </Button>
             )}
             {onGoHome && (
-              <Button onClick={onGoHome} variant="outline">
-                <Home className="h-4 w-4 mr-2" />
+              <Button onClick={onGoHome} variant='outline'>
+                <Home className='h-4 w-4 mr-2' />
                 Inicio
               </Button>
             )}
@@ -95,61 +93,61 @@ export const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
 }
 
 // Network Error
-export const NetworkError: React.FC<BaseErrorProps> = (props) => {
+export const NetworkError: React.FC<BaseErrorProps> = props => {
   return (
     <ErrorDisplay
-      title="Error de conexión"
-      message="No se pudo conectar al servidor. Verifica tu conexión a internet e inténtalo de nuevo."
-      icon={<Wifi className="h-12 w-12 text-red-500" />}
+      title='Error de conexión'
+      message='No se pudo conectar al servidor. Verifica tu conexión a internet e inténtalo de nuevo.'
+      icon={<Wifi className='h-12 w-12 text-red-500' />}
       {...props}
     />
   )
 }
 
 // Server Error
-export const ServerError: React.FC<BaseErrorProps> = (props) => {
+export const ServerError: React.FC<BaseErrorProps> = props => {
   return (
     <ErrorDisplay
-      title="Error del servidor"
-      message="El servidor está experimentando problemas. Por favor, inténtalo más tarde."
-      icon={<Server className="h-12 w-12 text-red-500" />}
+      title='Error del servidor'
+      message='El servidor está experimentando problemas. Por favor, inténtalo más tarde.'
+      icon={<Server className='h-12 w-12 text-red-500' />}
       {...props}
     />
   )
 }
 
 // Not Found Error
-export const NotFoundError: React.FC<BaseErrorProps> = (props) => {
+export const NotFoundError: React.FC<BaseErrorProps> = props => {
   return (
     <ErrorDisplay
-      title="Página no encontrada"
-      message="La página que buscas no existe o ha sido movida."
-      icon={<FileX className="h-12 w-12 text-red-500" />}
+      title='Página no encontrada'
+      message='La página que buscas no existe o ha sido movida.'
+      icon={<FileX className='h-12 w-12 text-red-500' />}
       {...props}
     />
   )
 }
 
 // Permission Error
-export const PermissionError: React.FC<BaseErrorProps> = (props) => {
+export const PermissionError: React.FC<BaseErrorProps> = props => {
   return (
     <ErrorDisplay
-      title="Acceso denegado"
-      message="No tienes permisos para acceder a este recurso."
-      icon={<Shield className="h-12 w-12 text-red-500" />}
-      variant="warning"
+      title='Acceso denegado'
+      message='No tienes permisos para acceder a este recurso.'
+      icon={<Shield className='h-12 w-12 text-red-500' />}
+      variant='warning'
       {...props}
     />
   )
 }
 
 // Timeout Error
-export const TimeoutError: React.FC<BaseErrorProps> = (props) => {
+export const TimeoutError: React.FC<BaseErrorProps> = props => {
   return (
     <ErrorDisplay
-      title="Tiempo de espera agotado"
-      message="La operación tardó demasiado tiempo. Por favor, inténtalo de nuevo."
-      icon={<Clock className="h-12 w-12 text-red-500" />}
+      title='Tiempo de espera agotado'
+      message='La operación tardó demasiado tiempo. Por favor, inténtalo de nuevo.'
+      icon={<Clock className='h-12 w-12 text-red-500' />}
       {...props}
     />
   )
@@ -171,15 +169,15 @@ export const InlineError: React.FC<InlineErrorProps> = ({
 }) => {
   return (
     <Alert variant={variant} className={className}>
-      <AlertTriangle className="h-4 w-4" />
-      <AlertDescription className="flex items-center justify-between">
+      <AlertTriangle className='h-4 w-4' />
+      <AlertDescription className='flex items-center justify-between'>
         <span>{message}</span>
         {onDismiss && (
           <Button
-            variant="ghost"
-            size="sm"
+            variant='ghost'
+            size='sm'
             onClick={onDismiss}
-            className="h-auto p-0 text-current hover:bg-transparent"
+            className='h-auto p-0 text-current hover:bg-transparent'
           >
             ×
           </Button>
@@ -198,71 +196,7 @@ interface FieldErrorProps {
 export const FieldError: React.FC<FieldErrorProps> = ({ message, className }) => {
   if (!message) return null
 
-  return (
-    <p className={cn('text-sm text-red-600 mt-1', className)}>
-      {message}
-    </p>
-  )
-}
-
-// Error Boundary Component
-interface ErrorBoundaryState {
-  hasError: boolean
-  error?: Error
-}
-
-interface ErrorBoundaryProps {
-  children: React.ReactNode
-  fallback?: React.ComponentType<{ error?: Error; resetError: () => void }>
-  onError?: (error: Error, errorInfo: React.ErrorInfo) => void
-}
-
-export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  constructor(props: ErrorBoundaryProps) {
-    super(props)
-    this.state = { hasError: false }
-  }
-
-  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
-    return { hasError: true, error }
-  }
-
-  override componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('Error caught by boundary:', error, errorInfo)
-    this.props.onError?.(error, errorInfo)
-  }
-
-  resetError = () => {
-    this.setState({ hasError: false, error: undefined })
-  }
-
-  override render() {
-    if (this.state.hasError) {
-      const FallbackComponent = this.props.fallback || DefaultErrorFallback
-      return <FallbackComponent error={this.state.error} resetError={this.resetError} />
-    }
-
-    return this.props.children
-  }
-}
-
-// Default Error Fallback
-const DefaultErrorFallback: React.FC<{ error?: Error; resetError: () => void }> = ({
-  error,
-  resetError,
-}) => {
-  return (
-    <ErrorDisplay
-      title="Error inesperado"
-      message={
-        process.env.NODE_ENV === 'development' && error
-          ? error.message
-          : 'Ha ocurrido un error inesperado. Por favor, recarga la página.'
-      }
-      onRetry={resetError}
-      onGoHome={() => window.location.href = '/'}
-    />
-  )
+  return <p className={cn('text-sm text-red-600 mt-1', className)}>{message}</p>
 }
 
 // Hook for Error Handling
@@ -298,19 +232,19 @@ export const handleApiError = (error: unknown): string => {
     if (error.message.includes('fetch')) {
       return 'Error de conexión. Verifica tu conexión a internet.'
     }
-    
+
     // Timeout errors
     if (error.message.includes('timeout')) {
       return 'La operación tardó demasiado tiempo. Inténtalo de nuevo.'
     }
-    
+
     return error.message
   }
-  
+
   // HTTP errors
   if (typeof error === 'object' && error !== null && 'status' in error) {
     const status = (error as any).status
-    
+
     switch (status) {
       case 400:
         return 'Solicitud inválida. Verifica los datos ingresados.'
@@ -330,6 +264,6 @@ export const handleApiError = (error: unknown): string => {
         return `Error del servidor (${status}). Inténtalo más tarde.`
     }
   }
-  
+
   return 'Ha ocurrido un error inesperado.'
 }
