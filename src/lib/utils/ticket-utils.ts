@@ -148,6 +148,16 @@ export const ADMIN_TICKET_EXPORT_COLUMN_MAP: Record<string, ExportColumn> = {
     label: 'Actividad',
     format: (v: any) => (v ? new Date(v).toLocaleDateString('es-ES') : ''),
   },
+  resolvedAt: {
+    key: 'resolvedAt',
+    label: 'Resuelto',
+    format: (v: any) => (v ? new Date(v).toLocaleDateString('es-ES') : ''),
+  },
+  closedAt: {
+    key: 'closedAt',
+    label: 'Cerrado',
+    format: (v: any) => (v ? new Date(v).toLocaleDateString('es-ES') : ''),
+  },
   ticketCode: {
     key: 'ticketCode',
     label: 'Código',

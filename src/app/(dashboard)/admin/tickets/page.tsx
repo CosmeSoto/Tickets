@@ -18,6 +18,7 @@ import {
   createAdminTicketColumns,
   renderAdminTicketRowActions,
   ADMIN_TICKET_COLUMN_DEFS,
+  ADMIN_TICKET_DEFAULT_VISIBLE_COLUMNS,
 } from '@/components/tickets/admin/ticket-columns'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
@@ -42,7 +43,9 @@ export default function AdminTicketsPage() {
   // Selector de columnas (visibilidad + orden), persistido en localStorage.
   // Alimenta tanto la tabla como la exportación (lo que ves es lo que exportas).
   const [columnOrder, setColumnOrder] = useState<string[]>(DEFAULT_COLUMN_ORDER)
-  const [visibleColumns, setVisibleColumns] = useState<string[]>(DEFAULT_COLUMN_ORDER)
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(
+    ADMIN_TICKET_DEFAULT_VISIBLE_COLUMNS
+  )
 
   const { families: contextFamilies } = useFamilies()
   const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
@@ -354,6 +357,7 @@ export default function AdminTicketsPage() {
                   onOrderChange={setColumnOrder}
                   onVisibleChange={setVisibleColumns}
                   storageKey='admin-tickets-columns-v1'
+                  defaultVisible={ADMIN_TICKET_DEFAULT_VISIBLE_COLUMNS}
                 />
                 <ExportButton
                   onExportCSV={exportCSV}
@@ -479,6 +483,7 @@ export default function AdminTicketsPage() {
                   onOrderChange={setColumnOrder}
                   onVisibleChange={setVisibleColumns}
                   storageKey='admin-tickets-columns-v1'
+                  defaultVisible={ADMIN_TICKET_DEFAULT_VISIBLE_COLUMNS}
                 />
                 <ExportButton
                   onExportCSV={exportCSV}

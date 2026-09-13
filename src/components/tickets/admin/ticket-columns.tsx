@@ -23,6 +23,26 @@ export const ADMIN_TICKET_COLUMN_DEFS: TableColumnDef[] = [
   { key: 'category', label: 'Categoría' },
   { key: 'createdAt', label: 'Creado' },
   { key: 'updatedAt', label: 'Actividad' },
+  { key: 'resolvedAt', label: 'Resuelto' },
+  { key: 'closedAt', label: 'Cerrado' },
+  { key: 'ticketCode', label: 'Código' },
+]
+
+/**
+ * Columnas visibles por defecto para un usuario que abre el selector por
+ * primera vez (sin preferencia guardada en localStorage) — solo las que
+ * cualquier admin necesita para escanear la lista de un vistazo. El resto
+ * (Área, Categoría, Actividad, Resuelto, Cerrado, Código) queda disponible
+ * para activar manualmente vía "Columnas", sin saturar la tabla/export por
+ * defecto.
+ */
+export const ADMIN_TICKET_DEFAULT_VISIBLE_COLUMNS = [
+  'title',
+  'status',
+  'priority',
+  'client',
+  'assignee',
+  'createdAt',
 ]
 
 /** Botón "ver" — se pasa como `rowActions` de `DataTable`, no como columna. */
@@ -170,6 +190,44 @@ export function createAdminTicketColumns(): Column<TicketType>[] {
             <span>{formatTimeAgo(ticket.updatedAt)}</span>
           </div>
         </div>
+      ),
+    },
+    {
+      key: 'resolvedAt',
+      label: 'Resuelto',
+      sortable: true,
+      render: (ticket: TicketType) =>
+        ticket.resolvedAt ? (
+          <div className='flex items-center gap-1 text-sm text-muted-foreground'>
+            <Calendar className='h-3.5 w-3.5' />
+            <span>{formatTimeAgo(ticket.resolvedAt)}</span>
+          </div>
+        ) : (
+          <span className='text-muted-foreground text-xs'>—</span>
+        ),
+    },
+    {
+      key: 'closedAt',
+      label: 'Cerrado',
+      sortable: true,
+      render: (ticket: TicketType) =>
+        ticket.closedAt ? (
+          <div className='flex items-center gap-1 text-sm text-muted-foreground'>
+            <Calendar className='h-3.5 w-3.5' />
+            <span>{formatTimeAgo(ticket.closedAt)}</span>
+          </div>
+        ) : (
+          <span className='text-muted-foreground text-xs'>—</span>
+        ),
+    },
+    {
+      key: 'ticketCode',
+      label: 'Código',
+      sortable: true,
+      render: (ticket: TicketType) => (
+        <span className='text-xs font-mono text-muted-foreground'>
+          #{getTicketDisplayCode(ticket)}
+        </span>
       ),
     },
   ]
