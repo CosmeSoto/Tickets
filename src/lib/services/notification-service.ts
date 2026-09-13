@@ -497,6 +497,21 @@ export class NotificationService {
             })
             if (n) notifications.push(n)
           }
+
+          // Si quien escribe es un colaborador (no el asignado), el técnico asignado
+          // también es parte del equipo y debe ver la nota — antes solo se enteraban
+          // los admins, y el asignado se quedaba fuera del hilo de su propio ticket.
+          if (ticket.assigneeId && ticket.assigneeId !== author.id) {
+            const n = await this.createNotification({
+              userId: ticket.assigneeId,
+              type: 'INFO',
+              title: '🔒 Nota interna de un colaborador',
+              message: `${author.name} dejó una nota interna en el ticket "${ticket.title}"`,
+              ticketId: ticket.id,
+              specificType: 'newComments',
+            })
+            if (n) notifications.push(n)
+          }
         }
 
         // Si lo escribe el admin → notificar al técnico asignado
@@ -512,9 +527,13 @@ export class NotificationService {
           if (n) notifications.push(n)
         }
 
-        // Nota interna del admin → notificar también a colaboradores técnicos
-        // (son parte del equipo y deben ver las instrucciones internas)
-        if (author.role === 'ADMIN' && collaboratorIds.length > 0) {
+        // Nota interna del admin o de un técnico (asignado o colaborador) →
+        // notificar también al resto de colaboradores técnicos, salvo quien la
+        // escribió: son parte del equipo y deben ver las instrucciones internas.
+        if (
+          (author.role === 'ADMIN' || author.role === 'TECHNICIAN') &&
+          collaboratorIds.length > 0
+        ) {
           for (const collabId of collaboratorIds) {
             if (collabId === author.id || collabId === ticket.assigneeId) continue
             const n = await this.createNotification({
@@ -545,6 +564,29 @@ export class NotificationService {
           specificType: 'newComments',
         })
         if (clientNotification) notifications.push(clientNotification)
+
+        // Avisar también al resto del equipo (asignado + colaboradores) cuando
+        // quien responde es un colaborador o un admin — antes solo se enteraba
+        // el cliente, y el resto del equipo perdía el hilo de su propio ticket
+        // hasta la próxima vez que lo abrieran manualmente.
+        const teammateIds = new Set<string>()
+        if (ticket.assigneeId && ticket.assigneeId !== author.id) {
+          teammateIds.add(ticket.assigneeId)
+        }
+        for (const collabId of collaboratorIds) {
+          if (collabId !== author.id) teammateIds.add(collabId)
+        }
+        for (const teammateId of teammateIds) {
+          const n = await this.createNotification({
+            userId: teammateId,
+            type: 'INFO',
+            title: 'Nueva respuesta en un ticket que sigues',
+            message: `${author.name} respondió al cliente en el ticket "${ticket.title}"`,
+            ticketId: ticket.id,
+            specificType: 'newComments',
+          })
+          if (n) notifications.push(n)
+        }
       }
 
       // Si el autor es cliente, notificar al técnico asignado
