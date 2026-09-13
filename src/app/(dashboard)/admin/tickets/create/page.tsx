@@ -20,7 +20,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Separator } from '@/components/ui/separator'
 import { createTicketSchema, CreateTicketData } from '@/lib/schemas/ticket-schemas'
 import { TicketPriority } from '@prisma/client'
@@ -32,8 +31,6 @@ import {
   ArrowLeft,
   User,
   Tag,
-  FileText,
-  Zap,
   Info,
   Upload,
   File,
@@ -492,425 +489,342 @@ export default function CreateTicketPage() {
         <div className='grid grid-cols-1 lg:grid-cols-3 gap-6'>
           {/* Formulario Principal */}
           <div className='lg:col-span-2'>
-            <Tabs defaultValue='details' className='w-full'>
-              <TabsList className='grid w-full grid-cols-2'>
-                <TabsTrigger value='details'>
-                  <FileText className='h-4 w-4 mr-2' />
-                  Detalles del Ticket
-                </TabsTrigger>
-                <TabsTrigger value='preview'>
-                  <Zap className='h-4 w-4 mr-2' />
-                  Vista Previa
-                </TabsTrigger>
-              </TabsList>
+            <div className='space-y-6'>
+              <Card>
+                <CardHeader>
+                  <CardTitle className='flex items-center'>
+                    <Ticket className='h-5 w-5 mr-2 text-primary' />
+                    Información del Ticket
+                  </CardTitle>
+                  <CardDescription>
+                    Completa todos los campos para crear un ticket completo y detallado.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleSubmit(onSubmit)} className='space-y-6'>
+                    <FormDraftBanner
+                      visible={wasRestored}
+                      onDismiss={dismissRestoredBanner}
+                      onDiscard={() => {
+                        clearDraft()
+                        dismissRestoredBanner()
+                        setSelectedFamilyId('')
+                        setValue('title', '')
+                        setValue('description', '')
+                        setValue('location', '')
+                        setValue('priority', TicketPriority.MEDIUM)
+                        setValue('categoryId', '')
+                        if (session?.user?.id) void handleClientSelect(session.user.id)
+                      }}
+                    />
+                    {/* Solicitante: combobox único. Default = tú; otro usuario = en su nombre */}
+                    <div className='space-y-2'>
+                      <Label htmlFor='clientId' className='flex items-center'>
+                        <User className='h-4 w-4 mr-2' />
+                        Solicitante *
+                      </Label>
+                      <UserCombobox
+                        value={clientId}
+                        onValueChange={id => {
+                          // Limpiar vuelve a ticket propio (evita formulario vacío)
+                          if (!id && session?.user?.id) {
+                            void handleClientSelect(session.user.id)
+                            return
+                          }
+                          if (id) void handleClientSelect(id)
+                        }}
+                        placeholder='Buscar usuario por nombre o email...'
+                        emptyText='No se encontraron usuarios'
+                        showEmail={true}
+                        showDepartment={true}
+                        allowClear={clientId !== session?.user?.id}
+                        preloadedUser={
+                          session?.user
+                            ? {
+                                id: session.user.id,
+                                name: session.user.name || 'Administrador',
+                                email: session.user.email || '',
+                                role: session.user.role as 'ADMIN' | 'CLIENT' | 'TECHNICIAN',
+                              }
+                            : null
+                        }
+                        className={errors.clientId ? 'border-red-500' : ''}
+                      />
+                      {errors.clientId && (
+                        <p className='text-sm text-destructive'>{errors.clientId.message}</p>
+                      )}
+                      <p className='text-xs text-muted-foreground'>
+                        {clientId === session?.user?.id
+                          ? 'Ticket propio: la solicitud queda a tu nombre. Elige otro usuario en la lista para crearla en su nombre.'
+                          : selectedClient
+                            ? `En nombre de ${selectedClient.name}: el ticket y las notificaciones quedan asociados a ese usuario.`
+                            : 'Selecciona el solicitante del ticket.'}
+                      </p>
+                    </div>
 
-              <TabsContent value='details' className='space-y-6 mt-6'>
-                <Card>
-                  <CardHeader>
-                    <CardTitle className='flex items-center'>
-                      <Ticket className='h-5 w-5 mr-2 text-primary' />
-                      Información del Ticket
-                    </CardTitle>
-                    <CardDescription>
-                      Completa todos los campos para crear un ticket completo y detallado.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <form onSubmit={handleSubmit(onSubmit)} className='space-y-6'>
-                      <FormDraftBanner
-                        visible={wasRestored}
-                        onDismiss={dismissRestoredBanner}
-                        onDiscard={() => {
-                          clearDraft()
-                          dismissRestoredBanner()
-                          setSelectedFamilyId('')
-                          setValue('title', '')
-                          setValue('description', '')
-                          setValue('location', '')
-                          setValue('priority', TicketPriority.MEDIUM)
-                          setValue('categoryId', '')
-                          if (session?.user?.id) void handleClientSelect(session.user.id)
+                    {/* Área de soporte — visible solo cuando hay cliente seleccionado */}
+                    {clientId && (
+                      <TicketSupportAreaField
+                        families={clientFamilies}
+                        loading={loadingFamilies}
+                        value={selectedFamilyId}
+                        onValueChange={v => {
+                          if (v !== selectedFamilyId && !skipCategoryResetRef.current) {
+                            setValue('categoryId', '')
+                          }
+                          skipCategoryResetRef.current = false
+                          setSelectedFamilyId(v)
                         }}
                       />
-                      {/* Solicitante: combobox único. Default = tú; otro usuario = en su nombre */}
-                      <div className='space-y-2'>
-                        <Label htmlFor='clientId' className='flex items-center'>
-                          <User className='h-4 w-4 mr-2' />
-                          Solicitante *
-                        </Label>
-                        <UserCombobox
-                          value={clientId}
-                          onValueChange={id => {
-                            // Limpiar vuelve a ticket propio (evita formulario vacío)
-                            if (!id && session?.user?.id) {
-                              void handleClientSelect(session.user.id)
-                              return
-                            }
-                            if (id) void handleClientSelect(id)
-                          }}
-                          placeholder='Buscar usuario por nombre o email...'
-                          emptyText='No se encontraron usuarios'
-                          showEmail={true}
-                          showDepartment={true}
-                          allowClear={clientId !== session?.user?.id}
-                          preloadedUser={
-                            session?.user
-                              ? {
-                                  id: session.user.id,
-                                  name: session.user.name || 'Administrador',
-                                  email: session.user.email || '',
-                                  role: session.user.role as 'ADMIN' | 'CLIENT' | 'TECHNICIAN',
-                                }
-                              : null
-                          }
-                          className={errors.clientId ? 'border-red-500' : ''}
-                        />
-                        {errors.clientId && (
-                          <p className='text-sm text-destructive'>{errors.clientId.message}</p>
-                        )}
-                        <p className='text-xs text-muted-foreground'>
-                          {clientId === session?.user?.id
-                            ? 'Ticket propio: la solicitud queda a tu nombre. Elige otro usuario en la lista para crearla en su nombre.'
-                            : selectedClient
-                              ? `En nombre de ${selectedClient.name}: el ticket y las notificaciones quedan asociados a ese usuario.`
-                              : 'Selecciona el solicitante del ticket.'}
-                        </p>
-                      </div>
+                    )}
 
-                      {/* Área de soporte — visible solo cuando hay cliente seleccionado */}
-                      {clientId && (
-                        <TicketSupportAreaField
-                          families={clientFamilies}
-                          loading={loadingFamilies}
-                          value={selectedFamilyId}
-                          onValueChange={v => {
-                            if (v !== selectedFamilyId && !skipCategoryResetRef.current) {
-                              setValue('categoryId', '')
-                            }
-                            skipCategoryResetRef.current = false
-                            setSelectedFamilyId(v)
-                          }}
-                        />
+                    <Separator />
+
+                    {/* Título */}
+                    <div className='space-y-2'>
+                      <Label htmlFor='title'>Título del Ticket *</Label>
+                      <Input
+                        id='title'
+                        // placeholder='Describe brevemente el problema o solicitud'
+                        {...register('title')}
+                        className={errors.title ? 'border-red-500' : ''}
+                      />
+                      {errors.title && (
+                        <p className='text-sm text-destructive'>{errors.title.message}</p>
                       )}
-
-                      <Separator />
-
-                      {/* Título */}
-                      <div className='space-y-2'>
-                        <Label htmlFor='title'>Título del Ticket *</Label>
-                        <Input
-                          id='title'
-                          // placeholder='Describe brevemente el problema o solicitud'
-                          {...register('title')}
-                          className={errors.title ? 'border-red-500' : ''}
-                        />
-                        {errors.title && (
-                          <p className='text-sm text-destructive'>{errors.title.message}</p>
-                        )}
-                        {/* <p className='text-xs text-muted-foreground'>
+                      {/* <p className='text-xs text-muted-foreground'>
                           Usa un título claro y descriptivo que resuma el problema
                         </p> */}
-                      </div>
+                    </div>
 
-                      {/* Descripción */}
-                      <div className='space-y-2'>
-                        <Label htmlFor='description'>Descripción Detallada *</Label>
-                        <Textarea
-                          id='description'
-                          // placeholder='Proporciona todos los detalles relevantes sobre el problema o solicitud. Incluye pasos para reproducir el problema, mensajes de error, etc.'
-                          rows={6}
-                          {...register('description')}
-                          className={errors.description ? 'border-red-500' : ''}
-                        />
-                        {errors.description && (
-                          <p className='text-sm text-destructive'>{errors.description.message}</p>
-                        )}
-                      </div>
+                    {/* Descripción */}
+                    <div className='space-y-2'>
+                      <Label htmlFor='description'>Descripción Detallada *</Label>
+                      <Textarea
+                        id='description'
+                        // placeholder='Proporciona todos los detalles relevantes sobre el problema o solicitud. Incluye pasos para reproducir el problema, mensajes de error, etc.'
+                        rows={6}
+                        {...register('description')}
+                        className={errors.description ? 'border-red-500' : ''}
+                      />
+                      {errors.description && (
+                        <p className='text-sm text-destructive'>{errors.description.message}</p>
+                      )}
+                    </div>
 
-                      {/* Ubicación */}
-                      <div className='space-y-2'>
-                        <Label htmlFor='location' className='flex items-center gap-1.5'>
-                          <MapPin className='h-4 w-4' />
-                          Ubicación / Área
-                          <span className='text-muted-foreground font-normal text-xs'>
-                            (opcional)
-                          </span>
-                        </Label>
-                        <Input
-                          id='location'
-                          // placeholder='Ej: Oficina 201, Piso 3, Sala de Reuniones A...'
-                          {...register('location')}
-                        />
-                        {/* <p className='text-xs text-muted-foreground'>
+                    {/* Ubicación */}
+                    <div className='space-y-2'>
+                      <Label htmlFor='location' className='flex items-center gap-1.5'>
+                        <MapPin className='h-4 w-4' />
+                        Ubicación / Área
+                        <span className='text-muted-foreground font-normal text-xs'>
+                          (opcional)
+                        </span>
+                      </Label>
+                      <Input
+                        id='location'
+                        // placeholder='Ej: Oficina 201, Piso 3, Sala de Reuniones A...'
+                        {...register('location')}
+                      />
+                      {/* <p className='text-xs text-muted-foreground'>
                           Indica dónde debe acercarse el técnico para atender el problema.
                         </p> */}
-                      </div>
+                    </div>
 
-                      {/* Prioridad */}
-                      <div className='space-y-2'>
-                        <Label htmlFor='priority' className='flex items-center'>
-                          <AlertCircle className='h-4 w-4 mr-2' />
-                          Prioridad *
-                        </Label>
-                        <Select
-                          value={selectedPriority}
-                          onValueChange={value => setValue('priority', value as TicketPriority)}
-                        >
-                          <SelectTrigger className={errors.priority ? 'border-red-500' : ''}>
-                            <SelectValue placeholder='Selecciona la prioridad' />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {Object.entries(priorityLabels).map(([value, label]) => (
-                              <SelectItem key={value} value={value}>
-                                <div className='flex items-center space-x-2'>
-                                  <div
-                                    className={`w-3 h-3 rounded-full ${
-                                      value === 'LOW'
-                                        ? 'bg-green-500'
-                                        : value === 'MEDIUM'
-                                          ? 'bg-yellow-500'
-                                          : value === 'HIGH'
-                                            ? 'bg-orange-500'
-                                            : 'bg-red-500'
-                                    }`}
-                                  />
-                                  <span>{label}</span>
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        {errors.priority && (
-                          <p className='text-sm text-destructive'>{errors.priority.message}</p>
-                        )}
-                        {selectedPriority && (
-                          <div
-                            className={`p-3 rounded-lg text-xs ${priorityColors[selectedPriority as keyof typeof priorityColors]}`}
-                          >
-                            <strong>
-                              {priorityLabels[selectedPriority as keyof typeof priorityLabels]}:
-                            </strong>{' '}
-                            {
-                              priorityDescriptions[
-                                selectedPriority as keyof typeof priorityDescriptions
-                              ]
-                            }
-                          </div>
-                        )}
-                      </div>
-
-                      <Separator className='my-6' />
-
-                      {/* Selector de Categorías Mejorado - ANCHO COMPLETO CON MÁS ESPACIO */}
-                      <div className='space-y-2'>
-                        <Label className='flex items-center text-base font-semibold'>
-                          <Tag className='h-5 w-5 mr-2' />
-                          Categoría del Ticket *
-                        </Label>
-                        <p className='text-sm text-muted-foreground mb-3'>
-                          Selecciona la categoría más específica que describa el problema. Puedes
-                          usar la búsqueda (Ctrl+K) o navegar por el árbol.
-                        </p>
-                        <div className='border rounded-lg p-4 bg-muted/30'>
-                          <CategorySelectorWrapper
-                            value={selectedCategoryId}
-                            onChange={categoryId => setValue('categoryId', categoryId)}
-                            ticketTitle={ticketTitle || ''}
-                            ticketDescription={ticketDescription || ''}
-                            clientId={clientId || ''}
-                            familyId={selectedFamilyId || undefined}
-                            requireFamily
-                            error={errors.categoryId?.message}
-                          />
-                        </div>
-                      </div>
-
-                      <Separator className='my-6' />
-
-                      {/* Archivos Adjuntos */}
-                      <div className='space-y-2'>
-                        <Label>Archivos Adjuntos (Opcional)</Label>
+                    {/* Prioridad */}
+                    <div className='space-y-2'>
+                      <Label htmlFor='priority' className='flex items-center'>
+                        <AlertCircle className='h-4 w-4 mr-2' />
+                        Prioridad *
+                      </Label>
+                      <Select
+                        value={selectedPriority}
+                        onValueChange={value => setValue('priority', value as TicketPriority)}
+                      >
+                        <SelectTrigger className={errors.priority ? 'border-red-500' : ''}>
+                          <SelectValue placeholder='Selecciona la prioridad' />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(priorityLabels).map(([value, label]) => (
+                            <SelectItem key={value} value={value}>
+                              <div className='flex items-center space-x-2'>
+                                <div
+                                  className={`w-3 h-3 rounded-full ${
+                                    value === 'LOW'
+                                      ? 'bg-green-500'
+                                      : value === 'MEDIUM'
+                                        ? 'bg-yellow-500'
+                                        : value === 'HIGH'
+                                          ? 'bg-orange-500'
+                                          : 'bg-red-500'
+                                  }`}
+                                />
+                                <span>{label}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {errors.priority && (
+                        <p className='text-sm text-destructive'>{errors.priority.message}</p>
+                      )}
+                      {selectedPriority && (
                         <div
-                          onDragOver={handleDragOver}
-                          onDragLeave={handleDragLeave}
-                          onDrop={handleDrop}
-                          className={`border-2 rounded-lg p-4 transition-all ${
-                            isDragging
-                              ? 'border-primary bg-primary/5 dark:bg-primary/10'
-                              : 'border-dashed border-border'
-                          }`}
+                          className={`p-3 rounded-lg text-xs ${priorityColors[selectedPriority as keyof typeof priorityColors]}`}
                         >
-                          <FileInputWithCamera
-                            accept='image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt'
-                            multiple
-                            onChange={handleFileSelect}
-                          >
-                            {({ openFile, openCamera, showCamera }) => (
-                              <div className='flex flex-col items-center gap-3'>
-                                <Upload className='h-8 w-8 text-muted-foreground' />
-                                <p className='text-sm text-muted-foreground text-center'>
-                                  {isDragging
-                                    ? 'Suelta los archivos aquí'
-                                    : 'Arrastra archivos aquí o usa los botones'}
-                                </p>
-                                <div className='flex items-center gap-2 flex-wrap justify-center'>
-                                  {showCamera && (
-                                    <Button
-                                      type='button'
-                                      variant='outline'
-                                      size='sm'
-                                      onClick={() => openCamera()}
-                                    >
-                                      <Camera className='h-4 w-4 mr-2' />
-                                      Tomar foto
-                                    </Button>
-                                  )}
+                          <strong>
+                            {priorityLabels[selectedPriority as keyof typeof priorityLabels]}:
+                          </strong>{' '}
+                          {
+                            priorityDescriptions[
+                              selectedPriority as keyof typeof priorityDescriptions
+                            ]
+                          }
+                        </div>
+                      )}
+                    </div>
+
+                    <Separator className='my-6' />
+
+                    {/* Selector de Categorías Mejorado - ANCHO COMPLETO CON MÁS ESPACIO */}
+                    <div className='space-y-2'>
+                      <Label className='flex items-center text-base font-semibold'>
+                        <Tag className='h-5 w-5 mr-2' />
+                        Categoría del Ticket *
+                      </Label>
+                      <p className='text-sm text-muted-foreground mb-3'>
+                        Selecciona la categoría más específica que describa el problema. Puedes usar
+                        la búsqueda (Ctrl+K) o navegar por el árbol.
+                      </p>
+                      <div className='border rounded-lg p-4 bg-muted/30'>
+                        <CategorySelectorWrapper
+                          value={selectedCategoryId}
+                          onChange={categoryId => setValue('categoryId', categoryId)}
+                          ticketTitle={ticketTitle || ''}
+                          ticketDescription={ticketDescription || ''}
+                          clientId={clientId || ''}
+                          familyId={selectedFamilyId || undefined}
+                          requireFamily
+                          error={errors.categoryId?.message}
+                        />
+                      </div>
+                    </div>
+
+                    <Separator className='my-6' />
+
+                    {/* Archivos Adjuntos */}
+                    <div className='space-y-2'>
+                      <Label>Archivos Adjuntos (Opcional)</Label>
+                      <div
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        onDrop={handleDrop}
+                        className={`border-2 rounded-lg p-4 transition-all ${
+                          isDragging
+                            ? 'border-primary bg-primary/5 dark:bg-primary/10'
+                            : 'border-dashed border-border'
+                        }`}
+                      >
+                        <FileInputWithCamera
+                          accept='image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt'
+                          multiple
+                          onChange={handleFileSelect}
+                        >
+                          {({ openFile, openCamera, showCamera }) => (
+                            <div className='flex flex-col items-center gap-3'>
+                              <Upload className='h-8 w-8 text-muted-foreground' />
+                              <p className='text-sm text-muted-foreground text-center'>
+                                {isDragging
+                                  ? 'Suelta los archivos aquí'
+                                  : 'Arrastra archivos aquí o usa los botones'}
+                              </p>
+                              <div className='flex items-center gap-2 flex-wrap justify-center'>
+                                {showCamera && (
                                   <Button
                                     type='button'
                                     variant='outline'
                                     size='sm'
-                                    onClick={openFile}
+                                    onClick={() => openCamera()}
                                   >
-                                    <Paperclip className='h-4 w-4 mr-2' />
-                                    {showCamera ? 'Galería / Archivo' : 'Seleccionar Archivos'}
+                                    <Camera className='h-4 w-4 mr-2' />
+                                    Tomar foto
                                   </Button>
-                                </div>
-                                <p className='text-xs text-muted-foreground'>
-                                  Máximo 5 archivos, 10MB cada uno
-                                </p>
-                              </div>
-                            )}
-                          </FileInputWithCamera>
-                        </div>
-
-                        {/* Lista de archivos seleccionados */}
-                        {selectedFiles.length > 0 && (
-                          <div className='space-y-2 mt-3'>
-                            <p className='text-sm font-medium'>
-                              Archivos seleccionados ({selectedFiles.length}/5):
-                            </p>
-                            {selectedFiles.map((file, index) => (
-                              <div
-                                key={index}
-                                className='flex items-center justify-between p-2 bg-muted rounded-lg'
-                              >
-                                <div className='flex items-center space-x-2'>
-                                  <File className='h-4 w-4 text-muted-foreground' />
-                                  <div>
-                                    <p className='text-sm font-medium'>{file.name}</p>
-                                    <p className='text-xs text-muted-foreground'>
-                                      {(file.size / 1024).toFixed(1)} KB
-                                    </p>
-                                  </div>
-                                </div>
+                                )}
                                 <Button
                                   type='button'
-                                  variant='ghost'
+                                  variant='outline'
                                   size='sm'
-                                  onClick={() => removeFile(index)}
+                                  onClick={openFile}
                                 >
-                                  <X className='h-4 w-4' />
+                                  <Paperclip className='h-4 w-4 mr-2' />
+                                  {showCamera ? 'Galería / Archivo' : 'Seleccionar Archivos'}
                                 </Button>
                               </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Botones */}
-                      <div className='flex items-center justify-end space-x-4 pt-6 border-t'>
-                        <Button type='button' variant='outline' asChild>
-                          <Link href='/admin/tickets'>Cancelar</Link>
-                        </Button>
-                        <Button type='submit' disabled={isSubmitting}>
-                          {isSubmitting ? (
-                            <>
-                              <Loader2 className='h-4 w-4 mr-2 animate-spin' />
-                              Creando Ticket...
-                            </>
-                          ) : (
-                            <>
-                              <Ticket className='h-4 w-4 mr-2' />
-                              Crear Ticket
-                            </>
+                              <p className='text-xs text-muted-foreground'>
+                                Máximo 5 archivos, 10MB cada uno
+                              </p>
+                            </div>
                           )}
-                        </Button>
-                      </div>
-                    </form>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value='preview' className='space-y-6 mt-6'>
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Vista Previa del Ticket</CardTitle>
-                    <CardDescription>
-                      Revisa cómo se verá el ticket antes de crearlo
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className='space-y-4'>
-                      <div>
-                        <Label className='text-sm font-medium text-muted-foreground'>Título</Label>
-                        <p className='text-lg font-semibold'>{watch('title') || 'Sin título'}</p>
+                        </FileInputWithCamera>
                       </div>
 
-                      <div>
-                        <Label className='text-sm font-medium text-muted-foreground'>
-                          Descripción
-                        </Label>
-                        <div className='mt-1 p-3 bg-muted rounded-lg'>
-                          <p className='whitespace-pre-wrap text-sm'>
-                            {watch('description') || 'Sin descripción'}
+                      {/* Lista de archivos seleccionados */}
+                      {selectedFiles.length > 0 && (
+                        <div className='space-y-2 mt-3'>
+                          <p className='text-sm font-medium'>
+                            Archivos seleccionados ({selectedFiles.length}/5):
                           </p>
-                        </div>
-                      </div>
-
-                      {watch('location') && (
-                        <div>
-                          <Label className='text-sm font-medium text-muted-foreground'>
-                            Ubicación
-                          </Label>
-                          <div className='mt-1 flex items-center gap-2 text-sm'>
-                            <MapPin className='h-3.5 w-3.5 text-amber-600' />
-                            <span>{watch('location')}</span>
-                          </div>
+                          {selectedFiles.map((file, index) => (
+                            <div
+                              key={index}
+                              className='flex items-center justify-between p-2 bg-muted rounded-lg'
+                            >
+                              <div className='flex items-center space-x-2'>
+                                <File className='h-4 w-4 text-muted-foreground' />
+                                <div>
+                                  <p className='text-sm font-medium'>{file.name}</p>
+                                  <p className='text-xs text-muted-foreground'>
+                                    {(file.size / 1024).toFixed(1)} KB
+                                  </p>
+                                </div>
+                              </div>
+                              <Button
+                                type='button'
+                                variant='ghost'
+                                size='sm'
+                                onClick={() => removeFile(index)}
+                              >
+                                <X className='h-4 w-4' />
+                              </Button>
+                            </div>
+                          ))}
                         </div>
                       )}
-
-                      <div className='grid grid-cols-2 gap-4'>
-                        <div>
-                          <Label className='text-sm font-medium text-muted-foreground'>
-                            Prioridad
-                          </Label>
-                          {selectedPriority && (
-                            <Badge
-                              className={
-                                priorityColors[selectedPriority as keyof typeof priorityColors]
-                              }
-                            >
-                              {priorityLabels[selectedPriority as keyof typeof priorityLabels]}
-                            </Badge>
-                          )}
-                        </div>
-
-                        <div>
-                          <Label className='text-sm font-medium text-muted-foreground'>
-                            Categoría
-                          </Label>
-                          {selectedCategoryId ? (
-                            <Badge variant='outline'>Categoría seleccionada</Badge>
-                          ) : (
-                            <p className='text-sm text-muted-foreground'>Sin categoría</p>
-                          )}
-                        </div>
-                      </div>
                     </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
+
+                    {/* Botones */}
+                    <div className='flex items-center justify-end space-x-4 pt-6 border-t'>
+                      <Button type='button' variant='outline' asChild>
+                        <Link href='/admin/tickets'>Cancelar</Link>
+                      </Button>
+                      <Button type='submit' disabled={isSubmitting}>
+                        {isSubmitting ? (
+                          <>
+                            <Loader2 className='h-4 w-4 mr-2 animate-spin' />
+                            Creando Ticket...
+                          </>
+                        ) : (
+                          <>
+                            <Ticket className='h-4 w-4 mr-2' />
+                            Crear Ticket
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </form>
+                </CardContent>
+              </Card>
+            </div>
           </div>
 
           {/* Sidebar */}

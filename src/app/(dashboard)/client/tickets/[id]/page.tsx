@@ -19,10 +19,8 @@ import {
 } from 'lucide-react'
 
 import { TicketDetailLayout } from '@/components/tickets/ticket-detail-layout'
-import { CompactFileManager } from '@/components/tickets/compact-file-manager'
 import { TicketTimeline } from '@/components/ui/ticket-timeline'
 import { TicketRatingSystem } from '@/components/ui/ticket-rating-system'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -62,37 +60,14 @@ export default function ClientTicketDetailPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
-  const [activeTab, setActiveTab] = useState('timeline')
   const stopPollingRef = useRef<(() => void) | null>(null)
   const [timelineKey, setTimelineKey] = useState(0)
-  const [fileKey, setFileKey] = useState(0)
   const [ratingKey, setRatingKey] = useState(0)
   const [editForm, setEditForm] = useState({ title: '', description: '' })
   const [showRatingModal, setShowRatingModal] = useState(false)
   const prevStatusRef = useRef<string | null>(null)
 
   const ticketId = params.id as string
-
-  // Persistir la pestaña activa por ticket — mismo motivo que en las vistas
-  // de técnico/admin: si el árbol llega a remontarse, no debe perderse la
-  // posición donde estaba el cliente.
-  useEffect(() => {
-    if (!ticketId) return
-    try {
-      const saved = sessionStorage.getItem(`ticket-tab:${ticketId}`)
-      if (saved) setActiveTab(saved)
-    } catch {
-      /* sessionStorage no disponible */
-    }
-  }, [ticketId])
-  const handleTabChange = (value: string) => {
-    setActiveTab(value)
-    try {
-      sessionStorage.setItem(`ticket-tab:${ticketId}`, value)
-    } catch {
-      /* ignore */
-    }
-  }
 
   const applyTicketUpdate = useCallback(
     (data: Ticket, opts?: { openRatingIfResolved?: boolean }) => {
@@ -390,37 +365,15 @@ export default function ClientTicketDetailPage() {
             </Card>
           )}
 
-          {/* Tabs */}
-          <Tabs value={activeTab} onValueChange={handleTabChange}>
-            <TabsList className='grid w-full grid-cols-2'>
-              <TabsTrigger value='timeline'>Historial</TabsTrigger>
-              <TabsTrigger value='files'>Archivos</TabsTrigger>
-            </TabsList>
-            <TabsContent
-              value='timeline'
-              forceMount
-              className='space-y-4 data-[state=inactive]:hidden'
-            >
-              <TicketTimeline
-                ticketId={ticket.id}
-                canAddComments={ticket.status !== 'CLOSED'}
-                canViewInternal={false}
-                refreshKey={timelineKey}
-                onCommentAdded={() => setFileKey(k => k + 1)}
-                onStopPolling={fn => {
-                  stopPollingRef.current = fn
-                }}
-              />
-            </TabsContent>
-            <TabsContent value='files' className='space-y-4'>
-              <CompactFileManager
-                ticketId={ticket.id}
-                onUploadComplete={loadTicket}
-                disabled={ticket.status === 'CLOSED'}
-                refreshKey={fileKey}
-              />
-            </TabsContent>
-          </Tabs>
+          <TicketTimeline
+            ticketId={ticket.id}
+            canAddComments={ticket.status !== 'CLOSED'}
+            canViewInternal={false}
+            refreshKey={timelineKey}
+            onStopPolling={fn => {
+              stopPollingRef.current = fn
+            }}
+          />
         </div>
 
         {/* Sidebar */}

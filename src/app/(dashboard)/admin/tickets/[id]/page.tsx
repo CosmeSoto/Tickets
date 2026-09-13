@@ -5,7 +5,6 @@ import { useParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { AlertCircle, Star } from 'lucide-react'
 import { TicketDetailLayout } from '@/components/tickets/ticket-detail-layout'
-import { CompactFileManager } from '@/components/tickets/compact-file-manager'
 import { TicketTimeline } from '@/components/ui/ticket-timeline'
 import { TicketRatingSystem } from '@/components/ui/ticket-rating-system'
 import { TicketResolutionTracker } from '@/components/ui/ticket-resolution-tracker'
@@ -56,7 +55,6 @@ export default function AdminTicketDetailPage() {
   const [unassigning, setUnassigning] = useState(false)
   const [assignmentDialogOpen, setAssignmentDialogOpen] = useState(false)
   const [timelineKey, setTimelineKey] = useState(0)
-  const [fileKey, setFileKey] = useState(0)
   const [ratingKey, setRatingKey] = useState(0)
   const [newStatus, setNewStatus] = useState<Ticket['status']>('OPEN')
   const [updatingStatus, setUpdatingStatus] = useState(false)
@@ -77,7 +75,7 @@ export default function AdminTicketDetailPage() {
     }
   }, [ticketId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Pestaña activa (Historial/Plan/Archivos), persistida por ticket — mismo
+  // Pestaña activa (Historial/Plan), persistida por ticket — mismo
   // motivo que en la vista de técnico: si el árbol llega a remontarse (p. ej.
   // loadTicket() vuelve a poner loading=true un instante), un <Tabs> no
   // controlado siempre vuelve a su defaultValue ("Historial"), sacando al
@@ -474,10 +472,9 @@ export default function AdminTicketDetailPage() {
           )}
 
           <Tabs value={activeTab} onValueChange={handleTabChange}>
-            <TabsList className='grid w-full grid-cols-3'>
+            <TabsList className='grid w-full grid-cols-2'>
               <TabsTrigger value='timeline'>Historial</TabsTrigger>
               <TabsTrigger value='resolution'>Plan</TabsTrigger>
-              <TabsTrigger value='files'>Archivos</TabsTrigger>
             </TabsList>
 
             <TabsContent
@@ -492,7 +489,6 @@ export default function AdminTicketDetailPage() {
                 ticketStatus={ticket.status}
                 requireInProgress
                 refreshKey={timelineKey}
-                onCommentAdded={() => setFileKey(k => k + 1)}
               />
             </TabsContent>
 
@@ -507,15 +503,6 @@ export default function AdminTicketDetailPage() {
                 canEdit
                 mode='admin'
                 onPlanChange={() => setTimelineKey(k => k + 1)}
-              />
-            </TabsContent>
-
-            <TabsContent value='files' className='space-y-4'>
-              <CompactFileManager
-                ticketId={ticket.id}
-                onUploadComplete={loadTicket}
-                disabled={ticket.status === 'CLOSED'}
-                refreshKey={fileKey}
               />
             </TabsContent>
           </Tabs>

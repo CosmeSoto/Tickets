@@ -22,7 +22,6 @@ import { TicketDetailLayout } from '@/components/tickets/ticket-detail-layout'
 import { TicketTimeline } from '@/components/ui/ticket-timeline'
 import { TicketRatingSystem } from '@/components/ui/ticket-rating-system'
 import { TicketResolutionTracker } from '@/components/ui/ticket-resolution-tracker'
-import { CompactFileManager } from '@/components/tickets/compact-file-manager'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -110,7 +109,6 @@ export default function TechnicianTicketDetailPage() {
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState<string | null>(null) // guarda el status que se está aplicando
   const [timelineKey, setTimelineKey] = useState(0)
-  const [fileKey, setFileKey] = useState(0)
   const [ratingKey, setRatingKey] = useState(0)
   const [showRatingModal, setShowRatingModal] = useState(false)
   const prevStatusRef = useRef<string | null>(null)
@@ -446,10 +444,9 @@ export default function TechnicianTicketDetailPage() {
 
           {/* Tabs — sin el tab de Estado */}
           <Tabs value={activeTab} onValueChange={handleTabChange}>
-            <TabsList className='grid w-full grid-cols-3'>
+            <TabsList className='grid w-full grid-cols-2'>
               <TabsTrigger value='timeline'>Historial</TabsTrigger>
               <TabsTrigger value='resolution'>Plan</TabsTrigger>
-              <TabsTrigger value='files'>Archivos</TabsTrigger>
             </TabsList>
 
             <TabsContent
@@ -464,7 +461,6 @@ export default function TechnicianTicketDetailPage() {
                 ticketStatus={ticket.status}
                 requireInProgress
                 refreshKey={timelineKey}
-                onCommentAdded={() => setFileKey(k => k + 1)}
               />
             </TabsContent>
 
@@ -479,16 +475,6 @@ export default function TechnicianTicketDetailPage() {
                 canEdit={ticket.assignee?.id === session?.user?.id}
                 mode='technician'
                 onPlanChange={() => setTimelineKey(k => k + 1)}
-              />
-            </TabsContent>
-
-            <TabsContent value='files' className='space-y-4'>
-              <CompactFileManager
-                ticketId={ticket.id}
-                onAttachmentsChange={loadTicket}
-                canUpload={ticket.status !== 'CLOSED'}
-                canDelete={ticket.status !== 'CLOSED'}
-                refreshKey={fileKey}
               />
             </TabsContent>
           </Tabs>
