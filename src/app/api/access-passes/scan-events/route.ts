@@ -1,22 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
+import { z } from 'zod'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import { getAccessModulePermission } from '@/lib/access/access-control'
+import { getAccessModulePermission, isAccessFamilyAllowed } from '@/lib/access/access-control'
+import { ACCESS_SCAN_RESULTS, ACCESS_SUBJECT_TYPES } from '@/lib/access/access-pass-state'
 
-const VALID_RESULTS = [
-  'VALID',
-  'EXPIRED',
-  'NOT_YET_VALID',
-  'REVOKED',
-  'SUSPENDED',
-  'PENDING_PRIVACY',
-  'INACTIVE_SUBJECT',
-  'NOT_FOUND',
-  'OUT_OF_SCOPE',
-] as const
-
-const VALID_ACCESS_TYPES = ['TENANT_EMPLOYEE', 'CONTRACTOR', 'AUTHORIZED_VISITOR'] as const
+const querySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  familyId: z.string().uuid().optional(),
+  result: z.enum(ACCESS_SCAN_RESULTS).optional(),
+  accessType: z.enum(ACCESS_SUBJECT_TYPES).optional(),
+  organizationId: z.string().uuid().optional(),
+  dateFrom: z.string().optional(),
+  dateTo: z.string().optional(),
+  search: z.string().trim().min(1).max(200).optional(),
+})
 
 /**
  * GET /api/access-passes/scan-events
@@ -40,54 +40,52 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
   }
 
+  // canScan ya incluye canManage (ver getAccessModulePermission) — mismo
+  // criterio que el resto de las rutas de accesos, en vez de reimplementarlo
+  // inline como antes.
   const permission = await getAccessModulePermission(session.user.id, session.user.role)
-  if (!permission.canScan && !permission.canManage) {
+  if (!permission.canScan) {
     return NextResponse.json({ error: 'No tienes acceso al módulo de Accesos.' }, { status: 403 })
   }
 
-  const { searchParams } = new URL(request.url)
-
-  const page = Math.max(1, Number(searchParams.get('page') ?? '1'))
-  const limit = Math.min(100, Math.max(1, Number(searchParams.get('limit') ?? '20')))
-  const familyId = searchParams.get('familyId') || null
-  const resultFilter = searchParams.get('result') || null
-  const accessTypeFilter = searchParams.get('accessType') || null
-  const organizationId = searchParams.get('organizationId') || null
-  const dateFrom = searchParams.get('dateFrom') || null
-  const dateTo = searchParams.get('dateTo') || null
-  const search = searchParams.get('search')?.trim() || null
+  const parsed = querySchema.safeParse(Object.fromEntries(new URL(request.url).searchParams))
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: 'Filtros inválidos.', details: parsed.error.flatten() },
+      { status: 400 }
+    )
+  }
+  const {
+    page,
+    limit,
+    familyId,
+    result: resultFilter,
+    accessType: accessTypeFilter,
+    organizationId,
+    dateFrom,
+    dateTo,
+    search,
+  } = parsed.data
 
   // Validar que el agente solo vea el scope de su familia
-  if (familyId && permission.familyIds && !permission.familyIds.includes(familyId)) {
+  if (familyId && !isAccessFamilyAllowed(permission, familyId)) {
     return NextResponse.json({ error: 'No tienes acceso a esa área.' }, { status: 403 })
   }
 
-  // Validar resultado
-  if (resultFilter && !VALID_RESULTS.includes(resultFilter as (typeof VALID_RESULTS)[number])) {
-    return NextResponse.json({ error: 'Resultado de filtro inválido.' }, { status: 400 })
-  }
-
-  // Validar tipo de acceso
-  if (
-    accessTypeFilter &&
-    !VALID_ACCESS_TYPES.includes(accessTypeFilter as (typeof VALID_ACCESS_TYPES)[number])
-  ) {
-    return NextResponse.json({ error: 'Tipo de acceso de filtro inválido.' }, { status: 400 })
-  }
-
-  // Construir el where de Prisma
-  const where: Record<string, unknown> = {}
+  // Construir el where de Prisma. Cada filtro se agrega como una entrada
+  // separada de un AND explícito — así el filtro de tipo de acceso/arrendatario
+  // (que también apunta a `pass.subject`) nunca puede quedar implícitamente
+  // mezclado con las ramas de `search` (que también filtran sobre `pass`).
+  const and: Record<string, unknown>[] = []
 
   // Scope de familia: los no-SuperAdmin solo ven sus áreas
   if (permission.familyIds !== undefined) {
-    where.familyId = familyId ? familyId : { in: permission.familyIds }
+    and.push({ familyId: familyId ? familyId : { in: permission.familyIds } })
   } else if (familyId) {
-    where.familyId = familyId
+    and.push({ familyId })
   }
 
-  if (resultFilter) {
-    where.result = resultFilter
-  }
+  if (resultFilter) and.push({ result: resultFilter })
 
   // Rango de fechas sobre scannedAt
   if (dateFrom || dateTo) {
@@ -104,7 +102,7 @@ export async function GET(request: NextRequest) {
         range.lte = d
       }
     }
-    if (Object.keys(range).length > 0) where.scannedAt = range
+    if (Object.keys(range).length > 0) and.push({ scannedAt: range })
   }
 
   // Tipo de acceso / arrendatario: filtran sobre el sujeto del pase escaneado
@@ -112,18 +110,22 @@ export async function GET(request: NextRequest) {
   if (accessTypeFilter) passSubjectWhere.accessType = accessTypeFilter
   if (organizationId) passSubjectWhere.organizationId = organizationId
   if (Object.keys(passSubjectWhere).length > 0) {
-    where.pass = { subject: passSubjectWhere }
+    and.push({ pass: { subject: passSubjectWhere } })
   }
 
   // Búsqueda por código de credencial, nombre/apellido o arrendatario de la persona
   if (search) {
-    where.OR = [
-      { pass: { credentialCode: { contains: search, mode: 'insensitive' } } },
-      { pass: { subject: { firstName: { contains: search, mode: 'insensitive' } } } },
-      { pass: { subject: { lastName: { contains: search, mode: 'insensitive' } } } },
-      { pass: { subject: { organization: { contains: search, mode: 'insensitive' } } } },
-    ]
+    and.push({
+      OR: [
+        { pass: { credentialCode: { contains: search, mode: 'insensitive' } } },
+        { pass: { subject: { firstName: { contains: search, mode: 'insensitive' } } } },
+        { pass: { subject: { lastName: { contains: search, mode: 'insensitive' } } } },
+        { pass: { subject: { organization: { contains: search, mode: 'insensitive' } } } },
+      ],
+    })
   }
+
+  const where: Record<string, unknown> = and.length > 0 ? { AND: and } : {}
 
   const db = prisma
 
