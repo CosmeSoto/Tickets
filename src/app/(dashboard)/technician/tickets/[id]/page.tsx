@@ -19,6 +19,7 @@ import {
 import Link from 'next/link'
 
 import { TicketDetailLayout } from '@/components/tickets/ticket-detail-layout'
+import { TicketCollaborators } from '@/components/tickets/ticket-collaborators'
 import { TicketTimeline } from '@/components/ui/ticket-timeline'
 import { TicketRatingSystem } from '@/components/ui/ticket-rating-system'
 import { TicketResolutionTracker } from '@/components/ui/ticket-resolution-tracker'
@@ -129,7 +130,15 @@ export default function TechnicianTicketDetailPage() {
 
   const isAssignedResolver = ticket?.assignee?.id === session?.user?.id
   const isUnassigned = !ticket?.assignee
-  const canAct = isAssignedResolver || isUnassigned // puede actuar si es el asignado o si no hay asignado
+
+  // IDs de colaboradores del ticket — los reporta <TicketCollaborators> al cargar,
+  // sin pedirlos de nuevo aquí. Un colaborador puede trabajar las tareas del plan
+  // de resolución (agregar/editar/cambiar estado) aunque no sea el asignado, igual
+  // que ya puede mover el ticket a "En progreso"/"En espera" sin poder resolverlo
+  // (esto último ya lo permitía la API — status/route.ts — solo faltaba mostrarlo).
+  const [collaboratorIds, setCollaboratorIds] = useState<string[]>([])
+  const isCollaborator = !!session?.user?.id && collaboratorIds.includes(session.user.id)
+  const canAct = isAssignedResolver || isUnassigned || isCollaborator
   // El middleware bloquea TODO /technician/knowledge/* si el usuario no tiene
   // canAccessKnowledge (Super Admin exento) — sin esto el botón navegaba a
   // una URL que el proxy redirige silenciosamente al dashboard, sin ningún
@@ -331,8 +340,15 @@ export default function TechnicianTicketDetailPage() {
   const statusConfig = getStatusConfig(ticket.status)
   const priorityConfig = getPriorityConfig(ticket.priority)
   const currentStatusCfg = STATUS_CONFIG[ticket.status]
-  const transitions =
+  const rawTransitions =
     canAct && ticket.status !== 'CLOSED' ? (TECH_TRANSITIONS[ticket.status] ?? []) : []
+  // Un colaborador (no el asignado) solo puede mover el ticket a en
+  // progreso/en espera, nunca resolverlo ni reabrirlo — igual que ya
+  // valida la API (status/route.ts, `collaboratorAllowed`).
+  const transitions =
+    isAssignedResolver || isUnassigned
+      ? rawTransitions
+      : rawTransitions.filter(t => t.value === 'IN_PROGRESS' || t.value === 'ON_HOLD')
 
   return (
     <TicketDetailLayout
@@ -472,7 +488,8 @@ export default function TechnicianTicketDetailPage() {
               <TicketResolutionTracker
                 ticketId={ticket.id}
                 ticketStatus={ticket.status}
-                canEdit={ticket.assignee?.id === session?.user?.id}
+                canEdit={isAssignedResolver}
+                canEditTasks={isAssignedResolver || isCollaborator}
                 mode='technician'
                 onPlanChange={() => setTimelineKey(k => k + 1)}
               />
@@ -564,6 +581,20 @@ export default function TechnicianTicketDetailPage() {
                     )}
                   </p>
                 </div>
+              </div>
+              <Separator />
+              {/* Colaboradores: el técnico asignado puede sumar otros técnicos de la
+                  misma familia por su cuenta, sin depender de que el admin se los
+                  haya asignado de antemano. */}
+              <div className='flex items-start gap-2'>
+                <User className='h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0' />
+                <TicketCollaborators
+                  ticketId={ticket.id}
+                  familyId={ticket.family?.id}
+                  assigneeId={ticket.assignee?.id}
+                  canManage={isAssignedResolver}
+                  onLoaded={setCollaboratorIds}
+                />
               </div>
               <Separator />
               <div className='flex items-start gap-2'>

@@ -6,7 +6,7 @@
  * Solo técnicos de la misma familia del ticket pueden ser colaboradores.
  */
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { UserPlus, UserMinus, Users, RefreshCw, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -47,9 +47,19 @@ interface Props {
   familyId?: string | null
   assigneeId?: string
   canManage: boolean
+  /** Se llama con los IDs de colaboradores cada vez que se (re)cargan — para
+   *  que la página pueda saber, sin otro fetch, si el usuario actual es
+   *  colaborador (ej. habilitar tareas del plan de resolución). */
+  onLoaded?: (collaboratorIds: string[]) => void
 }
 
-export function TicketCollaborators({ ticketId, familyId, assigneeId, canManage }: Props) {
+export function TicketCollaborators({
+  ticketId,
+  familyId,
+  assigneeId,
+  canManage,
+  onLoaded,
+}: Props) {
   const { toast } = useToast()
   const [collaborators, setCollaborators] = useState<Collaborator[]>([])
   const [availableTechs, setAvailableTechs] = useState<TechnicianOption[]>([])
@@ -59,12 +69,19 @@ export function TicketCollaborators({ ticketId, familyId, assigneeId, canManage 
   const [addingId, setAddingId] = useState<string | null>(null)
   const [removingId, setRemovingId] = useState<string | null>(null)
 
+  // Ref para no forzar un refetch si el padre pasa un `onLoaded` inline
+  // (identidad nueva en cada render) — solo nos interesa el valor más reciente.
+  const onLoadedRef = useRef(onLoaded)
+  onLoadedRef.current = onLoaded
+
   const loadCollaborators = useCallback(async () => {
     try {
       const res = await fetch(`/api/tickets/${ticketId}/collaborators`)
       if (res.ok) {
         const data = await res.json()
-        setCollaborators(data.data ?? [])
+        const rows: Collaborator[] = data.data ?? []
+        setCollaborators(rows)
+        onLoadedRef.current?.(rows.map(r => r.collaboratorId))
       }
     } catch {
       /* silencioso */
@@ -80,7 +97,7 @@ export function TicketCollaborators({ ticketId, familyId, assigneeId, canManage 
       // todos los técnicos activos
       const url = familyId
         ? `/api/users?roles=TECHNICIAN&isActive=true&familyId=${familyId}&purpose=categoryResolvers&limit=500`
-        : `/api/users?role=TECHNICIAN&isActive=true&limit=500`
+        : `/api/users?roles=TECHNICIAN&isActive=true&purpose=categoryResolvers&limit=500`
       const res = await fetch(url)
       if (res.ok) {
         const data = await res.json()

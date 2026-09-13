@@ -112,7 +112,7 @@ export function SidebarDetailsCard({
           <User className='h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0' />
           <TicketCollaborators
             ticketId={ticket.id}
-            familyId={(ticket as any).familyId}
+            familyId={ticket.family?.id}
             assigneeId={ticket.assignee?.id}
             canManage
           />

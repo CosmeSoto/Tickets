@@ -75,7 +75,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           assigneeId: plan.ticket.assigneeId,
           familyId: plan.ticket.familyId,
         },
-        'resolution_plan'
+        'resolution_plan_tasks'
       )
     } catch (err) {
       if (err instanceof TicketAccessError) {

@@ -62,7 +62,7 @@ export async function PATCH(
           assigneeId: task.plan.ticket.assigneeId,
           familyId: task.plan.ticket.familyId,
         },
-        'resolution_plan'
+        'resolution_plan_tasks'
       )
     } catch (err) {
       if (err instanceof TicketAccessError) {
@@ -377,7 +377,7 @@ export async function DELETE(
           assigneeId: task.plan.ticket.assigneeId,
           familyId: task.plan.ticket.familyId,
         },
-        'resolution_plan'
+        'resolution_plan_tasks'
       )
     } catch (err) {
       if (err instanceof TicketAccessError) {

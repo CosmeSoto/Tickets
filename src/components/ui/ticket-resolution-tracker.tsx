@@ -16,7 +16,17 @@ import { FormDraftBanner } from '@/components/common/form-draft-banner'
 interface TicketResolutionTrackerProps {
   ticketId: string
   ticketStatus?: string
+  /** Gestionar el plan en sí: crearlo, activarlo, completarlo, cancelarlo,
+   *  editar su título/fechas o eliminarlo. Solo el técnico asignado o un
+   *  admin — igual que resolver/cerrar el ticket, es una decisión de
+   *  propiedad del ticket, no de quien ayuda con el trabajo. */
   canEdit?: boolean
+  /** Trabajar las TAREAS del plan activo (agregar, editar, cambiar estado,
+   *  eliminar): más permisivo que `canEdit` — un colaborador (técnico sumado
+   *  al ticket sin ser el asignado) también puede, igual que ya puede mover
+   *  el ticket a IN_PROGRESS/ON_HOLD sin poder resolverlo ni cerrarlo. Si no
+   *  se pasa, hereda `canEdit` (admin y demás llamadores sin distinción). */
+  canEditTasks?: boolean
   mode?: 'admin' | 'technician' | 'client'
   onPlanChange?: () => void
 }
@@ -25,6 +35,7 @@ export function TicketResolutionTracker({
   ticketId,
   ticketStatus,
   canEdit = false,
+  canEditTasks,
   mode: _mode,
   onPlanChange,
 }: TicketResolutionTrackerProps) {
@@ -42,11 +53,17 @@ export function TicketResolutionTracker({
 
   const effectiveCanEdit =
     canEdit && !isTicketClosed && isInProgress && !isPlanCompleted && !isPlanCancelled
+  const effectiveCanEditTasks =
+    (canEditTasks ?? canEdit) &&
+    !isTicketClosed &&
+    isInProgress &&
+    !isPlanCompleted &&
+    !isPlanCancelled
   // Cambiar el estado de una tarea (completarla, bloquearla, etc.) requiere que el
   // plan ya esté activo — mientras está en "borrador" se puede seguir armando
-  // (agregar/editar/eliminar tareas vía effectiveCanEdit) pero no cerrarse trabajo
-  // que formalmente no ha arrancado.
-  const canChangeTaskStatus = effectiveCanEdit && openPlan?.status === 'active'
+  // (agregar/editar/eliminar tareas vía effectiveCanEditTasks) pero no cerrarse
+  // trabajo que formalmente no ha arrancado.
+  const canChangeTaskStatus = effectiveCanEditTasks && openPlan?.status === 'active'
   const canCreatePlan = canEdit && !isTicketClosed && isInProgress && !openPlan
 
   if (hook.loading) {
@@ -187,7 +204,7 @@ export function TicketResolutionTracker({
 
           <TaskList
             plan={openPlan}
-            canEdit={effectiveCanEdit}
+            canEdit={effectiveCanEditTasks}
             canChangeStatus={canChangeTaskStatus}
             showAddTask={hook.showAddTask}
             setShowAddTask={hook.setShowAddTask}

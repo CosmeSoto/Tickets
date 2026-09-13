@@ -24,6 +24,7 @@ export type TicketAccessAction =
   | 'assign'
   | 'manage_collaborators'
   | 'resolution_plan'
+  | 'resolution_plan_tasks'
   | 'delete'
 
 export interface TicketAccessUser {
@@ -123,6 +124,8 @@ export async function canAccessTicket(
       return canManageCollaborators(user, ticket)
     case 'resolution_plan':
       return canManageResolutionPlan(user, ticket)
+    case 'resolution_plan_tasks':
+      return canManageResolutionPlanTasks(user, ticket)
     case 'delete':
       return canDeleteTicket(user, ticket)
     default:
@@ -218,6 +221,34 @@ async function canManageResolutionPlan(
     if (ticket.assigneeId === user.id) return true
     if (await adminCanHandlePatrolTicket(user, ticket)) return true
     return adminCanOperateTicketFamily(user.id, ticket.familyId, user.isSuperAdmin === true)
+  }
+  return false
+}
+
+async function isTicketCollaborator(userId: string, ticketId: string): Promise<boolean> {
+  const row = await prisma.ticket_collaborators.findUnique({
+    where: { ticketId_collaboratorId: { ticketId, collaboratorId: userId } },
+    select: { ticketId: true },
+  })
+  return !!row
+}
+
+/**
+ * Trabajar sobre las TAREAS de un plan (crear, editar, cambiar estado,
+ * eliminar) es más permisivo que gestionar el plan en sí (crear, activar,
+ * completar, cancelar, eliminar el plan — eso sigue siendo `resolution_plan`,
+ * solo el asignado/admin). Los colaboradores fueron sumados justamente para
+ * ayudar con el trabajo del ticket, así que pueden operar las tareas del plan
+ * activo aunque no sean el técnico asignado — igual que ya pueden mover el
+ * ticket a IN_PROGRESS/ON_HOLD pero no resolverlo ni cerrarlo.
+ */
+async function canManageResolutionPlanTasks(
+  user: TicketAccessUser,
+  ticket: TicketAccessRecord
+): Promise<boolean> {
+  if (await canManageResolutionPlan(user, ticket)) return true
+  if (user.role === 'TECHNICIAN') {
+    return isTicketCollaborator(user.id, ticket.id)
   }
   return false
 }

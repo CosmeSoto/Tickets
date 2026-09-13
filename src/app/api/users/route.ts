@@ -36,9 +36,30 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 401 })
     }
 
+    const { searchParams } = new URL(request.url)
+
+    const role = searchParams.get('role')
+    const rolesParam = searchParams.get('roles') // ej: TECHNICIAN,ADMIN
+    const purpose = searchParams.get('purpose') // categoryResolvers
+    const requestedRoles = rolesParam
+      ?.split(',')
+      .map(r => r.trim())
+      .filter(Boolean)
+    // Solo es "categoryResolvers" de verdad si además no se coló CLIENT en `roles`
+    // (si no, cualquiera podría pasar purpose=categoryResolvers&roles=CLIENT para
+    // saltarse el chequeo de abajo y listar clientes en vez de personal).
+    const isCategoryResolvers =
+      purpose === 'categoryResolvers' &&
+      (!requestedRoles || requestedRoles.every(r => r === 'TECHNICIAN' || r === 'ADMIN'))
+
     // SECURITY: solo ADMIN puede listar usuarios sin restricción.
     // CLIENT/TECHNICIAN pueden listar si tienen canManageNews o canManageForms
-    // (necesario para el selector de visibilidad en noticias y documentos)
+    // (necesario para el selector de visibilidad en noticias y documentos), o si
+    // el propósito es categoryResolvers (elegir técnico/admin para resolver o
+    // colaborar en un ticket): ese filtro nunca puede devolver CLIENT — where.role
+    // queda forzado a TECHNICIAN/ADMIN más abajo — así que es directorio de staff,
+    // no de clientes, y cualquier técnico ya necesita poder ver a sus colegas para
+    // sumarlos como colaboradores (antes esto solo lo podía hacer un admin).
     if (session.user.role === 'CLIENT') {
       const currentUser = await prisma.users.findUnique({
         where: { id: session.user.id },
@@ -49,8 +70,8 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // TECHNICIAN: igual que CLIENT
-    if (session.user.role === 'TECHNICIAN') {
+    // TECHNICIAN: igual que CLIENT, más la excepción de categoryResolvers
+    if (session.user.role === 'TECHNICIAN' && !isCategoryResolvers) {
       const currentUser = await prisma.users.findUnique({
         where: { id: session.user.id },
         select: { canManageNews: true, canManageForms: true },
@@ -60,11 +81,6 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const { searchParams } = new URL(request.url)
-
-    const role = searchParams.get('role')
-    const rolesParam = searchParams.get('roles') // ej: TECHNICIAN,ADMIN
-    const purpose = searchParams.get('purpose') // categoryResolvers
     const isActive = searchParams.get('isActive')
     const departmentId = searchParams.get('departmentId')
     const department = searchParams.get('department')
@@ -78,12 +94,7 @@ export async function GET(request: NextRequest) {
     const formsEnabled = searchParams.get('formsEnabled')
     const newsEnabled = searchParams.get('newsEnabled')
 
-    const isCategoryResolvers = purpose === 'categoryResolvers'
-    const rolesList =
-      rolesParam
-        ?.split(',')
-        .map(r => r.trim())
-        .filter(Boolean) ?? null
+    const rolesList = requestedRoles ?? null
 
     // Construir filtros para Prisma
     const where: any = {}
@@ -257,7 +268,14 @@ export async function GET(request: NextRequest) {
           { isSuperAdmin: false },
         ]
       }
-    } else if (session.user.role !== 'ADMIN') {
+    } else if (session.user.role !== 'ADMIN' && !isCategoryResolvers) {
+      // No aplica a categoryResolvers: ese caso ya quedó scopeado arriba por la
+      // familia del TICKET (con su propia lógica de grants), no por la familia
+      // propia de quien pregunta — un técnico eligiendo colaboradores para un
+      // ticket necesita ver a sus colegas de la familia del ticket, no solo la
+      // suya (puede diferir si tiene un grant), y sin este `if` el resultado
+      // quedaba vacío en cuanto el técnico no tenía departamento propio o su
+      // familia nativa no coincidía con la del ticket.
       const { getUserFamilyScope, getDepartmentIdsForScope } =
         await import('@/lib/auth/admin-scope')
       const scope = await getUserFamilyScope(session.user.id, session.user.role, false)
