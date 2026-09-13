@@ -42,7 +42,31 @@ export function usePatrolExecution(
   refresh: () => void
 ) {
   const { toast } = useToast()
-  const { queuedCount, isOnline, addToQueue, syncNow } = usePatrolOfflineQueue(patrolId)
+
+  // Avisar al agente cuando una sincronización offline deja check-ins sin aplicar
+  // (rechazados por el servidor, o porque la ronda ya se cerró) — antes fallaban
+  // en silencio y el agente nunca se enteraba de que algo no se registró.
+  const handleSyncComplete = useCallback(
+    (results: { localQueueId: string; status: 'ACCEPTED' | 'REJECTED'; error?: string }[]) => {
+      const rejected = results.filter(r => r.status === 'REJECTED')
+      if (rejected.length === 0) return
+
+      const patrolClosed = rejected.some(r => r.error === 'PATROL_NOT_ACTIVE')
+      toast({
+        title: `${rejected.length} check-in${rejected.length !== 1 ? 's' : ''} offline no se pudo${rejected.length !== 1 ? 'ieron' : ''} sincronizar`,
+        description: patrolClosed
+          ? 'La ronda ya se cerró antes de que se pudieran sincronizar.'
+          : 'Revisa con tu supervisor — puede deberse a un token QR vencido o fuera del horario de la ronda.',
+        variant: 'destructive',
+      })
+      refresh()
+    },
+    [toast, refresh]
+  )
+  const { queuedCount, isOnline, addToQueue, syncNow } = usePatrolOfflineQueue(
+    patrolId,
+    handleSyncComplete
+  )
 
   // ── Estados de acción ────────────────────────────────────────────────────────
   const [scannerActive, setScannerActive] = useState(false)

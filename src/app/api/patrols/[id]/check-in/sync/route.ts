@@ -85,6 +85,22 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
     }
 
+    // Igual que el check-in en vivo: solo se aceptan check-ins de una ronda en
+    // progreso. Sin esta validación, un lote offline encolado antes de que la
+    // ronda se cerrara (cancelada, auto-cerrada por el cron, o ya finalizada)
+    // podía crear check-ins nuevos y sobrescribir completionPercentage en una
+    // ronda que ya no está activa, dejando el estado/missedCheckpointIds
+    // desalineados con el % mostrado.
+    if (patrol.status !== 'IN_PROGRESS') {
+      return NextResponse.json(
+        {
+          error: 'La ronda ya no está en progreso. No se pueden sincronizar check-ins pendientes.',
+          code: 'PATROL_NOT_ACTIVE',
+        },
+        { status: 409 }
+      )
+    }
+
     const familyConfig = await prisma.patrol_family_config.findUnique({
       where: { familyId: patrol.familyId },
       select: {
@@ -121,6 +137,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const checkpointMap = new Map(
       patrol.route.routeCheckpoints.map(rc => [rc.checkpointId, rc.checkpoint])
     )
+
+    // Checkpoints ya visitados (check-in en vivo previo, u otro lote offline ya
+    // sincronizado) — usado para deduplicar. El endpoint en vivo rechaza re-escaneos
+    // del mismo checkpoint (CHECKPOINT_ALREADY_VISITED); este batch no lo validaba,
+    // así que un reintento del cliente tras perder la respuesta de red (petición que
+    // sí se procesó en el servidor pero cuya respuesta nunca llegó) podía crear un
+    // check-in VALID duplicado para el mismo checkpoint.
+    const existingValidCheckIns = await prisma.patrol_check_ins.findMany({
+      where: { patrolId, validationResult: 'VALID' },
+      select: { id: true, checkpointId: true },
+    })
+    const visitedCheckpoints = new Map(existingValidCheckIns.map(ci => [ci.checkpointId, ci.id]))
 
     // Supervisores para notificaciones de rechazo
     const supervisors = await getPatrolSupervisors(patrol.familyId)
@@ -178,6 +206,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           status: 'REJECTED',
           error: 'CHECKPOINT_NOT_IN_ROUTE',
           message: 'El checkpoint no pertenece a esta ruta',
+        })
+        continue
+      }
+
+      // Idempotencia: checkpoint ya con check-in VALID → devolver el existente como
+      // aceptado en vez de duplicar (ver comentario de visitedCheckpoints arriba).
+      const existingCheckInId = visitedCheckpoints.get(item.checkpointId)
+      if (existingCheckInId) {
+        results.push({
+          localQueueId: item.localQueueId,
+          status: 'ACCEPTED',
+          checkInId: existingCheckInId,
         })
         continue
       }
@@ -274,6 +314,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           data: { checkInId: checkIn.id },
         })
       }
+
+      // Registrar como visitado para deduplicar el resto de este mismo lote
+      visitedCheckpoints.set(item.checkpointId, checkIn.id)
 
       results.push({ localQueueId: item.localQueueId, status: 'ACCEPTED', checkInId: checkIn.id })
     }

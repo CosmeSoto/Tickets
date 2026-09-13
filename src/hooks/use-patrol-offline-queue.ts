@@ -47,14 +47,26 @@ function saveQueue(items: OfflineCheckIn[]) {
  * Gestiona la cola offline de check-ins en localStorage.
  * Escucha eventos online/offline del navegador.
  * Sincroniza automáticamente al recuperar conectividad.
+ *
+ * @param onSyncComplete - Se invoca con el resultado de CADA sincronización real
+ *   (dispare desde el listener 'online' interno, el service worker, o una llamada
+ *   manual a syncNow). Usarlo para avisar al agente de rechazos en vez de leer el
+ *   valor de retorno de syncNow directamente: por el lock de syncingRef, si dos
+ *   disparadores compiten solo uno ejecuta la sincronización real y el otro recibe
+ *   `[]` — este callback es el único punto que siempre ve el resultado real.
  */
-export function usePatrolOfflineQueue(patrolId: string) {
+export function usePatrolOfflineQueue(
+  patrolId: string,
+  onSyncComplete?: (results: SyncResult[]) => void
+) {
   const [queue, setQueue] = useState<OfflineCheckIn[]>([])
   const [isOnline, setIsOnline] = useState(
     typeof navigator !== 'undefined' ? navigator.onLine : true
   )
   const [syncing, setSyncing] = useState(false)
   const syncingRef = useRef(false)
+  const onSyncCompleteRef = useRef(onSyncComplete)
+  onSyncCompleteRef.current = onSyncComplete
 
   // Cargar cola inicial
   useEffect(() => {
@@ -99,6 +111,7 @@ export function usePatrolOfflineQueue(patrolId: string) {
 
     syncingRef.current = true
     setSyncing(true)
+    let finalResults: SyncResult[] = []
 
     try {
       const res = await fetch(`/api/patrols/${patrolId}/check-in/sync`, {
@@ -108,29 +121,54 @@ export function usePatrolOfflineQueue(patrolId: string) {
       })
 
       if (!res.ok) {
-        console.error('[OfflineQueue] Sync failed:', res.status)
-        return []
+        const data = await res.json().catch(() => null)
+        // La ronda ya no está activa (cancelada, auto-cerrada por vencimiento, o
+        // ya finalizada) — reintentar es inútil, siempre volverá a fallar igual.
+        // Vaciar la cola de esta ronda para no quedar reintentando (y potencialmente
+        // re-notificando a supervisores) en cada reconexión, indefinidamente.
+        if (data?.code === 'PATROL_NOT_ACTIVE') {
+          const remaining = all.filter(item => item.patrolId !== patrolId)
+          saveQueue(remaining)
+          setQueue([])
+          finalResults = pending.map(item => ({
+            localQueueId: item.localQueueId,
+            status: 'REJECTED' as const,
+            error: 'PATROL_NOT_ACTIVE',
+          }))
+        } else {
+          console.error('[OfflineQueue] Sync failed:', res.status)
+        }
+        return finalResults
       }
 
       const data = await res.json()
       const results: SyncResult[] = data.results ?? []
 
-      // Remover los aceptados de la cola
-      const acceptedIds = new Set(
-        results.filter(r => r.status === 'ACCEPTED').map(r => r.localQueueId)
+      // Remover de la cola tanto los aceptados como los rechazados: un rechazo
+      // (token inválido, fuera de ventana de tiempo) es determinístico — el mismo
+      // ítem (mismo qrToken + deviceTimestamp) volverá a fallar igual en el próximo
+      // reintento. Dejarlo en la cola solo producía reintentos infinitos que además
+      // re-insertaban el registro de auditoría y re-notificaban a los supervisores
+      // en cada reconexión.
+      const handledIds = new Set(
+        results
+          .filter(r => r.status === 'ACCEPTED' || r.status === 'REJECTED')
+          .map(r => r.localQueueId)
       )
 
-      const remaining = all.filter(item => !acceptedIds.has(item.localQueueId))
+      const remaining = all.filter(item => !handledIds.has(item.localQueueId))
       saveQueue(remaining)
       setQueue(remaining.filter(i => i.patrolId === patrolId))
 
-      return results
+      finalResults = results
+      return finalResults
     } catch (err) {
       console.error('[OfflineQueue] Sync error:', err)
-      return []
+      return finalResults
     } finally {
       syncingRef.current = false
       setSyncing(false)
+      if (finalResults.length > 0) onSyncCompleteRef.current?.(finalResults)
     }
   }, [patrolId])
 

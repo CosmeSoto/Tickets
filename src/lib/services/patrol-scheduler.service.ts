@@ -14,6 +14,7 @@ import { NotificationType, PatrolRecurrence } from '@prisma/client'
 import { getPatrolSupervisors } from '@/lib/patrol/patrol-helpers'
 import { getAppTimezone } from '@/lib/utils/date-utils'
 import { queueTelegramNotification } from '@/lib/notifications/queue-notification-telegram'
+import { applyPatrolClose, computePatrolCloseFromProgress } from '@/lib/patrol/patrol-finalize'
 
 export class PatrolSchedulerService {
   // ── Generación de patrullas ─────────────────────────────────────────────────
@@ -497,19 +498,8 @@ export class PatrolSchedulerService {
           agentId: true,
           familyId: true,
           scheduledEnd: true,
-          route: {
-            select: {
-              name: true,
-              routeCheckpoints: {
-                select: { checkpointId: true, isRequired: true },
-              },
-            },
-          },
+          route: { select: { name: true } },
           agent: { select: { name: true } },
-          checkIns: {
-            where: { validationResult: 'VALID' },
-            select: { checkpointId: true },
-          },
         },
       })
 
@@ -527,62 +517,39 @@ export class PatrolSchedulerService {
                 agentId: true,
                 familyId: true,
                 scheduledEnd: true,
-                route: {
-                  select: {
-                    name: true,
-                    routeCheckpoints: {
-                      select: { checkpointId: true, isRequired: true },
-                    },
-                  },
-                },
+                route: { select: { name: true } },
                 agent: { select: { name: true } },
-                checkIns: {
-                  where: { validationResult: 'VALID' },
-                  select: { checkpointId: true },
-                },
               },
             })
           : []
 
       const patrolsToClose = [...expiredPatrols, ...completeCandidates]
+      const expiredIds = new Set(expiredPatrols.map(p => p.id))
 
       for (const patrol of patrolsToClose) {
-        const requiredCheckpointIds = patrol.route.routeCheckpoints
-          .filter(rc => rc.isRequired)
-          .map(rc => rc.checkpointId)
-
-        const visitedIds = new Set(patrol.checkIns.map(ci => ci.checkpointId))
-        const visitedRequired = requiredCheckpointIds.filter(cid => visitedIds.has(cid)).length
-        const missedIds = requiredCheckpointIds.filter(cid => !visitedIds.has(cid))
-
-        const completionPct =
-          requiredCheckpointIds.length === 0
-            ? visitedIds.size > 0
-              ? 100
-              : 0
-            : Math.round((visitedRequired / requiredCheckpointIds.length) * 100)
+        // Misma lógica de cierre que "Finalizar" manual y "Force close"
+        // (computePatrolCloseFromProgress, en patrol-finalize.ts) — antes esta
+        // función la reimplementaba en línea y divergía en el caso de rutas sin
+        // checkpoints obligatorios (marcaba COMPLETED aunque el agente no hubiera
+        // hecho ningún check-in). Reusar la misma función evita que vuelvan a
+        // desalinearse.
+        const closeResult = await computePatrolCloseFromProgress(patrol.id)
 
         // Red de seguridad: solo cerrar por % si realmente faltan 0 obligatorios
-        const isExpired = expiredPatrols.some(p => p.id === patrol.id)
-        if (!isExpired && missedIds.length > 0) continue
-
-        const finalStatus = missedIds.length === 0 ? 'COMPLETED' : 'INCOMPLETE'
+        if (!expiredIds.has(patrol.id) && closeResult.missedCheckpointIds.length > 0) continue
 
         try {
-          await prisma.patrols.update({
-            where: { id: patrol.id },
-            data: {
-              status: finalStatus,
-              completedAt: now,
-              completionPercentage: completionPct,
-              missedCheckpointIds: missedIds,
-            },
-          })
+          await applyPatrolClose(patrol.id, closeResult)
           closedCount++
 
           const threshold = config.alertCompletionThreshold ?? 80
-          if (completionPct < threshold) {
-            await this.notifyAutoClose(patrol, config.familyId, completionPct, missedIds.length)
+          if (closeResult.completionPercentage < threshold) {
+            await this.notifyAutoClose(
+              patrol,
+              config.familyId,
+              closeResult.completionPercentage,
+              closeResult.missedCheckpointIds.length
+            )
           }
         } catch (err) {
           console.error(`[PatrolSchedulerService] Error cerrando patrulla ${patrol.id}:`, err)
