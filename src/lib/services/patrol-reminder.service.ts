@@ -14,9 +14,7 @@ import { NotificationType } from '@prisma/client'
 import { getAppTimezone } from '@/lib/utils/date-utils'
 import { queueTelegramNotification } from '@/lib/notifications/queue-notification-telegram'
 
-// Acceso a campos de patrols que aún no están en el Prisma Client generado
-// (reminderSentAt, route, family, agent) — eliminar cast cuando se regenere el client
-const db = prisma as any
+const db = prisma
 
 export class PatrolReminderService {
   /**

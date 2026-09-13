@@ -17,8 +17,7 @@ import { PatrolIncidentService } from '@/lib/services/patrol-incident.service'
 import { checkPatrolFamilyAccess } from '@/lib/patrol/patrol-access'
 import { checkPatrolModuleAccess } from '@/lib/patrol/patrol-helpers'
 
-// Acceso al modelo patrol_incidents hasta regenerar el Prisma Client
-const db = prisma as any
+const db = prisma
 
 // ── GET: familias disponibles para el selector ──────────────────────────────
 

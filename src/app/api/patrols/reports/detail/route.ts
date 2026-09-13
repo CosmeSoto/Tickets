@@ -12,9 +12,7 @@ import { getPatrolAccessibleFamilyIds, checkPatrolFamilyAccess } from '@/lib/pat
 import { checkPatrolModuleAccess } from '@/lib/patrol/patrol-helpers'
 import { z } from 'zod'
 
-// Acceso a relaciones de patrols (checkIns, incidents, route, agent) que aún
-// no están en el Prisma Client generado — eliminar cast cuando se regenere el client
-const db = prisma as any
+const db = prisma
 
 const querySchema = z.object({
   patrolId: z.string().uuid().optional(),

@@ -125,7 +125,7 @@ export async function GET(request: NextRequest) {
     ]
   }
 
-  const db = prisma as any
+  const db = prisma
 
   const [total, events] = await Promise.all([
     db.access_scan_events.count({ where }),

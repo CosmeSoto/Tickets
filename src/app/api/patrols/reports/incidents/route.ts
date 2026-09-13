@@ -20,8 +20,7 @@ import prisma from '@/lib/prisma'
 import { getPatrolAccessibleFamilyIds } from '@/lib/patrol/patrol-access'
 import { checkPatrolModuleAccess } from '@/lib/patrol/patrol-helpers'
 
-// Acceso al modelo patrol_incidents hasta regenerar el Prisma Client
-const db = prisma as any
+const db = prisma
 
 export async function GET(request: NextRequest) {
   try {

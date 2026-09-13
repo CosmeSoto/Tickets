@@ -25,8 +25,7 @@ import { NotificationType } from '@prisma/client'
 import { getPatrolSupervisors } from '@/lib/patrol/patrol-helpers'
 import { getUploadDir } from '@/lib/upload-path'
 
-// Acceso al modelo patrol_incidents hasta que se regenere el Prisma Client
-const db = prisma as any
+const db = prisma
 
 // ── Interfaces ────────────────────────────────────────────────────────────────
 

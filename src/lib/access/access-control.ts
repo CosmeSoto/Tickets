@@ -167,7 +167,7 @@ const PASS_SCAN_INCLUDE = {
 export async function findAccessPassByScanPayload(raw: string) {
   const token = normalizeAccessQrPayload(raw)
   if (!token) return null
-  const db = prisma as any
+  const db = prisma
 
   if (token.length >= 32 && !isAccessCredentialCode(token)) {
     const byToken = await db.access_passes.findUnique({

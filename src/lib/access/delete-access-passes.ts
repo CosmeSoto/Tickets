@@ -32,7 +32,7 @@ export async function hardDeleteAccessPasses(ids: string[]): Promise<{
   const uniqueIds = [...new Set(ids.filter(Boolean))]
   if (uniqueIds.length === 0) return { deleted: [], subjectsRemoved: 0 }
 
-  const db = prisma as any
+  const db = prisma
   const passes = await db.access_passes.findMany({
     where: { id: { in: uniqueIds } },
     select: {

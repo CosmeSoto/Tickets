@@ -16,9 +16,7 @@
 import webPush from 'web-push'
 import prisma from '@/lib/prisma'
 
-// Acceso al modelo push_subscriptions (se agrega al schema pero el client
-// no lo conoce hasta correr prisma generate en producción)
-const db = prisma as any
+const db = prisma
 
 // ── Configuración VAPID ──────────────────────────────────────────────────────
 
