@@ -40,7 +40,14 @@ export function SidebarDetailsCard({
         <div className='flex items-start gap-2'>
           <User className='h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0' />
           <div className='min-w-0'>
-            <p className='text-xs text-muted-foreground'>Cliente</p>
+            {/* Tickets escalados de rondas (source=PATROL): client es el agente que
+                reportó la novedad, no un cliente real — mismo dato que ya usa
+                rating/route.ts para decidir quién puede calificar el ticket. Sin
+                este caso especial, un admin ve a un compañero técnico (o a sí
+                mismo) etiquetado como "Cliente". */}
+            <p className='text-xs text-muted-foreground'>
+              {ticket.source === 'PATROL' ? 'Agente que reportó la novedad' : 'Cliente'}
+            </p>
             <p className='font-medium'>{ticket.client.name}</p>
             <p className='text-xs text-muted-foreground'>{ticket.client.email}</p>
             {ticket.client.department && (

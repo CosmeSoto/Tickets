@@ -253,13 +253,21 @@ export class PatrolIncidentService {
       updateData.photoIds = [...incident.photoIds, savedPhoto.id]
     }
 
-    // 6. Persistir cambios
-    const updated = await db.patrol_incidents.update({
-      where: { id },
+    // 6. Persistir cambios — condicionado a status: 'OPEN' de forma atómica:
+    // el chequeo del paso 3 y este update no son una operación única, así que
+    // sin esta condición un admin podía resolver/escalar la novedad justo
+    // entre ambos pasos y este update la modificaría igual, después de
+    // resuelta/escalada (ver también resolve/escalateToTicket más abajo).
+    const result = await db.patrol_incidents.updateMany({
+      where: { id, status: 'OPEN' },
       data: updateData,
     })
 
-    return updated
+    if (result.count === 0) {
+      throw new Error('La novedad ya fue resuelta o escalada, no se pudo actualizar')
+    }
+
+    return db.patrol_incidents.findUnique({ where: { id } })
   }
 
   // ── Eliminar novedad ──────────────────────────────────────────────────────
@@ -293,7 +301,14 @@ export class PatrolIncidentService {
       throw new Error('El período de edición ha expirado')
     }
 
-    await db.patrol_incidents.delete({ where: { id } })
+    // Igual que en update: condicionar el delete a status: 'OPEN' de forma
+    // atómica, para no borrar una novedad que un admin acaba de resolver o
+    // escalar (y ya tiene un ticket real creado) justo entre el chequeo y
+    // esta operación.
+    const result = await db.patrol_incidents.deleteMany({ where: { id, status: 'OPEN' } })
+    if (result.count === 0) {
+      throw new Error('La novedad ya fue resuelta o escalada, no se pudo eliminar')
+    }
   }
 
   // ── Obtener por ID ────────────────────────────────────────────────────────
@@ -424,14 +439,26 @@ export class PatrolIncidentService {
       throw new Error('La novedad ya fue resuelta o escalada')
     }
 
-    const updated = await db.patrol_incidents.update({
-      where: { id },
+    // Claim atómico: sin el filtro status:'OPEN' aquí, dos llamadas casi
+    // simultáneas (resolve + resolve, o resolve + escalateToTicket) podían
+    // ambas pasar el chequeo de arriba y ambas escribir — la segunda en
+    // ganar dejaba el incidente en un estado inconsistente (ver
+    // escalateToTicket, que puede dejar ticketId poblado y status pisado a
+    // RESOLVED si pierde la carrera).
+    const claimed = await db.patrol_incidents.updateMany({
+      where: { id, status: 'OPEN' },
       data: {
         status: 'RESOLVED',
         resolvedAt: new Date(),
         resolvedById,
       },
     })
+
+    if (claimed.count === 0) {
+      throw new Error('La novedad ya fue resuelta o escalada por otro usuario')
+    }
+
+    const updated = await db.patrol_incidents.findUnique({ where: { id } })
 
     // Auditoría
     try {
@@ -504,6 +531,51 @@ export class PatrolIncidentService {
       throw new Error('La novedad ya fue resuelta o escalada')
     }
 
+    // Claim atómico ANTES de crear el ticket (efecto secundario costoso e
+    // irreversible): sin esto, dos escalados casi simultáneos (doble-click,
+    // reintento de red, dos admins a la vez) podían ambos pasar el chequeo de
+    // arriba y ambos crear un ticket real — patrol_incidents.ticketId no
+    // tiene unique constraint, así que el que escribe último "gana" y el otro
+    // ticket queda huérfano pero visible en las colas normales. Si algo falla
+    // después de reclamar, el catch de abajo revierte a OPEN.
+    const now = new Date()
+    const claimed = await db.patrol_incidents.updateMany({
+      where: { id, status: 'OPEN' },
+      data: { status: 'ESCALATED', resolvedAt: now, resolvedById: escalatedById },
+    })
+
+    if (claimed.count === 0) {
+      throw new Error('La novedad ya fue resuelta o escalada por otro usuario')
+    }
+
+    try {
+      return await this.finishEscalation(id, incident, escalatedById, targetFamilyId)
+    } catch (err) {
+      // Compensar: liberar el claim para que se pueda reintentar — no se
+      // llegó a crear (o vincular) el ticket, así que no debe quedar trabado
+      // en ESCALATED sin ticketId ni forma de reintentar.
+      await db.patrol_incidents
+        .update({ where: { id }, data: { status: 'OPEN', resolvedAt: null, resolvedById: null } })
+        .catch(() => {})
+      throw err
+    }
+  }
+
+  /**
+   * Segunda mitad de escalateToTicket: crea el ticket y lo vincula. Separado
+   * para poder envolverlo en el try/catch de compensación del claim atómico
+   * de arriba sin duplicar lógica.
+   */
+  private static async finishEscalation(
+    id: string,
+    incident: NonNullable<Awaited<ReturnType<typeof db.patrol_incidents.findUnique>>> & {
+      patrol: { familyId: string; id: string }
+      checkpoint: { name: string }
+      photos: { id: string; path: string; mimeType: string }[]
+    },
+    escalatedById: string,
+    targetFamilyId?: string
+  ) {
     // Resolver la familia destino del ticket:
     // Si no se provee targetFamilyId, hereda la familia de la ronda (comportamiento original).
     // Normalizar TECHNOLOGY legacy → familia activa para que el admin del área lo vea en cola.
@@ -575,7 +647,6 @@ export class PatrolIncidentService {
     })
 
     const ticketId = ticket.id
-    const now = new Date()
 
     // Adjuntar fotos de la novedad al ticket (no bloquea el escalado si falla)
     for (const [index, photo] of (incident.photos ?? []).entries()) {
@@ -594,10 +665,13 @@ export class PatrolIncidentService {
       }
     }
 
-    // Marcar la novedad como escalada, vincularla al ticket y registrar timestamp
+    // Vincular el ticket ya creado. status/resolvedAt/resolvedById ya quedaron
+    // seteados por el claim atómico de arriba — esta instancia es la única
+    // dueña del incidente a partir de ese punto, así que aquí no hace falta
+    // (ni corresponde) volver a condicionar por status.
     const updated = await db.patrol_incidents.update({
       where: { id },
-      data: { status: 'ESCALATED', ticketId, resolvedAt: now, resolvedById: escalatedById },
+      data: { ticketId },
     })
 
     // Auditoría — registra si la familia fue redirigida

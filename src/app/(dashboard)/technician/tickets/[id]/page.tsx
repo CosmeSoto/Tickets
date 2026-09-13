@@ -565,7 +565,13 @@ export default function TechnicianTicketDetailPage() {
                   <AvatarFallback>{ticket.client?.name?.charAt(0) ?? 'C'}</AvatarFallback>
                 </Avatar>
                 <div className='min-w-0'>
-                  <p className='text-xs text-muted-foreground'>Cliente</p>
+                  {/* Tickets escalados de rondas (source=PATROL): client es el
+                      agente que reportó la novedad, no un cliente real —
+                      mismo criterio que ya usa esta página para el rating
+                      (ratingUserLabel más arriba). */}
+                  <p className='text-xs text-muted-foreground'>
+                    {ticket.source === 'PATROL' ? 'Agente que reportó la novedad' : 'Cliente'}
+                  </p>
                   <p className='font-medium truncate'>{ticket.client?.name}</p>
                   <p className='text-xs text-muted-foreground truncate'>{ticket.client?.email}</p>
                 </div>
