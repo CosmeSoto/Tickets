@@ -23,7 +23,7 @@ export async function PUT(request: NextRequest, { params }: Ctx) {
     const { id } = await params
     const user = toInventoryAccessUser(session.user)
 
-    const existing = await (prisma as any).supplier_types.findUnique({ where: { id } })
+    const existing = await prisma.supplier_types.findUnique({ where: { id } })
     if (!existing) {
       return NextResponse.json({ error: 'Tipo no encontrado' }, { status: 404 })
     }
@@ -37,7 +37,7 @@ export async function PUT(request: NextRequest, { params }: Ctx) {
       await assertCatalogEntryWrite(user, targetFamilyId ?? null)
     }
 
-    const type = await (prisma as any).supplier_types.update({
+    const type = await prisma.supplier_types.update({
       where: { id },
       data: {
         name,
@@ -64,13 +64,13 @@ export async function DELETE(_request: NextRequest, { params }: Ctx) {
 
     const { id } = await params
 
-    const count = await (prisma as any).suppliers.count({ where: { typeId: id } })
+    const count = await prisma.suppliers.count({ where: { typeId: id } })
     if (count > 0) {
-      await (prisma as any).supplier_types.update({ where: { id }, data: { isActive: false } })
+      await prisma.supplier_types.update({ where: { id }, data: { isActive: false } })
       return NextResponse.json({ message: 'Desactivado (tiene proveedores asociados)' })
     }
 
-    await (prisma as any).supplier_types.delete({ where: { id } })
+    await prisma.supplier_types.delete({ where: { id } })
     return NextResponse.json({ message: 'Eliminado' })
   } catch (err) {
     if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)

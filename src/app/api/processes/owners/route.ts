@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'No tienes acceso a esa área.' }, { status: 403 })
   }
 
-  const owners = await (prisma as any).users.findMany({
+  const owners = await prisma.users.findMany({
     where: {
       isActive: true,
       OR: [

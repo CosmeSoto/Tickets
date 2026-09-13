@@ -679,7 +679,7 @@ export class FileService {
     const validation = await this.validateFile(file)
     if (!validation.isValid) throw new Error(validation.error)
 
-    const process = await (prisma as any).processes.findUnique({ where: { id: processId } })
+    const process = await prisma.processes.findUnique({ where: { id: processId } })
     if (!process) throw new Error('Proceso no encontrado')
 
     const originalBuffer = Buffer.from(await file.arrayBuffer()) as Buffer
@@ -700,7 +700,7 @@ export class FileService {
     const filePath = getUploadDir('processes', processId, uniqueFilename)
     await writeFile(filePath, finalBuffer)
 
-    return (prisma as any).process_attachments.create({
+    return prisma.process_attachments.create({
       data: {
         id: randomUUID(),
         filename: uniqueFilename,
@@ -716,14 +716,14 @@ export class FileService {
   }
 
   static async getFilesByProcess(processId: string) {
-    return (prisma as any).process_attachments.findMany({
+    return prisma.process_attachments.findMany({
       where: { processId },
       orderBy: { createdAt: 'desc' },
     })
   }
 
   static async deleteProcessFile(fileId: string) {
-    const attachment = await (prisma as any).process_attachments.findUnique({
+    const attachment = await prisma.process_attachments.findUnique({
       where: { id: fileId },
     })
     if (!attachment) throw new Error('Archivo no encontrado')
@@ -732,7 +732,7 @@ export class FileService {
     } catch {
       // El registro sigue eliminándose para no dejar una referencia inválida.
     }
-    await (prisma as any).process_attachments.delete({ where: { id: fileId } })
+    await prisma.process_attachments.delete({ where: { id: fileId } })
     return { success: true }
   }
 

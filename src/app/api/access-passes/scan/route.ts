@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
     userAgent: request.headers.get('user-agent') || null,
   }
   if (!pass) {
-    await (prisma as any).access_scan_events.create({
+    await prisma.access_scan_events.create({
       data: {
         agentId: session.user.id,
         result: 'NOT_FOUND',
@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
     })
   }
   if (!isAccessFamilyAllowed(permission, pass.familyId)) {
-    await (prisma as any).access_scan_events.create({
+    await prisma.access_scan_events.create({
       data: {
         passId: pass.id,
         familyId: pass.familyId,
@@ -90,8 +90,8 @@ export async function POST(request: NextRequest) {
     )
   }
   const result = resolveAccessPassState(pass)
-  await (prisma as any).$transaction([
-    (prisma as any).access_scan_events.create({
+  await prisma.$transaction([
+    prisma.access_scan_events.create({
       data: {
         passId: pass.id,
         familyId: pass.familyId,
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
         ...context,
       },
     }),
-    (prisma as any).access_passes.update({
+    prisma.access_passes.update({
       where: { id: pass.id },
       data: { lastScannedAt: new Date() },
     }),

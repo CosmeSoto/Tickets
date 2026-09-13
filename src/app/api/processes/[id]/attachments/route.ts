@@ -17,7 +17,7 @@ type Params = { params: Promise<{ id: string }> }
 async function loadScopedProcess(id: string, userId: string, role: string) {
   const [access, process] = await Promise.all([
     getProcessAccess(userId, role),
-    (prisma as any).processes.findUnique({
+    prisma.processes.findUnique({
       where: { id },
       select: { id: true, familyId: true, status: true },
     }),

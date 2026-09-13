@@ -15,10 +15,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   const name = typeof body.name === 'string' ? body.name.trim() : ''
   if (!name) return NextResponse.json({ error: 'El nombre es obligatorio' }, { status: 400 })
 
-  const existing = await (prisma as any).access_organizations.findUnique({ where: { id } })
+  const existing = await prisma.access_organizations.findUnique({ where: { id } })
   if (!existing) return NextResponse.json({ error: 'No encontrado' }, { status: 404 })
 
-  const organization = await (prisma as any).access_organizations.update({
+  const organization = await prisma.access_organizations.update({
     where: { id },
     data: {
       name,
@@ -42,18 +42,18 @@ export async function DELETE(
   if (denied) return denied
 
   const id = (await params).id
-  const existing = await (prisma as any).access_organizations.findUnique({ where: { id } })
+  const existing = await prisma.access_organizations.findUnique({ where: { id } })
   if (!existing) return NextResponse.json({ error: 'No encontrado' }, { status: 404 })
 
-  const inUse = await (prisma as any).access_subjects.count({ where: { organizationId: id } })
+  const inUse = await prisma.access_subjects.count({ where: { organizationId: id } })
   if (inUse > 0) {
-    await (prisma as any).access_organizations.update({
+    await prisma.access_organizations.update({
       where: { id },
       data: { isActive: false, updatedAt: new Date() },
     })
     return NextResponse.json({ success: true, deactivated: true })
   }
 
-  await (prisma as any).access_organizations.delete({ where: { id } })
+  await prisma.access_organizations.delete({ where: { id } })
   return NextResponse.json({ success: true, deleted: true })
 }

@@ -20,7 +20,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
 
   const { id, attachmentId } = await params
   const access = await getProcessAccess(session.user.id, session.user.role)
-  const process = await (prisma as any).processes.findUnique({
+  const process = await prisma.processes.findUnique({
     where: { id },
     select: { id: true, familyId: true },
   })
@@ -28,7 +28,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Proceso no encontrado.' }, { status: 404 })
   }
 
-  const attachment = await (prisma as any).process_attachments.findUnique({
+  const attachment = await prisma.process_attachments.findUnique({
     where: { id: attachmentId },
   })
   if (!attachment || attachment.processId !== id) {

@@ -40,7 +40,7 @@ function detectImageMime(buffer: Buffer): 'image/jpeg' | 'image/png' | 'image/we
 }
 
 async function resolvePass(id: string) {
-  return (prisma as any).access_passes.findUnique({
+  return prisma.access_passes.findUnique({
     where: { id },
     include: { subject: { select: { id: true, photoPath: true } } },
   })
@@ -102,7 +102,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const filename = `${randomUUID()}.jpg`
   const absolutePath = path.join(directory, filename)
   await writeFile(absolutePath, processed)
-  await (prisma as any).access_subjects.update({
+  await prisma.access_subjects.update({
     where: { id: pass.subject.id },
     data: { photoPath: absolutePath },
   })

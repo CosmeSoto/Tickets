@@ -37,7 +37,7 @@ const publicPassInclude = {
 
 async function findPendingPass(id: string, token: string) {
   const tokenHash = createHash('sha256').update(token).digest('hex')
-  return (prisma as any).access_passes.findFirst({
+  return prisma.access_passes.findFirst({
     where: { id, privacyAcceptanceTokenHash: tokenHash },
     include: publicPassInclude,
   })
@@ -147,7 +147,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     )
     .digest('hex')
 
-  const activatedPass = await (prisma as any).$transaction(async (tx: any) => {
+  const activatedPass = await prisma.$transaction(async (tx: any) => {
     const update = await tx.access_passes.updateMany({
       where: {
         id,
@@ -200,7 +200,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         text,
       })
       emailQueued = true
-      await (prisma as any).access_passes.update({
+      await prisma.access_passes.update({
         where: { id },
         data: { emailedAt: acceptedAt },
       })

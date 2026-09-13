@@ -39,7 +39,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     )
   }
   const id = (await params).id
-  const existing = await (prisma as any).access_passes.findUnique({
+  const existing = await prisma.access_passes.findUnique({
     where: { id },
     include: { subject: { select: { firstName: true, lastName: true } } },
   })
@@ -78,7 +78,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const restoringRevoked = Boolean(reissued && existing.status === 'REVOKED')
   const nextStatus = data.status ?? (restoringRevoked ? 'ACTIVE' : undefined)
   const isRevocation = nextStatus === 'REVOKED' && existing.status !== 'REVOKED'
-  const pass = await (prisma as any).access_passes.update({
+  const pass = await prisma.access_passes.update({
     where: { id },
     data: {
       ...(nextStatus ? { status: nextStatus } : {}),

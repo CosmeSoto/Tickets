@@ -119,10 +119,7 @@ async function resolveAsset(id: string): Promise<{
 /**
  * Lee los customValues actuales del activo normalizados como array.
  */
-async function readCurrentCustomValues(
-  id: string,
-  kind: AssetKind
-): Promise<CustomValueEntry[]> {
+async function readCurrentCustomValues(id: string, kind: AssetKind): Promise<CustomValueEntry[]> {
   if (kind === 'EQUIPMENT') {
     const rows = await prisma.equipment_custom_values.findMany({
       where: { equipmentId: id },
@@ -161,10 +158,7 @@ async function readCurrentCustomValues(
 /**
  * Lee los nombres de atributos definidos para un tipo destino.
  */
-async function getTargetTypeAttributeNames(
-  typeId: string,
-  kind: AssetKind
-): Promise<string[]> {
+async function getTargetTypeAttributeNames(typeId: string, kind: AssetKind): Promise<string[]> {
   if (kind === 'EQUIPMENT') {
     const attrs = await prisma.equipment_type_attributes.findMany({
       where: { equipmentTypeId: typeId },
@@ -174,7 +168,7 @@ async function getTargetTypeAttributeNames(
   }
 
   if (kind === 'LICENSE') {
-    const attrs = await (prisma as any).license_type_attributes.findMany({
+    const attrs = await prisma.license_type_attributes.findMany({
       where: { licenseTypeId: typeId },
       select: { attributeName: true },
     })
@@ -182,7 +176,7 @@ async function getTargetTypeAttributeNames(
   }
 
   if (kind === 'MRO') {
-    const attrs = await (prisma as any).consumable_type_attributes.findMany({
+    const attrs = await prisma.consumable_type_attributes.findMany({
       where: { consumableTypeId: typeId },
       select: { attributeName: true },
     })
@@ -243,10 +237,7 @@ async function persistMigratedCustomValues(
  *  - atributos que se perderán (en origen pero no en destino)
  *  - atributos nuevos vacíos (en destino pero no en origen)
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const session = await getServerSession(authOptions)
@@ -255,7 +246,10 @@ export async function GET(
     }
 
     const isSuperAdmin = (session.user as any).isSuperAdmin === true
-    if (session.user.role !== 'ADMIN' && !(await canManageInventory(session.user.id, session.user.role))) {
+    if (
+      session.user.role !== 'ADMIN' &&
+      !(await canManageInventory(session.user.id, session.user.role))
+    ) {
       return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
     }
 
@@ -277,7 +271,11 @@ export async function GET(
       isSuperAdmin,
       await canManageInventory(session.user.id, session.user.role)
     )
-    if (accessible !== undefined && asset.currentFamilyId && !accessible.includes(asset.currentFamilyId)) {
+    if (
+      accessible !== undefined &&
+      asset.currentFamilyId &&
+      !accessible.includes(asset.currentFamilyId)
+    ) {
       return NextResponse.json({ error: 'Sin acceso a la familia de origen' }, { status: 403 })
     }
 
@@ -335,10 +333,7 @@ export async function GET(
  *  preservedValues  CustomValueEntry[] — atributos a conservar (puede incluir valores editados)
  *  force?           boolean  — confirmar pérdida de atributos
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const session = await getServerSession(authOptions)
@@ -420,10 +415,7 @@ export async function POST(
 
     // ── No transferir a la misma familia ────────────────────────────────────
     if (asset.currentFamilyId === targetFamilyId) {
-      return NextResponse.json(
-        { error: 'El activo ya pertenece a esa familia' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'El activo ya pertenece a esa familia' }, { status: 400 })
     }
 
     // ── Validar que el tipo destino pertenece a la familia destino ───────────

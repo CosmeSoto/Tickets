@@ -23,7 +23,7 @@ export async function GET(request: NextRequest, { params }: Params) {
     if (denied) return new NextResponse('Forbidden', { status: denied.status })
 
     const access = await getProcessAccess(session.user.id, session.user.role)
-    const process = await (prisma as any).processes.findUnique({
+    const process = await prisma.processes.findUnique({
       where: { id },
       select: { id: true, familyId: true, status: true },
     })
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest, { params }: Params) {
       return new NextResponse('Not found', { status: 404 })
     }
 
-    const attachment = await (prisma as any).process_attachments.findUnique({
+    const attachment = await prisma.process_attachments.findUnique({
       where: { id: attachmentId },
     })
     if (!attachment || attachment.processId !== id) {

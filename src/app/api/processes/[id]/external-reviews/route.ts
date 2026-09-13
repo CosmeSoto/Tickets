@@ -54,7 +54,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
 
   const { id } = await params
   const access = await getProcessAccess(session.user.id, session.user.role)
-  const process = await (prisma as any).processes.findUnique({
+  const process = await prisma.processes.findUnique({
     where: { id },
     select: {
       id: true,
@@ -94,7 +94,7 @@ export async function POST(request: NextRequest, { params }: Params) {
 
   const { id } = await params
   const access = await getProcessAccess(session.user.id, session.user.role)
-  const process = await (prisma as any).processes.findUnique({
+  const process = await prisma.processes.findUnique({
     where: { id },
     select: {
       id: true,
@@ -153,7 +153,7 @@ export async function POST(request: NextRequest, { params }: Params) {
 
   let evidencePath: string | null = uploadedEvidence?.path || null
   if (!evidencePath && payload.evidenceAttachmentId) {
-    const attachment = await (prisma as any).process_attachments.findFirst({
+    const attachment = await prisma.process_attachments.findFirst({
       where: { id: payload.evidenceAttachmentId, processId: id },
       select: { path: true },
     })
@@ -176,7 +176,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     )
   }
 
-  const review = await (prisma as any).process_external_reviews.create({
+  const review = await prisma.process_external_reviews.create({
     data: {
       versionId,
       provider: payload.provider,

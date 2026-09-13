@@ -579,8 +579,8 @@ export async function exportUsersModuleData(): Promise<Record<UsersModuleTable, 
     prisma.password_reset_tokens.findMany({ where: { userId: { in: userIds } } }),
     prisma.verification_tokens.findMany(),
     prisma.technician_assignments.findMany({ where: { technicianId: { in: userIds } } }),
-    typeof (prisma as any).user_family_access?.findMany === 'function'
-      ? (prisma as any).user_family_access.findMany({ where: { userId: { in: userIds } } })
+    typeof prisma.user_family_access?.findMany === 'function'
+      ? prisma.user_family_access.findMany({ where: { userId: { in: userIds } } })
       : Promise.resolve([]),
   ])
 
@@ -677,9 +677,7 @@ export async function exportInventoryModuleData(): Promise<Record<string, unknow
 
   // Catálogos
   await fetchTable('supplier_types', () => prisma.supplier_types.findMany())
-  await fetchTable('contract_service_types', () =>
-    (prisma as any).contract_service_types.findMany()
-  )
+  await fetchTable('contract_service_types', () => prisma.contract_service_types.findMany())
   // findMany sin select: incluye campos comerciales (crédito, banco, plazos).
   // Decimal → string para JSON de módulo estable en restore.
   await fetchTable('suppliers', async () => {
@@ -721,9 +719,9 @@ export async function exportInventoryModuleData(): Promise<Record<string, unknow
   await fetchTable('contract_payment_installments', () =>
     prisma.contract_payment_installments.findMany()
   )
-  await fetchTable('contract_assignments', () => (prisma as any).contract_assignments.findMany())
+  await fetchTable('contract_assignments', () => prisma.contract_assignments.findMany())
   await fetchTable('contract_return_acts', () => prisma.contract_return_acts.findMany())
-  await fetchTable('contract_amendments', () => (prisma as any).contract_amendments.findMany())
+  await fetchTable('contract_amendments', () => prisma.contract_amendments.findMany())
 
   await fetchTable('maintenance_records', () => prisma.maintenance_records.findMany())
   await fetchTable('maintenance_tasks', () => prisma.maintenance_tasks.findMany())
@@ -802,7 +800,7 @@ export type ProcessesModuleTable = (typeof PROCESSES_MODULE_RESTORE_ORDER)[numbe
 export async function exportProcessesModuleData(): Promise<
   Record<ProcessesModuleTable, unknown[]>
 > {
-  const processes = await (prisma as any).processes.findMany()
+  const processes = await prisma.processes.findMany()
   const processIds = processes.map((row: { id: string }) => row.id)
   if (processIds.length === 0) {
     return {
@@ -816,17 +814,17 @@ export async function exportProcessesModuleData(): Promise<
   }
 
   const [process_versions, process_attachments, process_approval_events] = await Promise.all([
-    (prisma as any).process_versions.findMany({ where: { processId: { in: processIds } } }),
-    (prisma as any).process_attachments.findMany({ where: { processId: { in: processIds } } }),
-    (prisma as any).process_approval_events.findMany({ where: { processId: { in: processIds } } }),
+    prisma.process_versions.findMany({ where: { processId: { in: processIds } } }),
+    prisma.process_attachments.findMany({ where: { processId: { in: processIds } } }),
+    prisma.process_approval_events.findMany({ where: { processId: { in: processIds } } }),
   ])
   const versionIds = process_versions.map((row: { id: string }) => row.id)
   const [process_diagrams, process_external_reviews] = await Promise.all([
     versionIds.length
-      ? (prisma as any).process_diagrams.findMany({ where: { versionId: { in: versionIds } } })
+      ? prisma.process_diagrams.findMany({ where: { versionId: { in: versionIds } } })
       : Promise.resolve([]),
     versionIds.length
-      ? (prisma as any).process_external_reviews.findMany({
+      ? prisma.process_external_reviews.findMany({
           where: { versionId: { in: versionIds } },
         })
       : Promise.resolve([]),
@@ -855,10 +853,10 @@ export type AccessModuleTable = (typeof ACCESS_MODULE_RESTORE_ORDER)[number]
 export async function exportAccessModuleData(): Promise<Record<AccessModuleTable, unknown[]>> {
   const [access_organizations, access_subjects, access_passes, access_scan_events] =
     await Promise.all([
-      (prisma as any).access_organizations.findMany(),
-      (prisma as any).access_subjects.findMany(),
-      (prisma as any).access_passes.findMany(),
-      (prisma as any).access_scan_events.findMany(),
+      prisma.access_organizations.findMany(),
+      prisma.access_subjects.findMany(),
+      prisma.access_passes.findMany(),
+      prisma.access_scan_events.findMany(),
     ])
   return { access_organizations, access_subjects, access_passes, access_scan_events }
 }

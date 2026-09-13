@@ -133,7 +133,7 @@ export async function GET(request: NextRequest) {
     ]
   }
 
-  const passes = await (prisma as any).access_passes.findMany({
+  const passes = await prisma.access_passes.findMany({
     where,
     include: PASS_LIST_INCLUDE,
     orderBy: [{ validUntil: 'asc' }, { createdAt: 'desc' }],
@@ -170,7 +170,7 @@ export async function POST(request: NextRequest) {
   let organizationName: string | null = null
   let organizationId = data.organizationId || null
   if (organizationId) {
-    const org = await (prisma as any).access_organizations.findFirst({
+    const org = await prisma.access_organizations.findFirst({
       where: { id: organizationId, isActive: true },
       select: { id: true, name: true },
     })
@@ -187,7 +187,7 @@ export async function POST(request: NextRequest) {
   const { tokenHash } = generateAccessQrSecret()
   const acceptanceToken = generateAccessQrSecret()
   const acceptanceExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-  const pass = await (prisma as any).$transaction(async (tx: any) => {
+  const pass = await prisma.$transaction(async (tx: any) => {
     const subject = await tx.access_subjects.create({
       data: {
         familyId: data.familyId,
@@ -247,7 +247,7 @@ export async function POST(request: NextRequest) {
         acceptanceUrl,
       }),
     })
-    await (prisma as any).access_passes.update({
+    await prisma.access_passes.update({
       where: { id: pass.id },
       data: { emailedAt: new Date(), updatedById: session.user.id },
     })

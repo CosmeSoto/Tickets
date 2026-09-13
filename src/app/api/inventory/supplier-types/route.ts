@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
 
     const familyFilter = buildCatalogFamilyWhere(ctx, familyId, true)
 
-    const types = await (prisma as any).supplier_types.findMany({
+    const types = await prisma.supplier_types.findMany({
       where: {
         ...(isAdmin && includeInactive ? {} : { isActive: true }),
         ...familyFilter,
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Código y nombre son obligatorios' }, { status: 400 })
     }
 
-    const existing = await (prisma as any).supplier_types.findUnique({
+    const existing = await prisma.supplier_types.findUnique({
       where: { code: code.toUpperCase() },
     })
     if (existing) {
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
       nextOrder = (maxOrder._max.order ?? -1) + 1
     }
 
-    const type = await (prisma as any).supplier_types.create({
+    const type = await prisma.supplier_types.create({
       data: {
         id: randomUUID(),
         code: code.toUpperCase(),

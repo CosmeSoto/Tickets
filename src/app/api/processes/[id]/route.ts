@@ -112,7 +112,7 @@ async function assertExternalReviewBeforePublish(
   toStatus: string
 ) {
   if (toStatus !== 'PUBLISHED' || fromStatus !== 'PENDING_EXTERNAL_DPD') return null
-  const latestVersion = await (prisma as any).process_versions.findFirst({
+  const latestVersion = await prisma.process_versions.findFirst({
     where: { processId },
     orderBy: { versionNumber: 'desc' },
     select: {
@@ -151,7 +151,7 @@ async function loadAuthorizedProcess(
   forManagement = false
 ) {
   const access = await getProcessAccess(userId, role)
-  const process = await (prisma as any).processes.findUnique({
+  const process = await prisma.processes.findUnique({
     where: { id },
     include: PROCESS_DETAIL_INCLUDE,
   })
@@ -221,7 +221,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       nextReviewAt = new Date(now.getTime())
       nextReviewAt.setMonth(nextReviewAt.getMonth() + process.reviewEveryMonths)
     }
-    const updated = await (prisma as any).$transaction(async (tx: any) => {
+    const updated = await prisma.$transaction(async (tx: any) => {
       const record = await tx.processes.update({
         where: { id },
         data: {
@@ -308,7 +308,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       )
     }
     if (nextParentId) {
-      const parent = await (prisma as any).processes.findUnique({
+      const parent = await prisma.processes.findUnique({
         where: { id: nextParentId },
         select: { id: true, familyId: true, level: true },
       })
@@ -337,7 +337,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       process.status === 'PENDING_AREA_REVIEW' ||
       process.status === 'PENDING_EXTERNAL_DPD')
 
-  const updated = await (prisma as any).$transaction(async (tx: any) => {
+  const updated = await prisma.$transaction(async (tx: any) => {
     const record = await tx.processes.update({
       where: { id },
       data: {

@@ -24,7 +24,7 @@ function escapeHtml(value: string) {
 export async function checkProcessReviewsDue() {
   const now = new Date()
   const remindBefore = new Date(now.getTime() - REMINDER_INTERVAL_MS)
-  const processes = await (prisma as any).processes.findMany({
+  const processes = await prisma.processes.findMany({
     where: {
       status: 'PUBLISHED',
       nextReviewAt: { lte: now },
@@ -72,7 +72,7 @@ export async function checkProcessReviewsDue() {
         }),
       ])
 
-      await (prisma as any).processes.update({
+      await prisma.processes.update({
         where: { id: process.id },
         data: { lastReviewReminderAt: now },
       })

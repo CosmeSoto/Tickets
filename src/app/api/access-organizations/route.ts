@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
   if (denied) return denied
 
   const includeInactive = request.nextUrl.searchParams.get('includeInactive') === 'true'
-  const organizations = await (prisma as any).access_organizations.findMany({
+  const organizations = await prisma.access_organizations.findMany({
     where: includeInactive ? {} : { isActive: true },
     orderBy: [{ order: 'asc' }, { name: 'asc' }],
   })
@@ -42,13 +42,13 @@ export async function POST(request: NextRequest) {
   if (!code) code = slugCode(name)
   if (!code) return NextResponse.json({ error: 'El código es obligatorio' }, { status: 400 })
 
-  const existing = await (prisma as any).access_organizations.findUnique({ where: { code } })
+  const existing = await prisma.access_organizations.findUnique({ where: { code } })
   if (existing) {
     return NextResponse.json({ error: 'Ya existe un arrendatario con ese código' }, { status: 409 })
   }
 
-  const maxOrder = await (prisma as any).access_organizations.aggregate({ _max: { order: true } })
-  const organization = await (prisma as any).access_organizations.create({
+  const maxOrder = await prisma.access_organizations.aggregate({ _max: { order: true } })
+  const organization = await prisma.access_organizations.create({
     data: {
       id: randomUUID(),
       code,

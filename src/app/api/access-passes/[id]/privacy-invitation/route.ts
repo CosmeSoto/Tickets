@@ -24,7 +24,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (denied) return denied
 
   const id = (await params).id
-  const pass = await (prisma as any).access_passes.findUnique({
+  const pass = await prisma.access_passes.findUnique({
     where: { id },
     include: {
       subject: {
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const secret = generateAccessQrSecret()
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-  await (prisma as any).access_passes.update({
+  await prisma.access_passes.update({
     where: { id },
     data: {
       privacyAcceptanceTokenHash: secret.tokenHash,

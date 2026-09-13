@@ -26,7 +26,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (denied) return denied
 
   const id = (await params).id
-  const pass = await (prisma as any).access_passes.findUnique({
+  const pass = await prisma.access_passes.findUnique({
     where: { id },
     include: {
       subject: {
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     qrDataUrl: qrCode,
     privacyUrl: branding.privacyUrl,
   })
-  await (prisma as any).access_passes.update({
+  await prisma.access_passes.update({
     where: { id },
     data: { tokenHash: secret.tokenHash, emailedAt: new Date(), updatedById: session.user.id },
   })

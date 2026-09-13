@@ -84,7 +84,7 @@ export async function GET(request: NextRequest) {
     ]
   }
 
-  const processes = await (prisma as any).processes.findMany({
+  const processes = await prisma.processes.findMany({
     where,
     include: PROCESS_INCLUDE,
     orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
@@ -130,12 +130,12 @@ export async function POST(request: NextRequest) {
         })
       : Promise.resolve(null),
     data.parentProcessId
-      ? (prisma as any).processes.findUnique({
+      ? prisma.processes.findUnique({
           where: { id: data.parentProcessId },
           select: { id: true, familyId: true, level: true },
         })
       : Promise.resolve(null),
-    (prisma as any).processes.findUnique({ where: { code: data.code }, select: { id: true } }),
+    prisma.processes.findUnique({ where: { code: data.code }, select: { id: true } }),
   ])
 
   if (!family)
@@ -176,7 +176,7 @@ export async function POST(request: NextRequest) {
   const moduleSettings = await getProcessModuleSettings()
   const reviewEveryMonths = data.reviewEveryMonths ?? moduleSettings.defaultReviewMonths
 
-  const process = await (prisma as any).$transaction(async (tx: any) => {
+  const process = await prisma.$transaction(async (tx: any) => {
     const created = await tx.processes.create({
       data: {
         code: data.code,

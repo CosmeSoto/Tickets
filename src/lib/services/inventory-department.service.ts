@@ -114,7 +114,7 @@ export class InventoryDepartmentService {
   static async getDerivedFamily(
     equipmentId: string
   ): Promise<{ id: string; name: string; code: string } | null> {
-    const equipment = await (prisma as any).equipment.findUnique({
+    const equipment = await prisma.equipment.findUnique({
       where: { id: equipmentId },
       include: {
         department: {
