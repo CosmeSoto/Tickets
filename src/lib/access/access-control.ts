@@ -2,6 +2,12 @@ import { createHash, randomBytes } from 'crypto'
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { resolveModuleFamilyScopeIds } from '@/lib/auth/user-family-access'
+import { ACCESS_SCAN_MESSAGES, resolveAccessPassState } from '@/lib/access/access-pass-state'
+
+// Re-exportado por compatibilidad: la máquina de estados y sus catálogos viven en
+// access-pass-state.ts (única fuente de verdad, sin dependencia de Prisma, compartida
+// con el cliente) desde que se centralizaron junto con la validación de transiciones.
+export { resolveAccessPassState, ACCESS_SCAN_MESSAGES }
 
 export type AccessModulePermission = {
   canScan: boolean
@@ -103,49 +109,10 @@ export function normalizeAccessQrPayload(value: string): string | null {
   return trimmed
 }
 
-export function resolveAccessPassState(pass: {
-  status: 'PENDING_PRIVACY' | 'ACTIVE' | 'SUSPENDED' | 'REVOKED'
-  validFrom: Date
-  validUntil: Date
-  subject: { isActive: boolean }
-}):
-  | 'VALID'
-  | 'EXPIRED'
-  | 'NOT_YET_VALID'
-  | 'REVOKED'
-  | 'SUSPENDED'
-  | 'PENDING_PRIVACY'
-  | 'INACTIVE_SUBJECT' {
-  const now = new Date()
-  if (!pass.subject.isActive) return 'INACTIVE_SUBJECT'
-  if (pass.status === 'REVOKED') return 'REVOKED'
-  if (pass.status === 'PENDING_PRIVACY') return 'PENDING_PRIVACY'
-  if (pass.status === 'SUSPENDED') return 'SUSPENDED'
-  // "Todavía no inicia" y "ya venció" son estados distintos para quien escanea:
-  // uno se resuelve esperando a la hora de inicio, el otro requiere reemitir el pase.
-  if (pass.validFrom > now) return 'NOT_YET_VALID'
-  // Inválido desde el instante de vencimiento (validUntil inclusive como límite).
-  if (pass.validUntil <= now) return 'EXPIRED'
-  return 'VALID'
-}
-
 const CREDENTIAL_CODE_RE = /^ACC-\d{4}-[A-Z0-9]{8}$/i
 
 export function isAccessCredentialCode(value: string): boolean {
   return CREDENTIAL_CODE_RE.test(value.trim())
-}
-
-export const ACCESS_SCAN_MESSAGES: Record<string, string> = {
-  VALID: 'Acceso autorizado',
-  EXPIRED: 'Credencial vencida',
-  NOT_YET_VALID: 'Credencial aún no vigente: su periodo de acceso todavía no inicia',
-  REVOKED: 'Credencial revocada',
-  SUSPENDED: 'Credencial suspendida',
-  PENDING_PRIVACY: 'Credencial pendiente: la persona aún no ha aceptado el aviso de privacidad.',
-  INACTIVE_SUBJECT: 'La persona de esta credencial está inactiva',
-  NOT_FOUND: 'Credencial no reconocida. Usa el QR o el código ACC-… de la tabla.',
-  OUT_OF_SCOPE: 'No tienes autorización para verificar esta área.',
-  FORBIDDEN: 'No tienes acceso al módulo de Accesos.',
 }
 
 const PASS_SCAN_INCLUDE = {
