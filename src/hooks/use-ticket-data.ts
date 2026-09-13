@@ -426,6 +426,8 @@ export function useCategoryData() {
 }
 
 // Constantes del sistema
+// Fuente de verdad del color por estado. `getStatusColor` en `@/lib/utils/ticket-utils`
+// y los puntos de color en `StatusBadge`/`status-control-card` deben coincidir con esto.
 export const TICKET_STATUSES: TicketStatus[] = [
   {
     value: 'OPEN',

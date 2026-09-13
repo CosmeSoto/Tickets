@@ -1,12 +1,8 @@
 import * as React from 'react'
 import { Badge, BadgeProps } from './badge'
-import { designSystem } from '@/lib/ui/design-system'
 import { cn } from '@/lib/utils'
 import { getStatusConfig, getPriorityConfig, type Ticket } from '@/hooks/use-ticket-data'
-import { 
-  USER_ROLE_COLORS,
-  type UserRole
-} from '@/lib/constants/user-constants'
+import { USER_ROLE_COLORS, type UserRole } from '@/lib/constants/user-constants'
 
 // Status Badge Props
 interface StatusBadgeProps extends Omit<BadgeProps, 'variant'> {
@@ -32,12 +28,14 @@ export const StatusBadge = React.forwardRef<HTMLDivElement, StatusBadgeProps>(
       lg: 'px-3 py-1 text-sm',
     }
 
+    // Debe coincidir con TICKET_STATUSES en `@/hooks/use-ticket-data` (única fuente
+    // de verdad para el color de cada estado) — no reordenar sin actualizar ambos.
     const statusDotColors = {
       OPEN: 'bg-blue-500',
-      IN_PROGRESS: 'bg-yellow-500',
+      IN_PROGRESS: 'bg-amber-500',
       RESOLVED: 'bg-green-500',
-      CLOSED: 'bg-muted0',
-      ON_HOLD: 'bg-purple-500'
+      CLOSED: 'bg-gray-500',
+      ON_HOLD: 'bg-purple-500',
     }
 
     return (
@@ -45,16 +43,19 @@ export const StatusBadge = React.forwardRef<HTMLDivElement, StatusBadgeProps>(
         ref={ref}
         className={cn(
           'inline-flex items-center font-medium border rounded-full',
-          config.color.replace('bg-', 'bg-').replace('text-', 'text-') + ' border-current border-opacity-20',
+          config.color.replace('bg-', 'bg-').replace('text-', 'text-') +
+            ' border-current border-opacity-20',
           sizeStyles[size],
           className
         )}
         {...props}
       >
-        <div className={cn(
-          'w-1.5 h-1.5 rounded-full mr-1.5',
-          statusDotColors[status] || 'bg-muted0'
-        )} />
+        <div
+          className={cn(
+            'w-1.5 h-1.5 rounded-full mr-1.5',
+            statusDotColors[status] || 'bg-gray-500'
+          )}
+        />
         {config.label}
       </div>
     )
@@ -86,13 +87,14 @@ export const PriorityBadge = React.forwardRef<HTMLDivElement, PriorityBadgeProps
         ref={ref}
         className={cn(
           'inline-flex items-center font-medium border rounded-full',
-          config.color.replace('bg-', 'bg-').replace('text-', 'text-') + ' border-current border-opacity-20',
+          config.color.replace('bg-', 'bg-').replace('text-', 'text-') +
+            ' border-current border-opacity-20',
           sizeStyles[size],
           className
         )}
         {...props}
       >
-        <span className="mr-1">{priorityIcons[priority]}</span>
+        <span className='mr-1'>{priorityIcons[priority]}</span>
         {config.label}
       </div>
     )
@@ -117,8 +119,9 @@ export const CategoryBadge = React.forwardRef<HTMLDivElement, CategoryBadgeProps
       lg: 'px-3 py-1 text-sm',
     }
 
-    const backgroundColor = category.color || designSystem.colors.gray[100]
-    const textColor = category.color ? 'white' : designSystem.colors.gray[800]
+    // Gris neutro (Tailwind gray-100/800) cuando la categoría no trae color propio
+    const backgroundColor = category.color || '#f3f4f6'
+    const textColor = category.color ? 'white' : '#1f2937'
 
     return (
       <div
@@ -160,9 +163,10 @@ export const UserBadge = React.forwardRef<HTMLDivElement, UserBadgeProps>(
       lg: 'px-3 py-1 text-sm',
     }
 
-    const roleColor = user.role && USER_ROLE_COLORS[user.role] 
-      ? USER_ROLE_COLORS[user.role]
-      : 'bg-muted text-foreground border-border'
+    const roleColor =
+      user.role && USER_ROLE_COLORS[user.role]
+        ? USER_ROLE_COLORS[user.role]
+        : 'bg-muted text-foreground border-border'
 
     return (
       <div
@@ -176,12 +180,10 @@ export const UserBadge = React.forwardRef<HTMLDivElement, UserBadgeProps>(
         title={user.email}
         {...props}
       >
-        <div className="w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5" />
+        <div className='w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5' />
         {user.name}
         {showRole && user.role && (
-          <span className="ml-1 opacity-75">
-            ({user.role.toLowerCase()})
-          </span>
+          <span className='ml-1 opacity-75'>({user.role.toLowerCase()})</span>
         )}
       </div>
     )

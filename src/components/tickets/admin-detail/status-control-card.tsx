@@ -14,8 +14,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import { TICKET_STATUSES, formatDate, type Ticket } from '@/hooks/use-ticket-data'
-import { getStatusColor, getStatusIconColor, getStatusLabel } from '@/lib/utils/ticket-utils'
+import type { Ticket } from '@/hooks/use-ticket-data'
+import { getStatusLabel } from '@/lib/utils/ticket-utils'
 import { cn } from '@/lib/utils'
 
 interface StatusControlCardProps {
@@ -56,16 +56,18 @@ const availableStatuses = (ticket: Ticket, isSuperAdmin: boolean): Ticket['statu
   return techTransitions[ticket.status] ?? [ticket.status]
 }
 
+// Debe coincidir con TICKET_STATUSES en `@/hooks/use-ticket-data` (única fuente
+// de verdad para el color de cada estado) — no reordenar sin actualizar ambos.
 const getDotColor = (status: string) => {
   switch (status) {
     case 'OPEN':
       return 'bg-blue-500'
     case 'IN_PROGRESS':
-      return 'bg-blue-500'
+      return 'bg-amber-500'
     case 'RESOLVED':
       return 'bg-green-500'
     case 'ON_HOLD':
-      return 'bg-amber-500'
+      return 'bg-purple-500'
     default:
       return 'bg-gray-500'
   }
