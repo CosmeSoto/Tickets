@@ -42,6 +42,11 @@ export function TicketResolutionTracker({
 
   const effectiveCanEdit =
     canEdit && !isTicketClosed && isInProgress && !isPlanCompleted && !isPlanCancelled
+  // Cambiar el estado de una tarea (completarla, bloquearla, etc.) requiere que el
+  // plan ya esté activo — mientras está en "borrador" se puede seguir armando
+  // (agregar/editar/eliminar tareas vía effectiveCanEdit) pero no cerrarse trabajo
+  // que formalmente no ha arrancado.
+  const canChangeTaskStatus = effectiveCanEdit && openPlan?.status === 'active'
   const canCreatePlan = canEdit && !isTicketClosed && isInProgress && !openPlan
 
   if (hook.loading) {
@@ -183,6 +188,7 @@ export function TicketResolutionTracker({
           <TaskList
             plan={openPlan}
             canEdit={effectiveCanEdit}
+            canChangeStatus={canChangeTaskStatus}
             showAddTask={hook.showAddTask}
             setShowAddTask={hook.setShowAddTask}
             newTask={hook.newTask}

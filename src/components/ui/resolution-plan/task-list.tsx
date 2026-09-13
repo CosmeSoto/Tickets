@@ -62,6 +62,10 @@ const EMPTY_EDIT_FORM: TaskEditForm = {
 interface TaskListProps {
   plan: ResolutionPlan
   canEdit: boolean
+  /** Cambiar el estado de una tarea (completar, bloquear, etc.) requiere que el
+   *  plan ya esté activo. Con el plan en borrador, `canEdit` sigue permitiendo
+   *  agregar/editar/eliminar tareas, pero esto queda en false. */
+  canChangeStatus: boolean
   showAddTask: boolean
   setShowAddTask: (show: boolean) => void
   newTask: TaskFormData
@@ -139,6 +143,7 @@ function TaskDetailFields({
 export function TaskList({
   plan,
   canEdit,
+  canChangeStatus,
   showAddTask,
   setShowAddTask,
   newTask,
@@ -322,13 +327,13 @@ export function TaskList({
                       <TooltipTrigger asChild>
                         <button
                           onClick={() =>
-                            canEdit &&
+                            canChangeStatus &&
                             onUpdateTaskStatus(
                               task.id,
                               task.status === 'completed' ? 'pending' : 'completed'
                             )
                           }
-                          disabled={!canEdit}
+                          disabled={!canChangeStatus}
                           className='mt-1 disabled:opacity-50 disabled:cursor-not-allowed'
                         >
                           {getStatusIcon(task.status)}
@@ -336,9 +341,11 @@ export function TaskList({
                       </TooltipTrigger>
                       <TooltipContent>
                         <p>
-                          {task.status === 'completed'
-                            ? 'Marcar como pendiente'
-                            : 'Marcar como completada'}
+                          {!canChangeStatus && plan.status === 'draft'
+                            ? 'Activa el plan para poder completar tareas'
+                            : task.status === 'completed'
+                              ? 'Marcar como pendiente'
+                              : 'Marcar como completada'}
                         </p>
                       </TooltipContent>
                     </Tooltip>
@@ -477,11 +484,18 @@ export function TaskList({
 
                         <DropdownMenuSeparator />
 
-                        {/* Cambiar estado */}
+                        {/* Cambiar estado (requiere plan activo) */}
                         <DropdownMenuSub>
-                          <DropdownMenuSubTrigger>
+                          <DropdownMenuSubTrigger disabled={!canChangeStatus}>
                             <Circle className='h-4 w-4 mr-2' />
-                            Cambiar Estado
+                            <div className='flex flex-col'>
+                              <span>Cambiar Estado</span>
+                              {!canChangeStatus && (
+                                <span className='text-xs text-muted-foreground'>
+                                  Activa el plan primero
+                                </span>
+                              )}
+                            </div>
                           </DropdownMenuSubTrigger>
                           <DropdownMenuSubContent>
                             {task.status !== 'pending' && (

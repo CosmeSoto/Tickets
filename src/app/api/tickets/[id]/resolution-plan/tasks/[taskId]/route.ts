@@ -93,6 +93,21 @@ export async function PATCH(
     }
 
     if (body.status !== undefined) {
+      // El plan debe estar activo para poder completar/cambiar el estado de sus
+      // tareas — mientras está en "borrador" todavía se está armando (se pueden
+      // agregar/editar/eliminar tareas) y no debería poder cerrarse trabajo que
+      // formalmente no ha arrancado. La UI ya deshabilita esto (task-list.tsx);
+      // esta es la validación real, para no depender solo del cliente.
+      if (task.plan.status === 'draft') {
+        return NextResponse.json(
+          {
+            success: false,
+            message: 'El plan está en borrador. Actívalo antes de completar sus tareas.',
+          },
+          { status: 400 }
+        )
+      }
+
       updateData.status = body.status
       changes.status = { old: task.status, new: body.status }
 
