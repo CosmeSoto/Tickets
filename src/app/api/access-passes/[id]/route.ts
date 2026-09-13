@@ -10,6 +10,7 @@ import {
   isAccessFamilyAllowed,
   generateAccessQrSecret,
 } from '@/lib/access/access-control'
+import { assertAccessStatusTransition } from '@/lib/access/access-pass-state'
 import { hardDeleteAccessPasses } from '@/lib/access/delete-access-passes'
 import { AuditActionsComplete, AuditServiceComplete } from '@/lib/services/audit-service-complete'
 
@@ -58,30 +59,33 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     )
   }
 
-  // Un pase REVOKED no puede volver a ACTIVE/SUSPENDED con el mismo tokenHash.
-  if (
-    existing.status === 'REVOKED' &&
-    data.status &&
-    data.status !== 'REVOKED' &&
-    !data.reissueQr
-  ) {
-    return NextResponse.json(
-      {
-        error:
-          'Un pase revocado no se puede reactivar con el mismo QR. Usa reemisión para generar un código nuevo.',
-      },
-      { status: 400 }
-    )
-  }
-
   const reissued = data.reissueQr ? generateAccessQrSecret() : null
   const restoringRevoked = Boolean(reissued && existing.status === 'REVOKED')
-  const nextStatus = data.status ?? (restoringRevoked ? 'ACTIVE' : undefined)
+  const nextStatus = data.status ?? (restoringRevoked ? 'ACTIVE' : existing.status)
+
+  // Única fuente de verdad para qué cambios de status se permiten: cierra el
+  // bypass de consentimiento (nunca se activa "a mano" un pase que la persona
+  // no aceptó) sin bloquear transiciones legítimas ya usadas por la consola
+  // (p. ej. revocar un pase que sigue PENDING_PRIVACY).
+  const transition = assertAccessStatusTransition(existing.status, nextStatus, {
+    reissueQr: Boolean(data.reissueQr),
+    hasPrivacyAcceptance: Boolean(existing.privacyAcceptedAt),
+  })
+  if (!transition.ok) {
+    return NextResponse.json({ error: transition.message, code: transition.code }, { status: 409 })
+  }
+
   const isRevocation = nextStatus === 'REVOKED' && existing.status !== 'REVOKED'
-  const pass = await prisma.access_passes.update({
-    where: { id },
+
+  // Claim atómico: dos PATCH casi simultáneos sobre el mismo pase (revocar +
+  // reemitir, doble click, dos gestores) no deben poder pisarse — solo uno de
+  // los dos debe poder ganar la escritura. `status: existing.status` en el
+  // where actúa como token optimista: si el status cambió entre el findUnique
+  // de arriba y este updateMany, count será 0 y abortamos sin aplicar nada.
+  const claimed = await prisma.access_passes.updateMany({
+    where: { id, status: existing.status },
     data: {
-      ...(nextStatus ? { status: nextStatus } : {}),
+      status: nextStatus,
       validFrom,
       validUntil,
       ...(reissued ? { tokenHash: reissued.tokenHash } : {}),
@@ -93,6 +97,15 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         ? { revokedAt: null, revokedById: null, revokedReason: null }
         : {}),
     },
+  })
+  if (claimed.count !== 1) {
+    return NextResponse.json(
+      { error: 'El pase cambió mientras editabas. Recarga la página e intenta de nuevo.' },
+      { status: 409 }
+    )
+  }
+  const pass = await prisma.access_passes.findUniqueOrThrow({
+    where: { id },
     include: {
       subject: {
         select: {
