@@ -103,12 +103,17 @@ describe('CategorySelector', () => {
       <CategorySelector onChange={onChange} clientId='client1' categories={mockCategories} />
     )
 
-    // Switch to full view tab (should be default)
-    const fullViewTab = screen.getByRole('tab', { name: /vista completa/i })
-    await user.click(fullViewTab)
+    // El selector ya no tiene tabs "Vista Completa"/"Paso a Paso" — se
+    // rediseñó a un botón que despliega el árbol de categorías
+    // (treeBrowseMode). Sin contexto de ticket (sin ticketTitle/Description),
+    // el botón muestra "Ver árbol completo / seleccionar manualmente".
+    const showTreeButton = screen.getByRole('button', {
+      name: /ver árbol completo.*seleccionar manualmente/i,
+    })
+    await user.click(showTreeButton)
 
-    // The CategoryTree should render and allow selection
-    // This is a basic test - more detailed tests would be in CategoryTree.test.tsx
+    // El árbol debería renderizar las categorías pasadas
+    expect(await screen.findByText('Infraestructura')).toBeInTheDocument()
   })
 
   it('displays suggestions when title and description are provided', () => {
@@ -127,7 +132,11 @@ describe('CategorySelector', () => {
     expect(screen.getByText('Categorías Sugeridas')).toBeInTheDocument()
   })
 
-  it('allows switching between full and step-by-step modes', async () => {
+  // El modo "Paso a Paso" (tabs + StepByStepNavigator) se eliminó del
+  // componente en un rediseño previo, reemplazado por navegación de árbol
+  // (treeBrowseMode: closed/related/all) mediante botones simples. Este test
+  // ahora verifica esa navegación real: mostrar el árbol y volver a ocultarlo.
+  it('allows showing and hiding the category tree', async () => {
     const onChange = jest.fn()
     const user = userEvent.setup()
 
@@ -135,17 +144,18 @@ describe('CategorySelector', () => {
       <CategorySelector onChange={onChange} clientId='client1' categories={mockCategories} />
     )
 
-    // Check both tabs exist
-    expect(screen.getByRole('tab', { name: /vista completa/i })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: /paso a paso/i })).toBeInTheDocument()
+    const showTreeButton = screen.getByRole('button', {
+      name: /ver árbol completo.*seleccionar manualmente/i,
+    })
+    await user.click(showTreeButton)
 
-    // Click step-by-step tab
-    const stepByStepTab = screen.getByRole('tab', { name: /paso a paso/i })
-    await user.click(stepByStepTab)
+    expect(await screen.findByText('Infraestructura')).toBeInTheDocument()
 
-    // Should show step-by-step navigator with progress indicator
+    const hideTreeButton = screen.getByRole('button', { name: /ocultar árbol/i })
+    await user.click(hideTreeButton)
+
     await waitFor(() => {
-      expect(screen.getByText(/paso 0 de 4/i)).toBeInTheDocument()
+      expect(screen.queryByText('Infraestructura')).not.toBeInTheDocument()
     })
   })
 

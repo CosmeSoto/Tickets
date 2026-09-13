@@ -1,10 +1,12 @@
 import { render, screen, fireEvent } from '@testing-library/react'
 import { PublicEquipmentCard, PublicEquipmentItem } from './PublicEquipmentCard'
 
-// Mock Next.js Image component
+// Mock Next.js Image component. fill/priority son props de next/image, no
+// atributos HTML válidos — pasarlas tal cual a un <img> nativo genera un
+// warning de React ("Received `true` for a non-boolean attribute").
 jest.mock('next/image', () => ({
   __esModule: true,
-  default: (props: any) => {
+  default: ({ fill: _fill, priority: _priority, ...props }: any) => {
     // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
     return <img {...props} />
   },
@@ -52,7 +54,8 @@ describe('PublicEquipmentCard', () => {
     expect(screen.getByText('Dell Latitude 5420')).toBeInTheDocument()
     expect(screen.getByText('Laptop')).toBeInTheDocument()
     expect(screen.getByText('Tecnología')).toBeInTheDocument()
-    expect(screen.getByText('Bueno')).toBeInTheDocument()
+    // mockItem.condition = 'USED' → CONDITION_BADGE['USED'].label = 'Usado'
+    expect(screen.getByText('Usado')).toBeInTheDocument()
   })
 
   it('displays price when saleListingPrice is provided', () => {
@@ -71,7 +74,10 @@ describe('PublicEquipmentCard', () => {
   it('shows WhatsApp contact button when contactWhatsapp is provided', () => {
     render(<PublicEquipmentCard item={mockItem} />)
 
-    const whatsappLink = screen.getByRole('link', { name: /Contactar por WhatsApp/i })
+    // El CTA se unificó a un solo texto para ambas ramas (con y sin
+    // WhatsApp) — "Contactar Depto. de Compras" — lo que distingue el caso
+    // WhatsApp es el href (wa.me) y target=_blank, no el texto del link.
+    const whatsappLink = screen.getByRole('link', { name: /Contactar Depto\.? de Compras/i })
     expect(whatsappLink).toBeInTheDocument()
     expect(whatsappLink).toHaveAttribute('href', expect.stringContaining('wa.me'))
     expect(whatsappLink).toHaveAttribute('target', '_blank')
@@ -122,25 +128,27 @@ describe('PublicEquipmentCard', () => {
     expect(packageIcon).toBeInTheDocument()
   })
 
+  // EquipmentCondition (prisma/schema.prisma) solo tiene 3 valores — el test
+  // original probaba una escala de 5 (Bueno/Como Nuevo/Regular/Malo) que ya
+  // no existe. Las etiquetas reales están en CONDITION_BADGE más arriba en
+  // el componente.
   it('applies correct condition badge styling', () => {
     const { rerender } = render(<PublicEquipmentCard item={mockItem} />)
-    expect(screen.getByText('Bueno')).toBeInTheDocument()
+    expect(screen.getByText('Usado')).toBeInTheDocument()
 
     const newItem = { ...mockItem, condition: 'NEW' as const }
     rerender(<PublicEquipmentCard item={newItem} />)
     expect(screen.getByText('Nuevo')).toBeInTheDocument()
 
-    const likeNewItem = { ...mockItem, condition: 'NEW' as const }
-    rerender(<PublicEquipmentCard item={likeNewItem} />)
-    expect(screen.getByText('Como Nuevo')).toBeInTheDocument()
+    const damagedItem = { ...mockItem, condition: 'DAMAGED' as const }
+    rerender(<PublicEquipmentCard item={damagedItem} />)
+    expect(screen.getByText('Dañado')).toBeInTheDocument()
+  })
 
-    const fairItem = { ...mockItem, condition: 'USED' as const }
-    rerender(<PublicEquipmentCard item={fairItem} />)
-    expect(screen.getByText('Regular')).toBeInTheDocument()
-
-    const poorItem = { ...mockItem, condition: 'DAMAGED' as const }
-    rerender(<PublicEquipmentCard item={poorItem} />)
-    expect(screen.getByText('Malo')).toBeInTheDocument()
+  it('falls back to the raw condition value when it is not in CONDITION_BADGE', () => {
+    const unknownConditionItem = { ...mockItem, condition: 'REFURBISHED' as any }
+    render(<PublicEquipmentCard item={unknownConditionItem} />)
+    expect(screen.getByText('REFURBISHED')).toBeInTheDocument()
   })
 
   it('displays "En venta" badge', () => {

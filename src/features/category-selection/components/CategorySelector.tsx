@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { AlertCircle, CheckCircle2, Info, ChevronRight, X } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -13,7 +12,6 @@ import { cn } from '@/lib/utils'
 import { SearchBar } from './SearchBar'
 import { SuggestionEngine } from './SuggestionEngine'
 import { CategoryTree } from './CategoryTree'
-import { StepByStepNavigator } from './StepByStepNavigator'
 import { FrequentCategories } from './FrequentCategories'
 import { ConfirmationPanel } from './ConfirmationPanel'
 import { RelatedArticles } from './RelatedArticles'
@@ -59,7 +57,6 @@ export interface CategorySelectorProps {
  * Estado interno del componente CategorySelector
  *
  * @property {string[]} selectedPath - Array de IDs de categorías desde nivel 1 hasta la seleccionada
- * @property {'full' | 'stepByStep'} mode - Modo de navegación actual
  * @property {string} searchQuery - Query de búsqueda actual
  * @property {boolean} showConfirmation - Si se está mostrando el panel de confirmación
  * @property {number | null} selectionStartTime - Timestamp de cuando se inició la selección (para analytics)
@@ -67,7 +64,6 @@ export interface CategorySelectorProps {
  */
 interface CategorySelectorState {
   selectedPath: string[]
-  mode: 'full' | 'stepByStep'
   searchQuery: string
   showConfirmation: boolean
   selectionStartTime: number | null
@@ -135,7 +131,6 @@ export function CategorySelector({
   // State management
   const [state, setState] = useState<CategorySelectorState>({
     selectedPath: [],
-    mode: 'full',
     searchQuery: '',
     showConfirmation: false,
     selectionStartTime: null,
@@ -450,11 +445,6 @@ export function CategorySelector({
     [handleCategorySelect]
   )
 
-  // Handle mode toggle
-  const handleModeToggle = (mode: 'full' | 'stepByStep') => {
-    setState(prev => ({ ...prev, mode }))
-  }
-
   // Handle edit selection
   const handleEditSelection = () => {
     setState(prev => ({ ...prev, showConfirmation: false }))
@@ -737,7 +727,6 @@ export function CategorySelector({
                       onClick={() => {
                         setState({
                           selectedPath: [],
-                          mode: 'full',
                           searchQuery: '',
                           showConfirmation: false,
                           selectionStartTime: Date.now(),

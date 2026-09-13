@@ -8,6 +8,10 @@ import prisma from '@/lib/prisma'
 jest.mock('@/lib/prisma', () => {
   const p = {
     equipment: { findMany: jest.fn().mockResolvedValue([]) },
+    // El endpoint también resuelve el WhatsApp de contacto (system_settings
+    // legacy + landing_page_content) en paralelo con el findMany de equipos.
+    system_settings: { findMany: jest.fn().mockResolvedValue([]) },
+    landing_page_content: { findFirst: jest.fn().mockResolvedValue(null) },
   }
   return { __esModule: true, default: p, prisma: p }
 })
@@ -16,6 +20,8 @@ describe('Public API Security - Field Selection', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     ;(prisma.equipment.findMany as jest.Mock).mockResolvedValue([])
+    ;(prisma.system_settings.findMany as jest.Mock).mockResolvedValue([])
+    ;(prisma.landing_page_content.findFirst as jest.Mock).mockResolvedValue(null)
   })
 
   it('should call findMany with FOR_SALE filter and expected includes', async () => {
@@ -27,8 +33,11 @@ describe('Public API Security - Field Selection', () => {
 
     expect(callArgs.where).toMatchObject({ status: 'FOR_SALE' })
     expect(callArgs).toHaveProperty('include')
+    // model ya no tiene un campo `name` propio — el nombre se compone de
+    // model.brand.name (relación) + model.model (string), ver resolvedBrand/
+    // resolvedModel más abajo en la ruta.
     expect(callArgs.include).toMatchObject({
-      model: { select: { id: true, name: true } },
+      model: { select: { id: true, brand: true, model: true } },
       type: {
         include: {
           family: true,

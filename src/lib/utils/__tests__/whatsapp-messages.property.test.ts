@@ -282,14 +282,21 @@ describe('Generación de URL de WhatsApp', () => {
         fc.string({ minLength: 1, maxLength: 200 }) // Mensaje
       ),
       ([phone, message]) => {
-        const url = generateWhatsAppUrl(phone, message)
+        // Firma real: generateWhatsAppUrl(message, phoneNumber) — el mensaje
+        // va primero (ver whatsapp-messages.ts). Con los argumentos invertidos,
+        // el teléfono terminaba codificado dentro de ?text= (nunca como
+        // substring literal) y el "mensaje" (a veces sin dígitos) caía en la
+        // rama sin teléfono válido.
+        const url = generateWhatsAppUrl(message, phone)
 
         // Debe ser una URL válida de WhatsApp
         expect(url).toContain('https://wa.me/')
         expect(url).toContain('?text=')
 
-        // Debe contener el número de teléfono
-        const cleanPhone = phone.replace(/[\s\-\(\)]/g, '')
+        // Debe contener el número de teléfono. cleanPhone debe replicar
+        // exactamente el cleaning de producción (/\D/g, que también quita el
+        // '+') para que la comparación sea válida.
+        const cleanPhone = phone.replace(/\D/g, '')
         expect(url).toContain(cleanPhone)
       }
     )

@@ -48,11 +48,14 @@ describe('ForSaleSection Visibility', () => {
     render(<ForSaleSection items={mockItems} />)
 
     // Should show the section title
-    expect(screen.getByText(/Equipos disponibles para la venta/i)).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Activos Disponibles' })
+    ).toBeInTheDocument()
 
-    // Should show at least one equipment card
-    expect(screen.getByText('Dell')).toBeInTheDocument()
-    expect(screen.getByText('Latitude 5420')).toBeInTheDocument()
+    // Should show at least one equipment card. brand+model se renderizan como
+    // "{brand} {model}" dentro de un mismo <h3> (varios text nodes, pero un
+    // solo textContent) — el matcher debe buscar la cadena completa.
+    expect(screen.getByText('Dell Latitude 5420')).toBeInTheDocument()
   })
 
   it('should not render when items array is empty', () => {
@@ -60,7 +63,9 @@ describe('ForSaleSection Visibility', () => {
 
     // The component should render nothing or a minimal structure
     // Check that the main content is not present
-    expect(screen.queryByText(/Equipos disponibles para la venta/i)).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('heading', { level: 2, name: 'Activos Disponibles' })
+    ).not.toBeInTheDocument()
   })
 
   it('should show "Ver todos" link when items exist', () => {
@@ -107,17 +112,18 @@ describe('ForSaleSection Visibility', () => {
 
     render(<ForSaleSection items={multipleItems} />)
 
-    // Should show both family names as section headers
-    expect(screen.getByText('Tecnología')).toBeInTheDocument()
-    expect(screen.getByText('Vehículos')).toBeInTheDocument()
+    // Should show both family names as section headers (<h3>). getByText por
+    // sí solo es ambiguo aquí: el nombre de familia también aparece repetido
+    // como badge dentro de cada card del grupo (PublicEquipmentCard).
+    expect(screen.getByRole('heading', { level: 3, name: 'Tecnología' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 3, name: 'Vehículos' })).toBeInTheDocument()
   })
 
   it('should display equipment details correctly', () => {
     render(<ForSaleSection items={mockItems} />)
 
     // Check that key equipment details are displayed
-    expect(screen.getByText('Dell')).toBeInTheDocument()
-    expect(screen.getByText('Latitude 5420')).toBeInTheDocument()
+    expect(screen.getByText('Dell Latitude 5420')).toBeInTheDocument()
     expect(screen.getByText('Laptop')).toBeInTheDocument()
     expect(screen.getByText('850,50 US$')).toBeInTheDocument()
   })

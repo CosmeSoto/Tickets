@@ -17,7 +17,7 @@ const createMockData = (count: number): TestItem[] => {
   return Array.from({ length: count }, (_, i) => ({
     id: `item-${i + 1}`,
     name: `Item ${i + 1}`,
-    value: i + 1
+    value: i + 1,
   }))
 }
 
@@ -45,20 +45,22 @@ describe('usePagination', () => {
 
     it('should initialize with custom initial page', () => {
       const data = createMockData(50)
-      const { result } = renderHook(() => usePagination(data, { 
-        initialPage: 2,
-        pageSize: 10 
-      }))
+      const { result } = renderHook(() =>
+        usePagination(data, {
+          initialPage: 2,
+          pageSize: 10,
+        })
+      )
 
       // Note: initialPage is reset to 1 due to data.length useEffect
       // This is expected behavior - initialPage only applies on first mount
       expect(result.current.currentPage).toBe(1)
-      
+
       // Navigate to page 2 manually
       act(() => {
         result.current.goToPage(2)
       })
-      
+
       expect(result.current.currentPage).toBe(2)
       expect(result.current.paginatedData[0].id).toBe('item-11')
     })
@@ -102,7 +104,7 @@ describe('usePagination', () => {
       act(() => {
         result.current.goToPage(3)
       })
-      
+
       expect(result.current.currentPage).toBe(3)
 
       // Then navigate back
@@ -134,7 +136,7 @@ describe('usePagination', () => {
       act(() => {
         result.current.goToPage(3)
       })
-      
+
       expect(result.current.currentPage).toBe(3)
 
       // Then go to first page
@@ -167,7 +169,7 @@ describe('usePagination', () => {
       act(() => {
         result.current.goToLastPage()
       })
-      
+
       expect(result.current.currentPage).toBe(5)
 
       // Try to go beyond
@@ -275,25 +277,28 @@ describe('usePagination', () => {
   })
 
   describe('Index Calculations', () => {
+    // startIndex/endIndex son 1-based (para mostrar "Mostrando X-Y de Z" en UI,
+    // ver payments/page.tsx), no índices de array 0-based — paginatedData usa
+    // sus propios índices 0-based internamente vía slice().
     it('should calculate correct startIndex and endIndex', () => {
       const data = createMockData(50)
       const { result } = renderHook(() => usePagination(data, { pageSize: 10 }))
 
-      expect(result.current.startIndex).toBe(0)
+      expect(result.current.startIndex).toBe(1)
       expect(result.current.endIndex).toBe(10)
 
       act(() => {
         result.current.goToPage(2)
       })
 
-      expect(result.current.startIndex).toBe(10)
+      expect(result.current.startIndex).toBe(11)
       expect(result.current.endIndex).toBe(20)
 
       act(() => {
         result.current.goToPage(3)
       })
 
-      expect(result.current.startIndex).toBe(20)
+      expect(result.current.startIndex).toBe(21)
       expect(result.current.endIndex).toBe(30)
     })
 
@@ -305,7 +310,7 @@ describe('usePagination', () => {
         result.current.goToLastPage()
       })
 
-      expect(result.current.startIndex).toBe(40)
+      expect(result.current.startIndex).toBe(41)
       expect(result.current.endIndex).toBe(45)
       expect(result.current.paginatedData).toHaveLength(5)
     })
@@ -325,22 +330,26 @@ describe('usePagination', () => {
       expect(result.current.paginatedData).toHaveLength(25)
     })
 
-    it('should reset to first page when changing page size', () => {
+    it('should keep the first visible item in view when changing page size (not reset to page 1)', () => {
       const data = createMockData(50)
       const { result } = renderHook(() => usePagination(data, { pageSize: 10 }))
 
-      // Navigate to page 3
+      // Navigate to page 3 (items 21-30, 1-based)
       act(() => {
         result.current.goToPage(3)
       })
 
       expect(result.current.currentPage).toBe(3)
 
+      // setPageSize recalcula la página para que el primer ítem que se veía
+      // (índice 20, 0-based) siga visible con el nuevo tamaño: floor(20/20)+1 = 2.
+      // Deliberado (ver comentario "mantener el primer item visible" en el
+      // hook) — resetear siempre a la página 1 perdería el contexto del usuario.
       act(() => {
         result.current.setPageSize(20)
       })
 
-      expect(result.current.currentPage).toBe(1)
+      expect(result.current.currentPage).toBe(2)
     })
 
     it('should recalculate total pages when page size changes', () => {
@@ -443,10 +452,9 @@ describe('usePagination', () => {
     })
 
     it('should adjust current page when data shrinks', () => {
-      const { result, rerender } = renderHook(
-        ({ data }) => usePagination(data, { pageSize: 10 }),
-        { initialProps: { data: createMockData(50) } }
-      )
+      const { result, rerender } = renderHook(({ data }) => usePagination(data, { pageSize: 10 }), {
+        initialProps: { data: createMockData(50) },
+      })
 
       act(() => {
         result.current.goToPage(5)
@@ -463,10 +471,9 @@ describe('usePagination', () => {
     })
 
     it('should reset to page 1 when data changes', () => {
-      const { result, rerender } = renderHook(
-        ({ data }) => usePagination(data, { pageSize: 10 }),
-        { initialProps: { data: createMockData(50) } }
-      )
+      const { result, rerender } = renderHook(({ data }) => usePagination(data, { pageSize: 10 }), {
+        initialProps: { data: createMockData(50) },
+      })
 
       act(() => {
         result.current.goToPage(3)
@@ -524,9 +531,7 @@ describe('usePagination', () => {
     it('should call onPageChange when page changes', () => {
       const onPageChange = jest.fn()
       const data = createMockData(50)
-      const { result } = renderHook(() => 
-        usePagination(data, { pageSize: 10, onPageChange })
-      )
+      const { result } = renderHook(() => usePagination(data, { pageSize: 10, onPageChange }))
 
       act(() => {
         result.current.goToPage(3)
@@ -538,9 +543,7 @@ describe('usePagination', () => {
     it('should call onPageChange when using nextPage', () => {
       const onPageChange = jest.fn()
       const data = createMockData(50)
-      const { result } = renderHook(() => 
-        usePagination(data, { pageSize: 10, onPageChange })
-      )
+      const { result } = renderHook(() => usePagination(data, { pageSize: 10, onPageChange }))
 
       act(() => {
         result.current.nextPage()
@@ -552,9 +555,7 @@ describe('usePagination', () => {
     it('should call onPageChange when using prevPage', () => {
       const onPageChange = jest.fn()
       const data = createMockData(50)
-      const { result } = renderHook(() => 
-        usePagination(data, { pageSize: 10, onPageChange })
-      )
+      const { result } = renderHook(() => usePagination(data, { pageSize: 10, onPageChange }))
 
       // Navigate to page 3 first
       act(() => {
@@ -573,9 +574,7 @@ describe('usePagination', () => {
     it('should not call onPageChange when already at boundary', () => {
       const onPageChange = jest.fn()
       const data = createMockData(50)
-      const { result } = renderHook(() => 
-        usePagination(data, { pageSize: 10, onPageChange })
-      )
+      const { result } = renderHook(() => usePagination(data, { pageSize: 10, onPageChange }))
 
       onPageChange.mockClear()
 
@@ -606,8 +605,16 @@ describe('usePagination', () => {
 
       // Page 1
       expect(result.current.paginatedData.map(item => item.id)).toEqual([
-        'item-1', 'item-2', 'item-3', 'item-4', 'item-5',
-        'item-6', 'item-7', 'item-8', 'item-9', 'item-10'
+        'item-1',
+        'item-2',
+        'item-3',
+        'item-4',
+        'item-5',
+        'item-6',
+        'item-7',
+        'item-8',
+        'item-9',
+        'item-10',
       ])
 
       // Page 2
@@ -616,8 +623,16 @@ describe('usePagination', () => {
       })
 
       expect(result.current.paginatedData.map(item => item.id)).toEqual([
-        'item-11', 'item-12', 'item-13', 'item-14', 'item-15',
-        'item-16', 'item-17', 'item-18', 'item-19', 'item-20'
+        'item-11',
+        'item-12',
+        'item-13',
+        'item-14',
+        'item-15',
+        'item-16',
+        'item-17',
+        'item-18',
+        'item-19',
+        'item-20',
       ])
 
       // Page 3
@@ -626,16 +641,23 @@ describe('usePagination', () => {
       })
 
       expect(result.current.paginatedData.map(item => item.id)).toEqual([
-        'item-21', 'item-22', 'item-23', 'item-24', 'item-25',
-        'item-26', 'item-27', 'item-28', 'item-29', 'item-30'
+        'item-21',
+        'item-22',
+        'item-23',
+        'item-24',
+        'item-25',
+        'item-26',
+        'item-27',
+        'item-28',
+        'item-29',
+        'item-30',
       ])
     })
 
     it('should handle data updates correctly', () => {
-      const { result, rerender } = renderHook(
-        ({ data }) => usePagination(data, { pageSize: 10 }),
-        { initialProps: { data: createMockData(30) } }
-      )
+      const { result, rerender } = renderHook(({ data }) => usePagination(data, { pageSize: 10 }), {
+        initialProps: { data: createMockData(30) },
+      })
 
       expect(result.current.totalItems).toBe(30)
       expect(result.current.totalPages).toBe(3)

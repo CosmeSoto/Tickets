@@ -13,8 +13,8 @@ global.fetch = jest.fn()
 const mockToast = jest.fn()
 jest.mock('@/hooks/use-toast', () => ({
   useToast: () => ({
-    toast: mockToast
-  })
+    toast: mockToast,
+  }),
 }))
 
 // Mock data for testing
@@ -28,13 +28,13 @@ interface TestUser {
 const mockUsers: TestUser[] = [
   { id: '1', name: 'John Doe', email: 'john@example.com', role: 'ADMIN' },
   { id: '2', name: 'Jane Smith', email: 'jane@example.com', role: 'USER' },
-  { id: '3', name: 'Bob Johnson', email: 'bob@example.com', role: 'USER' }
+  { id: '3', name: 'Bob Johnson', email: 'bob@example.com', role: 'USER' },
 ]
 
 const mockFetchSuccess = (data: any) => {
   return Promise.resolve({
     ok: true,
-    json: () => Promise.resolve({ success: true, data })
+    json: () => Promise.resolve({ success: true, data }),
   } as Response)
 }
 
@@ -43,15 +43,18 @@ const mockFetchError = (status: number, message: string) => {
     ok: false,
     status,
     statusText: message,
-    json: () => Promise.resolve({ message })
+    json: () => Promise.resolve({ message }),
   } as Response)
 }
 
 describe('useModuleData', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
-    ;(global.fetch as jest.Mock).mockClear()
-    mockToast.mockClear()
+    // resetAllMocks (no solo clearAllMocks): clearAllMocks borra el historial
+    // de llamadas pero deja las mockImplementation puestas por el test
+    // anterior — un test que no mockea todos los fetch que el hook realmente
+    // dispara terminaba heredando en silencio el mock de otro test previo
+    // (falla dependiente del orden de ejecución).
+    jest.resetAllMocks()
     // Clear cache between tests
     jest.resetModules()
   })
@@ -60,7 +63,7 @@ describe('useModuleData', () => {
     it('should load data on mount when initialLoad is true', async () => {
       ;(global.fetch as jest.Mock).mockImplementation(() => mockFetchSuccess(mockUsers))
 
-      const { result } = renderHook(() => 
+      const { result } = renderHook(() =>
         useModuleData<TestUser>({ endpoint: '/api/users', initialLoad: true })
       )
 
@@ -73,13 +76,15 @@ describe('useModuleData', () => {
 
       expect(result.current.data).toEqual(mockUsers)
       expect(result.current.error).toBeNull()
-      expect(global.fetch).toHaveBeenCalledWith('/api/users')
+      // { cache: 'no-store' } es intencional (comentario en el header del
+      // hook): las listas CRUD deben ser siempre frescas, nunca cacheadas.
+      expect(global.fetch).toHaveBeenCalledWith('/api/users', { cache: 'no-store' })
     })
 
     it('should not load data on mount when initialLoad is false', () => {
       ;(global.fetch as jest.Mock).mockImplementation(() => mockFetchSuccess(mockUsers))
 
-      const { result } = renderHook(() => 
+      const { result } = renderHook(() =>
         useModuleData<TestUser>({ endpoint: '/api/users', initialLoad: false })
       )
 
@@ -89,14 +94,14 @@ describe('useModuleData', () => {
     })
 
     it('should handle array response format', async () => {
-      ;(global.fetch as jest.Mock).mockImplementation(() => 
+      ;(global.fetch as jest.Mock).mockImplementation(() =>
         Promise.resolve({
           ok: true,
-          json: () => Promise.resolve(mockUsers)
+          json: () => Promise.resolve(mockUsers),
         } as Response)
       )
 
-      const { result } = renderHook(() => 
+      const { result } = renderHook(() =>
         useModuleData<TestUser>({ endpoint: '/api/users', initialLoad: true })
       )
 
@@ -110,7 +115,7 @@ describe('useModuleData', () => {
     it('should handle success/data response format', async () => {
       ;(global.fetch as jest.Mock).mockImplementation(() => mockFetchSuccess(mockUsers))
 
-      const { result } = renderHook(() => 
+      const { result } = renderHook(() =>
         useModuleData<TestUser>({ endpoint: '/api/users', initialLoad: true })
       )
 
@@ -125,7 +130,7 @@ describe('useModuleData', () => {
       const singleUser = mockUsers[0]
       ;(global.fetch as jest.Mock).mockImplementation(() => mockFetchSuccess(singleUser))
 
-      const { result } = renderHook(() => 
+      const { result } = renderHook(() =>
         useModuleData<TestUser>({ endpoint: '/api/users/1', initialLoad: true })
       )
 
@@ -141,11 +146,11 @@ describe('useModuleData', () => {
 
       const transform = (data: TestUser[]) => data.filter(u => u.role === 'ADMIN')
 
-      const { result } = renderHook(() => 
-        useModuleData<TestUser>({ 
-          endpoint: '/api/users', 
+      const { result } = renderHook(() =>
+        useModuleData<TestUser>({
+          endpoint: '/api/users',
           initialLoad: true,
-          transform 
+          transform,
         })
       )
 
@@ -161,11 +166,11 @@ describe('useModuleData', () => {
       ;(global.fetch as jest.Mock).mockImplementation(() => mockFetchSuccess(mockUsers))
       const onSuccess = jest.fn()
 
-      renderHook(() => 
-        useModuleData<TestUser>({ 
-          endpoint: '/api/users', 
+      renderHook(() =>
+        useModuleData<TestUser>({
+          endpoint: '/api/users',
           initialLoad: true,
-          onSuccess 
+          onSuccess,
         })
       )
 
@@ -175,11 +180,11 @@ describe('useModuleData', () => {
     })
 
     it('should handle loading error', async () => {
-      ;(global.fetch as jest.Mock).mockImplementation(() => 
+      ;(global.fetch as jest.Mock).mockImplementation(() =>
         mockFetchError(500, 'Internal Server Error')
       )
 
-      const { result } = renderHook(() => 
+      const { result } = renderHook(() =>
         useModuleData<TestUser>({ endpoint: '/api/users', initialLoad: true })
       )
 
@@ -192,22 +197,20 @@ describe('useModuleData', () => {
       expect(mockToast).toHaveBeenCalledWith(
         expect.objectContaining({
           title: 'Error',
-          variant: 'destructive'
+          variant: 'destructive',
         })
       )
     })
 
     it('should call onError callback when loading fails', async () => {
-      ;(global.fetch as jest.Mock).mockImplementation(() => 
-        mockFetchError(404, 'Not Found')
-      )
+      ;(global.fetch as jest.Mock).mockImplementation(() => mockFetchError(404, 'Not Found'))
       const onError = jest.fn()
 
-      renderHook(() => 
-        useModuleData<TestUser>({ 
-          endpoint: '/api/users', 
+      renderHook(() =>
+        useModuleData<TestUser>({
+          endpoint: '/api/users',
           initialLoad: true,
-          onError 
+          onError,
         })
       )
 
@@ -224,7 +227,7 @@ describe('useModuleData', () => {
         .mockImplementationOnce(() => mockFetchSuccess(mockUsers))
         .mockImplementationOnce(() => mockFetchSuccess(newUser))
 
-      const { result } = renderHook(() => 
+      const { result } = renderHook(() =>
         useModuleData<TestUser>({ endpoint: '/api/users', initialLoad: true })
       )
 
@@ -236,7 +239,10 @@ describe('useModuleData', () => {
 
       let createdUser: TestUser | null = null
       await act(async () => {
-        createdUser = await result.current.create({ name: 'Alice Williams', email: 'alice@example.com' })
+        createdUser = await result.current.create({
+          name: 'Alice Williams',
+          email: 'alice@example.com',
+        })
       })
 
       expect(createdUser).toEqual(newUser)
@@ -247,13 +253,13 @@ describe('useModuleData', () => {
         expect.objectContaining({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: expect.any(String)
+          body: expect.any(String),
         })
       )
       expect(mockToast).toHaveBeenCalledWith(
         expect.objectContaining({
           title: 'Éxito',
-          description: 'Registro creado correctamente'
+          description: 'Registro creado correctamente',
         })
       )
     })
@@ -263,7 +269,7 @@ describe('useModuleData', () => {
         .mockImplementationOnce(() => mockFetchSuccess(mockUsers))
         .mockImplementationOnce(() => mockFetchError(400, 'Bad Request'))
 
-      const { result } = renderHook(() => 
+      const { result } = renderHook(() =>
         useModuleData<TestUser>({ endpoint: '/api/users', initialLoad: true })
       )
 
@@ -282,7 +288,7 @@ describe('useModuleData', () => {
       expect(mockToast).toHaveBeenCalledWith(
         expect.objectContaining({
           title: 'Error',
-          variant: 'destructive'
+          variant: 'destructive',
         })
       )
     })
@@ -291,11 +297,11 @@ describe('useModuleData', () => {
       const newUser = { id: '4', name: 'Alice', email: 'alice@example.com', role: 'USER' }
       ;(global.fetch as jest.Mock)
         .mockImplementationOnce(() => mockFetchSuccess(mockUsers))
-        .mockImplementationOnce(() => new Promise(resolve => 
-          setTimeout(() => resolve(mockFetchSuccess(newUser)), 100)
-        ))
+        .mockImplementationOnce(
+          () => new Promise(resolve => setTimeout(() => resolve(mockFetchSuccess(newUser)), 100))
+        )
 
-      const { result } = renderHook(() => 
+      const { result } = renderHook(() =>
         useModuleData<TestUser>({ endpoint: '/api/users', initialLoad: true })
       )
 
@@ -322,7 +328,7 @@ describe('useModuleData', () => {
         .mockImplementationOnce(() => mockFetchSuccess(mockUsers))
         .mockImplementationOnce(() => mockFetchSuccess(updatedUser))
 
-      const { result } = renderHook(() => 
+      const { result } = renderHook(() =>
         useModuleData<TestUser>({ endpoint: '/api/users', initialLoad: true })
       )
 
@@ -341,13 +347,13 @@ describe('useModuleData', () => {
         '/api/users/1',
         expect.objectContaining({
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' }
+          headers: { 'Content-Type': 'application/json' },
         })
       )
       expect(mockToast).toHaveBeenCalledWith(
         expect.objectContaining({
           title: 'Éxito',
-          description: 'Registro actualizado correctamente'
+          description: 'Registro actualizado correctamente',
         })
       )
     })
@@ -357,7 +363,7 @@ describe('useModuleData', () => {
         .mockImplementationOnce(() => mockFetchSuccess(mockUsers))
         .mockImplementationOnce(() => mockFetchError(404, 'Not Found'))
 
-      const { result } = renderHook(() => 
+      const { result } = renderHook(() =>
         useModuleData<TestUser>({ endpoint: '/api/users', initialLoad: true })
       )
 
@@ -378,7 +384,7 @@ describe('useModuleData', () => {
       expect(mockToast).toHaveBeenCalledWith(
         expect.objectContaining({
           title: 'Error',
-          variant: 'destructive'
+          variant: 'destructive',
         })
       )
     })
@@ -389,7 +395,7 @@ describe('useModuleData', () => {
         .mockImplementationOnce(() => mockFetchSuccess(mockUsers))
         .mockImplementationOnce(() => mockFetchSuccess(updatedUser))
 
-      const { result } = renderHook(() => 
+      const { result } = renderHook(() =>
         useModuleData<TestUser>({ endpoint: '/api/users', initialLoad: true })
       )
 
@@ -411,9 +417,11 @@ describe('useModuleData', () => {
     it('should delete an item successfully', async () => {
       ;(global.fetch as jest.Mock)
         .mockImplementationOnce(() => mockFetchSuccess(mockUsers))
-        .mockImplementationOnce(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ success: true }) } as Response))
+        .mockImplementationOnce(() =>
+          Promise.resolve({ ok: true, json: () => Promise.resolve({ success: true }) } as Response)
+        )
 
-      const { result } = renderHook(() => 
+      const { result } = renderHook(() =>
         useModuleData<TestUser>({ endpoint: '/api/users', initialLoad: true })
       )
 
@@ -434,13 +442,13 @@ describe('useModuleData', () => {
       expect(global.fetch).toHaveBeenCalledWith(
         '/api/users/1',
         expect.objectContaining({
-          method: 'DELETE'
+          method: 'DELETE',
         })
       )
       expect(mockToast).toHaveBeenCalledWith(
         expect.objectContaining({
           title: 'Éxito',
-          description: 'Registro eliminado correctamente'
+          description: 'Registro eliminado correctamente',
         })
       )
     })
@@ -450,7 +458,7 @@ describe('useModuleData', () => {
         .mockImplementationOnce(() => mockFetchSuccess(mockUsers))
         .mockImplementationOnce(() => mockFetchError(403, 'Forbidden'))
 
-      const { result } = renderHook(() => 
+      const { result } = renderHook(() =>
         useModuleData<TestUser>({ endpoint: '/api/users', initialLoad: true })
       )
 
@@ -469,7 +477,7 @@ describe('useModuleData', () => {
       expect(mockToast).toHaveBeenCalledWith(
         expect.objectContaining({
           title: 'Error',
-          variant: 'destructive'
+          variant: 'destructive',
         })
       )
     })
@@ -477,9 +485,11 @@ describe('useModuleData', () => {
     it('should remove only the specified item', async () => {
       ;(global.fetch as jest.Mock)
         .mockImplementationOnce(() => mockFetchSuccess(mockUsers))
-        .mockImplementationOnce(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ success: true }) } as Response))
+        .mockImplementationOnce(() =>
+          Promise.resolve({ ok: true, json: () => Promise.resolve({ success: true }) } as Response)
+        )
 
-      const { result } = renderHook(() => 
+      const { result } = renderHook(() =>
         useModuleData<TestUser>({ endpoint: '/api/users', initialLoad: true })
       )
 
@@ -500,12 +510,15 @@ describe('useModuleData', () => {
 
   describe('Reload Operation', () => {
     it('should reload data', async () => {
-      const updatedUsers = [...mockUsers, { id: '4', name: 'New User', email: 'new@example.com', role: 'USER' }]
+      const updatedUsers = [
+        ...mockUsers,
+        { id: '4', name: 'New User', email: 'new@example.com', role: 'USER' },
+      ]
       ;(global.fetch as jest.Mock)
         .mockImplementationOnce(() => mockFetchSuccess(mockUsers))
         .mockImplementationOnce(() => mockFetchSuccess(updatedUsers))
 
-      const { result } = renderHook(() => 
+      const { result } = renderHook(() =>
         useModuleData<TestUser>({ endpoint: '/api/users', initialLoad: true })
       )
 
@@ -526,11 +539,11 @@ describe('useModuleData', () => {
     it('should show loading state during reload', async () => {
       ;(global.fetch as jest.Mock)
         .mockImplementationOnce(() => mockFetchSuccess(mockUsers))
-        .mockImplementationOnce(() => new Promise(resolve => 
-          setTimeout(() => resolve(mockFetchSuccess(mockUsers)), 100)
-        ))
+        .mockImplementationOnce(
+          () => new Promise(resolve => setTimeout(() => resolve(mockFetchSuccess(mockUsers)), 100))
+        )
 
-      const { result } = renderHook(() => 
+      const { result } = renderHook(() =>
         useModuleData<TestUser>({ endpoint: '/api/users', initialLoad: true })
       )
 
@@ -550,15 +563,14 @@ describe('useModuleData', () => {
     })
 
     it('should invalidate cache on reload', async () => {
-      ;(global.fetch as jest.Mock)
-        .mockImplementation(() => mockFetchSuccess(mockUsers))
+      ;(global.fetch as jest.Mock).mockImplementation(() => mockFetchSuccess(mockUsers))
 
-      const { result } = renderHook(() => 
-        useModuleData<TestUser>({ 
-          endpoint: '/api/users', 
+      const { result } = renderHook(() =>
+        useModuleData<TestUser>({
+          endpoint: '/api/users',
           initialLoad: true,
           enableCache: true,
-          cacheTTL: 60000
+          cacheTTL: 60000,
         })
       )
 
@@ -581,7 +593,7 @@ describe('useModuleData', () => {
     it('should find item by id', async () => {
       ;(global.fetch as jest.Mock).mockImplementation(() => mockFetchSuccess(mockUsers))
 
-      const { result } = renderHook(() => 
+      const { result } = renderHook(() =>
         useModuleData<TestUser>({ endpoint: '/api/users', initialLoad: true })
       )
 
@@ -596,7 +608,7 @@ describe('useModuleData', () => {
     it('should return undefined for non-existent id', async () => {
       ;(global.fetch as jest.Mock).mockImplementation(() => mockFetchSuccess(mockUsers))
 
-      const { result } = renderHook(() => 
+      const { result } = renderHook(() =>
         useModuleData<TestUser>({ endpoint: '/api/users', initialLoad: true })
       )
 
@@ -611,7 +623,7 @@ describe('useModuleData', () => {
     it('should allow manual data setting', async () => {
       ;(global.fetch as jest.Mock).mockImplementation(() => mockFetchSuccess(mockUsers))
 
-      const { result } = renderHook(() => 
+      const { result } = renderHook(() =>
         useModuleData<TestUser>({ endpoint: '/api/users', initialLoad: true })
       )
 
@@ -640,12 +652,12 @@ describe('useModuleData', () => {
     it('should use cached data when available', async () => {
       ;(global.fetch as jest.Mock).mockImplementation(() => mockFetchSuccess(mockUsers))
 
-      const { result: result1, unmount: unmount1 } = renderHook(() => 
-        useModuleData<TestUser>({ 
-          endpoint: '/api/users-cache-test', 
+      const { result: result1, unmount: unmount1 } = renderHook(() =>
+        useModuleData<TestUser>({
+          endpoint: '/api/users-cache-test',
           initialLoad: true,
           enableCache: true,
-          cacheTTL: 60000
+          cacheTTL: 60000,
         })
       )
 
@@ -656,12 +668,12 @@ describe('useModuleData', () => {
       const fetchCallCount = (global.fetch as jest.Mock).mock.calls.length
 
       // Second hook with same endpoint should use cache
-      const { result: result2 } = renderHook(() => 
-        useModuleData<TestUser>({ 
-          endpoint: '/api/users-cache-test', 
+      const { result: result2 } = renderHook(() =>
+        useModuleData<TestUser>({
+          endpoint: '/api/users-cache-test',
           initialLoad: true,
           enableCache: true,
-          cacheTTL: 60000
+          cacheTTL: 60000,
         })
       )
 
@@ -677,11 +689,11 @@ describe('useModuleData', () => {
     it('should not use cache when disabled', async () => {
       ;(global.fetch as jest.Mock).mockImplementation(() => mockFetchSuccess(mockUsers))
 
-      const { result: result1 } = renderHook(() => 
-        useModuleData<TestUser>({ 
-          endpoint: '/api/users', 
+      const { result: result1 } = renderHook(() =>
+        useModuleData<TestUser>({
+          endpoint: '/api/users',
           initialLoad: true,
-          enableCache: false
+          enableCache: false,
         })
       )
 
@@ -691,11 +703,11 @@ describe('useModuleData', () => {
 
       expect(global.fetch).toHaveBeenCalledTimes(1)
 
-      const { result: result2 } = renderHook(() => 
-        useModuleData<TestUser>({ 
-          endpoint: '/api/users', 
+      const { result: result2 } = renderHook(() =>
+        useModuleData<TestUser>({
+          endpoint: '/api/users',
           initialLoad: true,
-          enableCache: false
+          enableCache: false,
         })
       )
 
@@ -714,11 +726,11 @@ describe('useModuleData', () => {
         .mockImplementationOnce(() => mockFetchSuccess(newUser))
         .mockImplementationOnce(() => mockFetchSuccess([...mockUsers, newUser]))
 
-      const { result } = renderHook(() => 
-        useModuleData<TestUser>({ 
-          endpoint: '/api/users-create-cache', 
+      const { result } = renderHook(() =>
+        useModuleData<TestUser>({
+          endpoint: '/api/users-create-cache',
           initialLoad: true,
-          enableCache: true
+          enableCache: true,
         })
       )
 
@@ -750,11 +762,11 @@ describe('useModuleData', () => {
         .mockImplementationOnce(() => mockFetchSuccess(updatedUser))
         .mockImplementationOnce(() => mockFetchSuccess([updatedUser, ...mockUsers.slice(1)]))
 
-      const { result } = renderHook(() => 
-        useModuleData<TestUser>({ 
-          endpoint: '/api/users-update-cache', 
+      const { result } = renderHook(() =>
+        useModuleData<TestUser>({
+          endpoint: '/api/users-update-cache',
           initialLoad: true,
-          enableCache: true
+          enableCache: true,
         })
       )
 
@@ -781,14 +793,16 @@ describe('useModuleData', () => {
     it('should invalidate cache after delete', async () => {
       ;(global.fetch as jest.Mock)
         .mockImplementationOnce(() => mockFetchSuccess(mockUsers))
-        .mockImplementationOnce(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ success: true }) } as Response))
+        .mockImplementationOnce(() =>
+          Promise.resolve({ ok: true, json: () => Promise.resolve({ success: true }) } as Response)
+        )
         .mockImplementationOnce(() => mockFetchSuccess(mockUsers.slice(1)))
 
-      const { result } = renderHook(() => 
-        useModuleData<TestUser>({ 
-          endpoint: '/api/users-delete-cache', 
+      const { result } = renderHook(() =>
+        useModuleData<TestUser>({
+          endpoint: '/api/users-delete-cache',
           initialLoad: true,
-          enableCache: true
+          enableCache: true,
         })
       )
 
@@ -815,11 +829,11 @@ describe('useModuleData', () => {
 
   describe('Loading States', () => {
     it('should set loading to true during data fetch', async () => {
-      ;(global.fetch as jest.Mock).mockImplementation(() => 
-        new Promise(resolve => setTimeout(() => resolve(mockFetchSuccess(mockUsers)), 100))
+      ;(global.fetch as jest.Mock).mockImplementation(
+        () => new Promise(resolve => setTimeout(() => resolve(mockFetchSuccess(mockUsers)), 100))
       )
 
-      const { result } = renderHook(() => 
+      const { result } = renderHook(() =>
         useModuleData<TestUser>({ endpoint: '/api/users', initialLoad: true })
       )
 
@@ -833,7 +847,7 @@ describe('useModuleData', () => {
     it('should set loading to false after successful fetch', async () => {
       ;(global.fetch as jest.Mock).mockImplementationOnce(() => mockFetchSuccess(mockUsers))
 
-      const { result } = renderHook(() => 
+      const { result } = renderHook(() =>
         useModuleData<TestUser>({ endpoint: '/api/users', initialLoad: true })
       )
 
@@ -847,7 +861,7 @@ describe('useModuleData', () => {
     it('should set loading to false after failed fetch', async () => {
       ;(global.fetch as jest.Mock).mockImplementationOnce(() => mockFetchError(500, 'Error'))
 
-      const { result } = renderHook(() => 
+      const { result } = renderHook(() =>
         useModuleData<TestUser>({ endpoint: '/api/users', initialLoad: true })
       )
 
@@ -862,11 +876,11 @@ describe('useModuleData', () => {
       const newUser = { id: '4', name: 'Alice', email: 'alice@example.com', role: 'USER' }
       ;(global.fetch as jest.Mock)
         .mockImplementationOnce(() => mockFetchSuccess(mockUsers))
-        .mockImplementationOnce(() => new Promise(resolve => 
-          setTimeout(() => resolve(mockFetchSuccess(newUser)), 100)
-        ))
+        .mockImplementationOnce(
+          () => new Promise(resolve => setTimeout(() => resolve(mockFetchSuccess(newUser)), 100))
+        )
 
-      const { result } = renderHook(() => 
+      const { result } = renderHook(() =>
         useModuleData<TestUser>({ endpoint: '/api/users', initialLoad: true })
       )
 
@@ -893,7 +907,7 @@ describe('useModuleData', () => {
         .mockImplementationOnce(() => mockFetchError(500, 'Error'))
         .mockImplementationOnce(() => mockFetchSuccess(mockUsers))
 
-      const { result } = renderHook(() => 
+      const { result } = renderHook(() =>
         useModuleData<TestUser>({ endpoint: '/api/users', initialLoad: true })
       )
 
@@ -909,11 +923,11 @@ describe('useModuleData', () => {
     })
 
     it('should handle network errors', async () => {
-      ;(global.fetch as jest.Mock).mockImplementation(() => 
+      ;(global.fetch as jest.Mock).mockImplementation(() =>
         Promise.reject(new Error('Network error'))
       )
 
-      const { result } = renderHook(() => 
+      const { result } = renderHook(() =>
         useModuleData<TestUser>({ endpoint: '/api/users', initialLoad: true })
       )
 
@@ -923,16 +937,16 @@ describe('useModuleData', () => {
     })
 
     it('should handle JSON parse errors', async () => {
-      ;(global.fetch as jest.Mock).mockImplementation(() => 
+      ;(global.fetch as jest.Mock).mockImplementation(() =>
         Promise.resolve({
           ok: false,
           status: 500,
           statusText: 'Internal Server Error',
-          json: () => Promise.reject(new Error('Invalid JSON'))
+          json: () => Promise.reject(new Error('Invalid JSON')),
         } as Response)
       )
 
-      const { result } = renderHook(() => 
+      const { result } = renderHook(() =>
         useModuleData<TestUser>({ endpoint: '/api/users', initialLoad: true })
       )
 
@@ -942,16 +956,16 @@ describe('useModuleData', () => {
     })
 
     it('should handle error responses with custom messages', async () => {
-      ;(global.fetch as jest.Mock).mockImplementationOnce(() => 
+      ;(global.fetch as jest.Mock).mockImplementationOnce(() =>
         Promise.resolve({
           ok: false,
           status: 400,
           statusText: 'Bad Request',
-          json: () => Promise.resolve({ message: 'Custom error message' })
+          json: () => Promise.resolve({ message: 'Custom error message' }),
         } as Response)
       )
 
-      const { result } = renderHook(() => 
+      const { result } = renderHook(() =>
         useModuleData<TestUser>({ endpoint: '/api/users', initialLoad: true })
       )
 
@@ -967,7 +981,7 @@ describe('useModuleData', () => {
     it('should handle empty response', async () => {
       ;(global.fetch as jest.Mock).mockImplementation(() => mockFetchSuccess([]))
 
-      const { result } = renderHook(() => 
+      const { result } = renderHook(() =>
         useModuleData<TestUser>({ endpoint: '/api/users', initialLoad: true })
       )
 
@@ -980,14 +994,14 @@ describe('useModuleData', () => {
     })
 
     it('should handle null response', async () => {
-      ;(global.fetch as jest.Mock).mockImplementation(() => 
+      ;(global.fetch as jest.Mock).mockImplementation(() =>
         Promise.resolve({
           ok: true,
-          json: () => Promise.resolve(null)
+          json: () => Promise.resolve(null),
         } as Response)
       )
 
-      const { result } = renderHook(() => 
+      const { result } = renderHook(() =>
         useModuleData<TestUser>({ endpoint: '/api/users', initialLoad: true })
       )
 
@@ -999,14 +1013,14 @@ describe('useModuleData', () => {
     })
 
     it('should handle undefined response', async () => {
-      ;(global.fetch as jest.Mock).mockImplementation(() => 
+      ;(global.fetch as jest.Mock).mockImplementation(() =>
         Promise.resolve({
           ok: true,
-          json: () => Promise.resolve(undefined)
+          json: () => Promise.resolve(undefined),
         } as Response)
       )
 
-      const { result } = renderHook(() => 
+      const { result } = renderHook(() =>
         useModuleData<TestUser>({ endpoint: '/api/users', initialLoad: true })
       )
 
@@ -1018,14 +1032,14 @@ describe('useModuleData', () => {
     })
 
     it('should handle response without success field', async () => {
-      ;(global.fetch as jest.Mock).mockImplementation(() => 
+      ;(global.fetch as jest.Mock).mockImplementation(() =>
         Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ data: mockUsers })
+          json: () => Promise.resolve({ data: mockUsers }),
         } as Response)
       )
 
-      const { result } = renderHook(() => 
+      const { result } = renderHook(() =>
         useModuleData<TestUser>({ endpoint: '/api/users', initialLoad: true })
       )
 
@@ -1041,11 +1055,11 @@ describe('useModuleData', () => {
         .mockImplementationOnce(() => mockFetchSuccess(mockUsers))
         .mockImplementationOnce(() => mockFetchSuccess([{ id: '1', name: 'Dept 1' }]))
 
-      const { result: result1 } = renderHook(() => 
+      const { result: result1 } = renderHook(() =>
         useModuleData<TestUser>({ endpoint: '/api/users', initialLoad: true })
       )
 
-      const { result: result2 } = renderHook(() => 
+      const { result: result2 } = renderHook(() =>
         useModuleData<any>({ endpoint: '/api/departments', initialLoad: true })
       )
 
@@ -1061,13 +1075,20 @@ describe('useModuleData', () => {
     it('should handle rapid successive operations', async () => {
       const newUser1 = { id: '4', name: 'User 4', email: 'user4@example.com', role: 'USER' }
       const newUser2 = { id: '5', name: 'User 5', email: 'user5@example.com', role: 'USER' }
-      
+
+      // create() dispara 2 fetches cada uno (POST + reload GET interno — ver
+      // comentario de reload en use-module-data.ts) — hay que mockear los 5
+      // en orden: mount GET, create1 POST, create1 reload GET, create2 POST,
+      // create2 reload GET. Antes solo se mockeaban 3, así que el resto caía
+      // en el mock que hubiera dejado el test anterior.
       ;(global.fetch as jest.Mock)
         .mockImplementationOnce(() => mockFetchSuccess(mockUsers))
         .mockImplementationOnce(() => mockFetchSuccess(newUser1))
+        .mockImplementationOnce(() => mockFetchSuccess([...mockUsers, newUser1]))
         .mockImplementationOnce(() => mockFetchSuccess(newUser2))
+        .mockImplementationOnce(() => mockFetchSuccess([...mockUsers, newUser1, newUser2]))
 
-      const { result } = renderHook(() => 
+      const { result } = renderHook(() =>
         useModuleData<TestUser>({ endpoint: '/api/users', initialLoad: true })
       )
 
@@ -1085,10 +1106,9 @@ describe('useModuleData', () => {
     })
 
     it('should handle operations on empty data', async () => {
-      ;(global.fetch as jest.Mock)
-        .mockImplementationOnce(() => mockFetchSuccess([]))
+      ;(global.fetch as jest.Mock).mockImplementationOnce(() => mockFetchSuccess([]))
 
-      const { result } = renderHook(() => 
+      const { result } = renderHook(() =>
         useModuleData<TestUser>({ endpoint: '/api/users', initialLoad: true })
       )
 
@@ -1105,12 +1125,12 @@ describe('useModuleData', () => {
         id: `${i + 1}`,
         name: `User ${i + 1}`,
         email: `user${i + 1}@example.com`,
-        role: 'USER'
+        role: 'USER',
       }))
 
       ;(global.fetch as jest.Mock).mockImplementation(() => mockFetchSuccess(largeDataset))
 
-      const { result } = renderHook(() => 
+      const { result } = renderHook(() =>
         useModuleData<TestUser>({ endpoint: '/api/users', initialLoad: true })
       )
 
@@ -1125,11 +1145,17 @@ describe('useModuleData', () => {
 
   describe('Data Integrity', () => {
     it('should not mutate original data on operations', async () => {
+      // remove() también dispara 2 fetches (DELETE + reload GET) — el mock
+      // del reload faltaba, así que caía en el mock de 1000 items dejado por
+      // el test anterior ("should handle very large datasets").
       ;(global.fetch as jest.Mock)
         .mockImplementationOnce(() => mockFetchSuccess(mockUsers))
-        .mockImplementationOnce(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ success: true }) } as Response))
+        .mockImplementationOnce(() =>
+          Promise.resolve({ ok: true, json: () => Promise.resolve({ success: true }) } as Response)
+        )
+        .mockImplementationOnce(() => mockFetchSuccess(mockUsers.filter(u => u.id !== '1')))
 
-      const { result } = renderHook(() => 
+      const { result } = renderHook(() =>
         useModuleData<TestUser>({ endpoint: '/api/users', initialLoad: true })
       )
 

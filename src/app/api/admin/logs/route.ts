@@ -13,9 +13,13 @@ import { ApiResponseBuilder } from '@/lib/api/response-builder'
 import { z } from 'zod'
 
 // Validation schemas
+// nullish() (no solo optional()): searchParams.get() devuelve null cuando el
+// parámetro no viene en la URL, no undefined — con optional() eso rechazaba
+// como inválida cualquier petición sin startDate/endDate, en vez de usar el
+// rango por defecto (última hora) documentado más abajo.
 const LogMetricsQuerySchema = z.object({
-  startDate: z.string().datetime().optional(),
-  endDate: z.string().datetime().optional(),
+  startDate: z.string().datetime().nullish(),
+  endDate: z.string().datetime().nullish(),
 })
 
 const AlertConfigSchema = z.object({
@@ -38,18 +42,22 @@ const AlertConfigSchema = z.object({
   cooldown: z.number(),
 })
 
+// Todos los campos numéricos son cantidades físicas (bytes, cantidad de
+// archivos, días, elementos por lote, milisegundos) — negativos o cero no
+// tienen sentido y antes se aceptaban igual (ej. maxFileSize: -1 pasaba la
+// validación).
 const LogManagerConfigSchema = z.object({
   rotation: z
     .object({
-      maxFileSize: z.number().optional(),
-      maxFiles: z.number().optional(),
+      maxFileSize: z.number().positive().optional(),
+      maxFiles: z.number().int().positive().optional(),
       rotateDaily: z.boolean().optional(),
       compressOldLogs: z.boolean().optional(),
     })
     .optional(),
   retention: z
     .object({
-      retentionDays: z.number().optional(),
+      retentionDays: z.number().int().positive().optional(),
       archiveOldLogs: z.boolean().optional(),
       archivePath: z.string().optional(),
     })
@@ -57,8 +65,8 @@ const LogManagerConfigSchema = z.object({
   aggregation: z
     .object({
       enabled: z.boolean().optional(),
-      batchSize: z.number().optional(),
-      flushInterval: z.number().optional(),
+      batchSize: z.number().int().positive().optional(),
+      flushInterval: z.number().positive().optional(),
     })
     .optional(),
 })

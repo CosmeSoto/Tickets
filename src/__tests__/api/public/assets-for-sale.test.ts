@@ -1,6 +1,27 @@
 /**
  * Tests for GET /api/public/assets-for-sale
+ *
+ * Mockea next/server: el NextResponse/NextRequest reales no funcionan bajo
+ * next/jest + jsdom en este proyecto (confirmado de forma aislada — el
+ * NextResponse real que devuelve la ruta no implementa `.json()` ni
+ * `.clone()` en este entorno), el mismo problema que motivó mockear
+ * next/server en el resto de tests de rutas API del repo.
  */
+
+jest.mock('next/server', () => ({
+  NextResponse: {
+    json: (data: unknown, init?: { status?: number }) => ({
+      status: init?.status ?? 200,
+      json: async () => data,
+    }),
+  },
+  NextRequest: class {
+    nextUrl: URL
+    constructor(url: string | URL) {
+      this.nextUrl = typeof url === 'string' ? new URL(url) : url
+    }
+  },
+}))
 
 import { NextRequest } from 'next/server'
 import { GET } from '@/app/api/public/assets-for-sale/route'
@@ -79,8 +100,11 @@ describe('GET /api/public/assets-for-sale', () => {
   it('passes optional query filters to Prisma when request is provided', async () => {
     ;(prisma.equipment.findMany as jest.Mock).mockResolvedValue([])
 
+    // 'GOOD' no es un EquipmentCondition válido (NEW/USED/DAMAGED) — la ruta lo
+    // descarta a propósito (whitelist contra el enum real), así que el filtro
+    // de prueba debe usar un valor válido para verificar que sí se propaga.
     const url = new URL(
-      'http://localhost/api/public/assets-for-sale?familyId=fam-1&typeId=t-1&condition=GOOD&limit=5'
+      'http://localhost/api/public/assets-for-sale?familyId=fam-1&typeId=t-1&condition=USED&limit=5'
     )
     await GET(new NextRequest(url))
 
@@ -90,7 +114,7 @@ describe('GET /api/public/assets-for-sale', () => {
           status: 'FOR_SALE',
           type: { familyId: 'fam-1' },
           typeId: 't-1',
-          condition: 'GOOD',
+          condition: 'USED',
         }),
         take: 5,
       })

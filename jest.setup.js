@@ -69,7 +69,17 @@ jest.mock('next/navigation', () => ({
 // Mock Next.js image
 jest.mock('next/image', () => ({
   __esModule: true,
-  default: props => {
+  // fill/priority/unoptimized/loader son props propias de next/image (no
+  // atributos HTML válidos) — pasarlas tal cual a un <img> nativo genera
+  // warnings de React ("Received `true` for a non-boolean attribute") en
+  // cada test que renderiza una imagen con fill.
+  default: ({
+    fill: _fill,
+    priority: _priority,
+    unoptimized: _unoptimized,
+    loader: _loader,
+    ...props
+  }) => {
     // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
     return <img {...props} />
   },

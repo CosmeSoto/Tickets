@@ -258,14 +258,26 @@ describe(
 
     describe('Validación de códigos manuales', () => {
       it('debe detectar códigos duplicados en la base de datos', async () => {
-        // Crear un equipo con un código específico
+        // Crear un equipo con un código específico. Se crea su propio
+        // department/type/model en vez de depender de que la BD ya tenga
+        // alguno cargado (asunción frágil que fallaba en una BD de test
+        // recién migrada, sin seed de catálogo).
         const testCode = 'TEST-LAP-OWN-2024-00001'
+        const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 
-        const type = await prisma.equipment_types.findFirst({ include: { models: { take: 1 } } })
-        if (!type?.models[0]) {
-          throw new Error('Se requiere al menos un equipment_model en BD para esta prueba')
-        }
-        const modelId = type.models[0].id
+        const department = await prisma.departments.create({
+          data: {
+            id: `dept-${suffix}`,
+            name: `Depto Test ${suffix}`,
+            updatedAt: new Date(),
+          },
+        })
+        const type = await prisma.equipment_types.create({
+          data: { code: `TYPE-${suffix}`, name: 'Tipo de prueba' },
+        })
+        const model = await prisma.equipment_models.create({
+          data: { model: 'Modelo de prueba', typeId: type.id },
+        })
 
         await prisma.equipment.create({
           data: {
@@ -273,25 +285,30 @@ describe(
             serialNumber: 'TEST123',
             brand: 'Test Brand',
             modelDeprecated: 'Test Model',
-            modelId,
+            modelId: model.id,
             typeId: type.id,
-            departmentId: (await prisma.departments.findFirst())!.id,
+            departmentId: department.id,
             status: 'AVAILABLE',
             condition: 'USED',
             ownershipType: 'FIXED_ASSET',
-            qrCode: `EQ-test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            qrCode: `EQ-test-${suffix}`,
           },
         })
 
-        // Validar códigos que incluyen el duplicado
-        const result = await validateManualCodes([testCode, 'TEST-LAP-OWN-2024-00002'])
+        try {
+          // Validar códigos que incluyen el duplicado
+          const result = await validateManualCodes([testCode, 'TEST-LAP-OWN-2024-00002'])
 
-        expect(result.valid).toBe(false)
-        expect(result.duplicates).toContain(testCode)
-        expect(result.duplicates).toHaveLength(1)
-
-        // Limpiar
-        await prisma.equipment.deleteMany({ where: { code: testCode } })
+          expect(result.valid).toBe(false)
+          expect(result.duplicates).toContain(testCode)
+          expect(result.duplicates).toHaveLength(1)
+        } finally {
+          // Limpiar en orden (FKs): equipo → modelo → tipo → departamento
+          await prisma.equipment.deleteMany({ where: { code: testCode } })
+          await prisma.equipment_models.delete({ where: { id: model.id } })
+          await prisma.equipment_types.delete({ where: { id: type.id } })
+          await prisma.departments.delete({ where: { id: department.id } })
+        }
       })
 
       it('debe aprobar códigos únicos', async () => {

@@ -1,39 +1,26 @@
 /**
  * Admin Logs API Tests
+ *
+ * Usa un NextRequest/NextResponse mockeados en vez de las clases reales de
+ * next/server: en este entorno (next/jest + jsdom) el NextRequest real no
+ * implementa `.json()` (queda `undefined`, no una función) — un problema de
+ * entorno de test confirmado de forma aislada, no del código de la ruta. El
+ * resto de tests de rutas API del repo ya evitan esto mockeando next/server
+ * y usando un objeto liviano con `.json()`/`.url`; este archivo se alinea con
+ * ese mismo patrón.
  */
 
-import { TextEncoder, TextDecoder } from 'util'
+jest.mock('next/server', () => ({
+  NextResponse: {
+    json: (data: unknown, init?: { status?: number }) => ({
+      status: init?.status ?? 200,
+      headers: { set: jest.fn() },
+      json: async () => data,
+    }),
+  },
+  NextRequest: class {},
+}))
 
-// Polyfill local compatible con NextResponse.json (no pisar Response.json del setup)
-Object.assign(global, {
-  TextEncoder,
-  TextDecoder,
-})
-
-if (typeof (globalThis as any).Response?.json !== 'function') {
-  class MockResponse {
-    _body: any
-    status: number
-    headers: Map<string, string>
-    constructor(body: any, options: any = {}) {
-      this._body = body
-      this.status = options.status || 200
-      this.headers = new Map(Object.entries(options.headers || {}))
-    }
-    static json(data: any, init: any = {}) {
-      return new MockResponse(JSON.stringify(data), {
-        status: init.status || 200,
-        headers: { 'Content-Type': 'application/json', ...(init.headers || {}) },
-      })
-    }
-    async json() {
-      return typeof this._body === 'string' ? JSON.parse(this._body) : this._body
-    }
-  }
-  ;(globalThis as any).Response = MockResponse
-}
-
-import { NextRequest } from 'next/server'
 import { GET, POST } from '@/app/api/admin/logs/route'
 import { getServerSession } from 'next-auth'
 
@@ -73,6 +60,16 @@ jest.mock('@/lib/logging', () => ({
 }))
 
 const mockGetServerSession = getServerSession as jest.MockedFunction<typeof getServerSession>
+
+/** Petición GET liviana: la ruta solo lee `request.url`. */
+function makeGetRequest(url: string) {
+  return { url } as any
+}
+
+/** Petición POST liviana: la ruta solo llama `await request.json()`. */
+function makePostRequest(body: unknown) {
+  return { json: async () => body } as any
+}
 
 describe('/api/admin/logs', () => {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -114,7 +111,7 @@ describe('/api/admin/logs', () => {
     it('should return 401 when not authenticated', async () => {
       mockGetServerSession.mockResolvedValue(null)
 
-      const request = new NextRequest('http://localhost:3000/api/admin/logs')
+      const request = makeGetRequest('http://localhost:3000/api/admin/logs')
       const response = await GET(request)
 
       expect(response.status).toBe(401)
@@ -125,7 +122,7 @@ describe('/api/admin/logs', () => {
         user: { id: 'user1', role: 'USER' },
       } as any)
 
-      const request = new NextRequest('http://localhost:3000/api/admin/logs')
+      const request = makeGetRequest('http://localhost:3000/api/admin/logs')
       const response = await GET(request)
 
       expect(response.status).toBe(403)
@@ -136,7 +133,7 @@ describe('/api/admin/logs', () => {
         user: { id: 'admin1', role: 'ADMIN' },
       } as any)
 
-      const request = new NextRequest('http://localhost:3000/api/admin/logs')
+      const request = makeGetRequest('http://localhost:3000/api/admin/logs')
       const response = await GET(request)
 
       expect(response.status).toBe(200)
@@ -157,7 +154,7 @@ describe('/api/admin/logs', () => {
       const startDate = new Date(Date.now() - 3600000).toISOString()
       const endDate = new Date().toISOString()
       const url = `http://localhost:3000/api/admin/logs?startDate=${startDate}&endDate=${endDate}`
-      const request = new NextRequest(url)
+      const request = makeGetRequest(url)
 
       const response = await GET(request)
 
@@ -174,7 +171,7 @@ describe('/api/admin/logs', () => {
       } as any)
 
       const url = 'http://localhost:3000/api/admin/logs?startDate=invalid-date'
-      const request = new NextRequest(url)
+      const request = makeGetRequest(url)
 
       const response = await GET(request)
 
@@ -186,10 +183,7 @@ describe('/api/admin/logs', () => {
     it('should return 401 when not authenticated', async () => {
       mockGetServerSession.mockResolvedValue(null)
 
-      const request = new NextRequest('http://localhost:3000/api/admin/logs', {
-        method: 'POST',
-        body: JSON.stringify({ action: 'update_config' }),
-      })
+      const request = makePostRequest({ action: 'update_config' })
       const response = await POST(request)
 
       expect(response.status).toBe(401)
@@ -200,10 +194,7 @@ describe('/api/admin/logs', () => {
         user: { id: 'user1', role: 'USER' },
       } as any)
 
-      const request = new NextRequest('http://localhost:3000/api/admin/logs', {
-        method: 'POST',
-        body: JSON.stringify({ action: 'update_config' }),
-      })
+      const request = makePostRequest({ action: 'update_config' })
       const response = await POST(request)
 
       expect(response.status).toBe(403)
@@ -219,10 +210,7 @@ describe('/api/admin/logs', () => {
         retention: { retentionDays: 60 },
       }
 
-      const request = new NextRequest('http://localhost:3000/api/admin/logs', {
-        method: 'POST',
-        body: JSON.stringify({ action: 'update_config', config }),
-      })
+      const request = makePostRequest({ action: 'update_config', config })
 
       const response = await POST(request)
 
@@ -249,10 +237,7 @@ describe('/api/admin/logs', () => {
         cooldown: 600000,
       }
 
-      const request = new NextRequest('http://localhost:3000/api/admin/logs', {
-        method: 'POST',
-        body: JSON.stringify({ action: 'add_alert', alert }),
-      })
+      const request = makePostRequest({ action: 'add_alert', alert })
 
       const response = await POST(request)
 
@@ -267,10 +252,7 @@ describe('/api/admin/logs', () => {
 
       mockLogManager.removeAlert.mockReturnValue(true)
 
-      const request = new NextRequest('http://localhost:3000/api/admin/logs', {
-        method: 'POST',
-        body: JSON.stringify({ action: 'remove_alert', alertId: 'test_alert' }),
-      })
+      const request = makePostRequest({ action: 'remove_alert', alertId: 'test_alert' })
 
       const response = await POST(request)
 
@@ -285,10 +267,7 @@ describe('/api/admin/logs', () => {
 
       mockLogManager.removeAlert.mockReturnValue(false)
 
-      const request = new NextRequest('http://localhost:3000/api/admin/logs', {
-        method: 'POST',
-        body: JSON.stringify({ action: 'remove_alert', alertId: 'non_existent' }),
-      })
+      const request = makePostRequest({ action: 'remove_alert', alertId: 'non_existent' })
 
       const response = await POST(request)
 
@@ -302,13 +281,10 @@ describe('/api/admin/logs', () => {
 
       mockLogManager.toggleAlert.mockReturnValue(true)
 
-      const request = new NextRequest('http://localhost:3000/api/admin/logs', {
-        method: 'POST',
-        body: JSON.stringify({
-          action: 'toggle_alert',
-          alertId: 'test_alert',
-          enabled: false,
-        }),
+      const request = makePostRequest({
+        action: 'toggle_alert',
+        alertId: 'test_alert',
+        enabled: false,
       })
 
       const response = await POST(request)
@@ -324,12 +300,9 @@ describe('/api/admin/logs', () => {
 
       mockLogManager.rotateLogs.mockResolvedValue(undefined)
 
-      const request = new NextRequest('http://localhost:3000/api/admin/logs', {
-        method: 'POST',
-        body: JSON.stringify({
-          action: 'rotate_logs',
-          logPath: '/var/log/app.log',
-        }),
+      const request = makePostRequest({
+        action: 'rotate_logs',
+        logPath: '/var/log/app.log',
       })
 
       const response = await POST(request)
@@ -345,12 +318,9 @@ describe('/api/admin/logs', () => {
 
       mockLogManager.cleanupOldLogs.mockResolvedValue(undefined)
 
-      const request = new NextRequest('http://localhost:3000/api/admin/logs', {
-        method: 'POST',
-        body: JSON.stringify({
-          action: 'cleanup_logs',
-          logDir: '/var/log',
-        }),
+      const request = makePostRequest({
+        action: 'cleanup_logs',
+        logDir: '/var/log',
       })
 
       const response = await POST(request)
@@ -364,10 +334,7 @@ describe('/api/admin/logs', () => {
         user: { id: 'admin1', role: 'ADMIN' },
       } as any)
 
-      const request = new NextRequest('http://localhost:3000/api/admin/logs', {
-        method: 'POST',
-        body: JSON.stringify({ action: 'invalid_action' }),
-      })
+      const request = makePostRequest({ action: 'invalid_action' })
 
       const response = await POST(request)
 
@@ -384,10 +351,7 @@ describe('/api/admin/logs', () => {
         // Missing required fields
       }
 
-      const request = new NextRequest('http://localhost:3000/api/admin/logs', {
-        method: 'POST',
-        body: JSON.stringify({ action: 'add_alert', alert: invalidAlert }),
-      })
+      const request = makePostRequest({ action: 'add_alert', alert: invalidAlert })
 
       const response = await POST(request)
 
@@ -403,10 +367,7 @@ describe('/api/admin/logs', () => {
         rotation: { maxFileSize: -1 }, // Invalid value
       }
 
-      const request = new NextRequest('http://localhost:3000/api/admin/logs', {
-        method: 'POST',
-        body: JSON.stringify({ action: 'update_config', config: invalidConfig }),
-      })
+      const request = makePostRequest({ action: 'update_config', config: invalidConfig })
 
       const response = await POST(request)
 
@@ -424,7 +385,7 @@ describe('/api/admin/logs', () => {
         throw new Error('Internal error')
       })
 
-      const request = new NextRequest('http://localhost:3000/api/admin/logs')
+      const request = makeGetRequest('http://localhost:3000/api/admin/logs')
       const response = await GET(request)
 
       expect(response.status).toBe(500)
@@ -437,12 +398,9 @@ describe('/api/admin/logs', () => {
 
       mockLogManager.rotateLogs.mockRejectedValue(new Error('Rotation failed'))
 
-      const request = new NextRequest('http://localhost:3000/api/admin/logs', {
-        method: 'POST',
-        body: JSON.stringify({
-          action: 'rotate_logs',
-          logPath: '/invalid/path',
-        }),
+      const request = makePostRequest({
+        action: 'rotate_logs',
+        logPath: '/invalid/path',
       })
 
       const response = await POST(request)
@@ -457,12 +415,9 @@ describe('/api/admin/logs', () => {
 
       mockLogManager.cleanupOldLogs.mockRejectedValue(new Error('Cleanup failed'))
 
-      const request = new NextRequest('http://localhost:3000/api/admin/logs', {
-        method: 'POST',
-        body: JSON.stringify({
-          action: 'cleanup_logs',
-          logDir: '/invalid/path',
-        }),
+      const request = makePostRequest({
+        action: 'cleanup_logs',
+        logDir: '/invalid/path',
       })
 
       const response = await POST(request)

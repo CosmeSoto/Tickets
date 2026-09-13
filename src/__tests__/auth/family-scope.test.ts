@@ -176,7 +176,10 @@ describe('family-scope patrols', () => {
 })
 
 describe('family-scope inventory', () => {
-  it('admin operational solo nativa', async () => {
+  // Desde 84735314 ("Respetar toggles de módulos en ADMIN de familia"), un ADMIN
+  // solo opera (crear/editar/eliminar) en inventario si además tiene el toggle
+  // canManageInventory ("Gestión completa") activo — dejó de bastar con el rol.
+  it('admin operational solo nativa (con canManageInventory=true)', async () => {
     ;(prisma.users.findUnique as jest.Mock).mockResolvedValue({
       role: 'ADMIN',
       departmentId: null,
@@ -185,11 +188,22 @@ describe('family-scope inventory', () => {
     const { getModuleFamilyIds } = await import('@/lib/auth/admin-scope')
     ;(getModuleFamilyIds as jest.Mock).mockResolvedValue([extraFamily])
 
-    const operational = await getInventoryOperationalFamilyIds('admin-1', 'ADMIN', false, false)
+    const operational = await getInventoryOperationalFamilyIds('admin-1', 'ADMIN', false, true)
     const visibility = await getInventoryVisibilityFamilyIds('admin-1', 'ADMIN', false, false)
 
     expect(operational).toEqual([nativeFamily])
     expect(visibility).toEqual(expect.arrayContaining([extraFamily]))
+  })
+
+  it('admin sin canManageInventory no puede operar (solo ver)', async () => {
+    ;(prisma.users.findUnique as jest.Mock).mockResolvedValue({
+      role: 'ADMIN',
+      departmentId: null,
+      departments: { familyId: nativeFamily },
+    })
+
+    const operational = await getInventoryOperationalFamilyIds('admin-1', 'ADMIN', false, false)
+    expect(operational).toEqual([])
   })
 
   it('gestor opera en nativa y grants inventory', async () => {
