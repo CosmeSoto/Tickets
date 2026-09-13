@@ -66,16 +66,27 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   }
   const pass = await findPendingPass((await params).id, token)
   if (!pass) return NextResponse.json({ error: 'Enlace de aceptación inválido.' }, { status: 404 })
-  if (
-    pass.status !== 'PENDING_PRIVACY' &&
-    (!pass.privacyAcceptanceExpiresAt || pass.privacyAcceptanceExpiresAt <= new Date())
-  ) {
+
+  const now = new Date()
+  const isPending = pass.status === 'PENDING_PRIVACY'
+  // Comprobante post-aceptación: el POST deja el pase ACTIVE y conserva el
+  // hash 24h para que un reintento HTTP sea idempotente (ver más abajo). Solo
+  // esa ventana cuenta como "recién aceptado" — un pase que después se
+  // revocó o suspendió deja de calificar aunque el campo de expiración
+  // todavía no haya pasado (antes NO se limpiaba al revocar, y esta rama
+  // devolvía 200 con el nombre/arrendatario/vigencia de la persona a quien
+  // tuviera el enlace viejo).
+  const isReceipt =
+    pass.status === 'ACTIVE' &&
+    Boolean(pass.privacyAcceptedAt) &&
+    Boolean(pass.privacyAcceptanceExpiresAt) &&
+    pass.privacyAcceptanceExpiresAt! > now
+  if (!isPending && !isReceipt) {
     return NextResponse.json({ error: 'Enlace de aceptación inválido.' }, { status: 404 })
   }
 
   const expired =
-    pass.status === 'PENDING_PRIVACY' &&
-    (!pass.privacyAcceptanceExpiresAt || pass.privacyAcceptanceExpiresAt <= new Date())
+    isPending && (!pass.privacyAcceptanceExpiresAt || pass.privacyAcceptanceExpiresAt <= now)
   return NextResponse.json(
     {
       pass: {
