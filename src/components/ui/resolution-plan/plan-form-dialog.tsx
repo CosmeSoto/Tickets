@@ -5,6 +5,7 @@ import { Clock, AlertCircle } from 'lucide-react'
 import type { PlanFormData } from '@/hooks/use-resolution-plan'
 import { formatDuration } from '@/lib/utils/time-utils'
 import { DatePickerWithTime } from '@/components/ui/date-time-picker'
+import { BusinessHoursHint } from '@/components/ui/business-hours-hint'
 
 interface PlanFormDialogProps {
   planForm: PlanFormData
@@ -77,6 +78,13 @@ export function PlanFormDialog({
               onTimeChange={v => setPlanForm(prev => ({ ...prev, startTime: v }))}
               showTime
             />
+            <BusinessHoursHint
+              value={
+                planForm.startDate && planForm.startTime
+                  ? `${planForm.startDate}T${planForm.startTime}`
+                  : undefined
+              }
+            />
           </div>
 
           <div>
@@ -87,6 +95,13 @@ export function PlanFormDialog({
               onDateChange={v => setPlanForm(prev => ({ ...prev, targetDate: v }))}
               onTimeChange={v => setPlanForm(prev => ({ ...prev, targetTime: v }))}
               showTime
+            />
+            <BusinessHoursHint
+              value={
+                planForm.targetDate && planForm.targetTime
+                  ? `${planForm.targetDate}T${planForm.targetTime}`
+                  : undefined
+              }
             />
           </div>
         </div>

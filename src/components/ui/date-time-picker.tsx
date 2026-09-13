@@ -52,9 +52,10 @@ export function DateTimePicker({
 
   const handleDaySelect = (day: Date | undefined) => {
     if (!day) return
-    // Preservar la hora actual; por defecto 09:00 al elegir el primer día
-    const h = selectedDate?.getHours() ?? 9
-    const m = selectedDate?.getMinutes() ?? 0
+    // Preservar la hora ya elegida; si es la primera selección, usar la hora actual del sistema
+    const now = new Date()
+    const h = selectedDate?.getHours() ?? now.getHours()
+    const m = selectedDate?.getMinutes() ?? now.getMinutes()
     day.setHours(h, m, 0, 0)
     onChange?.(formatForInput(day))
     // No cerramos el popover para que el usuario pueda ajustar la hora
@@ -114,7 +115,11 @@ export function DateTimePicker({
         />
         <div className='border-t px-3 py-2 flex items-center gap-2'>
           <span className='text-xs text-muted-foreground whitespace-nowrap'>Hora:</span>
-          <TimePicker value={timeStr || '09:00'} onChange={handleTimeChange} className='flex-1' />
+          <TimePicker
+            value={timeStr || currentTimeStr()}
+            onChange={handleTimeChange}
+            className='flex-1'
+          />
           <Button size='sm' variant='ghost' onClick={() => setOpen(false)} className='text-xs'>
             OK
           </Button>
@@ -159,7 +164,7 @@ export function DatePickerWithTime({
   const handleDaySelect = (day: Date | undefined) => {
     if (!day) return
     onDateChange?.(format(day, 'yyyy-MM-dd'))
-    if (showTime && !timeValue) onTimeChange?.('09:00')
+    if (showTime && !timeValue) onTimeChange?.(currentTimeStr())
     if (!showTime) setOpen(false)
   }
 
@@ -211,7 +216,7 @@ export function DatePickerWithTime({
           <div className='border-t px-3 py-2 flex items-center gap-2'>
             <span className='text-xs text-muted-foreground whitespace-nowrap'>Hora:</span>
             <TimePicker
-              value={timeValue || '09:00'}
+              value={timeValue || currentTimeStr()}
               onChange={v => {
                 if (!dateValue) onDateChange?.(format(new Date(), 'yyyy-MM-dd'))
                 onTimeChange?.(v)
@@ -229,6 +234,12 @@ export function DatePickerWithTime({
 }
 
 // ── Helper interno ────────────────────────────────────────────────────────────
+/** Hora actual del sistema en formato "HH:mm", usada como valor por defecto. */
+function currentTimeStr(): string {
+  const now = new Date()
+  return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+}
+
 function formatForInput(d: Date): string {
   const yyyy = d.getFullYear()
   const MM = String(d.getMonth() + 1).padStart(2, '0')

@@ -24,6 +24,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DateInput } from '@/components/ui/date-input'
 import { DateTimePicker } from '@/components/ui/date-time-picker'
+import { BusinessHoursHint } from '@/components/ui/business-hours-hint'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -777,6 +778,7 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
             <div>
               <Label>Fecha y hora programadas *</Label>
               <DateTimePicker value={approveAt} onChange={setApproveAt} />
+              <BusinessHoursHint value={approveAt} />
             </div>
             <MaintenanceAssigneeFields value={approveAssignee} onChange={setApproveAssignee} />
             <div>
@@ -811,6 +813,7 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
             <div>
               <Label>Nueva fecha y hora *</Label>
               <DateTimePicker value={newAt} onChange={setNewAt} />
+              <BusinessHoursHint value={newAt} />
             </div>
             <div>
               <Label>Descripción (opcional)</Label>

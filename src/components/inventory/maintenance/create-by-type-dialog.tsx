@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { DateTimePicker } from '@/components/ui/date-time-picker'
+import { BusinessHoursHint } from '@/components/ui/business-hours-hint'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { FamilyCombobox } from '@/components/ui/family-combobox'
 import { useFamilyOptions } from '@/hooks/use-family-options'
@@ -336,6 +337,7 @@ export function CreateByTypeDialog({ open, onClose, onCreated }: CreateByTypeDia
               Fecha y hora programadas <span className='text-destructive'>*</span>
             </Label>
             <DateTimePicker value={scheduledAt} onChange={setScheduledAt} />
+            <BusinessHoursHint value={scheduledAt} />
           </div>
 
           <MaintenanceAssigneeFields

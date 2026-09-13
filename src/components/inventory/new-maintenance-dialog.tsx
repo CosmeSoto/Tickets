@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/select'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { DateTimePicker } from '@/components/ui/date-time-picker'
+import { BusinessHoursHint } from '@/components/ui/business-hours-hint'
 import {
   Dialog,
   DialogContent,
@@ -26,6 +27,7 @@ import {
 import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
 import { useFamilyOptions } from '@/hooks/use-family-options'
 import { parseScheduledDateTime } from '@/lib/forms/form-date'
+import { suggestBusinessDateTime } from '@/lib/utils/business-hours'
 import {
   MaintenanceAssigneeFields,
   assigneeToApiPayload,
@@ -55,15 +57,14 @@ interface FamilyOption {
 }
 
 function defaultScheduledLocal(): string {
-  const d = new Date()
-  d.setHours(9, 0, 0, 0)
-  if (d.getTime() < Date.now()) {
-    d.setDate(d.getDate() + 1)
-  }
+  // Sugiere la hora actual si cae en horario laboral; si no, el próximo horario laboral disponible.
+  const d = suggestBusinessDateTime()
   const yyyy = d.getFullYear()
   const MM = String(d.getMonth() + 1).padStart(2, '0')
   const dd = String(d.getDate()).padStart(2, '0')
-  return `${yyyy}-${MM}-${dd}T09:00`
+  const HH = String(d.getHours()).padStart(2, '0')
+  const mm = String(d.getMinutes()).padStart(2, '0')
+  return `${yyyy}-${MM}-${dd}T${HH}:${mm}`
 }
 
 export function NewMaintenanceDialog({
@@ -204,7 +205,10 @@ export function NewMaintenanceDialog({
         if (!v) handleClose()
       }}
     >
-      <DialogContent className='w-[min(98vw,38rem)] max-w-none max-h-[90vh] overflow-y-auto' aria-describedby={undefined}>
+      <DialogContent
+        className='w-[min(98vw,38rem)] max-w-none max-h-[90vh] overflow-y-auto'
+        aria-describedby={undefined}
+      >
         <DialogHeader>
           <DialogTitle className='flex items-center gap-2'>
             <Wrench className='h-5 w-5' />
@@ -327,6 +331,7 @@ export function NewMaintenanceDialog({
                   El técnico puede ajustar la fecha y hora al aprobar tu solicitud.
                 </p>
               )}
+              <BusinessHoursHint value={scheduledAt} />
             </div>
 
             {!isClient && (

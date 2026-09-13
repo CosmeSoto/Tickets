@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { DateTimePicker } from '@/components/ui/date-time-picker'
+import { BusinessHoursHint } from '@/components/ui/business-hours-hint'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import {
@@ -130,6 +131,7 @@ export function MaintenanceDialog({
                 value={form.scheduledDate}
                 onChange={v => onFormChange({ ...form, scheduledDate: v })}
               />
+              <BusinessHoursHint value={form.scheduledDate} />
             </div>
 
             {/* Proveedor externo — solo para ADMIN/TECHNICIAN */}
