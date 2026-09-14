@@ -100,7 +100,12 @@ export async function POST(request: NextRequest) {
         ...context,
       },
     }),
-    prisma.access_passes.update({
+    // updateMany en vez de update: si el pase se borró justo entre el
+    // findAccessPassByScanPayload de arriba y este punto, el bookkeeping de
+    // lastScannedAt no debe tumbar la request con un P2025 — el scan_event
+    // (lo que realmente importa auditar) ya quedó registrado en esta misma
+    // transacción.
+    prisma.access_passes.updateMany({
       where: { id: pass.id },
       data: { lastScannedAt: new Date() },
     }),

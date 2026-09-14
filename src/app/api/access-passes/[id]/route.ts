@@ -159,7 +159,8 @@ export async function DELETE(
   if (denied) return denied
 
   const id = (await params).id
-  const { deleted, subjectsRemoved } = await hardDeleteAccessPasses([id])
+  const permission = await getAccessModulePermission(session.user.id, session.user.role)
+  const { deleted, subjectsRemoved } = await hardDeleteAccessPasses([id], permission.familyIds)
   if (deleted.length === 0) {
     return NextResponse.json({ error: 'Pase no encontrado.' }, { status: 404 })
   }

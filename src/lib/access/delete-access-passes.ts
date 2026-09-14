@@ -1,7 +1,5 @@
-import { unlink } from 'fs/promises'
-import path from 'path'
 import prisma from '@/lib/prisma'
-import { getUploadDir } from '@/lib/upload-path'
+import { removeStoredAccessPhoto } from '@/lib/access/access-photo-storage'
 
 export type DeletedAccessPassSummary = {
   id: string
@@ -11,30 +9,34 @@ export type DeletedAccessPassSummary = {
   subjectId: string
 }
 
-async function removeStoredPhoto(photoPath: string | null | undefined) {
-  if (!photoPath) return
-  const resolved = path.resolve(photoPath)
-  const root = path.resolve(getUploadDir())
-  const prefix = root.endsWith(path.sep) ? root : `${root}${path.sep}`
-  if (resolved !== root && !resolved.startsWith(prefix)) return
-  try {
-    await unlink(resolved)
-  } catch {
-    // El archivo puede no existir; el registro ya se elimina.
-  }
-}
-
-/** Borra pases de forma permanente. Si la persona no queda con más pases, también se elimina. */
-export async function hardDeleteAccessPasses(ids: string[]): Promise<{
+/**
+ * Borra pases de forma permanente. Si la persona no queda con más pases,
+ * también se elimina.
+ *
+ * `allowedFamilyIds` (`undefined` = scope global, Super Admin) filtra qué
+ * pases de los solicitados se llegan a borrar — hoy `canDelete` es exclusivo
+ * de Super Admin así que este filtro es defensa en profundidad, pero evita
+ * que un borrado masivo alcance pases fuera de área el día que se delegue
+ * el permiso. Los ids fuera de scope se devuelven en `skippedIds` en vez de
+ * fallar silenciosamente.
+ */
+export async function hardDeleteAccessPasses(
+  ids: string[],
+  allowedFamilyIds?: string[]
+): Promise<{
   deleted: DeletedAccessPassSummary[]
   subjectsRemoved: number
+  skippedIds: string[]
 }> {
   const uniqueIds = [...new Set(ids.filter(Boolean))]
-  if (uniqueIds.length === 0) return { deleted: [], subjectsRemoved: 0 }
+  if (uniqueIds.length === 0) return { deleted: [], subjectsRemoved: 0, skippedIds: [] }
 
   const db = prisma
   const passes = await db.access_passes.findMany({
-    where: { id: { in: uniqueIds } },
+    where: {
+      id: { in: uniqueIds },
+      ...(allowedFamilyIds ? { familyId: { in: allowedFamilyIds } } : {}),
+    },
     select: {
       id: true,
       credentialCode: true,
@@ -44,7 +46,8 @@ export async function hardDeleteAccessPasses(ids: string[]): Promise<{
       subject: { select: { id: true, photoPath: true } },
     },
   })
-  if (passes.length === 0) return { deleted: [], subjectsRemoved: 0 }
+  const skippedIds = uniqueIds.filter(id => !passes.some((p: { id: string }) => p.id === id))
+  if (passes.length === 0) return { deleted: [], subjectsRemoved: 0, skippedIds }
 
   const passIds = (passes as Array<{ id: string }>).map(p => p.id)
   const subjectIds: string[] = [
@@ -70,7 +73,7 @@ export async function hardDeleteAccessPasses(ids: string[]): Promise<{
     return orphans
   })) as string[]
 
-  await Promise.all(orphanIds.map(id => removeStoredPhoto(photosBySubject.get(id) ?? null)))
+  await Promise.all(orphanIds.map(id => removeStoredAccessPhoto(photosBySubject.get(id) ?? null)))
 
   return {
     deleted: passes.map((pass: DeletedAccessPassSummary) => ({
@@ -81,5 +84,6 @@ export async function hardDeleteAccessPasses(ids: string[]): Promise<{
       subjectId: pass.subjectId,
     })),
     subjectsRemoved: orphanIds.length,
+    skippedIds,
   }
 }

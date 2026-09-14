@@ -13,6 +13,7 @@ import {
 } from '@/lib/access/access-control'
 import { getUploadDir } from '@/lib/upload-path'
 import { SecurityConfigService } from '@/lib/services/security-config-service'
+import { removeStoredAccessPhoto } from '@/lib/access/access-photo-storage'
 
 const MAX_PHOTO_EDGE = 1280
 
@@ -102,10 +103,27 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const filename = `${randomUUID()}.jpg`
   const absolutePath = path.join(directory, filename)
   await writeFile(absolutePath, processed)
-  await prisma.access_subjects.update({
-    where: { id: pass.subject.id },
+
+  // Swap atómico del puntero: si otra request reemplazó la foto entre la
+  // lectura de arriba y este punto (dos subidas casi simultáneas), el
+  // where con el photoPath leído actúa como token optimista — count 0
+  // significa que perdimos la carrera, y el archivo recién escrito se borra
+  // (nunca queda basura de la request perdedora). Solo tras un swap exitoso
+  // se borra el archivo anterior — nunca antes, para no dejar un photoPath
+  // apuntando a un archivo ya borrado si algo falla en el medio.
+  const claimed = await prisma.access_subjects.updateMany({
+    where: { id: pass.subject.id, photoPath: pass.subject.photoPath },
     data: { photoPath: absolutePath },
   })
+  if (claimed.count !== 1) {
+    await removeStoredAccessPhoto(absolutePath)
+    return NextResponse.json(
+      { error: 'La foto fue actualizada por otro usuario. Recarga e inténtalo de nuevo.' },
+      { status: 409 }
+    )
+  }
+  await removeStoredAccessPhoto(pass.subject.photoPath)
+
   return NextResponse.json({ photoUrl: `/api/access-passes/${pass.id}/photo` })
 }
 

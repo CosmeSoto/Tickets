@@ -304,7 +304,14 @@ export async function DELETE(request: NextRequest) {
     )
   }
 
-  const { deleted, subjectsRemoved } = await hardDeleteAccessPasses(parsed.data.ids)
+  // Defensa en profundidad: canDelete hoy es exclusivo de Super Admin (scope
+  // global), pero si el permiso se delega a un gestor de área en el futuro,
+  // el borrado masivo nunca debe alcanzar pases fuera de su scope.
+  const permission = await getAccessModulePermission(session.user.id, session.user.role)
+  const { deleted, subjectsRemoved } = await hardDeleteAccessPasses(
+    parsed.data.ids,
+    permission.familyIds
+  )
   if (deleted.length === 0) {
     return NextResponse.json({ error: 'No se encontraron pases para eliminar.' }, { status: 404 })
   }
