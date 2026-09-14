@@ -5,6 +5,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { requireSuperAdmin } from '@/lib/auth/require-super-admin'
 import { getOAuthCredentials } from '@/lib/oauth-config'
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
@@ -15,6 +18,21 @@ const SUCCESS_REDIRECT = `${REDIRECT_URI_BASE}/admin/backups?tab=config&cloud=au
 const ERROR_REDIRECT = `${REDIRECT_URI_BASE}/admin/backups?tab=config&cloud=error`
 
 export async function GET(request: NextRequest) {
+  // El callback lo invoca Google/Microsoft con un 302 al navegador del propio
+  // admin que inició el flujo — esa navegación SÍ lleva las cookies de sesión
+  // de esta app. Antes solo se confiaba en el `userId` embebido en `state`
+  // (un query param que cualquiera puede construir sin sesión alguna): un
+  // atacante externo podía iniciar su PROPIO consentimiento OAuth apuntando
+  // `redirect_uri` a este callback y, sin autenticarse nunca en la app, dejar
+  // grabado su propio refresh_token como el destino global de backups a la
+  // nube. Exigir la sesión real (igual que el resto de rutas de Backups) es
+  // lo que cierra ese vector.
+  const session = await getServerSession(authOptions)
+  const authCheck = await requireSuperAdmin(session)
+  if (!authCheck.ok) {
+    return NextResponse.redirect(`${ERROR_REDIRECT}&reason=not_super_admin`)
+  }
+
   const code = request.nextUrl.searchParams.get('code')
   const state = request.nextUrl.searchParams.get('state') ?? ''
   const error = request.nextUrl.searchParams.get('error')
@@ -32,17 +50,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${ERROR_REDIRECT}&reason=no_code`)
   }
 
-  // El state tiene formato "provider:userId"
-  const [provider, userId] = state.split(':')
-
-  if (userId) {
-    const requester = await prisma.users.findUnique({
-      where: { id: userId },
-      select: { isSuperAdmin: true },
-    })
-    if (!requester?.isSuperAdmin) {
-      return NextResponse.redirect(`${ERROR_REDIRECT}&reason=not_super_admin`)
-    }
+  // El state tiene formato "provider:userId" — además de la sesión real de
+  // arriba, confirmar que corresponde a la MISMA sesión que inició el flujo
+  // (evita que el callback de un flujo iniciado por un super admin se
+  // "complete" bajo la sesión de otro).
+  const [provider, stateUserId] = state.split(':')
+  if (stateUserId && stateUserId !== session?.user?.id) {
+    return NextResponse.redirect(`${ERROR_REDIRECT}&reason=state_mismatch`)
   }
 
   try {
