@@ -24,14 +24,7 @@ import { SearchableSelect } from '@/components/ui/searchable-select'
 import { useToast } from '@/hooks/use-toast'
 import { CheckCircle2, Copy, Eye, EyeOff, ExternalLink, Loader2 } from 'lucide-react'
 import { formatCredentialVaultLabel } from '@/lib/credentials/constants'
-
-type Vault = {
-  id: string
-  name: string
-  kind: string
-  familyId?: string | null
-  family?: { id?: string; name: string; order?: number } | null
-}
+import type { CredentialVaultOption as Vault } from '@/components/credentials/types'
 
 interface CreateCredentialDialogProps {
   open: boolean

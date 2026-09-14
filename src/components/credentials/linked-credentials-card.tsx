@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { RevealCredentialDialog } from '@/components/credentials/reveal-credential-dialog'
 import { CreateCredentialDialog } from '@/components/credentials/create-credential-dialog'
 import { useToast } from '@/hooks/use-toast'
+import type { CredentialVaultOption as Vault } from '@/components/credentials/types'
 
 /** A partir de esta cantidad de credenciales, la lista se acota con scroll
  * interno y aparece un buscador — si no, una tarjeta con 15-20 credenciales
@@ -21,14 +22,6 @@ type CredentialEntry = {
   title: string
   username?: string | null
   entryType: string
-}
-
-type Vault = {
-  id: string
-  name: string
-  kind: string
-  familyId?: string | null
-  family?: { id?: string; name: string; order?: number } | null
 }
 
 type LinkedEntity = 'equipment' | 'license'
