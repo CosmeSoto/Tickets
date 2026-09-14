@@ -45,12 +45,10 @@ export async function POST(request: Request, { params }: RouteParams) {
 
   const secret = EncryptionService.decrypt(entry.secretEncrypted)
 
-  await prisma.credential_entries.update({
-    where: { id },
-    data: { lastRevealedAt: new Date() },
-  })
-
-  await AuditServiceComplete.log({
+  // Fail-closed: mismo criterio que reveal — la UI promete "queda auditado".
+  // AuditServiceComplete.log nunca lanza, así que el booleano es la única
+  // forma de saber si el registro realmente se persistió.
+  const audited = await AuditServiceComplete.log({
     action: AuditActionsComplete.CREDENTIAL_COPIED,
     entityType: 'credential_entry',
     entityId: id,
@@ -63,6 +61,17 @@ export async function POST(request: Request, { params }: RouteParams) {
     },
     ipAddress: request.headers.get('x-forwarded-for') || 'unknown',
     userAgent: request.headers.get('user-agent') || 'unknown',
+  })
+  if (!audited) {
+    return NextResponse.json(
+      { error: 'No se pudo registrar la auditoría; inténtalo de nuevo' },
+      { status: 500 }
+    )
+  }
+
+  await prisma.credential_entries.update({
+    where: { id },
+    data: { lastRevealedAt: new Date() },
   })
 
   return NextResponse.json({

@@ -85,9 +85,18 @@ export interface AuditExportOptions {
 
 export class AuditServiceComplete {
   /**
-   * Registrar una acción de auditoría con contexto enriquecido
+   * Registrar una acción de auditoría con contexto enriquecido.
+   *
+   * Nunca lanza (ver catch abajo): un fallo de auditoría no debe tumbar el
+   * flujo principal de negocio en los ~180 call-sites existentes, la
+   * mayoría de los cuales no puede permitirse fallar por esto. Devuelve
+   * `true`/`false` para que el puñado de llamadores que SÍ necesitan una
+   * garantía fail-closed (p. ej. revelar/copiar una credencial: la propia UI
+   * promete "queda auditado") puedan decidir no completar su propia
+   * operación si el registro de auditoría no se pudo persistir, sin tener
+   * que cambiar el contrato de "nunca lanza" para el resto de callers.
    */
-  static async log(data: AuditLogData): Promise<void> {
+  static async log(data: AuditLogData): Promise<boolean> {
     try {
       // Enriquecer contexto automáticamente
       const enrichedContext = data.request
@@ -184,9 +193,11 @@ export class AuditServiceComplete {
           createdAt: new Date(),
         },
       })
+      return true
     } catch (error) {
       console.error('[AUDIT] Error logging audit entry:', error)
       // No lanzar error para no interrumpir el flujo principal
+      return false
     }
   }
 
@@ -837,7 +848,7 @@ export class AuditServiceComplete {
   /**
    * Alias para log() - mantiene compatibilidad con código existente
    */
-  static async logAction(data: AuditLogData): Promise<void> {
+  static async logAction(data: AuditLogData): Promise<boolean> {
     return this.log(data)
   }
 }
