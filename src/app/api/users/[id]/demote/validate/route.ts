@@ -26,6 +26,25 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 
     const userId = (await params).id
 
+    // Mismo scope que el POST /demote hermano: un admin no-super no puede
+    // consultar datos de un usuario fuera de su ámbito de departamento/familia.
+    const viewer = await prisma.users.findUnique({
+      where: { id: session.user.id },
+      select: { isSuperAdmin: true },
+    })
+    const { assertAdminCanManageUser } = await import('@/lib/auth/admin-scope')
+    const scopeCheck = await assertAdminCanManageUser(
+      session.user.id,
+      viewer?.isSuperAdmin === true,
+      userId
+    )
+    if (!scopeCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: scopeCheck.error },
+        { status: scopeCheck.status }
+      )
+    }
+
     const user = await prisma.users.findUnique({
       where: { id: userId },
       select: { id: true, name: true, email: true, role: true },
