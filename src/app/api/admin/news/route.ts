@@ -148,9 +148,14 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ news })
   } catch (error) {
+    // Antes: `{news:[]}` con 200 para cualquier excepción — un error real
+    // (Prisma, permisos rotos) se veía en el panel admin como "no hay
+    // noticias" en vez de un error, y escondía silenciosamente cosas como
+    // las condiciones de carrera P2002 ya corregidas en este módulo. El
+    // panel (admin/news/page.tsx) ya comprueba `response.ok` y muestra un
+    // estado de error — no hacía falta ningún cambio de UI para esto.
     console.error('[/api/admin/news GET] Error:', error)
-    // No devolver 500 — devolver array vacío para no romper la UI
-    return NextResponse.json({ news: [] })
+    return NextResponse.json({ error: 'Error al obtener noticias' }, { status: 500 })
   }
 }
 
