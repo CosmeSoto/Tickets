@@ -1,13 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { checkRateLimit } from '@/lib/rate-limit'
+import { DigitalSignatureService } from '@/lib/services/digital-signature.service'
 
 /**
  * GET /api/public/equipment/[id]
  * Endpoint público — no requiere autenticación.
  * Devuelve información segura del equipo para la página de verificación QR.
  */
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
+
+  // Sin auth por diseño (QR físico) — limitar por IP evita enumeración
+  // automatizada de equipos (y de los datos de personal que expone).
+  const ip = DigitalSignatureService.extractIpAddress(req.headers)
+  const rateLimit = await checkRateLimit(`public-equipment:${ip}`, 30, 15 * 60_000)
+  if (!rateLimit.success) {
+    return NextResponse.json(
+      { error: 'Demasiadas solicitudes. Inténtalo nuevamente más tarde.' },
+      { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfter ?? 60) } }
+    )
+  }
 
   try {
     const equipment = await prisma.equipment.findUnique({
