@@ -21,10 +21,7 @@ export async function POST(request: NextRequest) {
     const { SecurityConfigService } = await import('@/lib/services/security-config-service')
     const passwordCheck = await SecurityConfigService.validatePasswordLength(newPassword)
     if (!passwordCheck.valid) {
-      return NextResponse.json(
-        { success: false, message: passwordCheck.message },
-        { status: 400 }
-      )
+      return NextResponse.json({ success: false, message: passwordCheck.message }, { status: 400 })
     }
 
     // Buscar token en la base de datos
@@ -61,6 +58,23 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Reclamar el token ANTES de tocar la contraseña (claim atómico): dos
+    // solicitudes concurrentes con el mismo token (dos pestañas, doble envío)
+    // pasaban ambas el chequeo `used` de arriba porque leían el mismo estado
+    // antes de que cualquiera escribiera — el "un solo uso" no era real bajo
+    // concurrencia. `updateMany` con guard `used: false` + `count` hace que
+    // solo una de las dos gane la carrera.
+    const claim = await prisma.password_reset_tokens.updateMany({
+      where: { id: resetToken.id, used: false },
+      data: { used: true },
+    })
+    if (claim.count === 0) {
+      return NextResponse.json(
+        { success: false, message: 'Este enlace ya fue utilizado' },
+        { status: 400 }
+      )
+    }
+
     // Hash de la nueva contraseña
     const passwordHash = await bcrypt.hash(newPassword, 12)
 
@@ -72,12 +86,6 @@ export async function POST(request: NextRequest) {
         passwordChangedAt: new Date(),
         updatedAt: new Date(),
       },
-    })
-
-    // Marcar token como usado
-    await prisma.password_reset_tokens.update({
-      where: { id: resetToken.id },
-      data: { used: true },
     })
 
     // Invalidar todas las sesiones activas del usuario por seguridad
