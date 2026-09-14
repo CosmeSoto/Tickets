@@ -5,6 +5,7 @@
 
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
+import { isPrismaUniqueViolation } from '@/lib/db/prisma-errors'
 
 export interface SecurityConfig {
   sessionTimeout: number // minutos
@@ -201,37 +202,62 @@ export class SecurityConfigService {
       const key = `failed_login:${email.toLowerCase()}`
       const now = Date.now()
 
-      const record = await prisma.system_settings.findUnique({ where: { key } })
+      let crossedThreshold = false
+      let finalAttempts = 0
 
-      if (record) {
-        const data = JSON.parse(record.value as string)
-        const previousAttempts = data.attempts || 0
-        data.attempts = previousAttempts + 1
-        data.lastAttempt = now
-        await prisma.system_settings.update({
-          where: { key },
-          data: { value: JSON.stringify(data) },
-        })
+      // Compare-and-swap: el contador vive como blob JSON en system_settings
+      // sin incremento atómico nativo. Un ciclo lectura-modificación-escritura
+      // sin guard pierde incrementos bajo intentos de login en paralelo —
+      // justo el escenario de fuerza bruta que este contador debe frenar.
+      // `updateMany` con guard sobre el `value` leído detecta si otra
+      // petición escribió primero (`count === 0`) y reintenta con el valor
+      // fresco en vez de pisar su incremento.
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const record = await prisma.system_settings.findUnique({ where: { key } })
 
-        if (previousAttempts < maxAttempts && data.attempts >= maxAttempts) {
-          const { notifySuperAdminsSecurityAlert } =
-            await import('@/lib/notifications/security-telegram')
-          notifySuperAdminsSecurityAlert({
-            title: 'Cuenta bloqueada por intentos fallidos',
-            body: `Email: ${email}\nIntentos: ${data.attempts}/${maxAttempts}\nBloqueo temporal activo (${LOCKOUT_DURATION_MINUTES} min).`,
-            link: '/admin/audit',
-          }).catch(() => {})
+        if (record) {
+          const data = JSON.parse(record.value as string)
+          const previousAttempts = data.attempts || 0
+          data.attempts = previousAttempts + 1
+          data.lastAttempt = now
+
+          const claim = await prisma.system_settings.updateMany({
+            where: { key, value: record.value },
+            data: { value: JSON.stringify(data) },
+          })
+          if (claim.count === 0) continue // otra petición ganó la escritura — reintentar
+
+          crossedThreshold = previousAttempts < maxAttempts && data.attempts >= maxAttempts
+          finalAttempts = data.attempts
+          break
         }
-      } else {
-        await prisma.system_settings.create({
-          data: {
-            id: randomUUID(),
-            key,
-            value: JSON.stringify({ attempts: 1, lastAttempt: now }),
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-        })
+
+        try {
+          await prisma.system_settings.create({
+            data: {
+              id: randomUUID(),
+              key,
+              value: JSON.stringify({ attempts: 1, lastAttempt: now }),
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+          })
+          finalAttempts = 1
+          break
+        } catch (error) {
+          if (isPrismaUniqueViolation(error, 'key')) continue // otra petición lo creó primero — reintentar como update
+          throw error
+        }
+      }
+
+      if (crossedThreshold) {
+        const { notifySuperAdminsSecurityAlert } =
+          await import('@/lib/notifications/security-telegram')
+        notifySuperAdminsSecurityAlert({
+          title: 'Cuenta bloqueada por intentos fallidos',
+          body: `Email: ${email}\nIntentos: ${finalAttempts}/${maxAttempts}\nBloqueo temporal activo (${LOCKOUT_DURATION_MINUTES} min).`,
+          link: '/admin/audit',
+        }).catch(() => {})
       }
     } catch (error) {
       console.error('[SECURITY CONFIG] Error registrando intento fallido:', error)
