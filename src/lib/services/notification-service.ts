@@ -876,16 +876,21 @@ export class NotificationService {
   }
 
   /**
-   * Marcar notificación como leída
+   * Marcar notificación como leída. La propiedad se verifica AQUÍ (no solo
+   * en el caller) — `updateMany` con `{ id, userId }` en el `where` es un
+   * no-op (count 0) si la notificación no es del usuario, en vez de mutar
+   * la fila de otro por un `update({ where: { id } })` sin filtrar. Defensa
+   * en profundidad: hoy el único caller ya valida esto antes de llamar, pero
+   * un caller futuro que no lo repita no abre un IDOR.
    */
-  static async markAsRead(notificationId: string) {
+  static async markAsRead(notificationId: string, userId: string) {
     try {
-      const notification = await prisma.notifications.update({
-        where: { id: notificationId },
+      const { count } = await prisma.notifications.updateMany({
+        where: { id: notificationId, userId },
         data: { isRead: true },
       })
-
-      return notification
+      if (count === 0) return null
+      return prisma.notifications.findUnique({ where: { id: notificationId } })
     } catch (error) {
       console.error('Error marking notification as read:', error)
       throw error
@@ -893,14 +898,17 @@ export class NotificationService {
   }
 
   /**
-   * Marcar notificación como no leída
+   * Marcar notificación como no leída. Mismo criterio de propiedad que
+   * `markAsRead`.
    */
-  static async markAsUnread(notificationId: string) {
+  static async markAsUnread(notificationId: string, userId: string) {
     try {
-      return await prisma.notifications.update({
-        where: { id: notificationId },
+      const { count } = await prisma.notifications.updateMany({
+        where: { id: notificationId, userId },
         data: { isRead: false },
       })
+      if (count === 0) return null
+      return prisma.notifications.findUnique({ where: { id: notificationId } })
     } catch (error) {
       console.error('Error marking notification as unread:', error)
       throw error

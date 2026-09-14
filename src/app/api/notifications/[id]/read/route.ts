@@ -44,8 +44,12 @@ async function setReadState(request: NextRequest, params: Promise<{ id: string }
     }
 
     const updated = isRead
-      ? await NotificationService.markAsRead(notificationId)
-      : await NotificationService.markAsUnread(notificationId)
+      ? await NotificationService.markAsRead(notificationId, session.user.id)
+      : await NotificationService.markAsUnread(notificationId, session.user.id)
+
+    if (!updated) {
+      return NextResponse.json({ error: 'Notificación no encontrada' }, { status: 404 })
+    }
 
     try {
       await invalidateCache(`notif:list:${session.user.id}:*`)
