@@ -6,6 +6,18 @@ import { writeFile, unlink } from 'fs/promises'
 import { existsSync, mkdirSync } from 'fs'
 import { getUploadDir } from '@/lib/upload-path'
 import { SecurityConfigService } from '@/lib/services/security-config-service'
+import {
+  resolveSafeUploadMime,
+  EXT_BY_MIME,
+  type SafeUploadMime,
+} from '@/lib/files/upload-file-type'
+
+const AVATAR_MIMES: ReadonlySet<SafeUploadMime> = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+])
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -59,23 +71,28 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       )
     }
 
-    // Validar tipo de archivo
-    if (!file.type.startsWith('image/')) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'El archivo debe ser una imagen válida (JPG, PNG, GIF, WebP)',
-        },
-        { status: 400 }
-      )
-    }
-
     const sizeCheck = await SecurityConfigService.validatePersonalImageSize(file.size)
     if (!sizeCheck.valid) {
       return NextResponse.json(
         {
           success: false,
           error: sizeCheck.message,
+        },
+        { status: 400 }
+      )
+    }
+
+    // Validar tipo de archivo por CONTENIDO real (magic bytes), no por el
+    // Content-Type que declara el cliente (trivialmente falsificable) — mismo
+    // pipeline ya aplicado a adjuntos de tickets/noticias/documentos.
+    const bytes = await file.arrayBuffer()
+    const buffer = Buffer.from(bytes)
+    const detectedMime = resolveSafeUploadMime(buffer, file.type)
+    if (!detectedMime || !AVATAR_MIMES.has(detectedMime)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'El archivo debe ser una imagen válida (JPG, PNG, GIF, WebP)',
         },
         { status: 400 }
       )
@@ -102,9 +119,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       mkdirSync(uploadsDir, { recursive: true })
     }
 
-    // Generar nombre único para el archivo
+    // Generar nombre único para el archivo — la extensión sale siempre del
+    // mime detectado por contenido, nunca del nombre que manda el cliente.
     const timestamp = Date.now()
-    const extension = file.name.split('.').pop()?.toLowerCase()
+    const extension = EXT_BY_MIME[detectedMime]
     const filename = `${id}-${timestamp}.${extension}`
     const filepath = getUploadDir('avatars', filename)
 
@@ -123,8 +141,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     // Guardar el nuevo archivo
-    const bytes = await file.arrayBuffer()
-    const buffer = Buffer.from(bytes)
     await writeFile(filepath, buffer)
 
     // Actualizar la base de datos
