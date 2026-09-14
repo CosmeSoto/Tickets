@@ -7,43 +7,13 @@ import { z } from 'zod'
 import { randomUUID } from 'crypto'
 import {
   assertCanAccessKnowledgeArticle,
+  assertCanWriteKnowledgeFamily,
   buildArticleSourceContext,
   filterArticleContentForClient,
   KnowledgeAccessError,
   rewriteTicketAttachmentLinks,
 } from '@/lib/knowledge/article-access'
-
-// ── Dedup de vistas ───────────────────────────────────────────────────────
-// GET incrementa `views`, pero este endpoint se llama en cada recarga en
-// segundo plano (refetch de sesión de NextAuth, pestañas duplicadas, ida y
-// vuelta con el botón atrás, etc.) — sin esto, cada recarga silenciosa suma
-// una vista aunque el usuario "solo abrió el artículo una vez". Se cuenta
-// como máximo una vista por usuario+artículo cada 30 minutos, sin importar
-// cuántas veces se dispare el GET en ese lapso.
-const VIEW_DEDUP_WINDOW_MS = 30 * 60 * 1000
-const recentArticleViews = new Map<string, number>() // `${userId}:${articleId}` -> timestamp
-
-function shouldCountView(userId: string, articleId: string): boolean {
-  const key = `${userId}:${articleId}`
-  const now = Date.now()
-  const last = recentArticleViews.get(key)
-  if (last && now - last < VIEW_DEDUP_WINDOW_MS) return false
-  recentArticleViews.set(key, now)
-  return true
-}
-
-// Limpieza periódica para no acumular memoria indefinidamente
-if (typeof setInterval !== 'undefined') {
-  setInterval(
-    () => {
-      const now = Date.now()
-      for (const [key, ts] of recentArticleViews.entries()) {
-        if (now - ts > VIEW_DEDUP_WINDOW_MS) recentArticleViews.delete(key)
-      }
-    },
-    10 * 60 * 1000
-  )
-}
+import { shouldCountArticleView } from '@/lib/knowledge/view-dedup'
 
 // Schema de validación para actualizar artículo
 const updateArticleSchema = z.object({
@@ -138,7 +108,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     // artículo (p. ej. mientras lo edita o revisa) o cuando este mismo usuario
     // ya generó una vista de este artículo en los últimos 30 minutos.
     const isOwnArticle = article.authorId === session.user.id
-    const countsAsNewView = !isOwnArticle && shouldCountView(session.user.id, id)
+    const countsAsNewView = !isOwnArticle && shouldCountArticleView(session.user.id, id)
     if (countsAsNewView) {
       await prisma.knowledge_articles.update({
         where: { id },
@@ -209,7 +179,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'Artículo no encontrado' }, { status: 404 })
     }
 
-    // Verificar permisos: solo el autor o ADMIN pueden editar
+    // Verificar permisos: solo el autor o ADMIN, y solo si conservan acceso de
+    // escritura vigente a la familia del artículo — un autor/ADMIN al que se
+    // le retiró el acceso a esa familia no debe conservar permiso indefinido
+    // sobre artículos viejos de ella (isSuperAdmin sigue con bypass total).
     const isAuthor = existingArticle.authorId === session.user.id
     const isAdmin = session.user.role === UserRole.ADMIN
 
@@ -218,6 +191,21 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         { error: 'No tienes permisos para editar este artículo' },
         { status: 403 }
       )
+    }
+
+    const knowledgeUser = {
+      id: session.user.id,
+      role: session.user.role,
+      isSuperAdmin: (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true,
+    }
+
+    try {
+      await assertCanWriteKnowledgeFamily(knowledgeUser, existingArticle.familyId)
+    } catch (err) {
+      if (err instanceof KnowledgeAccessError) {
+        return NextResponse.json({ error: err.message }, { status: err.statusCode })
+      }
+      throw err
     }
 
     const body = await request.json()
@@ -233,14 +221,32 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     const data = validationResult.data
 
-    // Si se actualiza la categoría, verificar que existe
+    // Si se actualiza la categoría, recalcular familyId (igual que en la
+    // creación) y validar acceso de escritura a la familia DESTINO — evita
+    // que un artículo movido de categoría quede con familyId obsoleto
+    // (rompiendo los filtros de listado/búsqueda por familia) y que se
+    // mueva a una familia a la que el usuario no tiene acceso.
+    let newFamilyId: string | null | undefined
     if (data.categoryId) {
       const category = await prisma.categories.findUnique({
         where: { id: data.categoryId },
+        select: { id: true, familyId: true, departments: { select: { familyId: true } } },
       })
 
       if (!category) {
         return NextResponse.json({ error: 'Categoría no encontrada' }, { status: 404 })
+      }
+
+      newFamilyId = category.familyId ?? category.departments?.familyId ?? null
+      if (newFamilyId !== existingArticle.familyId) {
+        try {
+          await assertCanWriteKnowledgeFamily(knowledgeUser, newFamilyId)
+        } catch (err) {
+          if (err instanceof KnowledgeAccessError) {
+            return NextResponse.json({ error: err.message }, { status: err.statusCode })
+          }
+          throw err
+        }
       }
     }
 
@@ -249,6 +255,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       where: { id },
       data: {
         ...data,
+        ...(newFamilyId !== undefined ? { familyId: newFamilyId } : {}),
         updatedAt: new Date(),
       },
       include: {
@@ -320,7 +327,8 @@ export async function DELETE(
       return NextResponse.json({ error: 'Artículo no encontrado' }, { status: 404 })
     }
 
-    // Verificar permisos: solo el autor o ADMIN pueden eliminar
+    // Verificar permisos: solo el autor o ADMIN, con acceso de escritura
+    // vigente a la familia del artículo (mismo criterio que PUT).
     const isAuthor = existingArticle.authorId === session.user.id
     const isAdmin = session.user.role === UserRole.ADMIN
 
@@ -329,6 +337,22 @@ export async function DELETE(
         { error: 'No tienes permisos para eliminar este artículo' },
         { status: 403 }
       )
+    }
+
+    try {
+      await assertCanWriteKnowledgeFamily(
+        {
+          id: session.user.id,
+          role: session.user.role,
+          isSuperAdmin: (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true,
+        },
+        existingArticle.familyId
+      )
+    } catch (err) {
+      if (err instanceof KnowledgeAccessError) {
+        return NextResponse.json({ error: err.message }, { status: err.statusCode })
+      }
+      throw err
     }
 
     // Eliminar votos primero (por la relación)
