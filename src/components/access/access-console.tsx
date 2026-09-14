@@ -63,6 +63,14 @@ import {
   formatAccessBelongsTo,
   formatAccessPurpose,
 } from '@/lib/access/access-labels'
+import {
+  ACCESS_SCAN_RESULT_BADGES,
+  ACCESS_STATE_BADGES,
+  resolveAccessPassDisplayState,
+  type AccessPassBadgeVariant,
+  type AccessPassStatus,
+} from '@/lib/access/access-pass-state'
+import { ACCESS_PRIVACY_NOTICE_VERSION } from '@/lib/access/access-privacy-notice'
 
 type ScanResponse = {
   result: string
@@ -104,47 +112,39 @@ type AccessPass = {
   family: { id?: string; name: string; color?: string | null }
 }
 
+/**
+ * Envoltorios sobre la máquina de estados centralizada (access-pass-state.ts)
+ * — antes reimplementada aquí con una precedencia DISTINTA a la del escáner
+ * (evaluaba vencimiento antes que SUSPENDED/PENDING_PRIVACY, y el estado del
+ * sujeto al final), lo que podía mostrar "EXPIRADO" en la tabla para un pase
+ * que el escáner ya rechazaba como "SUSPENDED". Se mantienen los mismos
+ * nombres/firma para no tocar ningún call site.
+ */
 function effectivePassLabel(pass: AccessPass): {
   label: string
-  variant: 'default' | 'secondary' | 'destructive' | 'outline'
+  variant: AccessPassBadgeVariant
 } {
-  if (pass.status === 'REVOKED') return { label: 'REVOCADO', variant: 'destructive' }
-  const now = Date.now()
-  const until = new Date(pass.validUntil).getTime()
-  const from = new Date(pass.validFrom).getTime()
-  // No confundir "todavía no inicia" con "ya terminó": son estados distintos
-  // para quien gestiona el acceso (uno se resuelve esperando, el otro reemitiendo).
-  if (from > now) return { label: 'PROGRAMADO', variant: 'outline' }
-  if (until <= now) return { label: 'EXPIRADO', variant: 'secondary' }
-  if (pass.status === 'PENDING_PRIVACY')
-    return { label: 'PENDIENTE DE PRIVACIDAD', variant: 'outline' }
-  if (pass.status === 'SUSPENDED') return { label: 'SUSPENDIDO', variant: 'outline' }
-  if (!pass.subject.isActive) return { label: 'INACTIVO', variant: 'secondary' }
-  const hoursLeft = (until - now) / (1000 * 60 * 60)
-  if (hoursLeft <= 24) return { label: 'POR VENCER', variant: 'outline' }
-  return { label: 'VIGENTE', variant: 'default' }
-}
-
-const SCAN_RESULT_LABELS: Record<
-  string,
-  { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }
-> = {
-  VALID: { label: 'Autorizado', variant: 'default' },
-  EXPIRED: { label: 'Vencido', variant: 'secondary' },
-  NOT_YET_VALID: { label: 'Aún no vigente', variant: 'outline' },
-  REVOKED: { label: 'Revocado', variant: 'destructive' },
-  SUSPENDED: { label: 'Suspendido', variant: 'outline' },
-  PENDING_PRIVACY: { label: 'Pend. privacidad', variant: 'outline' },
-  INACTIVE_SUBJECT: { label: 'Inactivo', variant: 'secondary' },
-  NOT_FOUND: { label: 'No encontrado', variant: 'destructive' },
-  OUT_OF_SCOPE: { label: 'Fuera de alcance', variant: 'secondary' },
+  const state = resolveAccessPassDisplayState({
+    status: pass.status as AccessPassStatus,
+    validFrom: new Date(pass.validFrom),
+    validUntil: new Date(pass.validUntil),
+    subject: { isActive: pass.subject.isActive },
+  })
+  return ACCESS_STATE_BADGES[state]
 }
 
 function scanResultLabel(result: string): {
   label: string
-  variant: 'default' | 'secondary' | 'destructive' | 'outline'
+  variant: AccessPassBadgeVariant
 } {
-  return SCAN_RESULT_LABELS[result] ?? { label: result, variant: 'outline' }
+  return (
+    (
+      ACCESS_SCAN_RESULT_BADGES as Record<
+        string,
+        { label: string; variant: AccessPassBadgeVariant }
+      >
+    )[result] ?? { label: result, variant: 'outline' }
+  )
 }
 
 type Family = { id: string; name: string; code: string }
@@ -176,8 +176,6 @@ type ScanEventsPagination = {
   totalPages: number
 }
 
-const PRIVACY_NOTICE_VERSION = 'v1'
-
 function buildInitialForm() {
   const now = new Date()
   const until = new Date(now.getTime() + 24 * 60 * 60 * 1000)
@@ -191,7 +189,9 @@ function buildInitialForm() {
     purpose: '',
     validFrom: toLocalDateTimeInputValue(now),
     validUntil: toLocalDateTimeInputValue(until),
-    privacyNoticeVersion: PRIVACY_NOTICE_VERSION,
+    // La versión del aviso de privacidad la fija el servidor
+    // (ACCESS_PRIVACY_NOTICE_VERSION) — ya no es un campo del formulario que
+    // se manda como dato de entrada.
   }
 }
 
@@ -1530,8 +1530,8 @@ export function AccessConsole() {
 
             <div className='rounded-lg border bg-muted/30 p-3 text-xs text-muted-foreground'>
               La persona recibirá un enlace personal para revisar y aceptar el aviso de privacidad (
-              {PRIVACY_NOTICE_VERSION}). Su credencial QR no se activa ni se envía antes de esa
-              aceptación.
+              {ACCESS_PRIVACY_NOTICE_VERSION}). Su credencial QR no se activa ni se envía antes de
+              esa aceptación.
             </div>
 
             <Button className='w-full' type='submit' disabled={submitting}>
