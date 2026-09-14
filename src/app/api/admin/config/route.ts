@@ -10,6 +10,7 @@ import { authOptions } from '@/lib/auth'
 import { configurationService } from '@/lib/config'
 import { ApplicationLogger } from '@/lib/logging'
 import { ApiResponseBuilder } from '@/lib/api/response-builder'
+import { requireSuperAdmin } from '@/lib/auth/require-super-admin'
 
 /**
  * GET /api/admin/config - Get configuration summary
@@ -28,6 +29,17 @@ export async function GET(request: NextRequest) {
     if (session.user.role !== 'ADMIN') {
       ApplicationLogger.apiRequestComplete('GET', '/api/admin/config', 403, Date.now() - startTime)
       return ApiResponseBuilder.forbidden('Admin access required')
+    }
+
+    const superCheck = await requireSuperAdmin(session)
+    if (!superCheck.ok) {
+      ApplicationLogger.apiRequestComplete(
+        'GET',
+        '/api/admin/config',
+        superCheck.status,
+        Date.now() - startTime
+      )
+      return ApiResponseBuilder.forbidden(superCheck.error)
     }
 
     ApplicationLogger.apiRequestStart('GET', '/api/admin/config', {
@@ -71,6 +83,17 @@ export async function POST(request: NextRequest) {
     if (session.user.role !== 'ADMIN') {
       ApplicationLogger.apiRequestComplete('POST', '/api/admin/config', 403, Date.now() - startTime)
       return ApiResponseBuilder.forbidden('Admin access required')
+    }
+
+    const superCheck = await requireSuperAdmin(session)
+    if (!superCheck.ok) {
+      ApplicationLogger.apiRequestComplete(
+        'POST',
+        '/api/admin/config',
+        superCheck.status,
+        Date.now() - startTime
+      )
+      return ApiResponseBuilder.forbidden(superCheck.error)
     }
 
     ApplicationLogger.apiRequestStart('POST', '/api/admin/config', {

@@ -10,6 +10,7 @@ import { authOptions } from '@/lib/auth'
 import { featureFlagsService } from '@/lib/config'
 import { ApplicationLogger } from '@/lib/logging'
 import { ApiResponseBuilder } from '@/lib/api/response-builder'
+import { requireSuperAdmin } from '@/lib/auth/require-super-admin'
 import { z } from 'zod'
 
 // Validation schemas
@@ -91,6 +92,17 @@ export async function GET(request: NextRequest) {
       return ApiResponseBuilder.forbidden('Admin access required')
     }
 
+    const superCheck = await requireSuperAdmin(session)
+    if (!superCheck.ok) {
+      ApplicationLogger.apiRequestComplete(
+        'GET',
+        '/api/admin/config/features',
+        superCheck.status,
+        Date.now() - startTime
+      )
+      return ApiResponseBuilder.forbidden(superCheck.error)
+    }
+
     ApplicationLogger.apiRequestStart('GET', '/api/admin/config/features', {
       userId: session.user.id,
     })
@@ -163,6 +175,17 @@ export async function POST(request: NextRequest) {
         Date.now() - startTime
       )
       return ApiResponseBuilder.forbidden('Admin access required')
+    }
+
+    const superCheck = await requireSuperAdmin(session)
+    if (!superCheck.ok) {
+      ApplicationLogger.apiRequestComplete(
+        'POST',
+        '/api/admin/config/features',
+        superCheck.status,
+        Date.now() - startTime
+      )
+      return ApiResponseBuilder.forbidden(superCheck.error)
     }
 
     ApplicationLogger.apiRequestStart('POST', '/api/admin/config/features', {
