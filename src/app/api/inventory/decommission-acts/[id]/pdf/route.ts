@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma'
 import { readFile } from 'fs/promises'
 import { existsSync } from 'fs'
 import { getUploadDir } from '@/lib/upload-path'
+import { getInventorySessionContext } from '@/lib/inventory/inventory-session'
 
 /**
  * GET /api/inventory/decommission-acts/[id]/pdf
@@ -14,9 +15,9 @@ import { getUploadDir } from '@/lib/upload-path'
  * /uploads/decommission-acts/{folio}_{timestamp}.pdf
  *
  * Permisos:
- *   - ADMIN (cualquiera)
+ *   - Super Admin (cualquiera)
+ *   - ADMIN/gestor dentro de su ámbito de familias
  *   - El solicitante original
- *   - Gestores con canManageInventory
  */
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -33,6 +34,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       include: {
         act: { select: { id: true, folio: true, pdfPath: true } },
         requester: { select: { id: true } },
+        equipment: { select: { type: { select: { familyId: true } } } },
+        license: { select: { licenseType: { select: { familyId: true } } } },
       },
     })
 
@@ -41,17 +44,40 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     // Verificar permisos
+    const isSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
     const isAdmin = session.user.role === 'ADMIN'
     const isRequester = decommissionRequest.requestedById === session.user.id
     const canManage = await (
       await import('@/lib/inventory/inventory-session')
     ).resolveCanManageInventory(session.user.id, session.user.role)
 
-    if (!isAdmin && !isRequester && !canManage) {
+    if (!isSuperAdmin && !isAdmin && !isRequester && !canManage) {
       return NextResponse.json(
         { error: 'No tienes permiso para descargar este PDF' },
         { status: 403 }
       )
+    }
+
+    // Un ADMIN/gestor no-super sigue acotado a su ámbito de familias — antes
+    // "ADMIN (cualquiera)" (documentado así en el comentario original de esta
+    // ruta) bypasseaba por completo el scope que sí exigen approve/reject/
+    // elevate sobre este mismo recurso. El solicitante siempre puede ver el
+    // suyo, sin scope.
+    if ((isAdmin || canManage) && !isSuperAdmin && !isRequester) {
+      const familyId =
+        decommissionRequest.assetType === 'EQUIPMENT'
+          ? (decommissionRequest.equipment?.type?.familyId ?? null)
+          : (decommissionRequest.license?.licenseType?.familyId ?? null)
+      const ctx = await getInventorySessionContext(session.user)
+      if (
+        ctx.scope.noAccess ||
+        (ctx.scope.familyIds?.length && familyId && !ctx.scope.familyIds.includes(familyId))
+      ) {
+        return NextResponse.json(
+          { error: 'No tienes permiso para descargar este PDF' },
+          { status: 403 }
+        )
+      }
     }
 
     // Verificar que la solicitud esté aprobada y tenga acta

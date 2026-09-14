@@ -6,6 +6,7 @@ import prisma from '@/lib/prisma'
 import { readFile } from 'fs/promises'
 import { existsSync } from 'fs'
 import { getUploadDir } from '@/lib/upload-path'
+import { getInventorySessionContext } from '@/lib/inventory/inventory-session'
 
 /**
  * GET /api/inventory/decommission-acts/[id]/preview
@@ -25,6 +26,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       include: {
         act: { select: { id: true, folio: true, pdfPath: true } },
         requester: { select: { id: true } },
+        equipment: { select: { type: { select: { familyId: true } } } },
+        license: { select: { licenseType: { select: { familyId: true } } } },
       },
     })
 
@@ -32,12 +35,35 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: 'Solicitud no encontrada' }, { status: 404 })
     }
 
+    const isSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
     const isAdmin = session.user.role === 'ADMIN'
     const isRequester = decommissionRequest.requestedById === session.user.id
     const canManage = await canManageInventory(session.user.id, session.user.role)
 
-    if (!isAdmin && !isRequester && !canManage) {
-      return NextResponse.json({ error: 'Sin permisos para previsualizar este PDF' }, { status: 403 })
+    if (!isSuperAdmin && !isAdmin && !isRequester && !canManage) {
+      return NextResponse.json(
+        { error: 'Sin permisos para previsualizar este PDF' },
+        { status: 403 }
+      )
+    }
+
+    // Mismo scope de familia que /pdf — un ADMIN/gestor no-super no puede
+    // previsualizar actas de baja fuera de su ámbito.
+    if ((isAdmin || canManage) && !isSuperAdmin && !isRequester) {
+      const familyId =
+        decommissionRequest.assetType === 'EQUIPMENT'
+          ? (decommissionRequest.equipment?.type?.familyId ?? null)
+          : (decommissionRequest.license?.licenseType?.familyId ?? null)
+      const ctx = await getInventorySessionContext(session.user)
+      if (
+        ctx.scope.noAccess ||
+        (ctx.scope.familyIds?.length && familyId && !ctx.scope.familyIds.includes(familyId))
+      ) {
+        return NextResponse.json(
+          { error: 'Sin permisos para previsualizar este PDF' },
+          { status: 403 }
+        )
+      }
     }
 
     if (decommissionRequest.status !== 'APPROVED' || !decommissionRequest.act) {

@@ -63,11 +63,17 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     )
   }
 
-  if (canManage && !isSuperAdmin && !isAdmin) {
+  // El scope de familia aplica a CUALQUIER no-super-admin con acceso al
+  // recurso (admin de familia incluido) — antes `isAdmin` bypasseaba esta
+  // verificación por completo, dejando a cualquier ADMIN no-super leer el
+  // detalle/PDF de solicitudes de baja de familias que no administra,
+  // aunque las rutas de escritura del mismo recurso (approve/reject/elevate)
+  // sí exigen `isAdminOfFamily`.
+  if ((isAdmin || canManage) && !isSuperAdmin) {
     const familyId =
       request.assetType === 'EQUIPMENT'
-        ? request.equipment?.type?.familyId ?? null
-        : request.license?.licenseType?.familyId ?? null
+        ? (request.equipment?.type?.familyId ?? null)
+        : (request.license?.licenseType?.familyId ?? null)
 
     const ctx = await getInventorySessionContext(session.user)
     if (ctx.scope.noAccess) {
