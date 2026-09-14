@@ -16,6 +16,7 @@ import {
 } from '@/lib/content/visibility-scope'
 import { buildVisibilityAuditSummary } from '@/lib/content/visibility-audit'
 import { buildNewsVisibilityConditions, getNewsViewer } from '@/lib/news/news-access'
+import { NEWS_PRIORITIES, NEWS_STATUSES, NEWS_TYPES, buildNewsSlug } from '@/lib/news/news-catalog'
 
 /**
  * GET - Obtener listado de noticias
@@ -194,36 +195,18 @@ export async function POST(request: NextRequest) {
     if (sanitized instanceof NextResponse) return sanitized
 
     // Validar enums — si llegan valores inválidos Prisma lanza error 500
-    const validTypes = [
-      'NEWS',
-      'ANNOUNCEMENT',
-      'EVENT',
-      'BIRTHDAY',
-      'HOLIDAY',
-      'ALERT',
-      'INTERNAL_AD',
-      'RECOGNITION',
-    ]
-    const validPriorities = ['LOW', 'MEDIUM', 'HIGH', 'URGENT']
-    const validStatuses = ['DRAFT', 'PUBLISHED', 'ARCHIVED']
-
-    const type = validTypes.includes(data.type) ? data.type : 'NEWS'
-    const priority = validPriorities.includes(data.priority) ? data.priority : 'MEDIUM'
-    const newsStatus = validStatuses.includes(data.status) ? data.status : 'DRAFT'
-
-    const slug = data.title
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^\w\s-]/g, '')
-      .replace(/\s+/g, '-')
-      .trim()
-      .substring(0, 200)
+    const type = (NEWS_TYPES as readonly string[]).includes(data.type) ? data.type : 'NEWS'
+    const priority = (NEWS_PRIORITIES as readonly string[]).includes(data.priority)
+      ? data.priority
+      : 'MEDIUM'
+    const newsStatus = (NEWS_STATUSES as readonly string[]).includes(data.status)
+      ? data.status
+      : 'DRAFT'
 
     const news = await prisma.news.create({
       data: {
         title: data.title,
-        slug: `${slug}-${Date.now()}`,
+        slug: buildNewsSlug(data.title),
         content: data.content || null,
         summary: data.summary || null,
         imageUrl: data.imageUrl || null,

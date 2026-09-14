@@ -17,6 +17,7 @@ import {
 } from '@/lib/content/visibility-scope'
 import { buildVisibilityAuditSummary } from '@/lib/content/visibility-audit'
 import { buildNewsVisibilityConditions, getNewsViewer } from '@/lib/news/news-access'
+import { NEWS_PRIORITIES, NEWS_STATUSES, NEWS_TYPES, buildNewsSlug } from '@/lib/news/news-catalog'
 
 interface Params {
   params: Promise<{ id: string }>
@@ -147,6 +148,22 @@ export async function PUT(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'Noticia no encontrada' }, { status: 404 })
     }
 
+    // El POST de alta ya validaba estos enums y el título; el PUT no
+    // validaba nada — un `type`/`priority`/`status` inválido llegaba tal
+    // cual a Prisma y salía como un 500 genérico en vez de un 400 claro.
+    if ('title' in data && !data.title?.trim()) {
+      return NextResponse.json({ error: 'El título es obligatorio' }, { status: 400 })
+    }
+    if ('type' in data && !(NEWS_TYPES as readonly string[]).includes(data.type)) {
+      return NextResponse.json({ error: 'Tipo de noticia inválido' }, { status: 400 })
+    }
+    if ('priority' in data && !(NEWS_PRIORITIES as readonly string[]).includes(data.priority)) {
+      return NextResponse.json({ error: 'Prioridad inválida' }, { status: 400 })
+    }
+    if ('status' in data && !(NEWS_STATUSES as readonly string[]).includes(data.status)) {
+      return NextResponse.json({ error: 'Estado inválido' }, { status: 400 })
+    }
+
     const isSuperAdmin =
       (
         await prisma.users.findUnique({
@@ -177,17 +194,16 @@ export async function PUT(request: NextRequest, { params }: Params) {
 
     let slug = existingNews.slug
     if (data.title && data.title !== existingNews.title) {
-      slug = data.title
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^\w\s-]/g, '')
-        .replace(/\s+/g, '-')
-        .trim()
-        .substring(0, 200)
-      slug = `${slug}-${Date.now()}`
+      slug = buildNewsSlug(data.title)
     }
 
+    // `startDate`/`endDate` se incluyen solo si el cliente mandó esa clave
+    // ('startDate' in data) — antes `data.startDate ? new Date(...) : null`
+    // convertía la AUSENCIA del campo (undefined, falsy) en `null` igual que
+    // un borrado explícito, así que cualquier PUT parcial que no mandara
+    // las fechas las borraba silenciosamente. El resto de los campos no
+    // necesita este tratamiento: un valor `undefined` ya hace que Prisma
+    // no toque esa columna.
     const updateData = {
       title: data.title,
       slug,
@@ -197,14 +213,16 @@ export async function PUT(request: NextRequest, { params }: Params) {
       type: data.type,
       priority: data.priority,
       status: data.status,
-      startDate: data.startDate ? new Date(data.startDate) : null,
-      endDate: data.endDate ? new Date(data.endDate) : null,
       isFeatured: data.isFeatured,
       allowComments: data.allowComments,
       allowReactions: data.allowReactions,
       notifyEmail: data.notifyEmail,
       notifyTelegram: data.notifyTelegram,
       updatedById: session.user.id,
+      ...('startDate' in data
+        ? { startDate: data.startDate ? new Date(data.startDate) : null }
+        : {}),
+      ...('endDate' in data ? { endDate: data.endDate ? new Date(data.endDate) : null } : {}),
     }
     const publishedNow = data.status === 'PUBLISHED' && existingNews.status !== 'PUBLISHED'
 
