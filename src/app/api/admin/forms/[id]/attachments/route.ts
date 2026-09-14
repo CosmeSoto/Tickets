@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
+import { randomUUID } from 'crypto'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { FileService } from '@/lib/services/file-service'
@@ -57,31 +58,48 @@ export async function POST(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'No se recibió ningún archivo' }, { status: 400 })
     }
 
-    // Eliminar adjuntos anteriores (un form tiene un solo archivo)
-    for (const old of form.form_attachments) {
-      await FileService.deleteFormFile(old.id).catch(() => {})
-    }
-
-    // Subir el nuevo archivo
-    const attachment = await FileService.uploadFormFile({
-      file,
-      formId: id,
-      uploadedById: session.user.id,
-    })
-
-    // La URL pública accesible para todos los usuarios autenticados
+    // Procesar y escribir el archivo a disco ANTES de la transacción — no
+    // hace falta mantener una conexión de BD abierta durante la lectura y
+    // compresión del archivo.
+    const prepared = await FileService.prepareFormFileUpload(file, id)
     const fileUrl = `/api/forms/${id}/file`
+    const oldPaths = form.form_attachments.map(a => a.path)
 
-    // Actualizar el form con la URL, tamaño y tipo del archivo
-    await prisma.forms.update({
-      where: { id },
-      data: {
-        fileUrl,
-        fileSize: attachment.size,
-        fileType: attachment.mimeType,
-        updatedById: session.user.id,
-      },
+    // Borrar adjuntos viejos + crear el nuevo + actualizar `forms` en una
+    // única transacción: antes se borraba cada adjunto viejo y se subía el
+    // nuevo en pasos sueltos sin atomicidad — dos subidas concurrentes del
+    // mismo documento podían dejar `forms.fileUrl/fileSize/fileType`
+    // desincronizado de lo que realmente hay en `form_attachments`.
+    const attachment = await prisma.$transaction(async tx => {
+      await tx.form_attachments.deleteMany({ where: { formId: id } })
+
+      const created = await tx.form_attachments.create({
+        data: {
+          id: randomUUID(),
+          ...prepared,
+          formId: id,
+          uploadedById: session.user.id,
+          createdAt: new Date(),
+        },
+      })
+
+      await tx.forms.update({
+        where: { id },
+        data: {
+          fileUrl,
+          fileSize: created.size,
+          fileType: created.mimeType,
+          updatedById: session.user.id,
+        },
+      })
+
+      return created
     })
+
+    // Limpieza del/los archivo(s) físico(s) viejo(s), best-effort — fuera de
+    // la transacción: un archivo huérfano en disco no es un problema de
+    // integridad de datos, a diferencia de las filas de `form_attachments`.
+    await FileService.deletePhysicalFiles(oldPaths)
 
     return NextResponse.json({ attachment, fileUrl }, { status: 201 })
   } catch (error) {

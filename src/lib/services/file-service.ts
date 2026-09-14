@@ -627,18 +627,21 @@ export class FileService {
 
   // ── Métodos para Formularios/Documentos ──────────────────────────────────────
 
-  static async uploadFormFile(data: { file: File; formId: string; uploadedById: string }) {
-    const { file, formId, uploadedById } = data
-
+  /**
+   * Valida y procesa el archivo (magic bytes, compresión, escritura a
+   * disco) SIN tocar la base de datos — separado de `uploadFormFile` para
+   * que el caller pueda envolver la parte de BD (borrar adjunto viejo +
+   * crear el nuevo + actualizar `forms`) en una única `$transaction`, sin
+   * mantener una conexión abierta durante la lectura/compresión del
+   * archivo.
+   */
+  static async prepareFormFileUpload(file: File, formId: string) {
     // 1. Validar tamaño y el tipo DECLARADO por el cliente (política
     // configurable del admin — allowedFileTypes). No es la única defensa:
-    // el contenido real se verifica en el paso 3 (mismo pipeline que
+    // el contenido real se verifica en el paso 2 (mismo pipeline que
     // uploadNewsFile — antes este método se quedó con la validación vieja).
     const validation = await this.validateFile(file)
     if (!validation.isValid) throw new Error(validation.error)
-
-    const form = await prisma.forms.findUnique({ where: { id: formId } })
-    if (!form) throw new Error('Documento no encontrado')
 
     // 2. Leer el contenido real y cruzarlo con el tipo declarado. `file.type`
     // lo pone el cliente en el multipart y es trivialmente falsificable — un
@@ -671,21 +674,43 @@ export class FileService {
 
     await writeFile(filePath, finalBuffer)
 
-    const attachment = await prisma.form_attachments.create({
+    return {
+      filename: uniqueFilename,
+      originalName: sanitizeOriginalFilename(file.name),
+      mimeType: finalMime as string,
+      size: finalBuffer.length,
+      path: filePath,
+    }
+  }
+
+  static async uploadFormFile(data: { file: File; formId: string; uploadedById: string }) {
+    const { file, formId, uploadedById } = data
+
+    const form = await prisma.forms.findUnique({ where: { id: formId } })
+    if (!form) throw new Error('Documento no encontrado')
+
+    const prepared = await this.prepareFormFileUpload(file, formId)
+
+    return prisma.form_attachments.create({
       data: {
         id: randomUUID(),
-        filename: uniqueFilename,
-        originalName: sanitizeOriginalFilename(file.name),
-        mimeType: finalMime,
-        size: finalBuffer.length,
-        path: filePath,
+        ...prepared,
         formId,
         uploadedById,
         createdAt: new Date(),
       },
     })
+  }
 
-    return attachment
+  /** Borra archivos físicos del disco, best-effort — no forma parte de la integridad de datos. */
+  static async deletePhysicalFiles(paths: string[]) {
+    for (const path of paths) {
+      try {
+        if (existsSync(path)) await unlink(path)
+      } catch {
+        console.warn('[FileService] No se pudo eliminar el archivo físico:', path)
+      }
+    }
   }
 
   static async getFilesByForm(formId: string) {
