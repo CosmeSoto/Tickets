@@ -17,7 +17,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    const denied = await assertCanViewNews(id, session.user.id, { allowAdminBypass: true })
+    const denied = await assertCanViewNews(id, session.user.id, { allowManagerBypass: true })
     if (denied) return denied
 
     const reactions = await prisma.news_reactions.findMany({

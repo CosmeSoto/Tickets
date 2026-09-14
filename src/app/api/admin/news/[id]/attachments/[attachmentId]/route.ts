@@ -15,12 +15,12 @@ export async function DELETE(
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    const deniedManage = await assertCanManageNews(session.user.id, session.user.role)
+    const deniedManage = await assertCanManageNews(session.user.id)
     if (deniedManage) return deniedManage
 
     const { id: newsId, attachmentId } = await params
 
-    const deniedModify = await assertCanModifyNews(newsId, session.user.id, session.user.role)
+    const deniedModify = await assertCanModifyNews(newsId, session.user.id)
     if (deniedModify) return deniedModify
 
     const attachment = await prisma.news_attachments.findFirst({

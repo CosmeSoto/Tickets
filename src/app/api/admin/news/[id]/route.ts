@@ -34,7 +34,7 @@ export async function GET(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    const denied = await assertCanManageNews(session.user.id, session.user.role)
+    const denied = await assertCanManageNews(session.user.id)
     if (denied) return denied
 
     const news = await prisma.news.findUnique({
@@ -133,9 +133,9 @@ export async function PUT(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    const deniedManage = await assertCanManageNews(session.user.id, session.user.role)
+    const deniedManage = await assertCanManageNews(session.user.id)
     if (deniedManage) return deniedManage
-    const deniedModify = await assertCanModifyNews(id, session.user.id, session.user.role)
+    const deniedModify = await assertCanModifyNews(id, session.user.id)
     if (deniedModify) return deniedModify
 
     const data = await request.json()
@@ -329,9 +329,9 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    const deniedManage = await assertCanManageNews(session.user.id, session.user.role)
+    const deniedManage = await assertCanManageNews(session.user.id)
     if (deniedManage) return deniedManage
-    const deniedModify = await assertCanModifyNews(id, session.user.id, session.user.role)
+    const deniedModify = await assertCanModifyNews(id, session.user.id)
     if (deniedModify) return deniedModify
 
     const existingNews = await prisma.news.findUnique({

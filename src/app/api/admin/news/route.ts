@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    const denied = await assertCanManageNews(session.user.id, session.user.role)
+    const denied = await assertCanManageNews(session.user.id)
     if (denied) return denied
 
     const dbUser = await prisma.users.findUnique({
@@ -164,7 +164,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    const deniedManage = await assertCanManageNews(session.user.id, session.user.role)
+    const deniedManage = await assertCanManageNews(session.user.id)
     if (deniedManage) return deniedManage
 
     const data = await request.json()

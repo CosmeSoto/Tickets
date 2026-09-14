@@ -1,11 +1,15 @@
 /**
  * PATCH /api/news/[id]/comment/[commentId]/hide
- * Oculta o muestra un comentario. Solo el creador de la noticia o SuperAdmin.
+ * Oculta o muestra un comentario. Mismo criterio que editar/borrar la
+ * noticia (assertCanModifyNews): autoría, o gestor dentro de su alcance.
+ * Antes chequeaba `isSuperAdmin || isOwner` a mano, sin importar si el
+ * autor de la noticia todavía tenía el módulo habilitado.
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { assertCanModifyNews } from '@/lib/news/news-manage-access'
 
 export async function PATCH(
   request: NextRequest,
@@ -21,27 +25,8 @@ export async function PATCH(
 
     const { isHidden } = await request.json()
 
-    // Verificar que la noticia existe y que el usuario tiene permiso
-    const news = await prisma.news.findUnique({
-      where: { id: newsId },
-      select: { createdById: true },
-    })
-
-    if (!news) {
-      return NextResponse.json({ error: 'Noticia no encontrada' }, { status: 404 })
-    }
-
-    const dbUser = await prisma.users.findUnique({
-      where: { id: session.user.id },
-      select: { isSuperAdmin: true, newsEnabled: true },
-    })
-
-    const isSuperAdmin = dbUser?.isSuperAdmin === true
-    const isOwner = news.createdById === session.user.id
-
-    if (!isSuperAdmin && !isOwner) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-    }
+    const denied = await assertCanModifyNews(newsId, session.user.id)
+    if (denied) return denied
 
     const comment = await prisma.news_comments.findFirst({
       where: { id: commentId, newsId },

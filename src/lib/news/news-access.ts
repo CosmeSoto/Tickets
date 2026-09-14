@@ -104,18 +104,26 @@ export function buildNewsVisibilityConditions(viewer: NewsViewer) {
 export function userCanAccessNews(
   news: NewsVisibilityData,
   viewer: NewsViewer,
-  options?: { allowAdminBypass?: boolean; requirePublished?: boolean }
+  options?: { allowManagerBypass?: boolean; requirePublished?: boolean }
 ): boolean {
-  const { allowAdminBypass = false, requirePublished = true } = options ?? {}
+  const { allowManagerBypass = false, requirePublished = true } = options ?? {}
 
   if (viewer.isSuperAdmin || news.createdById === viewer.id) return true
-  if (allowAdminBypass && viewer.role === 'ADMIN') return true
 
-  if (requirePublished && news.status !== 'PUBLISHED') return false
+  // Los gestores (ADMIN de familia) pueden revisar contenido no publicado o
+  // fuera de su ventana de vigencia — igual que el GET de administración,
+  // que no filtra por status/fechas. Esto NO salta el chequeo de
+  // roles/usuarios/departamentos/familias de más abajo: antes
+  // `allowAdminBypass` hacía `return true` para CUALQUIER ADMIN sin mirar
+  // esas listas, dejando ver/gestionar noticias de otra familia.
+  const isManagerBypass = allowManagerBypass && viewer.role === 'ADMIN'
+  if (!isManagerBypass) {
+    if (requirePublished && news.status !== 'PUBLISHED') return false
 
-  const now = new Date()
-  if (news.startDate && news.startDate > now) return false
-  if (news.endDate && news.endDate < now) return false
+    const now = new Date()
+    if (news.startDate && news.startDate > now) return false
+    if (news.endDate && news.endDate < now) return false
+  }
 
   const noRestrictions =
     news.news_roles.length === 0 &&
@@ -142,7 +150,7 @@ export function userCanAccessNews(
 export async function assertCanViewNews(
   newsId: string,
   userId: string,
-  options?: { allowAdminBypass?: boolean; requirePublished?: boolean }
+  options?: { allowManagerBypass?: boolean; requirePublished?: boolean }
 ): Promise<NextResponse | null> {
   const viewer = await getNewsViewer(userId)
   if (!viewer) {

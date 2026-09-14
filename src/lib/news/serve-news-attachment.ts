@@ -25,7 +25,7 @@ export async function serveNewsAttachment(
   attachmentId: string,
   userId: string
 ): Promise<NextResponse> {
-  const denied = await assertCanViewNews(newsId, userId, { allowAdminBypass: true })
+  const denied = await assertCanViewNews(newsId, userId, { allowManagerBypass: true })
   if (denied) {
     const status = denied.status
     return new NextResponse(

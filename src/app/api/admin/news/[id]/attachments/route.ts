@@ -12,12 +12,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    const deniedManage = await assertCanManageNews(session.user.id, session.user.role)
+    const deniedManage = await assertCanManageNews(session.user.id)
     if (deniedManage) return deniedManage
 
     const { id: newsId } = await params
 
-    const deniedModify = await assertCanModifyNews(newsId, session.user.id, session.user.role)
+    const deniedModify = await assertCanModifyNews(newsId, session.user.id)
     if (deniedModify) return deniedModify
 
     const formData = await request.formData()
@@ -50,12 +50,12 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    const deniedManage = await assertCanManageNews(session.user.id, session.user.role)
+    const deniedManage = await assertCanManageNews(session.user.id)
     if (deniedManage) return deniedManage
 
     const { id: newsId } = await params
 
-    const deniedModify = await assertCanModifyNews(newsId, session.user.id, session.user.role)
+    const deniedModify = await assertCanModifyNews(newsId, session.user.id)
     if (deniedModify) return deniedModify
 
     const attachments = await FileService.getFilesByNews(newsId)

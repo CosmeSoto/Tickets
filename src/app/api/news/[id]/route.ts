@@ -109,7 +109,7 @@ export async function GET(request: NextRequest, { params }: Params) {
 
     if (
       !userCanAccessNews(news, user, {
-        allowAdminBypass: true,
+        allowManagerBypass: true,
         requirePublished: news.status === 'PUBLISHED',
       })
     ) {
