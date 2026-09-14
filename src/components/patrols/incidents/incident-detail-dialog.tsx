@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
+import { toPublicUploadUrl } from '@/lib/uploads/public-upload-url'
 
 interface IncidentDetailDialogProps {
   open: boolean
@@ -278,7 +279,11 @@ export function IncidentDetailDialog({
               {incident.photos && incident.photos.length > 0 && (
                 <div>
                   <img
-                    src={incident.photos[0].url || `/uploads/${incident.photos[0].path}`}
+                    src={
+                      incident.photos[0].url ||
+                      toPublicUploadUrl(`/uploads/${incident.photos[0].path}`) ||
+                      undefined
+                    }
                     alt='Foto de novedad'
                     className='w-full max-h-64 object-contain rounded-md border'
                   />

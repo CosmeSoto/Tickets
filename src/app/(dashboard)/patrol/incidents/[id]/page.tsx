@@ -26,6 +26,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { IncidentFormDialog } from '@/components/patrols/incidents/incident-form-dialog'
+import { toPublicUploadUrl } from '@/lib/uploads/public-upload-url'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -278,7 +279,7 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
                 {incident.photos.map(photo => (
                   <img
                     key={photo.id}
-                    src={`/uploads/${photo.path}`}
+                    src={toPublicUploadUrl(`/uploads/${photo.path}`) ?? undefined}
                     alt='Foto de novedad'
                     className='w-24 h-24 rounded-lg object-cover border'
                   />

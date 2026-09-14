@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Pencil, Trash2, Clock, ExternalLink } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { toPublicUploadUrl } from '@/lib/uploads/public-upload-url'
 
 interface IncidentCardProps {
   incident: {
@@ -120,7 +121,7 @@ export function IncidentCard({
         {incident.photos.length > 0 && (
           <div className='flex-shrink-0'>
             <img
-              src={`/uploads/${incident.photos[0].path}`}
+              src={toPublicUploadUrl(`/uploads/${incident.photos[0].path}`) ?? undefined}
               alt='Foto de novedad'
               className='w-14 h-14 rounded-md object-cover border'
             />

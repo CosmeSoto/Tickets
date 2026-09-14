@@ -9,6 +9,7 @@ import {
   CHECK_IN_VALIDATION_LABELS_ES,
   getValidationResultColor,
 } from '@/lib/utils/patrol-utils'
+import { toPublicUploadUrl } from '@/lib/uploads/public-upload-url'
 
 interface CheckInPhoto {
   id: string
@@ -62,7 +63,7 @@ export function PatrolCheckInCard({ checkIn, className }: PatrolCheckInCardProps
             </div>
           ) : (
             <img
-              src={`/uploads/${photo.path}`}
+              src={toPublicUploadUrl(`/uploads/${photo.path}`) ?? undefined}
               alt='Foto del check-in'
               className='w-full h-full object-cover'
             />
