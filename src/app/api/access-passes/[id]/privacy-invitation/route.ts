@@ -3,10 +3,9 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import {
-  assertCanManageAccess,
   generateAccessQrSecret,
-  getAccessModulePermission,
   isAccessFamilyAllowed,
+  requireAccessPermission,
 } from '@/lib/access/access-control'
 import {
   ACCESS_PRIVACY_ACCEPTANCE_TTL_MS,
@@ -16,7 +15,7 @@ import {
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-  const denied = await assertCanManageAccess(session.user.id, session.user.role)
+  const { denied, permission } = await requireAccessPermission(session.user.id, 'manage')
   if (denied) return denied
 
   const id = (await params).id
@@ -36,7 +35,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     },
   })
   if (!pass) return NextResponse.json({ error: 'Pase no encontrado.' }, { status: 404 })
-  const permission = await getAccessModulePermission(session.user.id, session.user.role)
   if (!isAccessFamilyAllowed(permission, pass.familyId)) {
     return NextResponse.json({ error: 'No tienes acceso a este pase.' }, { status: 403 })
   }

@@ -5,11 +5,9 @@ import { randomUUID } from 'crypto'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import {
-  assertCanDeleteAccess,
-  assertCanManageAccess,
-  getAccessModulePermission,
   isAccessFamilyAllowed,
   generateAccessQrSecret,
+  requireAccessPermission,
 } from '@/lib/access/access-control'
 import { hardDeleteAccessPasses } from '@/lib/access/delete-access-passes'
 import { accessTypeRequiresOrganization } from '@/lib/access/access-labels'
@@ -104,10 +102,9 @@ function credentialCode(): string {
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-  const denied = await assertCanManageAccess(session.user.id, session.user.role)
+  const { denied, permission } = await requireAccessPermission(session.user.id, 'manage')
   if (denied) return denied
 
-  const permission = await getAccessModulePermission(session.user.id, session.user.role)
   const { searchParams } = new URL(request.url)
   const familyId = searchParams.get('familyId')
   const state = searchParams.get('state')
@@ -145,7 +142,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-  const denied = await assertCanManageAccess(session.user.id, session.user.role)
+  const { denied, permission } = await requireAccessPermission(session.user.id, 'manage')
   if (denied) return denied
   const parsed = createSchema.safeParse(await request.json())
   if (!parsed.success) {
@@ -155,7 +152,6 @@ export async function POST(request: NextRequest) {
     )
   }
   const data = parsed.data
-  const permission = await getAccessModulePermission(session.user.id, session.user.role)
   if (!isAccessFamilyAllowed(permission, data.familyId)) {
     return NextResponse.json({ error: 'No puedes emitir pases para esa área.' }, { status: 403 })
   }
@@ -293,7 +289,7 @@ const bulkDeleteSchema = z.object({
 export async function DELETE(request: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-  const denied = await assertCanDeleteAccess(session.user.id, session.user.role)
+  const { denied, permission } = await requireAccessPermission(session.user.id, 'delete')
   if (denied) return denied
 
   const parsed = bulkDeleteSchema.safeParse(await request.json().catch(() => null))
@@ -307,7 +303,6 @@ export async function DELETE(request: NextRequest) {
   // Defensa en profundidad: canDelete hoy es exclusivo de Super Admin (scope
   // global), pero si el permiso se delega a un gestor de área en el futuro,
   // el borrado masivo nunca debe alcanzar pases fuera de su scope.
-  const permission = await getAccessModulePermission(session.user.id, session.user.role)
   const { deleted, subjectsRemoved } = await hardDeleteAccessPasses(
     parsed.data.ids,
     permission.familyIds

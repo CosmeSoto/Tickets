@@ -1,15 +1,14 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { assertCanManageAccess, getAccessModulePermission } from '@/lib/access/access-control'
+import { requireAccessPermission } from '@/lib/access/access-control'
 import prisma from '@/lib/prisma'
 
 export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-  const denied = await assertCanManageAccess(session.user.id, session.user.role)
+  const { denied, permission } = await requireAccessPermission(session.user.id, 'manage')
   if (denied) return denied
-  const permission = await getAccessModulePermission(session.user.id, session.user.role)
   const families = await prisma.families.findMany({
     where: {
       isActive: true,

@@ -5,10 +5,9 @@ import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import {
   ACCESS_SCAN_MESSAGES,
-  assertCanScanAccess,
   findAccessPassByScanPayload,
-  getAccessModulePermission,
   isAccessFamilyAllowed,
+  requireAccessPermission,
   resolveAccessPassState,
 } from '@/lib/access/access-control'
 import { AuditActionsComplete, AuditServiceComplete } from '@/lib/services/audit-service-complete'
@@ -23,7 +22,7 @@ export async function POST(request: NextRequest) {
       { status: 401 }
     )
   }
-  const denied = await assertCanScanAccess(session.user.id, session.user.role)
+  const { denied, permission } = await requireAccessPermission(session.user.id, 'scan')
   if (denied) {
     return NextResponse.json(
       {
@@ -48,7 +47,6 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const permission = await getAccessModulePermission(session.user.id, session.user.role)
   const pass = await findAccessPassByScanPayload(parsed.data.payload)
   const context = {
     ipAddress: request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null,

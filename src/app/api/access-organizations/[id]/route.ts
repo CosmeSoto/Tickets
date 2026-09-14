@@ -3,11 +3,7 @@ import { getServerSession } from 'next-auth'
 import { z } from 'zod'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import {
-  assertCanManageAccess,
-  getAccessModulePermission,
-  isAccessOrganizationInScope,
-} from '@/lib/access/access-control'
+import { isAccessOrganizationInScope, requireAccessPermission } from '@/lib/access/access-control'
 import { AuditActionsComplete, AuditServiceComplete } from '@/lib/services/audit-service-complete'
 
 const updateSchema = z.object({
@@ -18,7 +14,7 @@ const updateSchema = z.object({
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-  const denied = await assertCanManageAccess(session.user.id, session.user.role)
+  const { denied, permission } = await requireAccessPermission(session.user.id, 'manage')
   if (denied) return denied
 
   const id = (await params).id
@@ -35,7 +31,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
   // access_organizations es un catálogo global (sin familyId): un gestor de
   // una sola área no puede renombrar/desactivar algo que otras áreas usan.
-  const permission = await getAccessModulePermission(session.user.id, session.user.role)
   if (!(await isAccessOrganizationInScope(permission, id))) {
     return NextResponse.json(
       { error: 'Esta empresa se usa en áreas fuera de tu alcance.' },
@@ -87,14 +82,13 @@ export async function DELETE(
 ) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-  const denied = await assertCanManageAccess(session.user.id, session.user.role)
+  const { denied, permission } = await requireAccessPermission(session.user.id, 'manage')
   if (denied) return denied
 
   const id = (await params).id
   const existing = await prisma.access_organizations.findUnique({ where: { id } })
   if (!existing) return NextResponse.json({ error: 'No encontrado' }, { status: 404 })
 
-  const permission = await getAccessModulePermission(session.user.id, session.user.role)
   if (!(await isAccessOrganizationInScope(permission, id))) {
     return NextResponse.json(
       { error: 'Esta empresa se usa en áreas fuera de tu alcance.' },

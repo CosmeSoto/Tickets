@@ -185,7 +185,7 @@ export async function GET(request: NextRequest) {
 
       if (moduleFilter === 'access') {
         const { getAccessModulePermission } = await import('@/lib/access/access-control')
-        const permission = await getAccessModulePermission(session.user.id, session.user.role)
+        const permission = await getAccessModulePermission(session.user.id)
         if (!permission.canScan && !permission.canManage) {
           return NextResponse.json({ success: true, data: [] })
         }

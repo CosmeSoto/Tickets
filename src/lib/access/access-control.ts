@@ -18,10 +18,7 @@ export type AccessModulePermission = {
   familyIds?: string[]
 }
 
-export async function getAccessModulePermission(
-  userId: string,
-  role: string
-): Promise<AccessModulePermission> {
+export async function getAccessModulePermission(userId: string): Promise<AccessModulePermission> {
   const user = await prisma.users.findUnique({
     where: { id: userId },
     select: {
@@ -51,16 +48,16 @@ export async function getAccessModulePermission(
   return { canScan, canManage, canDelete: false, familyIds }
 }
 
-export async function assertCanScanAccess(userId: string, role: string) {
-  const permission = await getAccessModulePermission(userId, role)
+export async function assertCanScanAccess(userId: string) {
+  const permission = await getAccessModulePermission(userId)
   if (!permission.canScan) {
     return NextResponse.json({ error: 'No tienes acceso al módulo de Accesos.' }, { status: 403 })
   }
   return null
 }
 
-export async function assertCanManageAccess(userId: string, role: string) {
-  const permission = await getAccessModulePermission(userId, role)
+export async function assertCanManageAccess(userId: string) {
+  const permission = await getAccessModulePermission(userId)
   if (!permission.canManage) {
     return NextResponse.json(
       { error: 'No tienes permiso para gestionar pases de acceso.' },
@@ -70,8 +67,8 @@ export async function assertCanManageAccess(userId: string, role: string) {
   return null
 }
 
-export async function assertCanDeleteAccess(userId: string, role: string) {
-  const permission = await getAccessModulePermission(userId, role)
+export async function assertCanDeleteAccess(userId: string) {
+  const permission = await getAccessModulePermission(userId)
   if (!permission.canDelete) {
     return NextResponse.json(
       { error: 'Solo Super Admin puede eliminar pases de acceso.' },
@@ -79,6 +76,41 @@ export async function assertCanDeleteAccess(userId: string, role: string) {
     )
   }
   return null
+}
+
+const ACCESS_PERMISSION_DENIED_MESSAGE: Record<'scan' | 'manage' | 'delete', string> = {
+  scan: 'No tienes acceso al módulo de Accesos.',
+  manage: 'No tienes permiso para gestionar pases de acceso.',
+  delete: 'Solo Super Admin puede eliminar pases de acceso.',
+}
+
+/**
+ * Colapsa el patrón repetido "assertCanX(...) seguido de otro
+ * getAccessModulePermission(...) para obtener el scope de familias" — antes
+ * cada ruta hacía ambas llamadas por separado (2× `users.findUnique` + 2×
+ * `resolveModuleFamilyScopeIds` por request). Aquí se calcula el permiso una
+ * sola vez y se reutiliza tanto para el chequeo como para el scope.
+ */
+export async function requireAccessPermission(
+  userId: string,
+  mode: 'scan' | 'manage' | 'delete'
+): Promise<
+  | { denied: NextResponse; permission?: undefined }
+  | { denied: null; permission: AccessModulePermission }
+> {
+  const permission = await getAccessModulePermission(userId)
+  const allowed =
+    mode === 'scan'
+      ? permission.canScan
+      : mode === 'manage'
+        ? permission.canManage
+        : permission.canDelete
+  if (!allowed) {
+    return {
+      denied: NextResponse.json({ error: ACCESS_PERMISSION_DENIED_MESSAGE[mode] }, { status: 403 }),
+    }
+  }
+  return { denied: null, permission }
 }
 
 export function isAccessFamilyAllowed(

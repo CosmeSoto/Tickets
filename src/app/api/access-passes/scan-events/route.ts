@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { z } from 'zod'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import { getAccessModulePermission, isAccessFamilyAllowed } from '@/lib/access/access-control'
+import { isAccessFamilyAllowed, requireAccessPermission } from '@/lib/access/access-control'
 import { ACCESS_SCAN_RESULTS, ACCESS_SUBJECT_TYPES } from '@/lib/access/access-pass-state'
 
 const querySchema = z.object({
@@ -43,10 +43,8 @@ export async function GET(request: NextRequest) {
   // canScan ya incluye canManage (ver getAccessModulePermission) — mismo
   // criterio que el resto de las rutas de accesos, en vez de reimplementarlo
   // inline como antes.
-  const permission = await getAccessModulePermission(session.user.id, session.user.role)
-  if (!permission.canScan) {
-    return NextResponse.json({ error: 'No tienes acceso al módulo de Accesos.' }, { status: 403 })
-  }
+  const { denied, permission } = await requireAccessPermission(session.user.id, 'scan')
+  if (denied) return denied
 
   const parsed = querySchema.safeParse(Object.fromEntries(new URL(request.url).searchParams))
   if (!parsed.success) {

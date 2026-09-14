@@ -32,7 +32,7 @@ function slugCode(name: string): string {
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-  const denied = await assertCanManageAccess(session.user.id, session.user.role)
+  const denied = await assertCanManageAccess(session.user.id)
   if (denied) return denied
 
   const includeInactive = request.nextUrl.searchParams.get('includeInactive') === 'true'
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-  const denied = await assertCanManageAccess(session.user.id, session.user.role)
+  const denied = await assertCanManageAccess(session.user.id)
   if (denied) return denied
 
   const parsed = createSchema.safeParse(await request.json().catch(() => null))
