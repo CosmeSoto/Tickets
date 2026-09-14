@@ -53,11 +53,28 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
 
     if (parentId) {
-      const parentComment = await prisma.news_comments.findUnique({
-        where: { id: parentId },
+      // El padre debe pertenecer a ESTA noticia — antes solo se verificaba
+      // que el comentario existiera en cualquier parte, así que se podía
+      // colgar una respuesta en el hilo de OTRA noticia (con allowComments
+      // desactivado, o sin acceso a esa noticia). También se limita a un
+      // solo nivel de respuestas: GET /api/news/[id] solo incluye un nivel
+      // de `replies`, así que una respuesta a una respuesta quedaría
+      // invisible en el hilo pero seguiría contando en _count.news_comments.
+      const parentComment = await prisma.news_comments.findFirst({
+        where: { id: parentId, newsId: id, isHidden: false },
+        select: { id: true, parentId: true },
       })
       if (!parentComment) {
-        return NextResponse.json({ error: 'Comentario padre no encontrado' }, { status: 404 })
+        return NextResponse.json(
+          { error: 'El comentario al que respondes no existe en esta noticia' },
+          { status: 404 }
+        )
+      }
+      if (parentComment.parentId) {
+        return NextResponse.json(
+          { error: 'Solo se permite un nivel de respuestas' },
+          { status: 400 }
+        )
       }
     }
 
