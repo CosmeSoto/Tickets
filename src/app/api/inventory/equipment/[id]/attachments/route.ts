@@ -1,26 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { canManageInventory } from '@/lib/inventory-access'
+import {
+  assertInventoryResourceRead,
+  assertInventoryResourceManage,
+  InventoryAccessError,
+  inventoryAccessToResponse,
+  toInventoryAccessUser,
+} from '@/lib/inventory/inventory-resource-access'
 import prisma from '@/lib/prisma'
 import { writeFile, mkdir } from 'fs/promises'
 import { existsSync } from 'fs'
 import { randomUUID } from 'crypto'
 import { getUploadDir } from '@/lib/upload-path'
-
-const ALLOWED_TYPES = [
-  'image/jpeg',
-  'image/jpg',
-  'image/png',
-  'image/webp',
-  'image/gif',
-  'application/pdf',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/vnd.ms-excel',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'text/plain',
-]
+import {
+  resolveSafeUploadMime,
+  EXT_BY_MIME,
+  sanitizeOriginalFilename,
+} from '@/lib/files/upload-file-type'
 
 /**
  * GET /api/inventory/equipment/[id]/attachments
@@ -31,6 +28,13 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
   const { id: equipmentId } = await params
+
+  try {
+    await assertInventoryResourceRead(toInventoryAccessUser(session.user), 'EQUIPMENT', equipmentId)
+  } catch (err) {
+    if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+    throw err
+  }
 
   const attachments = await prisma.equipment_attachments.findMany({
     where: { equipmentId },
@@ -49,14 +53,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
-  if (!(await canManageInventory(session.user.id, session.user.role))) {
-    return NextResponse.json(
-      { error: 'No tienes permiso para gestionar el inventario' },
-      { status: 403 }
-    )
-  }
-
   const { id: equipmentId } = await params
+
+  // `canManageInventory` por sí solo es un permiso GLOBAL (cualquier gestor
+  // de cualquier familia lo tiene en true) — `assertInventoryResourceManage`
+  // exige además el scope real de familia sobre ESTE equipo.
+  try {
+    await assertInventoryResourceManage(
+      toInventoryAccessUser(session.user),
+      'EQUIPMENT',
+      equipmentId
+    )
+  } catch (err) {
+    if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+    throw err
+  }
 
   const equipment = await prisma.equipment.findUnique({ where: { id: equipmentId } })
   if (!equipment) return NextResponse.json({ error: 'Equipo no encontrado' }, { status: 404 })
@@ -65,56 +76,32 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const file = formData.get('file') as File | null
   if (!file) return NextResponse.json({ error: 'No se proporcionó archivo' }, { status: 400 })
 
-  if (!ALLOWED_TYPES.includes(file.type)) {
-    return NextResponse.json({ error: 'Tipo de archivo no permitido' }, { status: 400 })
-  }
-
   const { SecurityConfigService } = await import('@/lib/services/security-config-service')
   const sizeCheck = await SecurityConfigService.validateFileSize(file.size)
   if (!sizeCheck.valid) {
     return NextResponse.json({ error: sizeCheck.message }, { status: 400 })
   }
 
-  const uploadDir = getUploadDir('equipment', equipmentId)
-  if (!existsSync(uploadDir)) await mkdir(uploadDir, { recursive: true })
-
   const buffer = Buffer.from(await file.arrayBuffer())
 
-  let ext = file.name.split('.').pop()?.toLowerCase() || 'bin'
-  let mimeType = file.type
-  if (file.type.startsWith('image/')) {
-    // El navegador no siempre reporta el formato real: un archivo ".jpg"
-    // puede ser WebP por dentro (pasa con capturas/recortes de algunos
-    // navegadores). Guardarlo con la extensión declarada en vez de la real
-    // deja el archivo ilegible para todo lo que sí valida el contenido —
-    // ej. el acta de entrega en PDF, que solo sabe leer PNG/JPEG y
-    // terminaba omitiendo la foto sin ningún aviso. Se detecta el formato
-    // real del contenido y se usa ese, no el que dijo el cliente.
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
-      const sharp = require('sharp') as typeof import('sharp')
-      const meta = await sharp(buffer).metadata()
-      const extByFormat: Record<string, string> = {
-        jpeg: 'jpg',
-        png: 'png',
-        webp: 'webp',
-        gif: 'gif',
-      }
-      const mimeByFormat: Record<string, string> = {
-        jpeg: 'image/jpeg',
-        png: 'image/png',
-        webp: 'image/webp',
-        gif: 'image/gif',
-      }
-      if (meta.format && extByFormat[meta.format]) {
-        ext = extByFormat[meta.format]
-        mimeType = mimeByFormat[meta.format]
-      }
-    } catch {
-      // No se pudo decodificar pese al Content-Type declarado — se guarda
-      // igual con lo que reportó el cliente, no bloquea la subida.
-    }
+  // Tipo de archivo por CONTENIDO real (magic bytes), no por el Content-Type
+  // que declara el cliente (trivialmente falsificable) — antes solo se
+  // sniffeaba el contenido real para imágenes; un .pdf/.doc/.xls declarado
+  // pasaba sin verificar, y se servía de vuelta con ese mismo mimeType sin
+  // validar (ver el fix del GET de adjunto individual). Mismo pipeline ya
+  // usado en Noticias/Documentos/Tickets/Usuarios esta sesión.
+  const detectedMime = resolveSafeUploadMime(buffer, file.type)
+  if (!detectedMime) {
+    return NextResponse.json(
+      { error: 'El contenido del archivo no corresponde a un tipo permitido' },
+      { status: 400 }
+    )
   }
+  const ext = EXT_BY_MIME[detectedMime]
+  const mimeType = detectedMime
+
+  const uploadDir = getUploadDir('equipment', equipmentId)
+  if (!existsSync(uploadDir)) await mkdir(uploadDir, { recursive: true })
 
   const filename = `${randomUUID()}.${ext}`
   const filepath = getUploadDir('equipment', equipmentId, filename)
@@ -125,7 +112,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       id: randomUUID(),
       equipmentId,
       filename,
-      originalName: file.name,
+      originalName: sanitizeOriginalFilename(file.name),
       mimeType,
       size: file.size,
       path: filepath,
