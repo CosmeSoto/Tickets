@@ -24,8 +24,14 @@ const MODE_PREFIX: Record<string, string> = {
  *
  * Ejemplo: TECH-EQ-FA-2026-0001
  *
- * El secuencial se calcula contando los activos existentes de la misma
- * familia+subtipo en el año actual, por lo que es siempre único.
+ * El secuencial sale de un contador atómico en BD (`equipment_code_counters`,
+ * vía `upsert` con `increment` — se traduce a un único `INSERT ... ON
+ * CONFLICT DO UPDATE SET last_sequence = last_sequence + 1`, sin ventana de
+ * carrera). Antes se calculaba contando activos existentes (`COUNT`): dos
+ * creaciones concurrentes de la misma familia+subtipo+año leían el mismo
+ * conteo y generaban el MISMO código, que solo se detectaba al chocar contra
+ * el `@unique` de `equipment.code` — y ese choque llegaba como 500 genérico
+ * en vez de una colisión limpia.
  */
 export async function generateAssetCode(
   familyId: string,
@@ -53,37 +59,20 @@ export async function generateAssetCode(
   const subtypePrefix = SUBTYPE_PREFIX[subtype] ?? subtype.slice(0, 3).toUpperCase()
   const modePrefix = MODE_PREFIX[acquisitionMode ?? 'FIXED_ASSET'] ?? 'FA'
 
-  // Contar activos existentes de esta familia+subtipo en el año para el secuencial
-  const yearStart = new Date(`${year}-01-01T00:00:00.000Z`)
-  const yearEnd = new Date(`${year + 1}-01-01T00:00:00.000Z`)
+  const counterKey = `${familyCode}-${subtypePrefix}-${modePrefix}-${year}`
+  const counter = await prisma.equipment_code_counters.upsert({
+    where: { counterKey },
+    update: { lastSequence: { increment: 1 } },
+    create: {
+      counterKey,
+      familyCode,
+      typeCode: subtypePrefix,
+      ownershipMode: modePrefix,
+      year,
+      lastSequence: 1,
+    },
+  })
 
-  let count = 0
-  if (!familyId) {
-    // Sin familia: usar timestamp como secuencial único
-    count = Date.now() % 9000
-  } else if (subtype === 'EQUIPMENT') {
-    count = await prisma.equipment.count({
-      where: {
-        type: { familyId },
-        createdAt: { gte: yearStart, lt: yearEnd },
-      },
-    })
-  } else if (subtype === 'MRO') {
-    count = await prisma.consumables.count({
-      where: {
-        consumableType: { familyId },
-        createdAt: { gte: yearStart, lt: yearEnd },
-      },
-    })
-  } else if (subtype === 'LICENSE') {
-    count = await prisma.software_licenses.count({
-      where: {
-        licenseType: { familyId },
-        createdAt: { gte: yearStart, lt: yearEnd },
-      },
-    })
-  }
-
-  const seq = String(count + 1).padStart(4, '0')
+  const seq = String(counter.lastSequence).padStart(4, '0')
   return `${familyCode}-${subtypePrefix}-${modePrefix}-${year}-${seq}`
 }

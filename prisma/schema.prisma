@@ -1121,8 +1121,14 @@ model equipment_batches {
 }
 
 model equipment {
-  id           String @id @default(uuid())
-  code         String @unique
+  id   String @id @default(uuid())
+  code String @unique
+  // Único cuando no está vacío: no puede ser `@unique` plano porque muchos
+  // equipos legítimamente no tienen número de serie (campo requerido, se
+  // guarda como ''). Constraint real aplicada por migración raw SQL
+  // (20260914080000_equipment_serial_unique_nonempty) como índice único
+  // parcial `WHERE serial_number <> ''` — Prisma DSL no soporta unique
+  // condicional, así que no aparece como `@unique` aquí pero SÍ existe en BD.
   serialNumber String @map("serial_number")
 
   // NUEVO: Referencia al modelo

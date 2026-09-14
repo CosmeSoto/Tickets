@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { canManageInventory } from '@/lib/inventory-access'
 import { queryAssets } from '@/lib/inventory/assets-query'
 import { createAsset } from '@/lib/inventory/assets-create'
+import { isPrismaUniqueViolation } from '@/lib/db/prisma-errors'
 import {
   assertInventoryManageByFamily,
   InventoryAccessError,
@@ -86,6 +87,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ...result.asset, subtype: result.subtype }, { status: 201 })
   } catch (error) {
     console.error('[POST /api/inventory/assets]', error)
+    // El `findFirst` previo en createAsset (número de serie) es una
+    // comprobación de aplicación, no atómica — dos creaciones concurrentes
+    // con el mismo serial/código pueden ambas pasarla; la constraint real de
+    // BD (índice único parcial en serial_number, @unique en code) es la que
+    // realmente lo impide, y sin traducir su P2002 caía como 500 genérico.
+    if (isPrismaUniqueViolation(error, 'serial_number')) {
+      return NextResponse.json(
+        { error: 'Ya existe un equipo con ese número de serie' },
+        { status: 409 }
+      )
+    }
+    if (isPrismaUniqueViolation(error, 'code')) {
+      return NextResponse.json({ error: 'Ya existe un activo con ese código' }, { status: 409 })
+    }
     const message = error instanceof Error ? error.message : String(error)
     return NextResponse.json({ error: message || 'Error al crear el activo' }, { status: 500 })
   }
