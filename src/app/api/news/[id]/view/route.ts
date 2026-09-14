@@ -25,23 +25,14 @@ export async function POST(request: NextRequest, { params }: Params) {
     const denied = await assertCanViewNews(id, session.user.id)
     if (denied) return denied
 
-    const existingView = await prisma.news_views.findUnique({
-      where: {
-        newsId_userId: {
-          newsId: id,
-          userId: session.user.id,
-        },
-      },
+    // createMany + skipDuplicates es el propio chequeo de idempotencia: dos
+    // POST casi simultáneos (remontaje del componente, doble click) sobre el
+    // mismo `newsId_userId` único ya no pueden chocar con un P2002 — antes
+    // el `findUnique` → `create` dejaba una ventana entre ambas llamadas.
+    await prisma.news_views.createMany({
+      data: [{ newsId: id, userId: session.user.id }],
+      skipDuplicates: true,
     })
-
-    if (!existingView) {
-      await prisma.news_views.create({
-        data: {
-          newsId: id,
-          userId: session.user.id,
-        },
-      })
-    }
 
     return NextResponse.json({ success: true })
   } catch (error) {
