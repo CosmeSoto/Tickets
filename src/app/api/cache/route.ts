@@ -4,16 +4,37 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { requireSuperAdmin } from '@/lib/auth/require-super-admin'
 import { cacheService } from '@/lib/cache'
 import { cacheManagementService } from '@/services/cached-services'
 import { CacheInvalidation } from '@/lib/cache-middleware'
 import { ApiResponse } from '@/lib/api-response'
 
 /**
+ * Ninguno de los 4 métodos tenía autenticación — cualquiera, sin sesión,
+ * podía leer estadísticas internas y, más grave, `POST {action:"clear",
+ * pattern:"*"}` / `DELETE ?pattern=*` ejecutan `redis.keys(pattern)` +
+ * `redis.del(...)` con el patrón tal cual lo manda el cliente, sobre el
+ * MISMO Redis que usan rate limiting, presencia SSE, colas, etc. — DoS
+ * trivial no autenticado sobre infraestructura compartida.
+ */
+async function assertCacheAdmin() {
+  const session = await getServerSession(authOptions)
+  return requireSuperAdmin(session)
+}
+
+/**
  * GET /api/cache - Get cache statistics and health
  */
 export async function GET(req: NextRequest) {
   try {
+    const authCheck = await assertCacheAdmin()
+    if (!authCheck.ok) {
+      return ApiResponse.error(authCheck.error, authCheck.status)
+    }
+
     const url = new URL(req.url)
     const action = url.searchParams.get('action')
 
@@ -53,6 +74,11 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
+    const authCheck = await assertCacheAdmin()
+    if (!authCheck.ok) {
+      return ApiResponse.error(authCheck.error, authCheck.status)
+    }
+
     const body = await req.json()
     const { action, pattern, entity, tags } = body
 
@@ -122,6 +148,11 @@ export async function POST(req: NextRequest) {
  */
 export async function DELETE(req: NextRequest) {
   try {
+    const authCheck = await assertCacheAdmin()
+    if (!authCheck.ok) {
+      return ApiResponse.error(authCheck.error, authCheck.status)
+    }
+
     const url = new URL(req.url)
     const key = url.searchParams.get('key')
     const pattern = url.searchParams.get('pattern')
@@ -152,6 +183,11 @@ export async function DELETE(req: NextRequest) {
  */
 export async function PUT(req: NextRequest) {
   try {
+    const authCheck = await assertCacheAdmin()
+    if (!authCheck.ok) {
+      return ApiResponse.error(authCheck.error, authCheck.status)
+    }
+
     const body = await req.json()
     const { key, value, ttl, tags } = body
 
