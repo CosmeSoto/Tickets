@@ -36,6 +36,12 @@ import { writeFile, mkdir, unlink, readFile } from 'fs/promises'
 import { existsSync } from 'fs'
 import { randomUUID } from 'crypto'
 import { getUploadDir } from '@/lib/upload-path'
+import {
+  EXT_BY_MIME,
+  resolveSafeUploadMime,
+  sanitizeOriginalFilename,
+  type SafeUploadMime,
+} from '@/lib/files/upload-file-type'
 
 // ─── Constantes ────────────────────────────────────────────────────────────────
 
@@ -524,7 +530,9 @@ export class FileService {
   static async uploadNewsFile(data: UploadNewsFileData) {
     const { file, newsId, uploadedBy } = data
 
-    // 1. Validar archivo
+    // 1. Validar tamaño y el tipo DECLARADO por el cliente (política
+    // configurable del admin — allowedFileTypes). No es la única defensa:
+    // el contenido real se verifica en el paso 3.
     const validation = await this.validateFile(file)
     if (!validation.isValid) throw new Error(validation.error)
 
@@ -532,26 +540,37 @@ export class FileService {
     const news = await prisma.news.findUnique({ where: { id: newsId } })
     if (!news) throw new Error('Noticia no encontrada')
 
-    // 3. Leer buffer original
+    // 3. Leer el contenido real y cruzarlo con el tipo declarado. `file.type`
+    // lo pone el cliente en el multipart y es trivialmente falsificable — un
+    // `evil.html` declarado `application/pdf` pasaba antes la validación de
+    // arriba sin problema. resolveSafeUploadMime mira los magic bytes.
     const originalBuffer = Buffer.from(await file.arrayBuffer()) as Buffer
+    const safeMime = resolveSafeUploadMime(originalBuffer, file.type)
+    if (!safeMime) {
+      throw new Error(
+        'El contenido del archivo no coincide con su tipo. Verifica que no esté corrupto o renombrado.'
+      )
+    }
 
-    // 4. Comprimir si es imagen comprimible
+    // 4. Comprimir si es imagen comprimible — según el mime DETECTADO, no el declarado.
     let finalBuffer = originalBuffer
-    let finalExt = file.name.split('.').pop()?.toLowerCase() || 'bin'
-    let compressed = false
+    let finalMime: SafeUploadMime = safeMime
 
-    if (IMAGE_TYPES.has(file.type)) {
-      const result = await compressImage(originalBuffer, file.type, file.name)
+    if (IMAGE_TYPES.has(safeMime)) {
+      const result = await compressImage(originalBuffer, safeMime, file.name)
       finalBuffer = result.buffer
-      finalExt = result.ext
-      compressed = result.compressed
+      // Solo se usa para decidir jpeg vs webp — la extensión en disco nunca
+      // sale de `result.ext` (que en el catch de compressImage cae de vuelta
+      // al nombre del cliente): siempre de EXT_BY_MIME más abajo.
+      finalMime = result.ext === 'webp' ? 'image/webp' : 'image/jpeg'
     }
 
     // 5. Organizar en subdirectorio por noticia
     const uploadDir = getUploadDir('news', newsId)
     if (!existsSync(uploadDir)) await mkdir(uploadDir, { recursive: true })
 
-    const uniqueFilename = `${randomUUID()}.${finalExt}`
+    // La extensión en disco SIEMPRE sale del mime final, nunca del nombre del cliente.
+    const uniqueFilename = `${randomUUID()}.${EXT_BY_MIME[finalMime]}`
     const filePath = getUploadDir('news', newsId, uniqueFilename)
 
     // 6. Guardar en disco
@@ -562,8 +581,8 @@ export class FileService {
       data: {
         id: randomUUID(),
         filename: uniqueFilename,
-        originalName: file.name,
-        mimeType: compressed ? (finalExt === 'webp' ? 'image/webp' : 'image/jpeg') : file.type,
+        originalName: sanitizeOriginalFilename(file.name),
+        mimeType: finalMime,
         size: finalBuffer.length,
         path: filePath,
         newsId,

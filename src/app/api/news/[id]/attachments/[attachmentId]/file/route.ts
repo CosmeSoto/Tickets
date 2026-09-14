@@ -5,13 +5,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
-import { assertCanViewNews } from '@/lib/news/news-access'
-import { readFile } from 'fs/promises'
-import { existsSync } from 'fs'
+import { serveNewsAttachment } from '@/lib/news/serve-news-attachment'
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string; attachmentId: string }> }
 ) {
   try {
@@ -19,38 +16,8 @@ export async function GET(
     if (!session?.user) {
       return new NextResponse('No autorizado', { status: 401 })
     }
-
     const { id: newsId, attachmentId } = await params
-
-    const denied = await assertCanViewNews(newsId, session.user.id, { allowAdminBypass: true })
-    if (denied) {
-      const status = denied.status
-      return new NextResponse(status === 404 ? 'Noticia no encontrada' : 'No tienes acceso a esta noticia', {
-        status,
-      })
-    }
-
-    const attachment = await prisma.news_attachments.findUnique({
-      where: { id: attachmentId },
-    })
-
-    if (!attachment || attachment.newsId !== newsId) {
-      return new NextResponse('Archivo no encontrado', { status: 404 })
-    }
-
-    if (!existsSync(attachment.path)) {
-      return new NextResponse('Archivo no disponible', { status: 404 })
-    }
-
-    const fileBuffer = await readFile(attachment.path)
-
-    return new NextResponse(fileBuffer, {
-      headers: {
-        'Content-Type': attachment.mimeType,
-        'Content-Disposition': `inline; filename="${attachment.originalName}"`,
-        'Cache-Control': 'private, max-age=86400',
-      },
-    })
+    return await serveNewsAttachment(newsId, attachmentId, session.user.id)
   } catch (error) {
     console.error('[public-news-attachment-file] Error:', error)
     return new NextResponse('Error al servir archivo', { status: 500 })
