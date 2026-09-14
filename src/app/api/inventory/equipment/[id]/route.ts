@@ -86,7 +86,45 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       )
     }
 
-    return NextResponse.json({ ...equipmentDetail, equipment: { ...eq, depreciation } })
+    // El equipo asignado a un CLIENT le da acceso de lectura (ese es el
+    // propósito de `hasAccessToEquipment` para su propio equipo), pero
+    // `getEquipmentDetail` no proyecta columnas — devuelve TODO el modelo,
+    // incluyendo precio de compra, número de factura/orden de compra,
+    // costo mensual de renta y el RUT/tax ID del proveedor. Nada de eso es
+    // asunto de quien solo tiene el equipo asignado.
+    const responseEquipment: Record<string, unknown> = { ...eq, depreciation }
+    let responseBatch = (equipmentDetail as { batch?: Record<string, unknown> }).batch
+    if (session.user.role === 'CLIENT') {
+      for (const field of [
+        'purchasePrice',
+        'estimatedPrice',
+        'invoiceNumber',
+        'purchaseOrderNumber',
+        'rentalMonthlyCost',
+        'rentalBuyoutValue',
+        'residualValue',
+        'saleListingPrice',
+      ]) {
+        delete responseEquipment[field]
+      }
+      const supplier = responseEquipment.supplier as
+        | { id: string; name: string; taxId?: string }
+        | undefined
+      if (supplier) {
+        responseEquipment.supplier = { id: supplier.id, name: supplier.name }
+      }
+      if (responseBatch) {
+        const batchRest = { ...responseBatch }
+        delete batchRest.unitPrice
+        responseBatch = batchRest
+      }
+    }
+
+    return NextResponse.json({
+      ...equipmentDetail,
+      equipment: responseEquipment,
+      batch: responseBatch,
+    })
   } catch (error) {
     console.error('Error en GET /api/inventory/equipment/[id]:', error)
 
