@@ -101,6 +101,24 @@ export function buildNewsVisibilityConditions(viewer: NewsViewer) {
   return conditions
 }
 
+/**
+ * Ventana de vigencia, independiente del `status` — `true` si `now` cae
+ * entre `startDate` y `endDate` (o no hay límite en alguno de los dos
+ * extremos). Única fuente de verdad: antes `userCanAccessNews` la
+ * calculaba inline y `getNewsNotificationRecipientIds` no la miraba en
+ * absoluto — publicar con `startDate` futura notificaba (push + email +
+ * Telegram) a toda la organización por una noticia que el feed todavía no
+ * mostraba a nadie.
+ */
+export function isNewsWithinDateWindow(
+  news: { startDate: Date | null; endDate: Date | null },
+  now: Date = new Date()
+): boolean {
+  if (news.startDate && news.startDate > now) return false
+  if (news.endDate && news.endDate < now) return false
+  return true
+}
+
 export function userCanAccessNews(
   news: NewsVisibilityData,
   viewer: NewsViewer,
@@ -119,10 +137,7 @@ export function userCanAccessNews(
   const isManagerBypass = allowManagerBypass && viewer.role === 'ADMIN'
   if (!isManagerBypass) {
     if (requirePublished && news.status !== 'PUBLISHED') return false
-
-    const now = new Date()
-    if (news.startDate && news.startDate > now) return false
-    if (news.endDate && news.endDate < now) return false
+    if (!isNewsWithinDateWindow(news)) return false
   }
 
   const noRestrictions =
@@ -195,7 +210,7 @@ export async function getNewsNotificationRecipientIds(
     include: NEWS_VISIBILITY_INCLUDE,
   })
 
-  if (!news || news.status !== 'PUBLISHED') return []
+  if (!news || news.status !== 'PUBLISHED' || !isNewsWithinDateWindow(news)) return []
 
   const moduleAccess = {
     isActive: true,
