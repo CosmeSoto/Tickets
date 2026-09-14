@@ -6,12 +6,15 @@ import { authOptions } from '@/lib/auth'
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user) {
-      return NextResponse.json(
-        { success: false, error: 'No autorizado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ success: false, error: 'No autorizado' }, { status: 401 })
+    }
+
+    // Solo consumido desde el formulario admin de categorías — expone carga
+    // de trabajo y nombres de técnicos, no debe ser accesible a CLIENT/TECHNICIAN.
+    if (session.user.role !== 'ADMIN') {
+      return NextResponse.json({ success: false, error: 'No autorizado' }, { status: 403 })
     }
 
     const { searchParams } = new URL(request.url)
@@ -28,15 +31,14 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: result
+      data: result,
     })
-
   } catch (error) {
     console.error('Error simulando asignación:', error)
     return NextResponse.json(
-      { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Error interno del servidor' 
+      {
+        success: false,
+        error: error instanceof Error ? error.message : 'Error interno del servidor',
       },
       { status: 500 }
     )
