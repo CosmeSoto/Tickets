@@ -177,10 +177,31 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       updateData.assigneeId = session.user.id
     }
 
-    // Actualizar ticket en BD
-    const updatedTicket = await prisma.tickets.update({
-      where: { id: ticketId },
+    // Actualizar ticket en BD — el `where` exige que el ticket siga en el
+    // MISMO estado leído arriba (claim atómico, mismo patrón usado en el
+    // resto del sistema). Sin esto, dos técnicos tomando a la vez un ticket
+    // sin asignar (o cualquier doble cambio de estado simultáneo) resolvían
+    // el `findUnique` inicial con los mismos datos, ambos pasaban la
+    // validación de transición, y el `update` incondicional dejaba que el
+    // último en escribir ganara en silencio — el otro recibía un 200 "éxito"
+    // sin que su cambio realmente se hubiera aplicado.
+    const claim = await prisma.tickets.updateMany({
+      where: { id: ticketId, status: currentStatus },
       data: updateData,
+    })
+    if (claim.count === 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            'El ticket cambió de estado mientras se procesaba tu solicitud. Recárgalo e intenta de nuevo.',
+        },
+        { status: 409 }
+      )
+    }
+
+    const updatedTicket = await prisma.tickets.findUniqueOrThrow({
+      where: { id: ticketId },
       include: {
         categories: { select: { id: true, name: true, color: true } },
         users_tickets_clientIdTousers: { select: { id: true, name: true, email: true } },

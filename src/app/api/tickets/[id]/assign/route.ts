@@ -95,13 +95,32 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       }
     }
 
-    const updatedTicket = await prisma.tickets.update({
-      where: { id: ticketId },
+    // El `where` exige que el ticket siga con el MISMO assigneeId leído
+    // arriba (claim atómico) — sin esto, dos admins reasignando el mismo
+    // ticket casi al mismo tiempo terminaban con "el último en escribir
+    // gana" en silencio, sin que el primero se enterara de que su cambio fue
+    // sobrescrito.
+    const claim = await prisma.tickets.updateMany({
+      where: { id: ticketId, assigneeId: currentTicket.assigneeId },
       data: {
         assigneeId: assignmentData.assigneeId,
         status: assignmentData.assigneeId ? 'IN_PROGRESS' : 'OPEN',
         updatedAt: new Date(),
       },
+    })
+    if (claim.count === 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            'La asignación del ticket cambió mientras se procesaba tu solicitud. Recárgalo e intenta de nuevo.',
+        },
+        { status: 409 }
+      )
+    }
+
+    const updatedTicket = await prisma.tickets.findUniqueOrThrow({
+      where: { id: ticketId },
       include: {
         users_tickets_assigneeIdTousers: {
           select: { id: true, name: true, email: true, role: true },
