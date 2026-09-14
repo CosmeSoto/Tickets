@@ -1,5 +1,6 @@
 import { families } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import { isPrismaForeignKeyViolation } from '@/lib/db/prisma-errors'
 
 // ============================================================
 // Interfaces
@@ -198,7 +199,8 @@ export class FamilyService {
         ...(data.icon !== undefined && { icon: data.icon }),
         ...(data.order !== undefined && { order: data.order }),
         ...(contactWhatsapp !== undefined && {
-          contactWhatsapp: contactWhatsapp === null || contactWhatsapp === '' ? null : contactWhatsapp,
+          contactWhatsapp:
+            contactWhatsapp === null || contactWhatsapp === '' ? null : contactWhatsapp,
         }),
       },
     })
@@ -326,6 +328,18 @@ export class FamilyService {
       )
     }
 
-    await prisma.families.delete({ where: { id } })
+    try {
+      await prisma.families.delete({ where: { id } })
+    } catch (err) {
+      // TOCTOU: un ticket/tipo pudo crearse entre los conteos y el delete.
+      // La FK real de Postgres lo impide (P2003) — se traduce al mismo
+      // mensaje amigable en vez de dejar pasar el error crudo de Prisma.
+      if (isPrismaForeignKeyViolation(err)) {
+        throw new Error(
+          'No se puede eliminar la familia: tiene registros asociados (tickets o tipos de activo)'
+        )
+      }
+      throw err
+    }
   }
 }

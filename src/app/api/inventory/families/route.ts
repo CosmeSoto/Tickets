@@ -65,7 +65,8 @@ export async function GET(request: NextRequest) {
 /**
  * POST /api/inventory/families
  * Crea una nueva familia de inventario.
- * Solo ADMIN.
+ * Solo Super Admin — misma tabla `families` que administra /api/families,
+ * que ya restringe la creación a Super Admin.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -75,11 +76,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    if (session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { error: 'Solo el administrador puede gestionar familias de inventario' },
-        { status: 403 }
-      )
+    const superCheck = await (
+      await import('@/lib/auth/require-super-admin')
+    ).requireSuperAdmin(session)
+    if (!superCheck.ok) {
+      return NextResponse.json({ error: superCheck.error }, { status: superCheck.status })
     }
 
     const body = await request.json()

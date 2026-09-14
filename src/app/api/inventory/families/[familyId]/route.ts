@@ -9,6 +9,7 @@ import {
   toInventoryAccessUser,
   inventoryAccessToResponse,
 } from '@/lib/inventory/inventory-resource-access'
+import { isPrismaForeignKeyViolation } from '@/lib/db/prisma-errors'
 
 /**
  * GET /api/inventory/families/[familyId]
@@ -64,7 +65,9 @@ export async function GET(
 
 /**
  * PUT /api/inventory/families/[familyId]
- * Edita una familia de inventario. Solo ADMIN.
+ * Edita una familia de inventario. Solo Super Admin — misma tabla `families`
+ * que administra /api/families, que ya restringe la edición a Super Admin;
+ * un ADMIN scoped a una familia no debe poder editar el catálogo global.
  */
 export async function PUT(
   request: NextRequest,
@@ -77,11 +80,11 @@ export async function PUT(
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    if (session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { error: 'Solo el administrador puede gestionar familias de inventario' },
-        { status: 403 }
-      )
+    const superCheck = await (
+      await import('@/lib/auth/require-super-admin')
+    ).requireSuperAdmin(session)
+    if (!superCheck.ok) {
+      return NextResponse.json({ error: superCheck.error }, { status: superCheck.status })
     }
 
     const { familyId } = await params
@@ -130,7 +133,9 @@ export async function PUT(
 
 /**
  * PATCH /api/inventory/families/[familyId]
- * Alterna el estado activo/inactivo de una familia. Solo ADMIN.
+ * Alterna el estado activo/inactivo de una familia. Solo Super Admin —
+ * desactivar una familia tiene efectos en cascada sobre tickets/inventario/
+ * rondas de toda la organización, no solo del ámbito de un ADMIN scoped.
  */
 export async function PATCH(
   _request: NextRequest,
@@ -143,11 +148,11 @@ export async function PATCH(
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    if (session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { error: 'Solo el administrador puede gestionar familias de inventario' },
-        { status: 403 }
-      )
+    const superCheck = await (
+      await import('@/lib/auth/require-super-admin')
+    ).requireSuperAdmin(session)
+    if (!superCheck.ok) {
+      return NextResponse.json({ error: superCheck.error }, { status: superCheck.status })
     }
 
     const { familyId } = await params
@@ -183,7 +188,9 @@ export async function PATCH(
 
 /**
  * DELETE /api/inventory/families/[familyId]
- * Elimina una familia si no tiene tipos de activo asignados. Solo ADMIN.
+ * Elimina una familia si no tiene tipos de activo asignados. Solo Super
+ * Admin — misma tabla `families` que administra /api/families, que ya
+ * restringe la eliminación a Super Admin.
  */
 export async function DELETE(
   _request: NextRequest,
@@ -196,11 +203,11 @@ export async function DELETE(
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    if (session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { error: 'Solo el administrador puede gestionar familias de inventario' },
-        { status: 403 }
-      )
+    const superCheck = await (
+      await import('@/lib/auth/require-super-admin')
+    ).requireSuperAdmin(session)
+    if (!superCheck.ok) {
+      return NextResponse.json({ error: superCheck.error }, { status: superCheck.status })
     }
 
     const { familyId } = await params
@@ -226,7 +233,23 @@ export async function DELETE(
       )
     }
 
-    await prisma.families.delete({ where: { id: familyId } })
+    try {
+      await prisma.families.delete({ where: { id: familyId } })
+    } catch (err) {
+      // TOCTOU: un tipo pudo crearse entre el conteo y el delete. La FK real
+      // de Postgres lo impide (P2003) — se traduce a la misma respuesta 409
+      // controlada en vez de dejarla caer al 500 genérico.
+      if (isPrismaForeignKeyViolation(err)) {
+        return NextResponse.json(
+          {
+            error:
+              'No se puede eliminar la familia porque tiene tipos de activo asignados. Desactívela en su lugar.',
+          },
+          { status: 409 }
+        )
+      }
+      throw err
+    }
 
     await prisma.audit_logs
       .create({
