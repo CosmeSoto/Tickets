@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
+import { NotificationService } from '@/lib/services/notification-service'
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,23 +14,17 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const {
-      title,
-      severity,
-      browser,
-      os,
-      steps,
-      expected,
-      actual,
-      additional
-    } = body
+    const { title, severity, browser, os, steps, expected, actual, additional } = body
 
     // Validar campos requeridos
     if (!title || !severity || !steps || !expected || !actual) {
-      return NextResponse.json({ 
-        success: false,
-        error: 'Faltan campos requeridos' 
-      }, { status: 400 })
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Faltan campos requeridos',
+        },
+        { status: 400 }
+      )
     }
 
     // Buscar categoría de "Bugs" o crear una por defecto
@@ -37,9 +32,9 @@ export async function POST(request: NextRequest) {
       where: {
         name: {
           contains: 'Bug',
-          mode: 'insensitive'
-        }
-      }
+          mode: 'insensitive',
+        },
+      },
     })
 
     if (!bugCategory) {
@@ -55,7 +50,7 @@ export async function POST(request: NextRequest) {
           isActive: true,
           createdAt: new Date(),
           updatedAt: new Date(),
-        }
+        },
       })
     }
 
@@ -85,39 +80,55 @@ ${additional ? `**Información Adicional:**\n${additional}` : ''}
         id: randomUUID(),
         title: `[BUG] ${title}`,
         description,
-        priority: severity === 'CRITICAL' ? 'URGENT' : 
-                 severity === 'HIGH' ? 'HIGH' :
-                 severity === 'MEDIUM' ? 'MEDIUM' : 'LOW',
+        priority:
+          severity === 'CRITICAL'
+            ? 'URGENT'
+            : severity === 'HIGH'
+              ? 'HIGH'
+              : severity === 'MEDIUM'
+                ? 'MEDIUM'
+                : 'LOW',
         status: 'OPEN',
         source: 'WEB',
         clientId: session.user.id,
         categoryId: bugCategory.id,
         tags: ['bug-report', 'help-system', severity.toLowerCase()],
         createdAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
       },
       include: {
         users_tickets_clientIdTousers: true,
-        categories: true
-      }
+        categories: true,
+      },
     })
 
-    // El sistema de notificaciones automáticamente detectará este ticket crítico
-    // y generará alertas para los administradores
+    // Este ticket se crea con `prisma.tickets.create` directo (no vía
+    // /api/tickets), así que NO dispara notificación por sí solo pese a lo
+    // que decía este comentario — sin familyId (la categoría "Reportes de
+    // Bugs" no pertenece a ninguna), notifyTicketCreated cae al fallback de
+    // "solo super admins" (getTicketOversightAdmins incluye siempre a los
+    // super admins, con o sin familia), que es quien debe triar un reporte
+    // de bug del sistema.
+    await NotificationService.notifyTicketCreated(ticket.id).catch(err => {
+      console.error('[NOTIFICATION] Error notificando reporte de bug:', err)
+    })
 
     return NextResponse.json({
       success: true,
       data: {
         ticketId: ticket.id,
-        ticketNumber: ticket.id.slice(-8).toUpperCase()
+        ticketNumber: ticket.id.slice(-8).toUpperCase(),
       },
-      message: 'Reporte de bug enviado exitosamente. Se ha creado un ticket para dar seguimiento.'
+      message: 'Reporte de bug enviado exitosamente. Se ha creado un ticket para dar seguimiento.',
     })
   } catch (error) {
     console.error('Error creating bug report:', error)
-    return NextResponse.json({ 
-      success: false,
-      error: 'Error interno del servidor' 
-    }, { status: 500 })
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Error interno del servidor',
+      },
+      { status: 500 }
+    )
   }
 }

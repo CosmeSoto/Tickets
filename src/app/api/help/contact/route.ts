@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
+import { NotificationService } from '@/lib/services/notification-service'
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,28 +14,26 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const {
-      subject,
-      category,
-      priority,
-      message
-    } = body
+    const { subject, category, priority, message } = body
 
     // Validar campos requeridos
     if (!subject || !category || !priority || !message) {
-      return NextResponse.json({ 
-        success: false,
-        error: 'Faltan campos requeridos' 
-      }, { status: 400 })
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Faltan campos requeridos',
+        },
+        { status: 400 }
+      )
     }
 
     // Mapear categorías a categorías existentes o crear una por defecto
     const categoryMap: { [key: string]: string } = {
-      'technical': 'Soporte Técnico',
-      'account': 'Cuenta y Acceso',
-      'billing': 'Facturación',
-      'feature': 'Solicitudes de Funciones',
-      'other': 'Consultas Generales'
+      technical: 'Soporte Técnico',
+      account: 'Cuenta y Acceso',
+      billing: 'Facturación',
+      feature: 'Solicitudes de Funciones',
+      other: 'Consultas Generales',
     }
 
     const categoryName = categoryMap[category] || 'Consultas Generales'
@@ -44,9 +43,9 @@ export async function POST(request: NextRequest) {
       where: {
         name: {
           contains: categoryName,
-          mode: 'insensitive'
-        }
-      }
+          mode: 'insensitive',
+        },
+      },
     })
 
     if (!ticketCategory) {
@@ -59,8 +58,8 @@ export async function POST(request: NextRequest) {
           color: '#3B82F6',
           order: 100,
           createdAt: new Date(),
-          updatedAt: new Date()
-        }
+          updatedAt: new Date(),
+        },
       })
     }
 
@@ -88,30 +87,39 @@ ${message}
         categoryId: ticketCategory.id,
         tags: ['help-system', 'support-request', category],
         createdAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
       },
       include: {
         users_tickets_clientIdTousers: true,
-        categories: true
-      }
+        categories: true,
+      },
     })
 
-    // El sistema de notificaciones automáticamente detectará este nuevo ticket
-    // y generará alertas para los técnicos apropiados
+    // Este ticket se crea con `prisma.tickets.create` directo (no vía
+    // /api/tickets), así que NO dispara notificación por sí solo pese a lo
+    // que decía este comentario — sin familyId, notifyTicketCreated cae al
+    // fallback de "solo super admins" (getTicketOversightAdmins incluye
+    // siempre a los super admins, con o sin familia).
+    await NotificationService.notifyTicketCreated(ticket.id).catch(err => {
+      console.error('[NOTIFICATION] Error notificando consulta de soporte:', err)
+    })
 
     return NextResponse.json({
       success: true,
       data: {
         ticketId: ticket.id,
-        ticketNumber: ticket.id.slice(-8).toUpperCase()
+        ticketNumber: ticket.id.slice(-8).toUpperCase(),
       },
-      message: 'Tu consulta ha sido enviada exitosamente. Te responderemos pronto.'
+      message: 'Tu consulta ha sido enviada exitosamente. Te responderemos pronto.',
     })
   } catch (error) {
     console.error('Error creating support request:', error)
-    return NextResponse.json({ 
-      success: false,
-      error: 'Error interno del servidor' 
-    }, { status: 500 })
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Error interno del servidor',
+      },
+      { status: 500 }
+    )
   }
 }
