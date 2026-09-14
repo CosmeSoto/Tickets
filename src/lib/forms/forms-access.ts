@@ -9,6 +9,7 @@
 
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { buildFormVisibilityConditions, getFormViewer } from '@/lib/forms/form-visibility'
 
 export interface FormsAccessContext {
   userId: string
@@ -68,15 +69,24 @@ export async function assertCanModifyForm(
   if (isSuperAdmin) return null
 
   if (role === 'ADMIN') {
-    const user = await prisma.users.findUnique({
-      where: { id: userId },
-      select: { formsEnabled: true },
-    })
-    if (!user?.formsEnabled) {
+    const viewer = await getFormViewer(userId)
+    if (!viewer?.formsEnabled) {
       return NextResponse.json(
         { error: 'No tienes permisos para gestionar documentos' },
         { status: 403 }
       )
+    }
+
+    // ADMIN de familia: mismo alcance de visibilidad que ya usa el GET de
+    // administración de este documento (admin/forms/[id]/route.ts) — antes
+    // formsEnabled=true bastaba para editar/borrar/reemplazar el adjunto de
+    // CUALQUIER documento del sistema, incluidos los de otra familia que ni
+    // siquiera puede ver por GET.
+    const inScope = await prisma.forms.count({
+      where: { id: formId, OR: buildFormVisibilityConditions(viewer) },
+    })
+    if (inScope === 0) {
+      return NextResponse.json({ error: 'No tienes acceso a este documento' }, { status: 403 })
     }
     return null
   }
