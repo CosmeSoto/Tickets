@@ -15,7 +15,7 @@ import {
   encryptFile,
 } from './backup-utils'
 import { generateAndSaveBackupMetadata } from './backup-metadata'
-import { cleanOldBackups } from './backup-cleanup'
+import { cleanOldBackups, reconcileStaleBackupRecords } from './backup-cleanup'
 import { BackupCloudService, type CloudProvider } from '../backup-cloud-service'
 import {
   isPgBackRestAvailable,
@@ -73,6 +73,25 @@ export async function createBackup(
 
   const mode: BackupCreateMode = options?.mode ?? 'infrastructure'
   const backupKind = options?.backupKind ?? resolveInfrastructureKind(mode, type)
+
+  // Un doble clic en "crear backup", o el cron disparando mientras un manual
+  // sigue corriendo, lanzaban dos `pg_dump`/exportaciones en paralelo sin
+  // ningún guard (el worker de pgBackRest sí tiene uno para /backup y
+  // /restore; este es el equivalente para export/module, que corren dentro
+  // de esta misma app). No es perfectamente atómico (sigue habiendo una
+  // ventana entre este check y el `create` del registro `in_progress` más
+  // abajo), pero reduce la ventana de milisegundos de setup síncrono en vez
+  // de la duración completa del backup. Reconciliar primero los `in_progress`
+  // obsoletos (proceso caído a medias) evita que un registro huérfano
+  // bloquee todo backup futuro para siempre.
+  await reconcileStaleBackupRecords()
+  const existingInProgress = await prisma.backups.findFirst({
+    where: { status: 'in_progress' },
+    select: { id: true },
+  })
+  if (existingInProgress) {
+    throw new Error('Ya hay un backup en curso. Espera a que termine antes de iniciar otro.')
+  }
 
   if (mode === 'module') {
     if (!options?.module || !isBackupModuleId(options.module)) {

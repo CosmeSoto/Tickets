@@ -282,6 +282,11 @@ async function finalizeStackAfterRestore() {
   await dockerStartContainers([CONTAINER_APP, CONTAINER_NGINX])
 }
 
+/** `true` mientras un `pgbackrest backup` está en curso — evita que dos
+ * llamadas concurrentes a /backup (doble clic, cron solapado con un disparo
+ * manual) ejecuten pgbackrest en paralelo sobre el mismo repositorio. */
+let backupRunning = false
+
 /** Estado de la última restauración pgBackRest (consultable tras reinicio de servicios). */
 let restoreJob = {
   status: 'idle',
@@ -562,6 +567,9 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (url.pathname === '/backup' && req.method === 'POST') {
+      if (backupRunning) {
+        return json(res, 409, { error: 'Ya hay un backup pgBackRest en curso' })
+      }
       if (!stanzaReady) {
         const result = await startInit()
         if (!result.ok) {
@@ -580,23 +588,28 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req)
       const type = ['full', 'diff', 'incr'].includes(body.type) ? body.type : 'diff'
       const start = Date.now()
-      await runPgBackRest(['backup', `--stanza=${STANZA}`, `--type=${type}`])
+      backupRunning = true
       try {
-        await runPgBackRest(['expire', `--stanza=${STANZA}`])
-        console.log('[backup-worker] expire completado tras backup')
-      } catch (expireErr) {
-        console.warn('[backup-worker] expire falló (backup OK):', expireErr)
+        await runPgBackRest(['backup', `--stanza=${STANZA}`, `--type=${type}`])
+        try {
+          await runPgBackRest(['expire', `--stanza=${STANZA}`])
+          console.log('[backup-worker] expire completado tras backup')
+        } catch (expireErr) {
+          console.warn('[backup-worker] expire falló (backup OK):', expireErr)
+        }
+        const { stdout } = await runPgBackRest(['info', `--stanza=${STANZA}`, '--output=json'])
+        const info = JSON.parse(stdout || '[]')
+        const stanzaInfo = info[0] || {}
+        const lastBackup = normalizeBackupEntry(stanzaInfo['backup']?.slice(-1)[0] || null)
+        return json(res, 200, {
+          success: true,
+          type,
+          durationMs: Date.now() - start,
+          backup: lastBackup,
+        })
+      } finally {
+        backupRunning = false
       }
-      const { stdout } = await runPgBackRest(['info', `--stanza=${STANZA}`, '--output=json'])
-      const info = JSON.parse(stdout || '[]')
-      const stanzaInfo = info[0] || {}
-      const lastBackup = normalizeBackupEntry(stanzaInfo['backup']?.slice(-1)[0] || null)
-      return json(res, 200, {
-        success: true,
-        type,
-        durationMs: Date.now() - start,
-        backup: lastBackup,
-      })
     }
 
     if (url.pathname === '/verify' && req.method === 'POST') {
