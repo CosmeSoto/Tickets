@@ -5,6 +5,7 @@ import { randomUUID } from 'crypto'
 import { getDepartmentNativeFamilyId } from '@/lib/auth/family-scope'
 import { roleCanBeInventoryManager } from '@/lib/inventory/manager-eligibility'
 import { AuditServiceComplete, AuditActionsComplete } from './audit-service-complete'
+import { isPrismaUniqueViolation } from '@/lib/db/prisma-errors'
 
 // Función helper para obtener el nombre del nivel
 function getLevelName(level: number): string {
@@ -329,114 +330,122 @@ export class UserService {
       : false
 
     // Crear el usuario en una transacción para manejar las asignaciones de categorías
-    const result = await prisma.$transaction(async tx => {
-      const user = await tx.users.create({
-        data: {
-          id: randomUUID(),
-          email: data.email,
-          name: data.name,
-          passwordHash,
-          role: data.role,
-          departmentId: data.departmentId || data.department || null,
-          phone: data.phone || null,
-          isActive: true,
-          isSuperAdmin: isAdminRole ? (data.isSuperAdmin ?? false) : false,
-          ticketsEnabled,
-          inventoryEnabled,
-          patrolsEnabled,
-          newsEnabled,
-          canManageNews,
-          canManageInventory,
-          canRequestAssets: data.canRequestAssets ?? false,
-          canAccessKnowledge: ticketsEnabled ? (data.canAccessKnowledge ?? true) : false,
-          formsEnabled,
-          canManageForms,
-          credentialsEnabled,
-          canManageCredentials,
-          processesEnabled,
-          canManageProcesses,
-          accessEnabled,
-          canManageAccess,
-          isEmailVerified: false,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-        include: {
-          departments: {
-            select: {
-              id: true,
-              name: true,
-              color: true,
-              description: true,
-            },
-          },
-        },
-      })
-
-      // Si es técnico y tiene categorías asignadas, crear las asignaciones
-      if (
-        data.role === 'TECHNICIAN' &&
-        data.assignedCategories &&
-        data.assignedCategories.length > 0
-      ) {
-        await tx.technician_assignments.createMany({
-          data: data.assignedCategories.map(assignment => ({
+    let result
+    try {
+      result = await prisma.$transaction(async tx => {
+        const user = await tx.users.create({
+          data: {
             id: randomUUID(),
-            technicianId: user.id,
-            categoryId: assignment.categoryId,
-            priority: assignment.priority,
-            maxTickets: assignment.maxTickets || 10,
-            autoAssign: assignment.autoAssign ?? true,
+            email: data.email,
+            name: data.name,
+            passwordHash,
+            role: data.role,
+            departmentId: data.departmentId || data.department || null,
+            phone: data.phone || null,
             isActive: true,
+            isSuperAdmin: isAdminRole ? (data.isSuperAdmin ?? false) : false,
+            ticketsEnabled,
+            inventoryEnabled,
+            patrolsEnabled,
+            newsEnabled,
+            canManageNews,
+            canManageInventory,
+            canRequestAssets: data.canRequestAssets ?? false,
+            canAccessKnowledge: ticketsEnabled ? (data.canAccessKnowledge ?? true) : false,
+            formsEnabled,
+            canManageForms,
+            credentialsEnabled,
+            canManageCredentials,
+            processesEnabled,
+            canManageProcesses,
+            accessEnabled,
+            canManageAccess,
+            isEmailVerified: false,
             createdAt: new Date(),
             updatedAt: new Date(),
-          })),
+          },
+          include: {
+            departments: {
+              select: {
+                id: true,
+                name: true,
+                color: true,
+                description: true,
+              },
+            },
+          },
         })
-      }
 
-      // Técnico: la familia nativa viene del departamento (no se persiste en user_family_access).
-      // Crear user_settings por defecto (garantiza que las notificaciones estén habilitadas)
-      await tx.user_settings.create({
-        data: {
-          id: randomUUID(),
-          userId: user.id,
-          emailNotifications: true,
-          pushNotifications: true,
-          ticketCreated: true,
-          ticketAssigned: true,
-          statusChanged: true,
-          newComments: true,
-          ticketUpdated: true,
-          updatedAt: new Date(),
-        },
+        // Si es técnico y tiene categorías asignadas, crear las asignaciones
+        if (
+          data.role === 'TECHNICIAN' &&
+          data.assignedCategories &&
+          data.assignedCategories.length > 0
+        ) {
+          await tx.technician_assignments.createMany({
+            data: data.assignedCategories.map(assignment => ({
+              id: randomUUID(),
+              technicianId: user.id,
+              categoryId: assignment.categoryId,
+              priority: assignment.priority,
+              maxTickets: assignment.maxTickets || 10,
+              autoAssign: assignment.autoAssign ?? true,
+              isActive: true,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            })),
+          })
+        }
+
+        // Técnico: la familia nativa viene del departamento (no se persiste en user_family_access).
+        // Crear user_settings por defecto (garantiza que las notificaciones estén habilitadas)
+        await tx.user_settings.create({
+          data: {
+            id: randomUUID(),
+            userId: user.id,
+            emailNotifications: true,
+            pushNotifications: true,
+            ticketCreated: true,
+            ticketAssigned: true,
+            statusChanged: true,
+            newComments: true,
+            ticketUpdated: true,
+            updatedAt: new Date(),
+          },
+        })
+
+        // Registrar auditoría
+        if (performedBy) {
+          await AuditServiceComplete.log({
+            action: AuditActionsComplete.USER_CREATED,
+            entityType: 'user',
+            entityId: user.id,
+            userId: performedBy,
+            details: {
+              userEmail: user.email,
+              userName: user.name,
+              userRole: user.role,
+              departmentId: user.departmentId,
+              assignedCategories: data.assignedCategories?.length || 0,
+            },
+            newValues: {
+              email: user.email,
+              name: user.name,
+              role: user.role,
+              departmentId: user.departmentId,
+              isActive: user.isActive,
+            },
+          })
+        }
+
+        return user
       })
-
-      // Registrar auditoría
-      if (performedBy) {
-        await AuditServiceComplete.log({
-          action: AuditActionsComplete.USER_CREATED,
-          entityType: 'user',
-          entityId: user.id,
-          userId: performedBy,
-          details: {
-            userEmail: user.email,
-            userName: user.name,
-            userRole: user.role,
-            departmentId: user.departmentId,
-            assignedCategories: data.assignedCategories?.length || 0,
-          },
-          newValues: {
-            email: user.email,
-            name: user.name,
-            role: user.role,
-            departmentId: user.departmentId,
-            isActive: user.isActive,
-          },
-        })
+    } catch (error) {
+      if (isPrismaUniqueViolation(error, 'email')) {
+        throw new Error('Ya existe un usuario con este email')
       }
-
-      return user
-    })
+      throw error
+    }
 
     return {
       id: result.id,
@@ -556,54 +565,62 @@ export class UserService {
         : null
 
     // Actualizar usuario en una transacción para manejar las asignaciones de categorías
-    const result = await prisma.$transaction(async tx => {
-      const updatedUser = await tx.users.update({
-        where: { id },
-        data: updateData,
-        include: {
-          departments: {
-            select: {
-              id: true,
-              name: true,
-              color: true,
-              description: true,
-              familyId: true,
-              family: {
-                select: { id: true, name: true, code: true, color: true },
+    let result
+    try {
+      result = await prisma.$transaction(async tx => {
+        const updatedUser = await tx.users.update({
+          where: { id },
+          data: updateData,
+          include: {
+            departments: {
+              select: {
+                id: true,
+                name: true,
+                color: true,
+                description: true,
+                familyId: true,
+                family: {
+                  select: { id: true, name: true, code: true, color: true },
+                },
               },
             },
           },
-        },
-      })
-
-      // Si es técnico y se proporcionaron asignaciones de categorías, actualizarlas
-      if (data.role === 'TECHNICIAN' && data.assignedCategories !== undefined) {
-        // Eliminar asignaciones existentes
-        await tx.technician_assignments.deleteMany({
-          where: { technicianId: id },
         })
 
-        // Crear nuevas asignaciones si las hay
-        if (data.assignedCategories.length > 0) {
-          await tx.technician_assignments.createMany({
-            data: data.assignedCategories.map(assignment => ({
-              id: randomUUID(),
-              technicianId: id,
-              categoryId: assignment.categoryId,
-              priority: assignment.priority,
-              maxTickets: assignment.maxTickets || 10,
-              autoAssign: assignment.autoAssign ?? true,
-              isActive: true,
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            })),
+        // Si es técnico y se proporcionaron asignaciones de categorías, actualizarlas
+        if (data.role === 'TECHNICIAN' && data.assignedCategories !== undefined) {
+          // Eliminar asignaciones existentes
+          await tx.technician_assignments.deleteMany({
+            where: { technicianId: id },
           })
-        }
-      }
 
-      // Técnico: familia nativa = departamento (user_family_access solo para áreas adicionales).
-      return updatedUser
-    })
+          // Crear nuevas asignaciones si las hay
+          if (data.assignedCategories.length > 0) {
+            await tx.technician_assignments.createMany({
+              data: data.assignedCategories.map(assignment => ({
+                id: randomUUID(),
+                technicianId: id,
+                categoryId: assignment.categoryId,
+                priority: assignment.priority,
+                maxTickets: assignment.maxTickets || 10,
+                autoAssign: assignment.autoAssign ?? true,
+                isActive: true,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              })),
+            })
+          }
+        }
+
+        // Técnico: familia nativa = departamento (user_family_access solo para áreas adicionales).
+        return updatedUser
+      })
+    } catch (error) {
+      if (isPrismaUniqueViolation(error, 'email')) {
+        throw new Error('Ya existe un usuario con este email')
+      }
+      throw error
+    }
 
     console.log('✅ [UserService] Usuario actualizado en BD:', {
       id: result.id,

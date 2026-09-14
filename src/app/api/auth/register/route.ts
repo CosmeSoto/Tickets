@@ -7,6 +7,7 @@ import { SecurityConfigService } from '@/lib/services/security-config-service'
 import { EmailService } from '@/lib/services/email/email-service'
 import { getEmailBranding } from '@/lib/services/email/email-branding'
 import { normalizePhoneInput, validatePhoneInput } from '@/lib/auth/profile-completion'
+import { isPrismaUniqueViolation } from '@/lib/db/prisma-errors'
 
 export async function POST(request: NextRequest) {
   try {
@@ -100,31 +101,50 @@ export async function POST(request: NextRequest) {
     // Hash de la contraseña
     const passwordHash = await bcrypt.hash(password, 10)
 
-    // Crear el usuario
-    const user = await prisma.users.create({
-      data: {
-        id: randomUUID(),
-        name: name.trim(),
-        email: email.toLowerCase().trim(),
-        passwordHash,
-        phone: normalizedPhone,
-        departmentId,
-        role: 'CLIENT',
-        isActive: true,
-        isEmailVerified: false,
-        passwordChangedAt: new Date(),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        departmentId: true,
-        createdAt: true,
-      },
-    })
+    // Crear el usuario. El `findUnique` de arriba no es atómico (dos
+    // registros concurrentes con el mismo email pueden pasarlo ambos antes de
+    // que cualquiera cree la fila) — el `create` es la fuente de verdad real:
+    // si Postgres rechaza por email duplicado (P2002), se traduce a 409 en
+    // vez de dejar que caiga al catch genérico como 500.
+    let user
+    try {
+      user = await prisma.users.create({
+        data: {
+          id: randomUUID(),
+          name: name.trim(),
+          email: email.toLowerCase().trim(),
+          passwordHash,
+          phone: normalizedPhone,
+          departmentId,
+          role: 'CLIENT',
+          isActive: true,
+          isEmailVerified: false,
+          passwordChangedAt: new Date(),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          departmentId: true,
+          createdAt: true,
+        },
+      })
+    } catch (error) {
+      if (isPrismaUniqueViolation(error, 'email')) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Este email ya está registrado',
+            field: 'email',
+          },
+          { status: 409 }
+        )
+      }
+      throw error
+    }
 
     // Log de auditoría
     await prisma.audit_logs.create({
