@@ -9,6 +9,7 @@ import {
   checkCredentialsModuleAccess,
   credentialEntryMetadataSelect,
   userCanAccessEntry,
+  userCanEditEntry,
   userCanMutateEntry,
 } from '@/lib/credentials/access'
 import { EncryptionService } from '@/lib/services/encryption.service'
@@ -90,7 +91,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     return NextResponse.json({ error: 'Credencial no encontrada' }, { status: 404 })
   }
 
-  if (!(await userCanMutateEntry(ctx, entry))) {
+  if (!(await userCanEditEntry(ctx, entry))) {
     return NextResponse.json({ error: 'Sin permiso para editar esta credencial' }, { status: 403 })
   }
 

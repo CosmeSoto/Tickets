@@ -12,8 +12,13 @@ import { isPrismaUniqueViolation } from '@/lib/db/prisma-errors'
 
 const createShareSchema = z.object({
   userId: z.string().min(1, 'Selecciona un usuario'),
-  /** MVP: solo VIEW (revelar/usar). EDIT/ADMIN quedan para más adelante. */
-  capability: z.enum(['VIEW']).optional().default('VIEW'),
+  /**
+   * VIEW: solo revelar/usar (auditado). EDIT: además puede editar el
+   * contenido (ver userCanEditEntry) — pero no borrar ni gestionar
+   * compartidos, eso sigue siendo solo del dueño/gestor. ADMIN queda para
+   * más adelante.
+   */
+  capability: z.enum(['VIEW', 'EDIT']).optional().default('VIEW'),
 })
 
 type RouteParams = { params: Promise<{ id: string }> }
@@ -167,11 +172,15 @@ export async function POST(request: Request, { params }: RouteParams) {
   })
 
   // Notificación in-app (sin secreto). Tipo INFO para no exigir migración de enum.
+  const actionHint =
+    share.capability === 'EDIT'
+      ? 'Ábrela en Credenciales: puedes revelarla y también editar su contenido (queda auditado).'
+      : 'Ábrela en Credenciales y usa «Usar / revelar» (queda auditado).'
   await notifyUser(
     target.id,
     'INFO',
     'Credencial compartida contigo',
-    `${session.user.name || 'Un colega'} te compartió «${entry.title}». Ábrela en Credenciales y usa «Usar / revelar» (queda auditado).`,
+    `${session.user.name || 'Un colega'} te compartió «${entry.title}». ${actionHint}`,
     { metadata: { link: '/credentials', entryId: id, kind: 'credential_shared' } }
   )
 

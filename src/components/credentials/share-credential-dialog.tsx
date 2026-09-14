@@ -49,6 +49,13 @@ const ROLE_LABEL: Record<string, string> = {
   CLIENT: 'Cliente',
 }
 
+const CAPABILITY_LABEL: Record<string, string> = {
+  VIEW: 'Solo ver / revelar',
+  EDIT: 'Puede editar',
+  USE: 'Solo ver / revelar',
+  ADMIN: 'Administrar',
+}
+
 export function ShareCredentialDialog({ entry, onClose }: ShareCredentialDialogProps) {
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
@@ -57,6 +64,7 @@ export function ShareCredentialDialog({ entry, onClose }: ShareCredentialDialogP
   const [candidates, setCandidates] = useState<Candidate[]>([])
   const [metaRule, setMetaRule] = useState('')
   const [selectedUserId, setSelectedUserId] = useState('')
+  const [capability, setCapability] = useState<'VIEW' | 'EDIT'>('VIEW')
   const [loadingCandidates, setLoadingCandidates] = useState(false)
 
   const loadShares = async (entryId: string) => {
@@ -105,6 +113,7 @@ export function ShareCredentialDialog({ entry, onClose }: ShareCredentialDialogP
     if (!entry) {
       setShares([])
       setSelectedUserId('')
+      setCapability('VIEW')
       setCandidates([])
       return
     }
@@ -140,15 +149,19 @@ export function ShareCredentialDialog({ entry, onClose }: ShareCredentialDialogP
       const res = await fetch(`/api/credentials/entries/${entry.id}/shares`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: selectedUserId, capability: 'VIEW' }),
+        body: JSON.stringify({ userId: selectedUserId, capability }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error || 'No se pudo compartir')
       toast({
         title: 'Credencial compartida',
-        description: 'Queda auditado. El usuario recibe notificación sin la clave en claro.',
+        description:
+          capability === 'EDIT'
+            ? 'Queda auditado. El usuario recibe notificación y podrá revelar y editar el contenido.'
+            : 'Queda auditado. El usuario recibe notificación sin la clave en claro.',
       })
       setSelectedUserId('')
+      setCapability('VIEW')
       await loadShares(entry.id)
     } catch (err: unknown) {
       toast({
@@ -192,8 +205,8 @@ export function ShareCredentialDialog({ entry, onClose }: ShareCredentialDialogP
           <DialogDescription>
             Comparte «{entry?.title}» con usuarios de tu familia (nativa o asignada de
             Credenciales), sea de tu nivel, inferior o superior — por ejemplo un cliente puede
-            compartir con un técnico. Solo podrá revelar/usar (auditado); no recibe la clave por
-            notificación.
+            compartir con un técnico. Elige si solo podrá revelar/usar, o si además podrá editar el
+            contenido; nunca recibe la clave por notificación.
           </DialogDescription>
         </DialogHeader>
 
@@ -254,6 +267,25 @@ export function ShareCredentialDialog({ entry, onClose }: ShareCredentialDialogP
               ) : null}
             </div>
 
+            <div className='space-y-1.5'>
+              <Label>Permiso</Label>
+              <Select value={capability} onValueChange={v => setCapability(v as 'VIEW' | 'EDIT')}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='VIEW'>Solo ver / revelar</SelectItem>
+                  <SelectItem value='EDIT'>Puede editar</SelectItem>
+                </SelectContent>
+              </Select>
+              {capability === 'EDIT' ? (
+                <p className='text-xs text-muted-foreground'>
+                  Podrá cambiar título, usuario, contraseña, URL y notas. No podrá borrarla ni
+                  compartirla con nadie más — eso sigue siendo solo tuyo.
+                </p>
+              ) : null}
+            </div>
+
             <Button
               onClick={handleShare}
               disabled={saving || !selectedUserId || !canShareSelected}
@@ -264,7 +296,7 @@ export function ShareCredentialDialog({ entry, onClose }: ShareCredentialDialogP
               ) : (
                 <UserPlus className='h-4 w-4 mr-1.5' />
               )}
-              Compartir (solo ver / revelar)
+              Compartir ({CAPABILITY_LABEL[capability]})
             </Button>
 
             <div className='space-y-2'>
@@ -283,7 +315,9 @@ export function ShareCredentialDialog({ entry, onClose }: ShareCredentialDialogP
                         <p className='text-xs text-muted-foreground truncate'>{s.user?.email}</p>
                       </div>
                       <div className='flex items-center gap-2 shrink-0'>
-                        <Badge variant='secondary'>{s.capability}</Badge>
+                        <Badge variant={s.capability === 'EDIT' ? 'default' : 'secondary'}>
+                          {CAPABILITY_LABEL[s.capability] ?? s.capability}
+                        </Badge>
                         <Button
                           type='button'
                           variant='ghost'

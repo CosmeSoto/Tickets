@@ -14,6 +14,7 @@ import {
   credentialEntryMetadataSelect,
   getCredentialsFamilyScopeIds,
   userCanAccessVault,
+  userCanEditEntry,
   userCanMutateEntry,
 } from '@/lib/credentials/access'
 import { EncryptionService } from '@/lib/services/encryption.service'
@@ -122,6 +123,8 @@ export async function GET(request: Request) {
       entries.map(async ({ shares, ...entry }) => {
         const sharedWithMe = shares.some(s => s.userId === session.user.id)
         const canMutate = await userCanMutateEntry(ctx, entry)
+        // canMutate ya implica poder editar; solo se re-evalúa (share EDIT) si no lo es.
+        const canEdit = canMutate ? true : await userCanEditEntry(ctx, entry)
 
         // Destinatarios solo si eres dueño o gestor de jerarquía (privacidad del share)
         const recipients = canMutate
@@ -160,6 +163,7 @@ export async function GET(request: Request) {
           sharedWithMe,
           visibility,
           canMutate,
+          canEdit,
           shareCapability: shares.find(s => s.userId === session.user.id)?.capability ?? null,
           isShared: recipients.length > 0 || sharedWithMe,
           shareCount: recipients.length,

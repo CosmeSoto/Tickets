@@ -234,7 +234,11 @@ export async function userCanAccessEntry(
   return Boolean(nativeId && entry.vault.familyId === nativeId)
 }
 
-/** Editar/borrar/compartir: dueño, o gestor de jerarquía sobre un inferior nativo. */
+/**
+ * Borrar / gestionar compartidos: dueño, o gestor de jerarquía sobre un
+ * inferior nativo. Un share (VIEW o EDIT) nunca otorga esto — solo editar
+ * contenido pasa por userCanEditEntry.
+ */
 export async function userCanMutateEntry(
   ctx: CredentialsAccessContext,
   entry: EntryAccessShape
@@ -243,7 +247,7 @@ export async function userCanMutateEntry(
   if (ctx.isSuperAdmin) return true
   if (entry.createdById === ctx.userId) return true
 
-  // Share VIEW no otorga mutación
+  // Share (cualquier capability) no otorga borrar/gestionar compartidos
   if (!(await canManageCredentialsHierarchy(ctx.userId, ctx.role, ctx.isSuperAdmin))) {
     return false
   }
@@ -313,10 +317,36 @@ export async function buildCredentialEntriesVisibilityWhere(
   }
 }
 
-/** Share solo VIEW en MVP: no otorga editar/borrar. */
+/** Existe algún share (cualquier capability) para ese usuario en esa entrada. */
 export async function userHasEntryShare(userId: string, entryId: string): Promise<boolean> {
   const share = await prisma.credential_shares.findFirst({
     where: { entryId, userId },
+    select: { id: true },
+  })
+  return !!share
+}
+
+/**
+ * Editar contenido (PATCH): dueño, gestor de jerarquía (ver userCanMutateEntry),
+ * o alguien a quien el dueño/gestor le compartió la credencial con capability
+ * EDIT o ADMIN. El propio dueño elige ese permiso al compartir (share dialog);
+ * un share VIEW sigue sin habilitar edición.
+ * Nota: NO otorga borrar ni gestionar compartidos — eso sigue siendo solo
+ * userCanMutateEntry (dueño o gestor de jerarquía).
+ */
+export async function userCanEditEntry(
+  ctx: CredentialsAccessContext,
+  entry: EntryAccessShape
+): Promise<boolean> {
+  if (!(await checkCredentialsModuleAccess(ctx))) return false
+  if (await userCanMutateEntry(ctx, entry)) return true
+
+  const share = await prisma.credential_shares.findFirst({
+    where: {
+      entryId: entry.id,
+      userId: ctx.userId,
+      capability: { in: ['EDIT', 'ADMIN'] },
+    },
     select: { id: true },
   })
   return !!share

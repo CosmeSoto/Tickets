@@ -12,6 +12,7 @@ import {
   Share2,
   Cpu,
   FileKey,
+  Pencil,
 } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
@@ -34,6 +35,7 @@ import {
 import { CreateCredentialDialog } from '@/components/credentials/create-credential-dialog'
 import { RevealCredentialDialog } from '@/components/credentials/reveal-credential-dialog'
 import { ShareCredentialDialog } from '@/components/credentials/share-credential-dialog'
+import { EditCredentialDialog } from '@/components/credentials/edit-credential-dialog'
 import { useToast } from '@/hooks/use-toast'
 import { useExport } from '@/hooks/common/use-export'
 import { useFilters, type FilterConfig } from '@/hooks/common/use-filters'
@@ -92,6 +94,8 @@ type CredentialEntry = {
   /** own | shared | hierarchy */
   visibility?: 'own' | 'shared' | 'hierarchy' | 'other'
   canMutate?: boolean
+  /** Editar contenido: dueño/gestor (canMutate) o share con capability EDIT. */
+  canEdit?: boolean
   shareCapability?: string | null
   isShared?: boolean
   shareCount?: number
@@ -211,6 +215,7 @@ export default function CredentialsPage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [revealEntry, setRevealEntry] = useState<CredentialEntry | null>(null)
   const [shareEntry, setShareEntry] = useState<CredentialEntry | null>(null)
+  const [editEntry, setEditEntry] = useState<CredentialEntry | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>('table')
   const [copyingId, setCopyingId] = useState<string | null>(null)
   const [columnOrder, setColumnOrder] = useState<string[]>(DEFAULT_ORDER)
@@ -582,6 +587,17 @@ export default function CredentialsPage() {
         <Eye className='h-4 w-4' />
         <span className={cn(compact ? 'sr-only' : 'ml-1.5')}>Revelar</span>
       </Button>
+      {entry.canEdit && (
+        <Button
+          variant='outline'
+          size='sm'
+          title='Editar credencial'
+          onClick={() => setEditEntry(entry)}
+        >
+          <Pencil className='h-4 w-4' />
+          <span className={cn(compact ? 'sr-only' : 'ml-1.5')}>Editar</span>
+        </Button>
+      )}
       {entry.canMutate && (
         <Button
           variant='outline'
@@ -911,6 +927,11 @@ export default function CredentialsPage() {
       {canCreate && (
         <ShareCredentialDialog entry={shareEntry} onClose={() => setShareEntry(null)} />
       )}
+      <EditCredentialDialog
+        entry={editEntry}
+        onClose={() => setEditEntry(null)}
+        onUpdated={loadData}
+      />
     </ModuleLayout>
   )
 }
