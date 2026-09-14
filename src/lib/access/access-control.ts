@@ -88,6 +88,24 @@ export function isAccessFamilyAllowed(
   return !permission.familyIds || permission.familyIds.includes(familyId)
 }
 
+/**
+ * `access_organizations` es un catálogo global (sin `familyId`): lo puede usar
+ * cualquier área. Un gestor con permiso en una sola área puede mutar/borrar una
+ * organización solo si ningún `access_subject` que la usa está fuera de su
+ * scope de familias — así no puede renombrar/desactivar algo que otras áreas
+ * dependen. Super Admin (scope global, `familyIds` undefined) no restringe.
+ */
+export async function isAccessOrganizationInScope(
+  permission: AccessModulePermission,
+  organizationId: string
+): Promise<boolean> {
+  if (permission.familyIds === undefined) return true
+  const outOfScope = await prisma.access_subjects.count({
+    where: { organizationId, familyId: { notIn: permission.familyIds } },
+  })
+  return outOfScope === 0
+}
+
 /** Token opaco; la BD persiste exclusivamente el hash SHA-256. */
 export function generateAccessQrSecret(): { token: string; tokenHash: string } {
   const token = randomBytes(32).toString('base64url')

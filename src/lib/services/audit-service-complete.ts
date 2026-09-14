@@ -41,6 +41,7 @@ export interface AuditLogData {
     | 'access_subject'
     | 'access_pass'
     | 'access_scan'
+    | 'access_organization'
   entityId?: string
   userId: string
   details?: Record<string, any>
@@ -1015,6 +1016,10 @@ export const AuditActionsComplete = {
   ACCESS_PASS_QR_REISSUED: 'access_pass_qr_reissued',
   ACCESS_PASS_SCANNED: 'access_pass_scanned',
   ACCESS_PASS_DELETED: 'access_pass_deleted',
+  ACCESS_ORGANIZATION_CREATED: 'access_organization_created',
+  ACCESS_ORGANIZATION_UPDATED: 'access_organization_updated',
+  ACCESS_ORGANIZATION_DEACTIVATED: 'access_organization_deactivated',
+  ACCESS_ORGANIZATION_DELETED: 'access_organization_deleted',
 
   // Credenciales (nunca registrar secretos en details)
   CREDENTIAL_CREATED: 'credential_created',
