@@ -1,5 +1,5 @@
 import { writeFile, stat, mkdir } from 'fs/promises'
-import { join } from 'path'
+import { join, basename, resolve } from 'path'
 import { randomUUID } from 'crypto'
 import prisma from '@/lib/prisma'
 import { BackupInfo } from './backup-types'
@@ -12,13 +12,28 @@ async function ensureBackupDirectory() {
   } catch {}
 }
 
+/**
+ * `filename` termina interpolado sin escapar dentro de comandos de shell
+ * (`pg_restore`/`gunzip`/`file`/`head` en backup-metadata.ts/backup-restore.ts)
+ * y como ruta en disco. Sin sanear, el nombre original del archivo subido —
+ * 100% controlado por quien sube el import — permite tanto inyección de
+ * comandos (`evil.$(cmd).dump`) como path traversal (`../../../etc/x.dump`).
+ * `basename` descarta cualquier componente de ruta y el reemplazo de
+ * caracteres deja solo el set seguro para nombre de archivo + shell.
+ */
+function sanitizeImportFilename(name: string): string {
+  const base = basename(name)
+  const cleaned = base.replace(/[^a-zA-Z0-9_.-]/g, '_')
+  return cleaned || 'backup-imported'
+}
+
 export async function importBackupFromFile(
   fileBuffer: Buffer,
   originalFilename: string
 ): Promise<BackupInfo> {
   await ensureBackupDirectory()
 
-  let filename = originalFilename
+  let filename = sanitizeImportFilename(originalFilename)
   let detectedModule: string | null = null
   let encrypted = false
   let compressed = false
@@ -73,6 +88,12 @@ export async function importBackupFromFile(
   }
 
   const filepath = join(BACKUP_DIR, filename)
+  // Defensa en profundidad: el filename ya está saneado (sin `/` ni `..`),
+  // pero confirmar que la ruta resuelta sigue dentro de BACKUP_DIR antes de
+  // escribir nada a disco.
+  if (resolve(filepath) !== resolve(join(BACKUP_DIR, basename(filepath)))) {
+    throw new Error('Nombre de archivo inválido')
+  }
   await writeFile(filepath, fileBuffer)
 
   const fileStats = await stat(filepath)
