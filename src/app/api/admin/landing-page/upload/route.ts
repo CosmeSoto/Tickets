@@ -5,11 +5,36 @@ import { writeFile, mkdir } from 'fs/promises'
 import { existsSync } from 'fs'
 import { getUploadDir } from '@/lib/upload-path'
 import prisma from '@/lib/prisma'
+import DOMPurify from 'isomorphic-dompurify'
+import {
+  resolveSafeUploadMime,
+  EXT_BY_MIME,
+  type SafeUploadMime,
+} from '@/lib/files/upload-file-type'
+
+/**
+ * `type` decide el nombre de archivo en disco (`${type}-${timestamp}.ext`,
+ * vía `getUploadDir` -> `path.join`). Antes venía sin validar directo del
+ * formulario: un `type` como `../../../../tmp/x` escribía fuera de
+ * `uploads/landing` (path traversal / escritura arbitraria). Debe ser
+ * siempre uno de estos tres valores fijos.
+ */
+const ALLOWED_TYPES = new Set(['logo-light', 'logo-dark', 'hero-bg'])
+
+const ALLOWED_IMAGE_MIMES: ReadonlySet<SafeUploadMime> = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+])
+
+const SVG_ROOT_PATTERN = /^\s*(<\?xml[^>]*\?>\s*)?(<!--[\s\S]*?-->\s*)*<svg[\s>]/i
 
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    const superCheck = await (await import('@/lib/auth/require-super-admin')).requireSuperAdmin(session)
+    const superCheck = await (
+      await import('@/lib/auth/require-super-admin')
+    ).requireSuperAdmin(session)
     if (!superCheck.ok) {
       return NextResponse.json({ error: superCheck.error }, { status: superCheck.status })
     }
@@ -28,11 +53,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No se proporcionó archivo' }, { status: 400 })
     }
 
-    // Validar tipo de archivo
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/svg+xml']
-    if (!allowedTypes.includes(file.type)) {
+    if (!ALLOWED_TYPES.has(type)) {
       return NextResponse.json(
-        { error: 'Tipo de archivo no permitido. Solo JPG, PNG, WebP y SVG' },
+        { error: 'Tipo de imagen inválido. Debe ser logo-light, logo-dark o hero-bg' },
         { status: 400 }
       )
     }
@@ -46,22 +69,55 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const bytes = await file.arrayBuffer()
+    const buffer = Buffer.from(bytes)
+
+    // Validar contenido REAL — nunca el Content-Type declarado por el
+    // cliente. SVG es un caso especial: es texto, no tiene magic bytes, y
+    // puede traer <script>/on* — se sanea con DOMPurify antes de guardarlo.
+    let finalBuffer: Buffer
+    let extension: string
+    let responseType: string
+
+    if (file.type === 'image/svg+xml') {
+      const raw = buffer.toString('utf8')
+      if (!SVG_ROOT_PATTERN.test(raw)) {
+        return NextResponse.json({ error: 'El archivo no es un SVG válido' }, { status: 400 })
+      }
+      const sanitized = DOMPurify.sanitize(raw, { USE_PROFILES: { svg: true, svgFilters: true } })
+      if (!sanitized.trim()) {
+        return NextResponse.json({ error: 'El archivo no es un SVG válido' }, { status: 400 })
+      }
+      finalBuffer = Buffer.from(sanitized, 'utf8')
+      extension = 'svg'
+      responseType = 'image/svg+xml'
+    } else {
+      const detectedMime = resolveSafeUploadMime(buffer, file.type)
+      if (!detectedMime || !ALLOWED_IMAGE_MIMES.has(detectedMime)) {
+        return NextResponse.json(
+          { error: 'El archivo no es una imagen válida (JPG, PNG, WebP o SVG)' },
+          { status: 400 }
+        )
+      }
+      finalBuffer = buffer
+      extension = EXT_BY_MIME[detectedMime]
+      responseType = detectedMime
+    }
+
     // Crear directorio si no existe
     const uploadDir = getUploadDir('landing')
     if (!existsSync(uploadDir)) {
       await mkdir(uploadDir, { recursive: true })
     }
 
-    // Generar nombre único
+    // Nombre único — `type` ya está restringido al enum fijo de arriba y
+    // `extension` siempre sale del mime detectado, nunca del nombre del
+    // cliente.
     const timestamp = Date.now()
-    const extension = file.name.split('.').pop()
     const filename = `${type}-${timestamp}.${extension}`
     const filepath = getUploadDir('landing', filename)
 
-    // Guardar archivo
-    const bytes = await file.arrayBuffer()
-    const buffer = Buffer.from(bytes)
-    await writeFile(filepath, buffer)
+    await writeFile(filepath, finalBuffer)
 
     // Retornar URL pública — servida via /api/uploads/
     const publicUrl = `/api/uploads/landing/${filename}`
@@ -69,8 +125,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       url: publicUrl,
       filename,
-      size: file.size,
-      type: file.type,
+      size: finalBuffer.length,
+      type: responseType,
     })
   } catch (error) {
     console.error('Error uploading file:', error)
