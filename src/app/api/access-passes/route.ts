@@ -17,6 +17,9 @@ import {
   ACCESS_PRIVACY_ACCEPTANCE_TTL_MS,
   sendAccessPrivacyInvitation,
 } from '@/lib/access/access-invitation'
+import { ACCESS_PRIVACY_NOTICE_VERSION } from '@/lib/access/access-privacy-notice'
+import { ACCESS_SUBJECT_TYPES } from '@/lib/access/access-pass-state'
+import { isPrismaUniqueViolation } from '@/lib/access/access-errors'
 import { AuditActionsComplete, AuditServiceComplete } from '@/lib/services/audit-service-complete'
 
 const createSchema = z
@@ -27,7 +30,7 @@ const createSchema = z
     email: z.string().trim().email().max(320).optional().nullable(),
     phone: z.string().trim().max(40).optional().nullable(),
     organizationId: z.string().uuid().optional().nullable(),
-    accessType: z.enum(['TENANT_EMPLOYEE', 'AUTHORIZED_VISITOR', 'CONTRACTOR']),
+    accessType: z.enum(ACCESS_SUBJECT_TYPES),
     purpose: z.string().trim().max(1000).optional().nullable(),
     documentLast4: z
       .string()
@@ -35,7 +38,9 @@ const createSchema = z
       .regex(/^\d{4}$/)
       .optional()
       .nullable(),
-    privacyNoticeVersion: z.string().trim().min(1).max(50),
+    // La versión del aviso de privacidad la fija el servidor
+    // (ACCESS_PRIVACY_NOTICE_VERSION) — nunca un dato de entrada del cliente,
+    // ya que queda como evidencia legal de consentimiento.
     validFrom: z.coerce.date(),
     validUntil: z.coerce.date(),
     sendEmail: z.literal(true),
@@ -182,38 +187,57 @@ export async function POST(request: NextRequest) {
   const { tokenHash } = generateAccessQrSecret()
   const acceptanceToken = generateAccessQrSecret()
   const acceptanceExpiresAt = new Date(Date.now() + ACCESS_PRIVACY_ACCEPTANCE_TTL_MS)
-  const pass = await prisma.$transaction(async (tx: any) => {
-    const subject = await tx.access_subjects.create({
-      data: {
-        familyId: data.familyId,
-        firstName: data.firstName,
-        lastName: data.lastName,
-        email: data.email || null,
-        phone: data.phone || null,
-        organizationId,
-        organization: organizationName,
-        accessType: data.accessType,
-        purpose: data.purpose || null,
-        documentLast4: data.documentLast4 || null,
-        privacyNoticeVersion: data.privacyNoticeVersion,
-      },
-    })
-    return tx.access_passes.create({
-      data: {
-        subjectId: subject.id,
-        familyId: data.familyId,
-        credentialCode: credentialCode(),
-        tokenHash,
-        status: 'PENDING_PRIVACY',
-        privacyAcceptanceTokenHash: acceptanceToken.tokenHash,
-        privacyAcceptanceExpiresAt: acceptanceExpiresAt,
-        validFrom: data.validFrom,
-        validUntil: data.validUntil,
-        createdById: session.user.id,
-      },
-      include: PASS_CREATE_INCLUDE,
-    })
-  })
+
+  // credentialCode() toma 8 hex de un UUID sobre una columna @unique: la
+  // colisión es muy improbable pero posible. Reintentar la transacción
+  // completa (subject + pass se crean juntos) en vez de dejar que el P2002
+  // se propague como 500 — el subject huérfano de un intento fallido nunca
+  // llega a persistirse porque toda la transacción revierte.
+  let pass!: Awaited<ReturnType<typeof prisma.access_passes.create>>
+  const MAX_ATTEMPTS = 4
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      pass = await prisma.$transaction(async (tx: any) => {
+        const subject = await tx.access_subjects.create({
+          data: {
+            familyId: data.familyId,
+            firstName: data.firstName,
+            lastName: data.lastName,
+            email: data.email || null,
+            phone: data.phone || null,
+            organizationId,
+            organization: organizationName,
+            accessType: data.accessType,
+            purpose: data.purpose || null,
+            documentLast4: data.documentLast4 || null,
+            privacyNoticeVersion: ACCESS_PRIVACY_NOTICE_VERSION,
+          },
+        })
+        return tx.access_passes.create({
+          data: {
+            subjectId: subject.id,
+            familyId: data.familyId,
+            credentialCode: credentialCode(),
+            tokenHash,
+            status: 'PENDING_PRIVACY',
+            privacyAcceptanceTokenHash: acceptanceToken.tokenHash,
+            privacyAcceptanceExpiresAt: acceptanceExpiresAt,
+            validFrom: data.validFrom,
+            validUntil: data.validUntil,
+            createdById: session.user.id,
+          },
+          include: PASS_CREATE_INCLUDE,
+        })
+      })
+      break
+    } catch (error) {
+      const isCollision =
+        isPrismaUniqueViolation(error, 'credential_code') ||
+        isPrismaUniqueViolation(error, 'token_hash') ||
+        isPrismaUniqueViolation(error, 'privacy_acceptance_token_hash')
+      if (!isCollision || attempt === MAX_ATTEMPTS) throw error
+    }
+  }
 
   if (data.email) {
     await sendAccessPrivacyInvitation({
@@ -248,7 +272,7 @@ export async function POST(request: NextRequest) {
       source: 'access_module',
       privacyInvitationQueued: true,
       subjectType: data.accessType,
-      privacyNoticeVersion: data.privacyNoticeVersion,
+      privacyNoticeVersion: ACCESS_PRIVACY_NOTICE_VERSION,
     },
     request,
   })
