@@ -8,6 +8,7 @@ import {
   TicketAccessError,
   toTicketAccessUser,
 } from '@/lib/tickets/ticket-access'
+import { INLINE_SAFE_MIMES, buildContentDisposition } from '@/lib/files/upload-file-type'
 
 export async function GET(
   request: NextRequest,
@@ -54,15 +55,22 @@ export async function GET(
       )
     }
 
-    // Determinar Content-Disposition según el modo
-    const disposition = isPreview ? 'inline' : 'attachment'
+    // El `Content-Type` de la respuesta solo confía en `INLINE_SAFE_MIMES` —
+    // un adjunto legado con un `mimeType` peligroso en BD (de antes del fix
+    // de magic-bytes en FileService.uploadFile) se sirve como
+    // `application/octet-stream` + descarga forzada, nunca `inline` con un
+    // tipo que el navegador pueda ejecutar. `buildContentDisposition` sanea
+    // el nombre (sin comillas/CRLF/control chars) — antes se interpolaba
+    // `attachment.originalName` crudo en la cabecera.
+    const inline = isPreview && INLINE_SAFE_MIMES.has(attachment.mimeType)
+    const contentType = inline ? attachment.mimeType : 'application/octet-stream'
 
-    // Retornar el archivo con los headers apropiados
     return new NextResponse(fileData.buffer, {
       headers: {
-        'Content-Type': attachment.mimeType || 'application/octet-stream',
-        'Content-Disposition': `${disposition}; filename="${encodeURIComponent(attachment.originalName)}"`,
+        'Content-Type': contentType,
+        'Content-Disposition': buildContentDisposition(attachment.originalName, inline),
         'Content-Length': attachment.size.toString(),
+        'X-Content-Type-Options': 'nosniff',
       },
     })
   } catch (error) {

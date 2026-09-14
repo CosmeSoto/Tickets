@@ -195,7 +195,10 @@ export class FileService {
   static async uploadFile(data: UploadFileData) {
     const { file, ticketId, uploadedBy, skipHistory = false } = data
 
-    // 1. Validar archivo
+    // 1. Validar tamaño y el tipo DECLARADO por el cliente (política
+    // configurable del admin — allowedFileTypes). No es la única defensa: el
+    // contenido real se verifica en el paso 4 (mismo pipeline ya aplicado a
+    // Noticias/Documentos — este método se había quedado con el viejo).
     const validation = await this.validateFile(file)
     if (!validation.isValid) throw new Error(validation.error)
 
@@ -207,19 +210,28 @@ export class FileService {
     const ticket = await prisma.tickets.findUnique({ where: { id: ticketId } })
     if (!ticket) throw new Error('Ticket no encontrado')
 
-    // 4. Leer buffer original
+    // 4. Leer el contenido real y cruzarlo con el tipo declarado. `file.type`
+    // lo pone el cliente en el multipart y es trivialmente falsificable — un
+    // `evil.html` declarado `application/pdf` pasaba antes la validación de
+    // arriba sin problema. resolveSafeUploadMime mira los magic bytes.
     const originalBuffer = Buffer.from(await file.arrayBuffer()) as Buffer
     const originalSize = originalBuffer.length
+    const safeMime = resolveSafeUploadMime(originalBuffer, file.type)
+    if (!safeMime) {
+      throw new Error(
+        'El contenido del archivo no coincide con su tipo. Verifica que no esté corrupto o renombrado.'
+      )
+    }
 
-    // 5. Comprimir si es imagen comprimible
+    // 5. Comprimir si es imagen comprimible — según el mime DETECTADO, no el declarado.
     let finalBuffer = originalBuffer
-    let finalExt = file.name.split('.').pop()?.toLowerCase() || 'bin'
+    let finalMime: SafeUploadMime = safeMime
     let compressed = false
 
-    if (IMAGE_TYPES.has(file.type)) {
-      const result = await compressImage(originalBuffer, file.type, file.name)
+    if (IMAGE_TYPES.has(safeMime)) {
+      const result = await compressImage(originalBuffer, safeMime, file.name)
       finalBuffer = result.buffer
-      finalExt = result.ext
+      finalMime = result.ext === 'webp' ? 'image/webp' : 'image/jpeg'
       compressed = result.compressed
     }
 
@@ -227,7 +239,8 @@ export class FileService {
     const uploadDir = getUploadDir('tickets', ticketId)
     if (!existsSync(uploadDir)) await mkdir(uploadDir, { recursive: true })
 
-    const uniqueFilename = `${randomUUID()}.${finalExt}`
+    // La extensión en disco SIEMPRE sale del mime final, nunca del nombre del cliente.
+    const uniqueFilename = `${randomUUID()}.${EXT_BY_MIME[finalMime]}`
     const filePath = getUploadDir('tickets', ticketId, uniqueFilename)
 
     // 7. Guardar en disco
@@ -238,8 +251,8 @@ export class FileService {
       data: {
         id: randomUUID(),
         filename: uniqueFilename,
-        originalName: file.name,
-        mimeType: compressed ? (finalExt === 'webp' ? 'image/webp' : 'image/jpeg') : file.type,
+        originalName: sanitizeOriginalFilename(file.name),
+        mimeType: finalMime,
         size: finalBuffer.length,
         path: filePath,
         ticketId,
@@ -302,21 +315,29 @@ export class FileService {
     const ticket = await prisma.tickets.findUnique({ where: { id: params.ticketId } })
     if (!ticket) throw new Error('Ticket no encontrado')
 
-    let finalBuffer = buffer
-    let finalExt = params.originalName.split('.').pop()?.toLowerCase() || 'jpg'
-    let compressed = false
+    // params.mimeType llega del cliente (creación de ticket con evidencia de
+    // patrulla) tan falsificable como el `file.type` de un multipart normal
+    // — mismo cruce con los magic bytes que en uploadFile.
+    const safeMime = resolveSafeUploadMime(buffer, params.mimeType)
+    if (!safeMime) {
+      throw new Error(
+        'El contenido del archivo no coincide con su tipo. Verifica que no esté corrupto o renombrado.'
+      )
+    }
 
-    if (IMAGE_TYPES.has(params.mimeType)) {
-      const result = await compressImage(buffer, params.mimeType, params.originalName)
+    let finalBuffer = buffer
+    let finalMime: SafeUploadMime = safeMime
+
+    if (IMAGE_TYPES.has(safeMime)) {
+      const result = await compressImage(buffer, safeMime, params.originalName)
       finalBuffer = result.buffer
-      finalExt = result.ext
-      compressed = result.compressed
+      finalMime = result.ext === 'webp' ? 'image/webp' : 'image/jpeg'
     }
 
     const uploadDir = getUploadDir('tickets', params.ticketId)
     if (!existsSync(uploadDir)) await mkdir(uploadDir, { recursive: true })
 
-    const uniqueFilename = `${randomUUID()}.${finalExt}`
+    const uniqueFilename = `${randomUUID()}.${EXT_BY_MIME[finalMime]}`
     const filePath = getUploadDir('tickets', params.ticketId, uniqueFilename)
     await writeFile(filePath, finalBuffer)
 
@@ -324,12 +345,8 @@ export class FileService {
       data: {
         id: randomUUID(),
         filename: uniqueFilename,
-        originalName: params.originalName,
-        mimeType: compressed
-          ? finalExt === 'webp'
-            ? 'image/webp'
-            : 'image/jpeg'
-          : params.mimeType,
+        originalName: sanitizeOriginalFilename(params.originalName),
+        mimeType: finalMime,
         size: finalBuffer.length,
         path: filePath,
         ticketId: params.ticketId,
@@ -396,6 +413,9 @@ export class FileService {
   // ── Consultas ────────────────────────────────────────────────────────────────
 
   static async getFilesByTicket(ticketId: string) {
+    // Sin `path` en el select ni en la respuesta: es la ruta absoluta del
+    // archivo en el servidor — no debería exponerse al frontend, y menos
+    // combinada con el nombre de archivo predecible del disco.
     const attachments = await prisma.attachments.findMany({
       where: { ticketId },
       select: {
@@ -404,7 +424,6 @@ export class FileService {
         originalName: true,
         mimeType: true,
         size: true,
-        path: true,
         ticketId: true,
         uploadedBy: true,
         createdAt: true,
@@ -419,7 +438,6 @@ export class FileService {
       originalName: a.originalName,
       mimeType: a.mimeType,
       size: a.size,
-      path: a.path,
       ticketId: a.ticketId,
       uploadedBy: a.uploadedBy,
       createdAt: a.createdAt,
