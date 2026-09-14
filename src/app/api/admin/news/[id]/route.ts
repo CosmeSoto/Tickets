@@ -188,26 +188,89 @@ export async function PUT(request: NextRequest, { params }: Params) {
       slug = `${slug}-${Date.now()}`
     }
 
-    const news = await prisma.news.update({
-      where: { id: id },
-      data: {
-        title: data.title,
-        slug,
-        content: data.content,
-        summary: data.summary,
-        imageUrl: data.imageUrl,
-        type: data.type,
-        priority: data.priority,
-        status: data.status,
-        startDate: data.startDate ? new Date(data.startDate) : null,
-        endDate: data.endDate ? new Date(data.endDate) : null,
-        isFeatured: data.isFeatured,
-        allowComments: data.allowComments,
-        allowReactions: data.allowReactions,
-        notifyEmail: data.notifyEmail,
-        notifyTelegram: data.notifyTelegram,
-        updatedById: session.user.id,
-      },
+    const updateData = {
+      title: data.title,
+      slug,
+      content: data.content,
+      summary: data.summary,
+      imageUrl: data.imageUrl,
+      type: data.type,
+      priority: data.priority,
+      status: data.status,
+      startDate: data.startDate ? new Date(data.startDate) : null,
+      endDate: data.endDate ? new Date(data.endDate) : null,
+      isFeatured: data.isFeatured,
+      allowComments: data.allowComments,
+      allowReactions: data.allowReactions,
+      notifyEmail: data.notifyEmail,
+      notifyTelegram: data.notifyTelegram,
+      updatedById: session.user.id,
+    }
+    const publishedNow = data.status === 'PUBLISHED' && existingNews.status !== 'PUBLISHED'
+
+    // Claim atómico + reescritura de visibilidad en una sola transacción.
+    // `status: existingNews.status` en el where actúa como token optimista:
+    // si dos PUT concurrentes leen el mismo status de partida (p. ej. dos
+    // intentos de publicar la misma noticia DRAFT), solo uno gana el
+    // updateMany — el otro ve count 0 y aborta con 409 sin duplicar la
+    // notificación de publicación. Las 8 escrituras de visibilidad entran en
+    // la MISMA transacción que el claim: antes ocurrían después de un
+    // `update` ya confirmado y sin `$transaction`, así que un fallo a mitad
+    // (p. ej. el createMany de familias) dejaba la noticia con las 4 tablas
+    // parcialmente vacías — que `buildNewsVisibilityConditions` interpreta
+    // como "sin restricciones", es decir visible para todo el mundo
+    // (fail-open). Con la transacción, ese fallo revierte todo el PUT.
+    const claim = await prisma.$transaction(async tx => {
+      const claimed = await tx.news.updateMany({
+        where: { id, status: existingNews.status },
+        data: updateData,
+      })
+      if (claimed.count !== 1) return { conflict: true as const }
+
+      if (sanitized && !(sanitized instanceof NextResponse)) {
+        await tx.news_roles.deleteMany({ where: { newsId: id } })
+        if (sanitized.roles.length) {
+          await tx.news_roles.createMany({
+            data: sanitized.roles.map(role => ({ newsId: id, role })),
+          })
+        }
+
+        await tx.news_users.deleteMany({ where: { newsId: id } })
+        if (sanitized.userIds.length) {
+          await tx.news_users.createMany({
+            data: sanitized.userIds.map(userId => ({ newsId: id, userId })),
+          })
+        }
+
+        await tx.news_departments.deleteMany({ where: { newsId: id } })
+        if (sanitized.departmentIds.length) {
+          await tx.news_departments.createMany({
+            data: sanitized.departmentIds.map(departmentId => ({
+              newsId: id,
+              departmentId,
+            })),
+          })
+        }
+
+        await tx.news_families.deleteMany({ where: { newsId: id } })
+        if (sanitized.familyIds.length) {
+          await tx.news_families.createMany({
+            data: sanitized.familyIds.map(familyId => ({ newsId: id, familyId })),
+          })
+        }
+      }
+      return { conflict: false as const }
+    })
+
+    if (claim.conflict) {
+      return NextResponse.json(
+        { error: 'La noticia fue modificada por otro usuario. Recarga e inténtalo de nuevo.' },
+        { status: 409 }
+      )
+    }
+
+    const news = await prisma.news.findUniqueOrThrow({
+      where: { id },
       include: {
         createdBy: {
           select: {
@@ -229,49 +292,15 @@ export async function PUT(request: NextRequest, { params }: Params) {
       },
     })
 
-    if (sanitized && !(sanitized instanceof NextResponse)) {
-      await prisma.news_roles.deleteMany({ where: { newsId: id } })
-      if (sanitized.roles.length) {
-        await prisma.news_roles.createMany({
-          data: sanitized.roles.map(role => ({ newsId: id, role })),
-        })
-      }
-
-      await prisma.news_users.deleteMany({ where: { newsId: id } })
-      if (sanitized.userIds.length) {
-        await prisma.news_users.createMany({
-          data: sanitized.userIds.map(userId => ({ newsId: id, userId })),
-        })
-      }
-
-      await prisma.news_departments.deleteMany({ where: { newsId: id } })
-      if (sanitized.departmentIds.length) {
-        await prisma.news_departments.createMany({
-          data: sanitized.departmentIds.map(departmentId => ({
-            newsId: id,
-            departmentId,
-          })),
-        })
-      }
-
-      await prisma.news_families.deleteMany({ where: { newsId: id } })
-      if (sanitized.familyIds.length) {
-        await prisma.news_families.createMany({
-          data: sanitized.familyIds.map(familyId => ({ newsId: id, familyId })),
-        })
-      }
-    }
-
     const visibilitySummary =
       sanitized && !(sanitized instanceof NextResponse)
         ? buildVisibilityAuditSummary(sanitized)
         : {}
 
     await AuditServiceComplete.log({
-      action:
-        data.status === 'PUBLISHED' && existingNews.status !== 'PUBLISHED'
-          ? AuditActionsComplete.NEWS_PUBLISHED
-          : AuditActionsComplete.NEWS_UPDATED,
+      action: publishedNow
+        ? AuditActionsComplete.NEWS_PUBLISHED
+        : AuditActionsComplete.NEWS_UPDATED,
       entityType: 'news',
       entityId: news.id,
       userId: session.user.id,
@@ -288,13 +317,13 @@ export async function PUT(request: NextRequest, { params }: Params) {
       },
       details: {
         source: 'news_module',
-        publishedNow: data.status === 'PUBLISHED' && existingNews.status !== 'PUBLISHED',
+        publishedNow,
       },
       request,
     })
 
     // Notificar solo a destinatarios de la visibilidad al publicar (in-app + email)
-    if (data.status === 'PUBLISHED' && existingNews.status !== 'PUBLISHED') {
+    if (publishedNow) {
       const { notifyNewsPublished } = await import('@/lib/news/notify-news-published')
       await notifyNewsPublished({
         newsId: news.id,
