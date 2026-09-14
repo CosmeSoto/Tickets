@@ -164,55 +164,10 @@ export async function GET() {
 
     // Caché 5 minutos — configuración del sistema cambia raramente
     const { withCache } = await import('@/lib/api-cache')
-    const settings = await withCache('admin:settings', 300, async () => {
-      const existingSettings = await prisma.system_settings.findMany()
-      const result = { ...defaultSettings } as any
-
-      existingSettings.forEach(setting => {
-        const value = setting.value
-        if (
-          [
-            'maxTicketsPerUser',
-            'smtpPort',
-            'sessionTimeout',
-            'maxLoginAttempts',
-            'passwordMinLength',
-            'passwordChangeIntervalDays',
-            'maxFileSize',
-            'maxPersonalImageSize',
-            'backupRetention',
-            'autoCloseDays',
-          ].includes(setting.key)
-        ) {
-          result[setting.key] = parseInt(value)
-        } else if (
-          [
-            'autoAssignmentEnabled',
-            'emailEnabled',
-            'smtpSecure',
-            'notificationsEnabled',
-            'emailNotifications',
-            'browserNotifications',
-            'requirePasswordChange',
-            'backupEnabled',
-            'telegramEnabled',
-            'telegramNotificationsEnabled',
-            'maintenanceMode',
-            'maintenanceAllowAdmins',
-          ].includes(setting.key)
-        ) {
-          result[setting.key] = value === 'true'
-        } else if (setting.key === 'allowedFileTypes') {
-          result[setting.key] = JSON.parse(value)
-        } else {
-          result[setting.key] = value
-        }
-      })
-      return result
-    })
+    const settings = await withCache('admin:settings', 300, () => loadCurrentSystemSettings())
 
     const isSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
-    const safeSettings = {
+    const safeSettings: Record<string, unknown> = {
       ...settings,
       smtpPasswordConfigured: Boolean(settings.smtpPassword),
       telegramBotTokenConfigured: Boolean(settings.telegramBotToken),
