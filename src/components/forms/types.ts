@@ -13,6 +13,31 @@ export interface FormFamily {
   name: string
 }
 
+/**
+ * Opciones para los selectores de visibilidad (roles/usuarios/departamentos/
+ * familias) del formulario de alta/edición — antes redeclaradas de forma
+ * idéntica en `admin/forms/page.tsx`, `forms/page.tsx` y
+ * `DocumentFormDialog.tsx`, con riesgo de que un cambio de forma quedara
+ * desalineado silenciosamente entre los tres.
+ */
+export interface FormUserOption {
+  id: string
+  name: string
+  email: string
+}
+
+export interface FormDepartmentOption {
+  id: string
+  name: string
+  familyId?: string | null
+}
+
+export interface FormFamilyOption {
+  id: string
+  name: string
+  departments: FormDepartmentOption[]
+}
+
 export interface FormItem {
   id: string
   title: string

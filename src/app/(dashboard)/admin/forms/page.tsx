@@ -24,28 +24,13 @@ import type { PendingFile } from '@/components/common/file-drop-zone'
 import { FormDetail } from '@/components/forms/FormDetail'
 import { ExportButton } from '@/components/common/export-button'
 import { useExport } from '@/hooks/common/use-export'
-import type { FormItem } from '@/components/forms/types'
-
-interface UserOption {
-  id: string
-  name: string
-  email: string
-}
-interface DepartmentOption {
-  id: string
-  name: string
-  familyId?: string | null
-}
-interface FamilyOption {
-  id: string
-  name: string
-  departments: DepartmentOption[]
-}
-interface CategoryOption {
-  id: string
-  name: string
-  description?: string | null
-}
+import type {
+  FormItem,
+  FormCategory as CategoryOption,
+  FormUserOption as UserOption,
+  FormDepartmentOption as DepartmentOption,
+  FormFamilyOption as FamilyOption,
+} from '@/components/forms/types'
 
 export default function AdminFormsPage() {
   const { data: session, status } = useSession()
@@ -123,8 +108,7 @@ export default function AdminFormsPage() {
           const data = await res.json()
           const u = data.user
           const formsOn = u?.formsEnabled === true
-          const canManage =
-            session.user.role === 'ADMIN' ? formsOn : u?.canManageForms && formsOn
+          const canManage = session.user.role === 'ADMIN' ? formsOn : u?.canManageForms && formsOn
           if (canManage) {
             setHasAccess(true)
             loadForms()

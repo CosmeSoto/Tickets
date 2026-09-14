@@ -25,29 +25,14 @@ import { useToast } from '@/hooks/use-toast'
 import { DocumentFormDialog, EMPTY_DOCUMENT_FORM } from '@/components/forms/DocumentFormDialog'
 import type { DocumentFormData } from '@/components/forms/DocumentFormDialog'
 import type { PendingFile } from '@/components/common/file-drop-zone'
-import type { FormFeedItem, FormItem } from '@/components/forms/types'
-
-interface CategoryOption {
-  id: string
-  name: string
-  description?: string | null
-}
-
-interface UserOption {
-  id: string
-  name: string
-  email: string
-}
-interface DepartmentOption {
-  id: string
-  name: string
-  familyId?: string | null
-}
-interface FamilyOption {
-  id: string
-  name: string
-  departments: DepartmentOption[]
-}
+import type {
+  FormFeedItem,
+  FormItem,
+  FormCategory as CategoryOption,
+  FormUserOption as UserOption,
+  FormDepartmentOption as DepartmentOption,
+  FormFamilyOption as FamilyOption,
+} from '@/components/forms/types'
 
 export default function PublicFormsPage() {
   const { data: session, status } = useSession()

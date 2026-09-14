@@ -33,6 +33,11 @@ import { FileDropZone } from '@/components/common/file-drop-zone'
 import type { PendingFile } from '@/components/common/file-drop-zone'
 import { MediaUrlInput } from '@/components/common/media-url-input'
 import { VisibilitySelector } from '@/components/common/visibility-selector'
+import type {
+  FormCategory as CategoryOption,
+  FormUserOption as UserOption,
+  FormFamilyOption as FamilyOption,
+} from '@/components/forms/types'
 
 export interface DocumentFormData {
   title: string
@@ -66,27 +71,6 @@ export const EMPTY_DOCUMENT_FORM: DocumentFormData = {
   userIds: [],
   departmentIds: [],
   familyIds: [],
-}
-
-interface CategoryOption {
-  id: string
-  name: string
-  description?: string | null
-}
-interface UserOption {
-  id: string
-  name: string
-  email: string
-}
-interface DepartmentOption {
-  id: string
-  name: string
-  familyId?: string | null
-}
-interface FamilyOption {
-  id: string
-  name: string
-  departments: DepartmentOption[]
 }
 
 interface DocumentFormDialogProps {
