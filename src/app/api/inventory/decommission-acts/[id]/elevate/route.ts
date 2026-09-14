@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
+import type { DecommissionStatus } from '@prisma/client'
 import { randomUUID } from 'crypto'
 import { isManagerOfFamily } from '@/lib/inventory-access'
 import { notifyFamilyScopedAdmins } from '@/lib/api/notify'
@@ -92,8 +93,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const managerName = session.user.name || session.user.email || 'Gestor'
 
-  await prisma.decommission_requests.update({
-    where: { id: requestId },
+  // Claim atómico: repite el filtro de estado en el `where` — un /elevate y
+  // un /approve o /reject casi simultáneos sobre la misma solicitud pasaban
+  // ambos su chequeo de estado leído antes de que cualquiera escribiera.
+  const claim = await prisma.decommission_requests.updateMany({
+    where: { id: requestId, status: { in: allowedStatuses as DecommissionStatus[] } },
     data: {
       status: 'MANAGER_REVIEW',
       managerId: session.user.id,
@@ -101,6 +105,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       managerElevatedAt: new Date(),
     } as any,
   })
+  if (claim.count === 0) {
+    return NextResponse.json(
+      {
+        error:
+          'La solicitud cambió de estado mientras se procesaba (ya fue aprobada, rechazada o elevada por otra persona).',
+      },
+      { status: 409 }
+    )
+  }
 
   // Notificar a los admins de la familia
   await notifyFamilyScopedAdmins(

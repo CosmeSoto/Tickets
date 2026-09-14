@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
+import type { DecommissionStatus } from '@prisma/client'
 import { randomUUID } from 'crypto'
 import { notifyUser } from '@/lib/api/notify'
 import { isAdminOfFamily } from '@/lib/inventory-access'
@@ -13,10 +14,7 @@ import { isAdminOfFamily } from '@/lib/inventory-access'
  * - SuperAdmin: puede rechazar desde cualquier estado
  * - Admin normal: solo desde MANAGER_REVIEW (o PENDING si no hay gestores)
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
@@ -44,13 +42,17 @@ export async function POST(
     include: {
       equipment: {
         select: {
-          id: true, code: true, brand: true, model: true,
+          id: true,
+          code: true,
+          brand: true,
+          model: true,
           type: { select: { familyId: true } },
         },
       },
       license: {
         select: {
-          id: true, name: true,
+          id: true,
+          name: true,
           licenseType: { select: { familyId: true } },
         },
       },
@@ -62,9 +64,10 @@ export async function POST(
     return NextResponse.json({ error: 'Solicitud no encontrada' }, { status: 404 })
   }
 
-  const familyId: string | null = decommissionRequest.assetType === 'EQUIPMENT'
-    ? (decommissionRequest.equipment as any)?.type?.familyId ?? null
-    : (decommissionRequest.license as any)?.licenseType?.familyId ?? null
+  const familyId: string | null =
+    decommissionRequest.assetType === 'EQUIPMENT'
+      ? ((decommissionRequest.equipment as any)?.type?.familyId ?? null)
+      : ((decommissionRequest.license as any)?.licenseType?.familyId ?? null)
 
   const hasAccess = await isAdminOfFamily(session.user.id, isSuperAdmin, familyId)
   if (!hasAccess) {
@@ -80,19 +83,26 @@ export async function POST(
 
   if (!rejectableStatuses.includes(decommissionRequest.status)) {
     return NextResponse.json(
-      { error: `La solicitud está en estado "${decommissionRequest.status}" y no puede ser rechazada` },
+      {
+        error: `La solicitud está en estado "${decommissionRequest.status}" y no puede ser rechazada`,
+      },
       { status: 409 }
     )
   }
 
-  const assetName = decommissionRequest.assetType === 'EQUIPMENT'
-    ? `${(decommissionRequest.equipment as any)?.code} - ${(decommissionRequest.equipment as any)?.brand} ${(decommissionRequest.equipment as any)?.model}`
-    : (decommissionRequest.license as any)?.name || 'Activo'
+  const assetName =
+    decommissionRequest.assetType === 'EQUIPMENT'
+      ? `${(decommissionRequest.equipment as any)?.code} - ${(decommissionRequest.equipment as any)?.brand} ${(decommissionRequest.equipment as any)?.model}`
+      : (decommissionRequest.license as any)?.name || 'Activo'
 
   const adminName = session.user.name || session.user.email || 'Administrador'
 
-  await prisma.decommission_requests.update({
-    where: { id: requestId },
+  // Claim atómico: repite el filtro de estado en el `where` en vez de confiar
+  // en el chequeo de arriba — un /reject y un /approve (o /elevate) casi
+  // simultáneos sobre la misma solicitud pasaban ambos su chequeo de estado
+  // (leído antes de que cualquiera escribiera).
+  const claim = await prisma.decommission_requests.updateMany({
+    where: { id: requestId, status: { in: rejectableStatuses as DecommissionStatus[] } },
     data: {
       status: 'REJECTED',
       rejectionReason: rejectionReason.trim(),
@@ -100,6 +110,15 @@ export async function POST(
       reviewedAt: new Date(),
     },
   })
+  if (claim.count === 0) {
+    return NextResponse.json(
+      {
+        error:
+          'La solicitud cambió de estado mientras se procesaba (ya fue aprobada, rechazada o elevada por otra persona).',
+      },
+      { status: 409 }
+    )
+  }
 
   const requesterId = decommissionRequest.requester.id
   const requesterEmail = decommissionRequest.requester.email
@@ -131,22 +150,32 @@ export async function POST(
     }
   )
 
-  await prisma.audit_logs.create({
-    data: {
-      id: randomUUID(),
-      action: 'DECOMMISSION_REJECTED',
-      entityType: 'inventory',
-      entityId: requestId,
-      userId: session.user.id,
-      details: { descripcion: `${adminName} rechazó la solicitud de baja de "${assetName}". Motivo: ${rejectionReason.trim().substring(0, 200)}` },
-      createdAt: new Date(),
-    },
-  }).catch(() => {})
+  await prisma.audit_logs
+    .create({
+      data: {
+        id: randomUUID(),
+        action: 'DECOMMISSION_REJECTED',
+        entityType: 'inventory',
+        entityId: requestId,
+        userId: session.user.id,
+        details: {
+          descripcion: `${adminName} rechazó la solicitud de baja de "${assetName}". Motivo: ${rejectionReason.trim().substring(0, 200)}`,
+        },
+        createdAt: new Date(),
+      },
+    })
+    .catch(() => {})
 
   return NextResponse.json({ message: 'Solicitud rechazada correctamente' })
 }
 
-function generateRejectionEmail(requesterName: string, assetName: string, reason: string, adminName: string, systemName: string): string {
+function generateRejectionEmail(
+  requesterName: string,
+  assetName: string,
+  reason: string,
+  adminName: string,
+  systemName: string
+): string {
   return `<!DOCTYPE html><html><head><meta charset="UTF-8">
 <style>body{font-family:Arial,sans-serif;line-height:1.6;color:#333}.container{max-width:600px;margin:0 auto;padding:20px}.header{background-color:#dc2626;color:white;padding:20px;border-radius:5px 5px 0 0}.content{background-color:#f9fafb;padding:20px;border:1px solid #e5e7eb}.info-box{background-color:white;padding:15px;margin:15px 0;border-left:4px solid #dc2626}.footer{text-align:center;margin-top:20px;color:#6b7280;font-size:12px}</style>
 </head><body><div class="container">

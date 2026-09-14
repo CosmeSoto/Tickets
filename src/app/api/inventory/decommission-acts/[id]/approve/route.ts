@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
+import type { DecommissionStatus } from '@prisma/client'
 import { randomUUID } from 'crypto'
 import fs from 'fs'
 import { generateDecommissionActPDF } from '@/lib/templates/decommission-act-pdf.template'
@@ -150,6 +151,21 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
 
   try {
     const act = await prisma.$transaction(async tx => {
+      // Claim atómico: repite el filtro de estado en el `where` del update en
+      // vez de confiar en el chequeo leído arriba. Sin esto, un /approve y un
+      // /reject (o /elevate) casi simultáneos sobre la misma solicitud en
+      // MANAGER_REVIEW pasaban ambos su respectivo chequeo de estado (leído
+      // antes de que cualquiera escribiera) y podían terminar en un estado
+      // inconsistente: equipo RETIRED + acta generada, pero la solicitud
+      // pisada a REJECTED por el otro request (o viceversa).
+      const claim = await tx.decommission_requests.updateMany({
+        where: { id: requestId, status: { in: approvableStatuses as DecommissionStatus[] } },
+        data: { status: 'APPROVED', reviewedById: session.user.id, reviewedAt: new Date() },
+      })
+      if (claim.count === 0) {
+        throw new DecommissionStatusRaceError()
+      }
+
       // Folio BAJA
       let counter = await tx.folio_counters.findUnique({
         where: { year_type: { year: currentYear, type: 'BAJA' } },
@@ -165,12 +181,6 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
         })
       }
       const folio = `BAJA-${currentYear}-${counter.lastNumber.toString().padStart(5, '0')}`
-
-      // Actualizar solicitud
-      await tx.decommission_requests.update({
-        where: { id: requestId },
-        data: { status: 'APPROVED', reviewedById: session.user.id, reviewedAt: new Date() },
-      })
 
       // Actualizar activo
       if (decommissionRequest.assetType === 'EQUIPMENT' && decommissionRequest.equipmentId) {
@@ -392,9 +402,21 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
       ...lastAssetForContract,
     })
   } catch (error) {
+    if (error instanceof DecommissionStatusRaceError) {
+      return NextResponse.json(
+        {
+          error:
+            'La solicitud cambió de estado mientras se procesaba (ya fue aprobada, rechazada o elevada por otra persona).',
+        },
+        { status: 409 }
+      )
+    }
     return NextResponse.json({ error: 'Error al aprobar la solicitud de baja' }, { status: 500 })
   }
 }
+
+/** Señal interna para abortar la transacción cuando otra petición ganó la carrera de estado. */
+class DecommissionStatusRaceError extends Error {}
 
 function buildApprovalEmail(
   requesterName: string,
