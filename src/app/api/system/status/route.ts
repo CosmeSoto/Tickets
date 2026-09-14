@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
+import { redis } from '@/lib/redis'
 import os from 'os'
 
 export async function GET(_request: NextRequest) {
@@ -29,7 +30,7 @@ async function getSystemStatus() {
     email: await getEmailStatus(),
     backup: await getBackupStatus(),
     server: await getServerStatus(),
-    lastUpdated: new Date().toISOString()
+    lastUpdated: new Date().toISOString(),
   }
 
   return status
@@ -38,56 +39,38 @@ async function getSystemStatus() {
 // Estado real de la base de datos
 async function getDatabaseStatus() {
   try {
-    // Verificar conexión a la base de datos
     const startTime = Date.now()
     await prisma.$queryRaw`SELECT 1`
     const responseTime = Date.now() - startTime
 
-    // Obtener estadísticas reales de la base de datos
-    const [
-      totalConnections,
-      activeQueries,
-      databaseSize,
-      totalTables
-    ] = await Promise.all([
-      // Conexiones activas (simulado basado en actividad)
-      prisma.users.count().then(count => Math.min(count + 10, 100)),
-      
-      // Consultas activas (basado en actividad reciente)
-      prisma.tickets.count({
-        where: {
-          updatedAt: {
-            gte: new Date(Date.now() - 5 * 60 * 1000) // Últimos 5 minutos
-          }
-        }
-      }),
-      
-      // Tamaño aproximado de la base de datos (basado en registros)
-      Promise.all([
-        prisma.tickets.count(),
-        prisma.users.count(),
-        prisma.comments.count()
-      ]).then(([tickets, users, comments]) => 
-        Math.round((tickets * 2 + users * 1 + comments * 0.5) / 1000) // MB aproximados
-      ),
-      
-      // Número de tablas principales
-      Promise.resolve(8) // tickets, users, categories, departments, comments, attachments, ratings, notifications
+    // Conexiones activas y tamaño reales — vía catálogo de Postgres, no
+    // estimados a partir de actividad de tickets como antes.
+    const [connStats, sizeStats] = await Promise.all([
+      prisma.$queryRaw<{ active: bigint; max_conn: number }[]>`
+        SELECT
+          (SELECT count(*) FROM pg_stat_activity WHERE datname = current_database()) AS active,
+          (SELECT setting::int FROM pg_settings WHERE name = 'max_connections') AS max_conn
+      `,
+      prisma.$queryRaw<{ size_bytes: bigint }[]>`
+        SELECT pg_database_size(current_database()) AS size_bytes
+      `,
     ])
+
+    const active = Number(connStats[0]?.active ?? 0)
+    const maxConn = Number(connStats[0]?.max_conn ?? 100)
+    const sizeMB = Math.round(Number(sizeStats[0]?.size_bytes ?? 0) / (1024 * 1024))
 
     return {
       status: 'active',
       type: 'PostgreSQL',
       responseTime: `${responseTime}ms`,
       connections: {
-        active: Math.min(totalConnections, 100),
-        max: 100,
-        percentage: Math.min(totalConnections, 100)
+        active,
+        max: maxConn,
+        percentage: maxConn > 0 ? Math.round((active / maxConn) * 100) : 0,
       },
-      size: `${databaseSize}MB`,
-      tables: totalTables,
-      activeQueries,
-      lastCheck: new Date().toISOString()
+      size: `${sizeMB}MB`,
+      lastCheck: new Date().toISOString(),
     }
   } catch (error) {
     console.error('Database status error:', error)
@@ -95,144 +78,125 @@ async function getDatabaseStatus() {
       status: 'error',
       type: 'PostgreSQL',
       error: 'Connection failed',
-      lastCheck: new Date().toISOString()
+      lastCheck: new Date().toISOString(),
     }
   }
 }
 
-// Estado del cache (Redis simulado basado en actividad)
+// Estado real de Redis (el cache efectivamente usado por la app vía @/lib/api-cache)
 async function getCacheStatus() {
   try {
-    // Simular estado del cache basado en actividad real del sistema
-    const recentActivity = await prisma.tickets.count({
-      where: {
-        updatedAt: {
-          gte: new Date(Date.now() - 60 * 60 * 1000) // Última hora
-        }
+    const pong = await redis.ping().catch(() => null)
+    if (pong !== 'PONG') {
+      return {
+        status: 'unavailable',
+        type: 'Redis',
+        note: 'Redis no configurado o inalcanzable — la app sigue funcionando sin caché.',
+        lastCheck: new Date().toISOString(),
       }
-    })
+    }
 
-    const cacheUsage = Math.min(30 + (recentActivity * 2), 95) // Uso basado en actividad
+    const keys = await redis.dbsize().catch(() => null)
 
     return {
       status: 'active',
-      type: 'Memory Cache',
-      usage: {
-        percentage: cacheUsage,
-        used: `${Math.round(cacheUsage * 5.12)}MB`, // Simulado
-        total: '512MB'
-      },
-      hitRate: Math.max(85, 100 - recentActivity), // Hit rate inversamente proporcional a actividad
-      keys: recentActivity * 10 + 150, // Número de keys basado en actividad
-      lastCheck: new Date().toISOString()
+      type: 'Redis',
+      keys: typeof keys === 'number' ? keys : null,
+      lastCheck: new Date().toISOString(),
     }
   } catch (error) {
     return {
       status: 'unknown',
-      type: 'Memory Cache',
+      type: 'Redis',
       error: 'Unable to check cache status',
-      lastCheck: new Date().toISOString()
+      lastCheck: new Date().toISOString(),
     }
   }
 }
 
-// Estado del servicio de email
+// Estado real de la cola de emails (tabla email_queue)
 async function getEmailStatus() {
   try {
-    // Contar emails enviados hoy (basado en tickets creados/actualizados)
     const today = new Date()
     today.setHours(0, 0, 0, 0)
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+    const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
 
-    const [
-      ticketsToday,
-      commentsToday,
-      resolvedToday
-    ] = await Promise.all([
-      prisma.tickets.count({
-        where: {
-          createdAt: {
-            gte: today
-          }
-        }
-      }),
-      prisma.comments.count({
-        where: {
-          createdAt: {
-            gte: today
-          }
-        }
-      }),
-      prisma.tickets.count({
-        where: {
-          status: 'RESOLVED',
-          resolvedAt: {
-            gte: today
-          }
-        }
-      })
-    ])
-
-    // Calcular emails enviados (notificaciones automáticas)
-    const emailsSent = (ticketsToday * 2) + commentsToday + (resolvedToday * 1)
+    const [pending, sentToday, sentThisWeek, sentThisMonth, lastSent, failedRecent] =
+      await Promise.all([
+        prisma.email_queue.count({ where: { status: 'pending' } }),
+        prisma.email_queue.count({ where: { status: 'sent', sentAt: { gte: today } } }),
+        prisma.email_queue.count({ where: { status: 'sent', sentAt: { gte: weekAgo } } }),
+        prisma.email_queue.count({ where: { status: 'sent', sentAt: { gte: monthAgo } } }),
+        prisma.email_queue.findFirst({
+          where: { status: 'sent' },
+          orderBy: { sentAt: 'desc' },
+          select: { sentAt: true },
+        }),
+        prisma.email_queue.count({ where: { status: 'failed', createdAt: { gte: weekAgo } } }),
+      ])
 
     return {
       status: 'active',
       type: 'SMTP',
       emailsSent: {
-        today: emailsSent,
-        thisWeek: emailsSent * 7, // Estimado
-        thisMonth: emailsSent * 30 // Estimado
+        today: sentToday,
+        thisWeek: sentThisWeek,
+        thisMonth: sentThisMonth,
       },
-      queue: Math.max(0, Math.floor(Math.random() * 5)), // Cola actual
-      lastSent: new Date(Date.now() - Math.random() * 60 * 60 * 1000).toISOString(),
+      queue: pending,
+      failedThisWeek: failedRecent,
+      lastSent: lastSent?.sentAt?.toISOString() ?? null,
       provider: 'SMTP Server',
-      lastCheck: new Date().toISOString()
+      lastCheck: new Date().toISOString(),
     }
   } catch (error) {
     return {
       status: 'error',
       type: 'SMTP',
       error: 'Unable to check email service',
-      lastCheck: new Date().toISOString()
+      lastCheck: new Date().toISOString(),
     }
   }
 }
 
-// Estado del backup
+// Estado real del backup (tabla backups, la misma que administra el módulo de Backups)
 async function getBackupStatus() {
   try {
-    // Simular backup basado en datos reales
-    const totalRecords = await Promise.all([
-      prisma.tickets.count(),
-      prisma.users.count(),
-      prisma.comments.count()
-    ]).then(([tickets, users, comments]) => tickets + users + comments)
+    const lastCompleted = await prisma.backups.findFirst({
+      where: { status: 'completed' },
+      orderBy: { createdAt: 'desc' },
+      select: { createdAt: true, size: true, backupKind: true },
+    })
 
-    // Último backup simulado (entre 1-6 horas atrás)
-    const lastBackupTime = new Date(Date.now() - (Math.random() * 5 + 1) * 60 * 60 * 1000)
-    const hoursAgo = Math.floor((Date.now() - lastBackupTime.getTime()) / (1000 * 60 * 60))
+    if (!lastCompleted) {
+      return {
+        status: 'no_backups',
+        type: 'Automated Backup',
+        lastBackup: null,
+        lastCheck: new Date().toISOString(),
+      }
+    }
+
+    const hoursAgo = Math.floor((Date.now() - lastCompleted.createdAt.getTime()) / (1000 * 60 * 60))
 
     return {
       status: hoursAgo < 24 ? 'scheduled' : 'overdue',
       type: 'Automated Backup',
       lastBackup: {
-        time: lastBackupTime.toISOString(),
+        time: lastCompleted.createdAt.toISOString(),
         timeAgo: `hace ${hoursAgo}h`,
-        size: `${Math.round(totalRecords / 100)}MB`,
-        records: totalRecords
+        size: `${Math.round(lastCompleted.size / (1024 * 1024))}MB`,
+        kind: lastCompleted.backupKind,
       },
-      nextBackup: new Date(Date.now() + (24 - hoursAgo) * 60 * 60 * 1000).toISOString(),
-      frequency: 'Daily',
-      retention: '30 days',
-      location: 'Cloud Storage',
-      lastCheck: new Date().toISOString()
+      lastCheck: new Date().toISOString(),
     }
   } catch (error) {
     return {
       status: 'error',
       type: 'Automated Backup',
       error: 'Unable to check backup status',
-      lastCheck: new Date().toISOString()
+      lastCheck: new Date().toISOString(),
     }
   }
 }
@@ -240,34 +204,39 @@ async function getBackupStatus() {
 // Estado del servidor
 async function getServerStatus() {
   try {
-    // Información del proceso Node.js
     const memoryUsage = process.memoryUsage()
     const uptime = process.uptime()
+    const cores = os.cpus().length
+    // Load average (1 min) como proxy real de uso de CPU — no es un porcentaje
+    // exacto de CPU, pero es una medición real del sistema, no un valor
+    // aleatorio. No disponible en Windows (loadavg devuelve [0,0,0] ahí).
+    const load1m = os.loadavg()[0]
 
     return {
       status: 'running',
       uptime: {
         seconds: Math.floor(uptime),
-        formatted: formatUptime(uptime)
+        formatted: formatUptime(uptime),
       },
       memory: {
         used: Math.round(memoryUsage.heapUsed / 1024 / 1024), // MB
         total: Math.round(memoryUsage.heapTotal / 1024 / 1024), // MB
-        percentage: Math.round((memoryUsage.heapUsed / memoryUsage.heapTotal) * 100)
+        percentage: Math.round((memoryUsage.heapUsed / memoryUsage.heapTotal) * 100),
       },
       cpu: {
-        usage: Math.floor(Math.random() * 20 + 10), // Simulado entre 10-30%
-        cores: os.cpus().length
+        loadAverage1m: Math.round(load1m * 100) / 100,
+        usagePercentEstimate: cores > 0 ? Math.min(100, Math.round((load1m / cores) * 100)) : null,
+        cores,
       },
       nodeVersion: process.version,
       platform: process.platform,
-      lastCheck: new Date().toISOString()
+      lastCheck: new Date().toISOString(),
     }
   } catch (error) {
     return {
       status: 'error',
       error: 'Unable to get server status',
-      lastCheck: new Date().toISOString()
+      lastCheck: new Date().toISOString(),
     }
   }
 }

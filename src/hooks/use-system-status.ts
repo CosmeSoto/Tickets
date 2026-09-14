@@ -17,22 +17,15 @@ interface DatabaseStatus {
     percentage: number
   }
   size?: string
-  tables?: number
-  activeQueries?: number
   error?: string
   lastCheck: string
 }
 
 interface CacheStatus {
-  status: 'active' | 'error' | 'unknown'
+  status: 'active' | 'unavailable' | 'error' | 'unknown'
   type: string
-  usage?: {
-    percentage: number
-    used: string
-    total: string
-  }
-  hitRate?: number
-  keys?: number
+  note?: string
+  keys?: number | null
   error?: string
   lastCheck: string
 }
@@ -46,25 +39,22 @@ interface EmailStatus {
     thisMonth: number
   }
   queue?: number
-  lastSent?: string
+  failedThisWeek?: number
+  lastSent?: string | null
   provider?: string
   error?: string
   lastCheck: string
 }
 
 interface BackupStatus {
-  status: 'scheduled' | 'overdue' | 'error' | 'running'
+  status: 'scheduled' | 'overdue' | 'no_backups' | 'error' | 'running'
   type: string
   lastBackup?: {
     time: string
     timeAgo: string
     size: string
-    records: number
-  }
-  nextBackup?: string
-  frequency?: string
-  retention?: string
-  location?: string
+    kind?: string
+  } | null
   error?: string
   lastCheck: string
 }
@@ -81,7 +71,10 @@ interface ServerStatus {
     percentage: number
   }
   cpu?: {
-    usage: number
+    /** Load average de 1 minuto (os.loadavg) — medición real, no un % exacto de CPU. 0 en Windows. */
+    loadAverage1m: number
+    /** Estimación aproximada de uso de CPU a partir del load average. */
+    usagePercentEstimate: number | null
     cores: number
   }
   nodeVersion?: string

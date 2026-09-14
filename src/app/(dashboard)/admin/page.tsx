@@ -649,17 +649,14 @@ export default function AdminDashboard() {
                     </Badge>
                   </div>
                   <p className='text-xs text-muted-foreground'>{systemStatus.cache.type}</p>
-                  {systemStatus.cache.usage ? (
+                  {typeof systemStatus.cache.keys === 'number' ? (
                     <p className='text-xs text-muted-foreground'>
-                      {systemStatus.cache.usage.percentage}% uso
+                      {systemStatus.cache.keys} claves
                     </p>
+                  ) : systemStatus.cache.note ? (
+                    <p className='text-xs text-yellow-600'>{systemStatus.cache.note}</p>
                   ) : (
                     <p className='text-xs text-yellow-600'>Estado desconocido</p>
-                  )}
-                  {systemStatus.cache.hitRate && (
-                    <p className='text-xs text-muted-foreground'>
-                      Hit rate: {systemStatus.cache.hitRate}%
-                    </p>
                   )}
                 </div>
 
