@@ -1,6 +1,6 @@
 /**
  * Cron Job: Auto-cierre de tickets resueltos sin calificación
- * 
+ *
  * Cierra automáticamente tickets que llevan más de X días en estado RESOLVED
  * sin que el cliente haya enviado su calificación.
  * El plazo es configurable por el admin en Configuración > Seguridad.
@@ -59,16 +59,25 @@ export async function autoCloseResolvedTickets(): Promise<{
 
     for (const ticket of staleTickets) {
       try {
-        await prisma.$transaction(async (tx) => {
-          // Cerrar el ticket
-          await tx.tickets.update({
-            where: { id: ticket.id },
+        const claimed = await prisma.$transaction(async tx => {
+          // Claim atómico: exige que el ticket SIGA en RESOLVED en el
+          // momento del update. Sin esto, dos ejecuciones del cron
+          // solapadas (dos workers, o un disparo manual mientras corre el
+          // programado) listaban el mismo ticket ANTES de que cualquiera
+          // escribiera, y ambas terminaban creando entradas de historial y
+          // notificaciones duplicadas para el mismo cierre automático.
+          const claim = await tx.tickets.updateMany({
+            where: { id: ticket.id, status: 'RESOLVED' },
             data: {
               status: 'CLOSED',
               closedAt: new Date(),
               updatedAt: new Date(),
             },
           })
+          if (claim.count === 0) {
+            // Otra ejecución ya lo cerró (o cambió de estado) primero.
+            return false
+          }
 
           // Registrar en historial
           await tx.ticket_history.create({
@@ -112,9 +121,11 @@ export async function autoCloseResolvedTickets(): Promise<{
               },
             })
           }
+
+          return true
         })
 
-        closed++
+        if (claimed) closed++
       } catch (err) {
         console.error(`[AUTO-CLOSE] Error cerrando ticket ${ticket.id}:`, err)
         errors++
