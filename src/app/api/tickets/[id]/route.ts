@@ -240,6 +240,37 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
       throw err
     }
 
+    // Reasignar (cambiar assigneeId) exige el scope de 'assign', no solo
+    // 'write'. Sin esto, un ADMIN que es el asignado ACTUAL del ticket pero
+    // que no tiene adminCanOperateTicketFamily sobre esa familia (p. ej. se
+    // le asignó puntualmente vía PATROL o manualmente por otro admin) podía
+    // reasignarlo a cualquier técnico por esta vía genérica — el endpoint
+    // dedicado PATCH /assign, que sí exige 'assign', se lo habría rechazado.
+    if (updates.assigneeId !== undefined && session.user.role === 'ADMIN') {
+      try {
+        await assertTicketAccess(
+          toTicketAccessUser(session.user),
+          {
+            id: existingTicket.id,
+            clientId: existingTicket.clientId,
+            assigneeId: existingTicket.assigneeId,
+            familyId: existingTicket.familyId,
+            source: existingTicket.source,
+            createdById: existingTicket.createdById,
+          },
+          'assign'
+        )
+      } catch (err) {
+        if (err instanceof TicketAccessError) {
+          return NextResponse.json(
+            { success: false, message: err.message },
+            { status: err.statusCode }
+          )
+        }
+        throw err
+      }
+    }
+
     // CONTROL DE PERMISOS POR ROL
     const filteredUpdates: any = {}
 
@@ -969,19 +1000,42 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
       return NextResponse.json({ success: false, message: 'Ticket no encontrado' }, { status: 404 })
     }
 
-    // Verificar permisos según el rol
-    if (session.user.role === 'ADMIN') {
-      // Admin puede eliminar cualquier ticket
-    } else if (session.user.role === 'CLIENT') {
-      // Cliente solo puede eliminar sus propios tickets
-      if (existingTicket.clientId !== session.user.id) {
+    // Verificar permisos según el rol — delega en el control de acceso
+    // centralizado (canDeleteTicket) en vez de reimplementar la regla acá.
+    // Antes esta ruta hacía `if (role === 'ADMIN') { /* puede eliminar
+    // cualquier ticket */ }` sin ningún chequeo de scope: un ADMIN de
+    // familia (no super admin) podía borrar CUALQUIER ticket del sistema,
+    // aunque el propio ticket-access.ts documenta que el borrado "sigue
+    // siendo solo nativa / super — no ampliar por patrullas", y el GET/PUT
+    // del mismo ticket sí respetan ese scope.
+    try {
+      await assertTicketAccess(
+        toTicketAccessUser(session.user),
+        {
+          id: existingTicket.id,
+          clientId: existingTicket.clientId,
+          assigneeId: existingTicket.assigneeId,
+          familyId: existingTicket.familyId,
+          source: existingTicket.source,
+          createdById: existingTicket.createdById,
+        },
+        'delete'
+      )
+    } catch (err) {
+      if (err instanceof TicketAccessError) {
         return NextResponse.json(
-          { success: false, message: 'No tienes permisos para eliminar este ticket' },
-          { status: 403 }
+          { success: false, message: err.message },
+          { status: err.statusCode }
         )
       }
+      throw err
+    }
 
-      // Cliente solo puede eliminar tickets en estado OPEN (no han sido revisados/trabajados)
+    // Reglas de negocio adicionales para CLIENT: canDeleteTicket solo valida
+    // propiedad (clientId === user.id); las restricciones de "solo mientras
+    // esté OPEN y sin asignar" son específicas de esta ruta, no de
+    // autorización, y se mantienen tal cual estaban.
+    if (session.user.role === 'CLIENT') {
       if (existingTicket.status !== 'OPEN') {
         return NextResponse.json(
           {
@@ -993,7 +1047,6 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
         )
       }
 
-      // Cliente no puede eliminar tickets que ya tienen técnico asignado
       if (existingTicket.assigneeId) {
         return NextResponse.json(
           {
@@ -1003,12 +1056,6 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
           { status: 403 }
         )
       }
-    } else {
-      // Técnicos no pueden eliminar tickets
-      return NextResponse.json(
-        { success: false, message: 'No tienes permisos para eliminar tickets' },
-        { status: 403 }
-      )
     }
 
     // Eliminar ticket (esto también eliminará comentarios, attachments, historial y notificaciones por cascada)
