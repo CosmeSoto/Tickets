@@ -8,6 +8,7 @@ import { checkCredentialsModuleAccess, userCanMutateEntry } from '@/lib/credenti
 import { assertCanShareCredentialWith } from '@/lib/credentials/share-scope'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 import { notifyUser } from '@/lib/api/notify'
+import { isPrismaUniqueViolation } from '@/lib/db/prisma-errors'
 
 const createShareSchema = z.object({
   userId: z.string().min(1, 'Selecciona un usuario'),
@@ -121,17 +122,32 @@ export async function POST(request: Request, { params }: RouteParams) {
     )
   }
 
-  const share = await prisma.credential_shares.create({
-    data: {
-      id: randomUUID(),
-      entryId: id,
-      userId: target.id,
-      capability: parsed.data.capability,
-    },
-    include: {
-      user: { select: { id: true, name: true, email: true, role: true } },
-    },
-  })
+  // El `findFirst` de arriba es solo el mensaje amigable del caso común — no
+  // es una garantía atómica. `credential_shares` ya tiene
+  // `@@unique([entryId, userId])`, así que dos POST concurrentes para el
+  // mismo destinatario chocan aquí (P2002) en vez de crear dos filas.
+  let share
+  try {
+    share = await prisma.credential_shares.create({
+      data: {
+        id: randomUUID(),
+        entryId: id,
+        userId: target.id,
+        capability: parsed.data.capability,
+      },
+      include: {
+        user: { select: { id: true, name: true, email: true, role: true } },
+      },
+    })
+  } catch (error) {
+    if (isPrismaUniqueViolation(error, 'entry_id')) {
+      return NextResponse.json(
+        { error: 'Esta credencial ya está compartida con ese usuario' },
+        { status: 409 }
+      )
+    }
+    throw error
+  }
 
   await AuditServiceComplete.log({
     action: AuditActionsComplete.CREDENTIAL_SHARED,

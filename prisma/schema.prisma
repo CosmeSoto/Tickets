@@ -4130,6 +4130,14 @@ model credential_shares {
   user   users?             @relation(fields: [userId], references: [id], onDelete: SetNull)
   family families?          @relation(fields: [familyId], references: [id], onDelete: SetNull)
 
+  // Sin esto, un POST duplicado (doble clic, reintento de red) podía crear
+  // dos filas para el mismo (entryId, userId); el DELETE de revocación ya se
+  // arregló para borrar todas las coincidencias (deleteMany), pero esto
+  // cierra también la creación del duplicado en origen. Postgres trata cada
+  // NULL como distinto en un índice único, así que no restringe las
+  // (hipotéticas, hoy no usadas por ninguna ruta) shares por familyId con
+  // userId nulo.
+  @@unique([entryId, userId])
   @@index([entryId])
   @@map("credential_shares")
 }
