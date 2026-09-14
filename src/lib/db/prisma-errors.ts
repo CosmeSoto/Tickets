@@ -25,3 +25,17 @@ export function isPrismaUniqueViolation(error: unknown, field?: string): boolean
   const targets = Array.isArray(target) ? target : [target]
   return targets.some(t => t.includes(field))
 }
+
+/**
+ * `true` si `error` es una violación de foreign key de Prisma (P2003) — por
+ * ejemplo, borrar una fila que todavía tiene hijos con una relación
+ * requerida. Útil para convertir un TOCTOU de "contar hijos, luego borrar"
+ * (una fila colada entre el conteo y el delete) en una respuesta 400
+ * controlada en vez de un 500 sin manejar: la FK real de la base de datos ya
+ * impide la corrupción de datos, esto solo evita que la carrera se filtre
+ * como un error genérico.
+ */
+export function isPrismaForeignKeyViolation(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false
+  return (error as PrismaKnownRequestErrorLike).code === 'P2003'
+}

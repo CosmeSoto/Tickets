@@ -9,6 +9,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { assertCanManageForms } from '@/lib/forms/forms-access'
+import { isPrismaForeignKeyViolation } from '@/lib/db/prisma-errors'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -75,7 +76,22 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
       )
     }
 
-    await prisma.form_categories.delete({ where: { id } })
+    try {
+      await prisma.form_categories.delete({ where: { id } })
+    } catch (deleteError) {
+      // TOCTOU: un POST /api/admin/forms con esta categoryId puede colarse
+      // entre el conteo de arriba y este delete. La FK real de Postgres ya
+      // impide borrar una categoría con documentos asociados (evita la
+      // corrupción de datos) — esto solo convierte esa carrera en un 400
+      // controlado en vez de dejarla caer al catch genérico como 500.
+      if (isPrismaForeignKeyViolation(deleteError)) {
+        return NextResponse.json(
+          { error: 'No se puede eliminar: tiene documentos asociados' },
+          { status: 400 }
+        )
+      }
+      throw deleteError
+    }
 
     return NextResponse.json({ success: true })
   } catch (error) {
