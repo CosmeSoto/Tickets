@@ -107,7 +107,10 @@ export async function GET(_request: NextRequest, { params }: Params) {
     const attachments = await FileService.getFilesByForm(id)
     return NextResponse.json({ attachments })
   } catch (error) {
+    // Antes: `{attachments:[]}` con 200 para cualquier excepción — mismo
+    // antipatrón ya corregido en GET /api/admin/news, escondía un error real
+    // de Prisma como "sin adjuntos".
     console.error('Error obteniendo adjuntos:', error)
-    return NextResponse.json({ attachments: [] })
+    return NextResponse.json({ error: 'Error al obtener adjuntos' }, { status: 500 })
   }
 }

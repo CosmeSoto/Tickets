@@ -12,6 +12,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { assertCanViewForm } from '@/lib/forms/form-visibility'
+import { buildFormAttachmentResponse } from '@/lib/forms/serve-form-attachment'
 import { readFile } from 'fs/promises'
 import { existsSync } from 'fs'
 
@@ -61,17 +62,7 @@ export async function GET(request: NextRequest, { params }: Params) {
       }
 
       const buffer = await readFile(attachment.path)
-
-      return new NextResponse(buffer, {
-        headers: {
-          'Content-Type': attachment.mimeType,
-          'Content-Length': String(buffer.length),
-          'Content-Disposition': download
-            ? `attachment; filename="${encodeURIComponent(attachment.originalName)}"`
-            : `inline; filename="${encodeURIComponent(attachment.originalName)}"`,
-          'Cache-Control': 'private, max-age=3600',
-        },
-      })
+      return buildFormAttachmentResponse(attachment, buffer, download)
     }
 
     // ── Caso 2: tiene URL externa ────────────────────────────────────────────
@@ -86,16 +77,7 @@ export async function GET(request: NextRequest, { params }: Params) {
           })
           if (attachment && existsSync(attachment.path)) {
             const buffer = await readFile(attachment.path)
-            return new NextResponse(buffer, {
-              headers: {
-                'Content-Type': attachment.mimeType,
-                'Content-Length': String(buffer.length),
-                'Content-Disposition': download
-                  ? `attachment; filename="${encodeURIComponent(attachment.originalName)}"`
-                  : `inline; filename="${encodeURIComponent(attachment.originalName)}"`,
-                'Cache-Control': 'private, max-age=3600',
-              },
-            })
+            return buildFormAttachmentResponse(attachment, buffer, download)
           }
         }
       }
