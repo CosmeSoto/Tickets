@@ -194,18 +194,27 @@ export async function DELETE(request: Request, { params }: RouteParams) {
     return NextResponse.json({ error: 'Indica shareId o userId' }, { status: 400 })
   }
 
-  const share = await prisma.credential_shares.findFirst({
-    where: {
-      entryId: id,
-      ...(shareId ? { id: shareId } : { userId: targetUserId! }),
-    },
-  })
-  if (!share) {
+  const shareWhere = {
+    entryId: id,
+    ...(shareId ? { id: shareId } : { userId: targetUserId! }),
+  }
+
+  // Sin `@@unique([entryId, userId])` en el schema, un POST duplicado (doble
+  // clic, reintento de red) puede haber creado más de una fila para el mismo
+  // (entryId, userId) — ver createShareSchema en el POST de esta misma ruta.
+  // `findFirst`+`delete` por un solo id solo borraba UNA de esas filas: la
+  // revocación "tenía éxito" pero el usuario conservaba acceso de
+  // lectura/revelado a través de la fila que quedó viva (`userCanAccessEntry`
+  // solo comprueba que EXISTA algún share, no cuántos). `deleteMany` con el
+  // mismo filtro borra todas las coincidencias de una vez.
+  const existingShares = await prisma.credential_shares.findMany({ where: shareWhere })
+  if (existingShares.length === 0) {
     return NextResponse.json({ error: 'Compartido no encontrado' }, { status: 404 })
   }
 
-  await prisma.credential_shares.delete({ where: { id: share.id } })
+  await prisma.credential_shares.deleteMany({ where: shareWhere })
 
+  const [share] = existingShares
   await AuditServiceComplete.log({
     action: AuditActionsComplete.CREDENTIAL_SHARE_REVOKED,
     entityType: 'credential_entry',
@@ -216,6 +225,7 @@ export async function DELETE(request: Request, { params }: RouteParams) {
       title: entry.title,
       targetUserId: share.userId,
       capability: share.capability,
+      revokedCount: existingShares.length,
     },
     ipAddress: request.headers.get('x-forwarded-for') || 'unknown',
     userAgent: request.headers.get('user-agent') || 'unknown',
