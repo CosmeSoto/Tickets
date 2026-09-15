@@ -1,9 +1,25 @@
 /**
  * Seed: Categorías para Familia ARQUITECTURA (ARCHITECTURE)
+ *
+ * Mismo criterio aplicado a Mantenimiento (categories-maintenance.seed.ts): el nivel
+ * 1/2 se mantiene (agrupa por tipo de espacio/trabajo real — Estructuras, Locales
+ * Comerciales, Zonas Comunes, Sanitarios, Fachada — que determina a qué técnico se
+ * asigna), pero se elimina el nivel 3 de síntoma (ej. "Grietas en Muros"/
+ * "Desprendimiento de Material"/"Filtración en Techo"/"Daños por Humedad", las
+ * cuatro bajo "Estructuras" y atendidas por el mismo equipo), plegando ese texto en
+ * la descripción de la categoría de nivel 2. Arquitectura y Mantenimiento son
+ * equipos separados con responsabilidades distintas (confirmado con el usuario) —
+ * no se fusionan aunque cubran temas superficialmente similares (ambos atienden
+ * fugas de agua o ascensores, por ejemplo, pero en áreas distintas).
+ *
+ * Las 9 categorías de nivel 2 (ahora hojas) + "Consulta o Asesoría" (nivel 1, ya era
+ * hoja) llevan un `priorityCeiling` inicial con el mismo criterio que Mantenimiento:
+ * HIGH en fallas con riesgo estructural/de seguridad/agua, MEDIUM en fallas de
+ * confort/estética, LOW en todo el lado Solicitud/Consulta.
  */
 
-import { PrismaClient } from '@prisma/client'
-import { upsertCategory } from './category-upsert'
+import { PrismaClient, TicketPriority } from '@prisma/client'
+import { upsertCategory, type CategorySeedData } from './category-upsert'
 
 export async function seedCategoriesArchitecture(
   prisma: PrismaClient,
@@ -16,8 +32,15 @@ export async function seedCategoriesArchitecture(
     return
   }
 
+  const currentIds: string[] = []
+  async function create(data: CategorySeedData) {
+    const category = await upsertCategory(prisma, data)
+    currentIds.push(category.id)
+    return category
+  }
+
   // ==================== DEPARTAMENTO ARQUITECTURA ====================
-  const fallaArquitectura = await upsertCategory(prisma, {
+  const fallaArquitectura = await create({
     name: 'Falla o Daño',
     description: 'Daño o desperfecto en infraestructura arquitectónica',
     level: 1,
@@ -27,7 +50,7 @@ export async function seedCategoriesArchitecture(
     color: '#EF4444',
   })
 
-  const solicitudArquitectura = await upsertCategory(prisma, {
+  const solicitudArquitectura = await create({
     name: 'Solicitud o Requerimiento',
     description: 'Solicitudes de obras, remodelaciones y adecuaciones',
     level: 1,
@@ -37,7 +60,7 @@ export async function seedCategoriesArchitecture(
     color: '#3B82F6',
   })
 
-  const consultaArquitectura = await upsertCategory(prisma, {
+  await create({
     name: 'Consulta o Asesoría',
     description: 'Consultas y asesorías técnicas',
     level: 1,
@@ -45,50 +68,59 @@ export async function seedCategoriesArchitecture(
     departmentId: deptArquitectura,
     order: 3,
     color: '#10B981',
+    priorityCeiling: TicketPriority.LOW,
   })
 
-  // Nivel 2 - Fallas Arquitectura
-  const estructuras = await upsertCategory(prisma, {
+  // Nivel 2 - Fallas Arquitectura (hojas: absorben los síntomas que antes eran nivel 3)
+  await create({
     name: 'Estructuras',
-    description: 'Fallas en estructuras, muros, columnas, techos',
+    description:
+      'Fallas en estructuras, muros, columnas, techos: grietas o fisuras en muros o columnas, desprendimiento de yeso, pintura o revestimiento, goteras o filtraciones en techos o cubiertas, humedad o moho por agua',
     level: 2,
     parentId: fallaArquitectura.id,
     departmentId: deptArquitectura,
     order: 1,
     color: '#EF4444',
+    priorityCeiling: TicketPriority.HIGH,
   })
 
-  const locales = await upsertCategory(prisma, {
+  await create({
     name: 'Locales Comerciales',
-    description: 'Fallas en locales, vitrinas, divisiones',
+    description:
+      'Fallas en locales, vitrinas, divisiones: vitrina rota o dañada, divisiones/paneles/mamparas dañadas, puerta/cerradura/bisagra dañada, piso dañado o baldosas rotas',
     level: 2,
     parentId: fallaArquitectura.id,
     departmentId: deptArquitectura,
     order: 2,
     color: '#EF4444',
+    priorityCeiling: TicketPriority.MEDIUM,
   })
 
-  const zonasComunes = await upsertCategory(prisma, {
+  await create({
     name: 'Zonas Comunes',
-    description: 'Fallas en pasillos, escaleras, ascensores',
+    description:
+      'Fallas en pasillos, escaleras, ascensores: escaleras/barandas/escalones dañados, piso de pasillo dañado, iluminación de pasillos o zonas comunes, problemas con ascensores o montacargas',
     level: 2,
     parentId: fallaArquitectura.id,
     departmentId: deptArquitectura,
     order: 3,
     color: '#EF4444',
+    priorityCeiling: TicketPriority.HIGH,
   })
 
-  const sanitarios = await upsertCategory(prisma, {
+  await create({
     name: 'Sanitarios',
-    description: 'Fallas en baños, sanitarios, duchas',
+    description:
+      'Fallas en baños, sanitarios, duchas: fuga de agua en inodoro, lavabo obstruido o con fugas, grifería rota o con fugas, sanitario que requiere limpieza urgente',
     level: 2,
     parentId: fallaArquitectura.id,
     departmentId: deptArquitectura,
     order: 4,
     color: '#EF4444',
+    priorityCeiling: TicketPriority.HIGH,
   })
 
-  const fachada = await upsertCategory(prisma, {
+  await create({
     name: 'Fachada y Exterior',
     description: 'Fallas en fachada, letreros, exterior',
     level: 2,
@@ -96,184 +128,23 @@ export async function seedCategoriesArchitecture(
     departmentId: deptArquitectura,
     order: 5,
     color: '#EF4444',
-  })
-
-  // Nivel 3 - Fallas Estructuras
-  await upsertCategory(prisma, {
-    name: 'Grietas en Muros',
-    description: 'Grietas o fisuras en muros o columnas',
-    level: 3,
-    parentId: estructuras.id,
-    departmentId: deptArquitectura,
-    order: 1,
-    color: '#EF4444',
-  })
-
-  await upsertCategory(prisma, {
-    name: 'Desprendimiento de Material',
-    description: 'Desprendimiento de yeso, pintura o revestimiento',
-    level: 3,
-    parentId: estructuras.id,
-    departmentId: deptArquitectura,
-    order: 2,
-    color: '#EF4444',
-  })
-
-  await upsertCategory(prisma, {
-    name: 'Filtración en Techo',
-    description: 'Goteras o filtraciones en techos o cubiertas',
-    level: 3,
-    parentId: estructuras.id,
-    departmentId: deptArquitectura,
-    order: 3,
-    color: '#EF4444',
-  })
-
-  await upsertCategory(prisma, {
-    name: 'Daños por Humedad',
-    description: 'Humedad, moho o deterioro por agua',
-    level: 3,
-    parentId: estructuras.id,
-    departmentId: deptArquitectura,
-    order: 4,
-    color: '#EF4444',
-  })
-
-  // Nivel 3 - Fallas Locales
-  await upsertCategory(prisma, {
-    name: 'Daño en Vitrina',
-    description: 'Vitrina rota o dañada',
-    level: 3,
-    parentId: locales.id,
-    departmentId: deptArquitectura,
-    order: 1,
-    color: '#EF4444',
-  })
-
-  await upsertCategory(prisma, {
-    name: 'Problema con Divisiones',
-    description: 'Divisiones, paneles o mamparas dañadas',
-    level: 3,
-    parentId: locales.id,
-    departmentId: deptArquitectura,
-    order: 2,
-    color: '#EF4444',
-  })
-
-  await upsertCategory(prisma, {
-    name: 'Puerta de Local',
-    description: 'Puerta, cerradura o bisagra dañada',
-    level: 3,
-    parentId: locales.id,
-    departmentId: deptArquitectura,
-    order: 3,
-    color: '#EF4444',
-  })
-
-  await upsertCategory(prisma, {
-    name: 'Piso de Local',
-    description: 'Piso dañado, baldosas rotas',
-    level: 3,
-    parentId: locales.id,
-    departmentId: deptArquitectura,
-    order: 4,
-    color: '#EF4444',
-  })
-
-  // Nivel 3 - Fallas Zonas Comunes
-  await upsertCategory(prisma, {
-    name: 'Escaleras Dañadas',
-    description: 'Escaleras, barandas o escalones dañados',
-    level: 3,
-    parentId: zonasComunes.id,
-    departmentId: deptArquitectura,
-    order: 1,
-    color: '#EF4444',
-  })
-
-  await upsertCategory(prisma, {
-    name: 'Piso de Pasillo',
-    description: 'Piso de pasillo dañado',
-    level: 3,
-    parentId: zonasComunes.id,
-    departmentId: deptArquitectura,
-    order: 2,
-    color: '#EF4444',
-  })
-
-  await upsertCategory(prisma, {
-    name: 'Iluminación de Zonas',
-    description: 'Luces de pasillos o zonas comunes',
-    level: 3,
-    parentId: zonasComunes.id,
-    departmentId: deptArquitectura,
-    order: 3,
-    color: '#EF4444',
-  })
-
-  await upsertCategory(prisma, {
-    name: 'Ascensor o Montacargas',
-    description: 'Problemas con ascensores o montacargas',
-    level: 3,
-    parentId: zonasComunes.id,
-    departmentId: deptArquitectura,
-    order: 4,
-    color: '#EF4444',
-  })
-
-  // Nivel 3 - Fallas Sanitarios
-  await upsertCategory(prisma, {
-    name: 'Inodoro con Fuga',
-    description: 'Fuga de agua en inodoro',
-    level: 3,
-    parentId: sanitarios.id,
-    departmentId: deptArquitectura,
-    order: 1,
-    color: '#EF4444',
-  })
-
-  await upsertCategory(prisma, {
-    name: 'Lavabo Obstruido',
-    description: 'Lavabo obstruido o con fugas',
-    level: 3,
-    parentId: sanitarios.id,
-    departmentId: deptArquitectura,
-    order: 2,
-    color: '#EF4444',
-  })
-
-  await upsertCategory(prisma, {
-    name: 'Grifería Dañada',
-    description: 'Grifería rota o con fugas',
-    level: 3,
-    parentId: sanitarios.id,
-    departmentId: deptArquitectura,
-    order: 3,
-    color: '#EF4444',
-  })
-
-  await upsertCategory(prisma, {
-    name: 'Limpieza Urgente',
-    description: 'Sanitario requiere limpieza urgente',
-    level: 3,
-    parentId: sanitarios.id,
-    departmentId: deptArquitectura,
-    order: 4,
-    color: '#EF4444',
+    priorityCeiling: TicketPriority.MEDIUM,
   })
 
   // Nivel 2 - Solicitudes Arquitectura
-  const remodelacion = await upsertCategory(prisma, {
+  await create({
     name: 'Remodelación o Adecuación',
-    description: 'Solicitudes de remodelación',
+    description:
+      'Solicitudes de remodelación: modificar distribución de local, instalar paneles o divisiones, adecuar zona para nuevo uso',
     level: 2,
     parentId: solicitudArquitectura.id,
     departmentId: deptArquitectura,
     order: 1,
     color: '#3B82F6',
+    priorityCeiling: TicketPriority.LOW,
   })
 
-  const instalacionMobiliario = await upsertCategory(prisma, {
+  await create({
     name: 'Instalación de Mobiliario',
     description: 'Instalación de muebles, estantes, divisiones',
     level: 2,
@@ -281,9 +152,10 @@ export async function seedCategoriesArchitecture(
     departmentId: deptArquitectura,
     order: 2,
     color: '#3B82F6',
+    priorityCeiling: TicketPriority.LOW,
   })
 
-  const pintura = await upsertCategory(prisma, {
+  await create({
     name: 'Pintura y Acabados',
     description: 'Trabajos de pintura',
     level: 2,
@@ -291,9 +163,10 @@ export async function seedCategoriesArchitecture(
     departmentId: deptArquitectura,
     order: 3,
     color: '#3B82F6',
+    priorityCeiling: TicketPriority.LOW,
   })
 
-  const señalizacion = await upsertCategory(prisma, {
+  await create({
     name: 'Señalización',
     description: 'Instalación o cambio de señalización',
     level: 2,
@@ -301,38 +174,22 @@ export async function seedCategoriesArchitecture(
     departmentId: deptArquitectura,
     order: 4,
     color: '#3B82F6',
+    priorityCeiling: TicketPriority.LOW,
   })
 
-  // Nivel 3 - Solicitudes Remodelación
-  await upsertCategory(prisma, {
-    name: 'Modificación de Local',
-    description: 'Modificar distribución de local',
-    level: 3,
-    parentId: remodelacion.id,
-    departmentId: deptArquitectura,
-    order: 1,
-    color: '#3B82F6',
+  // ==================== RETIRO DE LAS CATEGORÍAS DE SÍNTOMA (nivel 3) ====================
+  const oldCategories = await prisma.categories.findMany({
+    where: { departmentId: deptArquitectura, isActive: true, id: { notIn: currentIds } },
+    select: { id: true },
   })
+  if (oldCategories.length > 0) {
+    await prisma.categories.updateMany({
+      where: { id: { in: oldCategories.map(c => c.id) } },
+      data: { isActive: false, updatedAt: new Date() },
+    })
+  }
 
-  await upsertCategory(prisma, {
-    name: 'Instalación de Divisiones',
-    description: 'Instalar paneles o divisiones',
-    level: 3,
-    parentId: remodelacion.id,
-    departmentId: deptArquitectura,
-    order: 2,
-    color: '#3B82F6',
-  })
-
-  await upsertCategory(prisma, {
-    name: 'Adecuación de Zona',
-    description: 'Adecuar zona para nuevo uso',
-    level: 3,
-    parentId: remodelacion.id,
-    departmentId: deptArquitectura,
-    order: 3,
-    color: '#3B82F6',
-  })
-
-  console.log('✅ Categorías ARCHITECTURE (Arquitectura)')
+  console.log(
+    `✅ Categorías ARCHITECTURE (Arquitectura): ${currentIds.length} vigentes, ${oldCategories.length} retiradas`
+  )
 }

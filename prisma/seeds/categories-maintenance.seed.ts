@@ -1,11 +1,35 @@
 /**
  * Seed: Categorías para Familia OPERACIONES — Mantenimiento
  *
- * Categorías completas para centro comercial: mantenimiento civil, eléctrico, mecánico.
+ * Categorías completas para centro comercial: mantenimiento civil, eléctrico, mecánico
+ * e infraestructura (agua, gas, HVAC, drenaje, estacionamiento).
+ *
+ * A diferencia de TI (categories-technology.seed.ts, 117 → 15 categorías en un solo
+ * departamento), aquí el nivel 1/2 SÍ es significativo y no se toca: agrupa por
+ * oficio/especialidad real (civil, eléctrico, mecánico, infraestructura), que es lo
+ * que determina a qué técnico se asigna el ticket — Arquitectura y Mantenimiento
+ * siguen siendo equipos separados con responsabilidades distintas (confirmado con el
+ * usuario). Lo que sí sobraba era el nivel 3 — una categoría por síntoma dentro de
+ * cada especialidad (ej. "Baldosa Rota"/"Grieta en Pared"/"Desprendimiento de
+ * Revestimiento" bajo "Pisos y Paredes", las tres atendidas por el mismo técnico
+ * civil) — se elimina y su texto se pliega en la descripción de la categoría de
+ * nivel 2. El selector de categorías arma sus palabras clave de búsqueda a partir de
+ * `name`+`description` (src/features/category-selection/utils/search-index.ts), así
+ * que la descripción enriquecida sigue permitiendo que el buscador sugiera bien sin
+ * necesidad de una categoría por síntoma.
+ *
+ * Las 23 categorías de nivel 2 (ahora hojas) llevan además un `priorityCeiling`
+ * inicial: URGENT en fallas que son una emergencia real (fuga de gas, ascensor con
+ * gente atrapada, corte total de energía), HIGH en fallas con riesgo de daño mayor o
+ * de seguridad (agua, estructura, electricidad), MEDIUM en fallas de confort/
+ * estética, y LOW en todo el lado "Solicitud" (mantenimiento preventivo, reparación
+ * programada, pintura, instalación — nunca es una emergencia). Solo se aplica al
+ * crear la categoría (ver category-upsert.ts) — si un admin lo ajusta después a
+ * mano, el seed no lo revierte.
  */
 
-import { PrismaClient } from '@prisma/client'
-import { upsertCategory } from './category-upsert'
+import { PrismaClient, TicketPriority } from '@prisma/client'
+import { upsertCategory, type CategorySeedData } from './category-upsert'
 
 export async function seedCategoriesMaintenance(
   prisma: PrismaClient,
@@ -18,8 +42,18 @@ export async function seedCategoriesMaintenance(
     return
   }
 
+  // Ids de las categorías vigentes — se usan al final para retirar en bloque
+  // todo lo demás que quede activo bajo este departamento (los viejos niveles
+  // 3 de síntoma). Mismo patrón que categories-technology.seed.ts.
+  const currentIds: string[] = []
+  async function create(data: CategorySeedData) {
+    const category = await upsertCategory(prisma, data)
+    currentIds.push(category.id)
+    return category
+  }
+
   // ==================== DEPARTAMENTO MANTENIMIENTO CIVIL ====================
-  const fallaCivil = await upsertCategory(prisma, {
+  const fallaCivil = await create({
     name: 'Falla o Daño',
     description: 'Daño o desperfecto civil',
     level: 1,
@@ -29,7 +63,7 @@ export async function seedCategoriesMaintenance(
     color: '#EF4444',
   })
 
-  const solicitudCivil = await upsertCategory(prisma, {
+  const solicitudCivil = await create({
     name: 'Solicitud de Mantenimiento',
     description: 'Solicitudes de mantenimiento preventivo o correctivo',
     level: 1,
@@ -39,38 +73,45 @@ export async function seedCategoriesMaintenance(
     color: '#3B82F6',
   })
 
-  // Nivel 2 - Fallas Civiles
-  const pisosParedes = await upsertCategory(prisma, {
+  // Nivel 2 - Fallas Civiles (hojas: absorben los síntomas que antes eran nivel 3)
+  await create({
     name: 'Pisos y Paredes',
-    description: 'Daños en pisos, baldosas, revestimientos',
+    description:
+      'Daños en pisos, baldosas, revestimientos: baldosa rota o suelta, grieta o fisura en pared, desprendimiento de revestimiento o pintura',
     level: 2,
     parentId: fallaCivil.id,
     departmentId: deptMantenimiento,
     order: 1,
     color: '#EF4444',
+    priorityCeiling: TicketPriority.MEDIUM,
   })
 
-  const puertasVentanas = await upsertCategory(prisma, {
+  await create({
     name: 'Puertas y Ventanas',
-    description: 'Daños en puertas, ventanas, cerraduras',
+    description:
+      'Daños en puertas, ventanas, cerraduras: cerradura defectuosa, bisagra rota o ruidosa, vidrio roto',
     level: 2,
     parentId: fallaCivil.id,
     departmentId: deptMantenimiento,
     order: 2,
     color: '#EF4444',
+    // Vidrio roto es riesgo de corte para clientes/personal.
+    priorityCeiling: TicketPriority.HIGH,
   })
 
-  const sanitariosCivil = await upsertCategory(prisma, {
+  await create({
     name: 'Plomería y Sanitarios',
-    description: 'Fallas en plomería, tuberías, sanitarios',
+    description:
+      'Fallas en plomería, tuberías, sanitarios: fuga de agua en tubería o conexión, desagüe obstruido',
     level: 2,
     parentId: fallaCivil.id,
     departmentId: deptMantenimiento,
     order: 3,
     color: '#EF4444',
+    priorityCeiling: TicketPriority.HIGH,
   })
 
-  const techosCubiertas = await upsertCategory(prisma, {
+  await create({
     name: 'Techos y Cubiertas',
     description: 'Goteras, filtraciones, daños en techos',
     level: 2,
@@ -78,93 +119,11 @@ export async function seedCategoriesMaintenance(
     departmentId: deptMantenimiento,
     order: 4,
     color: '#EF4444',
-  })
-
-  // Nivel 3 - Fallas Pisos y Paredes
-  await upsertCategory(prisma, {
-    name: 'Baldosa Rota',
-    description: 'Baldosa de piso rota o suelta',
-    level: 3,
-    parentId: pisosParedes.id,
-    departmentId: deptMantenimiento,
-    order: 1,
-    color: '#EF4444',
-  })
-
-  await upsertCategory(prisma, {
-    name: 'Grieta en Pared',
-    description: 'Grieta o fisura en pared',
-    level: 3,
-    parentId: pisosParedes.id,
-    departmentId: deptMantenimiento,
-    order: 2,
-    color: '#EF4444',
-  })
-
-  await upsertCategory(prisma, {
-    name: 'Desprendimiento de Revestimiento',
-    description: 'Revestimiento o pintura desprendida',
-    level: 3,
-    parentId: pisosParedes.id,
-    departmentId: deptMantenimiento,
-    order: 3,
-    color: '#EF4444',
-  })
-
-  // Nivel 3 - Fallas Puertas y Ventanas
-  await upsertCategory(prisma, {
-    name: 'Cerradura Defectuosa',
-    description: 'Cerradura no funciona',
-    level: 3,
-    parentId: puertasVentanas.id,
-    departmentId: deptMantenimiento,
-    order: 1,
-    color: '#EF4444',
-  })
-
-  await upsertCategory(prisma, {
-    name: 'Bisagra Rota',
-    description: 'Bisagra dañada o ruidosa',
-    level: 3,
-    parentId: puertasVentanas.id,
-    departmentId: deptMantenimiento,
-    order: 2,
-    color: '#EF4444',
-  })
-
-  await upsertCategory(prisma, {
-    name: 'Vidrio Roto',
-    description: 'Vidrio de ventana o puerta roto',
-    level: 3,
-    parentId: puertasVentanas.id,
-    departmentId: deptMantenimiento,
-    order: 3,
-    color: '#EF4444',
-  })
-
-  // Nivel 3 - Fallas Plomería
-  await upsertCategory(prisma, {
-    name: 'Fuga de Agua',
-    description: 'Fuga en tubería o conexión',
-    level: 3,
-    parentId: sanitariosCivil.id,
-    departmentId: deptMantenimiento,
-    order: 1,
-    color: '#EF4444',
-  })
-
-  await upsertCategory(prisma, {
-    name: 'Desagüe Obstruido',
-    description: 'Desagüe tapado',
-    level: 3,
-    parentId: sanitariosCivil.id,
-    departmentId: deptMantenimiento,
-    order: 2,
-    color: '#EF4444',
+    priorityCeiling: TicketPriority.HIGH,
   })
 
   // Nivel 2 - Solicitudes Civiles
-  const mantenimientoPreventivo = await upsertCategory(prisma, {
+  await create({
     name: 'Mantenimiento Preventivo',
     description: 'Solicitudes de mantenimiento programado',
     level: 2,
@@ -172,9 +131,10 @@ export async function seedCategoriesMaintenance(
     departmentId: deptMantenimiento,
     order: 1,
     color: '#3B82F6',
+    priorityCeiling: TicketPriority.LOW,
   })
 
-  const reparacion = await upsertCategory(prisma, {
+  await create({
     name: 'Reparación',
     description: 'Solicitudes de reparación',
     level: 2,
@@ -182,9 +142,10 @@ export async function seedCategoriesMaintenance(
     departmentId: deptMantenimiento,
     order: 2,
     color: '#3B82F6',
+    priorityCeiling: TicketPriority.LOW,
   })
 
-  const pinturaCivil = await upsertCategory(prisma, {
+  await create({
     name: 'Pintura',
     description: 'Solicitudes de pintura',
     level: 2,
@@ -192,10 +153,11 @@ export async function seedCategoriesMaintenance(
     departmentId: deptMantenimiento,
     order: 3,
     color: '#3B82F6',
+    priorityCeiling: TicketPriority.LOW,
   })
 
   // ==================== DEPARTAMENTO MANTENIMIENTO ELÉCTRICO ====================
-  const fallaElectrico = await upsertCategory(prisma, {
+  const fallaElectrico = await create({
     name: 'Falla Eléctrica',
     description: 'Fallas en sistema eléctrico',
     level: 1,
@@ -205,7 +167,7 @@ export async function seedCategoriesMaintenance(
     color: '#EF4444',
   })
 
-  const solicitudElectrico = await upsertCategory(prisma, {
+  const solicitudElectrico = await create({
     name: 'Solicitud Eléctrica',
     description: 'Solicitudes de instalación o mantenimiento eléctrico',
     level: 1,
@@ -216,27 +178,30 @@ export async function seedCategoriesMaintenance(
   })
 
   // Nivel 2 - Fallas Eléctricas
-  const sinEnergia = await upsertCategory(prisma, {
+  await create({
     name: 'Sin Energía',
-    description: 'Corte de energía eléctrica',
+    description: 'Corte de energía eléctrica: corte total o parcial',
     level: 2,
     parentId: fallaElectrico.id,
     departmentId: deptMantenimiento,
     order: 1,
     color: '#EF4444',
+    // Un corte de energía en un centro comercial es crítico.
+    priorityCeiling: TicketPriority.URGENT,
   })
 
-  const iluminacion = await upsertCategory(prisma, {
+  await create({
     name: 'Iluminación',
-    description: 'Fallas en luces, focos, luminarias',
+    description: 'Fallas en luces, focos, luminarias: foco fundido, luz intermitente',
     level: 2,
     parentId: fallaElectrico.id,
     departmentId: deptMantenimiento,
     order: 2,
     color: '#EF4444',
+    priorityCeiling: TicketPriority.MEDIUM,
   })
 
-  const tomacorrientes = await upsertCategory(prisma, {
+  await create({
     name: 'Tomacorrientes e Interruptores',
     description: 'Fallas en enchufes, tomacorrientes, interruptores',
     level: 2,
@@ -244,9 +209,11 @@ export async function seedCategoriesMaintenance(
     departmentId: deptMantenimiento,
     order: 3,
     color: '#EF4444',
+    // Riesgo eléctrico/incendio.
+    priorityCeiling: TicketPriority.HIGH,
   })
 
-  const tableros = await upsertCategory(prisma, {
+  await create({
     name: 'Tableros Eléctricos',
     description: 'Fallas en tableros, breakers, fusibles',
     level: 2,
@@ -254,52 +221,11 @@ export async function seedCategoriesMaintenance(
     departmentId: deptMantenimiento,
     order: 4,
     color: '#EF4444',
-  })
-
-  // Nivel 3 - Fallas Sin Energía
-  await upsertCategory(prisma, {
-    name: 'Corte Total',
-    description: 'Corte total de energía',
-    level: 3,
-    parentId: sinEnergia.id,
-    departmentId: deptMantenimiento,
-    order: 1,
-    color: '#EF4444',
-  })
-
-  await upsertCategory(prisma, {
-    name: 'Corte Parcial',
-    description: 'Corte parcial de energía',
-    level: 3,
-    parentId: sinEnergia.id,
-    departmentId: deptMantenimiento,
-    order: 2,
-    color: '#EF4444',
-  })
-
-  // Nivel 3 - Fallas Iluminación
-  await upsertCategory(prisma, {
-    name: 'Foco Fundido',
-    description: 'Foco o luminaria fundida',
-    level: 3,
-    parentId: iluminacion.id,
-    departmentId: deptMantenimiento,
-    order: 1,
-    color: '#EF4444',
-  })
-
-  await upsertCategory(prisma, {
-    name: 'Luz Intermitente',
-    description: 'Luz parpadea o es intermitente',
-    level: 3,
-    parentId: iluminacion.id,
-    departmentId: deptMantenimiento,
-    order: 2,
-    color: '#EF4444',
+    priorityCeiling: TicketPriority.HIGH,
   })
 
   // Nivel 2 - Solicitudes Eléctricas
-  const instalacionElectrica = await upsertCategory(prisma, {
+  await create({
     name: 'Instalación',
     description: 'Instalación eléctrica nueva',
     level: 2,
@@ -307,9 +233,10 @@ export async function seedCategoriesMaintenance(
     departmentId: deptMantenimiento,
     order: 1,
     color: '#3B82F6',
+    priorityCeiling: TicketPriority.LOW,
   })
 
-  const mantenimientoElectrico = await upsertCategory(prisma, {
+  await create({
     name: 'Mantenimiento Preventivo',
     description: 'Mantenimiento preventivo eléctrico',
     level: 2,
@@ -317,10 +244,11 @@ export async function seedCategoriesMaintenance(
     departmentId: deptMantenimiento,
     order: 2,
     color: '#3B82F6',
+    priorityCeiling: TicketPriority.LOW,
   })
 
   // ==================== DEPARTAMENTO MANTENIMIENTO MECÁNICO ====================
-  const fallaMecanico = await upsertCategory(prisma, {
+  const fallaMecanico = await create({
     name: 'Falla Mecánica',
     description: 'Fallas en equipos mecánicos',
     level: 1,
@@ -330,7 +258,7 @@ export async function seedCategoriesMaintenance(
     color: '#EF4444',
   })
 
-  const solicitudMecanico = await upsertCategory(prisma, {
+  const solicitudMecanico = await create({
     name: 'Solicitud Mecánica',
     description: 'Solicitudes de mantenimiento mecánico',
     level: 1,
@@ -341,17 +269,20 @@ export async function seedCategoriesMaintenance(
   })
 
   // Nivel 2 - Fallas Mecánicas
-  const ascensores = await upsertCategory(prisma, {
+  await create({
     name: 'Ascensores y Montacargas',
-    description: 'Fallas en ascensores, montacargas',
+    description:
+      'Fallas en ascensores, montacargas: atascado entre pisos, puertas no abren o cierran, ruido o vibración anormal',
     level: 2,
     parentId: fallaMecanico.id,
     departmentId: deptMantenimiento,
     order: 1,
     color: '#EF4444',
+    // Puede haber gente atrapada — emergencia real.
+    priorityCeiling: TicketPriority.URGENT,
   })
 
-  const escalerasElectricas = await upsertCategory(prisma, {
+  await create({
     name: 'Escaleras Eléctricas',
     description: 'Fallas en escaleras eléctricas',
     level: 2,
@@ -359,9 +290,10 @@ export async function seedCategoriesMaintenance(
     departmentId: deptMantenimiento,
     order: 2,
     color: '#EF4444',
+    priorityCeiling: TicketPriority.HIGH,
   })
 
-  const equiposMecanicos = await upsertCategory(prisma, {
+  await create({
     name: 'Equipos Mecánicos',
     description: 'Fallas en bombas, compresores, motores',
     level: 2,
@@ -369,41 +301,11 @@ export async function seedCategoriesMaintenance(
     departmentId: deptMantenimiento,
     order: 3,
     color: '#EF4444',
-  })
-
-  // Nivel 3 - Fallas Ascensores
-  await upsertCategory(prisma, {
-    name: 'Ascensor Atascado',
-    description: 'Ascensor atascado entre pisos',
-    level: 3,
-    parentId: ascensores.id,
-    departmentId: deptMantenimiento,
-    order: 1,
-    color: '#EF4444',
-  })
-
-  await upsertCategory(prisma, {
-    name: 'Puertas de Ascensor',
-    description: 'Puertas no abren o cierran',
-    level: 3,
-    parentId: ascensores.id,
-    departmentId: deptMantenimiento,
-    order: 2,
-    color: '#EF4444',
-  })
-
-  await upsertCategory(prisma, {
-    name: 'Ruido Anormal',
-    description: 'Ruido o vibración anormal',
-    level: 3,
-    parentId: ascensores.id,
-    departmentId: deptMantenimiento,
-    order: 3,
-    color: '#EF4444',
+    priorityCeiling: TicketPriority.HIGH,
   })
 
   // Nivel 2 - Solicitudes Mecánicas
-  const mantenimientoMecanico = await upsertCategory(prisma, {
+  await create({
     name: 'Mantenimiento Preventivo',
     description: 'Mantenimiento preventivo de equipos',
     level: 2,
@@ -411,9 +313,10 @@ export async function seedCategoriesMaintenance(
     departmentId: deptMantenimiento,
     order: 1,
     color: '#3B82F6',
+    priorityCeiling: TicketPriority.LOW,
   })
 
-  const reparacionMecanica = await upsertCategory(prisma, {
+  await create({
     name: 'Reparación de Equipos',
     description: 'Reparación de equipos mecánicos',
     level: 2,
@@ -421,10 +324,11 @@ export async function seedCategoriesMaintenance(
     departmentId: deptMantenimiento,
     order: 2,
     color: '#3B82F6',
+    priorityCeiling: TicketPriority.LOW,
   })
 
   // ==================== INFRAESTRUCTURA (agua, gas, HVAC, drenaje) ====================
-  const fallaInfra = await upsertCategory(prisma, {
+  const fallaInfra = await create({
     name: 'Falla de Infraestructura',
     description: 'Fallas en infraestructura (agua, gas, HVAC, drenaje, estacionamiento)',
     level: 1,
@@ -435,190 +339,79 @@ export async function seedCategoriesMaintenance(
   })
 
   // Nivel 2 - Fallas Infraestructura
-  const aguaSanitaria = await upsertCategory(prisma, {
+  await create({
     name: 'Agua Sanitaria',
-    description: 'Fallas en tuberías, tanques, bombas',
+    description:
+      'Fallas en tuberías, tanques, bombas: fuga de agua, bomba de agua no funciona, problema con tanque de agua',
     level: 2,
     parentId: fallaInfra.id,
     departmentId: deptMantenimiento,
     order: 1,
     color: '#EF4444',
+    priorityCeiling: TicketPriority.HIGH,
   })
 
-  const drenaje = await upsertCategory(prisma, {
+  await create({
     name: 'Drenaje y Alcantarillado',
-    description: 'Fallas en drenaje, cloacas, sumideros',
+    description:
+      'Fallas en drenaje, cloacas, sumideros: desagüe o cloaca obstruida, sumidero tapado con residuos',
     level: 2,
     parentId: fallaInfra.id,
     departmentId: deptMantenimiento,
     order: 2,
     color: '#EF4444',
+    priorityCeiling: TicketPriority.HIGH,
   })
 
-  const gas = await upsertCategory(prisma, {
+  await create({
     name: 'Gas Natural',
-    description: 'Fugas o problemas con gas',
+    description: 'Fugas o problemas con gas: fuga de gas (emergencia), olor a gas',
     level: 2,
     parentId: fallaInfra.id,
     departmentId: deptMantenimiento,
     order: 3,
     color: '#EF4444',
+    priorityCeiling: TicketPriority.URGENT,
   })
 
-  const aireAcondicionado = await upsertCategory(prisma, {
+  await create({
     name: 'Aire Acondicionado y Ventilación',
-    description: 'Fallas en HVAC, unidades de AC, ventilación',
+    description:
+      'Fallas en HVAC, unidades de AC, ventilación: no enfría, fuga de refrigerante, ventilación insuficiente o ruidos anormales',
     level: 2,
     parentId: fallaInfra.id,
     departmentId: deptMantenimiento,
     order: 4,
     color: '#EF4444',
+    priorityCeiling: TicketPriority.MEDIUM,
   })
 
-  const estacionamiento = await upsertCategory(prisma, {
+  await create({
     name: 'Estacionamiento',
-    description: 'Fallas en estacionamiento, barreras, sensores',
+    description:
+      'Fallas en estacionamiento, barreras, sensores: barrera no funciona, sensor de detección de vehículo defectuoso, piso dañado o con marcas de aceite',
     level: 2,
     parentId: fallaInfra.id,
     departmentId: deptMantenimiento,
     order: 5,
     color: '#EF4444',
+    priorityCeiling: TicketPriority.MEDIUM,
   })
 
-  // Nivel 3 - Fallas Agua Sanitaria
-  await upsertCategory(prisma, {
-    name: 'Fuga de Agua',
-    description: 'Fuga en tubería o conexión',
-    level: 3,
-    parentId: aguaSanitaria.id,
-    departmentId: deptMantenimiento,
-    order: 1,
-    color: '#EF4444',
+  // ==================== RETIRO DE LAS CATEGORÍAS DE SÍNTOMA (nivel 3) ====================
+  // isActive:false conserva el historial de cualquier ticket que ya las use.
+  const oldCategories = await prisma.categories.findMany({
+    where: { departmentId: deptMantenimiento, isActive: true, id: { notIn: currentIds } },
+    select: { id: true },
   })
+  if (oldCategories.length > 0) {
+    await prisma.categories.updateMany({
+      where: { id: { in: oldCategories.map(c => c.id) } },
+      data: { isActive: false, updatedAt: new Date() },
+    })
+  }
 
-  await upsertCategory(prisma, {
-    name: 'Bomba de Agua',
-    description: 'Bomba de agua no funciona',
-    level: 3,
-    parentId: aguaSanitaria.id,
-    departmentId: deptMantenimiento,
-    order: 2,
-    color: '#EF4444',
-  })
-
-  await upsertCategory(prisma, {
-    name: 'Tanque de Agua',
-    description: 'Problema con tanque de agua',
-    level: 3,
-    parentId: aguaSanitaria.id,
-    departmentId: deptMantenimiento,
-    order: 3,
-    color: '#EF4444',
-  })
-
-  // Nivel 3 - Fallas Drenaje
-  await upsertCategory(prisma, {
-    name: 'Desagüe Obstruido',
-    description: 'Desagüe o cloaca obstruida',
-    level: 3,
-    parentId: drenaje.id,
-    departmentId: deptMantenimiento,
-    order: 1,
-    color: '#EF4444',
-  })
-
-  await upsertCategory(prisma, {
-    name: 'Sumidero Tapado',
-    description: 'Sumidero tapado con residuos',
-    level: 3,
-    parentId: drenaje.id,
-    departmentId: deptMantenimiento,
-    order: 2,
-    color: '#EF4444',
-  })
-
-  // Nivel 3 - Fallas Gas
-  await upsertCategory(prisma, {
-    name: 'Fuga de Gas',
-    description: 'Fuga de gas - EMERGENCIA',
-    level: 3,
-    parentId: gas.id,
-    departmentId: deptMantenimiento,
-    order: 1,
-    color: '#EF4444',
-  })
-
-  await upsertCategory(prisma, {
-    name: 'Olor a Gas',
-    description: 'Detección de olor a gas',
-    level: 3,
-    parentId: gas.id,
-    departmentId: deptMantenimiento,
-    order: 2,
-    color: '#EF4444',
-  })
-
-  // Nivel 3 - Fallas Aire Acondicionado
-  await upsertCategory(prisma, {
-    name: 'Unidad de AC No Enfría',
-    description: 'Aire acondicionado no enfría',
-    level: 3,
-    parentId: aireAcondicionado.id,
-    departmentId: deptMantenimiento,
-    order: 1,
-    color: '#EF4444',
-  })
-
-  await upsertCategory(prisma, {
-    name: 'Fuga de Refrigerante',
-    description: 'Fuga de gas refrigerante',
-    level: 3,
-    parentId: aireAcondicionado.id,
-    departmentId: deptMantenimiento,
-    order: 2,
-    color: '#EF4444',
-  })
-
-  await upsertCategory(prisma, {
-    name: 'Ventilación Deficiente',
-    description: 'Ventilación insuficiente o ruidos anormales',
-    level: 3,
-    parentId: aireAcondicionado.id,
-    departmentId: deptMantenimiento,
-    order: 3,
-    color: '#EF4444',
-  })
-
-  // Nivel 3 - Fallas Estacionamiento
-  await upsertCategory(prisma, {
-    name: 'Barrera No Funciona',
-    description: 'Barrera de estacionamiento defectuosa',
-    level: 3,
-    parentId: estacionamiento.id,
-    departmentId: deptMantenimiento,
-    order: 1,
-    color: '#EF4444',
-  })
-
-  await upsertCategory(prisma, {
-    name: 'Sensor de Vehículo',
-    description: 'Sensor de detección de vehículo defectuoso',
-    level: 3,
-    parentId: estacionamiento.id,
-    departmentId: deptMantenimiento,
-    order: 2,
-    color: '#EF4444',
-  })
-
-  await upsertCategory(prisma, {
-    name: 'Piso Estacionamiento',
-    description: 'Piso dañado o marcas de aceite',
-    level: 3,
-    parentId: estacionamiento.id,
-    departmentId: deptMantenimiento,
-    order: 3,
-    color: '#EF4444',
-  })
-
-  console.log('✅ Categorías OPERATIONS — Mantenimiento')
+  console.log(
+    `✅ Categorías OPERATIONS — Mantenimiento: ${currentIds.length} vigentes, ${oldCategories.length} retiradas`
+  )
 }
