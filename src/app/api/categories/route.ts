@@ -325,12 +325,23 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { name, description, level, parentId, departmentId, color, order } = body
+    const { name, description, level, parentId, departmentId, color, order, priorityCeiling } = body
 
     // Validaciones
     if (!name || !level) {
       return NextResponse.json(
         { success: false, message: 'Nombre y nivel son requeridos' },
+        { status: 400 }
+      )
+    }
+
+    if (
+      priorityCeiling !== undefined &&
+      priorityCeiling !== null &&
+      !['LOW', 'MEDIUM', 'HIGH', 'URGENT'].includes(priorityCeiling)
+    ) {
+      return NextResponse.json(
+        { success: false, message: 'Prioridad máxima inválida' },
         { status: 400 }
       )
     }
@@ -381,6 +392,7 @@ export async function POST(request: NextRequest) {
         familyId: targetFamilyId,
         color: color || '#6B7280',
         order: order || 0,
+        priorityCeiling: priorityCeiling || null,
         isActive: true,
         updatedAt: new Date(),
       },

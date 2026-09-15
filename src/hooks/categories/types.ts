@@ -30,6 +30,8 @@ export interface CategoryData {
   parentId?: string
   familyId?: string
   family?: { id: string; name: string; code: string; color?: string | null }
+  /** Prioridad operativa máxima que un ticket de esta categoría puede alcanzar automáticamente al crearse. null = sin techo (se asume Media). */
+  priorityCeiling?: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT' | null
   categories?: {
     id: string
     name: string
@@ -72,6 +74,8 @@ export interface FormData {
   departmentId: string | null
   familyId: string | null
   isActive: boolean
+  /** Prioridad operativa máxima que un ticket de esta categoría puede alcanzar automáticamente al crearse. null = sin techo (se asume Media). */
+  priorityCeiling: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT' | null
   technician_assignments: {
     technicianId: string
     priority: number

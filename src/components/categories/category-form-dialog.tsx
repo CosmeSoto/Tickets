@@ -8,6 +8,14 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { Combobox } from '@/components/ui/combobox'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { TICKET_PRIORITY_LABELS } from '@/lib/constants/ticket-labels'
 import { CategorySelector } from '@/components/ui/category-selector'
 import { TechnicianSelector } from '@/components/ui/technician-selector'
 import { DepartmentSelector } from '@/components/ui/department-selector'
@@ -525,6 +533,34 @@ export function CategoryFormDialog({
               </div>
               {formErrors.color && <p className='text-sm text-destructive'>{formErrors.color}</p>}
             </div>
+          </div>
+
+          {/* Prioridad máxima automática */}
+          <div className='space-y-2'>
+            <Label htmlFor='priorityCeiling'>Prioridad máxima automática</Label>
+            <Select
+              value={formData.priorityCeiling ?? 'MEDIUM'}
+              onValueChange={v =>
+                setFormData({ ...formData, priorityCeiling: v as FormData['priorityCeiling'] })
+              }
+            >
+              <SelectTrigger id='priorityCeiling'>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(TICKET_PRIORITY_LABELS).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className='text-xs text-muted-foreground'>
+              Techo automático para tickets de clientes en esta categoría: si un cliente pide una
+              prioridad mayor a esta, el ticket se crea igual, pero queda con esta prioridad
+              operativa (sin revisión manual). Un admin/técnico puede subirla después caso por caso
+              si hace falta.
+            </p>
           </div>
 
           {/* Estado Activo */}

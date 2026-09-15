@@ -32,6 +32,7 @@ const updateCategorySchema = z.object({
     .regex(/^#[0-9A-F]{6}$/i, 'Color inválido')
     .default('#6B7280'),
   isActive: z.boolean().default(true),
+  priorityCeiling: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional().nullable(),
   assignedTechnicians: z
     .array(
       z.object({
@@ -310,6 +311,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         familyId: resolvedFamilyId,
         level,
         parentId: validatedData.parentId || null,
+        priorityCeiling: validatedData.priorityCeiling ?? null,
         updatedAt: new Date(),
       },
       include: {
