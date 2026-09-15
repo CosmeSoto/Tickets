@@ -88,7 +88,14 @@ jest.mock('next/image', () => ({
 // Mock environment variables
 process.env.NEXTAUTH_SECRET = 'test-secret'
 process.env.NEXTAUTH_URL = 'http://localhost:3000'
-process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/test'
+// Antes se pisaba incondicionalmente, incluso si el invocador ya había
+// exportado un DATABASE_URL real (p. ej. para correr
+// code-generator.property.test.ts, el único archivo que usa el cliente de
+// Prisma real en vez de mockearlo — necesita una base alcanzable). La
+// mayoría de tests mockean '@/lib/prisma' y nunca leen este valor en
+// runtime; el fallback solo cubre los casos que sí lo requieren en el
+// import (p. ej. validación de config) cuando no se definió nada real.
+process.env.DATABASE_URL ??= 'postgresql://test:test@localhost:5432/test'
 
 // Mock console methods in tests
 global.console = {
