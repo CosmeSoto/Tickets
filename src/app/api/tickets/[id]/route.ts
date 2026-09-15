@@ -665,6 +665,13 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
           newValues: { priority: filteredUpdates.priority },
           request: request,
         })
+
+        // El SLA se calculó al crear el ticket con la prioridad original —
+        // si la prioridad cambia después, hay que recalcularlo o el
+        // slaDeadline queda desactualizado (bug detectado en revisión).
+        await SLAService.assignSLA(finalId).catch(err => {
+          console.error('[SLA] Error recalculando SLA tras cambio de prioridad:', err)
+        })
       }
 
       if (filteredUpdates.assigneeId && filteredUpdates.assigneeId !== existingTicket.assigneeId) {
@@ -902,6 +909,15 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
           createdAt: new Date(),
         },
       })
+
+      // El SLA se calculó al crear el ticket con la prioridad original —
+      // si un admin la cambia aquí, hay que recalcularlo o el slaDeadline
+      // queda desactualizado (mismo bug corregido en la rama de técnico).
+      if ('priority' in processedUpdates && processedUpdates.priority !== existingTicket.priority) {
+        await SLAService.assignSLA(finalId).catch(err => {
+          console.error('[SLA] Error recalculando SLA tras cambio de prioridad:', err)
+        })
+      }
 
       // Enviar notificación si se cambió la asignación desde el formulario de edición
       if (

@@ -72,11 +72,20 @@ export class SLAService {
         effectiveHours.businessDays
       )
 
-      // Crear métricas SLA
-      await prisma.ticket_sla_metrics.create({
-        data: {
+      // Crear (o recalcular, si ya existía — p. ej. tras un cambio de
+      // prioridad) las métricas SLA. `ticketId` es @unique en
+      // ticket_sla_metrics, así que un `create` plano fallaría en la
+      // segunda llamada; con upsert queda seguro invocar assignSLA de nuevo.
+      await prisma.ticket_sla_metrics.upsert({
+        where: { ticketId },
+        create: {
           id: randomUUID(),
           ticketId,
+          slaPolicyId: policy.id,
+          responseDeadline,
+          resolutionDeadline,
+        },
+        update: {
           slaPolicyId: policy.id,
           responseDeadline,
           resolutionDeadline,
@@ -639,8 +648,7 @@ export class SLAService {
         const assigneeId = entityData.ticket?.users_tickets_assigneeIdTousers?.id as
           | string
           | undefined
-        const title =
-          severity === 'CRITICAL' ? 'Violación SLA crítica' : 'Violación SLA alta'
+        const title = severity === 'CRITICAL' ? 'Violación SLA crítica' : 'Violación SLA alta'
         const message = ticketId
           ? `El ticket "${entityData.ticket?.title ?? ticketId}" incumplió el SLA de ${violationType === 'RESPONSE' ? 'respuesta' : 'resolución'} (${delayHours}h de retraso).`
           : `La solicitud "${entityData.assetRequest?.code ?? assetRequestId}" incumplió el SLA.`
