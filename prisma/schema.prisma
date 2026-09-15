@@ -103,6 +103,8 @@ model categories {
   order                  Int                      @default(0)
   color                  String?                  @default("#6B7280")
   isActive               Boolean                  @default(true)
+  /// Prioridad operativa máxima que un ticket de esta categoría puede alcanzar automáticamente al crearse (ver src/lib/tickets/priority-triage.ts). null = sin techo configurado, se asume MEDIUM.
+  priorityCeiling        TicketPriority?          @map("priority_ceiling")
   createdAt              DateTime                 @default(now())
   updatedAt              DateTime
   departments            departments?             @relation(fields: [departmentId], references: [id])
@@ -342,6 +344,8 @@ model tickets {
   location                         String?
   status                           TicketStatus                @default(OPEN)
   priority                         TicketPriority              @default(MEDIUM)
+  /// Prioridad tal como la eligió quien creó el ticket, antes de aplicar el techo de la categoría (ver src/lib/tickets/priority-triage.ts). Informativa: no se usa para SLA ni cola. null en tickets creados antes de este campo o sin tope aplicado.
+  requestedPriority                TicketPriority?             @map("requested_priority")
   clientId                         String
   assigneeId                       String?
   categoryId                       String
