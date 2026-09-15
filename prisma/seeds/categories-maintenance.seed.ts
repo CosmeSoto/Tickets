@@ -7,16 +7,26 @@
  * A diferencia de TI (categories-technology.seed.ts, 117 → 15 categorías en un solo
  * departamento), aquí el nivel 1/2 SÍ es significativo y no se toca: agrupa por
  * oficio/especialidad real (civil, eléctrico, mecánico, infraestructura), que es lo
- * que determina a qué técnico se asigna el ticket — Arquitectura y Mantenimiento
- * siguen siendo equipos separados con responsabilidades distintas (confirmado con el
- * usuario). Lo que sí sobraba era el nivel 3 — una categoría por síntoma dentro de
- * cada especialidad (ej. "Baldosa Rota"/"Grieta en Pared"/"Desprendimiento de
- * Revestimiento" bajo "Pisos y Paredes", las tres atendidas por el mismo técnico
- * civil) — se elimina y su texto se pliega en la descripción de la categoría de
- * nivel 2. El selector de categorías arma sus palabras clave de búsqueda a partir de
- * `name`+`description` (src/features/category-selection/utils/search-index.ts), así
- * que la descripción enriquecida sigue permitiendo que el buscador sugiera bien sin
- * necesidad de una categoría por síntoma.
+ * que determina a qué técnico se asigna el ticket. Lo que sí sobraba era el nivel 3
+ * — una categoría por síntoma dentro de cada especialidad (ej. "Baldosa Rota"/
+ * "Grieta en Pared"/"Desprendimiento de Revestimiento" bajo "Pisos y Paredes", las
+ * tres atendidas por el mismo técnico civil) — se elimina y su texto se pliega en
+ * la descripción de la categoría de nivel 2. El selector de categorías arma sus
+ * palabras clave de búsqueda a partir de `name`+`description`
+ * (src/features/category-selection/utils/search-index.ts), así que la descripción
+ * enriquecida sigue permitiendo que el buscador sugiera bien sin necesidad de una
+ * categoría por síntoma.
+ *
+ * Mantenimiento es quien ejecuta TODO el trabajo físico de reparación en el
+ * edificio, sea cual sea el área (local comercial, zona común, fachada) —
+ * Arquitectura solo diseña, hace verificaciones y da asesoría técnica, nunca
+ * ejecuta (aclarado por el usuario tras una primera pasada que dejaba a
+ * Arquitectura con su propia rama de "Falla o Daño", duplicando este trabajo).
+ * Por eso las categorías civiles de abajo (Pisos y Paredes, Puertas y Ventanas,
+ * Plomería y Sanitarios, Techos y Cubiertas) absorbieron también el vocabulario
+ * de esa rama retirada de Arquitectura (vitrinas y divisiones de locales,
+ * fachada y exterior, estructuras/muros/columnas, sanitarios de baño) — ver
+ * categories-architecture.seed.ts.
  *
  * Las 23 categorías de nivel 2 (ahora hojas) llevan además un `priorityCeiling`
  * inicial: URGENT en fallas que son una emergencia real (fuga de gas, ascensor con
@@ -77,7 +87,7 @@ export async function seedCategoriesMaintenance(
   await create({
     name: 'Pisos y Paredes',
     description:
-      'Daños en pisos, baldosas, revestimientos: baldosa rota o suelta, grieta o fisura en pared, desprendimiento de revestimiento o pintura',
+      'Daños en pisos, paredes, muros, estructura: baldosa rota o suelta, grieta o fisura en pared, muro o columna, desprendimiento de revestimiento, yeso o pintura, humedad o moho, piso de local comercial o de pasillo dañado, escaleras/barandas/escalones dañados, daños en fachada o exterior',
     level: 2,
     parentId: fallaCivil.id,
     departmentId: deptMantenimiento,
@@ -89,7 +99,7 @@ export async function seedCategoriesMaintenance(
   await create({
     name: 'Puertas y Ventanas',
     description:
-      'Daños en puertas, ventanas, cerraduras: cerradura defectuosa, bisagra rota o ruidosa, vidrio roto',
+      'Daños en puertas, ventanas, cerraduras: cerradura defectuosa, bisagra rota o ruidosa, vidrio roto, vitrina de local comercial rota o dañada, divisiones, paneles o mamparas dañadas',
     level: 2,
     parentId: fallaCivil.id,
     departmentId: deptMantenimiento,
@@ -102,7 +112,7 @@ export async function seedCategoriesMaintenance(
   await create({
     name: 'Plomería y Sanitarios',
     description:
-      'Fallas en plomería, tuberías, sanitarios: fuga de agua en tubería o conexión, desagüe obstruido',
+      'Fallas en plomería, tuberías, sanitarios, baños, duchas: fuga de agua en tubería, conexión o inodoro, desagüe obstruido, lavabo obstruido o con fugas, grifería rota o con fugas, sanitario que requiere limpieza urgente',
     level: 2,
     parentId: fallaCivil.id,
     departmentId: deptMantenimiento,
@@ -113,7 +123,7 @@ export async function seedCategoriesMaintenance(
 
   await create({
     name: 'Techos y Cubiertas',
-    description: 'Goteras, filtraciones, daños en techos',
+    description: 'Goteras, filtraciones o humedad en techos o cubiertas',
     level: 2,
     parentId: fallaCivil.id,
     departmentId: deptMantenimiento,
@@ -192,7 +202,8 @@ export async function seedCategoriesMaintenance(
 
   await create({
     name: 'Iluminación',
-    description: 'Fallas en luces, focos, luminarias: foco fundido, luz intermitente',
+    description:
+      'Fallas en luces, focos, luminarias: foco fundido, luz intermitente, iluminación de pasillos o zonas comunes',
     level: 2,
     parentId: fallaElectrico.id,
     departmentId: deptMantenimiento,

@@ -1,21 +1,28 @@
 /**
  * Seed: Categorías para Familia ARQUITECTURA (ARCHITECTURE)
  *
- * Mismo criterio aplicado a Mantenimiento (categories-maintenance.seed.ts): el nivel
- * 1/2 se mantiene (agrupa por tipo de espacio/trabajo real — Estructuras, Locales
- * Comerciales, Zonas Comunes, Sanitarios, Fachada — que determina a qué técnico se
- * asigna), pero se elimina el nivel 3 de síntoma (ej. "Grietas en Muros"/
- * "Desprendimiento de Material"/"Filtración en Techo"/"Daños por Humedad", las
- * cuatro bajo "Estructuras" y atendidas por el mismo equipo), plegando ese texto en
- * la descripción de la categoría de nivel 2. Arquitectura y Mantenimiento son
- * equipos separados con responsabilidades distintas (confirmado con el usuario) —
- * no se fusionan aunque cubran temas superficialmente similares (ambos atienden
- * fugas de agua o ascensores, por ejemplo, pero en áreas distintas).
+ * Corrección sobre la pasada anterior: Arquitectura y Mantenimiento parecían
+ * equipos separados con responsabilidades distintas (confirmado con el usuario en
+ * su momento), pero el usuario aclaró después la distinción real — Arquitectura
+ * NO ejecuta trabajo físico: solo diseña planos, hace verificaciones y da
+ * asesoría técnica. El esfuerzo físico (repararlo de verdad) siempre es de
+ * Mantenimiento, sea cual sea el área del edificio (un local comercial, una
+ * zona común o la fachada). Por eso la rama "Falla o Daño" que existía aquí
+ * (Estructuras, Locales Comerciales, Zonas Comunes, Sanitarios, Fachada y
+ * Exterior) se elimina por completo — duplicaba trabajo que ya hace
+ * Mantenimiento (grietas, filtraciones, fugas, ascensores...) bajo un
+ * departamento que nunca lo ejecuta. Se verificó que esa rama no tenía ningún
+ * ticket antes de retirarla. Su vocabulario de síntomas se trasladó a las
+ * descripciones de las categorías civiles de Mantenimiento
+ * (categories-maintenance.seed.ts: Pisos y Paredes, Puertas y Ventanas,
+ * Plomería y Sanitarios, Techos y Cubiertas, Iluminación) para no perder
+ * precisión de sugerencia.
  *
- * Las 9 categorías de nivel 2 (ahora hojas) + "Consulta o Asesoría" (nivel 1, ya era
- * hoja) llevan un `priorityCeiling` inicial con el mismo criterio que Mantenimiento:
- * HIGH en fallas con riesgo estructural/de seguridad/agua, MEDIUM en fallas de
- * confort/estética, LOW en todo el lado Solicitud/Consulta.
+ * Arquitectura queda con lo que sí hace: "Solicitud o Requerimiento" (obras,
+ * remodelaciones, mobiliario, pintura, señalización — trabajo que sí diseña/
+ * coordina, aunque la ejecución física de pintura o instalación pueda
+ * tercerizarse o coordinarse con Mantenimiento) y "Consulta o Asesoría"
+ * (planos, verificaciones técnicas o estructurales, asesoría).
  */
 
 import { PrismaClient, TicketPriority } from '@prisma/client'
@@ -40,95 +47,26 @@ export async function seedCategoriesArchitecture(
   }
 
   // ==================== DEPARTAMENTO ARQUITECTURA ====================
-  const fallaArquitectura = await create({
-    name: 'Falla o Daño',
-    description: 'Daño o desperfecto en infraestructura arquitectónica',
-    level: 1,
-    parentId: null,
-    departmentId: deptArquitectura,
-    order: 1,
-    color: '#EF4444',
-  })
-
   const solicitudArquitectura = await create({
     name: 'Solicitud o Requerimiento',
     description: 'Solicitudes de obras, remodelaciones y adecuaciones',
     level: 1,
     parentId: null,
     departmentId: deptArquitectura,
-    order: 2,
+    order: 1,
     color: '#3B82F6',
   })
 
   await create({
     name: 'Consulta o Asesoría',
-    description: 'Consultas y asesorías técnicas',
+    description:
+      'Consultas y asesorías técnicas: elaboración o revisión de planos, verificación técnica o estructural, asesoría de diseño previa a una obra o remodelación',
     level: 1,
     parentId: null,
     departmentId: deptArquitectura,
-    order: 3,
+    order: 2,
     color: '#10B981',
     priorityCeiling: TicketPriority.LOW,
-  })
-
-  // Nivel 2 - Fallas Arquitectura (hojas: absorben los síntomas que antes eran nivel 3)
-  await create({
-    name: 'Estructuras',
-    description:
-      'Fallas en estructuras, muros, columnas, techos: grietas o fisuras en muros o columnas, desprendimiento de yeso, pintura o revestimiento, goteras o filtraciones en techos o cubiertas, humedad o moho por agua',
-    level: 2,
-    parentId: fallaArquitectura.id,
-    departmentId: deptArquitectura,
-    order: 1,
-    color: '#EF4444',
-    priorityCeiling: TicketPriority.HIGH,
-  })
-
-  await create({
-    name: 'Locales Comerciales',
-    description:
-      'Fallas en locales, vitrinas, divisiones: vitrina rota o dañada, divisiones/paneles/mamparas dañadas, puerta/cerradura/bisagra dañada, piso dañado o baldosas rotas',
-    level: 2,
-    parentId: fallaArquitectura.id,
-    departmentId: deptArquitectura,
-    order: 2,
-    color: '#EF4444',
-    priorityCeiling: TicketPriority.MEDIUM,
-  })
-
-  await create({
-    name: 'Zonas Comunes',
-    description:
-      'Fallas en pasillos, escaleras, ascensores: escaleras/barandas/escalones dañados, piso de pasillo dañado, iluminación de pasillos o zonas comunes, problemas con ascensores o montacargas',
-    level: 2,
-    parentId: fallaArquitectura.id,
-    departmentId: deptArquitectura,
-    order: 3,
-    color: '#EF4444',
-    priorityCeiling: TicketPriority.HIGH,
-  })
-
-  await create({
-    name: 'Sanitarios',
-    description:
-      'Fallas en baños, sanitarios, duchas: fuga de agua en inodoro, lavabo obstruido o con fugas, grifería rota o con fugas, sanitario que requiere limpieza urgente',
-    level: 2,
-    parentId: fallaArquitectura.id,
-    departmentId: deptArquitectura,
-    order: 4,
-    color: '#EF4444',
-    priorityCeiling: TicketPriority.HIGH,
-  })
-
-  await create({
-    name: 'Fachada y Exterior',
-    description: 'Fallas en fachada, letreros, exterior',
-    level: 2,
-    parentId: fallaArquitectura.id,
-    departmentId: deptArquitectura,
-    order: 5,
-    color: '#EF4444',
-    priorityCeiling: TicketPriority.MEDIUM,
   })
 
   // Nivel 2 - Solicitudes Arquitectura
@@ -177,7 +115,9 @@ export async function seedCategoriesArchitecture(
     priorityCeiling: TicketPriority.LOW,
   })
 
-  // ==================== RETIRO DE LAS CATEGORÍAS DE SÍNTOMA (nivel 3) ====================
+  // ==================== RETIRO DE CATEGORÍAS VIEJAS ====================
+  // Incluye tanto los viejos niveles 3 de síntoma como, en esta pasada, toda
+  // la rama "Falla o Daño" completa (ver comentario del archivo).
   const oldCategories = await prisma.categories.findMany({
     where: { departmentId: deptArquitectura, isActive: true, id: { notIn: currentIds } },
     select: { id: true },
