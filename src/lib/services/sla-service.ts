@@ -7,6 +7,8 @@ import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import { WebhookService } from './webhook-service'
 import { NotificationService } from './notification-service'
+import { calculateSlaDeadline } from '@/lib/tickets/sla-deadline'
+import { getAppTimezone } from '@/lib/utils/date-utils'
 
 export interface SLAPolicy {
   id: string
@@ -283,7 +285,12 @@ export class SLAService {
   }
 
   /**
-   * Calcula deadline considerando horas laborales
+   * Calcula deadline considerando horas laborales.
+   * Delega en `calculateSlaDeadline` (src/lib/tickets/sla-deadline.ts), que hace
+   * la aritmética en la zona horaria de la app (`getAppTimezone()`) en vez de
+   * la del proceso de Node — ver el comentario de ese archivo para el bug que
+   * esto corrige (un horario "08:00–17:00" configurado en Ajustes se estaba
+   * interpretando como UTC, no como hora local).
    */
   private static calculateDeadline(
     startDate: Date,
@@ -293,65 +300,15 @@ export class SLAService {
     businessEnd: string = '18:00:00',
     businessDays: string = 'MON,TUE,WED,THU,FRI'
   ): Date {
-    if (!businessHoursOnly) {
-      // Cálculo simple: agregar horas directamente
-      const deadline = new Date(startDate)
-      deadline.setHours(deadline.getHours() + hours)
-      return deadline
-    }
-
-    // Cálculo con horas laborales
-    const deadline = new Date(startDate)
-    let remainingHours = hours
-    const businessDaysArray = businessDays.split(',')
-    const dayNames = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
-
-    const [startHour, startMinute] = businessStart.split(':').map(Number)
-    const [endHour, endMinute] = businessEnd.split(':').map(Number)
-    const dailyHours = endHour - startHour + (endMinute - startMinute) / 60
-
-    while (remainingHours > 0) {
-      const currentDay = dayNames[deadline.getDay()]
-
-      // Si es día laboral
-      if (businessDaysArray.includes(currentDay)) {
-        const currentHour = deadline.getHours()
-        const currentMinute = deadline.getMinutes()
-
-        // Si estamos antes del horario laboral, mover al inicio
-        if (currentHour < startHour || (currentHour === startHour && currentMinute < startMinute)) {
-          deadline.setHours(startHour, startMinute, 0, 0)
-        }
-
-        // Si estamos después del horario laboral, mover al siguiente día
-        if (currentHour >= endHour) {
-          deadline.setDate(deadline.getDate() + 1)
-          deadline.setHours(startHour, startMinute, 0, 0)
-          continue
-        }
-
-        // Calcular horas disponibles hoy
-        const hoursUntilEnd = endHour - currentHour + (endMinute - currentMinute) / 60
-
-        if (remainingHours <= hoursUntilEnd) {
-          // Cabe en el día actual
-          deadline.setHours(deadline.getHours() + Math.floor(remainingHours))
-          deadline.setMinutes(deadline.getMinutes() + (remainingHours % 1) * 60)
-          remainingHours = 0
-        } else {
-          // No cabe, usar todo el día y continuar mañana
-          remainingHours -= hoursUntilEnd
-          deadline.setDate(deadline.getDate() + 1)
-          deadline.setHours(startHour, startMinute, 0, 0)
-        }
-      } else {
-        // No es día laboral, mover al siguiente día
-        deadline.setDate(deadline.getDate() + 1)
-        deadline.setHours(startHour, startMinute, 0, 0)
-      }
-    }
-
-    return deadline
+    return calculateSlaDeadline(
+      startDate,
+      hours,
+      businessHoursOnly,
+      businessStart,
+      businessEnd,
+      businessDays,
+      getAppTimezone()
+    )
   }
 
   /**
