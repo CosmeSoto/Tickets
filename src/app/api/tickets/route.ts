@@ -18,6 +18,7 @@ import {
   PatrolIncidentValidationError,
 } from '@/lib/tickets/patrol-incident-validation'
 import { assertTechnicianActiveInFamily } from '@/lib/tickets/assignee-validation'
+import { resolveInitialPriority } from '@/lib/tickets/priority-triage'
 import { FileService } from '@/lib/services/file-service'
 import { getAutoAssignmentEnabled, getMaxTicketsPerUser } from '@/lib/settings/runtime-settings'
 import { notifyTicketChanged } from '@/lib/tickets/notify-ticket-changed'
@@ -311,6 +312,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const { priority: resolvedPriority, requestedPriority } = resolveInitialPriority(
+      session.user.role,
+      (ticketData.priority || 'MEDIUM') as import('@prisma/client').TicketPriority,
+      category.priorityCeiling
+    )
+
     const categoryFamilyId = category.familyId ?? category.departments?.familyId ?? null
     const isPatrolSource = ticketData.source === 'PATROL'
     let effectiveFamilyId: string | null = ticketData.familyId ?? categoryFamilyId
@@ -572,7 +579,8 @@ export async function POST(request: NextRequest) {
       title: ticketData.title,
       description: ticketData.description,
       location: ticketData.location || undefined,
-      priority: ticketData.priority || 'MEDIUM',
+      priority: resolvedPriority,
+      requestedPriority,
       clientId,
       categoryId: ticketData.categoryId,
       // Para técnicos: usar resolvedAssigneeId (resultado del escalamiento)

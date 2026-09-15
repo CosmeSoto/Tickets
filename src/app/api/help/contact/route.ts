@@ -4,6 +4,9 @@ import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import { NotificationService } from '@/lib/services/notification-service'
+import { SLAService } from '@/lib/services/sla-service'
+import { resolveInitialPriority } from '@/lib/tickets/priority-triage'
+import { TicketPriority } from '@prisma/client'
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,6 +25,17 @@ export async function POST(request: NextRequest) {
         {
           success: false,
           error: 'Faltan campos requeridos',
+        },
+        { status: 400 }
+      )
+    }
+
+    const normalizedPriority = String(priority).toUpperCase()
+    if (!['LOW', 'MEDIUM', 'HIGH', 'URGENT'].includes(normalizedPriority)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Prioridad inválida',
         },
         { status: 400 }
       )
@@ -75,12 +89,19 @@ ${message}
 *Consulta enviada desde el sistema de ayuda*
     `.trim()
 
+    const { priority: resolvedPriority, requestedPriority } = resolveInitialPriority(
+      session.user.role,
+      normalizedPriority as TicketPriority,
+      ticketCategory.priorityCeiling
+    )
+
     const ticket = await prisma.tickets.create({
       data: {
         id: randomUUID(),
         title: `[SOPORTE] ${subject}`,
         description,
-        priority: priority.toUpperCase() as any,
+        priority: resolvedPriority,
+        ...(requestedPriority ? { requestedPriority } : {}),
         status: 'OPEN',
         source: 'WEB',
         clientId: session.user.id,
@@ -96,10 +117,11 @@ ${message}
     })
 
     // Este ticket se crea con `prisma.tickets.create` directo (no vía
-    // /api/tickets), así que NO dispara notificación por sí solo pese a lo
-    // que decía este comentario — sin familyId, notifyTicketCreated cae al
-    // fallback de "solo super admins" (getTicketOversightAdmins incluye
-    // siempre a los super admins, con o sin familia).
+    // /api/tickets), así que no hereda su SLA/notificación automáticamente —
+    // se disparan ambos aquí explícitamente.
+    await SLAService.assignSLA(ticket.id).catch(err => {
+      console.error('[SLA] Error asignando SLA a consulta de soporte:', err)
+    })
     await NotificationService.notifyTicketCreated(ticket.id).catch(err => {
       console.error('[NOTIFICATION] Error notificando consulta de soporte:', err)
     })

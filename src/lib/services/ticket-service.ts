@@ -28,6 +28,8 @@ export interface CreateTicketData {
   description: string
   location?: string
   priority: TicketPriority
+  /** Prioridad tal como la pidió el creador, antes de aplicar el techo de la categoría (ver src/lib/tickets/priority-triage.ts). Solo se guarda cuando difiere de `priority`. */
+  requestedPriority?: TicketPriority
   categoryId: string
   clientId: string
   assigneeId?: string
@@ -245,6 +247,7 @@ export class TicketService {
             description: data.description.trim(),
             location: data.location?.trim() || null,
             priority: data.priority,
+            ...(data.requestedPriority ? { requestedPriority: data.requestedPriority } : {}),
             clientId: data.clientId,
             categoryId: data.categoryId,
             familyId,

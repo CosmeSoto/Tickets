@@ -4,6 +4,9 @@ import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import { NotificationService } from '@/lib/services/notification-service'
+import { SLAService } from '@/lib/services/sla-service'
+import { resolveInitialPriority } from '@/lib/tickets/priority-triage'
+import { TicketPriority } from '@prisma/client'
 
 export async function POST(request: NextRequest) {
   try {
@@ -75,19 +78,28 @@ ${additional ? `**Información Adicional:**\n${additional}` : ''}
 *Reporte generado automáticamente desde el sistema de ayuda*
     `.trim()
 
+    const severityPriority: TicketPriority =
+      severity === 'CRITICAL'
+        ? 'URGENT'
+        : severity === 'HIGH'
+          ? 'HIGH'
+          : severity === 'MEDIUM'
+            ? 'MEDIUM'
+            : 'LOW'
+
+    const { priority: resolvedPriority, requestedPriority } = resolveInitialPriority(
+      session.user.role,
+      severityPriority,
+      bugCategory.priorityCeiling
+    )
+
     const ticket = await prisma.tickets.create({
       data: {
         id: randomUUID(),
         title: `[BUG] ${title}`,
         description,
-        priority:
-          severity === 'CRITICAL'
-            ? 'URGENT'
-            : severity === 'HIGH'
-              ? 'HIGH'
-              : severity === 'MEDIUM'
-                ? 'MEDIUM'
-                : 'LOW',
+        priority: resolvedPriority,
+        ...(requestedPriority ? { requestedPriority } : {}),
         status: 'OPEN',
         source: 'WEB',
         clientId: session.user.id,
@@ -103,12 +115,15 @@ ${additional ? `**Información Adicional:**\n${additional}` : ''}
     })
 
     // Este ticket se crea con `prisma.tickets.create` directo (no vía
-    // /api/tickets), así que NO dispara notificación por sí solo pese a lo
-    // que decía este comentario — sin familyId (la categoría "Reportes de
-    // Bugs" no pertenece a ninguna), notifyTicketCreated cae al fallback de
-    // "solo super admins" (getTicketOversightAdmins incluye siempre a los
-    // super admins, con o sin familia), que es quien debe triar un reporte
-    // de bug del sistema.
+    // /api/tickets), así que no hereda su SLA/notificación automáticamente —
+    // se disparan ambos aquí explícitamente. Sin familyId (la categoría
+    // "Reportes de Bugs" no pertenece a ninguna), notifyTicketCreated cae al
+    // fallback de "solo super admins" (getTicketOversightAdmins incluye
+    // siempre a los super admins, con o sin familia), que es quien debe
+    // triar un reporte de bug del sistema.
+    await SLAService.assignSLA(ticket.id).catch(err => {
+      console.error('[SLA] Error asignando SLA a reporte de bug:', err)
+    })
     await NotificationService.notifyTicketCreated(ticket.id).catch(err => {
       console.error('[NOTIFICATION] Error notificando reporte de bug:', err)
     })
