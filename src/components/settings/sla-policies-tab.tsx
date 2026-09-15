@@ -27,6 +27,7 @@ interface SlaPolicy {
   businessHoursOnly: boolean
   isActive: boolean
   categoryId: string | null
+  familyId: string | null
   category?: { id: string; name: string } | null
 }
 
@@ -71,8 +72,15 @@ export function SLAPoliciesTab({ isSuperAdmin = false }: { isSuperAdmin?: boolea
       const res = await fetch('/api/admin/sla-policies?isActive=true')
       const data = await res.json()
       if (data.success) {
-        // Only global policies (no categoryId) for the main table
-        const global = (data.data as SlaPolicy[]).filter(p => !p.categoryId)
+        // Solo políticas realmente globales (sin categoryId NI familyId) para
+        // esta tabla. Antes solo se excluía categoryId, así que una política
+        // de familia (p. ej. "TI - Prioridad Media") también tiene
+        // categoryId=null y se colaba aquí — dependiendo del orden en que la
+        // API devolviera las filas, `policies.find()` podía quedarse con el
+        // valor de una familia en vez del verdadero fallback global, sin
+        // ningún indicio visual de que eso pasó (ver sla-policies-tab
+        // regression test).
+        const global = (data.data as SlaPolicy[]).filter(p => !p.categoryId && !p.familyId)
         setPolicies(global)
         // Build edit rows
         const rows: Record<string, EditableRow> = {}
