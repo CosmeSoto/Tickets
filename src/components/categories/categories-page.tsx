@@ -15,6 +15,7 @@ import {
   Trash2,
   Ticket,
   Users,
+  AlertTriangle,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -74,6 +75,26 @@ export default function CategoriesPage() {
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false)
   // Familias que el admin tiene asignadas (para validar permisos en UI)
   const [adminFamilyIds, setAdminFamilyIds] = useState<Set<string> | null>(null)
+  // Cuántos tickets recientes chocaron contra el techo de prioridad de cada
+  // categoría (tickets.requestedPriority !== null) — señal para decidir si
+  // hace falta subir el techo. Solo ADMIN puede consultarlo.
+  const [priorityCeilingHits, setPriorityCeilingHits] = useState<Record<string, number>>({})
+
+  useEffect(() => {
+    if (session?.user?.role !== 'ADMIN') return
+    fetch('/api/categories/priority-ceiling-stats?days=30')
+      .then(r => r.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.data)) {
+          const map: Record<string, number> = {}
+          for (const row of data.data) map[row.categoryId] = row.count
+          setPriorityCeilingHits(map)
+        }
+      })
+      .catch(() => {
+        /* no crítico: la columna simplemente no muestra el dato */
+      })
+  }, [session?.user?.role])
 
   // Familias desde el contexto global (cache Redis, sin peticion extra)
   const { families: contextFamilies } = useFamilies()
@@ -362,6 +383,35 @@ export default function CategoriesPage() {
           <span className='font-medium'>{category._count?.tickets || 0}</span>
         </button>
       ),
+    },
+    {
+      key: 'priorityCeilingHits',
+      header: 'Techo topado (30d)',
+      sortable: true,
+      accessor: (category: any) => priorityCeilingHits[category.id] ?? 0,
+      className: 'hidden lg:table-cell',
+      align: 'center' as const,
+      render: (category: any) => {
+        const hits = priorityCeilingHits[category.id] ?? 0
+        if (hits === 0) return <span className='text-muted-foreground text-xs'>—</span>
+        return (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className='inline-flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400 font-medium'>
+                  <AlertTriangle className='h-3.5 w-3.5' />
+                  {hits}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>
+                {hits} ticket{hits !== 1 ? 's' : ''} en los últimos 30 días pidieron más prioridad
+                de la que permite el techo de esta categoría. Si se repite seguido, considera subir
+                su &ldquo;Prioridad máxima automática&rdquo;.
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )
+      },
     },
     {
       key: 'technicians',
@@ -919,6 +969,7 @@ export default function CategoriesPage() {
           onLoadDepartments={loadDepartments}
           onLoadTechnicians={loadAvailableTechnicians}
           families={families.map(f => ({ ...f, color: f.color ?? null }))}
+          priorityCeilingHits={editingCategory ? (priorityCeilingHits[editingCategory.id] ?? 0) : 0}
         />
 
         {/* Dialog de confirmación para eliminar */}

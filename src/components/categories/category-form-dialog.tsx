@@ -1,6 +1,6 @@
 'use client'
 
-import { RefreshCw, Building, ChevronRight, Home, Users } from 'lucide-react'
+import { RefreshCw, Building, ChevronRight, Home, Users, AlertTriangle } from 'lucide-react'
 import { useEffect, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -51,6 +51,8 @@ interface CategoryFormDialogProps {
   onLoadDepartments: (familyId?: string | null) => void
   onLoadTechnicians: (familyId?: string, alreadyAssignedIds?: string[]) => void
   families?: { id: string; name: string; code: string; color: string | null }[]
+  /** Tickets de los últimos 30 días que chocaron contra el techo de esta categoría (editingCategory). 0 si no aplica. */
+  priorityCeilingHits?: number
 }
 
 export function CategoryFormDialog({
@@ -70,6 +72,7 @@ export function CategoryFormDialog({
   onLoadDepartments,
   onLoadTechnicians,
   families = [],
+  priorityCeilingHits = 0,
 }: CategoryFormDialogProps) {
   const {
     addTechnician,
@@ -561,6 +564,14 @@ export function CategoryFormDialog({
               operativa (sin revisión manual). Un admin/técnico puede subirla después caso por caso
               si hace falta.
             </p>
+            {editingCategory && priorityCeilingHits > 0 && (
+              <p className='text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1'>
+                <AlertTriangle className='h-3.5 w-3.5 shrink-0' />
+                {priorityCeilingHits} ticket{priorityCeilingHits !== 1 ? 's' : ''} en los últimos 30
+                días pidieron más de lo que permite este techo — si se repite seguido, considera
+                subirlo.
+              </p>
+            )}
           </div>
 
           {/* Estado Activo */}
