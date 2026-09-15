@@ -1,7 +1,16 @@
 'use client'
 
-import { RefreshCw, Building, ChevronRight, Home, Users, AlertTriangle } from 'lucide-react'
+import {
+  RefreshCw,
+  Building,
+  ChevronRight,
+  Home,
+  Users,
+  AlertTriangle,
+  ExternalLink,
+} from 'lucide-react'
 import { useEffect, useMemo } from 'react'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -53,6 +62,8 @@ interface CategoryFormDialogProps {
   families?: { id: string; name: string; code: string; color: string | null }[]
   /** Tickets de los últimos 30 días que chocaron contra el techo de esta categoría (editingCategory). 0 si no aplica. */
   priorityCeilingHits?: number
+  /** Determina a dónde lleva el link de "ajustar SLA/prioridades por área": tab de SLA (editable) si es Super Admin, o Áreas (techo por familia) si es un admin normal. */
+  isSuperAdmin?: boolean
 }
 
 export function CategoryFormDialog({
@@ -73,6 +84,7 @@ export function CategoryFormDialog({
   onLoadTechnicians,
   families = [],
   priorityCeilingHits = 0,
+  isSuperAdmin = false,
 }: CategoryFormDialogProps) {
   const {
     addTechnician,
@@ -559,11 +571,18 @@ export function CategoryFormDialog({
               </SelectContent>
             </Select>
             <p className='text-xs text-muted-foreground'>
-              Techo automático para tickets de clientes en esta categoría: si un cliente pide una
-              prioridad mayor a esta, el ticket se crea igual, pero queda con esta prioridad
-              operativa (sin revisión manual). Un admin/técnico puede subirla después caso por caso
-              si hace falta.
+              Techo automático para tickets de clientes en esta categoría (sin revisión manual). Un
+              admin/técnico puede subirla después caso por caso si hace falta.
             </p>
+            <Link
+              href={isSuperAdmin ? '/admin/settings?tab=sla' : '/admin/settings/tickets'}
+              target='_blank'
+              rel='noopener noreferrer'
+              className='text-xs text-primary hover:underline inline-flex items-center gap-1'
+            >
+              <ExternalLink className='h-3 w-3' />
+              {isSuperAdmin ? 'Ajustar tiempos de SLA' : 'Ver techo de prioridad por área'}
+            </Link>
             {editingCategory && priorityCeilingHits > 0 && (
               <p className='text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1'>
                 <AlertTriangle className='h-3.5 w-3.5 shrink-0' />

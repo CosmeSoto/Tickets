@@ -970,6 +970,7 @@ export default function CategoriesPage() {
           onLoadTechnicians={loadAvailableTechnicians}
           families={families.map(f => ({ ...f, color: f.color ?? null }))}
           priorityCeilingHits={editingCategory ? (priorityCeilingHits[editingCategory.id] ?? 0) : 0}
+          isSuperAdmin={isSuperAdmin}
         />
 
         {/* Dialog de confirmación para eliminar */}
