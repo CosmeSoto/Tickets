@@ -1,4 +1,5 @@
 import { ReportFilters } from './ticket-report.service'
+import { TICKET_PRIORITY_LABELS } from '@/lib/constants/ticket-labels'
 
 export interface ExportOptions {
   format: 'csv' | 'excel' | 'pdf' | 'json'
@@ -575,13 +576,7 @@ export class ExportService {
   }
 
   private static translatePriority(priority: string): string {
-    const priorityMap: Record<string, string> = {
-      LOW: 'Baja',
-      MEDIUM: 'Media',
-      HIGH: 'Alta',
-      URGENT: 'Urgente',
-    }
-    return priorityMap[priority] || priority
+    return TICKET_PRIORITY_LABELS[priority] || priority
   }
 
   private static translateSource(source: string): string {

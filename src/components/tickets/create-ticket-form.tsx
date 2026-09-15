@@ -32,6 +32,7 @@ import {
 } from '@/components/ui/select'
 import { createTicketSchema, CreateTicketData } from '@/lib/schemas/ticket-schemas'
 import { TicketPriority } from '@prisma/client'
+import { TICKET_PRIORITY_LABELS, TICKET_PRIORITY_COLORS } from '@/lib/constants/ticket-labels'
 import {
   Ticket,
   CheckCircle,
@@ -86,20 +87,25 @@ export interface CreateTicketFormProps {
   }
 }
 
-const PRIORITY_LABELS: Record<string, string> = {
-  LOW: 'Baja',
-  MEDIUM: 'Media',
-  HIGH: 'Alta',
-  URGENT: 'Urgente',
-}
+// Etiquetas/colores de la insignia vienen de TICKET_PRIORITY_LABELS/COLORS
+// (única fuente de verdad, src/lib/constants/ticket-labels.ts) — antes este
+// formulario tenía su propia paleta verde/amarillo/naranja/rojo, distinta de
+// la que usa PriorityBadge en el resto de la UI (tablas, detalle de ticket).
+const PRIORITY_COLORS: Record<string, string> = Object.fromEntries(
+  Object.entries(TICKET_PRIORITY_COLORS).map(([k, v]) => [
+    k,
+    `${v} border-current border-opacity-20`,
+  ])
+)
 
-const PRIORITY_COLORS: Record<string, string> = {
-  LOW: 'bg-green-100 text-green-800 dark:bg-green-500/20 dark:text-green-300 border-green-200 dark:border-green-500/40',
-  MEDIUM:
-    'bg-yellow-100 text-yellow-800 dark:bg-yellow-500/20 dark:text-yellow-300 border-yellow-200 dark:border-yellow-500/40',
-  HIGH: 'bg-orange-100 text-orange-800 dark:bg-orange-500/20 dark:text-orange-300 border-orange-200 dark:border-orange-500/40',
-  URGENT:
-    'bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-300 border-red-200 dark:border-red-500/40',
+/** Color de punto sólido para el selector — no hay equivalente en la fuente de
+ * verdad (que solo define pares bg+text para insignias), pero debe seguir el
+ * mismo esquema de color por prioridad para no desentonar con la insignia. */
+const PRIORITY_DOT_COLORS: Record<string, string> = {
+  LOW: 'bg-gray-500',
+  MEDIUM: 'bg-blue-500',
+  HIGH: 'bg-orange-500',
+  URGENT: 'bg-red-500',
 }
 
 const PRIORITY_DESCRIPTIONS: Record<string, string> = {
@@ -439,20 +445,10 @@ export function CreateTicketForm({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(PRIORITY_LABELS).map(([value, label]) => (
+                  {Object.entries(TICKET_PRIORITY_LABELS).map(([value, label]) => (
                     <SelectItem key={value} value={value}>
                       <div className='flex items-center gap-2'>
-                        <div
-                          className={`w-2.5 h-2.5 rounded-full ${
-                            value === 'LOW'
-                              ? 'bg-green-500'
-                              : value === 'MEDIUM'
-                                ? 'bg-yellow-500'
-                                : value === 'HIGH'
-                                  ? 'bg-orange-500'
-                                  : 'bg-red-500'
-                          }`}
-                        />
+                        <div className={`w-2.5 h-2.5 rounded-full ${PRIORITY_DOT_COLORS[value]}`} />
                         {label}
                       </div>
                     </SelectItem>
@@ -463,7 +459,7 @@ export function CreateTicketForm({
                 <p
                   className={`px-2 py-1.5 rounded text-xs border ${PRIORITY_COLORS[selectedPriority]}`}
                 >
-                  <strong>{PRIORITY_LABELS[selectedPriority]}:</strong>{' '}
+                  <strong>{TICKET_PRIORITY_LABELS[selectedPriority]}:</strong>{' '}
                   {PRIORITY_DESCRIPTIONS[selectedPriority]}
                 </p>
               )}

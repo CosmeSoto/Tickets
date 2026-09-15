@@ -19,6 +19,7 @@ import { useToast } from '@/hooks/use-toast'
 import { useTechnicians } from '@/contexts/users-context'
 import { TicketSupportAreaField } from '@/components/tickets/ticket-support-area-field'
 import { ticketRequestFamiliesUrl } from '@/lib/utils/ticket-family'
+import { TICKET_PRIORITY_LABELS } from '@/lib/constants/ticket-labels'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -330,10 +331,11 @@ export default function EditTicketPage() {
                 }
                 className='w-full px-3 py-2 border border-border rounded-md'
               >
-                <option value='LOW'>Baja</option>
-                <option value='MEDIUM'>Media</option>
-                <option value='HIGH'>Alta</option>
-                <option value='URGENT'>Urgente</option>
+                {Object.entries(TICKET_PRIORITY_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
               </select>
             </div>
           </div>

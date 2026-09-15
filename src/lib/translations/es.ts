@@ -14,14 +14,6 @@ export const TICKET_STATUS_ES: Record<string, string> = {
   ON_HOLD: 'EN ESPERA',
 }
 
-// Prioridades
-export const PRIORITY_ES: Record<string, string> = {
-  LOW: 'BAJA',
-  MEDIUM: 'MEDIA',
-  HIGH: 'ALTA',
-  URGENT: 'URGENTE',
-}
-
 // Estados de tareas
 export const TASK_STATUS_ES: Record<string, string> = {
   PENDING: 'PENDIENTE',
@@ -87,9 +79,10 @@ export const translateTicketStatus = (status: string): string => {
   return TICKET_STATUS_ES[status] || status
 }
 
-export const translatePriority = (priority: string): string => {
-  return PRIORITY_ES[priority] || priority
-}
+// translatePriority vive en @/lib/constants/ticket-labels (única fuente de
+// verdad para prioridad) — antes estaba duplicada aquí con su propia tabla
+// en mayúsculas (PRIORITY_ES), y con el mismo nombre de función que la de
+// ticket-labels.ts, lo que se prestaba a confusión sobre cuál se importaba.
 
 export const translateTaskStatus = (status: string): string => {
   // resolution_tasks.status es un string libre en minúsculas ('pending', 'in_progress', ...)

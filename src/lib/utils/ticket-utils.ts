@@ -3,22 +3,23 @@
  * Funciones compartidas para manejo de tickets, prioridades, estados, etc.
  */
 
+import { TICKET_PRIORITY_LABELS, TICKET_PRIORITY_COLORS } from '@/lib/constants/ticket-labels'
+
 export type Priority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'
 export type Status = 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED' | 'ON_HOLD'
 
 /**
- * Obtiene las clases de color para una prioridad
+ * Obtiene las clases de color para una prioridad.
+ * Reusa TICKET_PRIORITY_COLORS (src/lib/constants/ticket-labels.ts, única
+ * fuente de verdad) en vez de una paleta propia — antes esta función tenía
+ * su propia paleta verde/amarillo/naranja/rojo, distinta de la que usa
+ * PriorityBadge (el componente que realmente se ve en la mayoría de la UI).
  */
 export const getPriorityColor = (priority: Priority | string): string => {
-  const colors: Record<string, string> = {
-    URGENT:
-      'bg-red-100 text-red-700 border border-red-200 dark:bg-red-500/20 dark:text-red-300 dark:border-red-500/40',
-    HIGH: 'bg-orange-100 text-orange-700 border border-orange-200 dark:bg-orange-500/20 dark:text-orange-300 dark:border-orange-500/40',
-    MEDIUM:
-      'bg-yellow-100 text-yellow-700 border border-yellow-200 dark:bg-yellow-500/20 dark:text-yellow-300 dark:border-yellow-500/40',
-    LOW: 'bg-green-100 text-green-700 border border-green-200 dark:bg-green-500/20 dark:text-green-300 dark:border-green-500/40',
-  }
-  return colors[priority] || 'bg-muted text-muted-foreground border border-border'
+  const base = TICKET_PRIORITY_COLORS[priority]
+  return base
+    ? `${base} border border-current border-opacity-20`
+    : 'bg-muted text-muted-foreground border border-border'
 }
 
 /**
@@ -44,15 +45,8 @@ export const getStatusColor = (status: Status | string): string => {
 /**
  * Obtiene la etiqueta en español para una prioridad
  */
-export const getPriorityLabel = (priority: Priority | string): string => {
-  const labels: Record<string, string> = {
-    URGENT: 'Urgente',
-    HIGH: 'Alta',
-    MEDIUM: 'Media',
-    LOW: 'Baja',
-  }
-  return labels[priority] || priority
-}
+export const getPriorityLabel = (priority: Priority | string): string =>
+  TICKET_PRIORITY_LABELS[priority] ?? priority
 
 /**
  * Obtiene la etiqueta en español para un estado

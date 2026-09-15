@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { TICKET_PRIORITY_LABELS } from '@/lib/constants/ticket-labels'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -31,11 +32,13 @@ interface SlaPolicy {
 
 const PRIORITIES = ['URGENT', 'HIGH', 'MEDIUM', 'LOW'] as const
 
-const PRIORITY_META: Record<string, { label: string; variant: 'destructive' | 'default' | 'secondary' | 'outline' }> = {
-  URGENT: { label: 'Urgente', variant: 'destructive' },
-  HIGH: { label: 'Alta', variant: 'default' },
-  MEDIUM: { label: 'Media', variant: 'secondary' },
-  LOW: { label: 'Baja', variant: 'outline' },
+// Solo `variant` (prop de Badge de shadcn, sin equivalente en la fuente de
+// verdad) se queda local — `label` viene de TICKET_PRIORITY_LABELS.
+const PRIORITY_VARIANTS: Record<string, 'destructive' | 'default' | 'secondary' | 'outline'> = {
+  URGENT: 'destructive',
+  HIGH: 'default',
+  MEDIUM: 'secondary',
+  LOW: 'outline',
 }
 
 // Default fallback values if no policies exist in DB
@@ -69,7 +72,7 @@ export function SLAPoliciesTab({ isSuperAdmin = false }: { isSuperAdmin?: boolea
       const data = await res.json()
       if (data.success) {
         // Only global policies (no categoryId) for the main table
-        const global = (data.data as SlaPolicy[]).filter((p) => !p.categoryId)
+        const global = (data.data as SlaPolicy[]).filter(p => !p.categoryId)
         setPolicies(global)
         // Build edit rows
         const rows: Record<string, EditableRow> = {}
@@ -84,13 +87,22 @@ export function SLAPoliciesTab({ isSuperAdmin = false }: { isSuperAdmin?: boolea
         // Fill missing priorities with defaults
         for (const priority of PRIORITIES) {
           if (!rows[priority]) {
-            rows[priority] = { id: '', response: DEFAULTS[priority].response, resolution: DEFAULTS[priority].resolution, businessHoursOnly: false }
+            rows[priority] = {
+              id: '',
+              response: DEFAULTS[priority].response,
+              resolution: DEFAULTS[priority].resolution,
+              businessHoursOnly: false,
+            }
           }
         }
         setEditRows(rows)
       }
     } catch {
-      toast({ title: 'Error', description: 'Error al cargar políticas SLA', variant: 'destructive' })
+      toast({
+        title: 'Error',
+        description: 'Error al cargar políticas SLA',
+        variant: 'destructive',
+      })
     } finally {
       setLoading(false)
     }
@@ -104,7 +116,7 @@ export function SLAPoliciesTab({ isSuperAdmin = false }: { isSuperAdmin?: boolea
     setSaving(true)
     try {
       const results = await Promise.allSettled(
-        PRIORITIES.map((priority) => {
+        PRIORITIES.map(priority => {
           const row = editRows[priority]
           if (!row?.id) return Promise.resolve({ success: true, skipped: true })
           return fetch(`/api/admin/sla-policies/${row.id}`, {
@@ -115,12 +127,14 @@ export function SLAPoliciesTab({ isSuperAdmin = false }: { isSuperAdmin?: boolea
               resolutionTimeHours: row.resolution,
               businessHoursOnly: row.businessHoursOnly,
             }),
-          }).then((r) => r.json())
+          }).then(r => r.json())
         })
       )
 
       const failed = results.filter(
-        (r) => r.status === 'rejected' || (r.status === 'fulfilled' && r.value?.success === false && !r.value?.skipped)
+        r =>
+          r.status === 'rejected' ||
+          (r.status === 'fulfilled' && r.value?.success === false && !r.value?.skipped)
       )
 
       if (failed.length === 0) {
@@ -135,14 +149,18 @@ export function SLAPoliciesTab({ isSuperAdmin = false }: { isSuperAdmin?: boolea
         })
       }
     } catch {
-      toast({ title: 'Error', description: 'Error al guardar políticas SLA', variant: 'destructive' })
+      toast({
+        title: 'Error',
+        description: 'Error al guardar políticas SLA',
+        variant: 'destructive',
+      })
     } finally {
       setSaving(false)
     }
   }
 
   const updateRow = (priority: string, field: keyof EditableRow, value: number | boolean) => {
-    setEditRows((prev) => ({
+    setEditRows(prev => ({
       ...prev,
       [priority]: { ...prev[priority], [field]: value },
     }))
@@ -151,23 +169,24 @@ export function SLAPoliciesTab({ isSuperAdmin = false }: { isSuperAdmin?: boolea
   if (loading) {
     return (
       <Card>
-        <CardContent className="flex items-center justify-center py-12">
-          <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" />
+        <CardContent className='flex items-center justify-center py-12'>
+          <RefreshCw className='h-5 w-5 animate-spin text-muted-foreground' />
         </CardContent>
       </Card>
     )
   }
 
   return (
-    <div className="space-y-6">
+    <div className='space-y-6'>
       {/* Info banner */}
-      <div className="flex items-start gap-3 p-4 rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800">
-        <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
-        <div className="text-sm text-blue-800 dark:text-blue-300 space-y-1">
-          <p className="font-medium">Políticas SLA globales del sistema</p>
+      <div className='flex items-start gap-3 p-4 rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800'>
+        <Info className='h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0' />
+        <div className='text-sm text-blue-800 dark:text-blue-300 space-y-1'>
+          <p className='font-medium'>Políticas SLA globales del sistema</p>
           <p>
-            Estos tiempos aplican como referencia base para todos los módulos que usen SLA (tickets, rondas, etc.).
-            Cada módulo puede tener políticas específicas por categoría que sobreescriben estos valores.
+            Estos tiempos aplican como referencia base para todos los módulos que usen SLA (tickets,
+            rondas, etc.). Cada módulo puede tener políticas específicas por categoría que
+            sobreescriben estos valores.
           </p>
         </div>
       </div>
@@ -175,40 +194,31 @@ export function SLAPoliciesTab({ isSuperAdmin = false }: { isSuperAdmin?: boolea
       {/* Tabla de políticas globales */}
       <Card>
         <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3'>
             <div>
-              <CardTitle className="flex items-center gap-2">
-                <Bell className="h-5 w-5" />
+              <CardTitle className='flex items-center gap-2'>
+                <Bell className='h-5 w-5' />
                 Tiempos por prioridad
               </CardTitle>
-              <CardDescription className="mt-1">
+              <CardDescription className='mt-1'>
                 Tiempos de respuesta y resolución en horas hábiles por nivel de prioridad
               </CardDescription>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={loadPolicies}
-                disabled={loading}
-              >
+            <div className='flex flex-wrap items-center gap-2'>
+              <Button variant='outline' size='sm' onClick={loadPolicies} disabled={loading}>
                 <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               </Button>
               {isSuperAdmin && !editing && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setEditing(true)}
-                >
-                  <Edit2 className="h-4 w-4 mr-2" />
+                <Button variant='outline' size='sm' onClick={() => setEditing(true)}>
+                  <Edit2 className='h-4 w-4 mr-2' />
                   Editar
                 </Button>
               )}
               {isSuperAdmin && editing && (
                 <>
                   <Button
-                    variant="outline"
-                    size="sm"
+                    variant='outline'
+                    size='sm'
                     onClick={() => {
                       setEditing(false)
                       loadPolicies()
@@ -217,7 +227,7 @@ export function SLAPoliciesTab({ isSuperAdmin = false }: { isSuperAdmin?: boolea
                   >
                     Cancelar
                   </Button>
-                  <Button size="sm" onClick={handleSave} disabled={saving}>
+                  <Button size='sm' onClick={handleSave} disabled={saving}>
                     <Save className={`h-4 w-4 mr-2 ${saving ? 'animate-spin' : ''}`} />
                     {saving ? 'Guardando...' : 'Guardar'}
                   </Button>
@@ -226,78 +236,92 @@ export function SLAPoliciesTab({ isSuperAdmin = false }: { isSuperAdmin?: boolea
             </div>
           </div>
         </CardHeader>
-        <CardContent className="p-0 sm:p-6">
-          <div className="overflow-x-auto">
+        <CardContent className='p-0 sm:p-6'>
+          <div className='overflow-x-auto'>
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Prioridad</TableHead>
-                  <TableHead className="text-center">Respuesta (h)</TableHead>
-                  <TableHead className="text-center">Resolución (h)</TableHead>
-                  <TableHead className="text-center">Solo horas hábiles</TableHead>
-                  <TableHead className="text-center">Estado</TableHead>
+                  <TableHead className='text-center'>Respuesta (h)</TableHead>
+                  <TableHead className='text-center'>Resolución (h)</TableHead>
+                  <TableHead className='text-center'>Solo horas hábiles</TableHead>
+                  <TableHead className='text-center'>Estado</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {PRIORITIES.map((priority) => {
+                {PRIORITIES.map(priority => {
                   const row = editRows[priority]
-                  const policy = policies.find((p) => p.priority === priority)
+                  const policy = policies.find(p => p.priority === priority)
                   return (
                     <TableRow key={priority}>
                       <TableCell>
-                        <Badge variant={PRIORITY_META[priority].variant}>
-                          {PRIORITY_META[priority].label}
+                        <Badge variant={PRIORITY_VARIANTS[priority]}>
+                          {TICKET_PRIORITY_LABELS[priority]}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-center">
+                      <TableCell className='text-center'>
                         {editing && isSuperAdmin ? (
                           <Input
-                            type="number"
+                            type='number'
                             min={1}
                             max={720}
-                            className="w-20 mx-auto text-center font-mono h-8"
+                            className='w-20 mx-auto text-center font-mono h-8'
                             value={row?.response ?? ''}
-                            onChange={(e) => updateRow(priority, 'response', parseInt(e.target.value) || 1)}
+                            onChange={e =>
+                              updateRow(priority, 'response', parseInt(e.target.value) || 1)
+                            }
                           />
                         ) : (
-                          <span className="font-mono font-medium">{row?.response ?? DEFAULTS[priority].response}</span>
+                          <span className='font-mono font-medium'>
+                            {row?.response ?? DEFAULTS[priority].response}
+                          </span>
                         )}
                       </TableCell>
-                      <TableCell className="text-center">
+                      <TableCell className='text-center'>
                         {editing && isSuperAdmin ? (
                           <Input
-                            type="number"
+                            type='number'
                             min={1}
                             max={720}
-                            className="w-20 mx-auto text-center font-mono h-8"
+                            className='w-20 mx-auto text-center font-mono h-8'
                             value={row?.resolution ?? ''}
-                            onChange={(e) => updateRow(priority, 'resolution', parseInt(e.target.value) || 1)}
+                            onChange={e =>
+                              updateRow(priority, 'resolution', parseInt(e.target.value) || 1)
+                            }
                           />
                         ) : (
-                          <span className="font-mono font-medium">{row?.resolution ?? DEFAULTS[priority].resolution}</span>
+                          <span className='font-mono font-medium'>
+                            {row?.resolution ?? DEFAULTS[priority].resolution}
+                          </span>
                         )}
                       </TableCell>
-                      <TableCell className="text-center">
+                      <TableCell className='text-center'>
                         {editing && isSuperAdmin ? (
-                          <div className="flex justify-center">
+                          <div className='flex justify-center'>
                             <Switch
                               checked={row?.businessHoursOnly ?? false}
-                              onCheckedChange={(v) => updateRow(priority, 'businessHoursOnly', v)}
+                              onCheckedChange={v => updateRow(priority, 'businessHoursOnly', v)}
                             />
                           </div>
                         ) : (
-                          <Badge variant={row?.businessHoursOnly ? 'default' : 'secondary'} className="text-xs">
+                          <Badge
+                            variant={row?.businessHoursOnly ? 'default' : 'secondary'}
+                            className='text-xs'
+                          >
                             {row?.businessHoursOnly ? 'Sí' : 'No'}
                           </Badge>
                         )}
                       </TableCell>
-                      <TableCell className="text-center">
+                      <TableCell className='text-center'>
                         {policy ? (
-                          <Badge variant="default" className="text-xs bg-green-100 text-green-700 border-green-200">
+                          <Badge
+                            variant='default'
+                            className='text-xs bg-green-100 text-green-700 border-green-200'
+                          >
                             Activa
                           </Badge>
                         ) : (
-                          <Badge variant="secondary" className="text-xs">
+                          <Badge variant='secondary' className='text-xs'>
                             Sin política
                           </Badge>
                         )}
@@ -308,18 +332,20 @@ export function SLAPoliciesTab({ isSuperAdmin = false }: { isSuperAdmin?: boolea
               </TableBody>
             </Table>
           </div>
-          <div className="p-4 sm:p-0">
+          <div className='p-4 sm:p-0'>
             {!isSuperAdmin && (
-              <p className="text-xs text-muted-foreground mt-4 flex items-center gap-1">
-                <Info className="h-3 w-3" />
+              <p className='text-xs text-muted-foreground mt-4 flex items-center gap-1'>
+                <Info className='h-3 w-3' />
                 Solo el Super Admin puede modificar las políticas SLA.
               </p>
             )}
 
             {policies.length === 0 && (
-              <div className="mt-4 p-3 rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 text-sm text-amber-800 dark:text-amber-300">
-                ⚠️ No hay políticas SLA en la base de datos. Los valores mostrados son los predeterminados del sistema.
-                {isSuperAdmin && ' Crea las políticas desde la API o el seed para poder editarlas aquí.'}
+              <div className='mt-4 p-3 rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 text-sm text-amber-800 dark:text-amber-300'>
+                ⚠️ No hay políticas SLA en la base de datos. Los valores mostrados son los
+                predeterminados del sistema.
+                {isSuperAdmin &&
+                  ' Crea las políticas desde la API o el seed para poder editarlas aquí.'}
               </div>
             )}
           </div>
@@ -329,23 +355,35 @@ export function SLAPoliciesTab({ isSuperAdmin = false }: { isSuperAdmin?: boolea
       {/* Referencia de precedencia */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Jerarquía de precedencia</CardTitle>
+          <CardTitle className='text-base'>Jerarquía de precedencia</CardTitle>
           <CardDescription>Cómo se determina qué política SLA aplica a cada ticket</CardDescription>
         </CardHeader>
         <CardContent>
-          <ol className="space-y-3">
+          <ol className='space-y-3'>
             {[
-              { level: '1', title: 'Política de categoría específica', desc: 'La más prioritaria. Si la categoría del ticket tiene una política SLA asignada, se usa esa.' },
-              { level: '2', title: 'Política de familia / área', desc: 'Si no hay política de categoría, se usa la política asignada al área (familia) del ticket.' },
-              { level: '3', title: 'Política global (esta tabla)', desc: 'Fallback final. Se aplica cuando no hay política más específica.' },
-            ].map((item) => (
-              <li key={item.level} className="flex gap-3">
-                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center">
+              {
+                level: '1',
+                title: 'Política de categoría específica',
+                desc: 'La más prioritaria. Si la categoría del ticket tiene una política SLA asignada, se usa esa.',
+              },
+              {
+                level: '2',
+                title: 'Política de familia / área',
+                desc: 'Si no hay política de categoría, se usa la política asignada al área (familia) del ticket.',
+              },
+              {
+                level: '3',
+                title: 'Política global (esta tabla)',
+                desc: 'Fallback final. Se aplica cuando no hay política más específica.',
+              },
+            ].map(item => (
+              <li key={item.level} className='flex gap-3'>
+                <span className='flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center'>
                   {item.level}
                 </span>
                 <div>
-                  <p className="text-sm font-medium">{item.title}</p>
-                  <p className="text-xs text-muted-foreground">{item.desc}</p>
+                  <p className='text-sm font-medium'>{item.title}</p>
+                  <p className='text-xs text-muted-foreground'>{item.desc}</p>
                 </div>
               </li>
             ))}

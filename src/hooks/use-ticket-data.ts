@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import { useToast } from './use-toast'
+import { TICKET_PRIORITY_LABELS, TICKET_PRIORITY_COLORS } from '@/lib/constants/ticket-labels'
 
 // Tipos base para el sistema
 export interface TicketStatus {
@@ -465,28 +466,16 @@ export const TICKET_STATUSES: TicketStatus[] = [
   },
 ]
 
-export const TICKET_PRIORITIES: TicketPriority[] = [
-  {
-    value: 'LOW',
-    label: 'Baja',
-    color: 'bg-gray-100 dark:bg-gray-800/50 text-gray-800 dark:text-gray-300',
-  },
-  {
-    value: 'MEDIUM',
-    label: 'Media',
-    color: 'bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300',
-  },
-  {
-    value: 'HIGH',
-    label: 'Alta',
-    color: 'bg-orange-100 dark:bg-orange-900/20 text-orange-800 dark:text-orange-300',
-  },
-  {
-    value: 'URGENT',
-    label: 'Urgente',
-    color: 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-300',
-  },
-]
+// Etiquetas/colores vienen de TICKET_PRIORITY_LABELS/COLORS (única fuente de
+// verdad, src/lib/constants/ticket-labels.ts) — antes eran valores propios
+// aquí, duplicados (coincidían en sustancia, pero podían desincronizarse).
+export const TICKET_PRIORITIES: TicketPriority[] = (
+  ['LOW', 'MEDIUM', 'HIGH', 'URGENT'] as const
+).map(value => ({
+  value,
+  label: TICKET_PRIORITY_LABELS[value],
+  color: TICKET_PRIORITY_COLORS[value],
+}))
 
 // Utilidades
 export const getStatusConfig = (status: TicketStatus['value']) =>

@@ -2,11 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import {
-  translateTicketStatus,
-  translatePriority,
-  translateTaskStatus,
-} from '@/lib/translations/es'
+import { translateTicketStatus, translateTaskStatus } from '@/lib/translations/es'
+import { translatePriority } from '@/lib/constants/ticket-labels'
 import { UserRole } from '@prisma/client'
 import { z } from 'zod'
 import { randomUUID } from 'crypto'

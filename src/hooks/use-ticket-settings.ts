@@ -9,6 +9,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { useToast } from '@/hooks/use-toast'
+import { TICKET_PRIORITY_LABELS } from '@/lib/constants/ticket-labels'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -64,12 +65,11 @@ export const DEFAULTS: SlaRow[] = [
 
 export const PRIORITIES = ['URGENT', 'HIGH', 'MEDIUM', 'LOW'] as const
 
-export const PRIORITY_LABELS: Record<string, string> = {
-  URGENT: 'Urgente',
-  HIGH: 'Alta',
-  MEDIUM: 'Media',
-  LOW: 'Baja',
-}
+// Re-exporta la lista canónica (src/lib/constants/ticket-labels.ts) en vez de
+// duplicar las mismas 4 etiquetas — solo PRIORITY_COLORS se mantiene local
+// aquí, con una paleta pensada para tarjetas con borde, distinta a la de las
+// insignias (PriorityBadge) en el resto de la UI.
+export const PRIORITY_LABELS = TICKET_PRIORITY_LABELS
 
 export const DAY_OPTIONS = [
   { key: 'MON', label: 'L' },
