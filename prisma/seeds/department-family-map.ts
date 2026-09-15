@@ -66,39 +66,17 @@ export const DEPARTMENT_SEEDS: DepartmentSeedDef[] = [
   },
   {
     name: 'Tecnologías de la Información',
-    description: 'Coordinación TI, infraestructura y sistemas',
+    description:
+      'TI, infraestructura, soporte, seguridad de la información, usuarios/privilegios y telefonía',
     color: '#10B981',
     order: 7,
     familyCode: 'ADMINISTRATIVE',
   },
-  {
-    name: 'Soporte Técnico',
-    description: 'Soporte, mesa de ayuda y analistas TI',
-    color: '#F59E0B',
-    order: 8,
-    familyCode: 'ADMINISTRATIVE',
-  },
-  {
-    name: 'Seguridad Informática',
-    description: 'Seguridad de la información',
-    color: '#DC2626',
-    order: 9,
-    familyCode: 'ADMINISTRATIVE',
-  },
-  {
-    name: 'Usuarios y Privilegios',
-    description: 'Gestión de usuarios y accesos',
-    color: '#6366F1',
-    order: 10,
-    familyCode: 'ADMINISTRATIVE',
-  },
-  {
-    name: 'Telefonía',
-    description: 'Telefonía y comunicaciones',
-    color: '#0EA5E9',
-    order: 11,
-    familyCode: 'ADMINISTRATIVE',
-  },
+  // Soporte Técnico, Seguridad Informática, Usuarios y Privilegios y
+  // Telefonía se fusionaron en "Tecnologías de la Información" (un solo
+  // equipo TI en la práctica) — ver DEPARTMENT_NAME_ALIASES abajo. No
+  // quedan como entradas propias aquí: si siguieran en esta lista,
+  // ensureDepartments() los reactivaría en cada seed y deshacía la fusión.
   // ── 2. COMERCIAL ────────────────────────────────────────────────────────
   {
     name: 'Comercial',
@@ -234,6 +212,12 @@ export const DEPARTMENT_NAME_ALIASES: Record<string, string> = {
   // TI / admin
   'Tecnologías de la información': 'Tecnologías de la Información',
   'Seguridad Informatica': 'Seguridad Informática',
+  // TI consolidado: un solo equipo/departamento en vez de 5 (ver seed de
+  // categorías — mismo criterio que "Mantenimiento" más abajo).
+  'Soporte Técnico': 'Tecnologías de la Información',
+  'Seguridad Informática': 'Tecnologías de la Información',
+  'Usuarios y Privilegios': 'Tecnologías de la Información',
+  Telefonía: 'Tecnologías de la Información',
   'Servicio al cliente': 'Servicio al Cliente',
   contabilidad: 'Contabilidad',
   // Mensajería (departamento propio bajo Administración)

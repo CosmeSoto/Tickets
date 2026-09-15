@@ -278,13 +278,56 @@ async function mergeDepartmentAlias(
       where: { departmentId: aliasDept.id },
       data: { departmentId: canonicalDept.id, familyId: canonicalDept.familyId ?? familyId },
     })
-    try {
-      await (prisma as any).equipment?.updateMany?.({
-        where: { departmentId: aliasDept.id },
-        data: { departmentId: canonicalDept.id },
-      })
-    } catch {
-      /* optional */
+    // Resto de tablas que referencian departamento — best-effort (igual que
+    // `equipment` arriba): hoy dan 0 filas para las fusiones TI/Mantenimiento,
+    // pero se cubren para que la función sirva para cualquier fusión futura.
+    const extraRemaps: Array<() => Promise<unknown>> = [
+      () =>
+        (prisma as any).equipment?.updateMany?.({
+          where: { departmentId: aliasDept.id },
+          data: { departmentId: canonicalDept.id },
+        }),
+      () =>
+        (prisma as any).equipment_batches?.updateMany?.({
+          where: { departmentId: aliasDept.id },
+          data: { departmentId: canonicalDept.id },
+        }),
+      () =>
+        (prisma as any).license_assignments?.updateMany?.({
+          where: { departmentId: aliasDept.id },
+          data: { departmentId: canonicalDept.id },
+        }),
+      () =>
+        (prisma as any).software_licenses?.updateMany?.({
+          where: { assignedToDepartment: aliasDept.id },
+          data: { assignedToDepartment: canonicalDept.id },
+        }),
+      () =>
+        (prisma as any).processes?.updateMany?.({
+          where: { departmentId: aliasDept.id },
+          data: { departmentId: canonicalDept.id },
+        }),
+      // form_departments / news_departments son N:M con @@unique([xId, departmentId]):
+      // si el canónico ya tuviera la misma fila, el updateMany violaría esa
+      // unicidad — se ignora ese caso puntual (deja la fila del alias tal cual)
+      // en vez de romper toda la fusión del departamento.
+      () =>
+        (prisma as any).form_departments?.updateMany?.({
+          where: { departmentId: aliasDept.id },
+          data: { departmentId: canonicalDept.id },
+        }),
+      () =>
+        (prisma as any).news_departments?.updateMany?.({
+          where: { departmentId: aliasDept.id },
+          data: { departmentId: canonicalDept.id },
+        }),
+    ]
+    for (const remap of extraRemaps) {
+      try {
+        await remap()
+      } catch {
+        /* optional / best-effort */
+      }
     }
     await prisma.departments.update({
       where: { id: aliasDept.id },
