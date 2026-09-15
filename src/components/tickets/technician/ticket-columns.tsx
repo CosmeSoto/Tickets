@@ -6,6 +6,14 @@ import { Button } from '@/components/ui/button'
 import type { Column } from '@/components/ui/data-table'
 import type { Ticket as TicketType } from '@/hooks/use-ticket-data'
 import { formatTimeAgo, getTicketDisplayCode } from '@/hooks/use-ticket-data'
+import { getSlaCountdown } from '@/lib/tickets/sla-countdown'
+
+const SLA_URGENCY_CLASSES: Record<string, string> = {
+  ok: 'text-muted-foreground',
+  warning: 'text-amber-600',
+  overdue: 'text-red-600',
+  none: 'text-muted-foreground',
+}
 
 interface TechnicianTicketColumnsProps {
   onView: (ticket: TicketType) => void
@@ -57,6 +65,18 @@ export function createTechnicianTicketColumns({
       label: 'Prioridad',
       sortable: true,
       render: (ticket: TicketType) => <PriorityBadge priority={ticket.priority} size='sm' />,
+    },
+    {
+      key: 'sla',
+      label: 'SLA',
+      render: (ticket: TicketType) => {
+        const sla = getSlaCountdown(ticket.slaDeadline, ticket.resolvedAt ?? ticket.closedAt)
+        return (
+          <span className={`text-xs whitespace-nowrap ${SLA_URGENCY_CLASSES[sla.urgency]}`}>
+            {sla.label}
+          </span>
+        )
+      },
     },
     {
       key: 'client',

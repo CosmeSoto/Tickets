@@ -7,6 +7,14 @@ import type { Column } from '@/components/ui/data-table'
 import type { TableColumnDef } from '@/components/common/table-columns-menu'
 import type { Ticket as TicketType } from '@/hooks/use-ticket-data'
 import { formatTimeAgo, getTicketDisplayCode } from '@/hooks/use-ticket-data'
+import { getSlaCountdown } from '@/lib/tickets/sla-countdown'
+
+const SLA_URGENCY_CLASSES: Record<string, string> = {
+  ok: 'text-muted-foreground',
+  warning: 'text-amber-600 dark:text-amber-400',
+  overdue: 'text-red-600 dark:text-red-400',
+  none: 'text-muted-foreground',
+}
 
 /**
  * Definiciones para el selector de columnas (`TableColumnsMenu`) del datatable
@@ -18,6 +26,7 @@ export const ADMIN_TICKET_COLUMN_DEFS: TableColumnDef[] = [
   { key: 'family', label: 'Área' },
   { key: 'status', label: 'Estado' },
   { key: 'priority', label: 'Prioridad' },
+  { key: 'sla', label: 'SLA' },
   { key: 'client', label: 'Cliente' },
   { key: 'assignee', label: 'Asignado' },
   { key: 'category', label: 'Categoría' },
@@ -109,6 +118,18 @@ export function createAdminTicketColumns(): Column<TicketType>[] {
       label: 'Prioridad',
       sortable: true,
       render: (ticket: TicketType) => <PriorityBadge priority={ticket.priority} size='sm' />,
+    },
+    {
+      key: 'sla',
+      label: 'SLA',
+      render: (ticket: TicketType) => {
+        const sla = getSlaCountdown(ticket.slaDeadline, ticket.resolvedAt ?? ticket.closedAt)
+        return (
+          <span className={`text-xs whitespace-nowrap ${SLA_URGENCY_CLASSES[sla.urgency]}`}>
+            {sla.label}
+          </span>
+        )
+      },
     },
     {
       key: 'client',

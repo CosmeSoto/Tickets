@@ -17,6 +17,7 @@ import {
   buildPrimaryButton,
   escapeHtml,
 } from '../email-layout'
+import { getSlaCountdown } from '@/lib/tickets/sla-countdown'
 
 export default function ticketAssignedTemplate(data: Record<string, unknown>) {
   const branding = brandingFromTemplateData(data)
@@ -32,6 +33,7 @@ export default function ticketAssignedTemplate(data: Record<string, unknown>) {
     branding.baseUrl,
     String(data.ticketUrl || `/technician/tickets/${data.ticketId || ''}`)
   )
+  const sla = getSlaCountdown(data.slaDeadline as string | Date | null | undefined, null)
 
   const bodyHtml = `
     <p style="margin:0 0 16px;">Hola <strong>${escapeHtml(technicianName)}</strong>,</p>
@@ -42,6 +44,7 @@ export default function ticketAssignedTemplate(data: Record<string, unknown>) {
       { label: 'Cliente', value: clientName },
       { label: 'Categoría', value: category },
       { label: 'Prioridad', value: priorityLabel },
+      ...(sla.urgency !== 'none' ? [{ label: 'Vence SLA', value: sla.label }] : []),
     ])}
     ${description ? `<p style="margin:0 0 8px;color:#71717a;font-size:13px;line-height:1.5;"><strong>Resumen:</strong> ${escapeHtml(description)}</p>` : ''}
     ${buildPrimaryButton(ticketUrl, 'Abrir ticket', branding.primaryColor)}
@@ -62,7 +65,7 @@ Ticket #${ticketNumber} asignado.
 Título: ${ticketTitle}
 Cliente: ${clientName}
 Prioridad: ${priorityLabel}
-${description ? `Resumen: ${description}\n` : ''}
+${sla.urgency !== 'none' ? `Vence SLA: ${sla.label}\n` : ''}${description ? `Resumen: ${description}\n` : ''}
 Abrir ticket: ${ticketUrl}
 
 ${buildLegalFooterText(branding)}`

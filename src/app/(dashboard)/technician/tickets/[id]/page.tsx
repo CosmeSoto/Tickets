@@ -19,6 +19,15 @@ import {
 import Link from 'next/link'
 
 import { TicketDetailLayout } from '@/components/tickets/ticket-detail-layout'
+import { getSlaCountdown } from '@/lib/tickets/sla-countdown'
+import { TICKET_PRIORITY_LABELS } from '@/lib/constants/ticket-labels'
+
+const SLA_URGENCY_CLASSES: Record<string, string> = {
+  ok: 'text-muted-foreground',
+  warning: 'text-amber-600',
+  overdue: 'text-red-600',
+  none: 'text-muted-foreground',
+}
 import { TicketCollaborators } from '@/components/tickets/ticket-collaborators'
 import { TicketTimeline } from '@/components/ui/ticket-timeline'
 import { TicketRatingSystem } from '@/components/ui/ticket-rating-system'
@@ -626,6 +635,27 @@ export default function TechnicianTicketDetailPage() {
                   {ticket.resolvedAt && (
                     <p className='text-xs text-green-600'>
                       Resuelto: {formatDate(ticket.resolvedAt)}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <Separator />
+              <div className='flex items-start gap-2'>
+                <Clock className='h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0' />
+                <div>
+                  <p className='text-xs text-muted-foreground'>SLA</p>
+                  {(() => {
+                    const sla = getSlaCountdown(
+                      ticket.slaDeadline,
+                      ticket.resolvedAt ?? ticket.closedAt
+                    )
+                    return (
+                      <p className={`text-xs ${SLA_URGENCY_CLASSES[sla.urgency]}`}>{sla.label}</p>
+                    )
+                  })()}
+                  {ticket.requestedPriority && ticket.requestedPriority !== ticket.priority && (
+                    <p className='text-xs text-muted-foreground mt-0.5'>
+                      Cliente pidió: {TICKET_PRIORITY_LABELS[ticket.requestedPriority]}
                     </p>
                   )}
                 </div>

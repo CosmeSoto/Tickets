@@ -42,6 +42,8 @@ export interface Ticket {
   description: string
   status: TicketStatus['value']
   priority: TicketPriority['value']
+  /** Prioridad tal como la pidió el creador, antes del techo de la categoría. Solo viene cuando difiere de `priority` — ver src/lib/tickets/priority-triage.ts. */
+  requestedPriority?: TicketPriority['value'] | null
   source?: 'WEB' | 'EMAIL' | 'PHONE' | 'PATROL' | 'API'
   createdById?: string | null
   createdBy?: Pick<User, 'id' | 'name' | 'email'> | null
@@ -56,6 +58,8 @@ export interface Ticket {
   resolvedAt?: string
   closedAt?: string
   dueDate?: string
+  /** Deadline de resolución del SLA (ver SLAService.assignSLA). null = sin política aplicable. */
+  slaDeadline?: string | null
   knowledgeArticleId?: string | null
   tags?: string[]
   attachments?: Array<{

@@ -9,6 +9,8 @@ import {
 } from '@/lib/notifications/family-recipients'
 import { evaluateDelivery, type NotificationSpecificType } from '@/lib/notifications/delivery'
 import { queueTelegramNotification } from '@/lib/notifications/queue-notification-telegram'
+import { getSlaCountdown } from '@/lib/tickets/sla-countdown'
+import { TICKET_PRIORITY_LABELS } from '@/lib/constants/ticket-labels'
 
 export interface CreateNotificationData {
   userId: string
@@ -366,42 +368,33 @@ export class NotificationService {
 
       const notifications = []
 
-      // Notificar al técnico asignado
-      if (ticket.users_tickets_assigneeIdTousers) {
-        const techNotification = await this.createNotification({
-          userId: technicianId,
-          type: 'INFO',
-          title: 'Nuevo ticket asignado',
-          message: `Se te ha asignado el ticket "${ticket.title}"`,
+      // Notificar al técnico asignado. `ticket.users_tickets_assigneeIdTousers`
+      // puede no venir cargado (p. ej. justo tras un claim atómico) — en
+      // cualquier caso se notifica al `technicianId` recibido, no al include.
+      const sla = getSlaCountdown(ticket.slaDeadline, ticket.resolvedAt ?? ticket.closedAt)
+      const slaSuffix = sla.urgency !== 'none' ? ` — SLA: ${sla.label}` : ''
+      const requestedPriorityInfo =
+        ticket.requestedPriority && ticket.requestedPriority !== ticket.priority
+          ? ` (cliente pidió ${TICKET_PRIORITY_LABELS[ticket.requestedPriority]})`
+          : ''
+
+      const techNotification = await this.createNotification({
+        userId: technicianId,
+        type: 'INFO',
+        title: 'Nuevo ticket asignado',
+        message: `Se te ha asignado el ticket "${ticket.title}"${slaSuffix}${requestedPriorityInfo}`,
+        ticketId: ticket.id,
+        specificType: 'ticketAssigned',
+        metadata: {
+          priority: ticket.priority,
+          requestedPriority: ticket.requestedPriority ?? null,
+          slaDeadline: ticket.slaDeadline,
+          clientName: ticket.users_tickets_clientIdTousers.name,
           ticketId: ticket.id,
-          specificType: 'ticketAssigned',
-          metadata: {
-            priority: ticket.priority,
-            clientName: ticket.users_tickets_clientIdTousers.name,
-            ticketId: ticket.id,
-          },
-        })
-        if (techNotification) {
-          notifications.push(techNotification)
-        }
-      } else {
-        // Fallback: usar technicianId directamente si el include no cargó el técnico
-        const techNotification = await this.createNotification({
-          userId: technicianId,
-          type: 'INFO',
-          title: 'Nuevo ticket asignado',
-          message: `Se te ha asignado el ticket "${ticket.title}"`,
-          ticketId: ticket.id,
-          specificType: 'ticketAssigned',
-          metadata: {
-            priority: ticket.priority,
-            clientName: ticket.users_tickets_clientIdTousers.name,
-            ticketId: ticket.id,
-          },
-        })
-        if (techNotification) {
-          notifications.push(techNotification)
-        }
+        },
+      })
+      if (techNotification) {
+        notifications.push(techNotification)
       }
 
       // Notificar al cliente (solo si es diferente al técnico asignado)
@@ -424,7 +417,7 @@ export class NotificationService {
       queueTelegramNotification({
         recipientUserId: technicianId,
         title: 'Nuevo ticket asignado',
-        body: `Se te ha asignado el ticket "${ticket.title}" (${ticket.priority})`,
+        body: `Se te ha asignado el ticket "${ticket.title}" (${ticket.priority})${slaSuffix}`,
         module: 'tickets',
         event: 'ticketAssigned',
         link: `/technician/tickets/${ticket.id}`,

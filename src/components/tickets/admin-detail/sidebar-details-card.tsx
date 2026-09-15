@@ -13,6 +13,15 @@ import {
 } from '@/components/ui/select'
 import { TicketCollaborators } from '@/components/tickets/ticket-collaborators'
 import { formatDate, type Ticket } from '@/hooks/use-ticket-data'
+import { getSlaCountdown } from '@/lib/tickets/sla-countdown'
+import { TICKET_PRIORITY_LABELS } from '@/lib/constants/ticket-labels'
+
+const SLA_URGENCY_CLASSES: Record<string, string> = {
+  ok: 'text-muted-foreground',
+  warning: 'text-amber-600 dark:text-amber-400',
+  overdue: 'text-red-600 dark:text-red-400',
+  none: 'text-muted-foreground',
+}
 
 interface SidebarDetailsCardProps {
   ticket: Ticket
@@ -148,6 +157,22 @@ export function SidebarDetailsCard({
             {ticket.resolvedAt && (
               <p className='text-xs text-emerald-600 dark:text-emerald-400'>
                 Resuelto: {formatDate(ticket.resolvedAt)}
+              </p>
+            )}
+          </div>
+        </div>
+        <Separator />
+        <div className='flex items-start gap-2'>
+          <Clock className='h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0' />
+          <div>
+            <p className='text-xs text-muted-foreground'>SLA</p>
+            {(() => {
+              const sla = getSlaCountdown(ticket.slaDeadline, ticket.resolvedAt ?? ticket.closedAt)
+              return <p className={`text-xs ${SLA_URGENCY_CLASSES[sla.urgency]}`}>{sla.label}</p>
+            })()}
+            {ticket.requestedPriority && ticket.requestedPriority !== ticket.priority && (
+              <p className='text-xs text-muted-foreground mt-0.5'>
+                Cliente pidió: {TICKET_PRIORITY_LABELS[ticket.requestedPriority]}
               </p>
             )}
           </div>

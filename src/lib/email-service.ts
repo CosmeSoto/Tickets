@@ -162,6 +162,7 @@ export async function sendTicketAssignedToTechnicianEmail(ticketId: string) {
       clientName: ticket.users_tickets_clientIdTousers.name,
       category: ticket.categories.name,
       priority: ticket.priority,
+      slaDeadline: ticket.slaDeadline,
       description: ticket.description,
       ticketUrl: `/technician/tickets/${ticket.id}`,
     })
