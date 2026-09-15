@@ -20,9 +20,19 @@
  * (`utils/search-index.ts:41-48`). Es decir, la descripción ya funciona como
  * bolsa de palabras clave: no hace falta una categoría por síntoma para que
  * el cliente que escribe "se atascó el papel" reciba la sugerencia correcta.
+ *
+ * Las 12 categorías seleccionables (no las 3 contenedoras) llevan además un
+ * `priorityCeiling` inicial — techo automático de prioridad para tickets de
+ * clientes (ver resolveInitialPriority en src/lib/tickets/priority-triage.ts):
+ * HIGH en fallas que afectan a varias personas a la vez (red, correo/M365,
+ * energía regulada, telefonía), URGENT (= sin recorte) en incidentes de
+ * seguridad, LOW en todo lo que es puramente provisioning/compra, y MEDIUM en
+ * el resto. Solo se aplica al crear la categoría — si ya existe, un admin
+ * pudo haberlo ajustado a mano después y el seed no lo pisa (ver
+ * category-upsert.ts).
  */
 
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, TicketPriority } from '@prisma/client'
 import { upsertCategory, type CategorySeedData } from './category-upsert'
 
 export async function seedCategoriesTechnology(prisma: PrismaClient, deptMap: Map<string, string>) {
@@ -71,6 +81,8 @@ export async function seedCategoriesTechnology(prisma: PrismaClient, deptMap: Ma
     departmentId: deptId,
     order: 1,
     color: '#EF4444',
+    // Puede dejar sin trabajar a toda un área (wifi/switch caído).
+    priorityCeiling: TicketPriority.HIGH,
   })
   await create({
     name: 'Solicitudes de Red y VPN',
@@ -81,6 +93,8 @@ export async function seedCategoriesTechnology(prisma: PrismaClient, deptMap: Ma
     departmentId: deptId,
     order: 2,
     color: '#3B82F6',
+    // Provisioning — nunca es una emergencia.
+    priorityCeiling: TicketPriority.LOW,
   })
 
   const telefonia = await create({
@@ -101,6 +115,8 @@ export async function seedCategoriesTechnology(prisma: PrismaClient, deptMap: Ma
     departmentId: deptId,
     order: 1,
     color: '#EF4444',
+    // Incluye la central/PBX caída (afecta a todos), no solo una extensión.
+    priorityCeiling: TicketPriority.HIGH,
   })
   await create({
     name: 'Solicitudes de Telefonía',
@@ -110,6 +126,7 @@ export async function seedCategoriesTechnology(prisma: PrismaClient, deptMap: Ma
     departmentId: deptId,
     order: 2,
     color: '#3B82F6',
+    priorityCeiling: TicketPriority.LOW,
   })
 
   const seguridad = await create({
@@ -130,6 +147,10 @@ export async function seedCategoriesTechnology(prisma: PrismaClient, deptMap: Ma
     departmentId: deptId,
     order: 1,
     color: '#EF4444',
+    // Sin techo real (URGENT = sin recorte): un incidente de seguridad en
+    // curso es justo el caso que nunca debe quedar capado por debajo de lo
+    // que el cliente pide.
+    priorityCeiling: TicketPriority.URGENT,
   })
   await create({
     name: 'Requerimientos de Seguridad',
@@ -140,6 +161,7 @@ export async function seedCategoriesTechnology(prisma: PrismaClient, deptMap: Ma
     departmentId: deptId,
     order: 2,
     color: '#3B82F6',
+    priorityCeiling: TicketPriority.LOW,
   })
 
   // ==================== PLANAS (una sola categoría) ====================
@@ -153,6 +175,7 @@ export async function seedCategoriesTechnology(prisma: PrismaClient, deptMap: Ma
     departmentId: deptId,
     order: 3,
     color: '#EC4899',
+    priorityCeiling: TicketPriority.MEDIUM,
   })
 
   await create({
@@ -164,6 +187,8 @@ export async function seedCategoriesTechnology(prisma: PrismaClient, deptMap: Ma
     departmentId: deptId,
     order: 4,
     color: '#6366F1',
+    // Un correo/M365 caído deja a todos sin poder trabajar.
+    priorityCeiling: TicketPriority.HIGH,
   })
 
   await create({
@@ -175,6 +200,7 @@ export async function seedCategoriesTechnology(prisma: PrismaClient, deptMap: Ma
     departmentId: deptId,
     order: 5,
     color: '#22C55E',
+    priorityCeiling: TicketPriority.MEDIUM,
   })
 
   await create({
@@ -185,6 +211,8 @@ export async function seedCategoriesTechnology(prisma: PrismaClient, deptMap: Ma
     departmentId: deptId,
     order: 6,
     color: '#F59E0B',
+    // Riesgo de daño a equipos o corte de energía si no se atiende pronto.
+    priorityCeiling: TicketPriority.HIGH,
   })
 
   await create({
@@ -196,6 +224,7 @@ export async function seedCategoriesTechnology(prisma: PrismaClient, deptMap: Ma
     departmentId: deptId,
     order: 7,
     color: '#10B981',
+    priorityCeiling: TicketPriority.MEDIUM,
   })
 
   await create({
@@ -207,6 +236,10 @@ export async function seedCategoriesTechnology(prisma: PrismaClient, deptMap: Ma
     departmentId: deptId,
     order: 9,
     color: '#06B6D4',
+    // Compras/adquisiciones: nunca es una emergencia — es el bucket
+    // pensado justo para que estas solicitudes no compitan por prioridad
+    // urgente con fallas reales.
+    priorityCeiling: TicketPriority.LOW,
   })
 
   // ==================== RETIRO DE LAS CATEGORÍAS VIEJAS ====================

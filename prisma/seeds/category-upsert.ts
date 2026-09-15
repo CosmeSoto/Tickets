@@ -8,7 +8,7 @@
  * (ensure-categories / seed.ts).
  */
 
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, TicketPriority } from '@prisma/client'
 import { randomUUID } from 'crypto'
 
 const now = new Date()
@@ -23,6 +23,15 @@ export type CategorySeedData = {
   color: string
   /** Nombres previos en el mismo padre/área: permite renombrar sin duplicar. */
   formerNames?: string[]
+  /**
+   * Techo de prioridad sugerido para tickets de clientes en esta categoría
+   * (ver categories.priorityCeiling / resolveInitialPriority). Se aplica
+   * SOLO al crear la categoría — si ya existe, no se toca en el `update`,
+   * porque es un campo pensado para que un admin lo ajuste a mano después
+   * desde el diálogo de categoría; volver a correr el seed no debe
+   * revertir ese ajuste.
+   */
+  priorityCeiling?: TicketPriority
 }
 
 export type UpsertCounters = { created: number; updated: number }
