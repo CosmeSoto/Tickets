@@ -55,4 +55,22 @@ describe('resolveInitialPriority', () => {
 
     expect(result).toEqual({ priority: 'HIGH' })
   })
+
+  it('categoría sin techo propio → se cae al techo de la familia', () => {
+    const result = resolveInitialPriority('CLIENT', 'URGENT', null, 'HIGH')
+
+    expect(result).toEqual({ priority: 'HIGH', requestedPriority: 'URGENT' })
+  })
+
+  it('categoría con techo propio → ignora el techo de la familia (la categoría manda)', () => {
+    const result = resolveInitialPriority('CLIENT', 'URGENT', 'LOW', 'URGENT')
+
+    expect(result).toEqual({ priority: 'LOW', requestedPriority: 'URGENT' })
+  })
+
+  it('sin techo de categoría NI de familia → usa MEDIUM por defecto', () => {
+    const result = resolveInitialPriority('CLIENT', 'URGENT', null, null)
+
+    expect(result.priority).toBe(DEFAULT_PRIORITY_CEILING)
+  })
 })

@@ -19,6 +19,7 @@ import {
 } from '@/lib/tickets/patrol-incident-validation'
 import { assertTechnicianActiveInFamily } from '@/lib/tickets/assignee-validation'
 import { resolveInitialPriority } from '@/lib/tickets/priority-triage'
+import type { TicketPriority } from '@prisma/client'
 import { FileService } from '@/lib/services/file-service'
 import { getAutoAssignmentEnabled, getMaxTicketsPerUser } from '@/lib/settings/runtime-settings'
 import { notifyTicketChanged } from '@/lib/tickets/notify-ticket-changed'
@@ -312,12 +313,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { priority: resolvedPriority, requestedPriority } = resolveInitialPriority(
-      session.user.role,
-      (ticketData.priority || 'MEDIUM') as import('@prisma/client').TicketPriority,
-      category.priorityCeiling
-    )
-
     const categoryFamilyId = category.familyId ?? category.departments?.familyId ?? null
     const isPatrolSource = ticketData.source === 'PATROL'
     let effectiveFamilyId: string | null = ticketData.familyId ?? categoryFamilyId
@@ -364,10 +359,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    let familyConfig: {
+      ticketsEnabled: boolean
+      priorityCeiling: TicketPriority | null
+    } | null = null
     if (effectiveFamilyId) {
-      const familyConfig = await prisma.ticket_family_config.findUnique({
+      familyConfig = await prisma.ticket_family_config.findUnique({
         where: { familyId: effectiveFamilyId },
-        select: { ticketsEnabled: true },
+        select: { ticketsEnabled: true, priorityCeiling: true },
       })
       if (familyConfig && !familyConfig.ticketsEnabled && !isPatrolSource) {
         return NextResponse.json(
@@ -379,6 +378,16 @@ export async function POST(request: NextRequest) {
         )
       }
     }
+
+    // Techo de prioridad: la categoría manda si lo configuró; si no, se cae al
+    // techo de la familia (mismo criterio jerárquico que ya usa sla_policies
+    // categoría → familia → global); sin ninguno de los dos, MEDIUM por defecto.
+    const { priority: resolvedPriority, requestedPriority } = resolveInitialPriority(
+      session.user.role,
+      (ticketData.priority || 'MEDIUM') as TicketPriority,
+      category.priorityCeiling,
+      familyConfig?.priorityCeiling
+    )
 
     const isSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
     if (!isSuperAdmin && effectiveFamilyId) {

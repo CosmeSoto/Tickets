@@ -1,4 +1,4 @@
-import { families, ticket_family_config } from '@prisma/client'
+import { families, ticket_family_config, TicketPriority } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
 
@@ -16,6 +16,8 @@ export interface UpdateTicketFamilyConfigData {
   businessHoursEnd?: string
   businessDays?: string
   allowedFromFamilies?: string[]
+  /** Techo de prioridad para categorías de esta familia sin techo propio (ver categories.priorityCeiling). null = quitar el techo de familia. */
+  priorityCeiling?: TicketPriority | null
 }
 
 export interface FamilyWithTicketConfig {
@@ -98,6 +100,7 @@ export class TicketFamilyConfigService {
           ...(data.allowedFromFamilies !== undefined && {
             allowedFromFamilies: data.allowedFromFamilies,
           }),
+          ...(data.priorityCeiling !== undefined && { priorityCeiling: data.priorityCeiling }),
         },
       })
 

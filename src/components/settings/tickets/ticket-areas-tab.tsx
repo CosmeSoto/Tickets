@@ -21,6 +21,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { FamilyIcon } from '@/components/inventory/family-badge'
 import { TimePicker } from '@/components/ui/time-picker'
 import type { Family, TicketFamilyConfig, SlaRow } from '@/hooks/use-ticket-settings'
@@ -259,6 +266,33 @@ export function TicketAreasTab({
                       />
                     </div>
                   ))}
+                </div>
+                <div>
+                  <Label htmlFor='family-priority-ceiling'>
+                    Prioridad máxima automática (por defecto del área)
+                  </Label>
+                  <Select
+                    value={config.priorityCeiling ?? 'none'}
+                    onValueChange={v =>
+                      onSetConfig({ ...config, priorityCeiling: v === 'none' ? null : v })
+                    }
+                  >
+                    <SelectTrigger id='family-priority-ceiling' className='mt-1'>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value='none'>Sin techo propio (usa Media)</SelectItem>
+                      {Object.entries(PRIORITY_LABELS).map(([value, label]) => (
+                        <SelectItem key={value} value={value}>
+                          {label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className='text-xs text-muted-foreground mt-1'>
+                    Se usa solo para categorías de esta área que no tengan su propio techo
+                    configurado — el techo de la categoría siempre tiene prioridad sobre este.
+                  </p>
                 </div>
               </CardContent>
             </Card>

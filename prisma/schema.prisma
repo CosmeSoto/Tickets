@@ -2105,6 +2105,10 @@ model ticket_family_config {
   /// IDs de familias cuyos clientes pueden crear tickets aquí.
   /// Array vacío = acepta tickets de clientes de CUALQUIER familia.
   allowedFromFamilies        String[] @default([]) @map("allowed_from_families")
+  /// Techo de prioridad para categorías de esta familia sin techo propio
+  /// configurado (ver categories.priorityCeiling y src/lib/tickets/priority-triage.ts).
+  /// null = sin techo a nivel de familia, se usa el default global (MEDIUM).
+  priorityCeiling            TicketPriority? @map("priority_ceiling")
   createdAt                  DateTime @default(now()) @map("created_at")
   updatedAt                  DateTime @updatedAt @map("updated_at")
   family                     families @relation(fields: [familyId], references: [id], onDelete: Cascade)

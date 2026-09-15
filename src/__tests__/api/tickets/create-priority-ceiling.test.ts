@@ -18,7 +18,7 @@ jest.mock('@/lib/prisma', () => ({
     categories: { findUnique: jest.fn() },
     users: { findUnique: jest.fn() },
     tickets: { count: jest.fn().mockResolvedValue(0), findUnique: jest.fn() },
-    ticket_family_config: { findUnique: jest.fn() },
+    ticket_family_config: { findUnique: jest.fn().mockResolvedValue(null) },
   },
 }))
 
@@ -218,6 +218,66 @@ describe('POST /api/tickets — techo de prioridad por categoría', () => {
 
     expect(TicketService.createTicket).toHaveBeenCalledWith(
       expect.objectContaining({ priority: 'MEDIUM', requestedPriority: 'URGENT' })
+    )
+  })
+
+  it('categoría sin techo propio pero familia con techo Alto → se usa el techo de la familia', async () => {
+    // isSuperAdmin:true evita el chequeo de scope de familia (irrelevante
+    // para esta prueba, que solo verifica la resolución del techo).
+    ;(getServerSession as jest.Mock).mockResolvedValue({
+      user: { id: 'client-1', role: 'CLIENT', isSuperAdmin: true },
+    })
+    ;(prisma.categories.findUnique as jest.Mock).mockResolvedValue({
+      id: 'cat-1',
+      familyId: 'fam-1',
+      priorityCeiling: null,
+      departments: null,
+    })
+    ;(prisma.ticket_family_config.findUnique as jest.Mock).mockResolvedValue({
+      ticketsEnabled: true,
+      priorityCeiling: 'HIGH',
+    })
+
+    await POST(
+      jsonReq({
+        title: 'Necesito acceso',
+        description: 'desc',
+        categoryId: 'cat-1',
+        priority: 'URGENT',
+      })
+    )
+
+    expect(TicketService.createTicket).toHaveBeenCalledWith(
+      expect.objectContaining({ priority: 'HIGH', requestedPriority: 'URGENT' })
+    )
+  })
+
+  it('categoría CON techo propio manda sobre el techo (más permisivo) de la familia', async () => {
+    ;(getServerSession as jest.Mock).mockResolvedValue({
+      user: { id: 'client-1', role: 'CLIENT', isSuperAdmin: true },
+    })
+    ;(prisma.categories.findUnique as jest.Mock).mockResolvedValue({
+      id: 'cat-1',
+      familyId: 'fam-1',
+      priorityCeiling: 'LOW',
+      departments: null,
+    })
+    ;(prisma.ticket_family_config.findUnique as jest.Mock).mockResolvedValue({
+      ticketsEnabled: true,
+      priorityCeiling: 'URGENT',
+    })
+
+    await POST(
+      jsonReq({
+        title: 'Necesito acceso',
+        description: 'desc',
+        categoryId: 'cat-1',
+        priority: 'URGENT',
+      })
+    )
+
+    expect(TicketService.createTicket).toHaveBeenCalledWith(
+      expect.objectContaining({ priority: 'LOW', requestedPriority: 'URGENT' })
     )
   })
 })

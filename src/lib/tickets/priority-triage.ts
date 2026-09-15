@@ -34,6 +34,11 @@ export interface ResolvedPriority {
  * categoría genuinamente crítica (techo en URGENT) deja pasar la elección
  * del cliente sin ningún recorte.
  *
+ * Si la categoría no tiene techo propio configurado, se cae al techo de la
+ * familia (`ticket_family_config.priorityCeiling`) antes de usar el default
+ * global — mismo criterio jerárquico categoría → familia → global que ya
+ * usa `sla_policies` para los tiempos de SLA.
+ *
  * Un ADMIN o TECHNICIAN creando un ticket (incluido "en nombre de un
  * cliente") ya tiene autoridad para fijar la prioridad real directamente:
  * no se le aplica ningún tope.
@@ -41,13 +46,14 @@ export interface ResolvedPriority {
 export function resolveInitialPriority(
   creatorRole: string,
   requestedPriority: TicketPriority,
-  categoryPriorityCeiling: TicketPriority | null | undefined
+  categoryPriorityCeiling: TicketPriority | null | undefined,
+  familyPriorityCeiling?: TicketPriority | null
 ): ResolvedPriority {
   if (creatorRole !== 'CLIENT') {
     return { priority: requestedPriority }
   }
 
-  const ceiling = categoryPriorityCeiling ?? DEFAULT_PRIORITY_CEILING
+  const ceiling = categoryPriorityCeiling ?? familyPriorityCeiling ?? DEFAULT_PRIORITY_CEILING
 
   if (PRIORITY_RANK[requestedPriority] <= PRIORITY_RANK[ceiling]) {
     return { priority: requestedPriority }

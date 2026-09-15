@@ -36,6 +36,8 @@ export interface TicketFamilyConfig {
   businessHoursStart: string
   businessHoursEnd: string
   businessDays: string
+  /** Techo de prioridad para categorías de esta familia sin techo propio (ver categories.priorityCeiling). null = sin techo de familia. */
+  priorityCeiling?: string | null
 }
 
 export interface SlaRow {
@@ -291,6 +293,7 @@ export function useTicketSettings() {
           businessHoursStart: config.businessHoursStart,
           businessHoursEnd: config.businessHoursEnd,
           businessDays: config.businessDays,
+          priorityCeiling: config.priorityCeiling ?? null,
         }),
       })
       const { ok, data } = await parseSaveResponse(res)

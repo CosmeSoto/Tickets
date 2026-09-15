@@ -84,6 +84,17 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const rawBody = await request.json()
     const body = sanitizeTicketConfigBody(rawBody as Record<string, unknown>, isSuperAdmin)
 
+    if (
+      body.priorityCeiling !== undefined &&
+      body.priorityCeiling !== null &&
+      !['LOW', 'MEDIUM', 'HIGH', 'URGENT'].includes(body.priorityCeiling as string)
+    ) {
+      return NextResponse.json(
+        { success: false, message: 'Prioridad máxima inválida' },
+        { status: 400 }
+      )
+    }
+
     const updated = await TicketFamilyConfigService.update(familyId, body, session.user.id)
 
     try {
